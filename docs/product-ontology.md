@@ -1,7 +1,7 @@
 # Strelva product ontology
 
 Status: **normative**
-Updated: 2026-07-14
+Updated: 2026-07-30
 
 This document defines what the product is, the concepts it owns, and the
 language code and product work should use. It exists to keep commercial

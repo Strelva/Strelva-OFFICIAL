@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { getTenantFromHeaders } from "@/lib/tenant";
+import { getTenantConfig } from "@/lib/tenants";
 import { getContent } from "@/lib/storage";
 import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
 import { readJsonObject } from "@/lib/request-body";
 import { trackError } from "@/lib/monitoring";
 
-interface CheckoutItem {
-  productId: string;
-  quantity: number;
-  subscription: boolean;
-  subscriptionInterval?: string;
-}
+const checkoutItemSchema = z.object({
+  productId: z.string(),
+  quantity: z.number().int().positive(),
+  subscription: z.boolean(),
+  subscriptionInterval: z.string().optional(),
+});
+
+type CheckoutItem = z.infer<typeof checkoutItemSchema>;
 
 function parseProductPrice(price: string): number | null {
   const value = Number.parseFloat(price.replace(/[^0-9.]/g, ""));
@@ -45,11 +49,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const items = body.items as CheckoutItem[];
-
-  if (!Array.isArray(items) || items.length === 0 || items.length > 50) {
+  if (!Array.isArray(body.items) || body.items.length === 0 || body.items.length > 50) {
     return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
   }
+
+  const itemsResult = z.array(checkoutItemSchema).safeParse(body.items);
+  if (!itemsResult.success) {
+    return NextResponse.json({ error: "Invalid cart item" }, { status: 400 });
+  }
+  const items: CheckoutItem[] = itemsResult.data;
 
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   if (!stripeKey) {
@@ -63,6 +71,13 @@ export async function POST(req: NextRequest) {
   const stripe = new Stripe(stripeKey);
 
   const tenant = await getTenantFromHeaders();
+
+  // Verify the tenant exists and is active before creating a Stripe session.
+  const tenantConfig = await getTenantConfig(tenant);
+  if (!tenantConfig || tenantConfig.active === false) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const productsContent = await getContent("products", tenant);
   const productList = Array.isArray(productsContent.products) ? productsContent.products : [];
   const productById = new Map(productList.map((product) => [product.id, product]));

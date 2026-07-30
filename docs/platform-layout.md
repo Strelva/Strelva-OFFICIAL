@@ -1,6 +1,6 @@
 # Strelva Platform Layout — Three Audiences, One Engine
 
-**Date:** Jul 8 2026 · **Purpose:** solidify how the platform is organized — who sees what, admin-side vs client-side, and where the feature system fits. Written after the full-repo audit.
+**Date:** Jul 8 2026 (updated Jul 30 2026) · **Purpose:** solidify how the platform is organized — who sees what, admin-side vs client-side, and where the feature system fits. Written after the full-repo audit.
 
 ---
 
@@ -35,6 +35,8 @@ The Business OS the client logs into. **This is the client side.** Its contents 
 **Where:** the studio's public site (e.g. `covewellness.com`) · **GHL analogy:** none — GHL doesn't do this well.
 The end-customer's logged-in experience: book a class, buy/spend a pack, manage membership. **This is where Strelva goes beyond GHL**, and it's the greenfield build for the wellness set. Own auth lane, `studio_members` table (see `studio-vertical-architecture.md`).
 
+> **Status (2026-07-30):** The `src/lib/studio/` module and `src/app/(member)/` portal do not exist yet. This layer is architecture/design, gated on wellness validation. No `studio_*` tables have been applied to production. The Schedule/Roster/Members surfaces on the owner dashboard ARE real read surfaces (backed by existing `bookings`/`reward_members` data) — those are a separate thing from the net-new studio module.
+
 ---
 
 ## The Features (the client side, organized)
@@ -51,7 +53,7 @@ A vertical set is exactly GHL's "snapshot" idea: a named bundle of features you 
 
 ### How features actually work today (verified, and where it's thin)
 - `tenants.features[]` is the enabled-feature store; `dashboard-surfaces.ts` resolves which tabs show from it + presence-profile + connections.
-- **But it's barely wired:** the create path whitelists only 3 features (`commerce`, `booking`, `newsletter`); the edit path accepts none; there's **no operator toggle UI** and **no locked-core concept.**
+- **But it's barely wired (as of Jul 8; still true Jul 30):** the create path whitelists only 3 features (`commerce`, `booking`, `newsletter`); the edit path accepts none; there's **no operator toggle UI** and **no locked-core concept.**
 - **Features ≠ billing tiers.** Tiers ($99/$199/$499) are packaging; the platform serves whatever the client's custom repo builds. Features are a *dashboard-surface* concern, not a billing gate.
 - The fix = the feature registry + `CORE_FEATURES` lock + a toggle UI in `TenantEditor` (see `admin-feature-management-architecture.md`). That turns today's ad-hoc array into a real, GHL-style feature/snapshot system.
 

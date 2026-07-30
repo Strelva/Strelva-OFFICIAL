@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import ReactMarkdown from "react-markdown";
 import { getBlogPostForSite } from "@/lib/cms/blog-public";
 import { getContent } from "@/lib/storage";
 import { defaults } from "@/lib/defaults";
@@ -55,8 +56,6 @@ export default async function BlogPostPage({
 
   if (!post) notFound();
 
-  const paragraphs = post.content.split("\n\n").filter(Boolean);
-
   return (
     <>
       <PageViewTracker />
@@ -106,12 +105,64 @@ export default async function BlogPostPage({
             )}
           </header>
 
-          <div className="space-y-5" style={{ color: "var(--color-body, #5a6b5c)" }}>
-            {paragraphs.map((p, i) => (
-              <p key={i} className="text-lg leading-relaxed">
-                {p}
-              </p>
-            ))}
+          {/* Render the post body as markdown so authors can use headings, bold,
+              italic, lists, and links. react-markdown does not use
+              dangerouslySetInnerHTML, so XSS is not a concern here. */}
+          <div
+            className="prose prose-stone max-w-none space-y-5 text-lg leading-relaxed"
+            style={{ color: "var(--color-body, #5a6b5c)" }}
+          >
+            <ReactMarkdown
+              components={{
+                h1: ({ children }) => (
+                  <h2 className="text-2xl font-semibold mt-8 mb-3" style={{ color: "var(--color-heading, #2d3a2e)" }}>{children}</h2>
+                ),
+                h2: ({ children }) => (
+                  <h2 className="text-2xl font-semibold mt-8 mb-3" style={{ color: "var(--color-heading, #2d3a2e)" }}>{children}</h2>
+                ),
+                h3: ({ children }) => (
+                  <h3 className="text-xl font-semibold mt-6 mb-2" style={{ color: "var(--color-heading, #2d3a2e)" }}>{children}</h3>
+                ),
+                p: ({ children }) => (
+                  <p className="text-lg leading-relaxed">{children}</p>
+                ),
+                ul: ({ children }) => (
+                  <ul className="list-disc pl-6 space-y-1">{children}</ul>
+                ),
+                ol: ({ children }) => (
+                  <ol className="list-decimal pl-6 space-y-1">{children}</ol>
+                ),
+                li: ({ children }) => (
+                  <li className="text-lg leading-relaxed">{children}</li>
+                ),
+                strong: ({ children }) => (
+                  <strong className="font-semibold">{children}</strong>
+                ),
+                em: ({ children }) => (
+                  <em className="italic">{children}</em>
+                ),
+                a: ({ href, children }) => (
+                  <a
+                    href={href}
+                    className="underline hover:opacity-70 transition-opacity"
+                    style={{ color: "var(--color-accent, #5a6b5c)" }}
+                    rel="noopener noreferrer"
+                  >
+                    {children}
+                  </a>
+                ),
+                blockquote: ({ children }) => (
+                  <blockquote
+                    className="border-l-4 pl-4 italic my-4"
+                    style={{ borderColor: "var(--color-accent, #5a6b5c)", color: "var(--color-muted, #8a9b8c)" }}
+                  >
+                    {children}
+                  </blockquote>
+                ),
+              }}
+            >
+              {post.content}
+            </ReactMarkdown>
           </div>
         </article>
       </main>

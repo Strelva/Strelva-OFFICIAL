@@ -121,10 +121,13 @@ export async function GET(request: Request) {
           return;
         }
         await recordMailSend(tenant.id, "monthly_report", { ok: true, to: tenant.ownerEmail! }).catch(() => {});
+        // Mark sent ONLY after a confirmed real send so a dev-mode run (no
+        // RESEND_API_KEY) never consumes the once-per-month dedup marker.
+        if (redis) await redis.set(sentKey(tenant.id, monthKey), "1", { ex: 60 * 60 * 24 * 45 }).catch(() => {});
+      } else {
+        console.log(`[Monthly report dev] "Your ${monthName} recap" -> ${tenant.ownerEmail}`);
       }
 
-      // Mark sent only after a confirmed send (or a dry run without a key).
-      if (redis) await redis.set(sentKey(tenant.id, monthKey), "1", { ex: 60 * 60 * 24 * 45 }).catch(() => {});
       sent.push(tenant.id);
     } catch (err) {
       errors.push(`${tenant.id}: ${err instanceof Error ? err.message : "error"}`);

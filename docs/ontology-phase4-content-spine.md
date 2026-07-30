@@ -22,8 +22,12 @@ A `ContentVersion` carries `{ id, section, data, author, timestamp, status, chan
 `changes` is the field-level diff (`diffFields` in `src/lib/utils.ts`) computed at publish
 time between the previous live content and the new content.
 
-Both a Postgres branch (`DATA_SOURCE=postgres`) and a dev-file branch back each store; the
-dev file is the source of truth for local/tests.
+Both a Postgres branch and a dev-file branch back each store; the dev file is the source of
+truth for local/tests. **Source flag split (verified 2026-07-30):** `content-store.ts` gates
+on `CONTENT_SOURCE=postgres` (`contentSourceIsPostgres()`), while `draft-store.ts` and
+`version-store.ts` gate on `DATA_SOURCE=postgres` (`dataSourceIsPostgres()`). Both flags
+must be set in production. There is no runtime guard on `dataSourceIsPostgres()` — a missing
+`DATA_SOURCE` in prod silently falls back to the dev-file path (see Known issues below).
 
 ## Semantics (verified)
 
@@ -71,6 +75,22 @@ The other Phase-4 proposal items — the canonical `/api/v1/*` wire contract and
 execution-based custom-repo conformance check (`pnpm check:custom-repos`) — are already
 done and live; see `AGENTS.md` (Multi-tenant architecture) and
 `scripts/custom-repo-workspace-check.ts`.
+
+## Known issues / TODO (as of 2026-07-30)
+
+- [LOW/bug] **Split-brain source flags:** `content-store.ts` uses `CONTENT_SOURCE`, while
+  `draft-store.ts` and `version-store.ts` use `DATA_SOURCE`. Both must be set in production;
+  there is no runtime guard on `dataSourceIsPostgres()` that fails loudly when unset in
+  `VERCEL_ENV=production`, unlike `contentSourceIsPostgres()` which throws. Risk: if
+  `DATA_SOURCE` is unset in prod, drafts and version history silently serve the dev-file
+  (empty). Fix: add a production guard to `dataSourceIsPostgres()` matching the pattern in
+  `contentSourceIsPostgres()`, or unify on a single flag. Either way, document the intended
+  relationship between the two flags explicitly. (`src/lib/db/source-flags.ts:39-41`)
+- [MEDIUM/tech-debt] `sectionSchemas` is typed as `Record<ContentSection, z.ZodType>` which
+  erases output types — every downstream `setContent` call is an unchecked `as` cast
+  (`src/lib/schemas.ts:401` / `src/lib/apply-section-update.ts:107-170`). Fixing:
+  declare as `type SectionSchemaMap = { [K in ContentSection]: z.ZodType<ContentMap[K]> }`;
+  the individual schema objects already parse to the correct shapes.
 
 ## One cosmetic inconsistency (left as-is, not a bug)
 

@@ -37,6 +37,8 @@ vi.mock("@/lib/events", () => ({
 
 vi.mock("@/lib/tenants", () => ({
   updateTenant: (...args: unknown[]) => mockUpdateTenant(...args),
+  getTenantByStripeSubscriptionId: vi.fn(async () => null),
+  getTenantByStripeCustomerId: vi.fn(async () => null),
 }));
 
 vi.mock("@/lib/redis", () => ({
@@ -166,7 +168,7 @@ describe("billing webhook signature verification", () => {
 describe("calendly webhook signature verification", () => {
   const SECRET = "calendly_test_secret";
 
-  function calendlySignatureHeader(payload: string, secret = SECRET, timestamp = 1700000000): string {
+  function calendlySignatureHeader(payload: string, secret = SECRET, timestamp = Math.floor(Date.now() / 1000)): string {
     const sig = crypto
       .createHmac("sha256", secret)
       .update(`${timestamp}.${payload}`)

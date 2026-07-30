@@ -22,11 +22,11 @@
 
 Note: Vercel only supports single-level wildcards (`*.strelva.com`). `admin.<tenant>.strelva.com` (two levels) would need per-host domains, so clients go white-label on their own domain instead.
 
-## Current state (verified 2026-06-18)
+## Current state (verified 2026-06-18, updated 2026-07-30)
 
-- App project `strelva` (scaffold-web team) serves the merged `main` at **scaffoldweb.com** (publicly, `/sign-in` + `/api/health` = 200, all health checks green). **Auth is Supabase Auth + content is Postgres as of the 2026-06-20 cutover.**
-- DNS on **Cloudflare**. `strelva.com` (marketing) + `scaffoldweb.com` (app) are both team domains.
-- Auth = **Supabase Auth** (Google OAuth consent screen published / "In production" + magic link). Clerk is dead-pathed, pending teardown.
+- App project `strelva-admin` on the **`strelva`** Vercel team (deploy with `--scope strelva`). Previously called `scaffold-web` team — that name is stale in any CLI commands or notes. Serves the merged `main`. **Auth is Supabase Auth + content is Postgres as of the 2026-06-20 cutover.**
+- DNS on **Cloudflare**. `strelva.com` (marketing, separate `strelva-marketing` repo) + `scaffoldweb.com` (legacy app alias) are both team domains.
+- Auth = **Supabase Auth** (Google OAuth consent screen published / "In production" + magic link). **Clerk is fully removed** (teardown complete 2026-07-11, PR #146 — `@clerk/nextjs` dep gone, no `@clerk` imports remain).
 - `admin.strelva.com` does not resolve yet.
 
 ## The one gate: Supabase Auth redirect URLs
@@ -39,14 +39,14 @@ Note: Vercel only supports single-level wildcards (`*.strelva.com`). `admin.<ten
 In the Supabase dashboard → **Authentication → URL Configuration** → add `https://admin.strelva.com` (and `https://app.strelva.com` if used) to the **redirect URL allowlist**, and set the **Site URL** to the canonical app host. No new CNAME is needed for auth (Supabase Auth is hosted on the Supabase project, not a custom auth subdomain). _(Pre-cutover this step added a Clerk satellite domain + `clerk.strelva.com` CNAME — both obsolete now.)_
 
 ### 2. Vercel — attach the domains to the app project
-Run as the logged-in CLI (Noah, scaffold-web scope):
+Run as the logged-in CLI (Noah, `strelva` scope). The Vercel team is `strelva` and the project is `strelva-admin` — use `--scope strelva`:
 ```bash
 cd ~/strelva-platform
-vercel domains add admin.strelva.com strelva --scope scaffold-web
+vercel domains add admin.strelva.com strelva-admin --scope strelva
 # optional front door:
-vercel domains add app.strelva.com strelva --scope scaffold-web
+vercel domains add app.strelva.com strelva-admin --scope strelva
 # client public sites wildcard:
-vercel domains add "*.strelva.com" strelva --scope scaffold-web
+vercel domains add "*.strelva.com" strelva-admin --scope strelva
 ```
 Vercel will print the DNS target to add in Cloudflare (a CNAME to `cname.vercel-dns.com`, or the apex/A record it specifies).
 
@@ -70,13 +70,13 @@ vercel env add NEXT_PUBLIC_SITE_URL production   # https://app.strelva.com (or a
 curl -s -o /dev/null -w "%{http_code}\n" https://admin.strelva.com/api/health   # 200
 curl -s -o /dev/null -w "%{http_code}\n" https://admin.strelva.com/sign-in       # 200, Supabase sign-in loads
 ```
-Then actually sign in at `https://admin.strelva.com` → should land on `/admin` (super-admin). Confirm an existing session on `scaffoldweb.com` is still valid (no logout = redirect URLs done right).
+Then actually sign in at `https://admin.strelva.com` → should land on `/admin` (super-admin). Confirm an existing session on `scaffoldweb.com` (or `app.strelva.com` if already live) is still valid (no logout = redirect URLs done right).
 
 ### 6. Per client (white-label, when ready)
 For each client with a custom domain: add `admin.<their-domain>` in Vercel + Cloudflare (or their DNS) + add the origin to the **Supabase Auth redirect URL allowlist**, and set the tenant's `adminDomain`. Their dashboard then lives on their own brand. (Note: the long-term auth architecture in `docs/auth-tenancy-architecture.md` moves the dashboard to a single host `app.strelva.com/{tenant}` and removes white-label admin domains — confirm direction before building per-client admin domains.)
 
 ## Rollback
-Every step is reversible: `vercel domains rm <domain>`, delete the Cloudflare record, remove the Clerk satellite/origin. Nothing here is destructive; the app keeps serving on `scaffoldweb.com` throughout.
+Every step is reversible: `vercel domains rm <domain>`, delete the Cloudflare record, remove the Supabase redirect URL. Nothing here is destructive; the app keeps serving on `scaffoldweb.com` throughout. (The "remove the Clerk satellite/origin" line from the pre-cutover runbook is obsolete — Clerk is fully removed.)
 
 ## Interaction with the rebrand / Supabase migration
 - This cutover is independent of the data/auth migration, which is **already DONE** (Supabase Auth + Postgres, live 2026-06-20).

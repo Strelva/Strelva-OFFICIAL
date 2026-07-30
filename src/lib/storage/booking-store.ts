@@ -317,9 +317,18 @@ async function confirmBookingSlot(
   if (!redis) return;
 
   const keys = spanSlotKeys(tenant, date, startTime, endTime, bufferTime);
-  // Keep slots marked as booked for 48 hours (covers day-of and next-day edge cases)
+
+  // TTL must cover the entire advance-booking window so a slot confirmed far in
+  // the future doesn't have its lock expire before the appointment date. Compute
+  // seconds from now until midnight of the booking date plus a 24h safety margin.
+  const bookingDateMs = new Date(`${date}T00:00:00Z`).getTime() + 24 * 60 * 60 * 1000;
+  const ttlSeconds = Math.max(
+    Math.ceil((bookingDateMs - Date.now()) / 1000),
+    172800 // minimum 48h for same-day or past-date edge cases
+  );
+
   await Promise.all(
-    keys.map((key) => redis.set(key, "confirmed", { ex: 172800 }))
+    keys.map((key) => redis.set(key, "confirmed", { ex: ttlSeconds }))
   );
 }
 

@@ -409,15 +409,16 @@ function isCustomBuildChangeRequest(event: UnifiedEvent): boolean {
  * Used to gate new change-request creation so the owner never has two custom
  * jobs racing — the AI tells them what's already in flight instead.
  *
- * NOTE: `getEvents` only scans the most-recent slice of the zset (see its
- * window note), so we ask for a large limit here. A pending custom request is
- * resolved as soon as the build wraps, so it lives near the top of the recency
- * window in practice; 1000 covers any realistic backlog of recent events.
+ * NOTE: change_request events are resolved as soon as the build wraps, so in
+ * practice they live near the top of the recency window. A limit of 50 is
+ * sufficient — fetching 1000 events on every care-plan gate check is wasteful.
+ * The governed-work Postgres mirror (READ_PG) means this is often a DB query,
+ * not a Redis scan, so a tight limit is doubly important.
  */
 export async function getOpenChangeRequest(
   tenantId: string
 ): Promise<UnifiedEvent | null> {
-  const pending = await getEvents(tenantId, { status: "pending", limit: 1000 });
+  const pending = await getEvents(tenantId, { status: "pending", limit: 50 });
   return pending.find(isCustomBuildChangeRequest) ?? null;
 }
 
@@ -537,7 +538,7 @@ async function resolveEventLocked(
   // (resolutionHistory) so the shadow row stays in parity, not status-frozen.
   // No-op if the row was created before dual-write was enabled. Never throws.
   if (dualWritePgEnabled()) {
-    await setEventStatus(id, status, updated.metadata ?? null);
+    await setEventStatus(id, status, updated.metadata ?? null, updated.tenantId);
   }
 
   // Governed-work decision shadow: this is the single durable approve/dismiss
@@ -550,10 +551,27 @@ async function resolveEventLocked(
 
 /**
  * Get count of pending events for a tenant.
+ *
+ * Uses ZCARD on the tenant's event sorted set as a fast upper-bound estimate,
+ * avoiding a 1000-event scan + mget. ZCARD includes all statuses (pending,
+ * approved, dismissed) and any unresolved legacy members, so the result may
+ * over-count — but for the ops-report "queue depth" display this is an
+ * acceptable approximation. The governed-work Postgres mirror is authoritative
+ * for exact counts when GOVERNED_WORK_READ_PG is on; ZCARD keeps the Redis
+ * path cheap. NOTE: Redis stays authoritative for membership/ordering; this
+ * count is display-only and must never be used to gate business logic.
  */
 export async function getQueueCount(tenantId: string): Promise<number> {
-  const events = await getEvents(tenantId, { status: "pending", limit: 1000 });
-  return events.length;
+  const redis = getRedis();
+  if (!redis) return 0;
+  try {
+    const count = await redis.zcard(eventsKey(tenantId));
+    return typeof count === "number" ? count : 0;
+  } catch {
+    // Fall back to the exact count on error.
+    const events = await getEvents(tenantId, { status: "pending", limit: 1000 });
+    return events.length;
+  }
 }
 
 /**

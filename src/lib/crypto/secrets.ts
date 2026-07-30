@@ -19,13 +19,35 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypt
 const PREFIX = "enc:v1:";
 
 /**
+ * Module-level key cache. The raw env var is read once at first call and the
+ * derived 32-byte SHA-256 key is stored. Subsequent calls return the cached
+ * buffer instead of re-hashing on every encrypt/decrypt (rowToTenant calls
+ * decryptSecret 4 times per row; loadTenants maps over all tenants).
+ *
+ * The cache is keyed on the raw passphrase so a hot-reload that changes
+ * SECRETS_ENC_KEY (unusual but possible in some test harnesses) picks up the
+ * new value rather than serving a stale derivation.
+ */
+let _cachedRaw: string | undefined;
+let _cachedKey: Buffer | null = null;
+
+/**
  * The AES-256 key derived from `SECRETS_ENC_KEY`, or null when unset/empty.
  * SHA-256 of the raw passphrase yields a 32-byte key from any-length input.
+ * Memoized at the module level so derivation runs at most once per process.
  */
 function getKey(): Buffer | null {
   const raw = process.env.SECRETS_ENC_KEY;
-  if (!raw) return null;
-  return createHash("sha256").update(raw).digest();
+  if (!raw) {
+    _cachedRaw = undefined;
+    _cachedKey = null;
+    return null;
+  }
+  if (raw !== _cachedRaw) {
+    _cachedRaw = raw;
+    _cachedKey = createHash("sha256").update(raw).digest();
+  }
+  return _cachedKey;
 }
 
 export function encryptSecret(plaintext: string): string;

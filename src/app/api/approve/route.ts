@@ -30,6 +30,7 @@ import { verifyApproveToken, type ApproveLinkClaims } from "@/lib/approve-link";
 import { resolveEventAction } from "@/lib/event-actions";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
+import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -122,6 +123,10 @@ const INVALID = {
 
 /** GET only shows the confirm step — it must never mutate (scanners auto-fetch it). */
 export async function GET(request: Request): Promise<NextResponse> {
+  if (await isRateLimitedAsync(rateLimitKey(request, "approve"), 20)) {
+    return noticePage({ status: 429, heading: "Too many requests", body: "Please try again in a moment." });
+  }
+
   const token = new URL(request.url).searchParams.get("token");
   if (!token) return noticePage({ status: 400, ...INVALID.missing });
 
@@ -147,6 +152,10 @@ export async function GET(request: Request): Promise<NextResponse> {
 /** POST is the real resolve — only reachable from the confirm button, so an email
  *  scanner (which GETs, never POSTs) can't trigger the external write. */
 export async function POST(request: Request): Promise<NextResponse> {
+  if (await isRateLimitedAsync(rateLimitKey(request, "approve"), 20)) {
+    return noticePage({ status: 429, heading: "Too many requests", body: "Please try again in a moment." });
+  }
+
   const form = await request.formData().catch(() => null);
   const rawToken = form?.get("token");
   const token = typeof rawToken === "string" ? rawToken : null;

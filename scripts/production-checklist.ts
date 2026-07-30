@@ -46,6 +46,7 @@ const locallyGeneratedSecrets = new Set([
   "CRON_SECRET",
   "INTERNAL_API_SECRET",
   "OAUTH_STATE_SECRET",
+  "SECRETS_ENC_KEY",
   "SCAFFOLD_CUSTOM_REQUEST_SECRET",
   "REB_CUSTOM_REQUEST_SECRET",
 ]);
@@ -71,6 +72,8 @@ const envSourceHints: Record<string, string> = {
   NEXT_PUBLIC_APP_URL: "https://app.strelva.com or the deployed control-plane URL used for OAuth callbacks",
   NEXT_PUBLIC_SITE_URL: "https://strelva.com",
   NEXT_PUBLIC_SUPABASE_URL: "Supabase project URL (Project Settings → API)",
+  SUPABASE_URL: "Same Supabase project URL as NEXT_PUBLIC_SUPABASE_URL, server-only copy for the service-role client (Project Settings → API)",
+  SUPER_ADMIN_EMAILS: "Comma-separated operator emails allowed into the admin console (founder decision)",
   NEXT_PUBLIC_SUPABASE_ANON_KEY: "Supabase anon/publishable key (Project Settings → API)",
   SUPABASE_SERVICE_ROLE_KEY: "Supabase service-role key (Project Settings → API) — server-only, bypasses RLS",
   SCAFFOLD_CUSTOM_REQUEST_SECRET: "Shared high-entropy bearer secret for custom storefront /api/reb-custom-request endpoints. Canonical name; the agent route falls back to REB_CUSTOM_REQUEST_SECRET if this is unset.",
@@ -1050,6 +1053,18 @@ console.log("\n─── Cron & Internal API Security ────────�
 checkEnvVar("CRON_SECRET", true);
 checkEnvVar("INTERNAL_API_SECRET", true);
 checkEnvVar("OAUTH_STATE_SECRET", true);
+// At-rest secret envelope encryption (AES-256-GCM). If unset in prod, new
+// provider secrets are stored plaintext AND reads of already-enc:v1: rows throw
+// out of loadTenants (platform-wide outage). Required once the backfill has run.
+checkEnvVar("SECRETS_ENC_KEY", true);
+// Server-only Supabase URL used by the service-role client (src/lib/db/client.ts).
+// Missing SUPABASE_URL silently disables all service-role Postgres operations.
+checkEnvVar("SUPABASE_URL", true, false);
+// Super-admin allow-list (operator console gate).
+checkEnvVar("SUPER_ADMIN_EMAILS", true, false);
+// Approve-from-email HMAC secret. Falls back to OAUTH_STATE_SECRET/INTERNAL_API_SECRET
+// when unset (documented reuse); set a dedicated value to shrink the blast radius.
+checkEnvVar("APPROVE_LINK_SECRET", false);
 // Either SCAFFOLD_CUSTOM_REQUEST_SECRET (canonical) or REB_CUSTOM_REQUEST_SECRET
 // (legacy alias) satisfies the bearer-secret requirement. Don't fail the gate
 // when only the legacy name is set; the agent reads both.

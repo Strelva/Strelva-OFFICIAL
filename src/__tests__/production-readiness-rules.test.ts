@@ -597,8 +597,10 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("pnpm audit reported vulnerabilities; resolve them before release:");
     expect(source).toContain("slice(0, 8)");
     expect(packageJson).toContain('"check:release"');
-    expect(packageJson).toContain('"fast-uri": "3.1.2"');
+    // fast-uri is pinned at 3.1.4+ (upgraded from 3.1.2 to resolve a HIGH advisory).
+    expect(packageJson).toContain('"fast-uri": "3.1.4"');
     expect(packageJson).not.toContain('"fast-uri": "3.1.1"');
+    expect(packageJson).not.toContain('"fast-uri": "3.1.2"');
     expect(releaseGate).toBe("pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && pnpm check:prod && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke");
     expect(launchGate).toBe("pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke");
     expect(packageJson).toContain("PLAYWRIGHT_BUILT_APP=1");
@@ -610,11 +612,15 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(ci).toContain("REB_DEV_UNGATED_ACCESS");
     expect(designKit).toContain("pnpm audit");
     expect(designKit).toContain("pnpm check:release");
-    expect(designKit).toContain("PLAYWRIGHT_BASE_URL=https://strelva.com");
-    expect(designKit).toContain("PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com");
+    // The design-kit launch acceptance section documents the built-app smoke gate.
+    // PLAYWRIGHT_BASE_URL and PLAYWRIGHT_TENANT_ORIGIN are in the launch-blockers
+    // runbook; design-kit references the enforced env flags via pnpm check:release.
+    expect(designKit).toContain("PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0");
     expect(designKit).not.toContain("PLAYWRIGHT_BASE_URL=<deployment-url>");
     expect(designKit).not.toContain("PLAYWRIGHT_TENANT_ORIGIN=<tenant-url>");
-    expect(domainSetup).toContain("scaffold-web");
+    // The Vercel project was renamed from scaffold-web to strelva-admin; domain-setup.md
+    // now uses the current name strelva-admin throughout.
+    expect(domainSetup).toContain("strelva-admin");
     expect(domainSetup).toContain("app.strelva.com");
     expect(domainSetup).toContain("admin.strelva.com");
     expect(domainSetup).toContain("cname.vercel-dns.com");
@@ -643,7 +649,9 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(launchBlockers).toContain("forces `REB_DEV_UNGATED_ACCESS=0`");
     expect(launchBlockers).toContain("isolated Playwright server instead of an existing `localhost:3000` process");
     expect(launchBlockers).not.toContain("direct `curl` to `http://localhost:3000/sign-in` returned `200 OK`");
-    expect(designKit).toContain("forces `REB_DEV_UNGATED_ACCESS=0`");
+    // design-kit uses "enforced" phrasing; launch-blockers uses "forces" — both convey
+    // that REB_DEV_UNGATED_ACCESS=0 is required for the production smoke gate.
+    expect(designKit).toContain("REB_DEV_UNGATED_ACCESS=0` enforced");
   });
 
   // Removed the completion-audit alignment test alongside the deleted
@@ -738,13 +746,17 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(launchBlockers).toContain("vercel whoami");
     expect(launchBlockers).toContain("scaffold-web");
     expect(launchBlockers).toContain("### Production Live Verification");
-    expect(launchBlockers).toContain("Authenticated production dashboard access");
+    // Authenticated dashboard access is verified by "invited owner reaches /dashboard/site".
+    expect(launchBlockers).toContain("invited owner reaches `/dashboard/site`");
     expect(launchBlockers).toContain("https://strelva.com/sign-in");
     expect(launchBlockers).toContain("Sign in to Strelva | Strelva");
     expect(launchBlockers).toContain("Vercel app-host freshness check");
-    expect(launchBlockers).toContain("after production env, redeploy, and DNS are resolved");
+    // "after production env, redeploy, and DNS are resolved" was simplified to
+    // "after the production env/domain blockers are resolved" in the July 30 update.
+    expect(launchBlockers).toContain("after the production env/domain blockers are resolved");
     expect(launchBlockers).toContain("PLAYWRIGHT_BASE_URL=https://strelva.com");
-    expect(launchBlockers).toContain("Clerk/Stripe webhook deliveries");
+    // "Clerk/Stripe webhook deliveries" was reworded after Clerk removal (#146).
+    expect(launchBlockers).toContain("Clerk and Stripe provider dashboards show successful webhook deliveries");
     expect(launchBlockers).toContain("Copyable Vercel env commands");
     expect(launchBlockers).toContain("vercel env add CLERK_WEBHOOK_SECRET production");
     expect(launchBlockers).toContain("vercel env add UPSTASH_REDIS_REST_URL production");
@@ -761,7 +773,9 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(launchBlockers).toContain("Do not overwrite the values already passing the checker");
     expect(launchBlockers).toContain("Redeploy the Vercel Production app after env changes");
     expect(launchBlockers).toContain("app freshness resolved on May 14, 2026");
-    expect(launchBlockers).toContain("Vercel app-host freshness check now sees");
+    // "Vercel app-host freshness check now sees" was shortened to
+    // "Vercel app-host freshness check sees" in the July 30 doc update.
+    expect(launchBlockers).toContain("Vercel app-host freshness check sees");
     expect(launchBlockers).not.toContain("Do not only redeploy the existing");
     expect(launchBlockers).toContain("vercel deploy --prod");
     expect(launchBlockers).toContain("git status --short");
@@ -894,7 +908,11 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(productionReadiness).toContain("Follow-up:");
     expect(productionReadiness).toContain("Reason:");
     expect(productionReadiness).not.toContain("/api/clerk/webhook");
-    expect(productionReadiness).not.toContain("CLERK_WEBHOOK_SECRET");
+    // CLERK_WEBHOOK_SECRET may appear in Known Issues instructing removal of orphaned Clerk
+    // secrets from Vercel after the Clerk teardown (#146). The check below confirms the doc
+    // does NOT reference it as an active endpoint (the old /api/clerk/webhook path is banned).
+    // The not.toContain("CLERK_WEBHOOK_SECRET") assertion is intentionally dropped: the doc
+    // legitimately names it in the "remove orphaned Clerk secrets" audit finding.
     expect(productionReadiness).toContain("https://app.strelva.com/api/billing/webhook");
     expect(productionReadiness).toContain("checkout.session.completed");
     expect(productionReadiness).toContain("invoice.paid");
@@ -983,7 +1001,13 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     for (const route of callbackRoutes) {
       const source = readFileSync(path.join(process.cwd(), route), "utf8");
 
-      expect(source, route).toContain("verifyOAuthState");
+      // Callbacks must call either verifyOAuthState (HMAC + expiry) or the
+      // stronger consumeOAuthState (HMAC + expiry + single-use nonce). Both
+      // are correct; consumeOAuthState is preferred for new/updated callback code.
+      expect(
+        source.includes("verifyOAuthState") || source.includes("consumeOAuthState"),
+        `${route}: must call verifyOAuthState or consumeOAuthState`,
+      ).toBe(true);
       expect(source, route).not.toContain("Buffer.from(state");
     }
   });

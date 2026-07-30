@@ -9,6 +9,8 @@ in-platform preview path. **The real client websites are separate deployed
 repos** (GLDF, Rohlax) that never called that path, so their reports showed
 ≈ zero. This is the pipe that fixes it.
 
+Note: Rohlax's Vercel git auto-deploy has been dead since Jun 18. Deploy Rohlax manually via the Vercel CLI (`vercel --prod --scope strelva` from the rohlax repo) after any change — do not rely on a push-to-deploy triggering automatically.
+
 The control plane now exposes a public beacon:
 
 ```
@@ -199,3 +201,17 @@ The tracker fails silent and the endpoint is additive. To stop tracking for a
 repo, remove `<ScaffoldTracker />` from its layout (or unset the
 `NEXT_PUBLIC_*` vars) and redeploy. The control-plane endpoint can stay — it
 simply receives nothing.
+
+---
+
+## Known issues / TODO
+
+**[MEDIUM][perf] Triple `pgMetricSummary` RPC per report — 3 independent DB calls where 1 would do (`src/lib/storage/analytics-store.ts:166,302`).** When `DATA_SOURCE=postgres`, every call to `getClickCounts` or `getClickCountsByPrefix` invokes `pgMetricSummary(tenant)` independently. `generateWeeklyReport` in `reports.ts` calls `getClickCounts` three times (page-view, booking-click, phone-click) plus `getClickCountsByPrefix` once — that is four Postgres round trips where one would suffice. `pgMetricSummary` has no module-level memoization; each call hits the DB independently. Fix: hoist `pgMetricSummary` to a single call per report cycle and thread the result as a parameter, or add a per-request memoizer keyed on tenant. This reduces N DB calls to 1 per tenant per report cycle.
+
+**[HIGH][perf] Calendly webhook: `redis.keys()` full-keyspace scan in synchronous webhook handler (`src/app/api/webhooks/calendly/route.ts:64`).** The `findTenantByUserUri` helper issues a `redis.keys()` scan to find which tenant owns a Calendly user URI. Under any meaningful scale this degrades Redis. Fix: when saving a Calendly connection, write a reverse-index key `redis.set('calendly-user-uri:<userUri>', tenantId)` and make `findTenantByUserUri` an O(1) `redis.get` lookup. Clean up the reverse-index key on disconnection.
+
+**[MEDIUM][bug] Calendly webhook: `new Date(undefined)` produces `'Invalid Date'` string in stored event body (`src/app/api/webhooks/calendly/route.ts:129`).** Guard `startTime` before use: `const startTimeStr = startTime ? new Date(startTime).toLocaleString() : 'time TBD'`. Store `startTime ?? null` in metadata rather than `undefined`.
+
+**[HIGH][bug] Calendly webhook: unguarded `addEvent` call causes retry storm on any Redis/Postgres failure (`src/app/api/webhooks/calendly/route.ts:124`).** A thrown error from `addEvent` propagates to a 500 response, causing Calendly to retry indefinitely. Wrap the call in try/catch and return 200 on error so Calendly does not retry. Add Redis idempotency keyed on `eventUri` to deduplicate events before this fix ships.
+
+**[MEDIUM][perf] `buildOpsReport` has a fully serial N+1 loop — 3 sequential awaits per tenant with no concurrency cap (`src/lib/ops.ts:113-157`).** Each tenant in the active set is processed one at a time with three sequential awaits (SMS state, queue count, auto-approved events). Collapse into a single `mapPool(active, 8, async (tenant) => { ... })` call to process tenants concurrently. The per-tenant state is independent so there is no ordering dependency to preserve.

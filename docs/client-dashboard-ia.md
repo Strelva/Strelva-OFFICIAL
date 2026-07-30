@@ -184,3 +184,23 @@ ownership redirect) onto the new sections — a Business sub-hash resolves to th
 then scrolls to its anchor; `#billing` → Plan — so every existing link still lands.
 **Account** is read-only login identity; **Business info** (the `profile` band) holds the
 editable business fields including the `businessModel` that drives the presence resolver.
+
+## Known issues / TODO
+
+**[MEDIUM] `/dashboard/ownership` redirect ignores `clientFallbackRoot`** (`src/app/dashboard/ownership/page.tsx:4`): the ownership page redirects unconditionally rather than using the `clientFallbackRoot` helper. Clients who have a custom root may be sent to a wrong landing page.
+
+**[MEDIUM] `BrandSection` and `NavigationFooterSection` ignore `readOnly` in demo mode** (`src/app/dashboard/settings/page.tsx:414,717`): these two settings sections allow editing even when `readOnly` is true (i.e. when a super-admin is inspecting a demo tenant). The other settings sections respect `readOnly` correctly.
+
+**[MEDIUM] Google OAuth callback stores connection without re-verifying caller session** (`src/app/api/oauth/google/callback/route.ts:93`): the GET handler calls `saveConnection` before verifying the authenticated session and tenant access. A forged state parameter that passes the HMAC check could write a connection for an arbitrary tenant. Fix: call `verifyAuth()` + `requireTenantAccess(tenantId)` at the start of the callback handler, before writing.
+
+**[MEDIUM] Google review poll does not paginate** (`src/app/api/cron/poll-google-reviews/route.ts:116`): only the first page of reviews from the Google API is ingested. Reviews beyond the first page are never stored and never trigger reply drafts or alerts.
+
+**[MEDIUM] `PATCH /api/reviews` bypasses GBP publish path** (`src/app/api/reviews/route.ts:73`): patching a review directly (e.g. to mark it read) permanently suppresses the auto-reply backlog for that Google review rather than routing through the governed `resolveEventAction` path.
+
+**[MEDIUM] `maxAdvanceBooking` config field is never enforced at booking creation** (`src/lib/booking.ts:17`): the field exists in the schema and config store but booking creation does not validate against it, so clients can create bookings beyond the configured advance limit.
+
+**[MEDIUM] Booking list `today` filter uses UTC instead of tenant timezone** (`src/app/api/booking/list/route.ts:21`): the "today" date window is derived from UTC, not the tenant's configured timezone. For tenants in UTC-offset zones, "today" can show the wrong set of bookings.
+
+**[MEDIUM] Approve-link POST route has no rate limiting** (`src/app/api/approve/route.ts:149`): the one-click email approve/not-yet endpoint has no rate limit. An attacker with a valid token (14-day expiry) could hammer it without restriction.
+
+**[MEDIUM] `contact.email` schema default is empty string but field requires a valid email** (`src/lib/schemas.ts:181`, `src/lib/defaults.ts:76`): the default is `""` which fails the email validator. A PUT request on first use will fail validation unless the owner has set their contact email.

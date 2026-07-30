@@ -1,6 +1,6 @@
 # Persistence boundaries
 
-Updated 2026-07-14. This is the current authority map. A Postgres table or mirror write does
+Updated 2026-07-30. This is the current authority map. A Postgres table or mirror write does
 not make Postgres authoritative; authority changes only when the production read path changes.
 
 | Domain | Authority | Cache or mirror | Failure rule |
@@ -43,3 +43,67 @@ the service-role client. RLS remains defense-in-depth because the service-role c
 
 When moving an operational store to Postgres, change its read path, failure semantics, tests,
 and this table in the same change. Do not update documentation based on a shadow write alone.
+
+## Tenant rename registry completeness
+
+The `authoritativePatterns` list in `src/lib/tenant-rename.ts` is derived from this table.
+Every Redis-authoritative store with a slug-keyed key MUST appear there or it will silently
+not move on a tenant slug rename. Confirmed present as of 2026-07-15:
+
+`connections:*`, `crm:*`, `reb:crm-lock:*`, `leads:*`, `lead:*`, `orders:*`, `order:*`,
+`reb:reply-voice:*`, `reb:rewards:*`, `reb:booking:config:*`, `reb:booking:overrides:*`,
+`reb:booking:slot:*`, `reb:content-autonomy:*`, `reb:engagement:*`, `threads:*`,
+`goal:*`, `analytics:cfg:*`, `reb:report-cadence:*`, `reb:report-sent:*`,
+`reb:scan:baseline:*`.
+
+Caches (`reb:tenants:all`, content/page-config/google-meta/analytics/brief/domain-map
+caches) are intentionally NOT rekeyed — they regenerate from Postgres.
+
+## Known issues / TODO (2026-07-30)
+
+- **[HIGH][bug] `google-meta:*`, `review-replies:recent:*`, `reb:review-nudge-sent:*`,
+  `reb:order-review-request-sent:*`, and `reb:review-reply-declined:*` are NOT in the
+  `authoritativePatterns` registry** (`src/lib/tenant-rename.ts` line ~32-55). These
+  keys are Redis-authoritative (or durable operational markers) and will silently not
+  move on a tenant rename. Add each to `authoritativePatterns` and update the
+  completeness unit test assertions to cover them. The `google-meta:${t}` key is a plain
+  JSON object; the blob rewriter handles embedded `tenant`/`tenantId` fields but the key
+  itself must be SCAN-moved.
+
+- **[HIGH][tenant-isolation] Missing `Cache-Control: private` on collections list and
+  single-entry v1 routes** (`src/app/api/v1/collections/[tenant]/[type]/route.ts` and the
+  `[slug]` sibling). Neither route sets any cache headers; a CDN or shared cache can serve
+  one tenant's content to another. Fix: add `Cache-Control: private, max-age=0,
+  must-revalidate` to every successful `NextResponse.json()` response in both routes,
+  matching the pattern already used in content, page-config, and site-capabilities routes.
+
+- **[MEDIUM][bug] Split-brain between content and draft/version stores** due to two
+  independent source flags (`CONTENT_SOURCE` in `src/lib/storage/content-store.ts:133` vs
+  `DATA_SOURCE` in `src/lib/storage/draft-store.ts:22`). Either unify on one flag or add a
+  runtime guard that fails loudly in production when the flags diverge. Document the
+  intended relationship between the two flags explicitly and confirm both are set in the
+  Vercel deployment env vars.
+
+- **[MEDIUM][security] `INTERNAL_API_SECRET` is overloaded** — it serves as the domain-map
+  auth key, the OAuth state secret fallback, and the approve-link signing fallback
+  (`src/lib/approve-link.ts:40-44`, `src/lib/oauth-state.ts:15-16`,
+  `src/app/api/internal/domain-map/route.ts:12-14`). A key compromise has wider blast
+  radius than this table implies. Prefer dedicated named secrets for each role.
+
+- **[MEDIUM][security] `INTERNAL_API_SECRET` empty-string bypass**: when the variable is
+  unset or empty, the domain-map route and proxy can be reached unauthenticated
+  (`src/proxy.ts:341`). Ensure `INTERNAL_API_SECRET` is set in production and add it to
+  `scripts/production-checklist.ts`.
+
+- **[HIGH][security] `SUPABASE_URL` (private, service-role) missing from `.env.example`
+  and production checklist** (`src/lib/db/client.ts:29`). Add `SUPABASE_URL` to
+  `.env.example` and `.env.production.example` with a note that it is the same URL as
+  `NEXT_PUBLIC_SUPABASE_URL` but server-only, and add `checkEnvVar('SUPABASE_URL', true)`
+  to `scripts/production-checklist.ts`.
+
+- **[HIGH][security] `SECRETS_ENC_KEY` absent from env examples and production
+  checklist** (`src/lib/crypto/secrets.ts`). Add to `.env.production.example` with a
+  generation instruction (`openssl rand -hex 32`) and mark it required. Add
+  `checkEnvVar('SECRETS_ENC_KEY', true)` to the production checklist. Consider adding a
+  startup assertion in `secrets.ts` that warns when the key is unset and the DB already
+  contains `enc:v1:` prefixed values.

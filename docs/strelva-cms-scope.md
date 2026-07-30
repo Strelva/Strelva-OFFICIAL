@@ -1,6 +1,6 @@
 # Strelva CMS scope (v1: Collections)
 
-**Status:** scoping. Decisions locked with Noah 2026-06-20. Builds on the Postgres content backbone (the migration that just shipped). Pairs with [post-cutover-runbook.md](./post-cutover-runbook.md) and [supabase-migration-plan.md](./supabase-migration-plan.md).
+**Status:** SHIPPED. Foundation complete as of 2026-07 — `collection_entries` table live in Postgres, all three starter types implemented, v1 API routes live, agent tools wired, client editor built. Pairs with [post-cutover-runbook.md](./post-cutover-runbook.md) and [supabase-migration-plan.md](./supabase-migration-plan.md).
 
 ## What it is
 
@@ -22,24 +22,26 @@ Each content type = a field schema + one or more rendering themes that live in t
 
 | Type | Fields (schema) | Rendering theme (client repo) | Status today |
 |---|---|---|---|
-| **blog / text** | title, slug, excerpt, body, author, tags[], status, publishedAt | post list + post page | `BlogPost` type + `blog.ts` store already exist (Sanity-backed) + agent blog tools. Generalize, move to Postgres. |
-| **video** | title, slug, description, videoUrl/embed, thumbnail, tags[], status, publishedAt | video grid + player page | new |
-| **products (catalog)** | name, slug, description, price, images[], options, inStock, status | product grid + product page (checkout button -> client-repo Stripe) | `products`/`shop` are already `TenantFeature`s; no catalog collection yet |
+| **blog** | title, excerpt, body, author, tags[], status | post list + post page | SHIPPED. Postgres-backed via `collection_entries` (type=`blog`). Public read in `src/lib/cms/blog-public.ts`. Replaces the old Sanity `blog.ts` path entirely. |
+| **video** | title, description, videoUrl, thumbnail, tags[], status | video grid + player page | SHIPPED. Schema in `src/lib/cms/collection-types.ts`. |
+| **product (catalog)** | name, description, priceCents, currency, images[], inStock, checkoutUrl, status | product grid + product page (checkout button -> client-repo Stripe) | SHIPPED. Schema in `src/lib/cms/collection-types.ts`. `priceCents` is an integer (cents). |
 
-`blog` is the wedge: it is the closest existing primitive, so it proves the whole pattern (schema + entries + API + agent tool + theme) before video/products follow.
+All three types shipped in the same foundation step. The blog proved the pattern; video and products followed in the same pass.
 
 ## Architecture (reuse, do not reinvent)
 
-- **Data:** one `collection_entries` table in Postgres (tenant_id, type, slug, status, data jsonb, timestamps), plus a lightweight `collection_types` registry (or a code-side registry keyed by type) defining the field schema per type. JSONB `data` keeps the schema flexible per type; typed Zod validators per type guard writes (mirror `src/lib/schemas.ts`). RLS via the standard tenant-scoped policy in `supabase/migrations/20260619140000_rls.sql`.
-- **API contract:** extend the v1 contract the client repos already consume:
-  - `GET /api/v1/collections/[tenant]/[type]` (list, filter by status, paginate)
-  - `GET /api/v1/collections/[tenant]/[type]/[slug]` (single entry)
-  - Mirrors the existing `/api/v1/content/[tenant]/[section]` shape. Versioned, additive.
-- **Authoring:**
-  - Agent tools (extend `src/lib/agent-executor.ts`, which already has blog tools): `create_entry`, `update_entry`, `list_entries`, `publish_entry` generalized over type. Governance via `src/lib/ai-governance.ts` (auto-approve factual, review new copy).
-  - Basic client editor: a dashboard surface to list/create/edit entries of an enabled type. Form-driven off the type schema. No rich page-building, just structured fields. Drafts via the existing draft pattern.
-- **Capability gating:** a tenant opts into a type via the existing `TenantFeature` flags (`blog`, `products`, plus a new `video`). `site-capabilities` already advertises features to the client repo; collections plug into it.
-- **Rendering:** themes are components in `custom-repo-starter/` (the starter-first rule in `docs/operations.md`), pulling entries from the v1 collection endpoints. Promote a theme to the platform only once two repos need it.
+- **Data:** `collection_entries` table in Postgres (tenant_id, type, slug, status, data jsonb, timestamps). Migration: `supabase/migrations/20260620120000_cms_collections_reviews_suggestions.sql`. Type registry is code-side in `src/lib/cms/collection-types.ts` (no DB table needed). Zod schema per type guards all writes. RLS applied via that same migration (standard tenant-scoped policy: member or super-admin; else nothing).
+- **API contract** (LIVE):
+  - `GET /api/v1/collections/[tenant]/[type]` — list published entries (source: `src/app/api/v1/collections/[tenant]/[type]/route.ts`)
+  - `GET /api/v1/collections/[tenant]/[type]/[slug]` — single entry by slug (source: `src/app/api/v1/collections/[tenant]/[type]/[slug]/route.ts`)
+  - Both support `?preview=true` with a signed `revalidationSecret` token for draft previews.
+  - **Known issue / TODO:** Neither route sets `Cache-Control: private` on responses. Shared CDN caches could serve one tenant's entries to another. Fix: add `Cache-Control: private, max-age=0, must-revalidate` to every successful `NextResponse.json()` in both routes. (Audit finding [HIGH])
+  - **Known issue / TODO:** The slug URL parameter in the single-entry route is passed to the DB without an ID-format guard. Add a slug allowlist regex check (`/^[a-z0-9-]+$/`) before the DB call. (Audit finding [MEDIUM])
+- **Authoring** (LIVE):
+  - Agent tools in `src/app/api/agent/route.ts`: `list_entries` (list by type + optional status) and `save_entry` (create or update; always drafts, never auto-publishes). Agent-created entries are `status:"draft"` — the owner publishes from the client editor.
+  - Client editor: `src/components/dashboard/CollectionsManager.tsx` at `/dashboard/collections`. Form-driven off the type schema. Drafts/publish controlled from the editor.
+- **Capability gating:** `TenantFeature` flags `blog`, `products`, `video` in tenant config. `site-capabilities` advertises them to the client repo.
+- **Rendering:** client repos pull entries from the v1 collection endpoints. Public blog read helper: `src/lib/cms/blog-public.ts` (`getBlogPostsForSite` / `getBlogPostForSite`). Themes live in `custom-repo-starter/` per the starter-first rule.
 
 ## What v1 explicitly does NOT build
 
@@ -48,20 +50,28 @@ Each content type = a field schema + one or more rendering themes that live in t
 - A rich-text/page builder beyond structured fields + a body field.
 - Multi-user concurrent live co-editing (future; the Postgres + RLS backbone does not preclude it).
 
-## Sequence
+## What shipped (as of 2026-07)
 
-1. **Foundation:** `collection_entries` table + RLS + Zod schemas + the type registry. Generalize `blog.ts` onto it (Postgres, behind the same `CONTENT_SOURCE` style flag), keep Sanity fallback during soak. Ship the v1 collection endpoints.
-2. **Blog end-to-end:** agent tools generalized, basic client editor for blog, one rendering theme in the starter. This is the full vertical slice that proves the pattern.
-3. **Video:** add the type schema + theme. Mostly config once the slice exists.
-4. **Products (catalog):** add the type schema + grid/page theme; checkout button wires to the client repo's existing Stripe (RHM is the reference).
+All four planned sequence steps are done in one foundation pass:
 
-Each step is additive and flag-gated, same discipline as the migration.
+1. **Foundation DONE:** `collection_entries` + RLS + code-side type registry + Zod validators per type.
+2. **Blog end-to-end DONE:** `blog` type, `src/lib/cms/blog-public.ts` read helper, agent `list_entries`/`save_entry` tools, `CollectionsManager` client editor, v1 list + single-entry routes.
+3. **Video DONE:** `video` schema shipped alongside blog in `collection-types.ts`.
+4. **Products DONE:** `product` schema with `priceCents` (int cents), `images[]`, `checkoutUrl`; same endpoint contract.
 
-## Open questions
+Sanity fallback was not kept during soak — Sanity teardown is done (2026-07-10) and there is no Sanity read/write path in the CMS. `src/lib/cms/blog-public.ts` confirms: "Replaces the old `src/lib/blog.ts` Sanity path so there is one blog store end to end."
 
-- Type schema home: a DB `collection_types` table vs a code-side registry. Lean code-side registry first (simpler, versioned in git, no admin UI needed); move to DB only if non-engineers need to define types.
-- Slug uniqueness + routing: unique per (tenant, type). Confirm the client-repo routing convention for collection pages.
-- How much the "basic client editor" exposes vs leaves to the agent. Start minimal: list, create, edit fields, publish/unpublish. No reordering/layout.
+## Resolved questions
+
+- **Type schema home:** code-side registry (`src/lib/cms/collection-types.ts`). Shipped. No DB `collection_types` table.
+- **Slug uniqueness + routing:** unique per `(tenant_id, type)` enforced by the DB index `collection_entries_lookup_idx`. Client-repo convention: pull entries from `/api/v1/collections/[tenant]/[type]` and route by slug.
+- **Client editor scope:** `CollectionsManager` ships list / create / edit fields / publish / unpublish. No drag-and-drop reordering.
+
+## Known issues / TODO
+
+- [HIGH] `Cache-Control: private` missing on both v1 collections routes — see Architecture section above.
+- [MEDIUM] Slug parameter unsanitized in single-entry route before DB pass — add format guard.
+- The `database.types.ts` generated types are stale and do not include `collection_entries` columns accurately. Run `supabase gen types typescript` and commit the result; add a CI staleness check. (Audit finding [MEDIUM])
 
 ## Relationship to reviews
 

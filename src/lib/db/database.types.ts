@@ -1988,6 +1988,8 @@ export type Database = {
       }
       tenants: {
         Row: {
+          account_id: string | null
+          billing_type: string | null
           active: boolean
           admin_domain: string | null
           auto_approve_threshold: number | null
@@ -2039,6 +2041,8 @@ export type Database = {
           visibility: Json | null
         }
         Insert: {
+          account_id?: string | null
+          billing_type?: string | null
           active?: boolean
           admin_domain?: string | null
           auto_approve_threshold?: number | null
@@ -2090,6 +2094,8 @@ export type Database = {
           visibility?: Json | null
         }
         Update: {
+          account_id?: string | null
+          billing_type?: string | null
           active?: boolean
           admin_domain?: string | null
           auto_approve_threshold?: number | null

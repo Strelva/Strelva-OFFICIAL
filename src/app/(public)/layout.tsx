@@ -8,6 +8,7 @@ import { PreviewBanner } from "@/components/public/PreviewBanner";
 import { getContent } from "@/lib/storage";
 import { defaults } from "@/lib/defaults";
 import { getTenantFromHeaders, isPreviewMode } from "@/lib/tenant";
+import { getTenantConfig } from "@/lib/tenants";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { themeContentToCssVars } from "@/lib/design-tokens";
 
@@ -48,13 +49,33 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-// Structured data for the tenant's business — injected into <head> via Next.js metadata
+// Map a tenant industry string to its schema.org @type value.
+// Falls back to "LocalBusiness" for unknown or empty industries.
+function industryToSchemaType(industry: string): string {
+  const lower = industry.toLowerCase();
+  if (lower.includes("health") || lower.includes("beauty") || lower.includes("wellness") || lower.includes("spa") || lower.includes("salon") || lower.includes("fitness")) {
+    return "HealthAndBeautyBusiness";
+  }
+  if (lower.includes("food") || lower.includes("restaurant") || lower.includes("cafe") || lower.includes("bakery")) {
+    return "FoodEstablishment";
+  }
+  if (lower.includes("lodging") || lower.includes("hotel") || lower.includes("motel") || lower.includes("inn")) {
+    return "LodgingBusiness";
+  }
+  if (lower.includes("sport") || lower.includes("gym") || lower.includes("yoga") || lower.includes("pilates")) {
+    return "SportsActivityLocation";
+  }
+  return "LocalBusiness";
+}
+
+// Structured data for the tenant's business — injected into <head> via Next.js metadata.
 async function LocalBusinessSchema() {
   const tenant = await getTenantFromHeaders();
-  const [contact, settings, hero] = await Promise.all([
+  const [contact, settings, hero, tenantConfig] = await Promise.all([
     getContent("contact", tenant).catch(() => defaults.contact),
     getContent("settings", tenant).catch(() => defaults.settings),
     getContent("hero", tenant).catch(() => defaults.hero),
+    getTenantConfig(tenant).catch(() => null),
   ]);
 
   const dayMap: Record<string, string> = {
@@ -103,8 +124,8 @@ async function LocalBusinessSchema() {
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
 
-  // Use specific business type for tenants with full contact info, generic for others
-  const businessType = contact.phone && contact.address ? "HealthAndBeautyBusiness" : "LocalBusiness";
+  // Derive schema.org @type from the tenant's industry; fall back to LocalBusiness.
+  const businessType = industryToSchemaType(tenantConfig?.industry ?? "");
 
   const schema = {
     "@context": "https://schema.org",
@@ -139,7 +160,15 @@ async function LocalBusinessSchema() {
       contact.instagramUrl,
       contact.facebookUrl,
       settings.bookingUrl,
-    ].filter(Boolean),
+    ].filter((u): u is string => {
+      if (!u) return false;
+      try {
+        const parsed = new URL(u);
+        return parsed.protocol === "https:" || parsed.protocol === "http:";
+      } catch {
+        return false;
+      }
+    }),
     priceRange: "$$",
     ...(hero.backgroundImageUrl ? { image: hero.backgroundImageUrl } : {}),
     ...(settings.ownerName

@@ -1,40 +1,59 @@
 # Strelva Launch Blockers
 
-> **Status: current release gate (updated 2026-07-14).** Only `Current
+> **Status: current release gate (updated 2026-07-30).** Only `Current
 > Blockers` and `Waived Blockers` determine release status. The long evidence
 > record below is historical. Current architecture and commands live in
 > `production-readiness.md`: Supabase Auth, Postgres, and `app.strelva.com`.
+> **Auth is Supabase-only (Clerk fully removed #146, 2026-07-11). Sanity removed
+> as a data source (2026-07-10). Control plane URL is `app.strelva.com`.**
 
-Last local audit: May 14, 2026.
+Last local audit: May 14, 2026. Security audit: July 30, 2026.
 
 This file tracks launch blockers that cannot be resolved by code changes alone. `pnpm check:prod` fails while this file contains unwaived blockers. A release is not complete until this file is empty or every remaining item is explicitly waived in the release note with owner approval.
 
 ## Current Blockers
 
-_No current blockers — both prior entries are resolved (2026-07-12): Rohlax revalidation is wired and the apex + admin serve; the seed demo tenant `summit` and `jacobtest` are deactivated. Detail and release runbook retained below._
+_No current blockers from the original release gate — both prior entries are resolved (2026-07-12): Rohlax revalidation is wired and the apex + admin serve; the seed demo tenant `summit` and `jacobtest` are deactivated._
+
+### Security and dependency blockers (2026-07-30 audit — must resolve before next customer go-live)
+
+These are not blocking a re-deploy of code already in prod, but MUST be resolved before adding a new customer or touching billing/auth code:
+
+- **[CRITICAL][security] Next.js 16.2.6 has four HIGH + three MODERATE unpatched CVEs.** Bump `next` from `16.2.6` to `16.2.12` in `package.json` (also bump `eslint-config-next` to match). Run `pnpm install && pnpm audit`. Deploy with `vercel deploy --prod --yes --scope strelva` (not `vercel redeploy` — redeploy reuses the old env snapshot).
+- **[HIGH][security] Five security-pin overrides frozen at still-vulnerable versions** (`package.json` overrides block). Current stale pins: `brace-expansion@<2` at `1.1.13` (need `1.1.16+`), `brace-expansion@>=4 <5.0.5` at `5.0.5` (need `5.0.8`), `dompurify` at `3.4.11` (need `3.4.12+`), `fast-uri` at `3.1.2` (need `3.1.4`), `postcss` at `8.5.10` (need `8.5.18`). Run `pnpm audit` after updating each.
+- **[HIGH][security] Seven orphaned Clerk and Sanity secrets still live in Vercel after both teardowns.** Run `vercel env rm` for each Clerk (`CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `CLERK_WEBHOOK_SECRET`, etc.) and Sanity (`SANITY_PROJECT_ID`, `SANITY_DATASET`, etc.) secret across all environments (production, preview, development). Also remove `REVALIDATION_SECRET` (superseded by per-tenant `revalidationSecret`), `CORS_ORIGINS` (no code reference), and any Turborepo vars (`NX_DAEMON`, `TURBO_*`) unused in this non-Turbo repo. Use `vercel env ls` to enumerate before removing. Clerk vars still present in Vercel cause auth failures if they bleed into the runtime (Supabase auth breaks with Clerk env present).
+
+Detail and release runbook retained below.
 
 ## Current Release Verification Runbook
 
 - Required owner action: keep production values in Vercel aligned with
   `.env.production.example`; do not perform a production deploy from a dirty local working tree.
-- Minimum production values to confirm in Vercel: Supabase project URL,
-  publishable key, service-role key, Postgres source flags, Upstash, Stripe,
-  Resend, Sentry, `CRON_SECRET`, `INTERNAL_API_SECRET`, `OAUTH_STATE_SECRET`,
+- Minimum production values to confirm in Vercel: Supabase project URL (`NEXT_PUBLIC_SUPABASE_URL`),
+  private Supabase URL (`SUPABASE_URL` — same value, server-only, required by `src/lib/db/client.ts`),
+  publishable key (`NEXT_PUBLIC_SUPABASE_ANON_KEY`), service-role key (`SUPABASE_SERVICE_ROLE_KEY`),
+  `SECRETS_ENC_KEY` (AES-256-GCM at-rest secret key — missing = full platform outage when encrypted rows exist),
+  Postgres source flags (`CONTENT_SOURCE=postgres`, `DATA_SOURCE=postgres`, `TENANTS_SOURCE=postgres`),
+  Upstash, Stripe, Resend, Sentry, `CRON_SECRET`, `INTERNAL_API_SECRET`, `OAUTH_STATE_SECRET`,
   and `NEXT_PUBLIC_APP_URL=https://app.strelva.com`.
-- Copyable Vercel env commands: `vercel env add NEXT_PUBLIC_SUPABASE_URL production`,
+- Auth is Supabase-only. No Clerk env vars should be present — Clerk vars in the Vercel environment cause auth failures. Remove orphaned Clerk and Sanity secrets via `vercel env rm` before any production deploy.
+- Copyable Vercel env commands:
+  `vercel env add NEXT_PUBLIC_SUPABASE_URL production`,
+  `vercel env add SUPABASE_URL production`,
   `vercel env add UPSTASH_REDIS_REST_URL production`,
   `vercel env add UPSTASH_REDIS_REST_TOKEN production`,
+  `vercel env add SECRETS_ENC_KEY production`,
   `vercel env add SENTRY_DSN production`,
   `vercel env add NEXT_PUBLIC_SENTRY_DSN production`, and
   `vercel env add NEXT_PUBLIC_APP_URL production`.
 - Provider value sources: Supabase project settings -> API, Upstash Redis
   database -> REST API section, Sentry project settings -> Client Keys / DSN,
-  and Stripe live-mode Products/Webhooks.
+  and Stripe live-mode Products/Webhooks. Generate `SECRETS_ENC_KEY` with `openssl rand -hex 32`.
 - Do not overwrite the values already passing the checker. Generate local
   shared secrets with `openssl rand -hex 32`, then run
-  `vercel env pull .env.production.local --environment=production` and
+  `vercel env pull .env.production.local --environment=production --scope strelva` and
   `pnpm check:prod`.
-- After a clean `git status --short`, deploy with `vercel deploy --prod`, then run:
+- After a clean `git status --short`, deploy with `vercel deploy --prod --scope strelva`, then run:
 
 ```bash
 PLAYWRIGHT_BASE_URL=https://app.strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g "signed-out dashboard customers"
@@ -133,9 +152,9 @@ Move an item here only with owner approval in the release note. Each waiver must
 
 ### Production Live Verification
 
-- Status: app freshness resolved on May 14, 2026; final production verification remains pending Rohlax DNS, `jacobtest` tenant configuration, and owner manual checks.
-- Evidence: production env was pulled from Vercel, the local built-app gate passes, and the Vercel app-host freshness check now sees `https://strelva.com/sign-in` serve `Sign in to Strelva | Strelva` from Vercel. The latest inspected production deployment is `dpl_AjSfZpDFeYtzGzjuMBKsJsPzXJA6` for `scaffold-web`, created May 14, 2026 at 10:19:30 EDT, Ready at `https://scaffold-cqqfkhtzo-rhinehart514-gmailcoms-projects.vercel.app`, with aliases for `https://strelva.com`, `https://*.strelva.com`, `https://demo.strelva.com`, `https://admin.rohlaxwellness.com`, and `https://admin.greatlakesdriedfruit.com`. Previous blocker text covered Authenticated production dashboard access and said to run the final command after production env, redeploy, and DNS are resolved; the env and Strelva production-domain prerequisites are complete, while Rohlax Cloudflare DNS and `jacobtest` tenant configuration remain open.
-- Required owner action: continue using `PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release` for release verification, and keep manually checking that an invited owner reaches `/dashboard/site`, a content edit saves and refreshes preview, Clerk/Stripe webhook deliveries are visible in the provider dashboards, and cron 401/success behavior works before announcing a customer go-live.
+- Status: app freshness resolved on May 14, 2026; Rohlax DNS and `jacobtest` resolved 2026-07-12.
+- Evidence: production env was pulled from Vercel, the local built-app gate passes, and the Vercel app-host freshness check sees `https://app.strelva.com/sign-in` serve `Sign in to Strelva | Strelva` from Vercel. The Vercel project is `strelva-admin` under team `strelva` (previously listed as `scaffold-web`/`rhinehart514-gmailcoms-projects` — those are the old project/team names; use `--scope strelva` for all CLI operations). Auth is Supabase-only as of 2026-07-11 (#146) — no Clerk webhook deliveries to verify; check Supabase Auth and Stripe webhook deliveries in provider dashboards.
+- Required owner action: use `PLAYWRIGHT_BASE_URL=https://app.strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release` for release verification. Manually verify that an invited owner reaches `/dashboard/site`, a content edit saves and refreshes preview, Supabase Auth and Stripe webhook deliveries are visible in provider dashboards, and cron 401/success behavior works before announcing a customer go-live. Also confirm `SECRETS_ENC_KEY` and `SUPABASE_URL` (private) are set in Vercel prod (see production-readiness.md Known issues).
 
 ### Production Domain Routing
 
@@ -146,9 +165,9 @@ Move an item here only with owner approval in the release note. Each waiver must
 - Resolved env handoff reference:
   - Required owner action: Production env has been set, pulled, and rechecked locally; keep this handoff text for future rotations.
   - Minimum production values to confirm in Vercel: live Clerk keys and webhook secret, `SUPER_ADMIN_EMAILS`, Google AI key, Upstash REST URL/token, Stripe live key/price/webhook secret, Resend key/domain, generated `CRON_SECRET` / `INTERNAL_API_SECRET` / `OAUTH_STATE_SECRET`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `NEXT_PUBLIC_SITE_URL=https://strelva.com`, and `NEXT_PUBLIC_APP_URL=https://strelva.com` when Google, Instagram, or Calendly OAuth is enabled.
-  - Copyable Vercel env commands retained for rotation reference: `vercel env add CLERK_WEBHOOK_SECRET production`, `vercel env add UPSTASH_REDIS_REST_URL production`, `vercel env add UPSTASH_REDIS_REST_TOKEN production`, `vercel env add SENTRY_DSN production`, `vercel env add NEXT_PUBLIC_SENTRY_DSN production`, `vercel env add REB_CUSTOM_REQUEST_SECRET production`, and `vercel env add NEXT_PUBLIC_APP_URL production` when OAuth is enabled.
-  - Provider value sources: `CLERK_WEBHOOK_SECRET` from Clerk Dashboard -> Webhooks; `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` from Upstash Redis database -> REST API section; `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` from Sentry project settings -> Client Keys / DSN; `REB_CUSTOM_REQUEST_SECRET` is a generated shared custom-storefront bearer secret; `STRIPE_SCAFFOLD_PRICE_ID` is optional while admin-side pricing is undecided — when set it must be a live recurring monthly USD Stripe price configured under Stripe live-mode Products.
-  - Clerk publishable key, secret key, and webhook secret must come from the same live Clerk instance; mismatched Clerk apps can make `/sign-in` loop.
+  - Copyable Vercel env commands retained for rotation reference (NOTE: `CLERK_WEBHOOK_SECRET` is removed — Clerk is fully torn down as of #146): `vercel env add UPSTASH_REDIS_REST_URL production`, `vercel env add UPSTASH_REDIS_REST_TOKEN production`, `vercel env add SENTRY_DSN production`, `vercel env add NEXT_PUBLIC_SENTRY_DSN production`, `vercel env add REB_CUSTOM_REQUEST_SECRET production`, and `vercel env add NEXT_PUBLIC_APP_URL production` when OAuth is enabled.
+  - Provider value sources: `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` from Upstash Redis database -> REST API section; `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN` from Sentry project settings -> Client Keys / DSN; `REB_CUSTOM_REQUEST_SECRET` is a generated shared custom-storefront bearer secret; `STRIPE_SCAFFOLD_PRICE_ID` is optional while admin-side pricing is undecided — when set it must be a live recurring monthly USD Stripe price configured under Stripe live-mode Products. (Clerk is fully removed — no Clerk webhook secret needed.)
+  - (HISTORICAL — Clerk is fully removed as of #146.) Auth is now Supabase-only. Any Clerk env vars still present in Vercel must be removed.
   - Do not overwrite the values already passing the checker unless the provider dashboard says they are wrong. If a generated secret must be rotated, generate it with `openssl rand -hex 32`, update the matching provider or caller, run `vercel env pull .env.production.local --environment=production`, then rerun `pnpm check:prod`.
   - Redeploy the Vercel Production app after env changes. Prefer the Vercel dashboard or a clean release branch; check `git status --short` first and do not run `vercel deploy --prod` from a dirty local working tree. After redeploy, run the Vercel-host freshness probe with `PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g "signed-out dashboard customers"` and confirm `https://strelva.com/sign-in` serves `Sign in to Strelva | Strelva`.
 - Required Vercel Production env values now pass after pulling `vercel env pull .env.production.local --environment=production`: `CLERK_WEBHOOK_SECRET`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, and `REB_CUSTOM_REQUEST_SECRET` are set. `NEXT_PUBLIC_APP_URL` remains required only if Google, Instagram, or Calendly OAuth is enabled. Provider sources were Clerk Dashboard -> Webhooks -> `https://strelva.com/api/clerk/webhook`, Upstash Redis -> REST API, Sentry project settings -> Client Keys / DSN, and a generated shared custom-storefront bearer secret. Historical add commands for the resolved env handoff were `vercel env add CLERK_WEBHOOK_SECRET production`, `vercel env add UPSTASH_REDIS_REST_URL production`, `vercel env add UPSTASH_REDIS_REST_TOKEN production`, `vercel env add SENTRY_DSN production`, `vercel env add NEXT_PUBLIC_SENTRY_DSN production`, and `vercel env add REB_CUSTOM_REQUEST_SECRET production`.
@@ -215,13 +234,13 @@ pnpm audit
 pnpm build
 pnpm check:prod
 git status --short
-REB_DEV_UNGATED_ACCESS=0 PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm smoke
+REB_DEV_UNGATED_ACCESS=0 PLAYWRIGHT_BASE_URL=https://app.strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm smoke
 ```
 
 Equivalent one-command local gate:
 
 ```bash
-PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release
+PLAYWRIGHT_BASE_URL=https://app.strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release
 ```
 
 The GitHub Release workflow refuses to create a `reb-vYYYY.MM.DD.N` tag unless the operator confirms `pnpm check:release` passed or owner-waived blockers are documented in a real release note, PR, URL, or ticket reference. Placeholder references such as `none`, `n/a`, `todo`, `tbd`, or `pending` are rejected.
@@ -237,3 +256,4 @@ Then manually verify:
 - Public tenant pages cannot be framed without `?preview=true`.
 - `admin.greatlakesdriedfruit.com` root redirects to `/dashboard`, then signed-out users reach `/sign-in` with invited-email guidance.
 - Cron routes return `401` without `Authorization: Bearer <CRON_SECRET>` and succeed with it.
+- Supabase Auth webhook deliveries show success in the Supabase dashboard (Clerk is removed — no Clerk webhooks to verify).

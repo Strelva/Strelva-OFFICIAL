@@ -126,3 +126,23 @@ The workspace inventory is **manifest-driven** — `release-manifest.json` → `
 That's it — a starter-based repo inherits the whole baseline. Only add `packageScripts` / `requiredFiles` / `requiredEnv` to the entry if the repo has extras BEYOND the baseline (the legacy gldf/rohlax repos do; new starter repos shouldn't).
 
 **Verify:** `pnpm check:custom-repos` (green when siblings aren't checked out — repos SKIP; run with the repos checked out next to `strelva-platform`, or set `CUSTOM_REPO_WORKSPACE_ROOT`, to run the structural checks). Merge logic is covered by `src/__tests__/custom-repo-workspace-inventory.test.ts`.
+
+## Known issues / TODO
+
+**[HIGH][tenant-isolation] `upload_image` agent tool uses unscoped `uploadFile()` — missing tenant prefix.**
+`src/app/api/agent/route.ts:568` calls the raw `uploadFile(file)` from `src/lib/storage`, which stores into a flat shared Blob namespace with no tenant prefix. Fix: replace with `uploadTenantMedia(tenant, buffer, finalFilename, sniffedMimeType)` (`src/lib/storage/media-store.ts`). Also fixes the AVIF upload bug (the current path can reject AVIF despite advertising it in the error message).
+
+**[HIGH][bug] Tenant rename silently loses GBP meta and review-nudge history.**
+`src/lib/tenant-rename.ts` `authoritativePatterns` is missing several Redis-authoritative keys. After a slug rename those stores stay under the old key indefinitely:
+- `google-meta:${t}` — Google Business Profile connection state
+- `review-replies:recent:${t}` — recent reply dedup
+- `reb:review-nudge-sent:${t}` — review nudge dedup marker
+- `reb:order-review-request-sent:${t}:*` — order review request dedup
+- `reb:review-reply-declined:${t}:*` — 180-day reply-veto (durable, meaningful)
+Fix: add all five patterns to `authoritativePatterns` and add coverage assertions to the completeness unit test.
+
+**[MEDIUM][security] `businessRules` injected unsanitized into the agent system prompt.**
+`src/lib/agent-prompt-shared.ts:343` interpolates `tenantConfig.businessRules` directly without calling `sanitizePromptValue`. All other tenant-supplied strings in that file go through the sanitizer. Fix: wrap with `sanitizePromptValue(tenantConfig.businessRules)` and add a max-length cap (e.g. 1000 chars) in the `TenantEditor` validator at write time so a large `businessRules` value cannot balloon the system prompt.
+
+**[HIGH][tenant-isolation] Missing `Cache-Control: private` on v1 collections routes.**
+`src/app/api/v1/collections/[tenant]/[type]/route.ts` and `.../[slug]/route.ts` return successful responses with no `Cache-Control` header. Other v1 routes (content, page-config, site-capabilities) already set `private, max-age=0, must-revalidate`. Without it, a CDN or shared cache could serve one tenant's collection data to another tenant's visitor. Fix: add the same `TENANT_PRIVATE_CACHE` constant used in the content route to both collections routes.

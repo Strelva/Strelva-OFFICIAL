@@ -27,6 +27,25 @@ function stringList(value: unknown): string[] | null {
     : null;
 }
 
+/** Allow only safe path/tag values: printable ASCII, no newlines or null bytes.
+ *  A path must start with '/' and contain only non-whitespace safe chars.
+ *  A tag is any non-empty string with only safe chars (printable, no whitespace). */
+function isSafePath(s: string): boolean {
+  return s.startsWith("/") && /^[\x20-\x7E]+$/.test(s) && !s.includes("\0");
+}
+
+function isSafeTag(s: string): boolean {
+  return s.length > 0 && /^[\x21-\x7E]+$/.test(s) && !s.includes("\0");
+}
+
+function sanitizePaths(paths: string[]): string[] {
+  return paths.filter(isSafePath);
+}
+
+function sanitizeTags(tags: string[]): string[] {
+  return tags.filter(isSafeTag);
+}
+
 export async function POST(request: Request) {
   const secret = process.env.REVALIDATION_SECRET || process.env.REVALIDATE_SECRET;
   const tenantId = process.env.TENANT_ID;
@@ -52,8 +71,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, ignored: true });
   }
 
-  const paths = payload.all === true ? ["/"] : stringList(payload.paths) ?? [];
-  const tags = stringList(payload.tags) ?? [];
+  const rawPaths = payload.all === true ? ["/"] : stringList(payload.paths) ?? [];
+  const rawTags = stringList(payload.tags) ?? [];
+  const paths = sanitizePaths(rawPaths);
+  const tags = sanitizeTags(rawTags);
 
   for (const path of paths) revalidatePath(path);
   for (const tag of tags) revalidateTag(tag, "default");

@@ -36,6 +36,22 @@ const TOKENS = {
 // Real logo lockup (cairn + Fraunces wordmark), light-bg version. Hosted so it
 // renders everywhere incl. Outlook and carries the exact wordmark. Overridable
 // via env (the preview gallery injects a data URI since it can't hit the URL).
+//
+// Operational env vars consumed by the email system (document here so they are
+// not invisible to operators):
+//
+//   EMAIL_LOGO_URL   — Override the Strelva logo URL used in every outbound email
+//                      header and footer. Defaults to the hosted
+//                      strelva.com/brand/logo-full-light.png. Set in the Vercel
+//                      dashboard; the email preview gallery injects a data URI so
+//                      the preview works without hitting the real URL.
+//
+//   REPLY_TO_EMAIL   — Where subscriber/client replies land. Consumed by
+//                      src/lib/email/send.ts (sendEmail) and the newsletter batch
+//                      sender. Defaults to hello@strelva.com — the real human
+//                      inbox — so replies reach a person rather than the
+//                      send-only updates.strelva.com sending domain.
+//                      Override per deployment if the reply address changes.
 const EMAIL_LOGO_URL =
   process.env.EMAIL_LOGO_URL || "https://strelva.com/brand/logo-full-light.png";
 const LOGO_RATIO = 336 / 972;

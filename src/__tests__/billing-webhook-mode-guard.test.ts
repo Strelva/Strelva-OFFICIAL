@@ -24,6 +24,7 @@ const mockConstructEvent = vi.fn();
 const mockSubRetrieve = vi.fn();
 const mockRedisSet = vi.fn();
 const mockRedisGet = vi.fn();
+const mockIsProductionEnv = vi.fn(() => false);
 
 // A mutable handle so individual tests can opt into a fake Redis (to assert the
 // durable build-payment record) while the default stays null (non-prod =>
@@ -46,7 +47,7 @@ vi.mock("@/lib/redis", () => ({
 }));
 
 vi.mock("@/lib/production-guard", () => ({
-  isProductionEnv: vi.fn(() => false),
+  isProductionEnv: () => mockIsProductionEnv(),
 }));
 
 const mockAlert = vi.fn();
@@ -86,6 +87,8 @@ beforeEach(() => {
   mockRedisSet.mockResolvedValue("OK");
   mockSendNewSignupEmail.mockResolvedValue(true);
   mockSendPaymentFailedEmail.mockResolvedValue(true);
+  // Default: non-production (idempotency short-circuits to "claimed" without Redis).
+  mockIsProductionEnv.mockReturnValue(false);
   // Default: no Redis (matches non-prod idempotency short-circuit).
   redisHandle = null;
 });
@@ -571,6 +574,296 @@ describe("billing webhook checkout.session.completed mode guard", () => {
         ownerEmail: "owner@acme.com",
         tenantUrl: "https://admin.strelva.com/admin/clients/acme",
       }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// customer.subscription.deleted — three-level tenant-resolution fallback
+// ---------------------------------------------------------------------------
+describe("billing webhook customer.subscription.deleted", () => {
+  it("metadata tenantId present → subscriptionStatus set to cancelled + alert fires", async () => {
+    const res = await postEvent({
+      id: "evt_deleted_meta",
+      type: "customer.subscription.deleted",
+      created: 1_701_000_000,
+      data: {
+        object: {
+          id: "sub_del_1",
+          customer: "cus_del_1",
+          metadata: { tenantId: "acme" },
+        },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateTenant).toHaveBeenCalledWith(
+      "acme",
+      expect.objectContaining({ subscriptionStatus: "cancelled" }),
+    );
+    expect(mockAlert).toHaveBeenCalledWith(
+      "billing_subscription_cancelled",
+      "high",
+      expect.objectContaining({ tenantId: "acme" }),
+    );
+    // stored-id lookups must NOT be called when metadata already resolves it
+    expect(mockGetTenantBySubId).not.toHaveBeenCalled();
+    expect(mockGetTenantByCustomerId).not.toHaveBeenCalled();
+  });
+
+  it("no metadata → falls back to stored subscription id", async () => {
+    mockGetTenantBySubId.mockResolvedValue({ id: "acme" });
+    const res = await postEvent({
+      id: "evt_deleted_subid",
+      type: "customer.subscription.deleted",
+      created: 1_701_000_100,
+      data: {
+        object: {
+          id: "sub_del_stored",
+          customer: "cus_del_stored",
+          // No metadata at all
+          metadata: {},
+        },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockGetTenantBySubId).toHaveBeenCalledWith("sub_del_stored");
+    expect(mockUpdateTenant).toHaveBeenCalledWith(
+      "acme",
+      expect.objectContaining({ subscriptionStatus: "cancelled" }),
+    );
+    expect(mockAlert).toHaveBeenCalledWith(
+      "billing_subscription_cancelled",
+      "high",
+      expect.objectContaining({ tenantId: "acme" }),
+    );
+  });
+
+  it("no metadata, no matching sub-id → customer-id fallback resolves tenant", async () => {
+    // sub-id lookup misses; customer-id lookup finds the tenant
+    mockGetTenantBySubId.mockResolvedValue(undefined);
+    mockGetTenantByCustomerId.mockResolvedValue({ id: "acme" });
+    const res = await postEvent({
+      id: "evt_deleted_custid",
+      type: "customer.subscription.deleted",
+      created: 1_701_000_200,
+      data: {
+        object: {
+          id: "sub_del_cust",
+          customer: "cus_del_fallback",
+          metadata: {},
+        },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockGetTenantBySubId).toHaveBeenCalledWith("sub_del_cust");
+    expect(mockGetTenantByCustomerId).toHaveBeenCalledWith("cus_del_fallback");
+    expect(mockUpdateTenant).toHaveBeenCalledWith(
+      "acme",
+      expect.objectContaining({ subscriptionStatus: "cancelled" }),
+    );
+    expect(mockAlert).toHaveBeenCalledWith(
+      "billing_subscription_cancelled",
+      "high",
+      expect.objectContaining({ tenantId: "acme" }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stripe idempotency branches (duplicate / retry / Redis-throws)
+// ---------------------------------------------------------------------------
+
+/** Build a fake Redis that returns the given record on .get() for any key. */
+function useFakeRedisWithRecord(record: unknown) {
+  mockRedisGet.mockResolvedValue(record);
+  redisHandle = {
+    set: (...args: unknown[]) => mockRedisSet(...args),
+    get: (...args: unknown[]) => mockRedisGet(...args),
+  };
+}
+
+/** Build a fake Redis whose .set() and .get() both throw. */
+function useBrokenRedis() {
+  redisHandle = {
+    set: () => Promise.reject(new Error("Redis unavailable")),
+    get: () => Promise.reject(new Error("Redis unavailable")),
+  };
+}
+
+describe("billing webhook idempotency (claimStripeEvent branches)", () => {
+  it("duplicate event (key already processed) → 200 { duplicate: true }, no updateTenant", async () => {
+    // Stripe already has the event keyed with status:"processed" → it was
+    // handled by a previous delivery. The duplicate branch must ack 200 and
+    // skip all side-effects so a retried payment does not double-update status.
+    useFakeRedisWithRecord({ status: "processed" });
+    // The NX set fails because the key already exists → return null (not "OK").
+    mockRedisSet.mockResolvedValue(null);
+
+    const res = await postEvent({
+      id: "evt_dup",
+      type: "invoice.paid",
+      created: 1_702_000_000,
+      data: {
+        object: {
+          id: "in_dup",
+          metadata: { tenantId: "acme" },
+        },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.duplicate).toBe(true);
+    expect(mockUpdateTenant).not.toHaveBeenCalled();
+  });
+
+  it("in-flight event (status processing, recent startedAt) → 503", async () => {
+    // Another worker is currently processing this event. Returning 200 would
+    // tell Stripe "done" and it would never redeliver — so a crashed first
+    // attempt would silently drop the event. Return 503 so Stripe retries.
+    const recentStartedAt = Date.now() - 30_000; // 30 s ago, well within 5 min stale window
+    useFakeRedisWithRecord({ status: "processing", startedAt: recentStartedAt });
+    mockRedisSet.mockResolvedValue(null); // NX fails — key exists
+
+    const res = await postEvent({
+      id: "evt_inflight",
+      type: "invoice.paid",
+      created: 1_702_001_000,
+      data: {
+        object: {
+          id: "in_inflight",
+          metadata: { tenantId: "acme" },
+        },
+      },
+    });
+
+    expect(res.status).toBe(503);
+    expect(mockUpdateTenant).not.toHaveBeenCalled();
+  });
+
+  it("claimStripeEvent throws (Redis down in prod) → 503 + billing_webhook_idempotency_unavailable alert", async () => {
+    // In production, claimStripeEvent throws when Redis is unavailable (it
+    // can't guarantee idempotency). The route must catch this and return 503
+    // (telling Stripe to retry when Redis recovers), not 500 + stack leak.
+    // Simulate production so the throw path is taken.
+    mockIsProductionEnv.mockReturnValue(true);
+    useBrokenRedis();
+
+    const res = await postEvent({
+      id: "evt_redis_down",
+      type: "invoice.paid",
+      created: 1_702_002_000,
+      data: {
+        object: {
+          id: "in_redis_down",
+          metadata: { tenantId: "acme" },
+        },
+      },
+    });
+
+    expect(res.status).toBe(503);
+    expect(mockAlert).toHaveBeenCalledWith(
+      "billing_webhook_idempotency_unavailable",
+      "critical",
+      expect.objectContaining({ eventType: "invoice.paid" }),
+    );
+    expect(mockUpdateTenant).not.toHaveBeenCalled();
+
+    // Restore non-prod default for subsequent tests.
+    mockIsProductionEnv.mockReturnValue(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isTrialCreateInvoice guard — zero-dollar subscription_create invoice
+// ---------------------------------------------------------------------------
+describe("billing webhook isTrialCreateInvoice guard", () => {
+  it("$0 subscription_create invoice does NOT flip subscriptionStatus to active", async () => {
+    // Stripe fires invoice.paid for a $0 trial-creation invoice the instant a
+    // trial subscription is created. Promoting trialing → active on that would
+    // erase the trial state and count an unpaid trial as active MRR.
+    const res = await postEvent({
+      id: "evt_trial_invoice",
+      type: "invoice.paid",
+      created: 1_703_000_000,
+      data: {
+        object: {
+          id: "in_trial_create",
+          billing_reason: "subscription_create",
+          amount_paid: 0,
+          metadata: { tenantId: "acme" },
+          parent: {
+            subscription_details: { subscription: "sub_trial_create", metadata: { tenantId: "acme" } },
+          },
+        },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    // Must NOT promote to active — the trial state must be preserved.
+    const calls = mockUpdateTenant.mock.calls;
+    for (const [, patch] of calls) {
+      expect((patch as Record<string, unknown>).subscriptionStatus).not.toBe("active");
+    }
+  });
+
+  it("$0 subscription_create invoice DOES still stamp stripeSubscriptionId and clear past-due", async () => {
+    const res = await postEvent({
+      id: "evt_trial_invoice_stamp",
+      type: "invoice.paid",
+      created: 1_703_000_100,
+      data: {
+        object: {
+          id: "in_trial_create_stamp",
+          billing_reason: "subscription_create",
+          amount_paid: 0,
+          metadata: { tenantId: "acme" },
+          parent: {
+            subscription_details: { subscription: "sub_trial_stamp", metadata: { tenantId: "acme" } },
+          },
+        },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    // The sub id and past-due clear must still be applied even though status is skipped.
+    expect(mockUpdateTenant).toHaveBeenCalledWith(
+      "acme",
+      expect.objectContaining({
+        subscriptionPastDueSince: null,
+        stripeSubscriptionId: "sub_trial_stamp",
+      }),
+    );
+  });
+
+  it("non-zero invoice.paid with billing_reason subscription_create DOES flip to active (real first payment)", async () => {
+    // A subscription with no trial where the first invoice is paid immediately —
+    // billing_reason is still 'subscription_create' but amount_paid > 0 (real money).
+    // This must still promote to active.
+    const res = await postEvent({
+      id: "evt_paid_create",
+      type: "invoice.paid",
+      created: 1_703_000_200,
+      data: {
+        object: {
+          id: "in_paid_create",
+          billing_reason: "subscription_create",
+          amount_paid: 9900,
+          metadata: { tenantId: "acme" },
+          parent: {
+            subscription_details: { subscription: "sub_paid_create", metadata: { tenantId: "acme" } },
+          },
+        },
+      },
+    });
+
+    expect(res.status).toBe(200);
+    expect(mockUpdateTenant).toHaveBeenCalledWith(
+      "acme",
+      expect.objectContaining({ subscriptionStatus: "active" }),
     );
   });
 });

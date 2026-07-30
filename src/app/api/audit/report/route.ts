@@ -14,6 +14,11 @@ import type { AuditResult, CategoryResult } from "@/lib/audit/types";
 
 const GRADES = new Set(["A", "B", "C", "D", "F"]);
 
+/** Maximum number of categories and checks accepted from an untrusted caller.
+ *  The real audit engine emits at most ~8 categories and ~30 checks per category. */
+const MAX_CATEGORIES = 20;
+const MAX_CHECKS_PER_CATEGORY = 100;
+
 /** Minimal structural validation — enough to render safely, not a full schema. */
 function isAuditResult(value: unknown): value is AuditResult {
   if (!value || typeof value !== "object") return false;
@@ -23,13 +28,16 @@ function isAuditResult(value: unknown): value is AuditResult {
   if (typeof r.overallScore !== "number" || Number.isNaN(r.overallScore)) return false;
   if (typeof r.grade !== "string" || !GRADES.has(r.grade)) return false;
   if (!Array.isArray(r.categories)) return false;
+  // Reject payloads that exceed the expected size envelope.
+  if ((r.categories as unknown[]).length > MAX_CATEGORIES) return false;
   return (r.categories as unknown[]).every((c) => {
     if (!c || typeof c !== "object") return false;
     const cat = c as Partial<CategoryResult>;
     return (
       typeof cat.name === "string" &&
       typeof cat.score === "number" &&
-      Array.isArray(cat.checks)
+      Array.isArray(cat.checks) &&
+      (cat.checks as unknown[]).length <= MAX_CHECKS_PER_CATEGORY
     );
   });
 }

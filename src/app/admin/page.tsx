@@ -127,7 +127,12 @@ export default async function AdminPage() {
   // than a second adjacent list. Deep-link to the merged client detail URL.
   const portfolioState = await getPortfolioSummaryState();
   const portfolio = portfolioState.snapshot;
-  const attention = portfolio ? buildAttentionFromSnapshot(portfolio) : await buildAttentionBriefing();
+  // When no cached snapshot is available, fall back to an on-demand briefing.
+  // Wrap in a catch so a failure in buildAttentionBriefing never crashes the
+  // overview — it degrades to zero flags rather than a 500.
+  const attention = portfolio
+    ? buildAttentionFromSnapshot(portfolio)
+    : await buildAttentionBriefing().catch(() => ({ items: [] }));
   const flags: TodayFlag[] = attention.items
     .filter((i) => i.severity !== "low")
     .slice(0, 6)

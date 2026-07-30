@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 export type CronAuthResult =
@@ -17,7 +18,18 @@ export function validateCronRequest(
     return { allowed: false, status: 500, message: "CRON_SECRET not configured" };
   }
 
-  if (authorization === `Bearer ${expectedSecret}`) {
+  const expected = `Bearer ${expectedSecret}`;
+  const provided = authorization ?? "";
+  // Timing-safe compare prevents secret-length leakage via timing attacks.
+  // Both buffers must be the same byte length for timingSafeEqual to work, so
+  // we compare lengths first (that check leaks only whether the lengths match,
+  // not the secret value itself).
+  const expectedBuf = Buffer.from(expected);
+  const providedBuf = Buffer.from(provided);
+  if (
+    expectedBuf.length === providedBuf.length &&
+    timingSafeEqual(expectedBuf, providedBuf)
+  ) {
     return { allowed: true, status: 200, message: "OK" };
   }
 

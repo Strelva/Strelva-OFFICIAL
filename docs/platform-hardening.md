@@ -1,8 +1,13 @@
 # Platform Hardening
 
-> **Status: historical branch record.** Service lists, auth providers, and file
-> paths below describe the former hardening branch and are not current runbook
-> truth. Use `production-readiness.md`, `health.ts`, and `heartbeat.ts`.
+> **Status: partially historical.** Sections 1-5 describe shipped, live features
+> (health endpoint, Sentry, AI fallback, auto-approval, revalidation reconcile).
+> The service table in Section 1 is STALE: Sanity and Clerk checks were removed
+> when those integrations were torn down (Clerk #146, 2026-07-11; Sanity 2026-07-10).
+> The live health endpoint (`src/lib/health.ts`) now checks Redis, Supabase,
+> Stripe, and Gemini only. The overall-status logic changed: "down" triggers when
+> Redis OR Supabase fails (not Sanity). See `production-readiness.md` and
+> `health.ts` for current truth.
 
 Production hardening for Strelva: observability, reliability, and security improvements.
 
@@ -15,15 +20,17 @@ Production hardening for Strelva: observability, reliability, and security impro
 **File:** `src/app/api/health/route.ts`
 **Route:** `GET /api/health`
 
-Checks five services concurrently with a 3-second timeout per check:
+Checks four services concurrently with a 3-second timeout per check:
 
 | Service | How it checks | Auth needed |
 |---------|--------------|-------------|
 | Redis | `redis.ping()` via Upstash REST client | Upstash token |
-| Sanity | `count(*[_type == "siteSettings"])` query | Sanity API token |
-| Clerk | `GET /.well-known/jwks.json` on the frontend API domain (decoded from publishable key) | None (public JWKS endpoint) |
+| Supabase | Postgres query via service-role client | SUPABASE_SERVICE_ROLE_KEY |
 | Stripe | `GET /v1/events?limit=1` | Stripe secret key (Bearer auth) |
 | Gemini | `GET /v1beta/models?pageSize=1` | `x-goog-api-key` header |
+
+> **Removed (teardown complete):** Sanity check (2026-07-10) and Clerk check (2026-07-11)
+> are gone from the live implementation. The table above reflects `src/lib/health.ts`.
 
 ### Response shape
 
@@ -33,13 +40,11 @@ Checks five services concurrently with a 3-second timeout per check:
   "version": "0.1.0",
   "timestamp": "2025-05-20T12:00:00.000Z",
   "checks": {
-    "redis":  { "status": "ok", "responseMs": 42 },
-    "sanity": { "status": "ok", "responseMs": 180 },
-    "clerk":  { "status": "ok", "responseMs": 95 },
-    "stripe": { "status": "ok", "responseMs": 110 },
-    "gemini": { "status": "ok", "responseMs": 200 }
-  },
-  "errors": []
+    "redis":    { "status": "ok", "responseMs": 42 },
+    "supabase": { "status": "ok", "responseMs": 95 },
+    "stripe":   { "status": "ok", "responseMs": 110 },
+    "gemini":   { "status": "ok", "responseMs": 200 }
+  }
 }
 ```
 
@@ -47,15 +52,15 @@ Per-service `status` is `"ok"`, `"not configured"`, or `"error"`.
 
 ### Overall status logic
 
-- **"down"** if Redis OR Sanity is `"error"`. Returns HTTP 503.
-- **"degraded"** if any non-core service (Clerk, Stripe, Gemini) is `"error"`. Returns HTTP 200.
+- **"down"** if Redis OR Supabase is `"error"` (in production). Returns HTTP 503.
+- **"degraded"** if any non-core service (Stripe, Gemini) is `"error"`. Returns HTTP 200.
 - **"healthy"** if everything is `"ok"` or `"not configured"`. Returns HTTP 200.
 
 Services with missing env vars report `"not configured"` and do not drag status down.
 
 ### Wiring to monitoring
 
-Point UptimeRobot or Better Stack at `https://strelva.com/api/health`. Alert on:
+Point UptimeRobot or Better Stack at `https://app.strelva.com/api/health`. Alert on:
 - HTTP 503 (core service down)
 - JSON body `.status !== "healthy"` (degraded)
 - Response time > 5s (individual check timeout is 3s, but network adds overhead)
@@ -208,12 +213,14 @@ Detects custom-repo client sites that are out of sync with the control plane. Th
 
 ## 6. Dependency Changes
 
-### Added
+### Added (at time of this branch)
 
-| Package | Version | Purpose |
+| Package | Version at branch | Purpose |
 |---------|---------|---------|
 | `@ai-sdk/anthropic` | `3.0.78` | Anthropic provider for AI fallback |
 | `@ai-sdk/openai` | `3.0.64` | OpenAI provider for AI fallback |
+
+> See `package.json` for current installed versions.
 
 ### Env vars added
 
@@ -225,6 +232,14 @@ Detects custom-repo client sites that are out of sync with the control plane. Th
 | `AI_FALLBACK_MODEL` | No | Fallback AI model ID |
 
 ---
+
+## Known issues / TODO
+
+- **[CRITICAL][security] Next.js 16.2.6 has unpatched CVEs.** `package.json` pins `"next": "16.2.6"`. Bump to `16.2.12` and match `eslint-config-next`. Run `pnpm audit` to verify advisories clear. After bumping, do a full `vercel deploy --prod --yes --scope strelva` (redeploy reuses old env snapshot, not a fresh build). See `package.json:49`.
+- **[HIGH][security] Five security-pin overrides frozen at still-vulnerable versions** (`package.json:73-97`): `brace-expansion@<2` (pinned 1.1.13, need 1.1.16+), `brace-expansion@>=4 <5.0.5` (need 5.0.8), `fast-uri` (need 3.1.4), `postcss` (need 8.5.18), `dompurify` (need 3.4.12+). Update each, run `pnpm install && pnpm audit` to confirm advisory count drops.
+- **[MEDIUM][security] Newsletter HTML sanitizer allows CSS expressions and `javascript:` URLs in style attributes** (`src/lib/email-html.ts:23-33`). Remove `'style'` from `ALLOWED_ATTR` in `sanitizeEmailHtml`, or add a post-sanitization step stripping CSS `url()` and `expression()` patterns from surviving style attributes. Simplest fix: strip `style` entirely from tenant-supplied newsletter body content.
+- **[MEDIUM][security] Partial `FORBID_ATTR` blocklist in newsletter sanitizer** (`src/lib/email-html.ts:32`): only three of many event handlers are blocked; use `FORBID_TAGS` + `FORCE_BODY` instead of a per-handler blocklist.
+- **[LOW][security] Subdomain-resolved tenant requests skip the proxy auth gate** (`src/proxy.ts:636-647`). The `needsAuth` check covers `isAdminSubdomain`, `tenantFromQueryParam`, and `tenantFromClientPath` but not the raw subdomain resolution path. Add `tenantFromSubdomain` as a fourth condition in `needsAuth`. Per-route guards remain defense-in-depth.
 
 ## Files changed on this branch
 

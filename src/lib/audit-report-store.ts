@@ -55,6 +55,9 @@ export async function saveAuditReport(
 
 /** Look up a stored report by id. Returns null when missing, expired, or Redis is down. */
 export async function getAuditReport(id: string): Promise<StoredAuditReport | null> {
+  // Reject IDs that don't match the 32-hex shape produced by newId() to prevent
+  // arbitrary Redis key suffix injection (e.g. "../../other:key").
+  if (!/^[a-f0-9]{32}$/.test(id)) return null;
   const redis = getRedis();
   if (!redis) return null;
   try {

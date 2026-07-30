@@ -283,7 +283,6 @@ export async function executeAgentPromptDetailed(
       }),
       execute: async ({ title, content, tags }) => {
         const { saveEntry } = await import("@/lib/cms/collections-service");
-        const tenantConfig = await getTenantConfig(tenantId);
         const author = tenantConfig?.ownerName || "The Team";
         const excerpt = content.slice(0, 160).replace(/\n/g, " ").trim();
 

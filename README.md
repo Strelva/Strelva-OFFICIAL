@@ -29,7 +29,9 @@ pulls content from Strelva over a versioned contract.
 ```
 
 - **Source of truth:** Supabase Postgres for content/config/tenants (flipped 2026-06-20;
-  Sanity is being decommissioned); Upstash Redis as a write-through cache and the
+  Sanity teardown done 2026-07-10 — code reads no Sanity data; only two legacy
+  `NEXT_PUBLIC_SANITY_*` env vars remain to resolve stored image asset URLs until a
+  content-URL rewrite ops step); Upstash Redis as a write-through cache and the
   operational store (events, clicks, bookings, reviews, pay-links, rewards).
 - **Sync contract (`/api/v1/*`):** client repos pull content (ISR) and receive
   HMAC-signed revalidation pushes. The contract is versioned (`v1`) and changed only
@@ -49,7 +51,7 @@ proposed change runs through:
 - **Risk assessment** (`agent-risk.ts`) — classifies the operation (rewrite/add/delete/
   reorder/structural) and scores it; only low-risk minor edits auto-apply, everything else
   routes to human review.
-- On publish: write to Sanity → write-through Redis → HMAC revalidate the client repo →
+- On publish: write to Postgres → write-through Redis → HMAC revalidate the client repo →
   verify the change is actually live before claiming it.
 
 **Operator agent** ("Mission Control", `/api/admin/agent`) — the founders run the business
@@ -97,3 +99,19 @@ pnpm provision-tenant   # CLI tenant provisioning
 
 Agent guidance for contributors lives in [`AGENTS.md`](./AGENTS.md); the canonical operating
 model and roadmap in [`docs/operating-model.md`](./docs/operating-model.md).
+
+## Audit remediation (2026-07-30)
+
+The 2026-07-30 deep audit's confirmed findings have been remediated — 139+ fixes
+shipped and gated (typecheck + 1983 tests + build clean), `pnpm audit` down from
+24 vulns (14 high) to 3 (1 high, 2 moderate) — the lone high is dev-only
+(eslint's minimatch), not in the production runtime. The Next bump, tenant-isolation, SSRF, OAuth,
+billing, and perf fixes are all landed. See the **Audit remediation status** in
+[`AGENTS.md`](./AGENTS.md) for the fixed-vs-remaining split and
+[`docs/audit-2026-07-30-deep-audit.md`](./docs/audit-2026-07-30-deep-audit.md)
+for every finding with evidence.
+
+Two items still need live infra (do on the next deploy): `vercel env rm` the
+orphaned Clerk/Sanity secrets, and regenerate `src/lib/db/database.types.ts`
+(`supabase gen types typescript`) to drop the `billing_type`/`account_id` shadow
+casts. A fresh `vercel deploy --prod --scope strelva` applies the `next` bump.

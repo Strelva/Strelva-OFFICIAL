@@ -97,8 +97,11 @@ export function TrafficSourcesPanel({ ga, connectHref }: TrafficSourcesPanelProp
     );
   }
 
-  const sources = ga!.topSources.filter((s) => s.sessions > 0).slice(0, 6);
-  const pages = ga!.topPages.filter((p) => p.views > 0).slice(0, 5);
+  // ok === true implies ga?.status === "ok", so ga is defined here.
+  // Return early rather than casting so TypeScript narrows ga to GaPerf.
+  if (!ga) return null;
+  const sources = ga.topSources.filter((s) => s.sessions > 0).slice(0, 6);
+  const pages = ga.topPages.filter((p) => p.views > 0).slice(0, 5);
 
   // Connected, but nothing measured yet (fresh property, no sessions).
   if (sources.length === 0 && pages.length === 0) {

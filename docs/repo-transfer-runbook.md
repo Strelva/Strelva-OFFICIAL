@@ -1,6 +1,8 @@
-# Repo Transfer Runbook (month-12 / buyout handoff)
+# Repo Transfer Runbook (client handoff)
 
-This is the procedure for honoring the ownership promise in `docs/strategy/website-offer-two-door.md`: on the monthly plan (Door 2), the **repo and all files transfer at month 12 on request — or earlier via buyout** — and the domain was the client's from day one. "You leave with everything."
+This is the procedure for honoring the ownership promise: on the monthly subscription plan, the **repo and all files transfer on request** — and the domain was the client's from day one. "You leave with everything."
+
+> **Pricing note:** The two-door (build-fee) offer referenced in `docs/strategy/website-offer-two-door.md` was superseded on 2026-06-26 by a pure 3-tier monthly subscription (Presence $99 / Growth $199 / Scale $499, no upfront fee). The ownership promise and transfer procedure below are unchanged regardless of pricing model.
 
 The goal of a transfer is a **frozen, self-contained repo that runs on the client's own infrastructure with no dependency on Strelva's `/api/v1` control plane.** This doc is the checklist to get there.
 
@@ -42,7 +44,7 @@ After this step the repo is **frozen**: it renders the final content from local 
 
 ## Step 2 — Export assets and download the actual files (manifest gap)
 
-**Known gap:** `GET /api/tenant-export/assets` returns a **URL manifest, not file bytes.** Read `src/app/api/tenant-export/assets/route.ts`: the payload is `referencedUrls` (every `https://` URL found in content) plus `libraryAssets` (Sanity image-asset records with `url`). The endpoint's own checklist says "Download original files from each listed URL before changing DNS." Nobody has automated that download yet.
+**Known gap:** `GET /api/tenant-export/assets` returns a **URL manifest, not file bytes.** Read `src/app/api/tenant-export/assets/route.ts`: the payload is `referencedUrls` (every `https://` URL found in content) plus `libraryAssets` (tenant media from Vercel Blob via `collectTenantMedia` — Sanity is no longer a data source; the Sanity teardown is complete as of 2026-07-10). The endpoint's own checklist says "Download original files from each listed URL before changing DNS." Nobody has automated that download yet.
 
 Until that's productized, the runbook does it by hand:
 

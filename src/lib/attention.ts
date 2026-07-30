@@ -68,10 +68,13 @@ export function buildAttentionFromSnapshot(s: PortfolioSnapshot): AttentionBrief
     items.push({ severity: "medium", kind: "ops", message: `${m.tenantDomainDrift.length} tenant domain drift`, href: "/admin/ops" });
 
   // Quiet tenants — no activity in a while (a check-in / churn signal).
-  const now = Date.now();
+  // Use the snapshot's own timestamp rather than wall-clock now so that a
+  // cached snapshot produces consistent results regardless of when it's read.
+  const snapshotMs = new Date(s.snapshotAt).getTime();
+  const referenceMs = Number.isFinite(snapshotMs) ? snapshotMs : Date.now();
   for (const t of s.tenants) {
     if (t.lastActivity) {
-      const days = Math.floor((now - new Date(t.lastActivity).getTime()) / 86_400_000);
+      const days = Math.floor((referenceMs - new Date(t.lastActivity).getTime()) / 86_400_000);
       if (days >= STALE_TENANT_DAYS) {
         items.push({
           severity: "low",

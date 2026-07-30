@@ -15,7 +15,9 @@
  * citation probe actually ran. Without a key, the verdict is readiness-framed only.
  */
 
+import * as dns from "node:dns";
 import * as cheerio from "cheerio";
+import { validateUrlSafety, isPrivateIP } from "@/lib/audit/checks";
 
 export type Grade = "A" | "B" | "C" | "D" | "F";
 
@@ -88,6 +90,21 @@ async function fetchText(url: string, ms = 9000): Promise<string | null> {
     });
     clearTimeout(timer);
     if (!res.ok) return null;
+    // Post-redirect DNS rebinding guard: if the final URL resolved to a
+    // different host (redirect: "follow" can deliver a response from an
+    // internal host after a public-to-private redirect), reject it.
+    if (res.url) {
+      try {
+        const finalHost = new URL(res.url).hostname;
+        const startHost = new URL(url).hostname;
+        if (finalHost !== startHost) {
+          const { address } = await dns.promises.lookup(finalHost, { family: 4 });
+          if (isPrivateIP(address)) return null;
+        }
+      } catch {
+        return null;
+      }
+    }
     return await res.text();
   } catch {
     return null;
@@ -187,7 +204,12 @@ function readinessSignals(html: string, robots: string | null, _input: ScoreInpu
   });
 
   // 3) Entity / NAP clarity (name, address, phone)
-  const text = $("body").text();
+  // Strip script/style/noscript/template to avoid matching phone-like patterns
+  // inside inline JS (e.g. numeric literals, obfuscated code).
+  const $clone = $.root().clone();
+  $clone.find("script, style, noscript, template").remove();
+  const bodyEl = $clone.find("body");
+  const text = (bodyEl.length ? bodyEl.text() : $clone.text()).replace(/\s+/g, " ").trim();
   const hasPhone = /(\+?\d[\d\s().-]{7,}\d)/.test(text);
   const hasAddress = /\b\d{1,5}\s+\w+(\s\w+){0,3}\s+(st|street|ave|avenue|rd|road|blvd|dr|drive|ln|lane|way|suite|ste)\b/i.test(
     text,
@@ -256,7 +278,10 @@ async function citationProbe(input: ScoreInput): Promise<CitationProbe> {
       `{"names":[".."]} listing every business you named.`;
     const { text } = await generateText({ model: google("gemini-2.5-flash"), prompt });
     const named = text.toLowerCase();
-    const mentioned = named.includes(input.business.toLowerCase());
+    // Use word-boundary matching to avoid false positives where the business
+    // name appears as a substring of another word (e.g. "Ace" inside "Acera").
+    const escapedBusiness = input.business.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const mentioned = new RegExp(`(?<![a-z0-9])${escapedBusiness}(?![a-z0-9])`, "i").test(named);
     return {
       probed: true,
       mentioned,
@@ -281,6 +306,17 @@ export async function scoreAiVisibility(input: ScoreInput): Promise<AiVisibility
 
   if (input.url) {
     url = normalizeUrl(input.url);
+    // SSRF protection: validate the URL resolves to a public IP before any fetch,
+    // matching the same guard used by runAudit in src/lib/audit/checks.ts.
+    try {
+      await validateUrlSafety(url);
+    } catch {
+      // Treat SSRF-blocked URLs as unfetchable — degrade to no signals.
+      url = undefined;
+    }
+  }
+
+  if (url) {
     const origin = (() => {
       try {
         return new URL(url).origin;
@@ -318,7 +354,7 @@ export async function scoreAiVisibility(input: ScoreInput): Promise<AiVisibility
   let verdict: string;
   if (citation.probed && !citation.mentioned) {
     verdict = `AI won't recommend ${input.business}. You're invisible when customers ask AI for the best ${input.category ?? "option"}.`;
-  } else if (citation.probed && citation.mentioned && grade <= "C") {
+  } else if (citation.probed && citation.mentioned && score < 70) {
     verdict = `AI knows ${input.business} but your site is hard for it to read. Your lead is fragile.`;
   } else if (!citation.probed && score < 70) {
     verdict = `${input.business} is at high risk of being invisible to AI search. AI can barely read your site.`;

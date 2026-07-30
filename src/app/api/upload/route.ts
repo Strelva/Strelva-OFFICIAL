@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { uploadFile } from "@/lib/storage";
+import { uploadTenantFile } from "@/lib/storage/upload-store";
 import { verifyAuth, requireTenantPermission } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { isRateLimitedAsync } from "@/lib/rate-limit";
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { url } = await uploadFile(file);
+    const { url } = await uploadTenantFile(tenant, file);
     return NextResponse.json({ url });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Upload failed";

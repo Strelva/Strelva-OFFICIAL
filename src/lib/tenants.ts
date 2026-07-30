@@ -61,9 +61,7 @@ export function rowToTenant(r: Row<"tenants">): TenantConfig {
     subscriptionStartedAt: r.subscription_started_at ?? undefined,
     commitmentEndsAt: r.commitment_ends_at ?? undefined,
     planOverride: (r.plan_override as TenantConfig["planOverride"]) ?? undefined,
-    // billing_type is a newer column; cast so the mapper doesn't depend on a type regen.
-    billingType:
-      (((r as { billing_type?: string | null }).billing_type as TenantConfig["billingType"]) ?? undefined),
+    billingType: (r.billing_type as TenantConfig["billingType"]) ?? undefined,
     subscriptionPastDueSince: r.subscription_past_due_since ?? undefined,
     bookingProvider: r.booking_provider ?? undefined,
     bookingUrl: r.booking_url ?? undefined,
@@ -135,7 +133,7 @@ export function tenantToRow(t: Partial<TenantConfig> & { id: string }): Insert<"
   if (t.subscriptionStartedAt !== undefined) row.subscription_started_at = t.subscriptionStartedAt;
   if (t.commitmentEndsAt !== undefined) row.commitment_ends_at = t.commitmentEndsAt;
   if (t.planOverride !== undefined) row.plan_override = t.planOverride;
-  if (t.billingType !== undefined) (row as Record<string, unknown>).billing_type = t.billingType;
+  if (t.billingType !== undefined) row.billing_type = t.billingType;
   if (t.subscriptionPastDueSince !== undefined) row.subscription_past_due_since = t.subscriptionPastDueSince;
   if (t.bookingProvider !== undefined) row.booking_provider = t.bookingProvider;
   if (t.bookingUrl !== undefined) row.booking_url = t.bookingUrl;
@@ -173,6 +171,32 @@ const CACHE_TTL_SECONDS = 60;
 let _memCache: TenantConfig[] | null = null;
 let _memCacheTime = 0;
 
+// Secret fields that must NOT sit decrypted in the Redis cache (`reb:tenants:all`
+// lives outside the Postgres at-rest boundary). They're re-enveloped before the
+// Redis write and decrypted on read; the in-memory cache holds the live decrypted
+// objects (process memory is not a persistence boundary). No-op when SECRETS_ENC_KEY
+// is unset (encryptSecret is inert) and legacy-plaintext-safe (decryptSecret passes
+// through), so the round trip is a no-op in dev and lossless in prod.
+const CACHE_SECRET_FIELDS = [
+  "slackWebhookUrl",
+  "googleSearchConsoleKey",
+  "instagramAccessToken",
+  "revalidationSecret",
+] as const;
+
+function transformTenantSecrets(
+  tenants: TenantConfig[],
+  fn: (v: string | undefined) => string | null | undefined,
+): TenantConfig[] {
+  return tenants.map((t) => {
+    const out = { ...t };
+    for (const field of CACHE_SECRET_FIELDS) {
+      out[field] = fn(out[field]) ?? undefined;
+    }
+    return out;
+  });
+}
+
 async function loadTenants(): Promise<TenantConfig[]> {
   const redis = getRedis();
 
@@ -180,7 +204,7 @@ async function loadTenants(): Promise<TenantConfig[]> {
   if (redis) {
     try {
       const cached = await redis.get<TenantConfig[]>(REDIS_KEY);
-      if (cached) return cached;
+      if (cached) return transformTenantSecrets(cached, decryptSecret);
     } catch {
       // Redis failed — continue to source of truth
     }
@@ -202,10 +226,24 @@ async function loadTenants(): Promise<TenantConfig[]> {
       current.push(rowToDomainClaim(row));
       claimsByTenant.set(row.tenant_id, current);
     }
-    tenants = rows.map((row) => ({
-      ...rowToTenant(row),
-      domainClaims: claimsByTenant.get(row.id) ?? [],
-    }));
+    const mapped: TenantConfig[] = [];
+    for (const row of rows) {
+      try {
+        mapped.push({
+          ...rowToTenant(row),
+          domainClaims: claimsByTenant.get(row.id) ?? [],
+        });
+      } catch (err) {
+        // A decrypt failure (e.g. SECRETS_ENC_KEY removed/rotated incorrectly)
+        // on one row must not crash the entire platform. Skip the bad row and
+        // alert so the operator knows which tenant is affected.
+        console.error(
+          `[tenants] rowToTenant failed for tenant "${row.id}" — skipping row. ` +
+          `Check SECRETS_ENC_KEY. Error: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+    }
+    tenants = mapped;
   }
 
   if (!tenants) {
@@ -227,7 +265,11 @@ async function loadTenants(): Promise<TenantConfig[]> {
   if (tenants.length > 0) {
     if (redis) {
       try {
-        await redis.set(REDIS_KEY, tenants, { ex: CACHE_TTL_SECONDS });
+        // Re-envelope secrets so the Redis cache never holds plaintext provider
+        // credentials. The in-memory copy below stays decrypted.
+        await redis.set(REDIS_KEY, transformTenantSecrets(tenants, encryptSecret), {
+          ex: CACHE_TTL_SECONDS,
+        });
       } catch {
         // Redis write failed — not fatal
       }

@@ -13,7 +13,8 @@
 import { NextResponse } from "next/server";
 import { saveConnection } from "@/lib/connections";
 import { getRedis } from "@/lib/redis";
-import { verifyOAuthState } from "@/lib/oauth-state";
+import { consumeOAuthState } from "@/lib/oauth-state";
+import { verifyAuth, requireTenantAccess } from "@/lib/auth";
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const ACCOUNTS_URL = "https://mybusinessaccountmanagement.googleapis.com/v1/accounts";
@@ -90,13 +91,33 @@ export async function GET(req: Request) {
     );
   }
 
-  const verifiedState = verifyOAuthState(state);
+  // Verify session first — bind the code exchange to a user who currently holds
+  // settings:write on the target tenant. This eliminates the replay window where
+  // a stolen state token could associate attacker-controlled tokens to a victim
+  // tenantId, because the callback now requires a valid browser session.
+  const authed = await verifyAuth();
+  if (!authed) {
+    return NextResponse.redirect(
+      `${connectionsUrl}?error=${encodeURIComponent("Session expired — please try connecting again")}`
+    );
+  }
+
+  // Consume the state token (HMAC verify + nonce del in Redis for single-use).
+  const verifiedState = await consumeOAuthState(state);
   if (!verifiedState) {
     return NextResponse.redirect(
       `${connectionsUrl}?error=${encodeURIComponent("Invalid OAuth state")}`
     );
   }
   const tenantId = verifiedState.tenantId;
+
+  // Confirm the session user still has access to the tenant embedded in the state.
+  const accessDenied = await requireTenantAccess(tenantId);
+  if (accessDenied) {
+    return NextResponse.redirect(
+      `${connectionsUrl}?error=${encodeURIComponent("Access denied")}`
+    );
+  }
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;

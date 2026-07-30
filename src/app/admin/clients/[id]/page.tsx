@@ -11,6 +11,7 @@ import { diagnoseVisibility, summarizeVisibility } from "@/lib/visibility/diagno
 import { getReviews } from "@/lib/reviews";
 import { getAdminReviewIntelligence } from "@/lib/reviews/intelligence";
 import { getTenantCrm } from "@/lib/tenant-crm";
+import { getAccountForTenant } from "@/lib/accounts";
 import { getSuggestions, operatorSuggestions } from "@/lib/suggestions";
 import { getVercelProjectStatus } from "@/lib/vercel";
 import { getTenantAtRisk, type AtRiskSignal } from "@/lib/churn";
@@ -72,8 +73,13 @@ export default async function ClientDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  // Defense in depth: mirror the layout's super-admin gate.
-  if (!(await isSuperAdmin())) redirect("/");
+  // Defense in depth: re-check super-admin here even though the layout already
+  // checked. The layout gate does NOT protect a page's data-fetching path if
+  // the layout's redirect is somehow bypassed (e.g. direct RSC fetch, test
+  // harness). This guard is not redundant — it is necessary. Redirect to
+  // /sign-in rather than "/" to avoid a loop on the bare admin host where "/"
+  // rewrites back to /admin.
+  if (!(await isSuperAdmin())) redirect("/sign-in");
 
   const { id } = await params;
   const tenant = await getTenantConfig(id);
@@ -88,7 +94,7 @@ export default async function ClientDetailPage({
     subscriptionStatus: null,
   };
 
-  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk, dailyMetrics, suggestions, vercelStatus, goal] =
+  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk, dailyMetrics, suggestions, vercelStatus, goal, account] =
     await Promise.all([
       getClickCounts("page-view", id).catch(() => ({ thisWeek: 0, total: 0 })),
       getClickCounts("booking-click", id).catch(() => ({ thisWeek: 0, total: 0 })),
@@ -105,6 +111,7 @@ export default async function ClientDetailPage({
       getSuggestions(id).catch(() => []),
       getVercelProjectStatus(`${id}-site`).catch(() => null),
       getGoal(id).catch(() => null),
+      getAccountForTenant(id).catch(() => null),
     ]);
   const opportunities = operatorSuggestions(suggestions);
   const deployStatus = vercelStatus && vercelStatus.ok ? vercelStatus.data : null;
@@ -203,6 +210,14 @@ export default async function ClientDetailPage({
             <div className="mt-1 flex flex-wrap items-center gap-2 text-[12px] text-gray-muted">
               <span>{tenant.id}</span><span className="text-gray-faint">·</span>
               <span>{tenant.deliveryModel ?? "custom_repo"}</span>
+              {account && account.tenantIds.length > 1 && (
+                <>
+                  <span className="text-gray-faint">·</span>
+                  <Link href="/admin/accounts" className="font-medium text-accent hover:underline">
+                    {account.name} · {account.tenantIds.length} sites
+                  </Link>
+                </>
+              )}
               {tenant.active ? null : <Chip tone="neutral">archived</Chip>}
             </div>
           </div>

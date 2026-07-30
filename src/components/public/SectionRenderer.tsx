@@ -6,6 +6,10 @@ import { SectionErrorBoundary } from "./SectionErrorBoundary";
 interface SectionRendererProps {
   pageSlug: string;
   tenant: string;
+  /** Accepted from callers (e.g. ?edit=true query param) but not yet wired to any
+   *  server-side behavior in SectionRenderer itself. The dashboard's client-side
+   *  edit overlay is driven by DashboardContext instead. Remove this prop when
+   *  callers are updated to stop passing it. */
   editMode?: boolean;
   preview?: boolean;
 }

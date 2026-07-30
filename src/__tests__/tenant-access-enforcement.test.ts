@@ -82,7 +82,9 @@ describe("tenant access enforcement (hasTenantAccess / requireTenantAccess)", ()
   it("denies an unauthenticated request to any tenant", async () => {
     sessionUser = null;
     expect(await hasTenantAccess("tenant-a")).toBe(false);
-    expect((await requireTenantAccess("tenant-a"))?.status).toBe(403);
+    // Unauthenticated (no session) -> 401 Unauthorized, not 403 Forbidden.
+    // 403 is reserved for authenticated-but-unauthorized requests.
+    expect((await requireTenantAccess("tenant-a"))?.status).toBe(401);
   });
 
   it("lets a super-admin reach any tenant (cross-tenant is intentional for operators)", async () => {

@@ -194,7 +194,7 @@ export async function applySectionUpdate(
       tenantId,
       section,
       currentData: current,
-      proposedData: parsed.data as Record<string, unknown>,
+      proposedData: parsed.data as unknown as Record<string, unknown>,
       diffs,
       risk,
       governance,

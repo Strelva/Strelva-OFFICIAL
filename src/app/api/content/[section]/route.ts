@@ -117,7 +117,7 @@ export async function PUT(
     }
 
     const current = await getContent(s, tenant) as unknown as Record<string, unknown>;
-    const changes = diffFields(current, parsed.data as Record<string, unknown>);
+    const changes = diffFields(current, parsed.data as unknown as Record<string, unknown>);
 
     await setContent(s, parsed.data as ContentMap[typeof s], tenant);
     // Content is now live. Version history + the section timestamp are
@@ -163,7 +163,7 @@ export async function PUT(
 
     // Fire-and-forget verification: confirms the change is live on the public
     // read path and emits a change_verified / change_verify_failed event.
-    scheduleVerification(tenant, s, parsed.data as Record<string, unknown>);
+    scheduleVerification(tenant, s, parsed.data as unknown as Record<string, unknown>);
 
     return NextResponse.json({ success: true });
   } catch (err) {

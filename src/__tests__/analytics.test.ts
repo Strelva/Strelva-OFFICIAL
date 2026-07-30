@@ -450,7 +450,16 @@ describe("OAuth-first token selection", () => {
       hasGa4Scope: true,
     });
     mockGetGoogleAccessToken.mockResolvedValue("oauth-ga4-token");
-    const fetchMock = stubFetch({ reports: [] });
+    // Provide non-zero metrics so the zero-data guard does not short-circuit to
+    // "unavailable". The intent of this test is to verify the OAuth token is used,
+    // not to exercise GA4 data parsing.
+    const fetchMock = stubFetch({
+      reports: [
+        { rows: [{ metricValues: [{ value: "10" }, { value: "12" }, { value: "30" }] }] },
+        { rows: [{ dimensionValues: [{ value: "/" }], metricValues: [{ value: "30" }] }] },
+        { rows: [{ dimensionValues: [{ value: "google" }], metricValues: [{ value: "12" }] }] },
+      ],
+    });
 
     const perf = await getGa4Perf("gldf");
 

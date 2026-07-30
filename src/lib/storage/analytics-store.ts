@@ -119,21 +119,95 @@ async function pgMetricSummary(tenant: string): Promise<Map<string, MetricSummar
   }
 }
 
-/** All (metric,day,count) rows for a tenant. Returns [] on any failure. */
+/**
+ * All (metric,day,count) rows for a tenant, bounded to the last 400 days.
+ * Only used as a fallback when the site_metric_summary RPC is unavailable.
+ * Without a limit this query silently truncates at PostgREST's 1,000-row cap
+ * when a tenant has enough history (audit finding). 400 days covers > 1 year of
+ * data across 3 metrics (page-view/booking-click/phone-click) without hitting
+ * the cap for realistic traffic volumes; richer history is covered by the RPC.
+ */
 async function pgAllRows(
   tenant: string
 ): Promise<Array<{ metric: string; day: string; count: number }>> {
   const db = getSupabase();
   if (!db) return [];
   try {
+    const since = isoDay(400);
     const { data } = await db
       .from("site_metrics")
       .select("metric, day, count")
-      .eq("tenant_id", tenant);
+      .eq("tenant_id", tenant)
+      .gte("day", since)
+      .limit(1000);
     return (data ?? []) as Array<{ metric: string; day: string; count: number }>;
   } catch {
     return [];
   }
+}
+
+// --- Batch metric fetch (one RPC, multiple callers) ---
+
+/**
+ * Fetch the metric summary for a tenant exactly once and return individual
+ * aggregates for a set of named events plus a prefix scan — the pattern used by
+ * generateWeeklyReport, which previously issued 4 independent pgMetricSummary
+ * calls for the same tenant in the same Promise.all (audit finding: triple RPC
+ * per report). Callers that need only a single metric should use getClickCounts.
+ */
+export async function getMetricsBatch(
+  tenantId: string,
+  events: string[],
+  prefix?: string
+): Promise<{
+  counts: Record<string, { total: number; today: number; thisWeek: number; lastWeek: number }>;
+  byPrefix: Record<string, { total: number; thisWeek: number }>;
+}> {
+  const counts: Record<string, { total: number; today: number; thisWeek: number; lastWeek: number }> = {};
+  const byPrefix: Record<string, { total: number; thisWeek: number }> = {};
+
+  if (dataSourceIsPostgres()) {
+    // One round trip for all consumers.
+    const summary = await pgMetricSummary(tenantId);
+    for (const event of events) {
+      const s = summary.get(event);
+      counts[event] = {
+        total: s?.total ?? 0,
+        today: s?.today ?? 0,
+        thisWeek: s?.last7 ?? 0,
+        lastWeek: s?.prev7 ?? 0,
+      };
+    }
+    if (prefix !== undefined) {
+      for (const [metric, s] of summary) {
+        if (!metric.startsWith(prefix)) continue;
+        byPrefix[metric] = { total: s.total, thisWeek: s.last7 };
+      }
+    }
+    return { counts, byPrefix };
+  }
+
+  // Dev-file path: fall through to the individual helpers (no RPC overhead here).
+  for (const event of events) {
+    counts[event] = await getClickCounts(event, tenantId);
+  }
+  if (prefix !== undefined) {
+    const store = await readDevContent(tenantId);
+    const clicks = (store.__clicks as Record<string, number>) ?? {};
+    for (const key of Object.keys(clicks)) {
+      if (key.startsWith(prefix) && key.endsWith(":total")) {
+        const event = key.slice(0, -":total".length);
+        let weekCount = 0;
+        for (let i = 0; i < 7; i++) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          weekCount += clicks[`${event}:${d.toISOString().slice(0, 10)}`] || 0;
+        }
+        byPrefix[event] = { total: clicks[key] || 0, thisWeek: weekCount };
+      }
+    }
+  }
+  return { counts, byPrefix };
 }
 
 // --- Click tracking ---

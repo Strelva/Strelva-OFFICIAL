@@ -111,7 +111,7 @@ Apply inside `[data-dashboard]`.
 
 ### Navigation
 
-- Dashboard navigation prioritizes daily workflow: Today, Site, Queue/Review, Sources, Reports, Settings.
+- Dashboard navigation surfaces (from `getDashboardSurfaces` in `src/lib/dashboard-surfaces.ts`): Today, Ask Strelva, Website, Google Business, Analytics, Reports, Reviews, Settings. Conditional by tenant feature/connection state. Do not add new top-level surfaces without a matching entry in `DashboardSurface`.
 - Tenant storefront navigation stays short. If a template needs more than five links, use grouped menus on desktop and a full-screen or sheet-style menu on mobile.
 - Admin domains should route owners to dashboard surfaces, not public storefronts.
 
@@ -181,8 +181,8 @@ Business-type design references (starting points for a custom build, **not** pla
 
 Before launch:
 
-- Run `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm audit`, `pnpm build`, `pnpm check:prod`, and `REB_DEV_UNGATED_ACCESS=0 PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm smoke`.
-- Or run `PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release` for the same local release gate in one command; local smoke runs against the built Next app and `check:release` forces `REB_DEV_UNGATED_ACCESS=0`.
+- Run `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm audit`, `pnpm build`, `pnpm check:prod`, and `pnpm smoke` (smoke runs Playwright against the built Next app with `PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0` already baked into the `check:launch` script).
+- Or run `pnpm check:release` for the same gate in one command (`lint + typecheck + test + audit + build + check:prod + smoke`, with `PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0` enforced).
 - Verify dashboard desktop and mobile views manually.
 - Verify at least one tenant storefront on mobile and desktop.
 - Confirm marketing `/home`, `/access-request`, `/sign-in`, `/privacy`, and `/terms` are live.

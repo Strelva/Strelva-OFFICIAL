@@ -3,7 +3,6 @@ import {
   CLIENT_ROLES,
   isSuperAdmin,
   assignUserToTenant,
-  requireTenantPermission,
   getActorContext,
   findUserIdByEmail,
   LastOwnerError,
@@ -45,9 +44,14 @@ export async function POST(req: Request) {
       ? (requestedRole as ClientRole)
       : "owner";
 
+  // This route lives under /api/admin and is super-admin-only. The tenantId
+  // is taken from the request body, which makes a non-super-admin fallback
+  // unsafe (a caller could supply an arbitrary tenantId). Tenant-owner
+  // team-management belongs on a tenant-scoped route such as
+  // /api/dashboard/team/* where the tenant comes from the authenticated
+  // session, not from caller-supplied input.
   if (!(await isSuperAdmin())) {
-    const denied = await requireTenantPermission(tenantId, "team:manage");
-    if (denied) return denied;
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {

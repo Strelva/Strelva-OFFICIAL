@@ -633,11 +633,29 @@ export default async function proxy(req: NextRequest) {
     // write API is auth-gated (no session -> 401), so a demo viewer can read but
     // never mutate, and only this one hardcoded tenant is exposed.
     const isDemoTenant = tenantId === "demo";
-    const needsAuth = !devAccessBypass && !isDemoTenant && (
-      (isAdminSubdomain && !routeIsPublic) ||
-      (tenantFromQueryParam && !routeIsPublic) ||
-      (tenantFromClientPath && !clientPathIsAuthPage)
-    );
+    // tenantFromSubdomain: tenant resolved directly from the host (e.g.
+    // gldf.strelva.com) but is NOT the admin subdomain, client-path, or query-param
+    // variants (those are handled by their own conditions below). Without this
+    // fourth condition, plain-subdomain requests skipped the proxy auth gate
+    // entirely and landed at the route handler's requireTenantAccess with no
+    // prior session validation, leaking route existence via 403 instead of
+    // redirecting to /sign-in.
+    const tenantFromSubdomain =
+      !isAdminSubdomain && !tenantFromClientPath && !tenantFromQueryParam;
+    // Build needsAuth preserving original per-path semantics:
+    //  - isAdminSubdomain / tenantFromQueryParam: gate non-public routes only
+    //  - tenantFromClientPath: gate everything except explicit auth pages
+    //    (the existing !clientPathIsAuthPage already encodes the exemption list;
+    //    public-API routes reached via /client/{t}/api/v1/ are intentionally gated)
+    //  - tenantFromSubdomain (new): gate non-public routes — closes the gap where
+    //    plain-subdomain requests (gldf.strelva.com/*) skipped gateRequest entirely
+    const needsAuth =
+      !devAccessBypass &&
+      !isDemoTenant &&
+      (
+        ((isAdminSubdomain || tenantFromQueryParam || tenantFromSubdomain) && !routeIsPublic) ||
+        (tenantFromClientPath && !clientPathIsAuthPage)
+      );
     if (needsAuth) {
       const signInUrl = tenantFromClientPath || customAdminHostUsesFallbackAuth
         ? buildTenantFallbackUrl(req, tenantId, "/sign-in")

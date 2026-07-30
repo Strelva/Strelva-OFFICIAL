@@ -1,11 +1,14 @@
 # Strelva Operations — Where Things Live and the Rules That Keep It Clean
 
-> **Current-state note (2026-07-14):** Supabase Auth is the only auth path;
+> **Current-state note (2026-07-30):** Supabase Auth is the only auth path.
 > Postgres owns identity, tenant configuration, content, collections, drafts,
 > audit, and activity. Redis owns only the operational boundaries listed in
-> `persistence-boundaries.md`. Clerk and Sanity code teardown are complete;
-> only legacy Sanity image URL cleanup remains. The canonical control-plane
-> origin is `app.strelva.com`; `strelva.com` is the separate marketing repo.
+> `persistence-boundaries.md`. Clerk teardown is complete (2026-07-11, #146).
+> Sanity code teardown is complete (2026-07-10); only legacy Sanity image URL
+> cleanup remains (ops-only: rewrite stored `cdn.sanity.io` refs, then lock the
+> dataset). The canonical control-plane origin is `app.strelva.com`; `strelva.com`
+> is the separate marketing repo. The Vercel project is `strelva-admin` on the
+> `strelva` team.
 
 The architecture (org of per-client repos, one shared content store, one
 Vercel team) is correct for our size. What rots agency platforms is not the
@@ -17,7 +20,7 @@ site, 22 dead branches, canonical repos invisible to one founder).
 
 | Repo | What | Canonical location |
 | --- | --- | --- |
-| `REB` (this repo; legacy folder name) | Control plane: multi-tenant platform, AI agent, dashboard, `/api/v1` contract | canonical local control-plane workspace |
+| `strelva-platform` (this repo; formerly `REB`) | Control plane: multi-tenant platform, AI agent, dashboard, `/api/v1` contract | canonical local control-plane workspace |
 | `strelva-marketing` | strelva.com marketing site + `brand/` assets | separate production marketing workspace |
 | `custom-repo-starter/` (in this repo) | The template every client storefront starts from | here |
 | `rhm-innovations` | Client storefront | `Scaffold-Web` org |
@@ -195,3 +198,76 @@ Each dependency, what breaks, and the move.
 - **Restore drill (do this quarterly):** on a throwaway/dev tenant, create a
   snapshot, mutate content, restore the snapshot, confirm content matches and a
   `pre_restore` snapshot exists.
+
+## Known issues / TODO
+
+- **[HIGH][perf] `buildOpsReport` has a fully serial N+1 loop** (`src/lib/ops.ts:113-157`).
+  Three sequential `for...of` loops, 3 awaits per tenant, no concurrency. Collapse
+  into a single `mapPool(active, 8, async (tenant) => { ... })` call per the existing
+  `concurrency.ts` pattern. The SMS and domain-drift loops produce independent state
+  so ordering is not a constraint.
+- **[MEDIUM][perf] Triple `pgMetricSummary` RPC per report** (`src/lib/storage/analytics-store.ts:166,302`
+  and `src/lib/reports.ts:505-513`). Three identical DB calls where one would do.
+  Hoist to a per-call memoizer so one Postgres round-trip feeds all three metric
+  reads in a single report cycle.
+- **[MEDIUM][perf] `read_revenue` uses blocking `redis.keys()`** (`src/lib/revenue.ts:34`).
+  Degrades Redis under load. Replace with a set or sorted-set index.
+- **[MEDIUM][perf] `listMembers` fires N sequential Upstash HTTP round-trips (N+1)**
+  (`src/lib/rewards/memberRepositoryKv.ts:204`). Batch the member fetches.
+- **[MEDIUM][perf] `list_drafts` agent tool issues one Postgres query per tenant
+  sequentially** (`src/app/api/admin/agent/route.ts:228-239`). N+1 at portfolio scale;
+  batch with `Promise.all` or a single query with `IN`.
+- **[MEDIUM][bug] `poll-google-reviews` cron does not paginate** (`src/app/api/cron/poll-google-reviews/route.ts:116`).
+  Reviews beyond the first API page are never ingested. Add pagination support.
+- **[MEDIUM][bug] Monthly-report dev-mode run consumes the once-per-month dedup marker
+  without sending** (`src/app/api/cron/monthly-report/route.ts:98-128`). A dev/test
+  run burns the dedup key, suppressing the real send for the rest of the month.
+- **[MEDIUM][bug] Booking list 'today' filter uses UTC instead of tenant timezone**
+  (`src/app/api/booking/list/route.ts:21`). Use `zonedTodayIso` (same as the booking
+  config/schedule read paths).
+- **[MEDIUM][gap] `maxAdvanceBooking` config field is never enforced at booking creation**
+  (`src/lib/booking.ts:17`). The field is stored but has no effect.
+- **[MEDIUM][bug] GA4 cache can pin an 'unavailable' result indefinitely when `status:ok`
+  is cached with zeroed data** (`src/lib/analytics.ts:297-382`). Only cache results
+  where the data is actually non-zero, or add a separate staleness key.
+- **[MEDIUM][tenant-isolation] `getTenantFromHeaders` silently falls back to 'demo' when
+  `x-tenant` is absent** (`src/lib/tenant.ts:13`). Any route relying on this helper
+  for tenant scoping will operate on the demo tenant when the header is missing.
+  Callers that require a real tenant should treat a 'demo' fallback as an error.
+- **[MEDIUM][tenant-isolation] `analytics GET` route falls back to DEFAULT_TENANT ('demo')
+  on missing host** (`src/app/api/analytics/route.ts:8`). Same root cause as above.
+- **[MEDIUM][tenant-isolation] `setEventStatus` Postgres shadow-write has no tenant filter**
+  (`src/lib/db/repositories.ts:125`). It can update any event row by id. Add a
+  `tenant = $2` WHERE clause.
+- **[MEDIUM][bug] `reb:tenants:all` Redis cache stores decrypted (plaintext) secrets**
+  (`src/lib/tenants.ts:206-210`). The 60s TTL cache holds the fully-decrypted tenant
+  list. Consider encrypting secrets again before writing to the cache, or accept the
+  60s window as the defense-in-depth boundary.
+- **[MEDIUM][security] Prompt injection via unsanitized `businessRules` and `personality`
+  fields** (`src/lib/agent-prompt-shared.ts:342-339`). Wrap both in
+  `sanitizePromptValue()` before interpolation. Also enforce a max-length cap on
+  `businessRules` at write time (e.g. 1000 chars in the `TenantEditor` validator).
+- **[MEDIUM][security] `Rohlax /api/pay/rohlax` builds origin from spoofable
+  `x-forwarded` headers** (`src/app/api/pay/rohlax/route.ts:21-24`). Build
+  success/cancel URLs from `NEXT_PUBLIC_APP_URL` or another trusted env var,
+  not from the request headers.
+- **[MEDIUM][bug] `PATCH /api/reviews` bypasses GBP publish path and permanently
+  suppresses auto-reply backlog for Google reviews** (`src/app/api/reviews/route.ts:73`).
+  Any direct PATCH marking a Google review as replied skips the governed
+  `publishReviewReply` path. Audit callers and route through the governed path.
+- **[MEDIUM][tech-debt] `gbp-replies.ts` contains a private duplicate of
+  `refreshAccessToken`** (`src/lib/gbp-replies.ts:27`) that does not persist the
+  refreshed token. Consolidate into `src/lib/google-token.ts`.
+- **[MEDIUM][security] `Approve-link POST` route has no rate limiting**
+  (`src/app/api/approve/route.ts:149`). Add rate limiting matching the other public
+  endpoints.
+- **[MEDIUM][bug] `contact.email` schema default is empty string but requires valid email**
+  (`src/lib/schemas.ts:181` / `src/lib/defaults.ts:76`). A PUT with the default value
+  fails validation on first use. Change the default to `undefined` or relax the schema
+  to allow empty string.
+- **[MEDIUM][bug] `setPgPageConfig` uses non-atomic delete-then-insert**
+  (`src/lib/storage/page-config-store.ts:84-90`). There is a read window between the
+  delete and the insert. Replace with an upsert.
+- **[MEDIUM][gap] `section-analytics` route is a dead endpoint with fabricated trends**
+  (`src/app/api/section-analytics/route.ts:35-87`). Either wire it to real data or
+  remove it.

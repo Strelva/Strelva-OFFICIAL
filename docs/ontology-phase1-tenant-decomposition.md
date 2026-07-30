@@ -81,6 +81,7 @@ Every `TenantConfig` field is assigned to exactly one sub-model (disjoint + comp
 | `subscriptionPlan` | `CommercialPlanKey?` |
 | `planMonthlyCents` | `number?` |
 | `planCurrency` | `string?` |
+| `billingType` | `TenantConfig["billingType"]?` (newer column; shadow-cast in `rowToTenant`) |
 
 ### `AutomationPolicy` — automation + integration knobs
 | Field | Type |
@@ -141,10 +142,36 @@ step is a big-bang cutover.
 
 - **Consumer migration** — no consumer reads the sub-models yet; every one still uses
   `TenantConfig`.
-- **DB / schema decomposition** — the `tenants` table is still 45 flat columns;
+- **DB / schema decomposition** — the `tenants` table is still 45+ flat columns;
   `rowToTenant`/`tenantToRow` are untouched.
 - **Stable-id resolution** — `TenantIdentity` carries `id`/`subdomain` as they exist
-  today (there is no `stableId` field on `TenantConfig` yet); introducing a stable
-  identity key is separate future work.
+  today. NOTE: `stableId` (a `stable_id` uuid column) HAS since been added to `TenantConfig`
+  and is hydrated by `rowToTenant` (migration `20260715160000`); the sub-model field table
+  above should include it under `TenantIdentity` when the projection is next updated.
 - **No behavior change** — this is types + a pure projection + a test. No runtime path,
   cache, API contract, or persisted shape changes.
+
+## Known issues / TODO (2026-07-30)
+
+- **`stableId` is missing from the sub-model field tables above.** The `tenants.stable_id`
+  uuid column is live in production and is hydrated onto `TenantConfig.stableId` by
+  `rowToTenant`. It belongs in `TenantIdentity`. The projection file and its test need to
+  be updated to include it (currently a gap between the decomposition doc and the live
+  source).
+
+- **`billingType` field is a newer column** (`billing_type`) that `rowToTenant` shadow-casts
+  because `database.types.ts` is stale. The field is included in `CommercialSnapshot` above
+  but only once `database.types.ts` is regenerated via `supabase gen types typescript` will
+  the shadow cast in `rowToTenant` be removable. Add a CI check that fails if
+  `database.types.ts` is older than the newest migration file.
+
+- **`database.types.ts` is stale** — `billing_type` and `account_id` are missing from the
+  generated `Row` types (`src/lib/db/database.types.ts`). Run
+  `supabase gen types typescript --project-id <id> > src/lib/db/database.types.ts` and commit
+  to eliminate the shadow casts in `rowToTenant`/`tenantToRow`.
+
+- **`sectionSchemas` typed as `Record<ContentSection, z.ZodType>` erases output types**
+  (`src/lib/schemas.ts` line ~401). Every downstream `setContent` call is an unchecked cast.
+  Fix: change to `type SectionSchemaMap = { [K in ContentSection]: z.ZodType<ContentMap[K]> }`
+  so `sectionSchemas[section].safeParse(data).data` infers the correct type and the `as` casts
+  can be removed.

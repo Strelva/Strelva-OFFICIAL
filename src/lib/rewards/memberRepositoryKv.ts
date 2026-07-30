@@ -159,6 +159,7 @@ export async function adjustStars(
   delta: number,
   config: RewardsConfig = DEFAULT_REWARDS_CONFIG
 ): Promise<Member | null> {
+  if (!Number.isInteger(delta)) throw new Error("delta must be an integer");
   const kv = assertKv();
   const normalizedEmail = email.trim().toLowerCase();
   const memberKey = keys.member(tenant, normalizedEmail);
@@ -206,11 +207,14 @@ export async function listMembers(tenant: string): Promise<Member[]> {
   const emails = await kv.smembers(keys.membersSet(tenant));
   if (!emails || emails.length === 0) return [];
 
+  const results = await Promise.all(
+    emails.map((email) =>
+      kv.hgetall<Record<string, unknown>>(keys.member(tenant, String(email)))
+    )
+  );
+
   const out: Member[] = [];
-  for (const email of emails) {
-    const data = await kv.hgetall<Record<string, unknown>>(
-      keys.member(tenant, String(email))
-    );
+  for (const data of results) {
     if (!data) continue;
     const m = hashToMember(data);
     if (m) out.push(m);

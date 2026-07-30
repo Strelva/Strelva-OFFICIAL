@@ -15,12 +15,8 @@ import { recordBuildPayment as recordBuildPaymentPg } from "@/lib/db/repositorie
 import { dualWritePgEnabled, buildPaymentToInsert } from "@/lib/db/dual-write";
 import { sendNewSignupEmail, sendPaymentFailedEmail, sendPaymentPastDueEmail } from "@/lib/delivery-email";
 import { OPERATOR_URL } from "@/lib/brand";
-
-function getStripe() {
-  return new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: "2025-03-31.basil" as Stripe.LatestApiVersion,
-  });
-}
+import { getAccountForTenant, setAccountSubscription, type AccountSubscriptionItem } from "@/lib/accounts";
+import { getStripe } from "@/lib/billing";
 
 const PROCESSED_EVENT_TTL_SECONDS = 60 * 60 * 24 * 30;
 const PROCESSING_STALE_MINUTES = 5;
@@ -207,7 +203,7 @@ async function applyTenantSubscriptionStatus(
         console.warn(`[billing webhook] Ignoring out-of-order ${event.type} for ${tenantId}`);
         return;
       }
-      await redis.set(key, event.created);
+      await redis.set(key, event.created, { ex: PROCESSED_EVENT_TTL_SECONDS });
     } catch (err) {
       // The ordering guard is best-effort and must not block Stripe processing,
       // but a Redis failure on the money path should never be silent. (Double-
@@ -358,6 +354,86 @@ async function recordBuildPayment(
   }
 }
 
+/**
+ * Bundle sync (org layer): when the paying tenant belongs to a multi-site
+ * ACCOUNT, a single subscription can cover several sites via line items whose
+ * price carries `metadata.tenantId`. Iterate the items, flip EACH mapped tenant
+ * active (best-effort — a not-yet-provisioned site like Vermont before its
+ * tenant exists is skipped, no unknown-tenant alert), and snapshot the bundled
+ * subscription onto the account so /admin/accounts shows the real $ split.
+ * No-ops when the tenant has no account (a plain single-site subscription).
+ */
+/** Map a Stripe subscription status to the tenant's subscriptionStatus field. */
+function tenantStatusFromStripe(s: string): "active" | "trialing" | "past_due" | "cancelled" {
+  if (s === "trialing") return "trialing";
+  if (s === "past_due" || s === "unpaid") return "past_due";
+  if (s === "canceled" || s === "incomplete_expired") return "cancelled";
+  return "active";
+}
+
+async function syncBundleSubscriptionToAccount(
+  stripe: Stripe,
+  subscriptionId: string | undefined,
+  primaryTenantId: string | null,
+) {
+  if (!subscriptionId || !primaryTenantId) return;
+  const account = await getAccountForTenant(primaryTenantId).catch(() => null);
+  if (!account) return; // single-site tenant — nothing to bundle-sync
+
+  let sub: Stripe.Subscription;
+  try {
+    sub = await stripe.subscriptions.retrieve(subscriptionId, { expand: ["items.data.price"] });
+  } catch (err) {
+    console.error(`[billing webhook] bundle sync: retrieve ${subscriptionId} failed:`, err);
+    return;
+  }
+
+  const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
+  // Derive the per-site status from the LIVE sub status so this is correct on a
+  // renewal / failure / cancel, not just activation.
+  const flip = tenantStatusFromStripe(sub.status);
+  const items: AccountSubscriptionItem[] = [];
+
+  for (const item of sub.items?.data ?? []) {
+    const price = item.price;
+    const itemTenantId =
+      price && typeof price.metadata?.tenantId === "string" ? price.metadata.tenantId : null;
+    const amountCents = typeof price?.unit_amount === "number" ? price.unit_amount * (item.quantity ?? 1) : 0;
+    let label = itemTenantId ?? price?.nickname ?? "Site";
+
+    if (itemTenantId) {
+      const cfg = await getTenantConfig(itemTenantId).catch(() => null);
+      if (cfg) {
+        label = cfg.siteName || itemTenantId;
+        // The primary tenant was already flipped via applyTenantSubscriptionStatus;
+        // flip the OTHER mapped sites here (best-effort, no alert on unknown).
+        if (itemTenantId !== primaryTenantId) {
+          await updateTenant(itemTenantId, {
+            subscriptionStatus: flip,
+            stripeSubscriptionId: subscriptionId,
+          }).catch(() => {});
+        }
+      }
+    }
+
+    items.push({
+      tenantId: itemTenantId ?? "",
+      label,
+      amountCents,
+      stripePriceId: price?.id,
+      stripeItemId: item.id,
+    });
+  }
+
+  await setAccountSubscription(account.id, {
+    stripeSubscriptionId: subscriptionId,
+    stripeCustomerId: customerId,
+    status: sub.status,
+    items,
+    currency: sub.items?.data?.[0]?.price?.currency,
+  }).catch((err) => console.error(`[billing webhook] bundle sync: setAccountSubscription failed:`, err));
+}
+
 export async function POST(req: Request) {
   if (!process.env.STRIPE_SECRET_KEY) {
     return NextResponse.json({ error: "Stripe not configured" }, { status: 500 });
@@ -455,19 +531,25 @@ export async function POST(req: Request) {
               // keep "active" — a paid checkout completed
             }
           }
+          const KNOWN_PLAN_KEYS = ["presence", "growth", "scale"] as const;
+          type KnownPlanKey = (typeof KNOWN_PLAN_KEYS)[number];
+          const rawPlanKey = session.metadata?.planKey;
+          const validatedPlanKey = KNOWN_PLAN_KEYS.includes(rawPlanKey as KnownPlanKey)
+            ? (rawPlanKey as KnownPlanKey)
+            : undefined;
+
+          const rawCents = Number(session.metadata?.planMonthlyCents);
+          // Require planMonthlyCents > 0: a zero value from Stripe metadata is
+          // indistinguishable from "not set" and must not overwrite a real amount.
+          const validatedCents =
+            Number.isInteger(rawCents) && rawCents > 0 ? rawCents : undefined;
+
           await applyTenantSubscriptionStatus(
             sessionTenantId,
             {
               subscriptionStatus,
-              ...(session.metadata?.planKey === "presence" ||
-              session.metadata?.planKey === "growth" ||
-              session.metadata?.planKey === "scale"
-                ? { subscriptionPlan: session.metadata.planKey }
-                : {}),
-              ...(Number.isInteger(Number(session.metadata?.planMonthlyCents)) &&
-              Number(session.metadata?.planMonthlyCents) >= 0
-                ? { planMonthlyCents: Number(session.metadata?.planMonthlyCents) }
-                : {}),
+              ...(validatedPlanKey ? { subscriptionPlan: validatedPlanKey } : {}),
+              ...(validatedCents !== undefined ? { planMonthlyCents: validatedCents } : {}),
               ...(session.metadata?.planCurrency
                 ? { planCurrency: session.metadata.planCurrency.toLowerCase() }
                 : {}),
@@ -493,6 +575,15 @@ export async function POST(req: Request) {
             } catch (err) {
               console.error(`[billing webhook] new-signup operator email failed for ${sessionTenantId}:`, err);
             }
+          }
+          // Bundle (org layer): if this tenant belongs to a multi-site account,
+          // flip the other bundled sites active + snapshot the $ split onto the
+          // account. No-ops for a plain single-site subscription. Best-effort:
+          // the try/catch keeps a sync hiccup from affecting the 200 response.
+          try {
+            await syncBundleSubscriptionToAccount(stripe, subscriptionId, sessionTenantId);
+          } catch (err) {
+            console.error(`[billing webhook] bundle sync failed for ${sessionTenantId}:`, err);
           }
         } else if (session.mode === "payment") {
           // One-time charge, e.g. the Rohlax build payment. Do NOT flip
@@ -526,6 +617,13 @@ export async function POST(req: Request) {
           subscriptionPastDueSince: null,
           ...(subscriptionId ? { stripeSubscriptionId: subscriptionId } : {}),
         }, event);
+        // Refresh the account snapshot on renewal so a multi-site account's
+        // status/MRR stays current (best-effort; no-ops for a single-site sub).
+        try {
+          await syncBundleSubscriptionToAccount(stripe, subscriptionId, invoiceTenantId);
+        } catch (err) {
+          console.error(`[billing webhook] account refresh (invoice.paid) failed:`, err);
+        }
         break;
       }
 
@@ -576,22 +674,42 @@ export async function POST(req: Request) {
           try {
             const redis = getRedis();
             const dedupeKey = `reb:past-due-email-sent:${invoiceTenantId}:${pastDueSince}`;
+            // NOTE: dunning email goes to the owner's inbox and is payment-critical;
+            // it is not blocked by the client lifecycle email pause (sendPaymentPastDueEmail
+            // uses operator/billing audience). Document: this path won't fire until
+            // EMAIL_SENDING_ENABLED=true because sendPaymentPastDueEmail routes through
+            // sendEmail which owns the audience→switch mapping.
             const fresh = redis
               ? await redis.set(dedupeKey, "1", { nx: true, ex: 60 * 60 * 24 * 30 }).catch(() => null)
               : "ok";
             if (fresh) {
-              const ok = await sendPaymentPastDueEmail({
-                email: existing.ownerEmail,
-                businessName: existing.siteName || invoiceTenantId,
-                dashboardUrl: buildTenantAdminUrl(invoiceTenantId),
-                tenantId: invoiceTenantId,
-                logPrefix: "[billing webhook]",
-              });
+              let ok = false;
+              try {
+                ok = await sendPaymentPastDueEmail({
+                  email: existing.ownerEmail,
+                  businessName: existing.siteName || invoiceTenantId,
+                  dashboardUrl: buildTenantAdminUrl(invoiceTenantId),
+                  tenantId: invoiceTenantId,
+                  logPrefix: "[billing webhook]",
+                });
+              } catch (sendErr) {
+                // Roll back the dedup key so the next webhook delivery retries the
+                // send rather than silently losing it. The dedup key was set before
+                // the send, so a throw here leaves the key orphaned without this.
+                if (redis) await redis.del(dedupeKey).catch(() => {});
+                throw sendErr;
+              }
               if (!ok && redis) await redis.del(dedupeKey).catch(() => {});
             }
           } catch (err) {
             console.error(`[billing webhook] payment-past-due client email failed for ${invoiceTenantId}:`, err);
           }
+        }
+        // Reflect past_due onto the account snapshot (drops its MRR).
+        try {
+          await syncBundleSubscriptionToAccount(stripe, extractInvoiceSubscriptionId(invoice), invoiceTenantId);
+        } catch (err) {
+          console.error(`[billing webhook] account refresh (payment_failed) failed:`, err);
         }
         break;
       }
@@ -615,6 +733,67 @@ export async function POST(req: Request) {
           null;
         await applyTenantSubscriptionStatus(deletedTenantId, { subscriptionStatus: "cancelled" }, event);
         alert("billing_subscription_cancelled", "high", { tenantId: deletedTenantId ?? "unknown" });
+        // Mark the account's bundled subscription canceled (zeroes its MRR, flips
+        // the other bundled sites to cancelled too).
+        try {
+          await syncBundleSubscriptionToAccount(stripe, deletedSub.id, deletedTenantId);
+        } catch (err) {
+          console.error(`[billing webhook] account refresh (subscription.deleted) failed:`, err);
+        }
+        break;
+      }
+
+      case "customer.subscription.updated": {
+        // A plan change, price change, or status update made directly in the
+        // Stripe dashboard lands here — it does NOT create a new checkout session,
+        // so checkout.session.completed never fires. Without this handler the
+        // tenant's subscriptionPlan / planMonthlyCents / subscriptionStatus would
+        // stay stale forever after a dashboard-initiated change.
+        const updatedSub = event.data.object as Stripe.Subscription;
+        const updatedCustomerId =
+          typeof updatedSub.customer === "string" ? updatedSub.customer : updatedSub.customer?.id;
+        const updatedTenantId =
+          tenantId ??
+          (updatedSub.id
+            ? (await getTenantByStripeSubscriptionId(updatedSub.id).catch(() => undefined))?.id
+            : undefined) ??
+          (updatedCustomerId
+            ? (await getTenantByStripeCustomerId(updatedCustomerId).catch(() => undefined))?.id
+            : undefined) ??
+          null;
+
+        const KNOWN_PLAN_KEYS_SUB = ["presence", "growth", "scale"] as const;
+        type KnownPlanKeySub = (typeof KNOWN_PLAN_KEYS_SUB)[number];
+        const subMeta = updatedSub.metadata ?? {};
+        const rawSubPlanKey = subMeta.planKey;
+        const validatedSubPlanKey = KNOWN_PLAN_KEYS_SUB.includes(rawSubPlanKey as KnownPlanKeySub)
+          ? (rawSubPlanKey as KnownPlanKeySub)
+          : undefined;
+
+        const rawSubCents = Number(subMeta.planMonthlyCents);
+        const validatedSubCents =
+          Number.isInteger(rawSubCents) && rawSubCents > 0 ? rawSubCents : undefined;
+
+        await applyTenantSubscriptionStatus(
+          updatedTenantId,
+          {
+            subscriptionStatus: tenantStatusFromStripe(updatedSub.status),
+            ...(validatedSubPlanKey ? { subscriptionPlan: validatedSubPlanKey } : {}),
+            ...(validatedSubCents !== undefined ? { planMonthlyCents: validatedSubCents } : {}),
+            ...(subMeta.planCurrency
+              ? { planCurrency: subMeta.planCurrency.toLowerCase() }
+              : {}),
+            stripeSubscriptionId: updatedSub.id,
+          },
+          event,
+        );
+        // Keep the account snapshot current on any sub update (plan change,
+        // pause, reactivation). Best-effort; a sync hiccup must not 500 the ack.
+        try {
+          await syncBundleSubscriptionToAccount(stripe, updatedSub.id, updatedTenantId);
+        } catch (err) {
+          console.error(`[billing webhook] account refresh (subscription.updated) failed:`, err);
+        }
         break;
       }
 

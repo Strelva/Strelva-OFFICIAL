@@ -109,7 +109,7 @@ export async function POST(request: Request) {
     }
 
     const current = await getContent(typedSection, tenant) as unknown as Record<string, unknown>;
-    const changes = diffFields(current, parsed.data as Record<string, unknown>);
+    const changes = diffFields(current, parsed.data as unknown as Record<string, unknown>);
     await setContent(typedSection, parsed.data as ContentMap[typeof typedSection], tenant);
     await appendVersion(typedSection, parsed.data, "admin", tenant, changes);
     await recordSectionUpdate(typedSection, tenant);

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { saveConnection } from "@/lib/connections";
 import { getRedis } from "@/lib/redis";
-import { verifyOAuthState } from "@/lib/oauth-state";
+import { consumeOAuthState } from "@/lib/oauth-state";
+import { verifyAuth, requireTenantAccess } from "@/lib/auth";
 
 const TOKEN_URL = "https://auth.calendly.com/oauth/token";
 const USER_URL = "https://api.calendly.com/users/me";
@@ -43,13 +44,30 @@ export async function GET(req: Request) {
     );
   }
 
-  const verifiedState = verifyOAuthState(state);
+  // Bind the code exchange to a live session so a stolen state token can't
+  // associate attacker tokens to a victim tenant.
+  const authed = await verifyAuth();
+  if (!authed) {
+    return NextResponse.redirect(
+      `${connectionsUrl}?error=${encodeURIComponent("Session expired — please try connecting again")}`
+    );
+  }
+
+  // Single-use state (HMAC verify + nonce del).
+  const verifiedState = await consumeOAuthState(state);
   if (!verifiedState) {
     return NextResponse.redirect(
       `${connectionsUrl}?error=${encodeURIComponent("Invalid OAuth state")}`
     );
   }
   const tenantId = verifiedState.tenantId;
+
+  const accessDenied = await requireTenantAccess(tenantId);
+  if (accessDenied) {
+    return NextResponse.redirect(
+      `${connectionsUrl}?error=${encodeURIComponent("Access denied")}`
+    );
+  }
 
   const clientId = process.env.CALENDLY_CLIENT_ID;
   const clientSecret = process.env.CALENDLY_CLIENT_SECRET;
@@ -141,6 +159,11 @@ export async function GET(req: Request) {
         { userUri, orgUri },
         { ex: 60 * 60 * 24 * 365 }
       );
+      // Reverse index so the webhook resolves the tenant in O(1) instead of a
+      // blocking KEYS scan on every invitee.created event.
+      await redis.set(`calendly-user-uri:${userUri}`, tenantId, {
+        ex: 60 * 60 * 24 * 365,
+      });
     }
 
     return NextResponse.redirect(`${connectionsUrl}?success=true`);

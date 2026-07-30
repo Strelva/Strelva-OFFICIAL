@@ -11,6 +11,13 @@ import { getTenantConfig } from "@/lib/tenants";
 import { toPublicEntry } from "@/lib/cms/public-entry";
 import { isAuthorizedPreview } from "@/lib/preview-auth";
 
+// Per-tenant content is tenant-private: a shared/CDN cache must never store one
+// tenant's response and serve it to another. No CDN sits in front today, but
+// this closes the latent cross-tenant bleed before one ever does.
+// Matches the pattern in content/route.ts, page-config/route.ts, and
+// site-capabilities/route.ts.
+const TENANT_PRIVATE_CACHE = "private, max-age=0, must-revalidate";
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ tenant: string; type: string; slug: string }> }
@@ -22,6 +29,9 @@ export async function GET(
   }
   if (!isCollectionType(type)) {
     return NextResponse.json({ error: "Invalid collection type" }, { status: 400 });
+  }
+  if (!/^[a-z0-9-]+$/.test(slug)) {
+    return NextResponse.json({ error: "Invalid slug" }, { status: 400 });
   }
 
   try {
@@ -35,7 +45,9 @@ export async function GET(
     if (!entry || (!preview && entry.status !== "published")) {
       return NextResponse.json({ error: "Entry not found" }, { status: 404 });
     }
-    return NextResponse.json(toPublicEntry(entry));
+    return NextResponse.json(toPublicEntry(entry), {
+      headers: { "Cache-Control": TENANT_PRIVATE_CACHE },
+    });
   } catch (err) {
     console.error("[v1 collection entry GET]", tenant, type, slug, err);
     return NextResponse.json({ error: "Failed to load entry" }, { status: 500 });

@@ -8,6 +8,7 @@
  * results so the UI can report honest partial failures.
  */
 import { isSuperAdmin } from "@/lib/auth";
+import { getAllTenants } from "@/lib/tenants";
 import { escalateEventToOwner } from "@/lib/event-actions";
 import {
   bulkResolvePortfolioActions,
@@ -28,8 +29,20 @@ export async function resolvePortfolioActions(
   if (!(await isSuperAdmin())) return { ok: false, results: [] };
   if (!Array.isArray(items) || items.length === 0) return { ok: true, results: [] };
 
+  // Validate tenantIds against known DB records so client-supplied IDs cannot
+  // reference tenants that don't exist. The event resolution also enforces
+  // per-event tenant binding (wrong_tenant check), but filtering here makes the
+  // guard explicit and avoids unnecessary work for entirely bogus IDs.
+  const knownTenantIds = new Set((await getAllTenants().catch(() => [])).map((t) => t.id));
+
   const safe = items
-    .filter((i) => i && typeof i.tenantId === "string" && typeof i.eventId === "string")
+    .filter(
+      (i) =>
+        i &&
+        typeof i.tenantId === "string" &&
+        typeof i.eventId === "string" &&
+        knownTenantIds.has(i.tenantId),
+    )
     .slice(0, MAX_BATCH);
 
   const results = await bulkResolvePortfolioActions(safe);
@@ -48,8 +61,16 @@ export async function escalatePortfolioActions(
   if (!(await isSuperAdmin())) return { ok: false, results: [] };
   if (!Array.isArray(items) || items.length === 0) return { ok: true, results: [] };
 
+  const knownTenantIds = new Set((await getAllTenants().catch(() => [])).map((t) => t.id));
+
   const safe = items
-    .filter((i) => i && typeof i.tenantId === "string" && typeof i.eventId === "string")
+    .filter(
+      (i) =>
+        i &&
+        typeof i.tenantId === "string" &&
+        typeof i.eventId === "string" &&
+        knownTenantIds.has(i.tenantId),
+    )
     .slice(0, MAX_BATCH);
 
   const results = await Promise.all(
@@ -78,8 +99,10 @@ export async function draftPortfolioOpportunity(
   if (!OPPORTUNITY_KINDS.has(kind)) return { ok: false, results: [] };
   if (!Array.isArray(tenantIds) || tenantIds.length === 0) return { ok: true, results: [] };
 
+  const knownTenantIds = new Set((await getAllTenants().catch(() => [])).map((t) => t.id));
+
   const safe = tenantIds
-    .filter((id) => typeof id === "string" && id.length > 0)
+    .filter((id) => typeof id === "string" && id.length > 0 && knownTenantIds.has(id))
     .slice(0, MAX_BATCH);
 
   const results = await draftOpportunityForClients(kind, safe);

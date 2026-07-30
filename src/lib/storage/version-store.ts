@@ -6,6 +6,7 @@
  * surface at the mutation/read boundary; there is no production dev-file fallback.
  */
 
+import { randomUUID } from "crypto";
 import type { ContentSection, ContentMap } from "../types";
 import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
 import { setContent } from "./content-store";
@@ -88,7 +89,9 @@ export async function appendVersion(
   changes?: { field: string; before: string; after: string }[]
 ): Promise<ContentVersion> {
   const version: ContentVersion = {
-    id: `v_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    // crypto.randomUUID() is collision-safe under concurrent calls; the old
+    // Date.now() + Math.random() scheme was not (audit finding).
+    id: `v_${randomUUID()}`,
     section,
     data,
     author,

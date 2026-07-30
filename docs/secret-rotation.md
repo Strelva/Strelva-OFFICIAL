@@ -26,6 +26,17 @@ before a production deploy — run it after rotating.
 
 ## Per-secret notes
 
+- **SECRETS_ENC_KEY** — AES-256-GCM key for at-rest encryption of provider secrets
+  (OAuth tokens, `revalidation_secret`, etc.) in the Postgres `tenants` table and
+  Redis connection blobs. Active in prod since 2026-07-15. **This is the
+  highest-blast-radius rotation:** if you remove or change the key without first
+  re-encrypting existing rows, `loadTenants` throws on every row with an `enc:v1:`
+  prefix and the platform is fully down. Rotation procedure: (1) mint a new key
+  (`openssl rand -hex 32`), (2) run `scripts/backfill-secret-encryption.ts` with
+  both the old and new key set (the script re-encrypts all rows), (3) then update
+  the Vercel env var and redeploy. Do NOT simply swap the env var without
+  re-encrypting. Also note: the `reb:tenants:all` Redis cache holds a decrypted
+  copy (60s TTL) — flush it after rotation.
 - **CRON_SECRET** — gates every `/api/cron/*` (incl. the heartbeat watchdog).
   Rotating it mid-flight makes Vercel Cron calls 401 until the new value
   deploys. Rotate, deploy, then confirm the next heartbeat populates
@@ -34,13 +45,15 @@ before a production deploy — run it after rotating.
   Cache + Redis-authoritative operational data (events, locks, rate limits) is
   lost on a new instance; Postgres-backed caches rewarm, but operational stores
   require their own recovery plan. Prefer rotating the token in-place.
-- **SUPABASE_SERVICE_ROLE_KEY / SUPABASE_URL** — the service-role key is the
-  high-blast-radius secret (bypasses RLS). It's set per-environment in Vercel;
-  rotate it in the Supabase dashboard (Project Settings → API → roll), update
-  Vercel (Production + Preview), redeploy, confirm `/api/health` Postgres probe
-  + a dashboard sign-in. The publishable/anon key
-  (`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`) is client-safe; rotating it just needs
-  a redeploy. Database password rotation is separate (Supabase → Database).
+- **SUPABASE_SERVICE_ROLE_KEY / SUPABASE_URL / NEXT_PUBLIC_SUPABASE_URL** — the
+  service-role key is the high-blast-radius secret (bypasses RLS). Rotate in the
+  Supabase dashboard (Project Settings → API → roll), update Vercel (Production +
+  Preview) for both `SUPABASE_SERVICE_ROLE_KEY` AND `SUPABASE_URL` (the private
+  server-only copy), redeploy, confirm `/api/health` Postgres probe + a dashboard
+  sign-in. The anon key (`NEXT_PUBLIC_SUPABASE_ANON_KEY`, also aliased as
+  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in some paths) is client-safe; rotating
+  it just needs a redeploy. Database password rotation is separate (Supabase →
+  Database).
 - **STRIPE_SECRET_KEY / STRIPE_WEBHOOK_SECRET** — roll the API key in the
   Stripe dashboard (supports a rolled-key grace window); update the webhook
   signing secret and re-send a test webhook. Billing is OFF today, so blast
@@ -68,3 +81,16 @@ before a production deploy — run it after rotating.
 - `pnpm check:prod` green.
 - `https://app.strelva.com/api/health` reports healthy required infrastructure.
 - No new auth/permission errors in Sentry or the Slack alert channel.
+
+## Known issues / TODO
+
+- **`SECRETS_ENC_KEY` is not validated by `pnpm check:prod`** — the checker will
+  not catch it missing. Add `checkEnvVar('SECRETS_ENC_KEY', true)` to
+  `scripts/production-checklist.ts`. See `production-readiness.md` Known issues.
+- **`INTERNAL_API_SECRET` serves three roles** (domain-map auth, `OAUTH_STATE_SECRET`
+  fallback, approve-link fallback). Prefer setting `APPROVE_LINK_SECRET` and
+  `OAUTH_STATE_SECRET` as dedicated secrets so each is scoped to one role.
+- **Orphaned Clerk + Sanity secrets** may still be set in Vercel (teardowns done in
+  code but env vars may not have been removed). Audit with `vercel env ls` and
+  remove any `CLERK_*`, `SANITY_WEBHOOK_SECRET`, `REVALIDATION_SECRET`, `CORS_ORIGINS`,
+  and `TURBO_*` / `NX_DAEMON` vars.

@@ -9,10 +9,11 @@
  */
 
 import { getRedis } from "./redis";
-import { getAllTenants, getTenantConfig } from "./tenants";
+import { getAllTenants } from "./tenants";
 import { getTenantPrimaryDomain } from "./tenant-urls";
 import { getRecentFailures } from "./revalidate-client";
 import { getEvents, getQueueCount } from "./events";
+import { mapPool } from "./concurrency";
 
 /**
  * Count keys matching a pattern without the blocking `KEYS` command. KEYS scans
@@ -108,40 +109,6 @@ export async function buildOpsReport(): Promise<OpsReport> {
 
   if (redis) {
     metrics.webhookFailures = await scanKeyCount(redis, "stripe:event:error:*");
-
-    const staleCutoff = Date.now() - 24 * 60 * 60 * 1000;
-    for (const tenant of active) {
-      const pendingKey = `sms:pending:${tenant.id}`;
-      const pending = await redis.get<{ sentAt?: string; expiresAt?: string }>(pendingKey);
-      if (pending?.sentAt) {
-        const sentAtMs = new Date(pending.sentAt).getTime();
-        if (sentAtMs < staleCutoff) {
-          metrics.staleSmsApprovals++;
-          metrics.staleSmsItems!.push({ tenantId: tenant.id, sentAt: pending.sentAt });
-        }
-      }
-    }
-  }
-
-  for (const tenant of active) {
-    const count = await getQueueCount(tenant.id);
-    if (count > 0) {
-      metrics.pendingEvents[tenant.id] = count;
-      metrics.totalPendingEvents += count;
-    }
-
-    const events = await getEvents(tenant.id, { status: "auto_approved", limit: 100 });
-    const failedWrites = events.filter(
-      (e) => e.type === "content_update" && e.metadata?.error
-    );
-    metrics.failedAiWrites += failedWrites.length;
-    for (const e of failedWrites) {
-      metrics.failedAiWriteItems!.push({
-        tenantId: tenant.id,
-        title: e.title,
-        error: String(e.metadata!.error),
-      });
-    }
   }
 
   const envDomainMap: Record<string, string> = (() => {
@@ -152,26 +119,89 @@ export async function buildOpsReport(): Promise<OpsReport> {
     }
   })();
 
-  const domainDrift: DomainDriftItem[] = [];
-  for (const tenant of active) {
-    const config = await getTenantConfig(tenant.id);
-    const primaryDomain = config ? getTenantPrimaryDomain(config) : null;
+  // Collapse the three former serial loops into one concurrent pass (concurrency=8).
+  // Previously: 3 separate for...of loops → ~3 sequential Redis round trips per
+  // tenant. Now: all per-tenant work runs in parallel with a bounded concurrency
+  // cap so Redis/HTTP connections don't storm at scale.
+  const staleCutoff = Date.now() - 24 * 60 * 60 * 1000;
+  type PerTenantResult = {
+    staleSms?: StaleSmsItem;
+    pendingCount: number;
+    failedWrites: FailedAiWriteItem[];
+    drift?: DomainDriftItem;
+  };
+
+  const perTenantResults = await mapPool(active, 8, async (tenant): Promise<PerTenantResult> => {
+    const result: PerTenantResult = { pendingCount: 0, failedWrites: [] };
+
+    // SMS stale-approval check
+    if (redis) {
+      const pendingKey = `sms:pending:${tenant.id}`;
+      const pending = await redis.get<{ sentAt?: string; expiresAt?: string }>(pendingKey).catch(() => null);
+      if (pending?.sentAt) {
+        const sentAtMs = new Date(pending.sentAt).getTime();
+        if (sentAtMs < staleCutoff) {
+          result.staleSms = { tenantId: tenant.id, sentAt: pending.sentAt };
+        }
+      }
+    }
+
+    // Queue count + failed AI writes
+    const [count, events] = await Promise.all([
+      getQueueCount(tenant.id),
+      getEvents(tenant.id, { status: "auto_approved", limit: 100 }),
+    ]);
+    result.pendingCount = count;
+    const failedWriteEvents = events.filter(
+      (e) => e.type === "content_update" && e.metadata?.error
+    );
+    for (const e of failedWriteEvents) {
+      result.failedWrites.push({
+        tenantId: tenant.id,
+        title: e.title,
+        error: String(e.metadata!.error),
+      });
+    }
+
+    // Domain drift — tenant is already fully hydrated from getAllTenants(), so
+    // use it directly instead of re-fetching via getTenantConfig().
+    const primaryDomain = getTenantPrimaryDomain(tenant);
     if (primaryDomain) {
       const envTenant = envDomainMap[primaryDomain];
       if (envTenant && envTenant !== tenant.id) {
-        domainDrift.push({
+        result.drift = {
           tenantId: tenant.id,
           message: `${primaryDomain}: config=${tenant.id}, env=${envTenant}`,
-        });
-      }
-      if (!envTenant && !primaryDomain.includes("strelva.com")) {
-        domainDrift.push({
+        };
+      } else if (!envTenant && !primaryDomain.includes("strelva.com")) {
+        result.drift = {
           tenantId: tenant.id,
           message: `${primaryDomain}: missing from CUSTOM_DOMAIN_MAP`,
-        });
+        };
       }
     }
+
+    return result;
+  });
+
+  // Aggregate per-tenant results into the metrics object.
+  // mapPool preserves input order, so perTenantResults[i] corresponds to active[i].
+  const domainDrift: DomainDriftItem[] = [];
+  for (let i = 0; i < active.length; i++) {
+    const r = perTenantResults[i];
+    if (r.staleSms) {
+      metrics.staleSmsApprovals++;
+      metrics.staleSmsItems!.push(r.staleSms);
+    }
+    if (r.pendingCount > 0) {
+      metrics.pendingEvents[active[i].id] = r.pendingCount;
+      metrics.totalPendingEvents += r.pendingCount;
+    }
+    metrics.failedAiWrites += r.failedWrites.length;
+    metrics.failedAiWriteItems!.push(...r.failedWrites);
+    if (r.drift) domainDrift.push(r.drift);
   }
+
   metrics.domainDrift = domainDrift;
   metrics.tenantDomainDrift = domainDrift.map((d) => d.message);
 

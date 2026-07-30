@@ -1,11 +1,27 @@
 # Post-cutover cleanup runbook (historical)
 
-> This records the 2026 migration sequence and is not a current source-of-truth map.
-> Several operational stores intentionally still read Redis and only mirror Postgres.
-> Use [persistence-boundaries.md](./persistence-boundaries.md) for current ownership and
-> `AGENTS.md` for current auth/Sanity status.
+> This records the 2026 migration sequence and is NOT a current source-of-truth map.
+> All migration phases and both teardowns are COMPLETE. **Clerk teardown: done
+> (2026-07-11, PR #146).** **Sanity code teardown: done (2026-07-10).** The only
+> residual Sanity work is ops-only: rewrite legacy content-image asset URLs stored
+> in Postgres rows, then lock the dataset and remove the image resolver.
+> Use [persistence-boundaries.md](./persistence-boundaries.md) for current store
+> ownership and `AGENTS.md` for current auth/stack status.
+> The Phase 2.B checklist below is retained as historical record; steps 4-8 are
+> now DONE — do not attempt to re-execute them.
 
-**Status (updated 2026-06-25):** migration **FLIPPED + LIVE** (cutover 2026-06-20). Auth=Supabase, and `CONTENT_SOURCE` / `TENANTS_SOURCE` / `DATA_SOURCE` are all `=postgres` in prod — every store + the tenant spine read/write Postgres, verified live (health ok, real content/tenant resolution, full prod e2e green). Since cutover: **#82** (fixed the dead `classifySource` proof-signal + refreshed ~18 docs) and **#83** (Clerk LEAF teardown — webhook route deleted, sign-in/sign-up + `UseInvitedEmailButton` + `layout.tsx` Clerk branches stripped, `ClerkProvider` gone) merged to main. What's left is the **destructive teardown** (see bottom): residual Sanity reads in `core.ts`, locking the Sanity dataset, the `auth.ts` Clerk-branch collapse, and unwrapping `clerkMiddleware` in `proxy.ts` (`src/proxy.ts` + `src/lib/auth.ts` are the only two files still importing `@clerk`). Strategy/history: [supabase-migration-plan.md](./supabase-migration-plan.md). Generic rollback: [rollback.md](./rollback.md).
+**Status (updated 2026-07-30):** ALL DONE. Migration flipped 2026-06-20, both
+teardowns complete. Auth is Supabase-only (`src/lib/auth.ts` is Supabase-only,
+no `@clerk` imports remain). Sanity data-source reads and all Sanity write paths
+are removed; `@sanity/client`/`next-sanity`/`sanity` deps are gone. The only
+Sanity residual is `sanityImageUrl` (+ `@sanity/image-url`) for legacy content-
+image URLs still stored in Postgres rows — retained until the content-URL rewrite
+ops step, after which the dataset can be locked and the image resolver deleted.
+`CONTENT_SOURCE` / `TENANTS_SOURCE` / `DATA_SOURCE` are all `=postgres` in prod.
+The Clerk webhook route, `ClerkProvider`, all Clerk-branch ternaries, and the
+`@clerk/nextjs` dep are gone. `proxy.ts` uses the hand-rolled `gateRequest` /
+`isPublicRoute` auth gate. Strategy/history: [supabase-migration-plan.md](./supabase-migration-plan.md).
+Rollback: [rollback.md](./rollback.md).
 
 The governing rule: every load-bearing change is flag-gated so rollback is a flag flip in Vercel env (+ redeploy), never a code revert. The migration phases below are now DONE through the flip; the teardown is the remaining careful step.
 
@@ -41,18 +57,20 @@ Per store: backfill Sanity -> Postgres, flip that store's read flag (content-sto
 
 Lockdown order: (1) confirm zero reads, (2) add read-client token + `useCdn:false`, (3) lock dataset to authenticated-only / disable public CDN, (4) watch for 403s. This closes the public-read of onboardLead/contact emails (the security payoff).
 
-## Phase 2.B: Clerk removal order (proxy.ts LAST)
+## Phase 2.B: Clerk removal order (COMPLETE)
 
-Leaf usages first, request entry point last. Supabase path is already live; Clerk code is dead weight, safe through the soak. **Steps 1-3 DONE (merged #83, 2026-06-22) — the Clerk leaf is gone. Only `src/proxy.ts` + `src/lib/auth.ts` still import `@clerk`; steps 4-8 remain.**
+All steps complete as of 2026-07-11 (#146).
 
-1. ~~Delete `src/app/api/clerk/webhook/route.ts` (replaced by `handle_new_user` trigger).~~ **DONE (#83).**
-2. ~~UI ternaries: sign-in / sign-up pages + `UseInvitedEmailButton` -> Supabase branch only.~~ **DONE (#83).**
-3. ~~`src/app/layout.tsx` -> drop conditional `ClerkProvider`.~~ **DONE (#83) — `ClerkProvider` gone.**
-4. `src/lib/auth.ts` -> collapse 9 Clerk branches to Supabase-only. Verify owner/member/super-admin.
-5. CSP + `CLERK_*` env in `production-readiness-rules.ts`, `health.ts`, `proof-signals.ts`. `pnpm check:prod` must pass.
-6. Update the 9 `@clerk`-mocking test files. `pnpm test` green.
-7. Drop `users.clerk_id` only after `getUserByClerkId` has no callers (last; so a code rollback never hits a missing column).
-8. **`src/proxy.ts` ABSOLUTE LAST, own isolated PR.** Unwrap `clerkMiddleware(async (auth, req) => {...})` to `export default async function(req)`, drop the `auth` param from `gateRequest`. Atomic in one PR (a split can leave `auth.protect` bound to undefined and fail open or closed). Verify full host matrix: authed-allowed, anon-redirected, protected-route-blocked. Rehearsed one-PR `git revert`.
+1. ~~Delete `src/app/api/clerk/webhook/route.ts`.~~ **DONE (#83).**
+2. ~~UI ternaries → Supabase branch only.~~ **DONE (#83).**
+3. ~~Drop `ClerkProvider`.~~ **DONE (#83).**
+4. ~~Collapse `auth.ts` to Supabase-only.~~ **DONE (#146).**
+5. ~~Remove `CLERK_*` env from `production-readiness-rules.ts`, `health.ts`.~~ **DONE (#146).**
+6. ~~Update `@clerk`-mocking test files.~~ **DONE (#146).**
+7. ~~Drop `users.clerk_id`.~~ **DONE (#146).**
+8. ~~Unwrap `clerkMiddleware` in `proxy.ts` → hand-rolled `gateRequest`.~~ **DONE (#146).**
+
+`@clerk/nextjs` is gone from `package.json` and the lockfile. No `@clerk` imports remain.
 
 **Sequencing between 2.A and 2.B:** independent except `auth.ts` (Clerk removal) is imported by `tenants.ts`. Do the auth.ts collapse (2.B.4) and the tenants.ts cutover (2.A.4) as separate, sequenced PRs, never simultaneously.
 
@@ -79,8 +97,12 @@ and sends the headers. Deployed client repos (GLDF, Rohlax) keep serving live
 until their copy of `scaffold-client.ts` is updated and redeployed. Low urgency
 (preview is a dev/staging nicety, not production).
 
-## Noah-gated (blockers, not executable here)
-1. Publish the Google OAuth consent screen (blocks client sign-in today).
-2. Rotate the 3 leaked keys + update Vercel. See [secret-rotation.md](./secret-rotation.md).
-3. Send clients sign-in info (after #1). Owner invites seeded for gldf + rohlax.
-4. Noah's own prod sign-in smoke test (gates confidence before 2.B.8, the proxy unwrap).
+## Remaining ops work (historical blockers, updated 2026-07-30)
+
+1. ~~Publish the Google OAuth consent screen.~~ Status unknown — verify in Google Cloud Console.
+2. ~~Rotate leaked keys.~~ See [secret-rotation.md](./secret-rotation.md) for current state.
+3. ~~Send clients sign-in info.~~ Clients should be active; verify per `/admin/clients`.
+4. ~~Prod sign-in smoke test before proxy unwrap.~~ Proxy unwrap is done (#146).
+5. **Remaining Sanity ops work:** rewrite legacy `cdn.sanity.io` image URLs stored in Postgres content rows, then lock the Sanity dataset and remove `@sanity/image-url` + `sanityImageUrl`. Until this is done, `NEXT_PUBLIC_SANITY_PROJECT_ID` / `NEXT_PUBLIC_SANITY_DATASET` and the `cdn.sanity.io` CSP entry must stay set.
+
+> For current open issues see `production-readiness.md` Known issues and `rollback.md` Known issues.

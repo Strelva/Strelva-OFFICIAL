@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import Stripe from "stripe";
 import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
 import { readJsonObject } from "@/lib/request-body";
 import {
@@ -11,12 +10,7 @@ import {
   PAY_LINK_PURPOSE,
 } from "@/lib/pay-links";
 import { payLinkProductName, payLinkProductDescription } from "@/lib/pay-link-copy";
-
-function getStripe() {
-  return new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: "2025-03-31.basil" as Stripe.LatestApiVersion,
-  });
-}
+import { getStripe } from "@/lib/billing";
 
 function getRequestOrigin(req: NextRequest): string {
   // Trusted origin only — the Stripe success/cancel redirect carries the session
@@ -74,13 +68,8 @@ export async function POST(
     return NextResponse.json({ error: `Choose an amount of ${range}.` }, { status: 400 });
   }
 
-  if (!process.env.STRIPE_SECRET_KEY) {
-    return NextResponse.json(
-      { error: "Stripe is not configured yet. Add STRIPE_SECRET_KEY before collecting payment." },
-      { status: 500 },
-    );
-  }
-
+  // getStripe() throws BillingConfigurationError when STRIPE_SECRET_KEY is absent;
+  // the catch block below converts that to a 500 with no stack leak.
   const customerEmail = normalizeEmail(body.customerEmail);
   const stripe = getStripe();
   const origin = getRequestOrigin(req);
@@ -116,7 +105,10 @@ export async function POST(
       ],
       ...(customerEmail ? { customer_email: customerEmail } : {}),
       ...(config.tenantId ? { client_reference_id: config.tenantId } : {}),
-      success_url: `${origin}/pay/${config.slug}?payment=success`,
+      // Include the resolved amount so the confirmation page can render a
+      // "You paid $X" banner without a separate Stripe lookup. amountCents is
+      // server-derived (validated above), never from raw request input.
+      success_url: `${origin}/pay/${config.slug}?payment=success&amount=${amountCents}`,
       cancel_url: `${origin}/pay/${config.slug}?payment=cancelled`,
       metadata,
       payment_intent_data: { metadata },

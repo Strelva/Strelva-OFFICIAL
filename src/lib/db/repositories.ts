@@ -107,7 +107,8 @@ export async function listEvents(tenantId: string, limit = 50): Promise<Row<"uni
 export async function setEventStatus(
   id: string,
   status: string,
-  metadata?: Record<string, unknown> | null
+  metadata?: Record<string, unknown> | null,
+  tenantId?: string
 ): Promise<void> {
   const db = getSupabase();
   if (!db) return;
@@ -122,7 +123,12 @@ export async function setEventStatus(
     if (metadata !== undefined) {
       update.metadata = (metadata ?? null) as Insert<"unified_events">["metadata"];
     }
-    const { error } = await db.from("unified_events").update(update).eq("id", id);
+    // Scope the UPDATE to the owning tenant when provided — prevents a bare
+    // event id from updating a row belonging to a different tenant (e.g. if
+    // an id is guessed or replayed across tenants in the shadow-write path).
+    let q = db.from("unified_events").update(update).eq("id", id);
+    if (tenantId) q = q.eq("tenant_id", tenantId);
+    const { error } = await q;
     if (error) throw error;
   }, undefined);
 }

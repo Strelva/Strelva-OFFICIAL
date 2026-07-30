@@ -32,9 +32,9 @@ export async function POST(
     const delta = typeof body.delta === "number" ? body.delta : NaN;
     const note = typeof body.note === "string" ? body.note.trim() : "";
 
-    if (!Number.isFinite(delta) || delta === 0) {
+    if (!Number.isFinite(delta) || !Number.isInteger(delta) || delta === 0) {
       return NextResponse.json(
-        { error: "delta must be a non-zero number" },
+        { error: "delta must be a non-zero integer" },
         { status: 422 }
       );
     }

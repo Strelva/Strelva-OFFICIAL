@@ -1,9 +1,8 @@
 import type { SectionData } from "@/components/dashboard/ContentBrowser";
 import { truncate, getFreshness } from "@/lib/utils";
+import type { ContentMap } from "@/lib/types";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-const SECTION_BUILDERS: Record<string, (data: any, timestamps: Record<string, string>) => SectionData> = {
+const SECTION_BUILDERS: { [K in keyof ContentMap]?: (data: ContentMap[K], timestamps: Record<string, string>) => SectionData } = {
   hero: (d, ts) => ({
     preview: truncate((d.headline || "").replace(/\n/g, " "), 50),
     status: d.headline ? "live" : "empty",
@@ -16,27 +15,27 @@ const SECTION_BUILDERS: Record<string, (data: any, timestamps: Record<string, st
     ].filter((item) => item.label),
   }),
   services: (d, ts) => ({
-    preview: (d.services || []).slice(0, 3).map((s: any) => s.name).join(", "),
+    preview: (d.services || []).slice(0, 3).map((s) => s.name).join(", "),
     status: (d.services?.length || 0) > 0 ? "live" : "empty",
     count: `${d.services?.length || 0}`,
     chatPrompt: "Update my services",
     freshness: getFreshness("services", ts),
-    items: (d.services || []).map((s: any) => ({ label: s.name, detail: `$${s.price} · ${s.duration}` })),
+    items: (d.services || []).map((s) => ({ label: s.name, detail: `$${s.price} · ${s.duration}` })),
   }),
   products: (d, ts) => ({
-    preview: (d.products || []).slice(0, 3).map((p: any) => p.name).join(", "),
+    preview: (d.products || []).slice(0, 3).map((p) => p.name).join(", "),
     status: (d.products?.length || 0) > 0 ? "live" : "empty",
     count: `${d.products?.length || 0}`,
     chatPrompt: "Update my products",
     freshness: getFreshness("products", ts),
-    items: (d.products || []).map((p: any) => ({ label: p.name, detail: p.price ? `$${p.price}` : "" })),
+    items: (d.products || []).map((p) => ({ label: p.name, detail: p.price ? `$${p.price}` : "" })),
   }),
   story: (d, ts) => ({
     preview: truncate(d.headline || d.statement || "Your story", 50),
     status: "live",
     chatPrompt: "Update my about section",
     freshness: getFreshness("story", ts),
-    items: (d.paragraphs || []).map((p: string, i: number) => ({ label: truncate(p, 60), detail: `paragraph ${i + 1}` })),
+    items: (d.paragraphs || []).map((p, i) => ({ label: truncate(p, 60), detail: `paragraph ${i + 1}` })),
   }),
   testimonials: (d, ts) => ({
     preview: (d.testimonials?.length || 0) > 0 ? truncate(d.testimonials[0].quote, 50) : "No reviews yet",
@@ -44,7 +43,7 @@ const SECTION_BUILDERS: Record<string, (data: any, timestamps: Record<string, st
     count: `${d.testimonials?.length || 0}`,
     chatPrompt: "Add a new testimonial",
     freshness: getFreshness("testimonials", ts),
-    items: (d.testimonials || []).map((t: any) => ({ label: `"${truncate(t.quote, 40)}"`, detail: t.author })),
+    items: (d.testimonials || []).map((t) => ({ label: `"${truncate(t.quote, 40)}"`, detail: t.author })),
   }),
   events: (d, ts) => ({
     preview: (d.events?.length || 0) > 0 ? d.events[0].title : "No upcoming events",
@@ -52,15 +51,15 @@ const SECTION_BUILDERS: Record<string, (data: any, timestamps: Record<string, st
     count: `${d.events?.length || 0}`,
     chatPrompt: "Add a new event",
     freshness: getFreshness("events", ts),
-    items: (d.events || []).map((e: any) => ({ label: e.title, detail: e.date })),
+    items: (d.events || []).map((e) => ({ label: e.title, detail: e.date })),
   }),
   providers: (d, ts) => ({
-    preview: (d.providers || []).slice(0, 3).map((p: any) => p.name).join(", "),
+    preview: (d.providers || []).slice(0, 3).map((p) => p.name).join(", "),
     status: (d.providers?.length || 0) > 0 ? "live" : "empty",
     count: `${d.providers?.length || 0}`,
     chatPrompt: "Update my providers list",
     freshness: getFreshness("providers", ts),
-    items: (d.providers || []).map((p: any) => ({ label: p.name, detail: p.service })),
+    items: (d.providers || []).map((p) => ({ label: p.name, detail: p.service })),
   }),
   contact: (d, ts) => ({
     preview: [d.phone, d.email].filter(Boolean).join(" · "),
@@ -92,7 +91,7 @@ const SECTION_BUILDERS: Record<string, (data: any, timestamps: Record<string, st
     count: `${d.faqs?.length || 0}`,
     chatPrompt: "Update my FAQ",
     freshness: getFreshness("faq", ts),
-    items: (d.faqs || []).map((f: any) => ({ label: f.question, detail: "" })),
+    items: (d.faqs || []).map((f) => ({ label: f.question, detail: "" })),
   }),
   theme: (d, ts) => {
     const colors = d?.colors || {};
@@ -125,12 +124,12 @@ const SECTION_BUILDERS: Record<string, (data: any, timestamps: Record<string, st
     ],
   }),
   navigation: (d, ts) => ({
-    preview: (d?.menuItems || []).slice(0, 4).map((m: any) => m.label).join(" · ") || "No menu items",
+    preview: (d?.menuItems || []).slice(0, 4).map((m) => m.label).join(" · ") || "No menu items",
     status: (d?.menuItems?.length || 0) > 0 ? "live" : "empty",
     count: `${d?.menuItems?.length || 0}`,
     chatPrompt: "Update my nav menu",
     freshness: getFreshness("navigation", ts),
-    items: (d?.menuItems || []).map((m: any) => ({ label: m.label, detail: m.href })),
+    items: (d?.menuItems || []).map((m) => ({ label: m.label, detail: m.href })),
   }),
   footer: (d, ts) => ({
     preview: truncate(d?.tagline || "Footer", 50),
@@ -138,7 +137,7 @@ const SECTION_BUILDERS: Record<string, (data: any, timestamps: Record<string, st
     count: `${d?.columns?.length || 0}`,
     chatPrompt: "Update my footer",
     freshness: getFreshness("footer", ts),
-    items: (d?.columns || []).map((c: any) => ({
+    items: (d?.columns || []).map((c) => ({
       label: c.heading,
       detail: `${(c.links || []).length} links`,
     })),
@@ -149,7 +148,7 @@ const SECTION_BUILDERS: Record<string, (data: any, timestamps: Record<string, st
     count: `${d.items?.length || 0}`,
     chatPrompt: "Update my shop",
     freshness: getFreshness("shop", ts),
-    items: (d.items || []).map((s: any) => ({ label: s.name, detail: s.price ? `$${s.price}` : "" })),
+    items: (d.items || []).map((s) => ({ label: s.name, detail: s.price ? `$${s.price}` : "" })),
   }),
 };
 
@@ -158,14 +157,18 @@ const SECTION_BUILDERS: Record<string, (data: any, timestamps: Record<string, st
  * Works for any template — wellness, food-brand, restaurant, etc.
  */
 export function buildSectionData(
-  sections: Record<string, any>,
+  sections: Record<string, unknown>,
   timestamps: Record<string, string>,
 ): Record<string, SectionData> {
   const result: Record<string, SectionData> = {};
   for (const [key, data] of Object.entries(sections)) {
-    const builder = SECTION_BUILDERS[key];
+    const builder = SECTION_BUILDERS[key as keyof ContentMap];
     if (builder && data) {
-      result[key] = builder(data, timestamps);
+      // Safe: builder is typed to ContentMap[K] for the matching K; the runtime
+      // data came from getContent(section) which returns the same shape. The cast
+      // is confined to this one dispatch site instead of a file-level disable.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      result[key] = (builder as (d: any, ts: Record<string, string>) => SectionData)(data, timestamps);
     }
   }
   return result;

@@ -63,6 +63,20 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
   if (ga4PropertyId !== undefined) {
     const trimmed = typeof ga4PropertyId === "string" ? ga4PropertyId.trim() : "";
+    if (trimmed) {
+      // Accept either a bare numeric property ID (e.g. "123456789") or the
+      // "properties/123456789" form that the GA4 Data API expects. Reject any
+      // other free-text value so arbitrary strings are never forwarded to Google.
+      const numericPart = trimmed.startsWith("properties/")
+        ? trimmed.slice("properties/".length)
+        : trimmed;
+      if (!/^\d{1,20}$/.test(numericPart)) {
+        return NextResponse.json(
+          { error: "ga4PropertyId must be a numeric property ID (e.g. '123456789' or 'properties/123456789')." },
+          { status: 400 },
+        );
+      }
+    }
     patch.ga4PropertyId = trimmed || null;
     applied.push("ga4PropertyId");
   }

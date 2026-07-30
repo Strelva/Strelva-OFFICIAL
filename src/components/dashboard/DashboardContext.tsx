@@ -182,7 +182,8 @@ export function DashboardProvider({
   const [hasMounted, setHasMounted] = useState(false);
   const [activeSection, setActiveSectionState] = useState<string | null>(null);
   const [activePage, setActivePage] = useState<string>("home");
-  const [rightTab, setRightTab] = useState<RightTab>("chat");
+  const [rightTab, setRightTabState] = useState<RightTab>("chat");
+  const setRightTab = useCallback((tab: RightTab) => setRightTabState(tab), []);
   const [selectedNode, setSelectedNodeState] = useState<EditableNode | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [scrollToSection, setScrollToSection] = useState<string | null>(null);
@@ -260,7 +261,7 @@ export function DashboardProvider({
     setActiveSectionState(section);
     if (!section) setSelectedNodeState(null);
     if (section) setRightTab("properties"); // Auto-switch to properties when selecting a section
-  }, []);
+  }, [setRightTab]);
 
   const setSelectedNode = useCallback((node: EditableNode | null) => {
     setSelectedNodeState(node);
@@ -274,7 +275,7 @@ export function DashboardProvider({
     setRightTab("chat"); // Switch to chat tab when using chat prompt
     setActivePanel("chat"); // Switch to chat on mobile
     setChatDrawerOpen(true); // Also open the floating drawer
-  }, []);
+  }, [setRightTab]);
 
   const addEditReceipts = useCallback((receipts: NewEditReceipt[]) => {
     if (receipts.length === 0) return;

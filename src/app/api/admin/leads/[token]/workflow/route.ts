@@ -6,6 +6,8 @@ import {
   LEAD_WORKFLOW_STATUSES,
   type LeadWorkflowStatus,
 } from "@/lib/lead-workflow";
+import { getDeliveryLeadByToken } from "@/lib/access-request-delivery";
+import { getRedis } from "@/lib/redis";
 
 /**
  * Operator workflow status for one onboard-form lead — how the operator is
@@ -29,6 +31,21 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const { token } = await params;
   if (!TOKEN_RE.test(token)) {
     return NextResponse.json({ error: "Invalid lead token." }, { status: 400 });
+  }
+
+  // Verify the token belongs to a known lead before writing any state.
+  // Without this a super-admin could silently create orphan Redis keys for
+  // non-existent tokens. getDeliveryLeadByToken returns null both when the
+  // lead is absent AND when Redis is unavailable — distinguish using getRedis():
+  // if Redis is reachable and the lead is still null, the token is genuinely
+  // unknown (404). If Redis is unavailable, skip the check and let
+  // setLeadWorkflowStatus degrade gracefully (no-op) rather than blocking
+  // operators during a transient outage.
+  if (getRedis() !== null) {
+    const lead = await getDeliveryLeadByToken(token);
+    if (lead === null) {
+      return NextResponse.json({ error: "Lead not found." }, { status: 404 });
+    }
   }
 
   let body: unknown;

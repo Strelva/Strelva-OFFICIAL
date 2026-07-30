@@ -340,7 +340,17 @@ Available sections: ${sectionNames}.`;
   prompt += `\n\n${copyVoiceGuard()}`;
 
   if (tenantConfig?.businessRules) {
-    prompt += `\n\nBUSINESS RULES (always follow these):\n${tenantConfig.businessRules}`;
+    // businessRules is operator-set and allows longer multi-line content, so we
+    // apply a bespoke sanitize: strip C0 control chars EXCEPT newlines (which are
+    // meaningful rule separators), collapse runs of whitespace on each line, and
+    // cap the whole block at 1000 chars. This prevents prompt injection while
+    // preserving the field's intended structure.
+    const sanitizedRules = tenantConfig.businessRules
+      .replace(/[\x00-\x09\x0b-\x1f\x7f]+/g, " ") // strip C0 except \n (0x0a)
+      .replace(/[^\S\n]{2,}/g, " ")                 // collapse horizontal whitespace runs
+      .trim()
+      .slice(0, 1000);
+    prompt += `\n\nBUSINESS RULES (always follow these):\n${sanitizedRules}`;
   }
 
   if (tenantConfig?.businessHours) {
@@ -363,11 +373,11 @@ Available sections: ${sectionNames}.`;
     prompt += `\n\nBUSINESS HOURS:\n${hoursLines}`;
     if (tenantConfig.businessHours.holidays?.length) {
       prompt += `\n\nHOLIDAY CLOSURES:\n${tenantConfig.businessHours.holidays
-        .map((holiday) => `- ${holiday.date}: ${holiday.label}`)
+        .map((holiday) => `- ${sanitizePromptValue(holiday.date)}: ${sanitizePromptValue(holiday.label)}`)
         .join("\n")}`;
     }
     if (tenantConfig.businessHours.timezone) {
-      prompt += `\nTimezone: ${tenantConfig.businessHours.timezone}`;
+      prompt += `\nTimezone: ${sanitizePromptValue(tenantConfig.businessHours.timezone)}`;
     }
     prompt += `\nUse these hours when answering "are you open?" or related questions. If someone asks outside hours, let them know when you'll next be open.`;
   }

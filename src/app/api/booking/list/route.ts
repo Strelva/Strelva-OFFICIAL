@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { getBookings } from "@/lib/storage";
+import { getBookings, getBookingConfig } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { zonedTodayIso } from "@/lib/booking";
 
 export async function GET(request: Request) {
   const authed = await verifyAuth();
@@ -17,8 +18,11 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status") || "all";
 
-    const bookings = await getBookings(tenant);
-    const today = new Date().toISOString().slice(0, 10);
+    const [bookings, config] = await Promise.all([
+      getBookings(tenant),
+      getBookingConfig(tenant),
+    ]);
+    const today = zonedTodayIso(config.timezone);
 
     const filtered = bookings.filter((b) => {
       if (status === "upcoming") return b.date >= today;
