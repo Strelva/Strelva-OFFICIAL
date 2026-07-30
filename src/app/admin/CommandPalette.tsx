@@ -122,8 +122,8 @@ export function CommandPalette({ tenants }: { tenants: { id: string; siteName: s
       )
     ).filter((n) => !n.hasAttribute("disabled"));
     if (focusable.length === 0) return;
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
+    const first = focusable[0]!;
+    const last = focusable[focusable.length - 1]!;
     if (e.shiftKey) {
       if (document.activeElement === first) {
         e.preventDefault();
@@ -147,7 +147,7 @@ export function CommandPalette({ tenants }: { tenants: { id: string; siteName: s
     // ask over a live event instead of a no-op navigation.
     const askMatch = cmd.href.match(/^\/admin\?ask=(.*)$/);
     if (askMatch && pathname === "/admin") {
-      window.dispatchEvent(new CustomEvent("strelva:ask", { detail: decodeURIComponent(askMatch[1]) }));
+      window.dispatchEvent(new CustomEvent("strelva:ask", { detail: decodeURIComponent(askMatch[1] ?? "") }));
       return;
     }
     router.push(cmd.href);

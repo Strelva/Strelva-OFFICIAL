@@ -53,7 +53,7 @@ describe("sendOpsDigestEmail — recipients + content", () => {
 
     expect(ok).toBe(true);
     expect(sendMock).toHaveBeenCalledTimes(1);
-    const call = sendMock.mock.calls[0][0];
+    const call = sendMock.mock.calls[0]![0]!;
     expect(call.to).toEqual(["jacob@strelva.com"]);
     expect(call.subject).toBe("Strelva daily ops");
     expect(call.html).toContain(DESIGN_SYSTEM_MARKER);
@@ -75,7 +75,7 @@ describe("sendOpsDigestEmail — recipients + content", () => {
       recentSignups: [],
       opsUrl: "https://admin.strelva.com/",
     });
-    expect(sendMock.mock.calls[0][0].to).toEqual(["noah@strelva.com", "jacob@strelva.com"]);
+    expect(sendMock.mock.calls[0]![0]!.to).toEqual(["noah@strelva.com", "jacob@strelva.com"]);
   });
 
   it("is silenced by the operator kill-switch", async () => {
@@ -138,7 +138,7 @@ describe("GET /api/cron/ops-digest — composition", () => {
     expect(body).toMatchObject({ ok: true, totalLeads: 3, unworkedLeads: 2, atRisk: 2, recentSignups: 1, sent: true });
 
     expect(mockSendOpsDigestEmail).toHaveBeenCalledTimes(1);
-    const arg = mockSendOpsDigestEmail.mock.calls[0][0];
+    const arg = mockSendOpsDigestEmail.mock.calls[0]![0]!;
     expect(arg.totalLeads).toBe(3);
     expect(arg.unworkedLeads).toBe(2);
     expect(arg.atRisk).toEqual([

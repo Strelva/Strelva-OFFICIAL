@@ -91,7 +91,7 @@ async function main() {
 
   // Single URL, human-readable: full pretty output.
   if (urls.length === 1 && !flag("json")) {
-    const r = await auditUrl(urls[0]);
+    const r = await auditUrl(urls[0]!);
     printOne(r, flag("html") ? writeHtml(r) : undefined);
     return;
   }

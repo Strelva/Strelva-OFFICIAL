@@ -167,7 +167,7 @@ export function ContentBrowser({ sectionData, timestamps }: ContentBrowserProps)
     if (idx === -1) return;
     const targetIdx = direction === "up" ? idx - 1 : idx + 1;
     if (targetIdx < 0 || targetIdx >= sections.length) return;
-    [sections[idx], sections[targetIdx]] = [sections[targetIdx], sections[idx]];
+    [sections[idx], sections[targetIdx]] = [sections[targetIdx]!, sections[idx]!];
     // Reassign order values
     const reordered = sections.map((s, i) => ({ ...s, order: i }));
     const updated = { ...pageConfig, [activePage]: { sections: reordered } };

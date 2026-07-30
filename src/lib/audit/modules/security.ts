@@ -237,8 +237,8 @@ function checkMixedContent(ctx: AuditContext): CheckResult {
     for (const m of matches) {
       const urlMatch = m.match(/(?:src|href)=["'](http:\/\/[^"']+)["']/i);
       if (urlMatch) {
-        if (kind === "active") active.push(urlMatch[1]);
-        else passive.push(urlMatch[1]);
+        if (kind === "active") active.push(urlMatch[1]!);
+        else passive.push(urlMatch[1]!);
       }
     }
   }

@@ -57,7 +57,7 @@ vi.mock("ai", () => ({
     return {
       fullStream: (async function* () {
         if (!mockDrive) return;
-        const output = await opts.tools[mockDrive.name].execute(mockDrive.args);
+        const output = await opts.tools[mockDrive.name]!.execute(mockDrive.args);
         mockLastOutput = output;
         yield { type: "tool-call", toolName: mockDrive.name, input: mockDrive.args };
         yield { type: "tool-result", output };

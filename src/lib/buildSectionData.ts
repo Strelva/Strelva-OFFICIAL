@@ -38,7 +38,7 @@ const SECTION_BUILDERS: { [K in keyof ContentMap]?: (data: ContentMap[K], timest
     items: (d.paragraphs || []).map((p, i) => ({ label: truncate(p, 60), detail: `paragraph ${i + 1}` })),
   }),
   testimonials: (d, ts) => ({
-    preview: (d.testimonials?.length || 0) > 0 ? truncate(d.testimonials[0].quote, 50) : "No reviews yet",
+    preview: (d.testimonials?.length || 0) > 0 ? truncate(d.testimonials![0]!.quote, 50) : "No reviews yet",
     status: (d.testimonials?.length || 0) > 0 ? "live" : "empty",
     count: `${d.testimonials?.length || 0}`,
     chatPrompt: "Add a new testimonial",
@@ -46,7 +46,7 @@ const SECTION_BUILDERS: { [K in keyof ContentMap]?: (data: ContentMap[K], timest
     items: (d.testimonials || []).map((t) => ({ label: `"${truncate(t.quote, 40)}"`, detail: t.author })),
   }),
   events: (d, ts) => ({
-    preview: (d.events?.length || 0) > 0 ? d.events[0].title : "No upcoming events",
+    preview: (d.events?.length || 0) > 0 ? d.events![0]!.title : "No upcoming events",
     status: (d.events?.length || 0) > 0 ? "live" : "empty",
     count: `${d.events?.length || 0}`,
     chatPrompt: "Add a new event",
@@ -86,7 +86,7 @@ const SECTION_BUILDERS: { [K in keyof ContentMap]?: (data: ContentMap[K], timest
     ].filter(Boolean) as { label: string; detail: string }[],
   }),
   faq: (d, ts) => ({
-    preview: (d.faqs?.length || 0) > 0 ? d.faqs[0].question : "No FAQ yet",
+    preview: (d.faqs?.length || 0) > 0 ? d.faqs![0]!.question : "No FAQ yet",
     status: (d.faqs?.length || 0) > 0 ? "live" : "empty",
     count: `${d.faqs?.length || 0}`,
     chatPrompt: "Update my FAQ",
@@ -143,7 +143,7 @@ const SECTION_BUILDERS: { [K in keyof ContentMap]?: (data: ContentMap[K], timest
     })),
   }),
   shop: (d, ts) => ({
-    preview: (d.items?.length || 0) > 0 ? d.items[0].name : "No shop items",
+    preview: (d.items?.length || 0) > 0 ? d.items![0]!.name : "No shop items",
     status: (d.items?.length || 0) > 0 ? "live" : "empty",
     count: `${d.items?.length || 0}`,
     chatPrompt: "Update my shop",

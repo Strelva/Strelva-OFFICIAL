@@ -144,8 +144,8 @@ export function buildProofCards(
   const byDay = new Map<string, number>();
   for (const m of dailyMetrics) byDay.set(m.date, m.pageViews);
   const sortedDays = [...byDay.keys()].sort();
-  const earliest = sortedDays[0];
-  const latest = sortedDays[sortedDays.length - 1];
+  const earliest = sortedDays[0]!;
+  const latest = sortedDays[sortedDays.length - 1]!;
 
   const windowSum = (centerDay: string, dir: -1 | 1): number[] => {
     const vals: number[] = [];
@@ -153,7 +153,7 @@ export function buildProofCards(
     for (let i = 1; i <= PROOF_WINDOW_DAYS; i++) {
       const d = new Date(center);
       d.setUTCDate(center.getUTCDate() + dir * i);
-      const key = d.toISOString().split("T")[0];
+      const key = d.toISOString().split("T")[0]!;
       if (byDay.has(key)) vals.push(byDay.get(key)!);
     }
     return vals;
@@ -164,7 +164,7 @@ export function buildProofCards(
 
   for (const entry of activity) {
     if (entry.actor !== "ai") continue;
-    const day = entry.time.split("T")[0];
+    const day = entry.time.split("T")[0]!;
     // Need full windows on both sides within the metrics range.
     if (day <= earliest || day >= latest) continue;
     if (seen.has(day)) continue; // one card per change-day, strongest wins later

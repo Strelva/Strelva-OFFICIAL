@@ -157,7 +157,7 @@ export function LayoutPanel() {
     const index = sections.findIndex((section) => section.type === type);
     const target = direction === "up" ? index - 1 : index + 1;
     if (index < 0 || target < 0 || target >= sections.length) return;
-    [sections[index], sections[target]] = [sections[target], sections[index]];
+    [sections[index], sections[target]] = [sections[target]!, sections[index]!];
     updateActivePageSections(sections);
   }, [pageSections, updateActivePageSections]);
 

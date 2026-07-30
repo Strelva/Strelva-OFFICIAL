@@ -45,9 +45,12 @@ export default async function LinksPage() {
     bookingUrl
       ? { title: "Book a Session", url: bookingUrl, icon: "booking", featured: true, external: true }
       : null,
-    upcomingEvents.length > 0 && upcomingEvents[0].external_link
-      ? { title: upcomingEvents[0].title, url: upcomingEvents[0].external_link, icon: "calendar", featured: false, external: true }
-      : null,
+    (() => {
+      const firstEvent = upcomingEvents[0];
+      return firstEvent?.external_link
+        ? { title: firstEvent.title, url: firstEvent.external_link, icon: "calendar", featured: false, external: true }
+        : null;
+    })(),
     instagramUrl
       ? { title: "Follow on Instagram", url: instagramUrl, icon: "instagram", featured: false, external: true }
       : null,

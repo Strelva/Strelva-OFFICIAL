@@ -102,7 +102,8 @@ function setNestedValue(
   const next: Record<string, unknown> = { ...obj };
   let cursor: Record<string, unknown> = next;
   for (let i = 0; i < parts.length - 1; i++) {
-    const k = parts[i];
+    // i is always within bounds here (loop bound is parts.length - 1).
+    const k = parts[i]!;
     const existing = cursor[k];
     const cloned: Record<string, unknown> =
       existing && typeof existing === "object" && !Array.isArray(existing)
@@ -111,7 +112,8 @@ function setNestedValue(
     cursor[k] = cloned;
     cursor = cloned;
   }
-  cursor[parts[parts.length - 1]] = value;
+  // parts.length >= 1 always (split always produces at least one element).
+  cursor[parts[parts.length - 1]!] = value;
   return next;
 }
 
@@ -507,6 +509,9 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
   // Composite sections — not directly editable, point to chat
   if (activeSection && isComposite) {
     const info = COMPOSITE_SECTION_INFO[activeSection];
+    // isComposite is derived from `activeSection in COMPOSITE_SECTION_INFO`,
+    // so info is always present here — guard for the type system.
+    if (!info) return null;
     return (
       <div className="flex flex-col h-full bg-surface">
         <div className="px-4 py-2.5 border-b border-gray-border bg-gray-bg-alt shrink-0">

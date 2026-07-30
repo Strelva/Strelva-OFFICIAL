@@ -65,9 +65,10 @@ export function resolveEditableSections(
   template: { contentSections: string[]; components?: Record<string, unknown> },
   siteManifest: SiteCapabilityManifest,
 ) {
-  const draftable = (section: string) =>
-    Boolean(siteManifest.sections[section]) &&
-    siteManifest.sections[section].allowedActions?.includes("draft") !== false;
+  const draftable = (section: string) => {
+    const entry = siteManifest.sections[section];
+    return Boolean(entry) && entry!.allowedActions?.includes("draft") !== false;
+  };
 
   const templateSet = new Set(template.contentSections);
   const componentKeys = new Set(Object.keys(template.components ?? {}));
@@ -247,7 +248,7 @@ export function buildUndoTool(hooks: UndoToolHooks) {
         const result = await applySectionUpdate({
           tenantId,
           section: section as ContentSection,
-          data: target.data as Record<string, unknown>,
+          data: target!.data as Record<string, unknown>,
           tenantConfig: tenantConfig ?? null,
           siteManifest,
           forceReview: true,
@@ -275,12 +276,12 @@ export function buildUndoTool(hooks: UndoToolHooks) {
         // defensive so the shape stays coherent if governance ever changes.
         const eventId = result.status === "queued" ? result.eventId : undefined;
         const message = `I've drafted a revert of your ${section} back to the earlier version. It'll go live once you approve it. Nothing changes on your site until then.`;
-        const sourceProof = `Source: ${section} version history (restoring ${target.id})`;
+        const sourceProof = `Source: ${section} version history (restoring ${target!.id})`;
         hooks.onQueued?.(section, eventId, message, sourceProof);
         return {
           success: true,
           section,
-          restoredFromVersionId: target.id,
+          restoredFromVersionId: target!.id,
           eventId,
           eventIds: eventId ? [eventId] : undefined,
           governance: result.governance,

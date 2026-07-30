@@ -281,11 +281,11 @@ export function CreateTenantForm() {
             <fieldset className="sm:col-span-2">
               <legend className={labelCls}>Supported Features</legend>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {[
+                {([
                   ["supportsPageConfig", "Page config"],
                   ["supportsDraftPreview", "Draft preview"],
                   ["supportsInlineEditing", "Inline editing"],
-                ].map(([key, label]) => (
+                ] as [string, string][]).map(([key, label]) => (
                   <label key={key} className="flex items-center gap-2 rounded-md border border-glass-border bg-gray-bg px-3 py-2 text-xs text-gray-muted cursor-pointer">
                     <input
                       type="checkbox"

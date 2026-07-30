@@ -20,7 +20,7 @@ export const RESERVED_SUBDOMAINS = new Set(["www", "admin", "app", "api"]);
  * tenant record (TenantConfig.stableId), not from the host.
  */
 export function parseTenantHost(host: string): { tenant: string | null; isAdmin: boolean } {
-  const hostWithoutPort = host.toLowerCase().split(":")[0];
+  const hostWithoutPort = host.toLowerCase().split(":")[0] ?? "";
 
   if (isMarketingHost(host)) {
     return { tenant: null, isAdmin: false };

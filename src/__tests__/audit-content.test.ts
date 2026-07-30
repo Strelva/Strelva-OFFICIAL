@@ -81,11 +81,11 @@ describe("checkContent", () => {
     expect(result.score).toBeGreaterThanOrEqual(80);
 
     const byName = Object.fromEntries(result.checks.map((c) => [c.name, c]));
-    expect(byName["Enough content"].status).toBe("pass");
-    expect(byName["Heading structure"].status).toBe("pass");
-    expect(byName["Key pages linked"].status).toBe("pass");
-    expect(byName["Image alt coverage"].status).toBe("pass");
-    expect(byName["Clear calls to action"].status).toBe("pass");
+    expect(byName["Enough content"]!.status).toBe("pass");
+    expect(byName["Heading structure"]!.status).toBe("pass");
+    expect(byName["Key pages linked"]!.status).toBe("pass");
+    expect(byName["Image alt coverage"]!.status).toBe("pass");
+    expect(byName["Clear calls to action"]!.status).toBe("pass");
   });
 
   it("scores a thin page low", () => {
@@ -93,8 +93,8 @@ describe("checkContent", () => {
     expect(result.score).toBeLessThan(50);
 
     const byName = Object.fromEntries(result.checks.map((c) => [c.name, c]));
-    expect(byName["Enough content"].status).toBe("fail");
-    expect(byName["Heading structure"].status).toBe("fail");
-    expect(byName["Key pages linked"].status).toBe("fail");
+    expect(byName["Enough content"]!.status).toBe("fail");
+    expect(byName["Heading structure"]!.status).toBe("fail");
+    expect(byName["Key pages linked"]!.status).toBe("fail");
   });
 });

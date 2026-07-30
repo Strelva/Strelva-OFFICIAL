@@ -1,4 +1,4 @@
-import type { ContentSection, SitePageConfig, PageSectionConfig } from "@/lib/types";
+import type { ContentSection, SitePageConfig, PageSectionConfig, PageConfig } from "@/lib/types";
 import { getContent, getDraftPageConfig, getPageConfig } from "@/lib/storage";
 import { getTemplateForTenant } from "@/components/templates/registry";
 import { SectionErrorBoundary } from "./SectionErrorBoundary";
@@ -56,7 +56,7 @@ export async function SectionRenderer({ pageSlug, tenant, editMode: _editMode, p
   const rawStoredPage = pageConfig[pageSlug];
   const defaultPage = template.defaultPageConfig[pageSlug];
   const storedPage = rawStoredPage?.sections?.length ? rawStoredPage : undefined;
-  const fallbackPage = pageSlug === "contact" && template.components.contact
+  const fallbackPage: PageConfig | undefined = pageSlug === "contact" && template.components.contact
     ? {
         sections: [{ type: "contact", visible: true, order: 0 }],
         seo: {},

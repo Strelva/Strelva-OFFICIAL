@@ -87,10 +87,10 @@ async function LocalBusinessSchema() {
     t = t.trim().toLowerCase();
     const match12 = t.match(/^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$/i);
     if (match12) {
-      let h = parseInt(match12[1]);
-      const m = match12[2] || "00";
-      if (match12[3].toLowerCase() === "pm" && h < 12) h += 12;
-      if (match12[3].toLowerCase() === "am" && h === 12) h = 0;
+      let h = parseInt(match12[1]!);
+      const m = match12[2] ?? "00";
+      if (match12[3]!.toLowerCase() === "pm" && h < 12) h += 12;
+      if (match12[3]!.toLowerCase() === "am" && h === 12) h = 0;
       return `${h.toString().padStart(2, "0")}:${m}`;
     }
     if (t.includes(":")) return t;
@@ -103,14 +103,14 @@ async function LocalBusinessSchema() {
     for (const part of parts) {
       const match = part.match(/^(\w{3})\w*[:\s]+(\d{1,2}(?::\d{2})?\s*(?:AM|PM)?)\s*[-–]\s*(\d{1,2}(?::\d{2})?\s*(?:AM|PM)?)/i);
       if (match) {
-        const dayKey = match[1].toLowerCase();
+        const dayKey = match[1]!.toLowerCase();
         const day = dayMap[dayKey];
         if (day) {
           hoursSpecs.push({
             "@type": "OpeningHoursSpecification",
             dayOfWeek: day,
-            opens: parseTime(match[2]),
-            closes: parseTime(match[3]),
+            opens: parseTime(match[2]!),
+            closes: parseTime(match[3]!),
           });
         }
       }
@@ -139,7 +139,7 @@ async function LocalBusinessSchema() {
       "@type": "PostalAddress",
       streetAddress,
       addressLocality,
-      ...(stateZip ? { addressRegion: stateZip[1], postalCode: stateZip[2] } : {}),
+      ...(stateZip ? { addressRegion: stateZip[1]!, postalCode: stateZip[2]! } : {}),
       addressCountry: "US",
     },
     ...((() => {
@@ -149,8 +149,8 @@ async function LocalBusinessSchema() {
         ? {
             geo: {
               "@type": "GeoCoordinates",
-              latitude: parseFloat(coordMatch[2]),
-              longitude: parseFloat(coordMatch[1]),
+              latitude: parseFloat(coordMatch[2]!),
+              longitude: parseFloat(coordMatch[1]!),
             },
           }
         : {};

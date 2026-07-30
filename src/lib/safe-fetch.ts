@@ -34,10 +34,10 @@ function isPrivateOrReservedHost(host: string): boolean {
     if (h.startsWith("fc") || h.startsWith("fd")) return true;
     // IPv4-mapped IPv6: ::ffff:127.0.0.1 or its normalized hex ::ffff:7f00:1.
     const mappedDotted = h.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
-    if (mappedDotted) return isPrivateOrReservedHost(mappedDotted[1]);
+    if (mappedDotted) return isPrivateOrReservedHost(mappedDotted[1]!);
     const mappedHex = h.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
     if (mappedHex) {
-      const n = ((parseInt(mappedHex[1], 16) << 16) | parseInt(mappedHex[2], 16)) >>> 0;
+      const n = ((parseInt(mappedHex[1]!, 16) << 16) | parseInt(mappedHex[2]!, 16)) >>> 0;
       const quad = `${(n >>> 24) & 255}.${(n >>> 16) & 255}.${(n >>> 8) & 255}.${n & 255}`;
       return isPrivateOrReservedHost(quad);
     }

@@ -75,7 +75,7 @@ function RatingDistribution({ reviews }: { reviews: ReviewItem[] }) {
   const counts = [0, 0, 0, 0, 0]; // index 0 = 1★ … 4 = 5★
   for (const r of reviews) {
     const s = Math.round(r.rating);
-    if (s >= 1 && s <= 5) counts[s - 1] += 1;
+    if (s >= 1 && s <= 5) counts[s - 1]! += 1;
   }
   if (reviews.length < 4) return null;
   const max = Math.max(1, ...counts);
@@ -87,7 +87,7 @@ function RatingDistribution({ reviews }: { reviews: ReviewItem[] }) {
       </p>
       <div className="space-y-2">
         {[5, 4, 3, 2, 1].map((star) => {
-          const c = counts[star - 1];
+          const c = counts[star - 1]!;
           return (
             <div key={star} className="flex items-center gap-3">
               <span className="flex w-7 shrink-0 items-center justify-end gap-0.5 text-[12px] tabular-nums text-gray-muted">

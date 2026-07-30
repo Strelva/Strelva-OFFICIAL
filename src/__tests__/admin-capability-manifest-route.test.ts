@@ -80,7 +80,7 @@ describe("POST /api/admin/tenants/[id]/capability-manifest", () => {
   it("clears the URL on an empty string (undefined, not empty string)", async () => {
     const { POST } = await import("@/app/api/admin/tenants/[id]/capability-manifest/route");
     await POST(post({ capabilityManifestUrl: "" }), params("rohlax"));
-    const [, updates] = mockUpdateTenant.mock.calls[0];
+    const [, updates] = mockUpdateTenant.mock.calls[0]!;
     expect((updates.customRepo as Record<string, unknown>).capabilityManifestUrl).toBeUndefined();
   });
 

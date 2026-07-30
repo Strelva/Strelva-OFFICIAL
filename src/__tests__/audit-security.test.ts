@@ -65,11 +65,11 @@ describe("checkSecurity", () => {
     expect(result.score).toBeGreaterThanOrEqual(80);
 
     const byName = Object.fromEntries(result.checks.map((c) => [c.name, c]));
-    expect(byName["HTTPS"].status).toBe("pass");
-    expect(byName["Security headers"].status).toBe("pass");
-    expect(byName["No mixed content"].status).toBe("pass");
-    expect(byName["Form security"].status).toBe("pass");
-    expect(byName["Cookie consent"].status).toBe("pass");
+    expect(byName["HTTPS"]!.status).toBe("pass");
+    expect(byName["Security headers"]!.status).toBe("pass");
+    expect(byName["No mixed content"]!.status).toBe("pass");
+    expect(byName["Form security"]!.status).toBe("pass");
+    expect(byName["Cookie consent"]!.status).toBe("pass");
     // Every check status must agree with its score band.
     for (const c of result.checks) {
       const expected = c.score >= 80 ? "pass" : c.score >= 50 ? "warn" : "fail";
@@ -98,12 +98,12 @@ describe("checkSecurity", () => {
     expect(result.score).toBeLessThan(50);
 
     const byName = Object.fromEntries(result.checks.map((c) => [c.name, c]));
-    expect(byName["Security headers"].status).toBe("fail");
-    expect(byName["Security headers"].details).toContain("Missing headers");
+    expect(byName["Security headers"]!.status).toBe("fail");
+    expect(byName["Security headers"]!.details).toContain("Missing headers");
     // Active http:// script on an https page => mixed content fails at score 0.
-    expect(byName["No mixed content"].status).toBe("fail");
-    expect(byName["No mixed content"].score).toBe(0);
-    expect(byName["Cookie consent"].status).toBe("warn");
+    expect(byName["No mixed content"]!.status).toBe("fail");
+    expect(byName["No mixed content"]!.score).toBe(0);
+    expect(byName["Cookie consent"]!.status).toBe("warn");
   });
 
   it("fails HTTPS for an http url", () => {

@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     }
     const duration = parseInt(service.duration, 10) || 60;
 
-    const [startH, startM] = startTime.split(":").map(Number);
+    const [startH, startM] = startTime.split(":").map(Number) as [number, number];
     const endMinutes = startH * 60 + startM + duration;
     const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
 

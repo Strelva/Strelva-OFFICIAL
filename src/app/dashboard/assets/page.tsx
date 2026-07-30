@@ -124,7 +124,7 @@ export default function PhotosPage() {
     if (newAssets.length > 0) {
       setAssets((prev) => [...newAssets, ...prev]);
       // Select the first newly uploaded photo
-      setSelected(newAssets[0]);
+      setSelected(newAssets[0]!);
     }
     setUploadProgress(null);
     setUploading(false);

@@ -86,7 +86,7 @@ export async function buildMaintenanceDigest(tenant: string, siteName: string): 
   return {
     tenant,
     siteName,
-    weekOf: new Date().toISOString().split("T")[0],
+    weekOf: new Date().toISOString().split("T")[0]!,
     items,
     status: "pending",
     createdAt: new Date().toISOString(),

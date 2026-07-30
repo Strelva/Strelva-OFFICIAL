@@ -312,7 +312,7 @@ describe("POST /api/pay/[slug]", () => {
       selectedAmountCents: "200000",
     });
     const lineItems = args.line_items as Array<{ price_data: { unit_amount: number } }>;
-    expect(lineItems[0].price_data.unit_amount).toBe(200_000);
+    expect(lineItems[0]!.price_data.unit_amount).toBe(200_000);
   });
 
   it("supports a pre-tenant lead range link without a tenantId", async () => {
@@ -346,7 +346,7 @@ describe("POST /api/pay/[slug]", () => {
     expect(res.status).toBe(200);
     const [args] = mockCheckoutCreate.mock.calls[0] as [Record<string, unknown>];
     const lineItems = args.line_items as Array<{ price_data: { unit_amount: number } }>;
-    expect(lineItems[0].price_data.unit_amount).toBe(75_000);
+    expect(lineItems[0]!.price_data.unit_amount).toBe(75_000);
     expect((args.metadata as Record<string, string>).selectedAmountCents).toBe("75000");
   });
 
@@ -359,7 +359,7 @@ describe("POST /api/pay/[slug]", () => {
     expect(res.status).toBe(200);
     const [args] = mockCheckoutCreate.mock.calls[0] as [Record<string, unknown>];
     const lineItems = args.line_items as Array<{ price_data: { unit_amount: number } }>;
-    expect(lineItems[0].price_data.unit_amount).toBe(75_000);
+    expect(lineItems[0]!.price_data.unit_amount).toBe(75_000);
   });
 
   it("returns 404 for an unknown slug", async () => {
@@ -392,7 +392,7 @@ describe("POST /api/pay/[slug]", () => {
     expect(res.status).toBe(200);
     const [args] = mockCheckoutCreate.mock.calls[0] as [Record<string, unknown>];
     const lineItems = args.line_items as Array<{ price_data: { unit_amount: number } }>;
-    expect(lineItems[0].price_data.unit_amount).toBe(200_000);
+    expect(lineItems[0]!.price_data.unit_amount).toBe(200_000);
   });
 
   it("returns 429 when rate limited", async () => {

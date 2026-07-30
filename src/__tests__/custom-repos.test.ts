@@ -94,7 +94,7 @@ describe("custom repo dependency health", () => {
     });
 
     expect(dependencies).toHaveLength(1);
-    expect(dependencies[0].id).toBe("supabase-production");
+    expect(dependencies[0]!.id).toBe("supabase-production");
   });
 
   it("summarizes the worst dependency state", () => {

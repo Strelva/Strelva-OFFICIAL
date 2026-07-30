@@ -54,7 +54,7 @@ function NestedArrayEditor({
     const target = idx + dir;
     if (target < 0 || target >= rows.length) return;
     const next = rows.slice();
-    [next[idx], next[target]] = [next[target], next[idx]];
+    [next[idx], next[target]] = [next[target]!, next[idx]!];
     onChange(next);
   };
 

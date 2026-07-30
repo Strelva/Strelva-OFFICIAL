@@ -16,7 +16,7 @@ export default async function CollectionsPage() {
   );
   const types: CollectionType[] = enabled.length > 0 ? enabled : ["blog"];
 
-  const initialType = types[0];
+  const initialType = types[0]!;
   const initialEntries = await listEntriesForType(tenant, initialType).catch(() => []);
 
   return (

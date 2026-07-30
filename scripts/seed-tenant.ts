@@ -21,7 +21,7 @@ for (const path of [".env.local", ".env"]) {
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
-    const [key, ...valueParts] = trimmed.split("=");
+    const [key, ...valueParts] = trimmed.split("=") as [string, ...string[]];
     if (process.env[key]) continue;
     process.env[key] = valueParts.join("=").replace(/^['"]|['"]$/g, "");
   }

@@ -172,7 +172,7 @@ describe("social-store Postgres dual-path", () => {
     expect(Array.isArray(rows)).toBe(true);
     expect(rows).toHaveLength(2);
 
-    const [first, second] = rows;
+    const [first, second] = rows as [Record<string, unknown>, Record<string, unknown>];
 
     expect(first.id).toBe("social_a");
     expect(first.tenant_id).toBe("gldf");

@@ -121,7 +121,7 @@ async function pgFindPendingDuplicate(
   const { data, error } = await query.limit(1);
   if (error) throw error;
   if (!data || data.length === 0) return null;
-  return mapPgSuggestionRow(data[0]);
+  return mapPgSuggestionRow(data[0]!);
 }
 
 async function pgInsertSuggestion(suggestion: Suggestion): Promise<void> {
@@ -145,7 +145,7 @@ async function pgUpdateSuggestionStatus(
     .limit(1);
   if (error) throw error;
   if (!data || data.length === 0) return null;
-  return mapPgSuggestionRow(data[0]);
+  return mapPgSuggestionRow(data[0]!);
 }
 
 // --- Dev file fallback ---
@@ -353,10 +353,11 @@ export async function updateSuggestion(
   const idx = suggestions.findIndex((s) => s.id === suggestionId);
   if (idx === -1) return null;
 
-  suggestions[idx].status = status;
+  const suggestion = suggestions[idx]!;
+  suggestion.status = status;
   store[tenantId] = suggestions;
   await writeSuggestions(store);
-  return suggestions[idx];
+  return suggestion;
 }
 
 // --- Generation ---

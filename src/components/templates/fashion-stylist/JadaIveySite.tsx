@@ -85,7 +85,7 @@ const faqs = [
 
 export function JadaIveySite() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [selectedService, setSelectedService] = useState(services[0].name);
+  const [selectedService, setSelectedService] = useState(services[0]!.name);
   const [notes, setNotes] = useState("");
   const [bookingStatus, setBookingStatus] = useState("");
   const [newsletterStatus, setNewsletterStatus] = useState("");

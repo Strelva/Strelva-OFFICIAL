@@ -164,9 +164,9 @@ export function formatVerificationLines(
   if (sections.length === 0) return "";
 
   let list: string;
-  if (sections.length === 1) list = sections[0];
-  else if (sections.length === 2) list = `${sections[0]} and ${sections[1]}`;
-  else list = `${sections.slice(0, -1).join(", ")}, and ${sections[sections.length - 1]}`;
+  if (sections.length === 1) list = sections[0]!;
+  else if (sections.length === 2) list = `${sections[0]!} and ${sections[1]!}`;
+  else list = `${sections.slice(0, -1).join(", ")}, and ${sections[sections.length - 1]!}`;
 
   return `We refreshed your ${list} this week.`;
 }
@@ -216,7 +216,7 @@ export async function extractVisibilityDiff(tenantId: string): Promise<Visibilit
   try {
     const snapshots = await getLatestSnapshots(tenantId, 2);
     if (snapshots.length === 0) return null;
-    const current = snapshots[0];
+    const current = snapshots[0]!;
     const previous = snapshots[1] ?? null;
     return diffSnapshots(previous, current);
   } catch {
@@ -520,9 +520,9 @@ export async function generateWeeklyReport(
       getGa4Perf(tenantId),
     ]);
 
-  const pageViews = metricsBatch.counts["page-view"];
-  const bookingClicks = metricsBatch.counts["booking-click"];
-  const phoneClicks = metricsBatch.counts["phone-click"];
+  const pageViews = metricsBatch.counts["page-view"]!;
+  const bookingClicks = metricsBatch.counts["booking-click"]!;
+  const phoneClicks = metricsBatch.counts["phone-click"]!;
   const perServiceClicks = metricsBatch.byPrefix;
 
   const analyticsRows = buildAnalyticsRows(searchPerf, gaPerf);

@@ -99,16 +99,16 @@ describe("checkAiReadability", () => {
 
     const byName = Object.fromEntries(result.checks.map((c) => [c.name, c]));
 
-    expect(byName["Structured data present"].status).toBe("pass");
-    expect(byName["Business schema valid"].status).toBe("pass");
-    expect(byName["AI-answer content (FAQ/HowTo)"].score).toBeGreaterThanOrEqual(50);
+    expect(byName["Structured data present"]!.status).toBe("pass");
+    expect(byName["Business schema valid"]!.status).toBe("pass");
+    expect(byName["AI-answer content (FAQ/HowTo)"]!.score).toBeGreaterThanOrEqual(50);
     // sameAs authority = 3 platforms (30) + Wikipedia KG (+20) = 50 (warn by convention),
     // and the KG signal is recognized in the message.
-    expect(byName["Entity authority (sameAs)"].score).toBeGreaterThanOrEqual(50);
-    expect(byName["Entity authority (sameAs)"].message).toMatch(/Wikipedia\/Wikidata/);
-    expect(byName["Plain-text readable by AI"].status).toBe("pass");
-    expect(byName["Single clear business name"].status).toBe("pass");
-    expect(byName["llms.txt for AI agents"].status).toBe("pass");
+    expect(byName["Entity authority (sameAs)"]!.score).toBeGreaterThanOrEqual(50);
+    expect(byName["Entity authority (sameAs)"]!.message).toMatch(/Wikipedia\/Wikidata/);
+    expect(byName["Plain-text readable by AI"]!.status).toBe("pass");
+    expect(byName["Single clear business name"]!.status).toBe("pass");
+    expect(byName["llms.txt for AI agents"]!.status).toBe("pass");
 
     // Good case clears 60 comfortably; OWSH's authority/entity sub-scores are
     // deliberately conservative, so a strong site lands in the mid-60s+, well
@@ -163,8 +163,8 @@ describe("checkAiReadability", () => {
     const byName = Object.fromEntries(result.checks.map((c) => [c.name, c]));
 
     // FAQ schema is a pass on its own; 2 declared profiles pass entity authority.
-    expect(byName["AI-answer content (FAQ/HowTo)"].status).toBe("pass");
-    expect(byName["Entity authority (sameAs)"].status).not.toBe("fail");
+    expect(byName["AI-answer content (FAQ/HowTo)"]!.status).toBe("pass");
+    expect(byName["Entity authority (sameAs)"]!.status).not.toBe("fail");
     // A genuinely AI-ready local site should not be stuck in the 60s (this
     // minimal fixture, with no llms.txt and only 2 socials, lands in the mid-70s;
     // the same site live with 3 profiles scores mid-80s).
@@ -176,14 +176,14 @@ describe("checkAiReadability", () => {
 
     const byName = Object.fromEntries(result.checks.map((c) => [c.name, c]));
 
-    expect(byName["Structured data present"].status).toBe("fail");
-    expect(byName["Business schema valid"].status).toBe("fail");
-    expect(byName["AI-answer content (FAQ/HowTo)"].status).toBe("fail");
-    expect(byName["Entity authority (sameAs)"].status).toBe("fail");
+    expect(byName["Structured data present"]!.status).toBe("fail");
+    expect(byName["Business schema valid"]!.status).toBe("fail");
+    expect(byName["AI-answer content (FAQ/HowTo)"]!.status).toBe("fail");
+    expect(byName["Entity authority (sameAs)"]!.status).toBe("fail");
     // SPA root + < 100 words => "AI crawlers can't execute your JS"
-    expect(byName["Plain-text readable by AI"].status).toBe("fail");
-    expect(byName["Plain-text readable by AI"].message).toMatch(/can't execute your JavaScript/i);
-    expect(byName["llms.txt for AI agents"].status).not.toBe("pass");
+    expect(byName["Plain-text readable by AI"]!.status).toBe("fail");
+    expect(byName["Plain-text readable by AI"]!.message).toMatch(/can't execute your JavaScript/i);
+    expect(byName["llms.txt for AI agents"]!.status).not.toBe("pass");
 
     expect(result.score).toBeLessThan(40);
   });

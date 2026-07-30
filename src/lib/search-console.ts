@@ -180,7 +180,7 @@ export async function queryGscTotals(
   const queryRows: { keys: string[]; clicks: number; impressions: number; position: number }[] =
     queriesData.rows || [];
   const topQueries = queryRows.map((r) => ({
-    query: r.keys[0],
+    query: r.keys[0] ?? "",
     clicks: r.clicks,
     impressions: r.impressions,
     position: round1(r.position),

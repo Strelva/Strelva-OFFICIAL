@@ -119,7 +119,8 @@ function formatClientRequestStatus(status: string | null): string {
 }
 
 export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disabled, isOperator = false }: QueueCardProps) {
-  const colors = SOURCE_COLORS[event.source] || SOURCE_COLORS.default;
+  const DEFAULT_COLORS: { bg: string; text: string } = { bg: "bg-gray-bg", text: "text-gray-muted" };
+  const colors: { bg: string; text: string } = SOURCE_COLORS[event.source] ?? DEFAULT_COLORS;
   const icon = SOURCE_ICONS[event.source] || <Zap className="w-3.5 h-3.5" strokeWidth={1.5} />;
   const isPending = event.status === "pending";
   const isCustomRequest = event.type === "change_request" && event.metadata?.kind === "custom_code_or_design_request";
@@ -155,8 +156,9 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (disabled || !isPending) return;
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
+    // touches[0] is always present when a touchstart fires.
+    touchStartX.current = e.touches[0]!.clientX;
+    touchStartY.current = e.touches[0]!.clientY;
     isHorizontalSwipe.current = null;
     setIsSwiping(true);
   }, [disabled, isPending]);
@@ -164,8 +166,9 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
     if (!isSwiping || disabled || !isPending) return;
 
-    const deltaX = e.touches[0].clientX - touchStartX.current;
-    const deltaY = e.touches[0].clientY - touchStartY.current;
+    // touches[0] is always present during an active touch sequence.
+    const deltaX = e.touches[0]!.clientX - touchStartX.current;
+    const deltaY = e.touches[0]!.clientY - touchStartY.current;
 
     // Determine swipe direction on first significant move
     if (isHorizontalSwipe.current === null) {

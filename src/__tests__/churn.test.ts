@@ -67,7 +67,7 @@ describe("recordDailyEngagement + getEngagement7d", () => {
     // Counts for today .. 6 days ago sum to 28.
     const counts = [1, 2, 3, 4, 5, 6, 7];
     for (let i = 0; i < counts.length; i++) {
-      await recordDailyEngagement("gldf", counts[i], dayKey(i));
+      await recordDailyEngagement("gldf", counts[i]!, dayKey(i));
     }
     // An 8th day (outside the 7-day window) must not be counted.
     await recordDailyEngagement("gldf", 100, dayKey(7));
@@ -196,7 +196,7 @@ describe("getAtRiskTenants", () => {
     const result = await getAtRiskTenants();
     // Only b (cancelled subscription) is a real churn risk. a + c are fine.
     expect(result.map((s) => s.tenantId)).toEqual(["b"]);
-    expect(result[0].reasons).toEqual(["Subscription cancelled"]);
+    expect(result[0]!.reasons).toEqual(["Subscription cancelled"]);
   });
 });
 

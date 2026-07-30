@@ -68,7 +68,7 @@ export default async function AdminAnalyticsPage({
 
   const { tenant: requested } = await searchParams;
   const selected =
-    (requested && tenants.find((t) => t.id === requested)?.id) ?? tenants[0].id;
+    (requested && tenants.find((t) => t.id === requested)?.id) ?? tenants[0]!.id;
 
   // --- Per-tenant portfolio data (parallel, fail-soft per tenant) ---
   function extractDomain(t: { siteUrl: string | null; productionDomain: string | null }): string | null {

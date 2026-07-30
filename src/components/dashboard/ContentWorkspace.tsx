@@ -138,7 +138,7 @@ export function ContentWorkspace({
     // Prefer the first directly-editable section so a page never opens on a
     // composite ("Page Header", "Call to Action") that only offers Ask Strelva.
     const firstEditable = pageSections.find((section) => !COMPOSITE_SECTIONS.has(section.value));
-    setActiveSection((firstEditable ?? pageSections[0]).value);
+    setActiveSection((firstEditable ?? pageSections[0]!).value);
   }, [activeSection, pageSections, setActiveSection]);
 
   useEffect(() => {

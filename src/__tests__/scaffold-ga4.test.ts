@@ -53,10 +53,10 @@ describe("injectGa4Tag", () => {
     expect(injected).toBe(true);
     // Exactly one external loader, pointed at googletagmanager with the id.
     expect(doc.appended).toHaveLength(1);
-    expect(doc.appended[0].src).toBe(
+    expect(doc.appended[0]!.src).toBe(
       "https://www.googletagmanager.com/gtag/js?id=G-ABC12345",
     );
-    expect(doc.appended[0].async).toBe(true);
+    expect(doc.appended[0]!.async).toBe(true);
     // gtag stub wired + `js`/`config` commands queued on dataLayer.
     expect(typeof win.gtag).toBe("function");
     expect(win.dataLayer).toHaveLength(2);

@@ -15,8 +15,8 @@ vi.mock("../lib/tenants", () => ({
   updateTenant: vi.fn((tenantId: string, updates: Partial<TenantConfig>) => {
     const index = tenants.findIndex((tenant) => tenant.id === tenantId);
     if (index === -1) return Promise.resolve(null);
-    tenants[index] = { ...tenants[index], ...updates, id: tenantId };
-    return Promise.resolve(tenants[index]);
+    tenants[index] = { ...tenants[index]!, ...updates, id: tenantId };
+    return Promise.resolve(tenants[index] ?? null);
   }),
 }));
 

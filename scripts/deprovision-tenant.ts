@@ -135,7 +135,7 @@ async function main() {
     }
     console.log("");
   }
-  console.log(`  ${verb} ${result.pgRowTotal} Postgres row(s) across ${result.summary.postgres.length} table(s).`);
+  console.log(`  ${verb} ${result.pgRowTotal} Postgres row(s) across ${result.summary.postgres?.length ?? 0} table(s).`);
   console.log(banner);
   if (!result.executed) {
     console.log("DRY RUN — nothing was deleted. Re-run with --confirm to execute.\n");

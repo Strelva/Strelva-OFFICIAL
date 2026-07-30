@@ -25,7 +25,7 @@ describe("deprovision-tenant table coverage", () => {
   const tenantTables: string[] = [];
   const re = /\n {6}([a-z_]+): \{\n {8}Row: \{([\s\S]*?)\n {8}\}/g;
   for (let m = re.exec(tablesBlock); m; m = re.exec(tablesBlock)) {
-    if (/\btenant_id\b/.test(m[2])) tenantTables.push(m[1]);
+    if (/\btenant_id\b/.test(m[2]!)) tenantTables.push(m[1]!);
   }
 
   it("found a sane set of tenant-scoped tables to check against", () => {

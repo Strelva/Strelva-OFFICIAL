@@ -105,15 +105,15 @@ describe("scanPortfolioOpportunities", () => {
     expect(allClients).not.toContain("gone");
 
     const byKind = Object.fromEntries(snap.groups.map((g) => [g.kind, g]));
-    expect(byKind.unreplied_reviews.clients.map((c) => c.tenantId).sort()).toEqual(["acme", "bolt"]);
-    expect(byKind.unreplied_reviews.clients.find((c) => c.tenantId === "acme")?.detail).toBe(
+    expect(byKind["unreplied_reviews"]!.clients.map((c) => c.tenantId).sort()).toEqual(["acme", "bolt"]);
+    expect(byKind["unreplied_reviews"]!.clients.find((c) => c.tenantId === "acme")?.detail).toBe(
       "2 reviews awaiting a reply",
     );
-    expect(byKind.stale_sites.clients.map((c) => c.tenantId).sort()).toEqual(["acme", "cove"]);
-    expect(byKind.low_health.clients.map((c) => c.tenantId)).toEqual(["bolt"]);
+    expect(byKind["stale_sites"]!.clients.map((c) => c.tenantId).sort()).toEqual(["acme", "cove"]);
+    expect(byKind["low_health"]!.clients.map((c) => c.tenantId)).toEqual(["bolt"]);
 
     // Biggest-lever first: the 2-client groups precede the 1-client group.
-    expect(snap.groups[snap.groups.length - 1].kind).toBe("low_health");
+    expect(snap.groups[snap.groups.length - 1]!.kind).toBe("low_health");
     expect(snap.totalOpportunities).toBe(5); // 2 unreplied + 2 stale + 1 low-health
   });
 

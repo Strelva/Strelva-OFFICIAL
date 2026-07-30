@@ -62,7 +62,7 @@ export function sniffImageType(buf: Uint8Array): RasterMime | null {
 /** Read a big-endian uint from the buffer (2 or 4 bytes). */
 function beUint(buf: Uint8Array, offset: number, bytes: number): number {
   let n = 0;
-  for (let i = 0; i < bytes; i++) n = n * 256 + buf[offset + i];
+  for (let i = 0; i < bytes; i++) n = n * 256 + buf[offset + i]!;
   return n;
 }
 
@@ -87,8 +87,8 @@ export function readImageDimensions(
   // GIF: "GIF87a"/"GIF89a", logical-screen width @6, height @8 (LE uint16).
   if (ascii(buf, 0, "GIF87a") || ascii(buf, 0, "GIF89a")) {
     if (buf.length < 10) return null;
-    const width = buf[6] | (buf[7] << 8);
-    const height = buf[8] | (buf[9] << 8);
+    const width = buf[6]! | (buf[7]! << 8);
+    const height = buf[8]! | (buf[9]! << 8);
     return width > 0 && height > 0 ? { width, height } : null;
   }
 
@@ -101,7 +101,7 @@ export function readImageDimensions(
         offset++; // resync past padding/fill bytes
         continue;
       }
-      const marker = buf[offset + 1];
+      const marker = buf[offset + 1]!;
       // Standalone markers (no length): RSTn, SOI, EOI, TEM.
       if (marker === 0xd8 || marker === 0xd9 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
         offset += 2;
@@ -129,21 +129,21 @@ export function readImageDimensions(
   if (ascii(buf, 0, "RIFF") && ascii(buf, 8, "WEBP")) {
     // Lossy VP8: 3-byte start code @23, then width/height (14-bit LE) @26/@28.
     if (ascii(buf, 12, "VP8 ") && buf.length >= 30) {
-      const width = (buf[26] | (buf[27] << 8)) & 0x3fff;
-      const height = (buf[28] | (buf[29] << 8)) & 0x3fff;
+      const width = (buf[26]! | (buf[27]! << 8)) & 0x3fff;
+      const height = (buf[28]! | (buf[29]! << 8)) & 0x3fff;
       return width > 0 && height > 0 ? { width, height } : null;
     }
     // Lossless VP8L: 14-bit width-1 / height-1 packed from @21.
     if (ascii(buf, 12, "VP8L") && buf.length >= 25) {
-      const b0 = buf[21], b1 = buf[22], b2 = buf[23], b3 = buf[24];
+      const b0 = buf[21]!, b1 = buf[22]!, b2 = buf[23]!, b3 = buf[24]!;
       const width = 1 + (((b1 & 0x3f) << 8) | b0);
       const height = 1 + (((b3 & 0x0f) << 10) | (b2 << 2) | ((b1 & 0xc0) >> 6));
       return width > 0 && height > 0 ? { width, height } : null;
     }
     // Extended VP8X: 24-bit canvas width-1 @24, height-1 @27 (LE).
     if (ascii(buf, 12, "VP8X") && buf.length >= 30) {
-      const width = 1 + (buf[24] | (buf[25] << 8) | (buf[26] << 16));
-      const height = 1 + (buf[27] | (buf[28] << 8) | (buf[29] << 16));
+      const width = 1 + (buf[24]! | (buf[25]! << 8) | (buf[26]! << 16));
+      const height = 1 + (buf[27]! | (buf[28]! << 8) | (buf[29]! << 16));
       return width > 0 && height > 0 ? { width, height } : null;
     }
     return null;

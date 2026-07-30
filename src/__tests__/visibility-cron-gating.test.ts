@@ -117,7 +117,7 @@ describe("GET /api/cron/visibility — gating + derivation", () => {
       expect.objectContaining({ count: 2 }),
       expect.any(Number)
     );
-    const alertCtx = alertOnceMock.mock.calls[0][2] as { tenantIds: string };
+    const alertCtx = alertOnceMock.mock.calls[0]![2] as { tenantIds: string };
     expect(alertCtx.tenantIds.split(",").sort()).toEqual(["bare", "no-towns"]);
 
     // Reasons are specific, not a single opaque skip.

@@ -55,7 +55,7 @@ describe("sendBookingConfirmation (end-customer gate)", () => {
     process.env.CUSTOMER_EMAIL_ENABLED = "true";
     process.env.RESEND_API_KEY = "key";
     expect(await sendBookingConfirmation(booking)).toBe(true);
-    const arg = send.mock.calls[0][0];
+    const arg = send.mock.calls[0]![0];
     expect(arg.to).toBe("customer@example.com");
     expect(arg.from).toContain("Cove Wellness");
     expect(arg.html).toContain("Reformer Pilates");
@@ -87,7 +87,7 @@ describe("sendPaymentPastDueEmail (client dunning gate)", () => {
     process.env.EMAIL_SENDING_ENABLED = "true";
     process.env.RESEND_API_KEY = "key";
     expect(await sendPaymentPastDueEmail(dunning)).toBe(true);
-    const arg = send.mock.calls[0][0];
+    const arg = send.mock.calls[0]![0];
     expect(arg.to).toBe("owner@studio.com");
     expect(arg.text).toContain("didn't go through"); // plain text isn't HTML-escaped
     expect(arg.html).toContain("Cove Wellness");

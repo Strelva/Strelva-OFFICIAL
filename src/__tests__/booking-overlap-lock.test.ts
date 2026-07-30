@@ -89,7 +89,7 @@ function bookingPayload(opts: {
   startTime: string;
   duration: number;
 }) {
-  const [h, m] = opts.startTime.split(":").map(Number);
+  const [h, m] = opts.startTime.split(":").map(Number) as [number, number];
   const endMinutes = h * 60 + m + opts.duration;
   const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(
     endMinutes % 60

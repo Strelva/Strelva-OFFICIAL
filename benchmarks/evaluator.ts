@@ -323,7 +323,7 @@ export async function evaluateCase(
 
     if (ra.numbersMustComeFromTools) {
       // Find any number > 2 digits in the response.
-      const numbers = Array.from(text.matchAll(/\b(\d{3,})\b/g)).map((m) => m[1]);
+      const numbers = Array.from(text.matchAll(/\b(\d{3,})\b/g)).map((m) => m[1]!);
       // Concatenate all tool outputs into a searchable corpus.
       const toolCorpus = run.toolCalls
         .map((call) => JSON.stringify(call.output ?? ""))

@@ -26,7 +26,7 @@ describe("attachImpact — quantified loss estimate", () => {
 
     attachImpact(cat);
 
-    const c = cat.checks[0];
+    const c = cat.checks[0]!;
     expect(c.quantified).toBeDefined();
     expect(c.quantified).toMatch(/^~/); // conservative/approximate prefix
     expect(c.quantified).toMatch(/customers?\/mo/);
@@ -49,7 +49,7 @@ describe("attachImpact — quantified loss estimate", () => {
       source: "measured",
     });
 
-    const c = cat.checks[0];
+    const c = cat.checks[0]!;
     // 5000 * 0.35 * 0.05 = ~88 customers, vs ~5 on the generic prior.
     expect(c.quantified).toMatch(/88 customers\/mo/);
     // Honest qualifier flips from "estimated" to "based on your traffic".
@@ -63,8 +63,8 @@ describe("attachImpact — quantified loss estimate", () => {
     ]);
     attachImpact(cat); // no metrics → generic
     // 500 * 0.35 * 0.03 = ~5 customers.
-    expect(cat.checks[0].quantified).toMatch(/5 customers\/mo/);
-    expect(cat.checks[0].quantified).toMatch(/\(estimated\)/);
+    expect(cat.checks[0]!.quantified).toMatch(/5 customers\/mo/);
+    expect(cat.checks[0]!.quantified).toMatch(/\(estimated\)/);
   });
 
   it("sets a figure on a missing-schema (AI readiness) check", () => {
@@ -74,7 +74,7 @@ describe("attachImpact — quantified loss estimate", () => {
 
     attachImpact(cat);
 
-    const c = cat.checks[0];
+    const c = cat.checks[0]!;
     expect(c.quantified).toBeDefined();
     expect(c.quantified).toMatch(/AI search/i);
     expect(c.quantified).toMatch(/estimated/i);
@@ -87,7 +87,7 @@ describe("attachImpact — quantified loss estimate", () => {
 
     attachImpact(cat);
 
-    expect(cat.checks[0].quantified).toMatch(/won't submit info/i);
+    expect(cat.checks[0]!.quantified).toMatch(/won't submit info/i);
   });
 
   it("leaves quantified unset on a 'not measured' placeholder", () => {
@@ -97,9 +97,9 @@ describe("attachImpact — quantified loss estimate", () => {
 
     attachImpact(cat);
 
-    expect(cat.checks[0].quantified).toBeUndefined();
-    expect(cat.checks[0].impact).toBeUndefined();
-    expect(cat.checks[0].priority).toBeUndefined();
+    expect(cat.checks[0]!.quantified).toBeUndefined();
+    expect(cat.checks[0]!.impact).toBeUndefined();
+    expect(cat.checks[0]!.priority).toBeUndefined();
   });
 
   it("leaves quantified unset on a check with no credible dollar figure", () => {
@@ -110,8 +110,8 @@ describe("attachImpact — quantified loss estimate", () => {
     attachImpact(cat);
 
     // alt text gets an impact line but no quantified figure (not credible).
-    expect(cat.checks[0].impact).toBeTruthy();
-    expect(cat.checks[0].quantified).toBeUndefined();
+    expect(cat.checks[0]!.impact).toBeTruthy();
+    expect(cat.checks[0]!.quantified).toBeUndefined();
   });
 
   it("never touches passing checks", () => {
@@ -121,9 +121,9 @@ describe("attachImpact — quantified loss estimate", () => {
 
     attachImpact(cat);
 
-    expect(cat.checks[0].quantified).toBeUndefined();
-    expect(cat.checks[0].impact).toBeUndefined();
-    expect(cat.checks[0].priority).toBeUndefined();
+    expect(cat.checks[0]!.quantified).toBeUndefined();
+    expect(cat.checks[0]!.impact).toBeUndefined();
+    expect(cat.checks[0]!.priority).toBeUndefined();
   });
 });
 
@@ -145,8 +145,8 @@ describe("topFixes — ranking + quantified passthrough", () => {
     const fixes = topFixes([a11y, trust, perf], 5);
 
     // High-priority (heavy-category fail) ranks ahead of the low-priority warn.
-    expect(fixes[0].name).toBe("Largest Contentful Paint (LCP)");
-    expect(fixes[fixes.length - 1].name).toBe("Image alt text");
+    expect(fixes[0]!.name).toBe("Largest Contentful Paint (LCP)");
+    expect(fixes[fixes.length - 1]!.name).toBe("Image alt text");
 
     // quantified is exposed on the topFixes item shape.
     const lcpFix = fixes.find((f) => f.name === "Largest Contentful Paint (LCP)");

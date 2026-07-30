@@ -131,7 +131,7 @@ describe("getAllLeadWorkflow", () => {
     await setLeadWorkflowStatus(TOKEN, "converted");
 
     const all = await getAllLeadWorkflow([TOKEN, TOKEN_B]);
-    expect(all[TOKEN].status).toBe("converted");
+    expect(all[TOKEN]!.status).toBe("converted");
     expect(all[TOKEN_B]).toEqual({ token: TOKEN_B, status: "new", updatedAt: null });
   });
 
@@ -139,8 +139,8 @@ describe("getAllLeadWorkflow", () => {
     mockGetRedis.mockReturnValue(null);
     const all = await getAllLeadWorkflow([TOKEN, TOKEN_B]);
     expect(Object.keys(all)).toEqual([TOKEN, TOKEN_B]);
-    expect(all[TOKEN].status).toBe("new");
-    expect(all[TOKEN].updatedAt).toBeNull();
+    expect(all[TOKEN]!.status).toBe("new");
+    expect(all[TOKEN]!.updatedAt).toBeNull();
   });
 });
 

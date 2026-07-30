@@ -51,7 +51,7 @@ function findBlockingRules(robotsTxt: string): {
 
   for (const line of lines) {
     // Strip inline comments, then trim and lowercase for matching.
-    const stripped = line.split("#")[0];
+    const stripped = line.split("#")[0] ?? "";
     const trimmed = stripped.trim().toLowerCase();
 
     if (trimmed.startsWith("user-agent:")) {
@@ -273,16 +273,16 @@ export function checkSeoFoundations(ctx: AuditContext): CategoryResult {
   // Weighted score (raw weights normalized to /100)
   // -------------------------------------------------------------------------
   const weighted: Array<[number, number]> = [
-    [WEIGHTS.robotsTxt, checks[0].score],
-    [WEIGHTS.crawlersAllowed, checks[1].score],
-    [WEIGHTS.sitemap, checks[2].score],
-    [WEIGHTS.sitemapValid, checks[3].score],
-    [WEIGHTS.canonical, checks[4].score],
-    [WEIGHTS.title, checks[5].score],
-    [WEIGHTS.metaDescription, checks[6].score],
-    [WEIGHTS.h1Present, checks[7].score],
-    [WEIGHTS.h1Single, checks[8].score],
-    [WEIGHTS.serverRendered, checks[9].score],
+    [WEIGHTS.robotsTxt, checks[0]!.score],
+    [WEIGHTS.crawlersAllowed, checks[1]!.score],
+    [WEIGHTS.sitemap, checks[2]!.score],
+    [WEIGHTS.sitemapValid, checks[3]!.score],
+    [WEIGHTS.canonical, checks[4]!.score],
+    [WEIGHTS.title, checks[5]!.score],
+    [WEIGHTS.metaDescription, checks[6]!.score],
+    [WEIGHTS.h1Present, checks[7]!.score],
+    [WEIGHTS.h1Single, checks[8]!.score],
+    [WEIGHTS.serverRendered, checks[9]!.score],
   ];
   const totalWeight = weighted.reduce((sum, [w]) => sum + w, 0);
   const score =

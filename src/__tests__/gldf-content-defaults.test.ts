@@ -34,16 +34,16 @@ describe("GLDF content defaults", () => {
       ...gldfContentDefaults.products,
     });
 
-    expect(transformed.products[0].imageUrl).toBe("/images/kraft-bag.png");
-    expect(transformed.products[1].imageUrl).toBe("/images/product-bag.jpg");
+    expect(transformed.products[0]!.imageUrl).toBe("/images/kraft-bag.png");
+    expect(transformed.products[1]!.imageUrl).toBe("/images/product-bag.jpg");
   });
 
   it("keeps Strelva food-brand page config aligned with the GLDF storefront layout", () => {
     const sharedConfig = getDefaultPageConfig("food-brand");
 
-    expect(sharedConfig.home.sections).toEqual(foodBrandTemplate.defaultPageConfig.home.sections);
-    expect(sharedConfig.home.sections.find((section) => section.type === "story")?.visible).toBe(false);
-    expect(sharedConfig.home.sections.find((section) => section.type === "typographic-break")?.visible).toBe(false);
-    expect(sharedConfig.home.sections.find((section) => section.type === "testimonials")?.visible).toBe(false);
+    expect(sharedConfig.home!.sections).toEqual(foodBrandTemplate.defaultPageConfig.home!.sections);
+    expect(sharedConfig.home!.sections.find((section) => section.type === "story")?.visible).toBe(false);
+    expect(sharedConfig.home!.sections.find((section) => section.type === "typographic-break")?.visible).toBe(false);
+    expect(sharedConfig.home!.sections.find((section) => section.type === "testimonials")?.visible).toBe(false);
   });
 });

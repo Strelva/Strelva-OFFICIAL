@@ -146,7 +146,7 @@ async function scrapeEmailFromWebsite(
   const mailtoMatches = homeHtml.match(/mailto:([^\s"'<>?&]+)/g);
   if (mailtoMatches) {
     for (const m of mailtoMatches) {
-      const raw = m.replace("mailto:", "").split("?")[0];
+      const raw = m.replace("mailto:", "").split("?")[0] ?? "";
       const email = decodeURIComponent(raw).trim();
       if (isRealEmail(email)) return { email, source: "contact-page" };
     }
@@ -154,7 +154,7 @@ async function scrapeEmailFromWebsite(
 
   // Regex scan homepage
   const homeEmails = extractEmailsFromHtml(homeHtml);
-  if (homeEmails.length > 0) return { email: homeEmails[0], source: "contact-page" };
+  if (homeEmails.length > 0) return { email: homeEmails[0]!, source: "contact-page" };
 
   // Step 2: find contact page link
   const contactPatterns = [
@@ -169,7 +169,7 @@ async function scrapeEmailFromWebsite(
   const linkMatches = homeHtml.match(/href="([^"]*contact[^"]*)"/gi) ?? [];
   const contactPaths = [
     ...contactPatterns,
-    ...linkMatches.map((m) => m.replace(/href="([^"]*)"/i, "$1").split("?")[0]),
+    ...linkMatches.map((m) => m.replace(/href="([^"]*)"/i, "$1").split("?")[0] ?? ""),
   ];
 
   for (const path of contactPaths) {
@@ -188,14 +188,14 @@ async function scrapeEmailFromWebsite(
     const mailtoOnContact = contactHtml.match(/mailto:([^\s"'<>?&]+)/g);
     if (mailtoOnContact) {
       for (const m of mailtoOnContact) {
-        const raw = m.replace("mailto:", "").split("?")[0];
+        const raw = m.replace("mailto:", "").split("?")[0] ?? "";
         const email = decodeURIComponent(raw).trim();
         if (isRealEmail(email)) return { email, source: "contact-page" };
       }
     }
 
     const contactEmails = extractEmailsFromHtml(contactHtml);
-    if (contactEmails.length > 0) return { email: contactEmails[0], source: "contact-page" };
+    if (contactEmails.length > 0) return { email: contactEmails[0]!, source: "contact-page" };
 
     break; // only check the first found contact URL
   }
@@ -263,7 +263,7 @@ async function generateOpener(
     };
   }
 
-  const topSignal = failingSignals[0];
+  const topSignal = failingSignals[0]!;
   const secondSignal = failingSignals[1] ?? null;
 
   // Try Gemini for a natural sentence

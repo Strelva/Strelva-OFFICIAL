@@ -9,11 +9,11 @@ describe("lightweight template manifests", () => {
     for (const [id, metadata] of Object.entries(getTemplateManifests())) {
       const renderTemplate = renderRegistry[id];
       expect(renderTemplate, `${id} render template`).toBeDefined();
-      expect(renderTemplate.contentSections).toEqual(metadata.contentSections);
-      expect(Object.keys(renderTemplate.components).sort()).toEqual(
+      expect(renderTemplate!.contentSections).toEqual(metadata.contentSections);
+      expect(Object.keys(renderTemplate!.components).sort()).toEqual(
         [...metadata.componentTypes].sort()
       );
-      expect(renderTemplate.editableSections).toEqual(metadata.editableSections);
+      expect(renderTemplate!.editableSections).toEqual(metadata.editableSections);
     }
   });
 

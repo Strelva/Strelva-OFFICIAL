@@ -113,7 +113,7 @@ export function translateActivityEntry(entry: ActivityEntry): ActivityFeedItem |
     const collectionKey = Object.keys(COLLECTION_LINES).find((key) =>
       text.toLowerCase().includes(` ${key} entry`)
     );
-    const line = collectionKey ? COLLECTION_LINES[collectionKey] : { label: "Published a site update", kind: "post" as const };
+    const line = collectionKey ? COLLECTION_LINES[collectionKey]! : { label: "Published a site update", kind: "post" as const };
     return mk(line.label, line.kind, quotedTitle(text));
   }
 

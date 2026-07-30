@@ -51,7 +51,7 @@ describe("client lifecycle emails render through the shared design system", () =
     });
     expect(ok).toBe(true);
     expect(sendMock).toHaveBeenCalledTimes(1);
-    const call = sendMock.mock.calls[0][0];
+    const call = sendMock.mock.calls[0]![0]!;
     expect(call.subject).toBe("Welcome to Strelva");
     expect(call.html).toContain(DESIGN_SYSTEM_MARKER);
     expect(call.html).toContain("Welcome to Strelva");
@@ -71,7 +71,7 @@ describe("client lifecycle emails render through the shared design system", () =
       dashboardUrl: "https://admin.rohlax.com/dashboard",
     });
     expect(ok).toBe(true);
-    const call = sendMock.mock.calls[0][0];
+    const call = sendMock.mock.calls[0]![0]!;
     expect(call.subject).toBe("Rohlax Wellness is live");
     expect(call.html).toContain(DESIGN_SYSTEM_MARKER);
     expect(call.html).toContain("Your site is live");
@@ -91,7 +91,7 @@ describe("client lifecycle emails render through the shared design system", () =
       ownerName: "Chelsea",
     });
     expect(ok).toBe(true);
-    const call = sendMock.mock.calls[0][0];
+    const call = sendMock.mock.calls[0]![0]!;
     expect(call.subject).toBe("A few reviews go a long way for Rohlax Wellness");
     expect(call.html).toContain(DESIGN_SYSTEM_MARKER);
     expect(call.html).toContain("Open your review link");

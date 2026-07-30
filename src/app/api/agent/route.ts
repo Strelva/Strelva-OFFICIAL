@@ -175,7 +175,7 @@ export async function POST(req: Request) {
   const lastUserMessage = (() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i];
-      if (m.role !== "user") continue;
+      if (!m || m.role !== "user") continue;
       const text = textFromMessage(m as IncomingMessage);
       if (text) return text;
     }
@@ -595,7 +595,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
             if (!match) {
               return { success: false, error: "Invalid image data. Expected a base64-encoded data URL (data:image/type;base64,...)." };
             }
-            const buffer = Buffer.from(match[2], "base64");
+            const buffer = Buffer.from(match[2]!, "base64");
 
             // Size cap: a base64 string from the model is unbounded, so cap the
             // decoded buffer at 5MB (parity with MAX_FILE_SIZE in upload-store
@@ -613,7 +613,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
               return { success: false, error: "Invalid image. Allowed: JPEG, PNG, WebP, GIF, AVIF." };
             }
 
-            const ext = match[1].split("/")[1] || "png";
+            const ext = match[1]!.split("/")[1] ?? "png";
             const finalFilename = filename || `upload-${Date.now()}.${ext}`;
             const { uploadTenantMedia } = await import("@/lib/media-store");
             const asset = await uploadTenantMedia(tenant, buffer, finalFilename, sniffed);

@@ -27,8 +27,8 @@ describe("diagnoseVisibility", () => {
       })
     );
     expect(findings).toHaveLength(1);
-    expect(findings[0]).toMatchObject({ surface: "ai_answer", severity: "high", actionable: "on_site" });
-    expect(findings[0].problem).toContain("Not cited in the AI answer");
+    expect(findings[0]!).toMatchObject({ surface: "ai_answer", severity: "high", actionable: "on_site" });
+    expect(findings[0]!.problem).toContain("Not cited in the AI answer");
   });
 
   it("ignores skipped SERP checks and AI probes that did not run", () => {
@@ -60,7 +60,7 @@ describe("diagnoseVisibility", () => {
         aiResults: [{ query: "q", model: "g", probed: true, tenantMentioned: false, competitors: [], checkedAt: "x", methodologyNote: "" }],
       })
     );
-    expect(findings[0].severity).toBe("high");
+    expect(findings[0]!.severity).toBe("high");
   });
 });
 
@@ -80,7 +80,7 @@ describe("finding impact + quantified", () => {
   });
 
   it("quantifies from REAL named competitors, not an invented dollar figure", () => {
-    const [ai] = diagnoseVisibility(
+    const ai = diagnoseVisibility(
       snapshot({
         aiResults: [
           {
@@ -98,18 +98,18 @@ describe("finding impact + quantified", () => {
           },
         ],
       })
-    );
+    )[0]!;
     expect(ai.quantified).toBe("2 competitors named instead of you");
     // Honesty rail: never a fabricated dollar/traffic number.
     expect(ai.quantified).not.toMatch(/\$|\/mo/);
   });
 
   it("omits the quantified line when the probe named no rivals (qualitative only)", () => {
-    const [ai] = diagnoseVisibility(
+    const ai = diagnoseVisibility(
       snapshot({
         aiResults: [{ query: "q", model: "g", probed: true, tenantMentioned: false, competitors: [], checkedAt: "x", methodologyNote: "" }],
       })
-    );
+    )[0]!;
     expect(ai.quantified).toBeUndefined();
     expect(ai.impact).toBeTruthy();
   });

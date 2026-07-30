@@ -79,7 +79,7 @@ export function buildAgentResultContract(actions: AgentActionResult[]): AgentRes
 
 function formatSections(sectionIds: string[]): string {
   if (sectionIds.length === 0) return "site";
-  if (sectionIds.length === 1) return sectionIds[0];
+  if (sectionIds.length === 1) return sectionIds[0]!;
   return `${sectionIds.slice(0, 2).join(", ")}${sectionIds.length > 2 ? ` +${sectionIds.length - 2}` : ""}`;
 }
 

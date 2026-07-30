@@ -1,7 +1,7 @@
 function parseEditablePathPart(part: string): { key: string; index?: string } {
   const match = part.match(/^([^\[]+)(?:\[([^\]]+)\])?$/);
   if (!match) return { key: part };
-  return { key: match[1], index: match[2] };
+  return { key: match[1]!, index: match[2] };
 }
 
 function resolveEditableArrayIndex(array: unknown[], index: string | undefined): number {
@@ -46,7 +46,7 @@ export function setEditablePathValue(
   if (parts.length === 0) return source;
 
   function apply(current: unknown, index: number): unknown {
-    const { key, index: arrayIndex } = parseEditablePathPart(parts[index]);
+    const { key, index: arrayIndex } = parseEditablePathPart(parts[index]!);
     const isLast = index === parts.length - 1;
     const nextObject =
       current && typeof current === "object" && !Array.isArray(current)

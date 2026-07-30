@@ -504,7 +504,7 @@ async function main() {
     ownerName: config.ownerName!,
     industry: config.industry!,
     active: true,
-    createdAt: new Date().toISOString().split("T")[0],
+    createdAt: new Date().toISOString().split("T")[0]!,
     template: config.template || config.industry!,
     deliveryModel: "custom_repo",
     features: config.features || ["newsletter"],

@@ -28,7 +28,7 @@ export function Sparkline({
     })
     .join(" ");
 
-  const last = values[values.length - 1];
+  const last = values[values.length - 1]!;
   // Map the tone dot bg class to a stroke color via currentColor.
   const toneText: Record<string, string> = {
     "bg-positive": "text-positive",

@@ -110,7 +110,7 @@ describe("report-store Postgres dual-path", () => {
     expect(supa.lastTable).toBe("weekly_briefs");
     expect(reports).toHaveLength(1);
 
-    const r = reports[0];
+    const r = reports[0]!;
     // id is reconstructed deterministically from week_start + tenant_id.
     expect(r.id).toBe("report_2026-06-15_gldf");
     expect(r.weekStart).toBe("2026-06-15");
@@ -145,7 +145,8 @@ describe("report-store Postgres dual-path", () => {
       error: null,
     };
 
-    const [r] = await getWeeklyReports("rohlax");
+    const results = await getWeeklyReports("rohlax");
+    const r = results[0]!;
 
     expect(r.pageViews).toEqual({ total: 0, thisWeek: 0 });
     expect(r.bookingClicks).toEqual({ total: 0, thisWeek: 0 });

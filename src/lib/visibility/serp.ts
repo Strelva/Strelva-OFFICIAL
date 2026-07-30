@@ -90,7 +90,7 @@ function normaliseName(s: string): string {
 }
 
 function normaliseDomain(s: string): string {
-  return s.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0];
+  return s.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split("/")[0] ?? "";
 }
 
 function matchesOrganicResult(
@@ -166,7 +166,7 @@ export class SerperDevClient implements SerpProvider {
     let tenantPosition: number | null = null;
     let tenantInLocalPack = false;
     for (let i = 0; i < organic.length; i++) {
-      if (matchesOrganicResult(organic[i], tenantName, tenantDomain)) {
+      if (matchesOrganicResult(organic[i]!, tenantName, tenantDomain)) {
         tenantPosition = i + 1;
         break;
       }
@@ -183,7 +183,7 @@ export class SerperDevClient implements SerpProvider {
       let position: number | null = null;
       let inLocalPack = false;
       for (let i = 0; i < organic.length; i++) {
-        if (matchesOrganicResult(organic[i], c.name, c.domain)) {
+        if (matchesOrganicResult(organic[i]!, c.name, c.domain)) {
           position = i + 1;
           break;
         }

@@ -155,13 +155,14 @@ export async function PUT(req: Request) {
           : currentConfig.adminDomain,
       });
       if (domainErrors.length > 0) {
+        const firstDomainError = domainErrors[0]!;
         return NextResponse.json(
           {
-            error: domainErrors[0].error,
-            domain: domainErrors[0].domain,
-            role: domainErrors[0].role,
+            error: firstDomainError.error,
+            domain: firstDomainError.domain,
+            role: firstDomainError.role,
           },
-          { status: domainErrors[0].error.startsWith("Domain already claimed") ? 409 : 400 }
+          { status: firstDomainError.error.startsWith("Domain already claimed") ? 409 : 400 }
         );
       }
     }

@@ -54,7 +54,7 @@ describe("updateTenant — partial update does not clobber site_name / created_a
     });
 
     expect(mockUpsertTenant).toHaveBeenCalledTimes(1);
-    const row = mockUpsertTenant.mock.calls[0][0] as {
+    const row = mockUpsertTenant.mock.calls[0]![0] as {
       site_name: string;
       created_at: string;
       custom_repo: unknown;
@@ -66,7 +66,7 @@ describe("updateTenant — partial update does not clobber site_name / created_a
 
   it("still lets an explicit siteName/createdAt update through", async () => {
     await updateTenant("gldf", { siteName: "GLDF Rebrand" });
-    const row = mockUpsertTenant.mock.calls[0][0] as { site_name: string };
+    const row = mockUpsertTenant.mock.calls[0]![0] as { site_name: string };
     expect(row.site_name).toBe("GLDF Rebrand");
   });
 });

@@ -84,7 +84,8 @@ export function decryptSecret(value: string | null | undefined): string | null |
   if (!key) throw new Error("SECRETS_ENC_KEY is not set but an encrypted secret was read");
 
   const body = value.slice(PREFIX.length);
-  const [ivB64, tagB64, ctB64] = body.split(":"); // base64 has no ":", so split is safe
+  const parts = body.split(":"); // base64 has no ":", so split is safe
+  const [ivB64, tagB64, ctB64] = parts as [string, string, string];
   const iv = Buffer.from(ivB64, "base64");
   const tag = Buffer.from(tagB64, "base64");
   const ct = Buffer.from(ctB64, "base64");

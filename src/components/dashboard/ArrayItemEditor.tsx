@@ -27,11 +27,14 @@ export function ArrayItemEditor({
   const bottomRef = useRef<HTMLDivElement>(null);
 
   if (!config) return null;
+  // config is proven non-null by the guard above; capture as a non-nullable alias
+  // so closures inside this scope don't widen it back to undefined.
+  const resolvedConfig = config;
 
-  const items = (data[config.arrayKey] as Record<string, unknown>[]) || [];
+  const items = (data[resolvedConfig.arrayKey] as Record<string, unknown>[]) || [];
 
   function updateItems(newItems: Record<string, unknown>[]) {
-    onDataChange({ ...data, [config.arrayKey]: newItems });
+    onDataChange({ ...data, [resolvedConfig.arrayKey]: newItems });
   }
 
   function handleFieldChange(index: number, key: string, value: unknown) {
@@ -53,7 +56,8 @@ export function ArrayItemEditor({
   function handleMoveUp(index: number) {
     if (index === 0) return;
     const updated = [...items];
-    [updated[index - 1], updated[index]] = [updated[index], updated[index - 1]];
+    // index > 0 is guaranteed above; both indices are within bounds.
+    [updated[index - 1], updated[index]] = [updated[index]!, updated[index - 1]!];
     updateItems(updated);
     if (expandedIndex === index) setExpandedIndex(index - 1);
     else if (expandedIndex === index - 1) setExpandedIndex(index);
@@ -62,14 +66,15 @@ export function ArrayItemEditor({
   function handleMoveDown(index: number) {
     if (index === items.length - 1) return;
     const updated = [...items];
-    [updated[index], updated[index + 1]] = [updated[index + 1], updated[index]];
+    // index < items.length - 1 is guaranteed above; both indices are within bounds.
+    [updated[index], updated[index + 1]] = [updated[index + 1]!, updated[index]!];
     updateItems(updated);
     if (expandedIndex === index) setExpandedIndex(index + 1);
     else if (expandedIndex === index + 1) setExpandedIndex(index);
   }
 
   function handleAdd() {
-    const newItem = config.defaultItem();
+    const newItem = resolvedConfig.defaultItem();
     const updated = [...items, newItem];
     updateItems(updated);
     setExpandedIndex(updated.length - 1);
@@ -95,7 +100,7 @@ export function ArrayItemEditor({
             item={item}
             index={i}
             total={items.length}
-            config={config}
+            config={resolvedConfig}
             isExpanded={expandedIndex === i}
             onToggleExpand={() => setExpandedIndex(expandedIndex === i ? null : i)}
             onChange={(key, val) => handleFieldChange(i, key, val)}
@@ -112,7 +117,7 @@ export function ArrayItemEditor({
         className="mt-2 w-full flex items-center justify-center gap-1 px-3 py-2 rounded-lg text-[11px] text-sage font-medium hover:bg-sage/[0.06] transition-colors duration-150"
       >
         <Plus className="w-3 h-3" strokeWidth={2} />
-        {config.addLabel}
+        {resolvedConfig.addLabel}
       </button>
 
       <div ref={bottomRef} />

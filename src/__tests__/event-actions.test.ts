@@ -172,8 +172,8 @@ describe("resolveEventAction", () => {
       "tenant-a"
     );
     expect(mockClearDraft).toHaveBeenCalledWith("contact", "tenant-a");
-    expect(mockSetContent.mock.invocationCallOrder[0]).toBeLessThan(
-      mockResolveEvent.mock.invocationCallOrder[0],
+    expect(mockSetContent.mock.invocationCallOrder[0]!).toBeLessThan(
+      mockResolveEvent.mock.invocationCallOrder[0]!,
     );
   });
 

@@ -103,7 +103,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     actor: await getActorContext(id),
     metadata: {
       pgRowTotal: result.pgRowTotal,
-      tablesAffected: result.summary.postgres.map((a) => a.target),
+      tablesAffected: (result.summary.postgres ?? []).map((a) => a.target),
     },
   }).catch(() => {});
 

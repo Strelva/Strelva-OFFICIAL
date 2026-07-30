@@ -17,14 +17,15 @@ import { checkContent } from "./modules/content";
 // ---------------------------------------------------------------------------
 export function isPrivateIP(ip: string): boolean {
   const parts = ip.split(".").map(Number);
-  if (parts[0] === 0) return true;
-  if (parts[0] === 10) return true;
-  if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) return true;
-  if (parts[0] === 127) return true;
-  if (parts[0] === 169 && parts[1] === 254) return true;
-  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
-  if (parts[0] === 192 && parts[1] === 168) return true;
-  if (parts[0] === 198 && parts[1] >= 18 && parts[1] <= 19) return true;
+  const [p0, p1] = parts;
+  if (p0 === 0) return true;
+  if (p0 === 10) return true;
+  if (p0 === 100 && p1 !== undefined && p1 >= 64 && p1 <= 127) return true;
+  if (p0 === 127) return true;
+  if (p0 === 169 && p1 === 254) return true;
+  if (p0 === 172 && p1 !== undefined && p1 >= 16 && p1 <= 31) return true;
+  if (p0 === 192 && p1 === 168) return true;
+  if (p0 === 198 && p1 !== undefined && p1 >= 18 && p1 <= 19) return true;
   return false;
 }
 
@@ -238,7 +239,7 @@ async function checkWebVitals(
     return {
       name: "Core Web Vitals",
       slug: "web-vitals",
-      weight: WEIGHTS["web-vitals"],
+      weight: WEIGHTS["web-vitals"] ?? 0,
       score: averageCheckScores(checks.map((c) => c.score)),
       checks,
     };
@@ -253,7 +254,7 @@ async function checkWebVitals(
     return {
       name: "Core Web Vitals",
       slug: "web-vitals",
-      weight: WEIGHTS["web-vitals"],
+      weight: WEIGHTS["web-vitals"] ?? 0,
       score: 0,
       checks,
     };
@@ -332,7 +333,7 @@ async function checkMobile(
     return {
       name: "Mobile Responsiveness",
       slug: "mobile",
-      weight: WEIGHTS["mobile"],
+      weight: WEIGHTS["mobile"] ?? 0,
       score: averageCheckScores(checks.map((c) => c.score)),
       checks,
     };
@@ -347,7 +348,7 @@ async function checkMobile(
     return {
       name: "Mobile Responsiveness",
       slug: "mobile",
-      weight: WEIGHTS["mobile"],
+      weight: WEIGHTS["mobile"] ?? 0,
       score: 0,
       checks,
     };

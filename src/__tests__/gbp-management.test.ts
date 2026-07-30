@@ -540,7 +540,7 @@ describe("getGbpState", () => {
     expect(state).not.toBeNull();
     expect(state!.regularHours).toBeDefined();
     expect(state!.recentPosts).toHaveLength(1);
-    expect(state!.recentPosts[0].summary).toBe("We're open Saturdays!");
+    expect(state!.recentPosts[0]!.summary).toBe("We're open Saturdays!");
     expect(typeof state!.fetchedAt).toBe("string");
   });
 

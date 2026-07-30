@@ -92,7 +92,7 @@ describe("runDueAutoPosts", () => {
     mockResolveEventAction.mockResolvedValue({ changed: false, reason: "provider_failed" });
     await runDueAutoPosts(NOW);
     expect(mockUpdateEvent).toHaveBeenCalledTimes(1);
-    const updater = mockUpdateEvent.mock.calls[0][1] as (e: UnifiedEvent) => UnifiedEvent;
+    const updater = mockUpdateEvent.mock.calls[0]![1] as (e: UnifiedEvent) => UnifiedEvent;
     const next = updater(failing);
     expect(next.metadata?.autoPostAttempts).toBe(3);
     expect(next.metadata?.autoPostFailed).toBe(true);

@@ -27,6 +27,7 @@ for (const path of [".env.production.local", ".env.local", ".env"]) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
     const [key, ...valueParts] = trimmed.split("=");
+    if (!key) continue;
     if (process.env[key]) continue;
     process.env[key] = valueParts.join("=").replace(/^['"]|['"]$/g, "");
   }
@@ -1365,7 +1366,7 @@ async function checkVercelAppFreshness() {
 }
 
 async function getDnsContext(host: string): Promise<string> {
-  const bareHost = host.toLowerCase().split(":")[0];
+  const bareHost = host.toLowerCase().split(":")[0]!;
   const [aRecords, nsRecords] = await Promise.all([
     resolve4(bareHost).catch(() => [] as string[]),
     resolveNs(bareHost).catch(() => [] as string[]),

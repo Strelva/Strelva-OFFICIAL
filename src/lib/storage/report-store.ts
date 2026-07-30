@@ -42,14 +42,14 @@ function getWeekStart(date: Date = new Date()): string {
   const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
   d.setDate(diff);
   d.setHours(0, 0, 0, 0);
-  return d.toISOString().split("T")[0];
+  return d.toISOString().split("T")[0]!;
 }
 
 /** Derive the Sunday week-end (week_start + 6 days) as an ISO date string. */
 function getWeekEnd(weekStart: string): string {
   const d = new Date(`${weekStart}T00:00:00.000Z`);
   d.setUTCDate(d.getUTCDate() + 6);
-  return d.toISOString().split("T")[0];
+  return d.toISOString().split("T")[0]!;
 }
 
 /** The store id is fully derivable from weekStart + tenant, mirroring saveWeeklyReport. */

@@ -104,10 +104,10 @@ describe("getPortfolioActions", () => {
     expect(snap.totalClients).toBe(2);
     expect(snap.totalItems).toBe(3); // 2 acme + 1 bolt (booking excluded)
     // Busiest client first.
-    expect(snap.groups[0].tenantId).toBe("acme");
-    expect(snap.groups[0].items).toHaveLength(2);
-    expect(snap.groups[0].items.map((i) => i.label)).toEqual(["Google post", "Review reply"]);
-    expect(snap.groups[1].tenantId).toBe("bolt");
+    expect(snap.groups[0]!.tenantId).toBe("acme");
+    expect(snap.groups[0]!.items).toHaveLength(2);
+    expect(snap.groups[0]!.items.map((i) => i.label)).toEqual(["Google post", "Review reply"]);
+    expect(snap.groups[1]!.tenantId).toBe("bolt");
     // The archived tenant never appears.
     expect(snap.groups.some((g) => g.tenantId === "gone")).toBe(false);
     // A tenant whose read failed doesn't 500 the whole snapshot.
@@ -121,7 +121,7 @@ describe("getPortfolioActions", () => {
     ]);
 
     const snap = await getPortfolioActions();
-    const item = snap.groups[0].items[0];
+    const item = snap.groups[0]!.items[0]!;
     expect(item.type).toBe("content_update");
     expect(item.metadata).toEqual({ diffs });
   });
@@ -157,7 +157,7 @@ describe("getPortfolioActions", () => {
 
     const snap = await getPortfolioActions();
     expect(snap.totalClients).toBe(1);
-    expect(snap.groups[0].tenantId).toBe("acme");
+    expect(snap.groups[0]!.tenantId).toBe("acme");
   });
 });
 

@@ -153,7 +153,7 @@ export default async function ClientDetailPage({
 
   let verdict: { tone: "red" | "amber" | "emerald"; message: string; detail?: string };
   if (atRisk.atRisk && atRisk.reasons.length > 0) {
-    const reason = atRisk.reasons[0];
+    const reason = atRisk.reasons[0]!;
     verdict = {
       tone: "red",
       message: `At risk: ${reason.charAt(0).toLowerCase()}${reason.slice(1)}. Reach out.`,

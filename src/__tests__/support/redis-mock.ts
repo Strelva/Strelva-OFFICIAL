@@ -51,7 +51,7 @@ export function makeRedisMock(): RedisMock {
       const e = stop < 0 ? n + stop : Math.min(stop, n - 1);
       let removed = 0;
       for (let i = s; i <= e && i < n; i++) {
-        if (z.delete(asc[i])) removed++;
+        if (z.delete(asc[i]!)) removed++;
       }
       return removed;
     },

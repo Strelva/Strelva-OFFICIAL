@@ -42,14 +42,14 @@ describe("saveEntry", () => {
     const res = await saveEntry({ tenant: "gldf", type: "blog", data: { title: "Hello World" } });
     expect(res.ok).toBe(true);
     expect(mockUpsertEntry).toHaveBeenCalledTimes(1);
-    const arg = mockUpsertEntry.mock.calls[0][0];
+    const arg = mockUpsertEntry.mock.calls[0]![0];
     expect(arg).toMatchObject({ tenant_id: "gldf", type: "blog", slug: "hello-world", status: "draft" });
     expect(mockLogActivity).toHaveBeenCalledTimes(1);
   });
 
   it("honors an explicit slug", async () => {
     await saveEntry({ tenant: "gldf", type: "blog", slug: "custom", data: { title: "X" } });
-    expect(mockUpsertEntry.mock.calls[0][0].slug).toBe("custom");
+    expect(mockUpsertEntry.mock.calls[0]![0]!.slug).toBe("custom");
   });
 
   it("rejects invalid data without calling the repo", async () => {

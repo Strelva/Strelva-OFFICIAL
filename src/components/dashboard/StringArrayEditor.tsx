@@ -44,14 +44,14 @@ export function StringArrayEditor({ config, data, onDataChange }: StringArrayEdi
   function handleMoveUp(index: number) {
     if (index === 0) return;
     const next = [...items];
-    [next[index - 1], next[index]] = [next[index], next[index - 1]];
+    [next[index - 1], next[index]] = [next[index]!, next[index - 1]!];
     updateItems(next);
   }
 
   function handleMoveDown(index: number) {
     if (index === items.length - 1) return;
     const next = [...items];
-    [next[index], next[index + 1]] = [next[index + 1], next[index]];
+    [next[index], next[index + 1]] = [next[index + 1]!, next[index]!];
     updateItems(next);
   }
 

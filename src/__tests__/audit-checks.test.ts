@@ -313,8 +313,8 @@ describe("runAudit", () => {
     const mobile = results.find((r) => r.slug === "mobile")!;
     expect(webVitals.weight).toBe(0);
     expect(webVitals.score).toBe(50);
-    expect(webVitals.checks[0].status).toBe("warn");
-    expect(webVitals.checks[0].message.toLowerCase()).toContain("not measured");
+    expect(webVitals.checks[0]!.status).toBe("warn");
+    expect(webVitals.checks[0]!.message.toLowerCase()).toContain("not measured");
     expect(mobile.weight).toBe(0);
     expect(mobile.score).toBe(50);
   });

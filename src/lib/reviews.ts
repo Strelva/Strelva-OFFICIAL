@@ -179,9 +179,10 @@ export async function replyToReview(
   const idx = reviews.findIndex((r) => r.id === reviewId);
   if (idx === -1) return null;
 
-  reviews[idx] = { ...reviews[idx], reply: replyText, repliedAt };
+  const updated = { ...reviews[idx]!, reply: replyText, repliedAt } as ReviewItem;
+  reviews[idx] = updated;
   await writeDevReviews(tenant, reviews);
-  return reviews[idx];
+  return updated;
 }
 
 /**
@@ -215,7 +216,8 @@ export async function replyToReviewByExternalId(
   const reviews = await readDevReviews(tenant);
   const idx = reviews.findIndex((r) => r.externalId === externalId);
   if (idx === -1) return null;
-  reviews[idx] = { ...reviews[idx], reply: replyText, repliedAt };
+  const updatedByExtId = { ...reviews[idx]!, reply: replyText, repliedAt } as ReviewItem;
+  reviews[idx] = updatedByExtId;
   await writeDevReviews(tenant, reviews);
-  return reviews[idx];
+  return updatedByExtId;
 }

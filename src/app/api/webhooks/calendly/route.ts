@@ -35,11 +35,12 @@ interface CalendlyWebhookPayload {
 const SIGNATURE_MAX_AGE_SECONDS = 300;
 
 function verifySignature(payload: string, signature: string, secret: string): boolean {
-  const [, sigValue] = signature.split(",").find((p) => p.startsWith("v1="))?.split("=") ?? [];
+  const sigParts = signature.split(",").find((p) => p.startsWith("v1="))?.split("=") ?? [];
+  const sigValue = sigParts[1];
   if (!sigValue) return false;
 
   const [timestampPart] = signature.split(",").find((p) => p.startsWith("t="))?.split("=") ?? [];
-  const timestamp = timestampPart ? signature.split(",")[0].split("=")[1] : null;
+  const timestamp = timestampPart ? (signature.split(",")[0]?.split("=")[1] ?? null) : null;
 
   if (!timestamp) return false;
 

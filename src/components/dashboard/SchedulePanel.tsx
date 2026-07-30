@@ -10,8 +10,10 @@ const inputClass =
   "rounded-lg border border-gray-border bg-surface-base px-3 py-2 text-[14px] text-warm-black outline-none transition-colors focus:border-accent/40 disabled:opacity-40";
 
 function formatTime(hhmm: string): string {
-  const [h, m] = hhmm.split(":").map(Number);
-  if (Number.isNaN(h)) return hhmm;
+  const parts = hhmm.split(":").map(Number);
+  const h = parts[0];
+  const m = parts[1];
+  if (h === undefined || Number.isNaN(h)) return hhmm;
   const period = h >= 12 ? "PM" : "AM";
   const hour12 = h % 12 === 0 ? 12 : h % 12;
   return `${hour12}:${String(m).padStart(2, "0")} ${period}`;

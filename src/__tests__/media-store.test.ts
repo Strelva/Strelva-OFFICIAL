@@ -44,9 +44,9 @@ describe("listTenantMedia", () => {
     expect(mockList).toHaveBeenCalledWith(expect.objectContaining({ prefix: "media/gldf/" }));
     expect(assets).toHaveLength(2);
     // Newest first.
-    expect(assets[0].filename).toBe("b.png");
-    expect(assets[0]).toMatchObject({ url: `${BLOB}/media/gldf/b.png`, id: `${BLOB}/media/gldf/b.png`, size: 200 });
-    expect(assets[1].filename).toBe("a.jpg");
+    expect(assets[0]!.filename).toBe("b.png");
+    expect(assets[0]!).toMatchObject({ url: `${BLOB}/media/gldf/b.png`, id: `${BLOB}/media/gldf/b.png`, size: 200 });
+    expect(assets[1]!.filename).toBe("a.jpg");
   });
 
   it("reads persisted dimensions from the pathname, and stays Unknown (0x0) for legacy paths", async () => {
@@ -71,7 +71,7 @@ describe("listTenantMedia", () => {
 
     const assets = await listTenantMedia("gldf");
     expect(mockList).toHaveBeenCalledTimes(2);
-    expect(mockList.mock.calls[1][0]).toMatchObject({ cursor: "c1" });
+    expect(mockList.mock.calls[1]![0]).toMatchObject({ cursor: "c1" });
     expect(assets).toHaveLength(2);
   });
 
@@ -87,7 +87,7 @@ describe("uploadTenantMedia", () => {
 
     const asset = await uploadTenantMedia("gldf", Buffer.from("bytes"), "photo.jpg", "image/jpeg");
 
-    const [pathname, body, opts] = mockPut.mock.calls[0];
+    const [pathname, body, opts] = mockPut.mock.calls[0]!;
     // media/{tenant}/{uuid}/{cleanname} — the uuid subfolder makes the path unique
     // without mangling the display filename (no addRandomSuffix drift on reload).
     expect(pathname).toMatch(/^media\/gldf\/[0-9a-f-]{36}\/photo\.jpg$/);
@@ -102,7 +102,7 @@ describe("uploadTenantMedia", () => {
     const asset = await uploadTenantMedia("gldf", pngHeader(800, 600), "photo.png", "image/png");
 
     // Size rides in the pathname (before the clean filename) so a later `list` reads it back.
-    expect(mockPut.mock.calls[0][0] as string).toMatch(/^media\/gldf\/[0-9a-f-]{36}\/800x600\/photo\.png$/);
+    expect(mockPut.mock.calls[0]![0] as string).toMatch(/^media\/gldf\/[0-9a-f-]{36}\/800x600\/photo\.png$/);
     expect(asset).toMatchObject({ width: 800, height: 600, filename: "photo.png" });
   });
 
@@ -111,7 +111,7 @@ describe("uploadTenantMedia", () => {
 
     const asset = await uploadTenantMedia("gldf", Buffer.from("not-an-image"), "x.png", "image/png");
 
-    expect(mockPut.mock.calls[0][0] as string).toMatch(/^media\/gldf\/[0-9a-f-]{36}\/x\.png$/);
+    expect(mockPut.mock.calls[0]![0] as string).toMatch(/^media\/gldf\/[0-9a-f-]{36}\/x\.png$/);
     expect(asset).toMatchObject({ width: 0, height: 0 });
   });
 
@@ -127,7 +127,7 @@ describe("uploadTenantMedia", () => {
     mockPut.mockResolvedValue({ url: `${BLOB}/x`, pathname: "x" });
     await uploadTenantMedia("gldf", Buffer.from("b"), "../../evil name!.png", "image/png");
     // The `/` in the input became `_`, so the sanitized name is the last segment.
-    expect(mockPut.mock.calls[0][0] as string).toMatch(/^media\/gldf\/[^/]+\/\.\._\.\._evil_name_\.png$/);
+    expect(mockPut.mock.calls[0]![0] as string).toMatch(/^media\/gldf\/[^/]+\/\.\._\.\._evil_name_\.png$/);
   });
 });
 
