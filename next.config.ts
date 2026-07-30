@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   distDir: process.env.PLAYWRIGHT_DIST_DIR || ".next",
@@ -55,4 +56,14 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Wrap with Sentry so production builds upload source maps + wire release/cron
+// instrumentation. Upload only runs when SENTRY_AUTH_TOKEN + org/project are set
+// (prod build env); locally and without a token it no-ops. `silent` keeps the
+// build log clean when the token is absent.
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  silent: true,
+  widenClientFileUpload: true,
+  disableLogger: true,
+});

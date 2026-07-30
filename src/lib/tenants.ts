@@ -171,6 +171,32 @@ const CACHE_TTL_SECONDS = 60;
 let _memCache: TenantConfig[] | null = null;
 let _memCacheTime = 0;
 
+// Secret fields that must NOT sit decrypted in the Redis cache (`reb:tenants:all`
+// lives outside the Postgres at-rest boundary). They're re-enveloped before the
+// Redis write and decrypted on read; the in-memory cache holds the live decrypted
+// objects (process memory is not a persistence boundary). No-op when SECRETS_ENC_KEY
+// is unset (encryptSecret is inert) and legacy-plaintext-safe (decryptSecret passes
+// through), so the round trip is a no-op in dev and lossless in prod.
+const CACHE_SECRET_FIELDS = [
+  "slackWebhookUrl",
+  "googleSearchConsoleKey",
+  "instagramAccessToken",
+  "revalidationSecret",
+] as const;
+
+function transformTenantSecrets(
+  tenants: TenantConfig[],
+  fn: (v: string | undefined) => string | null | undefined,
+): TenantConfig[] {
+  return tenants.map((t) => {
+    const out = { ...t };
+    for (const field of CACHE_SECRET_FIELDS) {
+      out[field] = fn(out[field]) ?? undefined;
+    }
+    return out;
+  });
+}
+
 async function loadTenants(): Promise<TenantConfig[]> {
   const redis = getRedis();
 
@@ -178,7 +204,7 @@ async function loadTenants(): Promise<TenantConfig[]> {
   if (redis) {
     try {
       const cached = await redis.get<TenantConfig[]>(REDIS_KEY);
-      if (cached) return cached;
+      if (cached) return transformTenantSecrets(cached, decryptSecret);
     } catch {
       // Redis failed — continue to source of truth
     }
@@ -239,7 +265,11 @@ async function loadTenants(): Promise<TenantConfig[]> {
   if (tenants.length > 0) {
     if (redis) {
       try {
-        await redis.set(REDIS_KEY, tenants, { ex: CACHE_TTL_SECONDS });
+        // Re-envelope secrets so the Redis cache never holds plaintext provider
+        // credentials. The in-memory copy below stays decrypted.
+        await redis.set(REDIS_KEY, transformTenantSecrets(tenants, encryptSecret), {
+          ex: CACHE_TTL_SECONDS,
+        });
       } catch {
         // Redis write failed — not fatal
       }
