@@ -27,6 +27,7 @@
 import { NextResponse } from "next/server";
 import {
   normalizeSubmission,
+  isSpammySubmission,
   renderFormEmailHtml,
   renderFormEmailText,
   rateLimitOk,
@@ -58,6 +59,12 @@ export async function POST(req: Request) {
     // Optional dwell-time gate: if the form stamped `_t` (render time in ms) and
     // the submit came < 1.5s later, it's almost certainly a bot. Fake success.
     if (typeof body._t === "number" && Date.now() - body._t < 1500) {
+      return NextResponse.json({ success: true });
+    }
+
+    // Content backstop: bots that POST straight to the API (past the honeypot +
+    // dwell) with gibberish are dropped here. Fake success so they can't adapt.
+    if (isSpammySubmission(body)) {
       return NextResponse.json({ success: true });
     }
 

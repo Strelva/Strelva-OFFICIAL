@@ -162,3 +162,55 @@ export function rateLimitOk(key: string, max = 5, windowMs = 60_000): boolean {
   hits.set(key, recent);
   return true;
 }
+
+
+// ---- Content spam backstop (added 2026-07-30) --------------------------------
+// Honeypot + dwell above catch form-fill bots; this catches bots that POST
+// straight to the API with gibberish (the pattern seen on the Strelva/CoCard
+// forms: random-case/vowel-starved names, gmail dot-obfuscated emails). Generic
+// over arbitrary form fields; stacked signals over threshold 3 => drop.
+const _SPAM_VOWELS = new Set(["a", "e", "i", "o", "u", "y"]);
+function spamLooksRandom(raw: string): boolean {
+  const s = String(raw || "").trim();
+  if (s.length < 7) return false;
+  const letters = s.replace(/[^a-z]/gi, "");
+  if (letters.length < 7) return false;
+  const vowels = [...letters.toLowerCase()].filter((c) => _SPAM_VOWELS.has(c)).length;
+  if (vowels / letters.length < 0.26) return true;
+  if (!/\s/.test(s)) {
+    let flips = 0;
+    for (let i = 1; i < s.length; i++) {
+      const a = s[i - 1]!, b = s[i]!;
+      if ((/[a-z]/.test(a) && /[A-Z]/.test(b)) || (/[A-Z]/.test(a) && /[a-z]/.test(b))) flips++;
+    }
+    if (flips >= 3) return true;
+  }
+  return false;
+}
+function _gmailDots(email: string): number {
+  const m = /^([^@]+)@(gmail|googlemail)\.com$/i.exec(String(email || "").trim());
+  return m ? (m[1]!.match(/\./g) || []).length : 0;
+}
+/** True when a submission's CONTENT scores as spam (threshold 3). Backstop for
+ *  bots that bypass the honeypot/dwell by POSTing directly to the API. */
+export function isSpammySubmission(body: Record<string, unknown>): boolean {
+  let score = 0;
+  let gibberish = 0;
+  for (const [key, val] of Object.entries(body)) {
+    if (typeof val !== "string") continue;
+    const k = key.toLowerCase();
+    if (["_t", "_dwellms", "website", "company", "formname"].includes(k)) continue;
+    if (k.includes("email")) {
+      if (_gmailDots(val) >= 4) score += 1;
+      continue;
+    }
+    if (/(message|note|comment|detail|inquir)/i.test(k)) {
+      if ((val.match(/https?:\/\//gi) || []).length >= 2) score += 2;
+      continue;
+    }
+    if (/(name|business|company|first|last|contact|org)/i.test(k) && spamLooksRandom(val)) gibberish++;
+  }
+  score += gibberish >= 2 ? 2 : gibberish;
+  return score >= 3;
+}
+// -----------------------------------------------------------------------------
