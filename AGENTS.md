@@ -354,7 +354,10 @@ clean). Full detail: [`docs/audit-2026-07-30-deep-audit.md`](./docs/audit-2026-0
 - **Sentry build wrap:** `next.config.ts` wrapped with `withSentryConfig` (source maps + release/cron instrumentation; no-op without `SENTRY_AUTH_TOKEN`).
 - **`reb:tenants:all` cache:** the 4 provider-secret fields are re-enveloped on the Redis write and decrypted on read — no plaintext secret outside the Postgres at-rest boundary. In-memory cache stays decrypted; no-op without `SECRETS_ENC_KEY`.
 
+### DONE — shipped to prod (2026-07-30)
+- **Org-layer phase-0 migration APPLIED to prod** (`accounts`, `account_memberships`, `subscriptions`, `subscription_items`, `tenants.account_id` — verified live; recorded in `supabase_migrations`).
+- **`database.types.ts` regenerated** from the now-current live schema (replaced the hand-maintained stubs). The regen surfaced `subscription_items.tenant_id` → added it to `deprovision.ts` `TENANT_SCOPED_TABLES`.
+- **Merged to `main` + deployed to production** (`vercel deploy --prod --scope strelva`). Deployment holds the `app.strelva.com` + `admin.strelva.com` aliases; both health-check 200, `next` 16.2.12 live, no runtime errors. Org-layer stays dormant (nothing reads the new tables yet).
+
 ### REMAINING
-- **Prod deploy:** a fresh `vercel deploy --prod --scope strelva` applies the `next` bump. NOTE: main is ahead of the deployed prod by the org-layer phase-0 work — the first deploy after this lands org-layer in prod (its migration must be applied first, or its dormant reads guarded). Vercel does NOT auto-deploy on push (all deploys are CLI), so merging to main ships nothing on its own.
-- **`database.types.ts` full regen:** blocked until the org-layer `accounts`/`account_id` migration is applied to prod (a regen today would drop those and break org-layer). The two audited columns were added by hand in the meantime.
-- **`noUncheckedIndexedAccess`:** 637 sites — its own dedicated refactor.
+- **`noUncheckedIndexedAccess`:** 637 sites — its own dedicated refactor. Everything else from the 2026-07-30 audit is shipped.
