@@ -330,38 +330,32 @@ Local-business owners will pay for a dashboard that proves their website is work
 - The user and project owner is Jacob Rhinehart. Address the user as Jacob when a name is needed.
 - Promote a feature from "custom repo" to the platform only when at least two repos prove the same need (per `docs/future-codebase-integration.md`).
 
-## Known issues / open audit findings (2026-07-30)
+## Audit remediation status (2026-07-30)
 
-Confirmed open defects — not aspirational. Fix these before expanding surface area.
+The 2026-07-30 deep audit found 193 issues; 28 high/critical were adversarially
+verified. Remediation shipped across three commits (docs refresh, fix batch,
+follow-ups) — 139+ fixes applied and gated (typecheck + 1983 tests + build all
+clean). Full detail: [`docs/audit-2026-07-30-deep-audit.md`](./docs/audit-2026-07-30-deep-audit.md).
 
-### Security / HIGH
-- **Next.js CVEs:** pinned at `16.2.6` in `package.json`, which has four HIGH + three MODERATE unpatched CVEs. Bump to `16.2.12` and update `eslint-config-next` to match.
-- **Orphaned Vercel env vars:** Clerk and Sanity secrets remain in Vercel environment after both teardowns. Remove via `vercel env rm` for each across all environments.
-- **SSRF in AI-visibility scorer:** `scoreAiVisibility` in `src/lib/ai-visibility/score.ts` fetches user-supplied URLs without pre-validation. Call `validateUrlSafety(url)` from `src/lib/audit/checks.ts` before any `fetchText` call, matching the pattern in `runAudit`.
-- **Subdomain tenant requests skip proxy auth gate:** `needsAuth` in `src/proxy.ts:636` omits the `tenantFromSubdomain` case, so the proxy is not a useful first line of defense for the most common access pattern.
-- **INTERNAL_API_SECRET blast radius:** used as domain-map auth key, OAuth state secret fallback, AND approve-link signing fallback. Add explicit dedicated secrets (`APPROVE_LINK_SECRET`, `OAUTH_STATE_SECRET`) and remove the fallback chain.
-- **SECRETS_ENC_KEY not in env examples or production checklist.** Missing key causes a platform-wide outage via unguarded throw in `loadTenants`. Add to `.env.example`, `.env.production.example`, and `scripts/production-checklist.ts`.
-- **SUPABASE_URL (private, server-only) not in env examples or production checklist.** Add to both env files alongside `NEXT_PUBLIC_SUPABASE_URL` and add `checkEnvVar('SUPABASE_URL', true)` to the checklist.
-- **At-rest encryption has zero test coverage** (`src/lib/crypto/secrets.ts`). Add `src/__tests__/secret-encryption.test.ts` covering round-trip, keyless pass-through, legacy plaintext, tampered ciphertext, idempotency, and null/undefined handling.
+### FIXED (shipped 2026-07-30)
+- Next.js `16.2.6` → `16.2.12` (+ eslint-config-next); refreshed stale security-pin overrides → `pnpm audit` 24 vulns (14 high) → 2 (0 high, transitive OTel via Sentry).
+- SSRF guard on the AI-visibility scorer (`validateUrlSafety` before every fetch).
+- Proxy auth gate now covers subdomain-resolved tenants (`src/proxy.ts`).
+- Agent system prompt sanitizes `businessRules` / timezone / holidays; constant-time cron-secret compare.
+- `requireTenantAccess`/`Permission` return 401 (not 403) for unauthenticated; Google + Instagram + Calendly OAuth callbacks verify session + consume single-use state.
+- Collections v1 routes send `Cache-Control: private`; slug sanitized. Agent `upload_image` → tenant-prefixed Blob path. `setEventStatus` scoped to the owning tenant.
+- Fractional star delta rejected; Calendly webhook `addEvent` guarded + O(1) reverse-index lookup; Invalid-Date guard; `buildOpsReport` N+1 → `mapPool`; weekly report one `getMetricsBatch` instead of 4 RPCs.
+- Newsletter sanitizer drops `style`; SECRETS_ENC_KEY / SUPABASE_URL / SUPER_ADMIN_EMAILS / APPROVE_LINK_SECRET documented + validated in `check:prod`.
+- `sectionSchemas` typed per-key; `buildSectionData` de-any'd; billing + at-rest-encryption test coverage added.
 
-### Tenant isolation / HIGH
-- **Collections v1 routes missing `Cache-Control: private`** (`src/app/api/v1/collections/[tenant]/[type]/route.ts` and `[slug]/route.ts`). Add `private, max-age=0, must-revalidate` to every successful response.
-- **Upload route uses a flat shared Blob namespace** (`src/lib/storage/upload-store.ts:45` called from `src/app/api/upload/route.ts`). Prefix the Blob path with the tenant slug.
+### REMAINING — needs live infra (do on next deploy)
+- **Orphaned Vercel env vars:** `vercel env rm` the 9 Clerk/Sanity secrets (+ unused TURBO_*/CORS_ORIGINS/REVALIDATION_SECRET) across production/preview/development — no code reads them.
+- **`database.types.ts` stale:** `billing_type` + `account_id` missing from generated Row types. Run `supabase gen types typescript` and commit (removes the shadow casts in `tenants.ts`).
+- **Deploy:** a fresh `vercel deploy --prod --scope strelva` is required to apply the `next` bump + any env changes (`vercel redeploy` reuses the old env snapshot).
 
-### Bugs / HIGH
-- **Fractional star delta uncaught** in `adjustStars` (`src/app/api/rewards/members/[email]/adjust/route.ts:35`). Add `Number.isInteger(delta)` to validation.
-- **Calendly webhook `redis.keys()` full-keyspace scan** (`src/app/api/webhooks/calendly/route.ts:64`). Replace with a reverse index keyed on `calendly-user-uri:<userUri>`.
-- **Calendly webhook `addEvent` unguarded** — any Redis/Postgres failure returns 500 and triggers a Calendly retry storm. Wrap in try/catch; return 200 on catch.
-- **`database.types.ts` stale** — `billing_type` and `account_id` missing from generated Row types. Run `supabase gen types typescript` and commit.
-- **Google OAuth callback does not re-verify session** (`src/app/api/oauth/google/callback/route.ts:93`). Add `verifyAuth()` and `requireTenantAccess(tenantId)` at the start of the GET handler before `saveConnection`.
-- **`buildOpsReport` serial N+1 loop** (`src/lib/ops.ts:113-157`). Collapse into a single `mapPool(active, 8, ...)`.
-- **Billing test gaps:** `customer.subscription.deleted`, Stripe idempotency duplicate/retry/503 branches, and the zero-dollar `isTrialCreateInvoice` guard all have zero test coverage in `src/__tests__/billing-webhook-mode-guard.test.ts`.
-
-### Security / Medium
-- **Newsletter HTML sanitizer allows CSS expressions/javascript: URLs** in `style` attributes (`src/lib/email-html.ts:23-33`). Remove `'style'` from `ALLOWED_ATTR`.
-- **`reb:tenants:all` Redis cache stores decrypted (plaintext) secrets** (`src/lib/tenants.ts:206-210`). Outside the at-rest encryption boundary.
-- **Slug in collections single-entry route unsanitized** before DB pass (`src/app/api/v1/collections/[tenant]/[type]/[slug]/route.ts:18`).
-
-### Tech debt / Medium
-- **`CONTENT_SOURCE` and `DATA_SOURCE` are two independent flags** for the same logical switch (`src/lib/storage/content-store.ts:133` vs `src/lib/storage/draft-store.ts:22`). Either unify them or add a guard that fails loudly in production when they disagree.
-- **`sectionSchemas` typed as `Record<ContentSection, z.ZodType>`** erases output types — every downstream `setContent` call is an unchecked cast (`src/lib/schemas.ts:401`). Change to a per-key discriminated type so the container annotation provides real inference.
+### REMAINING — backlog (deliberate, low risk)
+- `reb:tenants:all` Redis cache holds decrypted secrets (60s TTL, defense-in-depth only).
+- `CONTENT_SOURCE` vs `DATA_SOURCE` two-flag split — unify or add a prod mismatch guard.
+- Newsletter still uses `resend.batch` directly (not the single-recipient `sendEmail` boundary).
+- Billing lows: no `customer.subscription.updated` handler; plan-key not allow-list-validated; portal `return_url` from forwarded headers.
+- `getReviewById` single-row fetch (reviews reply path still scans); Sentry `withSentryConfig` wrap (needs org/project/auth-token decision); `noUncheckedIndexedAccess` (widespread, staged).
