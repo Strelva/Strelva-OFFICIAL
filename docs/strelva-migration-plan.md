@@ -1,25 +1,34 @@
 # Strelva Migration Plan
 
 **Status: historical migration plan; partially executed and superseded.**
-Production `strelva.com` is served by the separate `strelva-marketing` repo;
-this control plane's canonical origin is `app.strelva.com`; Clerk is removed;
-and the repo-folder/package rename remains intentionally incomplete for
-compatibility. Use `docs/README.md` for current topology. The body below preserves
-the original proposal and is not a current checklist.
+
+What is done:
+- `strelva.com` marketing site is served by the separate `strelva-marketing` repo (live).
+- This control plane's canonical origin is `app.strelva.com`.
+- Clerk is fully removed (2026-07-11, PR #146); auth is Supabase.
+- Sanity data sources are fully removed (2026-07-10); content is Supabase Postgres.
+- `RESEND_DOMAIN=updates.strelva.com` is live in prod.
+- The repo-folder/package rename is intentionally incomplete for wire-level compatibility
+  (`reb:` Redis prefixes, `x-reb-*` HMAC headers stay as-is per AGENTS.md).
+
+What is still pending from this plan:
+- The ~518-literal `scaffoldweb` → `strelva` rebrand in source/config (§4).
+- The Stripe/OAuth/Calendly/Yelp/Instagram redirect-URL re-pointing to `app.strelva.com` (§5).
+- The `scaffoldweb.com` 301 redirects and decommission (§6 Phase 5-6).
+
+Use `AGENTS.md` for current topology. The body below preserves the original proposal
+and is not a current checklist; annotated items above reflect what changed.
 **Author:** generated from a full read of `main` (post release-branch merge, commit `5967494`)
 **Date:** 2026-06-01
 
-> **2026-06-22 — scope clarification.** This plan covers ONLY the
-> `scaffoldweb.com` → `strelva.com` **domain rebrand + repo split**. It is
-> *separate from* the **auth + data backbone cutover** (Clerk+Sanity → Supabase
-> Auth + Postgres), which is **DONE in production (2026-06-20)** — see
-> `docs/supabase-migration-plan.md` / `docs/post-cutover-runbook.md`. Concretely
-> that changes two assumptions in §5 below: the **Clerk** cutover step is moot
-> (auth is Supabase now, dead-pathed Clerk), and the **Supabase** "if used" note
-> is now "in use, primary." The **Resend sender domain is also already
-> re-pointed** — `RESEND_DOMAIN=updates.strelva.com` is live in prod (was
-> `updates.scaffoldweb.com`). Everything else here (the 518-literal rebrand, the
-> repo split, Stripe/OAuth re-pointing) is still pending and accurate.
+> **2026-06-22 — scope clarification (updated 2026-07-30):** This plan covers ONLY the
+> `scaffoldweb.com` → `strelva.com` **domain rebrand + repo split**. It is separate
+> from the auth + data backbone cutover, which is fully DONE — Clerk code removed
+> 2026-07-11, Sanity data-source code removed 2026-07-10 — see
+> `docs/supabase-migration-plan.md`. The **Clerk** step in §5 is fully moot.
+> Supabase Auth + Postgres is the live backbone. `RESEND_DOMAIN=updates.strelva.com`
+> is live. The 518-literal rebrand, Stripe/OAuth re-pointing, and `scaffoldweb.com`
+> redirects remain pending.
 
 ## Locked decisions
 
@@ -74,10 +83,12 @@ One Next.js 16 codebase, multi-tenant, **host-routed** via `src/proxy.ts` + `src
 | `strelva.com`, `www.strelva.com` | Marketing Vercel project | `strelva-marketing` |
 | `app.strelva.com` | App Vercel project (authenticated dashboard + `/api`) | `strelva-app` |
 | `<tenant>.strelva.com` | App project (host-routed `(public)`) | `strelva-app` |
-| `admin.<tenant>.strelva.com` | App project (admin views) | `strelva-app` |
+| `admin.<tenant>.strelva.com` | App project (client admin dashboard, host-routed) | `strelva-app` |
+| `admin.strelva.com` | App project (Strelva operator console) | `strelva-app` |
 | customer custom domains | App project (via `CUSTOM_DOMAIN_MAP`) | `strelva-app` |
-| `clerk.strelva.com` | Clerk (CNAME) | infra |
-| `send.strelva.com` (or `updates.`) | Resend (SPF/DKIM) | infra |
+| ~~`clerk.strelva.com`~~ | ~~Clerk (CNAME)~~ | ~~infra~~ (Clerk removed; CNAME not needed) |
+| `updates.strelva.com` | Resend (SPF/DKIM, **live**) | infra |
+| `mail.strelva.com` | Resend shared client-branded sending domain (**live**) | infra |
 
 **API placement (recommended):** keep the API colocated at `app.strelva.com/api`. A separate `api.strelva.com` adds CORS + cross-subdomain cookie/auth complexity for no real benefit at this stage. Revisit only if a non-web client appears.
 
@@ -120,13 +131,21 @@ Do **not** hand-edit ~518 literals. First centralize, then codemod:
 
 Each references the domain and/or brand and must be re-pointed:
 
-- **Supabase Auth** (replaced Clerk; live since 2026-06-20) — add `strelva.com` + `app.strelva.com` to the redirect-URL allowlist + Site URL, update Google OAuth redirect URLs. No custom auth CNAME and no forced logout (the Clerk session-domain logout risk no longer applies).
-- ~~**Clerk**~~ — *obsolete: auth is Supabase now; Clerk is dead-pathed pending teardown. Skip.*
-- **Resend** — verify `strelva.com` / `send.strelva.com` (SPF + DKIM), update `RESEND_DOMAIN`, warm up the new sending domain.
-- **Stripe** — update account branding, webhook endpoint → `app.strelva.com/api/...`, rename `STRIPE_SCAFFOLD_PRICE_ID`.
-- **OAuth providers** (Google, Yelp, Calendly, Instagram, Vegaro) — update redirect/callback URLs to `app.strelva.com`.
-- **Supabase** — in use as the primary auth + data backbone; update auth redirect/allowed URLs to the new host (this is the auth gate for the rebrand).
-- **Sanity** — *being decommissioned post-cutover (dual-write rollback mirror only).* If still present at rebrand time, point the webhook URL → app subdomain; dataset unchanged.
+- **Supabase Auth** (live since 2026-06-20; Clerk fully removed 2026-07-11) — add
+  `strelva.com` + `app.strelva.com` to redirect-URL allowlist + Site URL, update
+  Google OAuth redirect URLs to the new host when `scaffoldweb.com` is retired.
+- ~~**Clerk**~~ — *DONE: Clerk is fully removed (2026-07-11, PR #146). No action.*
+- **Resend** — `RESEND_DOMAIN=updates.strelva.com` is already live. `mail.strelva.com`
+  is the shared client-branded sending domain. No Resend action needed for the rebrand.
+- **Stripe** — update account branding, webhook endpoint → `app.strelva.com/api/...`,
+  rename `STRIPE_SCAFFOLD_PRICE_ID`. PENDING.
+- **OAuth providers** (Google, Yelp, Calendly, Instagram, Vegaro) — update
+  redirect/callback URLs to `app.strelva.com`. PENDING.
+- **Supabase** — primary auth + data backbone, live. Update auth redirect/allowed URLs
+  to `app.strelva.com` when DNS cutover happens.
+- ~~**Sanity**~~ — *DONE: Sanity data-source code fully removed (2026-07-10). Only
+  legacy image-asset CDN refs remain in stored content (ops-only rewrite, not blocking).
+  Dataset not yet locked — see `clerk-sanity-teardown-checklist.md`.*
 - **Sentry** — update allowed domains / DSN project settings.
 - **Google Search Console** — verify `strelva.com`, submit new sitemap (marketing repo owns SEO).
 - **Vercel** — two projects, domains assigned per §2, env vars set per project.
@@ -168,7 +187,25 @@ Each references the domain and/or brand and must be re-pointed:
 
 ## 8. Decisions to confirm before Phase 1
 
-1. **Subdomain map** — accept §2 as-is, or change (`app.` vs `dashboard.`, dedicated `api.`?).
-2. **Audit tool** — app-only feature, or a marketing lead-gen surface that calls the app API?
-3. **Cutover style** — recommended dual-run + 301 redirects, or a hard switch?
-4. **Shared code** — accept light duplication (`pricing.ts`, brand tokens) between repos for now, or set up a shared package from day one?
+1. ~~**Subdomain map**~~ — **Resolved:** `app.strelva.com` for the dashboard, `<tenant>.strelva.com` for client sites, `admin.strelva.com` for the operator console. Dedicated `api.strelva.com` is deferred.
+2. ~~**Audit tool**~~ — **Resolved (2026-07-14):** app-only engine. `strelva-marketing` forwards to this repo's `/api/audit/scan` and `/api/audit/lead` via a thin canonical forwarder. The old marketing scoring engine was deleted. See `docs/audit-page.md`.
+3. **Cutover style** — recommended dual-run + 301 redirects. Still pending.
+4. **Shared code** — light duplication accepted for now (`pricing.ts` duplicated). No shared package yet.
+
+---
+
+## Known issues / TODO (rebrand, as of 2026-07-30)
+
+- [HIGH/bug] `google-meta:${t}` and several review-nudge/reply-veto Redis keys are NOT in
+  `authoritativePatterns` (`src/lib/tenant-rename.ts`) — silently not moved on a tenant rename.
+  Any rebrand that also renames a tenant slug will lose GBP metadata and review dedup state.
+  See `supabase-migration-plan.md` Known issues for the full list.
+- [MEDIUM/security] Seven orphaned Clerk and Sanity secrets may still be present in the Vercel
+  environment after both teardowns. Also check for `REVALIDATION_SECRET`, `CORS_ORIGINS`, and
+  stale Turborepo vars. Remove via `vercel env rm <name> <environment>` or the dashboard.
+- [MEDIUM/tech-debt] `STRIPE_SCAFFOLD_PRICE_ID` is still the env var name; should be renamed
+  to `STRIPE_STRELVA_PRICE_ID` as part of the rebrand (requires the coordinated deployment
+  noted in AGENTS.md — redeploy, not `vercel redeploy`).
+- The `admin.<tenant>.scaffoldweb.com` admin subdomain pattern is referenced in comments in
+  `src/proxy.ts`; the live pattern is `app.strelva.com/<tenant>` path-based. The stale
+  subdomain comments should be cleaned up during the §4 codemod pass.

@@ -14,9 +14,11 @@ bypasses RLS, so RLS is defense-in-depth today, not the live isolation boundary.
 > `src/proxy.ts` unwrapped `clerkMiddleware` for a plain `proxy()` export with a hand-rolled
 > **fail-closed** auth gate + `isPublicRoute`/`isCronRoute` matcher (path-normalized),
 > `src/lib/auth.ts` is Supabase-only (dual-path branches collapsed, signatures + invariants
-> preserved), and the `@clerk/nextjs` dep + Clerk CSP entries are removed. Only the **Sanity
-> dataset lock** remains (OPS). The three-plane model and the service-role discipline below
-> remain the live operating rules.
+> preserved), and the `@clerk/nextjs` dep + Clerk CSP entries are removed. **Sanity code
+> teardown is also DONE (2026-07-10)** — all data-source reads/writes removed; only the
+> `sanityImageUrl` resolver is retained for legacy asset URL resolution until the
+> content-URL rewrite ops step, after which the Sanity dataset is locked. The three-plane
+> model and the service-role discipline below remain the live operating rules.
 
 Grounded in current Supabase guidance (RLS performance lint `0003_auth_rls_initplan`,
 Custom Access Token Hook, `@supabase/ssr`, multi-SSO) — verified against live docs, not memory.
@@ -168,14 +170,56 @@ repetitive content, ecom). Counter-intuitively this makes killing Sanity *more* 
 - `src/proxy.ts` — **DONE (#146, 2026-07-11):** `clerkMiddleware` unwrapped to a plain
   `proxy()` export; `clerkMiddleware`/`createRouteMatcher` replaced with a hand-rolled
   **fail-closed** `gateRequest` + `isPublicRoute`/`isCronRoute` matcher (path-normalized
-  against encoded/`//` bypass). The auth gate runs only on `app.strelva.com`; public hosts
-  (`{tenant}.strelva.com`, custom client domains) are unauthenticated read paths. (The
-  `admin.*`/custom-domain fallback-auth helpers were kept where still load-bearing.)
+  against encoded/`//` bypass). The auth gate covers `isAdminSubdomain`, `tenantFromQueryParam`,
+  and `tenantFromClientPath` paths. (The `admin.*`/custom-domain fallback-auth helpers were
+  kept where still load-bearing.)
 - `src/lib/auth.ts` — **DONE (live 2026-06-20; Clerk path removed #146):** Supabase-only
   against the server client + `memberships`/`super_admins`, signatures + invariants
   preserved. The `isSupabaseAuthConfigured()` dual-path branches are collapsed;
   `getTenantOwnerUserIds` is a single indexed query.
-- Dashboard routing moves to `app.strelva.com/{tenant}` (pending the rebrand /
-  single-host work); any existing `admin.{client-domain}` dashboard URL becomes a
-  301 to it.
+- Dashboard routing: client dashboards are reachable on `admin.{client-domain}` (the
+  `isAdminSubdomain` path) as well as the `/client/{tenant}/...` fallback path on
+  `app.strelva.com`. The single-host `app.strelva.com/{tenant}` model described above
+  is the target; the custom-admin-domain path is still active in production.
 - Full file inventory + API mapping: `docs/supabase-migration-plan.md` → "Auth swap" section.
+
+## Known issues / TODO (2026-07-30)
+
+- **[LOW][security] Subdomain-resolved tenant requests skip the proxy auth gate**
+  (`src/proxy.ts` line ~636). The `needsAuth` condition covers `isAdminSubdomain`,
+  `tenantFromQueryParam`, and `tenantFromClientPath`, but NOT `tenantFromSubdomain`
+  (non-admin tenant subdomains like `gldf.strelva.com`). Requests resolved by subdomain
+  pass through to per-route guards only; the proxy is not a first line of defense for
+  this common access pattern. Fix: add `tenantFromSubdomain` as a fourth condition or
+  restructure to `needsAuth = !devAccessBypass && !isDemoTenant && !routeIsPublic`.
+
+- **[MEDIUM][security] `businessRules` injected unsanitized into the agent system prompt**
+  (`src/lib/agent-prompt-shared.ts` line ~344). The `personality` field already runs through
+  `sanitizePromptValue` at line 338, but `businessRules` is interpolated directly. Fix:
+  wrap `tenantConfig.businessRules` in `sanitizePromptValue` before interpolation and add a
+  max-length cap (e.g. 1000 chars) in the TenantEditor validator.
+
+- **[HIGH][tenant-isolation] `upload_image` tool uses unscoped `uploadFile()` instead of
+  `uploadTenantMedia()`** (`src/app/api/agent/route.ts` line ~568-569). Files are stored in
+  the shared flat Blob namespace without a tenant prefix. Fix: replace with `uploadTenantMedia`
+  which takes a Buffer directly and accepts any MIME type `sniffImageType` returns.
+
+- **[HIGH][security] Seven orphaned Clerk and Sanity secrets still live in Vercel
+  environment** after both teardowns. Run `vercel env rm` for each of:
+  any remaining `CLERK_*` / `NEXT_PUBLIC_CLERK_*`, `SANITY_PROJECT_ID`, `SANITY_DATASET`,
+  `SANITY_API_TOKEN`, `SANITY_WEBHOOK_SECRET`, `REVALIDATION_SECRET` (superseded by
+  per-tenant `revalidationSecret`), `CORS_ORIGINS` (no code reference), and Turborepo
+  vars (`NX_DAEMON`, `TURBO_*`). Verify via `vercel env ls` before removal.
+
+- **[HIGH][bug] Missing `SECRETS_ENC_KEY` causes full platform outage** if removed after
+  activation (`src/lib/tenants.ts` load path, `src/lib/crypto/secrets.ts:62`). `decryptSecret`
+  throws on an `enc:v1:` prefixed value when the key is absent, and that throw in `rowToTenant`
+  propagates through `loadTenants` to kill all tenant resolution. Add `SECRETS_ENC_KEY` to the
+  production readiness checklist and wrap `rowToTenant` in a per-row try/catch in `loadTenants`
+  so one bad row cannot take down the entire platform.
+
+- **[MEDIUM][security] `reb:tenants:all` Redis cache stores decrypted (plaintext) secrets**
+  (`src/lib/tenants.ts` line ~206-210). The in-memory and Redis tenant-list cache contains
+  the decrypted values of `slackWebhookUrl`, `googleSearchConsoleKey`, etc. This is correct
+  for reads but expands the at-rest-encryption boundary. Optional defense-in-depth: re-encrypt
+  before caching.

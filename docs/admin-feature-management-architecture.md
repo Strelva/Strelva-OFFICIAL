@@ -1,24 +1,28 @@
 # Admin Feature Management — Architecture
 
-**Date:** Jul 8 2026 · **Goal:** let an operator add/remove a client's features from the admin cockpit, with core features locked (never removable). Grounded in the current code.
+**Date:** Jul 8 2026 · **Built:** Jul 8 2026 (PR #141, commit f144c4c, merged to main).
+**Goal:** let an operator add/remove a client's features from the admin cockpit, with core features locked (never removable). Grounded in the current code.
 
 ---
 
-## Current state (what the audit found)
+## Current state (as shipped — verified Jul 2026)
 
-- **Features already exist as data:** `tenants.features[]` (`TenantFeature` = `commerce | booking | newsletter | blog | video | events | shop | products | rewards | providers | instagram | reviews`).
-- **The dashboard nav already gates on them:** `src/lib/dashboard-surfaces.ts` → `getDashboardSurfaces()` decides tabs from **presence-profile** (derived from `template`/`businessModel`) + live **connections** + the `features[]` array (e.g. `tenantHasStore` reads `features` OR `hasCommerce`).
-- **The feature write path is barely wired (verified in code):** the **create** path (`POST /api/admin/tenants`) accepts `features`, but `cleanFeatures` only whitelists **3** of the 12 type values — `TENANT_FEATURES = {commerce, booking, newsletter}` (line 12). The **edit** path (`PATCH`) does **not** include `features` in its Zod whitelist at all. Net: 3 features can be set at creation, **zero can be toggled after.** The panel to extend is `TenantEditor.tsx` in the cockpit (strongest admin surface, 85/100).
-- **`features[]` is NOT the billing/tier system.** Per AGENTS.md, tiers ($99/$199/$499) are *packaging + build-scope*, not code-enforced flags — "the platform serves whatever's built into the client's repo; the Stripe price just sets the charge." So feature-management governs **which dashboard tools/surfaces a client sees**, not what they're billed for. Keep those two concerns separate.
-- **There is NO formal "core / locked" concept.** Core tabs (Today, Ask Strelva, Website, Analytics) are always-on because that's **hardcoded** in `getDashboardSurfaces()`, not because they're marked locked. Nothing stops a future write from trying to remove them.
-- **Three overlapping "feature" vocabularies** exist and must be reconciled: `features[]` (the array), presence-profile (`template`/`businessModel`), and `site_capabilities` (site-editing only, NOT feature gating). Plus `integrations[]` for connections.
+**This feature is LIVE.** The architecture below was designed and then built in the same increment (PR #141). The "what the audit found" items below describe the pre-ship state that motivated the design; see the design sections for what shipped.
+
+- **Features as data:** `tenants.features[]` (`TenantFeature` = `commerce | booking | newsletter | blog | video | events | shop | products | rewards | providers | instagram | reviews`, plus set-member ids `schedule | members | roster | packages` added by #141).
+- **The dashboard nav gates on them:** `src/lib/dashboard-surfaces.ts` → `getDashboardSurfaces()` decides tabs from presence-profile + connections + `features[]`. Set-member surfaces (`schedule`/`members`/`roster`) are appended by `getSetSurfaces(tenant.features)` from `src/lib/features/registry.ts`.
+- **Feature write path is fully wired (verified in code):** the **create** path (`POST /api/admin/tenants`) validates features against the full registry. The **edit** path (`PATCH`) accepts `features`, runs `applyFeatureChange(current, next)` (rejects core removal, expands sets, dedupes), and audit-logs the change. ~~Zero can be toggled after create~~ is gone.
+- **`features[]` is NOT the billing/tier system.** Per AGENTS.md, tiers ($99/$199/$499) are *packaging + build-scope*, not code-enforced flags. Feature-management governs which dashboard surfaces a client sees, not what they're billed for.
+- **`CORE_FEATURES` is the locked set:** `["today", "ask-ai", "website", "analytics", "reports"]` (5 items, not 4 — "reports" was added). Enforced server-side in `applyFeatureChange`; the UI also disables these toggles.
+- **Single source of truth:** `src/lib/features/registry.ts` — `FEATURE_REGISTRY`, `CORE_FEATURES`, `FEATURE_SETS` (wellness = schedule/members/packages/roster), and helpers `expandSets`/`applyFeatureChange`/`getSetSurfaces`/`getToggleableRegistry`. The resolver, write path, and operator UI all read this registry.
+- **`TenantEditor`** (`src/app/admin/clients/[id]/TenantEditor.tsx`) has a live `FeaturesPanel` component — core features listed with a lock, conditional toggles, and vertical-set toggles that expand to member features.
 
 ---
 
 ## The design
 
 ### 1. One feature registry (single source of truth)
-Create `src/lib/features/registry.ts` — the canonical list, replacing the scattered vocabularies. Each feature declares:
+`src/lib/features/registry.ts` — the canonical list, replacing the scattered vocabularies. Each feature declares:
 
 ```ts
 type FeatureTier = "core" | "conditional" | "set";
@@ -36,10 +40,10 @@ interface FeatureDef {
   onEnable?: string;            // setup hook (seed config / prompt connect)
 }
 
-export const CORE_FEATURES = ["website", "analytics", "today", "ask-ai"] as const; // locked
+export const CORE_FEATURES = ["today", "ask-ai", "website", "analytics", "reports"] as const; // locked — 5 items
 ```
 
-- **Core** (`locked: true`): website, analytics, today, ask-ai. Always on, cannot be removed.
+- **Core** (`locked: true`): today, ask-ai, website, analytics, reports. Always on, cannot be removed.
 - **Conditional**: google-business (`requires.property: physical_location` / `requires.connection: google`), reviews.
 - **Set**: a vertical bundle, e.g. `wellness` = {schedule, members, packages, roster}; `ecommerce` = {products, orders, storefront}. Toggling a set flips its member flags together.
 
@@ -85,24 +89,31 @@ Grouped by tier:
 
 ---
 
-## Net-new vs reuse
+## What shipped (PR #141)
 
 | Piece | Status |
 |-------|--------|
-| `tenants.features[]` store | **Reuse** |
-| `dashboard-surfaces` resolver | **Extend** (make registry-driven) |
-| `TenantEditor` panel | **Extend** (add the checklist) |
-| `TENANT_FEATURES` whitelist (create path) | **Extend** (currently only 3 of 12 features) |
-| PATCH schema / feature endpoint | **Extend** (add `features` — today PATCH accepts none — + the core guard) |
-| Feature registry + CORE_FEATURES | **Net-new** (the missing single source of truth) |
-| Core-lock guard | **Net-new** (no locked concept exists today) |
-| Set-expand + soft-disable logic | **Net-new** |
+| `tenants.features[]` store | Reused |
+| `src/lib/features/registry.ts` | Net-new — `FEATURE_REGISTRY`, `CORE_FEATURES`, `FEATURE_SETS`, helpers |
+| Core-lock guard (`applyFeatureChange`) | Net-new — enforced server-side in the PATCH handler |
+| `dashboard-surfaces` resolver | Extended — `getSetSurfaces()` appends set-member surfaces |
+| `TENANT_FEATURES` whitelist (create path) | Replaced with registry validation (full feature set) |
+| PATCH schema / feature endpoint | Extended — `features` accepted + core-guard applied |
+| `TenantEditor` `FeaturesPanel` | Net-new — live in `src/app/admin/clients/[id]/TenantEditor.tsx` |
+| Set-expand + member toggles | Net-new — `expandSets` on write; per-member sub-toggles in UI |
+| Placeholder pages for wellness set | Net-new — `schedule`/`members`/`packages`/`roster` surfaces |
 
-## Sequencing
-1. Registry + `CORE_FEATURES` (net-new, small).
-2. Server-side guard + `features` in the write path.
-3. Resolver refactor to registry-driven (behaviour-preserving).
-4. `TenantEditor` checklist UI.
-5. Set-toggle + soft-disable + "needs setup" states.
+### Known issues / TODO
 
-This is a small, contained build on already-strong surfaces — the only genuinely new concepts are the registry and the locked-core guard, which don't exist today.
+- **Audit finding [MEDIUM][security]**: `businessRules` field in the agent system prompt
+  (`src/lib/agent-prompt-shared.ts:342`) is interpolated without being wrapped in
+  `sanitizePromptValue`, unlike every other tenant-supplied field in the same prompt. This
+  opens a prompt-injection vector. Fix: wrap in `sanitizePromptValue(tenantConfig.businessRules)`
+  and add a max-length cap at write time (e.g. 1000 chars in the TenantEditor PATCH validator).
+  `personality` is already sanitized; `businessRules` is not.
+- **Audit finding [MEDIUM][bug]**: `upload_image` tool in `src/app/api/agent/route.ts:568`
+  calls unscoped `uploadFile()` instead of `uploadTenantMedia()` — uploaded images land in a
+  shared flat Blob namespace rather than under the tenant's prefix. Fix: replace with
+  `uploadTenantMedia(tenant, buffer, finalFilename, mimeType)`.
+- Soft-disable data warning (warn when toggling off a feature with existing data) was deferred —
+  currently toggling off a feature hides its surface but no warning fires if data exists.

@@ -38,6 +38,26 @@ agent is missing obvious action-tools (run scan, revoke pay link, send invite).
 
 ## Notes
 
-- Dev server pinned to **localhost:3100** (`pnpm exec next dev -p 3100`) to avoid the
-  PuckCast/other-project port-3000 collisions. Prod env pulled to `.env.local` +
-  `REB_DEV_UNGATED_ACCESS=1` for local super-admin.
+- Dev server runs on **localhost:3000** (`pnpm dev`). The port-3100 pin mentioned in
+  earlier drafts of this doc was a temporary workaround and is no longer used. Prod env
+  pulled to `.env.local` + `REB_DEV_UNGATED_ACCESS=1` for local super-admin.
+- Auth is now Supabase-only (Clerk fully removed 2026-07-11, #146). `src/proxy.ts`
+  (the renamed `middleware.ts` in Next.js 16) owns the request-level auth gate
+  (`gateRequest`, fail-closed) and route matcher (`isPublicRoute`/`isCronRoute`). No
+  `@clerk` imports remain anywhere in the repo.
+- Sanity is fully torn down as a data source (2026-07-10). The only residual is
+  `sanityImageUrl` for legacy content-image asset refs stored in Postgres rows, kept
+  until the content-URL rewrite ops step.
+
+## Status (as of 2026-07-30)
+
+Phase 1 and Phase 2 items from this plan are shipped and live. Phase 3 sparklines
+and the command palette are the remaining items. This doc is a historical design record
+for the `feat/platform-solidify` sprint. For the current operator surface map, see
+`docs/operator-command-center.md`.
+
+## Known issues / TODO
+
+**[MEDIUM] `OperatorConsole` proposals accumulate across turns** (`src/app/admin/OperatorConsole.tsx:423`): `setProposals(result.proposals)` replaces the proposals array on each response, but stale confirmed or in-flight proposals from previous turns can remain visible and clickable if the new response returns a different set. A user approving a stale card from a prior turn may trigger an unintended action.
+
+**[HIGH] `buildOpsReport` is a fully serial N+1 loop** (`src/lib/ops.ts:113-157`): three `for...of` loops over all active tenants with sequential `await` calls per tenant. At portfolio scale this blocks the ops-digest cron handler for O(n*3) sequential round-trips. Fix: collapse into a single `mapPool(active, 8, ...)` that fetches SMS state, queue count, and auto-approved events per tenant in parallel.

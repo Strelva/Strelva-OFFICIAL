@@ -1,6 +1,8 @@
 # Studio (Wellness) Vertical — Architecture & Build Notes
 
-**Date:** Jul 7 2026 · **Status:** design (pre-build, gated on validation) · **Scope:** the net-new studio-operations domain for the wellness edition, organized so it can either live as one vertical *or* be promoted to the whole company.
+**Date:** Jul 7 2026 (updated Jul 30 2026) · **Status:** design (pre-build, gated on validation — nothing in this document exists in the codebase yet) · **Scope:** the net-new studio-operations domain for the wellness edition, organized so it can either live as one vertical *or* be promoted to the whole company.
+
+> **Current state (2026-07-30):** `src/lib/studio/` does not exist. No `studio_*` migrations have been applied. No `studio_*` tables are in the production database. The owner-dashboard Schedule/Roster/Members surfaces that are already live are backed by the existing `bookings` table and `reward_members` KV store, NOT this module. Do not confuse those live surfaces with this pre-build spec.
 
 > **The governing principle:** build this as a **bounded module with clean seams**, not scattered across the codebase. If wellness stays one edition, it's isolated and low-risk. If it blows up and we pivot all-in, the module is already self-contained enough to become the primary app (or be extracted to its own service) without untangling it from six other verticals. We design for that optionality now, because retrofitting a boundary later is the expensive version.
 

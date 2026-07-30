@@ -70,10 +70,27 @@ Right shape for a 2-person team: serve many verticals off one codebase, spend bu
 ## Architecture reality (what's built vs what's new)
 
 - Control plane = one deployment; public studio sites are separate custom repos pulling `/api/v1/*`. Routing in `src/proxy.ts` (subdomain → tenant, custom domain, path fallback).
-- **Already built + reused:** multi-tenancy, Stripe subscription billing (live), a booking engine (`src/lib/booking.ts` + `bookings` table + availability/timezone/buffer), Calendly + Vagaro webhooks, member CRM/loyalty (`reward_members`) + operator CRM, reviews/audits/analytics/GBP, the AI agent, and a `wellness` template (the registry default).
-- **The new build for Pilates:** `bookings` is 1:1 appointment only today — **no recurring classes / capacity / waitlists** (the core build), no member portal, no class-payment path.
+- **Already built + reused:** multi-tenancy, Stripe subscription billing (live), a booking engine (`src/lib/booking.ts` + `bookings` table + availability/timezone/buffer), Calendly webhook (`src/app/api/webhooks/calendly/route.ts`), Vagaro embed integration (`src/components/public/VagaroEmbed.tsx` — widget or iframe, no webhook), member loyalty store (KV-backed, `src/lib/rewards/`, mirrored to `reward_members` Postgres table) + operator CRM, reviews/audits/analytics/GBP, the AI agent, and a `wellness` template (the registry default — `src/components/templates/registry.ts` falls back to `wellness` when no template is set).
+- **Wellness feature set (live, `src/lib/features/registry.ts`):** the `wellness` vertical set enables Schedule / Members / Roster dashboard surfaces via the tenant's `features[]`. These are backed by the existing `bookings` table + KV rewards store. **`packages` (class packs/memberships) is intentionally omitted from the live set** — there is no packages dashboard surface yet; it's part of the V1 build scope below.
+- **The new build for Pilates:** `bookings` is 1:1 appointment only today — **no recurring classes / capacity / waitlists** (the core build), no member portal, no class-payment path. `studio/` module does not exist yet (`src/lib/studio/` is a pre-build spec in `docs/studio-vertical-architecture.md`).
 - **One architecture call:** class-booking-with-payment breaks the current "control plane doesn't own client checkout" rule (or lives in a shared package the studio site consumes). We've decided to build it.
 - **The real bottleneck (agent should flag this):** today each site is hand-built (productized *agency*), not self-serve SaaS. We can't reach 150-300 studios if each needs a bespoke build. The highest-leverage move is **productizing the studio site into a near-self-serve templated delivery lane** (`custom-repo-starter`). That's what decides $500K-agency vs $1M+-ARR-SaaS.
+
+---
+
+## Known issues / TODO (platform-level, relevant to wellness build)
+
+These are open bugs and security gaps in the platform that the wellness build sits on. Fold fixes into the wellness sprint or track separately — do not inherit them as "known good."
+
+- **[HIGH] `maxAdvanceBooking` config field is never enforced at booking creation** (`src/lib/booking.ts` line 17 defines it; no call site reads it in slot generation). Any booking date is accepted regardless of the advance limit. Fix before Cove go-live.
+- **[HIGH] `upload_image` agent tool uses unscoped `uploadFile()` instead of `uploadTenantMedia()`** (`src/app/api/agent/route.ts:568`). Images are stored in a shared flat Blob namespace with no tenant prefix. A rename or cross-tenant leak is possible. Fix: replace `uploadFile` with `uploadTenantMedia(tenant, buffer, filename, mimeType)`.
+- **[MEDIUM] `businessRules` injected unsanitized into the agent system prompt** (`src/lib/agent-prompt-shared.ts:343`). `personality` is sanitized; `businessRules` is not. Wrap with `sanitizePromptValue` and add a max-length cap in the TenantEditor validator.
+- **[HIGH] GBP writes silently fail after tenant rename** — `google-meta` key is missing from the rename registry (`src/lib/tenant-rename.ts:32`). If a studio tenant is ever renamed, their GBP integration breaks silently.
+- **[HIGH] Calendly webhook: `redis.keys()` full-keyspace scan in the webhook handler** (`src/app/api/webhooks/calendly/route.ts:64`). Degrades under load. Replace with a reverse-index O(1) lookup.
+- **[MEDIUM] Calendly webhook: `addEvent` call is unguarded** — any failure returns 500 and triggers a Calendly retry storm (`src/app/api/webhooks/calendly/route.ts:124`). Wrap in try/catch, return 200 on error.
+- **[MEDIUM] `new Date(undefined)` in Calendly webhook** produces 'Invalid Date' string in stored event body (`route.ts:129`). Guard `startTime` before use.
+- **[CRITICAL] Next.js is on 16.2.6 with four HIGH + three MODERATE unpatched CVEs** (`package.json:49`). Bump to 16.2.12 before wellness launch.
+- **[MEDIUM] Fractional star delta causes uncaught Redis error in `adjustStars`** (`src/app/api/rewards/members/[email]/adjust/route.ts:35`). Validate `Number.isInteger(delta)` before the `hincrby` call.
 
 ---
 

@@ -4,7 +4,7 @@ Two test layers, and two Playwright "smoke" modes that differ by the dev-access 
 
 ## Vitest (unit + integration)
 
-`pnpm test` (`vitest run`) — the bulk of coverage (~1700 tests in `src/__tests__/`).
+`pnpm test` (`vitest run`) — the bulk of coverage (~1943 passing tests across `src/__tests__/` as of 2026-07-30).
 Runs in CI as the "Test (with coverage gate)" step. Mock at module boundaries
 (`vi.mock`), not the function under test — e.g. `tenant-access-enforcement.test.ts`
 exercises the REAL `hasTenantAccess` with the auth primitives (`getSessionUser`,
@@ -101,3 +101,13 @@ couple of validating runs. Usage resets on the 1st.
 - Re-introduce the `font-[family-name:var(--font-display)]` arbitrary class — use the
   `font-display` `@utility` (see AGENTS.md § Conventions). Turbopack dev mis-serializes the
   arbitrary value on cold compile and crashes the dev server.
+
+## Known issues / TODO (2026-07-30)
+
+These test gaps are confirmed open. Fix before shipping the related feature or security fix.
+
+- **[HIGH][security] At-rest encryption (`src/lib/crypto/secrets.ts`) has zero test coverage.** Need `src/__tests__/secret-encryption.test.ts` covering: round-trip encrypt→decrypt with key set; keyless pass-through (no `SECRETS_ENC_KEY`); legacy plaintext (no `enc:v1:` prefix) still reads correctly; tampered ciphertext (flipped auth tag) throws; `encryptSecret` is idempotent (already-encrypted value not re-wrapped); null/undefined/empty preserved across both functions.
+- **[HIGH][bug] `customer.subscription.deleted` has no test in `billing-webhook-mode-guard.test.ts`.** Add tests: (1) metadata tenantId present → `subscriptionStatus='cancelled'` set, (2) no metadata → fallback to `getTenantByStripeSubscriptionId`, (3) neither → `getTenantByStripeCustomerId`. Assert `alert('billing_subscription_cancelled')` fires.
+- **[HIGH][bug] Stripe idempotency branches completely untested.** Use the existing `useFakeRedis()` helper. Cover: duplicate event (Redis key already present with `status:"processed"`) → 200 `{duplicate:true}`, no `updateTenant` call; in-flight event (status `"processing"`, recent `startedAt`) → 503; Redis throws in `claimStripeEvent` → 503 + `alert("billing_webhook_idempotency_unavailable")`.
+- **[MEDIUM][bug] `isTrialCreateInvoice` guard (zero-dollar subscription_create invoice) has no test.** Post an `invoice.paid` with `billing_reason:'subscription_create'` and `amount_paid:0`; assert `updateTenant` is NOT called with `subscriptionStatus:'active'` but IS still called with `subscriptionPastDueSince:null` clear and `stripeSubscriptionId` stamp.
+- **1 test currently failing** (as of 2026-07-30 run) — investigate before merging any billing/auth work.

@@ -31,7 +31,9 @@
 - Confirm required platform env vars are set in production:
   `GOOGLE_GENERATIVE_AI_API_KEY`,
   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
+  `SUPABASE_URL` (private server-only; same URL as `NEXT_PUBLIC_SUPABASE_URL` but NOT prefixed — required by `src/lib/db/client.ts`; absent in `.env.example` and the production checklist as of 2026-07-30, see Known issues),
   `CONTENT_SOURCE=postgres`, `TENANTS_SOURCE=postgres`, `DATA_SOURCE=postgres` (the live data backbone),
+  `SECRETS_ENC_KEY` (AES-256-GCM at-rest encryption key for provider secrets; generate with `openssl rand -hex 32`; missing = encryption silently disabled AND loading any tenant whose secrets were already encrypted causes a full-platform outage — see Known issues),
   `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`,
   `INTERNAL_API_SECRET`, `CRON_SECRET`, `OAUTH_STATE_SECRET`, `SCAFFOLD_CUSTOM_REQUEST_SECRET` (legacy alias `REB_CUSTOM_REQUEST_SECRET`), `STRIPE_SECRET_KEY`, `STRIPE_SCAFFOLD_PRICE_ID`,
   `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`, `RESEND_DOMAIN`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`,
@@ -130,3 +132,58 @@
 - If content breaks a storefront, restore the previous content version from Strelva version history.
 - If code breaks a storefront, redeploy the previous Vercel deployment or release tag.
 - For incompatible schema changes, publish a new API version and keep `/api/v1/*` stable until all storefronts migrate.
+
+## Known issues / TODO (updated 2026-07-30)
+
+### Security / Critical
+
+- **[CRITICAL][security] Next.js 16.2.6 has four HIGH + three MODERATE unpatched CVEs.** Currently pinned at `16.2.6` in `package.json:49`. Bump `next` to `16.2.12` and update `eslint-config-next` to match. Run `pnpm install && pnpm audit`. Deploy with `vercel deploy --prod --yes --scope strelva` (not `vercel redeploy` — redeploy reuses the old deployment's env snapshot and will not apply env changes or the new lockfile).
+
+### Security / HIGH
+
+- **[HIGH][security] `SECRETS_ENC_KEY` missing from `pnpm check:prod` and both env examples.** `src/lib/crypto/secrets.ts` AES-256-GCM at-rest encryption has been live in prod since 2026-07-15 (backfill run, verified). If this key is removed from Vercel, `decryptSecret` throws on any `enc:v1:`-prefixed row — `loadTenants` propagates the throw with no per-row guard, causing a full platform outage. Fix: add `checkEnvVar('SECRETS_ENC_KEY', true)` to `scripts/production-checklist.ts` and `src/lib/production-readiness-rules.ts`. Add `SECRETS_ENC_KEY` (with `openssl rand -hex 32` generation instruction) to `.env.example` and `.env.production.example`. Add a startup warning in `secrets.ts` when the key is unset but encrypted rows exist.
+- **[HIGH][security] `SUPABASE_URL` (private, server-only) absent from `pnpm check:prod`, `.env.example`, and `.env.production.example`.** `src/lib/db/client.ts:29` requires this env var for server-side Postgres access. It is the same URL as `NEXT_PUBLIC_SUPABASE_URL` but must be set separately as a non-public server var. Add `checkEnvVar('SUPABASE_URL', true)` to `scripts/production-checklist.ts`. Add to both env example files with a comment: `# Same URL as NEXT_PUBLIC_SUPABASE_URL but server-only (not exposed to browser)`.
+- **[HIGH][security] Seven orphaned Clerk and Sanity secrets still live in Vercel after both teardowns.** Clerk removed 2026-07-11 (#146); Sanity removed 2026-07-10. Run `vercel env rm` for each Clerk key (`CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `CLERK_WEBHOOK_SECRET`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, etc.) and Sanity key (`SANITY_PROJECT_ID`, `SANITY_DATASET`, `SANITY_API_TOKEN`, etc.) across all environments (production, preview, development). Also remove `REVALIDATION_SECRET` (superseded by per-tenant `revalidationSecret`), `CORS_ORIGINS` (no code references), and any Turborepo vars (`NX_DAEMON`, `TURBO_RUN_SUMMARY`, `TURBO_REMOTE_ONLY`, `TURBO_DOWNLOAD_LOCAL_ENABLED`, `TURBO_CACHE`) — this is not a Turborepo project. Presence of Clerk vars in the runtime environment causes Supabase auth failures. Use `vercel env ls` to enumerate before removing.
+- **[HIGH][security] Five security-pin overrides frozen at still-vulnerable versions** (current `package.json` overrides block, lines 73-97): `brace-expansion@<2` pinned at `1.1.13` (need `1.1.16+`), `brace-expansion@>=4 <5.0.5` pinned at `5.0.5` (need `5.0.8`), `dompurify` pinned at `3.4.11` (need `3.4.12+`), `fast-uri` pinned at `3.1.2` (need `3.1.4`), `postcss` pinned at `8.5.10` (need `8.5.18`). Update each pin in `package.json`, run `pnpm install && pnpm audit` after each to confirm the advisory clears.
+- **[HIGH][security] SSRF in AI-visibility scorer.** `scoreAiVisibility` in `src/lib/ai-visibility/score.ts:80-95` fetches user-supplied URLs without calling `validateUrlSafety()`. Import and call `validateUrlSafety(url)` from `src/lib/audit/checks.ts` before any `fetchText` call, matching the `runAudit` pattern.
+
+### Tenant isolation / HIGH
+
+- **[HIGH][tenant-isolation] Missing `Cache-Control: private` on collections v1 routes.** `src/app/api/v1/collections/[tenant]/[type]/route.ts:39` and `[slug]/route.ts:38` return tenant-private data without `private, max-age=0, must-revalidate`. A shared cache (CDN edge, ISR layer) could serve one tenant's collection to another. Add the same `TENANT_PRIVATE_CACHE` constant already used in the content, page-config, and site-capabilities routes to every successful `NextResponse.json()` response in both files.
+- **[HIGH][tenant-isolation] `upload_image` agent tool uses unscoped `uploadFile()`.** `src/app/api/agent/route.ts:568` calls the raw `uploadFile()` instead of `uploadTenantMedia()`, so agent-uploaded images land in a flat shared Blob namespace with no tenant prefix. Replace with `uploadTenantMedia(tenant, buffer, finalFilename, sniffedMime)` and remove the intermediate `File`/`Blob` construction. This also fixes the AVIF-declared-but-rejected bug at line 561.
+
+### Bugs / HIGH
+
+- **[HIGH][bug] Fractional star delta causes uncaught Redis error in `adjustStars`.** `src/app/api/rewards/members/[email]/adjust/route.ts:35` validates `Number.isFinite(delta)` but not `Number.isInteger(delta)`. A fractional delta (e.g. `0.5`) passes validation and causes `redis.hincrby` to throw. Add `Number.isInteger(delta)` to the route validation and as a library-level guard inside `adjustStars`.
+- **[HIGH][bug] Calendly webhook uses `redis.keys()` full-keyspace scan** in `findTenantByUserUri` (`src/app/api/webhooks/calendly/route.ts:64`). Under load this degrades Redis and blocks the synchronous webhook handler. Replace with a reverse index: write `redis.set('calendly-user-uri:<userUri>', tenantId)` when saving a Calendly connection; `findTenantByUserUri` becomes a single O(1) `redis.get`.
+- **[HIGH][bug] Calendly webhook `addEvent` is unguarded.** `src/app/api/webhooks/calendly/route.ts:124` — any Redis/Postgres failure returns 500, triggering Calendly's retry storm. Wrap `addEvent` in try/catch; return 200 on catch. Also: `new Date(startTime)` at line 129 produces `'Invalid Date'` when `startTime` is undefined — guard with `startTime ? new Date(startTime).toLocaleString() : 'time TBD'`.
+- **[HIGH][bug] `buildOpsReport` has a serial N+1 loop.** `src/lib/ops.ts:113-157` has three sequential `for...of` loops with 3 awaits per tenant. Collapse into `mapPool(active, 8, ...)` for parallel processing.
+- **[HIGH][bug] `google-meta:${t}` and review-dedup keys missing from `authoritativePatterns` in `src/lib/tenant-rename.ts`.** GBP writes and review-reply vetos silently strand under the old slug on a tenant rename. Add `google-meta:${t}`, `review-replies:recent:${t}`, `reb:review-nudge-sent:${t}`, `reb:order-review-request-sent:${t}:*`, and `reb:review-reply-declined:${t}:*` to the registry. Update the completeness unit test to cover these patterns.
+- **[HIGH][bug] Google OAuth callback does not re-verify caller session** (`src/app/api/oauth/google/callback/route.ts:93`). `saveConnection` is called without first calling `verifyAuth()` and `requireTenantAccess(tenantId)`. Add those calls at the start of the GET handler.
+
+### Security / Medium
+
+- **[MEDIUM][security] `businessRules` field injected into agent system prompt without sanitization.** `src/lib/agent-prompt-shared.ts:342-343` interpolates `tenantConfig.businessRules` raw, while `personality` on line 338 is correctly wrapped in `sanitizePromptValue()`. Fix: wrap `tenantConfig.businessRules` in `sanitizePromptValue()`. Also enforce a max-length cap at write time (e.g. 1000 chars in the TenantEditor validator).
+- **[MEDIUM][security] Subdomain-resolved tenant requests skip the proxy auth gate.** `src/proxy.ts:636` — `needsAuth` only covers `isAdminSubdomain`, `tenantFromQueryParam`, and `tenantFromClientPath`. A request to a custom domain or `tenant.strelva.com` subdomain resolved via `extractTenantFromHost` hits the per-route guards but bypasses the proxy's first-line auth gate. Add `tenantFromSubdomain` as a fourth condition.
+- **[MEDIUM][security] Newsletter HTML sanitizer allows CSS expressions and `javascript:` URLs in `style` attributes.** `src/lib/email-html.ts:23-33` includes `'style'` in `ALLOWED_ATTR`. Remove it — tenant-supplied newsletter content should not carry raw CSS.
+- **[MEDIUM][security] `INTERNAL_API_SECRET` serves three roles** (domain-map auth key, `OAUTH_STATE_SECRET` fallback, approve-link signing fallback). A single compromise has wider blast radius than documented. Set `APPROVE_LINK_SECRET` and `OAUTH_STATE_SECRET` as dedicated secrets and remove the fallback chain.
+- **[MEDIUM][security] `reb:tenants:all` Redis cache stores decrypted (plaintext) secrets.** `src/lib/tenants.ts:206-210` — the 60-second cache holds decrypted secret values. This is outside the at-rest encryption boundary (correct for performance but an optional defense-in-depth gap).
+- **[MEDIUM][security] Slug URL parameter in collections single-entry route unsanitized before DB pass.** `src/app/api/v1/collections/[tenant]/[type]/[slug]/route.ts:18,33` — add an ID-format guard on `slug` before passing to `getEntryBySlug`.
+
+### Bugs / Medium
+
+- **[MEDIUM][bug] Split-brain between `CONTENT_SOURCE` and `DATA_SOURCE` flags.** `src/lib/storage/content-store.ts:133` checks `CONTENT_SOURCE`; `src/lib/storage/draft-store.ts:22` checks `DATA_SOURCE`. In production both must be `postgres`. Either unify on a single flag or add a runtime guard that fails loudly in `VERCEL_ENV=production` when either is unset. Confirm both are currently set in Vercel prod.
+- **[MEDIUM][bug] Billing webhook: ordering guard key has no TTL** (`src/app/api/billing/webhook/route.ts:211`). The Redis key used for event ordering leaks forever per tenant — add a TTL.
+- **[MEDIUM][bug] `withAccountLock` proceeds unlocked when lock acquisition fails** (`src/lib/accounts.ts:194-213`). Silent last-write-wins on concurrent webhook hits.
+- **[MEDIUM][bug] Dunning email to owner gated behind client email pause** (`src/app/api/billing/webhook/route.ts:672-690`). Payment-failed owner notifications may never be sent when `emailSendingPaused()` is true. Operator emails should use the `operator` audience, not `client`.
+- **[MEDIUM][bug] `PATCH /api/reviews` bypasses GBP publish path** and permanently suppresses auto-reply backlog for Google reviews (`src/app/api/reviews/route.ts:73`).
+- **[MEDIUM][bug] `poll-google-reviews` cron does not paginate** — reviews beyond the first API page are never ingested (`src/app/api/cron/poll-google-reviews/route.ts:116`).
+- **[MEDIUM][bug] Monthly-report dev-mode run consumes the once-per-month dedup marker without sending** (`src/app/api/cron/monthly-report/route.ts:98-128`). A dev/staging trigger burns the production dedup key.
+- **[MEDIUM][bug] `GA4` cache can pin an `'unavailable'` result indefinitely** when `status:ok` is cached with zeroed data (`src/lib/analytics.ts:297-382`).
+- **[MEDIUM][bug] `setPgPageConfig` uses non-atomic delete-then-insert** for `page_config` — read window between operations (`src/lib/storage/page-config-store.ts:84-90`).
+- **[MEDIUM][bug] `contact.email` schema default is `""` but field requires a valid email** — `PUT` fails on first use for a new tenant (`src/lib/schemas.ts:181` and `src/lib/defaults.ts:76`).
+
+### Tech debt / Medium
+
+- **[MEDIUM][tech-debt] `database.types.ts` is stale** — `billing_type` and `account_id` missing from generated Row types, requiring shadow casts in `rowToTenant`/`tenantToRow`. Run `supabase gen types typescript --project-id <id> > src/lib/db/database.types.ts` and commit. Add a CI step: `find supabase/migrations -newer src/lib/db/database.types.ts | grep -q .` fails if types are older than the newest migration.
+- **[MEDIUM][tech-debt] `sectionSchemas` typed as `Record<ContentSection, z.ZodType>` erases output types** — every downstream `setContent` call is an unchecked cast (`src/lib/schemas.ts:401`). Change to a per-key discriminated type `{ [K in ContentSection]: z.ZodType<ContentMap[K]> }` so the container annotation provides real inference.

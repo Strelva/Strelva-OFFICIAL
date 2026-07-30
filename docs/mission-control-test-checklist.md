@@ -1,27 +1,53 @@
 # Mission Control — test checklist
 
-> **Status: historical QA record for PR #55.** Routes, navigation, providers,
-> and setup steps below are snapshots. Use `operator-command-center.md` and the
-> current smoke commands in `AGENTS.md`.
+> **Status: historical QA record for PR #55. SEVERAL ITEMS BELOW ARE NOW STALE.**
+> Routes, navigation, auth providers, and setup steps below are snapshots from the
+> `feat/platform-solidify` sprint. The current operator surface is documented in
+> `operator-command-center.md`; the current smoke commands are in `AGENTS.md`.
+>
+> Key changes since this checklist was written:
+> - Auth is Supabase-only (Clerk removed 2026-07-11, #146). No Clerk setup needed.
+> - Sanity is fully removed as a data source (2026-07-10). Ignore "Sanity:" labels below.
+> - Dev server is `pnpm dev` on **localhost:3000** (not 3100).
+> - Vercel scope is `strelva` (not `scaffold-web`). Pull env with `vercel env pull .env.local --scope strelva`.
+> - `SCAFFOLD_API_URL` references are `strelva.com` / `app.strelva.com` now, not `scaffoldweb.com`.
+> - `CONTROL_PLANE_API_URL` should point to `app.strelva.com` (the T004 cutover is done).
+> - `/admin/tenants` and `/admin/tenants/[id]` redirect to `/admin/clients` and `/admin/clients/[id]`.
+> - The operator overview no longer renders a tenant table; it is a "Needs you" feed.
+> - Mission Control command bar is COLLAPSED below the queue on the overview, not at the top.
+> - `/admin/onboard` → `/admin/clients` workflow (the self-serve backend was deleted 2026-06-10).
 
 QA script for the `feat/platform-solidify` branch (PR rhinehart514/REB#55). Work
 top to bottom; each item says what to do and what "right" looks like.
 
-## Setup
-1. `cd ~/strelva-platform && git checkout feat/platform-solidify && git pull`
+## Setup (CURRENT — use these steps, not the stale ones above)
+1. `cd ~/strelva-platform && git checkout main && git pull`
 2. `pnpm install`
-3. `vercel env pull .env.local` (scope scaffold-web) — needed for real data.
+3. `vercel env pull .env.local --scope strelva` — needed for real data.
 4. `pnpm dev` → open `http://localhost:3000`. Sign in as a super-admin email
    (one in `SUPER_ADMIN_EMAILS`).
-5. Sanity: `pnpm typecheck`, `pnpm test` (expect 688 passing), `pnpm build` all green.
+5. `pnpm typecheck`, `pnpm test`, `pnpm build` all green (test count has grown beyond 688).
 
-## Admin overview (`/admin`)
-- [ ] Loads with the nav: Overview · Onboard · Pay Links · Ops · Drafts · Audit.
-- [ ] **Mission Control console** (command bar) renders at the top.
-- [ ] If anything's wrong in the portfolio, a **"Needs attention"** panel appears
-      (high = red, medium = amber), each row links to the right screen.
-- [ ] Summary cards include **Collected** (build payments) next to MRR.
-- [ ] The tenant table still renders (launch readiness, access, ops, activity).
+## Setup (HISTORICAL — stale, for reference only)
+1. `cd ~/strelva-platform && git checkout feat/platform-solidify && git pull`
+2. `pnpm install`
+3. ~~`vercel env pull .env.local` (scope scaffold-web)~~ — scope is now `strelva`.
+4. `pnpm dev` → open `http://localhost:3000`. Sign in as a super-admin email.
+5. ~~Sanity~~ (word used as a noun here, not the CMS): `pnpm typecheck`, `pnpm test`
+   (expect 688 passing at the time of PR #55), `pnpm build` all green.
+
+## Admin overview (`/admin`) — CURRENT
+- [ ] Loads with the left rail nav: Overview · Clients · Leads · Onboard · Pay links · Analytics (Clients group) · Actions · Drafts · Maintenance (Review group) · Ops · Audit (System group).
+- [ ] **"Needs you" feed** renders at the top (new leads, pending approvals, at-risk tenants, recent signups). No tenant table.
+- [ ] A **"Clear portfolio →"** link + count appears when any pending approval exists.
+- [ ] Below the feed: portfolio roll-up stat tiles (Active / Collected / MRR / Drafts / Custom repos).
+- [ ] **Mission Control console** (command bar) is COLLAPSED below the queue by default, labelled "Mission Control" with an expand toggle.
+- [ ] On mobile: left rail is hidden; `AdminMobileNav.tsx` shows a top-bar + slide-in drawer.
+
+## Admin overview (`/admin`) — HISTORICAL (PR #55 shape, stale)
+- [ ] ~~Loads with the nav: Overview · Onboard · Pay Links · Ops · Drafts · Audit.~~
+- [ ] ~~Mission Control console (command bar) renders at the top.~~
+- [ ] ~~Tenant table renders (launch readiness, access, ops, activity).~~
 
 ## The operator agent (the marquee)
 Type these into the command bar:
@@ -49,24 +75,25 @@ Type these into the command bar:
       pending queue, domain drift). Non-zero bad counts render red.
 - [ ] Revalidation-failure + domain-drift lists render (or "None").
 
-## Onboarding (`/admin/onboard`) — the big one
-- [ ] Fill a **throwaway** subdomain (e.g. `qa-test-1`), site name, owner name,
-      industry; leave production domain blank first.
-- [ ] Run it. The **live checklist** shows: tenant created, content seeded
-      (9 sections), owner invite (skipped if no email), Vercel project + env
-      created (**should be real — VERCEL_API_TOKEN is set**), domain skipped.
-- [ ] The "Still needs a human" list shows DNS + connect-the-repo steps.
-- [ ] A **"Client repo env"** block appears with copy-all — confirm
-      `SCAFFOLD_API_URL=https://scaffoldweb.com` and a 64-char `REVALIDATION_SECRET`
-      (this is what Jacob pastes into the hand-built repo).
-- [ ] Open the tenant → it exists with a revalidation secret. Check the created
-      Vercel project (`qa-test-1-site`) and that its env vars point at
-      **scaffoldweb.com** (the control plane), not strelva.com.
-- [ ] Clean up the throwaway tenant after.
+## Onboarding (`/admin/onboard`) — STALE
+> The self-serve onboarding backend was **deleted 2026-06-10**. `/onboard` redirects
+> to `/access-request`. Jacob provisions tenants manually via `pnpm provision-tenant`.
+> The Vercel project + env-var block below refers to the old automated flow.
+> Current provisioning: `pnpm provision-tenant` → follow the CLI prompts.
+> The client repo env block now references **strelva.com** (not `scaffoldweb.com`).
 
-## Tenant detail (`/admin/tenants/[id]`)
-- [ ] Edit owner email / subscription / founder-comp / active → **Save** → "Saved ✓".
+- [ ] ~~Fill a throwaway subdomain...~~ — use `pnpm provision-tenant` instead.
+- [ ] Confirm `SCAFFOLD_API_URL` points to **strelva.com** (not `scaffoldweb.com`) in
+      any newly provisioned client repo env block.
+
+## Client detail (`/admin/clients/[id]`) — CURRENT route
+- [ ] Edit owner email / subscription / active → **Save** → "Saved ✓".
 - [ ] **Grant access** (assign an existing user) and **Resend owner invite** both work.
+- [ ] KPI pulse, `SiteScan` health, `ReviewIntelPanel`, `VisibilityPanel`, `DomainManager`, `TenantEditor`, `ClientCrmSections`, and activity feed all render.
+- [ ] `/admin/tenants/[id]` redirects to `/admin/clients/[id]` (backward-compat redirect).
+
+## Tenant detail — HISTORICAL (stale route `/admin/tenants/[id]`)
+- [ ] ~~`/admin/tenants/[id]`~~ — now `/admin/clients/[id]`.
 
 ## Drafts (`/admin/drafts`)
 - [ ] Pending drafts show a **before/after diff** (red strikethrough → green),
@@ -85,10 +112,12 @@ Type these into the command bar:
 - [ ] Run `npx tsx scripts/seed-demo-engagement.ts` against the demo tenant so
       `demo.strelva.com`'s dashboard shows live activity + a receipt.
 
-## Config to confirm
-- [ ] `CONTROL_PLANE_API_URL` — onboarding defaults to scaffoldweb.com; set this
-      env to flip to app.strelva.com once the cutover (T004) lands.
-- [ ] `VERCEL_API_TOKEN` set (confirmed) → onboarding's Vercel steps run for real.
+## Config to confirm (CURRENT)
+- [ ] `CONTROL_PLANE_API_URL` — should be `app.strelva.com` (the T004 cutover is done; the `scaffoldweb.com` default is stale).
+- [ ] `VERCEL_API_TOKEN` set (confirmed) → provisioning Vercel steps run for real.
+- [ ] `SECRETS_ENC_KEY` set in Vercel prod (at-rest AES-256-GCM secret encryption active since 2026-07-15; missing = full platform outage on tenant load when encrypted rows exist). **NOT yet in `pnpm check:prod` — see production-readiness.md Known issues.**
+- [ ] `SUPABASE_URL` (private, server-side) set — distinct from `NEXT_PUBLIC_SUPABASE_URL`; checked in `src/lib/db/client.ts:29` but NOT yet in the production checklist script or env examples. **See production-readiness.md Known issues.**
+- [ ] No orphaned Clerk or Sanity secrets in Vercel env — Clerk is fully removed (#146, 2026-07-11); Sanity removed 2026-07-10. Presence of Clerk env vars causes Supabase auth failures. Verify with `vercel env ls --scope strelva` and remove any `CLERK_*` or `SANITY_*` vars.
 
 ## Known not-done (don't flag as bugs)
 - app.strelva.com cutover (T004) — still Jacob's dashboard work.
@@ -113,7 +142,8 @@ Type these into the command bar:
   `CONTROL_PLANE_API_URL` and re-onboard / re-point.
 
 ## Troubleshooting
-- Empty data everywhere → `.env.local` not pulled. `vercel env pull` (scope scaffold-web).
-- Onboarding Vercel steps "skipped" → `VERCEL_API_TOKEN` missing in the pulled env.
+- Empty data everywhere → `.env.local` not pulled. `vercel env pull --scope strelva` (scope is `strelva`, not `scaffold-web`).
+- Provisioning Vercel steps "skipped" → `VERCEL_API_TOKEN` missing in the pulled env.
 - Operator agent errors on every message → `GOOGLE_GENERATIVE_AI_API_KEY` missing.
 - 403 on `/admin/*` → your signed-in email isn't in `SUPER_ADMIN_EMAILS`.
+- Auth loops / sign-in broken → confirm no Clerk env vars are present in Vercel (Clerk is fully removed as of #146; presence of any `CLERK_*` var causes Supabase auth failures). Run `vercel env ls --scope strelva` and remove any `CLERK_*` vars. Also remove orphaned Sanity secrets (`SANITY_*`).

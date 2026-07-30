@@ -1,6 +1,6 @@
 # Documentation status and authority
 
-Updated: 2026-07-14
+Updated: 2026-07-30
 
 Strelva has accumulated implementation notes, migration plans, strategy research,
 and live runbooks. They are not equal sources of truth. When two documents
@@ -60,11 +60,16 @@ These files explain past decisions but must not drive new implementation:
 - `supabase-migration-plan.md` and `post-cutover-runbook.md`
 - `strelva-migration-plan.md` and `url-cutover-runbook.md`
 - `first-time-production-secrets.md`
-- `operating-model.md`, `platform-hardening.md`, and
-  `mission-control-test-checklist.md`
+- `operating-model.md` — superseded 2026-07-14; the top-banner and section headers
+  are updated to reflect that Clerk (removed 2026-07-11) and Sanity (removed
+  2026-07-10) teardowns are complete. Punch-list items referencing them are closed.
+  Use `product-ontology.md`, `persistence-boundaries.md`, and `operations.md` for
+  current decisions.
+- `platform-hardening.md` and `mission-control-test-checklist.md`
 - `docs/goals/**` state, runbooks, and completed goal notes
 - `strategy/research/**` and dated strategy alternatives unless explicitly
   promoted by `strategy/current-product-focus.md`
+- `clerk-sanity-teardown-checklist.md` — execution record; both teardowns complete.
 
 Do not repair a historical plan by making current code match it. Promote an
 intentional decision into a normative document and an executable contract test.

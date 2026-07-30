@@ -11,13 +11,17 @@ tenant repo owns **presentation**. So a redesign almost never touches data, it
 restyles and re-lays-out the components that render that data.
 
 ## Where they live
-- **Web folder:** `/Users/laneyfraass/websites/`
+- **Custom repos:** per-client Vercel projects in separate repos (not in this repo's tree).
   - `gldf` → greatlakesdriedfruit.com (Next 16, pnpm, `src/lib/reb-contracts.ts`, `REB_API_URL`)
   - `rohlax-wellness` → rohlaxwellness.com (Next 16, npm, `src/lib/storage.ts`, `REB_API_URL`/`SCAFFOLD_API_URL`)
   - more clients land here over time.
-- **Control plane:** `~/REB` (canonical). Its `src/app/(public)` + `src/components/public/SectionRenderer`
-  + `src/components/templates/*` are the *platform-rendered* storefront (the legacy/dev
-  path); the custom repos are the production per-client path.
+  - NOTE: the web folder path in this doc was previously `/Users/laneyfraass/websites/` — that
+    was a developer-specific local path, not a canonical location. Client repos live wherever
+    the developer has them checked out.
+- **Control plane:** `~/strelva-platform` (this repo; previously called `~/REB`). Its
+  `src/app/(public)` + `src/components/public/SectionRenderer` + `src/components/templates/*`
+  are the *platform-rendered* storefront (the legacy/dev path); the custom repos are the
+  production per-client path.
 
 ## Anatomy of a tenant repo
 - **Next 16 App Router + React 19 + Tailwind 4** (same stack as the platform).
@@ -45,14 +49,15 @@ restyles and re-lays-out the components that render that data.
 
 ## Prerequisites
 1. **Control plane reachable.** The tenant fetches from `REB_API_URL`. Locally,
-   point it at the running control plane (`pnpm dev` in `~/REB`) or the live API.
-   *Note:* until the Strelva infra cutover (`strelva-cutover` goal T004), the live
-   API is still `scaffoldweb.com` — don't flip the tenant's API/CSP domain to
-   `strelva.com` until the control plane actually serves there.
+   point it at the running control plane (`pnpm dev` in `~/strelva-platform`) or the live API.
+   The control plane is live on `app.strelva.com`. Wire-level env var names (`REB_API_URL`,
+   `REB_*` headers, `reb:` Redis key prefixes) are intentionally NOT renamed — they are
+   backward-compat aliases so deployed client repos keep working without a coordinated
+   cutover. Do not rename them in client repos without coordinating with the control plane.
 2. Node + the repo's package manager (gldf = pnpm, rohlax = npm).
 
 ## Workflow
-1. `cd /Users/laneyfraass/websites/<tenant>` and `git status` (commit/stash any
+1. `cd <your-local-path>/<tenant-repo>` and `git status` (commit/stash any
    pre-existing work first — these repos can carry uncommitted changes).
 2. Branch: `git checkout -b redesign/<area>`.
 3. Set `.env` `REB_API_URL` to a reachable control plane; `pnpm dev` / `npm run dev`.
@@ -83,7 +88,24 @@ site sage-and-cairn.
 - [ ] Committed (your files only), pushed, deployed, confirmed on the client domain.
 
 ## Gotchas
-- **Don't flip `scaffoldweb.com` → `strelva.com` in tenant CSP/proxy/env until T004**
-  (the control plane is live on `app.strelva.com`). It's functional, not branding.
+- **Wire-level names (`REB_API_URL`, `REB_*` headers, `reb:` Redis key prefixes) must NOT
+  be renamed in client repos without a coordinated cutover.** The control plane still
+  exports and accepts the `REB_*` aliases; changing only the client side breaks the contract.
+- The control plane is live on `app.strelva.com`. Client repos should already point their
+  `REB_API_URL` at `https://app.strelva.com` (or the Vercel deployment URL). Do NOT point
+  them at `scaffoldweb.com` (decommissioned).
 - Tenant repos may carry uncommitted work; never `git add -A` blindly.
 - Content lives in the control plane, edit it there (or via the dashboard/AI), not in the tenant repo.
+
+## Known issues / TODO (2026-07-30)
+
+- **[MEDIUM][security] Rohlax `/api/pay/rohlax` origin built from spoofable
+  `x-forwarded-*` headers** (`src/app/api/pay/rohlax/route.ts:21-24`). The success/cancel
+  URLs are constructed from the forwarded protocol/host, which can be spoofed in requests
+  not proxied by Vercel. Fix: use a hard-coded origin from env/brand config instead of
+  trusting forwarded headers for URL construction.
+
+- **[HIGH][perf] `buildOpsReport` has a fully serial N+1 loop** (`src/lib/ops.ts:113-157`).
+  Three sequential `for...of` loops with `await` per tenant, no concurrency cap. Fix:
+  collapse into a single `mapPool(active, 8, async (tenant) => { ... })` that fetches SMS
+  state, queue count, auto-approved events, and tenant config in parallel per tenant.

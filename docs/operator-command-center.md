@@ -285,6 +285,27 @@ The cron gates each send on `isReportDue` and records `markReportSent`.
 | `reb:review-alert-sent:{tenantId}:{reviewId}` | `poll-google-reviews` / `poll-yelp` crons → `src/lib/review-alert.ts` | Dedup marker for the review-needs-reply owner alert (rolled back on suppress/fail) |
 | `reb:health-alert-sent:{tenantId}:{prev}>{cur}` | `portfolio-scan` cron | Dedup marker for the health-regression owner alert (per grade transition) |
 | `reb:order-review-request-sent:{tenantId}:{orderId}` | `order-review-request` cron | Dedup marker for the order-triggered review request (rolled back on suppress/fail) |
+| `review-replies:recent:{tenantId}` | `src/lib/review-replies.ts` | Recent reply dedup cache (anti-boilerplate near-duplicate check) |
+| `reb:review-reply-declined:{tenantId}:{reviewId}` | `src/lib/review-replies.ts` | 180-day veto on auto-replying a declined review |
+| `reb:review-nudge-sent:{tenantId}` | `review-nudge` cron | Dedup marker for the review-nudge cron (prevents repeat nudges per tenant) |
 
 (`reb:` is the frozen wire/persistent-data prefix — see AGENTS.md. `crm:` and
-`analytics:cfg:` are new operator-only keys.)
+`analytics:cfg:` are operator-only keys.)
+
+## Known issues / TODO
+
+**[HIGH] Tenant rename misses several Redis-authoritative keys** (`src/lib/tenant-rename.ts`): `review-replies:recent:{t}`, `reb:review-nudge-sent:{t}`, `reb:order-review-request-sent:{t}:*`, and `reb:review-reply-declined:{t}:*` are not in `authoritativePatterns`. A tenant rename will silently strand these keys under the old slug. The `google-meta:{t}` cache is intentionally omitted (regenerates from Postgres), but the four reply/nudge/order keys above are NOT regenerable and must be added to the registry along with the completeness unit test assertions.
+
+**[HIGH] GBP writes silently fail after tenant rename** (`src/lib/tenant-rename.ts:32`): the `google-meta:${t}` key is listed as a cache omission in the comment but the rename code does not move the underlying OAuth connection blob. The `connections:${t}:*` pattern covers the OAuth tokens but `google-meta:` itself may accumulate stale data. Verify the blob rewriter handles this correctly post-rename.
+
+**[HIGH] Missing `Cache-Control: private` on collections list and single-entry v1 routes** (`src/app/api/v1/collections/[tenant]/[type]/route.ts:39`, `src/app/api/v1/collections/[tenant]/[type]/[slug]/route.ts:38`): both routes return `NextResponse.json(...)` with no cache headers. A shared CDN edge could cache one tenant's collection response and serve it to another tenant's request. Fix: add `Cache-Control: private, max-age=0, must-revalidate` to every successful response, matching the pattern already used in the content and page-config v1 routes.
+
+**[LOW] Subdomain-resolved tenant requests skip the proxy auth gate** (`src/proxy.ts:636-647`): `needsAuth` only covers `isAdminSubdomain`, `tenantFromQueryParam`, and `tenantFromClientPath`. A request resolved via the custom-domain or subdomain path (i.e. `tenantFromSubdomain`) is NOT included. The per-route guards remain defense-in-depth, but the proxy is not a useful first line of defense for the most common access pattern.
+
+**[MEDIUM] `businessRules` field injected unsanitized into the agent system prompt** (`src/lib/agent-prompt-shared.ts:343`): `tenantConfig.businessRules` is interpolated directly without wrapping in `sanitizePromptValue`. The `personality` field at line 338 is already sanitized. Fix: wrap `businessRules` in `sanitizePromptValue` at interpolation AND enforce a max-length cap (e.g. 1000 chars) in the `TenantEditor` validator.
+
+**[HIGH] `upload_image` tool uses unscoped `uploadFile()` instead of `uploadTenantMedia()`** (`src/app/api/agent/route.ts:568`): images are stored in a shared flat Blob namespace with no tenant prefix. Replace with `uploadTenantMedia(tenant, buffer, finalFilename, sniffedMime)`. This also fixes the AVIF rejection bug — AVIF is listed as allowed in the error message (line 561) but the underlying store's `ALLOWED_MIME_TYPES` rejects it.
+
+**[HIGH] `SECRETS_ENC_KEY` missing from production readiness checklist** (`src/lib/production-readiness-rules.ts`, `scripts/production-checklist.ts`): removing this key causes a full platform outage via an unguarded throw in `loadTenants`. Add `checkEnvVar('SECRETS_ENC_KEY', true)` to the checklist. Also add `SUPABASE_URL` (the private server-side key used in `src/lib/db/client.ts:29`) — currently only `NEXT_PUBLIC_SUPABASE_URL` is checked.
+
+**[CRITICAL] Orphaned Clerk and Sanity secrets still live in `.vercel/.env.production.local`**: `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_CLERK_DOMAIN`, `NEXT_PUBLIC_CLERK_SIGN_IN_URL`, `NEXT_PUBLIC_CLERK_SIGN_UP_URL`, `SANITY_API_TOKEN`, `SANITY_WEBHOOK_SECRET`, `NEXT_PUBLIC_SANITY_PROJECT_ID`, `NEXT_PUBLIC_SANITY_DATASET` are all present even though Clerk was fully removed (2026-07-11, #146) and Sanity was torn down (2026-07-10). Run `vercel env rm <name> <environment>` for each across all environments. Also audit for `REVALIDATION_SECRET` (superseded by per-tenant `revalidationSecret`), `CORS_ORIGINS` (no code reference), and Turborepo vars (`NX_DAEMON`, `TURBO_*`) which are unused in this non-Turbo repo.

@@ -1,37 +1,56 @@
 # Clerk + Sanity teardown — execution checklist (Phase A)
 
-> **Status: historical execution record with one ops-only tail.** Clerk and all
-> Sanity data reads/writes are removed. Only rewrite legacy content-image URLs,
-> lock/unset the dataset, then remove the residual image resolver.
+> **Status: Clerk teardown DONE (2026-07-11, #146). Sanity teardown DONE as a data
+> source (2026-07-10) with one ops-only image-URL tail remaining.** Steps 1-4 for
+> Clerk are executed and shipped. All Sanity data read/write paths are removed; the
+> only residual is `src/lib/sanity.ts` + `@sanity/image-url` dep + `cdn.sanity.io`
+> in CSP/next.config, retained to resolve legacy Sanity asset refs still stored in
+> Postgres content rows. The ops tail: rewrite those content-image URLs, then lock the
+> Sanity dataset, unset `SANITY_*`/`NEXT_PUBLIC_SANITY_*`, and delete `src/lib/sanity.ts`
+> + the `@sanity/image-url` dep + the `cdn.sanity.io` CSP/remotePatterns entries.
+> See "Known issues / TODO" at the bottom.
 
 > **✅ CLERK TEARDOWN DONE (2026-07-11, #146).** Steps 1–4 for Clerk are executed and
-> shipped to prod (deploy `dpl_6RxJPpBckUJNwroaAy3NJQ3hCeMQ`): `auth.ts` is Supabase-only,
-> `proxy.ts` uses a hand-rolled fail-closed auth gate + `isPublicRoute`/`isCronRoute`
-> matcher, `@clerk/nextjs` (+ `svix`, if unused) and the Clerk CSP entries are removed, and
-> the auth test suite was migrated off Clerk mocks. Post-deploy headless smoke confirmed the
-> route matcher behaves identically to Clerk's (public 200, protected 307→/sign-in, no leak).
-> **Still worth a human click:** an interactive Google OAuth sign-in + sign-out on prod (curl
-> can't drive OAuth; that Supabase path is unchanged by #146). The **Sanity** steps below
-> remain OPS-only (rewrite legacy content-image URLs, lock the dataset, unset `SANITY_*`).
-> The Clerk steps are retained below as the historical record of what was executed.
+> shipped to prod (deploy `dpl_6RxJPpBckUJNwroaAy3NJQ3hCeMQ`): `auth.ts` is Supabase-only
+> (the dual-path is fully collapsed; no `@clerk` imports remain), `proxy.ts` uses a
+> hand-rolled fail-closed auth gate (`gateRequest`) + `isPublicRoute`/`isCronRoute`
+> matcher, `@clerk/nextjs` Clerk CSP entries are removed, and the auth test suite was
+> migrated off Clerk mocks. Post-deploy headless smoke confirmed the route matcher behaves
+> identically to Clerk's (public 200, protected 307→/sign-in, no leak). The Playwright
+> auth tests were rewritten against the live Supabase flow (the old "sign-in paused" skips
+> are gone). **Still open from Step 5:** `svix` (1.92.2) is still in `package.json` with
+> no remaining import in `src/` — safe to remove with dep-review sign-off.
+> `dashboard-route-redirects.test.ts:67` still has an `it.skip` that `readFileSync`s the
+> deleted `SignInClient.tsx` — it throws if un-skipped; candidate to delete.
+> `@babel/plugin-transform-modules-systemjs` override is still in the lockfile — needs
+> evaluation before removal. The `getUserByClerkId` function and `clerk_id` column
+> reference remain in `repositories.ts`/`database.types.ts` as bridge artifacts; the
+> `SUPER_ADMIN_EMAILS` env var is still required by `production-readiness-rules.ts:128`
+> even though the `super_admins` table is the live source in prod — that check should
+> be dropped (per the original Step 1 plan). The **Sanity** ops tail is below.
+> The Clerk execution steps are retained as the historical record of what was done.
 
 Companion to `docs/post-cutover-runbook.md`. This is the precise, file:line step
 list for the HELD destructive end-step of the Clerk+Sanity → Supabase+Postgres
 migration. It was compiled from a full-platform audit on 2026-06-26.
 
-## THE GATE (Clerk portion satisfied — see banner above)
-Do not start until Noah has done a **real prod Google sign-in smoke test** on
-scaffoldweb.com (sign in, land on the dashboard, confirm it works). After Steps 1
-and 4 there is **no flag-flip rollback** — only a code revert + redeploy. One PR
-per step, CI green between each, soak before the next.
+## THE GATE
+**Clerk gate: SATISFIED.** Clerk teardown (Steps 1-4) is done and deployed to prod.
 
-Order is load-bearing: **1 → 2 → 3 → 4**, then cleanup. Step 3's read-client token
-edit MUST precede the actual dataset lock, and Step 2 MUST precede Step 3 (the
-write client still patches `_type=="tenant"` docs until then).
+For the remaining Sanity ops tail (Step 3 revised): the gate is the content-image URL rewrite
+completing cleanly. Do not lock the Sanity dataset while legacy Sanity CDN asset refs remain in
+production `content` rows — those images will 403 for any user. Rewrite first, then lock.
 
 ---
 
-## Step 1 — Collapse the Clerk branches in `src/lib/auth.ts` (second-riskiest)
+## Step 1 — Collapse the Clerk branches in `src/lib/auth.ts` (DONE)
+> **DONE (2026-07-11, #146).** `auth.ts` is Supabase-only. All dual-path Clerk branches
+> are removed. The Clerk-only helpers listed below are gone. `SUPER_ADMIN_EMAILS` removal
+> from the production readiness check was not yet done (tracked in Step 5 above).
+> `getUserByClerkId` in `repositories.ts` and `clerk_id` type refs in `database.types.ts`
+> are bridge artifacts still present (tracked in Step 5 above).
+
+
 - Delete the `@clerk/nextjs/server` import (`auth.ts:1`).
 - Remove the dead Clerk `else` branch from each dual-path function:
   `verifyAuth` (208-209), `getAuthUserId` (221-222), `findUserIdByEmail` (233-235),
@@ -51,7 +70,11 @@ write client still patches `_type=="tenant"` docs until then).
   Supabase public env = fail-closed lockout (no data exposure, total outage). The
   Supabase env becomes a hard single-point dependency.
 
-## Step 2 — `tenants.ts` Postgres cutover
+## Step 2 — `tenants.ts` Postgres cutover (DONE)
+> **DONE.** All Sanity read/write branches are removed from `tenants.ts`. Only a comment
+> referencing Sanity (in the domain-map comment) remains, which is harmless.
+
+
 - Remove the Sanity read fallback in `loadTenants` (`tenants.ts:159-185`, the
   `hasSanity` branch) **and** fix the MED divergence bug while you're here: a
   zero-row Postgres read currently drops to Sanity and caches it 60s
@@ -65,57 +88,93 @@ write client still patches `_type=="tenant"` docs until then).
   today; this is deleting now-dead Sanity branches.
 
 ## Step 3 — Lock the Sanity dataset (the security payoff — closes lead/email exposure)
-- **PREREQ EDIT FIRST:** `src/lib/sanity.ts:31-42` `getSanityReadClient()` — add
-  `token: process.env.SANITY_API_TOKEN` and `useCdn: false`. Without this, locking
-  the dataset 403s every read path. This is the single load-bearing change.
-- THEN lock the `production` dataset to authenticated-only / disable the public CDN
-  (Sanity dashboard — Noah/Jacob action). This closes the public-CDN read of
-  historical `onboardLead`/contact emails+phones (HIGH H1).
-- Verify these token-dependent read callers still work after the lock:
-  `content-store.ts:145`, `reviews.ts:114/152/184`, `media.ts:34/153`,
-  `tenant-export/assets/route.ts:44`, `agent/route.ts:1270`, `inbox-store.ts:186`,
-  `page-config-store.ts:129/157`, `site-snapshot-store.ts:328/378/503`,
-  `search-store.ts:76`, `social-store.ts:102`, `audit-store.ts:159/185`,
-  `report-store.ts:234`, `analytics-store.ts:433`, `version-store.ts:153`.
-- **NOT closed by this:** media uploads still WRITE to Sanity (`media.ts:111`,
-  `upload-store.ts:42`) via the write client. Lockdown ≠ Sanity decommission — the
-  image library stays Sanity-hosted until the media subsystem is migrated
-  (Vercel Blob / Postgres). That's Phase B, not here.
+> **Revised (verified 2026-07-30):** All Sanity data read/write callers listed below
+> are GONE — the Sanity data source was fully torn down (2026-07-10). The only remaining
+> Sanity tie is the legacy image-URL resolver (`src/lib/sanity.ts` + `@sanity/image-url`).
+> The dataset lock is still the right ops step; the PREREQ EDIT IS NO LONGER NEEDED.
+> The token-dependent callers listed below no longer exist.
+
+- Lock the `production` dataset to authenticated-only / disable the public CDN
+  (Sanity dashboard — Jacob/Noah action). This closes the public-CDN read of
+  historical data (HIGH security payoff from the original plan).
+- After locking: the `src/lib/sanity.ts` image resolver still resolves CDN URLs for
+  legacy asset refs via `NEXT_PUBLIC_SANITY_PROJECT_ID`. If public CDN is locked,
+  those images will 403 until the content-URL rewrite runs and replaces the asset
+  refs with Vercel Blob/direct URLs. **Recommended order:** rewrite content image
+  URLs first (replace Sanity asset refs in Postgres `content` rows with their Vercel
+  Blob equivalents), verify no `sanityImageUrl` calls return Sanity CDN URLs in
+  production, THEN lock the dataset.
+- After the URL rewrite + lock: delete `src/lib/sanity.ts`, remove `@sanity/image-url`
+  dep, remove `cdn.sanity.io` from `proxy.ts` CSP `img-src` (line 29) and from
+  `next.config.ts` `remotePatterns` (line 32), unset
+  `NEXT_PUBLIC_SANITY_PROJECT_ID`/`NEXT_PUBLIC_SANITY_DATASET` env vars, and remove
+  those entries from `.env.example` and `.env.production.example`.
+- **NOT applicable anymore:** the Sanity write paths (`media.ts`, `upload-store.ts`)
+  are already gone. Media now goes to Vercel Blob directly.
 
 ## Step 4 — Unwrap `clerkMiddleware` in `src/proxy.ts` (ABSOLUTE LAST)
-- `proxy.ts:399` `export default clerkMiddleware(async (auth, req) => {…})` → plain
-  `export default async function (req) {…}`; drop the `auth` param.
-- Remove `gateRequest`'s `auth` arg + the `auth.protect()` fallback (`:381`, `:395`)
-  so only the Supabase gate (`:385-393`) remains.
-- Remove the Clerk CSP allowlist entries (`proxy.ts:23,25,30`) and the dead
-  `/api/clerk/webhook` allowlist entry (`:56`).
-- Fix the `?tenant=` comment (`proxy.ts:484-487`): it claims the proxy enforces
-  "super-admin impersonation only" but only checks authentication — enforcement is
-  delegated to each route's `requireTenantAccess`. The 2026-06-26 audit confirmed
-  all 64 routes do guard, so this is a comment-accuracy fix (state the invariant:
-  every tenant-from-header read MUST call `requireTenantAccess`), not a hole.
-- **Blast radius:** widest (middleware-global), hardest rollback. Functionally
-  inert in prod (the Supabase gate already ignores `auth`), but do it alone.
+> **DONE (2026-07-11, #146).** `proxy.ts` exports a plain async function; `gateRequest`
+> is Supabase-only; Clerk CSP entries and `/api/clerk/webhook` allowlist entry are gone.
+> The `?tenant=` comment was also updated to state the correct invariant.
 
 ## Step 5 — Dependency + test cleanup (after 1–4 land)
-- Remove `@clerk/nextjs` and `svix` deps (both have zero imports once the webhook
-  route + auth branches are gone). **Dependency change → needs Noah's review per
-  the no-dep-changes rule; do not regenerate the lockfile without sign-off.**
-- Re-evaluate the `@babel/plugin-transform-modules-systemjs` override (still
-  referenced in the lockfile today — not a free no-op removal; same dep-review gate).
-- Rewrite or delete the 8 stale Playwright auth skips (`customer-frontend.spec.ts:128-201`,
-  `smoke.spec.ts:39`) — they assert a "Dashboard sign-in is paused / not using Clerk"
-  page that no longer exists. Rewrite against the live Supabase flow so the real
-  auth path finally has smoke coverage.
-- Delete the obsolete vitest skip (`dashboard-route-redirects.test.ts:60`) — it
-  `readFileSync`s a deleted `SignInClient.tsx` and would throw if un-skipped.
+> **Partially done.** `@clerk/nextjs` is removed (zero imports remain). Playwright
+> auth tests are rewritten — the "sign-in paused / not using Clerk" skips are gone;
+> `customer-frontend.spec.ts` now tests the live Supabase sign-in flow. Still open:
+
+- `svix` (1.92.2) is still in `package.json` with no remaining import in `src/` —
+  safe to remove with dep-review sign-off.
+- `dashboard-route-redirects.test.ts:67` still has an `it.skip` referencing the
+  deleted `SignInClient.tsx` — it throws if un-skipped; safe to delete the whole test.
+- Re-evaluate `@babel/plugin-transform-modules-systemjs` override (still in lockfile;
+  same dep-review gate applies before removal).
+- `getUserByClerkId` (`repositories.ts:241`) + `clerk_id` column refs in
+  `database.types.ts` are bridge artifacts; safe to remove once there is no migration
+  risk (the `clerk_id` column still exists in the `users` table schema).
+- `SUPER_ADMIN_EMAILS` is still listed as a required env var in
+  `production-readiness-rules.ts:128`. In prod, super-admin is the `super_admins`
+  table — this check is stale and should be dropped (per the original Step 1 plan).
 
 ---
 
 ## Not in this teardown (tracked elsewhere)
-- **Phase B:** migrate the Sanity media/image library off Sanity; cut the 4
-  shadow-write stores (`unified_events`, `mail_log`, `build_payments`,
-  `delivery_leads`) from Redis reads to Postgres.
+- **Phase B / content-URL rewrite (the Sanity tail):** rewrite legacy Sanity asset
+  refs stored in Postgres `content` rows with direct Vercel Blob URLs. That step
+  unblocks the Sanity dataset lock and the deletion of `src/lib/sanity.ts` /
+  `@sanity/image-url` / `cdn.sanity.io` CSP entries. Media migration off Sanity is
+  complete (all new media writes go to Vercel Blob); only the stored URL rewrite remains.
+- **Phase B / operational Postgres mirrors:** cut the 4 shadow-write stores
+  (`unified_events`, `mail_log`, `build_payments`, `delivery_leads`) from Redis
+  reads to Postgres-authoritative reads when dual-write parity is confirmed.
 - **Noah-gated, anytime:** rotate the leaked `sbp_` Supabase PAT + 2 other keys
   (enumerate the other two first — only the `sbp_` PAT is recorded); set
   `VERCEL_API_TOKEN` + `VERCEL_TEAM_ID` in the strelva Vercel project.
+- **Audit findings that belong here:**
+  - Seven orphaned Clerk and Sanity secrets may still live in Vercel environment
+    (run `vercel env ls --scope strelva` to confirm). Also check for
+    `REVALIDATION_SECRET` (superseded by per-tenant `revalidationSecret`),
+    `CORS_ORIGINS`, and stale Turborepo vars (`NX_DAEMON`, `TURBO_*`). Safe to
+    remove from the Vercel dashboard or via `vercel env rm <name> <environment>`.
+  - `SECRETS_ENC_KEY` is missing from `.env.example`, `.env.production.example`,
+    and the production readiness checklist (`production-readiness-rules.ts` /
+    `scripts/production-checklist.ts`). It is set and active in prod since 2026-07-15;
+    a future key removal would cause a hard outage via an unguarded throw in
+    `loadTenants`. Add `checkEnvVar('SECRETS_ENC_KEY', true)` to the checklist.
+  - `SUPABASE_URL` (the private service-role URL, distinct from
+    `NEXT_PUBLIC_SUPABASE_URL`) is missing from `.env.example` — should be added
+    as a comment alongside `NEXT_PUBLIC_SUPABASE_URL` explaining it is server-only.
+
+## Known issues / TODO (open as of 2026-07-30)
+
+| # | Severity | What | File |
+|---|---|---|---|
+| 1 | Medium | `svix` still in `package.json` (no imports in `src/`) | `package.json:55` |
+| 2 | Low | `it.skip` references deleted `SignInClient.tsx` — throws if un-skipped | `src/__tests__/dashboard-route-redirects.test.ts:67` |
+| 3 | Low | `getUserByClerkId` bridge artifact still in repos | `src/lib/db/repositories.ts:241` |
+| 4 | Low | `clerk_id` column still in DB types (bridge artifact) | `src/lib/db/database.types.ts:2204` |
+| 5 | Low | `SUPER_ADMIN_EMAILS` still required by production-readiness-rules (stale post-Supabase) | `src/lib/production-readiness-rules.ts:128` |
+| 6 | Ops | Content-image URL rewrite not yet run (Sanity CDN refs still in Postgres content rows) | `src/lib/storage/content-store.ts`, `src/lib/sanity.ts` |
+| 7 | Ops | Sanity dataset not yet locked (closes public-CDN read of historical lead data) | Sanity dashboard |
+| 8 | Ops | `@sanity/image-url` dep + `cdn.sanity.io` CSP/remotePatterns alive until URL rewrite | `package.json:36`, `src/proxy.ts:29`, `next.config.ts:32` |
+| 9 | Ops | `SECRETS_ENC_KEY` missing from `.env.example` + production checklist | `.env.example`, `scripts/production-checklist.ts` |
+| 10 | Ops | Orphaned Clerk/Sanity secrets may still be live in Vercel env | Vercel dashboard |

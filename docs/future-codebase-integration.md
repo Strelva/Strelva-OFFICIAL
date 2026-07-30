@@ -23,7 +23,7 @@ The current integration contract is `v1`.
 
 Source of truth inside Strelva:
 
-- Contract helpers: `src/lib/reb-contracts.ts`
+- Contract helpers: `src/lib/scaffold-contracts.ts` (versioned route helpers + HMAC signing/verification; legacy `REB_*` aliases exported for back-compat)
 - Public content API: `src/app/api/v1/content/[tenant]/[section]/route.ts`
 - Public page config API: `src/app/api/v1/page-config/[tenant]/route.ts`
 - Public capability API: `src/app/api/v1/site-capabilities/[tenant]/route.ts`
@@ -46,12 +46,14 @@ README.md
 .env.example
 package.json
 release-manifest.json
-src/lib/reb-contracts.ts
-src/lib/storage.ts or src/lib/reb.ts
+src/lib/reb-contracts.ts   # client-repo contract constants (TENANT_ID, REB_CONTRACT_VERSION)
+src/lib/storage.ts or src/lib/reb.ts  # Strelva fetch helpers
 src/app/api/reb-capabilities/route.ts
 src/app/api/v1/revalidate/route.ts
 scripts/production-checklist.ts or scripts/scaffold-web-check.mjs
 ```
+
+Note: `src/lib/reb-contracts.ts` lives inside the **custom repo** (not in the `strelva-platform` control plane). The control-plane contract helpers live in `src/lib/scaffold-contracts.ts`. The legacy `reb-contracts.ts` filename is kept in custom repos for back-compat with the `release-manifest.json` baseline check.
 
 The exact app structure can vary by product, but those files are the minimum operational surface Strelva expects for a custom repo.
 
@@ -468,3 +470,17 @@ A future codebase is Strelva-integrated only when all of this is true:
 - Rollback is documented and practical.
 
 If any item is missing, the repo may still be a good website, but it is not yet a scalable Strelva-integrated codebase.
+
+## Known issues / TODO (as of 2026-07-30)
+
+**[HIGH][tenant-isolation] v1 collections routes missing `Cache-Control: private`.**
+`GET /api/v1/collections/[tenant]/[type]` and `.../[slug]` return no `Cache-Control` header on success. Other v1 routes (content, page-config, site-capabilities) already set `private, max-age=0, must-revalidate`. A shared or CDN cache could serve one tenant's collection data to another. Fix both routes to match the pattern.
+
+**[MEDIUM][security] `SECRETS_ENC_KEY` and private `SUPABASE_URL` missing from production checklist.**
+`SECRETS_ENC_KEY` (at-rest AES-256-GCM for provider secrets) is not in `scripts/production-checklist.ts` or `.env.production.example`. A removed key causes a full platform outage via an unguarded throw in `loadTenants` (`src/lib/tenants.ts:205`). The private server-only `SUPABASE_URL` (separate from `NEXT_PUBLIC_SUPABASE_URL`) is also missing from both files. Fix: add `checkEnvVar('SECRETS_ENC_KEY', true)` and `checkEnvVar('SUPABASE_URL', true)` to the checklist, and document both in `.env.production.example`.
+
+**[MEDIUM][security] Orphaned Clerk and Sanity secrets in Vercel environment.**
+Several secrets from the Clerk and Sanity teardowns (both complete as of mid-2026) remain set in the Vercel project environment. Remove them with `vercel env rm` across all environments. Also remove unused Turborepo vars (`NX_DAEMON`, `TURBO_*`) and `CORS_ORIGINS` (no code reference). See the audit for the full list.
+
+**[CRITICAL][security] Next.js version has unpatched CVEs.**
+Check `package.json` for the current Next.js version and run `pnpm audit`. Bump to the latest 16.x patch to clear known HIGH/MODERATE advisories. Run `pnpm install` and redeploy after the bump.

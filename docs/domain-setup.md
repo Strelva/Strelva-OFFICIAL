@@ -22,11 +22,11 @@ This is a contract promise (see `docs/strategy/website-offer-two-door.md`): "the
 ## Adding a new tenant's custom domain
 
 1. Confirm the domain was purchased in the **client's** account per Step 0, and that Strelva has the DNS-edit member role.
-2. Add to the Vercel project (`scaffold-web`):
+2. Add to the Vercel project (`strelva-admin` on the `strelva` team):
    ```
-   vercel domains add yourbusiness.com
-   vercel domains add www.yourbusiness.com
-   vercel domains add admin.yourbusiness.com
+   vercel domains add yourbusiness.com strelva-admin --scope strelva
+   vercel domains add www.yourbusiness.com strelva-admin --scope strelva
+   vercel domains add admin.yourbusiness.com strelva-admin --scope strelva
    ```
 3. Configure DNS per Vercel instructions:
    ```
@@ -34,7 +34,7 @@ This is a contract promise (see `docs/strategy/website-offer-two-door.md`): "the
    CNAME www.yourbusiness.com    cname.vercel-dns.com
    CNAME admin.yourbusiness.com  cname.vercel-dns.com
    ```
-4. Update env on `scaffold-web`:
+4. Update env on the `strelva-admin` project:
    ```
    CUSTOM_DOMAIN_MAP={"yourbusiness.com":"tenantid"}
    ```
@@ -51,9 +51,9 @@ This is a contract promise (see `docs/strategy/website-offer-two-door.md`): "the
 
 The production topology has separate ownership:
 
-- `strelva.com` and `www.strelva.com` → `strelva-marketing` project.
+- `strelva.com` and `www.strelva.com` → `strelva-marketing` project (separate repo `~/strelva-marketing`).
 - `app.strelva.com`, `admin.strelva.com`, and `*.strelva.com` tenant fallbacks →
-  the `scaffold-web` control-plane project.
+  the `strelva-admin` control-plane project (`strelva` Vercel team, deploy with `--scope strelva`).
 
 Configure the app/admin/wildcard records using the exact values Vercel shows for
 the control-plane project. `MARKETING_DOMAINS` on that project lists only legacy
@@ -91,7 +91,7 @@ A admin.rohlaxwellness.com 76.76.21.21
 Current Vercel evidence:
 
 - `rohlaxwellness.com` is attached to project `rohlax-wellness`.
-- `admin.rohlaxwellness.com` is attached to project `scaffold-web`.
+- `admin.rohlaxwellness.com` is attached to the `strelva-admin` control-plane project.
 - `www.rohlaxwellness.com` is found under the account but still reports as not configured; confirm it is attached to the intended Vercel project if Vercel continues warning after the Cloudflare A record propagates.
 - On May 13, 2026, `www` and `admin` expose the CNAME `931bd7b36e7b2348.vercel-dns-017.com.`, but `dns.resolve4(...)` and `curl` still return `ENOTFOUND`. Treat that as partial DNS, not launch-ready routing.
 

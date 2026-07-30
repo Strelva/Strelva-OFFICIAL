@@ -1,6 +1,6 @@
 # Strelva Wellness Vertical — Status & Plan (START HERE)
 
-**Updated:** Jul 7 2026 · **Status board:** https://claude.ai/code/artifact/29bf13e1-81f4-413d-827f-bde965d94910
+**Updated:** Jul 30 2026 · **Status board:** https://claude.ai/code/artifact/29bf13e1-81f4-413d-827f-bde965d94910
 **This is the top-level page. Read it first, then follow the links.**
 
 ---
@@ -16,10 +16,17 @@ The thinking, research, and architecture are done. Nothing gets built until stud
 ## What's decided
 - **First vertical:** Wellness / Pilates studios, before trades (Noah's call).
 - **Positioning:** "Acuity but modern, plus our online-presence layer."
-- **The model:** the dashboard = **Features**. Wellness is a vertical **feature-set** on the shared platform (maps to `tenants.features[]` + `dashboard-surfaces`, already live).
+- **The model:** the dashboard = **Features**. Wellness is a vertical **feature-set** on the shared platform (maps to `tenants.features[]` + `dashboard-surfaces`, already live in `src/lib/features/registry.ts`).
 - **The wedges:** real reformer bay-selection · design · trustworthy migration. (App = cheap PWA bonus; native = V3 maybe.)
 - **Pricing shape:** low subscription + payments spread (Stripe Connect).
 - **First user:** Cove Wellness (Jazz's studio) — design partner + canary.
+
+## What's live on the platform today (as of Jul 30 2026)
+- **`wellness` feature set registered** (`src/lib/features/registry.ts`): toggling the wellness set on a tenant enables Schedule / Members / Roster dashboard surfaces. Backed by the existing `bookings` table + KV rewards store. No new migrations.
+- **`packages` NOT in the live set** — intentionally omitted because no dashboard surface exists yet. V1 build scope item.
+- **`src/lib/studio/` does not exist.** No `studio_*` tables in the DB. The pre-build spec lives in `docs/studio-vertical-architecture.md`.
+- **Booking engine (`src/lib/booking.ts`):** 1:1 appointment slots only — no recurring classes, no capacity/waitlist, no class-payment path.
+- **No Vagaro webhook.** Vagaro is an embed-only integration (`src/components/public/VagaroEmbed.tsx`). Calendly has a real webhook handler (`src/app/api/webhooks/calendly/route.ts`).
 
 ## What's done this round
 Market validation (5-agent, verdict build-but-narrow) · competitive/feature teardown · the Features product model · architecture + build scope (accounts, tabs, tables) · V1/V2/V3 roadmap · Jacob brief + interview script.
@@ -50,4 +57,16 @@ Market validation (5-agent, verdict build-but-narrow) · competitive/feature tea
 
 ---
 
-*Revisit ~Jul 9-10. Start at step 1. Do not build before step 4 clears.*
+## Known issues / TODO (pre-build blockers)
+
+Before any wellness V1 code lands, these open platform issues need to be addressed or tracked:
+
+- **[CRITICAL]** Next.js on 16.2.6 has unpatched CVEs. Bump to 16.2.12 before Cove goes live.
+- **[HIGH]** `maxAdvanceBooking` config field is declared (`src/lib/booking.ts:17`) but never enforced in slot generation. Any date is accepted regardless of the limit. Must fix before Cove production use.
+- **[HIGH]** `upload_image` agent tool uses a shared flat Blob namespace (no tenant prefix). Fix: use `uploadTenantMedia()` in `src/app/api/agent/route.ts:568`.
+- **[MEDIUM]** `businessRules` injected unsanitized into the agent system prompt (`src/lib/agent-prompt-shared.ts:343`). Wrap with `sanitizePromptValue`.
+- **[MEDIUM]** Fractional star delta causes uncaught Redis error in `adjustStars` (`src/app/api/rewards/members/[email]/adjust/route.ts:35`). Add `Number.isInteger(delta)` guard.
+
+Full audit findings with remediation detail are in `docs/wellness-vertical-brief.md` under "Known issues / TODO."
+
+*Do not build before step 4 (validation) clears.*

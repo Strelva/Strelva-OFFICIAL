@@ -146,3 +146,12 @@ Copy a row per new client. (The activation-only version lives in [activation-run
 | _(new client)_ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ | ☐ |
 
 **"Fully onboarded" =** their real domain serves the Strelva build, `check:prod` is green, the dashboard shows live numbers, and billing is active (or grandfathered).
+
+---
+
+## Known issues / TODO
+
+- **Env example gaps:** `.env.example` is missing `SUPABASE_URL` (private service-role URL) and `SECRETS_ENC_KEY` (at-rest encryption key). Both are required in production. `SECRETS_ENC_KEY` missing from a live deployment causes a full platform outage. Add both to `.env.example` and `.env.production.example`, and add `checkEnvVar` calls in `scripts/production-checklist.ts`. (Audit [HIGH])
+- **Orphaned Vercel secrets:** Clerk (`CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`, `NEXT_PUBLIC_CLERK_*`) and Sanity (`SANITY_API_TOKEN`, `SANITY_WEBHOOK_SECRET`) secrets are still set in Vercel env despite both teardowns being complete. Also stale: `REVALIDATION_SECRET`, `CORS_ORIGINS`, `NX_DAEMON`, `TURBO_*`. Run `vercel env rm` for each. (Audit [HIGH])
+- **Upload tenant isolation:** the `upload_image` agent tool calls `uploadFile()` (shared flat Blob namespace) instead of `uploadTenantMedia()`. Images uploaded via the AI agent are not namespaced to the tenant. Fix in `src/app/api/agent/route.ts:568`. (Audit [HIGH])
+- **Prompt injection:** `businessRules` in the agent system prompt is not wrapped in `sanitizePromptValue`. Enforce a 1000-char max at write time in the TenantEditor validator. (Audit [MEDIUM])

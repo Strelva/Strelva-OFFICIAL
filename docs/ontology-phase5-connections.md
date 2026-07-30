@@ -91,3 +91,24 @@ model carries no secret material — it is a typed health/authz signal only.
 
 `src/__tests__/integration-registry.test.ts` continues to cover registry shape + the
 original error/reauth normalization cases.
+
+## Known issues / TODO
+
+- **Audit finding [MEDIUM][bug]**: `poll-google-reviews` cron does not paginate — reviews
+  beyond the first API page are never ingested (`src/app/api/cron/poll-google-reviews/route.ts:116`).
+  This means a location that receives many reviews per poll window will silently miss older ones.
+
+- **Audit finding [MEDIUM][tech-debt]**: `src/lib/gbp-replies.ts` contains a private duplicate
+  of `refreshAccessToken` that does NOT persist the refreshed token back to the connection store.
+  Every subsequent call will re-refresh unnecessarily and the token will expire faster. Fix: delete
+  the duplicate and delegate to the shared `getValidAccessToken` from `src/lib/google-token.ts`
+  (which already persists the refreshed token).
+
+- **Audit finding [MEDIUM][security]**: Google OAuth callback (`src/app/api/oauth/google/callback/route.ts:93`)
+  stores the connection without re-verifying the caller's session. A nonce bound to the session
+  at `state` creation time and verified on callback would close this gap.
+
+- **Credential at-rest encryption** (AES-256-GCM via `src/lib/crypto/secrets.ts`) covers
+  `accessToken`/`refreshToken`/`apiKey` at the `saveConnection` boundary. The `reb:tenants:all`
+  Redis list cache holds decrypted copies (60s TTL) — correct for reads but outside the at-rest
+  boundary. See `AGENTS.md` "Credential at-rest security" for the full picture.

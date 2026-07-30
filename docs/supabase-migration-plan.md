@@ -1,10 +1,48 @@
 # Strelva → Supabase Migration Plan
 
-**Status: historical migration record.** The cutover and Clerk/Sanity code teardown
-are complete. Do not use the dated “today,” target-stack, rollback, or remaining-work
-statements below as current architecture. Use `persistence-boundaries.md`,
-`auth-tenancy-architecture.md`, and `AGENTS.md`. The only remaining Sanity task is
-ops-only legacy image URL rewrite/dataset lock cleanup.
+**Status: historical migration record. Migration is COMPLETE in production.**
+
+Supabase Auth replaced Clerk (cutover 2026-06-20; Clerk code fully removed 2026-07-11, PR #146).
+Supabase Postgres replaced Sanity and is the source of truth for identity, tenant config,
+content, collections, drafts, audit, and activity (Sanity data-source code removed 2026-07-10).
+The Clerk dual-path in `auth.ts` and `proxy.ts` is gone; `@clerk/nextjs` is not in `package.json`.
+
+Do not use the dated “today,” “NOT yet done,” or rollback statements below as current state.
+Current architecture is in `AGENTS.md`, `persistence-boundaries.md`, and
+`auth-tenancy-architecture.md`.
+
+Remaining ops-only tail (not a migration blocker):
+- Rewrite legacy Sanity image-asset refs in Postgres `content` rows to Vercel Blob URLs
+- Lock the Sanity `production` dataset
+- Delete `src/lib/sanity.ts` + `@sanity/image-url` dep + `cdn.sanity.io` CSP entries
+- See `clerk-sanity-teardown-checklist.md` “Known issues / TODO” for the full open list
+
+**Known issues / TODO (audit findings, as of 2026-07-30):**
+- [HIGH/bug] `google-meta:${t}`, `review-replies:recent:${t}`, `reb:review-nudge-sent:${t}`,
+  `reb:order-review-request-sent:${t}:*`, and `reb:review-reply-declined:${t}:*` are NOT in
+  the `authoritativePatterns` registry in `src/lib/tenant-rename.ts` — these keys are
+  silently NOT moved on a tenant rename, causing silent data loss for GBP meta, review-nudge
+  dedup state, and the 180-day declined-reply veto. Add them to the registry.
+- [HIGH/bug] `SECRETS_ENC_KEY` missing env causes full platform outage via unguarded throw in
+  `loadTenants` (`src/lib/tenants.ts:205-208`). The key removal risk is unguarded. Add
+  `SECRETS_ENC_KEY` to the production readiness checklist and add per-row try/catch in
+  `loadTenants` so one bad row does not kill all tenants.
+- [MEDIUM/tech-debt] `database.types.ts` is stale — `billing_type` and `account_id` columns
+  are missing from generated Row types (`src/lib/tenants.ts:65-66` casts around it). Run
+  `supabase gen types typescript --project-id <id>` and commit; add a CI staleness check.
+- [MEDIUM/security] `reb:tenants:all` Redis cache stores decrypted (plaintext) secrets
+  (`src/lib/tenants.ts:206-210`). The `SECRETS_ENC_KEY` at-rest boundary is the 60s
+  window; acceptable, but document explicitly.
+- [HIGH/security] `SECRETS_ENC_KEY` and `SUPABASE_URL` (private service-role URL, not the
+  same as `NEXT_PUBLIC_SUPABASE_URL`) are both missing from `.env.example`,
+  `.env.production.example`, and the production checklist. Add both.
+- [LOW/bug] Two independent source flags (`CONTENT_SOURCE` for content-store, `DATA_SOURCE`
+  for draft-store and operational stores) with no documented relationship. Add a runtime
+  guard to `dataSourceIsPostgres()` that fails loudly in `VERCEL_ENV=production` when unset,
+  matching the `contentSourceIsPostgres()` guard. Document the intended relationship.
+
+---
+
 **Decision (Noah, 2026-06-18):** move the platform's data + auth backbone onto Supabase while it's cheap to do (3 clients, billing off).
 **Decision (Noah, 2026-06-19):** auth is **Supabase Auth** (Decision 2 LOCKED). The hedge to keep Clerk was entirely about user-migration risk; a live read of the Clerk instance settled it — **one user (Jacob), Google-OAuth only, no passwords, zero orgs** → re-onboarding risk is nil. RLS keys off `auth.uid()`; `rls-draft.sql` Variant B (Clerk-JWT) deleted. See "Auth swap" below.
 **Author:** mapped from a full read of `main` (the live control plane).
@@ -26,7 +64,11 @@ ops-only legacy image URL rewrite/dataset lock cleanup.
 - **AUTH PATH BUILT + RUNTIME-VERIFIED (2026-06-19):** Supabase sign-in flow (`SupabaseSignIn` Google+magic-link, `/auth/callback`) + `proxy.ts` dual-path gate (`gateRequest`/`middleware-client.ts`). Dev-server test (Supabase on, bypass off): protected routes 307→/sign-in, public 200, Supabase UI renders. 919 tests + typecheck + lint green.
 - **RLS APPLIED + VERIFIED (2026-06-19, Phase 5):** `supabase/migrations/20260619140000_rls.sql` live on scaffold-web — 35 tables, 36 policies, no lockout gaps, perf rules folded in. **Tenant isolation proven with real JWTs:** gldf member sees only gldf, no-access user sees nothing, super-admin sees all 4. Note: the app's *data reads still use the service-role client* (bypasses RLS) — RLS is the proven backstop for when user-facing reads move to the user-JWT client (future data-layer work). Tenant isolation today still rides on the service-role discipline (Plane 3).
 - **CONTENT → POSTGRES (Phase 3) DONE + read-verified (2026-06-19):** `getContent`/`setContent` use the Postgres `content` table behind `CONTENT_SOURCE=postgres` (Sanity fallback on miss; `transformSanityImages` keeps image parity). Read proven: planted a marker in the gldf hero row, served it through `/api/v1/content/gldf/hero` while Sanity held the original. The 39 backfilled rows are now servable. Follow-ups: `page_config` (empty stubs), drafts, versions, and the Phase-2 operational dual-write (events/leads/etc. repos exist in `repositories.ts` but aren't wired into the app yet).
-- **NOT yet done (gated on Jacob-side / prod — can't be delegated):** (1) one real **Google sign-in** (provisions via the trigger); (2) **flip the flag in prod** — set `SUPABASE_*` + `NEXT_PUBLIC_SUPABASE_*` in Vercel (one scheduled logout); (3) rotate the leaked keys. **Clerk-free client tree DONE + verified (2026-06-19):** sign-up swapped to `SupabaseSignIn`, `UseInvitedEmailButton` uses Supabase `signOut()`, `ClerkProvider` rendered only on the Clerk path — dev server (flag on) renders all auth pages with zero ClerkProvider errors. **Deferred cleanup (needs DNS/prod or is large):** single-host `proxy.ts` simplification (needs `app.strelva.com` DNS), final Clerk package/dep + Sanity removal (after prod cutover), routing user-facing reads through the user-JWT client (data-layer work). The live app still runs on Clerk+Sanity+Redis.
+- **COMPLETED (2026-06-20 prod flip; 2026-07-10 Sanity code removed; 2026-07-11 Clerk removed):**
+  The live app runs on Supabase Auth + Supabase Postgres. Clerk is fully removed. All Sanity
+  data-source code is removed (residual is `src/lib/sanity.ts` image resolver only). User-facing
+  reads still use the service-role client (RLS is defense-in-depth, not the live boundary — per
+  AGENTS.md). The `isSupabaseAuthConfigured()` dual-path flag is gone; `auth.ts` is Supabase-only.
 
 ## Why (the two smells this fixes)
 
@@ -269,30 +311,16 @@ provisioned two-deep per tenant — fine at 3, miserable at 50). Custom admin do
 `shouldUseFallbackAuthForAdminHost`/`buildTenantFallbackUrl`. The auth gate runs only on
 `app.strelva.com`.
 
-### Sequencing within Phase 4
+### Sequencing within Phase 4 — ALL DONE
 1. ✅ **DONE** — Supabase server/browser clients (`@supabase/ssr`) + session helper + flag, additive.
-2. ✅ **DONE** — `src/lib/auth.ts` dual-path against `memberships`/`super_admins`; signatures stable; Clerk path unchanged (19 tests) + Supabase path tested (9 tests); identity repos built.
-3. ✅ **DONE (gate only) + runtime-verified** — `proxy.ts` dual-paths the auth gate (`gateRequest`): Supabase session when configured, Clerk otherwise (`middleware-client.ts`). Dev-server test (Supabase on, bypass off): protected routes 307→/sign-in, public routes 200, all routing tests green. The single-host *simplification* (drop `admin.*`/custom-domain auth) is deferred to a follow-up — not required for auth to work.
-4. ✅ **DONE + runtime-verified** — `SupabaseSignIn` (Google OAuth + magic-link) + `/auth/callback` code-exchange; sign-in page swaps behind the flag. Dev server renders the Supabase UI on the tenant sign-in page. Sign-up page + `ClerkProvider` removal deferred to the Clerk-decommission step (harmless during transition).
-5. ✅ **DONE** — `handle_new_user()` trigger applied + super-admin bootstrap seeded; tenants + content backfilled. Provisioning model = natural first sign-in (decision resolved: no pre-create → no OAuth-linking risk). Webhook deletion happens with the sign-in swap (step 4).
-6. ⬜ Configure Google OAuth provider in Supabase (Jacob — Google Cloud creds), then flip the flag (the single scheduled logout), bake, remove Clerk deps. → unblocks Phase 5 (`rls-draft.sql`).
+2. ✅ **DONE** — `src/lib/auth.ts` dual-path against `memberships`/`super_admins`; signatures stable; identity repos built.
+3. ✅ **DONE** — `proxy.ts` auth gate (`gateRequest`) is Supabase-only; hand-rolled `isPublicRoute`/`isCronRoute` matcher replaces `clerkMiddleware`/`createRouteMatcher`. Fail-closed.
+4. ✅ **DONE** — `SupabaseSignIn` (Google OAuth + magic-link) + `/auth/callback` code-exchange live in prod.
+5. ✅ **DONE** — `handle_new_user()` trigger applied + super-admin bootstrap seeded; provisioning = natural first sign-in.
+6. ✅ **DONE (2026-07-11, #146)** — Clerk dual-path collapsed entirely; `@clerk/nextjs` removed; Clerk CSP entries gone; Playwright auth tests rewritten to the live Supabase flow.
 
-### Open decision before step 5: identity provisioning model
-`users.id` should equal the Supabase `auth.uid()`. Two ways to seed the one real user (Jacob, Google):
-- **(A) pre-provision** via `auth.admin.createUser({ email, email_confirm: true })` → use the returned uid as `users.id`, then membership/super-admin rows. Google sign-in links by email. Clean; needs identity-linking confirmed.
-- **(B) bridge** — seed `users` now with `clerk_id` + random id; reconcile to the real `auth.uid` on first Supabase sign-in (match by email).
-At 1 user / 4 tenants this is a handful of inserts done interactively at cutover, not a script worth writing. Recommend **(A)**. Decide with creds in hand + a throwaway-tenant test (do NOT test against the live shared DB — see [[shared-db-test-on-throwaway-org]]).
-
-## Effort / risk
-
-- **Phases 0-1** (schema + backfill): days. Low risk, fully reversible.
-- **Phase 2** (dual-write operational): the bulk of the work, but incremental and safe — each subsystem is independent.
-- **Phase 4** (auth): highest risk, but small blast radius now (3 clients, one scheduled logout). This is exactly why doing it *now* is right; at 50 clients it's a nightmare.
-- This is a multi-week migration done in safe increments, not a weekend rewrite. Nothing forces a big-bang cutover.
-
-## Open decisions (Noah + Jacob)
-
-1. ~~**Sanity: keep or kill?**~~ **RESOLVED (2026-06-19): KILL — content moves to Postgres.** Settled by a live read of the Sanity dataset (`fcghwrak`/`production`). The only reason to keep Sanity is human editing UX, and **nobody uses it that way**: 607 docs / 31 types / 4 tenants, and every content-section write is either a provisioning/seed batch (5-8 sections written in the same ~10s) or an app/agent/cron write — **zero human Studio edits** in the history. Sanity is a programmatic doc store, which Postgres does + RLS. Surface is small and already mapped to migrations 0001/0002 (gaps: `suggestion` ×87 → small table or `unified_events`; `review` ×3 → integration-cached). Only **10 images** in Sanity's pipeline and uploads already go to Vercel Blob, so no real media migration. 62 files touch Sanity but almost all via `src/lib/storage/*-store.ts` — swap store impls, not logic. Side wins: drops the `/studio` route, `sanity`/`next-sanity`/`@sanity/*` deps (and dependabot #56). **Confirmed (Noah, 2026-06-19):** nobody hand-edits in Studio — the AI agent is the editing surface (clients request changes via the agent, which writes content). Sanity's CMS strengths are entirely in the unused column.
-2. ~~**Auth: Supabase Auth vs keep Clerk.**~~ **RESOLVED (Noah, 2026-06-19): Supabase Auth.** The only argument for keeping Clerk was migration risk, and a live read of the Clerk instance killed it — 1 user, Google-only, no passwords, 0 orgs. RLS keys off `auth.uid()`. The one genuine thing Clerk gave for free — multi-host login across custom admin domains — now becomes real Phase-4 work; see the "Auth swap" section for how it's replaced and the one risk to verify first.
-3. **Token encryption.** `integrations` holds OAuth access/refresh tokens. Encrypt at rest (pgcrypto or app-level) — don't store them plaintext in Postgres.
-4. ~~**The orphaned Supabase project** (`zthifbnrtsirdekzzlxs`): use it or start fresh?~~ **RESOLVED:** it was a near-empty stub; it's now the target with the schema applied. (Still worth deciding long-term home — the `websites` org is shared with Jacob's other projects; fine, or move to a dedicated Strelva org both fully own.)
+### Open decisions — ALL RESOLVED
+1. ~~Sanity: keep or kill?~~ **KILLED (2026-06-19).** Done (2026-07-10, data-source code removed). Ops tail: image-URL rewrite + dataset lock.
+2. ~~Auth: Supabase Auth vs Clerk.~~ **Supabase Auth (2026-06-19).** Done (2026-07-11, Clerk fully removed).
+3. ~~Token encryption.~~ **DONE (2026-07-15, `src/lib/crypto/secrets.ts`).** AES-256-GCM at rest via `SECRETS_ENC_KEY`; active in prod.
+4. ~~Orphaned Supabase project.~~ **RESOLVED:** `zthifbnrtsirdekzzlxs` is the live project.

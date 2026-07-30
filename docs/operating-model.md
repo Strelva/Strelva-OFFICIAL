@@ -3,20 +3,25 @@
 > **Status: historical roadmap, superseded 2026-07-14.** Use
 > `product-ontology.md`, `persistence-boundaries.md`, and `operations.md` for
 > current decisions. The dated progress and punch list below are preserved as
-> context, not current state. On **2026-06-20**
-> the auth + data backbone CUT OVER to **Supabase Auth + Postgres in
-> production** (`scaffoldweb.com` live + healthy). Where this doc (written
-> 2026-06-13) says **Sanity is the source of truth** / **Clerk** is the auth
-> layer / a **durable operational store is "soon, not yet built"** — that is now
-> DONE: **Postgres is the source of truth** for tenant + content + operational
-> data (prod flags `CONTENT_SOURCE`/`TENANTS_SOURCE`/`DATA_SOURCE` = `postgres`),
-> **RLS** enforces tenant isolation, and the `handle_new_user` trigger provisions
-> users. Sanity is dual-written as a reversible rollback mirror (no migrated
-> store reads it); Clerk is dead-pathed behind `isSupabaseAuthConfigured()`,
-> pending teardown. The remaining destructive teardown (remove Sanity reads, lock
-> the dataset, unwrap `clerkMiddleware` in `proxy.ts`) is the deliberate
-> end-step, not done yet (`core.ts` still uses Sanity as the content-store
-> fallback). Read the per-section corrections inline below.
+> context, not current state.
+>
+> **As of 2026-07-30 both teardowns are complete:**
+> - **Supabase Auth + Postgres cutover: DONE (2026-06-20).** Postgres is the
+>   source of truth for tenant + content + operational data (prod flags
+>   `CONTENT_SOURCE`/`TENANTS_SOURCE`/`DATA_SOURCE` = `postgres`); RLS enforces
+>   tenant isolation; `handle_new_user` trigger provisions users.
+> - **Clerk teardown: DONE (2026-07-11, PR #146).** `@clerk/nextjs` dep removed,
+>   `auth.ts` is Supabase-only, `proxy.ts` uses hand-rolled `gateRequest` (fail-
+>   closed). No `@clerk` imports remain. Any remaining Clerk env vars in Vercel are
+>   orphaned and should be removed via `vercel env rm`.
+> - **Sanity teardown: DONE (2026-07-10).** All data-source reads/writes removed;
+>   `@sanity/client`/`next-sanity`/`sanity` deps dropped. The only residual is
+>   `sanityImageUrl` (+ `@sanity/image-url` + `cdn.sanity.io` in CSP) for legacy
+>   content-image asset refs, retained until the content-URL rewrite ops step. No
+>   code path reads or writes Sanity data.
+>
+> Punch-list items that reference Clerk/Sanity/`isSupabaseAuthConfigured()` below
+> are historical — do not act on them. Read the per-section corrections inline.
 
 Authoritative source for **how Strelva operates as a whole** and the punch list to
 lock it. Written 2026-06-13 from a full code-level audit of the admin portal, the
@@ -34,7 +39,9 @@ Strelva is a **control plane**, not a website host.
 - **Supabase Postgres** is the source of truth for content + tenant config +
   operational data (cut over 2026-06-20; prod flags `CONTENT_SOURCE`/
   `TENANTS_SOURCE`/`DATA_SOURCE` = `postgres`). RLS enforces tenant isolation.
-  Sanity is dual-written as a reversible rollback mirror only.
+  **Sanity teardown is complete (2026-07-10) — no data is read from or written to
+  Sanity.** Only two legacy `NEXT_PUBLIC_SANITY_*` env vars remain to resolve stored
+  image asset URLs; remove after the content-URL rewrite ops step.
 - **Redis (Upstash)** is a write-through cache **and** still an operational
   store (events, bookings, clicks, reviews, pay-links, rewards, rate limits) —
   operational data now also dual-writes to Postgres.
@@ -74,16 +81,15 @@ strelva.com (marketing, separate repo)
    │ lead → /access-request
    ▼
 CONTROL PLANE (this repo, → app.strelva.com)
-   proxy.ts (host→tenant routing, Supabase Auth, CSP; Clerk dead-pathed)
-   /dashboard (owner) · /admin (Jacob+Noah) · /studio (Sanity — pending teardown)
+   proxy.ts (host→tenant routing, Supabase Auth, CSP; hand-rolled gateRequest — fail-closed)
+   /dashboard (owner) · /admin (Jacob+Noah)
    AI agent + ai-governance.ts
    /api/v1/* (content · page-config · site-capabilities · track) — frozen v1 contract
    │ pull (ISR 60s) ▲        ▼ push (HMAC revalidate)
    ▼                         │
  Postgres (truth, RLS) + Redis (cache+ops)   CUSTOM CLIENT REPOS (1 per client, own domain)
-   (Sanity dual-written as rollback mirror)
 External: Supabase(auth+db) · Stripe(billing live) · Resend(updates.strelva.com) · Gemini · Vercel Blob · Slack · Yelp/Google/IG/GSC · PageSpeed
-          (Clerk + Sanity retained until post-cutover teardown)
+          (Clerk removed 2026-07-11 · Sanity removed 2026-07-10)
 ```
 
 Key files: `src/proxy.ts`, `src/lib/scaffold-contracts.ts`, `src/lib/revalidate-client.ts`,
@@ -119,8 +125,8 @@ doc was written:
 - **Hardening** — done from the list below: super-admin all-emails, dev-bypass
   `check:prod` guard, operator audit logging, admin error/loading boundaries,
   loud Slack alerts on invite-email failure, pay-link door bug fixed.
-- **Platform health** — `src/lib/health.ts` (Redis/Sanity/Clerk/Stripe/Gemini)
-  surfaced on the ops board + a `read_health` agent tool.
+- **Platform health** — `src/lib/health.ts` (Redis/Stripe/Gemini)
+  surfaced on the ops board + a `read_health` agent tool. (Sanity/Clerk checks removed with their teardowns.)
 - **Rich tenant pages** — live pulse (visits/clicks/drafts) + activity history,
   linked from the overview.
 - **Pay-link paid tracking** — cross-references the build-payment trail (badge +
@@ -169,11 +175,10 @@ Full surface map: `docs/operator-command-center.md`.
 ## 4. Solidification punch list
 
 ### A. Correctness / security (do first)
-- [x] **Invite lockout bug** (N) — `clerk/webhook/route.ts` consumed the invite
-  before assigning the tenant; a transient assign failure permanently destroyed
-  it. Fixed: read non-destructively, assign, consume only on success. _(2026-06-13)_
-- [ ] **Super-admin email check** (N) — `isSuperAdmin()` (`auth.ts:161`) matches only
-  the user's *first* Clerk email; match **all** emails (mirror the claim path).
+- [x] **Invite lockout bug** (N) — DONE. _(2026-06-13)_
+- [x] **Clerk teardown** (N) — DONE 2026-07-11 (#146). `@clerk/nextjs` dep gone,
+  `auth.ts` Supabase-only, `proxy.ts` hand-rolled `gateRequest`. Super-admin email
+  check now uses Supabase `auth.users` directly (no Clerk email-list edge case).
 - [ ] **Dev bypass guard** (N/J) — add a `check:prod` assertion that
   `REB_DEV_UNGATED_ACCESS` is unset on every preview/prod deploy.
 - [ ] **Operator audit log** (N) — `logAuditEvent` on tenant create/update,
@@ -190,9 +195,9 @@ Full surface map: `docs/operator-command-center.md`.
   governance/risk pipeline; two thin entry points.
 
 ### C. Delivery model cleanup
-- [ ] **Verify tenant→template usage against prod Sanity** (J) — confirm which of
-  `demo / gldf / rohlax / jada` (and any others) still render via the in-repo
-  registry vs a custom repo. **Blocks the archival below.**
+- [ ] **Verify tenant→template usage** (J) — confirm which of `demo / gldf / rohlax / jada`
+  (and any others) still render via the in-repo registry vs a custom repo. Sanity is no
+  longer a reference point; check tenant `deliveryModel` in Postgres. **Blocks the archival below.**
 - [ ] **Archive the template registry** (N) — once C-verify is clear, move
   `src/components/templates/` → `src/components/templates/_archive/` (clearly
   labeled, revivable), starting with the dead-weight forks `food-brand` (17 files)
@@ -269,8 +274,8 @@ Full surface map: `docs/operator-command-center.md`.
 
 ## 5. What's already solid (do not "fix")
 
-The owner dashboard, the AI content-edit loop (ask → governance → Sanity write →
-HMAC revalidate → verify), RBAC enforcement across 55 write routes, the receipt
+The owner dashboard, the AI content-edit loop (ask → governance → Postgres write →
+HMAC revalidate → verify), RBAC enforcement across 55+ write routes, the receipt
 pipeline (per-tenant isolation, Resend error checks, deterministic fallback), and
 the frozen v1 custom-repo contract are real and shipped. Solidification is seam
 work, not a rebuild.

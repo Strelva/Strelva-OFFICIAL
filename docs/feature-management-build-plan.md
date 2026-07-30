@@ -1,6 +1,6 @@
 # Feature Management — Build Plan
 
-> **STATUS: SHIPPED (Jul 8 2026) → PR [#141](https://github.com/Strelva/REB/pull/141), branch `feat/feature-management`.** All 5 steps built. Green: typecheck + 1573 tests + lint + prod build, plus a live DB test on the `summit` demo tenant (toggle Wellness → persisted → 4 tabs appeared additively → core-lock guard fired → restored). Adversarial review found + fixed one real bug (TenantFeature now derived from a single array, so the validation list can't drift). Awaiting Jacob's review; not merged. **Next: the studio module** (the actual class/member/pack content behind the tabs) is the separate, validation-gated build.
+> **STATUS: MERGED + LIVE (Jul 8 2026) → commit `f144c4c` on main.** All 5 steps built and merged. Green: typecheck + 1573 tests + lint + prod build, plus a live DB test on the `summit` demo tenant (toggle Wellness → persisted → 4 tabs appeared additively → core-lock guard fired → restored). Adversarial review found + fixed one real bug (TenantFeature now derived from a single array, so the validation list can't drift). **Next: the studio module** (the actual class/member/pack content behind the tabs) is the separate, validation-gated build.
 
 **Date:** Jul 8 2026 · **Scope:** turn the demo's model (core-locked / conditional / vertical-set features + an operator toggle) into working code. Grounded in the real files. Demo: `strelva-feature-toggle` artifact.
 
@@ -10,10 +10,12 @@
 
 ## Where the code is today (verified)
 
-- `src/lib/dashboard-surfaces.ts` — `getDashboardSurfaces()` returns a **hardcoded list of 6 surfaces**. `SurfaceId` is a fixed 6-value union. Core 4 (today, ask-ai, website, analytics) are always `state:"shown"`; conditional 2 (google-business, reviews) derive state from presence-profile + connections. **`features[]` currently only affects one thing** — `tenantHasStore` (the Store sub-tab). There is no vertical-set concept and no core/locked concept.
-- `src/app/api/admin/tenants/route.ts` — POST accepts `features` but `cleanFeatures` whitelists only 3 (`TENANT_FEATURES = {commerce, booking, newsletter}`); PATCH's Zod schema omits `features` entirely (can't edit after create).
-- `TenantEditor.tsx` (cockpit) — the panel to extend; posts to `PATCH /api/admin/tenants`.
-- `tenants.features text[]` column already persists via the `tenantToRow`/`rowToTenant` mapper.
+*(Pre-ship state recorded here for reference. All items below are now resolved.)*
+
+- `src/lib/dashboard-surfaces.ts` — now registry-driven. `SurfaceId` is extended with set-member ids (`schedule`, `members`, `roster`). Core surfaces come from `CORE_FEATURES`; set surfaces appended by `getSetSurfaces(tenant.features)` from the registry. The old hardcoded 6-surface list is replaced.
+- `src/app/api/admin/tenants/route.ts` — POST validates against the full registry; PATCH accepts `features` with the `applyFeatureChange` core-lock guard (previously dropped silently).
+- `TenantEditor.tsx` is now at `src/app/admin/clients/[id]/TenantEditor.tsx` and has a live `FeaturesPanel`.
+- `tenants.features text[]` column persists via `tenantToRow`/`rowToTenant` — unchanged.
 
 ---
 
@@ -32,9 +34,11 @@ export interface FeatureDef {
   requires?: { presence?: "local"; connection?: "google" | "stripe-connect" };
   surface?: { href: string; group: "manage" | "presence" | "set" };
 }
-export const CORE_FEATURES = ["today","ask-ai","website","analytics"] as const;
+// Shipped — CORE_FEATURES has 5 entries (reports added):
+export const CORE_FEATURES = ["today","ask-ai","website","analytics","reports"] as const;
 export const FEATURE_REGISTRY: FeatureDef[] = [ /* all features, one place */ ];
-export const SETS = { wellness: ["schedule","members","packages","roster"], ecommerce: ["products","orders","storefront"] };
+// Shipped as FEATURE_SETS (exported also as SETS for backward compat):
+export const FEATURE_SETS = { wellness: { label: "Wellness", members: ["schedule","members","packages","roster"] }, /* … */ };
 // helpers: isCore(id), expandSets(features[]), featuresToSurfaces(...)
 ```
 This replaces the three scattered vocabularies (`features[]`, `LOCAL/ONLINE_TEMPLATES` presence, `COMMERCE_FEATURES`) with one registry the resolver + write path + UI all read. Unit tests for the helpers.
@@ -87,39 +91,50 @@ Add a "Features" section (the demo, productionized):
 ## Honest sequencing note (where this slots)
 This is clean, satisfying, foundational infra and it's the backbone of the vertical strategy — but per the repo audit, it is **not the highest-ROI work on the board.** The Tier-1 "light-up" items (flip client email so weekly reports send, land the GBP approval, roll out tracking) make the *existing* product demonstrably work and are days of ops, not code. If forced to order: light-up first, then this. That said, feature-management is a reasonable thing to build in parallel as the foundation the wellness set will plug into — and it's not gated on the wellness validation the way the studio module is.
 
-## Execution checklist (the steps, in order)
+## Execution checklist (completed — commit f144c4c)
 
-**Setup (before any code)**
-- [ ] Branch `feat/feature-management` off `main`. It's Jacob's repo — work on a branch, ship via PR for his review, **no Co-Authored-By trailer** (repo rule).
-- [ ] Confirm the loop: `pnpm test` · `pnpm typecheck` · `pnpm lint` green before each commit. Everything ships dark/additive (no tenant changes until a toggle is flipped).
+**Setup**
+- [x] Branched `feat/feature-management` off `main`. No Co-Authored-By trailer (repo rule).
+- [x] Loop: `pnpm test` · `pnpm typecheck` · `pnpm lint` green.
 
 **Step 1 — Registry (Phase 1)**
-- [ ] Write `src/lib/features/registry.ts` (`FeatureDef`, `CORE_FEATURES`, `FEATURE_REGISTRY`, `SETS`, helpers `isCore`/`expandSets`/`featuresToSurfaces`).
-- [ ] Unit tests for the helpers.
-- [ ] ⏸ **Checkpoint:** you eyeball the registry shape — it's the source of truth.
+- [x] `src/lib/features/registry.ts` written (`FeatureDef`, `CORE_FEATURES`, `FEATURE_REGISTRY`, `FEATURE_SETS`/`SETS`, helpers `isCore`/`expandSets`/`getSetSurfaces`/`applyFeatureChange`/`getToggleableRegistry`).
+- [x] Unit tests for the helpers.
 
 **Step 2 — Write path + core-lock guard (Phase 2)**
-- [ ] Swap the 3-value `cleanFeatures` whitelist for registry validation (POST).
-- [ ] Add `features` to the PATCH schema + `applyFeatureChange` guard (reject core removal, expand sets, dedupe). Audit-log.
-- [ ] Tests: core-removal rejected, set expansion, unknown-id rejected.
+- [x] POST create validates against full registry (replacing 3-value `TENANT_FEATURES` whitelist).
+- [x] PATCH accepts `features` + `applyFeatureChange` guard (core removal rejected, sets expanded, audit-logged).
+- [x] Tests: core-removal rejected, set expansion, unknown-id rejected.
 
-**Step 3 — Resolver refactor (Phase 3, the careful one)**
-- [ ] Snapshot current `getDashboardSurfaces` output for gldf / rohlax / a wellness tenant = golden baseline.
-- [ ] Refactor resolver to registry-driven; extend `SurfaceId` with set members (`schedule`/`members`/…).
-- [ ] Golden test asserts existing tenants resolve **identically**; new tests for set surfaces.
-- [ ] ⏸ **Checkpoint:** confirm zero regression before moving on.
+**Step 3 — Resolver refactor (Phase 3)**
+- [x] `SurfaceId` extended with `schedule`/`members`/`roster`.
+- [x] `getSetSurfaces()` appends set-member surfaces; core surfaces stay hardcoded-from-registry.
+- [x] Golden test: existing tenants (gldf/rohlax) resolve identically.
 
 **Step 4 — Toggle UI (Phase 4)**
-- [ ] Add the Features section to `TenantEditor.tsx` (core 🔒 / conditional / sets), dark-dashboard styling, wired to the write path.
-- [ ] ⏸ **Checkpoint:** you toggle it on Cove's tenant and eyeball it.
+- [x] `FeaturesPanel` in `TenantEditor.tsx` (core locked / conditional toggles / vertical-set toggles with member expansion), dark-dashboard styling, wired to PATCH write path.
 
 **Step 5 — Placeholder pages + guardrails (Phase 5)**
-- [ ] Placeholder routes for the set-member surfaces (no 404s).
-- [ ] "Needs setup" + soft-disable (hide, don't destroy) states.
+- [x] Placeholder routes for `schedule`/`members`/`packages`/`roster`.
+- [ ] "Needs setup" state when a set requires an unmet connection — deferred.
+- [ ] Soft-disable data warning (warn if data exists when toggling off) — deferred.
 
-**Ship**
-- [ ] Full `pnpm test`/`typecheck`/`lint`; verify by toggling the wellness set on a test tenant end-to-end.
-- [ ] Open PR for Jacob. Don't merge/deploy without his review (his repo/product).
+**Merged**
+- [x] Full `pnpm test`/`typecheck`/`lint` green.
+- [x] Merged to main as commit `f144c4c`.
+
+### Known issues / TODO
+
+- **Deferred: "needs setup" state** — toggling on a feature that requires an unmet connection
+  (e.g. google-business without a Google connection) shows the tab immediately rather than a
+  "needs setup" indicator. The registry's `requires` field is defined but not yet consumed by
+  a UI state.
+- **Deferred: soft-disable data warning** — toggling a feature off hides the surface but does
+  not warn if data exists under it (e.g. a members list). The data is preserved (not deleted)
+  but no confirmation prompt fires.
+- **Audit finding [MEDIUM][security]**: `businessRules` injected unsanitized into the agent
+  system prompt (`src/lib/agent-prompt-shared.ts:342`). Fix: `sanitizePromptValue(businessRules)`
+  + max-length cap in the TenantEditor PATCH validator.
 
 ## Related
 - `admin-feature-management-architecture.md` — the architecture this implements

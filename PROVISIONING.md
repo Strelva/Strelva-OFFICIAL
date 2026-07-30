@@ -11,7 +11,7 @@ bottom of this doc.
 
 Every paid client gets:
 1. A **tenant record** in Postgres (the source of truth since the 2026-06-20
-   cutover; dual-written to Sanity during the transition).
+   cutover; Sanity dual-write was removed as part of the Sanity teardown in 2026-07-10).
 2. A **custom repo** (separate Next.js project) that serves the public website —
    hand-built by Jacob, connected to a per-client Vercel project.
 3. **Signed revalidation** so content edits in the dashboard push to the live site.
@@ -79,8 +79,9 @@ auto-rollback.)
 1. **Create tenant record** — the hard prerequisite (the only step that bails the
    whole run on failure). Generates a 256-bit `revalidationSecret`, derives
    `siteUrl`/`revalidateUrl`, and writes the row to Postgres
-   (`TENANTS_SOURCE=postgres`) **and** dual-writes it to Sanity for rollback
-   safety. If the tenant already exists, the run resumes the remaining steps.
+   (`TENANTS_SOURCE=postgres`). The Sanity dual-write was removed as part of the
+   Sanity teardown (2026-07-10). If the tenant already exists, the run resumes
+   the remaining steps.
 2. **Seed starter content** — upserts **9 sections** (`hero`, `services`,
    `story`, `testimonials`, `events`, `providers`, `contact`, `settings`,
    `faq`) via `setContent`. Idempotent (overwrites, never duplicates). A
@@ -283,6 +284,40 @@ pnpm seed-tenant acme-hvac
 ### Valid industries
 
 `wellness`, `food-brand`, `restaurant`, `trades`, `professional`, `fashion-stylist`
+
+## Known issues / TODO
+
+- **[HIGH][bug] GBP writes silently fail after tenant rename.** `google-meta:${t}`,
+  `review-replies:recent:${t}`, `reb:review-nudge-sent:${t}`,
+  `reb:order-review-request-sent:${t}:*`, and `reb:review-reply-declined:${t}:*`
+  are missing from `authoritativePatterns` in `src/lib/tenant-rename.ts`. A renamed
+  tenant's GBP posts/review state silently stays under the old slug. Add these
+  patterns and update the completeness unit test.
+- **[HIGH][bug] Fractional star delta causes uncaught Redis error in `adjustStars`**
+  (`src/app/api/rewards/members/[email]/adjust/route.ts:35`). Add
+  `Number.isInteger(delta)` to the validation guard and a library-level guard in
+  `adjustStars` itself before the first `hincrby` call.
+- **[HIGH][bug] Missing `SECRETS_ENC_KEY` causes full platform outage via `loadTenants`**
+  (`src/lib/tenants.ts:205-208`). Wrap the `rowToTenant` call in a per-row
+  try/catch so one bad/unreadable row does not kill all tenant loads. Add
+  `SECRETS_ENC_KEY` to `scripts/production-checklist.ts`.
+- **[MEDIUM][tech-debt] `database.types.ts` is stale** — `billing_type` and
+  `account_id` missing from generated Row types, causing shadow casts in
+  `rowToTenant`/`tenantToRow`. Run `supabase gen types typescript --project-id <id>
+  > src/lib/db/database.types.ts` and add a CI staleness check.
+- **[HIGH][tenant-isolation] `upload_image` agent tool uses unscoped `uploadFile()`**
+  (`src/app/api/agent/route.ts:568`). Replace with `uploadTenantMedia(tenant, buffer,
+  filename, mimeType)` to namespace uploads under the tenant slug. This also fixes
+  the AVIF rejection bug — `uploadTenantMedia` accepts any MIME type that
+  `sniffImageType` returns.
+- **[MEDIUM][tenant-isolation] Upload route stores files in shared flat Blob namespace**
+  (`src/lib/storage/upload-store.ts:45`). Replace `uploadFile(file)` in
+  `src/app/api/upload/route.ts` with a tenant-prefixed wrapper, matching the pattern
+  in `src/lib/storage/media-store.ts`.
+- **[MEDIUM][security] Google OAuth callback stores connection without re-verifying session**
+  (`src/app/api/oauth/google/callback/route.ts:93`). Add `verifyAuth()` and
+  `requireTenantAccess(tenantId)` at the start of the GET handler, before
+  `saveConnection`.
 
 ## Troubleshooting
 

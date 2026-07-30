@@ -1,11 +1,13 @@
 # First-Time Production Secrets Setup
 
-> **Status: historical—do not use as a setup checklist.** It contains removed
-> Clerk/Sanity endpoints and the old apex API origin. Use
-> `.env.production.example`, `production-readiness.md`, and `pnpm check:prod`.
+> **Status: updated 2026-07-30.** Reflects the current stack: Supabase Auth,
+> Postgres source of truth, Redis cache/operational stores, no Clerk, no Sanity
+> write secrets. The canonical control-plane origin is `https://app.strelva.com`.
+> Vercel project is `strelva-admin` on the `strelva` team (`--scope strelva`).
 
-This is the plain-English checklist for getting Strelva production-ready.
-Do not paste real secrets into ChatGPT, Slack, GitHub, or docs. Put them directly into Vercel Production environment variables.
+This is the plain-English checklist for getting Strelva production-ready from a
+clean Vercel environment. Do not paste real secrets into ChatGPT, Slack, GitHub,
+or docs. Put them directly into Vercel Production environment variables.
 
 ## Goal
 
@@ -15,38 +17,26 @@ Make this command pass:
 pnpm check:prod
 ```
 
-Right now the production blocker list is:
-
-- Missing `CLERK_WEBHOOK_SECRET`
-- Missing `SANITY_WEBHOOK_SECRET`
-- Missing `UPSTASH_REDIS_REST_URL`
-- Missing `UPSTASH_REDIS_REST_TOKEN`
-- Missing `SENTRY_DSN`
-- Missing `NEXT_PUBLIC_SENTRY_DSN`
-- `strelva.com` DNS points to Porkbun/l.ink forwarding instead of Vercel
-- Final live verification has not been run
-
 ## Before You Start
 
 You need admin access to:
 
-- Vercel project: `scaffold-web`
-- Clerk production app
-- Sanity project
+- Vercel project: `strelva-admin` (team: `strelva`)
+- Supabase project (prod)
 - Upstash account
 - Sentry account
 - Stripe live account
-- Porkbun or wherever `strelva.com` DNS is managed
+- Resend account
+- DNS registrar for `strelva.com` / `app.strelva.com`
 
 From the repo:
 
 ```bash
-cd /Users/laneyfraass/websites/reb
 vercel whoami
-vercel link
+vercel link --scope strelva
 ```
 
-Confirm the linked Vercel project is `scaffold-web`.
+Confirm the linked Vercel project is `strelva-admin`.
 
 ## How To Add A Secret To Vercel
 
@@ -56,145 +46,100 @@ Use this pattern for each value:
 vercel env add VARIABLE_NAME production
 ```
 
-Vercel will prompt you to paste the value. Paste it, press enter, and choose the Production environment.
-
-After changing values, pull production env locally and re-run the checker:
+Vercel prompts you to paste the value. After changing values:
 
 ```bash
 vercel env pull .env.production.local --environment=production
 pnpm check:prod
 ```
 
-## 1. Clerk Webhook Secret
+> Note: `vercel env pull` returns blank for Sensitive-tagged vars even when set.
+> Use `vercel env ls` or the Vercel dashboard to confirm a var exists before
+> concluding it is unset.
 
-You already have live Clerk keys, but production is missing the webhook signing secret.
+## 1. Supabase
 
-In Clerk:
-
-1. Open the production Clerk application.
-2. Go to Webhooks.
-3. Add an endpoint:
-
-```text
-https://strelva.com/api/clerk/webhook
-```
-
-4. Select event:
-
-```text
-user.created
-```
-
-5. Copy the endpoint signing secret.
-6. Add it to Vercel:
+The auth, identity, tenant configuration, content, and audit backbone.
 
 ```bash
-vercel env add CLERK_WEBHOOK_SECRET production
+vercel env add NEXT_PUBLIC_SUPABASE_URL production       # https://<project>.supabase.co
+vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY production  # publishable anon key
+vercel env add SUPABASE_SERVICE_ROLE_KEY production      # service-role (bypasses RLS; keep secret)
+vercel env add SUPABASE_URL production                   # same URL as NEXT_PUBLIC_SUPABASE_URL
+                                                          # server-only; required by src/lib/db/client.ts
 ```
 
-Important: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, and `CLERK_WEBHOOK_SECRET` must all come from the same live Clerk app.
+All four must belong to the same Supabase project.
 
-## 2. Sanity Webhook Secret
+## 2. Upstash Redis
 
-Sanity needs a webhook so production content/tenant changes can trigger the app safely.
+Required for caches, queues, locks, rate limits, events, and operational stores.
 
-In Sanity:
-
-1. Open the production project.
-2. Go to API or Webhooks.
-3. Create a webhook.
-4. Endpoint URL:
-
-```text
-https://strelva.com/api/sanity/webhook
-```
-
-5. Trigger it for content create/update/delete events.
-6. Add a signing secret. Generate one if Sanity asks you to choose it:
-
-```bash
-openssl rand -hex 32
-```
-
-7. Copy that exact secret into Vercel:
-
-```bash
-vercel env add SANITY_WEBHOOK_SECRET production
-```
-
-The same value must be configured in Sanity and Vercel.
-
-## 3. Upstash Redis
-
-Redis is required for queues, reports, chat state, rate limits, events, and production storage paths.
-
-In Upstash:
-
-1. Create or open the production Redis database.
-2. Find the REST API section.
-3. Copy:
-
-```text
-UPSTASH_REDIS_REST_URL
-UPSTASH_REDIS_REST_TOKEN
-```
-
-4. Add both to Vercel:
+In Upstash: create or open the production Redis database, find the REST API section, copy both values.
 
 ```bash
 vercel env add UPSTASH_REDIS_REST_URL production
 vercel env add UPSTASH_REDIS_REST_TOKEN production
 ```
 
-## 4. Sentry DSNs
+## 3. At-rest secret encryption key
 
-Sentry is required by the production checker for monitoring.
-
-In Sentry:
-
-1. Create or open the Strelva project.
-2. Use a Next.js / JavaScript project.
-3. Find the DSN/client key.
-4. Use the DSN for both server and browser unless Sentry gives you separate values:
+AES-256-GCM key that encrypts provider secrets (OAuth tokens, revalidation
+secrets) stored in Postgres. Active in prod since 2026-07-15. If this key is
+absent when any tenant row has an `enc:v1:` prefix, `loadTenants` throws and
+the entire platform is down.
 
 ```bash
-vercel env add SENTRY_DSN production
-vercel env add NEXT_PUBLIC_SENTRY_DSN production
+openssl rand -hex 32   # generate once; store in 1Password
+vercel env add SECRETS_ENC_KEY production
 ```
 
-`SENTRY_DSN` is server-side. `NEXT_PUBLIC_SENTRY_DSN` is browser/client-side.
-
-## 5. Stripe $149 Monthly Price
-
-The current production `STRIPE_SCAFFOLD_PRICE_ID` already points to the intended live `$149/mo` price. You do not need to replace it unless `pnpm check:prod` says the price is invalid.
-
-If you ever need to recreate it in Stripe live mode:
-
-1. Open Products.
-2. Create or open the Strelva product.
-3. Create a recurring monthly price:
-
-```text
-Amount: $149.00
-Currency: USD
-Billing period: Monthly
-Mode: Live
-```
-
-4. Copy the `price_...` ID.
-5. Replace the Vercel value only if the checker says it is wrong:
+After setting the key, run the one-time backfill if the DB already has plaintext secrets:
 
 ```bash
-vercel env rm STRIPE_SCAFFOLD_PRICE_ID production --yes
-vercel env add STRIPE_SCAFFOLD_PRICE_ID production
+npx tsx scripts/backfill-secret-encryption.ts
 ```
 
-Paste the new `$149/mo` live `price_...` value.
+The backfill is idempotent — safe to run again if unsure.
 
-Stripe webhook should also be configured:
+## 4. Internal secrets
+
+```bash
+vercel env add CRON_SECRET production              # gates every /api/cron/* handler
+vercel env add INTERNAL_API_SECRET production      # domain-map auth + fallback
+vercel env add OAUTH_STATE_SECRET production       # OAuth CSRF state signing
+vercel env add APPROVE_LINK_SECRET production      # approve-from-email HMAC (falls back to OAUTH_STATE_SECRET → INTERNAL_API_SECRET if absent)
+vercel env add SCAFFOLD_CUSTOM_REQUEST_SECRET production  # agent custom-change HMAC
+```
+
+Keep `INTERNAL_API_SECRET`, `OAUTH_STATE_SECRET`, and `APPROVE_LINK_SECRET` as
+distinct values. They currently share a fallback chain but serve different
+purposes — a single compromise has wider blast radius than needed.
+
+## 5. Sentry
+
+```bash
+vercel env add SENTRY_DSN production               # server-side
+vercel env add NEXT_PUBLIC_SENTRY_DSN production   # client-side
+```
+
+Same DSN for both unless Sentry gives you separate values.
+
+## 6. Stripe
+
+Three-tier live billing (Presence $99 / Growth $199 / Scale $499). All Stripe
+values must be live-mode (never test-mode `sk_test_` keys).
+
+```bash
+vercel env add STRIPE_SECRET_KEY production
+vercel env add STRIPE_SCAFFOLD_PRICE_ID production  # Growth price_..., compatibility gate
+vercel env add STRIPE_WEBHOOK_SECRET production
+```
+
+Configure the Stripe webhook endpoint:
 
 ```text
-https://strelva.com/api/billing/webhook
+https://app.strelva.com/api/billing/webhook
 ```
 
 Required events:
@@ -206,110 +151,158 @@ invoice.payment_failed
 customer.subscription.deleted
 ```
 
-The current checker says `STRIPE_WEBHOOK_SECRET` is already set, but verify it matches this endpoint.
-
-## 6. DNS For strelva.com
-
-Right now `strelva.com` routes to Porkbun/l.ink forwarding, not the Vercel Next.js app.
-
-In Porkbun DNS:
-
-1. Remove URL forwarding / l.ink forwarding for `strelva.com`.
-2. Either point the apex at Vercel:
-
-```text
-Type: A
-Host: strelva.com or @
-Value: 76.76.21.21
-```
-
-3. Or switch nameservers to Vercel:
-
-```text
-ns1.vercel-dns.com
-ns2.vercel-dns.com
-```
-
-Then verify:
+## 7. Resend
 
 ```bash
-vercel domains inspect strelva.com
-dig +short strelva.com A
-dig +short strelva.com NS
-curl -I -L https://strelva.com/api/health
+vercel env add RESEND_API_KEY production
+vercel env add RESEND_DOMAIN production   # updates.strelva.com
 ```
 
-Expected result: `https://strelva.com/api/health` should stay on `strelva.com` and return the Vercel Next.js health response. It should not redirect to `scaffoldweb-com.l.ink`.
+Email sending is gated by `EMAIL_SENDING_ENABLED`. Do NOT set that to `true`
+until client lifecycle email is deliberately switched on. Operator + prospect
+emails default on and are not gated by this flag.
 
-## 7. Pull Env And Recheck
+## 8. Google AI
 
-After all Vercel env values and DNS are updated:
+```bash
+vercel env add GOOGLE_GENERATIVE_AI_API_KEY production  # Gemini 2.5 Flash
+```
+
+## 9. AI auto-publish
+
+```bash
+# Keep false for first production tenants until a tenant explicitly approves auto-publish
+vercel env add AI_AUTO_PUBLISH production   # value: false
+```
+
+## 10. Public URLs
+
+```bash
+vercel env add NEXT_PUBLIC_SITE_URL production    # https://strelva.com (marketing)
+vercel env add NEXT_PUBLIC_APP_URL production     # https://app.strelva.com (control plane)
+```
+
+## 11. Vercel API (for provisioning automation)
+
+Required for the `/api/admin/provision` Vercel project/env/domain steps:
+
+```bash
+vercel env add VERCEL_API_TOKEN production
+vercel env add VERCEL_TEAM_ID production
+```
+
+Without these, the Vercel automation steps in `provisionTenant()` are silently
+skipped (the tenant, content seed, and invite still complete).
+
+## 12. DNS
+
+`app.strelva.com` is the control-plane and API origin. Add in Vercel Domains:
+
+```
+app.strelva.com    → CNAME cname.vercel-dns.com
+admin.strelva.com  → CNAME cname.vercel-dns.com
+```
+
+`strelva.com` is the separate marketing repo — do not point it at this project.
+
+After DNS propagates:
+
+```bash
+curl -I -L https://app.strelva.com/api/health
+```
+
+Should return JSON, not a redirect.
+
+## 13. Pull env and recheck
+
+After all values and DNS are updated:
 
 ```bash
 vercel env pull .env.production.local --environment=production
 pnpm check:prod
 ```
 
-If `pnpm check:prod` still fails, read the `Required Release Actions` section it prints and fix those items.
+## 14. Redeploy production
 
-## 8. Redeploy Production
-
-After `pnpm check:prod` passes locally, redeploy production. Prefer the Vercel dashboard redeploy flow unless the branch is clean and ready.
-
-If deploying from CLI:
+After `pnpm check:prod` passes:
 
 ```bash
-git status --short
-vercel deploy --prod
+git status --short     # must be clean
+vercel deploy --prod --yes --scope strelva
 ```
 
-Do not deploy from a dirty working tree unless you intentionally want those local changes shipped.
+> **Important:** `vercel redeploy` reuses the target deployment's env snapshot
+> and will NOT apply env changes. Use `vercel deploy --prod` for a fresh build
+> that picks up the current env.
 
-## 9. Final Live Verification
-
-After env, DNS, and redeploy are complete:
+## 15. Final live verification
 
 ```bash
-PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release
+PLAYWRIGHT_BASE_URL=https://app.strelva.com \
+  PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com \
+  pnpm check:release
 ```
 
 Then manually verify:
 
-- `https://strelva.com/api/health` returns the app health response.
+- `https://app.strelva.com/api/health` returns JSON with `status:"healthy"`.
 - Signed-out `/dashboard` redirects to `/sign-in`.
 - `/sign-in` and `/sign-up` explain using the invited email.
 - An invited owner can access `/dashboard/site`.
 - A content edit saves and refreshes the preview.
-- Clerk webhook delivery succeeds in Clerk.
-- Sanity webhook delivery succeeds in Sanity.
-- Stripe webhook delivery succeeds in Stripe.
+- Stripe webhook delivery succeeds in Stripe dashboard.
 - Cron is protected:
 
 ```bash
-curl -i https://strelva.com/api/cron/maintenance
-curl -i -H "Authorization: Bearer $CRON_SECRET" https://strelva.com/api/cron/maintenance
+curl -i https://app.strelva.com/api/cron/maintenance
+curl -i -H "Authorization: Bearer $CRON_SECRET" https://app.strelva.com/api/cron/maintenance
 ```
 
-The first cron request should return `401`. The second should not return `401`.
+The first request must return 401. The second must not.
 
-## Quick Command List
+## Quick command reference
 
 ```bash
-vercel env add CLERK_WEBHOOK_SECRET production
-vercel env add SANITY_WEBHOOK_SECRET production
+vercel env add NEXT_PUBLIC_SUPABASE_URL production
+vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY production
+vercel env add SUPABASE_SERVICE_ROLE_KEY production
+vercel env add SUPABASE_URL production
+vercel env add SECRETS_ENC_KEY production
 vercel env add UPSTASH_REDIS_REST_URL production
 vercel env add UPSTASH_REDIS_REST_TOKEN production
+vercel env add CRON_SECRET production
+vercel env add INTERNAL_API_SECRET production
+vercel env add OAUTH_STATE_SECRET production
+vercel env add APPROVE_LINK_SECRET production
+vercel env add SCAFFOLD_CUSTOM_REQUEST_SECRET production
 vercel env add SENTRY_DSN production
 vercel env add NEXT_PUBLIC_SENTRY_DSN production
+vercel env add STRIPE_SECRET_KEY production
+vercel env add STRIPE_SCAFFOLD_PRICE_ID production
+vercel env add STRIPE_WEBHOOK_SECRET production
+vercel env add RESEND_API_KEY production
+vercel env add RESEND_DOMAIN production
+vercel env add GOOGLE_GENERATIVE_AI_API_KEY production
+vercel env add AI_AUTO_PUBLISH production
+vercel env add NEXT_PUBLIC_SITE_URL production
+vercel env add NEXT_PUBLIC_APP_URL production
+vercel env add VERCEL_API_TOKEN production
+vercel env add VERCEL_TEAM_ID production
 
 vercel env pull .env.production.local --environment=production
 pnpm check:prod
 ```
 
-## Do Not Skip
+## Do not skip
 
-- Do not use test-mode Clerk or Stripe keys.
-- Do not use a Stripe price unless it is live, monthly, USD, and exactly `$149`.
-- Do not leave `strelva.com` forwarding through l.ink.
-- Do not mark launch blockers as waived unless there is an explicit owner-approved reason and follow-up date.
-- Do not consider launch complete until `pnpm check:release` passes against `https://strelva.com`.
+- Do not use Stripe test-mode (`sk_test_`) keys.
+- Do not skip `SECRETS_ENC_KEY` — a missing key after secrets were encrypted causes a full platform outage.
+- Do not skip `SUPABASE_URL` — it is distinct from `NEXT_PUBLIC_SUPABASE_URL` and required server-side.
+- Do not use `vercel redeploy` after env changes — use `vercel deploy --prod`.
+- Do not mark launch blockers as waived without an explicit owner-approved reason and follow-up date.
+- Do not consider launch complete until `pnpm check:release` passes against `https://app.strelva.com`.
+
+## Known issues / TODO
+
+- **`SECRETS_ENC_KEY` and `SUPABASE_URL` are not yet in `pnpm check:prod`** — the checker will not catch a missing key. Track in `production-readiness.md` Known issues. Add `checkEnvVar('SECRETS_ENC_KEY', true)` and `checkEnvVar('SUPABASE_URL', true)` to `scripts/production-checklist.ts`.
+- **Seven orphaned Clerk + Sanity env vars may still be set in Vercel** from before the teardowns. Run `vercel env ls` to audit and `vercel env rm <name> <env>` to remove any of: `CLERK_WEBHOOK_SECRET`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `SANITY_WEBHOOK_SECRET`, `NEXT_PUBLIC_SANITY_PROJECT_ID`, `NEXT_PUBLIC_SANITY_DATASET`, `SANITY_API_TOKEN`, `REVALIDATION_SECRET` (superseded), `CORS_ORIGINS` (no code reference), and any `TURBO_*` / `NX_DAEMON` vars.
