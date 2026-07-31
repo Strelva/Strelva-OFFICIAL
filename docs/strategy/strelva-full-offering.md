@@ -23,7 +23,11 @@ One login, one monthly report, one bill.
 - **You own everything** — domain in your name, export your content anytime, no
   contract, leave whenever. `[live]`
 
-## 2. Your Google Presence (GBP add-on — +$99 / +$149 / +$199/mo)
+## 2. Your Google Presence (GBP add-on — 2 plans, priced PER LOCATION)
+
+- **GBP Manage — +$99/mo/location** — run the profile (reviews, posts, optimization, performance report).
+- **GBP Grow — +$149/mo/location** — Manage + geogrid map-pack rank + competitive monitoring.
+- **Multi-location = one plan per location, bundled on ONE account + one bill** (e.g. Twin Trees, 2 locations on Grow = 2 x $149). No separate multi-location tier — each location is its own Google profile to manage.
 
 ### Reviews (the thing you most want off your plate)
 - **Monitor every Google review** with real-time alerts. `[live]`
@@ -53,10 +57,12 @@ One login, one monthly report, one bill.
   service area, and how it's moving. `[build]`
 - **One combined monthly report** — website + Google presence + rank movement in a single
   view. `[build]`
+- **Competitive monitoring** (Grow) — track where key competitors rank vs. you on the grid. `[build]`
 
 ### Multi-location (for chains — e.g. Twin Trees)
-- **Manage several locations under one account**, bundled into one subscription. `[live]`
-  (account layer live; per-location GBP roster `[build]`)
+- Not a separate tier — **each location carries its own GBP plan, all bundled onto one
+  account and one bill.** The account layer that groups sites + bundles billing is `[live]`;
+  the per-location GBP roster view is `[build]`.
 
 *Not offered (Google shut down the APIs): Google Q&A automation, GBP messaging.*
 
@@ -87,17 +93,18 @@ One login, one monthly report, one bill.
 
 ## The bundle at a glance
 
-| | Site only | Site + GBP Essential | Site + GBP Growth | Site + GBP Scale |
-|---|---|---|---|---|
-| Website + dashboard + reports | ✅ | ✅ | ✅ | ✅ |
-| Reviews: monitor + DFY replies + ask-toolkit | — | ✅ | ✅ | ✅ |
-| Managed Google Posts | — | ✅ | ✅ | ✅ |
-| Profile optimization | — | ✅ | ✅ | ✅ |
-| GBP performance report | — | ✅ | ✅ | ✅ |
-| Map-pack geogrid rank | — | — | ✅ | ✅ |
-| Competitive monitoring | — | — | — | ✅ |
-| Multi-location | — | — | — | ✅ |
-| **Add-on price** | — | **+$99/mo** | **+$149/mo** | **+$199/mo** |
+| | Site only | + GBP Manage | + GBP Grow |
+|---|---|---|---|
+| Website + dashboard + reports | ✅ | ✅ | ✅ |
+| Reviews: monitor + DFY replies + ask-toolkit | — | ✅ | ✅ |
+| Managed Google Posts | — | ✅ | ✅ |
+| Profile optimization | — | ✅ | ✅ |
+| GBP performance report | — | ✅ | ✅ |
+| Map-pack geogrid rank | — | — | ✅ |
+| Competitive monitoring | — | — | ✅ |
+| **Add-on price (per location)** | — | **+$99/mo** | **+$149/mo** |
+
+*Multi-location = one plan per location, bundled on one account + one bill (no separate tier).*
 
 **What you can sell TODAY vs. after the Google API grant:** the website product and
 the reviews-monitoring / visibility / analytics pieces are live now. The GBP write

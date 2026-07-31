@@ -96,11 +96,12 @@ recurring cost; pick one with a real API so scans automate.
 
 **Bundle it, don't silo it.** "Your website and your Google presence, managed together."
 
-Pricing (tiered to the site plan; anchor **+$149/mo**):
-- **+$99/mo** (on the $99-199 site tiers) — posts + review monitoring & replies +
-  profile optimization + monthly performance report.
-- **+$149-$199/mo** (on the $299-499 tiers) — adds map-pack **geogrid** rank reporting +
-  review-generation + competitive monitoring.
+Pricing: **2 plans, priced PER LOCATION** (multi-location = one plan per location, bundled
+on one account/bill — no separate multi-location tier).
+- **GBP Manage — +$99/mo/location** — managed posts + review monitoring & replies +
+  ask-toolkit + profile optimization + monthly GBP performance report.
+- **GBP Grow — +$149/mo/location** — Manage + map-pack **geogrid** rank reporting +
+  competitive monitoring.
 - **One-time setup/optimization: $99-199** (below the $300-500 market norm — captures the
   front-loaded work without scaring the bundle).
 - **À la carte pass-through** (don't absorb incident risk): suspension reinstatement
@@ -198,17 +199,16 @@ tested, waiting on Google API access, `[build]` = to build for the add-on.
 
 ## Tiering (which features land in which add-on tier)
 
-| | +$99 Essential | +$149 Growth | +$199 Scale |
-|---|---|---|---|
-| Review monitor + DFY replies | ✅ | ✅ | ✅ |
-| Google Posts (managed) | ✅ | ✅ | ✅ |
-| Profile optimization (hours/photos/categories/services) | ✅ | ✅ | ✅ |
-| GBP performance in monthly report | ✅ | ✅ | ✅ |
-| Review-request toolkit | ✅ | ✅ | ✅ |
-| Map-pack geogrid rank reporting | — | ✅ | ✅ |
-| Competitive monitoring | — | — | ✅ |
-| Multi-location management | — | — | ✅ |
-| One-time setup/optimization | $99 | $149 | $199 |
+| (per location) | GBP Manage +$99 | GBP Grow +$149 |
+|---|---|---|
+| Review monitor + DFY replies + ask-toolkit | ✅ | ✅ |
+| Google Posts (managed) | ✅ | ✅ |
+| Profile optimization (hours/photos/categories/services) | ✅ | ✅ |
+| GBP performance in monthly report | ✅ | ✅ |
+| Map-pack geogrid rank reporting | — | ✅ |
+| Competitive monitoring | — | ✅ |
+| One-time setup/optimization | $99 | $149 |
+| Multi-location | one plan per location, bundled on one account/bill |
 | À la carte pass-through | suspension reinstatement ~$750 · review dispute ~$425 |
 
 ## What unlocks each pillar
