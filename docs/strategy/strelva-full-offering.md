@@ -31,8 +31,10 @@ One login, one monthly report, one bill.
   it to auto-post. Off / draft / auto, your call. `[unlock]`
 - **Sentiment + urgent-first** — negative or urgent reviews float to the top; you see the
   good numbers, we handle the rest. `[live]`
-- **Get more reviews** — a ready-to-share review link + order-triggered "leave us a
-  review" asks. `[unlock]`
+- **Review-request toolkit** — a branded review link + QR code + email/SMS templates the
+  owner sends to their own customers (we make asking easy; we don't manufacture reviews).
+  For clients running bookings/orders through Strelva, an auto-nudge to the real customer
+  post-transaction. `[unlock]` (order-nudge exists; toolkit `[build]`)
 
 ### Google Posts
 - **We write and publish Google Posts** for you — offers, events, updates — on a
@@ -88,11 +90,10 @@ One login, one monthly report, one bill.
 | | Site only | Site + GBP Essential | Site + GBP Growth | Site + GBP Scale |
 |---|---|---|---|---|
 | Website + dashboard + reports | ✅ | ✅ | ✅ | ✅ |
-| Review monitor + DFY replies | — | ✅ | ✅ | ✅ |
+| Reviews: monitor + DFY replies + ask-toolkit | — | ✅ | ✅ | ✅ |
 | Managed Google Posts | — | ✅ | ✅ | ✅ |
 | Profile optimization | — | ✅ | ✅ | ✅ |
 | GBP performance report | — | ✅ | ✅ | ✅ |
-| Review generation | — | — | ✅ | ✅ |
 | Map-pack geogrid rank | — | — | ✅ | ✅ |
 | Competitive monitoring | — | — | — | ✅ |
 | Multi-location | — | — | — | ✅ |

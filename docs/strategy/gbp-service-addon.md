@@ -86,7 +86,7 @@ recurring cost; pick one with a real API so scans automate.
   outcomes — they put the work back on the owner. Agencies silo GBP with no website tie-in.
 - **What SMBs actually pay for, ranked:** (1) review monitoring + replies — the #1 thing
   they want off their plate; (2) showing up in the map pack + rank reporting (the ROI
-  proof); (3) profile optimization; (4) posts ("keeps it active"); (5) photos; then Q&A,
+  proof); (3) profile optimization; (4) posts ("keeps it active"); (5) photos; review GENERATION is real but low-leverage for us (we don't hold the customer list; Google bans gating/incentives) — sell it as a light ask-toolkit, not a volume promise; then Q&A,
   suspension monitoring (low until it happens, then critical), and the monthly report
   (low intrinsic value, high *perceived* value → retention tool).
 - **They don't buy "GBP management" — they buy more calls/directions/bookings, a clean
@@ -174,7 +174,11 @@ tested, waiting on Google API access, `[build]` = to build for the add-on.
 - Monitor all Google reviews (poll cron, new-review alerts) `[live]`
 - Done-for-you replies: off / draft-to-approve / auto-post after 12h, per-client mode `[built·blocked]`
 - Sentiment + urgent-first "needs a reply" queue; owner sees positive numbers only `[live]`
-- Review generation: owner's Google review link + order-triggered request emails `[built·blocked]` (needs the Place ID field — now operator-settable)
+- Review-request toolkit (make asking easy — NOT review manufacturing): branded review
+  link + QR + owner-sent templates; auto-nudge to the real customer only for clients with a
+  booking/order integration. `[built·blocked]`/`[build]`. Constraint: we don't hold the
+  business's customer list, and Google bans gating/incentives/bulk solicitation — so this is
+  a light 'ask' toolkit, not a volume promise.
 
 ### Pillar 2 — Posts (keeps the profile alive)
 - AI-written Google Posts through the governed approve path `[built·blocked]`
@@ -200,7 +204,7 @@ tested, waiting on Google API access, `[build]` = to build for the add-on.
 | Google Posts (managed) | ✅ | ✅ | ✅ |
 | Profile optimization (hours/photos/categories/services) | ✅ | ✅ | ✅ |
 | GBP performance in monthly report | ✅ | ✅ | ✅ |
-| Review generation (request campaigns) | — | ✅ | ✅ |
+| Review-request toolkit | ✅ | ✅ | ✅ |
 | Map-pack geogrid rank reporting | — | ✅ | ✅ |
 | Competitive monitoring | — | — | ✅ |
 | Multi-location management | — | — | ✅ |
