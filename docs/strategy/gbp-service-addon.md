@@ -219,3 +219,60 @@ tested, waiting on Google API access, `[build]` = to build for the add-on.
 - Serper local visibility: already ~**$0.012/tenant/mo** (near-free).
 - **Geogrid (Local Falcon): the one real per-location recurring cost — pricing modeled
   separately (in progress).** This is what sets the floor on the +$149/+$199 tiers.
+
+---
+
+# Geogrid cost + margin model (Local Falcon research, 2026-07-31)
+
+**Verdict: geogrid is cheap enough to live in the mid ($149) tier, not Scale-only.**
+
+## Local Falcon pricing (verify live numbers before committing — allotments change)
+| Plan | $/mo | Credits/mo | Locations | Programmatic scan API |
+|---|---|---|---|---|
+| Starter | $24.99 | 7,500 | Unlimited | integrations only |
+| **Basic** | **$49.99** | **15,150** | Unlimited | Zapier/n8n/Looker |
+| Pro | $99.99 | 31,250 | Unlimited | yes |
+| Premium | $199.99 | 63,150 | Unlimited | yes |
+
+- **1 credit = 1 grid pin, per keyword.** 7x7 = 49 cr/kw, 9x9 = 81, 11x11 = 121.
+- Locations/users/keywords are **unlimited on every tier — you only buy credits.**
+- White-label reports included. The **on-demand programmatic scan API is a SEPARATE
+  $199/mo add-on** ($0.0032/request) — you likely don't need it (see below).
+
+## Modeled cost: the whole client book, not per-seat
+10 client locations, 1 weekly scan, 7x7 grid, 3 keywords each:
+- Per scan = 49 x 3 = 147 credits; per location/month ≈ 636 cr; **10 locations ≈ 6,360 cr/mo**.
+- Fits **Basic ($49.99, 15,150 cr) with 2.4x headroom.** Effective **~$5/location/month.**
+- Move to Pro ($99.99) only when burn nears ~12K cr/mo (roughly 18-20 locations).
+
+## The margin
+- The GBP add-on's ONLY real recurring per-location cost is geogrid: **~$5-10/loc/mo**
+  (or a **flat $50-100/mo for the whole book** on one Local Falcon plan).
+- GBP API is free; Serper is ~$0.012/tenant. So at **+$149/mo** the tool cost is
+  **~90-97% gross margin**; the +$99 Essential tier (no geogrid) is ~100% tool-margin.
+- Translation: **geogrid does NOT need to be gated to the top tier.** Put map-pack rank
+  reporting in the +$149 Growth tier — it's the ROI proof clients renew for and it costs
+  you ~$5/client. Reserve the +$199 Scale tier for competitive monitoring + multi-location.
+
+## Local Falcon vs Geogrid.dev — the real decision for Strelva
+Strelva automates everything (it would schedule scans on the client's content day, like it
+does posts). That makes the **programmatic scan API** the deciding factor:
+- **Local Falcon** — polished white-label dashboard + reports to resell, but programmatic
+  scan-launching is the extra **$199/mo** add-on. Best if you schedule scans in-dashboard
+  (semi-manual) and just pull the data, or want their ready-made client reports.
+- **Geogrid.dev** — **full REST API included** in the paid plan (Freelance $59/5K cr,
+  Agency $179/20K cr; 60-250 req/min), plus a pin-skipping algorithm that makes big grids
+  cheaper. Built for exactly the "launch scans from our own cron, render in our own report"
+  pattern Strelva already uses everywhere.
+- **Recommendation for Strelva: Geogrid.dev** for the automated build (API included, cheaper
+  per scan, fits the "our cron, our report" model — Strelva has its own report engine, it
+  doesn't need Local Falcon's). Keep **Local Falcon Basic ($49.99)** as the fallback if you
+  end up scheduling scans in-dashboard. Either way the cost is trivial vs. the +$149 price.
+- Skip **BrightLocal** for geogrid (it's a full suite; geogrid is a secondary feature, no
+  clean standalone API).
+
+## Net
+The add-on economics are excellent: near-zero CAC (existing site clients), ~$5-10/client/mo
+hard cost, largely-automatable labor, at +$149/mo. Geogrid moves into the mid tier. The
+only gating item remains the **Google API access approval** — file it first; pick the
+geogrid provider (lean Geogrid.dev) in parallel.
