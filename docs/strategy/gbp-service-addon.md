@@ -149,3 +149,73 @@ for), **(3) launch as a +$149/mo bundle** to the existing website book. It's hig
 recurring revenue on largely-automatable work, with a real wedge (nobody bundles the
 managed website + GBP), and it compounds the OWSH sales motion rather than being new product
 for its own sake — you're deepening the wallet share of clients you already have.
+
+---
+
+# Combined feature set — Website + GBP (2026-07-31)
+
+The bundle story: **one login, one monthly report, one bill** for a local business's
+entire online presence. The website is the conversion destination; GBP is the map-pack
+traffic engine that feeds it. Below, `[live]` = works today, `[built·blocked]` = coded +
+tested, waiting on Google API access, `[build]` = to build for the add-on.
+
+## Base: Managed Website (existing — $99 / $199 / $499)
+- Custom hand-built site + hosting + client-owned domain `[live]`
+- Update-by-chat AI agent (governed publish/review/block) `[live]`
+- Dashboard: Today, Analytics (GA4 + GSC), Reviews, Reports `[live]`
+- Lead capture — "who reached out" + spam-gated forms `[live]`
+- Site health / SEO audit + weekly/monthly report `[live]`
+- Single-point local visibility (SERP + local-pack + AI-answer mentions, Serper) `[live]`
+- Ownership: domain in client's name, content export anytime `[live]`
+
+## GBP Add-on (+$99 / +$149 / +$199)
+
+### Pillar 1 — Reviews (the #1 thing they want off their plate)
+- Monitor all Google reviews (poll cron, new-review alerts) `[live]`
+- Done-for-you replies: off / draft-to-approve / auto-post after 12h, per-client mode `[built·blocked]`
+- Sentiment + urgent-first "needs a reply" queue; owner sees positive numbers only `[live]`
+- Review generation: owner's Google review link + order-triggered request emails `[built·blocked]` (needs the Place ID field — now operator-settable)
+
+### Pillar 2 — Posts (keeps the profile alive)
+- AI-written Google Posts through the governed approve path `[built·blocked]`
+- Post scheduling / recurring content calendar `[build]`
+
+### Pillar 3 — Profile management
+- Business hours + special hours `[built·blocked]` (hours) / `[build]` (special hours)
+- Photo management (logo/cover/exterior/interior/…) `[built·blocked]`
+- Description, categories, services, attributes `[build]` (all Business Information API v1)
+- Q&A + messaging — NOT offered (Google killed both APIs; Q&A monitoring is manual)
+
+### Pillar 4 — Performance + proof
+- GBP-native insights: calls, direction requests, map views, search impressions, search terms `[build]` (Performance API v1)
+- Map-pack geogrid: rank heatmap across a grid of points `[build]` (Local Falcon / Geogrid ingest)
+- Combined monthly report: site performance + GBP performance + map-rank movement `[build]` (extend the existing report engine)
+- Multi-location: account roster + per-location GBP (ties into the org-layer accounts) `[build]`
+
+## Tiering (which features land in which add-on tier)
+
+| | +$99 Essential | +$149 Growth | +$199 Scale |
+|---|---|---|---|
+| Review monitor + DFY replies | ✅ | ✅ | ✅ |
+| Google Posts (managed) | ✅ | ✅ | ✅ |
+| Profile optimization (hours/photos/categories/services) | ✅ | ✅ | ✅ |
+| GBP performance in monthly report | ✅ | ✅ | ✅ |
+| Review generation (request campaigns) | — | ✅ | ✅ |
+| Map-pack geogrid rank reporting | — | ✅ | ✅ |
+| Competitive monitoring | — | — | ✅ |
+| Multi-location management | — | — | ✅ |
+| One-time setup/optimization | $99 | $149 | $199 |
+| À la carte pass-through | suspension reinstatement ~$750 · review dispute ~$425 |
+
+## What unlocks each pillar
+- Pillars 1-3 (reviews / posts / profile) are almost entirely **`[built·blocked]` → the
+  single unlock is Google API access approval.** File it first.
+- Pillar 4 (performance + geogrid + report + multi-location) is the **net-new build** and
+  the real client-facing value — do it in parallel with the API application so it's ready
+  when access lands.
+
+## Cost inputs to the margin model (geogrid TBD)
+- GBP API: **free** (just the approval gate + quotas).
+- Serper local visibility: already ~**$0.012/tenant/mo** (near-free).
+- **Geogrid (Local Falcon): the one real per-location recurring cost — pricing modeled
+  separately (in progress).** This is what sets the floor on the +$149/+$199 tiers.
