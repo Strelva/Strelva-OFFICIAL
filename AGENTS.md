@@ -202,6 +202,13 @@ Pivoted 2026-06-26 from the two-door build-fee offer (`docs/strategy/website-off
 - Canonical pricing/Stripe-setup detail (account, live price IDs, branding): vault `1-projects/scaffold-web/pricing-and-billing.md`.
 - Agency channel (wholesale resell) was researched and parked (2026-06-09); not built.
 
+### Managed Google Presence add-on (PLANNED, decided 2026-07-31 — NOT on the live marketing site yet)
+- A GBP-management add-on sold on top of the website subscription. **One plan, un-tiered: +$149/mo PER LOCATION** ($129 easy-yes anchor). Everything included — review monitoring + done-for-you replies + an ask-toolkit, managed Google Posts, profile optimization (hours/photos/description/categories/services/attributes), a GBP performance report, geogrid map-pack rank, competitive monitoring. Geogrid is the renewal hook so everyone gets it; add tiers only if volume ever demands price discrimination.
+- **Multi-location = the plan per location, bundled onto ONE account + one bill** via the org-layer accounts (e.g. Twin Trees = 2 locations = 2 × $149). No separate multi-location tier.
+- **The GBP write engine is already built** (`create_gbp_post`/`update_business_hours`/`upload_gbp_photo`/`publishReviewReply`, all governed) — the single gate is **Google Business Profile API access approval** (a multi-day manual review; file it FIRST). Near-term build = the client-facing value layer: GBP-native performance insights (Performance API v1), map-pack geogrid (lean **Geogrid.dev** — API-first + cheaper; Local Falcon Basic $49.99 fallback), broader profile-field editing, multi-location roster.
+- Economics: GBP API is free; geogrid ~$5-10/location/mo → ~90% margin at +$149. **NOT offered:** Google Q&A automation + GBP messaging (Google killed both APIs). Review *generation* is a light ask-toolkit only (we don't hold the customer list; Google bans gating/incentives) — the review pitch leads with monitor + replies.
+- This is wallet-share expansion of existing website clients (near-zero CAC), not a new product line. **NOT on the live strelva.com marketing site yet** — internal plan/offering only. Full research + build plan: `docs/strategy/gbp-service-addon.md`; customer-facing feature list: `docs/strategy/strelva-full-offering.md`.
+
 ## Value Hypothesis
 Local-business owners will pay for a dashboard that proves their website is working + an AI that handles updates — IF the dashboard shows clear value, the AI actually makes changes when asked, and the weekly report lands before the bill recurs.
 
