@@ -96,12 +96,12 @@ recurring cost; pick one with a real API so scans automate.
 
 **Bundle it, don't silo it.** "Your website and your Google presence, managed together."
 
-Pricing: **2 plans, priced PER LOCATION** (multi-location = one plan per location, bundled
-on one account/bill — no separate multi-location tier).
-- **GBP Manage — +$99/mo/location** — managed posts + review monitoring & replies +
-  ask-toolkit + profile optimization + monthly GBP performance report.
-- **GBP Grow — +$149/mo/location** — Manage + map-pack **geogrid** rank reporting +
-  competitive monitoring.
+Pricing: **ONE plan, priced PER LOCATION** (multi-location = the plan per location, bundled
+on one account/bill). Deliberately un-tiered — geogrid is the renewal hook, so include it
+for everyone; add tiers only if volume later demands price discrimination.
+- **Managed Google Presence — +$149/mo/location** ($129 for an easy-yes anchor). Everything:
+  review monitoring & replies + ask-toolkit + managed posts + profile optimization +
+  monthly GBP performance report + map-pack **geogrid** rank + competitive monitoring.
 - **One-time setup/optimization: $99-199** (below the $300-500 market norm — captures the
   front-loaded work without scaring the bundle).
 - **À la carte pass-through** (don't absorb incident risk): suspension reinstatement
@@ -199,17 +199,11 @@ tested, waiting on Google API access, `[build]` = to build for the add-on.
 
 ## Tiering (which features land in which add-on tier)
 
-| (per location) | GBP Manage +$99 | GBP Grow +$149 |
-|---|---|---|
-| Review monitor + DFY replies + ask-toolkit | ✅ | ✅ |
-| Google Posts (managed) | ✅ | ✅ |
-| Profile optimization (hours/photos/categories/services) | ✅ | ✅ |
-| GBP performance in monthly report | ✅ | ✅ |
-| Map-pack geogrid rank reporting | — | ✅ |
-| Competitive monitoring | — | ✅ |
-| One-time setup/optimization | $99 | $149 |
-| Multi-location | one plan per location, bundled on one account/bill |
-| À la carte pass-through | suspension reinstatement ~$750 · review dispute ~$425 |
+Single plan, everything included (per location): review monitor + DFY replies + ask-toolkit,
+managed Google Posts, profile optimization (hours/photos/categories/services), monthly GBP
+performance report, map-pack geogrid rank, competitive monitoring. One-time setup/optimization
+$99-149. Multi-location = the plan per location bundled on one account/bill. À la carte
+pass-through: suspension reinstatement ~$750, review dispute ~$425.
 
 ## What unlocks each pillar
 - Pillars 1-3 (reviews / posts / profile) are almost entirely **`[built·blocked]` → the
