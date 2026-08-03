@@ -4,7 +4,7 @@ The one master checklist for taking a new client from **signed lead → live man
 
 **Owner: you (Noah) run all of it.** The only steps that need the **client** are the ones on their own accounts — the Google Search Console / GA4 grants and the DNS records — because you can't grant yourself access to their Google or their registrar. `Auto` = the provision script does the step for you.
 
-**Tiers (packaging, not code flags):** Presence $99/mo (one-page) · Growth $199/mo (multi-page + booking/basic ecom, the anchor) · Scale $499/mo (+ content engine, multi-location). Building is free; the subscription starts at go-live ("pay when you're happy").
+**Tiers (packaging, not code flags):** Custom builds are scoped and quoted before work starts. Ongoing management is Presence $99/mo (one-page) · Growth $199/mo (multi-page + booking/basic ecom, the anchor) · Scale $499/mo (+ content engine, multi-location).
 
 ---
 
@@ -120,7 +120,7 @@ Only if replacing an existing site (like RHM's old Apache site → the Strelva b
 
 ## Phase 7 — Billing on (You)
 
-- [ ] Start the Stripe subscription at go-live (the tier price). Building was free; the monthly starts now ("pay when you're happy").
+- [ ] Confirm the build invoice is paid, then start the selected Stripe management subscription at go-live.
 - [ ] Grandfathered clients (gldf, rohlax) stay on `STRIPE_BILLING_GRANDFATHER_TENANTS` — no subscription.
 
 **Verify:** the client is active in Stripe at the agreed tier (or on the grandfather list), and `check:prod`'s grandfather-or-402 rule passes.

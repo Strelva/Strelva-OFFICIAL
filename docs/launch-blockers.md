@@ -243,7 +243,7 @@ Equivalent one-command local gate:
 PLAYWRIGHT_BASE_URL=https://app.strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm check:release
 ```
 
-The GitHub Release workflow refuses to create a `reb-vYYYY.MM.DD.N` tag unless the operator confirms `pnpm check:release` passed or owner-waived blockers are documented in a real release note, PR, URL, or ticket reference. Placeholder references such as `none`, `n/a`, `todo`, `tbd`, or `pending` are rejected.
+The GitHub Release workflow refuses to create a `strelva-v<SemVer>` tag unless the tag matches `package.json` and the operator confirms `pnpm check:release` passed or owner-waived blockers are documented in a real release note, PR, URL, or ticket reference. Run `pnpm version:check` first so the app and marketing site are aligned. Placeholder references such as `none`, `n/a`, `todo`, `tbd`, or `pending` are rejected.
 `pnpm check:release` runs local smoke against the built Next app and forces `REB_DEV_UNGATED_ACCESS=0` so signed-out access checks cannot be bypassed by the dev-access flag.
 
 Then manually verify:

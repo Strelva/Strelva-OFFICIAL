@@ -4,6 +4,8 @@ Canonical repo guidance for all coding agents (Claude Code, Codex). `CLAUDE.md` 
 
 **Naming**: Product is "Strelva" (rebranded). Package name is now `strelva`. The Vercel team is `strelva` and the control-plane project is `strelva-admin` (deploy with `--scope strelva`). Wire-level / persistent-data names stay legacy ON PURPOSE (coordinated-rollout only): the `reb:` Redis key prefixes, `x-reb-*` HMAC headers, and `REB_*` / `SCAFFOLD_*` env + contract symbols that deployed client repos depend on. So brand + package = Strelva; wire = legacy `reb`. Don't call the product "scaffold-web".
 
+**Release versioning**: the app and sibling `strelva-marketing` repository share one SemVer product version and must advance together. `package.json` is canonical inside each repo; `pnpm version:check` detects drift. Current release: `0.1.1` (Labs); baseline: `0.1.0`. Product SemVer is separate from the frozen `/api/v1` storefront contract. See `VERSIONING.md`.
+
 ## Commands
 
 ```bash
@@ -15,6 +17,7 @@ pnpm test src/__tests__/core.test.ts  # Single test file
 pnpm smoke                        # Playwright (public smoke; bypass OFF)
 pnpm smoke:surfaces               # Ungated admin/owner console smoke (bypass ON + fixture)
 pnpm typecheck                    # tsc --noEmit
+pnpm version:check                # app package version must match strelva-marketing
 pnpm provision-tenant             # Create new tenant
 pnpm check:prod                   # Production readiness checklist
 pnpm check:custom-repos           # Verify sibling custom-repo workspaces (executable conformance, not string-grep)
@@ -198,7 +201,7 @@ Pivoted 2026-06-26 from the two-door build-fee offer (`docs/strategy/website-off
 - **Billing is LIVE (2026-06-26)** on the new standalone Strelva Stripe account (`acct_1Tmc5dA4gUnh4arE`). `isBillingEnabled()` (`src/lib/subscription.ts`) is true (`STRIPE_SCAFFOLD_PRICE_ID` = the Growth price). `STRIPE_BILLING_GRANDFATHER_TENANTS=gldf,rohlax` keeps existing clients active; `check:prod` enforces the grandfather-list-or-402 rule.
 - ⚠️ **To change any Stripe/billing env var you MUST do a fresh `vercel deploy --prod --yes --scope strelva`. `vercel redeploy` REUSES the target deployment's env snapshot and will NOT apply env changes.**
 - **gldf + rohlax are grandfathered** (no subscription; protected via the list). New clients subscribe at a tier price.
-- **Offer hook = "free to build" (founder decision, 2026-06-26):** no build fee, no upfront/setup cost. We **build first**, the client approves, and the **monthly subscription starts at go-live** ("pay when you're happy"). This is a deliberate low-friction growth hook — we accept the risk of an occasional unpaid build as the cost of frictionless sign-on. Marketing says "free to build / pay when happy" on purpose; do NOT "correct" it to a pay-first framing.
+- **Website builds are paid (founder decision, 2026-08-03):** scope and quote every custom build before work starts. Ongoing management remains a separate monthly subscription. Do not offer “free to build,” “pay when happy,” free trials, or new comped case-study pricing.
 - Canonical pricing/Stripe-setup detail (account, live price IDs, branding): vault `1-projects/scaffold-web/pricing-and-billing.md`.
 - Agency channel (wholesale resell) was researched and parked (2026-06-09); not built.
 
@@ -332,7 +335,7 @@ Local-business owners will pay for a dashboard that proves their website is work
 - Tiered pricing UI.
 - A `/api/public/*` re-export shell of the v1 contract (v1 owns the contract directly now).
 - Self-serve onboarding/provisioning (backend deleted 2026-06-10; don't resurrect without a founder decision).
-- Copy implying the ONGOING service is free. "Free to build" (no build fee) and the free audit tool are the only "free" — the monthly subscription ($99/$199/$499) is always paid. Don't say "free site/free hosting/free forever."
+- Copy implying the build or ongoing service is free. The public audit tool may remain free, but websites and monthly management are paid. Don't say "free to build/free site/free hosting/free forever."
 
 ## Execution Rules
 - NEVER add "Co-Authored-By" lines to commits. (Intentional — this repo's commits read

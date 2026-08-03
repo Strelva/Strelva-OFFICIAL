@@ -9,7 +9,7 @@ import {
 
 /**
  * Owner self-serve: the signed-in owner of a tenant starts their OWN monthly
- * subscription ("pay when you're happy" go-live). Scoped to the caller's tenant
+ * management subscription at go-live. Scoped to the caller's tenant
  * via requireTenantAccess; the Stripe customer email comes from their auth, not
  * request input. Super admins create checkouts for other tenants via
  * /api/billing/create-subscription — this route is only ever the caller's own.

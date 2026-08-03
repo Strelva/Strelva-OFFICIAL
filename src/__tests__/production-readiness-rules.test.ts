@@ -670,7 +670,8 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(release).toContain("release_note_ref must be a real release note, PR, or ticket reference");
     expect(release).toContain("Owner-waived releases must reference waiver metadata");
     expect(release).toContain("launch-blockers");
-    expect(release).toContain("^reb-v[0-9]{4}");
+    expect(release).toContain("^strelva-v(0|[1-9][0-9]*)");
+    expect(release).toContain('strelva-v$PACKAGE_VERSION');
     expect(release).toContain("VERSION: ${{ inputs.version }}");
     expect(release).toContain('git tag "$VERSION"');
     expect(release).toContain('git push origin "$VERSION"');

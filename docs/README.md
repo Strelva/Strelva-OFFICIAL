@@ -1,6 +1,6 @@
 # Documentation status and authority
 
-Updated: 2026-07-30
+Updated: 2026-08-03
 
 Strelva has accumulated implementation notes, migration plans, strategy research,
 and live runbooks. They are not equal sources of truth. When two documents
@@ -17,6 +17,7 @@ conflict, use this order:
 
 | Document | Authority |
 |---|---|
+| `../VERSIONING.md` | Lockstep app/marketing SemVer and release-tag policy |
 | `product-ontology.md` | Product/domain ontology, taxonomy, maturity vocabulary |
 | `persistence-boundaries.md` | Store authority and migration boundaries |
 | `auth-tenancy-architecture.md` | Supabase Auth, membership, and application-layer tenancy |

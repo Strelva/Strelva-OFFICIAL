@@ -22,7 +22,7 @@ function cleanNumber(value: unknown): number | undefined {
   return undefined;
 }
 
-const VALID_BILLING_TYPES: BillingType[] = ["tier", "custom", "case_study", "none"];
+const VALID_BILLING_TYPES: BillingType[] = ["tier", "custom", "none"];
 const VALID_TIERS: CommercialPlanKey[] = ["presence", "growth", "scale"];
 const VALID_PRESENCE: PresenceProfile[] = ["local", "online", "hybrid"];
 

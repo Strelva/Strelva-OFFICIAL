@@ -94,7 +94,7 @@ export function billingLabel(tenant: BillingFields): string {
       return cents ? `Custom · $${Math.round(cents / 100)}/mo` : "Custom (amount not set)";
     }
     case "case_study":
-      return "Case study (free)";
+      return "Legacy case study";
     case "none":
     default:
       return "No plan set";

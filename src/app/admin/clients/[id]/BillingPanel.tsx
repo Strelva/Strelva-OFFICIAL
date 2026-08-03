@@ -6,7 +6,7 @@ import { CreditCard, ExternalLink } from "lucide-react";
 /**
  * The ONE billing surface for a client. Consolidates what used to be split across
  * StartPlanPanel + the TenantEditor billing section:
- *   - set the plan (tier / custom-off-platform / case-study / none)
+ *   - set the plan (tier / custom-off-platform / none)
  *   - see the current state
  *   - generate the recurring Stripe checkout link to send (tier clients only)
  */
@@ -15,7 +15,6 @@ const BILLING_TYPES: { value: string; label: string; hint: string }[] = [
   { value: "", label: "No plan set", hint: "Not configured yet — flags as an open item." },
   { value: "tier", label: "Tier — on Strelva Stripe", hint: "One of the 3 published plans. Send them a Stripe checkout link below." },
   { value: "custom", label: "Custom / legacy — billed off-platform", hint: "Not on Strelva Stripe (your invoice, their processor). Enter the monthly amount — counts toward MRR, no link needed." },
-  { value: "case_study", label: "Case study (free)", hint: "Comped — no charge." },
 ];
 const TIERS = [
   { value: "presence", label: "Presence · $99/mo" },

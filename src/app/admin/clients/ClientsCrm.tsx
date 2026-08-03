@@ -20,7 +20,7 @@ export interface ClientRow {
   seoGrade: LetterGrade | null;
   /** Managed-readiness verdict, or null. Only "blocked" is a real problem. */
   launchStatus: "ready" | "watch" | "blocked" | null;
-  /** Human billing label, e.g. "Growth · $199/mo" / "Case study (free)" / "No plan set". */
+  /** Human billing label, e.g. "Growth · $199/mo" / "Legacy case study" / "No plan set". */
   billingLabel: string;
   /** Whether billing is set up (tier/custom/case_study). false = "none". */
   billingConfigured: boolean;

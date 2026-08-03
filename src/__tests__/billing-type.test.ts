@@ -42,7 +42,7 @@ describe("billing-type", () => {
   it("labels each billing state for admin display", () => {
     expect(billingLabel({ billingType: "tier", subscriptionPlan: "growth" })).toContain("Growth");
     expect(billingLabel({ billingType: "custom", planMonthlyCents: 18500 })).toContain("185");
-    expect(billingLabel({ billingType: "case_study" })).toBe("Case study (free)");
+    expect(billingLabel({ billingType: "case_study" })).toBe("Legacy case study");
     expect(billingLabel({ billingType: "none" })).toBe("No plan set");
   });
 });

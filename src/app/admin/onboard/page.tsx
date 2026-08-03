@@ -35,7 +35,6 @@ const BILLING_TYPES: { value: BillingType | ""; label: string; hint: string }[] 
   { value: "", label: "No plan set", hint: "Not configured yet — this flags as an open item." },
   { value: "tier", label: "Tier — on Strelva Stripe (Presence / Growth / Scale)", hint: "On one of the 3 published plans." },
   { value: "custom", label: "Custom / legacy — billed off-platform", hint: "Not on Strelva Stripe. Enter the monthly amount — it counts toward MRR." },
-  { value: "case_study", label: "Case study (free)", hint: "Comped — no charge." },
 ];
 
 const TIERS: { value: CommercialPlanKey; label: string }[] = [

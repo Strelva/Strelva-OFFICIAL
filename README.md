@@ -6,8 +6,15 @@ language ("add my new Saturday class"); the founders run the whole portfolio fro
 AI-driven operator console. Each client's public site is a separate hand-built repo that
 pulls content from Strelva over a versioned contract.
 
-> Internal note: the repo's legacy name is `reb`; wire-level `x-reb-*` headers and `reb:`
-> Redis prefixes are intentionally frozen for back-compat. Product name is Strelva.
+> Internal note: wire-level `x-reb-*` headers and `reb:` Redis prefixes are
+> intentionally frozen for compatibility. Every product and release surface is Strelva.
+
+## Product version
+
+The Strelva app and the separate `strelva-marketing` site release in lockstep.
+Both are currently **v0.1.1**; v0.1.0 is the initial baseline and v0.1.1 adds
+Strelva Labs. Run `pnpm version:check` with both sibling repositories present
+before preparing a release. See [`VERSIONING.md`](./VERSIONING.md).
 
 ## Architecture
 
@@ -94,6 +101,7 @@ pnpm typecheck      # tsc --noEmit
 pnpm test           # vitest (~1983 tests)
 pnpm build          # production build
 pnpm check:prod     # production-readiness checklist
+pnpm version:check  # confirm app and marketing versions match
 pnpm provision-tenant   # CLI tenant provisioning
 ```
 

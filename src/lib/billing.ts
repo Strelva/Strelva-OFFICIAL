@@ -44,8 +44,6 @@ export interface TenantSubscriptionCheckoutInput {
   planKey?: CommercialPlanKey;
   planMonthlyCents?: number;
   planCurrency?: string;
-  /** Free trial length in days, wired to subscription_data.trial_period_days (e.g. Door 1's 3 months included). */
-  trialPeriodDays?: number;
 }
 
 export interface TenantSubscriptionCheckoutResult {
@@ -110,11 +108,7 @@ export async function createTenantSubscriptionCheckout(
           : {}),
         planCurrency: input.planCurrency ?? "usd",
       },
-      ...(input.trialPeriodDays && input.trialPeriodDays > 0
-        ? { trial_period_days: input.trialPeriodDays }
-        : {}),
     },
-    allow_promotion_codes: true,
   });
 
   if (!session.url) {

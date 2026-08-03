@@ -1,6 +1,6 @@
 {
   "name": "strelva",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "scripts": {
     "prepare": "git config core.hooksPath .githooks || true",
@@ -27,7 +27,8 @@
     "check:ontology": "tsx scripts/check-ontology.ts",
     "audit:full": "npx tsx --env-file-if-exists=.env.local scripts/full-audit.ts",
     "check:prod": "tsx scripts/production-checklist.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "version:check": "node scripts/check-version-sync.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "3.0.78",

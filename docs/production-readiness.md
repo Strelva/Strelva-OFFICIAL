@@ -1,6 +1,6 @@
 # Strelva Production Readiness
 
-> **Status: current release runbook (updated 2026-07-30).** Auth is Supabase-only;
+> **Status: current release runbook (updated 2026-08-03).** Auth is Supabase-only;
 > Postgres owns durable tenant/content state; Redis owns only the operational
 > boundaries listed in `persistence-boundaries.md`. Clerk and Sanity code teardown
 > are complete. The remaining Sanity work is ops-only legacy image URL cleanup.
@@ -12,7 +12,9 @@
 - Primary branch: `main`.
 - GLDF primary branch: `master` until intentionally renamed.
 - Rohlax Wellness primary branch: `main`.
-- Tag control-plane releases as `reb-vYYYY.MM.DD.N`.
+- Keep `REB/package.json` and `strelva-marketing/package.json` on the same SemVer;
+  run `pnpm version:check` before release.
+- Tag product releases as `strelva-v<version>`, for example `strelva-v0.1.1`.
 - Record compatible storefront tags or commit SHAs in each Strelva release note.
 
 ## API Contract
@@ -80,6 +82,7 @@
 - Run `pnpm audit`.
 - Run `pnpm build`.
 - Run `pnpm check:prod` against production env values.
+- Run `pnpm version:check` with the sibling `strelva-marketing` repo present.
 - Run `git status --short` and confirm the branch is clean before any CLI production deploy or release verification that should represent the release branch.
 - Redeploy the Vercel Production app after env or code changes from the Vercel dashboard or from a clean release branch with `vercel deploy --prod` before running live verification. The release branch must contain the launch-readiness fixes being verified; do not only redeploy an older artifact, and do not run a CLI production deploy from a dirty local working tree.
 - After redeploy, verify the control-plane hostname has the current customer access copy: `PLAYWRIGHT_BASE_URL=https://app.strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g "signed-out dashboard customers"`.

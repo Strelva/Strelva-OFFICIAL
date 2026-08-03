@@ -27,7 +27,6 @@ import { buildOpsReport } from "@/lib/ops";
 import { getServiceHealth } from "@/lib/health";
 import { buildAttentionBriefing } from "@/lib/attention";
 import { getAllTenants, getTenantConfig } from "@/lib/tenants";
-import { resolveBillingType } from "@/lib/billing-type";
 import { getAllAuditEvents } from "@/lib/storage";
 import { listPayLinks } from "@/lib/pay-links";
 import { buildRevenueSummary, listBuildPayments } from "@/lib/revenue";
@@ -363,35 +362,16 @@ export async function POST(req: Request) {
     }),
     propose_update_tenant: tool({
       description:
-        "Propose a tenant config change (e.g. owner email, subscription status, founder-comp, active). Returns a confirmation card; does NOT apply. Only include the fields to change.",
+        "Propose a tenant config change (e.g. owner email, subscription status, active). Returns a confirmation card; does NOT apply. Only include the fields to change.",
       inputSchema: z.object({
         tenantId: z.string(),
         ownerEmail: z.string().email().optional(),
         subscriptionStatus: z.enum(["none", "active", "trialing", "past_due", "cancelled"]).optional(),
-        founderComp: z.boolean().optional().describe("true sets founder-comp (free access), false clears it"),
         active: z.boolean().optional(),
       }),
-      execute: async ({ tenantId, founderComp, ...changes }) => {
+      execute: async ({ tenantId, ...changes }) => {
         const fields = Object.entries(changes).filter(([, v]) => v !== undefined);
         const params: Record<string, unknown> = { id: tenantId, ...Object.fromEntries(fields) };
-        // Free access = billingType "case_study" (the first-class replacement for
-        // the retired planOverride:"founder_comp" flag). Do NOT set planOverride
-        // here: the tenants PATCH coerces "founder_comp" -> "" (retirement rule),
-        // which would silently CLEAR access instead of granting it. case_study is
-        // honored by getEffectiveSubscriptionStatus. Kept out of the Gemini schema
-        // as a boolean since an empty enum value fails function-calling validation.
-        if (founderComp === true) {
-          params.billingType = "case_study";
-        } else if (founderComp === false) {
-          // Only CLEAR when the tenant is actually comped — Gemini routinely emits
-          // an explicit founderComp:false for a boolean the operator merely
-          // mentioned, and unconditionally writing "none" would wipe a paying
-          // tier/custom client out of MRR. Un-comp only a real case_study.
-          const current = await getTenantConfig(tenantId).catch(() => null);
-          if (current && resolveBillingType(current) === "case_study") {
-            params.billingType = "none";
-          }
-        }
         const changedKeys = Object.keys(params).filter((k) => k !== "id");
         if (changedKeys.length === 0) {
           return { error: "No fields to change." };

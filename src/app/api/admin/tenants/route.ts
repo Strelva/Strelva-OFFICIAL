@@ -173,12 +173,12 @@ export async function PATCH(req: Request) {
       active: z.boolean(),
       subscriptionStatus: z.enum(["none", "active", "trialing", "past_due", "cancelled"]),
       // Operator-set billing classification. "" from the UI means "none" (unset).
-      billingType: z.enum(["", "none", "tier", "custom", "case_study"]),
+      billingType: z.enum(["", "none", "tier", "custom"]),
       // Which tier when billingType==="tier"; "" clears it.
       subscriptionPlan: z.enum(["", "presence", "growth", "scale"]),
       // Custom monthly amount in cents (billingType==="custom"); null clears it. Capped for sanity.
       planMonthlyCents: z.number().int().min(0).max(1_000_000).nullable(),
-      planOverride: z.enum(["", "founder_comp"]),
+      planOverride: z.literal(""),
       // The enabled dashboard features. Validated + core-guarded below (not billing).
       features: z.array(z.string()).max(64),
       // Operator-settable TenantConfig fields (super-admin gated). These flow
@@ -254,12 +254,9 @@ export async function PATCH(req: Request) {
   const billingData = data as Record<string, unknown>;
   if (billingData.billingType === "") billingData.billingType = "none";
   if (billingData.subscriptionPlan === "") billingData.subscriptionPlan = null;
-  // Legacy: retire founder_comp — a case_study billingType supersedes it. Never re-set it.
-  if (billingData.planOverride === "founder_comp") billingData.planOverride = "";
-
   // Guard: a custom plan must carry a positive monthly amount. Without this,
   // an operator could save billingType:"custom" with $0 and silently corrupt MRR.
-  // tier/case_study/none legitimately have zero/null cents, so the guard is
+  // tier/none legitimately have zero/null cents, so the guard is
   // scoped to "custom" only (matching the POST /provision path).
   if (billingData.billingType === "custom") {
     const cents = billingData.planMonthlyCents;

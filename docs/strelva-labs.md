@@ -1,13 +1,19 @@
 # Strelva Labs
 
-Status: **working product specification; not yet a selected commercial product**
+Status: **public Labs surface introduced in Strelva v0.1.1; long-term product
+direction remains an unselected commercial specification**
 Created: 2026-08-02
+Updated: 2026-08-03
 
 This document captures the long-term product direction and initial validation
 plan for Strelva Labs. It is intentionally more ambitious than the current
 managed-website offering, but it does not supersede `product-ontology.md`, the
 current roadmap, or existing commercial commitments until evidence promotes a
 specific Labs direction into product truth.
+
+The v0.1.1 release includes the public `/labs` index and Experiment 001 in an
+honest `Building` state. It does not claim that the experiment, hosted tool,
+source repository, or long-term Labs runtime is live.
 
 ## Product thesis
 
