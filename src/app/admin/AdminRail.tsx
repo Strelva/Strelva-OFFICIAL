@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import type { CSSProperties } from "react";
 import {
   LayoutGrid, Users, Building2, Inbox, UserPlus, CreditCard, BarChart3,
-  Zap, FileText, Wrench, Activity, ScrollText, type LucideIcon,
+  Zap, FileText, Wrench, Activity, ScrollText, Globe, type LucideIcon,
 } from "lucide-react";
 import { LogoMark } from "@/components/Logo";
 
@@ -39,6 +39,7 @@ export const NAV: Group[] = [
     label: "System",
     items: [
       { href: "/admin/ops", label: "Ops", icon: Activity, badgeKey: "ops", hot: true },
+      { href: "/admin/uptime", label: "Uptime", icon: Globe },
       { href: "/admin/audit", label: "Audit", icon: ScrollText },
     ],
   },
