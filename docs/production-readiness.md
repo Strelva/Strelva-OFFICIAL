@@ -70,7 +70,7 @@
 - Confirm custom domain mapping resolves tenant from host or use `/api/v1/*` public routes.
 - Add production domains in Vercel, including `www` and `admin` variants where used.
 - Configure DNS and wait for Vercel domain verification before sending traffic.
-- For Cloudflare-managed tenant domains, keep the Vercel project domain entries and add the records Vercel recommends in Cloudflare. Current Rohlax evidence: `admin.rohlaxwellness.com` is attached to `scaffold-web`, `rohlaxwellness.com` is attached to `rohlax-wellness`, and `www` plus `admin` currently expose a Vercel CNAME alias but still fail `dns.resolve4(...)`/`curl`; Cloudflare still needs `A www.rohlaxwellness.com 76.76.21.21` plus `A admin.rohlaxwellness.com 76.76.21.21`.
+- For Cloudflare-managed tenant domains, keep the Vercel project domain entries and add the records Vercel recommends in Cloudflare. Current Rohlax evidence: `admin.rohlaxwellness.com` is attached to `strelva-admin`, `rohlaxwellness.com` is attached to `rohlax-wellness`, and `www` plus `admin` currently expose a Vercel CNAME alias but still fail `dns.resolve4(...)`/`curl`; Cloudflare still needs `A www.rohlaxwellness.com 76.76.21.21` plus `A admin.rohlaxwellness.com 76.76.21.21`.
 - Confirm `https://app.strelva.com/api/health` resolves to the control-plane Vercel
   project and returns JSON. The marketing apex is not an API health target.
 - Configure Stripe webhook `https://app.strelva.com/api/billing/webhook` for

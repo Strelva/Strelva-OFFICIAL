@@ -26,11 +26,12 @@ export function AdminMobileNav({
   useEffect(() => {
     if (!open) return;
     const prev = document.activeElement as HTMLElement | null;
+    const openButton = openButtonRef.current;
     requestAnimationFrame(() => closeButtonRef.current?.focus());
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = "";
-      (prev ?? openButtonRef.current)?.focus();
+      (prev ?? openButton)?.focus();
     };
   }, [open]);
 

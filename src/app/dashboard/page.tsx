@@ -77,7 +77,6 @@ async function DashboardHome() {
   // Customer actions = booking clicks + phone taps (booking's per-service
   // breakdown stays booking-only elsewhere; this is just the top-line total).
   const customerActionsTotal = customerActions.total + phoneActions.total;
-  const customerActionsThisWeek = customerActions.thisWeek + phoneActions.thisWeek;
   const siteUrl = tenantConfig
     ? getTenantPublicUrl(tenantConfig, getTenantPrimaryDomain(tenantConfig) ? "production" : process.env.NODE_ENV)
     : getTenantPublicUrlFromDomainMap(tenant);

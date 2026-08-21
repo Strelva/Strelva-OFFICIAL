@@ -105,13 +105,6 @@ const results = await pipeline(
   ),
 )
 
-const laneMeta = []
-for (let i = 0; i < lanes.length; i++) {
-  const r = results[i]
-  // results[i] is the array of verified findings for lane i (from the parallel stage)
-  laneMeta.push({ lane: lanes[i].key })
-}
-
 const all = results.flat().filter(Boolean)
 const survivors = all.filter((f) => f.verdict?.verdict === 'real')
 const nitpicks = all.filter((f) => f.verdict?.verdict === 'nitpick')

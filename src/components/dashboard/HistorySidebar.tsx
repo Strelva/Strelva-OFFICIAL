@@ -19,14 +19,14 @@ import { SURFACE_ICONS, GROUP_LABELS, SURFACE_MATCH } from "./surface-nav";
 import { createBrowserSupabase } from "@/lib/db/browser-client";
 
 /** Ends the active Supabase session then returns to sign-in. */
-async function signOutEverywhere() {
+async function signOutEverywhere(navigateToSignIn: () => void) {
   try {
     const supabase = createBrowserSupabase();
     if (supabase) await supabase.auth.signOut();
   } catch {
     // ignore — fall through to redirect so the user always leaves
   }
-  window.location.href = "/sign-in";
+  navigateToSignIn();
 }
 
 export interface Thread {
@@ -441,7 +441,7 @@ export function HistorySidebar({
           <button
             type="button"
             onClick={() => {
-              void signOutEverywhere();
+              void signOutEverywhere(() => router.replace("/sign-in"));
             }}
             className="w-8 h-8 rounded-md flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
             title="Sign out"

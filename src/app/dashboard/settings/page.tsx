@@ -683,8 +683,7 @@ function UtilitiesSection() {
 // Site config section
 // ---------------------------------------------------------------------------
 
-const ALL_SITE_CONFIG_TABS = ["navigation", "capabilities", "components"] as const;
-type SiteConfigTab = (typeof ALL_SITE_CONFIG_TABS)[number];
+type SiteConfigTab = "navigation" | "capabilities" | "components";
 
 function SiteConfigSection({ readOnly = false }: { readOnly?: boolean }) {
   const dashboard = useDashboardOptional();

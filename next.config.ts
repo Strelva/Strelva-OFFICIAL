@@ -36,6 +36,22 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      // Guides are a marketing publication. Keep the control plane from
+      // competing with the canonical first-party copy on www.strelva.com.
+      {
+        source: "/guides",
+        destination: "https://www.strelva.com/guides",
+        permanent: true,
+      },
+      {
+        source: "/guides/:path*",
+        destination: "https://www.strelva.com/guides/:path*",
+        permanent: true,
+      },
+    ];
+  },
   async headers() {
     return [
       {

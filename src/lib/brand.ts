@@ -11,7 +11,7 @@ export const BRAND_NAME = "Strelva" as const;
 export const ROOT_DOMAIN = "strelva.com" as const;
 
 // Outbound/marketing surfaces (metadata, sitemap, canonical URLs, email from-addresses).
-export const MARKETING_URL = `https://${ROOT_DOMAIN}` as const;
+export const MARKETING_URL = `https://www.${ROOT_DOMAIN}` as const;
 export const CONTROL_PLANE_URL = `https://app.${ROOT_DOMAIN}` as const;
 export const OPERATOR_URL = `https://admin.${ROOT_DOMAIN}` as const;
 export const EMAIL_DOMAIN = `updates.${ROOT_DOMAIN}` as const;

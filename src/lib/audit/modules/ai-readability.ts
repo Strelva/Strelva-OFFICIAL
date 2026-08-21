@@ -611,7 +611,6 @@ export function checkAiReadability(ctx: AuditContext): CategoryResult {
     // linked" on sites that plainly link their socials, e.g. RHM's 7 links).
     const schemaPlatforms = sameAs.platforms;
     const visible = visibleAuthorityPlatforms($);
-    const visibleOnly = visible.filter((p) => !schemaPlatforms.includes(p));
     const allPlatforms = [...new Set([...schemaPlatforms, ...visible])];
     // Calibrated for the local-SMB ICP: declaring Google + a couple of socials
     // (2 profiles) is a normal, healthy footprint and should pass — requiring 3+

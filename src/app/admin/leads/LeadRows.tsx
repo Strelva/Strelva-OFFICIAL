@@ -343,14 +343,6 @@ export function LeadRows({
   const [filter, setFilter] = useState<FilterKey>("all");
   const [showDismissed, setShowDismissed] = useState(false);
 
-  function statusOf(token: string): LeadWorkflowStatus {
-    return workflow[token]?.status ?? "new";
-  }
-
-  function updatedAtOf(token: string): string | null {
-    return workflow[token]?.updatedAt ?? null;
-  }
-
   async function setStatus(token: string, status: LeadWorkflowStatus): Promise<boolean> {
     setPending((p) => ({ ...p, [token]: true }));
     setActionError(null);

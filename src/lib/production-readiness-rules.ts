@@ -23,7 +23,7 @@ export function getLaunchBlockerError(content: string, path = "docs/launch-block
   const waivedBlockers = content.match(/## Waived Blockers([\s\S]*?)(?=\n## |\s*$)/i)?.[1] || "";
   const currentBlockerNames = [...currentBlockers.matchAll(/^###\s+(.+)$/gim)]
     .map((match) => match[1]!.trim())
-    .filter(Boolean);
+    .filter((name) => Boolean(name) && !/\bresolved\b/i.test(name));
   const hasUnwaivedBlocker =
     /Status:\s*blocked/i.test(currentBlockers) ||
     currentBlockerNames.length > 0 ||

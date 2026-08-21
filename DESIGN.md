@@ -1,44 +1,79 @@
-# Design
+# Strelva product design
 
-Strelva uses one shared token contract for three surface families: the product dashboard, Strelva marketing pages, and tenant storefronts.
+## User and result
 
-## Product Dashboard
+Strelva Websites serves a local-business owner who wants a useful site without becoming its webmaster. The owner should be able to see whether the site is doing useful work, ask Strelva for a change in ordinary language, understand what will happen, and receive honest evidence after the change is live.
 
-The dashboard is a restrained dark product UI. It should feel operational, calm, and repeatable: dense enough for review queues, settings, reports, and site editing, without decorative chrome.
+The secondary user is the Strelva operator managing many client sites. The operator needs to see which client requires judgment, inspect the exact proposed action and its consequence, and resolve the portfolio without losing tenant boundaries or pretending unfinished work is complete.
 
-- Backgrounds use `--surface-base`, `--surface`, `--surface-raised`, and `--surface-inset`.
-- Primary action and AI/system emphasis use `--accent`, `--accent-dim`, and `--accent-text`.
-- Success uses `--success` and `--success-dim`.
-- High-contrast text and filled controls use `--warm-white`, not raw `white`.
-- Filled `--warm-white` controls use `--on-warm-white` for foreground text.
-- Floating controls, menus, and overlays may use `--glass`, `--glass-border`, and `--glass-active`.
-- Backdrops use `--overlay-scrim`, not raw black utilities.
+The client owns their domain and content and can leave. The public site is a separate hand-built client repository; the control plane manages content, evidence, and governed actions without turning every client site into one template.
 
-## Tenant Storefronts
+## Dominant loops
 
-Tenant storefronts are brand-led and visual. They use tenant theme variables from content or template defaults, then render through the shared public section components.
+For an owner, the dominant loop is:
 
-- Base backgrounds use `--cream`, `--cream-dark`, and `--cream-mid`.
-- Primary actions and soft accents use `--sage`, `--sage-light`, `--sage-dark`, and `--sage-wash`.
-- Text uses `--bark`, `--bark-light`, and `--bark-faded`.
-- Warm editorial accents use `--blush`, `--blush-light`, `--terra`, and `--terra-light`.
+1. See the current result and the next relevant action on Today, Analytics, Reports, Reviews, or Website.
+2. Ask Strelva for a change or inspect work Strelva has prepared.
+3. Review the exact consequence when approval is required.
+4. See whether the action is pending, accepted, live, failed, or still unverified, with recovery available where the product supports it.
 
-## Rules
+For an operator, the dominant loop is to open the work that needs judgment, inspect it in the context of the correct client, approve, dismiss, or repair it, and see the resulting state. Portfolio rollups support this loop; they are not the product by themselves.
 
-- Do not introduce one-off color utilities when a token exists.
-- Do not use raw `bg-black`, `bg-white`, `text-black`, or `text-white` for product surfaces unless the element is rendering third-party or browser-like preview chrome.
-- Avoid gradient text, side-stripe card accents, decorative glass, and bounce easing.
-- Keep product radii compact, usually `6px` to `8px`; reserve full pills for small controls and status indicators.
-- Component primitives in `src/components/ui` are preferred over hand-rolled controls for new dashboard work.
+## Product nouns and actions
 
-## Strelva Marketing
+- A **tenant** is the control-plane identity for one managed client site.
+- A **client site** is the public website in its own repository and domain.
+- **Today** shows the owner's current proof and next action.
+- **Ask Strelva** is the plain-language website-management surface.
+- **Website** is the spine for site content, assets, history, and an applicable Store sub-surface.
+- **Analytics** shows live or selected-period evidence. **Reports** holds written recaps.
+- A **proposal** or **draft** is not a completed external action. An **approval** is the human decision authorizing a governed action.
+- **What Strelva did for you** contains only work that actually became live; it excludes the owner's own edits and pending drafts.
 
-The Strelva marketing surface is a restrained technical brand scene, not a generic AI SaaS page. It should feel precise, operational, and trustworthy: dark graphite surfaces, tinted neutrals, a green-cyan system accent, visible proof loops, and direct signup paths.
+Use customer language that names the result:
 
-- Marketing pages use the `--m-*` token family in `src/app/globals.css`.
-- Color strategy is restrained technical: graphite base, tinted rules, one green-cyan system accent, and warm-white primary actions.
-- Primary CTAs should point to the shortest signup/request path and use the shared `marketing-button-primary` class.
-- Secondary CTAs should help invited users reach `/sign-up` without competing with the main path.
-- Motion should be purposeful: page-entry choreography, proof-loop scans, progress state, and hover/press feedback. Avoid scattered decorative movement.
-- Use `--m-ease-*` and `--m-duration-*` motion tokens. Respect `prefers-reduced-motion` for all marketing animations.
-- Do not use purple-blue gradients, gradient text, hero stat templates, repeated icon-card grids, or glassmorphism as decoration.
+- “See what's working,” not “analytics dashboard.”
+- “Tell Strelva what to change,” not “conversational CMS.”
+- “47 people found you this week,” not “unique visitors: 47.”
+- “Your weekly report,” not “automated insights.”
+
+The assistant refers to itself as **Strelva**. The visible action is **Ask Strelva**, not “Ask AI.”
+
+## Creative premise
+
+The owner dashboard and operator console are a **restrained dark operations room**: calm, compact, and legible enough for evidence, review queues, settings, and site work. The visual center is the result or decision, not decorative chrome. Display type gives the system a human editorial voice; dense UI remains direct and quiet.
+
+Production Strelva marketing is a separate repository. Marketing surfaces that remain here use a **restrained technical field system**: graphite, tinted rules, one green-cyan signal, warm-white primary actions, direct paths, and visible proof rather than generic AI spectacle.
+
+Tenant storefronts are brand-led and visual. The client's real place, products, people, and materials should dominate; shared Strelva components provide reliable behavior without flattening clients into the control-plane brand.
+
+## Official systems and references
+
+- Dashboard tokens live in the `[data-dashboard]` contract in `src/app/globals.css`.
+- Dashboard and operator primitives live in `src/components/ui/` and `src/app/admin/console.tsx`.
+- Status colors map through `src/lib/status-colors.ts`; use the existing positive, warning, critical, and neutral semantics.
+- Marketing tokens use the `--m-*` family and shared marketing button classes in `src/app/globals.css`.
+- Tenant storefront theme variables and the public section components are the shared storefront foundation. A client repository may establish a narrower brand system for its own surfaces.
+
+Use the existing tokens and primitives when they express the accepted direction. Change them at the narrowest scope when they force a wrong client or product decision.
+
+## States and trust boundaries
+
+- Show actual state: loading, empty, unconfigured, unavailable, pending, approved, dismissed, failed, accepted-but-unverified, live, and recoverable history where applicable.
+- Do not turn a missing integration into fake activity or a “coming soon” promise. A relevant disconnected surface may offer a clear connect state; an irrelevant surface stays hidden.
+- Never invent traffic, rankings, reviews, baselines, customer activity, competitive benchmarks, completed work, or provider confirmation.
+- Before approval, show the exact copy, fields, hours, destination, or other consequence that will be published. After an external provider accepts a non-idempotent write, represent read-back failure separately rather than inviting a duplicate retry.
+- Keep tenant identity visible wherever an operator can act across clients. Client-safe summaries must not leak admin-only intelligence, secrets, or another tenant's data.
+- Owner-facing review summaries present real positive evidence and constructive opportunities without shame. Urgent concerns and at-risk intelligence remain on operator surfaces.
+- On the light sage accent, use the dark `text-on-accent` foreground. Use theme-aware text tokens on dark surfaces; do not assume white text is accessible.
+- Respect reduced motion. Motion explains entry, progress, or consequence; it does not loop for decoration or delay meaningful content from becoming visible.
+
+## Product-specific prohibitions
+
+- No drag-and-drop visual editor or client-facing code editor.
+- No checkout or payment engine in the control plane. Client repositories or commerce providers own carts and charges; Strelva may surface the resulting commerce evidence.
+- No self-serve provisioning unless a new founder decision explicitly reopens it.
+- No tiered-pricing UI as a proxy for code feature flags.
+- Do not imply that website builds, hosting, or ongoing management are free. The public audit may be free; the managed product is paid.
+- Do not expose repository structure, agents, data models, governance internals, or a generic dashboard as the user's main product.
+- Avoid raw black or white when a product token exists, one-off status hues, gradient text, decorative glass, purple-blue AI gradients, hero-stat templates, repeated icon-card grids, colored side stripes, bounce easing, and full pills on large controls.

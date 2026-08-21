@@ -213,7 +213,7 @@ checkFileContains("docs/design-kit.md", "Design kit", [
   "Template Expansion Rules",
 ]);
 checkFileContains("docs/domain-setup.md", "Domain setup doc", [
-  "scaffold-web",
+  "strelva-admin",
   "app.strelva.com",
   "admin.strelva.com",
   "cname.vercel-dns.com",
@@ -619,15 +619,15 @@ checkAuthAccessPages(
   "src/components/auth/UseInvitedEmailButton.tsx",
 );
 
-function checkAdminInviteFlow(adminPagePath: string, inviteButtonPath: string, inviteRoutePath: string) {
-  const missingFiles = [adminPagePath, inviteButtonPath, inviteRoutePath].filter((path) => !existsSync(path));
+function checkAdminInviteFlow(adminPagePath: string, tenantEditorPath: string, inviteRoutePath: string) {
+  const missingFiles = [adminPagePath, tenantEditorPath, inviteRoutePath].filter((path) => !existsSync(path));
   if (missingFiles.length) {
     log({ name: "Admin invite flow", status: "fail", message: `${missingFiles.join(", ")} missing` });
     return;
   }
 
   const adminPage = readFileSync(adminPagePath, "utf8");
-  const inviteButton = readFileSync(inviteButtonPath, "utf8");
+  const tenantEditor = readFileSync(tenantEditorPath, "utf8");
   const inviteRoute = readFileSync(inviteRoutePath, "utf8");
   const expectedTenantSignUpUrl = 'getTenantDashboardUrl(tenantConfig, "/sign-up", "production")';
   const expectedInviteEmailHtml = "buildInviteEmailHtml({ email, siteName: tenantConfig.siteName, signUpUrl })";
@@ -635,25 +635,17 @@ function checkAdminInviteFlow(adminPagePath: string, inviteButtonPath: string, i
   // The invite flow moved from the admin overview table onto the per-client
   // detail page in the console redesign; validate it there.
   const adminOk =
-    adminPage.includes("<InviteButton") &&
-    adminPage.includes("ownerEmail={tenant.ownerEmail}") &&
-    adminPage.includes("tenantId={tenant.id}");
+    adminPage.includes("<TenantEditor") &&
+    adminPage.includes("ownerEmail: tenant.ownerEmail") &&
+    adminPage.includes("id: tenant.id");
   const inviteOk =
-    inviteButton.includes('fetch("/api/admin/invites"') &&
-    inviteButton.includes("email.trim()") &&
-    inviteButton.includes("Access is assigned to this exact email on signup") &&
-    inviteButton.includes("signUpUrl?: string") &&
-    inviteButton.includes("data.signUpUrl") &&
-    inviteButton.includes("Open manual signup link") &&
-    inviteButton.includes("Share this link only with") &&
-    inviteButton.includes("Access is tied to that exact email") &&
-    inviteButton.includes("navigator.clipboard.writeText") &&
-    inviteButton.includes("Copy failed. Select the manual signup link above.") &&
-    inviteButton.includes("Copy signup link") &&
-    inviteButton.includes('role="dialog"') &&
-    inviteButton.includes('htmlFor="invite-email"') &&
-    inviteButton.includes('role="status"') &&
-    inviteButton.includes("Send Invite");
+    tenantEditor.includes("resendOwnerInvite") &&
+    tenantEditor.includes('fetch("/api/admin/invites"') &&
+    tenantEditor.includes("form.ownerEmail.trim()") &&
+    tenantEditor.includes('role: "owner"') &&
+    tenantEditor.includes("data.emailSent === false") &&
+    tenantEditor.includes("data.signUpUrl") &&
+    tenantEditor.includes("Invite created. Email failed, share:");
   const routeOk =
     inviteRoute.includes(expectedTenantSignUpUrl) &&
     inviteRoute.includes("getInviteSignUpUrl(") &&
@@ -665,7 +657,7 @@ function checkAdminInviteFlow(adminPagePath: string, inviteButtonPath: string, i
     log({
       name: "Admin invite flow",
       status: "fail",
-      message: `${adminPagePath}, ${inviteButtonPath}, and ${inviteRoutePath} must keep owner-email invites wired to /api/admin/invites with exact-email guidance and tenant/admin sign-up links`,
+      message: `${adminPagePath}, ${tenantEditorPath}, and ${inviteRoutePath} must keep owner-email invites wired to /api/admin/invites with exact-email guidance and tenant/admin sign-up links`,
     });
     return;
   }
@@ -677,7 +669,7 @@ function checkAdminInviteFlow(adminPagePath: string, inviteButtonPath: string, i
   });
 }
 
-checkAdminInviteFlow("src/app/admin/clients/[id]/page.tsx", "src/app/admin/InviteButton.tsx", "src/app/api/admin/invites/route.ts");
+checkAdminInviteFlow("src/app/admin/clients/[id]/page.tsx", "src/app/admin/clients/[id]/TenantEditor.tsx", "src/app/api/admin/invites/route.ts");
 
 function checkTenantDomainAccess(aliasPath: string, tenantRoutePath: string) {
   const missingFiles = [aliasPath, tenantRoutePath].filter((path) => !existsSync(path));
@@ -688,7 +680,9 @@ function checkTenantDomainAccess(aliasPath: string, tenantRoutePath: string) {
 
   const aliasRoute = readFileSync(aliasPath, "utf8");
   const tenantRoute = readFileSync(tenantRoutePath, "utf8");
-  const aliasOk = aliasRoute.trim() === 'export { DELETE, GET, PATCH, POST } from "@/app/api/tenant/domains/route";';
+  const aliasOk =
+    aliasRoute.includes('export { DELETE, GET, PATCH, POST } from "@/app/api/tenant/domains/route";') &&
+    !aliasRoute.includes("export async function");
   const tenantAccessOk =
     tenantRoute.includes("requireTenantFromHeaders") &&
     tenantRoute.includes('requireTenantPermission(tenant, "domains:manage")') &&
@@ -735,7 +729,8 @@ function checkPublicStorefrontApi(paths: {
   const contentOk =
     v1Content.includes("/^[a-z0-9-]+$/.test(tenant)") &&
     v1Content.includes("getTenantConfig(tenant)") &&
-    v1Content.includes("config.active === false") &&
+    (v1Content.includes("config.active === false") ||
+      (v1Content.includes("getTenantActive(tenant)") && v1Content.includes("config.active !== false"))) &&
     // Public reads validate against the known section set, not the capability
     // manifest — the manifest gates the editing UI, not what a deployed client
     // repo can fetch (see the route's own comment).
@@ -788,7 +783,7 @@ function checkOAuthCallbackState(callbackPaths: string[]) {
   const insecureRoutes = callbackPaths.filter((path) => {
     const source = readFileSync(path, "utf8");
     return !(
-      source.includes("verifyOAuthState(state)") &&
+      (source.includes("verifyOAuthState(state)") || source.includes("consumeOAuthState(state)")) &&
       source.includes("if (!verifiedState)") &&
       source.includes("const tenantId = verifiedState.tenantId") &&
       source.includes("saveConnection({") &&
@@ -896,8 +891,12 @@ function checkCronAuthCoverage(vercelPath: string, proxyPath: string, authPath: 
       proxy.includes("export function isCronRoute") &&
       proxy.includes("path.startsWith(\"/api/cron/\")") &&
       proxy.includes("validateCronRequest(process.env.CRON_SECRET");
+    const authComparesBearerSecret =
+      auth.includes('authorization === `Bearer ${expectedSecret}`') ||
+      (auth.includes('const expected = `Bearer ${expectedSecret}`') &&
+        auth.includes("timingSafeEqual(expectedBuf, providedBuf)"));
     const authFailsClosed =
-      auth.includes('authorization === `Bearer ${expectedSecret}`') &&
+      authComparesBearerSecret &&
       auth.includes('message: "CRON_SECRET not configured"') &&
       auth.includes('message: "Unauthorized"');
 
@@ -1618,7 +1617,7 @@ function printReleaseActions() {
   }
   if (results.some((result) => result.name === "Launch blockers" && result.status === "fail")) {
     if (launchBlockers.includes("Vercel Project Access")) {
-      console.log("- Vercel access: grant access to project scaffold-web (prj_AzaQBS8jM9E5RVgHuMWnQju0GIxb) in team_66XTGId41AJGh9vLvkiyXqkZ, then run `vercel whoami`, `vercel env pull .env.production.local --environment=production`, and `pnpm check:prod` from that account.");
+      console.log("- Vercel access: grant access to project strelva-admin in team strelva, then run `vercel whoami`, `vercel env pull .env.production.local --environment=production`, and `pnpm check:prod` from that account.");
     }
     if (launchBlockers.includes("Vercel app freshness")) {
       console.log("- Vercel app freshness: push/deploy a clean release branch containing the current launch-readiness fixes; do not only redeploy the existing stale production artifact. Then rerun `pnpm check:prod` and the app-host smoke probe:");

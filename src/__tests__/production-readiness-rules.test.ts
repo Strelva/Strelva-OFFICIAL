@@ -87,6 +87,16 @@ describe("production readiness rules", () => {
     expect(getLaunchBlockerError(`
 ## Current Blockers
 
+### Dependency audit — RESOLVED 2026-07-30
+
+- [RESOLVED] Patched and verified.
+
+## Waived Blockers
+`)).toBeNull();
+
+    expect(getLaunchBlockerError(`
+## Current Blockers
+
 ### Missing env
 
 - Status: blocked.
@@ -440,6 +450,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
   it("enforces a clean dependency audit during production checks", () => {
     const source = readFileSync(path.join(process.cwd(), "scripts/production-checklist.ts"), "utf8");
     const packageJson = readFileSync(path.join(process.cwd(), "package.json"), "utf8");
+    const pnpmWorkspace = readFileSync(path.join(process.cwd(), "pnpm-workspace.yaml"), "utf8");
     const packageData = JSON.parse(packageJson) as { scripts?: Record<string, string> };
     const ci = readFileSync(path.join(process.cwd(), ".github/workflows/ci.yml"), "utf8");
     const designKit = readFileSync(path.join(process.cwd(), "docs/design-kit.md"), "utf8");
@@ -527,7 +538,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("src/app/(marketing)/account/page.tsx");
     expect(source).toContain("src/components/auth/UseInvitedEmailButton.tsx");
     expect(source).toContain("src/app/admin/clients/[id]/page.tsx");
-    expect(source).toContain("src/app/admin/InviteButton.tsx");
+    expect(source).toContain("src/app/admin/clients/[id]/TenantEditor.tsx");
     expect(source).toContain("src/app/api/admin/invites/route.ts");
     expect(source).toContain('getTenantDashboardUrl(tenantConfig, "/sign-up", "production")');
     expect(source).toContain("validateCronRequest(process.env.CRON_SECRET");
@@ -597,10 +608,11 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("pnpm audit reported vulnerabilities; resolve them before release:");
     expect(source).toContain("slice(0, 8)");
     expect(packageJson).toContain('"check:release"');
-    // fast-uri is pinned at 3.1.4+ (upgraded from 3.1.2 to resolve a HIGH advisory).
-    expect(packageJson).toContain('"fast-uri": "3.1.4"');
-    expect(packageJson).not.toContain('"fast-uri": "3.1.1"');
-    expect(packageJson).not.toContain('"fast-uri": "3.1.2"');
+    // pnpm v11 reads root overrides from pnpm-workspace.yaml. Keep fast-uri at
+    // the current patched line rather than relying on an ignored package.json key.
+    expect(pnpmWorkspace).toContain('fast-uri: "3.1.5"');
+    expect(pnpmWorkspace).not.toContain('fast-uri: "3.1.1"');
+    expect(pnpmWorkspace).not.toContain('fast-uri: "3.1.2"');
     expect(releaseGate).toBe("pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && pnpm check:prod && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke");
     expect(launchGate).toBe("pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke");
     expect(packageJson).toContain("PLAYWRIGHT_BUILT_APP=1");
@@ -729,10 +741,8 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("invoice.payment_failed");
     expect(source).toContain("customer.subscription.deleted");
     expect(readinessRules).toContain("move them to Waived Blockers with Status, Owner, release/ticket reference, Follow-up, and Reason");
-    expect(source).toContain("Vercel access: grant access to project scaffold-web");
+    expect(source).toContain("Vercel access: grant access to project strelva-admin in team strelva");
     expect(source).toContain("vercel whoami");
-    expect(source).toContain("prj_AzaQBS8jM9E5RVgHuMWnQju0GIxb");
-    expect(source).toContain("team_66XTGId41AJGh9vLvkiyXqkZ");
     expect(source).toContain("Production live verification");
     expect(source).toContain("PLAYWRIGHT_BASE_URL=https://app.strelva.com");
     expect(source).toContain("Supabase Auth reaches /account");
@@ -797,7 +807,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(launchBlockers).toContain("THl7mfItZYUmELpcZNa2Zr");
     expect(launchBlockers).toContain("deactivate `jacobtest` if it is an internal test tenant");
     expect(launchBlockers).toContain("dax.ns.cloudflare.com");
-    expect(launchBlockers).toContain("admin.rohlaxwellness.com` is attached to `scaffold-web");
+    expect(launchBlockers).toContain("admin.rohlaxwellness.com` is attached to `strelva-admin");
     expect(launchBlockers).toContain("A admin.rohlaxwellness.com 76.76.21.21");
     expect(launchBlockers).toContain("does not redirect to `scaffoldweb-com.l.ink`");
     expect(launchBlockers).toContain("Copyable verification commands");
