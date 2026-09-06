@@ -51,5 +51,5 @@ Date: 2026-06-09. Source: 26-agent workflow (7 subsystem analyses + adversarial 
 
 ## Cross-repo + language flags
 
-- **strelva-marketing repo** (serves production strelva.com): pricing page says "We build it free… $99/mo" — directly contradicts both doors. Two-door pricing page + ownership-promise page belong THERE; this repo's marketing pages may also serve depending on env `MARKETING_DOMAINS` (verify which hosts hit which repo in prod).
+- **strelva-marketing repo** (serves production strelva.com): the canonical offer is a paid custom build quoted after a short call, with management from $99/mo. Pricing and ownership-promise changes belong THERE; this repo's marketing pages may also serve depending on env `MARKETING_DOMAINS` (verify which hosts hit which repo in prod).
 - **"Text it like a person"** is dashboard chat, not SMS. Sales language: "chat — like texting" or commit to a messaging channel later. Don't let the pitch promise a channel that doesn't exist.

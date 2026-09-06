@@ -25,7 +25,7 @@ a tenant site is a fast, repeatable task, not a migration archaeology dig.
     `src/lib/reb-contracts.ts`, 23 `reb-/REB_` files, 1 `scaffoldweb` ref.
   - `websites/rohlax-wellness` (Next 16.2, git `main`, 2026-05-14): both
     `REB_API_URL` and `SCAFFOLD_API_URL` (partial), 21 `reb-/REB_` files, 3 `scaffoldweb` refs.
-- **Marketing:** `~/strelva-marketing` has the full dark-glass redesign from this
+- **Marketing:** `./strelva-marketing` has the full dark-glass redesign from this
   session, builds green, but is **uncommitted**.
 - **Control-plane rename:** code rename ~done in `~/REB` (brand.ts, `strelva.com`,
   0 `scaffoldweb` in `src/`). **Remnants:** 7 stale smoke-test assertions

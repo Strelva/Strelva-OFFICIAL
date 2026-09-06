@@ -9,6 +9,7 @@ import {
 import { getDevAccessTenant } from "@/lib/dev-access";
 import type { TenantConfig } from "@/lib/types";
 import Link from "next/link";
+import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,7 @@ export default async function AccountPage() {
   const tenants = await getCurrentUserTenants();
 
   if (tenants.length === 0) {
+    if (workspaceReleaseEnabled()) redirect("/workspace");
     return <NoAccessState />;
   }
 

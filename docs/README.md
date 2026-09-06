@@ -25,9 +25,11 @@ conflict, use this order:
 | `operator-command-center.md` | Current operator information architecture |
 | `testing-and-ci.md` | Test layers and CI-faithful local verification |
 | `production-readiness.md` | Current release and production verification runbook |
+| `roadmap.md` | Current delivery state, market experiments, and execution priorities |
 | `rollback.md` | Current code, content, schema, Redis, and provider recovery policy |
 | `client-onboarding.md` | Current managed-client delivery workflow |
 | `strategy/current-product-focus.md` | Active product-strategy experiment |
+| `gtm/README.md` | Canonical GTM thesis, approach selection, release engine, experiments, and decisions |
 
 Commercial plan truth is `src/lib/billing-plans.ts` plus the selected plan and
 monthly amount persisted on each tenant. Plan, capability, vertical, presence
@@ -69,7 +71,7 @@ These files explain past decisions but must not drive new implementation:
 - `platform-hardening.md` and `mission-control-test-checklist.md`
 - `docs/goals/**` state, runbooks, and completed goal notes
 - `strategy/research/**` and dated strategy alternatives unless explicitly
-  promoted by `strategy/current-product-focus.md`
+  promoted by `strategy/current-product-focus.md` or `gtm/DECISIONS.md`
 - `clerk-sanity-teardown-checklist.md` — execution record; both teardowns complete.
 
 Do not repair a historical plan by making current code match it. Promote an

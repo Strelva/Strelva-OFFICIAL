@@ -1,0 +1,452 @@
+{
+  "version": 1,
+  "project": {
+    "name": "strelva",
+    "productType": null,
+    "stack": [
+      "nextjs",
+      "react",
+      "tailwind-v4"
+    ]
+  },
+  "sources": {
+    "tokens": [
+      "src/app/globals.css"
+    ],
+    "components": [
+      "src/components/ui"
+    ],
+    "assets": [],
+    "instructions": [
+      "DESIGN.md",
+      "CLAUDE.md"
+    ]
+  },
+  "design": {
+    "colorMode": "dark",
+    "colors": {
+      "--gray-border": {
+        "value": "rgba(255, 255, 255, 0.08)",
+        "source": "src/app/globals.css"
+      },
+      "--gray-muted": {
+        "value": "#858585",
+        "source": "src/app/globals.css"
+      },
+      "--accent": {
+        "value": "oklch(73% 0.07 145)",
+        "source": "src/app/globals.css"
+      },
+      "--on-accent": {
+        "value": "oklch(22% 0.03 145)",
+        "source": "src/app/globals.css"
+      },
+      "--accent-dim": {
+        "value": "oklch(73% 0.07 145 / 0.12)",
+        "source": "src/app/globals.css"
+      },
+      "--accent-text": {
+        "value": "oklch(80% 0.08 145)",
+        "source": "src/app/globals.css"
+      },
+      "--glass-border": {
+        "value": "rgba(255, 255, 255, 0.075)",
+        "source": "src/app/globals.css"
+      },
+      "--color-cream": {
+        "value": "var(--cream)",
+        "source": "src/app/globals.css"
+      },
+      "--color-cream-dark": {
+        "value": "var(--cream-dark)",
+        "source": "src/app/globals.css"
+      },
+      "--color-cream-mid": {
+        "value": "var(--cream-mid)",
+        "source": "src/app/globals.css"
+      },
+      "--color-sage": {
+        "value": "var(--sage)",
+        "source": "src/app/globals.css"
+      },
+      "--color-sage-light": {
+        "value": "var(--sage-light)",
+        "source": "src/app/globals.css"
+      },
+      "--color-sage-dark": {
+        "value": "var(--sage-dark)",
+        "source": "src/app/globals.css"
+      },
+      "--color-bark": {
+        "value": "var(--bark)",
+        "source": "src/app/globals.css"
+      },
+      "--color-bark-light": {
+        "value": "var(--bark-light)",
+        "source": "src/app/globals.css"
+      },
+      "--color-bark-faded": {
+        "value": "var(--bark-faded)",
+        "source": "src/app/globals.css"
+      },
+      "--color-blush": {
+        "value": "var(--blush)",
+        "source": "src/app/globals.css"
+      },
+      "--color-blush-light": {
+        "value": "var(--blush-light)",
+        "source": "src/app/globals.css"
+      },
+      "--color-terra": {
+        "value": "var(--terra)",
+        "source": "src/app/globals.css"
+      },
+      "--color-terra-light": {
+        "value": "var(--terra-light)",
+        "source": "src/app/globals.css"
+      },
+      "--color-pure-white": {
+        "value": "var(--pure-white)",
+        "source": "src/app/globals.css"
+      },
+      "--color-warm-white": {
+        "value": "var(--warm-white)",
+        "source": "src/app/globals.css"
+      },
+      "--color-on-warm-white": {
+        "value": "var(--on-warm-white)",
+        "source": "src/app/globals.css"
+      },
+      "--color-warm-black": {
+        "value": "var(--warm-black)",
+        "source": "src/app/globals.css"
+      },
+      "--color-accent": {
+        "value": "var(--accent, #7fae7f)",
+        "source": "src/app/globals.css"
+      },
+      "--color-accent-dim": {
+        "value": "var(--accent-dim, rgba(127, 174, 127, 0.12))",
+        "source": "src/app/globals.css"
+      },
+      "--color-accent-text": {
+        "value": "var(--accent-text, #a7c9a7)",
+        "source": "src/app/globals.css"
+      },
+      "--color-on-accent": {
+        "value": "var(--on-accent, #1a1510)",
+        "source": "src/app/globals.css"
+      },
+      "--color-success": {
+        "value": "var(--success, oklch(70% 0.14 145))",
+        "source": "src/app/globals.css"
+      },
+      "--color-success-dim": {
+        "value": "var(--success-dim, oklch(70% 0.14 145 / 0.12))",
+        "source": "src/app/globals.css"
+      },
+      "--color-positive": {
+        "value": "var(--positive, oklch(70% 0.14 145))",
+        "source": "src/app/globals.css"
+      },
+      "--color-warning": {
+        "value": "var(--warning, #ca8a04)",
+        "source": "src/app/globals.css"
+      },
+      "--color-critical": {
+        "value": "var(--critical, #ef4444)",
+        "source": "src/app/globals.css"
+      },
+      "--color-positive0": {
+        "value": "var(--positive, oklch(70% 0.14 145))",
+        "source": "src/app/globals.css"
+      },
+      "--color-warning0": {
+        "value": "var(--warning, #ca8a04)",
+        "source": "src/app/globals.css"
+      },
+      "--color-critical0": {
+        "value": "var(--critical, #ef4444)",
+        "source": "src/app/globals.css"
+      },
+      "--color-neutral": {
+        "value": "var(--neutral, #858585)",
+        "source": "src/app/globals.css"
+      },
+      "--color-glass": {
+        "value": "var(--glass, rgba(255, 255, 255, 0.024))",
+        "source": "src/app/globals.css"
+      },
+      "--color-glass-border": {
+        "value": "var(--glass-border, rgba(255, 255, 255, 0.04))",
+        "source": "src/app/globals.css"
+      },
+      "--color-glass-active": {
+        "value": "var(--glass-active, rgba(255, 255, 255, 0.075))",
+        "source": "src/app/globals.css"
+      },
+      "--color-overlay-scrim": {
+        "value": "var(--overlay-scrim, rgba(8, 8, 10, 0.62))",
+        "source": "src/app/globals.css"
+      },
+      "--color-gray-border": {
+        "value": "var(--gray-border)",
+        "source": "src/app/globals.css"
+      },
+      "--color-gray-bg": {
+        "value": "var(--gray-bg)",
+        "source": "src/app/globals.css"
+      },
+      "--color-gray-bg-hover": {
+        "value": "var(--gray-bg-hover)",
+        "source": "src/app/globals.css"
+      },
+      "--color-gray-bg-alt": {
+        "value": "var(--gray-bg-alt)",
+        "source": "src/app/globals.css"
+      },
+      "--color-gray-muted": {
+        "value": "var(--gray-muted)",
+        "source": "src/app/globals.css"
+      },
+      "--color-gray-subtle": {
+        "value": "var(--gray-subtle)",
+        "source": "src/app/globals.css"
+      },
+      "--color-gray-faint": {
+        "value": "var(--gray-faint)",
+        "source": "src/app/globals.css"
+      },
+      "--color-gray-fg": {
+        "value": "var(--gray-fg)",
+        "source": "src/app/globals.css"
+      },
+      "--color-surface": {
+        "value": "var(--surface)",
+        "source": "src/app/globals.css"
+      },
+      "--color-surface-base": {
+        "value": "var(--surface-base)",
+        "source": "src/app/globals.css"
+      },
+      "--color-surface-raised": {
+        "value": "var(--surface-raised)",
+        "source": "src/app/globals.css"
+      },
+      "--color-surface-inset": {
+        "value": "var(--surface-inset)",
+        "source": "src/app/globals.css"
+      },
+      "--color-m-text": {
+        "value": "var(--m-text)",
+        "source": "src/app/globals.css"
+      },
+      "--color-m-text-2": {
+        "value": "var(--m-text-2)",
+        "source": "src/app/globals.css"
+      },
+      "--color-m-text-3": {
+        "value": "var(--m-text-3)",
+        "source": "src/app/globals.css"
+      },
+      "--color-m-panel": {
+        "value": "var(--m-panel)",
+        "source": "src/app/globals.css"
+      },
+      "--color-m-panel-strong": {
+        "value": "var(--m-panel-strong)",
+        "source": "src/app/globals.css"
+      },
+      "--color-m-paper": {
+        "value": "var(--m-paper)",
+        "source": "src/app/globals.css"
+      },
+      "--color-m-surface": {
+        "value": "var(--m-surface)",
+        "source": "src/app/globals.css"
+      },
+      "--color-m-rule": {
+        "value": "var(--m-rule)",
+        "source": "src/app/globals.css"
+      },
+      "--color-m-rule-soft": {
+        "value": "var(--m-rule-soft)",
+        "source": "src/app/globals.css"
+      },
+      "--color-m-accent": {
+        "value": "var(--m-accent)",
+        "source": "src/app/globals.css"
+      },
+      "--color-m-accent-soft": {
+        "value": "var(--m-accent-soft)",
+        "source": "src/app/globals.css"
+      },
+      "--color-m-accent-faint": {
+        "value": "var(--m-accent-faint)",
+        "source": "src/app/globals.css"
+      },
+      "--color-m-button": {
+        "value": "var(--m-button)",
+        "source": "src/app/globals.css"
+      },
+      "--color-m-button-text": {
+        "value": "var(--m-button-text)",
+        "source": "src/app/globals.css"
+      },
+      "--color-m-success": {
+        "value": "var(--m-success)",
+        "source": "src/app/globals.css"
+      },
+      "--color-m-danger": {
+        "value": "var(--m-danger)",
+        "source": "src/app/globals.css"
+      },
+      "--jada-muted": {
+        "value": "#4f6fc8",
+        "source": "src/app/globals.css"
+      },
+      "--m-paper-muted": {
+        "value": "oklch(18.5% 0.014 248)",
+        "source": "src/app/globals.css"
+      },
+      "--m-accent": {
+        "value": "oklch(73% 0.07 145)",
+        "source": "src/app/globals.css"
+      },
+      "--m-accent-strong": {
+        "value": "oklch(79% 0.08 145)",
+        "source": "src/app/globals.css"
+      },
+      "--m-accent-soft": {
+        "value": "oklch(73% 0.07 145 / 0.14)",
+        "source": "src/app/globals.css"
+      },
+      "--m-accent-faint": {
+        "value": "oklch(73% 0.07 145 / 0.065)",
+        "source": "src/app/globals.css"
+      }
+    },
+    "typography": {
+      "--m-text": {
+        "value": "oklch(94.5% 0.008 235)",
+        "source": "src/app/globals.css"
+      },
+      "--m-text-2": {
+        "value": "oklch(73% 0.01 235)",
+        "source": "src/app/globals.css"
+      },
+      "--m-text-3": {
+        "value": "oklch(55% 0.011 235)",
+        "source": "src/app/globals.css"
+      },
+      "--m-button-text": {
+        "value": "oklch(10.5% 0.01 250)",
+        "source": "src/app/globals.css"
+      }
+    },
+    "spacing": {},
+    "radius": {
+      "--jada-radius": {
+        "value": "8px",
+        "source": "src/app/globals.css"
+      }
+    },
+    "shadows": {
+      "--jada-shadow": {
+        "value": "0 24px 70px rgba(26, 44, 114, 0.14)",
+        "source": "src/app/globals.css"
+      }
+    },
+    "motion": {
+      "--m-ease-out": {
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "source": "src/app/globals.css"
+      },
+      "--m-ease-quart": {
+        "value": "cubic-bezier(0.25, 1, 0.5, 1)",
+        "source": "src/app/globals.css"
+      },
+      "--m-ease-expo": {
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "source": "src/app/globals.css"
+      },
+      "--m-duration-instant": {
+        "value": "140ms",
+        "source": "src/app/globals.css"
+      },
+      "--m-duration-state": {
+        "value": "260ms",
+        "source": "src/app/globals.css"
+      },
+      "--m-duration-enter": {
+        "value": "720ms",
+        "source": "src/app/globals.css"
+      }
+    },
+    "density": "unknown"
+  },
+  "components": {
+    "installed": [
+      "ai-prompt-box",
+      "Button",
+      "Card",
+      "EmptyState",
+      "section-labels",
+      "shining-text",
+      "Skeleton",
+      "Tabs",
+      "TextInput",
+      "Toggle"
+    ],
+    "preferredPrimitives": [],
+    "patterns": []
+  },
+  "constraints": {
+    "must": [],
+    "avoid": []
+  },
+  "decisions": [
+    {
+      "date": "2026-09-06",
+      "scope": "src/experience/workspace",
+      "decision": "User selected sidebar home with collapse, full-width work, optional right discussion. Restrained dark tokens, editorial type, thin borders, real saved-work previews; no prompt-first requirement.",
+      "references": ["https://21st.dev/@andrewlu0/components/sidebar", "https://21st.dev/@shadcn/components/sidebar"],
+      "implementation": "Reuse Strelva Button and existing tokens. No registry component installed. Discussion opens an explicit unavailable state until private-workspace messaging is implemented."
+    }
+  ],
+  "evidence": [
+    {
+      "fact": "components.installed",
+      "source": "src/components/ui"
+    },
+    {
+      "fact": "design.colorMode:light",
+      "source": "src/app/globals.css"
+    },
+    {
+      "fact": "design.tokens",
+      "source": "src/app/globals.css"
+    },
+    {
+      "fact": "project.instructions",
+      "source": "CLAUDE.md"
+    },
+    {
+      "fact": "project.instructions",
+      "source": "DESIGN.md"
+    },
+    {
+      "fact": "project.stack:nextjs",
+      "source": "package.json"
+    },
+    {
+      "fact": "project.stack:react",
+      "source": "package.json"
+    },
+    {
+      "fact": "project.stack:tailwind-v4",
+      "source": "package.json"
+    }
+  ],
+  "generatedAt": "2026-09-06T13:35:44.720Z"
+}

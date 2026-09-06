@@ -42,7 +42,7 @@
         "compatibleCommit": "00e4323a9a93029070e802f9da0345cc441b6f59",
         "compatibleTag": "rohlax-v2026.05.12.1",
         "packageScripts": ["check:scaffold"],
-        "requiredFiles": ["AGENTS.md", "src/lib/reb.ts", "scripts/scaffold-web-check.mjs"],
+        "requiredFiles": ["src/lib/reb.ts", "scripts/scaffold-web-check.mjs"],
         "requiredEnv": ["TENANT_ID", "REB_DASHBOARD_URL", "REVALIDATION_SECRET"]
       }
     ]

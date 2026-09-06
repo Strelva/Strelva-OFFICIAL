@@ -4,10 +4,10 @@
  * POST /api/admin/pay-links route) that powers the public /pay/[slug] page +
  * POST /api/pay/[slug] Stripe checkout, in mode:"payment" (a single charge).
  *
- * The live offer is a pure monthly subscription with no upfront fee (founder
- * decision 2026-06-26), so pay-links are now for the OCCASIONAL one-off charge —
- * an out-of-band paid build or a one-time invoice. The admin UI mints these as
- * door:"build" and no longer surfaces the superseded two-door choice
+ * The live offer is a paid custom build, quoted after a short call, plus
+ * recurring management (founder decision 2026-07-23). Pay-links collect a
+ * quoted build payment or another one-time invoice. The admin UI mints these
+ * as door:"build" and no longer surfaces the superseded two-door choice
  * (docs/strategy/website-offer-two-door.md).
  *
  * The `door` field (build | managed_start) is RETAINED in the data model: it

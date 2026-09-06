@@ -56,6 +56,8 @@ const PUBLIC_EXACT = new Set([
   "/",
   "/no-access",
   "/api/ai-visibility",
+  // Own confirmed-session authorization; return JSON 401/503, never sign-in HTML.
+  "/api/workspace",
   "/api/health",
   "/api/newsletter/subscribe",
   "/api/track",

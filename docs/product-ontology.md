@@ -1,14 +1,31 @@
 # Strelva product ontology
 
 Status: **normative**
-Updated: 2026-07-30
+Updated: 2026-09-05
+
+## Product transition
+
+The founder's current direction is one accessible conversational Strelva
+experience for Users, Paid Users, Clients, and Enterprise accounts. Existing
+managed clients retain Client status. Standard paid access and personalized
+managed service are independent facts; neither status grants permissions.
+Agencies are a partner relationship with explicit delegated access, not an
+additional user tier.
+
+The managed-presence model below describes the existing delivery system and its
+compatibility vocabulary. It must not impose a website or tenant requirement on
+general Strelva users. The transition is specified in
+[`strategy/2026-09-05-product-structure-and-agency-experiment.md`](strategy/2026-09-05-product-structure-and-agency-experiment.md);
+[`../src/README.md`](../src/README.md) defines source boundaries. Shared
+conversation access and account-owned persistence are not yet deployed by this
+structural migration.
 
 This document defines what the product is, the concepts it owns, and the
 language code and product work should use. It exists to keep commercial
 packaging, customer experience, delivery architecture, and persistence from
 collapsing into one overloaded idea of a “feature.”
 
-## Product definition
+## Existing managed-presence product
 
 Strelva is a **managed business-presence operating service with a software
 control plane**. The customer buys an outcome—an effective presence that is

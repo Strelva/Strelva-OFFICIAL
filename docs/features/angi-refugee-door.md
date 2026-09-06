@@ -2,7 +2,7 @@
 
 Picked 2026-06-10 (features round, growth side). ICP = Angi-refugee plumbing/HVAC — this IS the ICP's front door.
 
-**Type:** travel (closing/discovery artifact). **Shape:** landing page + calculator on the marketing site (~/strelva-marketing).
+**Type:** travel (closing/discovery artifact). **Shape:** landing page + calculator on the marketing site (`./strelva-marketing`).
 
 ## What it is
 A landing page + simple calculator: "What did Angi/HomeAdvisor actually cost you per job?" Owner enters monthly lead spend, lead→job close rate → cost per won job, set against owning your own presence (quoted build + $99/mo). CTA into the gated discovery report. Used in outbound touches to former lead-buyers and as the `?ref=` destination for that messaging angle.

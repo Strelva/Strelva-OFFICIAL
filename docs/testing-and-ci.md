@@ -4,7 +4,8 @@ Two test layers, and two Playwright "smoke" modes that differ by the dev-access 
 
 ## Vitest (unit + integration)
 
-`pnpm test` (`vitest run`) — the bulk of coverage (~1983 passing tests across `src/__tests__/` as of 2026-07-30).
+`pnpm test` (`vitest run`) is the bulk of coverage. The 2026-08-01 local run
+passed 2,013 tests across 246 files with one intentional skip.
 Runs in CI as the "Test (with coverage gate)" step. Mock at module boundaries
 (`vi.mock`), not the function under test — e.g. `tenant-access-enforcement.test.ts`
 exercises the REAL `hasTenantAccess` with the auth primitives (`getSessionUser`,
@@ -70,10 +71,18 @@ Do NOT set `CONTENT_SOURCE=file` while asserting tenant **content** rendering �
 source-flags guard refuses dev-file content in a prod-like context (`CI=true`) and 500s.
 The Surface smoke only asserts chrome, so it's unaffected.
 
-## Actions-minutes budget (2,000/mo, resets the 1st)
+## GitHub Actions account gate
 
-The org's free tier is 2,000 GitHub Actions minutes/month with a $0 overage budget
-(so it HARD-BLOCKS when exhausted — every workflow then fails in ~2s with no runner).
+The org's free tier has a finite Actions budget and a zero-dollar overage limit.
+When the account cannot fund a run, every workflow stops before receiving a
+runner and therefore supplies no code evidence.
+
+As of 2026-08-01, the latest `main` Security and CI runs are blocked with GitHub's
+“recent account payments have failed or your spending limit needs to be increased”
+annotation. Their jobs have zero steps. This is an external account block, not a
+test failure, but `main` does not have fresh CI evidence until the account state is
+fixed and a new run passes.
+
 There are only two workflows now (CI + Security). Guardrails keep usage well under 2,000:
 
 - **`concurrency: cancel-in-progress`** on both workflows — a new push cancels the
@@ -94,9 +103,9 @@ There are only two workflows now (CI + Security). Guardrails keep usage well und
 locally. `pnpm check:ci` runs lint + typecheck + vitest + the no-Redis surface smoke —
 the same gates the runner enforces. If it's green, CI will be too.
 
-If minutes are exhausted mid-cycle and a PR must land: either merge on a local
-`pnpm check:ci` green-light, or raise the Actions spending cap a few dollars for a
-couple of validating runs. Usage resets on the 1st.
+If Actions is blocked, treat `pnpm check:ci` as local evidence only. Clear the
+billing/spending block and obtain a fresh hosted run before describing a PR or
+release as CI-green.
 
 ## Do NOT
 
@@ -106,12 +115,15 @@ couple of validating runs. Usage resets on the 1st.
   `font-display` `@utility` (see AGENTS.md § Conventions). Turbopack dev mis-serializes the
   arbitrary value on cold compile and crashes the dev server.
 
-## Known issues / TODO (2026-07-30)
+## Current verification record
 
-These test gaps are confirmed open. Fix before shipping the related feature or security fix.
+On 2026-08-01, `pnpm typecheck` and `pnpm test` passed locally. The encryption,
+subscription-deletion, Stripe idempotency, and zero-dollar trial invoice branches
+called out by the July audit all have current test coverage. No confirmed failing
+Vitest test remains.
 
-- **[HIGH][security] At-rest encryption (`src/lib/crypto/secrets.ts`) has zero test coverage.** Need `src/__tests__/secret-encryption.test.ts` covering: round-trip encrypt→decrypt with key set; keyless pass-through (no `SECRETS_ENC_KEY`); legacy plaintext (no `enc:v1:` prefix) still reads correctly; tampered ciphertext (flipped auth tag) throws; `encryptSecret` is idempotent (already-encrypted value not re-wrapped); null/undefined/empty preserved across both functions.
-- **[HIGH][bug] `customer.subscription.deleted` has no test in `billing-webhook-mode-guard.test.ts`.** Add tests: (1) metadata tenantId present → `subscriptionStatus='cancelled'` set, (2) no metadata → fallback to `getTenantByStripeSubscriptionId`, (3) neither → `getTenantByStripeCustomerId`. Assert `alert('billing_subscription_cancelled')` fires.
-- **[HIGH][bug] Stripe idempotency branches completely untested.** Use the existing `useFakeRedis()` helper. Cover: duplicate event (Redis key already present with `status:"processed"`) → 200 `{duplicate:true}`, no `updateTenant` call; in-flight event (status `"processing"`, recent `startedAt`) → 503; Redis throws in `claimStripeEvent` → 503 + `alert("billing_webhook_idempotency_unavailable")`.
-- **[MEDIUM][bug] `isTrialCreateInvoice` guard (zero-dollar subscription_create invoice) has no test.** Post an `invoice.paid` with `billing_reason:'subscription_create'` and `amount_paid:0`; assert `updateTenant` is NOT called with `subscriptionStatus:'active'` but IS still called with `subscriptionPastDueSince:null` clear and `stripeSubscriptionId` stamp.
-- **1 test currently failing** (as of 2026-07-30 run) — investigate before merging any billing/auth work.
+`pnpm lint` is currently red with 10 `no-explicit-any` errors in
+`scripts/inspect-tenant.ts` and seven warnings. In this combined local checkout,
+`eslint .` also traverses generated output under the ignored
+`strelva-marketing/` and `client-prototypes/` workspaces, making the failure slow
+to reach. `pnpm check:ci` stops at lint and has no current surface-smoke result.

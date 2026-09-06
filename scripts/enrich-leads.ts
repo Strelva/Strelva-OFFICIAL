@@ -30,7 +30,7 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { scoreAiVisibility, type AiVisibilityResult } from "../src/lib/ai-visibility/score";
+import { scoreAiVisibility, type AiVisibilityResult } from "../src/products/ai-visibility/server";
 import type { RawLead } from "./scrape-angi";
 
 const OUT_DIR = join(homedir(), ".leverage", "store", "angi-leads");

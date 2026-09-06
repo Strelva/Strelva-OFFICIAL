@@ -13,6 +13,11 @@ const req = (pathname: string): NextRequest =>
   ({ nextUrl: { pathname } }) as unknown as NextRequest;
 
 describe("isPublicRoute", () => {
+  it("lets only the exact workspace API enforce its own session and JSON errors", () => {
+    expect(isPublicRoute(req("/api/workspace"))).toBe(true);
+    expect(isPublicRoute(req("/api/workspace/admin"))).toBe(false);
+    expect(isPublicRoute(req("/api/workspaces"))).toBe(false);
+  });
   it("treats exact public paths as public", () => {
     for (const p of ["/", "/no-access", "/api/health", "/api/track", "/api/billing/webhook"]) {
       expect(isPublicRoute(req(p))).toBe(true);

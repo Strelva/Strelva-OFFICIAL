@@ -113,8 +113,11 @@ describe("owner journey copy and links", () => {
     const maintenance = readRepoFile("src/app/api/cron/maintenance/route.ts");
 
     expect(packageJson).toContain('"@vercel/analytics"');
-    expect(rootLayout).toContain('import { Analytics } from "@vercel/analytics/next"');
-    expect(rootLayout).toContain("<Analytics />");
+    expect(rootLayout).toContain("<PrivacyAwareAnalytics />");
+    const analyticsBoundary = readRepoFile("src/components/PrivacyAwareAnalytics.tsx");
+    expect(analyticsBoundary).toContain('import { Analytics } from "@vercel/analytics/next"');
+    expect(analyticsBoundary).toContain("<Analytics />");
+    expect(analyticsBoundary).toContain('pathname === "/workspace"');
     expect(dashboardPage).toContain("getOwnerRetentionSignals(tenant)");
     expect(dashboardPage).toContain('<EngagementTracker event="dashboard-open" />');
     expect(dashboardPage).toContain("<RetentionPanel signals={retentionSignals} />");

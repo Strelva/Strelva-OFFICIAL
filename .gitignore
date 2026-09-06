@@ -57,6 +57,7 @@ next-env.d.ts
 *.png
 *.jpeg
 *.jpg
+.validation-artifacts/
 blueprint-*.md
 full-page-snapshot.md
 PRODUCT.md

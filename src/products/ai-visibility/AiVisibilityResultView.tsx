@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { ArrowRight, Check, CheckCircle2, Share2, XCircle } from "lucide-react";
-import type { AiVisibilityResult, Grade } from "@/lib/ai-visibility/score";
+import type { AiVisibilityResult, Grade } from "./contracts";
 
 interface AiVisibilityResultViewProps {
   result: AiVisibilityResult;
   scanId: string | null;
   shareUrl: string | null;
+  workspaceEnabled?: boolean;
   onReset: () => void;
 }
 
@@ -24,17 +25,22 @@ function gradeColor(grade: Grade): string {
   }
 }
 
-export function AiVisibilityResultView({ result, scanId, shareUrl, onReset }: AiVisibilityResultViewProps) {
+export function AiVisibilityResultView({ result, scanId, shareUrl, workspaceEnabled = false, onReset }: AiVisibilityResultViewProps) {
   const [shareStatus, setShareStatus] = useState<"idle" | "copied">("idle");
   const [email, setEmail] = useState("");
   const [monitorState, setMonitorState] = useState<MonitorState>("idle");
   const [monitorError, setMonitorError] = useState("");
+  const measured = result.readinessMeasured ?? result.measurementStatus !== "unavailable";
 
   async function handleShare() {
     const url = shareUrl || window.location.href;
     try {
       if (navigator.share) {
-        await navigator.share({ title: `${result.business} AI Visibility scorecard`, text: `${result.grade} · ${result.score}/100`, url });
+        await navigator.share({
+          title: `${result.business} AI Visibility scorecard`,
+          text: measured ? `${result.grade} · ${result.score}/100` : "Measurement unavailable",
+          url,
+        });
         return;
       }
       await navigator.clipboard.writeText(url);
@@ -75,21 +81,34 @@ export function AiVisibilityResultView({ result, scanId, shareUrl, onReset }: Ai
   return (
     <div className="motion-rise">
       <div className="flex flex-col items-center text-center">
-        <div className="flex size-28 items-center justify-center rounded-full border-4 sm:size-32" style={{ borderColor: gradeColor(result.grade), background: `color-mix(in oklch, ${gradeColor(result.grade)} 10%, transparent)` }}>
+        <div className="flex size-28 items-center justify-center rounded-full border-4 sm:size-32" style={{ borderColor: measured ? gradeColor(result.grade) : "var(--m-rule)", background: measured ? `color-mix(in oklch, ${gradeColor(result.grade)} 10%, transparent)` : "var(--m-panel)" }}>
           <div>
-            <div className="text-4xl font-bold tabular-nums sm:text-5xl" style={{ color: gradeColor(result.grade) }}>{result.grade}</div>
-            <div className="text-[13px] font-semibold tabular-nums" style={{ color: gradeColor(result.grade) }}>{result.score}/100</div>
+            <div className="text-4xl font-bold tabular-nums sm:text-5xl" style={{ color: measured ? gradeColor(result.grade) : "var(--m-text-3)" }}>{measured ? result.grade : "?"}</div>
+            <div className="text-[13px] font-semibold tabular-nums" style={{ color: measured ? gradeColor(result.grade) : "var(--m-text-3)" }}>{measured ? `${result.score}/100` : "Not measured"}</div>
           </div>
         </div>
         <h2 className="mt-6 text-2xl font-semibold text-m-text sm:text-3xl">{result.business}</h2>
         {result.url && <p className="mt-2 text-[14px] text-m-text-3">{result.url}</p>}
         <p className="mx-auto mt-4 max-w-[560px] text-[16px] font-medium leading-[1.6] text-m-text">{result.verdict}</p>
+        {result.measurementNote && <p className="mx-auto mt-2 max-w-[560px] text-[13px] leading-[1.6] text-m-text-3">{result.measurementNote}</p>}
         {scanId && (
-          <button type="button" onClick={handleShare} className="marketing-button-secondary mt-5 h-11 px-5 text-[13px]">
-            {shareStatus === "copied" ? <Check className="size-4" /> : <Share2 className="size-4" />}
-            {shareStatus === "copied" ? "Link copied" : "Share scorecard"}
-          </button>
+          <div className="mt-5 flex flex-col items-center gap-3 sm:flex-row sm:flex-wrap sm:justify-center">
+            <button type="button" onClick={handleShare} className="marketing-button-secondary h-11 px-5 text-[13px]">
+              {shareStatus === "copied" ? <Check className="size-4" /> : <Share2 className="size-4" />}
+              {shareStatus === "copied" ? "Link copied" : "Share scorecard"}
+            </button>
+            {workspaceEnabled ? (
+              <Link href={`/workspace?save=${encodeURIComponent(scanId)}`} className="marketing-button-primary h-11 px-5 text-[13px]">
+                Save a copy <ArrowRight className="size-4" />
+              </Link>
+            ) : null}
+          </div>
         )}
+        {scanId && workspaceEnabled ? (
+          <p className="mt-3 max-w-[440px] text-[12px] leading-[1.6] text-m-text-3">
+            Saves a private copy in your workspace. This public scorecard stays separate.
+          </p>
+        ) : null}
       </div>
 
       {result.signals.length > 0 && (
@@ -113,8 +132,8 @@ export function AiVisibilityResultView({ result, scanId, shareUrl, onReset }: Ai
         <h3 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-m-text-3">Live AI citation probe</h3>
         <p className="mt-2 text-[14px] leading-[1.6] text-m-text-2">{result.citation.note}</p>
       </div>
-      <div className="mt-6 rounded-2xl border-l-4 bg-m-panel p-5" style={{ borderLeftColor: gradeColor(result.grade) }}>
-        <h3 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-m-text-3">Do this first</h3>
+      <div className="mt-6 rounded-2xl border-l-4 bg-m-panel p-5" style={{ borderLeftColor: measured ? gradeColor(result.grade) : "var(--m-rule)" }}>
+        <h3 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-m-text-3">{measured ? "Do this first" : "Next step"}</h3>
         <p className="mt-2 text-[15px] font-medium leading-[1.6] text-m-text">{result.topFix}</p>
       </div>
 

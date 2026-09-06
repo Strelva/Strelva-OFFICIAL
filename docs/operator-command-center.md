@@ -1,6 +1,6 @@
 # Operator Command Center
 
-A concise map of the operator (Jacob + Noah) surfaces — where they live, what they
+A concise map of Jacob's operator surfaces — where they live, what they
 read/write, and the Redis keys behind them. This is the control-plane's internal
 console, not anything a client sees. Everything here is **super-admin only**.
 
@@ -200,18 +200,26 @@ top pages / sources).
 - Config write: `POST /api/admin/tenants/[id]/analytics-config` (super-admin,
   audit-logged).
 
-## Operator vs client email
+## Email audiences and delivery policy
 
-Two independent switches in `src/lib/email-enabled.ts`:
+Authority: `src/lib/email-enabled.ts` owns audience policy. `src/lib/email/send.ts` owns the
+shared transport and audience-to-policy mapping.
 
-- `emailSendingEnabled()` / `emailSendingPaused()` — the **client** kill-switch. All
-  customer/prospect mail (weekly report, invites, lifecycle) is OFF unless
-  `EMAIL_SENDING_ENABLED="true"`. Currently paused in prod during the test-tenant
-  phase.
-- `operatorEmailsEnabled()` — the **operator** switch. Notifications to Jacob + Noah
-  (new-signup + payment-failed from the billing webhook, lead intake) **default ON**
-  and are silenced only by an explicit `OPERATOR_EMAILS_ENABLED="false"`, so the
-  founders stay alerted even while client mail is paused.
+| Audience | Transport check | Environment switch | Unset default | Recipients/use |
+|---|---|---|---|---|
+| Client | `!emailSendingPaused()` | `EMAIL_SENDING_ENABLED` | Paused | Client lifecycle, reports, review/health alerts, newsletters, invites |
+| Operator | `operatorEmailsEnabled()` | `OPERATOR_EMAILS_ENABLED` | Enabled | Configured operator signup, lead, and payment-failure alerts |
+| Prospect | `prospectEmailsEnabled()` | `PROSPECT_EMAILS_ENABLED` | Enabled | Free-audit scorecard recipient |
+| End customer | `!customerEmailPaused()` | `CUSTOMER_EMAIL_ENABLED` | Paused | Transactional mail to a client's customer |
+
+Invariants:
+
+- Audience roles are not interchangeable; one audience switch never authorizes another.
+- New senders call `sendEmail()` with an explicit `audience`; they do not instantiate Resend
+  or select policy locally.
+- Suppression is not delivery. Surfaces and workflows must not claim a message was sent when
+  the selected policy returns `false`.
+- Client email remains paused in production during the test-tenant phase.
 
 Client lifecycle emails (`sendWelcomeEmail` / `sendSiteLiveEmail` /
 `sendReviewRequestEmail` in `src/lib/delivery-email.ts`) sit behind the client
@@ -292,20 +300,10 @@ The cron gates each send on `isReportDue` and records `markReportSent`.
 (`reb:` is the frozen wire/persistent-data prefix — see AGENTS.md. `crm:` and
 `analytics:cfg:` are operator-only keys.)
 
-## Known issues / TODO
+## Current verification note
 
-**[HIGH] Tenant rename misses several Redis-authoritative keys** (`src/lib/tenant-rename.ts`): `review-replies:recent:{t}`, `reb:review-nudge-sent:{t}`, `reb:order-review-request-sent:{t}:*`, and `reb:review-reply-declined:{t}:*` are not in `authoritativePatterns`. A tenant rename will silently strand these keys under the old slug. The `google-meta:{t}` cache is intentionally omitted (regenerates from Postgres), but the four reply/nudge/order keys above are NOT regenerable and must be added to the registry along with the completeness unit test assertions.
-
-**[HIGH] GBP writes silently fail after tenant rename** (`src/lib/tenant-rename.ts:32`): the `google-meta:${t}` key is listed as a cache omission in the comment but the rename code does not move the underlying OAuth connection blob. The `connections:${t}:*` pattern covers the OAuth tokens but `google-meta:` itself may accumulate stale data. Verify the blob rewriter handles this correctly post-rename.
-
-~~**[HIGH] Missing `Cache-Control: private` on collections list and single-entry v1 routes**~~ **FIXED 2026-07-30** — both v1 collections routes now send `Cache-Control: private` on every successful response.
-
-~~**[LOW] Subdomain-resolved tenant requests skip the proxy auth gate**~~ **FIXED 2026-07-30** — `src/proxy.ts` now covers subdomain-resolved tenants in `needsAuth`.
-
-~~**[MEDIUM] `businessRules` field injected unsanitized into the agent system prompt**~~ **FIXED 2026-07-30** — `businessRules` is now wrapped in `sanitizePromptValue` and a max-length cap is enforced in the TenantEditor validator.
-
-~~**[HIGH] `upload_image` tool uses unscoped `uploadFile()` instead of `uploadTenantMedia()`**~~ **FIXED 2026-07-30** — agent `upload_image` now writes to a tenant-prefixed Blob path via `uploadTenantMedia()`.
-
-~~**[HIGH] `SECRETS_ENC_KEY` missing from production readiness checklist**~~ **FIXED 2026-07-30** — `SECRETS_ENC_KEY`, `SUPABASE_URL`, `SUPER_ADMIN_EMAILS`, and `APPROVE_LINK_SECRET` are now validated in `check:prod`.
-
-~~**[CRITICAL] Orphaned Clerk and Sanity secrets still live in `.vercel/.env.production.local`**~~ **DONE 2026-07-30** — 11 vars removed from prod + preview + dev: `CLERK_*` (×7), `SANITY_API_TOKEN`, `SANITY_WEBHOOK_SECRET`, `REVALIDATION_SECRET`, `CORS_ORIGINS`. `NEXT_PUBLIC_SANITY_DATASET` and `NEXT_PUBLIC_SANITY_PROJECT_ID` are kept for legacy image-URL resolution.
+Tenant rename now moves GBP metadata and the review/order dedup authorities.
+Collections caching, subdomain auth gating, prompt sanitization, tenant-scoped
+uploads, and production-secret checks are covered by current code and tests.
+Operational backlog belongs in `roadmap.md`; dated audit findings remain in the
+audit record rather than this surface map.

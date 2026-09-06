@@ -15,44 +15,13 @@
  * citation probe actually ran. Without a key, the verdict is readiness-framed only.
  */
 
-import * as dns from "node:dns";
 import * as cheerio from "cheerio";
-import { validateUrlSafety, isPrivateIP } from "@/lib/audit/checks";
+import { validateUrlSafety } from "@/lib/audit/checks";
+import { fetchPinnedPublicText } from "@/lib/pinned-public-text";
+import type { AiVisibilityResult, CitationProbe, Grade, MeasurementStatus, ScoreInput, Signal } from "./contracts";
 
-export type Grade = "A" | "B" | "C" | "D" | "F";
-
-export interface Signal {
-  id: string;
-  label: string;
-  pass: boolean;
-  detail: string;
-  weight: number;
-}
-
-export interface CitationProbe {
-  probed: boolean;
-  mentioned: boolean;
-  recommended: boolean;
-  note: string;
-}
-
-export interface AiVisibilityResult {
-  business: string;
-  url?: string;
-  score: number; // 0-100
-  grade: Grade;
-  verdict: string;
-  signals: Signal[];
-  citation: CitationProbe;
-  topFix: string;
-}
-
-export interface ScoreInput {
-  business: string;
-  url?: string;
-  category?: string;
-  location?: string;
-}
+export type { AiVisibilityResult, CitationProbe, ScoreInput, Signal } from "./contracts";
+export type { Grade } from "./contracts";
 
 const AI_BOTS = [
   "GPTBot",
@@ -79,36 +48,27 @@ function normalizeUrl(raw: string): string {
   return `https://${trimmed}`;
 }
 
-async function fetchText(url: string, ms = 9000): Promise<string | null> {
-  try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), ms);
-    const res = await fetch(url, {
-      signal: ctrl.signal,
-      redirect: "follow",
-      headers: { "user-agent": "StrelvaAIVisibilityBot/0.1 (+https://strelva.com)" },
-    });
-    clearTimeout(timer);
-    if (!res.ok) return null;
-    // Post-redirect DNS rebinding guard: if the final URL resolved to a
-    // different host (redirect: "follow" can deliver a response from an
-    // internal host after a public-to-private redirect), reject it.
-    if (res.url) {
-      try {
-        const finalHost = new URL(res.url).hostname;
-        const startHost = new URL(url).hostname;
-        if (finalHost !== startHost) {
-          const { address } = await dns.promises.lookup(finalHost, { family: 4 });
-          if (isPrivateIP(address)) return null;
-        }
-      } catch {
-        return null;
-      }
-    }
-    return await res.text();
-  } catch {
-    return null;
-  }
+const MAX_PAGE_BYTES = 1_000_000;
+const MAX_ROBOTS_BYTES = 256_000;
+
+/**
+ * Fetch text from a public HTTP(S) URL without allowing fetch to follow an
+ * unvalidated redirect. Every hop is resolved by `validateUrlSafety` before
+ * the request is sent. The timeout covers headers and body consumption, and
+ * the body cap prevents an unbounded response allocation.
+ *
+ * This is an application egress guard, not a network sandbox. Production
+ * infrastructure should also deny private/link-local destinations at egress.
+ */
+export async function fetchPublicText(
+  url: string,
+  options: { timeoutMs?: number; maxBytes?: number } = {},
+): Promise<string | null> {
+  return fetchPinnedPublicText(url, {
+    timeoutMs: options.timeoutMs,
+    maxBytes: options.maxBytes ?? MAX_PAGE_BYTES,
+    userAgent: "StrelvaAIVisibilityBot/0.1 (+https://strelva.com)",
+  });
 }
 
 /** True if robots.txt disallows the whole site (`Disallow: /`) for any AI
@@ -264,7 +224,7 @@ async function citationProbe(input: ScoreInput): Promise<CitationProbe> {
       probed: false,
       mentioned: false,
       recommended: false,
-      note: "Set GOOGLE_GENERATIVE_AI_API_KEY to run the live AI-citation probe (does ChatGPT/Gemini actually name you?).",
+      note: "A live Gemini citation check was not available for this run.",
     };
   }
   try {
@@ -287,15 +247,15 @@ async function citationProbe(input: ScoreInput): Promise<CitationProbe> {
       mentioned,
       recommended: mentioned, // if it surfaced in a "best/recommend" answer, treat as recommended
       note: mentioned
-        ? `AI named "${input.business}" when asked for the best ${what}${where}.`
-        : `AI did NOT name "${input.business}" when asked for the best ${what}${where}. A competitor got the recommendation.`,
+        ? `Gemini named "${input.business}" when asked for the best ${what}${where}.`
+        : `Gemini did not name "${input.business}" when asked for the best ${what}${where}.`,
     };
-  } catch (err) {
+  } catch {
     return {
       probed: false,
       mentioned: false,
       recommended: false,
-      note: `Citation probe unavailable (${err instanceof Error ? err.message : "error"}).`,
+      note: "The live Gemini citation check could not be completed for this run.",
     };
   }
 }
@@ -325,8 +285,8 @@ export async function scoreAiVisibility(input: ScoreInput): Promise<AiVisibility
       }
     })();
     const [html, robots] = await Promise.all([
-      fetchText(url),
-      origin ? fetchText(`${origin}/robots.txt`, 5000) : Promise.resolve(null),
+      fetchPublicText(url),
+      origin ? fetchPublicText(`${origin}/robots.txt`, { timeoutMs: 5_000, maxBytes: MAX_ROBOTS_BYTES }) : Promise.resolve(null),
     ]);
     if (html) signals = readinessSignals(html, robots, input);
   }
@@ -349,23 +309,61 @@ export async function scoreAiVisibility(input: ScoreInput): Promise<AiVisibility
     score = 0;
   }
   const grade = gradeFor(score);
+  const measurementStatus: MeasurementStatus =
+    signals.length > 0 && citation.probed
+      ? "measured"
+      : signals.length > 0 || citation.probed
+        ? "partial"
+        : "unavailable";
+  const measurementNote =
+    measurementStatus === "measured"
+      ? "Website readiness and one live Gemini citation answer were measured."
+      : measurementStatus === "partial" && signals.length > 0
+        ? "Website readiness was measured. A live Gemini citation answer was not available."
+        : measurementStatus === "partial"
+          ? "One live Gemini citation answer was measured. Website readiness could not be measured."
+          : "This run could not measure website readiness or a live Gemini citation answer.";
 
   // Honest verdict: only invoke "AI doesn't recommend you" when actually probed.
   let verdict: string;
-  if (citation.probed && !citation.mentioned) {
-    verdict = `AI won't recommend ${input.business}. You're invisible when customers ask AI for the best ${input.category ?? "option"}.`;
+  if (measurementStatus === "unavailable") {
+    verdict = `We couldn't measure ${input.business} on this run, so no visibility grade was produced.`;
+  } else if (citation.probed && !citation.mentioned && signals.length === 0) {
+    verdict = `Gemini did not name ${input.business} in one live answer. Website readiness could not be measured.`;
+  } else if (citation.probed && citation.mentioned && signals.length === 0) {
+    verdict = `Gemini named ${input.business} in one live answer. Website readiness could not be measured.`;
+  } else if (citation.probed && !citation.mentioned) {
+    verdict = `Gemini did not name ${input.business} when asked for the best ${input.category ?? "option"}.`;
   } else if (citation.probed && citation.mentioned && score < 70) {
-    verdict = `AI knows ${input.business} but your site is hard for it to read. Your lead is fragile.`;
+    verdict = `Gemini named ${input.business} in one live answer. The website readiness checks found gaps that may make its facts harder to use.`;
   } else if (!citation.probed && score < 70) {
-    verdict = `${input.business} is at high risk of being invisible to AI search. AI can barely read your site.`;
+    verdict = `${input.business}'s website readiness score was ${score}/100. This run did not measure whether an AI answer names the business.`;
   } else if (!citation.probed) {
-    verdict = `${input.business} is reasonably readable by AI. Run the live probe to confirm AI actually recommends you.`;
+    verdict = `${input.business}'s website readiness score was ${score}/100. This run did not measure whether an AI answer names the business.`;
   } else {
-    verdict = `${input.business} shows up when customers ask AI. Keep it that way.`;
+    verdict = `Gemini named ${input.business} in one live answer, and the website readiness score was ${score}/100.`;
   }
 
   const failing = signals.filter((s) => !s.pass).sort((a, b) => b.weight - a.weight);
-  const topFix = failing.length ? failing[0]!.detail : "Maintain structured data and AI-crawler access.";
+  const topFix = measurementStatus === "unavailable"
+    ? "Try again with a reachable public website to measure AI readiness."
+    : failing.length
+      ? failing[0]!.detail
+      : signals.length === 0
+        ? "Retry the website check to measure AI readiness."
+        : "Maintain structured data and AI-crawler access.";
 
-  return { business: input.business, url, score, grade, verdict, signals, citation, topFix };
+  return {
+    business: input.business,
+    url,
+    score,
+    grade,
+    verdict,
+    signals,
+    citation,
+    topFix,
+    measurementStatus,
+    measurementNote,
+    readinessMeasured: signals.length > 0,
+  };
 }

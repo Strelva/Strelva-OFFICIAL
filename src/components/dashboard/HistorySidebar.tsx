@@ -17,6 +17,7 @@ import { PropertySwitcher } from "./PropertySwitcher";
 import { useDashboardSurfaces } from "./DashboardSurfacesContext";
 import { SURFACE_ICONS, GROUP_LABELS, SURFACE_MATCH } from "./surface-nav";
 import { createBrowserSupabase } from "@/lib/db/browser-client";
+import { RELATIONSHIP_STATUS_LABELS, type RelationshipSnapshot } from "@/platform/relationships";
 
 /** Ends the active Supabase session then returns to sign-in. */
 async function signOutEverywhere(navigateToSignIn: () => void) {
@@ -52,6 +53,8 @@ interface HistorySidebarProps {
   isOpen?: boolean;
   onClose?: () => void;
   pendingCount?: number;
+  /** Display-only relationship for the currently selected dashboard context. */
+  relationship?: RelationshipSnapshot;
   /** Super-admin inspect mode — render the "Inspecting {name}" strip + preview markers. */
   inspect?: boolean;
   /** Business name shown in the inspect strip. */
@@ -98,6 +101,7 @@ export function HistorySidebar({
   isOpen = true,
   onClose,
   pendingCount = 0,
+  relationship,
   inspect = false,
   inspectTenantName,
   inspectExitHref,
@@ -115,6 +119,9 @@ export function HistorySidebar({
     siteHost = "";
   }
   const firstName = accountName.trim().split(/\s+/)[0] || "there";
+  const relationshipLabel = relationship && relationship.status !== "user"
+    ? RELATIONSHIP_STATUS_LABELS[relationship.status]
+    : null;
   const surfaces = useDashboardSurfaces();
   const navGroups = (["manage", "presence", "set"] as const)
     .map((id) => ({ id, label: GROUP_LABELS[id], items: surfaces.filter((s) => s.group === id) }))
@@ -396,6 +403,15 @@ export function HistorySidebar({
             <div className="flex items-center gap-1.5">
               {accountEmail && (
                 <p className="truncate text-[11px] text-gray-muted leading-tight">{accountEmail}</p>
+              )}
+              {relationshipLabel && (
+                <span
+                  data-relationship-status={relationship?.status}
+                  title={`Current workspace: ${relationshipLabel}`}
+                  className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-accent"
+                >
+                  {relationshipLabel}
+                </span>
               )}
               {isSuperAdmin && !viewAsClient && (
                 <span className="shrink-0 rounded-full bg-accent-dim px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-accent">

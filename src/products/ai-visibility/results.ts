@@ -7,17 +7,9 @@
  * it becomes operator-actionable instead of landing in an invisible side store.
  */
 import { getRedis } from "@/lib/redis";
-import type { AiVisibilityResult, ScoreInput } from "./score";
+import type { AiVisibilityResult, ScoreInput, StoredAiVisibilityResult } from "./contracts";
 
 const RESULT_TTL_SECONDS = 180 * 24 * 60 * 60;
-
-export interface StoredAiVisibilityResult {
-  id: string;
-  result: AiVisibilityResult;
-  input: Pick<ScoreInput, "category" | "location">;
-  source?: string;
-  createdAt: string;
-}
 
 function resultKey(id: string): string {
   return `reb:ai-visibility-result:${id}`;

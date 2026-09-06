@@ -22,6 +22,8 @@ import { getTenantDeliveryModel, getTenantEditablePreviewUrl } from "@/lib/custo
 import { getLocalClientPreviewUrl } from "@/lib/preview-target";
 import { ConversationShell } from "@/components/dashboard/ConversationShell";
 import { planByKey } from "@/lib/billing-plans";
+import { resolveLegacyManagedPresence } from "@/products/managed-presence";
+import { resolveRelationship } from "@/platform/relationships";
 
 export default async function DashboardLayout({
   children,
@@ -52,6 +54,18 @@ export default async function DashboardLayout({
   }
   const actor = await getActorContext(tenant);
   const tenantConfig = await getTenantConfig(tenant);
+  // Relationship status is contextual display metadata. The legacy dashboard
+  // adapter treats a resolved non-demo TenantConfig as managed-presence service
+  // context; it never promotes a personal account or membership by itself,
+  // and the demo is intentionally excluded from Client status.
+  const legacyManagedPresence = resolveLegacyManagedPresence(tenantConfig);
+  const relationship = resolveRelationship({
+    context: { kind: "tenant", tenantId: tenant },
+    serviceRelationship: legacyManagedPresence.serviceRelationship,
+    paidStanding: tenantConfig?.billingType === "case_study" || tenantConfig?.planOverride === "founder_comp"
+      ? "comped"
+      : tenantConfig?.subscriptionStatus ?? "none",
+  });
 
   // Suspended site: an inactive (non-demo) tenant shows a hold state to its
   // members instead of a half-working dashboard. Super-admins and the dev
@@ -172,6 +186,7 @@ export default async function DashboardLayout({
       planOverride={tenantConfig?.planOverride === "founder_comp" || tenant === "gldf" || tenant === "rohlax" ? "founder_comp" : null}
       commercialPlanLabel={commercialPlan.label}
       commercialPlanMonthlyCents={tenantConfig?.planMonthlyCents ?? commercialPlan.monthly * 100}
+      relationship={relationship}
       impersonation={{
         isActive: actor.isImpersonating,
         actorEmail: accountEmail,

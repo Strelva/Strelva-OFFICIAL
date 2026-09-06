@@ -22,10 +22,16 @@ function safeNext(next: string | null): string {
   return next;
 }
 
+function preservesWorkspaceReturn(next: string): boolean {
+  const resultId = next.startsWith("/workspace?save=") ? next.slice("/workspace?save=".length) : "";
+  return next === "/workspace" || (resultId.length <= 256 && /^scan_[a-z0-9]+$/i.test(resultId));
+}
+
 /** Bounce back to sign-in with a short, URL-safe reason tag so a failed round-trip
  *  is diagnosable from the address bar (and logged) instead of an opaque error. */
-function fail(origin: string, reason: string): NextResponse {
-  return NextResponse.redirect(`${origin}/sign-in?error=auth_callback&reason=${encodeURIComponent(reason)}`);
+function fail(origin: string, reason: string, next: string): NextResponse {
+  const retryNext = preservesWorkspaceReturn(next) ? `&next=${encodeURIComponent(next)}` : "";
+  return NextResponse.redirect(`${origin}/sign-in?error=auth_callback&reason=${encodeURIComponent(reason)}${retryNext}`);
 }
 
 export async function GET(request: NextRequest) {
@@ -38,7 +44,7 @@ export async function GET(request: NextRequest) {
   const providerError = searchParams.get("error_description") || searchParams.get("error");
   if (providerError) {
     console.error("[auth/callback] provider returned error:", providerError);
-    return fail(origin, `provider:${providerError.slice(0, 120)}`);
+    return fail(origin, `provider:${providerError.slice(0, 120)}`, next);
   }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -48,7 +54,7 @@ export async function GET(request: NextRequest) {
 
   if (!code || !url || !key) {
     console.error("[auth/callback] missing code/env", { hasCode: !!code, hasUrl: !!url, hasKey: !!key });
-    return fail(origin, !code ? "no_code" : "no_env");
+    return fail(origin, !code ? "no_code" : "no_env", next);
   }
 
   // Build the success redirect first; the Supabase client writes session cookies
@@ -80,7 +86,7 @@ export async function GET(request: NextRequest) {
       return response;
     }
     console.error("[auth/callback] exchangeCodeForSession failed:", error.message);
-    return fail(origin, `exchange:${error.message.slice(0, 120)}`);
+    return fail(origin, `exchange:${error.message.slice(0, 120)}`, next);
   }
 
   return response;

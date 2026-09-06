@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
+  // Instruction files are user-owned; next dev must not rewrite them.
+  agentRules: false,
   distDir: process.env.PLAYWRIGHT_DIST_DIR || ".next",
   // The dev-tools badge defaults to bottom-left, where it sits on top of the
   // dashboard sidebar's account footer during local walks. Move it out of the

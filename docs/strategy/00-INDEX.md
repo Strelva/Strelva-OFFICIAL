@@ -1,5 +1,11 @@
 # Strelva Strategy — Index
 
+> **Current-strategy pointer (2026-07-15):** this folder remains the research and
+> divergent-exploration archive. The canonical current GTM decision layer is
+> [`docs/gtm/`](../gtm/README.md); use the approaches below as evidence, not as
+> simultaneous roadmaps. References below to free client sites describe superseded
+> strategy; the current offer is a paid custom build quoted after a short call.
+
 > **What this folder is.** A divergent-exploration workspace for choosing Strelva's
 > product and go-to-market direction going into Q4 2026. Twelve non-consensus approaches
 > were written independently, then synthesized into a ranked recommendation. **The product

@@ -15,7 +15,7 @@
  *     claim about what AI does or doesn't recommend.
  */
 
-import type { AiVisibilityResult, CitationProbe, Grade } from "./score";
+import type { AiVisibilityResult, CitationProbe, Grade, MeasurementStatus } from "./contracts";
 
 /** URL-safe slug for the artifact filename. */
 export function slugify(name: string): string {
@@ -53,9 +53,16 @@ function escapeHtml(value: string): string {
  * `CitationProbe` fields (not the free-text `note`) so attribution is always
  * correct and never drifts into a generic "AI won't recommend you" claim.
  */
-export function probeStatusLine(citation: CitationProbe, business: string): string {
+export function probeStatusLine(
+  citation: CitationProbe,
+  business: string,
+  measurementStatus?: MeasurementStatus,
+): string {
   const name = escapeHtml(business);
   if (!citation.probed) {
+    if (measurementStatus === "unavailable") {
+      return `A live Gemini citation check wasn't available for ${name}, and website readiness couldn't be measured on this run.`;
+    }
     return `The live AI-citation probe hasn't been run yet for ${name}. This grade reflects AI readiness: how well AI can read and understand the site. Run the Gemini probe to confirm whether AI actually names ${name}.`;
   }
   if (citation.mentioned) {
@@ -75,12 +82,13 @@ function probeStatusLabel(citation: CitationProbe): string {
  * Pure function: same input -> same output, no IO, no env reads.
  */
 export function renderAiVisibilityHtml(result: AiVisibilityResult): string {
-  const accent = GRADE_HEX[result.grade];
+  const measured = result.readinessMeasured ?? result.measurementStatus !== "unavailable";
+  const accent = measured ? GRADE_HEX[result.grade] : "#6b7280";
   const business = escapeHtml(result.business);
   const url = result.url ? escapeHtml(result.url) : "";
   const verdict = escapeHtml(result.verdict);
   const topFix = escapeHtml(result.topFix);
-  const probeLine = probeStatusLine(result.citation, result.business);
+  const probeLine = probeStatusLine(result.citation, result.business, result.measurementStatus);
   const probeLabel = probeStatusLabel(result.citation);
 
   const signalRows = result.signals
@@ -226,10 +234,10 @@ export function renderAiVisibilityHtml(result: AiVisibilityResult): string {
     ${url ? `<div class="url">${url}</div>` : ""}
 
     <div class="grade-row">
-      <div class="grade">${result.grade}</div>
+      <div class="grade">${measured ? result.grade : "?"}</div>
       <div class="grade-meta">
-        <span class="score">${result.score}/100</span>
-        <span class="label">AI Visibility Grade</span>
+        <span class="score">${measured ? `${result.score}/100` : "Not measured"}</span>
+        <span class="label">${measured ? "AI Visibility Grade" : "Measurement unavailable"}</span>
       </div>
     </div>
 

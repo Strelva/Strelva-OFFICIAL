@@ -45,6 +45,14 @@ jobs:
       - name: Typecheck
         run: pnpm tsc --noEmit
 
+      - name: Product boundaries
+        run: pnpm check:boundaries
+
+      - name: Workspace ownership SQL
+        run: |
+          export PATH="$(pg_config --bindir):$PATH"
+          pnpm check:workspace-sql
+
       - name: Test (with coverage gate)
         run: pnpm test:coverage
 
@@ -90,6 +98,10 @@ jobs:
         # webServer timeout in playwright.config.ts is sized for cold Turbopack
         # compile on a CI runner.
         run: pnpm smoke
+
+      - name: Workspace browser acceptance (fixture-backed)
+        if: github.event.pull_request.draft == false
+        run: pnpm smoke:workspace
         env:
           CI: true
           SCAFFOLD_DEV_UNGATED_ACCESS: "0"

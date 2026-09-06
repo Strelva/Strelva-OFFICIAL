@@ -59,32 +59,15 @@ against provider state before retrying. A provider-accepted non-idempotent write
 must be resolved as accepted even if read-back verification failed, or a retry
 can duplicate it.
 
-## Known issues / TODO
+## Recovery invariants
 
-- **[HIGH][bug] `SECRETS_ENC_KEY` removal causes full platform outage.** If this
-  key is unset or changed while Postgres already has `enc:v1:`-prefixed secrets,
-  `loadTenants` throws on every tenant load. Before a deployment rollback, confirm
-  the rolled-back artifact was built with the same `SECRETS_ENC_KEY` that
-  encrypted the current DB rows. See `secret-rotation.md` for the correct rotation
-  procedure.
-- **[HIGH][bug] `withAccountLock` proceeds unlocked when lock acquisition fails**
-  (`src/lib/accounts.ts:194-213`). Concurrent Stripe webhook hits can produce
-  last-write-wins on subscription state. Recovery after a duplicate webhook storm:
-  query Stripe for the canonical subscription state and patch the tenant record
-  directly.
-- **[MEDIUM][bug] Ordering guard key in the Stripe webhook has no TTL**
-  (`src/app/api/billing/webhook/route.ts:211`). The key leaks forever per tenant.
-  Add a TTL on the guard key write.
-- **[HIGH][bug] Calendly webhook `addEvent` is unguarded** — any Redis/Postgres
-  failure returns 500, triggering Calendly retry storms
-  (`src/app/api/webhooks/calendly/route.ts:124`). Wrap in try/catch; return 200
-  on catch so Calendly does not retry. Add Redis idempotency keyed on `eventUri`.
-- **[HIGH][perf] Calendly webhook uses `redis.keys()` full-keyspace scan**
-  (`src/app/api/webhooks/calendly/route.ts:64`). Replace with a reverse index:
-  write `redis.set('calendly-user-uri:<userUri>', tenantId)` when saving a
-  connection; look it up with a single O(1) `redis.get`.
-- **[HIGH][bug] GBP writes silently fail after tenant rename** — `google-meta:${t}`,
-  `review-replies:recent:${t}`, `reb:review-nudge-sent:${t}`,
-  `reb:order-review-request-sent:${t}:*`, and `reb:review-reply-declined:${t}:*`
-  are missing from `authoritativePatterns` in `src/lib/tenant-rename.ts`. Add
-  them and update the completeness unit test.
+- `SECRETS_ENC_KEY` is part of the data contract. If it is unset or changed while
+  Postgres contains `enc:v1:` values, tenant loading fails closed. Confirm the
+  rollback artifact uses the current key and follow `secret-rotation.md` for any
+  rotation.
+- Account mutations now reject when their Redis lock cannot be acquired; Stripe
+  event-order keys expire; Calendly uses a reverse index and guarded writes; and
+  tenant rename moves GBP plus review/order dedup authorities. Preserve those
+  behaviors in any rollback target.
+- After any billing recovery, query Stripe as financial authority and reconcile
+  the tenant and account snapshots before reopening access.

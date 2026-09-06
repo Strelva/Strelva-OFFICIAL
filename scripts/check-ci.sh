@@ -11,6 +11,7 @@ echo "== typecheck =="
 pnpm typecheck
 echo "== ontology invariants =="
 pnpm check:ontology
+pnpm check:boundaries
 echo "== vitest =="
 pnpm test
 

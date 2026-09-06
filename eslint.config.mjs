@@ -10,6 +10,9 @@ const eslintConfig = [
       ".playwright-mcp/**",
       "test-results/**",
       "src/sanity/**",
+      // Independently configured applications, not source owned by this package.
+      "strelva-marketing/**",
+      "client-prototypes/**",
     ],
   },
   ...nextCoreWebVitals,

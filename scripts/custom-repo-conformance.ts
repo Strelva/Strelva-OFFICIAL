@@ -14,7 +14,7 @@
  *
  * It needs NO sibling client repo checked out — it exercises the platform + the
  * `custom-repo-starter` scaffold that every custom repo drops in. Both the
- * `scripts/custom-repo-workspace-check.ts` CLI and the vitest fixture
+ * `scripts/custom-repo-workspace-run.ts` CLI and the vitest fixture
  * (`src/__tests__/custom-repo-conformance.test.ts`) call it, so the check and
  * the test can never assert different things.
  *

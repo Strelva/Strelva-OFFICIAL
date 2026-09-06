@@ -138,69 +138,31 @@
 - If code breaks a storefront, redeploy the previous Vercel deployment or release tag.
 - For incompatible schema changes, publish a new API version and keep `/api/v1/*` stable until all storefronts migrate.
 
-## Known issues / TODO (updated 2026-07-30)
+## Current readiness notes (updated 2026-08-01)
 
-### Security / Critical
+- Local typecheck and Vitest pass. The latest run reports 246 passing files,
+  2,013 passing tests, and one intentional skip. Lint fails with 10
+  `no-explicit-any` errors in `scripts/inspect-tenant.ts` plus seven warnings, so
+  `pnpm check:ci` stops before surface smoke.
+- `pnpm audit --audit-level high` currently exits nonzero with three transitive
+  advisories: one high-severity `brace-expansion` path through ESLint/minimatch
+  and two moderate OpenTelemetry advisories. The high path is development-only,
+  but the release gate still reports it and must not be described as a passing
+  audit command.
+- The production health endpoint reported Redis, Supabase, Stripe, and Gemini
+  healthy on 2026-08-01. This is dependency evidence only; complete release
+  verification still requires the gate and manual checks above.
+- GitHub Actions is currently blocked before runner start by the account's
+  payment or spending-limit state. Clear that external block and obtain a fresh
+  hosted run before calling the current commit CI-green.
+- Client lifecycle mail remains paused by default. Operator payment-failure
+  alerts are independent and enabled by default; the owner-facing dunning email
+  still uses the client audience and is therefore suppressed while client mail
+  is paused. Do not claim that owner dunning was delivered unless `sendEmail()`
+  returned success.
+- Google Business Profile writes remain conditional on Google API approval,
+  tenant authorization, and quota. Their presence in code is not a launch check.
 
-- ~~**[CRITICAL][security] Next.js 16.2.6 has four HIGH + three MODERATE unpatched CVEs.**~~ **FIXED 2026-07-30.** Bumped to `16.2.12` + matching `eslint-config-next`. `pnpm audit` result: 3 remaining (1 high dev-only via eslint/minimatch — not in production bundle; 2 moderate OpenTelemetry pinned by Sentry).
-
-### Security / HIGH (open)
-
-- **[HIGH][bug] `google-meta:${t}` and review-dedup keys missing from `authoritativePatterns` in `src/lib/tenant-rename.ts`.** GBP writes and review-reply vetos silently strand under the old slug on a tenant rename. Add `google-meta:${t}`, `review-replies:recent:${t}`, `reb:review-nudge-sent:${t}`, `reb:order-review-request-sent:${t}:*`, and `reb:review-reply-declined:${t}:*` to the registry. Update the completeness unit test to cover these patterns.
-
-### Security / HIGH (fixed 2026-07-30)
-
-- ~~**`SECRETS_ENC_KEY` missing from `pnpm check:prod` and both env examples.**~~ **FIXED.** Added to `scripts/production-checklist.ts`, `.env.example`, `.env.production.example`.
-- ~~**`SUPABASE_URL` (private, server-only) absent from `pnpm check:prod`.**~~ **FIXED.** Added to checklist + env examples.
-- ~~**11 orphaned env vars still live in Vercel.**~~ **FIXED.** Removed: `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`, `CLERK_DOMAIN`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_CLERK_DOMAIN`, `NEXT_PUBLIC_CLERK_SIGN_IN_URL`, `NEXT_PUBLIC_CLERK_SIGN_UP_URL`, `SANITY_API_TOKEN`, `SANITY_WEBHOOK_SECRET`, `REVALIDATION_SECRET`, `CORS_ORIGINS` — removed from production + preview + development 2026-07-30. Kept: `NEXT_PUBLIC_SANITY_DATASET` + `NEXT_PUBLIC_SANITY_PROJECT_ID` (legacy image-URL resolution).
-- ~~**Five security-pin overrides frozen at vulnerable versions.**~~ **FIXED 2026-07-30.** Updated: `dompurify` → `3.4.12`, `postcss` → `8.5.25`, `fast-uri` → `3.1.4`, `sharp` → `0.35.3`, `js-yaml` → `4.3.0`, `@babel/core` pinned. See AGENTS.md audit remediation block for the current remaining advisory count.
-- ~~**SSRF in AI-visibility scorer.**~~ **FIXED 2026-07-30.** `validateUrlSafety` called before every `fetchText` call in `scoreAiVisibility`.
-
-### Tenant isolation / HIGH (fixed 2026-07-30)
-
-- ~~**Missing `Cache-Control: private` on collections v1 routes.**~~ **FIXED.** `TENANT_PRIVATE_CACHE` added to both collections routes.
-- ~~**`upload_image` agent tool uses unscoped `uploadFile()`.**~~ **FIXED.** Replaced with `uploadTenantMedia(tenant, buffer, finalFilename, sniffedMime)`; uploads are now tenant-prefixed.
-
-### Bugs / HIGH (fixed 2026-07-30)
-
-- ~~**Fractional star delta causes uncaught Redis error in `adjustStars`.**~~ **FIXED.** `Number.isInteger(delta)` guard added at route + library level.
-- ~~**Calendly webhook uses `redis.keys()` full-keyspace scan.**~~ **FIXED.** Replaced with O(1) reverse-index lookup.
-- ~~**Calendly webhook `addEvent` is unguarded.**~~ **FIXED.** Wrapped in try/catch; returns 200 on catch; `Invalid Date` guard added.
-- ~~**`buildOpsReport` has a serial N+1 loop.**~~ **FIXED.** Collapsed into `mapPool(active, 8, ...)`.
-- ~~**Google OAuth callback does not re-verify caller session.**~~ **FIXED.** `verifyAuth()` + `requireTenantAccess(tenantId)` added at the start of the GET handler. Same fix applied to Instagram and Calendly OAuth callbacks.
-
-### Bugs / HIGH (open)
-
-- **[HIGH][bug] `google-meta:${t}` and review-dedup keys missing from `authoritativePatterns` in `src/lib/tenant-rename.ts`.** GBP writes and review-reply vetos silently strand under the old slug on a tenant rename. Add `google-meta:${t}`, `review-replies:recent:${t}`, `reb:review-nudge-sent:${t}`, `reb:order-review-request-sent:${t}:*`, and `reb:review-reply-declined:${t}:*` to the registry. Update the completeness unit test.
-
-### Security / Medium (fixed 2026-07-30)
-
-- ~~**`businessRules` field injected into agent system prompt without sanitization.**~~ **FIXED.** Wrapped in `sanitizePromptValue()`.
-- ~~**Newsletter HTML sanitizer allows CSS in `style` attributes.**~~ **FIXED.** `style` dropped from `ALLOWED_ATTR`.
-- ~~**`reb:tenants:all` Redis cache stores decrypted plaintext secrets.**~~ **FIXED.** The 4 provider-secret fields are re-enveloped on the Redis write and decrypted on read.
-
-### Security / Medium (open)
-
-- **[MEDIUM][security] Subdomain-resolved tenant requests skip the proxy auth gate.** `src/proxy.ts` — `needsAuth` only covers `isAdminSubdomain`, `tenantFromQueryParam`, and `tenantFromClientPath`. Add `tenantFromSubdomain` as a fourth condition.
-- **[MEDIUM][security] `INTERNAL_API_SECRET` serves three roles** (domain-map auth, `OAUTH_STATE_SECRET` fallback, approve-link fallback). Prefer setting `APPROVE_LINK_SECRET` and `OAUTH_STATE_SECRET` as dedicated secrets.
-- ~~**Slug URL parameter in collections single-entry route unsanitized before DB pass.**~~ **FIXED 2026-07-30.** ID-format guard added on `slug` before `getEntryBySlug`.
-
-### Bugs / Medium (fixed 2026-07-30)
-
-- ~~**Split-brain between `CONTENT_SOURCE` and `DATA_SOURCE` flags.**~~ **FIXED.** `DATA_SOURCE` prod hard-fail guard added (mirrors `CONTENT_SOURCE`); both confirmed set in Vercel prod.
-
-### Bugs / Medium (open)
-- **[MEDIUM][bug] Billing webhook: ordering guard key has no TTL** (`src/app/api/billing/webhook/route.ts:211`). The Redis key used for event ordering leaks forever per tenant — add a TTL.
-- **[MEDIUM][bug] `withAccountLock` proceeds unlocked when lock acquisition fails** (`src/lib/accounts.ts:194-213`). Silent last-write-wins on concurrent webhook hits.
-- **[MEDIUM][bug] Dunning email to owner gated behind client email pause** (`src/app/api/billing/webhook/route.ts:672-690`). Payment-failed owner notifications may never be sent when `emailSendingPaused()` is true. Operator emails should use the `operator` audience, not `client`.
-- **[MEDIUM][bug] `PATCH /api/reviews` bypasses GBP publish path** and permanently suppresses auto-reply backlog for Google reviews (`src/app/api/reviews/route.ts:73`).
-- **[MEDIUM][bug] `poll-google-reviews` cron does not paginate** — reviews beyond the first API page are never ingested (`src/app/api/cron/poll-google-reviews/route.ts:116`).
-- **[MEDIUM][bug] Monthly-report dev-mode run consumes the once-per-month dedup marker without sending** (`src/app/api/cron/monthly-report/route.ts:98-128`). A dev/staging trigger burns the production dedup key.
-- **[MEDIUM][bug] `GA4` cache can pin an `'unavailable'` result indefinitely** when `status:ok` is cached with zeroed data (`src/lib/analytics.ts:297-382`).
-- **[MEDIUM][bug] `setPgPageConfig` uses non-atomic delete-then-insert** for `page_config` — read window between operations (`src/lib/storage/page-config-store.ts:84-90`).
-- **[MEDIUM][bug] `contact.email` schema default is `""` but field requires a valid email** — `PUT` fails on first use for a new tenant (`src/lib/schemas.ts:181` and `src/lib/defaults.ts:76`).
-
-### Tech debt / Medium (fixed 2026-07-30)
-
-- ~~**`database.types.ts` is stale** — `billing_type` and `account_id` missing.~~ **FIXED.** Regenerated from the live schema 2026-07-30 (surfaced `subscription_items.tenant_id` → added to `deprovision.ts` `TENANT_SCOPED_TABLES`). Add a CI staleness check: `find supabase/migrations -newer src/lib/db/database.types.ts | grep -q .` fails if types are older than the newest migration.
-- ~~**`sectionSchemas` typed as `Record<ContentSection, z.ZodType>` erases output types.**~~ **FIXED 2026-07-30.** Changed to per-key discriminated type.
+The finding history from the July security audit lives in
+`audit-2026-07-30-deep-audit.md`. Items closed in code are not repeated as live
+backlog here. Current product and operational priorities live in `roadmap.md`.

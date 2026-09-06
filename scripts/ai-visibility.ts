@@ -15,8 +15,7 @@
  */
 import { writeFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
-import { scoreAiVisibility, type Grade } from "../src/lib/ai-visibility/score";
-import { renderAiVisibilityHtml, slugify } from "../src/lib/ai-visibility/html";
+import { renderAiVisibilityHtml, scoreAiVisibility, slugify, type Grade } from "../src/products/ai-visibility/server";
 
 function arg(name: string): string | undefined {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));

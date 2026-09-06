@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
-import { AiVisibilityResultView } from "@/components/marketing/AiVisibilityResultView";
-import type { AiVisibilityResult } from "@/lib/ai-visibility/score";
+import { AiVisibilityResultView } from "./AiVisibilityResultView";
+import type { AiVisibilityResult } from "./contracts";
 
 type ScanState = "idle" | "scanning" | "done" | "error";
 
@@ -16,6 +16,8 @@ interface AuditResponse extends AiVisibilityResult {
 interface AiVisibilityPageProps {
   initialResult?: AiVisibilityResult;
   scanId?: string;
+  /** The server decides whether private workspace continuation is open. */
+  workspaceEnabled?: boolean;
 }
 
 function acquisitionSource(): string | undefined {
@@ -30,7 +32,7 @@ function acquisitionSource(): string | undefined {
   }
 }
 
-export function AiVisibilityPage({ initialResult, scanId: initialScanId }: AiVisibilityPageProps) {
+export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspaceEnabled = false }: AiVisibilityPageProps) {
   const [business, setBusiness] = useState("");
   const [url, setUrl] = useState("");
   const [category, setCategory] = useState("");
@@ -114,17 +116,29 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId }: AiVis
           <div className="motion-rise">
             <p className="text-[14px] font-medium text-m-text-3">Free AI visibility audit</p>
             <h1 className="mt-4 text-4xl font-semibold leading-[0.94] tracking-normal text-m-text sm:text-5xl md:text-6xl">
-              Does AI recommend your business?
+              Can AI understand and surface your business?
             </h1>
             <p className="mt-5 max-w-[620px] text-[17px] leading-[1.7] text-m-text-2">
-              When customers ask ChatGPT or Gemini for the best option near them, do you show up? Get an instant A&ndash;F grade for how visible your business is to AI search.
+              Check how clearly your website explains your business to AI systems. When available, the result also includes one live Gemini citation check.
             </p>
 
             <form onSubmit={handleScan} className="mt-8 grid gap-3 sm:grid-cols-2">
-              <input type="text" value={business} onChange={(event) => setBusiness(event.target.value)} placeholder="Business name" autoComplete="organization" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
-              <input type="text" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="example.com" autoComplete="url" inputMode="url" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
-              <input type="text" value={category} onChange={(event) => setCategory(event.target.value)} placeholder="Category (e.g. HVAC, dentist)" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
-              <input type="text" value={city} onChange={(event) => setCity(event.target.value)} placeholder="City (e.g. Buffalo, NY)" autoComplete="address-level2" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
+              <label className="block">
+                <span className="sr-only">Business name</span>
+                <input id="business-name" type="text" value={business} onChange={(event) => setBusiness(event.target.value)} placeholder="Business name" autoComplete="organization" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
+              </label>
+              <label className="block">
+                <span className="sr-only">Website</span>
+                <input id="website" type="text" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="example.com" autoComplete="url" inputMode="url" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
+              </label>
+              <label className="block">
+                <span className="sr-only">Business category</span>
+                <input id="business-category" type="text" value={category} onChange={(event) => setCategory(event.target.value)} placeholder="Category (e.g. HVAC, dentist)" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
+              </label>
+              <label className="block">
+                <span className="sr-only">City and state</span>
+                <input id="city-state" type="text" value={city} onChange={(event) => setCity(event.target.value)} placeholder="City (e.g. Buffalo, NY)" autoComplete="address-level2" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
+              </label>
               <button type="submit" className="marketing-button-primary h-14 px-8 text-[15px] sm:col-span-2">
                 Run my AI audit <ArrowRight className="size-4" />
               </button>
@@ -141,13 +155,13 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId }: AiVis
             <h2 className="mt-4 text-3xl font-semibold text-m-text sm:text-4xl">Checking AI visibility for {business}...</h2>
             <div className="mt-10 flex items-center gap-3 rounded-2xl border border-m-rule-soft bg-m-panel p-6">
               <Loader2 className="size-5 shrink-0 animate-spin text-m-accent" />
-              <span className="text-[14px] text-m-text-2">Reading your site, checking AI-crawler access, and probing live AI answers...</span>
+              <span className="text-[14px] text-m-text-2">Reading your site and checking AI-crawler access. A live Gemini result will be included when available.</span>
             </div>
           </div>
         )}
 
         {state === "done" && result && (
-          <AiVisibilityResultView result={result} scanId={scanId} shareUrl={shareUrl} onReset={handleReset} />
+          <AiVisibilityResultView result={result} scanId={scanId} shareUrl={shareUrl} workspaceEnabled={workspaceEnabled} onReset={handleReset} />
         )}
       </div>
     </div>

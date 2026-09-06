@@ -25,7 +25,7 @@ import { runPlatformContractConformance } from "./custom-repo-conformance";
  * 2-tenant array that would need editing for every new client).
  */
 
-type CheckResult = {
+export type CheckResult = {
   name: string;
   ok: boolean;
   skipped?: boolean;
@@ -42,7 +42,7 @@ type RepoCheck = {
   compatibleCommit: string | null;
 };
 
-type WorkspaceManifest = {
+export type WorkspaceManifest = {
   contractVersion?: string;
   customRepoWorkspace?: {
     contractVersion?: string;
@@ -83,84 +83,82 @@ export function workspaceContractVersion(manifest: WorkspaceManifest): string {
   return manifest.customRepoWorkspace?.contractVersion ?? manifest.contractVersion ?? "v1";
 }
 
-// ── runner (top-level side effects) ──────────────────────────────────────────
+// ── import-safe workspace checks ────────────────────────────────────────────
 
-const workspaceRoot = process.env.CUSTOM_REPO_WORKSPACE_ROOT
-  ? path.resolve(process.env.CUSTOM_REPO_WORKSPACE_ROOT)
-  : path.resolve(process.cwd(), "..");
+/**
+ * Run the executable contract and structural workspace checks without doing
+ * any I/O at module load time or changing the process exit status. Keeping the
+ * import-safe module makes it safe for Vitest and other callers to import the
+ * manifest-resolution helpers without triggering a process exit.
+ */
+export function runWorkspaceChecks(
+  manifest: WorkspaceManifest,
+  workspaceRoot: string,
+  cwd: string,
+): CheckResult[] {
+  const results: CheckResult[] = [];
+  const contractVersion = workspaceContractVersion(manifest);
+  const repos = resolveRepoChecks(manifest, workspaceRoot, cwd);
 
-const results: CheckResult[] = [];
-const manifest = JSON.parse(readFileSync(path.join(process.cwd(), "release-manifest.json"), "utf8")) as WorkspaceManifest;
-const contractVersion = workspaceContractVersion(manifest);
-const repos = resolveRepoChecks(manifest, workspaceRoot, process.cwd());
-
-function record(name: string, ok: boolean, detail?: string) {
-  results.push({ name, ok, detail: ok ? undefined : detail });
-}
-function recordSkip(name: string, detail: string) {
-  results.push({ name, ok: true, skipped: true, detail });
-}
-function read(filePath: string): string {
-  return readFileSync(filePath, "utf8");
-}
-function checkFile(repo: RepoCheck, relativePath: string): boolean {
-  const fullPath = path.join(workspaceRoot, repo.repoDir, relativePath);
-  const ok = existsSync(fullPath);
-  record(`${repo.tenant}:file:${relativePath}`, ok, ok ? undefined : `missing at ${fullPath}`);
-  return ok;
-}
-function checkPackageScripts(repo: RepoCheck) {
-  if (!checkFile(repo, "package.json")) return;
-  const pkg = JSON.parse(read(path.join(workspaceRoot, repo.repoDir, "package.json")));
-  for (const script of repo.packageScripts) {
-    const ok = Boolean(pkg.scripts?.[script]);
-    record(`${repo.tenant}:package:scripts:${script}`, ok, ok ? undefined : "missing script");
+  function record(name: string, ok: boolean, detail?: string) {
+    results.push({ name, ok, detail: ok ? undefined : detail });
   }
-}
-function checkReleaseManifest(repo: RepoCheck) {
-  if (!checkFile(repo, "release-manifest.json")) return;
-  const repoManifest = JSON.parse(read(path.join(workspaceRoot, repo.repoDir, "release-manifest.json")));
-  record(`${repo.tenant}:release:contract`, repoManifest.contractVersion === contractVersion, `expected contractVersion ${contractVersion}`);
-  const required = repo.releaseRequiredEnv.every((name) => repoManifest.requiredEnv?.includes(name));
-  record(`${repo.tenant}:release:required-env`, required, "release-manifest missing required env");
-}
-
-// 1. Contract conformance by execution — runs with no sibling repo present.
-for (const r of runPlatformContractConformance()) {
-  record(`contract:${r.name}`, r.ok, r.detail);
-}
-
-// 2. Per-repo: compatibility marker (from the manifest, always checkable) +
-//    structural checks (SKIP when the sibling repo isn't checked out).
-for (const repo of repos) {
-  record(`${repo.tenant}:manifest:compatible-commit`, Boolean(repo.compatibleCommit), "missing compatibleCommit in release-manifest.json");
-
-  const repoPath = path.join(workspaceRoot, repo.repoDir);
-  if (!existsSync(repoPath)) {
-    recordSkip(`${repo.tenant}:sibling`, `repo not checked out at ${repoPath}`);
-    continue;
+  function recordSkip(name: string, detail: string) {
+    results.push({ name, ok: true, skipped: true, detail });
   }
-  record(`${repo.tenant}:repo`, true);
-  checkPackageScripts(repo);
-  for (const file of repo.requiredFiles) checkFile(repo, file);
-  checkReleaseManifest(repo);
-}
+  function read(filePath: string): string {
+    return readFileSync(filePath, "utf8");
+  }
+  function checkFile(repo: RepoCheck, relativePath: string): boolean {
+    const fullPath = path.join(workspaceRoot, repo.repoDir, relativePath);
+    const ok = existsSync(fullPath);
+    record(`${repo.tenant}:file:${relativePath}`, ok, ok ? undefined : `missing at ${fullPath}`);
+    return ok;
+  }
+  function checkPackageScripts(repo: RepoCheck) {
+    if (!checkFile(repo, "package.json")) return;
+    const pkg = JSON.parse(read(path.join(workspaceRoot, repo.repoDir, "package.json")));
+    for (const script of repo.packageScripts) {
+      const ok = Boolean(pkg.scripts?.[script]);
+      record(`${repo.tenant}:package:scripts:${script}`, ok, ok ? undefined : "missing script");
+    }
+  }
+  function checkReleaseManifest(repo: RepoCheck) {
+    if (!checkFile(repo, "release-manifest.json")) return;
+    const repoManifest = JSON.parse(read(path.join(workspaceRoot, repo.repoDir, "release-manifest.json")));
+    record(
+      `${repo.tenant}:release:contract`,
+      repoManifest.contractVersion === contractVersion,
+      `expected contractVersion ${contractVersion}`,
+    );
+    const required = repo.releaseRequiredEnv.every((name) => repoManifest.requiredEnv?.includes(name));
+    record(`${repo.tenant}:release:required-env`, required, "release-manifest missing required env");
+  }
 
-for (const result of results) {
-  const status = result.skipped ? "SKIP" : result.ok ? "PASS" : "FAIL";
-  const detail = result.detail ? ` - ${result.detail}` : "";
-  console.log(`${status} ${result.name}${detail}`);
-}
+  // 1. Contract conformance by execution — runs with no sibling repo present.
+  for (const r of runPlatformContractConformance()) {
+    record(`contract:${r.name}`, r.ok, r.detail);
+  }
 
-const failed = results.filter((result) => !result.ok);
-const skipped = results.filter((result) => result.skipped);
-if (failed.length > 0) {
-  console.error(`Custom repo workspace check failed: ${failed.length}/${results.length} checks failed.`);
-  process.exit(1);
-}
+  // 2. Per-repo: compatibility marker (from the manifest, always checkable) +
+  //    structural checks (SKIP when the sibling repo isn't checked out).
+  for (const repo of repos) {
+    record(
+      `${repo.tenant}:manifest:compatible-commit`,
+      Boolean(repo.compatibleCommit),
+      "missing compatibleCommit in release-manifest.json",
+    );
 
-const passed = results.length - skipped.length;
-console.log(
-  `Custom repo workspace check passed: ${passed}/${results.length} checks passed` +
-    (skipped.length ? `, ${skipped.length} skipped (sibling repos not checked out).` : "."),
-);
+    const repoPath = path.join(workspaceRoot, repo.repoDir);
+    if (!existsSync(repoPath)) {
+      recordSkip(`${repo.tenant}:sibling`, `repo not checked out at ${repoPath}`);
+      continue;
+    }
+    record(`${repo.tenant}:repo`, true);
+    checkPackageScripts(repo);
+    for (const file of repo.requiredFiles) checkFile(repo, file);
+    checkReleaseManifest(repo);
+  }
+
+  return results;
+}

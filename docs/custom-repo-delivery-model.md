@@ -127,14 +127,9 @@ That's it — a starter-based repo inherits the whole baseline. Only add `packag
 
 **Verify:** `pnpm check:custom-repos` (green when siblings aren't checked out — repos SKIP; run with the repos checked out next to `strelva-platform`, or set `CUSTOM_REPO_WORKSPACE_ROOT`, to run the structural checks). Merge logic is covered by `src/__tests__/custom-repo-workspace-inventory.test.ts`.
 
-## Known issues / TODO
+## Current verification note
 
-**[HIGH][bug] Tenant rename silently loses GBP meta and review-nudge history.**
-`src/lib/tenant-rename.ts` `authoritativePatterns` is missing several Redis-authoritative keys. After a slug rename those stores stay under the old key indefinitely:
-- `google-meta:${t}` — Google Business Profile connection state
-- `review-replies:recent:${t}` — recent reply dedup
-- `reb:review-nudge-sent:${t}` — review nudge dedup marker
-- `reb:order-review-request-sent:${t}:*` — order review request dedup
-- `reb:review-reply-declined:${t}:*` — 180-day reply-veto (durable, meaningful)
-Fix: add all five patterns to `authoritativePatterns` and add coverage assertions to the completeness unit test.
-
+The tenant-rename registry includes GBP metadata and the review/order dedup
+authorities. Keep `src/lib/tenant-rename.ts`, its completeness test, and
+`persistence-boundaries.md` synchronized whenever a new slug-keyed operational
+store is introduced.

@@ -1,213 +1,157 @@
-# Strelva — Auth & Tenancy Architecture
+# Strelva auth and tenancy architecture
 
-**Current enforcement boundary (updated 2026-07-14):** Supabase Auth establishes identity;
-`memberships` and `super_admins` are the authorization source of truth. Server routes enforce
-tenant access in application code before calling the service-role Postgres client. That client
-bypasses RLS, so RLS is defense-in-depth today, not the live isolation boundary.
+Status: **normative**
 
-> **2026-06-22 — SHIPPED; Clerk teardown COMPLETE 2026-07-11 (#146).** The Clerk →
-> Supabase Auth + Postgres swap **cut over in production on 2026-06-20**: Supabase Auth
-> is live (`auth.uid()`, Google OAuth + magic link), `memberships`/`super_admins` back
-> authorization, **RLS is enabled as defense-in-depth**, and the
-> `handle_new_user` trigger provisions users on first sign-in (replacing the
-> Clerk webhook). **The destructive Clerk teardown is now done (#146, deployed to prod):**
-> `src/proxy.ts` unwrapped `clerkMiddleware` for a plain `proxy()` export with a hand-rolled
-> **fail-closed** auth gate + `isPublicRoute`/`isCronRoute` matcher (path-normalized),
-> `src/lib/auth.ts` is Supabase-only (dual-path branches collapsed, signatures + invariants
-> preserved), and the `@clerk/nextjs` dep + Clerk CSP entries are removed. **Sanity code
-> teardown is also DONE (2026-07-10)** — all data-source reads/writes removed; only the
-> `sanityImageUrl` resolver is retained for legacy asset URL resolution until the
-> content-URL rewrite ops step, after which the Sanity dataset is locked. The three-plane
-> model and the service-role discipline below remain the live operating rules.
+Updated: **2026-08-01**
 
-Grounded in current Supabase guidance (RLS performance lint `0003_auth_rls_initplan`,
-Custom Access Token Hook, `@supabase/ssr`, multi-SSO) — verified against live docs, not memory.
+This document owns the current identity, routing, authorization, and tenant
+isolation boundaries. Historical Clerk, Sanity, and proposed single-host
+migration plans do not define current behavior.
 
----
+## Current model
 
-## The organizing principle: three independent planes
+Three planes remain independent:
 
-Most multi-tenant auth pain comes from tangling these. Keep them separate and each scales on
-its own — changing one never forces changing the others.
+1. **Identity:** Supabase Auth establishes the signed-in user.
+2. **Routing:** `src/proxy.ts` resolves the requested host/path to a tenant or
+   operator surface.
+3. **Authorization:** Postgres memberships and super-admin records decide what
+   that user may access. Application guards enforce the decision before any
+   service-role data call.
 
-1. **Identity** — *who you are.* Supabase Auth, one host.
-2. **Authorization** — *what you can touch.* `memberships` / `super_admins` in Postgres, enforced by application guards; RLS backs them up.
-3. **Routing** — *where you reach it.* Public sites on client domains; dashboard on `app.strelva.com`.
+A resolved tenant is context, not authority. A valid session is identity, not
+membership. A commercial account or billing relationship is not authorization.
 
----
+## Identity
 
-## Plane 1 — Identity (auth host)
+Supabase Auth is the only authentication path. Google OAuth and magic-link flows
+land through the Supabase callback; Clerk has no runtime role.
 
-**Decision: the dashboard authenticates only on a single host, `app.strelva.com`.**
+`src/lib/auth.ts` owns the session, verified-email, membership, role, permission,
+last-owner, and super-admin checks. Preserve these invariants:
 
-- **Tenant in the path:** `app.strelva.com/{tenant}/...`. One host, one TLS cert, **host-only
-  session cookie**. No wildcard DNS, no cross-subdomain cookie, nothing two-levels deep.
-- Tenant context = path + the user's **membership** (the URL is routing, not a security
-  boundary — RLS + the membership check are). Single-tenant clients land on their one tenant;
-  super-admins switch tenant by changing the path.
-- `@supabase/ssr` `createServerClient` with the cookie adapter handles the session. Host-only
-  cookie on `app.strelva.com` is tighter than a `.strelva.com`-wide cookie — public preview
-  hosts can never carry a dashboard session.
+- unverified email never grants tenant or super-admin access;
+- membership is evaluated against the requested tenant;
+- role order is `viewer < editor < admin < owner`;
+- removing access cannot leave a tenant without an owner;
+- development bypasses remain local/test-only and never become a production
+  recovery path.
 
-**Rejected: per-tenant subdomains** (`{tenant}.strelva.com` + `admin.{tenant}.strelva.com`).
-The two-level `admin.*.strelva.com` form needs DNS + certs provisioned two-deep per tenant
-(a single `*.strelva.com` wildcard does not cover a second label). Fine at 3 clients, miserable
-at 50. The single-host path model is the standard B2B SaaS shape (GitHub `/org`, Vercel `/team`)
-and removes proxy code rather than adding it.
+## Routing
 
-**Auth methods roadmap:**
-- **Now:** Google OAuth.
-- **Soon:** email magic link (most local-business owners won't have/use Google), email+password optional.
-- **Later (reserved, do not build now):** SAML SSO for the higher-ACV "Custom Software" arm —
-  Supabase supports multiple SSO providers; the membership model already doesn't preclude it.
+`src/proxy.ts` is the only outer routing and auth-gate boundary. It resolves:
 
----
+- `app.strelva.com` for the client control plane and API origin;
+- `admin.strelva.com` for the super-admin operator console;
+- tenant subdomain and client-path fallbacks used by current dashboard routing;
+- verified custom-domain and admin-domain claims;
+- local development equivalents such as `gldf.localhost`.
 
-## Plane 2 — Authorization
+The proxy may attach trusted tenant headers after resolution. Request body,
+query, or path input alone never grants tenant authority. Custom-domain lookup
+uses the fail-closed internal domain-map route and its required secret.
 
-The `memberships` / `super_admins` schema (migration 0001) is the textbook Supabase
-multi-tenant pattern — keep it as-is.
+Current client-admin domains are supported behavior. Do not delete them or
+describe a single-host path model as shipped without an explicit product and
+migration decision.
 
-**Decision: authorization source of truth is the membership table, queried by application
-guards (always fresh) — NOT JWT claims.** Baking `tenant_ids`/roles into the token via a Custom Access
-Token Hook is faster (no per-request join) but **stale**: a revoked role keeps working until the
-token refreshes (~1h). For a trust-sensitive product where access is revoked on offboarding,
-fresh beats fast. The hook stays on the table as a *later read-path optimization* if RLS ever
-shows up in slow queries — adopted only with the staleness trade-off understood.
+## Authorization and tenant derivation
 
-**RLS performance rules (the part that silently rots at scale — Supabase lint 0003):**
-- Wrap `auth.uid()` as `(select auth.uid())` everywhere so Postgres evaluates it **once per
-  query** (initplan), not once per row.
-- `security definer` helper functions (`app_tenant_ids()`, `app_is_super_admin()`) — already in
-  `rls-draft.sql`; they also let the helper read `memberships` without recursive RLS.
-- `TO authenticated` on every policy so it never runs for the `anon` role.
-- Index every `tenant_id` and `user_id` FK used in a policy (the tenant-scoped tables, not just
-  `memberships_tenant_role_idx`).
-- Run `get_advisors` after enabling RLS to catch any regressed policy.
+Tenant-data routes follow this sequence:
 
-**Invariants that must survive forever (today enforced in `src/lib/auth.ts`):**
-- **Verified-email gate** — never grant a role or super-admin on an unverified email.
-- **Last-owner guard** — a tenant can never reach 0 owners. In Postgres this becomes a
-  transaction (`select … for update` on the tenant's owner rows), replacing the Redis lock.
-- Role ladder `viewer(0) < editor(1) < admin(2) < owner(3)` and the permission map, unchanged.
+```text
+authenticate actor
+  → derive tenant from trusted routing/session/configuration
+  → require tenant access or the exact permission
+  → call tenant-scoped repository/service behavior
+```
 
----
+Use `requireTenantFromHeaders()` in API routes that require a real proxy-resolved
+tenant. `getTenantFromHeaders()` retains a demo fallback for server-component and
+development rendering and must not become authority for a new write route.
 
-## Plane 3 — The service-role boundary (the real long-term risk)
+Permission guards already prove membership. Do not add a second access check when
+the exact permission guard covers the same tenant, but never omit both.
 
-The control-plane server code uses the **service-role client, which bypasses RLS entirely.**
-RLS is only a hard floor for paths that carry a user JWT. So tenant isolation at scale depends
-on a discipline, written here so it survives team growth:
+Super-admin routes re-check super-admin state at the route or layout boundary.
+The bare admin host rewrite is not sufficient authorization by itself.
 
-- **Current:** user-facing routes derive tenant identity from trusted request/auth context,
-  call `requireTenantAccess` or a permission guard, then use tenant-scoped repositories through
-  the service-role client. Every repository call must carry the trusted tenant id.
-- **Target hardening:** request paths may move to the user-JWT client so RLS becomes an enforced
-  second boundary. Do not describe that target as shipped until the repositories actually use it.
-- **Service-role:** remains appropriate for crons, provisioning, super-admin actions, and the
-  public `/api/v1/*` contract, with explicit tenant scoping.
+## Service-role and RLS boundary
 
----
+The server uses a Supabase service-role client for control-plane repositories.
+That client bypasses row-level security. Therefore:
 
-## Cross-cutting
+- application guards are the live tenant-isolation boundary;
+- every tenant read/write carries the trusted tenant id into the repository;
+- request input is validated but never promoted to authority;
+- RLS remains defense in depth for non-service-role paths and future hardening;
+- crons, provisioning, operator actions, and public `/api/v1/*` routes still
+  require explicit tenant scoping even when no end-user JWT is present.
 
-- **Billing × auth stay orthogonal.** A past-due tenant still logs in; it hits a paywall.
-  Never gate the session on `subscription_status` — gate features. (Billing-on is already a
-  separate cliff: `STRIPE_BILLING_GRANDFATHER_TENANTS`.)
-- **Token encryption.** `integrations` holds OAuth access/refresh tokens — encrypt at rest
-  (pgcrypto or app-level), never plaintext. (= migration-plan Decision 3.)
-- **Cutover is a forcing function.** *(Resolved — the Clerk→Supabase swap shipped
-  2026-06-20, at the low client count this argued for.)* The swap cost one
-  scheduled logout; doing it early avoided forcing a re-login on every client
-  added later.
+Moving a request path to a user-JWT database client would make RLS an additional
+enforced boundary for that path. Do not describe that target as implemented until
+the repository read/write actually uses the user-scoped client.
 
-## Future roadmap: block editor + Strelva CMS (reinforces the kill-Sanity call)
+## Public client-site contract
 
-Roadmap (Noah, 2026-06-19): a **basic-Framer-style block editor** + a **Strelva CMS** (blogs,
-repetitive content, ecom). Counter-intuitively this makes killing Sanity *more* right, not less:
+Custom Site Properties consume additive `/api/v1/*` routes and signed
+revalidation. Public reads do not use platform membership, but they still:
 
-- **Sanity Studio is a form-based editor, not a visual canvas.** A Framer-like block editor is a
-  custom frontend you build either way — Sanity doesn't provide it. So the editor doesn't argue
-  for Sanity; it just needs a store. Postgres already has the shape: `page_config.sections`
-  (JSONB block array) + `draft_*` (draft layer) + `content_versions` (history) + Supabase
-  Realtime (live preview/collab).
-- **Blogs** = rich text as JSON (TipTap/Lexical) in JSONB. **Repetitive content** = relational,
-  Postgres's strength. **Ecom** = orders/inventory/variants = transactional + referential
-  integrity = Postgres only; a document store would be an anti-pattern here.
-- **Strategic:** if the editor + CMS are *Strelva products*, the data layer must be owned — you
-  can't build a CMS product on rented CMS infra, and "leave with everything" must route through
-  your own export, not Sanity's. Owning the editor means owning the store.
-- **Timing:** keep Sanity now → still migrate off it when Strelva CMS ships, but at higher client
-  count + more content + mid-build. Now (4 tenants, agent-only writes) is the cheapest it gets.
-- **Real-time co-editing — addable later, store-agnostic (not a Sanity loss).** Collab lives in
-  the sync/editor layer, not the DB: a CRDT (Yjs) holds the live shared doc, clients sync over a
-  websocket, the converged result persists to the store. Sanity's built-in collab works *only
-  inside Sanity Studio* — a custom Framer-like editor would NOT inherit it, so you'd build collab
-  yourself either way. Recipe when wanted: **Tiptap + Yjs + Supabase Realtime → persist to
-  Postgres JSONB**. Tiers: (0) presence + soft locks ("X is editing the hero", last-write-wins) —
-  days, covers ~90% of real need; (1) full Yjs co-editing — weeks, genuinely hard frontend work
-  but a known recipe. Keep-the-door-open cost now: zero (content is already structured JSON
-  blocks in `page_config.sections`, which CRDTs map onto cleanly).
-- **Middle path when the time comes:** **Payload** (OSS CMS framework on your own Postgres) gives
-  Sanity-like admin/schema tooling while keeping data owned + under RLS — the thing to evaluate
-  vs building from scratch. Either way the store stays Postgres.
-- **Do NOT build now.** The AI agent is the editing surface today (the actual differentiator).
-  This migration just lays an owned/isolated/transactional foundation so these land cleanly later.
+- validate tenant and route identifiers;
+- resolve an active tenant through trusted configuration;
+- expose only the versioned public contract;
+- use private caching where tenant-specific responses require it;
+- keep HMAC revalidation secrets server-side.
 
-## Explicitly deferred (do NOT build now; nothing here blocks adding them later)
+Public lead and telemetry writes are unauthenticated by design. They use schema
+validation, tenant resolution, rate limits, spam/dedup controls, and bounded
+retention instead of membership.
 
-- **White-label admin domains** (login on a client's own domain). Not a current goal. The
-  custom-admin-domain auth path is being *removed*. Re-enters later as a redirect → `app.strelva.com`
-  or a PKCE token-handoff — additive to the routing plane only.
-- **Org-above-tenant layer** (one company, many sites, one bill). Only if a real customer needs
-  it. The `tenant_id text` PK doesn't block adding it.
-- **SAML SSO**, **JWT custom claims**. As above.
+## Accounts and billing
 
----
+An Account groups one or more Tenants under a payer and bundled subscription. It
+does not grant dashboard access. Platform Membership remains tenant-scoped until
+an explicit account-membership product decision changes the authorization model.
 
-## What this changes in code (Phase 4 scope) — status as of 2026-06-22
+Subscription state is also orthogonal to identity. A signed-in member may reach
+the control plane and encounter a feature/paywall gate; auth must not fabricate
+an active subscription or infer a plan from a pay link.
 
-- `src/proxy.ts` — **DONE (#146, 2026-07-11):** `clerkMiddleware` unwrapped to a plain
-  `proxy()` export; `clerkMiddleware`/`createRouteMatcher` replaced with a hand-rolled
-  **fail-closed** `gateRequest` + `isPublicRoute`/`isCronRoute` matcher (path-normalized
-  against encoded/`//` bypass). The auth gate covers `isAdminSubdomain`, `tenantFromQueryParam`,
-  and `tenantFromClientPath` paths. (The `admin.*`/custom-domain fallback-auth helpers were
-  kept where still load-bearing.)
-- `src/lib/auth.ts` — **DONE (live 2026-06-20; Clerk path removed #146):** Supabase-only
-  against the server client + `memberships`/`super_admins`, signatures + invariants
-  preserved. The `isSupabaseAuthConfigured()` dual-path branches are collapsed;
-  `getTenantOwnerUserIds` is a single indexed query.
-- Dashboard routing: client dashboards are reachable on `admin.{client-domain}` (the
-  `isAdminSubdomain` path) as well as the `/client/{tenant}/...` fallback path on
-  `app.strelva.com`. The single-host `app.strelva.com/{tenant}` model described above
-  is the target; the custom-admin-domain path is still active in production.
-- Full file inventory + API mapping: `docs/supabase-migration-plan.md` → "Auth swap" section.
+## Provider credentials
 
-## Known issues / TODO (2026-07-30)
+Provider Connections are tenant-scoped and encrypted at rest. OAuth state binds
+the callback to a tenant, expires, and is consumed once when Redis is available.
+Callbacks re-authenticate the actor and require access before saving a connection.
 
-All items from this section that were open before 2026-07-30 have been resolved. The
-audit remediation shipped 2026-07-30 — see `AGENTS.md` "Audit remediation status" for
-the authoritative record.
+`INTERNAL_API_SECRET`, `OAUTH_STATE_SECRET`, and `APPROVE_LINK_SECRET` have
+separate production configuration. Compatibility fallbacks may verify old tokens
+but should not be used as a reason to omit the dedicated values.
 
-Items resolved as of 2026-07-30:
+## Failure behavior
 
-- **FIXED** Subdomain-resolved tenant requests skip the proxy auth gate — proxy auth
-  gate now covers subdomain-resolved tenants (`src/proxy.ts`).
-- **FIXED** `businessRules` injected unsanitized into the agent system prompt — agent
-  system prompt now sanitizes `businessRules` / timezone / holidays
-  (`src/lib/agent-prompt-shared.ts`).
-- **FIXED** `upload_image` tool uses unscoped `uploadFile()` — agent `upload_image`
-  now uses `uploadTenantMedia()` with a tenant-prefixed Blob path
-  (`src/app/api/agent/route.ts`).
-- **FIXED** Orphaned Clerk and Sanity secrets in Vercel environment — 11 vars removed
-  from production + preview + development: `CLERK_*` (×7), `SANITY_API_TOKEN`,
-  `SANITY_WEBHOOK_SECRET`, `REVALIDATION_SECRET`, `CORS_ORIGINS`. `NEXT_PUBLIC_SANITY_*`
-  kept for legacy image-URL resolution. Each verified unread by code before removal.
-- **FIXED** `SECRETS_ENC_KEY` absent from production checklist — now documented and
-  validated in `scripts/production-checklist.ts`; `SUPABASE_URL`,
-  `SUPER_ADMIN_EMAILS`, and `APPROVE_LINK_SECRET` also added to the checklist and env
-  examples.
-- **FIXED** `reb:tenants:all` Redis cache stores plaintext secrets — the 4
-  provider-secret fields are now re-enveloped (AES-256-GCM) on the Redis write and
-  decrypted on read; no plaintext secret outside the Postgres at-rest boundary
-  (`src/lib/tenants.ts`). In-memory cache stays decrypted (process boundary).
+- Missing/invalid auth fails closed.
+- Missing tenant context fails closed in strict API routes.
+- Supabase Auth outage blocks dashboard login but not public client sites.
+- Postgres authority outage prevents authoritative writes; a documented cache may
+  serve only the domain behavior allowed by `persistence-boundaries.md`.
+- Redis outage follows each operational domain's failure rule. Security-sensitive
+  rate limits, locks, and dedup paths fail closed where their contract requires it.
+
+There is no production bypass account. Recovery happens through provider status,
+credential repair, or a reviewed data correction.
+
+## Verification
+
+Keep all three tenant-isolation test layers green:
+
+- storage scoping;
+- structural route-guard coverage;
+- membership/permission enforcement behavior.
+
+Also verify signed-out dashboard redirects, invited-email recovery, super-admin
+console isolation, cross-tenant denial, OAuth callback consumption, public v1
+contract behavior, and cron authentication through the commands in
+`testing-and-ci.md` and `production-readiness.md`.
+
+Any change to routing, membership, service-role use, or account-level access must
+update this document and its executable guard coverage in the same change.

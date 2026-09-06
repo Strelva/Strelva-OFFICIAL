@@ -17,11 +17,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 // Mock global fetch so scoreAiVisibility does no real network IO.
-const mockFetch = vi.fn();
+const mockFetch = vi.hoisted(() => vi.fn());
 vi.stubGlobal("fetch", mockFetch);
+vi.mock("@/lib/pinned-public-text", () => ({
+  fetchPinnedPublicText: async (url: string) => {
+    const response = await mockFetch(url);
+    return response.ok ? response.text() : null;
+  },
+}));
 
-import { scoreAiVisibility, type AiVisibilityResult, type Signal } from "../lib/ai-visibility/score";
-import { renderAiVisibilityHtml, slugify, probeStatusLine } from "../lib/ai-visibility/html";
+import { probeStatusLine, renderAiVisibilityHtml, scoreAiVisibility, slugify, type AiVisibilityResult, type Signal } from "../products/ai-visibility/server";
 
 /** Minimal HTML page that fails most readiness signals -> low grade. */
 const WEAK_HTML = "<html><head><title>Hi</title></head><body><p>Welcome</p></body></html>";
@@ -53,14 +58,14 @@ describe("scoreAiVisibility — honest verdict language", () => {
     delete process.env.GOOGLE_GENERATIVE_AI_API_KEY; // probe cannot run
     const result = await scoreAiVisibility({
       business: "Acme Plumbing",
-      url: "acme-plumbing.example",
+      url: "example.com",
       category: "plumbers",
       location: "Buffalo, NY",
     });
 
     expect(result.citation.probed).toBe(false);
     // Readiness-framed verdict, no unproven recommendation claim.
-    expect(result.verdict).toMatch(/invisible to AI search|readable by AI/i);
+    expect(result.verdict).toMatch(/website readiness score/i);
     expect(result.verdict).not.toMatch(/won't recommend|did NOT name|isn't recommended/i);
   });
 
@@ -68,7 +73,19 @@ describe("scoreAiVisibility — honest verdict language", () => {
     delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     const result = await scoreAiVisibility({ business: "Acme Plumbing", url: "acme-plumbing.example" });
     expect(result.citation.probed).toBe(false);
-    expect(result.citation.note).toMatch(/GOOGLE_GENERATIVE_AI_API_KEY|probe/i);
+    expect(result.citation.note).toMatch(/Gemini citation check was not available/i);
+    expect(result.citation.note).not.toContain("GOOGLE_GENERATIVE_AI_API_KEY");
+  });
+
+  it("does not present a grade when no evidence source could be measured", async () => {
+    delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    const result = await scoreAiVisibility({ business: "Acme Plumbing" });
+
+    expect(result.measurementStatus).toBe("unavailable");
+    expect(result.readinessMeasured).toBe(false);
+    expect(result.verdict).toMatch(/couldn't measure/i);
+    expect(result.verdict).toMatch(/no visibility grade was produced/i);
+    expect(result.topFix).toMatch(/reachable public website/i);
   });
 });
 
@@ -139,6 +156,18 @@ describe("renderAiVisibilityHtml", () => {
     expect(html).toContain("AI readiness");
     expect(html).not.toMatch(/Gemini did not name|Gemini named/i);
     expect(html).not.toMatch(/won't recommend you/i);
+  });
+
+  it("does not render a legacy F when measurement was unavailable", () => {
+    const html = renderAiVisibilityHtml(baseResult({
+      measurementStatus: "unavailable",
+      measurementNote: "This run could not measure either source.",
+      readinessMeasured: false,
+    }));
+    expect(html).toContain("Not measured");
+    expect(html).toContain("Measurement unavailable");
+    expect(html).not.toContain(">F<");
+    expect(html).not.toContain("42/100");
   });
 
   it("escapes HTML in untrusted fields (no injection)", () => {

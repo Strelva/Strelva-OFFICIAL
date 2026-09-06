@@ -30,6 +30,8 @@ vi.mock("@/lib/tenants", () => ({
 describe("auth access pages", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "0");
     mockHeaderValues.clear();
     mockHeaderValues.set("x-client-fallback-root", "/client/gldf");
     mockHeaderValues.set("x-tenant", "gldf");
@@ -110,5 +112,23 @@ describe("auth access pages", () => {
     expect(html).toContain("Create access for Great Lakes Dried Fruit.");
     expect(html).toContain('data-supabase="sign-in"');
     expect(html).toContain("&quot;next&quot;:&quot;/client/gldf/dashboard&quot;");
+  });
+
+  it("uses work language and workspace return for the general auth path when open", async () => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    mockHeaderValues.clear();
+    mockGetInvite.mockResolvedValue(null);
+    const { default: SignInPage } = await import("@/app/sign-in/[[...sign-in]]/page");
+    const { default: SignUpPage } = await import("@/app/sign-up/[[...sign-up]]/page");
+
+    const signIn = renderToStaticMarkup(await SignInPage({ searchParams: Promise.resolve({}) }));
+    const signUp = renderToStaticMarkup(await SignUpPage({ searchParams: Promise.resolve({}) }));
+
+    expect(signIn).toContain("Sign in to your work.");
+    expect(signIn).toContain("&quot;next&quot;:&quot;/workspace&quot;");
+    expect(signIn).toContain("Try the free AI Visibility audit");
+    expect(signUp).toContain("Start your work here.");
+    expect(signUp).toContain("&quot;next&quot;:&quot;/workspace&quot;");
+    expect(signUp).toContain("Need a managed website? Request your build");
   });
 });

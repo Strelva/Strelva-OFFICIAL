@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Inter } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
+import { PrivacyAwareAnalytics } from "@/components/PrivacyAwareAnalytics";
 import { BRAND_NAME, MARKETING_URL } from "@/lib/brand";
 import "./globals.css";
 
@@ -55,7 +55,7 @@ export default function RootLayout({
         className={`${fraunces.variable} ${inter.variable} antialiased`}
       >
         {children}
-        <Analytics />
+        <PrivacyAwareAnalytics />
       </body>
     </html>
   );

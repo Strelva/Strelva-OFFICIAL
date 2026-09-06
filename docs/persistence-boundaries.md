@@ -49,52 +49,27 @@ and this table in the same change. Do not update documentation based on a shadow
 
 The `authoritativePatterns` list in `src/lib/tenant-rename.ts` is derived from this table.
 Every Redis-authoritative store with a slug-keyed key MUST appear there or it will silently
-not move on a tenant slug rename. Confirmed present as of 2026-07-15:
+not move on a tenant slug rename. Confirmed present as of 2026-08-01:
 
 `connections:*`, `crm:*`, `reb:crm-lock:*`, `leads:*`, `lead:*`, `orders:*`, `order:*`,
 `reb:reply-voice:*`, `reb:rewards:*`, `reb:booking:config:*`, `reb:booking:overrides:*`,
 `reb:booking:slot:*`, `reb:content-autonomy:*`, `reb:engagement:*`, `threads:*`,
 `goal:*`, `analytics:cfg:*`, `reb:report-cadence:*`, `reb:report-sent:*`,
-`reb:scan:baseline:*`.
+`reb:scan:baseline:*`, `google-meta:*`, `review-replies:recent:*`,
+`reb:review-nudge-sent:*`, `reb:order-review-request-sent:*`, and
+`reb:review-reply-declined:*`.
 
-Caches (`reb:tenants:all`, content/page-config/google-meta/analytics/brief/domain-map
+Caches (`reb:tenants:all`, content/page-config/analytics/brief/domain-map
 caches) are intentionally NOT rekeyed — they regenerate from Postgres.
 
-## Known issues / TODO (2026-07-30)
+## Current security notes
 
-Items resolved as of 2026-07-30:
-
-- **FIXED** Missing `Cache-Control: private` on collections v1 routes — collections list
-  and single-entry routes now send `Cache-Control: private`
-  (`src/app/api/v1/collections/[tenant]/[type]/route.ts`).
-- **FIXED** Split-brain between content and draft/version stores — `DATA_SOURCE` now has
-  a prod hard-fail guard mirroring `CONTENT_SOURCE`
-  (`src/lib/storage/draft-store.ts`).
-- **FIXED** `SUPABASE_URL` missing from env examples and production checklist — added to
-  `.env.production.example` and `scripts/production-checklist.ts`.
-- **FIXED** `SECRETS_ENC_KEY` absent from env examples and production checklist — added
-  to `.env.production.example` (with `openssl rand -hex 32` generation note) and
-  `scripts/production-checklist.ts`. `SUPER_ADMIN_EMAILS` and `APPROVE_LINK_SECRET` also
-  added.
-
-Items still open:
-
-- **[HIGH][bug] `google-meta:*`, `review-replies:recent:*`, `reb:review-nudge-sent:*`,
-  `reb:order-review-request-sent:*`, and `reb:review-reply-declined:*` are NOT in the
-  `authoritativePatterns` registry** (`src/lib/tenant-rename.ts` line ~32-55). These
-  keys are Redis-authoritative (or durable operational markers) and will silently not
-  move on a tenant rename. Add each to `authoritativePatterns` and update the
-  completeness unit test assertions to cover them. The `google-meta:${t}` key is a plain
-  JSON object; the blob rewriter handles embedded `tenant`/`tenantId` fields but the key
-  itself must be SCAN-moved.
-
-- **[MEDIUM][security] `INTERNAL_API_SECRET` is overloaded** — it serves as the domain-map
-  auth key, the OAuth state secret fallback, and the approve-link signing fallback
-  (`src/lib/approve-link.ts:40-44`, `src/lib/oauth-state.ts:15-16`,
-  `src/app/api/internal/domain-map/route.ts:12-14`). A key compromise has wider blast
-  radius than this table implies. Prefer dedicated named secrets for each role.
-
-- **[MEDIUM][security] `INTERNAL_API_SECRET` empty-string bypass**: when the variable is
-  unset or empty, the domain-map route and proxy can be reached unauthenticated
-  (`src/proxy.ts:341`). Ensure `INTERNAL_API_SECRET` is set in production and add it to
-  `scripts/production-checklist.ts`.
+- Collections v1 responses use private caching; content and draft source flags
+  fail closed in production; required Postgres and encryption configuration is
+  covered by the production checklist.
+- The internal domain-map route fails closed when `INTERNAL_API_SECRET` is absent.
+  `INTERNAL_API_SECRET` and `OAUTH_STATE_SECRET` are required by the production
+  checklist. `APPROVE_LINK_SECRET` is the dedicated approval-link key and retains
+  the older secrets only as a compatibility fallback.
+- A tenant rename must keep the completeness test aligned with every new
+  slug-keyed Redis authority added to this table.
