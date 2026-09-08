@@ -13,7 +13,12 @@ import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 
 export const dynamic = "force-dynamic";
 
-export default async function AccountPage() {
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ managed?: string | string[] }>;
+} = {}) {
+  const managedRequested = (await searchParams)?.managed === "1";
   const userId = await getAuthUserId();
 
   if (!userId) {
@@ -33,6 +38,11 @@ export default async function AccountPage() {
   }
 
   const claimedInvite = await claimPendingInviteForCurrentUser();
+  // Claim an existing invitation before entering the shared environment. This
+  // changes only the landing destination; membership and site gates still own
+  // access. The explicit managed path keeps the existing recovery/chooser flow.
+  if (workspaceReleaseEnabled() && !managedRequested) redirect("/workspace");
+
   if (claimedInvite) {
     const config = await getTenantConfig(claimedInvite.tenant);
     if (config && isActiveTenant(config)) redirect(getTenantDashboardFallbackUrl(config));
@@ -41,7 +51,6 @@ export default async function AccountPage() {
   const tenants = await getCurrentUserTenants();
 
   if (tenants.length === 0) {
-    if (workspaceReleaseEnabled()) redirect("/workspace");
     return <NoAccessState />;
   }
 

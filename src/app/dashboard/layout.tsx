@@ -85,6 +85,9 @@ export default async function DashboardLayout({
     : domainMapSiteUrl;
   const liveSyncEnabled = Boolean(tenantConfig?.revalidateUrl && tenantConfig?.revalidationSecret);
   const requestHost = requestHeaders.get("host") || "";
+  const hostname = requestHost.toLowerCase().split(":")[0];
+  const appBase = hostname === "localhost" || hostname === "127.0.0.1" || hostname?.endsWith(".localhost") || hostname === "app.strelva.com" || hostname?.endsWith(".vercel.app")
+    ? "" : "https://app.strelva.com";
   const requestProto = requestHeaders.get("x-forwarded-proto")
     || (requestHost.includes("localhost") ? "http" : "https");
   const requestOrigin = requestHost ? `${requestProto}://${requestHost}` : "";
@@ -217,6 +220,8 @@ export default async function DashboardLayout({
         {!isDemo && <SessionKeeper />}
         <BillingBanner subscriptionStatus={subscriptionStatus} />
         <ConversationShell
+          appBase={appBase}
+          signedIn={Boolean(userId) || devAccessBypass}
           businessName={siteName}
           businessLogoUrl={businessLogoUrl}
           accountName={accountName}

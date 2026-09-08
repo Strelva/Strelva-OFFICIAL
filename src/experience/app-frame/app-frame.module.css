@@ -1,16 +1,16 @@
 .frame {
   display: flex;
-  min-height: 100dvh;
-  height: 100dvh;
+  min-height: var(--app-frame-height, 100dvh);
+  height: var(--app-frame-height, 100dvh);
   overflow: hidden;
   background: var(--surface-base);
   color: var(--warm-black);
 }
 
 .navigation {
-  width: 276px;
+  width: var(--app-navigation-width, 276px);
   height: 100%;
-  flex: 0 0 276px;
+  flex: 0 0 var(--app-navigation-width, 276px);
   min-width: 0;
   overflow: visible;
   transition: width 180ms ease, flex-basis 180ms ease;

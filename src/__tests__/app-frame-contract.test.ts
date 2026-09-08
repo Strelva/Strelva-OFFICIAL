@@ -34,11 +34,12 @@ describe("shared app frame accessibility contract", () => {
 
     expect(source).toContain("OptionalManagedDiscussion");
     expect(source).toContain('effectivePathname === "/dashboard/chat"');
-    expect(source).toContain("navigationOpen={sidebarOpen}");
-    expect(source).toContain('aria-controls="managed-navigation"');
+    expect(source).toContain("<StrelvaShell");
+    expect(source).toContain("<ManagedNavigation");
+    expect(source).toContain('aria-controls="managed-discussion"');
     expect(source).toContain("useHydrationReady");
     expect(source).toContain("disabled={!hydrationReady}");
-    expect(readFileSync(path.join(root, "src/experience/workspace/WorkspaceLayout.tsx"), "utf8")).toContain("showNavigationToggle={false}");
+    expect(readFileSync(path.join(root, "src/experience/workspace/WorkspaceLayout.tsx"), "utf8")).toContain("<StrelvaShell");
     expect(source).not.toContain('rightRail={<ChatPanel');
   });
 

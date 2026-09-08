@@ -67,46 +67,50 @@ async function mockWorkspace(page: Page, handler: (route: Route) => Promise<void
   await page.route("**/api/workspace**", handler);
 }
 
-test("renders the result-first workspace on desktop and mobile", async ({ page }) => {
+test("keeps one navigation around saved work on desktop and mobile", async ({ page }) => {
   await mockWorkspace(page, (route) => fulfill(route, snapshot()));
   await page.goto("/workspace");
-  await expect(page.getByRole("heading", { name: "Good work starts here." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What would you like to work on?" })).toBeVisible();
+  const navigation = page.getByLabel("Strelva navigation", { exact: true });
+  await expect(navigation).toBeVisible();
   await page.screenshot({ path: "test-results/workspace-home-desktop.png", fullPage: true });
-  await page.getByRole("button", { name: "Collapse sidebar" }).click();
+  await page.getByRole("button", { name: "Collapse navigation" }).click();
   await page.reload();
-  await expect(page.getByRole("button", { name: "Expand sidebar" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Expand navigation" })).toBeVisible();
+  await page.getByRole("button", { name: "Expand navigation" }).click();
   await page.getByRole("button", { name: "Open Harbor Dental" }).click();
   await expect(page.getByRole("heading", { name: "Harbor Dental" })).toBeVisible();
   await expect(page.getByLabel("Grade B, 74 out of 100")).toBeVisible();
-  await expect(page.getByRole("complementary", { name: "Workspace navigation" })).toHaveCount(0);
+  await expect(navigation).toBeVisible();
+  await expect(navigation.getByRole("button", { name: "Home", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Discuss", exact: true })).toHaveCount(0);
   await page.screenshot({ path: "test-results/workspace-desktop.png", fullPage: true });
-  await page.getByRole("button", { name: "Discuss", exact: true }).click();
-  await expect(page.getByText("Discussion isn’t available for private assessments yet.", { exact: false })).toBeVisible();
-  await page.screenshot({ path: "test-results/workspace-discussion-desktop.png", fullPage: true });
-  await page.getByRole("button", { name: "Close discussion" }).click();
+  // The saved resource can be resumed directly without losing its navigation.
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Harbor Dental" })).toBeVisible();
+  await expect(navigation).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await expect(page.getByText("Do this first")).toBeVisible();
   await page.screenshot({ path: "test-results/workspace-mobile.png", fullPage: true });
-  await page.getByRole("button", { name: "Discuss", exact: true }).click();
-  const discussionRail = page.locator("#workspace-discussion");
-  await expect(discussionRail).toBeVisible();
-  await expect(discussionRail).toHaveAttribute("role", "dialog");
-  await expect(page.getByRole("button", { name: "Close discussion" })).toBeFocused();
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "Discuss", exact: true })).toBeFocused();
-  await page.getByRole("button", { name: "Back to my work" }).click();
-  await page.screenshot({ path: "test-results/workspace-home-mobile.png", fullPage: true });
-  const search = page.getByRole("searchbox", { name: "Search saved work" });
   await page.getByRole("button", { name: "Open navigation" }).click();
-  const mobileNavigation = page.getByRole("dialog", { name: "Workspace navigation" });
+  const mobileNavigation = page.getByRole("dialog", { name: "Strelva navigation" });
   await expect(mobileNavigation).toBeVisible();
-  await mobileNavigation.getByRole("button", { name: "Search", exact: true }).click();
-  await expect(search).toBeFocused();
+  await expect(mobileNavigation.getByRole("link", { name: "Strelva home" })).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(mobileNavigation.getByRole("button", { name: "Sign out" })).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: "Open navigation" })).toBeFocused();
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  await mobileNavigation.getByRole("button", { name: "My work", exact: true }).click();
+  await expect(mobileNavigation).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "My work", exact: true })).toBeVisible();
+  const search = page.getByRole("searchbox", { name: "Search saved work" });
   await search.fill("missing");
   await expect(page.getByText("No matching work")).toBeVisible();
+  await page.screenshot({ path: "test-results/workspace-home-mobile.png", fullPage: true });
 });
 
 test("workspace sign-in and failed callback retain the workspace destination", async ({ page }) => {
@@ -128,7 +132,7 @@ test("separates signed-out recovery from a temporary workspace failure", async (
 
   await page.goto("/workspace");
   await expect(page.getByRole("heading", { name: "Sign in to open your private work." })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Sign in/ })).toHaveAttribute("href", "/sign-in?next=%2Fworkspace");
+  await expect(page.getByRole("main").getByRole("link", { name: /Sign in/ })).toHaveAttribute("href", "/sign-in?next=%2Fworkspace");
 
   phase = "unavailable";
   await page.reload();
@@ -153,6 +157,8 @@ test("creates a private assessment and restores it after reload", async ({ page 
   });
 
   await page.goto("/workspace");
+  await page.getByRole("button", { name: "Check a business" }).click();
+  await expect(page.getByRole("heading", { name: "AI Visibility", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Check a business" }).click();
   await expect(page.getByRole("heading", { name: "See what AI can understand about this business." })).toBeVisible();
   await page.getByLabel("Business name").fill("Harbor Dental");
@@ -194,7 +200,7 @@ test("requires explicit confirmation before saving a public scorecard privately"
   await expect(page.getByText("Public scorecard saved privately to your workspace.")).toBeVisible();
   await expect(page).toHaveURL(/\/workspace$/);
   await expect(page.getByRole("heading", { name: "Harbor Dental" })).toBeVisible();
-  await expect(page.getByRole("banner")).toContainText("Harbor Dental public scorecard");
+  await expect(page.getByLabel("Strelva navigation", { exact: true })).toContainText("Harbor Dental public scorecard");
   expect(saveRequests).toBe(1);
 });
 
@@ -202,7 +208,11 @@ test("preserves a public save destination when signed out", async ({ page }) => 
   await mockWorkspace(page, (route) => fulfill(route, { error: "Sign in with a confirmed email to open your work." }, 401));
   await page.goto("/workspace?save=scan_public123");
   await expect(page.getByRole("heading", { name: "Sign in to open your private work." })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Sign in/ })).toHaveAttribute("href", "/sign-in?next=%2Fworkspace%3Fsave%3Dscan_public123");
+  const signInLinks = page.getByRole("link", { name: "Sign in", exact: true });
+  await expect(signInLinks).toHaveCount(2);
+  for (const link of await signInLinks.all()) {
+    await expect(link).toHaveAttribute("href", "/sign-in?next=%2Fworkspace%3Fsave%3Dscan_public123");
+  }
 });
 
 test("keeps public-save confirmation open after a rejected save", async ({ page }) => {
@@ -243,7 +253,7 @@ test("never presents unavailable measurement as a failing grade and labels parti
   await page.unroute("**/api/workspace**");
   await mockWorkspace(page, (route) => fulfill(route, snapshot({ work: [partial] })));
   await page.reload();
-  await page.getByRole("button", { name: "Open Harbor Dental" }).click();
+  await expect(page.getByRole("heading", { name: "Harbor Dental" })).toBeVisible();
   await expect(page.getByText("The website was measured, but the live citation probe was unavailable.")).toBeVisible();
 });
 
@@ -279,18 +289,23 @@ test("keeps product discovery descriptive and managed work scoped to authorized 
   })));
 
   await page.goto("/workspace");
-  await page.getByRole("button", { name: "Products", exact: true }).click();
-  const shelf = page.locator("#workspace-products");
-  await expect(shelf).toBeVisible();
-  await expect(shelf.locator('[data-product-id="ai_visibility"]')).toContainText("AI Visibility");
-  await expect(shelf.locator('[data-product-id="managed_presence"]')).toContainText("Managed Websites");
-  await expect(shelf.getByRole("link", { name: /Harbor Dental website.*Client/ })).toHaveAttribute("href", "https://app.strelva.com/client/harbor/dashboard");
-  await expect(shelf.getByRole("link", { name: /Northstar portfolio.*Enterprise/ })).toHaveAttribute("href", "https://app.strelva.com/client/northstar/dashboard");
-  await expect(shelf.locator('[data-product-id="homefinder"]')).toContainText("Not enabled");
-  // Internal monitoring must not become a consumer-facing product merely
-  // because the server catalog contains an operator entry.
-  await expect(shelf.locator('[data-product-id="domain_monitoring"]')).toHaveCount(0);
+  await page.getByRole("button", { name: "Explore", exact: true }).click();
+  const main = page.getByRole("main");
+  await expect(main.getByRole("heading", { name: "More you can do." })).toBeVisible();
+  await expect(main.getByRole("button", { name: /AI Visibility/ })).toBeVisible();
+  await expect(main.getByRole("button", { name: /Managed Websites/ })).toBeVisible();
+  await expect(main.getByRole("button", { name: /Homefinder/ })).toContainText("Not available yet");
+  // An operator catalog entry must not become a consumer product.
+  await expect(main.getByText("Domain Monitoring")).toHaveCount(0);
   await page.screenshot({ path: "test-results/workspace-products-desktop.png", fullPage: true });
+  await main.getByRole("button", { name: /Managed Websites/ }).click();
+  await expect(main.getByRole("link", { name: /Harbor Dental website/ })).toHaveAttribute("href", "https://app.strelva.com/client/harbor/dashboard");
+  await expect(main.getByRole("link", { name: /Northstar portfolio/ })).toHaveAttribute("href", "https://app.strelva.com/client/northstar/dashboard");
+  await expect(main.getByRole("button", { name: "Open Harbor Dental" })).toHaveCount(0);
+  await main.getByRole("button", { name: "All products" }).click();
+  await main.getByRole("button", { name: /Homefinder/ }).click();
+  await expect(main).toContainText("It is not available to install from your account yet.");
+  await expect(main.getByRole("button", { name: /Install|Activate|Buy/ })).toHaveCount(0);
 });
 
 test("keeps managed discovery honest when tenant links are temporarily unavailable", async ({ page }) => {
@@ -303,20 +318,20 @@ test("keeps managed discovery honest when tenant links are temporarily unavailab
   })));
 
   await page.goto("/workspace");
-  await page.getByRole("button", { name: "Products", exact: true }).click();
-  const shelf = page.locator("#workspace-products");
-  await expect(shelf).toContainText("Managed website destinations are temporarily unavailable. Nothing has changed.");
-  await expect(shelf.getByRole("link")).toHaveCount(0);
+  await expect(page.getByRole("status")).toContainText("Some websites could not be loaded.");
+  await expect(page.getByRole("link", { name: "Check website access" })).toHaveAttribute("href", "/account?managed=1");
+  await expect(page.getByRole("button", { name: "Open Harbor Dental" })).toBeVisible();
 });
 
 test("returns from an empty agency view to My work", async ({ page }) => {
   await mockWorkspace(page, (route) => fulfill(route, snapshot({ work: [] })));
   await page.goto("/workspace");
-  await expect(page.getByRole("heading", { name: "Good work starts here." })).toBeVisible();
-  await page.getByRole("button", { name: "Agency" }).click();
+  await expect(page.getByRole("heading", { name: "What would you like to work on?" })).toBeVisible();
+  await page.getByRole("button", { name: "Help & service", exact: true }).click();
+  await page.getByRole("main").getByRole("button", { name: "Sharing & agency access" }).click();
   await expect(page.getByRole("heading", { name: "Prepare useful work before the customer arrives." })).toBeVisible();
-  await page.getByRole("button", { name: "Work", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Good work starts here." })).toBeVisible();
+  await page.getByRole("button", { name: "Home", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "What would you like to work on?" })).toBeVisible();
 });
 
 test("keeps My work and Shared with me context-local and read-only", async ({ page }) => {
@@ -337,19 +352,17 @@ test("keeps My work and Shared with me context-local and read-only", async ({ pa
   });
 
   await page.goto("/workspace");
-  await expect(page.getByRole("button", { name: "Shared with me", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Shared with me", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Shared work starts here." })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Shared with me", exact: true })).toBeVisible();
+  await page.getByLabel("Current workspace").selectOption(CUSTOMER_ID);
+  await expect(page.getByRole("heading", { name: "Take a closer look." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Shared work", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open Customer-owned assessment" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "New", exact: true })).toBeDisabled();
-  await expect(page.getByText("Customer-owned work shared with you", { exact: true })).toBeVisible();
-  await expect(page.getByText("Private to this workspace", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Check a business" }).click();
+  await expect(page.getByRole("button", { name: "Check a business", exact: true })).toBeDisabled();
+  await expect(page.getByText("Switch to a workspace you own to create an assessment.")).toBeVisible();
 
-  // Returning to My work must switch the selected workspace before rendering its
-  // cards; delegated work must not leak into the owned collection.
-  await page.getByRole("button", { name: "My work", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Good work starts here." })).toBeVisible();
+  // Returning to owned work changes context before rendering its collection.
+  await page.getByLabel("Current workspace").selectOption(PERSONAL_ID);
+  await expect(page.getByRole("heading", { name: "What would you like to work on?" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open Harbor Dental" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open Customer-owned assessment" })).toHaveCount(0);
   await page.screenshot({ path: "test-results/workspace-my-work-restored.png", fullPage: true });
@@ -394,7 +407,8 @@ test("hands work to the named customer with optional access unchecked, then revo
   });
 
   await page.goto("/workspace?ignored=public#handoff=");
-  await page.getByRole("button", { name: "Agency" }).click();
+  await page.getByRole("button", { name: "Help & service", exact: true }).click();
+  await page.getByRole("main").getByRole("button", { name: "Sharing & agency access" }).click();
   await page.getByLabel("Customer email").fill("owner@example.com");
   await page.getByRole("button", { name: "Create private handoff" }).click();
   await expect(page.getByText(/\/workspace#handoff=recipient-bound-secret/)).toBeVisible();
@@ -413,7 +427,8 @@ test("hands work to the named customer with optional access unchecked, then revo
   await page.getByRole("button", { name: "Accept into my workspace" }).click();
   await expect(page).toHaveURL(/\/workspace$/);
 
-  await page.getByRole("button", { name: "Agency" }).click();
+  await page.getByRole("button", { name: "Help & service", exact: true }).click();
+  await page.getByRole("main").getByRole("button", { name: "Sharing & agency access" }).click();
   await expect(page.getByRole("heading", { name: "You own this workspace." })).toBeVisible();
   await page.getByRole("button", { name: "Revoke access" }).click();
   await expect(page.getByText("Agency access was revoked. Your work remains here.")).toBeVisible();
@@ -444,12 +459,11 @@ test("keeps delegated customer work read-only while customer-owned work retains 
   })));
 
   await page.goto("/workspace");
-  await expect(page.getByRole("button", { name: "New" })).toBeDisabled();
   await page.getByRole("button", { name: "Open Harbor Dental" }).click();
   await expect(page.getByText("Read-only access granted by the customer")).toBeVisible();
   await expect(page.getByRole("button", { name: "Retry assessment" })).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Access", exact: true }).click();
+  await page.getByRole("button", { name: "Sharing & access", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Customer work shared read-only." })).toBeVisible();
   await expect(page.getByRole("button", { name: "Create private handoff" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Revoke/ })).toHaveCount(0);
@@ -477,4 +491,72 @@ test("ignores a stale workspace response after a newer account switch", async ({
   await expect(page.getByRole("button", { name: "Open Current customer result" })).toBeVisible();
   await page.waitForTimeout(350);
   await expect(selector).toHaveValue(CUSTOMER_ID);
+});
+
+
+test("lets someone prepare a capability request without claiming it was submitted", async ({ page }) => {
+  let mutations = 0;
+  await mockWorkspace(page, (route) => {
+    if (route.request().method() !== "GET") mutations += 1;
+    return fulfill(route, snapshot());
+  });
+  await page.goto("/workspace?view=help");
+  await expect(page.getByRole("heading", { name: "What do you need?" })).toBeVisible();
+  const request = page.getByLabel("What are you trying to do?");
+  await request.fill("I use WordPress and need a way to review changes before publishing.");
+  const email = page.getByRole("link", { name: "Open email", exact: true });
+  const href = await email.getAttribute("href");
+  expect(href).toMatch(/^mailto:hello@strelva\.com\?/);
+  expect(decodeURIComponent(href!)).toContain("I use WordPress and need a way to review changes before publishing.");
+  await expect(page.getByText("Opens your email app. Nothing is sent until you send it; requests are not delivery commitments.")).toBeVisible();
+  expect(mutations).toBe(0);
+  await page.setViewportSize({ width: 320, height: 740 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await expect(request).toBeVisible();
+});
+
+test("does not add a completed assessment to a workspace selected while it was running", async ({ page }) => {
+  const workspaces: WorkspaceSnapshot["workspaces"] = [
+    { id: PERSONAL_ID, kind: "personal", name: "My work" },
+    { id: AGENCY_ID, kind: "agency", name: "Northstar Agency" },
+  ];
+  const completed = work({ title: "Original workspace assessment", payload: { ...work().payload!, business: "Original workspace assessment" } });
+  const agencyWork = work({ id: CUSTOMER_WORK_ID, workspaceId: AGENCY_ID, title: "Agency assessment" });
+  let saved: WorkspaceWork[] = [];
+  let pendingAssessment: Route | undefined;
+  await mockWorkspace(page, async (route) => {
+    if (route.request().method() === "GET") {
+      const selected = new URL(route.request().url()).searchParams.get("workspaceId") || PERSONAL_ID;
+      return fulfill(route, snapshot({ workspaces, workspaceId: selected, work: selected === AGENCY_ID ? [agencyWork] : saved }));
+    }
+    const action = route.request().postDataJSON() as { action: string; workspaceId: string };
+    expect(action.action).toBe("assess");
+    expect(action.workspaceId).toBe(PERSONAL_ID);
+    pendingAssessment = route;
+  });
+
+  await page.goto("/workspace");
+  await page.getByRole("button", { name: "Check a business" }).click();
+  await page.getByRole("button", { name: "Check a business", exact: true }).click();
+  await page.getByLabel("Business name").fill("Original workspace assessment");
+  await page.getByRole("button", { name: "Run assessment" }).click();
+  await expect.poll(() => Boolean(pendingAssessment)).toBe(true);
+
+  await page.getByLabel("Current workspace").selectOption(AGENCY_ID);
+  await expect(page.getByRole("button", { name: "Open Agency assessment" })).toBeVisible();
+  const response = page.waitForResponse((item) => item.url().endsWith("/api/workspace") && item.request().method() === "POST");
+  saved = [completed];
+  await fulfill(pendingAssessment!, { work: completed }, 201);
+  await (await response).finished();
+  // Allow the resolved form promise and React's subsequent render to settle.
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+
+  await expect(page.getByLabel("Current workspace")).toHaveValue(AGENCY_ID);
+  await expect(page.getByRole("button", { name: "Open Agency assessment" })).toBeVisible();
+  await expect(page.getByText("Original workspace assessment", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Assessment saved privately to this workspace.")).toHaveCount(0);
+  // The completed work remains available from its actual owning workspace.
+  await page.getByLabel("Current workspace").selectOption(PERSONAL_ID);
+  await expect(page.getByRole("button", { name: "Open Original workspace assessment" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open Agency assessment" })).toHaveCount(0);
 });

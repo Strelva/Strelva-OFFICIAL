@@ -4,6 +4,9 @@ This repository is the Strelva Websites control plane. It owns the multi-tenant 
 
 Production `strelva.com` marketing lives in the sibling `strelva-marketing` repository. Each paid client site is a separate custom repository and Vercel project. Do not move marketing presentation or client-specific frontend behavior into this control plane. Strelva's Custom Software division is not defined by this repository; do not turn the Websites product into a claim about that unresolved offering.
 
+Read [CONTEXT.md](./CONTEXT.md) for current local scope, evidence state, and
+release attention before changing product behavior.
+
 ## Product and compatibility boundaries
 
 - The product, package, Vercel team, and control-plane project use the Strelva name. Do not call the product Scaffold Web.

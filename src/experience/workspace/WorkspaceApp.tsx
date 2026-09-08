@@ -19,6 +19,8 @@ import { Button } from "@/components/ui/Button";
 import { TextInput } from "@/components/ui/TextInput";
 import { AiVisibilityAssessmentForm, AiVisibilityAssessmentResult } from "@/products/ai-visibility";
 import { WorkspaceLayout } from "./WorkspaceLayout";
+import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
+import { WorkspaceRequestContext, useWorkspaceRequest } from "./WorkspaceRequest";
 import type {
   WorkspaceAction,
   WorkspaceHandoffPreview,
@@ -46,8 +48,8 @@ async function readResponse<T>(response: Response, fallback: string): Promise<T>
   return body;
 }
 
-async function postAction<T>(action: WorkspaceAction, fallback: string): Promise<T> {
-  const response = await fetch("/api/workspace", {
+async function postAction<T>(action: WorkspaceAction, fallback: string, request: typeof fetch): Promise<T> {
+  const response = await request("/api/workspace", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(action),
@@ -61,7 +63,18 @@ function formatDate(value: string): string {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(date);
 }
 
-export function WorkspaceApp() {
+export function WorkspaceApp({ request = fetch, appBase = "", signOut }: { request?: typeof fetch; appBase?: string; signOut?: React.ReactNode } = {}) {
+  return <WorkspaceRequestContext.Provider value={request}><WorkspaceContent appBase={appBase} signOut={signOut} /></WorkspaceRequestContext.Provider>;
+}
+
+function usePostAction() {
+  const request = useWorkspaceRequest();
+  return useCallback(<T,>(action: WorkspaceAction, fallback: string) => postAction<T>(action, fallback, request), [request]);
+}
+
+function WorkspaceContent({ appBase, signOut }: { appBase: string; signOut?: React.ReactNode }) {
+  const request = useWorkspaceRequest();
+  const postAction = usePostAction();
   const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(null);
   const [selectedWorkId, setSelectedWorkId] = useState<string | null>(null);
   const [view, setView] = useState<View>("work");
@@ -77,30 +90,36 @@ export function WorkspaceApp() {
   const [publicSaveSaving, setPublicSaveSaving] = useState(false);
   const [publicSaveError, setPublicSaveError] = useState("");
   const requestRef = useRef(0);
+  const activeWorkspaceRef = useRef<string | null>(null);
 
   const loadWorkspace = useCallback(async (workspaceId?: string, preserveNotice = false) => {
-    const request = ++requestRef.current;
+    const requestId = ++requestRef.current;
+    activeWorkspaceRef.current = null;
     setLoading(true);
     setSignInRequired(false);
     if (!preserveNotice) setNotice(null);
     setSelectedWorkId(null);
     try {
       const suffix = workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : "";
-      const response = await fetch(`/api/workspace${suffix}`, { cache: "no-store" });
+      const response = await request(`/api/workspace${suffix}`, { cache: "no-store" });
       const data = await readResponse<WorkspaceSnapshot>(response, "We couldn’t load this workspace.");
-      if (request !== requestRef.current) return;
+      if (requestId !== requestRef.current) return;
+      activeWorkspaceRef.current = data.workspaceId;
       setSnapshot(data);
-      setSelectedWorkId(data.work[0]?.id ?? null);
+      const requestedWork = new URLSearchParams(window.location.search).get("work");
+      const match = data.work.find(item => item.id === requestedWork);
+      setSelectedWorkId(match?.id ?? data.work[0]?.id ?? null);
+      if (match) { setHome(false); setView("work"); }
       setShowAssessment(data.work.length === 0);
     } catch (cause) {
-      if (request !== requestRef.current) return;
+      if (requestId !== requestRef.current) return;
       setSnapshot(null);
       if (cause instanceof WorkspaceRequestError && cause.status === 401) setSignInRequired(true);
       setNotice({ kind: "error", message: cause instanceof Error ? cause.message : "We couldn’t load this workspace." });
     } finally {
-      if (request === requestRef.current) setLoading(false);
+      if (requestId === requestRef.current) setLoading(false);
     }
-  }, []);
+  }, [request]);
 
   useEffect(() => {
     void loadWorkspace();
@@ -128,7 +147,7 @@ export function WorkspaceApp() {
         }
       })
       .finally(() => setHandoffLoading(false));
-  }, []);
+  }, [postAction]);
 
   useEffect(() => {
     const resultId = new URLSearchParams(window.location.search).get("save");
@@ -168,8 +187,9 @@ export function WorkspaceApp() {
         { action: "save_public_result", workspaceId: snapshot.workspaceId, resultId: publicSaveResultId },
         "That public scorecard couldn’t be saved.",
       );
+      if (activeWorkspaceRef.current !== snapshot.workspaceId) return;
       setSnapshot((current) => {
-        if (!current) return current;
+        if (!current || current.workspaceId !== body.work.workspaceId) return current;
         const work = current.work.some((item) => item.id === body.work.id)
           ? current.work.map((item) => item.id === body.work.id ? body.work : item)
           : [body.work, ...current.work];
@@ -197,6 +217,7 @@ export function WorkspaceApp() {
   if (!snapshot) {
     return (
       <WorkspaceFrame>
+        <StrelvaShell signedIn={false} signInHref={signInHref} title="Your Strelva">
         <div className="mx-auto flex min-h-[70vh] max-w-xl flex-col items-center justify-center text-center">
           {signInRequired ? <LockKeyhole className="h-7 w-7 text-accent-text" strokeWidth={1.5} /> : <CircleAlert className="h-7 w-7 text-critical" strokeWidth={1.5} />}
           <h1 className="mt-5 font-display text-[28px] font-medium text-warm-black">{signInRequired ? "Sign in to open your private work." : "Your workspace didn’t open."}</h1>
@@ -205,24 +226,22 @@ export function WorkspaceApp() {
             <Link href={signInHref} className="mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-accent px-5 py-2.5 text-[13px] font-medium text-on-accent transition-colors hover:bg-accent/85">Sign in <ArrowRight className="h-4 w-4" /></Link>
           ) : <Button className="mt-6" onClick={() => void loadWorkspace()}>Try again</Button>}
         </div>
+        </StrelvaShell>
       </WorkspaceFrame>
     );
   }
 
   return (
     <WorkspaceFrame>
-      <a href="#workspace-main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-accent focus:px-3 focus:py-2 focus:text-on-accent">
-        Skip to work
-      </a>
       <div inert={Boolean(handoffLoading || (handoffToken && handoffPreview) || publicSaveResultId) || undefined}>
-      <WorkspaceLayout key={`${snapshot.workspaceId}:${home}:${view}:${showAssessment ? "new" : selectedWork?.id}`} snapshot={snapshot} home={home} agency={view === "agency"} busy={loading} selectedWork={showAssessment ? null : selectedWork}
+      <WorkspaceLayout appBase={appBase} signOut={signOut} key={snapshot.workspaceId} snapshot={snapshot} home={home} agency={view === "agency"} busy={loading} selectedWork={showAssessment ? null : selectedWork}
         managedWork={snapshot.managedWork}
         managedWorkUnavailable={snapshot.managedWorkUnavailable}
         onHome={() => { setHome(true); setView("work"); }}
         onChoose={chooseWork}
         onNew={() => { setHome(false); setView("work"); setShowAssessment(true); setNotice(null); }}
         onAgency={() => { setHome(false); setView("agency"); }}
-        onWorkspace={(id) => { setHome(true); setView("work"); void loadWorkspace(id); }}
+        onWorkspace={(id) => { const url = new URL(window.location.href); url.searchParams.delete("work"); url.searchParams.delete("view"); window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`); setHome(true); setView("work"); void loadWorkspace(id); }}
         notice={notice ? (
         <div inert={Boolean(handoffLoading || (handoffToken && handoffPreview)) || undefined} role={notice.kind === "error" ? "alert" : "status"} className={`mx-4 mt-4 flex items-start justify-between gap-4 rounded-xl border px-4 py-3 text-[13px] sm:mx-7 ${notice.kind === "error" ? "border-critical/30 bg-critical/10 text-critical" : "border-positive/30 bg-positive/10 text-positive"}`}>
           <span>{notice.message}</span>
@@ -249,7 +268,8 @@ export function WorkspaceApp() {
               }}
               onCancel={snapshot.work.length ? () => setShowAssessment(false) : undefined}
               onCreated={(work) => {
-                setSnapshot((current) => current ? { ...current, work: [work, ...current.work] } : current);
+                if (activeWorkspaceRef.current !== work.workspaceId) return;
+                setSnapshot((current) => current?.workspaceId === work.workspaceId ? { ...current, work: [work, ...current.work] } : current);
                 setSelectedWorkId(work.id);
                 setShowAssessment(false);
                 setNotice({ kind: "success", message: "Assessment saved privately to this workspace." });
@@ -305,15 +325,17 @@ export function WorkspaceApp() {
 }
 
 function WorkspaceFrame({ children }: { children: React.ReactNode }) {
-  return <div data-dashboard className="flex min-h-dvh flex-col bg-surface-base text-warm-black">{children}</div>;
+  return <div data-dashboard className="flex min-h-0 flex-col bg-surface-base text-warm-black">{children}</div>;
 }
 
 function WorkspaceLoading({ label }: { label: string }) {
   return (
     <WorkspaceFrame>
-      <div role="status" className="flex min-h-dvh items-center justify-center gap-3 text-[14px] text-gray-muted">
+      <StrelvaShell signedIn={false} title="Your Strelva">
+      <div role="status" className="flex flex-1 items-center justify-center gap-3 text-[14px] text-gray-muted">
         <Loader2 className="h-4 w-4 animate-spin" />{label}
       </div>
+      </StrelvaShell>
     </WorkspaceFrame>
   );
 }
@@ -346,6 +368,7 @@ function AgencySurface({ snapshot, currentKind, currentAccess, selectedWork, onC
 }
 
 function CreateAgency({ onCreated }: { onCreated: (id: string) => void }) {
+  const postAction = usePostAction();
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -374,6 +397,7 @@ function CreateAgency({ onCreated }: { onCreated: (id: string) => void }) {
 }
 
 function AgencyHandoff({ snapshot, selectedWork, onChanged, setNotice }: { snapshot: WorkspaceSnapshot; selectedWork: WorkspaceWork | null; onChanged: () => void; setNotice: (notice: Notice) => void }) {
+  const postAction = usePostAction();
   const [recipientEmail, setRecipientEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [createdLink, setCreatedLink] = useState("");
@@ -416,6 +440,7 @@ function AgencyHandoff({ snapshot, selectedWork, onChanged, setNotice }: { snaps
 }
 
 function CustomerAccess({ snapshot, onChanged, setNotice }: { snapshot: WorkspaceSnapshot; onChanged: () => void; setNotice: (notice: Notice) => void }) {
+  const postAction = usePostAction();
   const [submitting, setSubmitting] = useState(false);
   async function revoke(id: string) {
     setSubmitting(true); setNotice(null);
@@ -434,6 +459,7 @@ function CustomerAccess({ snapshot, onChanged, setNotice }: { snapshot: Workspac
 }
 
 function HandoffOverlay({ loading, token, preview, onAccepted, onClose }: { loading: boolean; token: string | null; preview: WorkspaceHandoffPreview | null; onAccepted: (workspaceId: string) => void; onClose: () => void }) {
+  const postAction = usePostAction();
   const checkboxId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);

@@ -1,0 +1,9 @@
+.preview { min-width: 0; background: var(--surface-base); }
+.preview > [data-dashboard] { min-height: var(--app-frame-height, 100dvh); }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px; padding: 8px 24px; border-bottom: 1px solid var(--gray-border); color: var(--gray-fg); background: var(--surface-raised); font-size: 12px; line-height: 16px; }
+.controls div { display: flex; flex: 1; min-width: 200px; flex-wrap: wrap; gap: 4px 12px; }
+.controls strong { font-weight: 600; color: var(--warm-black); }
+.controls label { display: flex; align-items: center; gap: 8px; }
+.controls select { min-height: 40px; max-width: 176px; padding: 4px 12px; border: 1px solid var(--gray-border); border-radius: 8px; color: var(--warm-black); background: var(--surface-base); font-size: 14px; }
+.controls select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.controls p { margin: 0; flex-basis: 100%; }

@@ -1,0 +1,60 @@
+.scroll { flex:1; min-height:0; overflow:auto; }
+.home,.page,.detail { width:100%; margin-inline:auto; padding:48px; }
+.home { max-width:1056px; padding-top:clamp(64px,12vh,144px); }
+.page { max-width:1056px; }
+.detail { max-width:1200px; }
+.welcome { max-width:720px; }
+.eyebrow { margin:0 0 16px; color:var(--accent-text); font-size:12px; font-weight:500; }
+.welcome h1,.pageHeader h1 { color:var(--warm-black); font-family:var(--font-display),serif; font-size:clamp(32px,4vw,48px); line-height:1.15; font-weight:400; letter-spacing:-.025em; text-wrap:balance; }
+.welcome>p:last-child,.pageHeader>p:last-child { margin-top:16px; max-width:600px; font-size:16px; line-height:1.65; color:var(--gray-muted); }
+.starts { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:40px; }
+.starts>button { display:flex; align-items:center; gap:16px; text-align:left; padding:24px; min-height:104px; border:1px solid var(--gray-border); border-radius:24px; background:var(--surface); transition:background 120ms,border-color 120ms; }
+.starts>button:hover { background:var(--surface-raised); border-color:var(--accent); }
+.starts>button>span { flex:1; }
+.starts strong { display:block; font-size:16px; font-weight:500; }
+.starts small { display:block; font-size:13px; color:var(--gray-muted); margin-top:4px; }
+.recent { margin-top:64px; }
+.sectionHeading { display:flex; justify-content:space-between; gap:16px; align-items:center; margin-bottom:16px; }
+.sectionHeading h2 { font-size:14px; font-weight:500; }
+.sectionHeading button,.textAction { display:inline-flex; gap:8px; align-items:center; min-height:44px; font-size:13px; color:var(--gray-muted); }
+.sectionHeading button:hover,.textAction:hover { color:var(--warm-black); }
+.workList { border-top:1px solid var(--gray-border); }
+.workRow { display:flex; align-items:center; gap:16px; width:100%; padding:20px 8px; text-align:left; border-bottom:1px solid var(--gray-border); color:var(--gray-muted); }
+.workRow:hover { background:var(--surface); }
+.workRow>span { flex:1; min-width:0; }
+.workRow strong { display:block; color:var(--warm-black); font-size:14px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.workRow small { display:block; margin-top:4px; font-size:12px; }
+.homeFoot { display:flex; align-items:center; justify-content:space-between; gap:24px; margin-top:64px; font-size:12px; line-height:1.6; color:var(--gray-muted); }
+.homeFoot button { display:flex; align-items:center; gap:8px; min-height:44px; text-align:left; }
+.pageHeader { padding-block:24px 40px; }
+.productList { border-top:1px solid var(--gray-border); }
+.productRow { display:flex; align-items:center; gap:24px; width:100%; padding:32px 8px; border-bottom:1px solid var(--gray-border); text-align:left; }
+.productRow:hover { background:var(--surface); }
+.productRow>span:nth-child(2) { flex:1; min-width:0; }
+.productRow strong { font-size:24px; font-weight:500; }
+.productRow p { margin:8px 0; max-width:560px; font-size:14px; line-height:1.65; color:var(--gray-muted); }
+.productRow small { font-size:12px; color:var(--accent-text); }
+.productSymbol { display:grid; place-items:center; width:64px; height:64px; flex-shrink:0; border-radius:24px; background:var(--surface-raised); color:var(--accent-text); }
+.productBody { max-width:720px; }
+.productBody h2,.invitation h2,.empty h2,.request h2,.helpSections h2 { font-size:20px; font-weight:500; line-height:1.4; }
+.productBody p,.invitation p,.empty p,.helpSections p { margin-block:16px; font-size:15px; line-height:1.7; color:var(--gray-muted); }
+.invitation { margin-top:48px; padding-block:24px; }
+.primaryAction,.secondaryAction { display:inline-flex; justify-content:center; align-items:center; gap:8px; min-height:48px; padding:12px 16px; border-radius:12px; font-size:14px; font-weight:500; }
+.primaryAction { background:var(--accent); color:var(--on-accent,#152117); }
+.secondaryAction { border:1px solid var(--gray-border); color:var(--warm-black); }
+.productBody .primaryAction,.productBody .secondaryAction { margin-top:16px; }
+.search { display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid var(--gray-border); border-radius:12px; margin-bottom:24px; color:var(--gray-muted); }
+.search input { background:transparent; border:0; width:100%; min-width:0; color:var(--warm-black); font-size:14px; }
+.empty { padding:48px 0; }
+.emptyNote { padding-block:24px; font-size:14px; line-height:1.7; color:var(--gray-muted); }
+.emptyNote a { text-decoration:underline; }
+.back { display:inline-flex; align-items:center; gap:8px; min-height:44px; margin-bottom:24px; font-size:13px; color:var(--gray-muted); }
+.request { padding:24px; border:1px solid var(--gray-border); border-radius:24px; background:var(--surface); }
+.request label { display:block; font-size:14px; margin:24px 0 8px; }
+.request textarea { resize:vertical; display:block; width:100%; min-height:160px; max-height:600px; padding:16px; border:1px solid var(--gray-border); border-radius:12px; background:var(--surface-base); color:var(--warm-black); font-size:16px; line-height:1.6; }
+.request p { margin-top:12px; font-size:12px; color:var(--gray-muted); line-height:1.7; }
+.requestActions { display:flex; flex-wrap:wrap; gap:12px; margin-top:24px; }
+.helpSections { display:grid; grid-template-columns:1fr 1fr; gap:48px; margin-top:48px; }
+@media(max-width:1023px) { .home,.page,.detail { padding:32px; } .home { padding-top:64px; } }
+@media(max-width:639px) { .home,.page,.detail { padding:24px; } .home { padding-top:48px; } .starts,.helpSections { grid-template-columns:1fr; } .starts { gap:12px; margin-top:32px; } .starts>button { padding:20px; min-height:96px; } .recent { margin-top:40px; } .homeFoot { flex-direction:column; align-items:flex-start; gap:8px; margin-top:32px; } .productRow { gap:16px; padding-block:24px; } .productRow strong { font-size:20px; } .productSymbol { width:40px; height:48px; border-radius:12px; } .productRow>svg { display:none; } .request { padding:20px; } .sectionHeading { align-items:baseline; } }
+@media(prefers-reduced-motion:reduce) { .starts>button { transition:none; } }

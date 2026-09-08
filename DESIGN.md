@@ -3,17 +3,42 @@
 ## User and result
 
 Strelva gives people a result-first way to use products without becoming
-technology operators. The visible structure is **Products -> Work -> specific
-thing**: choose a concrete product or capability, create or resume bounded Work,
-and keep the business, site, customer, or record it concerns explicit. A product
-may be public, private, managed, or release-gated; availability is not
-authorization or installation.
+technology operators. Everyone uses the same Strelva environment: free users,
+paid users, agencies, managed clients, and enterprise members. People can begin
+useful work or resume a result while keeping the business, site, customer, or
+record it concerns explicit. A product may be public, private, managed, or
+release-gated; availability is not authorization or installation.
 
 The person using Strelva may be a User, Paid User, Client, or Enterprise member
 in the selected account context. Those labels describe relationship and service
 standing; they do not grant permission. A person can use a personal workspace,
 belong to an organization, and receive separately scoped access to another
 person's Work.
+
+### One persistent interface
+
+Jacob selected a common interface on September 7, 2026. The ChatGPT comparison
+means an accessible entrance, familiar persistent navigation, and easy return
+to work. It does not require a chat composer or conversation as the main object.
+An assessment, website, or another supported result occupies the working area.
+
+The local composition uses Home, My work, and Explore, with Help & service and
+Account always reachable. Explore describes supported products and their actual
+availability. This composition can change with evidence; the durable decision is
+one environment for all customer relationships. Relationship labels do not
+produce separate applications or unlock capabilities by themselves.
+
+Opening a managed website retains the shared frame and adds contextual site
+navigation, approvals, history, and settings. Ask Strelva remains available where
+the governed website conversation exists. Do not show an unavailable discussion
+panel around an unrelated result just to fill space. The internal operator
+console remains distinct, and operator inspection keeps its actor and tenant
+visible.
+
+Use the shared frame for account, empty, loading, and recoverable error states.
+Keep the navigation collapsible on desktop and accessible as a modal on narrow
+screens. Changing the current workspace or website must keep its identity
+explicit and discard stale responses from the previous context.
 
 ### Managed presence remains a concrete product
 
@@ -36,7 +61,8 @@ they do not make a website or tenant requirement for general Strelva users.
 
 ## Product, Work, and specific thing
 
-The composition contract is:
+The product relationship is represented as follows; this is not a mandatory
+sequence of screens or a requirement to begin in a catalog:
 
 ```text
 Products -> Work -> specific thing
@@ -63,7 +89,7 @@ server-side boundary that operation requires.
 
 For a person using a product, the dominant loop is:
 
-1. Choose a concrete product entry or return to existing Work.
+1. Begin a supported task from Home or Explore, or return to existing Work.
 2. Name or select the specific thing the Work concerns.
 3. Receive a usable result, with its ownership, evidence, and next action
    visible.
@@ -120,6 +146,9 @@ Tenant storefronts are brand-led and visual. The client's real place, products, 
 
 ## Official systems and references
 
+- The common customer frame lives in [`StrelvaShell`](./src/experience/app-frame/StrelvaShell.tsx)
+  and [`AppFrame`](./src/experience/app-frame/AppFrame.tsx). Workspace,
+  managed website, and account views compose their content inside that frame.
 - Dashboard tokens live in the `[data-dashboard]` contract in `src/app/globals.css`.
 - Dashboard and operator primitives live in `src/components/ui/` and `src/app/admin/console.tsx`.
 - Status colors map through `src/lib/status-colors.ts`; use the existing positive, warning, critical, and neutral semantics.
@@ -133,6 +162,10 @@ Use the existing tokens and primitives when they express the accepted direction.
 - Show actual state: loading, empty, unconfigured, unavailable, pending, approved, dismissed, failed, accepted-but-unverified, live, and recoverable history where applicable.
 - Do not turn a missing integration into fake activity or a “coming soon” promise. A relevant disconnected surface may offer a clear connect state; an irrelevant surface stays hidden.
 - Never invent traffic, rankings, reviews, baselines, customer activity, competitive benchmarks, completed work, or provider confirmation.
+- Preserve existing managed service and billing paths during the interface
+  transition. A capability request is feedback, not an accepted delivery promise.
+  Unknown capability, pricing, or paid allowance must remain explicit; navigation
+  is not evidence that it can be purchased or executed.
 - Keep product availability, Work ownership, and paid/service standing separate.
   A public trial or descriptive catalog entry must not imply a paid plan,
   managed installation, or completed provider action.

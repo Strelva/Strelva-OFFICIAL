@@ -1,17 +1,18 @@
 "use client";
 
-import { ArrowLeft, ArrowUpRight, FileSearch, Menu, MessageSquare, Search } from "lucide-react";
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
-import { AppFrame } from "@/experience/app-frame";
-import { Button } from "@/components/ui/Button";
+import Link from "next/link";
+import { ArrowLeft, ArrowRight, ArrowUpRight, Building2, FileSearch, Globe2, Search } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { StrelvaShell, type StrelvaSection } from "@/experience/app-frame/StrelvaShell";
 import type { WorkspaceSnapshot, WorkspaceWork } from "./contracts";
-import { CollapsedWorkspaceSidebar, WorkspaceSidebar } from "./WorkspaceSidebar";
-import type { ManagedWorkSummary } from "./WorkspaceProductDiscovery";
-import styles from "./workspace-layout.module.css";
+import { discoveryProducts, sameAppHref, type ManagedWorkSummary } from "./WorkspaceProductDiscovery";
+import { WorkspaceHelp } from "./WorkspaceHelp";
+import styles from "./workspace-surface.module.css";
 
 interface Props {
+  appBase?: string;
+  signOut?: ReactNode;
   snapshot: WorkspaceSnapshot;
-  /** Optional server-scoped managed-client destinations for this actor. */
   managedWork?: readonly ManagedWorkSummary[];
   managedWorkUnavailable?: boolean;
   home: boolean;
@@ -27,291 +28,90 @@ interface Props {
   children: ReactNode;
 }
 
-function subscribePreference(callback: () => void) {
-  window.addEventListener("storage", callback);
-  window.addEventListener("strelva:sidebar", callback);
-  return () => {
-    window.removeEventListener("storage", callback);
-    window.removeEventListener("strelva:sidebar", callback);
-  };
+function initialSection(): StrelvaSection {
+  if (typeof window === "undefined") return "home";
+  const value = new URLSearchParams(window.location.search).get("view");
+  return value === "products" || value === "work" || value === "help" ? value : "home";
 }
 
-let sessionCollapsed = false;
-
-function readPreference() {
-  try {
-    return localStorage.getItem("strelva:sidebar-collapsed") === "true";
-  } catch {
-    return sessionCollapsed;
-  }
-}
-
-function writePreference(collapsed: boolean) {
-  sessionCollapsed = collapsed;
-  try {
-    localStorage.setItem("strelva:sidebar-collapsed", String(collapsed));
-  } catch {
-    // A blocked preference must not affect workspace navigation.
-  }
-  window.dispatchEvent(new Event("strelva:sidebar"));
-}
-
-function DiscussionPanel({ onClose }: { onClose: () => void }) {
-  return (
-    <div className={styles.discussionEmpty}>
-      <MessageSquare aria-hidden="true" size={25} strokeWidth={1.3} />
-      <h3>Stay beside the work.</h3>
-      <p>Discussion isn’t available for private assessments yet. Your assessment and sharing controls remain available.</p>
-      <Button type="button" size="sm" variant="ghost" onClick={onClose} icon={<ArrowLeft size={14} strokeWidth={1.5} />}>
-        Back to the assessment
-      </Button>
-    </div>
-  );
-}
-
-export function WorkspaceLayout({
-  snapshot,
-  managedWork,
-  managedWorkUnavailable,
-  home,
-  agency,
-  busy,
-  selectedWork,
-  onHome,
-  onNew,
-  onAgency,
-  onChoose,
-  onWorkspace,
-  notice,
-  children,
-}: Props) {
-  const collapsed = useSyncExternalStore(subscribePreference, readPreference, () => false);
-  const [productsOpen, setProductsOpen] = useState(false);
-  const [mobileNavigation, setMobileNavigation] = useState(false);
-  const [discussion, setDiscussion] = useState(false);
+export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], managedWorkUnavailable, home, agency, busy, selectedWork, onHome, onNew, onAgency, onChoose, onWorkspace, notice, children }: Props) {
+  const [section, setSection] = useState<StrelvaSection>(initialSection);
   const [query, setQuery] = useState("");
-  const searchRef = useRef<HTMLInputElement>(null);
-  const discussionButton = useRef<HTMLButtonElement>(null);
-  const mobileNavigationButton = useRef<HTMLButtonElement>(null);
-  const current = snapshot.workspaces.find((item) => item.id === snapshot.workspaceId);
+  const [productId, setProductId] = useState<string | null>(null);
+  const current = snapshot.workspaces.find(item => item.id === snapshot.workspaceId);
   const readOnly = current?.access === "delegated_read";
-  const ownedWorkspaces = snapshot.workspaces.filter((item) => item.access !== "delegated_read");
-  const sharedWorkspaces = snapshot.workspaces.filter((item) => item.access === "delegated_read");
-  const normalizedQuery = query.trim().toLowerCase();
-  const visible = busy ? [] : snapshot.work.filter((item) => {
-    if (!normalizedQuery) return true;
-    const searchable = [
-      item.title,
-      item.productId,
-      item.resourceKind,
-      item.payload?.business,
-      item.payload?.url,
-      item.payload?.verdict,
-      item.payload?.topFix,
-      item.input.business,
-      item.input.url,
-      item.input.category,
-      item.input.location,
-    ];
-    return searchable.some((value) => typeof value === "string" && value.toLowerCase().includes(normalizedQuery));
-  });
-  const scopeLabel = readOnly ? "Shared with me" : "My work";
+  const products = discoveryProducts(snapshot.products);
+  const product = products.find(item => item.id === productId);
+  const normalized = query.trim().toLowerCase();
+  const visibleWork = snapshot.work.filter(work => [work.title, work.payload?.business, work.payload?.url].some(value => value?.toLowerCase().includes(normalized)));
+  const sites = managedWork.flatMap(site => { const href = sameAppHref(site.href); return href ? [{ ...site, href }] : []; });
+  const visibleSites = sites.filter(site => site.title.toLowerCase().includes(normalized));
+  const person = snapshot.actor.email.split("@")[0] || "Your account";
 
-  useEffect(() => {
-    if (!discussion) return;
-    // AppFrame also moves focus to its close control. This fallback keeps the
-    // focus contract intact if the rail is temporarily unavailable on mobile.
-    const frame = window.requestAnimationFrame(() => discussionButton.current?.focus());
-    return () => window.cancelAnimationFrame(frame);
-  }, [discussion]);
-
-  function goHome() {
-    setProductsOpen(false);
-    const personalWorkspace = ownedWorkspaces.find((workspace) => workspace.kind === "personal") ?? ownedWorkspaces[0];
-    if (readOnly && personalWorkspace && personalWorkspace.id !== snapshot.workspaceId) {
-      onWorkspace(personalWorkspace.id);
-      return;
-    }
-    onHome();
+  function navigate(next: StrelvaSection) {
+    setSection(next); setProductId(null); setQuery(""); onHome();
+    const url = new URL(window.location.href);
+    if (next === "home") url.searchParams.delete("view"); else url.searchParams.set("view", next);
+    url.searchParams.delete("work");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+  function openWork(id: string) {
+    onChoose(id);
+    const url = new URL(window.location.href); url.searchParams.set("work", id);
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
   }
 
-  function goShared() {
-    setProductsOpen(false);
-    const target = sharedWorkspaces[0];
-    if (!target) return;
-    if (target.id === snapshot.workspaceId) {
-      onHome();
-      return;
-    }
-    onWorkspace(target.id);
+  const recent = <>
+    {sites.length > 0 && <section aria-label="Your websites"><h2>Websites</h2>{sites.map(site => <Link key={site.id} href={site.href} prefetch={false}><Globe2 size={16} aria-hidden="true" /><span>{site.title}</span></Link>)}</section>}
+    {snapshot.work.length > 0 && <section aria-label="Recent work"><h2>Recent work</h2>{snapshot.work.slice(0, 8).map(work => <button key={work.id} type="button" onClick={() => openWork(work.id)} aria-current={!home && selectedWork?.id === work.id && !agency ? "page" : undefined}><FileSearch size={15} aria-hidden="true" /><span>{work.title}</span></button>)}</section>}
+    {(current?.kind === "agency" || current?.kind === "customer" || snapshot.delegations.length > 0) && <section><h2>People</h2><button type="button" onClick={onAgency}><Building2 size={16} aria-hidden="true" /><span>Sharing & agency access</span></button></section>}
+  </>;
+
+  function workList(limit?: number) {
+    const items = limit === undefined ? visibleWork : visibleWork.slice(0, limit);
+    return <div className={styles.workList}>
+      {visibleSites.map(site => <Link key={site.id} href={site.href} className={styles.workRow} prefetch={false}><Globe2 size={20} strokeWidth={1.5} /><span><strong>{site.title}</strong><small>Website · {site.relationship === "enterprise" ? "Enterprise service" : "Managed by Strelva"}</small></span><ArrowUpRight size={17} aria-hidden="true" /></Link>)}
+      {items.map(work => <button key={work.id} type="button" className={styles.workRow} onClick={() => openWork(work.id)} aria-label={`Open ${work.title}`}><FileSearch size={20} strokeWidth={1.5} /><span><strong>{work.title}</strong><small>{work.payload ? "AI Visibility assessment" : "Saved work · view unavailable"} · {new Date(work.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</small></span><ArrowUpRight size={17} aria-hidden="true" /></button>)}
+    </div>;
   }
 
-  function startAiVisibility() {
-    setProductsOpen(false);
-    onNew();
-  }
-
-  function focusSearch() {
-    setProductsOpen(false);
-    setMobileNavigation(false);
-    // Let AppFrame finish restoring focus from the mobile navigation overlay,
-    // then move focus into the search field as the requested destination.
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        const input = searchRef.current;
-        if (!input) return;
-        input.focus();
-        input.scrollIntoView?.({
-          block: "center",
-          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
-        });
-      });
-    });
-  }
-
-  const header = (
-    <div className={styles.headerContent}>
-      {home ? (
-        <button ref={mobileNavigationButton} type="button" className={styles.mobileMenuButton} onClick={() => setMobileNavigation(true)} aria-label="Open navigation" title="Open navigation">
-          <Menu size={18} strokeWidth={1.5} />
-        </button>
-      ) : null}
-      {!home ? (
-        <button type="button" className={styles.headerIconButton} onClick={onHome} aria-label="Back to my work" title="Back to my work">
-          <ArrowLeft size={18} strokeWidth={1.5} />
-        </button>
-      ) : null}
-      {!home ? <span className={styles.workTitle}>{agency ? "Agency" : selectedWork?.title || "New assessment"}</span> : <span className={styles.headerScope}>Workspace</span>}
-      <label className={styles.workspaceSelect}>
-        <span className="sr-only">Current workspace</span>
-        <select value={snapshot.workspaceId} disabled={busy} onChange={(event) => onWorkspace(event.target.value)}>
-          {snapshot.workspaces.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}{item.access === "delegated_read" ? " · Read-only" : ""}
-            </option>
-          ))}
-        </select>
-      </label>
-      {!home && !agency && selectedWork ? (
-        <div className={styles.headerActions}>
-          <button
-            ref={discussionButton}
-            type="button"
-            aria-expanded={discussion}
-            aria-controls="workspace-discussion"
-            className={styles.textButton}
-            onClick={() => setDiscussion((value) => !value)}
-          >
-            <MessageSquare size={16} strokeWidth={1.5} />Discuss
-          </button>
-          <button type="button" className={styles.textButton} onClick={onAgency}>Access</button>
-        </div>
-      ) : null}
-      {!home && agency ? (
-        <button type="button" className={styles.textButton} onClick={() => selectedWork ? onChoose(selectedWork.id) : onHome()}>
-          Work
-        </button>
-      ) : null}
-    </div>
-  );
-
-  const navigation = home ? (
-    <WorkspaceSidebar
-      snapshot={snapshot}
-      managedWork={managedWork}
-      managedWorkUnavailable={managedWorkUnavailable}
-      collapsed={collapsed}
-      productsOpen={productsOpen}
-      mobileOpen={mobileNavigation}
-      onToggleSidebar={() => writePreference(!collapsed)}
-      onCloseMobile={() => setMobileNavigation(false)}
-      onToggleProducts={() => setProductsOpen((open) => !open)}
-      onNew={onNew}
-      onHome={goHome}
-      onSearch={focusSearch}
-      onShared={goShared}
-      onAgency={onAgency}
-      onStartAiVisibility={startAiVisibility}
-    />
-  ) : undefined;
-
-  return (
-    <AppFrame
-      navigation={navigation}
-      collapsedNavigation={home ? <CollapsedWorkspaceSidebar onExpand={() => writePreference(false)} /> : undefined}
-      navigationLabel="Workspace navigation"
-      showNavigationToggle={false}
-      navigationCollapsed={collapsed}
-      onNavigationToggle={writePreference}
-      navigationStorageKey="strelva:sidebar-collapsed"
-      navigationOpen={mobileNavigation}
-      onCloseNavigation={() => setMobileNavigation(false)}
-      navigationTriggerRef={mobileNavigationButton}
-      header={header}
-      notice={notice}
-      contentId="workspace-main"
-      rightRail={selectedWork && !home && !agency ? <DiscussionPanel onClose={() => setDiscussion(false)} /> : undefined}
-      rightRailId="workspace-discussion"
-      rightRailTitle="Discussion"
-      rightRailOpen={discussion}
-      onCloseRightRail={() => setDiscussion(false)}
-      rightRailTriggerRef={discussionButton}
-      className={styles.workspaceFrame}
-    >
-      <div className={styles.content}>
-        {home ? (
-          <div className={styles.home}>
-            <section className={styles.start} aria-labelledby="start-title">
-              <p className={styles.eyebrow}>{readOnly ? "Shared workspace" : "Your Strelva workspace"}</p>
-              <h1 id="start-title">{readOnly ? "Shared work starts here." : "Good work starts here."}</h1>
-              <p>{readOnly ? "Review the customer work shared with you." : "Something new, or right where you left off."}</p>
-              <Button disabled={readOnly} onClick={onNew} icon={<FileSearch size={16} strokeWidth={1.5} />}>
-                Check a business
-              </Button>
-              {readOnly ? <p className={styles.readOnly}>This workspace is shared with you read-only.</p> : null}
-            </section>
-
-            <section aria-labelledby="recent-title" aria-busy={busy || undefined}>
-              <div className={styles.collectionHeader}>
-                <div>
-                  <h2 id="recent-title">{scopeLabel}</h2>
-                  <p>{readOnly ? "Customer-owned work shared with you" : "Private to this workspace"}</p>
-                </div>
-                <label className={styles.search}>
-                  <Search aria-hidden="true" size={15} strokeWidth={1.5} />
-                  <span className="sr-only">Search saved work</span>
-                  <input ref={searchRef} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find work…" type="search" />
-                </label>
-              </div>
-              {busy ? <div className={styles.loadingWork} role="status">Loading saved work…</div> : <div className={styles.collection}>
-                {visible.map((work) => (
-                  <button className={styles.workCard} key={work.id} type="button" onClick={() => onChoose(work.id)} aria-label={`Open ${work.title}`}>
-                    <div className={styles.preview}>
-                      <FileSearch aria-hidden="true" size={20} strokeWidth={1.3} />
-                      <span className={styles.previewTitle}>{work.title}</span>
-                      <span className={styles.previewLine} />
-                      <span className={styles.previewLine} />
-                      <p>{work.payload?.topFix || "Open saved work"}</p>
-                    </div>
-                    <div className={styles.cardCaption}><span>{work.title}</span><ArrowUpRight aria-hidden="true" size={15} strokeWidth={1.5} /></div>
-                    <p className={styles.cardMeta}>{work.productId === "ai_visibility" ? "AI Visibility" : work.productId} · {new Date(work.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</p>
-                  </button>
-                ))}
-              </div>}
-              {!busy && !visible.length ? (
-                <div className={styles.empty}>
-                  <FileSearch aria-hidden="true" size={24} strokeWidth={1.3} />
-                  <h3>{query ? "No matching work" : "A place for what you make."}</h3>
-                  <p>{query ? "Try a different name." : "Your saved assessments will appear here. Start with a business you know."}</p>
-                  {query ? <button type="button" className={styles.textButton} onClick={() => setQuery("")}>Clear search</button> : null}
-                </div>
-              ) : null}
-            </section>
+  return <StrelvaShell appBase={appBase} signOut={signOut}
+    active={home ? section : undefined}
+    title={!home ? agency ? "People & access" : selectedWork ? "Your work" : "New assessment" : section === "home" ? "Strelva" : section === "products" ? "Explore" : section === "help" ? "Help & service" : "My work"}
+    accountName={person} accountDetail={snapshot.actor.email}
+    onNavigate={navigate} onStart={() => navigate("products")} navigation={recent}
+    context={<label><span className="sr-only">Current workspace</span><select value={snapshot.workspaceId} disabled={busy} onChange={event => { setSection("home"); setProductId(null); setQuery(""); onWorkspace(event.target.value); }}>{snapshot.workspaces.map(item => <option key={item.id} value={item.id}>{item.name}{item.access === "delegated_read" ? " · Read-only" : ""}</option>)}</select></label>}
+    actions={!home ? <button type="button" onClick={agency ? () => navigate("home") : onAgency}>{agency ? "Back to home" : "Sharing & access"}</button> : undefined}
+    notice={notice} contentId="workspace-main"
+  >
+    <div className={styles.scroll} aria-busy={busy || undefined}>
+      {!home ? <div className={styles.detail}><button type="button" className={styles.back} onClick={() => navigate("work")}><ArrowLeft size={16} />Back to my work</button>{children}</div> : section === "help" ? <WorkspaceHelp workspaceName={current?.name} hasManagedService={sites.length > 0} onAgency={onAgency} /> : section === "products" ? <div className={styles.page}>
+        {product ? <>
+          <button type="button" className={styles.back} onClick={() => setProductId(null)}><ArrowLeft size={16} />All products</button>
+          <header className={styles.pageHeader}><p className={styles.eyebrow}>{product.availability === "available" ? "Available to use" : product.availability === "managed" ? "Managed service" : "Not available yet"}</p><h1>{product.name}</h1><p>{product.description}</p></header>
+          <div className={styles.productBody}>
+            {product.id === "ai_visibility" ? <><h2>Understand what AI can find.</h2><p>Check a business, inspect the evidence, and keep the assessment in your work. Share a copy when you want someone else to use it.</p><p>This is an assessment at a point in time. It does not activate monitoring or change your website.</p><button className={styles.primaryAction} type="button" disabled={readOnly || product.availability !== "available"} onClick={onNew}>Check a business<ArrowRight size={17} /></button>{readOnly && <p>Switch to a workspace you own to create an assessment.</p>}</> : product.id === "managed_presence" ? <><h2>Your website, with the work around it.</h2><p>Open your website to work with its content, review changes, and see the connected information available for your business.</p>{sites.length ? workList(0) : <p>No managed website is connected to this account. You can ask Strelva about a build or an existing site.</p>}<button type="button" className={styles.secondaryAction} onClick={() => navigate("help")}>Talk about your website<ArrowRight size={17} /></button></> : <><h2>Home search on a brokerage’s own site.</h2><p>Home Finder is being prepared as a focused product for brokerage-branded search and inquiry delivery. It is not available to install from your account yet.</p><p>A live installation needs brokerage approval, permitted listing data, and verified inquiry delivery.</p><button type="button" className={styles.secondaryAction} onClick={() => navigate("help")}>Ask about Home Finder<ArrowRight size={17} /></button></>}
           </div>
-        ) : (
-          <div className={styles.workContent}>{children}</div>
-        )}
-      </div>
-    </AppFrame>
-  );
+        </> : <>
+          <header className={styles.pageHeader}><p className={styles.eyebrow}>Strelva products</p><h1>More you can do.</h1><p>Start with something useful. Add to the business you already have.</p></header>
+          <div className={styles.productList}>{products.map(item => <button type="button" key={item.id} className={styles.productRow} onClick={() => setProductId(item.id)}><span className={styles.productSymbol}>{item.id === "ai_visibility" ? <FileSearch size={26} strokeWidth={1.3} /> : <Globe2 size={26} strokeWidth={1.3} />}</span><span><strong>{item.name}</strong><p>{item.description}</p><small>{item.availability === "available" ? "Available · Free assessment" : item.availability === "managed" ? "For connected clients" : "Not available yet"}</small></span><ArrowRight size={18} aria-hidden="true" /></button>)}</div>
+          <div className={styles.invitation}><h2>Something missing?</h2><p>Tell us what you want to do, what you use today, and where it falls short.</p><button type="button" className={styles.textAction} onClick={() => navigate("help")}>Tell us what you need<ArrowRight size={16} /></button></div>
+        </>}
+      </div> : section === "work" ? <div className={styles.page}>
+        <header className={styles.pageHeader}><p className={styles.eyebrow}>{readOnly ? "Shared with you" : current?.name}</p><h1>My work</h1><p>Your websites and saved work, ready to return to.</p></header>
+        <label className={styles.search}><Search size={18} aria-hidden="true" /><span className="sr-only">Search saved work</span><input type="search" placeholder="Find a website or saved work…" value={query} onChange={event => setQuery(event.target.value)} /></label>
+        {busy ? <p role="status">Loading your work…</p> : workList()}
+        {!busy && !visibleWork.length && !visibleSites.length && <div className={styles.empty}><h2>{query ? "No matching work" : "Your work will be here."}</h2><p>{query ? "Try a different name." : "Start with a business assessment, or open a website connected to your account."}</p><button className={styles.textAction} onClick={() => query ? setQuery("") : navigate("products")}>{query ? "Clear search" : "Explore what’s available"}<ArrowRight size={16} /></button></div>}
+      </div> : <div className={styles.home}>
+        <header className={styles.welcome}><p className={styles.eyebrow}>{readOnly ? "Shared with you" : "Your Strelva"}</p><h1>{readOnly ? "Take a closer look." : "What would you like to work on?"}</h1><p>{readOnly ? "Review the work shared with you. Its owner controls access." : "Something new, or something you’re ready to improve."}</p></header>
+        <div className={styles.starts}>
+          <button type="button" onClick={() => { setProductId("ai_visibility"); setSection("products"); }}><FileSearch size={21} strokeWidth={1.5} /><span><strong>Check a business</strong><small>See what AI can understand</small></span><ArrowRight size={16} /></button>
+          <button type="button" onClick={() => navigate(sites.length ? "work" : "products")}><Globe2 size={21} strokeWidth={1.5} /><span><strong>{sites.length ? "Work on your website" : "Explore Strelva"}</strong><small>{sites.length ? "Open your connected sites" : "Find a useful product"}</small></span><ArrowRight size={16} /></button>
+        </div>
+        <section className={styles.recent} aria-labelledby="recent-title"><div className={styles.sectionHeading}><h2 id="recent-title">{readOnly ? "Shared work" : "Pick up where you left off"}</h2>{(snapshot.work.length > 0 || sites.length > 0) && <button type="button" onClick={() => navigate("work")}>View all<ArrowRight size={14} /></button>}</div>{busy ? <p role="status">Loading your work…</p> : workList(4)}{!busy && !snapshot.work.length && !sites.length && <p className={styles.emptyNote}>Your saved work will appear here. You don’t need a managed service to begin.</p>}</section>
+        {managedWorkUnavailable && <p role="status" className={styles.emptyNote}>Some websites could not be loaded. Your saved assessments remain available. <Link href="/account?managed=1">Check website access</Link></p>}
+        <div className={styles.homeFoot}><span>Built in Buffalo. Open to what comes next.</span><button type="button" onClick={() => navigate("help")}>What would make this more useful?<ArrowRight size={14} /></button></div>
+      </div>}
+    </div>
+  </StrelvaShell>;
 }

@@ -21,6 +21,9 @@ vi.mock("next/navigation", () => ({
   redirect: mocks.redirect,
   useRouter: () => mocks.router,
 }));
+vi.mock("@/experience/app-frame/StrelvaShell", () => ({
+  StrelvaShell: ({ children }: { children: unknown }) => ({ type: "div", props: { children } }),
+}));
 vi.mock("@/experience/workspace/WorkspaceSignOutButton", () => ({
   WorkspaceSignOutButton: ({ className }: { className?: string }) => ({
     type: "button",
@@ -84,7 +87,7 @@ describe("authenticated workspace account context", () => {
     expect(text).toContain("Harbor Dental");
     expect(text).toContain("Customer workspace");
     expect(text).toContain("Read-only access");
-    expect(text).toContain("does not change site access or tenant permissions");
+    expect(text).toContain("Each site keeps its own people, settings, and agreed service");
   });
 
   it("keeps identity useful and bounds workspace-store failures", async () => {
