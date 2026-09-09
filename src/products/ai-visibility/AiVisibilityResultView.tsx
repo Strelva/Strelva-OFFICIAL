@@ -33,7 +33,7 @@ export function AiVisibilityResultView({ result, scanId, shareUrl, workspaceEnab
   const measured = result.readinessMeasured ?? result.measurementStatus !== "unavailable";
 
   async function handleShare() {
-    const url = shareUrl || window.location.href;
+    const url = shareUrl || (scanId ? new URL(`/ai-visibility/${encodeURIComponent(scanId)}`, window.location.origin).href : window.location.href);
     try {
       if (navigator.share) {
         await navigator.share({

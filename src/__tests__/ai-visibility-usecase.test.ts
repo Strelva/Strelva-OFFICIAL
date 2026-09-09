@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   listWork: vi.fn(),
   assertCanSaveWork: vi.fn(),
   saveWork: vi.fn(),
+  operation: vi.fn(),
   rate: vi.fn(),
   score: vi.fn(),
   getPublicResult: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock("@/platform/workspaces", async (importOriginal) => {
     listWork: mocks.listWork,
     assertCanSaveWork: mocks.assertCanSaveWork,
     saveWork: mocks.saveWork,
+    runWorkspaceOperation: mocks.operation,
   };
 });
 
@@ -60,6 +62,10 @@ describe("private AI Visibility workspace use case", () => {
     mocks.score.mockResolvedValue(scored);
     mocks.saveWork.mockResolvedValue(saved);
     mocks.getPublicResult.mockResolvedValue(publicResult);
+    mocks.operation.mockImplementation(async ({ actor, workspaceId, work, run }) => {
+      await mocks.assertCanSaveWork(actor, workspaceId);
+      return mocks.saveWork(actor, workspaceId, { ...work, payload: await run() });
+    });
   });
 
   it("checks direct workspace membership before any capacity, rate, or provider work", async () => {

@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useState, type FormEvent } from "react";
-import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import { AiVisibilityResultView } from "./AiVisibilityResultView";
 import type { AiVisibilityResult } from "./contracts";
 
@@ -86,6 +85,9 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
       const data: AuditResponse = await response.json();
       setResult(data);
       setScanId(data.scanId);
+      if (data.scanId && /^scan_[a-z0-9]+$/i.test(data.scanId)) {
+        window.history.replaceState(window.history.state, "", `/ai-visibility/${encodeURIComponent(data.scanId)}`);
+      }
       setShareUrl(data.shareUrl);
       setState("done");
     } catch (cause) {
@@ -95,6 +97,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
   }
 
   function handleReset() {
+    window.history.replaceState(window.history.state, "", "/ai-visibility");
     setState("idle");
     setResult(null);
     setScanId(null);
@@ -103,19 +106,12 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
   }
 
   return (
-    <div className="marketing-root min-h-dvh px-5 py-5 md:px-8">
-      <div className="relative z-10 mx-auto max-w-[760px] pt-20 pb-16">
-        <div className="motion-rise mb-10">
-          <Link href="/" className="inline-flex items-center gap-2 text-[13px] font-medium text-m-text-2 transition-colors hover:text-m-text">
-            <ArrowLeft className="size-4" />
-            Strelva
-          </Link>
-        </div>
-
+    <div className="product-surface px-6 py-8 md:px-12">
+      <div className="relative z-10 mx-auto max-w-[760px] pb-16">
         {(state === "idle" || state === "error") && (
           <div className="motion-rise">
             <p className="text-[14px] font-medium text-m-text-3">Free AI visibility audit</p>
-            <h1 className="mt-4 text-4xl font-semibold leading-[0.94] tracking-normal text-m-text sm:text-5xl md:text-6xl">
+            <h1 className="mt-4 font-display text-[32px] font-medium leading-[1.15] text-m-text sm:text-[40px]">
               Can AI understand and surface your business?
             </h1>
             <p className="mt-5 max-w-[620px] text-[17px] leading-[1.7] text-m-text-2">
@@ -124,19 +120,19 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
 
             <form onSubmit={handleScan} className="mt-8 grid gap-3 sm:grid-cols-2">
               <label className="block">
-                <span className="sr-only">Business name</span>
+                <span className="mb-2 block text-sm text-m-text-2">Business name</span>
                 <input id="business-name" type="text" value={business} onChange={(event) => setBusiness(event.target.value)} placeholder="Business name" autoComplete="organization" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
               </label>
               <label className="block">
-                <span className="sr-only">Website</span>
+                <span className="mb-2 block text-sm text-m-text-2">Website</span>
                 <input id="website" type="text" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="example.com" autoComplete="url" inputMode="url" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
               </label>
               <label className="block">
-                <span className="sr-only">Business category</span>
+                <span className="mb-2 block text-sm text-m-text-2">Business category</span>
                 <input id="business-category" type="text" value={category} onChange={(event) => setCategory(event.target.value)} placeholder="Category (e.g. HVAC, dentist)" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
               </label>
               <label className="block">
-                <span className="sr-only">City and state</span>
+                <span className="mb-2 block text-sm text-m-text-2">City and state</span>
                 <input id="city-state" type="text" value={city} onChange={(event) => setCity(event.target.value)} placeholder="City (e.g. Buffalo, NY)" autoComplete="address-level2" className="h-14 w-full rounded-2xl border border-m-rule bg-m-surface px-4 text-[16px] text-m-text outline-none transition-colors placeholder:text-m-text-3 focus:border-m-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-m-accent" />
               </label>
               <button type="submit" className="marketing-button-primary h-14 px-8 text-[15px] sm:col-span-2">

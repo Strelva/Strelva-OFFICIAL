@@ -2099,3 +2099,41 @@ a[href*="booking"]:active, a[href*="services#booking"]:active,
   padding: 0.1em 0.35em;
   border-radius: 4px;
 }
+
+/* Diagnostic product views retain their result markup with product-owned tokens. */
+.product-surface {
+  --m-bg: var(--surface-base);
+  --m-panel: var(--surface);
+  --m-panel-strong: var(--surface-raised);
+  --m-paper: var(--surface);
+  --m-surface: var(--surface-inset);
+  --m-rule: var(--gray-border);
+  --m-rule-soft: var(--gray-border);
+  --m-text: var(--warm-black);
+  --m-text-2: var(--gray-fg);
+  --m-text-3: var(--gray-muted);
+  --m-accent: var(--accent-text);
+  --m-accent-soft: var(--accent-dim);
+  --m-accent-faint: var(--accent-dim);
+  --m-button: var(--accent);
+  --m-button-text: var(--on-accent);
+  --m-success: var(--positive);
+  --m-danger: var(--critical);
+  color: var(--warm-black);
+  background: var(--surface-base);
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+.product-surface .marketing-button-primary,
+.product-surface .marketing-button-secondary {
+  border-radius: 12px;
+  min-height: 48px;
+  line-height: 24px;
+  padding: 12px 16px;
+  box-shadow: none;
+  transform: none;
+}
+.product-surface .marketing-button-primary:hover { background: var(--accent); filter: brightness(1.08); }
+.product-surface .motion-rise { animation: none; }
+.product-surface :is(input, button, a):focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }

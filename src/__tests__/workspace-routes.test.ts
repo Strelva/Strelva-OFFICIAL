@@ -4,15 +4,17 @@ const mocks = vi.hoisted(() => ({
   user: vi.fn(), rate: vi.fn(), score: vi.fn(), personal: vi.fn(), list: vi.fn(), work: vi.fn(), getWork: vi.fn(),
   save: vi.fn(), createAgency: vi.fn(), handoff: vi.fn(), inspect: vi.fn(), accept: vi.fn(),
   revoke: vi.fn(), cancel: vi.fn(), handoffs: vi.fn(), agencyDelegations: vi.fn(), workDelegations: vi.fn(),
-  preflight: vi.fn(), runPrivate: vi.fn(), savePublicResult: vi.fn(), managedWork: vi.fn(),
+  pending: vi.fn(), operation: vi.fn(), saveAudit: vi.fn(), preflight: vi.fn(), runPrivate: vi.fn(), savePublicResult: vi.fn(), managedWork: vi.fn(),
 }));
 vi.mock("@/lib/db/server-client", () => ({ getSessionUser: mocks.user }));
 vi.mock("@/lib/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate }));
 vi.mock("@/products/ai-visibility/server", () => ({ runPrivateAiVisibilityAssessment: mocks.runPrivate, savePublicAiVisibilityResult: mocks.savePublicResult }));
+vi.mock("@/products/website-audit/server", () => ({ savePublicWebsiteAudit: mocks.saveAudit }));
 vi.mock("@/products/managed-presence/server", () => ({ listManagedPresenceWork: mocks.managedWork }));
 vi.mock("@/platform/workspaces", async () => {
   const types = await import("@/platform/workspaces/types");
-  return { ...types, assertCanSaveWork: mocks.preflight, ensurePersonalWorkspace: mocks.personal, listWorkspaces: mocks.list,
+  const { WorkspaceOperationPendingError } = await import("@/platform/workspaces/operations");
+  return { ...types, WorkspaceOperationPendingError, operationRequest: mocks.operation, listPendingAssessments: mocks.pending, assertCanSaveWork: mocks.preflight, ensurePersonalWorkspace: mocks.personal, listWorkspaces: mocks.list,
     listWork: mocks.work, getWork: mocks.getWork, saveWork: mocks.save, createAgencyWorkspace: mocks.createAgency,
     createHandoff: mocks.handoff, inspectHandoff: mocks.inspect, acceptHandoff: mocks.accept,
     revokeDelegation: mocks.revoke, revokeHandoff: mocks.cancel, listAgencyHandoffs: mocks.handoffs,
@@ -41,6 +43,7 @@ beforeEach(() => {
   vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
   mocks.user.mockResolvedValue({ id: "actor", email: "OWNER@example.com", email_confirmed_at: "2026-09-05" });
   mocks.rate.mockResolvedValue(false);
+  mocks.pending.mockResolvedValue([]);
   mocks.personal.mockResolvedValue(workspace);
   mocks.list.mockResolvedValue([workspace]);
   mocks.work.mockResolvedValue([work]);
@@ -251,5 +254,30 @@ describe("release-one private workspace routes", () => {
     const response = await GET(new Request("https://strelva.com/api/workspace"));
     expect(response.status).toBe(200);
     expect(await response.text()).not.toContain("must-not-leak");
+  });
+});
+
+describe("assessment recovery and website report routes", () => {
+  it("keeps recoverable operation IDs scoped to direct members", async () => {
+    mocks.pending.mockResolvedValue([{ id: otherId, status: "ready", createdAt: "today" }]);
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+    expect((await response.json()).pendingAssessments).toEqual([{ id: otherId, status: "ready", createdAt: "today" }]);
+    expect(mocks.pending).toHaveBeenCalledWith({ userId: "actor", verifiedEmail: "owner@example.com" },workspaceId);
+    mocks.pending.mockClear(); mocks.list.mockResolvedValue([{ ...workspace, access:"delegated_read" }]);
+    const delegated = await GET(new Request("https://strelva.com/api/workspace"));
+    expect((await delegated.json()).pendingAssessments).toEqual([]);
+    expect(mocks.pending).not.toHaveBeenCalled();
+  });
+  it("recovers from server-owned inputs and rejects browser-supplied replacements", async () => {
+    mocks.operation.mockResolvedValue({product_id:"ai_visibility",input:{business:"Server business",url:"https://example.com"}});
+    expect((await POST(request({action:"recover_assessment",workspaceId,requestId:otherId}))).status).toBe(200);
+    expect(mocks.runPrivate).toHaveBeenCalledWith(expect.objectContaining({requestId:otherId,input:expect.objectContaining({business:"Server business"})}));
+    expect((await POST(request({action:"recover_assessment",workspaceId,requestId:otherId,business:"Forged"}))).status).toBe(400);
+  });
+  it("passes only the retained audit ID, never an uploaded result", async () => {
+    const resultId=`audit_${"a".repeat(32)}`; mocks.saveAudit.mockResolvedValue(work);
+    expect((await POST(request({action:"save_website_audit",workspaceId,resultId}))).status).toBe(200);
+    expect(mocks.saveAudit).toHaveBeenCalledWith({actor:{userId:"actor",verifiedEmail:"owner@example.com"},workspaceId,resultId});
+    expect((await POST(request({action:"save_website_audit",workspaceId,resultId,payload:result}))).status).toBe(400);
   });
 });

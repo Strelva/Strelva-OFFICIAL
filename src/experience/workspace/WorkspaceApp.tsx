@@ -1,5 +1,8 @@
 "use client";
 
+import { WebsiteAuditPage } from "@/products/website-audit";
+import { replaceWorkspaceLocation, workspaceReturnTarget } from "@/lib/workspace-location";
+
 import {
   ArrowLeft,
   ArrowRight,
@@ -76,9 +79,15 @@ function WorkspaceContent({ appBase, signOut }: { appBase: string; signOut?: Rea
   const request = useWorkspaceRequest();
   const postAction = usePostAction();
   const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(null);
+  const [missingWork, setMissingWork] = useState(false);
+  const [returnTarget, setReturnTarget] = useState("/workspace");
   const [selectedWorkId, setSelectedWorkId] = useState<string | null>(null);
   const [view, setView] = useState<View>("work");
   const [home, setHome] = useState(true);
+  const [pendingRequest, setPendingRequest] = useState<string | null>(null);
+  const [recovering, setRecovering] = useState(false);
+  const attemptRef = useRef<{ signature: string; id: string } | null>(null);
+  const [retryWork, setRetryWork] = useState<WorkspaceWork | null>(null);
   const [showAssessment, setShowAssessment] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<Notice>(null);
@@ -100,7 +109,8 @@ function WorkspaceContent({ appBase, signOut }: { appBase: string; signOut?: Rea
     if (!preserveNotice) setNotice(null);
     setSelectedWorkId(null);
     try {
-      const suffix = workspaceId ? `?workspaceId=${encodeURIComponent(workspaceId)}` : "";
+      const selectedId = workspaceId || new URLSearchParams(window.location.search).get("workspaceId");
+      const suffix = selectedId ? `?workspaceId=${encodeURIComponent(selectedId)}` : "";
       const response = await request(`/api/workspace${suffix}`, { cache: "no-store" });
       const data = await readResponse<WorkspaceSnapshot>(response, "We couldn’t load this workspace.");
       if (requestId !== requestRef.current) return;
@@ -108,9 +118,11 @@ function WorkspaceContent({ appBase, signOut }: { appBase: string; signOut?: Rea
       setSnapshot(data);
       const requestedWork = new URLSearchParams(window.location.search).get("work");
       const match = data.work.find(item => item.id === requestedWork);
-      setSelectedWorkId(match?.id ?? data.work[0]?.id ?? null);
-      if (match) { setHome(false); setView("work"); }
-      setShowAssessment(data.work.length === 0);
+      setMissingWork(Boolean(requestedWork && !match));
+      setSelectedWorkId(match?.id ?? (requestedWork ? null : data.work[0]?.id) ?? null);
+      if (!preserveNotice) { setHome(!requestedWork); setView("work"); }
+      setShowAssessment(!requestedWork && data.work.length === 0);
+      replaceWorkspaceLocation(data.workspaceId, requestedWork || undefined);
     } catch (cause) {
       if (requestId !== requestRef.current) return;
       setSnapshot(null);
@@ -122,7 +134,13 @@ function WorkspaceContent({ appBase, signOut }: { appBase: string; signOut?: Rea
   }, [request]);
 
   useEffect(() => {
-    void loadWorkspace();
+    const restore = () => {
+      setReturnTarget(workspaceReturnTarget(`/workspace${window.location.search}`) || "/workspace");
+      void loadWorkspace();
+    };
+    restore();
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
   }, [loadWorkspace]);
 
   useEffect(() => {
@@ -151,20 +169,52 @@ function WorkspaceContent({ appBase, signOut }: { appBase: string; signOut?: Rea
 
   useEffect(() => {
     const resultId = new URLSearchParams(window.location.search).get("save");
-    if (resultId && resultId.length <= 256 && /^scan_[a-z0-9]+$/i.test(resultId)) setPublicSaveResultId(resultId);
+    if (resultId && resultId.length <= 256 && /^(scan_[a-z0-9]+|audit_[a-f0-9]{32})$/i.test(resultId)) setPublicSaveResultId(resultId);
   }, []);
 
   const selectedWork = useMemo(
-    () => snapshot?.work.find((work) => work.id === selectedWorkId) ?? snapshot?.work[0] ?? null,
-    [selectedWorkId, snapshot],
+    () => missingWork ? null : snapshot?.work.find((work) => work.id === selectedWorkId) ?? snapshot?.work[0] ?? null,
+    [selectedWorkId, snapshot, missingWork],
   );
+  const currentWorkspaceId = snapshot?.workspaceId;
+  const currentActorEmail = snapshot?.actor.email;
+  const serverPendingId = snapshot?.pendingAssessments?.[0]?.id;
+  useEffect(() => {
+    if (!currentWorkspaceId || !currentActorEmail) return;
+    let retained: string | null = null;
+    try { retained = sessionStorage.getItem(`strelva:assessment:${currentActorEmail}:${currentWorkspaceId}`); } catch { /* Storage may be disabled. */ }
+    setPendingRequest(serverPendingId || retained);
+    attemptRef.current = null;
+  }, [currentWorkspaceId, currentActorEmail, serverPendingId]);
+
+  function rememberAttempt(id: string | null) {
+    if (!snapshot) return;
+    setPendingRequest(id);
+    try {
+      const key = `strelva:assessment:${snapshot.actor.email}:${snapshot.workspaceId}`;
+      if (id) sessionStorage.setItem(key, id); else sessionStorage.removeItem(key);
+    } catch { /* In-page recovery remains available. */ }
+  }
+
+  async function recoverAssessment() {
+    if (!snapshot || !pendingRequest || recovering) return;
+    setRecovering(true);
+    try {
+      const body = await postAction<{ work: WorkspaceWork }>({ action: "recover_assessment", workspaceId: snapshot.workspaceId, requestId: pendingRequest }, "This assessment could not be recovered yet.");
+      if (activeWorkspaceRef.current !== body.work.workspaceId) return;
+      rememberAttempt(null);
+      replaceWorkspaceLocation(body.work.workspaceId, body.work.id);
+      await loadWorkspace(body.work.workspaceId);
+    } catch (cause) { setNotice({ kind: "error", message: cause instanceof Error ? cause.message : "Recovery is unavailable. Try again." }); }
+    finally { setRecovering(false); }
+  }
+
   const currentWorkspace = snapshot?.workspaces.find((workspace) => workspace.id === snapshot.workspaceId) ?? null;
   const delegatedRead = currentWorkspace?.access === "delegated_read";
-  const signInHref = publicSaveResultId
-    ? `/sign-in?next=${encodeURIComponent(`/workspace?save=${publicSaveResultId}`)}`
-    : "/sign-in?next=%2Fworkspace";
+  const signInHref = `/sign-in?next=${encodeURIComponent(returnTarget)}`;
 
   function chooseWork(id: string) {
+    setMissingWork(false);
     setHome(false);
     setSelectedWorkId(id);
     setShowAssessment(false);
@@ -184,8 +234,8 @@ function WorkspaceContent({ appBase, signOut }: { appBase: string; signOut?: Rea
     setPublicSaveError("");
     try {
       const body = await postAction<{ work: WorkspaceWork; alreadySaved?: boolean }>(
-        { action: "save_public_result", workspaceId: snapshot.workspaceId, resultId: publicSaveResultId },
-        "That public scorecard couldn’t be saved.",
+        { action: publicSaveResultId.startsWith("audit_") ? "save_website_audit" : "save_public_result", workspaceId: snapshot.workspaceId, resultId: publicSaveResultId },
+        "That result couldn’t be saved.",
       );
       if (activeWorkspaceRef.current !== snapshot.workspaceId) return;
       setSnapshot((current) => {
@@ -196,6 +246,8 @@ function WorkspaceContent({ appBase, signOut }: { appBase: string; signOut?: Rea
         return { ...current, work };
       });
       setSelectedWorkId(body.work.id);
+      setMissingWork(false);
+      replaceWorkspaceLocation(body.work.workspaceId, body.work.id);
       setHome(false);
       setView("work");
       setShowAssessment(false);
@@ -203,10 +255,10 @@ function WorkspaceContent({ appBase, signOut }: { appBase: string; signOut?: Rea
       clearPublicSaveQuery();
       setNotice({
         kind: "success",
-        message: body.alreadySaved ? "This scorecard is already saved in your workspace." : "Public scorecard saved privately to your workspace.",
+        message: body.alreadySaved ? "This result is already saved in your workspace." : "Result saved privately to your workspace.",
       });
     } catch (cause) {
-      setPublicSaveError(cause instanceof Error ? cause.message : "That public scorecard couldn’t be saved.");
+      setPublicSaveError(cause instanceof Error ? cause.message : "That result couldn’t be saved.");
     } finally {
       setPublicSaveSaving(false);
     }
@@ -237,18 +289,23 @@ function WorkspaceContent({ appBase, signOut }: { appBase: string; signOut?: Rea
       <WorkspaceLayout appBase={appBase} signOut={signOut} key={snapshot.workspaceId} snapshot={snapshot} home={home} agency={view === "agency"} busy={loading} selectedWork={showAssessment ? null : selectedWork}
         managedWork={snapshot.managedWork}
         managedWorkUnavailable={snapshot.managedWorkUnavailable}
-        onHome={() => { setHome(true); setView("work"); }}
+        onHome={() => { setMissingWork(false); setHome(true); setView("work"); }}
         onChoose={chooseWork}
-        onNew={() => { setHome(false); setView("work"); setShowAssessment(true); setNotice(null); }}
+        onNew={() => { setMissingWork(false); setRetryWork(null); replaceWorkspaceLocation(snapshot.workspaceId); setHome(false); setView("work"); setShowAssessment(true); setNotice(null); }}
         onAgency={() => { setHome(false); setView("agency"); }}
-        onWorkspace={(id) => { const url = new URL(window.location.href); url.searchParams.delete("work"); url.searchParams.delete("view"); window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`); setHome(true); setView("work"); void loadWorkspace(id); }}
-        notice={notice ? (
+        onWorkspace={(id) => { replaceWorkspaceLocation(id); const url = new URL(window.location.href); url.searchParams.delete("work"); url.searchParams.delete("view"); window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`); setHome(true); setView("work"); void loadWorkspace(id); }}
+        notice={<>
+        {pendingRequest ? <div role="status" className="mx-4 mt-4 flex flex-wrap items-center gap-4 rounded-xl border border-gray-border p-4 text-sm"><span>An assessment may still need to finish saving.</span>
+          {(snapshot.pendingAssessments?.length || 0) > 1 ? <label className="flex items-center gap-2">Assessment<select className="rounded-lg border border-gray-border bg-surface px-3 py-2" value={pendingRequest} onChange={event => setPendingRequest(event.target.value)}>{!snapshot.pendingAssessments?.some(item => item.id === pendingRequest) ? <option value={pendingRequest}>Current attempt</option> : null}{snapshot.pendingAssessments?.map((item, index) => <option key={item.id} value={item.id}>{index + 1} · {formatDate(item.createdAt)}</option>)}</select></label> : null}<Button disabled={recovering} onClick={() => void recoverAssessment()}>Recover assessment</Button><Button variant="ghost" disabled={recovering} onClick={() => rememberAttempt(null)}>Dismiss</Button></div> : null}
+        {notice ? (
         <div inert={Boolean(handoffLoading || (handoffToken && handoffPreview)) || undefined} role={notice.kind === "error" ? "alert" : "status"} className={`mx-4 mt-4 flex items-start justify-between gap-4 rounded-xl border px-4 py-3 text-[13px] sm:mx-7 ${notice.kind === "error" ? "border-critical/30 bg-critical/10 text-critical" : "border-positive/30 bg-positive/10 text-positive"}`}>
           <span>{notice.message}</span>
           <button type="button" onClick={() => setNotice(null)} className="shrink-0 underline underline-offset-2">Dismiss</button>
         </div>
-      ) : null}>
-          {view === "agency" ? (
+      ) : null}</>}>
+          {missingWork ? (
+            <div><h1 className="font-display text-3xl text-warm-black">This saved result is unavailable.</h1><p className="mt-4 text-gray-muted">It may have been removed, or your access may have changed. Choose another result from My work or switch to its workspace.</p></div>
+          ) : view === "agency" ? (
             <AgencySurface
               snapshot={snapshot}
               currentKind={currentWorkspace?.kind ?? "personal"}
@@ -262,21 +319,31 @@ function WorkspaceContent({ appBase, signOut }: { appBase: string; signOut?: Rea
             <DelegatedEmpty />
           ) : (showAssessment || !selectedWork) && !delegatedRead ? (
             <AiVisibilityAssessmentForm<WorkspaceWork>
+              initialInput={retryWork?.payload ? { business: retryWork.payload.business, url: retryWork.payload.url, category: typeof retryWork.input.category === "string" ? retryWork.input.category : undefined, location: typeof retryWork.input.location === "string" ? retryWork.input.location : undefined } : undefined}
               onSubmit={async (input) => {
-                const body = await postAction<{ work: WorkspaceWork }>({ action: "assess", workspaceId: snapshot.workspaceId, ...input }, "The assessment couldn’t be completed.");
+                const signature = JSON.stringify([snapshot.workspaceId, input]);
+                const requestId = attemptRef.current?.signature === signature ? attemptRef.current.id : crypto.randomUUID();
+                attemptRef.current = { signature, id: requestId };
+                rememberAttempt(requestId);
+                const body = await postAction<{ work: WorkspaceWork }>({ action: "assess", workspaceId: snapshot.workspaceId, requestId, ...input }, "The assessment couldn’t be completed. Use Recover assessment before starting again.");
                 return body.work;
               }}
               onCancel={snapshot.work.length ? () => setShowAssessment(false) : undefined}
               onCreated={(work) => {
                 if (activeWorkspaceRef.current !== work.workspaceId) return;
                 setSnapshot((current) => current?.workspaceId === work.workspaceId ? { ...current, work: [work, ...current.work] } : current);
+                rememberAttempt(null);
+                attemptRef.current = null;
                 setSelectedWorkId(work.id);
+                replaceWorkspaceLocation(work.workspaceId, work.id);
                 setShowAssessment(false);
                 setNotice({ kind: "success", message: "Assessment saved privately to this workspace." });
               }}
             />
+          ) : selectedWork?.auditPayload ? (
+            <WebsiteAuditPage key={selectedWork.id} initialResult={selectedWork.auditPayload} saved />
           ) : selectedWork ? (
-            <AiVisibilityAssessmentResult work={selectedWork} onRetry={delegatedRead ? undefined : () => setShowAssessment(true)} accessLabel={delegatedRead ? "Read-only access granted by the customer" : "Access controlled by this workspace"} />
+            <AiVisibilityAssessmentResult work={selectedWork} onRetry={delegatedRead ? undefined : () => { setRetryWork(selectedWork); setShowAssessment(true); }} accessLabel={delegatedRead ? "Read-only access granted by the customer" : "Access controlled by this workspace"} />
           ) : null}
       </WorkspaceLayout>
       </div>
@@ -286,7 +353,8 @@ function WorkspaceContent({ appBase, signOut }: { appBase: string; signOut?: Rea
           loading={handoffLoading}
           token={handoffToken}
           preview={handoffPreview}
-          onAccepted={(workspaceId) => {
+          onAccepted={(workspaceId, workId) => {
+            replaceWorkspaceLocation(workspaceId, workId);
             const url = new URL(window.location.href);
             url.hash = "";
             window.history.replaceState(null, "", `${url.pathname}${url.search}`);
@@ -458,7 +526,7 @@ function CustomerAccess({ snapshot, onChanged, setNotice }: { snapshot: Workspac
   );
 }
 
-function HandoffOverlay({ loading, token, preview, onAccepted, onClose }: { loading: boolean; token: string | null; preview: WorkspaceHandoffPreview | null; onAccepted: (workspaceId: string) => void; onClose: () => void }) {
+function HandoffOverlay({ loading, token, preview, onAccepted, onClose }: { loading: boolean; token: string | null; preview: WorkspaceHandoffPreview | null; onAccepted: (workspaceId: string, workId: string) => void; onClose: () => void }) {
   const postAction = usePostAction();
   const checkboxId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -495,7 +563,7 @@ function HandoffOverlay({ loading, token, preview, onAccepted, onClose }: { load
   async function accept() {
     if (!token) return;
     setSubmitting(true); setError("");
-    try { const body = await postAction<{ workspaceId: string; workId: string }>({ action: "accept_handoff", token, allowAgencyAccess }, "This handoff couldn’t be accepted."); onAccepted(body.workspaceId); }
+    try { const body = await postAction<{ workspaceId: string; workId: string }>({ action: "accept_handoff", token, allowAgencyAccess }, "This handoff couldn’t be accepted."); onAccepted(body.workspaceId, body.workId); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "This handoff couldn’t be accepted."); }
     finally { setSubmitting(false); }
   }
@@ -561,9 +629,9 @@ function PublicResultSaveOverlay({ workspaceName, saving, error, onSave, onClose
       <div className="mx-auto flex min-h-full max-w-xl items-center">
         <div className="w-full rounded-2xl border border-gray-border bg-surface p-5 shadow-2xl sm:p-8">
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-accent-text">Private workspace</p>
-          <h1 id="public-save-title" className="mt-3 font-display text-[28px] font-medium leading-tight text-warm-black">Save a private copy of this public scorecard?</h1>
+          <h1 id="public-save-title" className="mt-3 font-display text-[28px] font-medium leading-tight text-warm-black">Save a private copy of this result?</h1>
           <p className="mt-5 rounded-xl border border-gray-border bg-surface-inset px-4 py-3 text-[13px] text-gray-fg"><span className="font-medium text-warm-black">Workspace:</span> {workspaceName}</p>
-          <p className="mt-5 text-[14px] leading-relaxed text-gray-muted">This creates a new private work item in this workspace. The public scorecard stays separate and its source ownership does not change.</p>
+          <p className="mt-5 text-[14px] leading-relaxed text-gray-muted">This creates a new private work item in this workspace. The original public report stays separate and its source ownership does not change.</p>
           {error ? <p role="alert" className="mt-4 rounded-lg border border-critical/30 bg-critical/10 px-3 py-2 text-[13px] leading-relaxed text-critical">{error}</p> : null}
           <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <Button type="button" variant="secondary" size="lg" disabled={saving} onClick={onClose}>Back</Button>

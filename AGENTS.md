@@ -71,6 +71,7 @@ pnpm smoke:surfaces      # Owner and operator surface smoke tests with local fix
 pnpm check:prod          # Production-readiness checks
 pnpm check:custom-repos  # Executable custom-repository compatibility checks
 pnpm check:ontology      # Persistence and lifecycle invariants
+pnpm check:workspace-sql # Isolated PostgreSQL workspace and recovery migration checks
 pnpm version:check       # App and marketing product-version parity
 ```
 
@@ -84,3 +85,10 @@ pnpm version:check       # App and marketing product-version parity
 - Persistence, tenant identity, auth, cron, billing, email, governance, or external-write changes require focused failure-path tests as well as the normal success path.
 - User-facing changes require rendered inspection of realistic content, relevant empty/loading/error/permission states, and the affected desktop and mobile journey. A build or screenshot alone is not proof of behavior.
 - Never claim a production result from local evidence. State separately what was proven locally, in preview, and in production.
+
+The workspace SQL check requires PostgreSQL server binaries (`postgres`, `initdb`,
+`pg_ctl`, `psql`) on PATH; `libpq` alone is insufficient. On this workstation use
+`PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH npm run check:workspace-sql`.
+The script creates an isolated Unix-socket cluster, applies only the workspace
+and recovery migrations, tests permissions and failure paths, and stops the cluster.
+It does not connect to or migrate production.

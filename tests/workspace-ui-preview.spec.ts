@@ -33,6 +33,8 @@ test("empty workspace can create an explicitly fictional local assessment", asyn
   await expect(page.getByRole("heading", { name: "Fictional Bakery", exact: true })).toBeVisible();
   await expect(page.getByText(/These scores are fictional/)).toBeVisible();
   await page.reload();
+  await expect(page.getByRole("heading", { name: "This saved result is unavailable." })).toBeVisible();
+  await page.getByRole("button", { name: "Home", exact: true }).click();
   await expect(page.getByText(/Your saved work will appear here/)).toBeVisible();
 });
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, ArrowUpRight, Building2, FileSearch, Globe2, Search } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { StrelvaShell, type StrelvaSection } from "@/experience/app-frame/StrelvaShell";
 import type { WorkspaceSnapshot, WorkspaceWork } from "./contracts";
 import { discoveryProducts, sameAppHref, type ManagedWorkSummary } from "./WorkspaceProductDiscovery";
@@ -38,12 +38,17 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
   const [section, setSection] = useState<StrelvaSection>(initialSection);
   const [query, setQuery] = useState("");
   const [productId, setProductId] = useState<string | null>(null);
+  useEffect(() => {
+    const restore = () => { setSection(initialSection()); setProductId(null); setQuery(""); };
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, []);
   const current = snapshot.workspaces.find(item => item.id === snapshot.workspaceId);
   const readOnly = current?.access === "delegated_read";
   const products = discoveryProducts(snapshot.products);
   const product = products.find(item => item.id === productId);
   const normalized = query.trim().toLowerCase();
-  const visibleWork = snapshot.work.filter(work => [work.title, work.payload?.business, work.payload?.url].some(value => value?.toLowerCase().includes(normalized)));
+  const visibleWork = snapshot.work.filter(work => [work.title, work.payload?.business, work.payload?.url, work.auditPayload?.url].some(value => value?.toLowerCase().includes(normalized)));
   const sites = managedWork.flatMap(site => { const href = sameAppHref(site.href); return href ? [{ ...site, href }] : []; });
   const visibleSites = sites.filter(site => site.title.toLowerCase().includes(normalized));
   const person = snapshot.actor.email.split("@")[0] || "Your account";
@@ -53,12 +58,12 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     const url = new URL(window.location.href);
     if (next === "home") url.searchParams.delete("view"); else url.searchParams.set("view", next);
     url.searchParams.delete("work");
-    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   }
   function openWork(id: string) {
     onChoose(id);
-    const url = new URL(window.location.href); url.searchParams.set("work", id);
-    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    const url = new URL(window.location.href); url.searchParams.set("work", id); url.searchParams.set("workspaceId", snapshot.workspaceId);
+    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   }
 
   const recent = <>
@@ -71,7 +76,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     const items = limit === undefined ? visibleWork : visibleWork.slice(0, limit);
     return <div className={styles.workList}>
       {visibleSites.map(site => <Link key={site.id} href={site.href} className={styles.workRow} prefetch={false}><Globe2 size={20} strokeWidth={1.5} /><span><strong>{site.title}</strong><small>Website · {site.relationship === "enterprise" ? "Enterprise service" : "Managed by Strelva"}</small></span><ArrowUpRight size={17} aria-hidden="true" /></Link>)}
-      {items.map(work => <button key={work.id} type="button" className={styles.workRow} onClick={() => openWork(work.id)} aria-label={`Open ${work.title}`}><FileSearch size={20} strokeWidth={1.5} /><span><strong>{work.title}</strong><small>{work.payload ? "AI Visibility assessment" : "Saved work · view unavailable"} · {new Date(work.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</small></span><ArrowUpRight size={17} aria-hidden="true" /></button>)}
+      {items.map(work => <button key={work.id} type="button" className={styles.workRow} onClick={() => openWork(work.id)} aria-label={`Open ${work.title}`}><FileSearch size={20} strokeWidth={1.5} /><span><strong>{work.title}</strong><small>{work.auditPayload ? "Website audit" : work.payload ? "AI Visibility assessment" : "Saved work · view unavailable"} · {new Date(work.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</small></span><ArrowUpRight size={17} aria-hidden="true" /></button>)}
     </div>;
   }
 
@@ -95,6 +100,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
         </> : <>
           <header className={styles.pageHeader}><p className={styles.eyebrow}>Strelva products</p><h1>More you can do.</h1><p>Start with something useful. Add to the business you already have.</p></header>
           <div className={styles.productList}>{products.map(item => <button type="button" key={item.id} className={styles.productRow} onClick={() => setProductId(item.id)}><span className={styles.productSymbol}>{item.id === "ai_visibility" ? <FileSearch size={26} strokeWidth={1.3} /> : <Globe2 size={26} strokeWidth={1.3} />}</span><span><strong>{item.name}</strong><p>{item.description}</p><small>{item.availability === "available" ? "Available · Free assessment" : item.availability === "managed" ? "For connected clients" : "Not available yet"}</small></span><ArrowRight size={18} aria-hidden="true" /></button>)}</div>
+          <div className={styles.invitation}><h2>Website health</h2><p>Check SEO, speed, security, and accessibility, then export the report.</p><Link className={styles.textAction} href="/audit">Open website audit<ArrowRight size={16} /></Link></div>
           <div className={styles.invitation}><h2>Something missing?</h2><p>Tell us what you want to do, what you use today, and where it falls short.</p><button type="button" className={styles.textAction} onClick={() => navigate("help")}>Tell us what you need<ArrowRight size={16} /></button></div>
         </>}
       </div> : section === "work" ? <div className={styles.page}>

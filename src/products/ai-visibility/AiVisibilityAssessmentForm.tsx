@@ -17,6 +17,7 @@ export interface AiVisibilityAssessmentFormProps<TWork = unknown> {
   onSubmit: SubmitAiVisibilityAssessment<TWork>;
   onCreated: (work: TWork) => void;
   onCancel?: () => void;
+  initialInput?: ScoreInput;
 }
 
 /** A named callback type for hosts that want to keep the operation separate. */
@@ -33,11 +34,12 @@ export function AiVisibilityAssessmentForm<TWork = unknown>({
   onSubmit,
   onCreated,
   onCancel,
+  initialInput,
 }: AiVisibilityAssessmentFormProps<TWork>) {
-  const [business, setBusiness] = useState("");
-  const [url, setUrl] = useState("");
-  const [category, setCategory] = useState("");
-  const [location, setLocation] = useState("");
+  const [business, setBusiness] = useState(initialInput?.business || "");
+  const [url, setUrl] = useState(initialInput?.url || "");
+  const [category, setCategory] = useState(initialInput?.category || "");
+  const [location, setLocation] = useState(initialInput?.location || "");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 

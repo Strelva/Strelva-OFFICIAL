@@ -44,3 +44,8 @@
 }
 @media(max-width:479px) { .title { display:none; } .context { max-width:calc(100vw - 152px); margin-left:0; } .actions button { padding:8px; } }
 @media(prefers-reduced-motion:reduce) { .shell * { scroll-behavior:auto; } .start { transition:none; } }
+
+@media(max-width:1023px) {
+  /* The shared navigation is an overlay: opening it must not squeeze the work. */
+  .shell[data-navigation-open="true"] > [role="dialog"] { position:absolute; z-index:100; flex-basis:0; }
+}

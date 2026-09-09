@@ -45,6 +45,38 @@ runtimes; customer-specific frontend code; authority implied by a relationship
 label; new commercial terms inferred from navigation. Existing client agreements
 and provider permissions survive the interface transition.
 
+## September 8 self-service transition
+
+Local changes move `/ai-visibility`, its retained public results, and `/audit`
+out of the marketing layout into the common product frame. Website diagnostics
+use the existing canonical audit engine; the marketing repository redirects old
+entry/report URLs to the product. Anonymous assessment remains available; private
+AI Visibility and website-audit saving retain the workspace release gate. Website
+audits now support explicit private copies of retained server reports; lead details
+and browser-supplied result payloads are not imported. Public result URLs support
+reopening while their retained source exists.
+
+Saved-work URLs now include workspace identity. Reload, browser history, sign-in
+and failed callback recovery retain the requested result. Missing results have
+an explicit unavailable state; handoff acceptance opens the customer's copy and
+assessment retry retains its business inputs. The additive September 8 recovery
+migration introduces actor-bound attempts, leased execution, a durable result
+checkpoint, and atomic completion into one saved work item. Recovery is explicit;
+a pre-checkpoint interruption may repeat read-only provider checks. Pending
+assessments can be found from the server as well as the same browser session.
+
+Pricing options live in `../.scratch/product-release/pricing-2026-09-08.md`.
+No price, new entitlement, production migration, deployment, or release flag was
+selected or changed. The product and marketing builds pass locally; live auth,
+database and existing-client rollout acceptance remain separate gates. Isolated
+PostgreSQL verifies the workspace and recovery migrations; read-only production verification now uses the existing Vercel login and the
+production connection from `strelva-admin`, whose domains include `app.strelva.com`.
+The identity table is accessible, but workspace tables and RPCs are not exposed
+to the service role through PostgREST; the new workspace schema is not available
+to the application. No migration or activation was performed. On September
+8, public HTTP checks returned 404 for `/workspace` and 200 for `/sign-in`,
+`/ai-visibility`, and `/audit`. These do not prove authenticated production behavior.
+
 ## Current attention
 
 Complete review of shared navigation, result and website continuity, narrow-screen

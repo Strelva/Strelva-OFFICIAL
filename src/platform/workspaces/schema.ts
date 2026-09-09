@@ -7,6 +7,7 @@ type Table = { Row: Row; Insert: Row; Update: Row; Relationships: [] };
 export type WorkspaceDatabase = {
   public: {
     Tables: {
+      workspace_operations: Table;
       workspaces: Table;
       workspace_memberships: Table;
       saved_product_work: Table;

@@ -437,3 +437,14 @@ export async function revokeDelegation(input: WorkspaceActor, delegationId: stri
   if (updateError) workspaceDbFailure(updateError, "Delegation could not be revoked");
   return Boolean(updated?.length);
 }
+
+/** Only the initiating person can resume an incomplete assessment. */
+export async function listPendingAssessments(input: WorkspaceActor, workspaceId: string) {
+  const a = actor(input);
+  await requireMember(a.userId, workspaceId);
+  const { data, error } = await db().from("workspace_operations").select("id,status,created_at")
+    .eq("workspace_id", workspaceId).eq("created_by", a.userId).eq("product_id", "ai_visibility")
+    .in("status", ["running", "ready", "failed"]).order("created_at", { ascending: false }).limit(20);
+  if (error) workspaceDbFailure(error, "Assessment recovery is unavailable");
+  return (data || []).map(row => ({ id: asString(row.id), status: asString(row.status), createdAt: asString(row.created_at) }));
+}

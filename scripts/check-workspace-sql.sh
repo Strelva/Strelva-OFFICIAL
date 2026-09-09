@@ -35,7 +35,7 @@ if [[ ! -f "$migration" || ! -f "$schema_test" ]]; then
 fi
 
 mkdir -p "$cluster_socket"
-initdb -D "$cluster_data" --auth=trust --no-instructions >/dev/null
+initdb -D "$cluster_data" --locale=C --encoding=UTF8 --auth=trust --no-instructions >/dev/null
 pg_ctl -D "$cluster_data" \
   -l "$cluster_log" \
   -o "-F -k '$cluster_socket' -c listen_addresses='' -p $cluster_port" \
@@ -67,6 +67,8 @@ SQL
 
 psql "${psql_args[@]}" --file="$migration"
 psql "${psql_args[@]}" --file="$schema_test"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260908120000_workspace_result_recovery.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-recovery-schema.sql"
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

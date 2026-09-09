@@ -1,3 +1,4 @@
+import { workspaceReturnTarget } from "@/lib/workspace-location";
 /**
  * Supabase Auth callback (migration Phase 4) — redirect target for OAuth (Google)
  * and magic-link. Exchanges the `code` for a session and writes the session cookies
@@ -18,19 +19,14 @@ export const dynamic = "force-dynamic";
 
 /** Only allow same-origin relative redirects (no open-redirect via ?next=). */
 function safeNext(next: string | null): string {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) return "/account";
+  if (!next || !next.startsWith("/") || next.startsWith("//") || /[\\\u0000-\u001f]/.test(next)) return "/account";
   return next;
-}
-
-function preservesWorkspaceReturn(next: string): boolean {
-  const resultId = next.startsWith("/workspace?save=") ? next.slice("/workspace?save=".length) : "";
-  return next === "/workspace" || (resultId.length <= 256 && /^scan_[a-z0-9]+$/i.test(resultId));
 }
 
 /** Bounce back to sign-in with a short, URL-safe reason tag so a failed round-trip
  *  is diagnosable from the address bar (and logged) instead of an opaque error. */
 function fail(origin: string, reason: string, next: string): NextResponse {
-  const retryNext = preservesWorkspaceReturn(next) ? `&next=${encodeURIComponent(next)}` : "";
+  const retryNext = workspaceReturnTarget(next) ? `&next=${encodeURIComponent(next)}` : "";
   return NextResponse.redirect(`${origin}/sign-in?error=auth_callback&reason=${encodeURIComponent(reason)}${retryNext}`);
 }
 

@@ -1,6 +1,6 @@
 import type { WorkspaceAction, WorkspaceSnapshot, WorkspaceWork } from "../contracts";
 
-export const PREVIEW_SCENARIOS = ["free", "paid", "managed", "agency", "enterprise", "empty", "read-only", "unavailable", "signed-out"] as const;
+export const PREVIEW_SCENARIOS = ["free", "paid", "managed", "agency", "enterprise", "empty", "read-only", "unavailable", "signed-out", "website-audit", "recovery"] as const;
 export type PreviewScenario = typeof PREVIEW_SCENARIOS[number];
 export function previewScenario(value: string | undefined): PreviewScenario {
   return PREVIEW_SCENARIOS.includes(value as PreviewScenario) ? value as PreviewScenario : "free";
@@ -52,7 +52,8 @@ export function createPreviewRequest(scenario: PreviewScenario): typeof fetch {
       productId: "managed_presence", relationship: scenario === "enterprise" ? "enterprise" : "client",
     }] : [],
   };
-  const saved = new Map(base.workspaces.map(workspace => [workspace.id, scenario === "empty" ? [] : [sampleWork(workspace.id)]]));
+  if (scenario === "recovery") base.pendingAssessments = [{ id: "88888888-8888-4888-8888-888888888888", status: "ready", createdAt: "2026-09-08T12:00:00Z" }];
+  const saved = new Map(base.workspaces.map(workspace => [workspace.id, scenario === "empty" || scenario === "recovery" ? [] : scenario === "website-audit" ? [{ ...sampleWork(workspace.id), productId: "website_audit", resourceKind: "website_audit_report", title: "https://harbordental.example", payload: null, auditPayload: { url: "https://harbordental.example", scannedAt: "2026-09-08T12:00:00Z", overallScore: 74, grade: "B" as const, categories: [{ name: "SEO", slug: "seo", weight: 1, score: 74, checks: [{ name: "Service descriptions", status: "warn" as const, score: 74, message: "Fictional example: add specific treatment descriptions. No live site was queried." }] }] } }] : [sampleWork(workspace.id)]]));
   let sequence = 0;
   const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
@@ -73,6 +74,12 @@ export function createPreviewRequest(scenario: PreviewScenario): typeof fetch {
     let action: WorkspaceAction;
     try { action = JSON.parse(init.body) as WorkspaceAction; }
     catch { return response({ error: "Invalid local preview request." }, 400); }
+    if (action.action === "recover_assessment" && scenario === "recovery") {
+      const work = sampleWork(workspaceId);
+      saved.set(workspaceId, [work]);
+      base.pendingAssessments = [];
+      return response({ work });
+    }
     if (action.action === "assess") {
       const workspace = base.workspaces.find(item => item.id === action.workspaceId);
       if (!workspace || workspace.access === "delegated_read") return response({ error: "This workspace is read-only." }, 403);

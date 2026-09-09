@@ -1,3 +1,5 @@
+import { savePublicWebsiteAudit } from "@/products/website-audit/server";
+import { operationRequest, WorkspaceOperationPendingError } from "@/platform/workspaces";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionUser } from "@/lib/db/server-client";
@@ -6,7 +8,7 @@ import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { listWorkspaceDiscoveryProducts } from "@/platform/products";
 import {
   acceptHandoff, createAgencyWorkspace, createHandoff, ensurePersonalWorkspace, getWork,
-  inspectHandoff, listAgencyDelegations, listAgencyHandoffs, listWork,
+  listPendingAssessments, inspectHandoff, listAgencyDelegations, listAgencyHandoffs, listWork,
   listWorkDelegations, listWorkspaces, revokeDelegation, revokeHandoff,
   WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError,
   type WorkspaceActor, type Delegation,
@@ -25,9 +27,11 @@ export const maxDuration = 60;
 const boundedText = (max: number) => z.string().trim().min(1).max(max);
 const actions = z.discriminatedUnion("action", [
   z.object({ action: z.literal("create_agency"), name: boundedText(120) }).strict(),
-  z.object({ action: z.literal("assess"), workspaceId: z.string().uuid(),
+  z.object({ action: z.literal("assess"), workspaceId: z.string().uuid(), requestId: z.string().uuid().optional(),
     business: boundedText(160), url: z.string().trim().max(2048).optional(),
     category: z.string().trim().max(160).optional(), location: z.string().trim().max(160).optional() }).strict(),
+  z.object({ action: z.literal("recover_assessment"), workspaceId: z.string().uuid(), requestId: z.string().uuid() }).strict(),
+  z.object({ action: z.literal("save_website_audit"), workspaceId: z.string().uuid(), resultId: z.string().regex(/^audit_[a-f0-9]{32}$/) }).strict(),
   z.object({ action: z.literal("save_public_result"), workspaceId: z.string().uuid(),
     resultId: z.string().trim().regex(/^scan_[a-z0-9]+$/i).max(256) }).strict(),
   z.object({ action: z.literal("handoff"), workId: z.string().uuid(), recipientEmail: z.string().trim().email().max(254) }).strict(),
@@ -51,6 +55,8 @@ async function actor(): Promise<WorkspaceActor | null> {
 }
 
 function failed(error: unknown) {
+  if (error instanceof WorkspaceOperationPendingError) return json({ error: error.message }, 409);
+  if (error instanceof Error && error.name === "PublicWebsiteAuditUnavailableError") return json({ error: "This website report has expired or is unavailable. Run another audit." }, 404);
   if (error instanceof WorkspaceAccessError) return json({ error: "This work or invitation is unavailable to your account." }, 403);
   if (error instanceof WorkspaceConflictError) return json({ error: "This action is no longer available or a workspace limit has been reached. Refresh your workspace before continuing." }, 409);
   if (error instanceof Error && ["PrivateAiVisibilityAssessmentRateLimitError", "PublicAiVisibilityImportRateLimitError"].includes(error.name)) {
@@ -147,6 +153,7 @@ export async function GET(request: Request) {
       actor: { email: current.verifiedEmail, localPreview: false },
       workspaces: workspaces.map(({ id, kind, name, access }) => ({ id, kind, name, access })), workspaceId: selected.id,
       work: work.map(presentWorkspaceWork),
+      pendingAssessments: selected.access === "member" ? await listPendingAssessments(current, selected.id) : [],
       managedWork: managedPresence.managedWork,
       ...(managedPresence.unavailable ? { managedWorkUnavailable: true } : {}),
       handoffs: handoffs.map(({ id, sourceWorkId, recipientEmail, status, expiresAt, createdAt }) => ({ id, sourceWorkId, recipientEmail, status, expiresAt, createdAt })),
@@ -183,8 +190,21 @@ export async function POST(request: Request) {
       }
       case "assess": {
         const scoreInput = { business: input.business, url: input.url || undefined, category: input.category || undefined, location: input.location || undefined };
-        const work = await runPrivateAiVisibilityAssessment({ actor: current, workspaceId: input.workspaceId, input: scoreInput });
+        const work = await runPrivateAiVisibilityAssessment({ actor: current, workspaceId: input.workspaceId, input: scoreInput, ...(input.requestId ? { requestId: input.requestId } : {}) });
         return json({ work: presentWorkspaceWork(work) }, 201);
+      }
+      case "recover_assessment": {
+        const op = await operationRequest(current, input.workspaceId, input.requestId, "read");
+        if (op.product_id !== "ai_visibility") throw new WorkspaceAccessError();
+        const recovered = actions.parse({ action: "assess", workspaceId: input.workspaceId, requestId: input.requestId, ...op.input });
+        if (recovered.action !== "assess") throw new WorkspaceAccessError();
+        const work = await runPrivateAiVisibilityAssessment({ actor: current, workspaceId: input.workspaceId, requestId: input.requestId,
+          input: { business: recovered.business, url: recovered.url, category: recovered.category, location: recovered.location } });
+        return json({ work: presentWorkspaceWork(work) });
+      }
+      case "save_website_audit": {
+        const work = await savePublicWebsiteAudit({ actor: current, workspaceId: input.workspaceId, resultId: input.resultId });
+        return json({ work: presentWorkspaceWork(work) });
       }
       case "save_public_result": {
         const saved = await savePublicAiVisibilityResult({ actor: current, workspaceId: input.workspaceId, resultId: input.resultId });

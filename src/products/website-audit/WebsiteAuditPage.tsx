@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useState } from "react";
 import {
-  ArrowLeft,
   ArrowRight,
   CheckCircle2,
   AlertTriangle,
@@ -68,6 +67,7 @@ function CategoryCard({ category }: { category: CategoryResult }) {
     <div className="rounded-2xl border border-m-rule-soft bg-m-panel overflow-hidden">
       <button
         type="button"
+        aria-expanded={expanded}
         onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center gap-4 p-5 text-left transition-colors hover:bg-m-panel-strong"
       >
@@ -140,24 +140,15 @@ function CategoryCard({ category }: { category: CategoryResult }) {
   );
 }
 
-export function AuditPage() {
-  const [url, setUrl] = useState("");
-  const [state, setState] = useState<ScanState>("idle");
-  const [result, setResult] = useState<AuditResult | null>(null);
-  const [error, setError] = useState("");
-  const [progressStep, setProgressStep] = useState(0);
+export function WebsiteAuditPage({ initialUrl = "", initialResult, initialReportId, initialError, workspaceEnabled = false, saved = false }: { initialUrl?: string; initialResult?: AuditResult; initialReportId?: string; initialError?: string; workspaceEnabled?: boolean; saved?: boolean }) {
+  const [url, setUrl] = useState(initialUrl);
+  const [state, setState] = useState<ScanState>(initialResult ? "done" : "idle");
+  const [result, setResult] = useState<AuditResult | null>(initialResult || null);
+  const [reportId, setReportId] = useState<string | null>(initialReportId || null);
+  const [error, setError] = useState(initialError || "");
   const [reportLoading, setReportLoading] = useState(false);
 
-  const progressSteps = [
-    "Connecting to site...",
-    "Checking AI readability...",
-    "Analyzing SEO foundations...",
-    "Scanning security...",
-    "Checking Core Web Vitals...",
-    "Reviewing accessibility...",
-    "Reading trust and content signals...",
-    "Calculating score...",
-  ];
+
 
   async function handleScan(e: React.FormEvent) {
     e.preventDefault();
@@ -176,21 +167,10 @@ export function AuditPage() {
       return;
     }
 
+    setReportId(null);
     setState("scanning");
     setError("");
     setResult(null);
-    setProgressStep(0);
-
-    // Animate progress steps
-    const interval = setInterval(() => {
-      setProgressStep((prev) => {
-        if (prev >= progressSteps.length - 1) {
-          clearInterval(interval);
-          return prev;
-        }
-        return prev + 1;
-      });
-    }, 2800);
 
     try {
       const res = await fetch("/api/audit/scan", {
@@ -199,24 +179,32 @@ export function AuditPage() {
         body: JSON.stringify({ url: cleaned }),
       });
 
-      clearInterval(interval);
 
       if (!res.ok) {
         const body = await res.json().catch(() => null);
         throw new Error(body?.error || `Scan failed (${res.status})`);
       }
 
-      const data: AuditResult = await res.json();
+      const data: AuditResult & { reportId?: string } = await res.json();
+      setReportId(data.reportId || null);
+      if (data.reportId && /^audit_[a-f0-9]{32}$/.test(data.reportId)) {
+        const location = new URL(window.location.href);
+        location.searchParams.set("report", data.reportId);
+        window.history.replaceState(window.history.state, "", `${location.pathname}${location.search}`);
+      }
       setResult(data);
       setState("done");
     } catch (err) {
-      clearInterval(interval);
       setError(err instanceof Error ? err.message : "Scan failed. Try again.");
       setState("error");
     }
   }
 
   function handleReset() {
+    const location = new URL(window.location.href);
+    location.searchParams.delete("report");
+    window.history.replaceState(window.history.state, "", `${location.pathname}${location.search}`);
+    setReportId(null);
     setState("idle");
     setResult(null);
     setError("");
@@ -255,30 +243,19 @@ export function AuditPage() {
   }
 
   return (
-    <div className="marketing-root min-h-dvh px-5 py-5 md:px-8">
-      <div className="relative z-10 mx-auto max-w-[960px] pt-20 pb-16">
-        {/* Header */}
-        <div className="motion-rise mb-10">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-[13px] font-medium text-m-text-2 transition-colors hover:text-m-text"
-          >
-            <ArrowLeft className="size-4" />
-            Strelva
-          </Link>
-        </div>
-
+    <div className={saved ? "product-surface py-8" : "product-surface px-6 py-8 md:px-12"}>
+      <div className="relative z-10 mx-auto max-w-[960px] pb-16">
         {/* Input form */}
         {(state === "idle" || state === "error") && (
           <div className="motion-rise">
             <p className="text-[14px] font-medium text-m-text-3">
               Free site health audit
             </p>
-            <h1 className="mt-4 text-4xl font-semibold leading-[0.94] tracking-normal text-m-text sm:text-5xl md:text-6xl">
+            <h1 className="mt-4 font-display text-[32px] font-medium leading-[1.15] text-m-text sm:text-[40px]">
               How healthy is your website?
             </h1>
             <p className="mt-5 max-w-[620px] text-[17px] leading-[1.7] text-m-text-2">
-              Enter your website URL and get an instant health score. We check
+              Enter your website URL and get a health assessment. We check
               speed, SEO, mobile experience, structured data, security, and
               accessibility.
             </p>
@@ -291,6 +268,8 @@ export function AuditPage() {
                 <Globe className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-m-text-3" />
                 <input
                   type="text"
+                  aria-label="Website address"
+                  required
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder="example.com"
@@ -343,25 +322,9 @@ export function AuditPage() {
               {url}
             </p>
 
-            <div className="mt-10 grid gap-4 rounded-2xl border border-m-rule-soft bg-m-panel p-6">
-              {progressSteps.map((step, i) => (
-                <div
-                  key={step}
-                  className="flex items-center gap-3 transition-opacity duration-300"
-                  style={{ opacity: i <= progressStep ? 1 : 0.25 }}
-                >
-                  {i < progressStep ? (
-                    <CheckCircle2 className="size-5 shrink-0 text-m-success" />
-                  ) : i === progressStep ? (
-                    <Loader2 className="size-5 shrink-0 animate-spin text-m-accent" />
-                  ) : (
-                    <div className="size-5 shrink-0 rounded-full border border-m-rule-soft" />
-                  )}
-                  <span className="text-[14px] text-m-text-2">
-                    {step}
-                  </span>
-                </div>
-              ))}
+            <div role="status" className="mt-10 flex items-center gap-3 rounded-2xl border border-m-rule-soft bg-m-panel p-6">
+              <Loader2 className="size-5 shrink-0 animate-spin text-m-accent" />
+              <span className="text-[14px] text-m-text-2">Reading the website and running its checks. Results appear when the scan completes.</span>
             </div>
           </div>
         )}
@@ -472,16 +435,15 @@ export function AuditPage() {
                 Your site scored {result.overallScore}/100.
               </h3>
               <p className="mx-auto mt-3 max-w-[480px] text-[15px] leading-[1.6] text-m-text-2">
-                Strelva builds and manages local business websites that
-                score higher — with AI-powered updates, health monitoring, and
-                weekly reports.
+                Inspect the findings and export the report. This assessment does not change your website or activate monitoring.
               </p>
+              {saved ? <p className="mt-4 text-sm text-m-text-2">Saved privately to this workspace.</p> : reportId && workspaceEnabled ? <Link className="marketing-button-primary mt-4 min-h-12 px-6" href={`/workspace?save=${reportId}`}>Save to my work</Link> : <p className="mt-4 text-sm text-m-text-2">Account saving is unavailable for this result. You can still export it.</p>}
               <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <Link
-                  href="/access-request?ref=audit"
+                  href="/ai-visibility"
                   className="marketing-button-primary h-12 px-6"
                 >
-                  Request your build
+                  Check AI Visibility
                   <ArrowRight className="size-4" />
                 </Link>
                 <button
@@ -497,13 +459,13 @@ export function AuditPage() {
                   )}
                   {reportLoading ? "Preparing..." : "Save as PDF"}
                 </button>
-                <button
+                {!saved && <button
                   type="button"
                   onClick={handleReset}
                   className="marketing-button-secondary h-12 px-6"
                 >
                   Scan another site
-                </button>
+                </button>}
               </div>
             </div>
           </div>

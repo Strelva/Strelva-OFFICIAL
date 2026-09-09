@@ -1,3 +1,4 @@
+import { parseWebsiteAudit } from "@/products/website-audit/client";
 import type { SavedWork } from "@/platform/workspaces/types";
 import type { ProductWorkPresentation } from "@/platform/products/contracts";
 import {
@@ -51,6 +52,14 @@ function presentWorkInput(
 
 /** Explicit renderer dispatch. A new product cannot masquerade as an assessment. */
 export function presentWorkspaceWork(work: SavedWork): WorkspaceWork {
+  if (work.productId === "website_audit" && work.resourceKind === "website_audit_report") {
+    const auditPayload = parseWebsiteAudit(work.payload);
+    return { id: work.id, workspaceId: work.workspaceId, productId: work.productId, resourceKind: work.resourceKind,
+      title: auditPayload?.url || work.title || "Website audit", payload: null, auditPayload,
+      input: {}, createdAt: work.createdAt,
+      ...(!auditPayload ? { unavailableReason: "This saved website audit could not be displayed. Its stored data is unchanged." } : {}),
+    };
+  }
   const presentation = getWorkspaceWorkPresentation(work.productId, work.resourceKind);
   let parsed: AiVisibilityResult | null = null;
   if (presentation) {

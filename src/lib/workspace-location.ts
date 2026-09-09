@@ -1,0 +1,27 @@
+/** Navigation hints only. APIs still authorize the requested workspace and work. */
+const ID = /^[a-z0-9_-]{1,128}$/i;
+const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+const VIEWS = new Set(["work", "products", "help"]);
+
+export function workspaceReturnTarget(value: string | null): string | null {
+  if (!value || (value !== "/workspace" && !value.startsWith("/workspace?"))) return null;
+  const url = new URL(value, "https://workspace.invalid");
+  if (url.hash || url.pathname !== "/workspace") return null;
+  const params = url.searchParams;
+  for (const [key, item] of params) {
+    if (params.getAll(key).length !== 1) return null;
+    if (key === "workspaceId" ? !UUID.test(item)
+      : key === "work" ? !ID.test(item)
+      : key === "save" ? !/^(scan_[a-z0-9]{1,251}|audit_[a-f0-9]{32})$/i.test(item)
+      : key === "view" ? !VIEWS.has(item) : true) return null;
+  }
+  return `/workspace${params.size ? `?${params}` : ""}`;
+}
+
+export function replaceWorkspaceLocation(workspaceId: string, workId?: string) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("workspaceId", workspaceId);
+  if (workId) url.searchParams.set("work", workId);
+  else url.searchParams.delete("work");
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+}

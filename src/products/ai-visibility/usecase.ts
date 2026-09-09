@@ -7,9 +7,11 @@
  * persists only to the private workspace store.
  */
 
+import { randomUUID } from "node:crypto";
 import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
 import {
   assertCanSaveWork,
+  runWorkspaceOperation,
   listWork,
   listWorkspaces,
   saveWork,
@@ -52,6 +54,7 @@ export interface RunPrivateAiVisibilityAssessmentInput {
   actor: WorkspaceActor;
   workspaceId: string;
   input: ScoreInput;
+  requestId?: string;
 }
 
 /**
@@ -65,31 +68,23 @@ export async function runPrivateAiVisibilityAssessment({
   actor,
   workspaceId,
   input,
+  requestId,
 }: RunPrivateAiVisibilityAssessmentInput): Promise<SavedWork> {
   const workspace = (await listWorkspaces(actor)).find(
     (candidate) => candidate.id === workspaceId && candidate.access === "member",
   );
   if (!workspace) throw new WorkspaceAccessError();
 
-  // Bound persistence before incurring provider spend. This also retains the
-  // existing workspace store's exact role and capacity enforcement.
-  await assertCanSaveWork(actor, workspace.id);
-
-  // The assessment budget is per verified person, not per workspace or agency.
-  if (await isRateLimitedWindowedAsync(`workspace:assessment:${actor.userId}`, 10, 86_400_000)) {
-    throw new PrivateAiVisibilityAssessmentRateLimitError();
-  }
-
-  const result = await scoreAiVisibility(input);
-  return saveWork(actor, workspace.id, {
-    productId: AI_VISIBILITY_PRODUCT_ID,
-    // New account-owned work uses the private resource id. The renderer keeps
-    // accepting the older assessment id for rows created before this move.
-    resourceKind: AI_VISIBILITY_PRIVATE_WORK_RESOURCE_KIND,
-    title: input.business,
-    payload: result,
-    input,
-  });
+  const work = { productId: AI_VISIBILITY_PRODUCT_ID,
+    resourceKind: AI_VISIBILITY_PRIVATE_WORK_RESOURCE_KIND, title: input.business,
+    input: JSON.parse(JSON.stringify(input)) as Record<string, unknown> };
+  const run = async () => {
+    if (await isRateLimitedWindowedAsync(`workspace:assessment:${actor.userId}`, 10, 86_400_000)) {
+      throw new PrivateAiVisibilityAssessmentRateLimitError();
+    }
+    return scoreAiVisibility(input);
+  };
+  return runWorkspaceOperation({ actor, workspaceId, id: requestId || randomUUID(), work, run });
 }
 
 function sourcePublicResultId(input: unknown): string | null {

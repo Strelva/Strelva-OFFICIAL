@@ -1,3 +1,4 @@
+import { workspaceReturnTarget } from "@/lib/workspace-location";
 import type { Metadata } from "next";
 import { SupabaseSignIn } from "@/components/auth/SupabaseSignIn";
 import { LogoFull } from "@/components/Logo";
@@ -23,15 +24,6 @@ type AuthSearchParams = Record<string, string | string[] | undefined>;
 function searchValue(value: string | string[] | undefined): string | null {
   if (Array.isArray(value)) return value[0] || null;
   return value || null;
-}
-
-function workspaceReturnTarget(value: string | null): string | null {
-  if (value === "/workspace") return value;
-  if (!value?.startsWith("/workspace?")) return null;
-  const query = new URLSearchParams(value.slice("/workspace?".length));
-  const resultId = query.get("save");
-  if (query.size !== 1 || !resultId || resultId.length > 256 || !/^scan_[a-z0-9]+$/i.test(resultId)) return null;
-  return `/workspace?save=${encodeURIComponent(resultId)}`;
 }
 
 function normalizeEmail(value: string | null): string | null {
@@ -83,7 +75,7 @@ export default async function SignInPage({
   const params = await searchParams;
   const workspaceOpen = workspaceReleaseEnabled();
   const workspaceTarget = workspaceReturnTarget(searchValue(params.next));
-  if (workspaceOpen && workspaceTarget) return <WorkspaceSignIn next={workspaceTarget} />;
+  if (workspaceOpen && workspaceTarget) return <WorkspaceSignIn next={workspaceTarget} failed={searchValue(params.error) === "auth_callback"} />;
   const invite = await getInviteContext(params);
   if (invite) {
     return (

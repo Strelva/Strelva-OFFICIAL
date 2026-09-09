@@ -5,7 +5,7 @@ import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 export const metadata: Metadata = {
   title: "Free AI Visibility Audit",
   description:
-    "When customers ask ChatGPT or Gemini for the best business near them, do you show up? Get an instant A–F AI visibility grade — free, no signup.",
+    "Assess website readability and inspect one sampled Gemini response when available. Free, no signup required.",
 };
 
 export default function Page() {

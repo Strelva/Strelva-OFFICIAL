@@ -22,6 +22,7 @@ export interface WorkspaceWork<TPayload = WorkspaceWorkPayload> {
   productId: string;
   resourceKind: string;
   payload: TPayload | null;
+  auditPayload?: import("@/products/website-audit/client").AuditResult | null;
   unavailableReason?: string;
   input: Record<string, unknown>;
   createdAt: string;
@@ -73,6 +74,7 @@ export interface WorkspaceSnapshot {
   workspaces: WorkspaceSummary[];
   workspaceId: string;
   work: WorkspaceWork[];
+  pendingAssessments?: Array<{ id: string; status: string; createdAt: string }>;
   /** Existing managed sites visible to this verified account, if any. */
   managedWork?: ManagedWork[];
   /** True only when managed-site discovery was partially unavailable. */
@@ -92,7 +94,9 @@ export interface WorkspaceHandoffPreview<TPayload = WorkspaceWorkPayload> {
 
 export type WorkspaceAction =
   | { action: "create_agency"; name: string }
-  | { action: "assess"; workspaceId: string; business: string; url?: string; category?: string; location?: string }
+  | { action: "assess"; workspaceId: string; requestId?: string; business: string; url?: string; category?: string; location?: string }
+  | { action: "recover_assessment"; workspaceId: string; requestId: string }
+  | { action: "save_website_audit"; workspaceId: string; resultId: string }
   | { action: "save_public_result"; workspaceId: string; resultId: string }
   | { action: "handoff"; workId: string; recipientEmail: string }
   | { action: "inspect_handoff"; token: string }

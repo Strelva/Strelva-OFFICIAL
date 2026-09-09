@@ -5,6 +5,7 @@ not make Postgres authoritative; authority changes only when the production read
 
 | Domain | Authority | Cache or mirror | Failure rule |
 |---|---|---|---|
+| Private workspace results and assessment recovery | Postgres `saved_product_work`, `workspace_operations` after the release migrations | Anonymous audit reports remain 60-day Redis bearer records, copied only on explicit save | Fail closed. Actor and direct membership are checked on every operation transition. A checkpoint survives failed completion; one operation commits one saved result. A pre-checkpoint interruption can repeat provider reads. No automatic background worker is implied. Local implementation only until migration and release acceptance. |
 | Identity, memberships, super-admins | Supabase Auth + Postgres | None | Fail closed. |
 | Tenant configuration and commercial plan | Postgres `tenants` | Redis tenant-list cache; dev file locally | Production never falls back to a dev file. |
 | Domain ownership and verification | Postgres `domain_claims` | Redis legacy mirror/domain-map cache | Only verified claims route; explicit operator-configured production/admin domains remain trusted. |
@@ -73,3 +74,21 @@ caches) are intentionally NOT rekeyed — they regenerate from Postgres.
   the older secrets only as a compatibility fallback.
 - A tenant rename must keep the completeness test aligned with every new
   slug-keyed Redis authority added to this table.
+
+## Workspace recovery retention and limits
+
+The September 8 additive migration retains assessment input and execution state
+inside the owning workspace. Completed operations retain their identity and saved
+work pointer for deduplication; the redundant checkpoint payload is cleared on
+completion. Workspace deletion cascades to its operations; deleting a saved result
+clears the pointer without making the completed operation executable again.
+No time-based operation purge has been introduced. Individual privacy/deletion
+workflows must include this table when those workflows are implemented.
+
+A lease lasts two minutes, with at most three execution attempts for one operation.
+Each actual provider retry still consumes the existing assessment budget. Recovery
+of a checkpointed or completed result does not consume provider budget. At most
+100 incomplete operations per actor/workspace are retained before rejecting new
+attempts. This is an implementation safeguard, not a paid allowance or promise.
+Only the initiating actor can recover an operation, even when other people belong
+to the workspace. Pending operation listing never extends to delegated readers.

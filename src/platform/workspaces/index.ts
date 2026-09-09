@@ -24,7 +24,9 @@ export {
   listWorkDelegations,
   listWork,
   listWorkspaces,
+  listPendingAssessments,
   revokeDelegation,
   revokeHandoff,
   saveWork,
 } from "./repository";
+export { runWorkspaceOperation, operationRequest, WorkspaceOperationPendingError } from "./operations";
