@@ -1,5 +1,10 @@
 {
   "framework": "nextjs",
+  "git": {
+    "deploymentEnabled": {
+      "strelvav2": false
+    }
+  },
   "crons": [
     {
       "path": "/api/cron/domain-monitor",
@@ -84,6 +89,10 @@
     {
       "path": "/api/cron/review-auto-post",
       "schedule": "0 */3 * * *"
+    },
+    {
+      "path": "/api/cron/inquiry-follow-ups",
+      "schedule": "0 * * * *"
     },
     {
       "path": "/api/cron/heartbeat",

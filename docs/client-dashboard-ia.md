@@ -1,5 +1,12 @@
 # Client Dashboard IA
 
+> Historical compatibility map. The selected
+> [inquiry-first product specification](./inquiry-first-product-spec-2026-09-11.md)
+> supersedes this document's navigation and information architecture for the
+> local migration. Existing routes, managed behavior, and compatibility details
+> below remain factual until their implementation changes. This document is not
+> evidence that the inquiry-first interface is deployed.
+
 The information architecture of the owner-facing dashboard (`admin.{client-domain}` →
 `/dashboard/*`). This is what a paying client sees. The operator console is a separate
 surface — see [`operator-command-center.md`](./operator-command-center.md).
@@ -95,8 +102,8 @@ Group labels come from `GROUP_LABELS` in `src/components/dashboard/surface-nav.t
 ## The resolver: `getDashboardSurfaces`
 
 `src/lib/dashboard-surfaces.ts`. Computed **server-side** in the dashboard layout and passed
-to the nav via `DashboardSurfacesContext` — no client fetch, no flash. Consumed by
-`HistorySidebar.tsx` (desktop sidebar) and `MobileNav.tsx` (phone bottom bar).
+to the nav via `DashboardSurfacesContext` — no client fetch, no flash. The active managed
+dashboard composes it through `ConversationShell.tsx` and `ManagedNavigation.tsx`.
 
 ### Presence profile drives the local-only surfaces
 
@@ -135,8 +142,9 @@ connected Google (GBP) / Yelp account (`hasReviewsSource`).
 
 ### Mobile
 
-`MobileNav.tsx` shows up to five `shown` surfaces on the bottom bar, ranked by a keep-priority
-order, and surfaces the approval-queue badge on the phone.
+The shared `AppFrame.tsx` owns the responsive navigation modal and focus return. It keeps the
+same surface resolver and approval-queue state in the active shell; the retired phone bottom
+bar is no longer a rendered dashboard surface.
 
 ## Design-system contract
 

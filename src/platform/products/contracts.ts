@@ -11,7 +11,8 @@ export type ProductId =
   | "ai_visibility"
   | "managed_presence"
   | "domain_monitoring"
-  | "homefinder";
+  | "homefinder"
+  | "tracker";
 
 export type ResourceOwnership =
   | "public_result"

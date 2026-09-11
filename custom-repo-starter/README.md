@@ -1,7 +1,7 @@
-# Scaffold Custom Repo Starter
+# Strelva Custom Repo Starter
 
 Use this folder as the contract scaffold for every paid-client custom site repo.
-Scaffold Web remains the control plane; the custom repo is the public website runtime.
+Strelva remains the control plane; the custom repo is the public website runtime.
 
 > **Onboarding an existing client site?** Point that repo's coding agent at
 > [`AGENT-PLAYBOOK.md`](./AGENT-PLAYBOOK.md) — the step-by-step to wire a client
@@ -15,6 +15,7 @@ Scaffold Web remains the control plane; the custom repo is the public website ru
 | `scaffold-client.ts` | Typed fetch client for Scaffold Web's `/api/v1/*` contract |
 | `ScaffoldTracker.tsx` | Client-side analytics beacon → `/api/v1/track/{tenant}` (page views, booking clicks, **phone-call taps**, orders — powers the weekly report) |
 | `ScaffoldLeadForm.tsx` | Self-contained contact/quote form → `/api/v1/leads/{tenant}` (captures real people into the dashboard's "Who reached out") — the **platform-integrated** form path (Strelva tenants) |
+| `StrelvaInquiryForm.tsx` + `inquiry-client.ts` | Fixed inquiry renderer and versioned transport for the inquiry-first release. Reads only the published form; submissions retain its capability ID and version. |
 | `form-route.template.tsx` | Drop-in `app/api/contact/route.ts` — the **standalone Formspree replacement**: emails the owner every submission via Resend on the shared `mail.strelva.com` domain, clearly labeled (site + form + all fields). No platform tenant needed. Config: `RESEND_API_KEY` / `SCAFFOLD_FORM_FROM` / `SCAFFOLD_FORM_TO` / `SCAFFOLD_SITE_NAME` |
 | `scaffold-forms.ts` | Pure helpers behind `form-route.template.tsx` (`normalizeSubmission`, `renderFormEmailHtml/Text`, in-memory rate limit) — turn any form payload into a clean owner-notification email |
 | `ScaffoldLocalBusinessSchema.tsx` | Server-rendered LocalBusiness JSON-LD `<script>` (the schema our audit engine grades sites on) |
@@ -32,6 +33,31 @@ Scaffold Web remains the control plane; the custom repo is the public website ru
 | `dynamic-page-route.template.tsx` | Template for `app/[...slug]/page.tsx` — renders ANY page from the platform's page config (new pages become a data op, no per-page code) |
 | `vitest.config.ts` + `__tests__/` | Scoped Vitest suite for the pure helpers (`npx vitest run --config custom-repo-starter/vitest.config.ts`) |
 | `README.md` | This file |
+
+## Versioned inquiry capability
+
+Copy `StrelvaInquiryForm.tsx` and `inquiry-client.ts` together into the client
+repository. Install the component in the agreed page location:
+
+```tsx
+<StrelvaConnectedInquiryForm
+  baseUrl="https://app.strelva.com"
+  tenant="your-tenant"
+  capabilityId="the-approved-capability-id"
+/>
+```
+
+The component reads `GET /api/v1/inquiries/{tenant}?capabilityId=...` and posts
+the displayed version to `POST /api/v1/leads/{tenant}`. A stale version returns
+409; an unavailable store must not produce a success message. Form loading and
+submission errors remain visible. Public configuration contains no routing
+recipient, private records, provider credentials, or responsibility policy.
+
+This path requires the inquiry migration, release gate, approved capability,
+and a deployed client component. Adding these starter files alone does not
+install the form on an existing client site. Existing lead forms keep their
+current contract. Verify both representative consumers with
+`pnpm check:custom-repos` before an authorized rollout.
 
 ## Forms (contact / quote / booking) — the Formspree replacement
 

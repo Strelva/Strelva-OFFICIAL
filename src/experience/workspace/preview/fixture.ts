@@ -1,4 +1,5 @@
 import type { WorkspaceAction, WorkspaceSnapshot, WorkspaceWork } from "../contracts";
+import { presentAssessmentWork } from "@/products/assessment";
 
 export const PREVIEW_SCENARIOS = ["free", "paid", "managed", "agency", "enterprise", "empty", "read-only", "unavailable", "signed-out", "website-audit", "recovery"] as const;
 export type PreviewScenario = typeof PREVIEW_SCENARIOS[number];
@@ -11,21 +12,23 @@ const AGENCY = "22222222-2222-4222-8222-222222222222";
 const CUSTOMER = "33333333-3333-4333-8333-333333333333";
 
 function sampleWork(workspaceId: string, title = "Harbor Dental", id = "44444444-4444-4444-8444-444444444444"): WorkspaceWork {
+  const payload = {
+    business: title, url: "https://harbordental.example", score: 74, grade: "B" as const,
+    verdict: "The business identity is clear. Specific service evidence needs more detail.",
+    signals: [
+      { id: "identity", label: "Business identity", pass: true, detail: "Name, location, and contact information are stated clearly.", weight: 25 },
+      { id: "services", label: "Service evidence", pass: false, detail: "Service pages lack specific treatment and practitioner details.", weight: 20 },
+      { id: "structure", label: "Website structure", pass: true, detail: "Business facts have readable, stable pages.", weight: 15 },
+    ],
+    citation: { probed: false, mentioned: false, recommended: false, note: "Synthetic preview. No AI system or live website was queried." },
+    topFix: "Explain each primary treatment on its own page, with location and practitioner details.",
+    measurementStatus: "partial" as const, measurementNote: "Synthetic preview data. These scores are fictional and are not a measured business result.", readinessMeasured: true,
+  };
   return {
     id, workspaceId, title, productId: "ai_visibility", resourceKind: "ai_visibility_assessment",
     input: { category: "Dentist", location: "Buffalo, NY" }, createdAt: "2026-09-07T12:00:00.000Z",
-    payload: {
-      business: title, url: "https://harbordental.example", score: 74, grade: "B",
-      verdict: "The business identity is clear. Specific service evidence needs more detail.",
-      signals: [
-        { id: "identity", label: "Business identity", pass: true, detail: "Name, location, and contact information are stated clearly.", weight: 25 },
-        { id: "services", label: "Service evidence", pass: false, detail: "Service pages lack specific treatment and practitioner details.", weight: 20 },
-        { id: "structure", label: "Website structure", pass: true, detail: "Business facts have readable, stable pages.", weight: 15 },
-      ],
-      citation: { probed: false, mentioned: false, recommended: false, note: "Synthetic preview. No AI system or live website was queried." },
-      topFix: "Explain each primary treatment on its own page, with location and practitioner details.",
-      measurementStatus: "partial", measurementNote: "Synthetic preview data. These scores are fictional and are not a measured business result.", readinessMeasured: true,
-    },
+    payload,
+    assessment: presentAssessmentWork({ id, workspaceId, title, productId: "ai_visibility", resourceKind: "ai_visibility_assessment", payload, createdAt: "2026-09-07T12:00:00.000Z" }) || undefined,
   };
 }
 
@@ -45,7 +48,9 @@ export function createPreviewRequest(scenario: PreviewScenario): typeof fetch {
     products: [
       { id: "ai_visibility", name: "AI Visibility", description: "See what AI can understand about a business.", availability: "available" },
       { id: "managed_presence", name: "Managed Websites", description: "Your website and the work that keeps it useful.", availability: "managed" },
-      { id: "homefinder", name: "Home Finder", description: "Home search for a brokerage’s own site.", availability: "not_enabled" },
+      { id: "inquiries", name: "Inquiry work", description: "Keep customer requests moving with a clear, inspectable thread.", availability: "available" },
+      { id: "tracker", name: "Spreadsheet tracker", description: "Turn a CSV into working data with a saved history.", availability: "available" },
+      { id: "homefinder", name: "Home Finder", description: "Home search for a brokerage’s own site.", availability: "not_enabled", previewHref: "http://127.0.0.1:3213/embed/agency-preview" },
     ],
     managedWork: scenario === "managed" || scenario === "enterprise" ? [{
       id: "preview-harbor", title: "Harbor Dental", href: "/preview/strelva/website",
@@ -53,7 +58,11 @@ export function createPreviewRequest(scenario: PreviewScenario): typeof fetch {
     }] : [],
   };
   if (scenario === "recovery") base.pendingAssessments = [{ id: "88888888-8888-4888-8888-888888888888", status: "ready", createdAt: "2026-09-08T12:00:00Z" }];
-  const saved = new Map(base.workspaces.map(workspace => [workspace.id, scenario === "empty" || scenario === "recovery" ? [] : scenario === "website-audit" ? [{ ...sampleWork(workspace.id), productId: "website_audit", resourceKind: "website_audit_report", title: "https://harbordental.example", payload: null, auditPayload: { url: "https://harbordental.example", scannedAt: "2026-09-08T12:00:00Z", overallScore: 74, grade: "B" as const, categories: [{ name: "SEO", slug: "seo", weight: 1, score: 74, checks: [{ name: "Service descriptions", status: "warn" as const, score: 74, message: "Fictional example: add specific treatment descriptions. No live site was queried." }] }] } }] : [sampleWork(workspace.id)]]));
+  const saved = new Map(base.workspaces.map(workspace => [workspace.id, scenario === "empty" || scenario === "recovery" ? [] : scenario === "website-audit" ? (() => {
+    const auditPayload = { url: "https://harbordental.example", scannedAt: "2026-09-08T12:00:00Z", overallScore: 74, grade: "B" as const, categories: [{ name: "SEO", slug: "seo", weight: 1, score: 74, checks: [{ name: "Service descriptions", status: "warn" as const, score: 74, message: "Fictional example: add specific treatment descriptions. No live site was queried." }] }] };
+    const work = { ...sampleWork(workspace.id), productId: "website_audit", resourceKind: "website_audit_report", title: "https://harbordental.example", payload: null, auditPayload };
+    return [{ ...work, assessment: presentAssessmentWork({ id: work.id, workspaceId: work.workspaceId, productId: work.productId, resourceKind: work.resourceKind, title: work.title, payload: auditPayload, createdAt: work.createdAt }) || undefined }];
+  })() : [sampleWork(workspace.id)]]));
   let sequence = 0;
   const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 

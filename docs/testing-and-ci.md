@@ -48,28 +48,31 @@ The **dev-access bypass** (`REB_DEV_UNGATED_ACCESS=1` / `SCAFFOLD_DEV_UNGATED_AC
 
 ## CI (`.github/workflows/ci.yml`)
 
-`build` job: install → lint → typecheck → vitest+coverage → `pnpm audit --audit-level high`
-→ build → Playwright browsers → **Smoke tests** (bypass OFF) → **Surface smoke** (bypass ON,
-seeds `tests/fixtures/tenants.fixture.json` → `./dev-tenants.json`). CI has **no DB and no
-Redis** and never touches prod.
+`build` job: install with the repository's exact `pnpm@10.34.5` → lint → typecheck → product
+boundaries → ontology invariants → isolated workspace SQL → vitest+coverage →
+`pnpm audit --audit-level high` → build → Playwright browsers → **Smoke tests** (bypass OFF)
+→ **Workspace browser acceptance** → **Surface smoke** (bypass ON, seeds
+`tests/fixtures/tenants.fixture.json` → `./dev-tenants.json`). CI has **no DB and no Redis**
+and never touches prod. Browser steps are conditional on a non-draft pull request; the
+workflow explicitly includes `ready_for_review` so a draft becoming reviewable runs them.
 
 ### The CI-faithful local sim (use this before trusting a green local run)
 
-Local `.env` provides Postgres **and** Upstash, which silently masks CI-only failures
-(a tenant that only resolves via the fixture; a page that only renders with Redis). To
-reproduce CI locally, blank BOTH the data sources and Redis:
+Local exports or `.env` may provide Postgres **and** Upstash, which silently masks CI-only
+failures (a tenant that only resolves via the fixture; a page that only renders with Redis).
+Run the restore-safe CI harness instead of copying/removing the fixture by hand:
 
 ```bash
-cp tests/fixtures/tenants.fixture.json dev-tenants.json
-DATA_SOURCE=file CONTENT_SOURCE=file TENANTS_SOURCE=file CI=true \
-  UPSTASH_REDIS_REST_URL="" UPSTASH_REDIS_REST_TOKEN="" KV_REST_API_URL="" KV_REST_API_TOKEN="" \
-  pnpm smoke:surfaces
-rm -f dev-tenants.json
+pnpm check:ci
 ```
 
-Do NOT set `CONTENT_SOURCE=file` while asserting tenant **content** rendering — the prod
-source-flags guard refuses dev-file content in a prod-like context (`CI=true`) and 500s.
-The Surface smoke only asserts chrome, so it's unaffected.
+`scripts/check-ci.sh` runs the hosted-equivalent checks, exports empty provider/data and
+release-bypass values so `.env.local` cannot repopulate them in its subprocess, and seeds the
+synthetic tenant only for Surface smoke. For that step it backs up an existing
+`dev-tenants.json` with metadata, restores it on success, test failure or signal, and removes
+the synthetic file when none existed. The Surface smoke asserts only chrome; do not set
+`CONTENT_SOURCE=file` while asserting tenant **content** rendering — the production
+source-flags guard refuses dev-file content when `VERCEL_ENV=production` and 500s.
 
 ## GitHub Actions account gate
 
@@ -77,11 +80,13 @@ The org's free tier has a finite Actions budget and a zero-dollar overage limit.
 When the account cannot fund a run, every workflow stops before receiving a
 runner and therefore supplies no code evidence.
 
-As of 2026-08-01, the latest `main` Security and CI runs are blocked with GitHub's
-“recent account payments have failed or your spending limit needs to be increased”
-annotation. Their jobs have zero steps. This is an external account block, not a
-test failure, but `main` does not have fresh CI evidence until the account state is
-fixed and a new run passes.
+### Historical account observation (2026-08-01)
+
+As of that dated observation, the latest `main` Security and CI runs were blocked with
+GitHub's “recent account payments have failed or your spending limit needs to be increased”
+annotation, and their jobs had zero steps. This was an external account block, not a test
+failure. It is historical evidence only; inspect the latest hosted run before describing
+the branch or release as CI-green.
 
 There are only two workflows now (CI + Security). Guardrails keep usage well under 2,000:
 
@@ -90,18 +95,20 @@ There are only two workflows now (CI + Security). Guardrails keep usage well und
 - **CodeQL was deleted.** It analyzed with `upload: never` (code scanning isn't enabled),
   so it burned ~3 min/event producing nothing usable. Re-add it (`git show` the old
   `codeql.yml` from history) only after enabling code scanning in repo settings.
-- **The Playwright e2e smoke (public + surface, ~2.5 min) runs only on NON-DRAFT PRs.**
-  Draft-PR pushes and main pushes run the fast checks (lint/typecheck/vitest/build) only —
-  iterate in a draft PR, mark it "ready for review" to run the e2e gate before merge.
+- **The Playwright e2e smoke (public + workspace + surface, ~2.5 min) runs only on NON-DRAFT
+  PRs.** Draft-PR pushes and main pushes run the fast checks (lint/typecheck/vitest/build)
+  only. The workflow subscribes to `ready_for_review`, so marking a draft ready runs the
+  browser gate before merge.
 - **`paths-ignore`** on CI for `**.md` / `docs/**`; **Playwright browsers cached**.
 - **Local git hooks** (`.githooks/`, wired via the `prepare` script's `core.hooksPath`):
   pre-commit runs gitleaks on staged changes (never commit a secret); pre-push runs
   typecheck (catch type errors before they reach a runner). Both skippable with
   `--no-verify`; gitleaks degrades to a warning if the binary/docker isn't present.
 
-**Before you push (avoid burning a run to find a failure):** run the CI-faithful check
-locally. `pnpm check:ci` runs lint + typecheck + vitest + the no-Redis surface smoke —
-the same gates the runner enforces. If it's green, CI will be too.
+**Before you push:** run `pnpm check:ci` locally. It runs lint, typecheck, product-boundary
+and ontology checks, isolated SQL, coverage, high-severity audit, build, public smoke,
+workspace browser acceptance and no-Redis surface smoke. A local green result is local
+evidence only; it cannot replace the hosted run or production evidence.
 
 If Actions is blocked, treat `pnpm check:ci` as local evidence only. Clear the
 billing/spending block and obtain a fresh hosted run before describing a PR or
@@ -117,13 +124,14 @@ release as CI-green.
 
 ## Current verification record
 
-On 2026-08-01, `pnpm typecheck` and `pnpm test` passed locally. The encryption,
-subscription-deletion, Stripe idempotency, and zero-dollar trial invoice branches
-called out by the July audit all have current test coverage. No confirmed failing
-Vitest test remains.
+The current IMP-01 receipt is [docs/major-release/implementation-receipt.md](major-release/implementation-receipt.md).
+It records the exact toolchain and local evidence without turning local results into a
+hosted or production claim. The repository pins `pnpm@10.34.5`, the lockfile was regenerated
+with that toolchain, and generated output is ignored narrowly at the ESLint boundary
+(`.next-self-service*`, `.validation-artifacts`, and sibling `.next*` output only).
 
-`pnpm lint` is currently red with 10 `no-explicit-any` errors in
-`scripts/inspect-tenant.ts` and seven warnings. In this combined local checkout,
-`eslint .` also traverses generated output under the ignored
-`strelva-marketing/` and `client-prototypes/` workspaces, making the failure slow
-to reach. `pnpm check:ci` stops at lint and has no current surface-smoke result.
+The receipt also records the official Next.js advisory review and the patched `next` and
+`eslint-config-next` line. A clean install in an isolated temporary checkout, the focused
+release tests and `pnpm typecheck` must be recorded separately from any run that reuses the
+developer checkout. No local check authorizes deployment, migration, provider writes or a
+production release.

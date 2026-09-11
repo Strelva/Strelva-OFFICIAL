@@ -1,7 +1,10 @@
 # Strelva interface and Managed Websites context
 
-Reviewed: 2026-09-07
+Reviewed: 2026-09-11
 Kind: product
+
+Internal release: **strelvav2**. See the [release entry point](./docs/strelvav2.md).
+This branch is for internal work and is not approved for production.
 
 ## Role
 
@@ -12,6 +15,23 @@ in the [workspace context](../CONTEXT.md); interaction decisions live in
 [DESIGN.md](./DESIGN.md).
 
 ## Evidence state
+
+- **Latest confirmed product direction:** the
+  [horizontal product brief](./docs/horizontal-product-brief-2026-09-11.md)
+  records Jacob's subsequent decisions: users across organization sizes, fluid
+  self-service and managed collaboration, outside agencies and agents, and
+  vertical R&D measuring time and financial value. The inquiry migration below
+  is one narrow implementation slice, not the whole product or its launch
+  sequence. See the [audit and staged plan](./docs/horizontal-audit-and-plan-2026-09-11.md).
+  These planning decisions do not change live scope, billing or runtime authority.
+
+- **Existing inquiry implementation contract:** the
+  [inquiry-first product specification](./docs/inquiry-first-product-spec-2026-09-11.md)
+  governs the September 11 local migration. The
+  [acceptance matrix](./docs/inquiry-first-acceptance-2026-09-11.md) keeps
+  implementation and evidence status separate from the selected behavior.
+  Work present in the local tree is under review and does not establish release,
+  deployment, provider access, live delivery, or customer adoption.
 
 - **Implemented locally:** the shared frame, workspace Home/My work/Explore,
   contextual website navigation, account presentation, and release-gated account
@@ -30,6 +50,16 @@ in the [workspace context](../CONTEXT.md); interaction decisions live in
 - **Operated, adopted, commercial:** managed website agreements and live use
   require the corresponding current evidence. A working shared interface does
   not establish new paid plans, adoption, or accepted service.
+
+## September 11 inquiry migration checkpoint
+
+The inquiry engine, business entry, fixed public form, version-bound intake,
+rehearsal UI, publication transaction, receipts, consent controls, and undo now
+have local implementation and tests. Production activation remains pending. The [initial implementation checkpoint](./docs/inquiry-first-implementation-status-2026-09-11.md)
+is historical. The [horizontal verification record](./docs/horizontal-local-verification-2026-09-11.md)
+records the later implementation and authenticated local evidence. Keep
+`STRELVA_INQUIRIES_RELEASE` off until that checklist is complete and a separate
+production action is authorized.
 
 ## Owns
 
@@ -79,10 +109,21 @@ to the application. No migration or activation was performed. On September
 
 ## Current attention
 
-Complete review of shared navigation, result and website continuity, narrow-screen
-behavior, keyboard access, empty/error/read-only states, and account recovery.
-Keep capability and price availability honest while the release scope is being
-selected. A submitted capability request is not an accepted delivery promise.
+The [first horizontal scope](./docs/horizontal-first-scope-2026-09-11.md) is selected:
+shared inquiry work, CSV trackers, and internal experiment evidence. Its local
+implementation passes unit, browser, build, compatibility and isolated storage
+checks, including authenticated local journeys. See the
+[verification record](./docs/horizontal-local-verification-2026-09-11.md) for the
+exact evidence and limits. Provider testing, representative client installation
+and production activation remain release gates. Use
+the [rollout checklist](./docs/horizontal-release-checklist-2026-09-11.md) to keep
+local, authenticated staging, and production evidence separate. Preserve the
+inquiry acceptance requirements for any
+inquiry release without weakening the existing
+shared-navigation, website-continuity, narrow-screen, keyboard, error,
+read-only, and account-recovery boundaries. Keep capability and price
+availability honest. A submitted capability request is not an accepted delivery
+promise, and a local inquiry fixture is not a live handling authority.
 
 ## Verify before consequential action
 
@@ -102,5 +143,7 @@ presence of these routes.
   [managed website frame](./src/components/dashboard/ConversationShell.tsx).
 - [Testing and CI](./docs/testing-and-ci.md) and
   [persistence boundaries](./docs/persistence-boundaries.md).
+- [Inquiry-first product specification](./docs/inquiry-first-product-spec-2026-09-11.md)
+  and [acceptance matrix](./docs/inquiry-first-acceptance-2026-09-11.md).
 - [Client dashboard surfaces](./docs/client-dashboard-ia.md) and
   [operator responsibilities](./docs/operator-command-center.md).

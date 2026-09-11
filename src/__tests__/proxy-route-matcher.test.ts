@@ -25,7 +25,7 @@ describe("isPublicRoute", () => {
   });
 
   it("treats public prefixes (and their sub-paths) as public", () => {
-    for (const p of ["/sign-in", "/sign-in/foo", "/sign-up", "/access-request/abc", "/api/v1/content/gldf/hero", "/api/pay/xyz", "/api/internal/domain-map"]) {
+    for (const p of ["/sign-in", "/sign-in/foo", "/sign-up", "/access-request/abc", "/api/v1/content/gldf/hero", "/api/pay/xyz", "/api/internal/domain-map", "/api/webhooks/resend"]) {
       expect(isPublicRoute(req(p))).toBe(true);
     }
   });

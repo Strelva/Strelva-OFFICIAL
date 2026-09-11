@@ -75,6 +75,9 @@ const PUBLIC_PREFIXES = [
   "/api/audit/",
   "/api/onboard/",
   "/api/pay/",
+  // Signed provider callbacks authenticate themselves with the provider
+  // signature, so Supabase session auth must not intercept them.
+  "/api/webhooks/",
   "/api/approve",
   "/api/v1/",
   "/api/cron/",

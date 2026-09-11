@@ -13,9 +13,36 @@ const PERSONAL_ID = "11111111-1111-4111-8111-111111111111";
 const AGENCY_ID = "22222222-2222-4222-8222-222222222222";
 const CUSTOMER_ID = "33333333-3333-4333-8333-333333333333";
 const WORK_ID = "44444444-4444-4444-8444-444444444444";
+const SECOND_WORK_ID = "45454545-4545-4454-8454-454545454545";
 const CUSTOMER_WORK_ID = "55555555-5555-4555-8555-555555555555";
+const TRACKER_WORK_ID = "56565656-5656-4565-8565-565656565656";
 const DELEGATION_ID = "66666666-6666-4666-8666-666666666666";
 const HANDOFF_ID = "77777777-7777-4777-8777-777777777777";
+
+const trackerSnapshot = {
+  id: "tracker-record",
+  title: "Shared backlog",
+  source: { sourceId: "source-1", originalFileName: "backlog.csv", format: "csv", mediaType: "text/csv", sizeBytes: 38 },
+  originalSource: "Name,Status\nExample,Open\nSecond,Closed",
+  columns: [{ id: "name", sourceColumn: 1, sourceColumnIndex: 0, sourceHeader: "Name", fieldKey: "name", label: "Name", kind: "text" }],
+  rows: [
+    { id: "row-1", cells: { name: { value: "Example", originalValue: "Example", lineage: null } }, lineage: null, state: "active", createdAt: "2026-09-05T14:00:00.000Z", updatedAt: "2026-09-05T14:00:00.000Z" },
+    { id: "row-2", cells: { name: { value: "Second", originalValue: "Second", lineage: null } }, lineage: null, state: "active", createdAt: "2026-09-05T14:00:00.000Z", updatedAt: "2026-09-05T14:00:00.000Z" },
+  ],
+  history: [], revision: 0, createdAt: "2026-09-05T14:00:00.000Z", updatedAt: "2026-09-05T14:00:00.000Z",
+};
+
+const trackerPreview = {
+  id: trackerSnapshot.id,
+  title: trackerSnapshot.title,
+  source: { fileName: trackerSnapshot.source.originalFileName, sizeBytes: trackerSnapshot.source.sizeBytes },
+  revision: trackerSnapshot.revision,
+  rowCount: trackerSnapshot.rows.length,
+  historyCount: trackerSnapshot.history.length,
+  columns: [{ id: "name", sourceColumn: 1, label: "Name", kind: "text" as const }],
+  rows: trackerSnapshot.rows.map((row) => ({ id: row.id, sourceRow: null, state: row.state as "active" | "deleted", cells: { name: row.cells.name.value } })),
+  updatedAt: trackerSnapshot.updatedAt,
+};
 
 function work(overrides: Partial<WorkspaceWork> = {}): WorkspaceWork {
   return {
@@ -42,6 +69,20 @@ function work(overrides: Partial<WorkspaceWork> = {}): WorkspaceWork {
       measurementNote: "Website and live citation evidence measured.",
       readinessMeasured: true,
     },
+    ...overrides,
+  };
+}
+
+function trackerWork(overrides: Partial<WorkspaceWork> = {}): WorkspaceWork {
+  return {
+    id: TRACKER_WORK_ID,
+    workspaceId: AGENCY_ID,
+    title: "Shared backlog",
+    productId: "tracker",
+    resourceKind: "tracker",
+    input: {},
+    createdAt: "2026-09-05T14:00:00.000Z",
+    payload: null,
     ...overrides,
   };
 }
@@ -284,7 +325,7 @@ test("keeps product discovery descriptive and managed work scoped to authorized 
       { id: "ai_visibility", name: "AI Visibility", description: "See what AI can understand about a business.", availability: "available" },
       { id: "managed_presence", name: "Managed Websites", description: "Keep an existing client website current.", availability: "managed" },
       { id: "domain_monitoring", name: "Domain Monitoring", description: "Internal portfolio uptime checks.", availability: "managed" },
-      { id: "homefinder", name: "Homefinder", description: "A separate external pilot.", availability: "not_enabled" },
+      { id: "homefinder", name: "Homefinder", description: "A separate external pilot.", availability: "not_enabled", previewHref: "http://127.0.0.1:3213/embed/agency-preview" },
     ],
   })));
 
@@ -294,7 +335,7 @@ test("keeps product discovery descriptive and managed work scoped to authorized 
   await expect(main.getByRole("heading", { name: "More you can do." })).toBeVisible();
   await expect(main.getByRole("button", { name: /AI Visibility/ })).toBeVisible();
   await expect(main.getByRole("button", { name: /Managed Websites/ })).toBeVisible();
-  await expect(main.getByRole("button", { name: /Homefinder/ })).toContainText("Not available yet");
+  await expect(main.getByRole("button", { name: /Homefinder/ })).toContainText("Preview · early access");
   // An operator catalog entry must not become a consumer product.
   await expect(main.getByText("Domain Monitoring")).toHaveCount(0);
   await page.screenshot({ path: "test-results/workspace-products-desktop.png", fullPage: true });
@@ -304,8 +345,11 @@ test("keeps product discovery descriptive and managed work scoped to authorized 
   await expect(main.getByRole("button", { name: "Open Harbor Dental" })).toHaveCount(0);
   await main.getByRole("button", { name: "All products" }).click();
   await main.getByRole("button", { name: /Homefinder/ }).click();
-  await expect(main).toContainText("It is not available to install from your account yet.");
-  await expect(main.getByRole("button", { name: /Install|Activate|Buy/ })).toHaveCount(0);
+  await expect(main.getByRole("heading", { name: "Homefinder", exact: true })).toBeVisible();
+  await expect(main.getByRole("link", { name: /Try Home Finder/ })).toHaveAttribute("href", "http://127.0.0.1:3213/embed/agency-preview");
+  await expect(main).toContainText("A live installation needs brokerage approval");
+  await main.getByRole("button", { name: "Ask about early access" }).click();
+  await expect(main.getByLabel("What are you trying to do?")).toHaveValue(/enabling a live brokerage installation/);
 });
 
 test("keeps managed discovery honest when tenant links are temporarily unavailable", async ({ page }) => {
@@ -376,7 +420,7 @@ test("hands work to the named customer with optional access unchecked, then revo
   const workspaces: WorkspaceSnapshot["workspaces"] = [
     { id: PERSONAL_ID, kind: "personal", name: "My work" },
     { id: AGENCY_ID, kind: "agency", name: "Northstar Agency" },
-    { id: CUSTOMER_ID, kind: "customer", name: "Harbor Dental" },
+    { id: CUSTOMER_ID, kind: "customer", name: "Harbor Dental", role: "owner" },
   ];
   const agencySnapshot = () => snapshot({ actor: { email: "agency@example.com", localPreview: false }, workspaces, workspaceId: AGENCY_ID, work: [agencyWork], handoffs });
   const customerSnapshot = () => snapshot({ workspaces, workspaceId: CUSTOMER_ID, work: [work({ id: CUSTOMER_WORK_ID, workspaceId: CUSTOMER_ID })], handoffs: [], delegations: delegationActive ? [{ id: DELEGATION_ID, workId: CUSTOMER_WORK_ID, agencyWorkspaceId: AGENCY_ID, status: "active", canRevoke: true }] : [] });
@@ -434,6 +478,147 @@ test("hands work to the named customer with optional access unchecked, then revo
   await page.getByRole("button", { name: "Revoke access" }).click();
   await expect(page.getByText("Agency access was revoked. Your work remains here.")).toBeVisible();
   await expect(page.getByText("No agency can access this workspace.")).toBeVisible();
+});
+
+test("hands a tracker to the named customer and keeps optional agency access read-only", async ({ page }) => {
+  const agencyWork = trackerWork();
+  const customerWork = trackerWork({ id: CUSTOMER_WORK_ID, workspaceId: CUSTOMER_ID });
+  let phase: "agency" | "customer" | "agency-reader" = "agency";
+  let handoffs: WorkspaceSnapshot["handoffs"] = [];
+  const agencyWorkspaces: WorkspaceSnapshot["workspaces"] = [
+    { id: AGENCY_ID, kind: "agency", name: "Northstar Agency", access: "member" },
+  ];
+  const customerWorkspaces: WorkspaceSnapshot["workspaces"] = [
+    { id: CUSTOMER_ID, kind: "customer", name: "Harbor Dental", access: "member", role: "owner" },
+  ];
+  const agencyReaderWorkspaces: WorkspaceSnapshot["workspaces"] = [
+    { id: AGENCY_ID, kind: "agency", name: "Northstar Agency", access: "member" },
+    { id: CUSTOMER_ID, kind: "customer", name: "Harbor Dental", access: "delegated_read" },
+  ];
+  const agencySnapshot = () => snapshot({ actor: { email: "agency@example.com", localPreview: false }, workspaces: agencyWorkspaces, workspaceId: AGENCY_ID, work: [agencyWork], handoffs });
+  const customerSnapshot = () => snapshot({ actor: { email: "owner@example.com", localPreview: false }, workspaces: customerWorkspaces, workspaceId: CUSTOMER_ID, work: [customerWork], handoffs: [], delegations: [{ id: DELEGATION_ID, workId: CUSTOMER_WORK_ID, agencyWorkspaceId: AGENCY_ID, status: "active", canRevoke: true }] });
+  const agencyReaderSnapshot = () => snapshot({ actor: { email: "agency@example.com", localPreview: false }, workspaces: agencyReaderWorkspaces, workspaceId: CUSTOMER_ID, work: [customerWork], handoffs: [], delegations: [{ id: DELEGATION_ID, workId: CUSTOMER_WORK_ID, agencyWorkspaceId: AGENCY_ID, status: "active", canRevoke: false }] });
+  const preview: WorkspaceHandoffPreview = { recipientEmail: "owner@example.com", agencyName: "Northstar Agency", work: { ...agencyWork, tracker: trackerPreview }, expiresAt: "2026-09-12T14:00:00.000Z", accepted: false };
+
+  await mockWorkspace(page, async (route) => {
+    if (route.request().method() === "GET") {
+      return fulfill(route, phase === "agency" ? agencySnapshot() : phase === "customer" ? customerSnapshot() : agencyReaderSnapshot());
+    }
+    const body = route.request().postDataJSON() as { action: string; allowAgencyAccess?: boolean };
+    if (body.action === "handoff") {
+      handoffs = [{ id: HANDOFF_ID, sourceWorkId: TRACKER_WORK_ID, recipientEmail: "owner@example.com", status: "pending", expiresAt: preview.expiresAt, createdAt: "2026-09-05T15:00:00.000Z" }];
+      return fulfill(route, { token: "tracker-recipient-secret" }, 201);
+    }
+    if (body.action === "inspect_handoff") return fulfill(route, preview);
+    if (body.action === "accept_handoff") {
+      expect(body.allowAgencyAccess).toBe(true);
+      phase = "customer";
+      return fulfill(route, { workspaceId: CUSTOMER_ID, workId: CUSTOMER_WORK_ID });
+    }
+    return fulfill(route, { error: "Unexpected mocked action." }, 400);
+  });
+  await page.route("**/api/tracker*", (route) => fulfill(route, { workId: CUSTOMER_WORK_ID, workspaceId: CUSTOMER_ID, tracker: trackerSnapshot }));
+
+  await page.goto(`/workspace?workspaceId=${AGENCY_ID}&view=work&work=${TRACKER_WORK_ID}`);
+  await page.getByRole("button", { name: "Sharing & access", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Put finished work in the customer’s hands." })).toBeVisible();
+  await page.getByLabel("Customer email").fill("owner@example.com");
+  await page.getByRole("button", { name: "Create private handoff" }).click();
+
+  await page.goto("/workspace#handoff=tracker-recipient-secret");
+  await expect(page.getByRole("heading", { name: "Northstar Agency prepared this for you." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Shared backlog", exact: true })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "Example" })).toBeVisible();
+  const consent = page.getByLabel("Allow Northstar Agency read-only access");
+  await expect(consent).not.toBeChecked();
+  await consent.check();
+  await page.getByRole("button", { name: "Accept into my workspace" }).click();
+  await expect(page.getByRole("heading", { name: "Shared backlog", exact: true })).toBeVisible();
+
+  phase = "agency-reader";
+  await page.goto(`/workspace?workspaceId=${CUSTOMER_ID}&view=tracker&work=${CUSTOMER_WORK_ID}`);
+  await expect(page.getByText("You can review this work. Editing requires workspace membership.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Shared backlog", exact: true })).toBeVisible();
+});
+
+test("resets a created handoff link when the selected work changes", async ({ page }) => {
+  const first = work({
+    workspaceId: AGENCY_ID,
+    title: "First assessment",
+    payload: { ...work().payload!, business: "First assessment" },
+  });
+  const second = work({
+    id: SECOND_WORK_ID,
+    workspaceId: AGENCY_ID,
+    title: "Second assessment",
+    payload: { ...work().payload!, business: "Second assessment" },
+  });
+  const workspaces: WorkspaceSnapshot["workspaces"] = [
+    { id: AGENCY_ID, kind: "agency", name: "Northstar Agency" },
+  ];
+  let handoffs: WorkspaceSnapshot["handoffs"] = [];
+  await mockWorkspace(page, async (route) => {
+    if (route.request().method() === "GET") return fulfill(route, snapshot({ actor: { email: "agency@example.com", localPreview: false }, workspaces, workspaceId: AGENCY_ID, work: [first, second], handoffs }));
+    const body = route.request().postDataJSON() as { action: string };
+    if (body.action === "handoff") {
+      handoffs = [{ id: HANDOFF_ID, sourceWorkId: WORK_ID, recipientEmail: "owner@example.com", status: "pending", expiresAt: "2026-09-12T14:00:00.000Z", createdAt: "2026-09-05T15:00:00.000Z" }];
+      return fulfill(route, { token: "recipient-bound-secret" }, 201);
+    }
+    return fulfill(route, { error: "Unexpected mocked action." }, 400);
+  });
+
+  await page.goto("/workspace");
+  await page.getByRole("button", { name: "Help & service", exact: true }).click();
+  await page.getByRole("main").getByRole("button", { name: "Sharing & agency access" }).click();
+  await page.getByLabel("Customer email").fill("owner@example.com");
+  await page.getByRole("button", { name: "Create private handoff" }).click();
+  await expect(page.getByText(/recipient-bound-secret/)).toBeVisible();
+
+  await page.getByLabel("Strelva navigation", { exact: true }).getByRole("button", { name: "Second assessment", exact: true }).click();
+  await page.getByRole("button", { name: "Sharing & access", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Create private handoff" })).toBeVisible();
+  await expect(page.getByText(/recipient-bound-secret/)).toHaveCount(0);
+  await expect(page.getByLabel("Customer email")).toHaveValue("");
+});
+
+test("drops a late handoff completion after the work context changes", async ({ page }) => {
+  const first = work({
+    workspaceId: AGENCY_ID,
+    title: "First assessment",
+    payload: { ...work().payload!, business: "First assessment" },
+  });
+  const second = work({
+    id: SECOND_WORK_ID,
+    workspaceId: AGENCY_ID,
+    title: "Second assessment",
+    payload: { ...work().payload!, business: "Second assessment" },
+  });
+  const workspaces: WorkspaceSnapshot["workspaces"] = [
+    { id: AGENCY_ID, kind: "agency", name: "Northstar Agency" },
+  ];
+  let handoffStarted = false;
+  await mockWorkspace(page, async (route) => {
+    if (route.request().method() === "GET") return fulfill(route, snapshot({ actor: { email: "agency@example.com", localPreview: false }, workspaces, workspaceId: AGENCY_ID, work: [first, second] }));
+    const body = route.request().postDataJSON() as { action: string };
+    if (body.action === "handoff") {
+      handoffStarted = true;
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      return fulfill(route, { token: "late-recipient-secret" }, 201);
+    }
+    return fulfill(route, { error: "Unexpected mocked action." }, 400);
+  });
+
+  await page.goto("/workspace");
+  await page.getByRole("button", { name: "Help & service", exact: true }).click();
+  await page.getByRole("main").getByRole("button", { name: "Sharing & agency access" }).click();
+  await page.getByLabel("Customer email").fill("owner@example.com");
+  await page.getByRole("button", { name: "Create private handoff" }).click();
+  await expect.poll(() => handoffStarted).toBe(true);
+  await page.getByLabel("Strelva navigation", { exact: true }).getByRole("button", { name: "Second assessment", exact: true }).click();
+  await page.waitForTimeout(450);
+  await page.getByRole("button", { name: "Sharing & access", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Create private handoff" })).toBeVisible();
+  await expect(page.getByText(/late-recipient-secret/)).toHaveCount(0);
 });
 
 test("keeps delegated customer work read-only while customer-owned work retains controls", async ({ page }) => {

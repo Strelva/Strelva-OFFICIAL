@@ -2042,6 +2042,201 @@ export type Database = {
           },
         ]
       }
+      inquiry_record_overlays: {
+        Row: {
+          assignee_id: string | null
+          business_id: string
+          capability_id: string
+          created_at: string
+          inquiry_id: string
+          status: string
+          tenant_id: string
+          tenant_stable_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          assignee_id?: string | null
+          business_id: string
+          capability_id: string
+          created_at?: string
+          inquiry_id: string
+          status: string
+          tenant_id: string
+          tenant_stable_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          assignee_id?: string | null
+          business_id?: string
+          capability_id?: string
+          created_at?: string
+          inquiry_id?: string
+          status?: string
+          tenant_id?: string
+          tenant_stable_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inquiry_record_overlays_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inquiry_record_overlays_tenant_stable_id_fkey"
+            columns: ["tenant_stable_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["stable_id"]
+          },
+        ]
+      }
+      inquiry_publication_claims: {
+        Row: {
+          acceptance_id: string | null
+          accepted_at: string | null
+          action: string
+          actor_id: string | null
+          business_id: string
+          capability_id: string
+          change_id: string
+          claim_token_hash: string
+          command_digest: string
+          created_at: string
+          failure_reason: string | null
+          governance_event_id: string | null
+          id: string
+          idempotency_key: string
+          provider_receipt: Json | null
+          request_id: string
+          status: string
+          tenant_id: string
+          tenant_stable_id: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          acceptance_id?: string | null
+          accepted_at?: string | null
+          action: string
+          actor_id?: string | null
+          business_id: string
+          capability_id: string
+          change_id: string
+          claim_token_hash: string
+          command_digest: string
+          created_at?: string
+          failure_reason?: string | null
+          governance_event_id?: string | null
+          id?: string
+          idempotency_key: string
+          provider_receipt?: Json | null
+          request_id: string
+          status?: string
+          tenant_id: string
+          tenant_stable_id?: string
+          updated_at?: string
+          version: number
+        }
+        Update: {
+          acceptance_id?: string | null
+          accepted_at?: string | null
+          action?: string
+          actor_id?: string | null
+          business_id?: string
+          capability_id?: string
+          change_id?: string
+          claim_token_hash?: string
+          command_digest?: string
+          created_at?: string
+          failure_reason?: string | null
+          governance_event_id?: string | null
+          id?: string
+          idempotency_key?: string
+          provider_receipt?: Json | null
+          request_id?: string
+          status?: string
+          tenant_id?: string
+          tenant_stable_id?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inquiry_publication_claims_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inquiry_publication_claims_tenant_stable_id_fkey"
+            columns: ["tenant_stable_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["stable_id"]
+          },
+        ]
+      }
+      inquiry_workspaces: {
+        Row: {
+          business_id: string
+          created_at: string
+          id: string
+          revision: number
+          state: Json
+          state_version: number
+          tenant_id: string
+          tenant_stable_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          business_id: string
+          created_at?: string
+          id?: string
+          revision?: number
+          state: Json
+          state_version?: number
+          tenant_id: string
+          tenant_stable_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          business_id?: string
+          created_at?: string
+          id?: string
+          revision?: number
+          state?: Json
+          state_version?: number
+          tenant_id?: string
+          tenant_stable_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inquiry_workspaces_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inquiry_workspaces_tenant_stable_id_fkey"
+            columns: ["tenant_stable_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["stable_id"]
+          },
+        ]
+      }
       suggestions: {
         Row: {
           action: string

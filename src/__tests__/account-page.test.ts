@@ -8,8 +8,10 @@ const mockGetTenantConfig = vi.hoisted(() => vi.fn());
 const mockIsSuperAdmin = vi.hoisted(() => vi.fn());
 const mockRedirect = vi.hoisted(() => vi.fn());
 const mockWorkspaceReleaseEnabled = vi.hoisted(() => vi.fn());
+const mockInquiryReleaseEnabled = vi.hoisted(() => vi.fn());
 
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mockWorkspaceReleaseEnabled }));
+vi.mock("@/products/inquiries/server", () => ({ inquiryReleaseEnabled: mockInquiryReleaseEnabled }));
 
 vi.mock("next/navigation", () => ({
   redirect: mockRedirect,
@@ -78,6 +80,7 @@ describe("account page access handoff", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockWorkspaceReleaseEnabled.mockReturnValue(false);
+    mockInquiryReleaseEnabled.mockReturnValue(false);
     mockRedirect.mockImplementation((target: string) => { throw new Error(`REDIRECT:${target}`); });
     mockGetAuthUserId.mockResolvedValue("user_123");
     mockGetCurrentUserTenants.mockResolvedValue(["missing-a", "missing-b"]);
@@ -112,6 +115,20 @@ describe("account page access handoff", () => {
     await expect(AccountPage()).rejects.toThrow("REDIRECT:/admin");
 
     expect(mockClaimPendingInvite).not.toHaveBeenCalled();
+  });
+
+  it("opens the inquiry business entry only when its release is enabled", async () => {
+    mockInquiryReleaseEnabled.mockReturnValue(true);
+    const { default: AccountPage } = await import("@/app/(marketing)/account/page");
+    await expect(AccountPage()).rejects.toThrow("REDIRECT:/business");
+    expect(mockClaimPendingInvite).toHaveBeenCalledOnce();
+  });
+
+  it("preserves explicit managed-account recovery during the inquiry release", async () => {
+    mockInquiryReleaseEnabled.mockReturnValue(true);
+    const { default: AccountPage } = await import("@/app/(marketing)/account/page");
+    const page = await AccountPage({ searchParams: Promise.resolve({ managed: "1" }) });
+    expect(textFrom(page)).toContain("No invited sites on this account");
   });
 
   it("claims a managed invitation before the shared workspace landing", async () => {

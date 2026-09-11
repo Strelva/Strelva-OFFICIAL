@@ -51,6 +51,7 @@ const _CRON_SCHEDULE = {
   "revalidation-reconcile": 7 * 3600, // every 6h
   "portfolio-snapshot": 5 * 3600, // every 4h
   "review-auto-post": 5 * 3600, // every 3h
+  "inquiry-follow-ups": 3 * 3600, // hourly
   "governed-work-reconcile": 7 * 3600, // every 6h — durability sweep for the PG mirror
   "domain-monitor": 70 * 60, // every 30 min (schedule) + 40 min grace
   heartbeat: 70 * 60, // every 30 min (schedule) + 40 min grace

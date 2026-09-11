@@ -9,30 +9,14 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { getRedis } from "./redis";
+import type { ChatMessage, Thread } from "./conversation-types";
+
+export type { ChatMessage, Thread } from "./conversation-types";
 
 // Chat threads expire after 90 days and the per-tenant index is capped, so they
 // can't grow unbounded and LRU-evict hotter cache (rate limits, locks, content).
 const THREAD_TTL_SECONDS = 90 * 24 * 60 * 60;
 const THREAD_KEEP = 200;
-
-// --- Types ---
-
-export interface ChatMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  timestamp: string;
-  toolCalls?: unknown[];
-  toolResults?: unknown[];
-}
-
-export interface Thread {
-  id: string;
-  title: string;
-  messages: ChatMessage[];
-  createdAt: string;
-  updatedAt: string;
-}
 
 // --- Helpers ---
 

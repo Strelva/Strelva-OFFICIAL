@@ -1,6 +1,6 @@
-/** Drop private workspace telemetry, including invitation fragments and API payloads. */
+/** Drop private work telemetry, including inquiry records and invitation fragments. */
 export function isPrivateWorkspaceLocation(value: unknown): boolean {
-  return typeof value === "string" && /(?:^|\/)\b(?:api\/)?workspace(?:[/?#\s]|$)/.test(value);
+  return typeof value === "string" && /(?:^|\/)(?:(?:api\/)?(?:workspace|inquiry-workspace)|business|preview\/strelva\/inquiries)(?:[/?#\s]|$)/.test(value);
 }
 
 export function onPrivateWorkspacePage(): boolean {

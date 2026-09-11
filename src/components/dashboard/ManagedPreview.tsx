@@ -6,6 +6,7 @@ import { ConversationShell } from "./ConversationShell";
 import { DashboardProvider } from "./DashboardContext";
 import { DashboardSurfacesProvider } from "./DashboardSurfacesContext";
 import { ChatPanel } from "./ChatPanel";
+import { ManagedEditorPreview } from "./ManagedEditorPreview";
 import { resolveRelationship } from "@/platform/relationships";
 import type { DashboardSurface } from "@/lib/dashboard-surfaces";
 
@@ -23,17 +24,19 @@ const surfaces: DashboardSurface[] = [
 /** Synthetic content, real shell. The route guard and prefixed API handlers isolate this fixture. */
 export function ManagedPreview() {
   const pathname = usePathname();
-  const threadId = useSearchParams().get("thread") || undefined;
+  const searchParams = useSearchParams();
+  const threadId = searchParams.get("thread") || undefined;
+  const editorPreview = searchParams.get("editor") === "1";
   const route = pathname.slice(base.length) || "/dashboard";
   const isChat = route.startsWith("/dashboard/chat");
   const pageName = surfaces.find((surface) => surface.href === route)?.label || (route.includes("settings") ? "Website settings" : "Website");
 
-  return <DashboardProvider tenantId="preview-business" dashboardBasePath={base} siteUrl="https://example.com" readOnly autoPublish={false} relationship={resolveRelationship({ context: { kind: "tenant", tenantId: "preview-business" }, serviceRelationship: "managed_client", paidStanding: "active" })}>
+  return <DashboardProvider tenantId="preview-business" dashboardBasePath={base} siteModel={editorPreview ? "food-brand" : "wellness"} siteUrl={editorPreview ? "" : "https://example.com"} previewUrl={editorPreview ? `${base}/dashboard/site` : ""} readOnly={!editorPreview} autoPublish={false} relationship={resolveRelationship({ context: { kind: "tenant", tenantId: "preview-business" }, serviceRelationship: "managed_client", paidStanding: "active" })}>
     <DashboardSurfacesProvider surfaces={surfaces}>
       <ConversationShell businessName="Elmwood Studio" accountName="Alex Morgan" accountEmail="alex@example.com" pendingCount={0} signOut={null} appBase="/preview/strelva">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-gray-border px-6 py-3 text-[12px] text-gray-muted"><span>Local interface preview · fictional business · no live actions</span><Link href="/preview/strelva?scenario=managed" className="underline underline-offset-4">Back to workspace preview</Link></div>
-          {isChat ? <ChatPanel ownerName="Alex Morgan" threadId={threadId} /> : <div className="min-h-0 flex-1 overflow-auto px-6 py-8 md:px-8 lg:px-12">
+          {isChat ? <ChatPanel ownerName="Alex Morgan" threadId={threadId} /> : editorPreview ? <ManagedEditorPreview /> : <div className="min-h-0 flex-1 overflow-auto px-6 py-8 md:px-8 lg:px-12">
             <div className="mx-auto max-w-[960px]">
               <p className="text-[14px] text-gray-muted">Elmwood Studio</p>
               <h1 className="mt-2 font-display text-[32px] leading-[40px] text-warm-black">{pageName}</h1>

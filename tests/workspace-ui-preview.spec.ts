@@ -1,6 +1,52 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 test.skip(process.env.STRELVA_UI_PREVIEW !== "1", "Requires the explicit development-only interface preview.");
+
+const EDITOR_HERO = {
+  headline: "A fictional headline",
+  subheadline: "Synthetic studio",
+  tagline: "Content stays inside this local fixture.",
+  ctaText: "See the work",
+  ctaLink: "#products",
+  backgroundImageUrl: "/images/product-bag.jpg",
+};
+
+async function mockEditorApi(page: Page, options: { denyDrafts?: boolean } = {}) {
+  let draft = { ...EDITOR_HERO };
+  const draftBodies: Record<string, unknown>[] = [];
+  const apiRequests: { method: string; path: string }[] = [];
+
+  await page.route("**/preview/strelva/website/api/**", async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const path = url.pathname;
+    apiRequests.push({ method: request.method(), path });
+
+    if (path.endsWith("/publish")) {
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ contentDrafts: {}, pageConfigDraft: false }) });
+    }
+    if (path.endsWith("/page-config")) {
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(null) });
+    }
+    if (path.endsWith("/content/hero")) {
+      if (request.method() === "GET") {
+        return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(url.searchParams.get("draft") === "true" ? draft : EDITOR_HERO) });
+      }
+      if (request.method() === "PUT") {
+        const body = request.postDataJSON() as Record<string, unknown>;
+        draftBodies.push(body);
+        if (options.denyDrafts) {
+          return route.fulfill({ status: 403, contentType: "application/json", body: JSON.stringify({ error: "Content permission is required." }) });
+        }
+        draft = body as typeof EDITOR_HERO;
+        return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ success: true, draft: true }) });
+      }
+    }
+    return route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "Fixture route not provided." }) });
+  });
+
+  return { draftBodies, apiRequests };
+}
 
 test("shared navigation remains available while opening and finding work", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=free");
@@ -15,11 +61,28 @@ test("shared navigation remains available while opening and finding work", async
   await expect(page.getByRole("button", { name: "Open Harbor Dental", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Explore", exact: true }).click();
   await page.getByRole("button", { name: /Home Finder/ }).click();
-  await expect(page.getByText("Not available yet", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Ask about Home Finder" }).click();
+  await expect(page.getByText("Preview · early access", { exact: true }).last()).toBeVisible();
+  await expect(page.getByRole("link", { name: /Try Home Finder/ })).toHaveAttribute("href", /127\.0\.0\.1:3213\/embed\/agency-preview/);
+  await page.getByRole("button", { name: "Ask about early access" }).click();
+  await expect(page.getByLabel("What are you trying to do?")).toHaveValue(/enabling a live brokerage installation/);
   await page.getByLabel("What are you trying to do?").fill("Bring my existing WordPress website.");
   await expect(page.getByRole("link", { name: "Open email" })).toHaveAttribute("href", /Bring%20my%20existing%20WordPress/);
   await expect(page.getByText(/Nothing is sent until you send it/)).toBeVisible();
+});
+
+test("shared workspace resumes inquiry work inside the one Strelva frame", async ({ page }) => {
+  await page.goto("/preview/strelva?scenario=managed");
+  await page.getByRole("button", { name: /Handle customer inquiries/ }).click();
+  await expect(page.getByRole("heading", { name: "What should Strelva handle?" })).toBeVisible();
+  await expect(page.getByLabel("Strelva navigation", { exact: true })).toHaveCount(1);
+  await expect(page.getByRole("navigation", { name: "Inquiry navigation", exact: true })).toHaveCount(0);
+  await page.getByRole("navigation", { name: "Inquiry work", exact: true }).getByRole("button", { name: "New", exact: true }).click();
+  await page.getByLabel("What should Strelva handle?").fill("Collect quote requests and route them to the recorded inbox.");
+  await page.getByRole("button", { name: "Shape this request" }).click();
+  await expect(page.getByRole("heading", { name: "What this work touches" })).toBeVisible();
+  await expect(page).toHaveURL(/view=inquiries/);
+  await expect(page).toHaveURL(/inquiryView=shape/);
+  await expect(page).toHaveURL(/inquiryRequest=fixture_request_/);
 });
 
 test("empty workspace can create an explicitly fictional local assessment", async ({ page }) => {
@@ -90,4 +153,34 @@ test("preview controls reserve viewport space so the account stays visible", asy
     await expect(account).toBeInViewport({ ratio: 1 });
     if (width < 1024) await page.keyboard.press("Escape");
   }
+});
+
+test("isolated Website editor accepts structured text and image draft controls", async ({ page }) => {
+  const fixture = await mockEditorApi(page);
+  await page.goto("/preview/strelva/website/dashboard/site?editor=1", { waitUntil: "domcontentloaded" });
+  await expect(page.getByText("Local Website editor · fictional content · no live actions")).toBeVisible();
+  await page.getByRole("button", { name: "Edit site" }).click();
+  await expect(page.getByLabel("Headline").first()).toBeVisible();
+  await expect(page.getByText("Background image", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Remove image" })).toBeVisible();
+
+  await page.getByLabel("Headline").first().fill("A changed fictional headline");
+  await expect(page.getByText("Draft saved - preview updated", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Remove image" }).click();
+  await expect.poll(() => fixture.draftBodies.some((body) => body.headline === "A changed fictional headline" && body.backgroundImageUrl === "")).toBe(true);
+
+  expect(fixture.apiRequests.some((request) => request.method === "PUT" && request.path.endsWith("/content/hero"))).toBe(true);
+  expect(fixture.apiRequests.some((request) => request.method === "POST" && request.path.endsWith("/publish"))).toBe(false);
+  expect(fixture.apiRequests.some((request) => request.method === "DELETE" && request.path.endsWith("/publish"))).toBe(false);
+});
+
+test("isolated Website editor surfaces a permission failure without accepting the draft", async ({ page }) => {
+  const fixture = await mockEditorApi(page, { denyDrafts: true });
+  await page.goto("/preview/strelva/website/dashboard/site?editor=1", { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "Edit site" }).click();
+  await page.getByLabel("Headline").first().fill("A denied fictional headline");
+  await expect(page.getByText("Couldn't save. Try again", { exact: false })).toBeVisible();
+  expect(fixture.draftBodies.some((body) => body.headline === "A denied fictional headline")).toBe(true);
+  expect(fixture.apiRequests.some((request) => request.method === "POST" && request.path.endsWith("/publish"))).toBe(false);
+  expect(fixture.apiRequests.some((request) => request.method === "DELETE" && request.path.endsWith("/publish"))).toBe(false);
 });

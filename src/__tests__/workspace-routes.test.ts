@@ -23,6 +23,7 @@ vi.mock("@/platform/workspaces", async () => {
 
 import { GET, POST } from "@/app/api/workspace/route";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError } from "@/platform/workspaces/types";
+import { createTrackerFromImport } from "@/products/tracker";
 
 const workspaceId = "11111111-1111-4111-8111-111111111111";
 const workId = "22222222-2222-4222-8222-222222222222";
@@ -32,6 +33,11 @@ const result = { business: "Example", score: 70, grade: "C", verdict: "Readiness
   signals: [], citation: { probed: false, mentioned: false, recommended: false, note: "Not measured" } };
 const work = { id: workId, workspaceId, title: "Example", productId: "ai_visibility", resourceKind: "ai_visibility_assessment",
   payload: result, input: {}, createdAt: "2026-09-05T00:00:00Z" };
+const trackerSnapshot = createTrackerFromImport(
+  { fileName: "handoff.csv", content: "Name,Status\nExample,Open\nSecond,Closed", mimeType: "text/csv" },
+  { trackerId: "tracker-handoff", actorId: "actor", title: "Handoff tracker", at: "2026-09-05T00:00:00.000Z" },
+);
+const trackerWork = { id: otherId, workspaceId, title: "Handoff tracker", productId: "tracker", resourceKind: "tracker", payload: { tracker: trackerSnapshot }, input: {}, createdAt: "2026-09-05T00:00:00Z" };
 
 function request(value: unknown, headers: Record<string, string> = {}) {
   return new Request("https://strelva.com/api/workspace", { method: "POST",
@@ -48,6 +54,7 @@ beforeEach(() => {
   mocks.list.mockResolvedValue([workspace]);
   mocks.work.mockResolvedValue([work]);
   mocks.getWork.mockResolvedValue(work);
+  mocks.inspect.mockResolvedValue({ recipientEmail: "owner@example.com", agencyWorkspace: { name: "Agency" }, work, status: "pending", expiresAt: "2026-09-12" });
   mocks.save.mockResolvedValue(work);
   mocks.score.mockResolvedValue(result);
   mocks.preflight.mockResolvedValue(undefined);
@@ -163,6 +170,7 @@ describe("release-one private workspace routes", () => {
     const output = await response.json();
     expect(output.work[1].payload).toBeNull();
     expect(output.products.find((product: { id: string }) => product.id === "homefinder").availability).toBe("not_enabled");
+    expect(output.products.find((product: { id: string }) => product.id === "tracker").availability).toBe("available");
     expect(output.products.find((product: { id: string }) => product.id === "domain_monitoring")).toBeUndefined();
   });
   it("authorizes workspace writes before incurring scoring cost", async () => {
@@ -226,11 +234,43 @@ describe("release-one private workspace routes", () => {
     expect(response.status).toBe(201);
     expect(await response.json()).toEqual({ token: "opaque-once" });
   });
+  it("supports only valid Tracker and assessment handoffs, preserving delegated denial", async () => {
+    mocks.getWork.mockResolvedValue(trackerWork);
+    mocks.handoff.mockResolvedValue({ token: "tracker-token", handoff: { tokenHash: "secret-hash" } });
+    const created = await POST(request({ action: "handoff", workId: otherId, recipientEmail: "client@example.com" }));
+    expect(created.status).toBe(201);
+    expect(await created.json()).toEqual({ token: "tracker-token" });
+
+    mocks.handoff.mockClear();
+    mocks.getWork.mockResolvedValue({ ...trackerWork, payload: { tracker: { invalid: true } } });
+    expect((await POST(request({ action: "handoff", workId: otherId, recipientEmail: "client@example.com" }))).status).toBe(409);
+    expect(mocks.handoff).not.toHaveBeenCalled();
+
+    mocks.getWork.mockResolvedValue({ ...trackerWork, productId: "homefinder", resourceKind: "external_homefinder_installation" });
+    expect((await POST(request({ action: "handoff", workId: otherId, recipientEmail: "client@example.com" }))).status).toBe(409);
+    expect(mocks.handoff).not.toHaveBeenCalled();
+
+    mocks.getWork.mockResolvedValue(trackerWork);
+    mocks.handoff.mockRejectedValue(new WorkspaceAccessError());
+    expect((await POST(request({ action: "handoff", workId: otherId, recipientEmail: "client@example.com" }))).status).toBe(403);
+  });
   it("uses a POST body to inspect handoffs and returns only the approved preview", async () => {
     mocks.inspect.mockResolvedValue({ recipientEmail: "owner@example.com", agencyWorkspace: { name: "Agency" }, work, status: "pending", expiresAt: "2026-09-12" });
     const response = await POST(request({ action: "inspect_handoff", token: "opaque-once" }));
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ agencyName: "Agency", work: { id: workId } });
+  });
+  it("returns a bounded addressed Tracker preview without reading the source work directly", async () => {
+    mocks.inspect.mockResolvedValue({ recipientEmail: "owner@example.com", agencyWorkspace: { name: "Agency" }, work: trackerWork, status: "pending", expiresAt: "2026-09-12" });
+    const response = await POST(request({ action: "inspect_handoff", token: "tracker-token" }));
+    expect(response.status).toBe(200);
+    const output = await response.json();
+    expect(mocks.getWork).not.toHaveBeenCalled();
+    expect(output.work).toMatchObject({ productId: "tracker", payload: null, tracker: { title: "Handoff tracker", revision: 0, rowCount: 2, historyCount: 0 } });
+    expect(output.work.tracker.source).toEqual({ fileName: "handoff.csv", sizeBytes: trackerSnapshot.source.sizeBytes });
+    expect(output.work.tracker.rows).toHaveLength(2);
+    expect(output.work.input).toEqual({});
+    expect(JSON.stringify(output)).not.toContain("originalSource");
   });
   it("rejects wrong-recipient preview without leaking work", async () => {
     mocks.inspect.mockRejectedValue(new WorkspaceAccessError());
@@ -243,6 +283,12 @@ describe("release-one private workspace routes", () => {
     mocks.accept.mockResolvedValue({ customerWorkspaceId: workspaceId, customerWorkId: workId });
     expect((await POST(request({ action: "accept_handoff", token: "opaque", allowAgencyAccess: false }))).status).toBe(200);
     expect(mocks.accept).toHaveBeenCalledWith(expect.any(Object), "opaque", false);
+  });
+  it("rejects malformed addressed Tracker acceptance before the generic copy RPC", async () => {
+    mocks.inspect.mockResolvedValue({ recipientEmail: "owner@example.com", agencyWorkspace: { name: "Agency" }, work: { ...trackerWork, payload: { tracker: { invalid: true } } }, status: "pending", expiresAt: "2026-09-12" });
+    const response = await POST(request({ action: "accept_handoff", token: "opaque", allowAgencyAccess: false }));
+    expect(response.status).toBe(409);
+    expect(mocks.accept).not.toHaveBeenCalled();
   });
   it("does not turn a failed revocation into success", async () => {
     mocks.revoke.mockResolvedValue(false);

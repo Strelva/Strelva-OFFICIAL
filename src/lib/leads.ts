@@ -25,6 +25,10 @@ export interface LeadRecord {
   message?: string;
   /** Where it came from, e.g. "contact-form", "quote". */
   source?: string;
+  /** Structured fields from a published inquiry capability, when applicable. */
+  fields?: Record<string, string>;
+  capabilityId?: string;
+  capabilityVersion?: number;
   createdAt: string;
 }
 
@@ -32,6 +36,29 @@ export interface LeadSummary {
   count: number;
   recent: LeadRecord[];
 }
+
+/** Optional behavior for callers that add their own governed delivery path.
+ * Existing callers keep the owner notification by default. A capability that
+ * routes the same submission through its own explicit policy can disable this
+ * legacy notice so the owner does not receive two messages. */
+export interface RecordLeadOptions {
+  notifyOwner?: boolean;
+}
+
+export interface RecordLeadInput {
+  name: string;
+  email?: string;
+  message?: string;
+  source?: string;
+  fields?: Record<string, string>;
+  capabilityId?: string;
+  capabilityVersion?: number;
+}
+
+export type RecordLeadResult =
+  | { status: "captured"; lead: LeadRecord }
+  | { status: "duplicate"; lead?: LeadRecord }
+  | { status: "unavailable" };
 
 function leadsKey(tenant: string): string {
   return `leads:${tenant}`;
@@ -46,8 +73,20 @@ function newLeadId(): string {
 }
 
 /** A short, stable hash for double-submit dedup (no crypto dep needed). */
-function dedupHash(name: string, email: string, message: string): string {
-  const s = `${name}|${email}|${message}`.toLowerCase();
+function normalizeFields(fields: Record<string, string> | undefined): Record<string, string> | undefined {
+  if (!fields || typeof fields !== "object" || Array.isArray(fields)) return undefined;
+  const entries = Object.entries(fields)
+    .filter(([key, value]) => /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(key) && typeof value === "string")
+    .slice(0, 30)
+    .map(([key, value]) => [key, value.trim().slice(0, 5000)] as const);
+  return entries.length ? Object.fromEntries(entries) : undefined;
+}
+
+function dedupHash(input: RecordLeadInput, fields?: Record<string, string>): string {
+  const serializedFields = fields
+    ? Object.entries(fields).sort(([a], [b]) => a.localeCompare(b)).map(([key, value]) => `${key}=${value}`).join("&")
+    : "";
+  const s = `${input.name}|${input.email ?? ""}|${input.message ?? ""}|${input.capabilityId ?? ""}|${input.capabilityVersion ?? ""}|${serializedFields}`.toLowerCase();
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
   return (h >>> 0).toString(36);
@@ -56,16 +95,25 @@ function dedupHash(name: string, email: string, message: string): string {
 /** Capture a form submission. Idempotent over a short window; returns null on dedup/no-redis. */
 export async function recordLead(
   tenant: string,
-  input: { name: string; email?: string; message?: string; source?: string },
+  input: RecordLeadInput,
+  options: RecordLeadOptions = {},
 ): Promise<LeadRecord | null> {
-  const redis = getRedis();
-  if (!redis) return null;
+  const result = await captureLead(tenant, input, options);
+  return result.status === "captured" ? result.lead : null;
+}
 
-  // Best-effort double-submit guard (a refresh/double-click), 5-minute window.
-  const hash = dedupHash(input.name, input.email ?? "", input.message ?? "");
-  const dedupKey = `lead-dedup:${tenant}:${hash}`;
-  const fresh = await redis.set(dedupKey, "1", { nx: true, ex: 300 });
-  if (!fresh) return null;
+/**
+ * Capture a lead while exposing the persistence outcome to new capability
+ * routes. Legacy callers retain `recordLead`'s nullable return behavior.
+ */
+export async function captureLead(
+  tenant: string,
+  input: RecordLeadInput,
+  options: RecordLeadOptions = {},
+): Promise<RecordLeadResult> {
+  const redis = getRedis();
+  if (!redis) return { status: "unavailable" };
+  const fields = normalizeFields(input.fields);
 
   const lead: LeadRecord = {
     id: newLeadId(),
@@ -73,8 +121,27 @@ export async function recordLead(
     email: input.email,
     message: input.message,
     source: input.source,
+    ...(fields ? { fields } : {}),
+    ...(input.capabilityId ? { capabilityId: input.capabilityId } : {}),
+    ...(Number.isSafeInteger(input.capabilityVersion) && (input.capabilityVersion ?? 0) >= 1
+      ? { capabilityVersion: input.capabilityVersion }
+      : {}),
     createdAt: new Date().toISOString(),
   };
+
+  // Best-effort double-submit guard (a refresh/double-click), 5-minute window.
+  const hash = dedupHash(input, fields);
+  const dedupKey = `lead-dedup:${tenant}:${hash}`;
+  const fresh = await redis.set(dedupKey, lead.id, { nx: true, ex: 300 });
+  if (!fresh) {
+    // The marker contains the accepted lead id, so a retry can repair a
+    // missing canonical receipt without creating a second Redis record.
+    const duplicateId = await redis.get<string>(dedupKey).catch(() => null);
+    const duplicate = duplicateId && duplicateId !== "1"
+      ? await redis.get<LeadRecord>(leadKey(tenant, duplicateId)).catch(() => null)
+      : null;
+    return duplicate ? { status: "duplicate", lead: duplicate } : { status: "duplicate" };
+  }
 
   // The dedup lock is held before the writes; if a write fails we must release
   // it, or a retry of the same submission is swallowed by the 5-minute guard
@@ -92,8 +159,8 @@ export async function recordLead(
   // Notify the owner a customer reached out — best-effort, only for genuinely
   // new leads (the dedup guard above already returned on a re-submission). A
   // failed email must never fail the capture, so it's isolated and logged.
-  await notifyOwnerOfLead(tenant, lead);
-  return lead;
+  if (options.notifyOwner !== false) await notifyOwnerOfLead(tenant, lead);
+  return { status: "captured", lead };
 }
 
 /**
@@ -126,6 +193,13 @@ export async function getLeads(tenant: string, limit = 50): Promise<LeadRecord[]
   if (!ids.length) return [];
   const rows = await redis.mget<LeadRecord[]>(...ids.map((id) => leadKey(tenant, id)));
   return rows.filter((l): l is LeadRecord => Boolean(l));
+}
+
+/** Read one captured lead by its durable id for reconciliation workers. */
+export async function getLeadById(tenant: string, id: string): Promise<LeadRecord | null> {
+  const redis = getRedis();
+  if (!redis || !tenant.trim() || !id.trim()) return null;
+  return redis.get<LeadRecord>(leadKey(tenant, id));
 }
 
 /** Count of leads in the window + the most recent few, for the Today feed. */

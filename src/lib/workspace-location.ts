@@ -1,7 +1,8 @@
 /** Navigation hints only. APIs still authorize the requested workspace and work. */
 const ID = /^[a-z0-9_-]{1,128}$/i;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
-const VIEWS = new Set(["work", "products", "help"]);
+const VIEWS = new Set(["work", "products", "help", "inquiries", "tracker"]);
+const INQUIRY_VIEWS = new Set(["home", "new", "shape", "work", "plan", "preview", "rehearsal", "receipt", "search", "record", "why", "responsibility", "connections", "onboarding", "account", "attention", "patterns"]);
 
 export function workspaceReturnTarget(value: string | null): string | null {
   if (!value || (value !== "/workspace" && !value.startsWith("/workspace?"))) return null;
@@ -12,6 +13,9 @@ export function workspaceReturnTarget(value: string | null): string | null {
     if (params.getAll(key).length !== 1) return null;
     if (key === "workspaceId" ? !UUID.test(item)
       : key === "work" ? !ID.test(item)
+      : key === "tenantId" ? !ID.test(item)
+      : key === "inquiryView" ? !INQUIRY_VIEWS.has(item)
+      : key === "inquiryRequest" || key === "inquiryRecord" ? !ID.test(item)
       : key === "save" ? !/^(scan_[a-z0-9]{1,251}|audit_[a-f0-9]{32})$/i.test(item)
       : key === "view" ? !VIEWS.has(item) : true) return null;
   }

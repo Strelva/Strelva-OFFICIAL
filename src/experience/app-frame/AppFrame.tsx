@@ -84,7 +84,7 @@ function readCollapsedPreference(key: string | undefined, fallback: boolean): bo
   }
 }
 
-function useViewportMatch(query: string): boolean {
+export function useViewportMatch(query: string): boolean {
   const [matches, setMatches] = useState(false);
 
   useEffect(() => {

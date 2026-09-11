@@ -36,6 +36,8 @@
 .productRow small { font-size:12px; color:var(--accent-text); }
 .productSymbol { display:grid; place-items:center; width:64px; height:64px; flex-shrink:0; border-radius:24px; background:var(--surface-raised); color:var(--accent-text); }
 .productBody { max-width:720px; }
+.productChoices { display:grid; gap:12px; margin-top:20px; }
+.productChoices .secondaryAction { justify-content:flex-start; width:fit-content; }
 .productBody h2,.invitation h2,.empty h2,.request h2,.helpSections h2 { font-size:20px; font-weight:500; line-height:1.4; }
 .productBody p,.invitation p,.empty p,.helpSections p { margin-block:16px; font-size:15px; line-height:1.7; color:var(--gray-muted); }
 .invitation { margin-top:48px; padding-block:24px; }

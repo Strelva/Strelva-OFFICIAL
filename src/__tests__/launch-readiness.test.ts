@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildTenantLaunchReadiness, tenantHasOwnerMessage } from "@/lib/launch-readiness";
 import type { TenantConfig } from "@/lib/types";
-import type { Thread } from "@/lib/threads";
+import type { Thread } from "@/lib/conversation-types";
 
 const baseTenant: TenantConfig = {
   id: "client",

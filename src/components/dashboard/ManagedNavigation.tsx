@@ -7,7 +7,7 @@ import { Eye, EyeOff, Inbox, Plus, Settings, Shield, X } from "lucide-react";
 import { useDashboard } from "./DashboardContext";
 import { useDashboardSurfaces } from "./DashboardSurfacesContext";
 import { GROUP_LABELS, SURFACE_ICONS, SURFACE_MATCH } from "./surface-nav";
-import type { Thread } from "./HistorySidebar";
+import type { ThreadSummary } from "@/lib/conversation-types";
 import styles from "./managed-navigation.module.css";
 
 interface Props {
@@ -69,7 +69,7 @@ function ManagedHistory() {
   const { dashboardHref } = useDashboard();
   const activeThread = useSearchParams().get("thread");
   const router = useRouter();
-  const [threads, setThreads] = useState<Thread[]>([]);
+  const [threads, setThreads] = useState<ThreadSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deletingThreadId, setDeletingThreadId] = useState<string | null>(null);
@@ -80,7 +80,7 @@ function ManagedHistory() {
       .then(async (response) => {
         if (!response.ok) throw new Error("Conversations could not be loaded.");
         const data: unknown = await response.json();
-        const list = (Array.isArray(data) ? data : []) as Array<Thread & { messages?: Array<{ content?: string }> }>;
+        const list = (Array.isArray(data) ? data : []) as Array<ThreadSummary & { messages?: Array<{ content?: string }> }>;
         if (!controller.signal.aborted) setThreads(list
           .filter((thread) => Boolean(thread.preview?.trim()) || Boolean(thread.messages?.length))
           .slice(0, 6)

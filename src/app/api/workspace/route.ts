@@ -1,5 +1,6 @@
 import { savePublicWebsiteAudit } from "@/products/website-audit/server";
-import { operationRequest, WorkspaceOperationPendingError } from "@/platform/workspaces";
+import { recoverAssessment } from "@/products/assessment/server";
+import { WorkspaceOperationPendingError } from "@/platform/workspaces";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionUser } from "@/lib/db/server-client";
@@ -11,15 +12,18 @@ import {
   listPendingAssessments, inspectHandoff, listAgencyDelegations, listAgencyHandoffs, listWork,
   listWorkDelegations, listWorkspaces, revokeDelegation, revokeHandoff,
   WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError,
-  type WorkspaceActor, type Delegation,
+  type WorkspaceActor, type Delegation, type SavedWork,
 } from "@/platform/workspaces";
 import {
   runPrivateAiVisibilityAssessment,
   savePublicAiVisibilityResult,
 } from "@/products/ai-visibility/server";
 import { listManagedPresenceWork } from "@/products/managed-presence/server";
+import { resolveHomeFinderPreviewHref } from "@/products/home-finder/server";
+import { inquiryReleaseEnabled } from "@/products/inquiries";
+import { parseTrackerWorkPayload, presentTrackerHandoffPreview } from "@/products/tracker";
 import { presentWorkspaceWork } from "@/experience/workspace/result";
-import type { ManagedWork, WorkspaceDelegation, WorkspaceSnapshot } from "@/experience/workspace/contracts";
+import type { ManagedWork, WorkspaceDelegation, WorkspaceProduct, WorkspaceSnapshot, WorkspaceWork } from "@/experience/workspace/contracts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -124,6 +128,37 @@ function presentManagedWorkListing(value: unknown): { managedWork: ManagedWork[]
   return { managedWork, unavailable: source.unavailable === true || !Array.isArray(source.managedWork) };
 }
 
+/**
+ * Handoff presentation is narrower than normal workspace presentation. The
+ * recipient has an addressed token, so a valid tracker may show a bounded
+ * read-only preview, but its raw CSV and edit lineage remain server-side.
+ */
+function presentHandoffWork(work: SavedWork): WorkspaceWork {
+  const presented = presentWorkspaceWork(work, { access: "addressed" });
+  if (work.productId !== "tracker" || work.resourceKind !== "tracker") return presented;
+  const tracker = presentTrackerHandoffPreview(work.payload);
+  if (!tracker) {
+    return {
+      ...presented,
+      payload: null,
+      input: {},
+      unavailableReason: "This tracker handoff is unavailable because its saved snapshot is invalid.",
+    };
+  }
+  return { ...presented, payload: null, input: {}, tracker, unavailableReason: undefined };
+}
+
+function supportsHandoff(work: SavedWork): boolean {
+  const presented = presentWorkspaceWork(work, { access: "owned" });
+  if (presented.assessment?.actions.handoff.allowed) return true;
+  return work.productId === "tracker" && work.resourceKind === "tracker" && parseTrackerWorkPayload(work.payload) !== null;
+}
+
+/**
+ * Home Finder owns the preview route. The workspace only forwards a
+ * server-selected synthetic destination; it never accepts a browser URL or
+ * infers a live installation from product availability.
+ */
 export async function GET(request: Request) {
   if (!workspaceReleaseEnabled()) return json({ error: "The workspace release is not enabled." }, 503);
   try {
@@ -149,18 +184,27 @@ export async function GET(request: Request) {
       ? await listAgencyDelegations(current, selected.id) : [];
     const customerDelegations = selected.access === "member" && (selected.role === "owner" || selected.role === "admin")
       ? (await Promise.all(work.map((item) => listWorkDelegations(current, item.id)))).flat() : [];
+    const homeFinderPreview = resolveHomeFinderPreviewHref();
+    const products: WorkspaceProduct[] = listWorkspaceDiscoveryProducts().map((product): WorkspaceProduct => ({ id: product.id, name: product.name, description: product.promise,
+      availability: product.release.availability === "public" ? "available"
+        : product.release.availability === "not_enabled" ? "not_enabled" : "managed",
+      ...(product.id === "homefinder" && homeFinderPreview ? { previewHref: homeFinderPreview } : {}),
+    }));
+    // Inquiry work is intentionally absent while its explicit exposure flag is
+    // off. The route still enforces the same flag for direct deep links.
+    if (inquiryReleaseEnabled()) products.push({ id: "inquiries", name: "Inquiry work", description: "Keep customer requests moving with a clear, inspectable thread.", availability: "available" });
     const snapshot: WorkspaceSnapshot = {
       actor: { email: current.verifiedEmail, localPreview: false },
-      workspaces: workspaces.map(({ id, kind, name, access }) => ({ id, kind, name, access })), workspaceId: selected.id,
-      work: work.map(presentWorkspaceWork),
+      workspaces: workspaces.map(({ id, kind, name, access, role }) => ({ id, kind, name, access, role })), workspaceId: selected.id,
+      work: work.map((item) => presentWorkspaceWork(item, {
+        access: selected.access === "delegated_read" ? "delegated_read" : selected.kind === "personal" ? "owned" : "member",
+      })),
       pendingAssessments: selected.access === "member" ? await listPendingAssessments(current, selected.id) : [],
       managedWork: managedPresence.managedWork,
       ...(managedPresence.unavailable ? { managedWorkUnavailable: true } : {}),
       handoffs: handoffs.map(({ id, sourceWorkId, recipientEmail, status, expiresAt, createdAt }) => ({ id, sourceWorkId, recipientEmail, status, expiresAt, createdAt })),
       delegations: [...agencyDelegations.map((value) => presentDelegation(value, false)), ...customerDelegations.map((value) => presentDelegation(value, true))],
-      products: listWorkspaceDiscoveryProducts().map((product) => ({ id: product.id, name: product.name, description: product.promise,
-        availability: product.release.availability === "public" ? "available"
-          : product.release.availability === "not_enabled" ? "not_enabled" : "managed" })),
+      products,
     };
     return json(snapshot);
   } catch (error) { return failed(error); }
@@ -182,7 +226,7 @@ export async function POST(request: Request) {
       case "inspect_handoff": {
         const preview = await inspectHandoff(current, input.token);
         return json({ recipientEmail: preview.recipientEmail, agencyName: preview.agencyWorkspace.name,
-          work: presentWorkspaceWork(preview.work), expiresAt: preview.expiresAt, accepted: preview.status === "accepted" });
+          work: presentHandoffWork(preview.work), expiresAt: preview.expiresAt, accepted: preview.status === "accepted" });
       }
       case "create_agency": {
         const workspace = await createAgencyWorkspace(current, input.name);
@@ -194,12 +238,7 @@ export async function POST(request: Request) {
         return json({ work: presentWorkspaceWork(work) }, 201);
       }
       case "recover_assessment": {
-        const op = await operationRequest(current, input.workspaceId, input.requestId, "read");
-        if (op.product_id !== "ai_visibility") throw new WorkspaceAccessError();
-        const recovered = actions.parse({ action: "assess", workspaceId: input.workspaceId, requestId: input.requestId, ...op.input });
-        if (recovered.action !== "assess") throw new WorkspaceAccessError();
-        const work = await runPrivateAiVisibilityAssessment({ actor: current, workspaceId: input.workspaceId, requestId: input.requestId,
-          input: { business: recovered.business, url: recovered.url, category: recovered.category, location: recovered.location } });
+        const work = await recoverAssessment({ actor: current, workspaceId: input.workspaceId, operationId: input.requestId });
         return json({ work: presentWorkspaceWork(work) });
       }
       case "save_website_audit": {
@@ -213,11 +252,13 @@ export async function POST(request: Request) {
       case "handoff": {
         const work = await getWork(current, input.workId);
         if (!work) return json({ error: "Saved work unavailable." }, 404);
-        if (!presentWorkspaceWork(work).payload) return json({ error: "This product does not support handoffs in this release." }, 409);
+        if (!supportsHandoff(work)) return json({ error: "This product does not support handoffs in this release." }, 409);
         const result = await createHandoff(current, input.workId, input.recipientEmail);
         return json({ token: result.token }, 201);
       }
       case "accept_handoff": {
+        const addressed = await inspectHandoff(current, input.token);
+        if (!supportsHandoff(addressed.work)) return json({ error: "This product does not support handoffs in this release." }, 409);
         const accepted = await acceptHandoff(current, input.token, input.allowAgencyAccess);
         return json({ workspaceId: accepted.customerWorkspaceId, workId: accepted.customerWorkId });
       }

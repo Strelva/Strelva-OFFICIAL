@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantPermission, isSuperAdmin } from "@/lib/auth";
+import { getAuthUserId, verifyAuth, requireTenantPermission, isSuperAdmin } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { resolveEventAction, type EventWorkflowAction } from "@/lib/event-actions";
@@ -35,6 +35,8 @@ export async function PATCH(
 ) {
   const authed = await verifyAuth();
   if (!authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const actorId = await getAuthUserId();
+  if (!actorId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const tenant = await getTenantFromHeaders();
   const permissionDenied = await requireTenantPermission(tenant, "publishing:manage");
@@ -61,7 +63,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const result = await resolveEventAction(tenant, id, action as EventWorkflowAction);
+  const result = await resolveEventAction(tenant, id, action as EventWorkflowAction, actorId);
   if (result.reason === "not_found") {
     return NextResponse.json({ error: "Event not found" }, { status: 404 });
   }

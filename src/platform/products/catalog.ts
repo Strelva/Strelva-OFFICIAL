@@ -391,6 +391,85 @@ export const PRODUCT_CATALOG = [
       note: "Homefinder is recorded for compatibility with future product structure. It is not enabled or sold by this catalog.",
     },
   },
+  {
+    id: "tracker",
+    name: "Spreadsheet tracker",
+    promise: "Turn a supported CSV into working data with saved edits and attributable history.",
+    resources: [
+      {
+        kind: "tracker",
+        label: "Saved spreadsheet tracker",
+        ownership: "customer_account",
+        description: "A workspace-owned tracker retaining its source rows, field mapping, and attributable edit history.",
+      },
+    ],
+    operations: [
+      {
+        id: "create_tracker",
+        label: "Create a tracker",
+        resourceKind: "tracker",
+        effect: "create_resource",
+        support: "supported",
+        description: "Review a supported CSV import and save a tracker in the current workspace.",
+      },
+      {
+        id: "edit_tracker",
+        label: "Edit tracker data",
+        resourceKind: "tracker",
+        effect: "propose_change",
+        support: "supported",
+        description: "Apply attributable, revision-checked edits to an owned tracker.",
+      },
+    ],
+    presentations: [
+      {
+        mode: "workspace",
+        primary: true,
+        description: "A shared-workspace tracker with import review, filtering, and attributable edit history.",
+      },
+    ],
+    distribution: [
+      {
+        id: "client_workspace",
+        kind: "client_workspace",
+        label: "Workspace tracker",
+        href: null,
+        status: "available",
+        description: "Tracker work opens inside the authenticated shared workspace.",
+      },
+    ],
+    controls: {
+      enforcement: "executing_use_case",
+      access: ["authenticated_person", "scoped_delegation"],
+      approval: "none",
+      note: "Workspace membership authorizes creation and edits. Scoped delegated readers can inspect a tracker but cannot create, edit, or record experiment evidence.",
+    },
+    release: {
+      availability: "public",
+      releaseOne: false,
+      gates: [
+        {
+          id: "workspace_release",
+          label: "Shared workspace release gate",
+          state: "met",
+          evidence: "The workspace route and tracker API enforce the existing workspace release flag before serving the surface.",
+        },
+        {
+          id: "tracker_persistence",
+          label: "Workspace persistence and revision checks",
+          state: "met",
+          evidence: "Tracker work uses saved_product_work with verified membership and revision-checked updates.",
+        },
+        {
+          id: "external_product_release",
+          label: "External product release decision",
+          state: "unmet",
+          evidence: "This is an internal horizontal experiment and has no separate customer product release or pricing decision.",
+        },
+      ],
+      note: "The tracker is discoverable only through the authenticated workspace route while the workspace release flag is enabled. It is not a standalone public product claim.",
+    },
+  },
 ] as const satisfies readonly ProductDefinition[];
 
 const PRODUCT_BY_ID: ReadonlyMap<ProductId, ProductDefinition> = new Map(

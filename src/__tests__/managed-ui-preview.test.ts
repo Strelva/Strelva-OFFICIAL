@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DELETE, GET, PATCH, POST, PUT } from "@/app/preview/strelva/website/api/[...path]/route";
 
-const request = (path: string) => GET(new Request(`http://localhost/preview/strelva/website/api/${path}`), { params: Promise.resolve({ path: path.split("/") }) });
+const request = (path: string) => {
+  const url = new URL(`http://localhost/preview/strelva/website/api/${path}`);
+  return GET(new Request(url), { params: Promise.resolve({ path: url.pathname.replace("/preview/strelva/website/api/", "").split("/") }) });
+};
 afterEach(() => vi.unstubAllEnvs());
 
 describe("isolated managed interface preview", () => {
@@ -10,12 +13,29 @@ describe("isolated managed interface preview", () => {
     vi.stubEnv("STRELVA_UI_PREVIEW", "1");
     expect((await request("my-properties")).status).toBe(404);
     expect(POST().status).toBe(404);
+    expect((await PUT(new Request("http://localhost/preview/strelva/website/api/content/hero"), { params: Promise.resolve({ path: ["content", "hero"] }) })).status).toBe(404);
   });
 
-  it("keeps all mutations unavailable with preview enabled", async () => {
+  it("keeps unknown mutations unavailable while allowing only fixture drafts", async () => {
     vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("STRELVA_UI_PREVIEW", "1");
-    for (const mutation of [POST, PUT, PATCH, DELETE]) expect(mutation().status).toBe(405);
+    expect(POST().status).toBe(405);
+    expect(PATCH().status).toBe(405);
+    expect((await PUT(new Request("http://localhost/preview/strelva/website/api/agent"), { params: Promise.resolve({ path: ["agent"] }) })).status).toBe(405);
+    expect((await DELETE(new Request("http://localhost/preview/strelva/website/api/agent"), { params: Promise.resolve({ path: ["agent"] }) })).status).toBe(405);
+    const body = {
+      headline: "Fixture draft",
+      subheadline: "Synthetic studio",
+      tagline: "Content stays inside this local fixture.",
+      ctaText: "See the work",
+      ctaLink: "#products",
+      backgroundImageUrl: "/images/product-bag.jpg",
+    };
+    const draft = await PUT(new Request("http://localhost/preview/strelva/website/api/content/hero?draft=true", { method: "PUT", body: JSON.stringify(body) }), { params: Promise.resolve({ path: ["content", "hero"] }) });
+    expect(draft.status).toBe(200);
+    expect(await (await request("content/hero")).json()).toMatchObject({ headline: "A fictional headline" });
+    expect(await (await request("content/hero?draft=true")).json()).toMatchObject({ headline: "Fixture draft" });
+    expect((await DELETE(new Request("http://localhost/preview/strelva/website/api/publish"), { params: Promise.resolve({ path: ["publish"] }) })).status).toBe(200);
     expect((await request("agent")).status).toBe(404);
   });
 

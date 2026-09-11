@@ -1,6 +1,6 @@
 # Documentation status and authority
 
-Updated: 2026-08-03
+Updated: 2026-09-11
 
 Strelva has accumulated implementation notes, migration plans, strategy research,
 and live runbooks. They are not equal sources of truth. When two documents
@@ -17,7 +17,17 @@ conflict, use this order:
 
 | Document | Authority |
 |---|---|
+| [strelvav2](./strelvav2.md) | Internal release name, scope, verification, and production hold |
+| `horizontal-product-brief-2026-09-11.md` | Latest confirmed horizontal product direction; no claim of implementation or release |
+| `horizontal-audit-and-plan-2026-09-11.md` | Bounded source audit and proposed stages; architecture and release scope remain under review |
+| `horizontal-first-scope-2026-09-11.md` | Accepted local implementation scope and evidence requirements |
+| `horizontal-local-verification-2026-09-11.md` | Local implementation evidence, authenticated inquiry/tracker proof, and remaining release gates |
+| `horizontal-release-checklist-2026-09-11.md` | Local, authenticated staging, and separately authorized rollout checks |
+| `horizontal-capability-experiments-2026-09-11.md` | Sourced technical possibilities and experimental feature candidates, not committed capabilities |
 | `../VERSIONING.md` | Lockstep app/marketing SemVer and release-tag policy |
+| `inquiry-first-product-spec-2026-09-11.md` | Selected inquiry-first migration behavior, records, authority, and surface contract |
+| `inquiry-first-acceptance-2026-09-11.md` | Evidence requirements and initial inquiry audit; later results are in horizontal local verification |
+| `inquiry-first-architecture-security-review-2026-09-11.md` | Independent local review of inquiry trust boundaries, serious findings, and release blockers |
 | `product-ontology.md` | Product/domain ontology, taxonomy, maturity vocabulary |
 | `persistence-boundaries.md` | Store authority and migration boundaries |
 | `auth-tenancy-architecture.md` | Supabase Auth, membership, and application-layer tenancy |
@@ -48,6 +58,21 @@ remain only where deployed wire, persistent data, or repository compatibility
 requires them.
 
 ## Current with scoped historical material
+
+- [September 11 product-direction synthesis](./product-direction-2026-09-11.md):
+  research context for the common interface. Its generic Request topology is
+  superseded by the selected inquiry-first specification where they conflict.
+- [Major-release specifications](./major-release/README.md): Astra's proposed
+  release package covering simple interfaces, deep modules, Enterprise agencies,
+  customers, Home Finder, implementation, and acceptance. Its proposed surface
+  topology and implementation order are superseded where they conflict with the
+  selected inquiry-first specification. Its authority and release evidence
+  constraints still apply and it does not establish deployed behavior.
+- [IDE for business research memo](./research/ide-for-business-2026-09-11.md):
+  September 11 product research on Strelva as an environment and runtime for a
+  business. Proposes primitives, an object model, an interface architecture,
+  a first wedge, and a moat analysis. Research direction for review; it does
+  not select scope, prices, or release behavior.
 
 - `launch-blockers.md`: only Current/Waived Blockers and the current verification
   section are normative; the evidence log is historical.

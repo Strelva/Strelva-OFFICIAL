@@ -1,7 +1,13 @@
 # Strelva product ontology
 
 Status: **normative**
-Updated: 2026-09-05
+Updated: 2026-09-11
+
+The [inquiry-first product specification](./inquiry-first-product-spec-2026-09-11.md)
+is authoritative for the selected local migration. It supersedes the generic
+conversational experience and surface examples below where they conflict.
+Existing managed-presence vocabulary remains authoritative for deployed
+compatibility and behavior that has not migrated.
 
 ## Product transition
 
@@ -163,7 +169,57 @@ The resulting Delivery Lead is Strelva’s pre-tenant sales/delivery record.
 ### Customer Inquiry
 
 A lead captured for a Tenant through its public Site Property. It is recent
-customer activity, not Strelva’s own sales lead and not a full CRM record.
+customer activity, not Strelva’s own sales lead and not a full CRM record. In
+the inquiry-first product it is a durable instance handled by an exact published
+Capability version. Pause, Undo, or a later Capability edit cannot erase it.
+
+### Record
+
+A Record is a typed thing one Business works with, such as an inquiry, booking,
+page, listing, customer, quote, or review. It has stable identity, typed fields,
+links, and a timeline. Customer Inquiry is the first Record type in the selected
+migration.
+
+### Capability, Capability Version, and Rule
+
+A **Capability** is the stable, governed way Strelva receives and handles one
+kind of Customer Inquiry for one Business. A **Capability Version** is an
+immutable shape containing the form schema, routing, templates, follow-up, and
+Responsibility reference. A **Rule** is a versioned condition and consequence
+built from the fixed component set. A published version is never edited in
+place. In this selected product model, unqualified Capability means this
+business workflow. Existing Tenant Capability, Site Capability, and Agent
+Capability remain distinct compatibility terms.
+
+### Change and Work
+
+A **Change** is a proposed, previewable, reversible modification to Records, a
+Capability, or a Rule. It holds exact versions, authorization, and an inverse.
+Its receipt is the human-readable diff and result.
+
+**Work** is the durable thread from a person's intent to an answer, Change,
+Capability, or Responsibility. It is used for recent work and history. It does
+not grant authority and is not a generic replacement for those records.
+
+### Responsibility
+
+A Responsibility is the policy boundary for one Capability. It states what
+Strelva may do, must never do, and must ask a person to approve. It also records
+limits, escalation, voice, hours, and supervised or trusted status. Promotion
+is the explicit action that changes this status. Service
+scope, provider connection, and actor role do not imply a Responsibility.
+
+### Rehearsal
+
+A Rehearsal is a saved, rerunnable execution of one Capability Version against
+synthetic inputs with external writes blocked. Its named check results are
+evidence for publishing only that exact version.
+
+### Receipt
+
+A Receipt is structured, durable evidence of an action. It records actor, what
+happened, why, target, version, evidence, outcome, and any supported inverse.
+Activity copy may summarize a Receipt but does not replace it.
 
 ### Commercial Plan
 

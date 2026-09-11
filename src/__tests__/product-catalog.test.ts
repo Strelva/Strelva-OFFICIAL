@@ -79,6 +79,7 @@ describe("platform product catalog", () => {
       "ai_visibility",
       "managed_presence",
       "homefinder",
+      "tracker",
     ]);
     expect(listWorkspaceDiscoveryProducts().some((product) => product.id === "domain_monitoring")).toBe(false);
     expect(listWorkspaceDiscoveryProducts().find((product) => product.id === "homefinder")?.release.availability).toBe("not_enabled");
@@ -90,6 +91,22 @@ describe("platform product catalog", () => {
     expect(monitoring.controls.access).toEqual(["operator"]);
     expect(monitoring.release.gates).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: "installation_scoping", state: "unmet" }),
+    ]));
+  });
+
+  it("describes the tracker as a workspace-gated experiment with scoped read access", () => {
+    expect(getProductDefinition("tracker")).toMatchObject({
+      release: { availability: "public", releaseOne: false },
+      controls: { access: ["authenticated_person", "scoped_delegation"] },
+      distribution: [expect.objectContaining({ id: "client_workspace", status: "available", href: null })],
+    });
+    expect(getProductDefinition("tracker").operations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "create_tracker", resourceKind: "tracker", support: "supported" }),
+      expect.objectContaining({ id: "edit_tracker", resourceKind: "tracker", support: "supported" }),
+    ]));
+    expect(getProductDefinition("tracker").release.gates).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "workspace_release", state: "met" }),
+      expect.objectContaining({ id: "external_product_release", state: "unmet" }),
     ]));
   });
 

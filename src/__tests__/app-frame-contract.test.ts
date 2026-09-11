@@ -6,7 +6,7 @@ const root = process.cwd();
 const frame = () => readFileSync(path.join(root, "src/experience/app-frame/AppFrame.tsx"), "utf8");
 const frameStyles = () => readFileSync(path.join(root, "src/experience/app-frame/app-frame.module.css"), "utf8");
 const managedShell = () => readFileSync(path.join(root, "src/components/dashboard/ConversationShell.tsx"), "utf8");
-const workspaceSidebar = () => readFileSync(path.join(root, "src/experience/workspace/WorkspaceSidebar.tsx"), "utf8");
+const workspaceShell = () => readFileSync(path.join(root, "src/experience/app-frame/StrelvaShell.tsx"), "utf8");
 const workspaceSignOut = () => readFileSync(path.join(root, "src/experience/workspace/WorkspaceSignOutButton.tsx"), "utf8");
 
 describe("shared app frame accessibility contract", () => {
@@ -44,8 +44,10 @@ describe("shared app frame accessibility contract", () => {
   });
 
   it("keeps personal workspace sign-out discoverable without carrying handoff state", () => {
-    const source = `${workspaceSidebar()}\n${workspaceSignOut()}`;
+    const source = `${workspaceShell()}\n${workspaceSignOut()}`;
 
+    expect(source).toContain("export function StrelvaShell");
+    expect(source).toContain("signOut === undefined");
     expect(source).toContain("createBrowserSupabase");
     expect(source).toContain("supabase.auth.signOut()");
     expect(source).toContain('key?.startsWith("strelva:workspace-")');

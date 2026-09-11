@@ -69,6 +69,17 @@ psql "${psql_args[@]}" --file="$migration"
 psql "${psql_args[@]}" --file="$schema_test"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260908120000_workspace_result_recovery.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-recovery-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260911150000_tracker_work_updates.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tracker-work-schema.sql"
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
+
+# Enterprise Customers uses a separate isolated cluster because its fictional
+# fixture deliberately has no overlap with the workspace schema proof.  Keep
+# the aggregate gate explicit without applying either migration to production.
+bash "$repo_root/scripts/check-customer-mapping-sql.sh"
+
+# Inquiry capabilities use their own isolated fictional tenant fixture. This
+# validates the additive migration without connecting to production.
+bash "$repo_root/scripts/check-inquiry-workspace-sql.sh"

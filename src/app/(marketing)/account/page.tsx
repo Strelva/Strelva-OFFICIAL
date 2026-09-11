@@ -10,6 +10,7 @@ import { getDevAccessTenant } from "@/lib/dev-access";
 import type { TenantConfig } from "@/lib/types";
 import Link from "next/link";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
+import { inquiryReleaseEnabled } from "@/products/inquiries/server";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ export default async function AccountPage({
   }
 
   const claimedInvite = await claimPendingInviteForCurrentUser();
+  if (inquiryReleaseEnabled() && !managedRequested) redirect("/business");
   // Claim an existing invitation before entering the shared environment. This
   // changes only the landing destination; membership and site gates still own
   // access. The explicit managed path keeps the existing recovery/chooser flow.

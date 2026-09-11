@@ -156,6 +156,16 @@ insert into public.saved_product_work (
     '{"score": 20}'::jsonb,
     null,
     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+  ),
+  (
+    '88888888-8888-4888-8888-888888888888',
+    '11111111-1111-4111-8111-111111111111',
+    'tracker',
+    'tracker',
+    'Shared tracker',
+    '{"tracker":{"id":"tracker-source","title":"Shared tracker","source":{"sourceId":"source-1","originalFileName":"backlog.csv","format":"csv","mediaType":"text/csv","sizeBytes":26},"originalSource":"Name,Status\\nExample,Open","columns":[{"id":"name","sourceColumn":1,"sourceColumnIndex":0,"sourceHeader":"Name","fieldKey":"name","label":"Name","kind":"text"}],"rows":[],"history":[],"revision":0,"createdAt":"2026-09-05T14:00:00Z","updatedAt":"2026-09-05T14:00:00Z"}}'::jsonb,
+    '{}'::jsonb,
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
   );
 
 insert into public.workspace_handoffs (
@@ -210,6 +220,13 @@ insert into public.workspace_handoffs (
     '11111111-1111-4111-8111-111111111111',
     '22222222-2222-4222-8222-222222222222',
     'other@example.com', repeat('0', 64), 'pending', now() + interval '1 hour',
+    'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', null, null
+  ),
+  (
+    '50000000-0000-4000-8000-000000000008',
+    '11111111-1111-4111-8111-111111111111',
+    '88888888-8888-4888-8888-888888888888',
+    'recipient@example.com', repeat('8', 64), 'pending', now() + interval '1 hour',
     'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', null, null
   );
 
@@ -472,6 +489,42 @@ begin
         and status = 'active'
     ),
     'revoked delegation must no longer expose work'
+  );
+end;
+$$;
+
+do $$
+declare accepted record;
+begin
+  select * into accepted from public.accept_workspace_handoff(
+    repeat('8', 64),
+    'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    'recipient@example.com',
+    true
+  );
+  perform pg_temp.assert_true(not accepted.already_accepted, 'Tracker handoff acceptance must create a new customer copy');
+  perform pg_temp.assert_true(
+    exists (
+      select 1 from public.saved_product_work
+      where id = accepted.customer_work_id
+        and workspace_id = accepted.customer_workspace_id
+        and source_work_id = '88888888-8888-4888-8888-888888888888'
+        and product_id = 'tracker'
+        and resource_kind = 'tracker'
+        and payload->'tracker'->>'id' = 'tracker-source'
+    ),
+    'Tracker acceptance must preserve product identity, source provenance, and the typed payload'
+  );
+  perform pg_temp.assert_true(
+    exists (
+      select 1 from public.workspace_delegations
+      where id = accepted.delegation_id
+        and customer_work_id = accepted.customer_work_id
+        and agency_workspace_id = '11111111-1111-4111-8111-111111111111'
+        and scope = array['work:read']::text[]
+        and status = 'active'
+    ),
+    'Tracker opt-in must create only scoped read delegation'
   );
 end;
 $$;

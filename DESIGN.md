@@ -186,3 +186,34 @@ Use the existing tokens and primitives when they express the accepted direction.
 - Do not imply that website builds, hosting, or ongoing management are free. The public audit may be free; the managed product is paid.
 - Do not expose repository structure, agents, data models, governance internals, or a generic dashboard as the user's main product.
 - Avoid raw black or white when a product token exists, one-off status hues, gradient text, decorative glass, purple-blue AI gradients, hero-stat templates, repeated icon-card grids, colored side stripes, bounce easing, and full pills on large controls.
+
+### Business Home direction — September 9, 2026
+
+Jacob selected a warm ivory, ink-teal and muted-sage business interface with a
+persistent text navigation rail, a central request composer and recent work,
+and a business context panel. The business implementation is scoped to the
+local `/preview/strelva/client` route; it does not replace the personal workspace
+or agency composition. `src/experience/delivery/BusinessHome.tsx` and
+`business.module.css` own the business composition and use the shared request
+session and AppFrame. `delivery.module.css` scopes its shell refinements under
+`businessTheme`.
+
+Use the existing cairn mark, `font-display` for editorial headings, soft outlined
+controls, restrained surface depth, and purposeful work thumbnails. The Buffalo
+waterfront is a faint supporting detail, never a backdrop beneath essential work.
+The business panel moves after the main work on narrower screens. Recent work
+comes from request records; unsupported integrations remain explicitly unconnected.
+Do not reproduce the concept image's illustrative live statuses as product facts.
+
+The selected pill-shaped business composer is an explicit exception to the older
+restriction on full pills for large controls. Ordinary controls retain 12px radii.
+
+### Internal R&D identity — September 9, 2026
+
+Jacob selected the three-ribbon spiral around a sage dot as the Strelva team's
+internal R&D mark. The ribbons derive from the three pills in the main logo.
+The standalone asset is [strelva-rd.svg](./output/brand-motion/rd/strelva-rd.svg);
+its motion reference is the [20-second reveal](./output/brand-motion/v3/strelva-field-20s.mp4).
+Use this mark for internal R&D materials. The existing three-stone logo remains
+the main Strelva identity. This decision does not establish a public R&D product,
+division, or commercial offering.

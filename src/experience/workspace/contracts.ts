@@ -1,4 +1,6 @@
 import type { AiVisibilityResult } from "@/products/ai-visibility/contracts";
+import type { AssessmentResult } from "@/products/assessment";
+import type { TrackerHandoffPreview } from "@/products/tracker/contracts";
 
 /** Browser response contract. Internal membership and invitation secrets stay server-side. */
 export interface WorkspaceSummary {
@@ -6,6 +8,7 @@ export interface WorkspaceSummary {
   kind: "personal" | "agency" | "customer";
   name: string;
   access?: "member" | "delegated_read";
+  role?: "owner" | "admin" | "member";
 }
 
 /**
@@ -15,6 +18,28 @@ export interface WorkspaceSummary {
  */
 export type WorkspaceWorkPayload = AiVisibilityResult;
 
+/** Browser-safe projection of an operator-reported tracker experiment. */
+export interface WorkspaceExperiment {
+  version: 1;
+  targetWorkId: string;
+  targetRevision: number;
+  recordedBy: string;
+  recordedAt: string;
+  hypothesis: string;
+  workload: string;
+  baselineMinutes: number;
+  setupMinutes: number;
+  reviewMinutes: number;
+  correctionMinutes: number;
+  providerCostUsd: number | null;
+  result: "passed" | "failed" | "inconclusive";
+  evidence: string;
+  observedMinutes: number;
+  differenceMinutes: number;
+  evidenceKind: "operator_reported";
+  promoted: false;
+}
+
 export interface WorkspaceWork<TPayload = WorkspaceWorkPayload> {
   id: string;
   workspaceId: string;
@@ -23,6 +48,13 @@ export interface WorkspaceWork<TPayload = WorkspaceWorkPayload> {
   resourceKind: string;
   payload: TPayload | null;
   auditPayload?: import("@/products/website-audit/client").AuditResult | null;
+  /** Explicit method/payload/action descriptor for supported assessments. */
+  assessment?: AssessmentResult;
+  /** Safe, typed projection for research experiments; raw payload stays server-side. */
+  experiment?: WorkspaceExperiment;
+  /** Bounded tracker data shown only after recipient-bound handoff inspection. */
+  tracker?: TrackerHandoffPreview;
+  sourceWorkId?: string;
   unavailableReason?: string;
   input: Record<string, unknown>;
   createdAt: string;
@@ -67,6 +99,8 @@ export interface WorkspaceProduct {
   name: string;
   description: string;
   availability: "available" | "managed" | "not_enabled" | "release_gated";
+  /** Server-generated, allowlisted preview destination for an external product. */
+  previewHref?: string;
 }
 
 export interface WorkspaceSnapshot {

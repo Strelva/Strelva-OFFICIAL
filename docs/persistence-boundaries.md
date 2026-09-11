@@ -1,6 +1,6 @@
 # Persistence boundaries
 
-Updated 2026-07-30. This is the current authority map. A Postgres table or mirror write does
+Updated 2026-09-11. This is the current authority map. A Postgres table or mirror write does
 not make Postgres authoritative; authority changes only when the production read path changes.
 
 | Domain | Authority | Cache or mirror | Failure rule |
@@ -14,7 +14,8 @@ not make Postgres authoritative; authority changes only when the production read
 | Audit and activity | Postgres | Store-specific cache where present | Tenant id comes from trusted auth/config. |
 | Event and approval queue | Redis `event:*` + tenant sorted-set index | Postgres `unified_events` mirror | Pending governed work requires Redis; action claims precede side effects. |
 | Pre-tenant delivery leads | Redis lead/status records | Postgres `delivery_leads` mirror | Delivery status is the canonical lifecycle; operator workflow is a projection. |
-| Tenant Customer Inquiries | Redis `leads:{tenant}` + `lead:{tenant}:*` | None | 90-day recent-activity window; this is not Strelva's sales lead or a CRM. |
+| Tenant Customer Inquiries | Redis `leads:{tenant}` + `lead:{tenant}:*`; delivery checkpoints, accepted-write markers, provider indexes, event claims, reply indexes/state, capture-repair jobs and daily budget in `reb:inquiry-delivery:*`, `reb:inquiry-delivery-claim:*`, `reb:inquiry-delivery-provider:*`, `reb:inquiry-delivery-event:*`, `reb:inquiry-reply:*`, `reb:inquiry-reply-state:*`, `reb:inquiry-capture-repair*`, `reb:inquiry-timeline:*`, and `reb:inquiry-budget:*` | None | 90-day recent-activity window; this is not Strelva's sales lead or a CRM. Delivery markers are tenant-scoped and must be moved with the inquiry slug. The opaque-address reverse index `reb:inquiry-reply-target:*` stores a tenant id in its value and is rewritten/deprovisioned by value. |
+| Inquiry capability workspace, record overlays, and publication claims | Postgres `inquiry_workspaces`, `inquiry_record_overlays`, and `inquiry_publication_claims` after the inquiry migration | None | The workspace stores definitions, rehearsals, and receipts. Record overlays store only handling status and assignment for a Redis-authoritative inquiry id. Neither stores customer inquiry fields. A publication claim binds one exact actor and command to one accepted provider write. Accepted writes remain closed when read-back verification fails. Local implementation only until the migration and release are separately authorized. |
 | Store order telemetry | Redis `orders:{tenant}` + `order:{tenant}:*` | None | 90-day/500-order visibility window; the client repository/payment provider remains financial authority. |
 | Reviews | Postgres `reviews` | Provider polling/dedup markers in Redis | Provider ids dedupe; replies publish only through governed actions. |
 | Booking configuration and date overrides | Redis | None | Surface degrades to an honest empty/default state. |
@@ -58,7 +59,13 @@ not move on a tenant slug rename. Confirmed present as of 2026-08-01:
 `goal:*`, `analytics:cfg:*`, `reb:report-cadence:*`, `reb:report-sent:*`,
 `reb:scan:baseline:*`, `google-meta:*`, `review-replies:recent:*`,
 `reb:review-nudge-sent:*`, `reb:order-review-request-sent:*`, and
-`reb:review-reply-declined:*`.
+`reb:review-reply-declined:*`, `reb:inquiry-delivery:*`,
+`reb:inquiry-delivery-claim:*`, `reb:inquiry-delivery-provider:*`,
+`reb:inquiry-delivery-event:*`, `reb:inquiry-reply:*`,
+`reb:inquiry-reply-state:*`, `reb:inquiry-capture-repair*`,
+`reb:inquiry-timeline:*`, and `reb:inquiry-budget:*`. The opaque-address
+`reb:inquiry-reply-target:*` reverse index is handled separately because the
+tenant id is in its value rather than its key.
 
 Caches (`reb:tenants:all`, content/page-config/analytics/brief/domain-map
 caches) are intentionally NOT rekeyed — they regenerate from Postgres.
@@ -92,3 +99,24 @@ of a checkpointed or completed result does not consume provider budget. At most
 attempts. This is an implementation safeguard, not a paid allowance or promise.
 Only the initiating actor can recover an operation, even when other people belong
 to the workspace. Pending operation listing never extends to delegated readers.
+
+## Tracker and internal experiment work
+
+The September 11 tracker slice uses the existing `saved_product_work` authority.
+A tracker payload retains the original CSV, field mapping, cell source references,
+current rows, and attributable edit history. Re-import creates separate work;
+it cannot replace an edited tracker. `update_tracker_work` checks a verified
+actor, locks the direct membership and saved work, and accepts only the next
+revision with unchanged tracker identity and source. Delegated read access does
+not permit this update. No client-supplied snapshot is accepted as an edit.
+
+Internal experiment records use separate immutable saved-work rows linked to a
+tracker and its tested revision. They record operator-reported baseline, setup,
+review and correction time, evidence, and optional provider cost. Missing cost is
+unknown. Recording an experiment does not promote or publish a capability.
+These records follow existing workspace retention; no new automatic purge exists.
+
+Website setup suggestions and corrections are structured evidence inside inquiry
+workspace action receipts. Public-page metadata is a suggestion, not independent
+verification. Corrections survive later website reads and do not directly mutate
+published tenant settings. Customer inquiry fields remain in their Redis authority.
