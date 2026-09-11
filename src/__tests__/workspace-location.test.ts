@@ -11,6 +11,9 @@ describe("workspace return destination", () => {
     const target = `/workspace?workspaceId=${workspaceId}&view=inquiries&tenantId=buffalo-realty&inquiryView=shape&inquiryRequest=request-1`;
     expect(workspaceReturnTarget(target)).toBe(target);
   });
+  it("preserves the document start route through sign-in", () => {
+    expect(workspaceReturnTarget(`/workspace?workspaceId=${workspaceId}&view=document`)).toBe(`/workspace?workspaceId=${workspaceId}&view=document`);
+  });
   it.each(["https://evil.example/workspace", "//evil.example/workspace", "/workspace/other", "/workspace?next=https://evil.example", "/workspace?work=first&work=second", "/workspace?workspaceId=invalid", "/workspace?work=%2Fprivate", "/workspace?view=inquiries&inquiryView=publish", "/workspace?view=inquiries&tenantId=bad%2Ftenant", "/workspace?view=inquiries&tenantId=one&tenantId=two", "/workspace#handoff=secret"])("rejects ambiguous or unrelated destinations: %s", value => {
     expect(workspaceReturnTarget(value)).toBeNull();
   });

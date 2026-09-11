@@ -50,6 +50,7 @@ export function createPreviewRequest(scenario: PreviewScenario): typeof fetch {
       { id: "managed_presence", name: "Managed Websites", description: "Your website and the work that keeps it useful.", availability: "managed" },
       { id: "inquiries", name: "Inquiry work", description: "Keep customer requests moving with a clear, inspectable thread.", availability: "available" },
       { id: "tracker", name: "Spreadsheet tracker", description: "Turn a CSV into working data with a saved history.", availability: "available" },
+      { id: "documents", name: "Documents", description: "Write procedures, proposals, and notes with a saved history.", availability: "available" },
       { id: "homefinder", name: "Home Finder", description: "Home search for a brokerage’s own site.", availability: "not_enabled", previewHref: "http://127.0.0.1:3213/embed/agency-preview" },
     ],
     managedWork: scenario === "managed" || scenario === "enterprise" ? [{

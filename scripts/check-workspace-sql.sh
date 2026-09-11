@@ -63,6 +63,10 @@ create table public.users (
   email text unique not null,
   verified_at timestamptz
 );
+
+create table public.tenants (
+  id text primary key
+);
 SQL
 
 psql "${psql_args[@]}" --file="$migration"
@@ -71,6 +75,12 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260908120000_wor
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-recovery-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260911150000_tracker_work_updates.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tracker-work-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260911200000_job_economics.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/work-economics-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260911210000_document_work.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/document-work-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260911220000_work_plan_output_execution.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/work-plan-output-schema.sql"
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

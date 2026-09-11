@@ -123,7 +123,7 @@ test("keeps one navigation around saved work on desktop and mobile", async ({ pa
   await expect(page.getByRole("heading", { name: "Harbor Dental" })).toBeVisible();
   await expect(page.getByLabel("Grade B, 74 out of 100")).toBeVisible();
   await expect(navigation).toBeVisible();
-  await expect(navigation.getByRole("button", { name: "Home", exact: true })).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Strelva home", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Discuss", exact: true })).toHaveCount(0);
   await page.screenshot({ path: "test-results/workspace-desktop.png", fullPage: true });
   // The saved resource can be resumed directly without losing its navigation.
@@ -145,7 +145,7 @@ test("keeps one navigation around saved work on desktop and mobile", async ({ pa
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: "Open navigation" })).toBeFocused();
   await page.getByRole("button", { name: "Open navigation" }).click();
-  await mobileNavigation.getByRole("button", { name: "My work", exact: true }).click();
+  await mobileNavigation.getByRole("button", { name: "Search", exact: true }).click();
   await expect(mobileNavigation).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "My work", exact: true })).toBeVisible();
   const search = page.getByRole("searchbox", { name: "Search saved work" });
@@ -330,7 +330,7 @@ test("keeps product discovery descriptive and managed work scoped to authorized 
   })));
 
   await page.goto("/workspace");
-  await page.getByRole("button", { name: "Explore", exact: true }).click();
+  await page.goto("/workspace?view=products");
   const main = page.getByRole("main");
   await expect(main.getByRole("heading", { name: "More you can do." })).toBeVisible();
   await expect(main.getByRole("button", { name: /AI Visibility/ })).toBeVisible();
@@ -371,10 +371,11 @@ test("returns from an empty agency view to My work", async ({ page }) => {
   await mockWorkspace(page, (route) => fulfill(route, snapshot({ work: [] })));
   await page.goto("/workspace");
   await expect(page.getByRole("heading", { name: "What would you like to work on?" })).toBeVisible();
-  await page.getByRole("button", { name: "Help & service", exact: true }).click();
+  await page.getByRole("link", { name: "Strelva home", exact: true }).click();
+  await page.getByRole("button", { name: "What would make this more useful?", exact: true }).click();
   await page.getByRole("main").getByRole("button", { name: "Sharing & agency access" }).click();
   await expect(page.getByRole("heading", { name: "Prepare useful work before the customer arrives." })).toBeVisible();
-  await page.getByRole("button", { name: "Home", exact: true }).click();
+  await page.getByRole("link", { name: "Strelva home", exact: true }).click();
   await expect(page.getByRole("heading", { name: "What would you like to work on?" })).toBeVisible();
 });
 
@@ -451,7 +452,8 @@ test("hands work to the named customer with optional access unchecked, then revo
   });
 
   await page.goto("/workspace?ignored=public#handoff=");
-  await page.getByRole("button", { name: "Help & service", exact: true }).click();
+  await page.getByRole("link", { name: "Strelva home", exact: true }).click();
+  await page.getByRole("button", { name: "What would make this more useful?", exact: true }).click();
   await page.getByRole("main").getByRole("button", { name: "Sharing & agency access" }).click();
   await page.getByLabel("Customer email").fill("owner@example.com");
   await page.getByRole("button", { name: "Create private handoff" }).click();
@@ -472,7 +474,8 @@ test("hands work to the named customer with optional access unchecked, then revo
   expect(new URL(page.url()).searchParams.has("save")).toBe(false);
   await expect(page).toHaveURL(url => Boolean(url.searchParams.get("work")));
 
-  await page.getByRole("button", { name: "Help & service", exact: true }).click();
+  await page.getByRole("link", { name: "Strelva home", exact: true }).click();
+  await page.getByRole("button", { name: "What would make this more useful?", exact: true }).click();
   await page.getByRole("main").getByRole("button", { name: "Sharing & agency access" }).click();
   await expect(page.getByRole("heading", { name: "You own this workspace." })).toBeVisible();
   await page.getByRole("button", { name: "Revoke access" }).click();
@@ -568,7 +571,8 @@ test("resets a created handoff link when the selected work changes", async ({ pa
   });
 
   await page.goto("/workspace");
-  await page.getByRole("button", { name: "Help & service", exact: true }).click();
+  await page.getByRole("link", { name: "Strelva home", exact: true }).click();
+  await page.getByRole("button", { name: "What would make this more useful?", exact: true }).click();
   await page.getByRole("main").getByRole("button", { name: "Sharing & agency access" }).click();
   await page.getByLabel("Customer email").fill("owner@example.com");
   await page.getByRole("button", { name: "Create private handoff" }).click();
@@ -609,7 +613,8 @@ test("drops a late handoff completion after the work context changes", async ({ 
   });
 
   await page.goto("/workspace");
-  await page.getByRole("button", { name: "Help & service", exact: true }).click();
+  await page.getByRole("link", { name: "Strelva home", exact: true }).click();
+  await page.getByRole("button", { name: "What would make this more useful?", exact: true }).click();
   await page.getByRole("main").getByRole("button", { name: "Sharing & agency access" }).click();
   await page.getByLabel("Customer email").fill("owner@example.com");
   await page.getByRole("button", { name: "Create private handoff" }).click();
@@ -686,7 +691,9 @@ test("lets someone prepare a capability request without claiming it was submitte
     if (route.request().method() !== "GET") mutations += 1;
     return fulfill(route, snapshot());
   });
-  await page.goto("/workspace?view=help");
+  await page.goto("/workspace");
+  await page.getByRole("link", { name: "Strelva home", exact: true }).click();
+  await page.getByRole("button", { name: "What would make this more useful?", exact: true }).click();
   await expect(page.getByRole("heading", { name: "What do you need?" })).toBeVisible();
   const request = page.getByLabel("What are you trying to do?");
   await request.fill("I use WordPress and need a way to review changes before publishing.");
@@ -758,7 +765,7 @@ test("restores the exact agency result across reload and browser history", async
   await expect(page.getByRole("heading", { name: "Agency result", exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole("heading", { name: "Agency result", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Home", exact: true }).click();
+  await page.getByRole("link", { name: "Strelva home", exact: true }).click();
   await expect(page.getByRole("heading", { name: "What would you like to work on?" })).toBeVisible();
   await page.goBack();
   await expect(page.getByRole("heading", { name: "Agency result", exact: true })).toBeVisible();

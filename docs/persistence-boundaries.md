@@ -6,6 +6,8 @@ not make Postgres authoritative; authority changes only when the production read
 | Domain | Authority | Cache or mirror | Failure rule |
 |---|---|---|---|
 | Private workspace results and assessment recovery | Postgres `saved_product_work`, `workspace_operations` after the release migrations | Anonymous audit reports remain 60-day Redis bearer records, copied only on explicit save | Fail closed. Actor and direct membership are checked on every operation transition. A checkpoint survives failed completion; one operation commits one saved result. A pre-checkpoint interruption can repeat provider reads. No automatic background worker is implied. Local implementation only until migration and release acceptance. |
+| Private documents, plans and accepted plan outputs | Postgres `saved_product_work` and `work_plan_output_executions` after the local release migrations | None | Documents use revision-checked edits and append-only receipts. Plans retain bounded source references. A private output and its execution receipt commit together; retries reopen that output. These are local capabilities, not a general background executor or permission to publish. |
+| Internal work budgets and reported costs | Postgres `job_economics`, `job_economics_reservations`, `job_economics_usage` after the local release migration | None | The named payer accepts a budget. Reservations and usage have stable retry keys. Unknown costs remain unknown; Strelva-caused retries are recorded separately from customer usage. No Stripe charge or provider-side spending limit is implemented by this ledger. |
 | Identity, memberships, super-admins | Supabase Auth + Postgres | None | Fail closed. |
 | Tenant configuration and commercial plan | Postgres `tenants` | Redis tenant-list cache; dev file locally | Production never falls back to a dev file. |
 | Domain ownership and verification | Postgres `domain_claims` | Redis legacy mirror/domain-map cache | Only verified claims route; explicit operator-configured production/admin domains remain trusted. |
@@ -115,6 +117,30 @@ tracker and its tested revision. They record operator-reported baseline, setup,
 review and correction time, evidence, and optional provider cost. Missing cost is
 unknown. Recording an experiment does not promote or publish a capability.
 These records follow existing workspace retention; no new automatic purge exists.
+
+The local comparison format supports a baseline and several candidates against
+the same workload version. Evidence distinguishes simulation, operator reports,
+and measurements. Support and maintenance effort are included; recording a
+comparison does not qualify an offering automatically.
+
+## Private documents and work plans
+
+Documents remain plain text in `saved_product_work`. They retain creation
+identity and a bounded history of before-and-after revisions. An Undo appends a
+compensating edit and refuses to overwrite a later edit. Creating or editing a
+document does not send it or publish it to a website.
+
+Planning requires `STRELVA_PLANNING_ENABLED=1`, an authenticated workspace
+member, and a configured model. Selected source work is authorized and reduced
+to bounded excerpts before the model call. The saved plan retains source
+identities and versions. A model's operation names cannot grant authority.
+Private document and empty tracker creation use the native product engines and
+an explicit user action. `work_plan_output_executions` binds a plan output to its
+one created work item and receipt. This does not extend the assessment-specific
+`workspace_operations` executor to arbitrary work.
+
+These records have no new automatic retention period or purge worker. Production
+migration, retention acceptance, and activation remain separate release actions.
 
 Website setup suggestions and corrections are structured evidence inside inquiry
 workspace action receipts. Public-page metadata is a suggestion, not independent

@@ -18,6 +18,8 @@ export interface AiVisibilityAssessmentFormProps<TWork = unknown> {
   onCreated: (work: TWork) => void;
   onCancel?: () => void;
   initialInput?: ScoreInput;
+  /** Request text carried from a broader workspace start; it is context only. */
+  initialRequestText?: string | null;
 }
 
 /** A named callback type for hosts that want to keep the operation separate. */
@@ -35,6 +37,7 @@ export function AiVisibilityAssessmentForm<TWork = unknown>({
   onCreated,
   onCancel,
   initialInput,
+  initialRequestText,
 }: AiVisibilityAssessmentFormProps<TWork>) {
   const [business, setBusiness] = useState(initialInput?.business || "");
   const [url, setUrl] = useState(initialInput?.url || "");
@@ -83,6 +86,7 @@ export function AiVisibilityAssessmentForm<TWork = unknown>({
       <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-accent-text">AI Visibility</p>
       <h1 className="mt-4 max-w-2xl font-display text-[34px] font-medium leading-[1.08] text-warm-black sm:text-[44px]">See what AI can understand about this business.</h1>
       <p className="mt-4 max-w-xl text-[14px] leading-relaxed text-gray-muted">Create an evidence-backed assessment you can keep private or, from an agency workspace, hand directly to its customer.</p>
+      {initialRequestText?.trim() ? <div role="note" className="mt-5 max-w-2xl rounded-xl border border-gray-border bg-surface-inset px-4 py-3"><p className="text-[11px] font-medium uppercase tracking-[0.12em] text-accent-text">From your request</p><p className="mt-2 whitespace-pre-wrap text-[14px] leading-relaxed text-warm-black">{initialRequestText.trim()}</p><p className="mt-3 text-[12px] leading-relaxed text-gray-muted">This assessment uses the business details below. Your request stays here as context and does not add checks beyond this assessment.</p></div> : null}
       <form onSubmit={submit} className="mt-9 grid gap-4 sm:grid-cols-2">
         <TextInput label="Business name" required autoFocus autoComplete="organization" value={business} onChange={(event) => setBusiness(event.target.value)} placeholder="Acme Dental" className="min-h-12" />
         <TextInput label="Website" inputMode="url" autoComplete="url" value={url} onChange={(event) => setUrl(event.target.value)} placeholder="example.com" className="min-h-12" />

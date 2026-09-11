@@ -166,8 +166,8 @@ function CapabilityRow({ capability }: { capability: InquiryCapabilityState }) {
 }
 
 function NewView() {
-  const { snapshot, perform, navigate, pending, can } = useInquiry();
-  const [intent, setIntent] = useState("");
+  const { snapshot, perform, navigate, pending, can, initialRequestText } = useInquiry();
+  const [intent, setIntent] = useState(() => initialRequestText);
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!intent.trim() || !can("canStart")) return;

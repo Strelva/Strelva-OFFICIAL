@@ -227,7 +227,7 @@ export interface TrackerHandoffPreview {
   updatedAt: string;
 }
 
-export type TrackerCommandKind = "update_cell" | "add_row" | "delete_row";
+export type TrackerCommandKind = "update_cell" | "add_row" | "delete_row" | "bulk_update" | "undo_change";
 
 export interface TrackerCommandBase {
   commandId: string;
@@ -255,10 +255,31 @@ export interface TrackerDeleteRowCommand extends TrackerCommandBase {
   rowId: string;
 }
 
+export interface TrackerBulkUpdateCommand extends TrackerCommandBase {
+  kind: "bulk_update";
+  rowIds: string[];
+  columnId: string;
+  value: string;
+}
+
+export interface TrackerUndoCommand extends TrackerCommandBase {
+  kind: "undo_change";
+  targetCommandId: string;
+}
+
+export interface TrackerCellChange {
+  rowId: string;
+  columnId: string;
+  before: string;
+  after: string;
+}
+
 export type TrackerCommand =
   | TrackerUpdateCellCommand
   | TrackerAddRowCommand
-  | TrackerDeleteRowCommand;
+  | TrackerDeleteRowCommand
+  | TrackerBulkUpdateCommand
+  | TrackerUndoCommand;
 
 export interface TrackerHistoryEntry {
   commandId: string;
@@ -272,6 +293,8 @@ export interface TrackerHistoryEntry {
   before: string | null;
   after: string | null;
   sourceLineage: TrackerRowLineage | null;
+  changes?: TrackerCellChange[];
+  undoesCommandId?: string;
 }
 
 export interface TrackerCreateOptions {
@@ -356,6 +379,16 @@ export const trackerCommandSchema = z.discriminatedUnion("kind", [
     kind: z.literal("delete_row"),
     rowId: identifier,
   }),
+  trackerCommandBaseSchema.extend({
+    kind: z.literal("bulk_update"),
+    rowIds: z.array(identifier).min(1).max(1000),
+    columnId: identifier,
+    value: cellValue,
+  }),
+  trackerCommandBaseSchema.extend({
+    kind: z.literal("undo_change"),
+    targetCommandId: identifier,
+  }),
 ]);
 
 const trackerSourceSchema = z.object({
@@ -412,7 +445,7 @@ const trackerHistoryEntrySchema = z.object({
   commandId: identifier,
   trackerId: identifier,
   revision: z.number().int().positive(),
-  kind: z.enum(["update_cell", "add_row", "delete_row"]),
+  kind: z.enum(["update_cell", "add_row", "delete_row", "bulk_update", "undo_change"]),
   actorId: identifier,
   at: timestamp,
   rowId: identifier,
@@ -420,6 +453,8 @@ const trackerHistoryEntrySchema = z.object({
   before: cellValue.nullable(),
   after: cellValue.nullable(),
   sourceLineage: trackerLineageSchema.nullable(),
+  changes: z.array(z.object({ rowId: identifier, columnId: identifier, before: cellValue, after: cellValue })).min(1).max(1000).optional(),
+  undoesCommandId: identifier.optional(),
 });
 
 export const trackerSnapshotSchema = z.object({

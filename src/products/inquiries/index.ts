@@ -3,8 +3,40 @@
 export { runDueInquiryFollowUps } from "./follow-up-cron";
 
 export { inquiryReleaseEnabled } from "./release";
-export { discoverInquiryPortfolio } from "./portfolio";
+export { discoverInquiryPortfolio, resolveInquiryPatternVersion } from "./portfolio";
+export type { ResolveInquiryPatternVersionInput } from "./portfolio";
 export { reconcileInquiryProviderEvent } from "./reconciliation";
+export {
+  commitPatternInstallationAfterVerification,
+  commitPatternUpdate,
+  getPatternInstallation,
+  listPatternInstallations,
+  patternShape,
+  patternUpdatePublishReadiness,
+  proposePatternUpdate,
+  registerPatternInstallation,
+  resolvePatternUpdate,
+  stagePatternUpdate,
+} from "./inquiry-pattern-updates";
+export type {
+  CommitPatternUpdateInput,
+  InquiryPatternShape,
+  PatternConflictChoice,
+  PatternConflictResolution,
+  PatternFieldShape,
+  PatternInstallation,
+  PatternPendingUpdate,
+  PatternInstallationStatus,
+  PatternUpdateChange,
+  PatternUpdateConflict,
+  PatternUpdateInput,
+  PatternUpdateProposal,
+  PatternUpdatePublishReadiness,
+  PatternUpdateStatus,
+  ResolvedPatternUpdate,
+  StagePatternUpdateInput,
+  StagePatternUpdateResult,
+} from "./inquiry-pattern-updates";
 export type {
   InquiryMessageReviewAction,
   InquiryMessageReviewOutcome,

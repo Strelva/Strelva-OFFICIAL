@@ -5,7 +5,9 @@
 
 create table public.inquiry_workspaces (
   id uuid primary key default gen_random_uuid(),
-  tenant_id text not null references public.tenants(id) on delete cascade,
+  -- The routing slug is mutable. The stable UUID and business_id below are
+  -- the immutable identities carried by the saved state.
+  tenant_id text not null references public.tenants(id) on delete cascade on update cascade,
   tenant_stable_id uuid not null references public.tenants(stable_id) on delete cascade,
   business_id text not null check (char_length(business_id) between 1 and 160),
   state_version integer not null default 1 check (state_version = 1),
@@ -32,7 +34,7 @@ create trigger inquiry_workspaces_stable_id_trg
 -- Lead fields remain Redis-authoritative. These annotations let the engine
 -- retain status and assignment across a reload without copying customer data.
 create table public.inquiry_record_overlays (
-  tenant_id text not null references public.tenants(id) on delete cascade,
+  tenant_id text not null references public.tenants(id) on delete cascade on update cascade,
   tenant_stable_id uuid not null references public.tenants(stable_id) on delete cascade,
   business_id text not null check (char_length(business_id) between 1 and 160),
   inquiry_id text not null check (char_length(inquiry_id) between 1 and 256),
@@ -55,7 +57,7 @@ create trigger inquiry_record_overlays_stable_id_trg
 
 create table public.inquiry_publication_claims (
   id uuid primary key default gen_random_uuid(),
-  tenant_id text not null references public.tenants(id) on delete cascade,
+  tenant_id text not null references public.tenants(id) on delete cascade on update cascade,
   tenant_stable_id uuid not null references public.tenants(stable_id) on delete cascade,
   business_id text not null check (char_length(business_id) between 1 and 160),
   request_id text not null check (char_length(request_id) between 1 and 256),
@@ -99,11 +101,14 @@ create trigger inquiry_publication_claims_stable_id_trg
 create or replace function public.guard_inquiry_publication_transition() returns trigger
 language plpgsql set search_path = public as $$
 begin
-  if (old.tenant_id, old.tenant_stable_id, old.business_id, old.request_id,
+  -- tenant_id is the mutable routing slug and may change during an atomic
+  -- tenant rename. The stable UUID and command/business identities remain
+  -- immutable, so a slug cascade must not be rejected here.
+  if (old.tenant_stable_id, old.business_id, old.request_id,
       old.capability_id, old.change_id, old.action, old.version,
       old.idempotency_key, old.command_digest, old.claim_token_hash, old.actor_id)
      is distinct from
-     (new.tenant_id, new.tenant_stable_id, new.business_id, new.request_id,
+     (new.tenant_stable_id, new.business_id, new.request_id,
       new.capability_id, new.change_id, new.action, new.version,
       new.idempotency_key, new.command_digest, new.claim_token_hash, new.actor_id) then
     raise exception 'inquiry_publication_command_is_immutable';

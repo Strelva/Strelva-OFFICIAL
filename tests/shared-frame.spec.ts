@@ -98,7 +98,7 @@ test("keeps the existing navigation reachable when the shared frame collapses it
   const expand = page.getByRole("button", { name: "Expand navigation" });
   await expect(expand).toBeVisible();
   await expand.click();
-  await expect(page.getByRole("navigation", { name: "Main", exact: true }).getByRole("link", { name: "Home", exact: true })).toHaveAttribute("href", managedBase ? "/preview/strelva/workspace" : "/workspace");
+  await expect(page.getByRole("link", { name: "Strelva home", exact: true })).toHaveAttribute("href", managedBase ? "/preview/strelva/workspace" : "/workspace");
   await expect(page.getByRole("link", { name: "Today", exact: true })).toBeVisible();
   await page.screenshot({ path: "test-results/shared-frame-collapsed-desktop.png", fullPage: true });
 });
@@ -112,7 +112,7 @@ test("keeps global and website navigation together on mobile", async ({ page }) 
   await trigger.click();
   const navigation = page.getByRole("dialog", { name: "Strelva navigation", exact: true });
   await expect(navigation).toBeVisible();
-  await expect(navigation.getByRole("link", { name: "Home", exact: true })).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Strelva home", exact: true })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Website", exact: true })).toBeVisible();
   await navigation.getByRole("link", { name: "Analytics", exact: true }).click();
   await expect(navigation).toBeHidden();

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ resolve: vi.fn() }));
-vi.mock("@/products/inquiries/portfolio", () => ({ resolveInquiryPattern: mocks.resolve }));
+const mocks = vi.hoisted(() => ({ resolve: vi.fn(), resolveVersion: vi.fn() }));
+vi.mock("@/products/inquiries/portfolio", () => ({ resolveInquiryPattern: mocks.resolve, resolveInquiryPatternVersion: mocks.resolveVersion }));
 vi.mock("@/lib/redis", () => ({ getRedis: () => null }));
 vi.mock("@/lib/auth", () => ({ getTenantRole: async () => "owner", roleHasPermission: () => true }));
 vi.mock("@/lib/connections", () => ({ getConnections: async () => [] }));
@@ -9,6 +9,7 @@ import { executeInquirySurface } from "@/products/inquiries/server";
 import { InquiryEngine } from "@/products/inquiries/inquiry-engine";
 import { createInMemoryInquiryRepository } from "@/products/inquiries/repository";
 import type { TenantConfig } from "@/lib/types";
+import type { InquiryEngineState } from "@/products/inquiries/contracts";
 
 const businessId = "22222222-2222-4222-8222-222222222222";
 function context() {
@@ -43,5 +44,26 @@ describe("cross-business pattern installation", () => {
     const ctx = context();
     await expect(executeInquirySurface({ context: ctx, action: { kind: "use-pattern", patternId: "stale-reference", businessId, actorId: "target-owner" }, expectedRevision: null, actorId: "target-owner" })).rejects.toThrow("no longer available");
     expect(await ctx.repository.getSnapshot("target", businessId)).toBeNull();
+  });
+
+  it("proposes and stages a newer source through the public commands", async () => {
+    const sourceEngine = new InquiryEngine({ businessId: "source-business" });
+    const sourceWork = sourceEngine.start({ actorId: "source-owner", intent: "Collect seller inquiries", destination: "source@example.test" });
+    const sourceDraft = structuredClone(sourceEngine.acceptShape(sourceWork.id, { actorId: "source-owner" }).draft!);
+    mocks.resolve.mockResolvedValue({ sourceBusinessName: "Source Realty", definition: sourceDraft });
+    const ctx = context();
+    const copied = await executeInquirySurface({ context: ctx, action: { kind: "use-pattern", patternId: "opaque-reference", businessId, destination: "target@example.test", actorId: "target-owner" }, expectedRevision: null, actorId: "target-owner" });
+    const sourceUpdate = structuredClone(sourceDraft);
+    sourceUpdate.version += 1;
+    sourceUpdate.form.intro = "The updated seller explanation.";
+    mocks.resolveVersion.mockResolvedValue({ sourceBusinessName: "Source Realty", definition: sourceUpdate });
+    const proposed = await executeInquirySurface({ context: ctx, action: { kind: "propose-pattern-update", installationId: copied.snapshot.patternInstallations![0]!.id, capabilityId: copied.work!.capabilityId, actorId: "target-owner" }, expectedRevision: copied.snapshot.revision!, actorId: "target-owner" });
+    expect(proposed.patternUpdate?.sourceVersion).toBe(2);
+    expect(proposed.patternUpdate?.status).toBe("ready");
+    const staged = await executeInquirySurface({ context: ctx, action: { kind: "stage-pattern-update", installationId: copied.snapshot.patternInstallations![0]!.id, capabilityId: copied.work!.capabilityId, sourceVersion: 2, resolutions: [], actorId: "target-owner" }, expectedRevision: proposed.snapshot.revision!, actorId: "target-owner" });
+    expect(staged.work?.state).toBe("planned");
+    expect(staged.work?.draft?.version).toBe(2);
+    const durable = await ctx.repository.getSnapshot("target", businessId);
+    expect((durable?.state as InquiryEngineState & { patternInstallations?: Array<{ pendingUpdate?: unknown }> }).patternInstallations?.[0]?.pendingUpdate).toBeDefined();
   });
 });

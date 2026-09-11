@@ -37,7 +37,8 @@ import type { InquiryRecordStatus, JsonValue } from "./contracts";
 import { projectInquiryConnections } from "./connections";
 import { applyInquiryEmailConsent, projectInquiryEmailConnection } from "./email-consent";
 import { recordedOnboarding, readOnboardingWebsite, projectOnboardingCorrections, SETUP_FIELD_LABELS } from "./onboarding";
-import { resolveInquiryPattern } from "./portfolio";
+import { ensurePatternResponsibility, executePatternCopyAction, executePatternUpdateAction } from "./inquiry-pattern-server";
+import { listPatternInstallations } from "./inquiry-pattern-updates";
 import { explainWhyWithDelivery, projectInquiryDeliveryTimeline, withoutInquiryDeliveryProjection } from "./delivery-surface";
 
 export { inquiryReleaseEnabled } from "./release";
@@ -529,6 +530,32 @@ export function parseInquirySurfaceAction(value: unknown, actorId: string, busin
       if (targetBusinessId !== businessId) throw new InquiryValidationError("A pattern can only be installed in the selected business.");
       return { kind, patternId: cleanActionString(action.patternId, "Pattern id"), businessId: targetBusinessId, ...(action.destination ? { destination: cleanActionString(action.destination, "Staff destination", 254) } : {}), actorId };
     }
+    case "propose-pattern-update":
+      return {
+        kind,
+        installationId: cleanActionString(action.installationId, "Pattern installation id"),
+        capabilityId: cleanActionString(action.capabilityId, "Capability id"),
+        actorId,
+      };
+    case "stage-pattern-update": {
+      const sourceVersion = actionNumber(action.sourceVersion, "Source pattern version", 1, 100_000);
+      if (sourceVersion === undefined) throw new InquiryValidationError("A source pattern version is required.");
+      if (!Array.isArray(action.resolutions) || action.resolutions.length > 100) throw new InquiryValidationError("Pattern conflict choices are invalid.");
+      const resolutions = action.resolutions.map((item) => {
+        const choice = objectValue(item);
+        const selected = choice.choice === "local" || choice.choice === "source" ? choice.choice : null;
+        if (!selected) throw new InquiryValidationError("Choose the local or source value for every pattern conflict.");
+        return { path: cleanActionString(choice.path, "Pattern conflict path", 256), choice: selected } as const;
+      });
+      return {
+        kind,
+        installationId: cleanActionString(action.installationId, "Pattern installation id"),
+        capabilityId: cleanActionString(action.capabilityId, "Capability id"),
+        sourceVersion,
+        resolutions,
+        actorId,
+      };
+    }
     default:
       throw new InquiryValidationError("Unsupported inquiry action.");
   }
@@ -665,6 +692,7 @@ async function surfaceSnapshot(input: SurfaceContext, workspace: InquiryWorkspac
   const businessRole: "owner" | "agency_member" | "read_only" = readOnly ? "read_only" : input.audience === "agency" ? "agency_member" : "owner";
   const website = config.siteUrl ?? config.productionDomain ?? null;
   const projectedConnections = projectInquiryConnections(input.tenantId, connections, "/account?connections=1");
+  const patternInstallations = listPatternInstallations(new InquiryEngine({ businessId: input.businessId, state: baseState })).map(({ id, capabilityId, sourceBusinessId, sourceCapabilityId, sourceVersion, targetVersion, status, lastProposalId, updatedAt }) => ({ id, capabilityId, sourceBusinessId, sourceCapabilityId, sourceVersion, targetVersion, status, lastProposalId, updatedAt }));
   try {
     const email = await projectInquiryEmailConnection(new InquiryEngine({ businessId: input.businessId, state: stateForEngine(workspace, input.businessId) }), input.tenantId);
     projectedConnections.splice(projectedConnections.findIndex((item) => item.id === "email"), 1, email);
@@ -709,6 +737,7 @@ async function surfaceSnapshot(input: SurfaceContext, workspace: InquiryWorkspac
       provenVersion: capability.live!.version,
       cleanReceiptCount: visibleState.changes.filter((change) => change.capabilityId === capability.id && change.verification?.verified).length,
     })),
+    patternInstallations,
   };
 }
 
@@ -752,31 +781,6 @@ function stageUndo(engine: InquiryEngine, requestId: string, actorId: string): {
   return { work: engine.getWork(requestId), change: engine._change(receipt.id) };
 }
 
-function ensureResponsibility(engine: InquiryEngine, work: InquiryWork, actorId: string): void {
-  if (engine._state().responsibilities.some((policy) => policy.capabilityId === work.capabilityId)) return;
-  engine.createResponsibility({
-    actorId,
-    capabilityId: work.capabilityId,
-    title: "Handle inquiry follow-up",
-    scope: "Route inquiry requests to the recorded destination and prepare one follow-up when nobody replies.",
-    // Never clauses are part of the written boundary, so their actions must
-    // be represented in the allowed set before the engine can block them.
-    allowedActions: ["reply", "send_message", "schedule_follow_up", "charge", "delete", "change_permissions"],
-    never: [
-      { action: "charge", sentence: "Never charge a customer." },
-      { action: "delete", sentence: "Never delete an inquiry." },
-      { action: "change_permissions", sentence: "Never change anyone's access." },
-    ],
-    approval: [
-      { action: "reply", sentence: "Ask before confirming receipt to a customer." },
-      { action: "send_message", sentence: "Ask before sending a message." },
-    ],
-    escalation: { primary: "Business owner", secondary: null },
-    budget: { dailyMessages: 10, timezone: "UTC" },
-    hours: { timezone: "UTC", days: [1, 2, 3, 4, 5], start: "08:00", end: "18:00" },
-  });
-}
-
 export async function executeInquirySurface(input: {
   context: SurfaceContext;
   action: InquirySurfaceAction;
@@ -798,6 +802,7 @@ export async function executeInquirySurface(input: {
   let why: import("./contracts").WhyResult | undefined;
   let affectedRecordIds: string[] | undefined;
   let message: string | undefined;
+  let patternUpdate: InquirySurfaceResult["patternUpdate"];
   const persist = true;
   const nextConfig = context.config;
 
@@ -811,7 +816,7 @@ export async function executeInquirySurface(input: {
       break;
     case "accept-shape":
       work = engine.acceptShape(action.requestId, { ...action.input, actorId });
-      ensureResponsibility(engine, work, actorId);
+      ensurePatternResponsibility(engine, work, actorId);
       break;
     case "edit": {
       const result = engine.applyDraftEdit(action.requestId, { ...action.input, actorId });
@@ -918,25 +923,19 @@ export async function executeInquirySurface(input: {
       message = "Review the proposed shape before making a change.";
       break;
     }
+    case "propose-pattern-update":
+    case "stage-pattern-update": {
+      const result = await executePatternUpdateAction({ engine, action, actorId, repository: context.repository });
+      patternUpdate = result.proposal;
+      work = result.work;
+      change = result.change;
+      message = result.message;
+      break;
+    }
     case "use-pattern": {
-      const local = engine._state().capabilities.find((item) => item.id === action.patternId && item.status === "live" && item.live);
-      const source = local ? null : await resolveInquiryPattern(action.patternId, context.repository);
-      if (!local && !source) throw new InquiryValidationError("This pattern changed or is no longer available to your account. Refresh the list.");
-      const crossBusiness = source && source.definition.businessId !== context.businessId;
-      work = engine.copyPattern(source?.definition.id ?? action.patternId, {
-        sourceCapabilityId: source?.definition.id ?? action.patternId,
-        ...(crossBusiness ? { sourceDefinition: source.definition, sourceBusinessId: source.definition.businessId } : {}),
-        targetBusinessId: context.businessId, targetActorId: actorId, destination: action.destination ?? "your team",
-        emailConnection: { status: "missing", consent: "missing", lastCheckedAt: null },
-      });
-      if (source && source.sourceBusinessName !== context.config.siteName && work.draft) {
-        const brand = (value: string) => value.split(source.sourceBusinessName).join(context.config.siteName);
-        const fields = [{ path: "form.title", value: work.draft.form.title }, { path: "form.intro", value: work.draft.form.intro }, ...(work.draft.followUp ? [{ path: "followUp.messageTemplate", value: work.draft.followUp.messageTemplate }] : [])];
-        const edits = fields.filter((field) => brand(field.value) !== field.value).map((field) => ({ actorId, source: "words" as const, path: field.path, after: brand(field.value) }));
-        if (edits.length) work = engine.applyDraftEdits(work.id, edits).work;
-      }
-      ensureResponsibility(engine, work, actorId);
-      message = "Pattern copied as a draft. Review this business's wording and staff destination, connect its own accounts, and rehearse before making it live.";
+      const result = await executePatternCopyAction({ engine, action, actorId, businessId: context.businessId, businessName: context.config.siteName, repository: context.repository });
+      work = result.work;
+      message = result.message;
       break;
     }
   }
@@ -984,5 +983,5 @@ export async function executeInquirySurface(input: {
     ? { ...workspace, snapshot: await (context.repository ?? getInquiryRepository()).getSnapshot(context.tenantId, context.businessId), recordOverlays: await (context.repository ?? getInquiryRepository()).getRecordOverlays(context.tenantId, context.businessId) }
     : workspace;
   const projected = await surfaceSnapshot(context, resultWorkspace, nextConfig, persist ? undefined : engine.snapshot());
-  return { snapshot: projected, ...(work ? { work: projected.state.requests.find((item) => item.id === work.id) ?? work } : {}), ...(record ? { record } : {}), ...(change ? { change } : {}), ...(rehearsal ? { rehearsal } : {}), ...(why ? { why } : {}), ...(affectedRecordIds ? { affectedRecordIds } : {}), ...(message ? { message } : {}) };
+  return { snapshot: projected, ...(work ? { work: projected.state.requests.find((item) => item.id === work.id) ?? work } : {}), ...(record ? { record } : {}), ...(change ? { change } : {}), ...(rehearsal ? { rehearsal } : {}), ...(patternUpdate ? { patternUpdate } : {}), ...(why ? { why } : {}), ...(affectedRecordIds ? { affectedRecordIds } : {}), ...(message ? { message } : {}) };
 }

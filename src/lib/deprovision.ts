@@ -35,7 +35,7 @@ export const TENANT_SCOPED_TABLES = [
   "collection_entries", "reviews", "suggestions", "content", "content_versions",
   "domain_claims", "draft_content", "draft_page_config", "inbox_items",
   "integrations", "invites", "mail_log", "memberships", "newsletter_subscribers",
-  "inquiry_record_overlays", "inquiry_publication_claims", "inquiry_workspaces",
+  "inquiry_record_overlays", "inquiry_publication_claims", "inquiry_workspaces", "job_economics",
   "page_config", "pay_links", "reward_members", "reward_transactions",
   "scan_history", "scan_results", "search_console_data", "site_metrics",
   "site_snapshots", "social_posts", "subscription_items", "unified_events",

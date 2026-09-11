@@ -65,6 +65,10 @@ insert into public.tenants (id, stable_id) values
 insert into public.inquiry_workspaces (tenant_id, business_id, state)
 values ('fictional-tenant', 'fictional-business', '{"inquiries": []}'::jsonb);
 
+update public.inquiry_workspaces
+set state = '{"inquiries": [], "references": [{"businessId": "fictional-business"}]}'::jsonb
+where tenant_id = 'fictional-tenant' and business_id = 'fictional-business';
+
 select pg_temp.assert_true(
   (select tenant_stable_id = '10000000-0000-4000-8000-000000000001'::uuid
    from public.inquiry_workspaces where tenant_id = 'fictional-tenant'),
@@ -145,6 +149,50 @@ set status = 'verification_failed',
     failure_reason = 'Published configuration requires read-back verification.',
     updated_at = now()
 where id = '20000000-0000-4000-8000-000000000001';
+
+-- A tenant slug is a mutable routing label. Renaming it must move the
+-- tenant-scoped rows while retaining the stable tenant and business
+-- identities, including the immutable state references and publication
+-- evidence.
+update public.tenants
+set id = 'renamed-fictional-tenant'
+where id = 'fictional-tenant';
+
+select pg_temp.assert_true(
+  (
+    select count(*) = 1
+      and bool_and(tenant_id = 'renamed-fictional-tenant'
+        and tenant_stable_id = '10000000-0000-4000-8000-000000000001'::uuid
+        and business_id = 'fictional-business'
+        and state->'inquiries' = '[]'::jsonb
+        and state->'references'->0->>'businessId' = 'fictional-business')
+    from public.inquiry_workspaces
+  ),
+  'tenant slug rename must preserve inquiry workspace identity and state'
+);
+
+select pg_temp.assert_true(
+  (
+    select count(*) = 1
+      and bool_and(tenant_id = 'renamed-fictional-tenant'
+        and tenant_stable_id = '10000000-0000-4000-8000-000000000001'::uuid
+        and business_id = 'fictional-business')
+    from public.inquiry_record_overlays
+  ),
+  'tenant slug rename must preserve inquiry overlay identity'
+);
+
+select pg_temp.assert_true(
+  (
+    select count(*) = 1
+      and bool_and(tenant_id = 'renamed-fictional-tenant'
+        and tenant_stable_id = '10000000-0000-4000-8000-000000000001'::uuid
+        and business_id = 'fictional-business'
+        and status = 'verification_failed')
+    from public.inquiry_publication_claims
+  ),
+  'tenant slug rename must preserve publication claim identity and evidence'
+);
 
 do $$
 declare caught text;

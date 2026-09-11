@@ -6,8 +6,10 @@ import { TextInput } from "@/components/ui/TextInput";
 import { filterTrackerRows } from "@/products/tracker";
 import type { TrackerHistoryEntry, TrackerImportPreview, TrackerMappingSelection, TrackerSnapshot } from "@/products/tracker/contracts";
 import { TrackerExperimentForm } from "./TrackerExperimentForm";
+import { trackerReceiptChanges, trackerUndoBlock } from "@/products/tracker/changes";
+import { TRACKER_TEMPLATES, trackerTemplateSource, type TrackerTemplateId } from "@/products/tracker/templates";
 
-type Props = { workspaceId: string; workId?: string; readOnly?: boolean; onSaved?: (id: string) => void; transport?: TrackerTransport };
+type Props = { workspaceId: string; workId?: string; readOnly?: boolean; onSaved?: (id: string) => void; transport?: TrackerTransport; templateId?: TrackerTemplateId };
 type TrackerSourceInput = { fileName: string; mimeType: "text/csv"; content: string };
 export type TrackerSavedResult = { workId: string; workspaceId: string; tracker: TrackerSnapshot; canRecordExperiment?: boolean };
 
@@ -38,6 +40,7 @@ async function request(body: Record<string, unknown>) {
 }
 
 function sourceRowLabel(entry: TrackerHistoryEntry): string {
+  if (entry.changes) return `${new Set(entry.changes.map(change => change.rowId)).size} rows`;
   return entry.sourceLineage ? `Source row ${entry.sourceLineage.sourceRow}` : "Added row";
 }
 
@@ -47,6 +50,8 @@ function historyDescription(entry: TrackerHistoryEntry, tracker: TrackerSnapshot
     return `Changed ${column?.label ?? "a field"} from “${entry.before ?? ""}” to “${entry.after ?? ""}”`;
   }
   if (entry.kind === "add_row") return "Added a row";
+  if (entry.kind === "bulk_update") return `Changed ${entry.changes?.length ?? 0} fields together`;
+  if (entry.kind === "undo_change") return `Undid a change to ${entry.changes?.length ?? 0} fields`;
   return "Removed a row from the active view";
 }
 
@@ -54,7 +59,7 @@ export function TrackerExperience(props: Props) {
   return <TrackerSession key={`${props.workspaceId}:${props.workId ?? "new"}`} {...props} />;
 }
 
-function TrackerSession({ workspaceId, workId, readOnly = false, onSaved, transport = serverTransport }: Props) {
+function TrackerSession({ workspaceId, workId, readOnly = false, onSaved, transport = serverTransport, templateId }: Props) {
   const [source, setSource] = useState<TrackerSourceInput | null>(null);
   const [preview, setPreview] = useState<TrackerImportPreview | null>(null);
   const [mapping, setMapping] = useState<TrackerMappingSelection[]>([]);
@@ -66,6 +71,9 @@ function TrackerSession({ workspaceId, workId, readOnly = false, onSaved, transp
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [editing, setEditing] = useState<{ rowId: string; columnId: string; value: string } | null>(null);
+  const [selectedRows, setSelectedRows] = useState<string[]>([]);
+  const [bulk, setBulk] = useState<{ columnId: string; value: string; reviewed: boolean }>({ columnId: "", value: "", reviewed: false });
+  const [newRow, setNewRow] = useState<Record<string, string> | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -108,6 +116,13 @@ function TrackerSession({ workspaceId, workId, readOnly = false, onSaved, transp
     finally { setBusy(false); }
   }
 
+  async function chooseTemplate(id: TrackerTemplateId) {
+    if (readOnly || busy) return;
+    const input = trackerTemplateSource(id);
+    await inspect(new File([input.content], input.fileName, { type: input.mimeType }));
+    setTitle(TRACKER_TEMPLATES.find(template => template.id === id)!.name);
+  }
+
   async function create() {
     if (!source || !preview) return;
     if (readOnly) {
@@ -145,6 +160,17 @@ function TrackerSession({ workspaceId, workId, readOnly = false, onSaved, transp
     finally { setBusy(false); }
   }
 
+  async function changeRows(command: Record<string, unknown>) {
+    if (!saved || readOnly || busy) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const result = await transport.write({ action: "command", workId: saved.workId, command: { ...command, commandId: crypto.randomUUID(), baseRevision: saved.tracker.revision } }) as Saved;
+      setSaved(result); setSelectedRows([]); setBulk({ columnId: "", value: "", reviewed: false }); setEditing(null); setNewRow(null);
+      setNotice(transport.mode === "local-preview" ? "Change recorded in this preview only." : "Change saved with one receipt.");
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "The change could not be saved."); }
+    finally { setBusy(false); }
+  }
+
   const tracker = saved?.tracker;
   const matchingRows = tracker ? filterTrackerRows(tracker, { query }) : [];
   const pageCount = Math.max(1, Math.ceil(matchingRows.length / ROWS_PER_PAGE));
@@ -155,13 +181,13 @@ function TrackerSession({ workspaceId, workId, readOnly = false, onSaved, transp
   const canCreate = Boolean(preview?.validation.valid && mappingReady);
   const pageStatus = matchingRows.length
     ? `Page ${currentPage + 1} of ${pageCount}. Showing rows ${pageStart + 1} to ${Math.min(pageStart + ROWS_PER_PAGE, matchingRows.length)} of ${matchingRows.length} matching rows.`
-    : "No rows match this filter.";
+    : query ? "No rows match this filter." : "No records yet. Add your first record when you are ready.";
 
   return <section className="mx-auto w-full max-w-5xl space-y-6 p-4 sm:p-8" aria-label="Spreadsheet tracker" aria-busy={busy}>
     <header>
       <p className="text-sm text-gray-muted">Experimental · Spreadsheet tracker</p>
       <h1 className="font-display text-2xl">{tracker?.title ?? "Turn a spreadsheet into a tracker"}</h1>
-      <p className="mt-2 text-sm text-gray-muted">Review the fields, save your tracker, and keep a history of edits. CSV only; formulas are not calculated.</p>
+      <p className="mt-2 text-sm text-gray-muted">Start with suggested fields or import a CSV. Review changes and keep a history you can undo. Formulas are not calculated.</p>
     </header>
 
     {error ? <p id="tracker-error" role="alert" aria-live="assertive" className="text-critical">{error} {workId ? <button type="button" className="underline" onClick={() => window.location.reload()}>Reload tracker</button> : null}</p> : null}
@@ -170,6 +196,11 @@ function TrackerSession({ workspaceId, workId, readOnly = false, onSaved, transp
     {workId && !saved && !error ? <p role="status" aria-live="polite">Loading saved tracker…</p> : null}
 
     {!workId && !saved ? <>
+      <section aria-label="Start from a template" className="space-y-3">
+        <h2 className="font-display text-lg">Start with a useful set of fields</h2>
+        <p className="text-sm text-gray-muted">These start empty. Review the fields before creating your list. Quantities stay as entered; no calculations or automatic reminders run.</p>
+        <div className="flex flex-wrap gap-2">{TRACKER_TEMPLATES.map(template => <Button key={template.id} type="button" variant={template.id === templateId ? "primary" : "secondary"} disabled={busy || readOnly} onClick={() => void chooseTemplate(template.id)}>{template.name}</Button>)}</div>
+      </section>
       <div>
         <label htmlFor="tracker-file" className="block text-sm">Choose a CSV file</label>
         <input id="tracker-file" type="file" accept=".csv,text/csv" disabled={busy || readOnly} onChange={(event) => { const file = event.target.files?.[0]; if (file) void inspect(file); }} className="mt-2 max-w-full text-sm" />
@@ -220,12 +251,32 @@ function TrackerSession({ workspaceId, workId, readOnly = false, onSaved, transp
     </> : null}
 
     {tracker ? <>
+      {!readOnly && !newRow ? <Button type="button" variant="secondary" disabled={busy || tracker.rows.length >= 1000} onClick={() => setNewRow({})}>Add a record</Button> : null}
+      {newRow && !readOnly ? <form aria-label="New tracker record" className="space-y-3 border-y border-gray-border py-4" onSubmit={event => { event.preventDefault(); void changeRows({ kind: "add_row", rowId: crypto.randomUUID(), values: newRow }); }}>
+        <h2 className="font-display text-lg">New record</h2>
+        <div className="grid gap-3 sm:grid-cols-2">{tracker.columns.map(column => <TextInput key={column.id} label={column.label} value={newRow[column.id] ?? ""} maxLength={10000} disabled={busy} onChange={event => setNewRow(current => ({ ...current, [column.id]: event.target.value }))} />)}</div>
+        <Button type="submit" disabled={busy || !Object.values(newRow).some(value => value.trim())}>Save record</Button>
+        <Button type="button" variant="secondary" disabled={busy} onClick={() => setNewRow(null)}>Cancel new record</Button>
+      </form> : null}
       <TextInput label="Filter rows" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search any field" />
+      {selectedRows.length > 0 && !readOnly ? <form aria-label="Change selected rows" className="space-y-3 border-y border-gray-border py-4" onSubmit={event => { event.preventDefault(); setBulk(current => ({ ...current, reviewed: true })); }}>
+        <p>{selectedRows.length} rows selected, including any hidden by your filter.</p>
+        <label className="block text-sm">Field to change<select aria-label="Field to change" value={bulk.columnId} required disabled={busy} className="ml-3 rounded border border-gray-border bg-surface-inset p-2" onChange={event => setBulk(current => ({ ...current, columnId: event.target.value, reviewed: false }))}><option value="">Choose a field</option>{tracker.columns.map(column => <option key={column.id} value={column.id}>{column.label}</option>)}</select></label>
+        <TextInput label="Value for selected rows" value={bulk.value} disabled={busy} maxLength={10000} onChange={event => setBulk(current => ({ ...current, value: event.target.value, reviewed: false }))} />
+        {bulk.reviewed && bulk.columnId ? <section aria-label="Proposed change" className="space-y-2">
+          <h2 className="font-display text-lg">Review this change</h2>
+          <ul className="max-h-56 overflow-auto text-sm">{tracker.rows.filter(row => selectedRows.includes(row.id)).map(row => <li key={row.id} className="py-1">Source row {row.lineage?.sourceRow ?? "added"}: {row.cells[bulk.columnId]?.value || "Empty"} → {bulk.value || "Empty"}</li>)}</ul>
+          <p className="text-sm text-gray-muted">One change with one Undo. Fields that already match stay unchanged.</p>
+          <Button type="button" disabled={busy} onClick={() => void changeRows({ kind: "bulk_update", rowIds: selectedRows, columnId: bulk.columnId, value: bulk.value })}>Apply selected changes</Button>
+        </section> : <Button type="submit" disabled={busy || !bulk.columnId}>Review selected changes</Button>}
+        <Button type="button" variant="secondary" disabled={busy} onClick={() => { setSelectedRows([]); setBulk(current => ({ ...current, reviewed: false })); }}>Clear selection</Button>
+      </form> : null}
       <div className="overflow-x-auto rounded-lg border border-gray-border" tabIndex={0} role="region" aria-label="Tracker rows, scroll horizontally for more fields">
         <table id="tracker-rows" className="w-full min-w-max text-left text-sm">
           <caption className="p-3 text-left">{pageStatus} Source: {tracker.source.originalFileName}.</caption>
-          <thead><tr><th scope="col" className="p-3">Source row</th>{tracker.columns.map((column) => <th scope="col" className="p-3" key={column.id}>{column.label}</th>)}</tr></thead>
+          <thead><tr>{!readOnly ? <th scope="col" className="p-3"><span className="sr-only">Select rows</span></th> : null}<th scope="col" className="p-3">Source row</th>{tracker.columns.map((column) => <th scope="col" className="p-3" key={column.id}>{column.label}</th>)}</tr></thead>
           <tbody>{visibleRows.map((row) => <tr key={row.id} className="border-t border-gray-border">
+            {!readOnly ? <td className="p-3"><input type="checkbox" aria-label={`Select source row ${row.lineage?.sourceRow ?? row.id}`} disabled={busy} checked={selectedRows.includes(row.id)} onChange={event => { setSelectedRows(current => event.target.checked ? [...current, row.id] : current.filter(id => id !== row.id)); setBulk(current => ({ ...current, reviewed: false })); }} /></td> : null}
             <th scope="row" className="p-3 font-normal">{row.lineage?.sourceRow ?? "Added"}</th>
             {tracker.columns.map((column) => {
               const value = row.cells[column.id]?.value ?? row.cells[column.fieldKey]?.value ?? "";
@@ -242,7 +293,6 @@ function TrackerSession({ workspaceId, workId, readOnly = false, onSaved, transp
           <Button type="button" variant="secondary" size="sm" onClick={() => setPage((current) => Math.min(pageCount - 1, Math.max(current, 0) + 1))} disabled={currentPage >= pageCount - 1}>Next rows</Button>
         </div>
       </nav>
-      {!matchingRows.length ? <p role="status">No rows match this filter.</p> : null}
 
       {editing && !readOnly ? <form aria-labelledby="tracker-edit-title" className="space-y-3 border-t border-gray-border pt-4" onSubmit={(event) => { event.preventDefault(); void saveCell(); }}>
         <h2 id="tracker-edit-title" className="font-display text-lg">Edit cell</h2>
@@ -254,7 +304,7 @@ function TrackerSession({ workspaceId, workId, readOnly = false, onSaved, transp
         <h2 id="tracker-history-title" className="font-display text-lg">Edit history</h2>
         {tracker.history.length ? <>
           <p className="mt-2 text-sm text-gray-muted">{tracker.history.length} recorded edit{tracker.history.length === 1 ? "" : "s"}. Showing the latest {Math.min(20, tracker.history.length)}.</p>
-          <ol className="mt-3 space-y-2 text-sm" aria-label="Tracker edit history">{tracker.history.slice(-20).reverse().map((entry) => <li key={entry.commandId} className="rounded-lg border border-gray-border px-3 py-2"><p>{historyDescription(entry, tracker)}</p><p className="mt-1 text-xs text-gray-muted">Revision {entry.revision} · {sourceRowLabel(entry)} · <time dateTime={entry.at}>{new Date(entry.at).toLocaleString()}</time></p></li>)}</ol>
+          <ol className="mt-3 space-y-2 text-sm" aria-label="Tracker edit history">{tracker.history.slice(-20).reverse().map((entry) => <li key={entry.commandId} className="rounded-lg border border-gray-border px-3 py-2"><p>{historyDescription(entry, tracker)}</p><p className="mt-1 text-xs text-gray-muted">Revision {entry.revision} · {sourceRowLabel(entry)} · <time dateTime={entry.at}>{new Date(entry.at).toLocaleString()}</time></p>{entry.changes ? <details className="mt-2"><summary>Before and after</summary><ul>{entry.changes.map(change => <li key={`${change.rowId}:${change.columnId}`}>{tracker.columns.find(column => column.id === change.columnId)?.label}: {change.before || "Empty"} → {change.after || "Empty"}</li>)}</ul></details> : null}{!readOnly && entry.kind !== "undo_change" && trackerReceiptChanges(entry).length ? <div className="mt-2"><Button size="sm" variant="secondary" disabled={busy || Boolean(trackerUndoBlock(tracker, entry))} onClick={() => void changeRows({ kind: "undo_change", targetCommandId: entry.commandId })}>Undo change {entry.revision}</Button>{trackerUndoBlock(tracker, entry) ? <p className="mt-1 text-xs text-gray-muted">{trackerUndoBlock(tracker, entry)}</p> : null}</div> : null}</li>)}</ol>
         </> : <p className="mt-2 text-sm text-gray-muted">No edits yet. The imported source is preserved.</p>}
       </section>
       {saved?.canRecordExperiment && !readOnly ? <TrackerExperimentForm workId={saved.workId} expectedRevision={saved.tracker.revision} /> : null}

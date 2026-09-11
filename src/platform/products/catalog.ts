@@ -470,6 +470,20 @@ export const PRODUCT_CATALOG = [
       note: "The tracker is discoverable only through the authenticated workspace route while the workspace release flag is enabled. It is not a standalone public product claim.",
     },
   },
+  {
+    id: "documents",
+    name: "Documents",
+    promise: "Write procedures, proposals, and notes with reviewed changes and a saved history.",
+    resources: [{ kind: "document", label: "Private document", ownership: "customer_account", description: "Workspace-owned text and its revision history." }],
+    operations: [
+      { id: "create_document", label: "Create a document", resourceKind: "document", effect: "create_resource", support: "release_gated", description: "Review and save private text in your workspace." },
+      { id: "edit_document", label: "Edit a document", resourceKind: "document", effect: "propose_change", support: "release_gated", description: "Review revisions and undo the latest edit without publishing externally." },
+    ],
+    presentations: [{ mode: "document", primary: true, description: "Text editor, change review, and revision receipts." }],
+    distribution: [{ id: "workspace_document", kind: "client_workspace", label: "Workspace document", href: "/workspace?view=document", status: "restricted", description: "Requires a verified workspace member and the workspace release gate." }],
+    controls: { enforcement: "executing_use_case", access: ["authenticated_person", "scoped_delegation"], approval: "operation_policy", note: "Membership controls writes. Read grants never allow edits, and document content cannot grant permission." },
+    release: { availability: "public", releaseOne: false, gates: [{ id: "document_local", label: "Local document implementation", state: "partial", evidence: "Private document commands exist behind the workspace release gate. Not deployed." }], note: "Internal strelvav2 capability. Public discovery does not authorize production activation." },
+  },
 ] as const satisfies readonly ProductDefinition[];
 
 const PRODUCT_BY_ID: ReadonlyMap<ProductId, ProductDefinition> = new Map(

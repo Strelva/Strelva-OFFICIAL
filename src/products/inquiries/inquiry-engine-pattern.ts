@@ -9,6 +9,7 @@ import type {
 } from "./contracts";
 import { planFor } from "./inquiry-engine-support";
 import { InquiryEngineHost, actor, allInquiryIds, changeSummary, clean, clone, definitionItems, ensureDefinition, equal, json, time, appendTimeline } from "./inquiry-engine-operations";
+import { patternShape, registerPatternInstallation } from "./inquiry-pattern-updates";
 
 function capabilityForPattern(source: InquiryCapabilityDefinition, host: InquiryEngineHost, input: PatternCopyInput): InquiryCapabilityDefinition {
   const now = time(host, input.now);
@@ -36,6 +37,9 @@ export function copyPattern(host: InquiryEngineHost, sourceCapabilityId: string,
     if (sourceDefinition.businessId !== input.sourceBusinessId) throw new Error("The supplied pattern does not belong to its declared source business.");
     ensureDefinition(sourceDefinition);
   }
+  // Validate the source projection before allocating target capability state.
+  // A rejected private/secret value must leave the engine untouched.
+  patternShape(sourceDefinition);
   const target = capabilityForPattern(sourceDefinition, host, input);
   const now = time(host, input.now);
   const requestId = input.requestId?.trim() || host._id("request");
@@ -101,6 +105,11 @@ export function copyPattern(host: InquiryEngineHost, sourceCapabilityId: string,
   host._state().capabilities.unshift(capability);
   host._state().requests.unshift(work);
   host._state().changes.unshift(receipt);
+  registerPatternInstallation(host, sourceDefinition, target, {
+    sourceBusinessId: sourceDefinition.businessId,
+    sourceCapabilityId: sourceDefinition.id,
+    now,
+  });
   work.activeChangeId = receipt.id;
   host._addActionReceipt({
     businessId: host.businessId,

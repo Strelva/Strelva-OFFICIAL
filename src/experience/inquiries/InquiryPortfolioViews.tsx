@@ -7,7 +7,7 @@ import type {
   InquiryPatternSummary,
   InquiryPortfolio,
 } from "@/products/inquiries/contracts";
-import type { InquirySurfaceSnapshot } from "./contracts";
+import type { InquirySurfaceResult, InquirySurfaceSnapshot } from "./contracts";
 import { useInquiry } from "./context";
 import styles from "./inquiry.module.css";
 
@@ -133,7 +133,10 @@ export function InquiryPatternsView() {
   const { snapshot, navigate, perform, pending, can } = useInquiry();
   const { state, retry } = usePortfolio();
   const [destinations, setDestinations] = useState<Record<string, string>>({});
+  const [proposals, setProposals] = useState<Record<string, NonNullable<InquirySurfaceResult["patternUpdate"]>>>({});
+  const [choices, setChoices] = useState<Record<string, "local" | "source">>({});
   const patterns = state.status === "ready" ? state.portfolio.patterns : [];
+  const installations = snapshot.patternInstallations ?? [];
   async function apply(event: FormEvent<HTMLFormElement>, pattern: InquiryPatternSummary) {
     event.preventDefault();
     const destination = destinations[pattern.id]?.trim();
@@ -141,11 +144,30 @@ export function InquiryPatternsView() {
     const result = await perform({ kind: "use-pattern", patternId: pattern.id, businessId: snapshot.business.id, destination, actorId: snapshot.business.role === "agency_member" ? "agency-member" : "business-owner" });
     if (result?.work) navigate("shape", { requestId: result.work.id });
   }
+  async function checkForUpdate(installation: NonNullable<InquirySurfaceSnapshot["patternInstallations"]>[number]) {
+    if (!can("canEdit")) return;
+    const result = await perform({ kind: "propose-pattern-update", installationId: installation.id, capabilityId: installation.capabilityId, actorId: snapshot.business.role === "agency_member" ? "agency-member" : "business-owner" });
+    if (result?.patternUpdate) setProposals((current) => ({ ...current, [installation.id]: result.patternUpdate! }));
+  }
+  async function stageUpdate(installation: NonNullable<InquirySurfaceSnapshot["patternInstallations"]>[number], proposal: NonNullable<InquirySurfaceResult["patternUpdate"]>) {
+    if (!can("canEdit") || proposal.status === "up_to_date") return;
+    const resolutions = proposal.conflicts.map((conflict) => ({ path: conflict.path, choice: choices[`${installation.id}:${conflict.path}`] })).filter((item): item is { path: string; choice: "local" | "source" } => Boolean(item.choice));
+    if (resolutions.length !== proposal.conflicts.length) return;
+    const result = await perform({ kind: "stage-pattern-update", installationId: installation.id, capabilityId: installation.capabilityId, sourceVersion: proposal.sourceVersion, resolutions, actorId: snapshot.business.role === "agency_member" ? "agency-member" : "business-owner" });
+    if (result?.work) navigate("work", { requestId: result.work.id });
+  }
   return <div className={styles.page}>
     <PageHeader eyebrow="PATTERNS" title="Reuse an inquiry setup." description="Choose a setup from a business you can access. Check the wording and staff, then rehearse the new draft before making it live." />
     <PortfolioStatus state={state} retry={retry} />
     {state.status === "ready" && state.portfolio.unavailableTenantIds.length > 0 ? <p className={styles.readOnlyCopy} role="status">Some businesses could not be checked, so their patterns are not shown.</p> : null}
     {state.status === "ready" && patterns.length === 0 ? <section className={styles.missingEvidence}><CircleHelp size={18} aria-hidden="true" /><h2 className="font-display">No reusable patterns are available.</h2><p>A live inquiry shape will appear here after its source business can be checked.</p></section> : null}
     {patterns.length > 0 ? <section className={styles.patternsPanel} aria-labelledby="portfolio-patterns-title"><div className={styles.panelHeading}><div><span className={styles.eyebrow}>AVAILABLE SHAPES</span><h2 id="portfolio-patterns-title" className="font-display">Choose a starting shape</h2></div></div><div className={styles.patternRows}>{patterns.map((pattern) => <form className={styles.patternRow} key={pattern.id} onSubmit={(event) => void apply(event, pattern)}><div><h3 className="font-display">{pattern.name}</h3><p>Source: {pattern.sourceBusinessName} · version {pattern.version}</p><small>{pattern.cleanReceiptCount} verified receipt{pattern.cleanReceiptCount === 1 ? "" : "s"}. Source permissions and staff routing are not copied.</small></div><label><span>Destination for {snapshot.business.name}</span><input type="email" required autoComplete="email" value={destinations[pattern.id] ?? ""} onChange={(event) => setDestinations((current) => ({ ...current, [pattern.id]: event.target.value }))} placeholder="team@example.com" disabled={pending || !can("canStart")} /></label><button type="submit" className={styles.primaryButton} disabled={pending || !can("canStart") || !destinations[pattern.id]?.trim()}>{pending ? "Preparing…" : "Copy to this business"}</button></form>)}</div></section> : null}
+    {installations.length > 0 ? <section className={styles.patternsPanel} aria-labelledby="installed-patterns-title"><div className={styles.panelHeading}><div><span className={styles.eyebrow}>INSTALLED PATTERNS</span><h2 id="installed-patterns-title" className="font-display">Review source updates</h2><p>Each update keeps this business&apos;s local wording and routing unless you choose the source value.</p></div></div><div className={styles.patternRows}>{installations.map((installation) => { const proposal = proposals[installation.id]; const choiceCount = proposal?.conflicts.filter((conflict) => choices[`${installation.id}:${conflict.path}`]).length ?? 0; return <div className={styles.patternRow} key={installation.id}><div><h3 className="font-display">{installation.capabilityId}</h3><p>Source {installation.sourceBusinessId} · pinned v{installation.sourceVersion} · installed v{installation.targetVersion}</p><small>{installation.status === "installed" ? "Up to date until the source publishes a newer version." : installation.status === "conflicted" ? "A source update needs an explicit local or source choice." : "A source update is waiting for review."}</small></div><div className={styles.patternUpdateActions}><button type="button" className={styles.secondaryButton} onClick={() => void checkForUpdate(installation)} disabled={pending || !can("canEdit")}>{pending ? "Checking…" : "Check for updates"}</button>{proposal && proposal.status !== "up_to_date" ? <><div className={styles.patternUpdateSummary} role="status">Source v{proposal.sourceVersion} proposes target v{proposal.targetVersion}. {proposal.conflicts.length > 0 ? `${choiceCount} of ${proposal.conflicts.length} conflicts resolved.` : "No local conflicts found."}</div>{proposal.conflicts.map((conflict) => { const key = `${installation.id}:${conflict.path}`; const selected = choices[key]; return <fieldset className={styles.patternConflict} key={conflict.path}><legend>{conflict.path}</legend><p>Source: {patternValue(conflict.sourceAfter)} · Local: {patternValue(conflict.localValue)}</p><button type="button" className={selected === "local" ? styles.primaryButton : styles.secondaryButton} aria-pressed={selected === "local"} onClick={() => setChoices((current) => ({ ...current, [key]: "local" }))}>Keep local</button><button type="button" className={selected === "source" ? styles.primaryButton : styles.secondaryButton} aria-pressed={selected === "source"} onClick={() => setChoices((current) => ({ ...current, [key]: "source" }))}>Use source</button></fieldset>; })}<button type="button" className={styles.primaryButton} onClick={() => void stageUpdate(installation, proposal)} disabled={pending || !can("canEdit") || choiceCount !== proposal.conflicts.length}>{pending ? "Staging…" : "Stage update for rehearsal"}</button></> : proposal ? <p className={styles.readOnlyCopy} role="status">This installation is already on source version {proposal.sourceVersion}.</p> : null}</div></div>; })}</div></section> : null}
   </div>;
+}
+
+function patternValue(value: unknown): string {
+  if (value === null || value === undefined) return "Empty";
+  if (typeof value === "string") return value;
+  try { return JSON.stringify(value); } catch { return "Unavailable"; }
 }

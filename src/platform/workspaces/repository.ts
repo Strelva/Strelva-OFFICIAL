@@ -270,6 +270,12 @@ export async function assertCanSaveWork(input: WorkspaceActor, workspaceId: stri
   if ((count ?? 0) >= MAX_WORK_PER_WORKSPACE) throw new WorkspaceConflictError("Saved work limit reached");
 }
 
+/** Authorize a direct workspace member without consuming the saved-work cap. */
+export async function assertWorkspaceMember(input: WorkspaceActor, workspaceId: string): Promise<void> {
+  const a = actor(input);
+  await requireMember(a.userId, workspaceId);
+}
+
 export async function saveWork(input: WorkspaceActor, workspaceId: string, work: SaveWorkInput): Promise<SavedWork> {
   const a = actor(input);
   await assertCanSaveWork(a, workspaceId);

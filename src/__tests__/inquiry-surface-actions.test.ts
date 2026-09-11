@@ -31,6 +31,16 @@ describe("inquiry surface action boundary", () => {
     }, "owner-1", "business-stable")).toThrow("A pattern can only be installed in the selected business.");
   });
 
+  it("binds pattern update commands to the authenticated actor and validates explicit choices", () => {
+    expect(parseInquirySurfaceAction({ kind: "propose-pattern-update", installationId: "install-1", capabilityId: "capability-1", actorId: "attacker" }, "owner-1", "business-stable")).toEqual({
+      kind: "propose-pattern-update", installationId: "install-1", capabilityId: "capability-1", actorId: "owner-1",
+    });
+    expect(parseInquirySurfaceAction({ kind: "stage-pattern-update", installationId: "install-1", capabilityId: "capability-1", sourceVersion: 4, resolutions: [{ path: "form.title", choice: "local" }], actorId: "attacker" }, "owner-1", "business-stable")).toEqual({
+      kind: "stage-pattern-update", installationId: "install-1", capabilityId: "capability-1", sourceVersion: 4, resolutions: [{ path: "form.title", choice: "local" }], actorId: "owner-1",
+    });
+    expect(() => parseInquirySurfaceAction({ kind: "stage-pattern-update", installationId: "install-1", capabilityId: "capability-1", sourceVersion: 4, resolutions: [{ path: "form.title", choice: "skip" }], actorId: "attacker" }, "owner-1", "business-stable")).toThrow("local or source");
+  });
+
   it("binds contextual requests and rule edits to the authenticated actor", () => {
     expect(parseInquirySurfaceAction({ kind: "contextual-request", inquiryId: "inquiry-1", intent: "Review this record", actorId: "attacker" }, "owner-1", "business-stable")).toEqual({
       kind: "contextual-request",

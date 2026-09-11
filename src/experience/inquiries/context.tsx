@@ -27,6 +27,8 @@ export type InquiryExperienceProps = {
   initialView?: InquiryView;
   initialRequestId?: string | null;
   initialInquiryId?: string | null;
+  /** Request text carried in from the shared workspace start screen. */
+  initialRequestText?: string | null;
   basePath?: string;
   /** Prefix route state when the surface is embedded in another app frame. */
   routePrefix?: string;
@@ -40,6 +42,7 @@ type ProviderProps = {
   initialView: InquiryView;
   initialRequestId?: string | null;
   initialInquiryId?: string | null;
+  initialRequestText?: string | null;
   basePath: string;
   routePrefix?: string;
   children: ReactNode;
@@ -59,6 +62,7 @@ export type InquiryContextValue = {
   view: InquiryView;
   requestId: string | null;
   inquiryId: string | null;
+  initialRequestText: string;
   basePath: string;
   pending: boolean;
   message: string;
@@ -121,6 +125,7 @@ function InquiryProvider({
   initialView,
   initialRequestId,
   initialInquiryId,
+  initialRequestText,
   basePath,
   routePrefix,
   children,
@@ -216,6 +221,7 @@ function InquiryProvider({
     view,
     requestId,
     inquiryId,
+    initialRequestText: initialRequestText || "",
     basePath,
     pending,
     message,

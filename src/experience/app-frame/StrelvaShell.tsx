@@ -2,16 +2,14 @@
 
 import Link from "next/link";
 import { useRef, useState, type RefObject, type ReactNode } from "react";
-import { Boxes, FolderOpen, Home, LifeBuoy, Menu, Plus, Settings2, X, type LucideIcon } from "lucide-react";
+import { Search, Menu, Plus, Settings2, X, type LucideIcon } from "lucide-react";
 import { AppFrame, useHydrationReady } from "./AppFrame";
 import { WorkspaceSignOutButton } from "@/experience/workspace/WorkspaceSignOutButton";
 import styles from "./strelva-shell.module.css";
 
 export type StrelvaSection = "home" | "work" | "products" | "help" | "account";
 export const STRELVA_SECTIONS: readonly { id: StrelvaSection; label: string; icon: LucideIcon }[] = [
-  { id: "home", label: "Home", icon: Home },
-  { id: "work", label: "My work", icon: FolderOpen },
-  { id: "products", label: "Explore", icon: Boxes },
+  { id: "work", label: "Search", icon: Search },
 ];
 
 export function workspaceSectionHref(section: StrelvaSection, base = "") {
@@ -71,11 +69,10 @@ export function StrelvaShell({ children, active, title = "Strelva", context, nav
               <Link href={workspaceSectionHref("home", appBase)} className={styles.brand} onClick={onNavigate ? (event) => { event.preventDefault(); setMobileOpen(false); onNavigate("home"); } : undefined} aria-label="Strelva home"><span className={styles.mark} aria-hidden="true">s</span>Strelva</Link>
               <button className={styles.mobileClose} aria-label="Close navigation" type="button" onClick={() => setMobileOpen(false)}><X size={18} /></button>
             </div>
-            {onStart ? <button className={styles.start} type="button" onClick={() => { setMobileOpen(false); onStart(); }}><Plus size={18} aria-hidden="true" />Start something</button> : <Link className={styles.start} href={workspaceSectionHref("products", appBase)}><Plus size={18} aria-hidden="true" />Start something</Link>}
+            {onStart ? <button className={styles.start} type="button" onClick={() => { setMobileOpen(false); onStart(); }}><Plus size={18} aria-hidden="true" />New</button> : <Link className={styles.start} href={`${appBase}/workspace?view=start`}><Plus size={18} aria-hidden="true" />New</Link>}
             <nav className={styles.primary} aria-label="Main">{STRELVA_SECTIONS.map(({ id, label, icon }) => item(id, label, icon))}</nav>
             <div className={styles.resources} onClick={(event) => { if ((event.target as HTMLElement).closest("a, button")) setMobileOpen(false); }}>{navigation}</div>
             <div className={styles.footer}>
-              {item("help", "Help & service", LifeBuoy)}
               {signedIn ? <>
                 <Link className={styles.account} href={workspaceSectionHref("account", appBase)} aria-current={active === "account" ? "page" : undefined}>
                   <span className={styles.avatar} aria-hidden="true">{accountName.slice(0, 1).toUpperCase()}</span>

@@ -1,5 +1,6 @@
 import { InquiryEngine } from "@/products/inquiries/client";
 import type { InquiryCapabilityDefinition } from "@/products/inquiries/contracts";
+import { commitPatternInstallationAfterVerification, getPatternInstallation, listPatternInstallations, proposePatternUpdate, resolvePatternUpdate, stagePatternUpdate } from "@/products/inquiries/inquiry-pattern-updates";
 import type { InquiryAudience, InquirySurfaceAdapter, InquirySurfaceSnapshot } from "./contracts";
 
 const FIXTURE_TIME = "2026-09-11T14:00:00.000Z";
@@ -75,6 +76,7 @@ export function createPreviewInquiryAdapter(
         provenVersion: capability.live!.version,
         cleanReceiptCount: state.changes.filter((change) => change.capabilityId === capability.id && change.verification?.verified).length,
       })),
+      patternInstallations: listPatternInstallations(engine).map(({ id, capabilityId, sourceBusinessId, sourceCapabilityId, sourceVersion, targetVersion, status, lastProposalId, updatedAt }) => ({ id, capabilityId, sourceBusinessId, sourceCapabilityId, sourceVersion, targetVersion, status, lastProposalId, updatedAt })),
     };
   };
   return {
@@ -138,7 +140,9 @@ export function createPreviewInquiryAdapter(
           const result = await engine.publish(action.requestId, { actorId: action.actorId, version: draft.version, explicit: true });
           if (result.provider.status === "accepted") {
             const observed = publishedFixtures.get(draft.id);
-            engine.recordPublishVerification(action.requestId, { actorId: action.actorId, version: draft.version, verified: JSON.stringify(observed) === JSON.stringify(draft), evidence: ["Read back exact definition from isolated fixture memory; no live website was changed."] });
+            const verified = JSON.stringify(observed) === JSON.stringify(draft);
+            engine.recordPublishVerification(action.requestId, { actorId: action.actorId, version: draft.version, verified, evidence: ["Read back exact definition from isolated fixture memory; no live website was changed."] });
+            if (verified) commitPatternInstallationAfterVerification(engine, { capabilityId: draft.id, actorId: action.actorId });
           }
           return { snapshot: getSnapshot(), work: engine.getWork(action.requestId), change: engine.listChanges(draft.id).find((change) => change.id === result.receipt.id), message: "Rehearsal publication checked. No live website was changed." };
         }
@@ -203,6 +207,23 @@ export function createPreviewInquiryAdapter(
           if (!why.fix || why.fix.targetPath !== action.path) throw new Error("That proposed fix is no longer available. Review the current timeline.");
           const work = engine.start({ actorId: action.actorId, intent: `${why.fix.title}. ${why.fix.reason}`, title: why.fix.title, destination: "maria@example.invalid" });
           return { snapshot: getSnapshot(), work, why, message: "Review the proposed shape before making a change." };
+        }
+        case "propose-pattern-update": {
+          const installation = getPatternInstallation(engine, action.installationId);
+          if (installation.capabilityId !== action.capabilityId) throw new Error("That pattern installation does not belong to this capability.");
+          const source = engine.snapshot().capabilities.find((capability) => capability.id === installation.sourceCapabilityId)?.live;
+          if (!source) throw new Error("The source pattern is unavailable in this preview.");
+          const patternUpdate = proposePatternUpdate(engine, { capabilityId: action.capabilityId, sourceDefinition: source });
+          return { snapshot: getSnapshot(), patternUpdate, message: patternUpdate.status === "up_to_date" ? `This installation already uses source version ${patternUpdate.sourceVersion}.` : "Review the source update and choose what to keep." };
+        }
+        case "stage-pattern-update": {
+          const installation = getPatternInstallation(engine, action.installationId);
+          const source = engine.snapshot().capabilities.find((capability) => capability.id === installation.sourceCapabilityId)?.live;
+          if (!source || source.version !== action.sourceVersion) throw new Error("The source pattern changed. Check for updates again.");
+          const proposal = proposePatternUpdate(engine, { capabilityId: action.capabilityId, sourceDefinition: source });
+          const resolution = resolvePatternUpdate(proposal, action.resolutions);
+          const staged = stagePatternUpdate(engine, { proposal, resolution, actorId: action.actorId });
+          return { snapshot: getSnapshot(), work: staged.work, change: staged.change, patternUpdate: proposal, message: "The pattern update is staged. Run a fresh rehearsal before making it live." };
         }
         case "use-pattern": {
           if (action.businessId !== BUSINESS_ID) throw new Error("This preview only grants access to Buffalo Realty.");

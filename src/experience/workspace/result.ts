@@ -1,11 +1,15 @@
 import type { SavedWork } from "@/platform/workspaces/types";
+import { documentSchema } from "@/products/documents/engine";
+import { workPlanSchema } from "@/products/work-plans/contracts";
+import { parseTrackerWorkPayload } from "@/products/tracker/presentation";
 import type { ProductWorkPresentation } from "@/platform/products/contracts";
 import {
   aiVisibilityWorkPresentation,
   type AiVisibilityResult,
 } from "@/products/ai-visibility/client";
+import { parseTrackerExperimentComparison } from "@/products/tracker/comparison";
 import { presentAssessmentWork, type AssessmentAccess } from "@/products/assessment";
-import type { WorkspaceExperiment, WorkspaceHandoffPreview, WorkspaceSnapshot, WorkspaceWork } from "./contracts";
+import type { WorkspaceExperiment, WorkspaceExperimentComparison, WorkspaceHandoffPreview, WorkspaceLegacyExperiment, WorkspaceSnapshot, WorkspaceWork } from "./contracts";
 
 /**
  * Browser-safe, explicit product renderer registry.
@@ -36,7 +40,7 @@ function readFinite(value: unknown): number | null {
  * Research work is retained in the same workspace table as product work, but
  * its browser projection is deliberately narrower than the stored payload.
  */
-export function parseWorkspaceExperiment(value: unknown): WorkspaceExperiment | null {
+function parseLegacyWorkspaceExperiment(value: unknown): WorkspaceLegacyExperiment | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const source = value as Record<string, unknown>;
   const version = source.version;
@@ -71,6 +75,20 @@ export function parseWorkspaceExperiment(value: unknown): WorkspaceExperiment | 
 }
 
 /**
+ * Preserve the v1 experiment projection while accepting the bounded v2
+ * comparison payload added by the R&D expansion. The server remains the
+ * authority for target work and revision; this parser only shapes persisted
+ * data for the browser.
+ */
+export function parseWorkspaceExperiment(value: unknown): WorkspaceExperiment | null {
+  const comparison = parseTrackerExperimentComparison(value);
+  if (comparison && comparison.targetWorkId && comparison.targetRevision !== undefined && comparison.recordedBy && comparison.recordedAt) {
+    return comparison as WorkspaceExperimentComparison;
+  }
+  return parseLegacyWorkspaceExperiment(value);
+}
+
+/**
  * Keep the workspace response to the fields the current product accepts. An
  * unsupported product's input is not a browser contract, and persisted rows
  * may contain fields added by a newer server implementation.
@@ -99,6 +117,29 @@ export interface WorkspacePresentationOptions {
 }
 
 export function presentWorkspaceWork(work: SavedWork, options: WorkspacePresentationOptions = {}): WorkspaceWork {
+  if (work.productId === "tracker" && work.resourceKind === "tracker") {
+    const tracker = parseTrackerWorkPayload(work.payload);
+    return { id: work.id, workspaceId: work.workspaceId, productId: work.productId, resourceKind: work.resourceKind,
+      title: work.title?.trim() || tracker?.title || "Tracker", payload: null, input: {}, createdAt: work.createdAt,
+      ...(work.sourceWorkId ? { sourceWorkId: work.sourceWorkId } : {}),
+      ...(!tracker ? { unavailableReason: "This tracker could not be read. Its saved content has not changed." } : {}),
+    };
+  }
+  if (work.productId === "work_plans" && work.resourceKind === "plan") {
+    const parsed = workPlanSchema.safeParse(work.payload);
+    return { id: work.id, workspaceId: work.workspaceId, productId: work.productId, resourceKind: work.resourceKind,
+      title: work.title?.trim() || "Work plan", payload: null, input: {}, createdAt: work.createdAt,
+      ...(parsed.success ? { workPlan: { summary: parsed.data.summary, status: parsed.data.status } } : { unavailableReason: "This plan could not be read. Its saved content has not changed." }),
+    };
+  }
+  if (work.productId === "documents" && work.resourceKind === "document") {
+    const parsed = documentSchema.safeParse(work.payload);
+    return { id: work.id, workspaceId: work.workspaceId, productId: work.productId, resourceKind: work.resourceKind,
+      title: work.title?.trim() || "Document", payload: null, input: {}, createdAt: work.createdAt,
+      ...(work.sourceWorkId ? { sourceWorkId: work.sourceWorkId } : {}),
+      ...(parsed.success ? { document: { title: parsed.data.title, revision: parsed.data.revision } } : { unavailableReason: "This document could not be read. Its saved content has not changed." }),
+    };
+  }
   if (work.productId === "research" && work.resourceKind === "experiment") {
     const experiment = parseWorkspaceExperiment(work.payload);
     return {

@@ -18,6 +18,7 @@ import {
   type TrackerWorkPayload,
 } from "./contracts";
 import { applyTrackerMapping, previewTrackerImport, type TrackerImportOptions } from "./import";
+import { applyTrackerCellChange } from "./changes";
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -49,7 +50,7 @@ function ensureColumn(snapshot: TrackerSnapshot, columnId: string): TrackerColum
 }
 
 function historyEntryFor(
-  command: TrackerCommand,
+  command: TrackerUpdateCellCommand | TrackerAddRowCommand | TrackerDeleteRowCommand,
   revision: number,
   row: TrackerRow,
   before: string | null,
@@ -143,6 +144,7 @@ export function applyTrackerCommand(snapshot: TrackerSnapshot, command: TrackerC
   if (snapshot.history.some((entry) => entry.commandId === checked.commandId)) {
     throw new TrackerConflictError("This tracker command was already applied.");
   }
+  if (checked.kind === "bulk_update" || checked.kind === "undo_change") return applyTrackerCellChange(snapshot, checked);
   if (checked.kind === "update_cell") return applyUpdateCell(snapshot, checked);
   if (checked.kind === "add_row") return applyAddRow(snapshot, checked);
   return applyDeleteRow(snapshot, checked);
@@ -245,6 +247,14 @@ export function parseTrackerSnapshot(value: unknown): TrackerSnapshot | null {
   const commandIds = new Set<string>();
   for (const entry of snapshot.history) {
     if (commandIds.has(entry.commandId) || entry.trackerId !== snapshot.id || entry.revision > snapshot.revision) return null;
+    if ((entry.kind === "bulk_update" || entry.kind === "undo_change") && !entry.changes?.length) return null;
+    if (entry.kind === "undo_change" && !entry.undoesCommandId) return null;
+    const changedCells = new Set<string>();
+    for (const change of entry.changes ?? []) {
+      const key = JSON.stringify([change.rowId, change.columnId]);
+      if (!rowIds.has(change.rowId) || !columnIds.has(change.columnId) || changedCells.has(key)) return null;
+      changedCells.add(key);
+    }
     commandIds.add(entry.commandId);
   }
   return clone(snapshot);

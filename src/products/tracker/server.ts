@@ -7,6 +7,7 @@ import { previewTrackerImport } from "./import";
 import { createTracker, applyTrackerCommand, parseTrackerSnapshot, trackerWorkPayload } from "./engine";
 import { trackerImportInputSchema, trackerMappingSelectionSchema, trackerCommandSchema, type TrackerSnapshot } from "./contracts";
 import { summarizeTrackerExperiment, trackerExperimentInputSchema, trackerExperimentSchema } from "./experiment";
+import { summarizeTrackerComparison, trackerExperimentComparisonInputSchema } from "./comparison";
 
 const uuid = z.string().uuid();
 const createSchema = z.object({ workspaceId: uuid, input: trackerImportInputSchema, title: z.string().trim().min(1).max(160), mapping: z.array(trackerMappingSelectionSchema).max(50).optional() });
@@ -56,6 +57,31 @@ export async function editSavedTracker(actor: WorkspaceActor, workId: string, ra
 
 export async function recordTrackerExperiment(actor: WorkspaceActor, workId: string, raw: unknown) {
   const target = await readSavedTracker(actor, workId);
+  const rawRecord = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : null;
+  const isComparison = Boolean(rawRecord && (Array.isArray(rawRecord.candidates) || rawRecord.version === 2 || rawRecord.kind === "candidate_comparison"));
+  if (isComparison) {
+    // Read and compare the revision before calculating or writing anything.
+    // The tracker read above is the authority; client supplied target metadata
+    // is intentionally ignored by the comparison payload.
+    const expectedRevision = z.number().int().nonnegative().parse(rawRecord?.expectedRevision);
+    if (expectedRevision !== target.tracker.revision) throw new WorkspaceConflictError();
+    const comparison = summarizeTrackerComparison(trackerExperimentComparisonInputSchema.parse(raw));
+    const recordedAt = new Date().toISOString();
+    const saved = await saveWork(actor, target.workspaceId, {
+      productId: "research",
+      resourceKind: "experiment",
+      title: `Experiment: ${target.tracker.title}`,
+      sourceWorkId: target.workId,
+      payload: {
+        ...comparison,
+        targetWorkId: target.workId,
+        targetRevision: target.tracker.revision,
+        recordedBy: actor.userId,
+        recordedAt,
+      },
+    });
+    return { experimentWorkId: saved.id, evidence: saved.payload };
+  }
   const input = trackerExperimentInputSchema.parse(raw);
   if (input.expectedRevision !== target.tracker.revision) throw new WorkspaceConflictError();
   // The expected revision is a request guard. The persisted evidence uses the

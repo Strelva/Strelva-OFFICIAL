@@ -22,14 +22,14 @@ export type InquiryServerWorkspaceExperienceProps = InquiryServerExperienceProps
 export function InquiryServerExperience({
   ...props
 }: InquiryServerExperienceProps) {
-  return <ServerInquiryBridge key={`${props.endpoint || "default"}:${props.tenantId}`} surface="frame" {...props} />;
+  return <ServerInquiryBridge key={`${props.endpoint || "default"}:${props.tenantId}:${props.initialView || "home"}:${props.initialRequestText || ""}`} surface="frame" {...props} />;
 }
 
 /** Authenticated inquiry work embedded in the shared workspace frame. */
 export function InquiryServerWorkspaceExperience({
   ...props
 }: InquiryServerWorkspaceExperienceProps) {
-  return <ServerInquiryBridge key={`${props.endpoint || "default"}:${props.tenantId}`} surface="workspace" {...props} />;
+  return <ServerInquiryBridge key={`${props.endpoint || "default"}:${props.tenantId}:${props.initialView || "home"}:${props.initialRequestText || ""}`} surface="workspace" {...props} />;
 }
 
 function ServerInquiryBridge({

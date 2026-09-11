@@ -10,6 +10,44 @@ const actor = { userId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", verifiedEmail: "
 const workspaceId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const workId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const input = { fileName: "tasks.csv", content: "Name,Status\nExample,Open" };
+function comparisonInput(expectedRevision = 0) {
+  return {
+    expectedRevision,
+    hypothesis: "Compare review time",
+    workload: "The same imported rows",
+    workloadKey: "synthetic-rows",
+    inputScope: "Tracker revision 0",
+    baseline: {
+      id: "baseline",
+      label: "Manual spreadsheet",
+      version: "current",
+      setupMinutes: 4,
+      reviewMinutes: 10,
+      correctionMinutes: 2,
+      supportMinutes: 3,
+      maintenanceMinutes: 1,
+      providerCostUsd: null,
+      result: "passed",
+    },
+    candidates: [{
+      id: "candidate-one",
+      label: "Saved tracker",
+      version: "v1",
+      setupMinutes: 2,
+      reviewMinutes: 5,
+      correctionMinutes: 1,
+      supportMinutes: 1,
+      maintenanceMinutes: 1,
+      providerCostUsd: 0.25,
+      result: "inconclusive",
+      evidenceKind: "measured",
+    }],
+    evidenceKind: "operator_reported",
+    evidence: "The operator reviewed the same rows.",
+    testFailures: ["No customer workload yet."],
+    decision: "continue_testing",
+  };
+}
 function stored() {
   return { id: workId, workspaceId, productId: "tracker", resourceKind: "tracker", payload: { tracker: createTrackerFromImport(input, { trackerId: "tracker-one", actorId: actor.userId }) } };
 }
@@ -72,5 +110,34 @@ describe("durable tracker commands", () => {
       evidence: "The displayed tracker was reviewed.",
     });
     expect(result.evidence).toMatchObject({ targetWorkId: workId, targetRevision: 0, evidenceKind: "operator_reported", promoted: false });
+  });
+  it("persists a v2 same-workload comparison through research work authority", async () => {
+    const saved = stored(); mocks.getWork.mockResolvedValue(saved);
+    mocks.saveWork.mockImplementation(async (_actor, id, work) => ({ id: "comparison-one", workspaceId: id, ...work }));
+    const result = await recordTrackerExperiment(actor, workId, {
+      ...comparisonInput(),
+      targetWorkId: "forged-target",
+      targetRevision: 999,
+      recordedBy: "forged-actor",
+      recordedAt: "2099-01-01T00:00:00.000Z",
+    });
+    expect(result.evidence).toMatchObject({
+      version: 2,
+      kind: "candidate_comparison",
+      targetWorkId: workId,
+      targetRevision: 0,
+      recordedBy: actor.userId,
+      baseline: { supportMinutes: 3, maintenanceMinutes: 1, providerCostStatus: "unknown" },
+      candidates: [{ evidenceKind: "measured", providerCostStatus: "known" }],
+      comparisons: [{ providerCostDifferenceUsd: null }],
+      promoted: false,
+      status: "experimental",
+    });
+    expect(result.evidence).not.toHaveProperty("targetWorkId", "forged-target");
+  });
+  it("rejects a stale v2 comparison before saving research work", async () => {
+    const saved = stored(); mocks.getWork.mockResolvedValue(saved);
+    await expect(recordTrackerExperiment(actor, workId, comparisonInput(1))).rejects.toBeInstanceOf(WorkspaceConflictError);
+    expect(mocks.saveWork).not.toHaveBeenCalled();
   });
 });

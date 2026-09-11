@@ -12,6 +12,7 @@ export type ProductId =
   | "managed_presence"
   | "domain_monitoring"
   | "homefinder"
+  | "documents"
   | "tracker";
 
 export type ResourceOwnership =

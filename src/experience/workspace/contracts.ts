@@ -1,5 +1,6 @@
 import type { AiVisibilityResult } from "@/products/ai-visibility/contracts";
 import type { AssessmentResult } from "@/products/assessment";
+import type { TrackerExperimentComparison } from "@/products/tracker/comparison";
 import type { TrackerHandoffPreview } from "@/products/tracker/contracts";
 
 /** Browser response contract. Internal membership and invitation secrets stay server-side. */
@@ -18,8 +19,8 @@ export interface WorkspaceSummary {
  */
 export type WorkspaceWorkPayload = AiVisibilityResult;
 
-/** Browser-safe projection of an operator-reported tracker experiment. */
-export interface WorkspaceExperiment {
+/** Browser-safe projection of the original operator-reported experiment. */
+export interface WorkspaceLegacyExperiment {
   version: 1;
   targetWorkId: string;
   targetRevision: number;
@@ -40,7 +41,15 @@ export interface WorkspaceExperiment {
   promoted: false;
 }
 
+/** Browser-safe projection of a bounded same-workload candidate comparison. */
+export type WorkspaceExperimentComparison = TrackerExperimentComparison & Required<Pick<TrackerExperimentComparison, "targetWorkId" | "targetRevision" | "recordedBy" | "recordedAt">>;
+
+/** Both versions stay readable while the stored research row migrates. */
+export type WorkspaceExperiment = WorkspaceLegacyExperiment | WorkspaceExperimentComparison;
+
 export interface WorkspaceWork<TPayload = WorkspaceWorkPayload> {
+  workPlan?: { summary: string; status: "ready" | "needs_scoping" };
+  document?: Pick<import("@/products/documents/engine").WorkspaceDocument, "title" | "revision">;
   id: string;
   workspaceId: string;
   title: string;

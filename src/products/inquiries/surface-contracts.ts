@@ -20,8 +20,24 @@ import type {
   ResponsibilityUpdateInput,
   WhyResult,
 } from "./contracts";
+import type {
+  PatternConflictResolution,
+  PatternUpdateProposal,
+} from "./inquiry-pattern-updates";
 
 export type InquiryAudience = "business" | "agency";
+
+export type InquiryPatternInstallationView = {
+  id: string;
+  capabilityId: string;
+  sourceBusinessId: string;
+  sourceCapabilityId: string;
+  sourceVersion: number;
+  targetVersion: number;
+  status: "installed" | "update_available" | "conflicted";
+  lastProposalId: string | null;
+  updatedAt: string;
+};
 
 export type InquirySurfaceSnapshot = {
   /** Server-only concurrency cursor carried through the client adapter. */
@@ -70,6 +86,7 @@ export type InquirySurfaceSnapshot = {
     provenVersion: number;
     cleanReceiptCount: number;
   }>;
+  patternInstallations?: InquiryPatternInstallationView[];
   account?: {
     name: string | null;
     email: string | null;
@@ -97,7 +114,9 @@ export type InquirySurfaceAction =
   | { kind: "promote-responsibility"; responsibilityId: string; actorId: string }
   | { kind: "update-responsibility"; responsibilityId: string; input: ResponsibilityUpdateInput }
   | { kind: "fix-why"; requestId: string; path: string; actorId: string }
-  | { kind: "use-pattern"; patternId: string; businessId: string; destination?: string; actorId: string };
+  | { kind: "use-pattern"; patternId: string; businessId: string; destination?: string; actorId: string }
+  | { kind: "propose-pattern-update"; installationId: string; capabilityId: string; actorId: string }
+  | { kind: "stage-pattern-update"; installationId: string; capabilityId: string; sourceVersion: number; resolutions: PatternConflictResolution[]; actorId: string };
 
 export type InquirySurfaceResult = {
   snapshot: InquirySurfaceSnapshot;
@@ -105,6 +124,8 @@ export type InquirySurfaceResult = {
   record?: InquiryRecord;
   change?: ChangeReceipt;
   rehearsal?: RehearsalRun;
+  patternUpdate?: PatternUpdateProposal;
+  patternInstallation?: InquiryPatternInstallationView;
   why?: WhyResult;
   affectedRecordIds?: string[];
   message?: string;

@@ -30,8 +30,8 @@ describe("workspace product discovery", () => {
     expect(discoveryProducts([])).toEqual([]);
   });
 
-  it("keeps inquiry and tracker entries in the shared product allowlist", () => {
-    expect(discoveryProducts([catalog("inquiries"), catalog("tracker"), catalog("domain_monitoring")]).map((product) => product.id)).toEqual(["inquiries", "tracker"]);
+  it("keeps inquiry, tracker, and document entries in the shared product allowlist", () => {
+    expect(discoveryProducts([catalog("inquiries"), catalog("tracker"), catalog("documents"), catalog("domain_monitoring")]).map((product) => product.id)).toEqual(["inquiries", "tracker", "documents"]);
   });
 
   it("accepts only same-app managed work destinations", () => {
@@ -88,5 +88,39 @@ describe("workspace product discovery", () => {
     expect(html).toContain("data-inquiry-embedded");
     expect(html).toContain("What should Strelva handle?");
     expect(html).not.toContain("Inquiry navigation");
+  });
+
+  it("carries a start request into the inquiry New view", () => {
+    const html = renderToStaticMarkup(createElement(InquiryWorkspaceExperience, {
+      adapter: createPreviewInquiryAdapter("business"),
+      basePath: "/workspace",
+      initialView: "new",
+      initialRequestText: "Collect quote requests and follow up when nobody replies.",
+    }));
+    expect(html).toContain("Collect quote requests and follow up when nobody replies.");
+  });
+
+  it("links saved tracker provenance to its readable plan receipt", async () => {
+    const snapshot = await (await createPreviewRequest("managed")("/api/workspace")).json();
+    const sourcePlan = { ...snapshot.work[0], id: "plan-1", productId: "work_plans", resourceKind: "plan", title: "Plan for the tracker" };
+    const tracker = { ...snapshot.work[0], id: "tracker-1", productId: "tracker", resourceKind: "tracker", title: "Customer tracker", sourceWorkId: sourcePlan.id };
+    const html = renderToStaticMarkup(createElement(WorkspaceLayout, {
+      appBase: "/preview/strelva",
+      signOut: null,
+      snapshot: { ...snapshot, work: [tracker, sourcePlan] },
+      managedWork: snapshot.managedWork,
+      home: false,
+      agency: false,
+      busy: false,
+      selectedWork: tracker,
+      onHome: () => undefined,
+      onNew: () => undefined,
+      onAgency: () => undefined,
+      onChoose: () => undefined,
+      onWorkspace: () => undefined,
+      notice: null,
+    }, createElement("p", null, "tracker detail")));
+    expect(html).toContain("View plan and creation receipt");
+    expect(html).toContain(`/preview/strelva/workspace?workspaceId=${snapshot.workspaceId}&amp;view=plan&amp;work=plan-1`);
   });
 });

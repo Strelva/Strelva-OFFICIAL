@@ -4,6 +4,7 @@ import { inquiryReleaseEnabled } from "./release";
 import { getInquiryRepository, publicationClaimToken, type InquiryRepository, type InquiryWorkspaceSnapshot, type PublicationClaim } from "./repository";
 import type { InquiryCapabilityDefinition, InquiryEngineState } from "./contracts";
 import { stateForReceive } from "./receive";
+import { commitPatternInstallationAfterVerification } from "./inquiry-pattern-updates";
 
 export interface InquiryPublicationResult {
   accepted: boolean;
@@ -118,6 +119,7 @@ async function verifyPublication(repository: InquiryRepository, claim: Publicati
     const verified = sameDefinition(actual, expected);
     const engine = new InquiryEngine({ businessId: claim.businessId, state: stateForReceive(observed) });
     engine.recordPublishVerification(claim.requestId, { actorId: claim.actorId!, version: receipt.targetVersion, verified, evidence: [verified ? "Read back the exact committed definition from the Postgres authority used by the public inquiry endpoint." : "The current public inquiry definition differs from this accepted change."] });
+    if (verified) commitPatternInstallationAfterVerification(engine, { capabilityId: claim.capabilityId, actorId: claim.actorId! });
     const saved = await repository.compareAndSwap({ tenantId: claim.tenantId, businessId: claim.businessId, expectedRevision: observed.revision, actorId: claim.actorId, state: engine.snapshot() });
     if (!saved.changed) throw new Error("verification_receipt_conflict");
     if (!verified) throw new Error("definition_readback_mismatch");

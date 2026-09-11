@@ -21,3 +21,27 @@ export {
   trackerWorkPayload,
 } from "./engine";
 export { isTrackerWorkPayload, parseTrackerWorkPayload, presentTrackerHandoffPreview } from "./presentation";
+export {
+  TRACKER_EXPERIMENT_COMPARISON_VERSION,
+  TRACKER_EXPERIMENT_MAX_CANDIDATES,
+  TRACKER_EXPERIMENT_MAX_FAILURES,
+  parseTrackerExperimentComparison,
+  summarizeTrackerComparison,
+  summarizeTrackerExperimentComparison,
+  trackerComparisonInputSchema,
+  trackerComparisonSchema,
+  trackerExperimentComparisonInputSchema,
+  trackerExperimentComparisonPayloadSchema,
+  trackerExperimentDecisionSchema,
+  trackerExperimentOptionSchema,
+} from "./comparison";
+export type {
+  TrackerComparison,
+  TrackerComparisonInput,
+  TrackerExperimentCandidateComparison,
+  TrackerExperimentComparison,
+  TrackerExperimentComparisonInput,
+  TrackerExperimentEvidenceKind,
+  TrackerExperimentOption,
+  TrackerExperimentOptionSummary,
+} from "./comparison";

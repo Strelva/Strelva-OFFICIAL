@@ -59,7 +59,7 @@ test("shared navigation remains available while opening and finding work", async
   await expect(page.getByRole("heading", { name: "No matching work" })).toBeVisible();
   await page.getByRole("button", { name: "Clear search" }).click();
   await expect(page.getByRole("button", { name: "Open Harbor Dental", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Explore", exact: true }).click();
+  await page.getByRole("button", { name: /^Explore Strelva/ }).click();
   await page.getByRole("button", { name: /Home Finder/ }).click();
   await expect(page.getByText("Preview · early access", { exact: true }).last()).toBeVisible();
   await expect(page.getByRole("link", { name: /Try Home Finder/ })).toHaveAttribute("href", /127\.0\.0\.1:3213\/embed\/agency-preview/);
@@ -97,7 +97,7 @@ test("empty workspace can create an explicitly fictional local assessment", asyn
   await expect(page.getByText(/These scores are fictional/)).toBeVisible();
   await page.reload();
   await expect(page.getByRole("heading", { name: "This saved result is unavailable." })).toBeVisible();
-  await page.getByRole("button", { name: "Home", exact: true }).click();
+  await page.getByRole("link", { name: "Strelva home", exact: true }).click();
   await expect(page.getByText(/Your saved work will appear here/)).toBeVisible();
 });
 
@@ -114,7 +114,7 @@ test("mobile navigation traps focus, closes on selection, and does not overflow"
   await page.keyboard.press("Escape");
   await expect(page.getByRole("button", { name: "Open navigation", exact: true })).toBeFocused();
   await page.getByRole("button", { name: "Open navigation", exact: true }).click();
-  await navigation.getByRole("button", { name: "Explore", exact: true }).click();
+  await navigation.getByRole("button", { name: /^Explore Strelva/ }).click();
   await expect(navigation).not.toBeVisible();
   await expect(page.getByRole("heading", { name: "More you can do." })).toBeVisible();
 });

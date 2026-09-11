@@ -28,6 +28,7 @@ export function InquiryExperience({
   initialView = "home",
   initialRequestId,
   initialInquiryId,
+  initialRequestText,
   basePath = "/preview/strelva/inquiries",
   routePrefix,
   adapter,
@@ -43,6 +44,7 @@ export function InquiryExperience({
       initialView={initialView}
       initialRequestId={initialRequestId}
       initialInquiryId={initialInquiryId}
+      initialRequestText={initialRequestText}
       basePath={basePath}
       routePrefix={routePrefix}
     >
@@ -60,6 +62,7 @@ export function InquiryWorkspaceExperience({
   initialView = "home",
   initialRequestId,
   initialInquiryId,
+  initialRequestText,
   basePath = "/workspace",
   routePrefix = "inquiry",
   adapter,
@@ -73,6 +76,7 @@ export function InquiryWorkspaceExperience({
       initialView={initialView}
       initialRequestId={initialRequestId}
       initialInquiryId={initialInquiryId}
+      initialRequestText={initialRequestText}
       basePath={basePath}
       routePrefix={routePrefix}
     >

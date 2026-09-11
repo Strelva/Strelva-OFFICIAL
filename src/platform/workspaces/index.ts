@@ -14,6 +14,7 @@ export { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError } fro
 export {
   acceptHandoff,
   assertCanSaveWork,
+  assertWorkspaceMember,
   createAgencyWorkspace,
   createHandoff,
   ensurePersonalWorkspace,
@@ -29,4 +30,6 @@ export {
   revokeHandoff,
   saveWork,
 } from "./repository";
+export { listWorkPlanOutputs, persistWorkPlanOutput, readWorkPlanOutput } from "./plan-output";
+export type { PersistWorkPlanOutputInput, PersistedWorkPlanOutput } from "./plan-output";
 export { runWorkspaceOperation, operationRequest, WorkspaceOperationPendingError } from "./operations";

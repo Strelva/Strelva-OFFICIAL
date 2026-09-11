@@ -360,6 +360,12 @@
 .patternRow input { min-height: 2.8rem; border: 1px solid var(--gray-border); border-radius: .65rem; background: var(--surface-inset); color: var(--warm-black); padding: .65rem .8rem; font: inherit; }
 .patternRow input:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .patternRow .primaryButton { margin-left: auto; }
+.patternUpdateActions { display: grid; min-width: min(100%, 22rem); gap: .65rem; }
+.patternUpdateSummary { color: var(--gray-muted); font-size: .75rem; line-height: 1.45; }
+.patternConflict { display: grid; grid-template-columns: 1fr auto auto; gap: .45rem; align-items: center; border: 1px solid var(--gray-border); border-radius: .65rem; padding: .65rem; }
+.patternConflict legend { grid-column: 1 / -1; color: var(--warm-black); font-size: .72rem; font-weight: 600; }
+.patternConflict p { grid-column: 1 / -1; margin: 0; overflow-wrap: anywhere; }
+.patternConflict button { font-size: .72rem; }
 .accountScope, .membershipList { display: grid; gap: .4rem; border-top: 1px solid var(--gray-border); padding-top: 1rem; }
 .accountScope strong, .accountScope p, .membershipList p { margin: 0; color: var(--warm-black); }
 .membershipList ul { margin-top: .25rem; }

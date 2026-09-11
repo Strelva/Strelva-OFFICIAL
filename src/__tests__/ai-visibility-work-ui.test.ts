@@ -52,6 +52,19 @@ describe("AI Visibility workspace UI entry", () => {
     expect(html).toContain("Saved only after completion");
   });
 
+  it("keeps a workspace request visible without expanding the assessment contract", () => {
+    const html = renderToStaticMarkup(
+      createElement(AiVisibilityAssessmentForm, {
+        onSubmit: async () => work,
+        onCreated: () => undefined,
+        initialRequestText: "Help me see what AI understands about my business.",
+      }),
+    );
+    expect(html).toContain("From your request");
+    expect(html).toContain("Help me see what AI understands about my business.");
+    expect(html).toContain("does not add checks beyond this assessment");
+  });
+
   it("renders only the product result fields and never raw saved payload fields", () => {
     const html = renderToStaticMarkup(
       createElement(AiVisibilityAssessmentResult, {

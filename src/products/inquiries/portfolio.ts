@@ -48,6 +48,11 @@ export interface ResolvedInquiryPattern {
   definition: InquiryCapabilityDefinition;
 }
 
+export interface ResolveInquiryPatternVersionInput {
+  sourceBusinessId: string;
+  sourceCapabilityId: string;
+}
+
 function safeText(value: string, fallback: string, max = 160): string {
   const clean = value.replace(/[\u0000-\u001f\u007f]/g, " ").trim();
   return (clean || fallback).slice(0, max);
@@ -187,6 +192,41 @@ export async function resolveInquiryPattern(
         definition: structuredClone(live.live),
       };
     }
+  }
+  return null;
+}
+
+/**
+ * Re-read the latest live source for a target installation after checking the
+ * source membership. The installation stores stable business/capability
+ * identity rather than a source definition, so this path never trusts a
+ * browser supplied definition or pattern payload.
+ */
+export async function resolveInquiryPatternVersion(
+  input: ResolveInquiryPatternVersionInput,
+  repository: InquiryRepository = getInquiryRepository(),
+): Promise<ResolvedInquiryPattern | null> {
+  const sourceBusinessId = input.sourceBusinessId.trim();
+  const sourceCapabilityId = input.sourceCapabilityId.trim();
+  if (!sourceBusinessId || !sourceCapabilityId) return null;
+  const tenantIds = [...new Set(await getCurrentUserTenants())].sort();
+  for (const tenantId of tenantIds) {
+    if (await requireTenantAccess(tenantId)) continue;
+    const config = await getTenantConfig(tenantId);
+    if (!config?.active || (config.stableId ?? tenantId) !== sourceBusinessId) continue;
+    const snapshot = await repository.getSnapshot(tenantId, sourceBusinessId);
+    const live = snapshot?.state.capabilities.find((item) => item.id === sourceCapabilityId);
+    if (!snapshot || snapshot.tenantId !== tenantId || snapshot.businessId !== sourceBusinessId || live?.status !== "live" || !live.live || live.live.businessId !== sourceBusinessId || live.live.id !== sourceCapabilityId) continue;
+    // The resolver is deliberately a fresh read after the membership check.
+    // Source revocation or replacement returns no definition to the update
+    // command, which leaves the target pin unchanged.
+    if (await requireTenantAccess(tenantId)) return null;
+    const freshConfig = await getTenantConfig(tenantId);
+    if (!freshConfig?.active || (freshConfig.stableId ?? tenantId) !== sourceBusinessId) return null;
+    const fresh = await repository.getSnapshot(tenantId, sourceBusinessId);
+    const current = fresh?.state.capabilities.find((item) => item.id === sourceCapabilityId);
+    if (!fresh || fresh.tenantId !== tenantId || fresh.businessId !== sourceBusinessId || current?.status !== "live" || !current.live || current.live.businessId !== sourceBusinessId || current.live.id !== sourceCapabilityId) return null;
+    return { sourceBusinessName: safeText(freshConfig.siteName, tenantId), definition: structuredClone(current.live) };
   }
   return null;
 }

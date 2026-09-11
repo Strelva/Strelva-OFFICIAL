@@ -109,6 +109,16 @@ to the application. No migration or activation was performed. On September
 
 ## Current attention
 
+The [full horizontal acceptance ledger](./docs/strelvav2-horizontal-acceptance.md)
+now defines the requested expansion beyond the first slice. Current local work
+adds outcome entry, private documents, grouped tracker edits and Undo, task and
+project starts, model-backed planning with selected sources, reusable inquiry
+updates, cost records, and richer experiment comparisons. Implementation is in
+progress; the earlier first-slice verification does not prove these additions.
+Jacob will conduct the end-to-end behavior review. Use focused behavior tests,
+critical failure checks, and type checking during implementation. Production
+remains off, and no audited full-product completion percentage is established.
+
 The [first horizontal scope](./docs/horizontal-first-scope-2026-09-11.md) is selected:
 shared inquiry work, CSV trackers, and internal experiment evidence. Its local
 implementation passes unit, browser, build, compatibility and isolated storage

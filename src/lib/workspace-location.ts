@@ -1,7 +1,7 @@
 /** Navigation hints only. APIs still authorize the requested workspace and work. */
 const ID = /^[a-z0-9_-]{1,128}$/i;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
-const VIEWS = new Set(["work", "products", "help", "inquiries", "tracker"]);
+const VIEWS = new Set(["work", "products", "help", "inquiries", "tracker", "document", "plan", "start"]);
 const INQUIRY_VIEWS = new Set(["home", "new", "shape", "work", "plan", "preview", "rehearsal", "receipt", "search", "record", "why", "responsibility", "connections", "onboarding", "account", "attention", "patterns"]);
 
 export function workspaceReturnTarget(value: string | null): string | null {
