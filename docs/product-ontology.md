@@ -182,14 +182,15 @@ migration.
 
 ### Capability, Capability Version, and Rule
 
-A **Capability** is the stable, governed way Strelva receives and handles one
-kind of Customer Inquiry for one Business. A **Capability Version** is an
-immutable shape containing the form schema, routing, templates, follow-up, and
-Responsibility reference. A **Rule** is a versioned condition and consequence
-built from the fixed component set. A published version is never edited in
-place. In this selected product model, unqualified Capability means this
-business workflow. Existing Tenant Capability, Site Capability, and Agent
-Capability remain distinct compatibility terms.
+A **Capability** is a reusable, governed ability to create, inspect, or operate
+a kind of business work. A **Capability Version** fixes its inputs, outputs,
+rules, approved interface parts, and supported actions. Inquiry intake is one
+implemented kind; scheduling, investigation, and other horizontal kinds must
+earn their own execution evidence. A **Rule** is a versioned condition and
+consequence. A published version is never edited in place. Existing Tenant
+Capability, Site Capability, and Agent Capability remain distinct compatibility
+terms. This broader product definition does not rename or generalize the current
+inquiry contracts by itself.
 
 ### Change and Work
 
@@ -203,7 +204,9 @@ not grant authority and is not a generic replacement for those records.
 
 ### Responsibility
 
-A Responsibility is the policy boundary for one Capability. It states what
+A Responsibility is an explicit, ongoing assignment with a policy boundary over
+named work and capabilities. The current inquiry implementation binds it to one
+Capability. It states what
 Strelva may do, must never do, and must ask a person to approve. It also records
 limits, escalation, voice, hours, and supervised or trusted status. Promotion
 is the explicit action that changes this status. Service
@@ -220,6 +223,38 @@ evidence for publishing only that exact version.
 A Receipt is structured, durable evidence of an action. It records actor, what
 happened, why, target, version, evidence, outcome, and any supported inverse.
 Activity copy may summarize a Receipt but does not replace it.
+
+### Research project, source, claim, and opportunity
+
+A **Research Project** is a scoped investigation with a question, owner, permitted
+sources, research responsibility, and budget. It uses the shared Work model;
+the term does not imply an autonomous research runtime is already implemented.
+
+A **Source** is a retrievable reference or permitted captured item with origin,
+time, access scope, and freshness. A **Claim** is a versioned assertion linked to
+supporting and contradictory sources, with its segment and limits explicit.
+
+An **Observation** describes evidence actually recorded, including whether it is
+direct behavior or someone reporting behavior. An **Inference** interprets that
+evidence. An **Unknown** names something not established. Repetition and synthetic
+agreement cannot silently promote an inference into an observation.
+
+An **Opportunity** connects a pattern of behavior, constraint, and unresolved job
+to a possible improvement. A **Possibility** is one proposed response. Neither
+is a supported Capability or an authorization to implement one.
+
+A **Capability Assessment** compares a dated technical claim with task-specific
+feasibility evidence, remaining constraints, and cost. It differs from an
+installed Capability or a provider permission.
+
+An **Experiment** is a versioned comparison with an expectation, workload,
+baseline, alternatives, measures, results, and decision. A **Qualification
+Decision** records whether evidence supports offering, revising, or stopping the
+work. It is separate from deployment approval and never grants provider access.
+
+See the [completion contract](./strelvav2-definition-of-done.md) for acceptance
+and current limits. These research concepts are proposed durable product records,
+not a claim that their full runtime exists today.
 
 ### Commercial Plan
 

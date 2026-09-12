@@ -109,6 +109,13 @@ to the application. No migration or activation was performed. On September
 
 ## Current attention
 
+The [definition of done](./docs/strelvav2-definition-of-done.md) proposes separate
+acceptance gates for the horizontal interface, working local product and internal
+research/learning system, and operated customer offerings. Inquiry screen counts
+do not measure horizontal completion. Internal research retains sourced claims,
+observations, inferences, unknowns, and contradictory evidence; synthetic users
+do not establish demand. These definitions add no production or spending authority.
+
 The [full horizontal acceptance ledger](./docs/strelvav2-horizontal-acceptance.md)
 now defines the requested expansion beyond the first slice. Current local work
 adds outcome entry, private documents, grouped tracker edits and Undo, task and

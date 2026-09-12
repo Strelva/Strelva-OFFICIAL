@@ -63,6 +63,13 @@ remain unchanged until a separate commercial and release decision.
 
 ## Vertical R&D
 
+The [definition of done](./strelvav2-definition-of-done.md) expands this direction
+into a proposed evidence-to-outcome learning loop: recurring research, problem
+discovery, user understanding, frontier capability assessment, divergent
+possibilities, strategy, product coherence, goal-based experience checks,
+construction/verification, and postlaunch learning. These are internal work
+requirements, not ten customer navigation sections or implemented services.
+
 The foundation stays horizontal. Internal R&D investigates verticals deeply to
 produce business knowledge, reusable offerings, and evidence of customer value.
 It includes a safe testing workspace, product experiments, and budgeted

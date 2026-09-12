@@ -17,10 +17,20 @@ The foundation works across industries. Internal R&D develops industry knowledge
 and proves offerings against customer outcomes, human effort, and cost. A working
 demonstration is not proof of saved money or a supported offering.
 
+## Completion contract
+
+The [definition of done](./strelvav2-definition-of-done.md) now specifies the
+proposed horizontal screen gate, local product gate, and internal product
+learning loop. This ledger remains the current implementation inventory for
+the twenty customer-product requirements; its R&D row does not stand in for the
+ten new learning requirements.
+
 ## What 95% must mean
 
-Earlier estimates of 40%, 85%, and 95% used different scopes and are not an
-audited completion measure. Do not reuse them as measured progress.
+Earlier estimates of 40%, 55%, 64%, 85%, 95%, and 100% used different scopes or
+unverified screen classifications and are not an audited completion measure.
+Do not reuse them as measured progress. A directory with fourteen inquiry links
+does not establish fourteen accepted horizontal screens.
 
 The 95% target requires all core journeys below to work through authenticated
 local adapters, with durable state and failure recovery. The remaining work may

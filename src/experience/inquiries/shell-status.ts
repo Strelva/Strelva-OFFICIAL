@@ -7,9 +7,8 @@ export type InquiryShellStatus = {
 
 /**
  * Review-only map of the interface promised by the inquiry-first migration.
- * "Ready" means the narrow inquiry journey is present locally. A coming-soon
- * row still has its complete screen shell, but names the broader behavior that
- * has not been built yet.
+ * These links identify inquiry examples, not accepted horizontal screens.
+ * Status is descriptive availability and must never become a completion score.
  */
 export const INQUIRY_SHELL_STATUS: InquiryShellStatus[] = [
   { name: "Sidebar", href: "/preview/strelva/inquiries?view=home", detail: "New, Search, businesses or clients, recent work, and account.", status: "ready" },
@@ -27,10 +26,3 @@ export const INQUIRY_SHELL_STATUS: InquiryShellStatus[] = [
   { name: "Onboarding", href: "/preview/strelva/inquiries?view=onboarding", detail: "Website facts can be checked and corrected in place.", status: "ready" },
   { name: "Agency", href: "/preview/strelva/inquiries?audience=agency&view=attention", detail: "Attention and reusable inquiry patterns work. More work types and agency contribution are coming soon.", status: "coming_soon" },
 ];
-
-export const INQUIRY_SHELL_COVERAGE = {
-  readyShells: INQUIRY_SHELL_STATUS.length,
-  totalShells: INQUIRY_SHELL_STATUS.length,
-  completeFirstSlice: INQUIRY_SHELL_STATUS.filter((item) => item.status === "ready").length,
-  comingSoon: INQUIRY_SHELL_STATUS.filter((item) => item.status === "coming_soon").length,
-};
