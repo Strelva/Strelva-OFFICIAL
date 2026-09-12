@@ -109,6 +109,15 @@ to the application. No migration or activation was performed. On September
 
 ## Current attention
 
+The [internal product research](./docs/research/strelva-horizontal-product-research.md)
+and [evidence register](./docs/product-reality.md) examine horizontal capabilities
+and product structure. Jacob clarified the high-growth technology-product aim,
+with clients becoming product users under subscription/usage pricing. Exploration
+keeps app creation, recurring work, interactive shared outputs, and reusable
+products open. A work-centered or agency-delivery default is not accepted. R&D
+is strictly internal. These research options authorize no implementation or
+production change.
+
 The [definition of done](./docs/strelvav2-definition-of-done.md) proposes separate
 acceptance gates for the horizontal interface, working local product and internal
 research/learning system, and operated customer offerings. Inquiry screen counts

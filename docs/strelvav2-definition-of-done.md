@@ -41,15 +41,13 @@ Evidence, alternatives, costs, and research methods are available when inspected
 Research on Strelva itself must never combine private customer evidence without
 its permitted purpose and scope. Agency methods stay private by default.
 
-Product boundaries:
-
-- Customer experience alone would be simpler to finish but omits the learning
-  system Jacob requested.
-- A common product plus internal R&D is the recommended boundary. It reuses
-  operations while keeping research administration out of everyday work.
-- Selling the full research system as another customer offering is a possible
-  later choice, with its own evidence and support requirements. It is not an
-  assumed part of this release.
+R&D is internal, as Jacob explicitly clarified. It can reuse shared work and
+governance mechanisms while retaining separate access, evidence, and acceptance
+records. It is not a customer offering. Customer readiness and internal research
+maturity must remain separately inspectable even when this release includes both.
+The [product research](./research/strelva-horizontal-product-research.md) explores
+capabilities and product structure; its options do not become release requirements
+until selected and added to the acceptance contract.
 
 ## Horizontal screen acceptance
 

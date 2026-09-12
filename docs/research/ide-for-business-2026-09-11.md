@@ -1,5 +1,11 @@
 # Strelva as the IDE for business
 
+Research correction: the [later horizontal product research](./strelva-horizontal-product-research.md)
+revisits this memo's categorical competitor and runtime claims against current
+documentation. Inspection, governance, and recovery are not absent from existing
+products. Treat the original argument below as a hypothesis, not established
+competitive evidence or accepted product topology.
+
 Prepared September 11, 2026. Status: product research memo for Jacob's review.
 It proposes direction and an object model. It does not authorize implementation,
 a release, prices, production changes, or deletion of existing behavior.
