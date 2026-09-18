@@ -93,10 +93,14 @@ Validation-gated:
   `$300/month` website plan exist. The two custom sites, live Stripe subscription,
   owner contact, and owner invite remain delivery/go-live work. Treat those as
   recorded operator state until rechecked in the live systems.
-- **The Mooney Firm:** a local intake package, recommendation generator, and
-  three-direction website prototype exist under `client-intake/sheri-mooney/`
-  and `client-prototypes/sheri-mooney/`. They are local working assets, not part
-  of the control plane and not evidence of a signed or live client.
+- **The Mooney Firm:** Jacob selected `attymooney.com` for the first native
+  website-to-business acceptance case on September 18. The live contact page
+  was inspected without submitting it. Current website source and September 8
+  release evidence belong to `/Users/jacobrhinehart/Desktop/mooney-firm-site`;
+  the older prototypes and `mooney-firm-live-inquiry` checkout are historical.
+  The selected workflow hands off to Outlook / ADR Notable and does not create
+  a Strelva case tracker. Actual mailbox receipt, approved ADR configuration and
+  customer use remain unverified. See the [work index](../todo.md).
 
 ## Market experiments
 

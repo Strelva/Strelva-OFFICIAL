@@ -1,6 +1,6 @@
 import { InquiryEngine } from "@/products/inquiries/client";
 import type { InquiryCapabilityDefinition } from "@/products/inquiries/contracts";
-import { commitPatternInstallationAfterVerification, getPatternInstallation, listPatternInstallations, proposePatternUpdate, resolvePatternUpdate, stagePatternUpdate } from "@/products/inquiries/inquiry-pattern-updates";
+import { commitPatternInstallationAfterVerification, getPatternInstallation, listPatternInstallations, proposePatternUpdate, resolvePatternUpdate, stagePatternUpdate } from "@/products/inquiries/client";
 import type { InquiryAudience, InquirySurfaceAdapter, InquirySurfaceSnapshot } from "./contracts";
 
 const FIXTURE_TIME = "2026-09-11T14:00:00.000Z";

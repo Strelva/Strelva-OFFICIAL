@@ -8,6 +8,8 @@ export interface WorkspaceAccountViewProps {
   signOut?: ReactNode;
   managedHref?: string;
   notice?: ReactNode;
+  continuation?: ReactNode;
+  payerInbox?: ReactNode;
   name: string | null;
   email: string;
   emailConfirmed: boolean;
@@ -29,7 +31,7 @@ function workspaceKindLabel(kind: Workspace["kind"]): string {
 
 
 /** Presentation only. The account route resolves verified identity and access. */
-export function WorkspaceAccountView({ appBase, signOut, managedHref = "/account?managed=1", notice, name, email, emailConfirmed, releaseOpen, workspaces, workspacesUnavailable = false }: WorkspaceAccountViewProps) {
+export function WorkspaceAccountView({ appBase, signOut, managedHref = "/account?managed=1", notice, continuation, payerInbox, name, email, emailConfirmed, releaseOpen, workspaces, workspacesUnavailable = false }: WorkspaceAccountViewProps) {
   return (
     <StrelvaShell appBase={appBase} signOut={signOut} notice={notice} active="account" title="Account" accountName={name || email || "Your account"} accountDetail={email || "Account & access"}>
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -67,6 +69,8 @@ export function WorkspaceAccountView({ appBase, signOut, managedHref = "/account
             )}
           </section>
 
+          {continuation}
+
           <section className="border-b border-gray-border py-8" aria-labelledby="workspaces-title">
             <div className="flex items-baseline justify-between gap-4">
               <h2 id="workspaces-title" className="text-[16px] font-medium leading-6 text-warm-black">
@@ -96,7 +100,10 @@ export function WorkspaceAccountView({ appBase, signOut, managedHref = "/account
                 {workspaces.map((workspace) => (
                   <li key={workspace.id} className="flex flex-col gap-1 py-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <div className="min-w-0">
-                      <p className="break-words text-[14px] font-medium text-warm-black">{workspace.name}</p>
+                      <Link
+                        href={`${appBase || ""}/workspace?workspaceId=${encodeURIComponent(workspace.id)}`}
+                        className="break-words text-[14px] font-medium text-warm-black underline underline-offset-4"
+                      >{workspace.name}</Link>
                       <p className="mt-1 text-[14px] text-gray-muted">{workspaceKindLabel(workspace.kind)}</p>
                     </div>
                     <span className="shrink-0 text-[14px] text-gray-muted">
@@ -107,6 +114,12 @@ export function WorkspaceAccountView({ appBase, signOut, managedHref = "/account
               </ul>
             )}
           </section>
+
+          {releaseOpen && emailConfirmed && payerInbox ? <section className="border-b border-gray-border py-8" aria-labelledby="payer-requests-title">
+            <h2 id="payer-requests-title" className="text-[16px] font-medium leading-6 text-warm-black">Payer requests</h2>
+            <p className="mt-4 max-w-xl text-[14px] leading-relaxed text-gray-muted">Review financial responsibility addressed to this verified account. Accepting does not grant access to a business or its saved work.</p>
+            {payerInbox}
+          </section> : null}
 
           <section className="border-b border-gray-border py-8" aria-labelledby="managed-title">
             <h2 id="managed-title" className="text-[16px] font-medium leading-6 text-warm-black">

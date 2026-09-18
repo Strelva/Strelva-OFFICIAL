@@ -7,7 +7,7 @@ import type { ManagedWork, WorkspaceProduct } from "./contracts";
  */
 export type ManagedWorkSummary = ManagedWork;
 
-const CONSUMER_PRODUCT_IDS = new Set(["ai_visibility", "managed_presence", "homefinder", "inquiries", "tracker", "documents"]);
+const CONSUMER_PRODUCT_IDS = new Set(["ai_visibility", "managed_presence", "homefinder", "inquiries", "tracker", "documents", "applications", "scheduling", "investigations", "operations"]);
 
 export function discoveryProducts(products: readonly WorkspaceProduct[]): WorkspaceProduct[] {
   return products.filter((product) => CONSUMER_PRODUCT_IDS.has(product.id));

@@ -3,8 +3,24 @@ import { Output, generateText } from "ai";
 import { z } from "zod";
 import type { ModelConfig } from "@/lib/ai-models";
 import { getFallbackModel, getPrimaryModel, isTransientModelError } from "@/lib/ai-models";
-import { listWorkspaceDiscoveryProducts } from "@/platform/products";
+import {
+  CapabilityUnavailableError,
+  type QualifiedExecutableCapability,
+} from "@/platform/capabilities";
+import {
+  listExecutableCapabilityDescriptors,
+  requireExactExecutableCapability,
+} from "@/server/capabilities";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
+import { executeBudgetedAction, type BudgetExecution } from "@/platform/work-economics";
+import { reconcileBudgetedAction } from "@/platform/work-economics/runtime";
+import {
+  geminiReceiptFromAiSdkResult,
+  ProviderEvidenceUnavailableError,
+  reconciliationFromTrustedProviderReceipt,
+  trustedProviderReceiptSchema,
+  type TrustedProviderReceipt,
+} from "@/platform/work-economics/provider-evidence";
 import {
   assertCanSaveWork,
   assertWorkspaceMember,
@@ -17,9 +33,12 @@ import {
   type PersistedWorkPlanOutput,
   type WorkspaceActor,
 } from "@/platform/workspaces";
-import { createDocument, documentContentSchema } from "@/products/documents/engine";
+import { WorkspaceConflictError } from "@/platform/workspaces/types";
+import { createApplicationDraft } from "@/products/applications/server";
+import { workPlanApplicationDraftSchema } from "./contracts";
+import { createDocument, documentContentSchema } from "@/products/documents/contracts";
 import { createTrackerFromImport, trackerWorkPayload } from "@/products/tracker";
-import { trackerTemplateSource } from "@/products/tracker/templates";
+import { trackerTemplateSource } from "@/products/tracker/client";
 import {
   createWorkPlanRequestSchema,
   executeWorkPlanOutputRequestSchema,
@@ -36,6 +55,7 @@ import {
   type WorkPlanNativeOperation,
   type WorkPlanOutputExecution,
   type WorkPlanRecord,
+  type CreateWorkPlanRequest,
 } from "./contracts";
 import {
   prepareWorkPlanContext,
@@ -51,6 +71,8 @@ const PLANNING_SYSTEM_PROMPT = [
   "Use only the supplied native operation identifiers.",
   "If the goal cannot be scoped to those operations, use status needs_scoping and state the missing decision.",
   "For a create_document or create_tracker output, include a small reviewable draft when the requested result is specific enough. A document draft contains only title and private text; a tracker draft names one of the supplied empty templates.",
+  "For create_application, infer the smallest useful private app from the requested outcome. Include an application draft with title, typed fields, and approved form/list/detail/document components referencing those fields. Never include executable code, arbitrary URLs, customer records, permissions, deployment claims, or a maintenance owner. The server assigns ownership and the native app must pass checks before activation.",
+  "For an equipment or repair request, prefer a concise intake and review list with only the fields the request calls for, such as equipment, location, problem, urgency, and notes. Use the supported text, number, and boolean types.",
   "Set no cost value. The server records estimatedCost as null until a trusted estimate exists.",
 ].join(" ");
 
@@ -58,6 +80,22 @@ export class WorkPlanUnavailableError extends Error {
   constructor(message = "Planning is unavailable") {
     super(message);
     this.name = "WorkPlanUnavailableError";
+  }
+}
+
+/** Model-backed planning is unavailable until an accepted work-economics job exists. */
+export class WorkPlanFundingRequiredError extends Error {
+  constructor(message = "Accept a planning budget before requesting a model-backed plan.") {
+    super(message);
+    this.name = "WorkPlanFundingRequiredError";
+  }
+}
+
+/** A durable model receipt without a saved result must never trigger a second call. */
+export class WorkPlanGenerationReplayError extends Error {
+  constructor(message = "A previous planning call has a durable receipt but its result was not saved. Inspect or reconcile that receipt before retrying.") {
+    super(message);
+    this.name = "WorkPlanGenerationReplayError";
   }
 }
 
@@ -106,9 +144,24 @@ export interface WorkPlanGenerationInput {
   userGoal: string;
   evidence: readonly WorkPlanEvidence[];
   allowedOperations: readonly WorkPlanNativeOperation[];
+  /** Exact admission identity used to bind a provider billing receipt. */
+  executionContext?: {
+    jobId: string;
+    executionKey: string;
+    maximumCents: number;
+    kind: "model";
+    attribution: "normal" | "strelva_retry";
+  };
 }
 
-export type WorkPlanGenerator = (input: WorkPlanGenerationInput) => Promise<unknown>;
+export type WorkPlanGenerationResult = {
+  /** Structured plan output. This is the only value persisted as work. */
+  output: unknown;
+  /** Present only when a provider returned an exact server-side billing receipt. */
+  providerEvidence?: TrustedProviderReceipt;
+};
+
+export type WorkPlanGenerator = (input: WorkPlanGenerationInput) => Promise<unknown | WorkPlanGenerationResult>;
 
 export function planningEnabled(): boolean {
   return process.env.STRELVA_PLANNING_ENABLED === "1";
@@ -143,7 +196,7 @@ function promptFor(input: WorkPlanGenerationInput): string {
   ].join("\n\n");
 }
 
-async function defaultGenerate(input: WorkPlanGenerationInput): Promise<unknown> {
+async function defaultGenerate(input: WorkPlanGenerationInput): Promise<unknown | WorkPlanGenerationResult> {
   if (!planningEnabled()) throw new WorkPlanUnavailableError("Planning is not enabled");
   const models = configuredModels();
   if (!models.length) throw new WorkPlanUnavailableError("No planning model is configured");
@@ -162,12 +215,21 @@ async function defaultGenerate(input: WorkPlanGenerationInput): Promise<unknown>
 
   try {
     const result = await generateText({ ...options(), model: models[0]!.model });
-    return result.output;
+    const providerEvidence = input.executionContext
+      ? trustedReceiptFromFallbackResult(result, input.executionContext, models[0]!.label)
+      : null;
+    return providerEvidence ? { output: result.output, providerEvidence } : result.output;
   } catch (error) {
     if (models[1] && isTransientModelError(error)) {
       try {
         const result = await generateText({ ...options(), model: models[1].model });
-        return result.output;
+        // Fallback providers use the same strict receipt contract. They only
+        // settle when a provider-specific billing gateway supplies an exact
+        // amount and immutable request id; token usage remains unresolved.
+        const providerEvidence = input.executionContext
+          ? trustedReceiptFromFallbackResult(result, input.executionContext, models[1]!.label)
+          : null;
+        return providerEvidence ? { output: result.output, providerEvidence } : result.output;
       } catch {
         throw new WorkPlanUnavailableError("The planning provider did not return a plan");
       }
@@ -176,19 +238,80 @@ async function defaultGenerate(input: WorkPlanGenerationInput): Promise<unknown>
   }
 }
 
+function trustedReceiptFromFallbackResult(
+  result: unknown,
+  context: NonNullable<WorkPlanGenerationInput["executionContext"]>,
+  modelLabel: string,
+): TrustedProviderReceipt | null {
+  // Anthropic and OpenAI adapters expose usage and response ids through the
+  // AI SDK, but neither is a billable-dollar receipt. A provider-specific
+  // billing extension may use its provider key in metadata in the future.
+  const provider = modelLabel.split("/")[0] || "unknown";
+  if (provider === "google") return geminiReceiptFromAiSdkResult(result, context);
+  const value = result && typeof result === "object" && !Array.isArray(result)
+    ? result as Record<string, unknown>
+    : null;
+  const metadata = value?.providerMetadata;
+  const providerValue = metadata && typeof metadata === "object" && !Array.isArray(metadata)
+    ? (metadata as Record<string, unknown>)[provider]
+    : null;
+  const billing = providerValue && typeof providerValue === "object" && !Array.isArray(providerValue)
+    ? (providerValue as Record<string, unknown>).billing
+    : null;
+  if (!billing || typeof billing !== "object" || Array.isArray(billing)) return null;
+  const candidate = billing as Record<string, unknown>;
+  if (typeof candidate.requestId !== "string" || typeof candidate.billableCents !== "number" || typeof candidate.evidenceReference !== "string") return null;
+  return {
+    version: 1,
+    provider,
+    requestId: candidate.requestId,
+    executionKey: context.executionKey,
+    kind: context.kind,
+    attribution: context.attribution,
+    maximumCents: context.maximumCents,
+    billableCents: candidate.billableCents,
+    evidenceReference: candidate.evidenceReference,
+  };
+}
+
 function nativeOperationCatalog(): WorkPlanNativeOperation[] {
-  return listWorkspaceDiscoveryProducts().flatMap((product) => product.operations
-    .filter((operation) => operation.support === "supported" ||
-      (operation.support === "release_gated" && product.id === "documents" && workspaceReleaseEnabled()))
-    .map((operation) => ({
-      id: operation.id,
-      productId: product.id,
-      resourceKind: operation.resourceKind,
-      label: operation.label,
-      effect: operation.effect,
-      support: operation.support === "release_gated" ? "release_gated" as const : "supported" as const,
-      description: operation.description,
-    })));
+  return listExecutableCapabilityDescriptors("planner")
+    .filter((capability) => capability.support === "supported" ||
+      (capability.support === "release_gated" && workspaceReleaseEnabled()))
+    .map((capability) => ({
+      id: capability.id,
+      capabilityVersion: capability.version,
+      productId: capability.productId,
+      resourceKind: capability.resourceKind,
+      label: capability.label,
+      effect: capability.effect,
+      support: capability.support === "release_gated" ? "release_gated" as const : "supported" as const,
+      description: capability.description,
+    }));
+}
+
+function unwrapGeneration(value: unknown): { output: unknown; providerEvidence?: TrustedProviderReceipt } {
+  if (value && typeof value === "object" && !Array.isArray(value)
+    && Object.prototype.hasOwnProperty.call(value, "output")) {
+    const candidate = value as { output: unknown; providerEvidence?: unknown };
+    if (candidate.providerEvidence !== undefined) {
+      const providerEvidence = trustedProviderReceiptSchemaForWorkPlan(candidate.providerEvidence);
+      return { output: candidate.output, ...(providerEvidence ? { providerEvidence } : {}) };
+    }
+    return { output: candidate.output };
+  }
+  return { output: value };
+}
+
+function trustedProviderReceiptSchemaForWorkPlan(value: unknown): TrustedProviderReceipt | null {
+  // Keep malformed provider metadata unresolved. A malformed receipt must not
+  // prevent the valid plan from being retained or turn into a zero charge.
+  try {
+    const parsed = trustedProviderReceiptSchema.safeParse(value);
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
 }
 
 function assertUnique(values: readonly string[], label: string): void {
@@ -236,6 +359,11 @@ function normalizePlan(
   }
 
   const operations = resolveOperations(generated, catalog);
+  for (const output of generated.proposedOutputs) {
+    if (generated.status === "ready" && output.nativeOperationIds.includes("create_application") && output.draft?.kind !== "application") {
+      throw new WorkPlanInvalidOutputError("A create_application output needs a reviewable application draft");
+    }
+  }
   let status = generated.status;
   const requiredDecisions = [...generated.requiredDecisions];
   if (status === "ready" && operations.length === 0) status = "needs_scoping";
@@ -274,11 +402,6 @@ function normalizePlan(
   });
 }
 
-const executableOperations = {
-  create_document: { productId: "documents", resourceKind: "document", draftKind: "document" },
-  create_tracker: { productId: "tracker", resourceKind: "tracker", draftKind: "tracker" },
-} as const;
-
 const trackerOutputInputSchema = z.object({
   templateId: z.enum(["tasks", "projects", "inventory"]),
   title: z.string().trim().min(1).max(160).optional(),
@@ -309,21 +432,32 @@ function selectedOperation(
   plan: WorkPlan,
   output: WorkPlan["proposedOutputs"][number],
   requested: string | undefined,
-): keyof typeof executableOperations {
+): QualifiedExecutableCapability {
   const operationId = requested || (output.nativeOperationIds.length === 1 ? output.nativeOperationIds[0] : undefined);
   if (!operationId || !output.nativeOperationIds.includes(operationId)) {
     throw new WorkPlanExecutionUnsupportedError(operationId || "multiple_operations");
   }
-  const executable = executableOperations[operationId as keyof typeof executableOperations];
   const described = plan.supportedNativeOperations.find((operation) => operation.id === operationId);
-  if (!executable || !described || described.productId !== executable.productId ||
-      described.resourceKind !== executable.resourceKind || described.effect !== "create_resource") {
+  if (!described || described.effect !== "create_resource") {
     throw new WorkPlanExecutionUnsupportedError(operationId);
   }
-  if (operationId === "create_document" && !workspaceReleaseEnabled()) {
+  const capabilityVersion = described.capabilityVersion ?? 1;
+  let capability;
+  try {
+    capability = requireExactExecutableCapability(operationId, capabilityVersion, "planner");
+  } catch (error) {
+    if (error instanceof CapabilityUnavailableError) throw new WorkPlanExecutionUnsupportedError(operationId);
+    throw error;
+  }
+  if (capability.definition.productId !== described.productId ||
+      capability.definition.resourceKind !== described.resourceKind ||
+      capability.definition.execution.effect !== described.effect) {
     throw new WorkPlanExecutionUnsupportedError(operationId);
   }
-  return operationId as keyof typeof executableOperations;
+  if (capability.definition.support === "release_gated" && !workspaceReleaseEnabled()) {
+    throw new WorkPlanExecutionUnsupportedError(operationId);
+  }
+  return capability;
 }
 
 function assertRequiredDecisions(plan: WorkPlan, decisions: Record<string, string>): void {
@@ -369,14 +503,17 @@ async function assertContextFresh(input: {
 function draftInputs(
   output: WorkPlan["proposedOutputs"][number],
   inputs: Record<string, unknown>,
-  operationId: keyof typeof executableOperations,
+  adapterKey: string,
 ): Record<string, unknown> {
   if (Object.keys(inputs).length > 0) return inputs;
   if (!output.draft) throw new WorkPlanInvalidOutputError("This output has no reviewable draft. Use the native product flow to provide one.");
-  if (operationId === "create_document" && output.draft.kind === "document") {
+  if (adapterKey === "applications.create_draft" && output.draft.kind === "application") {
+    return { title: output.draft.title, fields: output.draft.fields, components: output.draft.components };
+  }
+  if (adapterKey === "documents.create" && output.draft.kind === "document") {
     return { title: output.draft.title, text: output.draft.text };
   }
-  if (operationId === "create_tracker" && output.draft.kind === "tracker") {
+  if (adapterKey === "tracker.create" && output.draft.kind === "tracker") {
     return { templateId: output.draft.templateId, ...(output.draft.title ? { title: output.draft.title } : {}) };
   }
   throw new WorkPlanInvalidOutputError("The proposed draft does not match its native operation.");
@@ -386,12 +523,20 @@ function buildNativeOutput(input: {
   actor: WorkspaceActor;
   planWorkId: string;
   outputId: string;
-  operationId: keyof typeof executableOperations;
+  capability: QualifiedExecutableCapability;
   output: WorkPlan["proposedOutputs"][number];
   inputs: Record<string, unknown>;
 }): Pick<PersistWorkPlanOutputInput, "nativeProductId" | "nativeResourceKind" | "nativeTitle" | "nativePayload" | "nativeInput"> {
-  const values = draftInputs(input.output, input.inputs, input.operationId);
-  if (input.operationId === "create_document") {
+  const values = draftInputs(input.output, input.inputs, input.capability.definition.adapterKey);
+  if (input.capability.definition.adapterKey === "applications.create_draft") {
+    if (input.output.draft?.kind !== "application") throw new WorkPlanInvalidOutputError("The application output needs a reviewable application draft.");
+    const parsed = workPlanApplicationDraftSchema.safeParse({ ...values, kind: "application" });
+    if (!parsed.success) throw new WorkPlanInvalidOutputError("Review the application's fields and approved views before accepting it.");
+    const { kind: _kind, ...spec } = parsed.data;
+    const application = createApplicationDraft({ ...spec, maintenanceOwner: input.actor.userId }, input.actor);
+    return { nativeProductId: "applications", nativeResourceKind: "application", nativeTitle: application.title, nativePayload: application, nativeInput: spec };
+  }
+  if (input.capability.definition.adapterKey === "documents.create") {
     if (input.output.draft?.kind !== "document") {
       throw new WorkPlanInvalidOutputError("The document output needs a reviewable document draft.");
     }
@@ -407,7 +552,7 @@ function buildNativeOutput(input: {
     };
   }
 
-  if (input.output.draft?.kind !== "tracker") {
+  if (input.capability.definition.adapterKey !== "tracker.create" || input.output.draft?.kind !== "tracker") {
     throw new WorkPlanInvalidOutputError("The tracker output needs a reviewable empty-template draft.");
   }
   const parsed = trackerOutputInputSchema.safeParse(values);
@@ -465,9 +610,9 @@ export async function executeWorkPlanOutput(input: {
   if (!output) throw new WorkPlanInvalidOutputError("The requested plan output is unavailable.");
   assertRequiredDecisions(record.plan, request.decisions);
 
-  let operationId: keyof typeof executableOperations;
+  let capability: QualifiedExecutableCapability;
   try {
-    operationId = selectedOperation(record.plan, output, request.operationId);
+    capability = selectedOperation(record.plan, output, request.operationId);
   } catch (error) {
     if (error instanceof WorkPlanExecutionUnsupportedError) throw error;
     throw new WorkPlanInvalidOutputError("The requested plan output is unavailable.");
@@ -479,7 +624,7 @@ export async function executeWorkPlanOutput(input: {
       actor: input.actor,
       planWorkId: request.planWorkId,
       outputId: request.outputId,
-      operationId,
+      capability,
       output,
       inputs: request.inputs,
     });
@@ -489,29 +634,66 @@ export async function executeWorkPlanOutput(input: {
   }
 
   const executionInput = {
-    operationId,
+    operationId: capability.definition.id,
+    capabilityVersion: capability.definition.version,
     inputs: native.nativeInput,
     decisions: request.decisions,
   };
-  const idempotencyKey = `work-plan-output:${request.planWorkId}:${record.plan.metadata.revision}:${request.outputId}:${operationId}`;
+  const idempotencyKey = `work-plan-output:${request.planWorkId}:${record.plan.metadata.revision}:${request.outputId}:${capability.definition.id}@${capability.definition.version}`;
   const digest = inputDigest(executionInput);
+  const legacyPersistenceKey = capability.definition.version === 1
+    ? {
+      actor: input.actor,
+      workspaceId: request.workspaceId,
+      planWorkId: request.planWorkId,
+      planRevision: record.plan.metadata.revision,
+      outputId: request.outputId,
+      operationId: capability.definition.id,
+      idempotencyKey: `work-plan-output:${request.planWorkId}:${record.plan.metadata.revision}:${request.outputId}:${capability.definition.id}`,
+      inputDigest: inputDigest({
+        operationId: capability.definition.id,
+        inputs: native.nativeInput,
+        decisions: request.decisions,
+      }),
+    }
+    : undefined;
   const persistenceKey = {
     actor: input.actor,
     workspaceId: request.workspaceId,
     planWorkId: request.planWorkId,
     planRevision: record.plan.metadata.revision,
     outputId: request.outputId,
-    operationId,
+    operationId: capability.definition.id,
     idempotencyKey,
     inputDigest: digest,
   };
-  const previouslyPersisted = await (input.read ?? readWorkPlanOutput)(persistenceKey);
+  const readOutput = input.read ?? readWorkPlanOutput;
+  let previouslyPersisted: PersistedWorkPlanOutput | null;
+  try {
+    previouslyPersisted = await readOutput(persistenceKey);
+  } catch (error) {
+    // Before capability versions were persisted, v1 accepted outputs used the
+    // unversioned key and digest. The current read RPC reports a conflict when
+    // it finds one of those receipts, so retry that exact legacy identity once.
+    if (!legacyPersistenceKey || !(error instanceof WorkspaceConflictError)) throw error;
+    previouslyPersisted = await readOutput(legacyPersistenceKey);
+    if (!previouslyPersisted) throw error;
+  }
   if (previouslyPersisted) {
     if (previouslyPersisted.nativeProductId !== native.nativeProductId ||
         previouslyPersisted.nativeResourceKind !== native.nativeResourceKind) {
       throw new WorkPlanInvalidOutputError("The saved output receipt did not match the native product.");
     }
-    const receipt = workPlanOutputExecutionReceiptSchema.parse(previouslyPersisted.receipt);
+    const persistedReceipt = previouslyPersisted.receipt && typeof previouslyPersisted.receipt === "object"
+      ? previouslyPersisted.receipt as Record<string, unknown>
+      : {};
+    if (persistedReceipt.capabilityVersion !== undefined && persistedReceipt.capabilityVersion !== capability.definition.version) {
+      throw new WorkPlanExecutionUnsupportedError(capability.definition.id);
+    }
+    const receipt = workPlanOutputExecutionReceiptSchema.parse({
+      ...persistedReceipt,
+      capabilityVersion: capability.definition.version,
+    });
     return workPlanOutputExecutionSchema.parse({
       planWorkId: request.planWorkId,
       outputId: request.outputId,
@@ -519,6 +701,7 @@ export async function executeWorkPlanOutput(input: {
       nativeWorkId: previouslyPersisted.nativeWorkId,
       nativeProductId: previouslyPersisted.nativeProductId,
       nativeResourceKind: previouslyPersisted.nativeResourceKind,
+      capabilityVersion: capability.definition.version,
       receipt,
     });
   }
@@ -534,7 +717,7 @@ export async function executeWorkPlanOutput(input: {
     planWorkId: request.planWorkId,
     planRevision: record.plan.metadata.revision,
     outputId: request.outputId,
-    operationId,
+    operationId: capability.definition.id,
     idempotencyKey,
     inputDigest: digest,
     ...native,
@@ -545,6 +728,10 @@ export async function executeWorkPlanOutput(input: {
     throw new WorkPlanInvalidOutputError("The saved output receipt did not match the native product.");
   }
   const receipt = workPlanOutputExecutionReceiptSchema.parse(persisted.receipt);
+  const versionedReceipt = workPlanOutputExecutionReceiptSchema.parse({
+    ...receipt,
+    capabilityVersion: capability.definition.version,
+  });
   return workPlanOutputExecutionSchema.parse({
     planWorkId: request.planWorkId,
     outputId: request.outputId,
@@ -552,7 +739,8 @@ export async function executeWorkPlanOutput(input: {
     nativeWorkId: persisted.nativeWorkId,
     nativeProductId: persisted.nativeProductId,
     nativeResourceKind: persisted.nativeResourceKind,
-    receipt,
+    capabilityVersion: capability.definition.version,
+    receipt: versionedReceipt,
   });
 }
 
@@ -562,19 +750,34 @@ export async function createWorkPlan(input: {
   userGoal: string;
   evidence?: readonly WorkPlanEvidence[];
   sourceWorkIds?: readonly string[];
+  planningEconomics?: CreateWorkPlanRequest["planningEconomics"];
   generate?: WorkPlanGenerator;
   now?: () => Date;
-}): Promise<WorkPlanRecord> {
+}): Promise<WorkPlanRecord & {
+  planningReceipt?: BudgetExecution;
+  planningReconciliation?: {
+    status: "settled" | "unresolved";
+    code?: string;
+    message?: string;
+  };
+}> {
   const request = createWorkPlanRequestSchema.parse({
     workspaceId: input.workspaceId,
     userGoal: input.userGoal,
     evidence: input.evidence,
     sourceWorkIds: input.sourceWorkIds,
+    planningEconomics: input.planningEconomics,
   });
 
   // Membership and saved-work capacity are checked before the bounded model call.
   await assertCanSaveWork(input.actor, request.workspaceId);
   if (!planningEnabled()) throw new WorkPlanUnavailableError("Planning is not enabled");
+  if (!input.generate && !request.planningEconomics) {
+    // Preserve the existing unavailable state when no model is configured, but
+    // never let a configured provider run without an explicit funding boundary.
+    if (!configuredModels().length) throw new WorkPlanUnavailableError("No planning model is configured");
+    throw new WorkPlanFundingRequiredError();
+  }
 
   const context = request.sourceWorkIds?.length
     ? await prepareWorkPlanContext({
@@ -589,11 +792,84 @@ export async function createWorkPlan(input: {
   }
 
   const catalog = nativeOperationCatalog();
-  const generated = await (input.generate ?? defaultGenerate)({
+  const generationInput = {
     userGoal: request.userGoal,
     evidence,
     allowedOperations: catalog,
-  });
+  } satisfies WorkPlanGenerationInput;
+  let generated: unknown;
+  let planningReceipt: BudgetExecution | undefined;
+  let planningReconciliation: {
+    status: "settled" | "unresolved";
+    code?: string;
+    message?: string;
+  } | undefined;
+  if (request.planningEconomics) {
+    const executionContext = {
+      jobId: request.planningEconomics.jobId,
+      executionKey: request.planningEconomics.executionKey,
+      maximumCents: request.planningEconomics.maximumCents,
+      kind: "model" as const,
+      attribution: "normal" as const,
+    };
+    const result = await executeBudgetedAction(input.actor, {
+      jobId: request.planningEconomics.jobId,
+      executionKey: request.planningEconomics.executionKey,
+      maximumCents: request.planningEconomics.maximumCents,
+      kind: "model",
+      expectedTarget: { workspaceId: request.workspaceId, workId: null },
+    }, {
+      recheck: async () => { await assertCanSaveWork(input.actor, request.workspaceId); },
+      perform: async () => ({
+        value: await (input.generate ?? defaultGenerate)({ ...generationInput, executionContext }),
+        // Provider token usage is not a trusted dollar amount. Keep the accepted
+        // maximum held until an independently verified receipt exists.
+        amountCents: null,
+        effect: "accepted" as const,
+      }),
+    });
+    if (result.disposition === "replayed") throw new WorkPlanGenerationReplayError();
+    const generation = unwrapGeneration(result.value);
+    generated = generation.output;
+    planningReceipt = result.execution;
+    if (generation.providerEvidence) {
+      try {
+        planningReceipt = await reconcileBudgetedAction(input.actor, {
+          jobId: executionContext.jobId,
+          executionKey: executionContext.executionKey,
+          maximumCents: executionContext.maximumCents,
+          kind: executionContext.kind,
+          attribution: executionContext.attribution,
+          expectedTarget: { workspaceId: request.workspaceId, workId: null },
+        }, {
+          async resolve(context) {
+            return reconciliationFromTrustedProviderReceipt(context, generation.providerEvidence);
+          },
+        });
+        planningReconciliation = { status: "settled" };
+      } catch (error) {
+        if (!(error instanceof ProviderEvidenceUnavailableError)) throw error;
+        // The plan itself is still a useful durable result. Keep the execution
+        // held and expose the precise recovery state to the caller; never
+        // convert a mismatch or missing receipt into zero.
+        planningReconciliation = {
+          status: "unresolved",
+          code: error.code,
+          message: error.message,
+        };
+      }
+    } else {
+      planningReconciliation = {
+        status: "unresolved",
+        code: "provider_billing_unavailable",
+        message: "The provider returned no trusted billed-cost receipt. Token usage is not a dollar amount, so the accepted maximum remains held.",
+      };
+    }
+  } else {
+    // Custom generators are the deterministic local test/fixture seam. The
+    // production path above cannot invoke a configured model without funding.
+    generated = await input.generate!(generationInput);
+  }
   const createdAt = (input.now ?? (() => new Date()))().toISOString();
   const plan = normalizePlan(generated, {
     userGoal: request.userGoal,
@@ -621,7 +897,12 @@ export async function createWorkPlan(input: {
       } : {}),
     },
   });
-  return { work, plan };
+  return {
+    work,
+    plan,
+    ...(planningReceipt ? { planningReceipt } : {}),
+    ...(planningReconciliation ? { planningReconciliation } : {}),
+  };
 }
 
 export async function readWorkPlan(input: {
@@ -641,6 +922,7 @@ export async function readWorkPlan(input: {
 
 function presentOutputExecution(value: PersistedWorkPlanOutput): WorkPlanOutputExecution | null {
   try {
+    const receipt = workPlanOutputExecutionReceiptSchema.parse(value.receipt);
     return workPlanOutputExecutionSchema.parse({
       planWorkId: value.planWorkId,
       outputId: value.outputId,
@@ -648,14 +930,22 @@ function presentOutputExecution(value: PersistedWorkPlanOutput): WorkPlanOutputE
       nativeWorkId: value.nativeWorkId,
       nativeProductId: value.nativeProductId,
       nativeResourceKind: value.nativeResourceKind,
-      receipt: workPlanOutputExecutionReceiptSchema.parse(value.receipt),
+      ...(receipt.capabilityVersion ? { capabilityVersion: receipt.capabilityVersion } : {}),
+      receipt,
     });
   } catch {
     return null;
   }
 }
 
-export function presentWorkPlan(record: WorkPlanRecord, executions?: readonly PersistedWorkPlanOutput[]) {
+export function presentWorkPlan(record: WorkPlanRecord & {
+  planningReceipt?: BudgetExecution;
+  planningReconciliation?: {
+    status: "settled" | "unresolved";
+    code?: string;
+    message?: string;
+  };
+}, executions?: readonly PersistedWorkPlanOutput[]) {
   const { work, plan } = record;
   const response = {
     work: {
@@ -669,6 +959,8 @@ export function presentWorkPlan(record: WorkPlanRecord, executions?: readonly Pe
       updatedAt: work.updatedAt,
     },
     plan,
+    ...(record.planningReceipt ? { planningEconomics: record.planningReceipt } : {}),
+    ...(record.planningReconciliation ? { planningReconciliation: record.planningReconciliation } : {}),
   };
   if (executions === undefined) return response;
   return {

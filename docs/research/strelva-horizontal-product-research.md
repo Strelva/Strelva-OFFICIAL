@@ -1,5 +1,11 @@
 # What Strelva should let people do
 
+The [September 12 frontier investigation](./frontier-strelva-2026-09-12.md)
+extends this research with a strict six-month capability window, 29 current
+workflow teardowns, substantially different product directions, and ten
+demonstrable behaviors. It preserves the distinction between recommendations,
+selected direction, local implementation, and operated customer evidence.
+
 Strelva is being designed as a horizontal technology product with high-growth ambition. People should be able to discover useful possibilities, create and use software, complete work, and let more of it run over time. Existing clients can become independent product users under subscriptions and usage. Agencies can build alongside other users, but agency delivery does not define the product.
 
 This is internal concept research for Jacob. R&D stays internal. The concepts are possibilities to develop and compare, not an accepted strategy, proof of demand, or instructions to change production. Current repository limits describe what is built today; they do not set the ceiling for the product.

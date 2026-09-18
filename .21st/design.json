@@ -11,15 +11,35 @@
   },
   "sources": {
     "tokens": [
-      "src/app/globals.css"
+      "src/app/globals.css",
+      "src/app/styles/workspace-colors.css",
+      "src/app/styles/motion.css",
+      "src/components/ui/atmosphere/atmospheric-card.module.css",
+      "src/components/ui/primitives.module.css",
+      "src/lib/motion.ts"
     ],
     "components": [
-      "src/components/ui"
+      "src/components/ui",
+      "src/components/brand",
+      "src/components/ui/atmosphere",
+      "src/components/ui/motion"
     ],
-    "assets": [],
+    "assets": [
+      "src/components/Logo.tsx",
+      "src/components/brand/StrelvaLockup.tsx",
+      "docs/prototypes/atmospheric-launch/strelva-lockup.svg",
+      "docs/design/references"
+    ],
     "instructions": [
+      "AGENTS.md",
       "DESIGN.md",
-      "CLAUDE.md"
+      "docs/component-system.md",
+      "docs/color-system.md",
+      "docs/design/strelva-visual-direction.md",
+      "docs/design/character-atmosphere-direction.md",
+      "docs/design/motion.md",
+      "docs/design/atmospheric-component-contract.md",
+      "docs/design/current-component-context.md"
     ]
   },
   "design": {
@@ -402,16 +422,48 @@
     "patterns": []
   },
   "constraints": {
-    "must": [],
-    "avoid": []
+    "must": [
+      "Read DESIGN.md#visual-direction-and-extension-map and docs/component-system.md#extending-the-foundation before extending the system; these files own decisions and adoption.",
+      "Distinguish selected direction, existing source, experimental studies, rendered verification, human acceptance and deployment.",
+      "Treat the design token extract dated by generatedAt as historical discovery data; resolve current scoped values from source before reuse.",
+      "Preserve repository-owned components, customer branding, permissions and behavior; record actual consumers and verification with each enhancement."
+    ],
+    "avoid": [
+      "Do not infer a universal dark-only theme or current font decision from legacy source or token extraction.",
+      "Do not promote reference artwork, prototype controls or a passing gallery into approved assets, product APIs or complete adoption.",
+      "Do not import sibling repository source or create page-level lookalikes of owned atoms."
+    ]
   },
   "decisions": [
     {
       "date": "2026-09-06",
       "scope": "src/experience/workspace",
       "decision": "User selected sidebar home with collapse, full-width work, optional right discussion. Restrained dark tokens, editorial type, thin borders, real saved-work previews; no prompt-first requirement.",
-      "references": ["https://21st.dev/@andrewlu0/components/sidebar", "https://21st.dev/@shadcn/components/sidebar"],
+      "references": [
+        "https://21st.dev/@andrewlu0/components/sidebar",
+        "https://21st.dev/@shadcn/components/sidebar"
+      ],
       "implementation": "Reuse Strelva Button and existing tokens. No registry component installed. Discussion opens an explicit unavailable state until private-workspace messaging is implemented."
+    },
+    {
+      "date": "2026-09-14",
+      "scope": "Workspace Home",
+      "decision": "Jacob selected an illustrated business with actual saved work arranged around it. Retain the building, dark palette, real work-opening actions, recorded attention, and mobile list. The September 15 surface topology uses Home, Work, Ongoing, People & access, and Settings, with New, Search, Explore offerings, and Help as utilities and personal Account in the footer. Agency Home shows only its explicitly shared client work and private agency work. Use Motion to explain connections and acknowledge direct interaction without looping decoration or invented business state.",
+      "references": [
+        "https://21st.dev/@ruixen.ui/components/multi-orbit-semi-circle"
+      ],
+      "implementation": "StrelvaSidebar owns the persistent workspace navigation and active states. Workspace Home keeps the shared business illustration and may use the LogoMark in the request composer and supporting moments. motion/react handles relationship drawing, layout changes, and direct feedback with reduced-motion support. Existing work routes and resource permissions remain. No registry component was installed."
+    },
+    {
+      "date": "2026-09-18",
+      "scope": "Foundation and visual-direction structure",
+      "decision": "The current direction selects Geist Sans, original cairn/custom lettering, prominent gloss, selective atmosphere and independently finished light/dark components. DESIGN.md routes to the existing imagery, color, material, motion and component owners. Extend those owners and record experiments, decisions, source, specimens and adoption separately.",
+      "references": [
+        "DESIGN.md#visual-direction-and-extension-map",
+        "docs/component-system.md#extending-the-foundation",
+        "docs/design/strelva-visual-direction.md#visual-review-and-extension"
+      ],
+      "implementation": "Documentation and source-index alignment only. Geist adoption, full token implementation, field/tab repair, material selection and cross-repository parity remain open. No runtime or deployment change."
     }
   ],
   "evidence": [
@@ -420,8 +472,8 @@
       "source": "src/components/ui"
     },
     {
-      "fact": "design.colorMode:light",
-      "source": "src/app/globals.css"
+      "fact": "design.colorMode:scoped-light-and-dark",
+      "source": "docs/color-system.md"
     },
     {
       "fact": "design.tokens",
@@ -429,7 +481,7 @@
     },
     {
       "fact": "project.instructions",
-      "source": "CLAUDE.md"
+      "source": "AGENTS.md"
     },
     {
       "fact": "project.instructions",

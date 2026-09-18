@@ -46,6 +46,44 @@ The **dev-access bypass** (`REB_DEV_UNGATED_ACCESS=1` / `SCAFFOLD_DEV_UNGATED_AC
   so it needs no DB/Redis/prod. The owner **Today** page is the exception (its verdict + activity
   feed are backend-driven), so its smoke is a render-check only.
 
+## Workspace schema checks
+
+`pnpm check:workspace-sql` builds the current workspace and recovery schema in
+isolated PostgreSQL and exercises its permissions, concurrency and failure paths.
+It is the regular CI gate.
+
+`pnpm check:workspace-upgrade` is the ordered-history rehearsal. It applies every
+repository migration through the documented pre-workspace baseline
+`20260729180000_org_layer_phase0_accounts.sql`, seeds representative tenant,
+membership and content rows, then applies every later workspace/recovery
+migration. It checks identity preservation, service-role-only creation, browser
+denial, RLS, verified and unverified owners, and atomic rejection of a duplicate
+migration. It never connects to a hosted or production database.
+
+Both commands require PostgreSQL server binaries. On this workstation:
+
+```bash
+PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-sql
+PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-upgrade
+```
+
+The upgrade rehearsal is a deliberate release check rather than a per-push CI
+step because it replays the full retained history. Run it when the workspace
+migration tail or its baseline changes and before authorizing a real migration.
+
+## Internal product-learning acceptance
+
+`tests/product-learning-authenticated-local.spec.ts` uses isolated local Supabase
+Auth/Postgres and synthetic users, sources and evidence. It checks the full saved
+learning lifecycle, independent review, stale revisions, source change/outage,
+pause and revoked access. Its direct due-time setup exercises collection admission;
+it does not prove background dispatch or observed customer value.
+
+Production access is disabled unless `STRELVA_PRODUCT_LEARNING_RELEASE=1` and the
+workspace release gate are both enabled. Active verified internal access and native
+workspace membership remain required. This flag does not schedule collection.
+Changing a production environment remains a separate authorized release action.
+
 ## CI (`.github/workflows/ci.yml`)
 
 `build` job: install with the repository's exact `pnpm@10.34.5` → lint → typecheck → product

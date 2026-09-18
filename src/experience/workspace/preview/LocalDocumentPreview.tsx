@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useRef } from "react";
-import { changeDocument, createDocument } from "@/products/documents/engine";
+import { changeDocument, createDocument } from "@/products/documents/contracts";
 import { DocumentExperience, type DocumentSaved, type DocumentTransport } from "../DocumentExperience";
 
 export function LocalDocumentPreview({ workspaceId, readOnly, initialRequestText }: { workspaceId: string; readOnly: boolean; initialRequestText?: string }) {

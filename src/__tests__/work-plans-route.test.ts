@@ -19,6 +19,7 @@ vi.mock("@/products/work-plans", async () => {
 });
 
 import { GET, POST } from "@/app/api/work-plans/route";
+import { WorkPlanFundingRequiredError } from "@/products/work-plans";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 
 const workspaceId = "22222222-2222-4222-8222-222222222222";
@@ -81,5 +82,32 @@ describe("workspace work-plan route", () => {
     const response = await POST(postRequest({ workspaceId, userGoal: "Make a tracker" }));
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ error: "This workspace is unavailable to your account." });
+  });
+
+  it("rejects model planning when no accepted economics job is supplied", async () => {
+    mocks.create.mockRejectedValue(new WorkPlanFundingRequiredError());
+    const response = await POST(postRequest({ workspaceId, userGoal: "Make a tracker" }));
+    expect(response.status).toBe(428);
+    expect(await response.json()).toEqual({
+      error: "Accept a planning budget before requesting a model-backed plan.",
+      code: "planning_funding_required",
+    });
+  });
+
+  it("passes the accepted planning job and execution identity to the planner", async () => {
+    const planningEconomics = {
+      jobId: "44444444-4444-4444-8444-444444444444",
+      executionKey: "planning:attempt-1",
+      maximumCents: 125,
+    };
+    const response = await POST(postRequest({ workspaceId, userGoal: "Make a tracker", planningEconomics }));
+    expect(response.status).toBe(201);
+    expect(mocks.create).toHaveBeenCalledWith({
+      actor: { userId: user.id, verifiedEmail: "owner@example.com" },
+      workspaceId,
+      userGoal: "Make a tracker",
+      evidence: [],
+      planningEconomics,
+    });
   });
 });

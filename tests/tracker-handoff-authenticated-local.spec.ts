@@ -84,6 +84,7 @@ test("real local auth preserves tracker handoff, delegated read, and customer re
     const wrongAcceptance = await postWorkspace(wrongRecipient.context.request, env.app, {
       action: "accept_handoff",
       token,
+      destination: { kind: "existing", workspaceId: "00000000-0000-4000-8000-000000000000" },
       allowAgencyAccess: true,
     });
     expect(wrongAcceptance.status()).toBe(403);
@@ -98,6 +99,7 @@ test("real local auth preserves tracker handoff, delegated read, and customer re
       recipientEmail?: unknown;
       agencyName?: unknown;
       accepted?: unknown;
+      destinations?: Array<{ id?: unknown; name?: unknown }>;
       work?: {
         productId?: unknown;
         resourceKind?: unknown;
@@ -108,6 +110,7 @@ test("real local auth preserves tracker handoff, delegated read, and customer re
     expect(preview.recipientEmail).toBe(customer.email);
     expect(preview.agencyName).toBe("Local handoff verification team");
     expect(preview.accepted).toBe(false);
+    expect(preview.destinations).toEqual([]);
     expect(preview.work?.productId).toBe("tracker");
     expect(preview.work?.resourceKind).toBe("tracker");
     expect(preview.work?.payload).toBeNull();
@@ -118,12 +121,21 @@ test("real local auth preserves tracker handoff, delegated read, and customer re
     expect(preview.work?.tracker).not.toHaveProperty("originalSource");
     expect(previewText).not.toContain('"originalSource"');
 
-    const acceptedResponse = await postWorkspace(customer.context.request, env.app, {
-      action: "accept_handoff",
-      token,
-      allowAgencyAccess: true,
-    });
+    const customerPage = await customer.context.newPage();
+    const acceptedRequest = customerPage.waitForResponse((response) => response.url().endsWith("/api/workspace") && response.request().method() === "POST" && response.request().postData()?.includes('"action":"accept_handoff"') === true);
+    await customerPage.goto(`/workspace#handoff=${token}`);
+    await expect(customerPage.getByRole("heading", { name: "Local handoff verification team prepared this for you." })).toBeVisible();
+    await expect(customerPage.getByText("Create a new business", { exact: true })).toBeVisible();
+    await customerPage.getByLabel("Business name", { exact: true }).fill("Harbor Dental");
+    await customerPage.screenshot({ path: "test-results/handoff-business-desktop.png", fullPage: true });
+    await customerPage.setViewportSize({ width: 390, height: 844 });
+    await customerPage.getByRole("group", { name: "Which business is this for?" }).evaluate(element => element.scrollIntoView({ block: "start" }));
+    await customerPage.screenshot({ path: "test-results/handoff-business-mobile.png", fullPage: true });
+    await customerPage.getByLabel("Allow Local handoff verification team read-only access").check();
+    await customerPage.getByRole("button", { name: "Accept into my workspace", exact: true }).click();
+    const acceptedResponse = await acceptedRequest;
     expect(acceptedResponse.status()).toBe(200);
+    expect(acceptedResponse.request().postDataJSON()).toMatchObject({ destination: { kind: "new", name: "Harbor Dental" } });
     const accepted = await acceptedResponse.json() as { workspaceId?: unknown; workId?: unknown };
     expect(typeof accepted.workspaceId).toBe("string");
     expect(typeof accepted.workId).toBe("string");
@@ -131,6 +143,92 @@ test("real local auth preserves tracker handoff, delegated read, and customer re
     customerWorkId = accepted.workId as string;
     expect(customerWorkspaceId).not.toBe(agencyWorkspaceId);
     expect(customerWorkId).not.toBe(sourceWorkId);
+    await expect.poll(() => new URL(customerPage.url()).searchParams.get("work")).toBe(customerWorkId);
+    await expect(customerPage.getByRole("heading", { name: "Local handoff tracker", exact: true })).toBeVisible();
+    await customerPage.setViewportSize({ width: 1280, height: 800 });
+
+    const secondHandoffResponse = await postWorkspace(owner.context.request, env.app, {
+      action: "handoff",
+      workId: sourceWorkId,
+      recipientEmail: customer.email,
+    });
+    expect(secondHandoffResponse.status()).toBe(201);
+    const secondHandoffBody = await secondHandoffResponse.json() as { token?: unknown };
+    expect(typeof secondHandoffBody.token).toBe("string");
+    const secondToken = secondHandoffBody.token as string;
+
+    const secondInspection = await postWorkspace(customer.context.request, env.app, {
+      action: "inspect_handoff",
+      token: secondToken,
+    });
+    expect(secondInspection.status()).toBe(200);
+    const secondPreview = await secondInspection.json() as { destinations?: Array<{ id?: unknown; name?: unknown }> };
+    expect(secondPreview.destinations).toEqual([{ id: customerWorkspaceId, name: "Harbor Dental" }]);
+
+    const secondAcceptedRequest = customerPage.waitForResponse((response) => response.url().endsWith("/api/workspace") && response.request().method() === "POST" && response.request().postData()?.includes('"action":"accept_handoff"') === true);
+    await customerPage.goto(`/workspace#handoff=${secondToken}`);
+    await expect(customerPage.getByRole("heading", { name: "Local handoff verification team prepared this for you." })).toBeVisible();
+    await expect(customerPage.getByText("Use an existing business", { exact: true })).toBeVisible();
+    await expect(customerPage.getByText("Create a new business", { exact: true })).toBeVisible();
+    await customerPage.getByLabel("Create a new business", { exact: true }).check();
+    await customerPage.getByLabel("Business name", { exact: true }).fill("Lakeside Dental");
+    await customerPage.getByRole("button", { name: "Accept into my workspace", exact: true }).click();
+    const secondAcceptedResponse = await secondAcceptedRequest;
+    expect(secondAcceptedResponse.status()).toBe(200);
+    expect(secondAcceptedResponse.request().postDataJSON()).toMatchObject({ destination: { kind: "new", name: "Lakeside Dental" } });
+    const secondAccepted = await secondAcceptedResponse.json() as { workspaceId?: unknown; workId?: unknown };
+    expect(typeof secondAccepted.workspaceId).toBe("string");
+    expect(typeof secondAccepted.workId).toBe("string");
+    const secondCustomerWorkspaceId = secondAccepted.workspaceId as string;
+    const secondCustomerWorkId = secondAccepted.workId as string;
+    expect(secondCustomerWorkspaceId).not.toBe(customerWorkspaceId);
+    expect(secondCustomerWorkId).not.toBe(customerWorkId);
+
+    const replayResponse = await postWorkspace(customer.context.request, env.app, {
+      action: "accept_handoff",
+      token: secondToken,
+      destination: { kind: "new", name: "Lakeside Dental" },
+      allowAgencyAccess: false,
+    });
+    expect(replayResponse.status()).toBe(200);
+    expect(await replayResponse.json()).toEqual({ workspaceId: secondCustomerWorkspaceId, workId: secondCustomerWorkId });
+    const changedReplayResponse = await postWorkspace(customer.context.request, env.app, {
+      action: "accept_handoff",
+      token: secondToken,
+      destination: { kind: "new", name: "Different business" },
+      allowAgencyAccess: false,
+    });
+    expect(changedReplayResponse.status()).toBe(409);
+
+    const thirdHandoffResponse = await postWorkspace(owner.context.request, env.app, {
+      action: "handoff",
+      workId: sourceWorkId,
+      recipientEmail: customer.email,
+    });
+    expect(thirdHandoffResponse.status()).toBe(201);
+    const thirdHandoffBody = await thirdHandoffResponse.json() as { token?: unknown };
+    expect(typeof thirdHandoffBody.token).toBe("string");
+    const thirdToken = thirdHandoffBody.token as string;
+    const thirdInspection = await postWorkspace(customer.context.request, env.app, {
+      action: "inspect_handoff",
+      token: thirdToken,
+    });
+    expect(thirdInspection.status()).toBe(200);
+    const thirdPreview = await thirdInspection.json() as { destinations?: Array<{ id?: unknown; name?: unknown }> };
+    expect(thirdPreview.destinations).toEqual([
+      { id: customerWorkspaceId, name: "Harbor Dental" },
+      { id: secondCustomerWorkspaceId, name: "Lakeside Dental" },
+    ]);
+
+    const thirdAcceptedRequest = customerPage.waitForResponse((response) => response.url().endsWith("/api/workspace") && response.request().method() === "POST" && response.request().postData()?.includes('"action":"accept_handoff"') === true);
+    await customerPage.goto(`/workspace#handoff=${thirdToken}`);
+    await expect(customerPage.getByRole("heading", { name: "Local handoff verification team prepared this for you." })).toBeVisible();
+    await customerPage.getByLabel("Business", { exact: true }).selectOption(secondCustomerWorkspaceId);
+    await customerPage.getByRole("button", { name: "Accept into my workspace", exact: true }).click();
+    const thirdAcceptedResponse = await thirdAcceptedRequest;
+    expect(thirdAcceptedResponse.status()).toBe(200);
+    expect(thirdAcceptedResponse.request().postDataJSON()).toMatchObject({ destination: { kind: "existing", workspaceId: secondCustomerWorkspaceId } });
+    expect(await thirdAcceptedResponse.json()).toMatchObject({ workspaceId: secondCustomerWorkspaceId, workId: expect.any(String) });
 
     const customerRead = await customer.context.request.get(`/api/tracker?workId=${customerWorkId}`);
     expect(customerRead.status()).toBe(200);

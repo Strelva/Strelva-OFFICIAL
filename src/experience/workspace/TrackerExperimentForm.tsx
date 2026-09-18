@@ -8,7 +8,7 @@ import {
   TRACKER_EXPERIMENT_MAX_CANDIDATES,
   trackerExperimentComparisonInputSchema,
   type TrackerExperimentEvidenceKind,
-} from "@/products/tracker/comparison";
+} from "@/products/tracker/client";
 
 type Props = {
   workId: string;

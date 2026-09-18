@@ -1,7 +1,7 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { WorkspaceApp } from "../WorkspaceApp";
 import { createPreviewInquiryAdapter } from "@/experience/inquiries/preview-fixture";
 import { createPreviewRequest, PREVIEW_SCENARIOS, type PreviewScenario } from "./fixture";
@@ -9,6 +9,8 @@ import styles from "./preview.module.css";
 
 export function WorkspacePreview({ scenario }: { scenario: PreviewScenario }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [installedStaffRequest] = useState(() => searchParams.get("previewSetup") === "staff-request");
   const previewRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
@@ -21,7 +23,13 @@ export function WorkspacePreview({ scenario }: { scenario: PreviewScenario }) {
     observer.observe(controls);
     return () => observer.disconnect();
   }, []);
-  const request = useMemo(() => createPreviewRequest(scenario), [scenario]);
+  const request = useMemo(() => createPreviewRequest(scenario, { installedStaffRequest }), [installedStaffRequest, scenario]);
+  useEffect(() => {
+    if (!installedStaffRequest) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("previewSetup");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }, [installedStaffRequest]);
   const inquiry = useMemo(() => ({ tenantId: "buffalo-realty", label: "Buffalo Realty", adapter: createPreviewInquiryAdapter("business", scenario) }), [scenario]);
   return <div ref={previewRef} data-dashboard className={styles.preview}>
     <aside ref={controlsRef} className={styles.controls} aria-label="Local preview controls">

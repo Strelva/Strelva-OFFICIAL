@@ -1,0 +1,11 @@
+:root {
+  --motion-feedback: 120ms;
+  --motion-disclosure: 360ms;
+  --motion-exit: 220ms;
+  --motion-ease: cubic-bezier(.2,.8,.2,1);
+  /* Soft overshoot for material shape; never use on text scale. */
+  --motion-gooey: linear(0, .14 10%, .46 22%, .79 38%, .96 55%, 1.035 72%, 1.012 88%, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --motion-feedback: 0ms; --motion-disclosure: 0ms; --motion-exit: 0ms; }
+}

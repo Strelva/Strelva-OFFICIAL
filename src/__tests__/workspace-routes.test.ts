@@ -100,6 +100,21 @@ describe("release-one private workspace routes", () => {
     expect(await response.json()).toMatchObject({ workspaceId, work: [{ id: workId }], actor: { email: "owner@example.com" } });
     expect(mocks.work).toHaveBeenCalledWith({ userId: "actor", verifiedEmail: "owner@example.com" }, workspaceId);
   });
+  it("exposes locally executable products only inside the enabled workspace release", async () => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "0");
+    expect((await GET(new Request("https://strelva.com/api/workspace"))).status).toBe(503);
+
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+    expect(response.status).toBe(200);
+    const products = (await response.json()).products as Array<{ id: string; availability: string }>;
+    expect(products).toEqual(expect.arrayContaining([
+      { id: "applications", name: "Internal applications", description: "Collect and use business records in a private form and working list.", availability: "available" },
+      { id: "scheduling", name: "Scheduling", description: "Reserve available time and keep conflicting requests out of the schedule.", availability: "available" },
+      { id: "investigations", name: "Ongoing checks", description: "Compare two permitted records and notice when they disagree.", availability: "available" },
+      { id: "operations", name: "Delegated work", description: "Approve a bounded result and keep its progress, decisions, and evidence together.", availability: "available" },
+    ]));
+  });
   it("includes authorized managed websites as tenant links without cloning saved work", async () => {
     mocks.managedWork.mockResolvedValue({ managedWork: [{ id: "gldf", title: "Great Lakes Dried Fruit", href: "https://app.strelva.com/client/gldf/dashboard", productId: "managed_presence", relationship: "client" }], unavailable: false });
 
@@ -171,6 +186,8 @@ describe("release-one private workspace routes", () => {
     expect(output.work[1].payload).toBeNull();
     expect(output.products.find((product: { id: string }) => product.id === "homefinder").availability).toBe("not_enabled");
     expect(output.products.find((product: { id: string }) => product.id === "tracker").availability).toBe("available");
+    expect(output.products.find((product: { id: string }) => product.id === "documents").availability).toBe("release_gated");
+    expect(output.products.find((product: { id: string }) => product.id === "applications").availability).toBe("available");
     expect(output.products.find((product: { id: string }) => product.id === "domain_monitoring")).toBeUndefined();
   });
   it("authorizes workspace writes before incurring scoring cost", async () => {
@@ -281,12 +298,13 @@ describe("release-one private workspace routes", () => {
   it("requires explicit agency-access consent and passes false without promotion", async () => {
     expect((await POST(request({ action: "accept_handoff", token: "opaque" }))).status).toBe(400);
     mocks.accept.mockResolvedValue({ customerWorkspaceId: workspaceId, customerWorkId: workId });
-    expect((await POST(request({ action: "accept_handoff", token: "opaque", allowAgencyAccess: false }))).status).toBe(200);
-    expect(mocks.accept).toHaveBeenCalledWith(expect.any(Object), "opaque", false);
+    const destination = { kind: "new" as const, name: "Customer business" };
+    expect((await POST(request({ action: "accept_handoff", token: "opaque", destination, allowAgencyAccess: false }))).status).toBe(200);
+    expect(mocks.accept).toHaveBeenCalledWith(expect.any(Object), "opaque", destination, false);
   });
   it("rejects malformed addressed Tracker acceptance before the generic copy RPC", async () => {
     mocks.inspect.mockResolvedValue({ recipientEmail: "owner@example.com", agencyWorkspace: { name: "Agency" }, work: { ...trackerWork, payload: { tracker: { invalid: true } } }, status: "pending", expiresAt: "2026-09-12" });
-    const response = await POST(request({ action: "accept_handoff", token: "opaque", allowAgencyAccess: false }));
+    const response = await POST(request({ action: "accept_handoff", token: "opaque", destination: { kind: "new", name: "Customer business" }, allowAgencyAccess: false }));
     expect(response.status).toBe(409);
     expect(mocks.accept).not.toHaveBeenCalled();
   });
@@ -300,6 +318,26 @@ describe("release-one private workspace routes", () => {
     const response = await GET(new Request("https://strelva.com/api/workspace"));
     expect(response.status).toBe(200);
     expect(await response.text()).not.toContain("must-not-leak");
+  });
+  it("includes the customer scope needed to separate one agency's active delegations", async () => {
+    mocks.list.mockResolvedValue([{ ...workspace, kind: "agency" }]);
+    mocks.agencyDelegations.mockResolvedValue([{
+      id: otherId,
+      customerWorkspaceId: "44444444-4444-4444-8444-444444444444",
+      customerWorkId: workId,
+      agencyWorkspaceId: workspaceId,
+      scope: ["work:read"],
+      status: "active",
+      createdAt: "2026-09-15T12:00:00.000Z",
+    }]);
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+    expect(response.status).toBe(200);
+    expect((await response.json()).delegations).toEqual([expect.objectContaining({
+      workId,
+      customerWorkspaceId: "44444444-4444-4444-8444-444444444444",
+      agencyWorkspaceId: workspaceId,
+      status: "active",
+    })]);
   });
 });
 

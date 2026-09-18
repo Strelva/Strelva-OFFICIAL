@@ -9,6 +9,7 @@ import { getInvite } from "@/lib/invites";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantSiteName } from "@/lib/tenant-display";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
+import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/lib/workspace-location";
 
 export const metadata: Metadata = {
   title: "Create your Strelva account",
@@ -71,6 +72,11 @@ export default async function SignUpPage({
   searchParams: Promise<AuthSearchParams>;
 }) {
   const params = await searchParams;
+  const workspaceOpen = workspaceReleaseEnabled();
+  const requestedNext = searchValue(params.next);
+  const workspaceTarget = workspaceOpen ? workspaceReturnTarget(requestedNext) : null;
+  const invitationTarget = workspaceOpen ? workspaceInvitationReturnTarget(requestedNext) : null;
+  const accountTarget = workspaceOpen ? accountReturnTarget(requestedNext) : null;
   const invite = await getInviteContext(params);
 
   if (invite) {
@@ -100,7 +106,10 @@ export default async function SignUpPage({
           </section>
 
           <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
-            <SupabaseSignIn next="/account" prefillEmail={invite.email} />
+            <SupabaseSignIn
+              next={workspaceTarget ? `/account?next=${encodeURIComponent(workspaceTarget)}` : accountTarget || "/account"}
+              prefillEmail={invite.email}
+            />
           </section>
         </div>
       </main>
@@ -169,7 +178,7 @@ export default async function SignUpPage({
           </section>
 
           <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
-            <SupabaseSignIn next="/workspace" />
+            <SupabaseSignIn next={invitationTarget || workspaceTarget || accountTarget || "/workspace"} />
           </section>
         </div>
       </main>

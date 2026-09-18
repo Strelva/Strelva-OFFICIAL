@@ -1,6 +1,6 @@
 import type { AiVisibilityResult } from "@/products/ai-visibility/contracts";
 import type { AssessmentResult } from "@/products/assessment";
-import type { TrackerExperimentComparison } from "@/products/tracker/comparison";
+import type { TrackerExperimentComparison } from "@/products/tracker/client";
 import type { TrackerHandoffPreview } from "@/products/tracker/contracts";
 
 /** Browser response contract. Internal membership and invitation secrets stay server-side. */
@@ -48,8 +48,9 @@ export type WorkspaceExperimentComparison = TrackerExperimentComparison & Requir
 export type WorkspaceExperiment = WorkspaceLegacyExperiment | WorkspaceExperimentComparison;
 
 export interface WorkspaceWork<TPayload = WorkspaceWorkPayload> {
-  workPlan?: { summary: string; status: "ready" | "needs_scoping" };
-  document?: Pick<import("@/products/documents/engine").WorkspaceDocument, "title" | "revision">;
+  operation?: { status: string; reason?: string };
+  workPlan?: { summary: string; status: "ready" | "needs_scoping"; outputCount?: number };
+  document?: Pick<import("@/products/documents/contracts").WorkspaceDocument, "title" | "revision">;
   id: string;
   workspaceId: string;
   title: string;
@@ -97,6 +98,8 @@ export interface WorkspaceHandoff {
 export interface WorkspaceDelegation {
   id: string;
   workId: string;
+  /** Customer scope named by this delegation. Older stored browser snapshots may omit it. */
+  customerWorkspaceId?: string;
   agencyWorkspaceId: string;
   status: "active" | "revoked";
   /** Only customer owners can revoke agency read access. */
@@ -133,6 +136,17 @@ export interface WorkspaceHandoffPreview<TPayload = WorkspaceWorkPayload> {
   work: WorkspaceWork<TPayload>;
   expiresAt: string;
   accepted: boolean;
+  /** Current customer businesses the addressed actor may choose. */
+  destinations?: WorkspaceHandoffDestinationOption[];
+}
+
+export type WorkspaceHandoffDestination =
+  | { kind: "existing"; workspaceId: string }
+  | { kind: "new"; name: string };
+
+export interface WorkspaceHandoffDestinationOption {
+  id: string;
+  name: string;
 }
 
 export type WorkspaceAction =
@@ -143,7 +157,7 @@ export type WorkspaceAction =
   | { action: "save_public_result"; workspaceId: string; resultId: string }
   | { action: "handoff"; workId: string; recipientEmail: string }
   | { action: "inspect_handoff"; token: string }
-  | { action: "accept_handoff"; token: string; allowAgencyAccess: boolean }
+  | { action: "accept_handoff"; token: string; destination: WorkspaceHandoffDestination; allowAgencyAccess: boolean }
   | { action: "revoke_delegation"; delegationId: string }
   | { action: "revoke_handoff"; handoffId: string };
 

@@ -655,3 +655,9 @@
   :global([data-appearance="dark"]) .suggestions button,
   :global([data-appearance="dark"]) .rowAction { background: #1c2d26; }
 }
+
+.newWork { margin-top:24px; }
+.newWork > summary { width:fit-content; cursor:pointer; min-height:44px; display:list-item; align-content:center; font-size:14px; }
+.newWork > summary:focus-visible { outline:2px solid currentColor; outline-offset:4px; }
+
+.recent + .recent { margin-top:32px; }

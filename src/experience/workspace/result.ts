@@ -1,13 +1,13 @@
 import type { SavedWork } from "@/platform/workspaces/types";
-import { documentSchema } from "@/products/documents/engine";
+import { documentSchema } from "@/products/documents/contracts";
 import { workPlanSchema } from "@/products/work-plans/contracts";
-import { parseTrackerWorkPayload } from "@/products/tracker/presentation";
+import { parseTrackerWorkPayload } from "@/products/tracker/client";
 import type { ProductWorkPresentation } from "@/platform/products/contracts";
 import {
   aiVisibilityWorkPresentation,
   type AiVisibilityResult,
 } from "@/products/ai-visibility/client";
-import { parseTrackerExperimentComparison } from "@/products/tracker/comparison";
+import { parseTrackerExperimentComparison } from "@/products/tracker/client";
 import { presentAssessmentWork, type AssessmentAccess } from "@/products/assessment";
 import type { WorkspaceExperiment, WorkspaceExperimentComparison, WorkspaceHandoffPreview, WorkspaceLegacyExperiment, WorkspaceSnapshot, WorkspaceWork } from "./contracts";
 
@@ -117,6 +117,14 @@ export interface WorkspacePresentationOptions {
 }
 
 export function presentWorkspaceWork(work: SavedWork, options: WorkspacePresentationOptions = {}): WorkspaceWork {
+  const horizontalKinds: Record<string, string> = { applications: "application", scheduling: "schedule", investigations: "investigation", operations: "responsibility", "product-learning": "learning" };
+  if (horizontalKinds[work.productId] === work.resourceKind) {
+    const value = work.payload && typeof work.payload === "object" && !Array.isArray(work.payload) ? work.payload as Record<string, unknown> : null;
+    const status = typeof value?.status === "string" ? value.status : undefined;
+    return { id: work.id, workspaceId: work.workspaceId, title: work.title || "Saved work", productId: work.productId, resourceKind: work.resourceKind, payload: null, input: {}, createdAt: work.createdAt,
+      ...(work.sourceWorkId ? { sourceWorkId: work.sourceWorkId } : {}),
+      ...(status ? { operation: { status } } : {}), ...(!value ? { unavailableReason: "This saved work could not be read." } : {}) };
+  }
   if (work.productId === "tracker" && work.resourceKind === "tracker") {
     const tracker = parseTrackerWorkPayload(work.payload);
     return { id: work.id, workspaceId: work.workspaceId, productId: work.productId, resourceKind: work.resourceKind,
@@ -129,7 +137,7 @@ export function presentWorkspaceWork(work: SavedWork, options: WorkspacePresenta
     const parsed = workPlanSchema.safeParse(work.payload);
     return { id: work.id, workspaceId: work.workspaceId, productId: work.productId, resourceKind: work.resourceKind,
       title: work.title?.trim() || "Work plan", payload: null, input: {}, createdAt: work.createdAt,
-      ...(parsed.success ? { workPlan: { summary: parsed.data.summary, status: parsed.data.status } } : { unavailableReason: "This plan could not be read. Its saved content has not changed." }),
+      ...(parsed.success ? { workPlan: { summary: parsed.data.summary, status: parsed.data.status, outputCount: parsed.data.proposedOutputs.length } } : { unavailableReason: "This plan could not be read. Its saved content has not changed." }),
     };
   }
   if (work.productId === "documents" && work.resourceKind === "document") {

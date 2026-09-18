@@ -16,7 +16,7 @@ export const TONE_PILL: Record<Tone, string> = {
   good: "border-positive/25 bg-positive/10 text-positive",
   warn: "border-warning/25 bg-warning/10 text-warning",
   bad: "border-critical/25 bg-critical/10 text-critical",
-  info: "border-accent/25 bg-accent/10 text-accent",
+  info: "border-accent/25 bg-accent/10 text-accent-text",
   neutral: "border-glass-border bg-gray-bg text-gray-muted",
 };
 
@@ -34,7 +34,7 @@ export const TONE_TEXT: Record<Tone, string> = {
   good: "text-positive",
   warn: "text-warning",
   bad: "text-critical",
-  info: "text-accent",
+  info: "text-accent-text",
   neutral: "text-gray-muted",
 };
 

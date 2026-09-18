@@ -1,4 +1,4 @@
-import { workspaceReturnTarget } from "@/lib/workspace-location";
+import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/lib/workspace-location";
 import type { Metadata } from "next";
 import { SupabaseSignIn } from "@/components/auth/SupabaseSignIn";
 import { LogoFull } from "@/components/Logo";
@@ -74,8 +74,13 @@ export default async function SignInPage({
 }) {
   const params = await searchParams;
   const workspaceOpen = workspaceReleaseEnabled();
-  const workspaceTarget = workspaceReturnTarget(searchValue(params.next));
-  if (workspaceOpen && workspaceTarget) return <WorkspaceSignIn next={workspaceTarget} failed={searchValue(params.error) === "auth_callback"} />;
+  const requestedNext = searchValue(params.next);
+  const workspaceTarget = workspaceReturnTarget(requestedNext);
+  const invitationTarget = workspaceOpen ? workspaceInvitationReturnTarget(requestedNext) : null;
+  const accountTarget = workspaceOpen ? accountReturnTarget(requestedNext) : null;
+  const inviteNext = workspaceTarget
+    ? `/account?next=${encodeURIComponent(workspaceTarget)}`
+    : accountTarget || "/account";
   const invite = await getInviteContext(params);
   if (invite) {
     return (
@@ -102,12 +107,14 @@ export default async function SignInPage({
           </section>
 
           <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
-            <SupabaseSignIn next="/account" prefillEmail={invite.email} />
+            <SupabaseSignIn next={inviteNext} prefillEmail={invite.email} />
           </section>
         </div>
       </main>
     );
   }
+
+  if (workspaceOpen && (workspaceTarget || invitationTarget)) return <WorkspaceSignIn next={workspaceTarget || invitationTarget!} failed={searchValue(params.error) === "auth_callback"} />;
 
   const tenantAuth = await getTenantAuthContext();
   if (tenantAuth) {
@@ -179,7 +186,7 @@ export default async function SignInPage({
               ) : null}
             </p>
           )}
-          <SupabaseSignIn next={workspaceOpen ? "/workspace" : "/account"} />
+          <SupabaseSignIn next={invitationTarget || accountTarget || (workspaceOpen ? "/workspace" : "/account")} />
         </section>
       </div>
     </main>

@@ -14,9 +14,10 @@ export const dynamic = "force-dynamic";
  *  2. PENDING — every draft/approval already waiting, grouped by client, with
  *     approve-all — all through the governed `resolveEventAction` spine.
  *
- * Both reads degrade to empty, so a backend blip can never 500 the overview.
- * Super-admin is enforced by the /admin layout (and re-checked inside each server
- * action that performs a write).
+ * Reads remain usable during a backend blip, but their snapshots carry explicit
+ * incomplete source/tenant identity so the clients cannot claim the portfolio is
+ * clear until the relevant coverage is verified. Super-admin is enforced by the
+ * /admin layout (and re-checked inside each server action that performs a write).
  */
 export default async function PortfolioActionsPage() {
   const [opportunities, snapshot] = await Promise.all([

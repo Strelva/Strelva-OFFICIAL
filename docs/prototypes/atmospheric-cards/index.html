@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Strelva atmospheric cards</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --grid: 8px;
+      --card-pad: 24px;
+      --card-radius: 24px;
+      --control-radius: 12px;
+      --graphite: #11191c;
+      --slate: #202b30;
+      --ivory: #eeeae0;
+      --sage: #96bd96;
+      --mist: #a2a9ad;
+      --rule: rgb(238 234 224 / 16%);
+      --rule-soft: rgb(238 234 224 / 9%);
+      --font-body: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-display: Fraunces, Georgia, serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { background: var(--graphite); }
+    body {
+      margin: 0;
+      min-width: 320px;
+      color: var(--ivory);
+      background:
+        radial-gradient(circle at 50% -20%, rgb(150 189 150 / 12%), transparent 36rem),
+        var(--graphite);
+      font: 14px/20px var(--font-body);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button { font: inherit; }
+    button:focus-visible {
+      outline: 2px solid var(--sage);
+      outline-offset: 2px;
+    }
+    h1, h2, p { margin: 0; }
+
+    .page {
+      width: min(1600px, 100%);
+      margin: 0 auto;
+      padding: 48px;
+    }
+
+    .intro {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 48px;
+      margin-bottom: 32px;
+    }
+
+    .eyebrow {
+      color: var(--mist);
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 16px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 760px;
+      margin-top: 8px;
+      font-size: clamp(32px, 4vw, 56px);
+      font-weight: 500;
+      line-height: 1.08;
+      letter-spacing: -.035em;
+    }
+
+    .intro-copy {
+      max-width: 400px;
+      color: var(--mist);
+      font-size: 16px;
+      line-height: 24px;
+    }
+
+    .studies {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 24px;
+    }
+
+    .study {
+      min-width: 0;
+    }
+
+    .field {
+      position: relative;
+      display: grid;
+      min-height: 664px;
+      place-items: center;
+      overflow: hidden;
+      padding: 48px 24px;
+      border: 1px solid var(--rule);
+      border-radius: 24px;
+      isolation: isolate;
+    }
+
+    .field::before {
+      position: absolute;
+      inset: -10%;
+      z-index: -2;
+      content: "";
+      background-image:
+        linear-gradient(145deg, transparent 18%, rgb(150 189 150 / 18%) 46%, transparent 72%),
+        url("../../design/references/strelva-watercolor-blur-material-2026-09-17.png");
+      background-position: center;
+      background-size: cover;
+      filter: saturate(.82) contrast(1.04);
+      transform: scale(1.04);
+    }
+
+    .field::after {
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      content: "";
+      background:
+        repeating-radial-gradient(circle at 50% 48%, transparent 0 79px, rgb(238 234 224 / 8%) 80px 81px),
+        linear-gradient(180deg, rgb(17 25 28 / 4%), rgb(17 25 28 / 42%));
+    }
+
+    .field.context::before {
+      filter: saturate(.68) brightness(1.45) contrast(.86);
+    }
+    .field.action::before {
+      background-image:
+        radial-gradient(circle at 20% 14%, rgb(255 194 100 / 96%), transparent 36%),
+        radial-gradient(circle at 52% 50%, rgb(210 80 28 / 78%), transparent 56%),
+        linear-gradient(135deg, rgb(150 189 150 / 30%), transparent 38%),
+        url("../../design/references/strelva-watercolor-blur-material-2026-09-17.png");
+      background-blend-mode: screen, color, soft-light, multiply;
+      filter: saturate(.9) contrast(1.05);
+    }
+    .field.evidence::before {
+      filter: saturate(.58) brightness(.62) contrast(1.2);
+    }
+
+    .card {
+      width: min(100%, 368px);
+      padding: 24px;
+      border: 1px solid rgb(238 234 224 / 30%);
+      border-radius: 24px;
+      background: rgb(32 43 48 / 62%);
+      box-shadow:
+        inset 0 1px 0 rgb(238 234 224 / 12%),
+        0 24px 64px -28px rgb(3 8 10 / 72%);
+      backdrop-filter: blur(20px) saturate(112%);
+      -webkit-backdrop-filter: blur(20px) saturate(112%);
+    }
+
+    .context .card {
+      color: var(--graphite);
+      border-color: rgb(255 255 255 / 52%);
+      background: rgb(238 234 224 / 44%);
+      box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 56%),
+        0 24px 64px -28px rgb(17 25 28 / 48%);
+    }
+
+    .action .card {
+      background: rgb(32 25 22 / 46%);
+    }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      min-height: 40px;
+      margin-bottom: 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-display);
+      font-size: 20px;
+      line-height: 24px;
+    }
+
+    .mark { width: 24px; height: 24px; flex: 0 0 auto; }
+
+    .signal {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 32px;
+      padding: 4px 12px;
+      border: 1px solid rgb(150 189 150 / 26%);
+      border-radius: 999px;
+      color: inherit;
+      background: rgb(150 189 150 / 12%);
+      font-size: 12px;
+      line-height: 16px;
+    }
+    .signal::before {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--sage);
+      content: "";
+    }
+
+    .card h2 {
+      margin-bottom: 24px;
+      font-size: 24px;
+      font-weight: 500;
+      line-height: 32px;
+      letter-spacing: -.02em;
+    }
+
+    .rows {
+      border-top: 1px solid var(--rule-soft);
+    }
+    .context .rows { border-top-color: rgb(17 25 28 / 10%); }
+
+    .row {
+      display: grid;
+      grid-template-columns: 40px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 16px;
+      min-height: 72px;
+      border-bottom: 1px solid var(--rule-soft);
+    }
+    .context .row { border-bottom-color: rgb(17 25 28 / 10%); }
+
+    .icon {
+      display: grid;
+      width: 40px;
+      height: 40px;
+      place-items: center;
+      border: 1px solid var(--rule-soft);
+      border-radius: 12px;
+      background: rgb(238 234 224 / 8%);
+    }
+    .context .icon {
+      border-color: rgb(17 25 28 / 8%);
+      background: rgb(238 234 224 / 46%);
+    }
+    .icon svg { width: 20px; height: 20px; }
+
+    .row-copy { min-width: 0; }
+    .row-label {
+      color: var(--mist);
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 16px;
+    }
+    .context .row-label { color: rgb(17 25 28 / 58%); }
+    .row-value {
+      overflow: hidden;
+      margin-top: 4px;
+      font-size: 14px;
+      font-weight: 500;
+      line-height: 20px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .row-meta {
+      color: var(--mist);
+      font-size: 12px;
+      font-variant-numeric: tabular-nums;
+      line-height: 16px;
+      white-space: nowrap;
+    }
+    .context .row-meta { color: rgb(17 25 28 / 58%); }
+
+    .action-input {
+      display: flex;
+      align-items: center;
+      min-height: 72px;
+      margin-bottom: 16px;
+      padding: 16px;
+      border: 1px solid var(--rule);
+      border-radius: 12px;
+      color: var(--ivory);
+      background: rgb(17 25 28 / 22%);
+      font-size: 16px;
+      line-height: 24px;
+    }
+
+    .card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-top: 24px;
+    }
+
+    .card-footer small {
+      color: var(--mist);
+      font-size: 12px;
+      line-height: 16px;
+    }
+    .context .card-footer small { color: rgb(17 25 28 / 58%); }
+
+    .primary {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 48px;
+      padding: 12px 16px;
+      border: 0;
+      border-radius: 12px;
+      color: var(--graphite);
+      background: var(--ivory);
+      font-weight: 600;
+      line-height: 24px;
+      cursor: pointer;
+    }
+    .primary:hover { background: #f8f5ec; }
+
+    .caption {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 8px 0;
+      color: var(--mist);
+      font-size: 12px;
+      line-height: 16px;
+    }
+    .caption strong { color: var(--ivory); font-weight: 500; }
+
+    .metric {
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 1120px) {
+      .page { padding: 32px; }
+      .studies { grid-template-columns: 1fr; }
+      .field { min-height: 600px; }
+    }
+
+    @media (max-width: 640px) {
+      .page { padding: 32px 24px; }
+      .intro { display: block; }
+      .intro-copy { margin-top: 24px; }
+      .field { min-height: 560px; padding: 32px 24px; }
+      .row { grid-template-columns: 40px minmax(0, 1fr); }
+      .row-meta { grid-column: 2; margin-top: -12px; padding-bottom: 12px; }
+      .card-footer { align-items: stretch; flex-direction: column; }
+      .primary { width: 100%; }
+      .caption { display: block; }
+      .caption .metric { display: block; margin-top: 8px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <svg width="0" height="0" aria-hidden="true" style="position:absolute">
+    <defs>
+      <g id="logo">
+        <circle cx="24.5" cy="7.2" r="3.4" fill="var(--sage)"/>
+        <ellipse cx="20.5" cy="15.9" rx="6.6" ry="4" fill="currentColor" transform="rotate(-8 20.5 15.9)"/>
+        <ellipse cx="22.5" cy="26.4" rx="9.4" ry="4.9" fill="currentColor" transform="rotate(5 22.5 26.4)"/>
+        <ellipse cx="24" cy="38.5" rx="12.2" ry="5.6" fill="currentColor" transform="rotate(-3 24 38.5)"/>
+      </g>
+      <symbol id="building" viewBox="0 0 24 24"><path d="M4 21h16M6 21V5h9v16M15 10h3v11M9 8h2M9 12h2M9 16h2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6zM14 3v5h4M9 13h6M9 17h6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+      <symbol id="layers" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5zM3 12l9 5 9-5M3 16l9 5 9-5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    </defs>
+  </svg>
+
+  <main class="page">
+    <header class="intro">
+      <div>
+        <p class="eyebrow">Atmospheric software / card study</p>
+        <h1>One geometry. Three working states.</h1>
+      </div>
+      <p class="intro-copy">Every card uses an 8px base grid, exactly 24px padding, and a 24px outer radius. The material and task change; the component contract does not.</p>
+    </header>
+
+    <section class="studies" aria-label="Refined Strelva card studies">
+      <article class="study">
+        <div class="field context">
+          <section class="card" aria-labelledby="context-title">
+            <div class="card-head">
+              <div class="brand"><svg class="mark" viewBox="0 0 48 48" aria-hidden="true"><use href="#logo"/></svg>Strelva</div>
+              <span class="signal">Current</span>
+            </div>
+            <h2 id="context-title">Current context</h2>
+            <div class="rows">
+              <div class="row">
+                <span class="icon" aria-hidden="true"><svg><use href="#building"/></svg></span>
+                <div class="row-copy"><div class="row-label">Business</div><div class="row-value">Northstar Workshop</div></div>
+                <span class="row-meta">Buffalo, NY</span>
+              </div>
+              <div class="row">
+                <span class="icon" aria-hidden="true"><svg><use href="#file"/></svg></span>
+                <div class="row-copy"><div class="row-label">Work</div><div class="row-value">Lease review</div></div>
+                <span class="row-meta">In progress</span>
+              </div>
+              <div class="row">
+                <span class="icon" aria-hidden="true"><svg><use href="#layers"/></svg></span>
+                <div class="row-copy"><div class="row-label">Evidence</div><div class="row-value">3 source files</div></div>
+                <span class="row-meta">Updated 14:27</span>
+              </div>
+            </div>
+            <div class="card-footer"><small>Context stays with the work.</small><button class="primary" type="button">Open work <span aria-hidden="true">→</span></button></div>
+          </section>
+        </div>
+        <div class="caption"><strong>Context card</strong><span class="metric">8px grid · 24px / 24px</span></div>
+      </article>
+
+      <article class="study">
+        <div class="field action">
+          <section class="card" aria-labelledby="action-title">
+            <div class="card-head">
+              <div class="brand"><svg class="mark" viewBox="0 0 48 48" aria-hidden="true"><use href="#logo"/></svg>Strelva</div>
+              <span class="signal">Ready</span>
+            </div>
+            <h2 id="action-title">What should move forward?</h2>
+            <div class="action-input">Prepare the lease review</div>
+            <div class="rows">
+              <div class="row">
+                <span class="icon" aria-hidden="true"><svg><use href="#building"/></svg></span>
+                <div class="row-copy"><div class="row-label">Business</div><div class="row-value">Northstar Workshop</div></div>
+                <span class="row-meta">Selected</span>
+              </div>
+              <div class="row">
+                <span class="icon" aria-hidden="true"><svg><use href="#layers"/></svg></span>
+                <div class="row-copy"><div class="row-label">Sources</div><div class="row-value">3 available</div></div>
+                <span class="row-meta">⌘ ↵</span>
+              </div>
+            </div>
+            <div class="card-footer"><small>Nothing runs before review.</small><button class="primary" type="button">Prepare <span aria-hidden="true">→</span></button></div>
+          </section>
+        </div>
+        <div class="caption"><strong>Action card</strong><span class="metric">8px grid · 24px / 24px</span></div>
+      </article>
+
+      <article class="study">
+        <div class="field evidence">
+          <section class="card" aria-labelledby="evidence-title">
+            <div class="card-head">
+              <div class="brand"><svg class="mark" viewBox="0 0 48 48" aria-hidden="true"><use href="#logo"/></svg>Strelva</div>
+              <span class="signal">Verified</span>
+            </div>
+            <h2 id="evidence-title">Lease review prepared</h2>
+            <div class="rows">
+              <div class="row">
+                <span class="icon" aria-hidden="true"><svg><use href="#file"/></svg></span>
+                <div class="row-copy"><div class="row-label">Source files</div><div class="row-value">3 attached</div></div>
+                <span class="row-meta">Checked</span>
+              </div>
+              <div class="row">
+                <span class="icon" aria-hidden="true"><svg><use href="#layers"/></svg></span>
+                <div class="row-copy"><div class="row-label">Open questions</div><div class="row-value">2 marked</div></div>
+                <span class="row-meta">Needs you</span>
+              </div>
+              <div class="row">
+                <span class="icon" aria-hidden="true"><svg><use href="#building"/></svg></span>
+                <div class="row-copy"><div class="row-label">Next decision</div><div class="row-value">Review draft</div></div>
+                <span class="row-meta">14:27</span>
+              </div>
+            </div>
+            <div class="card-footer"><small>Prepared from recorded sources.</small><button class="primary" type="button">Review <span aria-hidden="true">→</span></button></div>
+          </section>
+        </div>
+        <div class="caption"><strong>Evidence card</strong><span class="metric">8px grid · 24px / 24px</span></div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

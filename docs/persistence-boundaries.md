@@ -1,13 +1,20 @@
 # Persistence boundaries
 
-Updated 2026-09-11. This is the current authority map. A Postgres table or mirror write does
+Updated 2026-09-15. This is the current authority map. A Postgres table or mirror write does
 not make Postgres authoritative; authority changes only when the production read path changes.
 
 | Domain | Authority | Cache or mirror | Failure rule |
 |---|---|---|---|
 | Private workspace results and assessment recovery | Postgres `saved_product_work`, `workspace_operations` after the release migrations | Anonymous audit reports remain 60-day Redis bearer records, copied only on explicit save | Fail closed. Actor and direct membership are checked on every operation transition. A checkpoint survives failed completion; one operation commits one saved result. A pre-checkpoint interruption can repeat provider reads. No automatic background worker is implied. Local implementation only until migration and release acceptance. |
 | Private documents, plans and accepted plan outputs | Postgres `saved_product_work` and `work_plan_output_executions` after the local release migrations | None | Documents use revision-checked edits and append-only receipts. Plans retain bounded source references. A private output and its execution receipt commit together; retries reopen that output. These are local capabilities, not a general background executor or permission to publish. |
-| Internal work budgets and reported costs | Postgres `job_economics`, `job_economics_reservations`, `job_economics_usage` after the local release migration | None | The named payer accepts a budget. Reservations and usage have stable retry keys. Unknown costs remain unknown; Strelva-caused retries are recorded separately from customer usage. No Stripe charge or provider-side spending limit is implemented by this ledger. |
+| Internal work budgets and execution costs | Postgres `job_economics`, `job_economics_reservations`, `job_economics_usage`, `job_economics_executions` after the local release migrations | None | The named payer accepts a budget. Atomic admission reserves funds and limits concurrent execution. Accepted or uncertain actions never replay; unknown costs retain their cap until verified reconciliation. Strelva-caused retries are excluded from customer costs. The local native runner records actual execution receipts; this does not impose provider-side quotas or charge Stripe. |
+| Native applications after the September 14 release migration | Postgres `application_states`, `application_releases`, `application_records`; `saved_product_work` retains resource identity | Application fields in `saved_product_work.payload` are a compatibility projection | Released definitions and records have separate revisions. A candidate edit leaves the current release available. Publication checks current records; rollback preserves data. Missing canonical storage fails closed. New record attribution comes from the verified actor; imported legacy attribution remains unknown. These migrations have only been exercised locally. |
+| Recipient application access | Postgres `application_use_grants`, `application_use_submissions` after the local September 14 migration | None | Grants bind the verified recipient, permitted views, record scope and expiry. Submissions use the canonical application record writer. Accepted submission receipts bind retries to the same actor, grant and content. Revoked access blocks further use. |
+| Ongoing responsibilities | Postgres `standing_responsibilities`, `standing_responsibility_jobs`, `standing_responsibility_runs`, `standing_responsibility_receipts` after the local September 14 migration | Run status and receipts project the corresponding finite responsibility; they do not authorize another execution | An approved policy admits individual jobs with distinct trigger keys and limits. The finite runner checks the current policy before acting. Current repeatable work is limited to saved-source investigations without provider spending. Local SQL and Auth/browser checks cover approval, separate runs, pause/revocation and recovery. New claims check the accepted policy under the shared lock; interrupted projections can be repaired without repeating completed work. No production scheduling is enabled. |
+| Local schedules and saved-source investigations | Postgres `saved_product_work`, revision-checked `update_bounded_product_work` | None | Private workspace membership governs commands. Reservation conflicts are checked at CAS; provider acceptance remains separate from read-back. Investigations retain exact source evidence and due time. No live calendar or external-source connection is implied. |
+| Accepted responsibilities and attempts | Postgres `saved_product_work`, owner-checked `update_work_responsibility` | None | Approved inputs are immutable. CAS admits one worker, native commands recheck authority, and cancellation preserves in-flight evidence. Interrupted/accepted actions require reconciliation rather than replay. `workspace-work` cron dispatch is separately gated by `STRELVA_BACKGROUND_WORK_RELEASE`; no flag or production deployment was changed. |
+| Work context and scoped participation | Postgres `workspace_work_context`, `workspace_work_participation` | None | Current membership, exact source versions, expiry, revocation and append-only history are rechecked by the SQL boundary. Preferences never grant authority. Guest contributions are scoped proposals, not native mutation authority. Reported contribution costs are not payments. Work deletion cascades these rows; no automatic history purge is configured. Internal product-learning work cannot be shared through these paths. |
+| Internal product learning | Postgres `saved_product_work`, internal-member create/update RPCs | None | Active super-admin and workspace membership are locked through commit. Source provenance, freshness, withdrawal, simulation labels and unknown outcomes survive transitions. The module is production-disabled. Its recurring adapter reads registered private documents, trackers and recorded experiments; it does not collect live interviews or telemetry. |
 | Identity, memberships, super-admins | Supabase Auth + Postgres | None | Fail closed. |
 | Tenant configuration and commercial plan | Postgres `tenants` | Redis tenant-list cache; dev file locally | Production never falls back to a dev file. |
 | Domain ownership and verification | Postgres `domain_claims` | Redis legacy mirror/domain-map cache | Only verified claims route; explicit operator-configured production/admin domains remain trusted. |
@@ -41,6 +48,27 @@ Schema presence alone does not establish authority. In particular,
 `integrations`, `reward_members`, `reward_transactions`, normalized dashboard
 chat tables, and other migration-era tables remain inactive until their read
 paths deliberately cut over.
+
+## September 15 local product additions
+
+These additions remain behind the workspace release gate. Their migrations have
+been exercised only in the isolated SQL harness, not applied to production.
+
+| Concern | Local source of truth | Rules |
+| --- | --- | --- |
+| Offering installations | Postgres through `src/platform/offerings` | Existing customer workspace identity; installation/configuration/retirement require current owner or admin authority. Native records retain their own lifecycle and authorization. A requested provider is not an accepted service. |
+| Business website attachments | Postgres `offering_website_bindings` | Binding requires current workspace owner/admin and tenant owner authority. Store stable tenant identity; no membership or domain authority transfers. Revocation retains history. Existing tenant deletion clears the physical reference and preserves an unavailable binding record. |
+| Operational assignments | Postgres through `src/platform/work-participation/assignments.ts` and the assignment repository | Owner offers, verified assignee accepts, expiry and revocation stop subsequent work. The current slice requires existing direct membership and supports approved zero-cost finite work; it does not narrow permissions the assignee already holds. Acting identity remains distinct from sponsor. |
+| Configured period allowances and contribution credits | Postgres `work_allowances`, `work_allowance_ledger`, `work_allowance_reservations` | Operator awards, payer accepts the operational spending cap, trusted native execution reserves and settles named units. Strelva retries consume no customer allowance. Unknown effects/costs retain holds. No Stripe subscription sync, commercial price or royalty payout is implied. |
+| Personal AI integration tokens | Postgres through `src/platform/agent-access` | Store token hashes only. Bind to the issuing verified user, exact work and native participation grant. Current membership, scope, expiry and revocation govern read/propose access. Proposals stay pending; tokens confer no execution authority or independent agent identity. |
+
+An execution receipt remains authoritative after allowance settlement fails.
+Retrying accounting must never repeat the native action. Existing per-job dollar
+limits continue to apply alongside configured period allowances. Unconfigured
+legacy jobs retain their accepted per-job budget behavior.
+If a pre-action failure cannot be recorded durably, the reservation stays held
+and requires explicit reconciliation. The runtime preserves both errors and
+does not treat a second request as permission to act.
 
 Tenant isolation is enforced in application code. Routes derive a tenant from trusted headers,
 session membership, or server configuration and call the access/permission guard before using
@@ -134,8 +162,10 @@ Planning requires `STRELVA_PLANNING_ENABLED=1`, an authenticated workspace
 member, and a configured model. Selected source work is authorized and reduced
 to bounded excerpts before the model call. The saved plan retains source
 identities and versions. A model's operation names cannot grant authority.
-Private document and empty tracker creation use the native product engines and
-an explicit user action. `work_plan_output_executions` binds a plan output to its
+Private documents, empty trackers and application definitions are created through
+the native product engines after an explicit user action. A ready application
+proposal must contain a validated definition; model output cannot assign its
+owner, access grants or customer records. `work_plan_output_executions` binds a plan output to its
 one created work item and receipt. This does not extend the assessment-specific
 `workspace_operations` executor to arbitrary work.
 

@@ -1,4 +1,4 @@
-.shell { --app-navigation-width: 240px; background: var(--surface-base); }
+.shell { --app-navigation-width: 190px; background: var(--surface-base); }
 .sidebar { display:flex; flex-direction:column; height:100%; min-height:0; padding:24px 12px 12px; background:var(--surface-inset); border-right:1px solid var(--gray-border); }
 .brandRow { display:flex; align-items:center; justify-content:space-between; padding:0 12px 24px; }
 .brand { display:flex; align-items:center; gap:12px; font-family:var(--font-display),serif; font-size:24px; color:var(--warm-black); }

@@ -8,6 +8,8 @@ import {
   type AcceptedHandoff,
   type Delegation,
   type Handoff,
+  type HandoffDestination,
+  type HandoffDestinationOption,
   type HandoffPreview,
   type SavedWork,
   type SaveWorkInput,
@@ -29,12 +31,17 @@ type DbFailure = { message?: string; code?: string } | null;
 const ACCESS_FAILURES = [
   "handoff_not_found",
   "handoff_recipient_mismatch",
+  "handoff_destination_membership_required",
   "verified_identity_required",
 ] as const;
 const CONFLICT_FAILURES = [
   "handoff_expired",
   "handoff_revoked",
   "handoff_already_claimed",
+  "handoff_destination_required",
+  "handoff_destination_changed",
+  "handoff_destination_invalid",
+  "handoff_product_unsupported",
   "handoff_source_invalid",
   "workspace_limit_reached",
   "saved_work_limit_reached",
@@ -201,6 +208,20 @@ export async function listWorkspaces(input: WorkspaceActor): Promise<Workspace[]
   return direct;
 }
 
+/** List customer businesses the signed-in actor currently belongs to. */
+export async function listCustomerWorkspaces(input: WorkspaceActor): Promise<Workspace[]> {
+  const a = actor(input);
+  const { data, error } = await db().from("workspace_memberships")
+    .select("role, workspaces!inner(*)")
+    .eq("user_id", a.userId)
+    .eq("workspaces.kind", "customer");
+  if (error) workspaceDbFailure(error, "Customer businesses are unavailable");
+  return (data ?? []).map((membership) => {
+    const row = membership as DbRow;
+    return mapWorkspace(row.workspaces as DbRow, "member", asString(row.role) as WorkspaceRole);
+  });
+}
+
 export async function ensurePersonalWorkspace(input: WorkspaceActor): Promise<Workspace> {
   const a = actor(input);
   const name = `${a.verifiedEmail.split("@")[0]}'s workspace`;
@@ -304,6 +325,9 @@ export async function createHandoff(input: WorkspaceActor, workId: string, recip
   const a = actor(input);
   const work = await getWork(a, workId);
   if (!work) throw new WorkspaceAccessError("Work not found");
+  if (work.productId === "applications" || work.resourceKind === "application") {
+    throw new WorkspaceConflictError("Applications must use their definition install path before they can be handed off.");
+  }
   const role = await requireMember(a.userId, work.workspaceId);
   const { data: workspace, error: workspaceError } = await db().from("workspaces")
     .select("kind").eq("id", work.workspaceId).single();
@@ -346,11 +370,13 @@ async function handoffByToken(input: WorkspaceActor, token: string): Promise<DbR
 }
 
 export async function inspectHandoff(input: WorkspaceActor, token: string): Promise<HandoffPreview> {
-  const row = await handoffByToken(input, token);
+  const a = actor(input);
+  const row = await handoffByToken(a, token);
   const handoff = mapHandoff(row);
-  const [{ data: workspace, error: workspaceError }, { data: work, error: workError }] = await Promise.all([
+  const [{ data: workspace, error: workspaceError }, { data: work, error: workError }, destinations] = await Promise.all([
     db().from("workspaces").select("id,name,kind").eq("id", handoff.agencyWorkspaceId).single(),
     db().from("saved_product_work").select("*").eq("id", handoff.sourceWorkId).single(),
+    listCustomerWorkspaces(a),
   ]);
   if (workspaceError || workError || !workspace || !work) throw new WorkspaceStoreError("Handoff preview is incomplete");
   const w = workspace as DbRow;
@@ -362,15 +388,21 @@ export async function inspectHandoff(input: WorkspaceActor, token: string): Prom
     recipientEmail: handoff.recipientEmail,
     status: handoff.status,
     expiresAt: handoff.expiresAt,
+    destinations: destinations.map((destination): HandoffDestinationOption => ({ id: destination.id, name: destination.name })),
   };
 }
 
-export async function acceptHandoff(input: WorkspaceActor, token: string, allowAgencyAccess: boolean): Promise<AcceptedHandoff> {
+export async function acceptHandoff(input: WorkspaceActor, token: string, destination: HandoffDestination, allowAgencyAccess: boolean): Promise<AcceptedHandoff> {
   const a = actor(input);
   await handoffByToken(a, token);
+  const customerWorkspaceId = destination.kind === "existing" ? destination.workspaceId : null;
+  const customerWorkspaceName = destination.kind === "new" ? destination.name : null;
   const { data, error } = await db().rpc("accept_workspace_handoff", {
     p_token_hash: hashToken(token), p_user_id: a.userId,
-    p_verified_email: a.verifiedEmail, p_allow_agency_access: allowAgencyAccess,
+    p_verified_email: a.verifiedEmail,
+    p_customer_workspace_id: customerWorkspaceId,
+    p_customer_workspace_name: customerWorkspaceName,
+    p_allow_agency_access: allowAgencyAccess,
   });
   if (error) workspaceDbFailure(error, "Handoff was not accepted");
   if (!data?.[0]) throw new WorkspaceStoreError("Handoff was not accepted");

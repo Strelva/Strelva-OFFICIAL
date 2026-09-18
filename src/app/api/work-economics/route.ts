@@ -1,3 +1,4 @@
+import { inquiryEconomicsAuthority } from "@/products/inquiries/server";
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/db/server-client";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
@@ -92,6 +93,7 @@ function responseFor(
   return {
     ledger: inspection?.job ?? null,
     usage: inspection?.usage ?? [],
+    executions: inspection?.executions ?? [],
     policy: inspection?.policy ?? JOB_ECONOMICS_POLICY,
     currentActorId,
     canManage,
@@ -107,7 +109,7 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams;
     const jobId = params.get("jobId");
     if (jobId) {
-      const inspection = await readJobEconomics(actor, jobId);
+      const inspection = await readJobEconomics(actor, jobId, inquiryEconomicsAuthority);
       return json(responseFor(inspection, inspection.job.payerId === actor.userId, actor.userId));
     }
     const queryValues = {
@@ -122,7 +124,7 @@ export async function GET(request: Request) {
     };
     const lookup = await findJobEconomicsForTarget(actor, Object.fromEntries(
       Object.entries(queryValues).filter(([, value]) => value !== null),
-    ));
+    ), inquiryEconomicsAuthority);
     return json(responseFor(lookup.inspection, lookup.canManage, actor.userId));
   } catch (error) {
     return failure(error);
@@ -140,7 +142,7 @@ export async function POST(request: Request) {
     }
     const body = await readBoundedObject(request);
     if (!body) return json({ error: "Invalid request body." }, 400);
-    const inspection = await executeJobEconomicsCommand(actor, body);
+    const inspection = await executeJobEconomicsCommand(actor, body, inquiryEconomicsAuthority);
     return json(responseFor(inspection, inspection.job.payerId === actor.userId, actor.userId));
   } catch (error) {
     if (error instanceof BodyTooLargeError) return json({ error: "Request body is too large." }, 413);

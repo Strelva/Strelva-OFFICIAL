@@ -1,6 +1,9 @@
 # Strelva interface and Managed Websites context
 
-Reviewed: 2026-09-11
+Reviewed: 2026-09-17
+
+Component checkpoint reviewed on this date; earlier product evidence retains its
+own dates.
 Kind: product
 
 Internal release: **strelvav2**. See the [release entry point](./docs/strelvav2.md).
@@ -14,7 +17,81 @@ views use one shared frame. Company direction and cross-product boundaries live
 in the [workspace context](../CONTEXT.md); interaction decisions live in
 [DESIGN.md](./DESIGN.md).
 
+## Current component work
+
+Start with the [foundation inventory](./docs/component-system.md): tokens,
+atoms, contracts and remaining adoption work. The
+[September 17 component checkpoint](./docs/design/current-component-context.md)
+records local implementations, rejected treatments, alternatives and proof.
+The system is partially adopted, not fully migrated. No material winner, final
+visual acceptance or production release is implied.
+
+The September 18 [visual direction map](./DESIGN.md#visual-direction-and-extension-map)
+and [foundation extension contract](./docs/component-system.md#extending-the-foundation)
+connect selected direction, source owners, specimens and verification. They
+resolve older font-selection guidance in favor of the recorded Geist/custom-logo
+decision. This is structural documentation work; component implementation and
+adoption gaps remain in the foundation inventory.
+
+## Current product work
+
+The [September 16 transition and hypotheses](./docs/horizontal-product-brief-2026-09-11.md#september-16-transition-and-hypotheses)
+explain the move from hiring Strelva for defined delivery toward using a product
+to improve and operate business work. Improving existing work and enabling
+previously unaffordable work are equally part of the direction. The
+[evidence register](./docs/product-reality.md#september-16-transition-hypotheses)
+keeps this selected direction separate from unproven adoption and economics.
+
+Jacob's September 15 direction authorizes local implementation of the full
+business and offering topology in the
+[product brief](./docs/horizontal-product-brief-2026-09-11.md). The earlier staff
+application journey remains a required regression, not a restriction on broader
+work. The [acceptance ledger](./docs/strelvav2-horizontal-acceptance.md) separates
+proof from unfinished behavior. Existing customer agreements, native product
+authority and production restrictions remain unchanged.
+
+## Language
+
+**Business:** The customer organization whose work and records must remain
+separate from other businesses. A business is not a website tenant, payer or
+agency merely because the same person can access them.
+
+**Offering:** A specific promise combining usable software, completed work or
+ongoing help. Its limits and provider commitments are explicit.
+
+**Installation:** An offering configured for one business, with its selected
+version and connected resources. Installation does not grant new authority or
+prove that a human provider accepted service.
+
+**Assignment:** A person's or agent's explicit permission to operate specified
+work within agreed limits and time. It does not transfer customer ownership.
+
+**Work:** A finite request, action or result. Work can belong to an installation
+or remain independently useful.
+
+**Provider commitment:** The work a provider has actually agreed to take care of.
+Requesting a provider is not its acceptance.
+
+**Contribution reward:** An explicitly awarded benefit for helping develop an
+offering. It may begin as usage or subscription credit; it is not company equity
+or permission to access client information.
+
 ## Evidence state
+
+Jacob authorized the full horizontal local implementation on September 12. The
+[acceptance ledger](./docs/strelvav2-horizontal-acceptance.md) is the completion
+record. The current work adds durable owner-approved execution, private bounded
+apps, local scheduling, repeated saved-source investigations, scoped contributions,
+source context, runtime cost admission, and the internal learning loop. Results
+remain central in the common frame; website requests carry into the governed
+composer and document drafting stays in place. Generated app plans create native
+private drafts through the existing atomic plan-output receipt.
+
+The isolated Auth/Postgres journeys have exercised actual local persistence,
+revocation and native execution. Browser fixtures separately prove interface
+behavior. Neither proves production operation, live calendar/provider integration,
+real research samples, customer value, or Jacob's human acceptance. Production,
+paid calls, live messages, grants and deployments remain unapproved.
 
 - **Latest confirmed product direction:** the
   [horizontal product brief](./docs/horizontal-product-brief-2026-09-11.md)
@@ -37,7 +114,7 @@ in the [workspace context](../CONTEXT.md); interaction decisions live in
   contextual website navigation, account presentation, and release-gated account
   entry routing are present in the September 7 working changes. The existing
   workspace supports bounded AI Visibility results and scoped agency access;
-  this is not a general execution engine.
+  the September 12 bounded execution work extends this foundation; it is not an unrestricted agent runtime.
 - **Verification:** focused account tests cover invitation processing, release
   gating, managed recovery, operator routing, verified identity, and unavailable
   workspace storage. The production build and focused browser checks pass locally. Native T3
@@ -117,6 +194,12 @@ keeps app creation, recurring work, interactive shared outputs, and reusable
 products open. A work-centered or agency-delivery default is not accepted. R&D
 is strictly internal. These research options authorize no implementation or
 production change.
+
+The [September 12 frontier report](./docs/research/frontier-strelva-2026-09-12.md)
+adds a six-month capability delta, 29 source-inspected workflow teardowns, four
+product alternatives, and ten proposed demonstrations. Its recommendations are
+research, not a newly selected strategy or evidence of general autonomous
+operation. Existing authority and release boundaries remain in force.
 
 The [definition of done](./docs/strelvav2-definition-of-done.md) proposes separate
 acceptance gates for the horizontal interface, working local product and internal

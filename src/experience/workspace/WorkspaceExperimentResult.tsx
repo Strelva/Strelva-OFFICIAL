@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { TrackerExperimentComparison, TrackerExperimentEvidenceKind, TrackerExperimentOptionSummary } from "@/products/tracker/comparison";
+import type { TrackerExperimentComparison, TrackerExperimentEvidenceKind, TrackerExperimentOptionSummary } from "@/products/tracker/client";
 import type { WorkspaceExperiment, WorkspaceLegacyExperiment, WorkspaceWork } from "./contracts";
 
 function minutes(value: number): string {

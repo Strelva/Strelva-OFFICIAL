@@ -140,6 +140,54 @@ describe("inquiry domain engine", () => {
     expect(calls).toBe(2);
   });
 
+  it("records the exact staff assignee in the grouped change and restores it on undo", async () => {
+    const { engine, work, capabilityId } = draftEngine({
+      async publish() { return { status: "accepted", acceptanceId: "accepted-assignment", acceptedAt: SECOND }; },
+    });
+    engine.runRehearsal(work.id);
+    const version = engine.getWork(work.id).draft!.version;
+    engine.approvePublish(work.id, { actorId: "owner", version });
+    await engine.publish(work.id, { actorId: "owner", version, explicit: true });
+    const record = engine.receiveInquiry({ capabilityId, expectedCapabilityVersion: version, fields: FIELDS, inquiryId: "assign_one" });
+
+    const assigned = engine.bulkUpdateInquiries({ inquiryIds: [record.id], actorId: "staff-one", assigneeId: "staff-one", status: "assigned", why: "Staff accepted this request." });
+    expect(engine.listInquiryRecords()[0]).toMatchObject({ status: "assigned", assigneeId: "staff-one" });
+    expect(assigned.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: "inquiries.assign_one.status", after: "assigned" }),
+      expect.objectContaining({ path: "inquiries.assign_one.assigneeId", after: "staff-one" }),
+    ]));
+    expect(assigned.summary).toBe("1 inquiry record");
+
+    engine.undoBulkChange(assigned.id, { actorId: "owner", now: SECOND });
+    expect(engine.listInquiryRecords()[0]).toMatchObject({ status: "new", assigneeId: null });
+  });
+
+  it("rejects a stale assignment undo atomically and records reassignment attribution", async () => {
+    const { engine, work, capabilityId } = draftEngine({
+      async publish() { return { status: "accepted", acceptanceId: "accepted-reassignment", acceptedAt: SECOND }; },
+    });
+    engine.runRehearsal(work.id);
+    const version = engine.getWork(work.id).draft!.version;
+    engine.approvePublish(work.id, { actorId: "owner", version });
+    await engine.publish(work.id, { actorId: "owner", version, explicit: true });
+    const record = engine.receiveInquiry({ capabilityId, expectedCapabilityVersion: version, fields: FIELDS, inquiryId: "assign_twice" });
+
+    const first = engine.bulkUpdateInquiries({ inquiryIds: [record.id], actorId: "staff-a", assigneeId: "staff-a", status: "assigned", why: "Staff A accepted this request." });
+    const timelineBeforeReassignment = engine.snapshot().timeline.filter((event) => event.inquiryId === record.id).length;
+    const second = engine.bulkUpdateInquiries({ inquiryIds: [record.id], actorId: "staff-b", assigneeId: "staff-b", status: "assigned", why: "Staff B took responsibility." });
+    const reassignedTimeline = engine.snapshot().timeline.filter((event) => event.inquiryId === record.id);
+    expect(reassignedTimeline).toHaveLength(timelineBeforeReassignment + 1);
+    expect(reassignedTimeline.at(-1)?.summary).toBe("Assigned this inquiry to staff-b.");
+
+    expect(() => engine.undoBulkChange(first.id, { actorId: "owner" })).toThrow("Undo its current change first");
+    expect(engine.listInquiryRecords()[0]).toMatchObject({ status: "assigned", assigneeId: "staff-b" });
+
+    engine.undoBulkChange(second.id, { actorId: "owner" });
+    expect(engine.listInquiryRecords()[0]).toMatchObject({ status: "assigned", assigneeId: "staff-a" });
+    engine.undoBulkChange(first.id, { actorId: "owner" });
+    expect(engine.listInquiryRecords()[0]).toMatchObject({ status: "new", assigneeId: null });
+  });
+
   it("keeps Why causal claims tied to timeline links", async () => {
     const { engine, work, capabilityId } = draftEngine({
       async publish() {

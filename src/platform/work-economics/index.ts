@@ -28,3 +28,6 @@ export type {
   JobEconomicsUsageKind,
 } from "./types";
 export { executeJobEconomicsCommand, readJobEconomics } from "./service";
+
+export { executeBudgetedAction, reconcileBudgetedAction, BudgetExecutionNotStartedError } from "./runtime";
+export type { BudgetExecution, BudgetExecutionInput, BudgetExecutionMeasurement, BudgetExecutionEffect, BudgetExecutionResult, BudgetExecutionHandlers, BudgetExecutionReconciliation, BudgetExecutionEvidenceContext, BudgetExecutionEvidenceResolver } from "./runtime";

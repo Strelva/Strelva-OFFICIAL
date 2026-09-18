@@ -364,7 +364,7 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                 {actionsOpen && (
                     <div
                       role="menu"
-                      className="absolute bottom-full left-0 z-30 mb-2 w-[min(calc(100vw-2rem),360px)] overflow-visible rounded-2xl border border-white/10 bg-[#303033] p-1.5 shadow-[0_18px_55px_rgba(0,0,0,0.42)]"
+                      className="absolute bottom-full left-0 z-30 mb-2 w-[min(calc(100vw-2rem),360px)] overflow-visible rounded-2xl border border-white/10 bg-surface-popover text-text-popover p-1.5 shadow-[0_18px_55px_rgba(0,0,0,0.42)]"
                     >
                     <button
                       type="button"
@@ -378,7 +378,7 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                         <span className="block text-[13px] font-medium">
                           {uploading ? "Uploading..." : "Upload photos & files"}
                         </span>
-                        <span className="mt-0.5 block truncate text-[11px] text-gray-subtle">
+                        <span className="mt-0.5 block truncate text-[11px] text-text-popover">
                           Attach files to this AI request.
                         </span>
                       </span>
@@ -399,7 +399,7 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                         <span className="min-w-0 flex-1">
                           <span className="block text-[13px] font-medium">{action.label}</span>
                           {action.description && (
-                            <span className="mt-0.5 block truncate text-[11px] text-gray-subtle">
+                            <span className="mt-0.5 block truncate text-[11px] text-text-popover">
                               {action.description}
                             </span>
                           )}
@@ -420,11 +420,11 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                           action.label === "Custom site request" && "animate-pulse border border-amber-300/20 bg-amber-300/10 shadow-[0_0_24px_rgba(245,158,11,0.08)]",
                         )}
                       >
-                        <action.icon className={cn("h-5 w-5 shrink-0", action.label === "Custom site request" ? "text-amber-300" : "text-gray-fg")} strokeWidth={1.7} />
+                        <action.icon className={cn("h-5 w-5 shrink-0", action.label === "Custom site request" ? "text-warning" : "text-gray-fg")} strokeWidth={1.7} />
                         <span className="min-w-0 flex-1">
                           <span className="block text-[13px] font-medium">{action.label}</span>
                           {action.description && (
-                            <span className="mt-0.5 block truncate text-[11px] text-gray-subtle">
+                            <span className="mt-0.5 block truncate text-[11px] text-text-popover">
                               {action.description}
                             </span>
                           )}
@@ -448,7 +448,7 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                           <span className="min-w-0 flex-1">
                             <span className="block text-[13px] font-medium">{action.label}</span>
                             {action.description && (
-                              <span className="mt-0.5 block truncate text-[11px] text-gray-subtle">
+                              <span className="mt-0.5 block truncate text-[11px] text-text-popover">
                                 {action.description}
                               </span>
                             )}
@@ -475,17 +475,17 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                         <Link2 className="h-5 w-5 shrink-0 text-gray-fg" strokeWidth={1.7} />
                         <span className="min-w-0 flex-1">
                           <span className="block text-[13px] font-medium">Use a source</span>
-                          <span className="mt-0.5 block truncate text-[11px] text-gray-subtle">
+                          <span className="mt-0.5 block truncate text-[11px] text-text-popover">
                             Add source context to the prompt.
                           </span>
                         </span>
-                        <ChevronRight className="h-4 w-4 shrink-0 text-gray-subtle" strokeWidth={1.8} />
+                        <ChevronRight className="h-4 w-4 shrink-0 text-text-popover" strokeWidth={1.8} />
                       </button>
 
                       {connectionsOpen && (
                         <div
                           role="menu"
-                          className="absolute bottom-0 left-[calc(100%+0.5rem)] z-40 w-[min(calc(100vw-2rem),310px)] rounded-2xl border border-white/10 bg-[#303033] p-1.5 shadow-[0_18px_55px_rgba(0,0,0,0.42)] max-md:bottom-full max-md:left-0 max-md:mb-2"
+                          className="absolute bottom-0 left-[calc(100%+0.5rem)] z-40 w-[min(calc(100vw-2rem),310px)] rounded-2xl border border-white/10 bg-surface-popover text-text-popover p-1.5 shadow-[0_18px_55px_rgba(0,0,0,0.42)] max-md:bottom-full max-md:left-0 max-md:mb-2"
                         >
                           {SOURCE_ACTIONS.map((action) => (
                             <button
@@ -499,7 +499,7 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                               <span className="min-w-0 flex-1">
                                 <span className="block text-[13px] font-medium">{action.label}</span>
                                 {action.description && (
-                                  <span className="mt-0.5 block truncate text-[11px] text-gray-subtle">
+                                  <span className="mt-0.5 block truncate text-[11px] text-text-popover">
                                     {action.description}
                                   </span>
                                 )}
@@ -519,7 +519,7 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                             <Link2 className="h-[18px] w-[18px] shrink-0 text-gray-fg" strokeWidth={1.7} />
                             <span className="min-w-0 flex-1">
                               <span className="block text-[13px] font-medium">Manage sources</span>
-                              <span className="mt-0.5 block truncate text-[11px] text-gray-subtle">
+                              <span className="mt-0.5 block truncate text-[11px] text-text-popover">
                                 Open source settings.
                               </span>
                             </span>
@@ -563,7 +563,7 @@ export const PromptInputBox = forwardRef<HTMLTextAreaElement, PromptInputBoxProp
                 <span
                   id="ai-think-usage"
                   role="tooltip"
-                  className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 w-max max-w-[240px] rounded-lg border border-white/10 bg-[#151517] px-2.5 py-1.5 text-left text-[11px] leading-relaxed text-gray-fg shadow-[0_12px_30px_rgba(0,0,0,0.32)]"
+                  className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 w-max max-w-[240px] rounded-lg border border-white/10 bg-surface-tooltip px-2.5 py-1.5 text-left text-[11px] leading-relaxed text-text-tooltip shadow-[0_12px_30px_rgba(0,0,0,0.32)]"
                 >
                   {usage
                     ? `AI requests left: ${usage.remaining} of ${usage.limit} this minute`

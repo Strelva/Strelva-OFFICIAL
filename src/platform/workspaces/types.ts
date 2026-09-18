@@ -56,6 +56,17 @@ export interface Handoff {
   delegationId?: string;
 }
 
+/** The recipient must choose an existing business or name a new one. */
+export type HandoffDestination =
+  | { kind: "existing"; workspaceId: string }
+  | { kind: "new"; name: string };
+
+/** A current customer workspace the addressed recipient may choose. */
+export interface HandoffDestinationOption {
+  id: string;
+  name: string;
+}
+
 export interface HandoffPreview {
   id: string;
   agencyWorkspace: Pick<Workspace, "id" | "name" | "kind">;
@@ -64,6 +75,7 @@ export interface HandoffPreview {
   recipientEmail: string;
   status: Handoff["status"];
   expiresAt: string;
+  destinations: HandoffDestinationOption[];
 }
 
 export interface Delegation {

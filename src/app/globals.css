@@ -1,10 +1,14 @@
 @import "tailwindcss";
+@import "./styles/workspace-colors.css";
+@import "./styles/motion.css";
 
 /* =============================================
    Strelva — Design System
    ============================================= */
 
 :root {
+  /* REB owns one Geist Sans binding; display text intentionally aliases it. */
+  --font-display: var(--font-body);
   --cream:       #faf9f7;
   --cream-dark:  #f0ede8;
   --cream-mid:   #e5e0d8;
@@ -24,14 +28,36 @@
   --on-warm-white: #1a1510;
   --warm-black:  #1a1510;
 
+  /* Shared action, status, and overlay roles for the light foundation. */
+  --accent: #7fae7f;
+  --on-accent: #1a1510;
+  --accent-dim: rgba(127, 174, 127, 0.12);
+  --accent-text: #466753;
+  --success: #3f6b4c;
+  --success-dim: rgba(63, 107, 76, 0.12);
+  --positive: var(--success);
+  --on-positive: #ffffff;
+  --warning: #8a5b00;
+  --critical: #b91c1c;
+  --neutral: var(--gray-muted);
+  --glass: rgba(42, 37, 32, 0.024);
+  --glass-border: rgba(42, 37, 32, 0.14);
+  --control-thumb: #ffffff;
+  --surface-popover: #ffffff;
+  --surface-tooltip: #2a2520;
+  --text-popover: #666666;
+  --text-tooltip: #faf9f7;
+  --action-danger: #b91c1c;
+  --on-action-danger: #ffffff;
+
   /* Semantic grays — dashboard surfaces */
   --gray-border:   #e8e8e8;
   --gray-bg:       #f5f5f5;
   --gray-bg-hover: #f0f0f0;
   --gray-bg-alt:   #fafafa;
-  --gray-muted:    #999999;
-  --gray-subtle:   #cccccc;
-  --gray-faint:    #bbbbbb;
+  --gray-muted:    #666666;
+  --gray-subtle:   #666666;
+  --gray-faint:    #666666;
   --gray-fg:       #666666;
 
   /* Surface tokens */
@@ -78,6 +104,12 @@
      positive = sage-go (--success), warning = one amber, critical = one red,
      neutral = gray. Anything else is off-brand; do not add a fourth hue. */
   --positive: var(--success);
+  --on-positive: var(--on-accent);
+  --control-thumb: #f4f4f5;
+  --surface-popover: #303033;
+  --surface-tooltip: #151517;
+  --text-popover: #b8b8b8;
+  --text-tooltip: var(--gray-fg);
   --warning:  #ca8a04;
   --critical: var(--terra);
   --neutral:  var(--gray-muted);
@@ -91,8 +123,8 @@
   --gray-bg-hover: rgba(255, 255, 255, 0.075);
   --gray-bg-alt:   rgba(255, 255, 255, 0.028);
   --gray-muted:    #858585;
-  --gray-subtle:   #797979;
-  --gray-faint:    #6e6e6e;
+  --gray-subtle:   #999999;
+  --gray-faint:    #999999;
   --gray-fg:       #c2c2c2;
 
   --surface:        #151515;
@@ -146,6 +178,14 @@
   --color-accent-dim: var(--accent-dim, rgba(127, 174, 127, 0.12));
   --color-accent-text: var(--accent-text, #a7c9a7);
   --color-on-accent: var(--on-accent, #1a1510);
+  --color-control-thumb: var(--control-thumb);
+  --color-on-positive: var(--on-positive);
+  --color-surface-popover: var(--surface-popover);
+  --color-surface-tooltip: var(--surface-tooltip);
+  --color-text-popover: var(--text-popover);
+  --color-text-tooltip: var(--text-tooltip);
+  --color-action-danger: var(--action-danger);
+  --color-on-action-danger: var(--on-action-danger);
   --color-success: var(--success, oklch(70% 0.14 145));
   --color-success-dim: var(--success-dim, oklch(70% 0.14 145 / 0.12));
   --color-positive: var(--positive, oklch(70% 0.14 145));
@@ -216,6 +256,7 @@ body {
   background: var(--cream);
   color: var(--bark);
   font-family: var(--font-body), system-ui, sans-serif;
+  --font-display: var(--font-body);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
 }

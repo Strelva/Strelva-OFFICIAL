@@ -19,6 +19,7 @@ import {
   WorkPlanExecutionConflictError,
   WorkPlanInvalidOutputError,
 } from "@/products/work-plans";
+import { WorkspaceConflictError } from "@/platform/workspaces/types";
 
 const actor = { userId: "11111111-1111-4111-8111-111111111111", verifiedEmail: "owner@example.com" };
 const workspaceId = "22222222-2222-4222-8222-222222222222";
@@ -208,6 +209,43 @@ describe("work-plan output acceptance", () => {
     });
 
     expect(result.status).toBe("already_completed");
+    expect(mocks.persistWorkPlanOutput).not.toHaveBeenCalled();
+  });
+
+  it("replays a pre-capability v1 receipt after the versioned key and digest rollout", async () => {
+    const output = {
+      id: "output",
+      title: "Procedure",
+      description: "A private procedure.",
+      outcome: "capability",
+      nativeOperationIds: ["create_document"],
+      draft: { kind: "document", title: "Procedure", text: "Draft" },
+    };
+    mocks.getWork.mockResolvedValue(planFor(output, "create_document"));
+    const legacyReceipt = persisted("create_document", "documents", "document", true);
+    mocks.readWorkPlanOutput.mockImplementation(async (key: { idempotencyKey: string }) => {
+      if (key.idempotencyKey.endsWith("create_document@1")) throw new WorkspaceConflictError();
+      return legacyReceipt;
+    });
+
+    const result = await executeWorkPlanOutput({
+      actor,
+      workspaceId,
+      planWorkId,
+      outputId: "output",
+      expectedPlanRevision: 1,
+      operationId: "create_document",
+      read: mocks.readWorkPlanOutput,
+      persist: mocks.persistWorkPlanOutput,
+    });
+
+    expect(result).toMatchObject({ status: "already_completed", nativeWorkId, capabilityVersion: 1, receipt: { capabilityVersion: 1 } });
+    expect(mocks.readWorkPlanOutput).toHaveBeenCalledTimes(2);
+    const versionedKey = mocks.readWorkPlanOutput.mock.calls[0]?.[0] as { idempotencyKey: string; inputDigest: string };
+    const legacyKey = mocks.readWorkPlanOutput.mock.calls[1]?.[0] as { idempotencyKey: string; inputDigest: string };
+    expect(versionedKey.idempotencyKey).toContain(":create_document@1");
+    expect(legacyKey.idempotencyKey).toContain(":create_document");
+    expect(versionedKey.inputDigest).not.toBe(legacyKey.inputDigest);
     expect(mocks.persistWorkPlanOutput).not.toHaveBeenCalled();
   });
 

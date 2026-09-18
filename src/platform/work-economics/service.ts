@@ -1,5 +1,5 @@
 import { getWork, WorkspaceAccessError, type WorkspaceActor } from "@/platform/workspaces";
-import { assertJobTargetAccess, resolveCreateTarget } from "./adapters";
+import { assertJobTargetAccess, resolveCreateTarget, type InquiryEconomicsAuthority } from "./adapters";
 import { commandJobEconomics, findJobEconomics, readJobEconomics as readStoredJobEconomics } from "./repository";
 import {
   MAX_JOB_ECONOMICS_CENTS,
@@ -17,7 +17,10 @@ function canonicalCreateCommand(command: Extract<JobEconomicsCommand, { action: 
     action: "create",
     productId: target.productId,
     resourceKind: target.resourceKind,
-    ...(target.workspaceId ? { workspaceId: target.workspaceId, workId: target.workId! } : {
+    ...(target.workspaceId ? {
+      workspaceId: target.workspaceId,
+      ...(target.workId ? { workId: target.workId } : {}),
+    } : {
       tenantId: target.tenantId!,
       businessId: target.businessId!,
       requestId: target.requestId!,
@@ -29,10 +32,10 @@ function canonicalCreateCommand(command: Extract<JobEconomicsCommand, { action: 
   };
 }
 
-async function inspectAndAuthorize(actor: WorkspaceActor, jobId: string): Promise<JobEconomicsInspection> {
+async function inspectAndAuthorize(actor: WorkspaceActor, jobId: string, inquiryAuthority?: InquiryEconomicsAuthority): Promise<JobEconomicsInspection> {
   const inspection = await readStoredJobEconomics(actor, jobId);
   if (!inspection) throw new JobEconomicsNotFoundError();
-  await assertJobTargetAccess(actor, inspection.job);
+  await assertJobTargetAccess(actor, inspection.job, inquiryAuthority);
   return inspection;
 }
 
@@ -40,21 +43,22 @@ async function inspectAndAuthorize(actor: WorkspaceActor, jobId: string): Promis
 export async function executeJobEconomicsCommand(
   actor: WorkspaceActor,
   input: unknown,
+  inquiryAuthority?: InquiryEconomicsAuthority,
 ): Promise<JobEconomicsInspection> {
   const command = parseJobEconomicsCommand(input);
   if (command.action === "create") {
-    const target = await resolveCreateTarget(actor, command);
+    const target = await resolveCreateTarget(actor, command, inquiryAuthority);
     const payerId = command.payerId ?? actor.userId;
     if (command.productId === "inquiry" && payerId !== actor.userId) {
       throw new JobEconomicsNotFoundError("The inquiry payer must be the authenticated tenant member.");
     }
     const created = await commandJobEconomics(actor, canonicalCreateCommand({ ...command, payerId }, target));
-    return inspectAndAuthorize(actor, created.id);
+    return inspectAndAuthorize(actor, created.id, inquiryAuthority);
   }
 
-  const existing = await inspectAndAuthorize(actor, command.jobId);
+  const existing = await inspectAndAuthorize(actor, command.jobId, inquiryAuthority);
   await commandJobEconomics(actor, command);
-  return inspectAndAuthorize(actor, existing.job.id);
+  return inspectAndAuthorize(actor, existing.job.id, inquiryAuthority);
 }
 
 export interface JobEconomicsTargetLookup {
@@ -66,6 +70,7 @@ export interface JobEconomicsTargetLookup {
 export async function findJobEconomicsForTarget(
   actor: WorkspaceActor,
   input: unknown,
+  inquiryAuthority?: InquiryEconomicsAuthority,
 ): Promise<JobEconomicsTargetLookup> {
   const value = (input && typeof input === "object" && !Array.isArray(input))
     ? input as Record<string, unknown>
@@ -97,16 +102,17 @@ export async function findJobEconomicsForTarget(
     maxAuthorizedCents: MAX_JOB_ECONOMICS_CENTS,
   });
   if (command.action !== "create") throw new JobEconomicsNotFoundError();
-  const target = await resolveCreateTarget(actor, command);
+  const target = await resolveCreateTarget(actor, command, inquiryAuthority);
   const inspection = await findJobEconomics(target);
   if (!inspection) return { inspection: null, canManage: true };
-  await assertJobTargetAccess(actor, inspection.job);
+  await assertJobTargetAccess(actor, inspection.job, inquiryAuthority);
   return { inspection, canManage: inspection.job.payerId === actor.userId };
 }
 
 export async function readJobEconomics(
   actor: WorkspaceActor,
   input: unknown,
+  inquiryAuthority?: InquiryEconomicsAuthority,
 ): Promise<JobEconomicsInspection> {
-  return inspectAndAuthorize(actor, parseJobEconomicsId(input));
+  return inspectAndAuthorize(actor, parseJobEconomicsId(input), inquiryAuthority);
 }

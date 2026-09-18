@@ -33,13 +33,16 @@ import type {
   ResponsibilityUpdateInput,
 } from "./contracts";
 import type { InquirySurfaceAction, InquirySurfaceResult, InquirySurfaceSnapshot } from "./surface-contracts";
-import type { InquiryRecordStatus, JsonValue } from "./contracts";
+import type { JsonValue } from "./contracts";
 import { projectInquiryConnections } from "./connections";
 import { applyInquiryEmailConsent, projectInquiryEmailConnection } from "./email-consent";
 import { recordedOnboarding, readOnboardingWebsite, projectOnboardingCorrections, SETUP_FIELD_LABELS } from "./onboarding";
 import { ensurePatternResponsibility, executePatternCopyAction, executePatternUpdateAction } from "./inquiry-pattern-server";
 import { listPatternInstallations } from "./inquiry-pattern-updates";
 import { explainWhyWithDelivery, projectInquiryDeliveryTimeline, withoutInquiryDeliveryProjection } from "./delivery-surface";
+import { placeholderInquiryRecords, projectedInquiryRecords } from "./record-projection";
+
+export { recordedInquiryAssignee, recordedInquiryStatus } from "./record-projection";
 
 export { inquiryReleaseEnabled } from "./release";
 export { executeInquiryPublication } from "./publication";
@@ -577,79 +580,6 @@ function stateForEngine(workspace: InquiryWorkspaceRead, businessId: string): In
   return { ...base, inquiries: [...records, ...placeholderInquiryRecords(base, workspace.recordOverlays).filter((record) => !ids.has(record.id))] };
 }
 
-export function recordedInquiryStatus(state: InquiryEngineState, inquiryId: string, fallback: InquiryRecordStatus): InquiryRecordStatus {
-  for (const change of state.changes) {
-    if (change.status !== "published") continue;
-    const item = change.items.find((entry) => entry.path === `inquiries.${inquiryId}.status`);
-    if (item && ["new", "assigned", "follow_up_pending", "handled", "blocked"].includes(String(item.after))) return item.after as InquiryRecordStatus;
-  }
-  return fallback;
-}
-
-function projectedInquiryRecords(
-  state: InquiryEngineState,
-  leads: LeadRecord[],
-  overlays: InquiryRecordOverlay[],
-): InquiryRecord[] {
-  const capabilities = new Map(state.capabilities.map((item) => [item.id, item]));
-  const overlayById = new Map(overlays.map((item) => [item.inquiryId, item]));
-  const seen = new Set<string>();
-  const projected: InquiryRecord[] = [];
-  for (const lead of leads) {
-    if (seen.has(lead.id)) continue;
-    const capabilityId = lead.capabilityId && capabilities.has(lead.capabilityId)
-      ? lead.capabilityId
-      : state.capabilities.length === 1 ? state.capabilities[0]!.id : null;
-    if (!capabilityId) continue;
-    const capability = capabilities.get(capabilityId)!;
-    const overlay = overlayById.get(lead.id);
-    const fields = lead.fields && typeof lead.fields === "object" ? { ...lead.fields } : {
-      name: lead.name,
-      ...(lead.email ? { email: lead.email } : {}),
-      ...(lead.message ? { message: lead.message } : {}),
-    };
-    projected.push({
-      id: lead.id,
-      businessId: state.capabilities[0]?.businessId ?? capability.businessId,
-      capabilityId,
-      capabilityVersion: lead.capabilityVersion && lead.capabilityVersion >= 1 ? lead.capabilityVersion : capability.live?.version ?? 1,
-      fields,
-      status: recordedInquiryStatus(state, lead.id, overlay?.status ?? "new"),
-      receivedAt: lead.createdAt,
-      timelineEventIds: state.timeline.filter((event) => event.inquiryId === lead.id).map((event) => event.id),
-      createdReceiptId: state.actionReceipts.find((receipt) => receipt.inquiryId === lead.id)?.id ?? "",
-    });
-    seen.add(lead.id);
-  }
-  return projected;
-}
-
-/** Supply non-PII anchors for engine validation when Redis is unavailable. */
-function placeholderInquiryRecords(state: InquiryEngineState, overlays: InquiryRecordOverlay[]): InquiryRecord[] {
-  const references = new Map<string, { capabilityId: string; at: string }>();
-  for (const event of state.timeline) references.set(event.inquiryId, { capabilityId: event.capabilityId, at: event.at });
-  for (const receipt of state.actionReceipts) {
-    if (receipt.inquiryId && receipt.capabilityId) references.set(receipt.inquiryId, { capabilityId: receipt.capabilityId, at: receipt.createdAt });
-  }
-  for (const change of state.changes) {
-    for (const id of change.preservedInquiryIds) references.set(id, { capabilityId: change.capabilityId, at: change.updatedAt });
-  }
-  const overlayById = new Map(overlays.map((item) => [item.inquiryId, item]));
-  return [...references.entries()]
-    .filter(([, ref]) => state.capabilities.some((capability) => capability.id === ref.capabilityId))
-    .map(([id, ref]) => ({
-      id,
-      businessId: state.capabilities.find((item) => item.id === ref.capabilityId)!.businessId,
-      capabilityId: ref.capabilityId,
-      capabilityVersion: state.capabilities.find((item) => item.id === ref.capabilityId)!.live?.version ?? 1,
-      fields: {},
-      status: recordedInquiryStatus(state, id, overlayById.get(id)?.status ?? "new"),
-      receivedAt: ref.at,
-      timelineEventIds: state.timeline.filter((event) => event.inquiryId === id).map((event) => event.id),
-      createdReceiptId: state.actionReceipts.find((receipt) => receipt.inquiryId === id)?.id ?? "",
-    }));
-}
-
 async function surfacePermissions(tenantId: string): Promise<InquirySurfaceSnapshot["permissions"]> {
   const role = await getTenantRole(tenantId).catch(() => null);
   const can = (permission: TenantPermission): boolean => role === "super_admin" || (role !== null && roleHasPermission(role as ClientRole, permission));
@@ -869,7 +799,7 @@ export async function executeInquirySurface(input: {
       break;
     }
     case "bulk-record":
-      change = engine.bulkUpdateInquiries({ inquiryIds: action.recordIds, actorId, status: action.action === "assign" ? "assigned" : "handled", why: "The authorized user selected these inquiries for one grouped change." });
+      change = engine.bulkUpdateInquiries({ inquiryIds: action.recordIds, actorId, status: action.action === "assign" ? "assigned" : "handled", ...(action.action === "assign" ? { assigneeId: actorId } : {}), why: "The authorized user selected these inquiries for one grouped change." });
       affectedRecordIds = action.recordIds;
       break;
     case "bulk-undo": {
@@ -985,3 +915,5 @@ export async function executeInquirySurface(input: {
   const projected = await surfaceSnapshot(context, resultWorkspace, nextConfig, persist ? undefined : engine.snapshot());
   return { snapshot: projected, ...(work ? { work: projected.state.requests.find((item) => item.id === work.id) ?? work } : {}), ...(record ? { record } : {}), ...(change ? { change } : {}), ...(rehearsal ? { rehearsal } : {}), ...(patternUpdate ? { patternUpdate } : {}), ...(why ? { why } : {}), ...(affectedRecordIds ? { affectedRecordIds } : {}), ...(message ? { message } : {}) };
 }
+
+export { inquiryEconomicsAuthority } from "./economics";

@@ -1,8 +1,15 @@
 import { z } from "zod";
 import { presentAssessmentWork, assessmentKindForResource, type AssessmentResult } from "@/products/assessment";
-import { documentSchema, type WorkspaceDocument } from "@/products/documents/engine";
+import { documentSchema, type WorkspaceDocument } from "@/products/documents/contracts";
 import { getWork, type SavedWork, type WorkspaceActor } from "@/platform/workspaces";
-import { parseTrackerWorkPayload } from "@/products/tracker/presentation";
+import { parseTrackerWorkPayload } from "@/products/tracker/client";
+import {
+  ContextSourceIsolationError,
+  isSensitiveContextFieldName,
+  prepareContextEvidence,
+  prepareContextProvenance,
+  prepareContextText,
+} from "@/platform/work-context/preparation";
 import {
   workPlanContextSourceReferenceSchema,
   workPlanEvidenceSchema,
@@ -80,29 +87,22 @@ export class WorkPlanContextSourceError extends Error {
 }
 
 function clip(value: string, max: number): string {
-  const clean = value.replace(/\u0000/g, "").trim();
-  if (clean.length <= max) return clean;
-  const suffix = "… [truncated]";
-  return `${clean.slice(0, Math.max(1, max - suffix.length)).trimEnd()}${suffix}`.slice(0, max);
+  return prepareContextText({ value, maxCharacters: max }).value;
 }
 
 function titleFor(work: SavedWork, fallback: string): string {
   return clip(work.title?.trim() || fallback, 160) || fallback;
 }
 
-const sensitiveNamePattern = /(?:api[\s_-]*key|access[\s_-]*key|client[\s_-]*secret|secret|password|passcode|token|credential|authorization|cookie|private[\s_-]*key|ssh[\s_-]*key|social[\s_-]*security|ssn|credit[\s_-]*card|card[\s_-]*number)/i;
-const sensitiveValuePattern = /(?:^|\s)(?:sk|pk|ghp|github_pat|xox[baprs])[_-][a-z0-9_-]{8,}|(?:api[\s_-]*key|access[\s_-]*key|secret|password|token)\s*[:=]\s*\S+/i;
-
-function sensitiveField(value: string): boolean {
-  return sensitiveNamePattern.test(value);
-}
-
 function safeCell(value: string, sensitive: boolean): string {
-  if (sensitive || sensitiveValuePattern.test(value)) return "[redacted]";
-  return clip(value, WORK_PLAN_CONTEXT_LIMITS.maxTrackerCellCharacters) || "(empty)";
+  return prepareContextText({
+    value,
+    maxCharacters: WORK_PLAN_CONTEXT_LIMITS.maxTrackerCellCharacters,
+    fieldName: sensitive ? "secret" : undefined,
+  }).value || "(empty)";
 }
 
-function documentContext(work: SavedWork): {
+function documentContext(work: SavedWork, expectedWorkspaceId: string): {
   source: WorkPlanContextSourceReference;
   evidence: WorkPlanEvidence;
 } {
@@ -112,30 +112,43 @@ function documentContext(work: SavedWork): {
   }
   const document = parsed.data as WorkspaceDocument;
   const title = titleFor(work, document.title);
+  const prepared = prepareContextEvidence({
+    source: {
+      workId: work.id,
+      workspaceId: work.workspaceId,
+      title,
+      revision: String(document.revision),
+    },
+    expectedWorkspaceId,
+    label: `Document: ${title} (revision ${document.revision})`,
+    value: document.text || "(The document has no text.)",
+    maxLabelCharacters: 120,
+    maxValueCharacters: Math.min(
+      WORK_PLAN_CONTEXT_LIMITS.maxDocumentTextCharacters,
+      WORK_PLAN_CONTEXT_LIMITS.maxEvidenceValueCharacters,
+    ),
+  });
   return {
     source: workPlanContextSourceReferenceSchema.parse({
       workId: work.id,
       productId: work.productId,
       resourceKind: work.resourceKind,
       kind: "document",
-      title,
+      title: prepared.provenance.title,
       version: document.version,
       revision: document.revision,
       updatedAt: work.updatedAt,
     }),
-    // Keep the document value as plaintext. Metadata and revision receipts
-    // remain in the source reference and never enter the model evidence.
+    // Metadata and revision receipts remain in the source reference. The
+    // plaintext is scrubbed as defense in depth before becoming model evidence.
     evidence: workPlanEvidenceSchema.parse({
-      label: `Document: ${clip(title, 100)} (revision ${document.revision})`,
-      value: clip(document.text, Math.min(
-        WORK_PLAN_CONTEXT_LIMITS.maxDocumentTextCharacters,
-        WORK_PLAN_CONTEXT_LIMITS.maxEvidenceValueCharacters,
-      )) || "(The document has no text.)",
+      label: prepared.label,
+      value: prepared.value || "(The document has no text.)",
     }),
   };
 }
 
-function trackerContext(work: SavedWork): {
+function trackerContext(work: SavedWork, expectedWorkspaceId: string): {
   source: WorkPlanContextSourceReference;
   evidence: WorkPlanEvidence;
 } {
@@ -146,11 +159,11 @@ function trackerContext(work: SavedWork): {
   const title = titleFor(work, tracker.title);
   const columns = tracker.columns.slice(0, WORK_PLAN_CONTEXT_LIMITS.maxTrackerColumns).map((column, index) => ({
     index: index + 1,
-    label: sensitiveField(column.label) || sensitiveField(column.sourceHeader)
+    label: isSensitiveContextFieldName(column.label) || isSensitiveContextFieldName(column.sourceHeader)
       ? "[redacted field]"
       : clip(column.label, 80) || `Field ${index + 1}`,
     kind: column.kind,
-    sensitive: sensitiveField(column.label) || sensitiveField(column.sourceHeader),
+    sensitive: isSensitiveContextFieldName(column.label) || isSensitiveContextFieldName(column.sourceHeader),
   }));
   const activeRows = tracker.rows.filter((row) => row.state === "active");
   const sampleRows = activeRows.slice(0, WORK_PLAN_CONTEXT_LIMITS.maxTrackerRows).map((row) =>
@@ -166,25 +179,38 @@ function trackerContext(work: SavedWork): {
     "Current sample rows:",
     JSON.stringify(sampleRows),
   ].join("\n");
+  const prepared = prepareContextEvidence({
+    source: {
+      workId: work.id,
+      workspaceId: work.workspaceId,
+      title,
+      revision: String(tracker.revision),
+    },
+    expectedWorkspaceId,
+    label: `Tracker: ${title} (revision ${tracker.revision})`,
+    value: summary,
+    maxLabelCharacters: 120,
+    maxValueCharacters: WORK_PLAN_CONTEXT_LIMITS.maxEvidenceValueCharacters,
+  });
   return {
     source: workPlanContextSourceReferenceSchema.parse({
       workId: work.id,
       productId: work.productId,
       resourceKind: work.resourceKind,
       kind: "tracker",
-      title,
+      title: prepared.provenance.title,
       version: 1,
       revision: tracker.revision,
       updatedAt: work.updatedAt,
     }),
     evidence: workPlanEvidenceSchema.parse({
-      label: `Tracker: ${clip(title, 100)} (revision ${tracker.revision})`,
-      value: clip(summary, WORK_PLAN_CONTEXT_LIMITS.maxEvidenceValueCharacters),
+      label: prepared.label,
+      value: prepared.value,
     }),
   };
 }
 
-function assessmentContext(work: SavedWork): {
+function assessmentContext(work: SavedWork, expectedWorkspaceId: string): {
   source: WorkPlanContextSourceReference;
   evidence: WorkPlanEvidence;
 } {
@@ -201,20 +227,34 @@ function assessmentContext(work: SavedWork): {
     throw new WorkPlanContextSourceError(work.id, "malformed", "The selected assessment cannot be used as planning context.");
   }
   const title = titleFor(work, assessment.subject.name);
+  const sourceRevision = assessment.method.version ?? assessment.presentationVersion;
+  const prepared = prepareContextEvidence({
+    source: {
+      workId: work.id,
+      workspaceId: work.workspaceId,
+      title,
+      revision: String(sourceRevision),
+    },
+    expectedWorkspaceId,
+    label: `Assessment: ${title}`,
+    value: assessmentSummary(assessment),
+    maxLabelCharacters: 120,
+    maxValueCharacters: WORK_PLAN_CONTEXT_LIMITS.maxEvidenceValueCharacters,
+  });
   return {
     source: workPlanContextSourceReferenceSchema.parse({
       workId: work.id,
       productId: work.productId,
       resourceKind: work.resourceKind,
       kind: "assessment",
-      title,
-      version: assessment.method.version ?? assessment.presentationVersion,
+      title: prepared.provenance.title,
+      version: sourceRevision,
       revision: null,
       updatedAt: work.updatedAt,
     }),
     evidence: workPlanEvidenceSchema.parse({
-      label: `Assessment: ${clip(title, 104)}`,
-      value: clip(assessmentSummary(assessment), WORK_PLAN_CONTEXT_LIMITS.maxEvidenceValueCharacters),
+      label: prepared.label,
+      value: prepared.value,
     }),
   };
 }
@@ -251,10 +291,17 @@ function assessmentSummary(assessment: AssessmentResult): string {
   ].join("\n");
 }
 
-function sourceContext(work: SavedWork): { source: WorkPlanContextSourceReference; evidence: WorkPlanEvidence } {
-  if (work.productId === "documents" && work.resourceKind === "document") return documentContext(work);
-  if (work.productId === "tracker" && work.resourceKind === "tracker") return trackerContext(work);
-  if (assessmentKindForResource(work.productId, work.resourceKind)) return assessmentContext(work);
+function sourceContext(work: SavedWork, expectedWorkspaceId: string): { source: WorkPlanContextSourceReference; evidence: WorkPlanEvidence } {
+  // Reject a workspace mismatch before parsing any product-owned payload.
+  prepareContextProvenance({
+    workId: work.id,
+    workspaceId: work.workspaceId,
+    title: work.title || "Untitled work",
+    revision: work.updatedAt,
+  }, expectedWorkspaceId);
+  if (work.productId === "documents" && work.resourceKind === "document") return documentContext(work, expectedWorkspaceId);
+  if (work.productId === "tracker" && work.resourceKind === "tracker") return trackerContext(work, expectedWorkspaceId);
+  if (assessmentKindForResource(work.productId, work.resourceKind)) return assessmentContext(work, expectedWorkspaceId);
   throw new WorkPlanContextSourceError(work.id, "unsupported", "The selected saved work type is not supported as planning context.");
 }
 
@@ -280,10 +327,15 @@ export async function prepareWorkPlanContext(input: {
     if (!work) {
       throw new WorkPlanContextSourceError(sourceWorkId, "not_found", "A selected planning source is unavailable.");
     }
-    if (work.workspaceId !== request.workspaceId) {
-      throw new WorkPlanContextSourceError(sourceWorkId, "wrong_workspace", "A selected planning source belongs to another workspace.");
+    let prepared: ReturnType<typeof sourceContext>;
+    try {
+      prepared = sourceContext(work, request.workspaceId);
+    } catch (error) {
+      if (error instanceof ContextSourceIsolationError) {
+        throw new WorkPlanContextSourceError(sourceWorkId, "wrong_workspace", "A selected planning source belongs to another workspace.");
+      }
+      throw error;
     }
-    const prepared = sourceContext(work);
     sources.push(prepared.source);
     evidence.push(prepared.evidence);
   }

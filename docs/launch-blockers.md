@@ -1,6 +1,6 @@
 # Strelva Launch Blockers
 
-> **Status: current release gate (updated 2026-07-30).** Only `Current
+> **Status: current release gate (updated 2026-09-18).** Only `Current
 > Blockers` and `Waived Blockers` determine release status. The long evidence
 > record below is historical. Current architecture and commands live in
 > `production-readiness.md`: Supabase Auth, Postgres, and `app.strelva.com`.
@@ -14,6 +14,15 @@ This file tracks launch blockers that cannot be resolved by code changes alone. 
 ## Current Blockers
 
 _No current blockers from the original release gate — both prior entries are resolved (2026-07-12): Rohlax revalidation is wired and the apex + admin serve; the seed demo tenant `summit` and `jacobtest` are deactivated._
+
+### strelvav2 customer-journey and activation acceptance
+
+- Status: blocked
+- Owner: implementation team; Jacob owns human acceptance and live activation.
+- Scope: the new horizontal product on branch `strelvav2`, not a claim that the existing Managed Websites production service has stopped working.
+- Reference: [horizontal acceptance](./strelvav2-horizontal-acceptance.md) and [release evaluation gates](./horizontal-release-checklist-2026-09-11.md#current-completion-evaluation).
+- Required closure: complete the mandatory PRD journeys with independently reviewed evidence, resolve operating and commercial choices at their dependent boundary, prepare the exact migration/environment/deployment and recovery steps, and obtain the necessary live-action authority. Fixture-only results, local builds and resolved historical launch blockers cannot close this gate.
+- Current gaps include account/result continuity, complete application handoffs, provider-cost reconciliation, authenticated delegated operation, custom application release integration and specified provider/service lifecycle. The acceptance ledger retains their current scope and proof limits.
 
 ### Security and dependency blockers (2026-07-30 audit — RESOLVED 2026-07-30)
 

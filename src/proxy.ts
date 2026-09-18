@@ -56,8 +56,14 @@ const PUBLIC_EXACT = new Set([
   "/",
   "/no-access",
   "/api/ai-visibility",
+  // Accepts only a bounded public brief and writes an encrypted browser cookie.
+  // The sibling import route remains session-protected.
+  "/api/public-continuation",
   // Own confirmed-session authorization; return JSON 401/503, never sign-in HTML.
   "/api/workspace",
+  "/api/workspace-invitations",
+  "/api/workspace-invitations/revoke",
+  "/api/workspace-export",
   "/api/health",
   "/api/newsletter/subscribe",
   "/api/track",
@@ -68,6 +74,10 @@ const PUBLIC_EXACT = new Set([
 const PUBLIC_PREFIXES = [
   "/sign-in",
   "/sign-up",
+  // The page discloses only bounded invitation terms. Acceptance and all data
+  // access still require the exact verified Supabase identity.
+  "/workspace/invitations/accept/",
+  "/api/workspace-invitations/accept/",
   "/access-request",
   "/ai-visibility",
   "/onboard",
@@ -78,6 +88,9 @@ const PUBLIC_PREFIXES = [
   // Signed provider callbacks authenticate themselves with the provider
   // signature, so Supabase session auth must not intercept them.
   "/api/webhooks/",
+  // External personal integrations authenticate with a scoped bearer token in
+  // the route. The management route remains behind the Supabase session gate.
+  "/api/agent-access/work/",
   "/api/approve",
   "/api/v1/",
   "/api/cron/",

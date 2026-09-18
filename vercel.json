@@ -97,6 +97,10 @@
     {
       "path": "/api/cron/heartbeat",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/workspace-work",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

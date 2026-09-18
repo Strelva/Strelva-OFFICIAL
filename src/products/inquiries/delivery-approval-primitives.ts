@@ -138,6 +138,18 @@ export function throwCode(code: string, message: string): never {
   throw new InquiryMessageReviewEngineError(message, code);
 }
 
+export function assertOpenInquiry(status: InquiryRecordStatus): void {
+  if (status === "handled" || status === "blocked") {
+    throwCode("inquiry_changed", "This inquiry is no longer open for message delivery.");
+  }
+}
+
+export function assertResponsibilitySponsor(responsibility: ResponsibilityPolicy, actorId: string): void {
+  if (responsibility.sponsorId !== actorId) {
+    throwCode("permission_denied", "Only the current responsibility sponsor can approve this message.");
+  }
+}
+
 export function statusFromState(state: InquiryEngineState, inquiryId: string, fallback: InquiryRecordStatus): InquiryRecordStatus {
   for (const change of state.changes) {
     if (change.status !== "published") continue;

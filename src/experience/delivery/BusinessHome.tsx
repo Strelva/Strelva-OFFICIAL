@@ -29,7 +29,7 @@ type Props = {
   onRequests: () => void;
 };
 
-/** A visual index of actual local request records; no invented delivery state. */
+/** Local request states remain explicit; only saved decisions appear in attention. */
 export function BusinessHome({
   requests,
   empty,
@@ -40,17 +40,20 @@ export function BusinessHome({
   onRequests,
 }: Props) {
   const [idea, setIdea] = useState("");
+  const returning = !empty || requests.length > 0;
+  const attention = requests.filter(request => request.stage === "review" || request.stage === "draft");
+  const otherRequests = requests.filter(request => request.stage !== "review" && request.stage !== "draft");
   return (
     <>
       <header className={s.introduction}>
         <p className={s.eyebrow}>HOME</p>
         <h1 ref={headingRef} tabIndex={-1} className="font-display">
-          What should your business be able to do next?
+          {returning ? "Your business, ready for what’s next." : "What should your business be able to do next?"}
         </h1>
         <p className={s.intro}>
-          Tell Strelva what you want to make possible. We’ll work through the
-          details and handle the implementation.
+          {returning ? "Review what needs you, or return to your work." : "Start with a result your business needs. This sample saves requests for review; it does not carry out the work."}
         </p>
+        <details open={!returning} className={s.newWork}><summary>Start something new</summary>
         <form
           className={s.composer}
           onSubmit={(event) => {
@@ -95,11 +98,45 @@ export function BusinessHome({
             </button>
           ))}
         </div>
+        </details>
       </header>
+      {attention.length > 0 ? <section className={s.recent} aria-labelledby="business-attention-title"><div className={s.sectionHeading}><h2 id="business-attention-title" className="font-display">Needs you</h2></div><div className={s.workList}>
+          {attention.map((request) => (
+            <button
+              key={request.id}
+              data-stage={request.stage}
+              className={s.workRow}
+              onClick={() => onOpen(request)}
+            >
+              <div className={s.thumbnail}>
+                <Miniature
+                  kind={request.stage === "review" ? "form" : "request"}
+                />
+              </div>
+              <div className={s.workCopy}>
+                <div>
+                  <strong className="font-display">{request.title}</strong>
+                  <span className={s.status} data-stage={request.stage}>
+                    {stageLabels[request.stage]}
+                  </span>
+                </div>
+                <p>{request.description}</p>
+              </div>
+              <span className={s.rowAction}>
+                {request.stage === "review"
+                  ? "Review"
+                  : request.stage === "draft"
+                    ? "Continue"
+                    : "View progress"}
+                <ArrowRight size={14} />
+              </span>
+            </button>
+          ))}
+      </div></section> : null}
       <section className={s.recent} aria-labelledby="recent-work-title">
         <div className={s.sectionHeading}>
           <h2 id="recent-work-title" className="font-display">
-            Recent work
+            Your work
           </h2>
           <button onClick={onRequests}>
             All requests <ArrowRight size={16} />
@@ -123,7 +160,7 @@ export function BusinessHome({
               </span>
             </Link>
           )}
-          {requests.map((request) => (
+          {otherRequests.map((request) => (
             <button
               key={request.id}
               data-stage={request.stage}

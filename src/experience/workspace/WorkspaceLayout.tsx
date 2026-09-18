@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, ArrowUpRight, FileSearch, FileText, Globe2, MessageSquareText, Search, Table2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, ArrowUpRight, FileSearch, FileText, Globe2, MessageSquareText, Search } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { StrelvaShell, type StrelvaSection } from "@/experience/app-frame/StrelvaShell";
 import { InquiryServerWorkspaceExperience } from "@/experience/inquiries/InquiryServerExperience";
@@ -10,6 +10,16 @@ import type { WorkspaceSnapshot, WorkspaceWork } from "./contracts";
 import { discoveryProducts, sameAppHref, type ManagedWorkSummary } from "./workspace-discovery";
 import { WorkspaceHelp } from "./WorkspaceHelp";
 import { WorkspaceStart } from "./WorkspaceStart";
+import { BusinessHome } from "./BusinessHome";
+import { AgencyHome } from "./AgencyHome";
+import { WorkspaceBusinessSettings } from "./WorkspaceBusinessSettings";
+import { WebsiteAssignmentHandoff } from "./WorkspaceOfferings";
+import { workspaceWorkLabel } from "./work-label";
+import {
+  WorkspaceOfferingDirectory,
+  boundManagedWebsiteIds,
+  useWorkspaceOfferings,
+} from "./WorkspaceOfferings";
 import type { WorkspaceStartContext, WorkspaceStartContinuation, WorkspaceStartTemplate, WorkspaceStartWebsiteHandoff } from "./workspace-start";
 import styles from "./workspace-surface.module.css";
 
@@ -33,14 +43,18 @@ interface Props {
   agency: boolean;
   busy: boolean;
   selectedWork: WorkspaceWork | null;
+  workingTitle?: string;
+  workingSection?: "work" | "ongoing";
   onHome: () => void;
   onNew: (context?: WorkspaceStartContinuation) => void;
   onPlan?: (request: string) => void;
+  onOngoing: () => void;
   onAgency: () => void;
   onInquiry?: (tenantId: string, context?: WorkspaceStartContinuation) => void;
   onTracker?: (context?: WorkspaceStartContinuation) => void;
-  onWebsite?: (site: ManagedWorkSummary, context?: WorkspaceStartContinuation) => void;
+  onWebsite?: (site: ManagedWorkSummary, context?: WorkspaceStartContinuation) => void | false;
   onDocument?: (context?: WorkspaceStartContinuation) => void;
+  onHorizontal?: (productId: "applications" | "scheduling" | "investigations" | "operations", context?: WorkspaceStartContinuation) => void;
   trackerTemplates?: readonly WorkspaceStartTemplate[];
   inquiryBusinesses?: readonly { id: string; title: string }[];
   inquiry?: WorkspaceInquiryTarget;
@@ -49,6 +63,7 @@ interface Props {
   document?: ReactNode;
   onChoose: (id: string) => void;
   onWorkspace: (id: string) => void;
+  onOpenClientWork: (workspaceId: string, workId: string) => void;
   notice: ReactNode;
   children?: ReactNode;
 }
@@ -56,8 +71,9 @@ interface Props {
 function initialSection(): StrelvaSection {
   if (typeof window === "undefined") return "home";
   const value = new URLSearchParams(window.location.search).get("view");
+  if (value === "operations" || value === "ongoing") return "ongoing";
   if (value === "tracker" || value === "inquiries" || value === "document" || value === "plan") return "work";
-  return value === "products" || value === "work" || value === "help" ? value : "home";
+  return value === "products" || value === "work" || value === "access" || value === "settings" || value === "help" ? value : "home";
 }
 
 function initialStartOpen(): boolean {
@@ -65,35 +81,66 @@ function initialStartOpen(): boolean {
   return new URLSearchParams(window.location.search).get("view") === "start";
 }
 
-export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], managedWorkUnavailable, home, agency, busy, selectedWork, onHome, onNew, onPlan, onAgency, onInquiry, onTracker, onWebsite, onDocument, trackerTemplates, inquiryBusinesses = [], inquiry, tracker, plan, document, onChoose, onWorkspace, notice, children }: Props) {
+function initialOfferingId(): string | null {
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get("offering");
+}
+
+export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], managedWorkUnavailable, home, agency, busy, selectedWork, workingTitle, workingSection = "work", onHome, onNew, onPlan, onOngoing, onAgency, onInquiry, onTracker, onWebsite, onDocument, onHorizontal, trackerTemplates, inquiryBusinesses = [], inquiry, tracker, plan, document, onChoose, onWorkspace, onOpenClientWork, notice, children }: Props) {
   const [section, setSection] = useState<StrelvaSection>(initialSection);
   const [startOpen, setStartOpen] = useState(initialStartOpen);
   const [query, setQuery] = useState("");
   const [productId, setProductId] = useState<string | null>(null);
+  const [offeringId, setOfferingId] = useState<string | null>(initialOfferingId);
   const [helpRequest, setHelpRequest] = useState<string | undefined>();
   const [websiteHandoff, setWebsiteHandoff] = useState<WorkspaceStartWebsiteHandoff | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const productHeadingRef = useRef<HTMLHeadingElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    const restore = () => { setSection(initialSection()); setStartOpen(initialStartOpen()); setProductId(null); setQuery(""); setHelpRequest(undefined); setWebsiteHandoff(null); };
+    const restore = () => { setSection(initialSection()); setStartOpen(initialStartOpen()); setProductId(null); setOfferingId(initialOfferingId()); setQuery(""); setHelpRequest(undefined); setWebsiteHandoff(null); };
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
   }, []);
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0, behavior: "auto" });
     if (section === "products" && productId) productHeadingRef.current?.focus({ preventScroll: true });
-  }, [productId, section]);
+  }, [offeringId, productId, section]);
+  useEffect(() => {
+    if (section !== "work" || typeof window === "undefined" || new URLSearchParams(window.location.search).get("search") !== "1") return;
+    const frame = window.requestAnimationFrame(() => searchInputRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [section]);
   const current = snapshot.workspaces.find(item => item.id === snapshot.workspaceId);
   const readOnly = current?.access === "delegated_read";
-  const businessHeading = current?.kind === "agency" ? "Clients" : "Businesses";
+  const offeringUnavailableReason = current?.kind !== "customer"
+    ? "Choose a customer business workspace to view its installations. Personal and agency workspaces remain separate."
+    : readOnly
+      ? "This work-share does not include business-wide offering access. The customer can add direct business membership when that access is appropriate."
+      : "Offering access is unavailable in this workspace.";
+  const offerings = useWorkspaceOfferings({
+    businessId: snapshot.workspaceId,
+    enabled: current?.kind === "customer" && !readOnly,
+    unavailableReason: offeringUnavailableReason,
+  });
   const products = discoveryProducts(snapshot.products);
   const product = products.find(item => item.id === productId);
   const normalized = query.trim().toLowerCase();
   const visibleWork = snapshot.work.filter(work => [work.title, work.assessment?.subject.name, work.assessment?.subject.url, work.assessment?.method.label].some(value => value?.toLowerCase().includes(normalized)));
   const sites = managedWork.flatMap(site => { const href = sameAppHref(site.href); return href ? [{ ...site, href }] : []; });
-  const visibleSites = sites.filter(site => site.title.toLowerCase().includes(normalized));
+  const boundWebsiteIds = boundManagedWebsiteIds(offerings.state);
+  const siteAssignmentsKnown = current?.kind !== "customer" || (!managedWorkUnavailable && offerings.state.status === "ready");
+  const siteAssignmentState = managedWorkUnavailable || offerings.state.status === "error" || offerings.state.status === "unavailable"
+    ? "unavailable" as const
+    : offerings.state.status === "loading"
+      ? "loading" as const
+      : "known" as const;
+  const assignedSites = sites.filter((site) => boundWebsiteIds.has(site.id));
+  const unassignedSites = sites.filter((site) => !boundWebsiteIds.has(site.id));
+  const visibleSites = assignedSites.filter(site => site.title.toLowerCase().includes(normalized));
+  const visibleUnassignedSites = unassignedSites.filter(site => site.title.toLowerCase().includes(normalized));
   const person = snapshot.actor.email.split("@")[0] || "Your account";
-  const sourcePlan = selectedWork && (selectedWork.productId === "documents" || selectedWork.productId === "tracker") && selectedWork.sourceWorkId
+  const sourcePlan = selectedWork && (selectedWork.productId === "documents" || selectedWork.productId === "tracker" || selectedWork.productId === "applications") && selectedWork.sourceWorkId
     ? snapshot.work.find((work) => work.id === selectedWork.sourceWorkId && work.productId === "work_plans" && work.resourceKind === "plan")
     : undefined;
   const sourcePlanHref = sourcePlan
@@ -101,27 +148,35 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     : undefined;
 
   function workMethod(work: WorkspaceWork): string {
-    if (work.productId === "research" && work.resourceKind === "experiment") return "Tracker experiment";
-    if (work.productId === "documents" && work.resourceKind === "document") return "Private document";
-    if (work.productId === "work_plans" && work.resourceKind === "plan") return "Work plan";
-    if (work.productId === "tracker" && work.resourceKind === "tracker") return "Tracker";
-    return work.assessment?.method.label ?? "Saved work · view unavailable";
+    return workspaceWorkLabel(work);
   }
 
   function clearEmbeddedParams(url: URL) {
+    url.searchParams.delete("standingId");
+    url.searchParams.delete("assignmentId");
     url.searchParams.delete("tenantId");
     url.searchParams.delete("inquiryView");
     url.searchParams.delete("inquiryRequest");
     url.searchParams.delete("inquiryRecord");
     url.searchParams.delete("trackerWork");
+    url.searchParams.delete("row");
+    url.searchParams.delete("search");
   }
 
-  function navigate(next: StrelvaSection, prefillHelp?: string) {
-    setStartOpen(false); setSection(next); setProductId(null); setQuery(""); setHelpRequest(next === "help" ? prefillHelp : undefined); setWebsiteHandoff(null); onHome();
+  function openSearch() {
+    navigate("work", undefined, true);
+    window.requestAnimationFrame(() => searchInputRef.current?.focus());
+  }
+
+  function navigate(next: StrelvaSection, prefillHelp?: string, focusSearch = false) {
+    setStartOpen(false); setSection(next); setProductId(null); setOfferingId(null); setQuery(""); setHelpRequest(next === "help" ? prefillHelp : undefined); setWebsiteHandoff(null);
+    if (next === "ongoing") onOngoing(); else onHome();
     const url = new URL(window.location.href);
     clearEmbeddedParams(url);
     if (next === "home") url.searchParams.delete("view"); else url.searchParams.set("view", next);
+    if (focusSearch && next === "work") url.searchParams.set("search", "1"); else url.searchParams.delete("search");
     url.searchParams.delete("work");
+    url.searchParams.delete("offering");
     window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   }
   function openWork(id: string) {
@@ -130,7 +185,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     const selected = snapshot.work.find((work) => work.id === id);
     const url = new URL(window.location.href); url.searchParams.set("work", id); url.searchParams.set("workspaceId", snapshot.workspaceId);
     clearEmbeddedParams(url);
-    url.searchParams.set("view", selected?.productId === "tracker" ? "tracker" : selected?.productId === "documents" ? "document" : selected?.productId === "work_plans" ? "plan" : "work");
+    url.searchParams.set("view", selected?.productId === "operations" ? "ongoing" : selected?.productId === "tracker" ? "tracker" : selected?.productId === "documents" ? "document" : selected?.productId === "work_plans" ? "plan" : "work");
     window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   }
 
@@ -147,10 +202,28 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   }
 
+  function openAccess() {
+    setStartOpen(false);
+    setSection("access");
+    setProductId(null);
+    setOfferingId(null);
+    setQuery("");
+    setHelpRequest(undefined);
+    setWebsiteHandoff(null);
+    onAgency();
+    const url = new URL(window.location.href);
+    clearEmbeddedParams(url);
+    url.searchParams.set("view", "access");
+    url.searchParams.delete("work");
+    url.searchParams.delete("offering");
+    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
   function openStart() {
     setStartOpen(true);
     setSection("home");
     setProductId(null);
+    setOfferingId(null);
     setQuery("");
     setHelpRequest(undefined);
     setWebsiteHandoff(null);
@@ -159,6 +232,24 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     clearEmbeddedParams(url);
     url.searchParams.set("view", "start");
     url.searchParams.delete("work");
+    url.searchParams.delete("offering");
+    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
+  function openOffering(id?: string | null) {
+    setStartOpen(false);
+    setSection("products");
+    setProductId(null);
+    setOfferingId(id ?? null);
+    setQuery("");
+    setHelpRequest(undefined);
+    setWebsiteHandoff(null);
+    onHome();
+    const url = new URL(window.location.href);
+    clearEmbeddedParams(url);
+    url.searchParams.set("view", "products");
+    url.searchParams.delete("work");
+    if (id) url.searchParams.set("offering", id); else url.searchParams.delete("offering");
     window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   }
 
@@ -186,12 +277,14 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
       openInquiry(business.id, continuation);
       return;
     }
+    if (continuation.route === "applications" || continuation.route === "scheduling" || continuation.route === "investigations" || continuation.route === "operations") {
+      if (!onHorizontal) return; setStartOpen(false); onHorizontal(continuation.route, continuation); return;
+    }
     if (continuation.route === "website") {
       const site = sites.find((item) => item.id === continuation.siteId);
       if (!site) return;
       if (onWebsite) {
-        setStartOpen(false);
-        onWebsite(site, continuation);
+        if (onWebsite(site, continuation) !== false) setStartOpen(false);
       } else setWebsiteHandoff({ site, request: continuation.request });
       return;
     }
@@ -210,25 +303,25 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
       inquiries: Boolean(onInquiry),
       website: Boolean(onWebsite || sites.length),
       document: Boolean(onDocument),
+      applications: Boolean(onHorizontal), scheduling: Boolean(onHorizontal), investigations: Boolean(onHorizontal), operations: Boolean(onHorizontal),
       help: true,
     },
   };
 
-  const recent = <>
-    {(inquiryBusinesses.length > 0 || sites.length > 0) && <section aria-label={businessHeading}><h2>{businessHeading}</h2>{inquiryBusinesses.slice(0, 8).map((business) => <button key={`inquiry-${business.id}`} type="button" onClick={() => openInquiry(business.id)}><MessageSquareText size={16} aria-hidden="true" /><span>{business.title}</span></button>)}{sites.filter((site) => !inquiryBusinesses.some((business) => business.id === site.id)).slice(0, 8).map(site => <Link key={`site-${site.id}`} href={site.href} prefetch={false}><Globe2 size={16} aria-hidden="true" /><span>{site.title}</span></Link>)}</section>}
-    {snapshot.work.length > 0 && <section aria-label="Recent work"><h2>Recent work</h2>{snapshot.work.slice(0, 8).map(work => <button key={work.id} type="button" onClick={() => openWork(work.id)} aria-current={!home && selectedWork?.id === work.id && !agency ? "page" : undefined}><FileSearch size={15} aria-hidden="true" /><span>{work.title}</span></button>)}</section>}
-  </>;
-
-  function workList(limit?: number) {
-    const items = limit === undefined ? visibleWork : visibleWork.slice(0, limit);
+  function workList(limit?: number, source = visibleWork) {
+    const items = limit === undefined ? source : source.slice(0, limit);
     return <div className={styles.workList}>
-      {visibleSites.map(site => <Link key={site.id} href={site.href} className={styles.workRow} prefetch={false}><Globe2 size={20} strokeWidth={1.5} /><span><strong>{site.title}</strong><small>Website · {site.relationship === "enterprise" ? "Enterprise service" : "Managed by Strelva"}</small></span><ArrowUpRight size={17} aria-hidden="true" /></Link>)}
+      {visibleSites.map(site => <Link key={site.id} href={site.href} className={styles.workRow} prefetch={false}><Globe2 size={20} strokeWidth={1.5} /><span><strong>{site.title}</strong><small>Website installation · {site.relationship === "enterprise" ? "Enterprise service" : "Managed by Strelva"}</small></span><ArrowUpRight size={17} aria-hidden="true" /></Link>)}
       {items.map(work => <button key={work.id} type="button" className={styles.workRow} onClick={() => openWork(work.id)} aria-label={`Open ${work.title}`}><FileSearch size={20} strokeWidth={1.5} /><span><strong>{work.title}</strong><small>{workMethod(work)} · {new Date(work.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</small></span><ArrowUpRight size={17} aria-hidden="true" /></button>)}
     </div>;
   }
 
   function renderProductBody() {
     if (!product) return null;
+    if (product.id === "applications" || product.id === "scheduling" || product.id === "investigations" || product.id === "operations") {
+      const id = product.id;
+      return <><h2>{product.name}</h2><p>{product.description}</p><button className={styles.primaryAction} type="button" disabled={readOnly || !onHorizontal} onClick={() => onHorizontal?.(id)}>Get started<ArrowRight size={17} /></button></>;
+    }
     if (product.id === "ai_visibility") {
       return <><h2>Understand what AI can find.</h2><p>Check a business, inspect the evidence, and keep the assessment in your work. Share a copy when you want someone else to use it.</p><p>This is an assessment at a point in time. It does not activate monitoring or change your website.</p><button className={styles.primaryAction} type="button" disabled={readOnly || product.availability !== "available"} onClick={() => onNew()}>Check a business<ArrowRight size={17} /></button>{readOnly && <p>Switch to a workspace you own to create an assessment.</p>}</>;
     }
@@ -247,46 +340,46 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     return <><h2>Try the search before you connect it.</h2><p>Home Finder is a brokerage-branded home search. This preview uses synthetic listings and never sends or stores buyer inquiries.</p>{product.previewHref ? <a className={styles.primaryAction} href={product.previewHref} target="_blank" rel="noreferrer">Try Home Finder<ArrowRight size={17} /></a> : <p>Its synthetic preview is not available from this environment yet.</p>}<p>A live installation needs brokerage approval, permitted listing data, and verified inquiry delivery.</p><button type="button" className={styles.secondaryAction} onClick={() => navigate("help", "I’d like early access to Home Finder. Please tell me what enabling a live brokerage installation would require.")}>Ask about early access<ArrowRight size={17} /></button></>;
   }
 
+  if (home && !startOpen && section === "home" && current?.kind !== "agency") return <BusinessHome
+    snapshot={snapshot} sites={assignedSites} unassignedSites={unassignedSites} siteAssignmentsKnown={siteAssignmentsKnown} offerings={offerings.state} busy={busy} notice={notice} managedWorkUnavailable={managedWorkUnavailable}
+    appBase={appBase} accountHref={`${appBase || ""}/workspace/account`} signOut={signOut}
+    onExplore={() => navigate("products")}
+    onOpen={openWork} onStart={openStart} onRequest={onPlan}
+    onWork={() => navigate("work")} onOngoing={() => navigate("ongoing")} onAccess={openAccess} onSettings={() => navigate("settings")} onHelp={() => navigate("help")} onOfferings={openOffering}
+    onWebsiteCommand={offerings.websiteCommand} onRetryWebsiteAssignments={offerings.reload}
+  />;
+
   return <StrelvaShell appBase={appBase} signOut={signOut}
-    active={home ? startOpen ? undefined : section : "work"}
-    title={!home ? inquiry ? "Inquiry work" : tracker !== undefined ? "Tracker" : plan !== undefined ? "Work plan" : document !== undefined ? "Document" : agency ? "People & access" : selectedWork ? "Your work" : "New assessment" : startOpen ? "New" : section === "home" ? "Strelva" : section === "products" ? "Explore" : section === "help" ? "Help & service" : "My work"}
+    active={agency ? "access" : home ? startOpen ? undefined : section : workingSection}
+    title={!home ? inquiry ? "Inquiry work" : tracker !== undefined ? "Tracker" : plan !== undefined ? "Work plan" : document !== undefined ? "Document" : agency ? "People & access" : workingTitle || (selectedWork ? "Your work" : "New assessment") : startOpen ? "New" : section === "home" ? "Strelva" : section === "products" ? "Explore offerings" : section === "settings" ? "Settings" : section === "ongoing" ? "Ongoing" : section === "help" ? "Help" : "Work"}
     accountName={person} accountDetail={snapshot.actor.email}
-    onNavigate={navigate} onStart={openStart} navigation={recent}
-    context={<label><span className="sr-only">Current workspace</span><select value={snapshot.workspaceId} disabled={busy} onChange={event => { setStartOpen(false); setSection("home"); setProductId(null); setQuery(""); onWorkspace(event.target.value); }}>{snapshot.workspaces.map(item => <option key={item.id} value={item.id}>{item.name}{item.access === "delegated_read" ? " · Read-only" : ""}</option>)}</select></label>}
+    onNavigate={navigate} onAccess={openAccess} onSearch={openSearch} onStart={openStart} navigation={undefined}
+    context={<label><span className="sr-only">Current workspace</span><select value={snapshot.workspaceId} disabled={busy} onChange={event => { setStartOpen(false); setSection("home"); setProductId(null); setOfferingId(null); setQuery(""); onWorkspace(event.target.value); }}>{snapshot.workspaces.map(item => <option key={item.id} value={item.id}>{item.name}{item.access === "delegated_read" ? " · Read-only" : ""}</option>)}</select></label>}
     actions={!home ? inquiry ? <button type="button" onClick={() => navigate("work")}>My work</button> : tracker !== undefined || plan !== undefined || document !== undefined ? selectedWork ? <button type="button" onClick={onAgency}>Sharing & access</button> : <button type="button" onClick={() => navigate("work")}>My work</button> : <button type="button" onClick={agency ? () => navigate("home") : onAgency}>{agency ? "Back to home" : "Sharing & access"}</button> : undefined}
     notice={notice} contentId="workspace-main"
   >
     <div ref={scrollRef} className={styles.scroll} aria-busy={busy || undefined}>
-      {!home ? <div className={styles.detail}><button type="button" className={styles.back} onClick={() => navigate("work")}><ArrowLeft size={16} />Back to my work</button>{sourcePlanHref ? <Link className={styles.textAction} href={sourcePlanHref}><FileSearch size={15} aria-hidden="true" />View plan and creation receipt<ArrowRight size={15} aria-hidden="true" /></Link> : null}{inquiry ? <InquiryServerWorkspaceExperience tenantId={inquiry.tenantId} adapter={inquiry.adapter} initialSnapshot={inquiry.initialSnapshot} initialView={inquiry.initialView} initialRequestId={inquiry.initialRequestId} initialInquiryId={inquiry.initialInquiryId} initialRequestText={inquiry.initialRequestText} basePath="/workspace" routePrefix="inquiry" /> : tracker !== undefined ? tracker : plan !== undefined ? plan : document !== undefined ? document : children}</div> : startOpen ? <WorkspaceStart context={startContext} websiteHandoff={websiteHandoff} onWebsiteHandoffBack={() => setWebsiteHandoff(null)} onContinue={continueStart} onHelp={(request) => navigate("help", request)} onPlan={onPlan} /> : section === "help" ? <WorkspaceHelp key={helpRequest} workspaceName={current?.name} hasManagedService={sites.length > 0} onAgency={onAgency} initialRequest={helpRequest} /> : section === "products" ? <div className={styles.page}>
-        {product ? <>
+      {!home ? <div className={styles.detail}><button type="button" className={styles.back} onClick={() => navigate(workingSection)}><ArrowLeft size={16} />Back to {workingSection === "ongoing" ? "ongoing" : "work"}</button>{sourcePlanHref ? <Link className={styles.textAction} href={sourcePlanHref}><FileSearch size={15} aria-hidden="true" />View plan and creation receipt<ArrowRight size={15} aria-hidden="true" /></Link> : null}{inquiry ? <InquiryServerWorkspaceExperience tenantId={inquiry.tenantId} adapter={inquiry.adapter} initialSnapshot={inquiry.initialSnapshot} initialView={inquiry.initialView} initialRequestId={inquiry.initialRequestId} initialInquiryId={inquiry.initialInquiryId} initialRequestText={inquiry.initialRequestText} basePath="/workspace" routePrefix="inquiry" /> : tracker !== undefined ? tracker : plan !== undefined ? plan : document !== undefined ? document : children}</div> : startOpen ? <WorkspaceStart context={startContext} websiteHandoff={websiteHandoff} onWebsiteHandoffBack={() => setWebsiteHandoff(null)} onContinue={continueStart} onHelp={(request) => navigate("help", request)} onPlan={onPlan} /> : section === "home" && current?.kind === "agency" ? <AgencyHome snapshot={snapshot} busy={busy} onWorkspace={onWorkspace} onOpenWork={openWork} onOpenClientWork={onOpenClientWork} onStart={openStart} /> : section === "settings" ? <WorkspaceBusinessSettings workspace={current} sites={assignedSites} unassignedSites={unassignedSites} offerings={offerings.state} onWebsiteCommand={offerings.websiteCommand} onRetryWebsiteAssignments={offerings.reload} siteAssignmentState={siteAssignmentState} managedWorkUnavailable={managedWorkUnavailable} accountHref={`${appBase || ""}/workspace/account`} /> : section === "help" ? <WorkspaceHelp key={helpRequest} workspaceName={current?.name} hasManagedService={assignedSites.length > 0} onAgency={onAgency} initialRequest={helpRequest} /> : section === "products" ? <div className={styles.page}>
+        {offeringId ? <WorkspaceOfferingDirectory state={offerings.state} businessName={current?.name || "This business"} work={snapshot.work} managedSites={sites} selectedId={offeringId} onSelect={openOffering} onRetry={offerings.reload} onCommand={offerings.command} onWebsiteCommand={offerings.websiteCommand} /> : product ? <>
           <button type="button" className={styles.back} onClick={() => setProductId(null)}><ArrowLeft size={16} />All products</button>
           <header className={styles.pageHeader}><p className={styles.eyebrow}>{product.id === "homefinder" ? "Preview · early access" : product.availability === "available" ? "Available to use" : product.availability === "managed" ? "Managed service" : "Not available yet"}</p><h1 ref={productHeadingRef} tabIndex={-1}>{product.name}</h1><p>{product.description}</p></header>
           <div className={styles.productBody}>
             {renderProductBody()}
           </div>
         </> : <>
-          <header className={styles.pageHeader}><p className={styles.eyebrow}>Strelva products</p><h1>More you can do.</h1><p>Start with something useful. Add to the business you already have.</p></header>
-          <div className={styles.productList}>{products.map(item => <button type="button" key={item.id} className={styles.productRow} onClick={() => setProductId(item.id)}><span className={styles.productSymbol}>{item.id === "ai_visibility" ? <FileSearch size={26} strokeWidth={1.3} /> : item.id === "documents" ? <FileText size={26} strokeWidth={1.3} /> : <Globe2 size={26} strokeWidth={1.3} />}</span><span><strong>{item.name}</strong><p>{item.description}</p><small>{item.id === "homefinder" ? "Preview · early access" : item.id === "tracker" || item.id === "documents" ? "Available to use" : item.availability === "available" ? "Available · Free assessment" : item.availability === "managed" ? "For connected clients" : "Not available yet"}</small></span><ArrowRight size={18} aria-hidden="true" /></button>)}</div>
+          <WorkspaceOfferingDirectory state={offerings.state} businessName={current?.name || "This business"} work={snapshot.work} managedSites={sites} selectedId={null} onSelect={openOffering} onRetry={offerings.reload} onCommand={offerings.command} onWebsiteCommand={offerings.websiteCommand} />
+          <header className={styles.pageHeader}><p className={styles.eyebrow}>Strelva products</p><h1>More you can do.</h1><p>Start useful work without turning it into a business installation.</p></header>
+          <div className={styles.productList}>{products.map(item => <button type="button" key={item.id} className={styles.productRow} onClick={() => setProductId(item.id)}><span className={styles.productSymbol}>{item.id === "ai_visibility" ? <FileSearch size={26} strokeWidth={1.3} /> : item.id === "documents" ? <FileText size={26} strokeWidth={1.3} /> : <Globe2 size={26} strokeWidth={1.3} />}</span><span><strong>{item.name}</strong><p>{item.description}</p><small>{item.id === "homefinder" ? "Preview · early access" : item.id === "ai_visibility" && item.availability === "available" ? "Available · Free assessment" : item.availability === "available" ? "Available to use" : item.availability === "managed" ? "For connected clients" : "Not available yet"}</small></span><ArrowRight size={18} aria-hidden="true" /></button>)}</div>
           <div className={styles.invitation}><h2>Website health</h2><p>Check SEO, speed, security, and accessibility, then export the report.</p><Link className={styles.textAction} href="/audit">Open website audit<ArrowRight size={16} /></Link></div>
           <div className={styles.invitation}><h2>Something missing?</h2><p>Tell us what you want to do, what you use today, and where it falls short.</p><button type="button" className={styles.textAction} onClick={() => navigate("help")}>Tell us what you need<ArrowRight size={16} /></button></div>
         </>}
       </div> : section === "work" ? <div className={styles.page}>
         <header className={styles.pageHeader}><p className={styles.eyebrow}>{readOnly ? "Shared with you" : current?.name}</p><h1>My work</h1><p>Your websites and saved work, ready to return to.</p></header>
-        <label className={styles.search}><Search size={18} aria-hidden="true" /><span className="sr-only">Search saved work</span><input type="search" placeholder="Find a website or saved work…" value={query} onChange={event => setQuery(event.target.value)} /></label>
+        <label className={styles.search}><Search size={18} aria-hidden="true" /><span className="sr-only">Search saved work</span><input ref={searchInputRef} id="workspace-search" type="search" placeholder="Find a website or saved work…" value={query} onChange={event => setQuery(event.target.value)} /></label>
         {busy ? <p role="status">Loading your work…</p> : workList()}
-        {!busy && !visibleWork.length && !visibleSites.length && <div className={styles.empty}><h2>{query ? "No matching work" : "Your work will be here."}</h2><p>{query ? "Try a different name." : "Start with a business assessment, or open a website connected to your account."}</p><button className={styles.textAction} onClick={() => query ? setQuery("") : navigate("products")}>{query ? "Clear search" : "Explore what’s available"}<ArrowRight size={16} /></button></div>}
-      </div> : <div className={styles.home}>
-        <header className={styles.welcome}><p className={styles.eyebrow}>{readOnly ? "Shared with you" : "Your Strelva"}</p><h1>{readOnly ? "Take a closer look." : "What would you like to work on?"}</h1><p>{readOnly ? "Review the work shared with you. Its owner controls access." : "Something new, or something you’re ready to improve."}</p></header>
-        <div className={styles.starts}>
-          <button type="button" onClick={() => { setProductId("ai_visibility"); setSection("products"); }}><FileSearch size={21} strokeWidth={1.5} /><span><strong>Check a business</strong><small>See what AI can understand</small></span><ArrowRight size={16} /></button>
-          {inquiryBusinesses.length > 0 && onInquiry ? <button type="button" onClick={() => inquiryBusinesses.length === 1 ? openInquiry(inquiryBusinesses[0]!.id) : openStart()}><MessageSquareText size={21} strokeWidth={1.5} /><span><strong>Handle customer inquiries</strong><small>{inquiryBusinesses.length === 1 ? "Move one request forward" : "Choose a business first"}</small></span><ArrowRight size={16} /></button> : null}
-          {onTracker && products.some((item) => item.id === "tracker" && item.availability === "available") ? <button type="button" onClick={() => onTracker()}><Table2 size={21} strokeWidth={1.5} /><span><strong>Build a tracker</strong><small>Turn a CSV into working data</small></span><ArrowRight size={16} /></button> : null}
-          <button type="button" onClick={() => navigate(sites.length ? "work" : "products")}><Globe2 size={21} strokeWidth={1.5} /><span><strong>{sites.length ? "Update your website" : "Explore Strelva"}</strong><small>{sites.length ? "Open your connected sites" : "Find a useful product"}</small></span><ArrowRight size={16} /></button>
-        </div>
-        <section className={styles.recent} aria-labelledby="recent-title"><div className={styles.sectionHeading}><h2 id="recent-title">{readOnly ? "Shared work" : "Pick up where you left off"}</h2>{(snapshot.work.length > 0 || sites.length > 0) && <button type="button" onClick={() => navigate("work")}>View all<ArrowRight size={14} /></button>}</div>{busy ? <p role="status">Loading your work…</p> : workList(4)}{!busy && !snapshot.work.length && !sites.length && <p className={styles.emptyNote}>Your saved work will appear here. You don’t need a managed service to begin.</p>}</section>
-        {managedWorkUnavailable && <p role="status" className={styles.emptyNote}>Some websites could not be loaded. Your saved assessments remain available. <Link href="/account?managed=1">Check website access</Link></p>}
-        <div className={styles.homeFoot}><span>Built in Buffalo. Open to what comes next.</span><button type="button" onClick={() => navigate("help")}>What would make this more useful?<ArrowRight size={14} /></button></div>
-      </div>}
+        {!busy && visibleUnassignedSites.length > 0 ? <section className={styles.unassignedSites} aria-labelledby="unassigned-sites-title"><h2 id="unassigned-sites-title">{siteAssignmentsKnown ? "Authorized sites, not assigned to this business" : "Authorized sites, business assignment unavailable"}</h2><p>{siteAssignmentsKnown ? "These sites are available to your account. Assign one to this business before using its website controls here." : "These sites are available to your account, but this view cannot read the business offering that would establish an installation."}</p><WebsiteAssignmentHandoff businessName={current?.name || "this business"} state={managedWorkUnavailable ? { status: "unavailable", reason: "Linked website access is unavailable right now." } : offerings.state} sites={visibleUnassignedSites} onRetry={offerings.reload} onCommand={offerings.websiteCommand} /></section> : null}
+        {!busy && !visibleWork.length && !visibleSites.length && !visibleUnassignedSites.length && <div className={styles.empty}><h2>{query ? "No matching work" : "Your work will be here."}</h2><p>{query ? "Try a different name." : "Start a document, tracker, or assessment. Business installations appear here only after they are explicitly linked."}</p><button className={styles.textAction} onClick={() => query ? setQuery("") : navigate("products")}>{query ? "Clear search" : "Explore what’s available"}<ArrowRight size={16} /></button></div>}
+      </div> : null}
     </div>
   </StrelvaShell>;
 }

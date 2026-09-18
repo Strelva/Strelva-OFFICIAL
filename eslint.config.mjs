@@ -26,6 +26,11 @@ const eslintConfig = [
   ...nextCoreWebVitals,
   ...nextTypescript,
   {
+    // Node's explicitly CommonJS study/build tools use require by design.
+    files: ["docs/prototypes/**/*.cjs", "scripts/**/*.cjs"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
+  },
+  {
     rules: {
       "@typescript-eslint/no-unused-vars": [
         "warn",

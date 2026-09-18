@@ -11,7 +11,6 @@ vi.mock("@/platform/workspaces", () => ({
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import {
   prepareWorkPlanContext,
-  WorkPlanContextSourceError,
 } from "@/products/work-plans/context";
 
 const actor = {
@@ -146,13 +145,17 @@ describe("prepareWorkPlanContext", () => {
   });
 
   it("does not silently skip a source from another workspace", async () => {
-    mocks.getWork.mockResolvedValue({ ...documentWork, workspaceId: "55555555-5555-4555-8555-555555555555" });
+    mocks.getWork.mockResolvedValue({
+      ...documentWork,
+      workspaceId: "55555555-5555-4555-8555-555555555555",
+      payload: { malformed: "must not be inspected first" },
+    });
 
     await expect(prepareWorkPlanContext({
       actor,
       workspaceId,
       sourceWorkIds: [documentId],
-    })).rejects.toBeInstanceOf(WorkPlanContextSourceError);
+    })).rejects.toMatchObject({ code: "wrong_workspace", sourceWorkId: documentId });
   });
 
   it("caps document plaintext at the planner evidence limit", async () => {
@@ -168,5 +171,26 @@ describe("prepareWorkPlanContext", () => {
     });
 
     expect(context.evidence[0]?.value.length).toBeLessThanOrEqual(2_000);
+  });
+
+  it("scrubs likely secrets from document evidence without dropping useful context", async () => {
+    mocks.getWork.mockResolvedValue({
+      ...documentWork,
+      payload: {
+        ...documentWork.payload,
+        text: "Escalate failed requests to the owner. Password: river-stone-42. Authorization: Bearer abcdefghijklmnop.",
+      },
+    });
+
+    const context = await prepareWorkPlanContext({
+      actor,
+      workspaceId,
+      sourceWorkIds: [documentId],
+    });
+
+    expect(context.evidence[0]?.value).toContain("Escalate failed requests to the owner.");
+    expect(context.evidence[0]?.value).toContain("[redacted]");
+    expect(context.evidence[0]?.value).not.toContain("river-stone-42");
+    expect(context.evidence[0]?.value).not.toContain("abcdefghijklmnop");
   });
 });

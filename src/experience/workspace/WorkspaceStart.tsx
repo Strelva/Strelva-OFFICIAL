@@ -6,6 +6,7 @@ import styles from "./workspace-surface.module.css";
 import {
   createWorkspaceStartContinuation,
   planWorkspaceStart,
+  workspaceStartContinueLabel,
   type WorkspaceStartContext,
   type WorkspaceStartContinuation,
   type WorkspaceStartPart,
@@ -37,14 +38,6 @@ function renderPlanIcon(route: WorkspaceStartPlan["route"]): ReactNode {
   if (route === "website") return <Globe2 size={19} aria-hidden="true" />;
   if (route === "document") return <FileText size={19} aria-hidden="true" />;
   return <FileSearch size={19} aria-hidden="true" />;
-}
-
-function continueLabel(plan: WorkspaceStartPlan): string {
-  if (plan.route === "inquiries") return plan.needsSelection === "business" ? "Choose a business" : "Open inquiry work";
-  if (plan.route === "tracker") return "Open your tracker";
-  if (plan.route === "website") return plan.needsSelection === "site" ? "Choose a website" : "Open your website";
-  if (plan.route === "document") return "Open your document";
-  return "Continue to business assessment";
 }
 
 function selectionLabel(plan: WorkspaceStartPlan): string | null {
@@ -187,14 +180,14 @@ export function WorkspaceStart({ context, initialRequest = "", websiteHandoff = 
     {websiteHandoff ? <WebsiteRequestHandoff handoff={websiteHandoff} onBack={onWebsiteHandoffBack} /> : plan ? <section className={styles.startProposal} aria-labelledby={`${formId}-proposal`} aria-live="polite">
       <div className={styles.startProposalHeader}><div className={styles.startProposalIcon}>{renderPlanIcon(plan.route)}</div><div><p className={styles.eyebrow}>{plan.kind === "help" ? "A narrower path" : plan.outcome || "Proposed shape"}</p><h2 id={`${formId}-proposal`}>{plan.title}</h2></div></div>
       <p className={styles.startProposalSummary}>{plan.summary}</p>
-        {plan.kind === "help" ? <><div className={styles.startHelp}><CircleHelp size={17} aria-hidden="true" /><p><strong>Here are the paths available today.</strong> Strelva can assess a business, turn a CSV into a tracker, handle inquiries for an authorized business, open work on a connected managed website, or start a private document. No work has started from this request. {context.readOnly ? "Switch to a workspace you own before preparing a plan." : "You can plan this with Strelva when one of these paths does not fit."}</p></div>{plan.reason ? <div className={styles.startBlocked} role="status"><CircleHelp size={17} aria-hidden="true" /><p>{plan.reason}</p></div> : null}</> : <>
+        {plan.kind === "help" ? <><div className={styles.startHelp}><CircleHelp size={17} aria-hidden="true" /><p><strong>Here are the workspace paths to consider.</strong> Strelva can assess a business, turn a CSV into a tracker, handle inquiries for an authorized business, open work on a connected managed website, start a private document, build an application, set up scheduling, compare saved sources, or carry a bounded responsibility. No work has started from this request. {context.readOnly ? "Switch to a workspace you own before preparing a plan." : "You can ask about the closest path when none of these fits."}</p></div>{plan.reason ? <div className={styles.startBlocked} role="status"><CircleHelp size={17} aria-hidden="true" /><p>{plan.reason}</p></div> : null}</> : <>
         <div className={styles.startParts} aria-label="Proposed shape">{plan.parts.map((part) => renderPart(part, selectedPartIds.includes(part.id), () => togglePart(part.id), `${formId}-${part.id}`))}</div>
         {selection ? <label className={styles.startSelect} htmlFor={`${formId}-selection`}><span>{selection}</span><select id={`${formId}-selection`} value={plan.needsSelection === "business" ? businessId : siteId} onChange={(event) => plan.needsSelection === "business" ? setBusinessId(event.target.value) : setSiteId(event.target.value)} required><option value="">Choose one</option>{(plan.needsSelection === "business" ? selectedBusiness : selectedSites).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label> : null}
         {templates.length ? <label className={styles.startSelect} htmlFor={`${formId}-template`}><span>Starting shape <small>Optional</small></span><select id={`${formId}-template`} value={trackerTemplateId} onChange={(event) => setTrackerTemplateId(event.target.value)}><option value="">Start from a blank tracker</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.label}</option>)}</select></label> : null}
         {plan.status === "blocked" ? <div className={styles.startBlocked} role="status"><CircleHelp size={17} aria-hidden="true" /><p>{plan.reason}</p></div> : null}
       </>}
       {error ? <p className={styles.startError} role="alert">{error}</p> : null}
-      <div className={styles.startProposalActions}>{plan.kind === "help" ? <><button type="button" className={styles.primaryAction} disabled={!canContinue} onClick={continueToSupportedFlow}>Prepare a plan<ArrowRight size={16} /></button><button type="button" className={styles.secondaryAction} onClick={() => onHelp(plan.helpRequest || plan.request)}>Ask about available paths<ArrowRight size={16} /></button></> : plan.status === "blocked" ? <>{canPreparePlan ? <button type="button" className={styles.primaryAction} onClick={preparePlan}>Prepare a plan<ArrowRight size={16} /></button> : null}<button type="button" className={styles.secondaryAction} onClick={continueToSupportedFlow}>Ask about this path<ArrowRight size={16} /></button></> : <><button type="button" className={styles.primaryAction} disabled={!canContinue} onClick={continueToSupportedFlow}>{continueLabel(plan)}<ArrowRight size={16} /></button>{canPreparePlan ? <button type="button" className={styles.secondaryAction} onClick={preparePlan}>Prepare a plan<ArrowRight size={16} /></button> : null}</>}</div>
+      <div className={styles.startProposalActions}>{plan.kind === "help" ? <><button type="button" className={styles.primaryAction} disabled={!canContinue} onClick={continueToSupportedFlow}>Prepare a plan<ArrowRight size={16} /></button><button type="button" className={styles.secondaryAction} onClick={() => onHelp(plan.helpRequest || plan.request)}>Ask about available paths<ArrowRight size={16} /></button></> : plan.status === "blocked" ? <>{canPreparePlan ? <button type="button" className={styles.primaryAction} onClick={preparePlan}>Prepare a plan<ArrowRight size={16} /></button> : null}<button type="button" className={styles.secondaryAction} onClick={continueToSupportedFlow}>Ask about this path<ArrowRight size={16} /></button></> : <><button type="button" className={styles.primaryAction} disabled={!canContinue} onClick={continueToSupportedFlow}>{workspaceStartContinueLabel(plan)}<ArrowRight size={16} /></button>{canPreparePlan ? <button type="button" className={styles.secondaryAction} onClick={preparePlan}>Prepare a plan<ArrowRight size={16} /></button> : null}</>}</div>
       {plan.status === "blocked" && context.readOnly ? <p className={styles.startFootnote}>Use the workspace selector above to switch to a workspace you own. No work has been created.</p> : null}
     </section> : null}
   </div>;

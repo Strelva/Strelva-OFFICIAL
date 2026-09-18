@@ -145,10 +145,19 @@ export function bulkUpdateInquiries(host: InquiryEngineHost, input: BulkInquiryU
   for (const record of records) {
     const before = json(record.status, "record status");
     const after = json(input.status, "record status");
-    if (!equal(before, after)) items.push({ id: host._id("change_item"), kind: "record", path: `inquiries.${record.id}.status`, before, after, sources: ["manual"], editIds: [] });
-    if (before !== after) {
+    const statusChanged = !equal(before, after);
+    if (statusChanged) items.push({ id: host._id("change_item"), kind: "record", path: `inquiries.${record.id}.status`, before, after, sources: ["manual"], editIds: [] });
+    const nextAssignee = input.status === "assigned" ? input.assigneeId ?? actorId : record.assigneeId ?? null;
+    const assigneeChanged = input.status === "assigned" && (record.assigneeId ?? null) !== nextAssignee;
+    if (assigneeChanged) {
+      items.push({ id: host._id("change_item"), kind: "record", path: `inquiries.${record.id}.assigneeId`, before: record.assigneeId ?? null, after: nextAssignee, sources: ["manual"], editIds: [] });
+      record.assigneeId = nextAssignee;
+    }
+    if (statusChanged) {
       record.status = input.status;
       appendTimeline(host, record, { type: "status_changed", actor: { kind: "person", id: actorId }, summary: `Changed this inquiry to ${input.status}.`, at: now, outcome: "recorded", evidence: [reason] }, now);
+    } else if (assigneeChanged) {
+      appendTimeline(host, record, { type: "status_changed", actor: { kind: "person", id: actorId }, summary: `Assigned this inquiry to ${nextAssignee}.`, at: now, outcome: "recorded", evidence: [reason] }, now);
     }
   }
   if (items.length === 0) throw new Error("The selected inquiries already have that status.");
@@ -160,7 +169,7 @@ export function bulkUpdateInquiries(host: InquiryEngineHost, input: BulkInquiryU
     baseVersion: capability.live?.version ?? null,
     targetVersion: capability.live?.version ?? 1,
     status: "published",
-    summary: `${items.length} inquiry record${items.length === 1 ? "" : "s"}`,
+    summary: `${records.length} inquiry record${records.length === 1 ? "" : "s"}`,
     items,
     preservedInquiryIds: allInquiryIds(host._state(), capabilityId),
     undoOfChangeId: null,
@@ -202,12 +211,27 @@ export function undoBulkChange(host: InquiryEngineHost, changeId: string, input:
     const inquiryId = item.path.split(".")[1];
     if (!inquiryId) return null;
     const record = host._inquiry(inquiryId);
-    if (item.before === null || typeof item.before !== "string") throw new Error("The inquiry status history is invalid.");
-    return { item, record, before: item.before as InquiryRecordStatus };
-  }).filter((value): value is { item: ChangeItem; record: import("./contracts").InquiryRecord; before: InquiryRecordStatus } => Boolean(value));
-  for (const { record, before } of changes) {
-    record.status = before;
-    appendTimeline(host, record, { type: "status_changed", actor: { kind: "person", id: actorId }, summary: "Undid the grouped inquiry status change.", at: now, outcome: "recorded", evidence: [source.id] }, now);
+    const field = item.path.split(".")[2];
+    if (field === "status") {
+      if (item.before === null || typeof item.before !== "string" || typeof item.after !== "string") throw new Error("The inquiry status history is invalid.");
+      return { item, record, field, before: item.before as InquiryRecordStatus, current: record.status };
+    }
+    if (field === "assigneeId" && (item.before === null || typeof item.before === "string") && (item.after === null || typeof item.after === "string")) {
+      return { item, record, field, before: item.before, current: record.assigneeId ?? null };
+    }
+    throw new Error("The inquiry record history is invalid.");
+  }).filter((value): value is NonNullable<typeof value> => Boolean(value));
+  if (changes.some(({ item, current }) => !equal(item.after, current))) {
+    throw new Error("That inquiry changed after this receipt. Undo its current change first.");
+  }
+  const changedRecords = new Map<string, import("./contracts").InquiryRecord>();
+  for (const { record, field, before } of changes) {
+    if (field === "status") record.status = before as InquiryRecordStatus;
+    else record.assigneeId = before;
+    changedRecords.set(record.id, record);
+  }
+  for (const record of changedRecords.values()) {
+    appendTimeline(host, record, { type: "status_changed", actor: { kind: "person", id: actorId }, summary: "Undid the grouped inquiry assignment or status change.", at: now, outcome: "recorded", evidence: [source.id] }, now);
   }
   source.undoAvailable = false;
   const receipt: ChangeReceipt = {
@@ -223,7 +247,7 @@ export function undoBulkChange(host: InquiryEngineHost, changeId: string, input:
     undoAvailable: false,
     providerAcceptanceId: null,
     providerReceipt: null,
-    verification: { actorId, version: source.targetVersion, verified: true, checkedAt: now, evidence: ["record statuses restored", "inquiry records preserved"] },
+    verification: { actorId, version: source.targetVersion, verified: true, checkedAt: now, evidence: ["record assignments and statuses restored", "inquiry records preserved"] },
   };
   host._state().changes.unshift(receipt);
   host._emit();

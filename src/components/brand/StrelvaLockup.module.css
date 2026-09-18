@@ -1,0 +1,11 @@
+/* One entrance; no looping, text blur, or animated filters. */
+.lockup{display:block;width:100%;height:auto;overflow:visible;color:inherit;fill:currentColor}
+.lockup[data-animated=true] .stone{animation:stone-settle 360ms var(--motion-gooey,linear(0,.14 10%,.46 22%,.79 38%,.96 55%,1.035 72%,1.012 88%,1)) both;animation-delay:calc(var(--order)*60ms);transform-box:fill-box;transform-origin:center bottom}
+.lockup[data-animated=true] .letter{animation:letter-settle 360ms var(--motion-gooey,linear(0,.14 10%,.46 22%,.79 38%,.96 55%,1.035 72%,1.012 88%,1)) both;animation-delay:calc(180ms + var(--order)*35ms)}
+.lockup[data-paused=true] :is(.stone,.letter){animation-play-state:paused}
+@keyframes stone-settle{from{opacity:0;transform:translateY(-2px) scale(.94,1.06)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes letter-settle{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.lockup[data-animated=true] :is(.stone,.letter){animation:none;opacity:1;transform:none}}
+
+.switch{display:block;width:100%;min-height:44px;padding:0;border:0;border-radius:12px;background:transparent;color:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.switch:focus-visible{outline:2px solid currentColor;outline-offset:8px}

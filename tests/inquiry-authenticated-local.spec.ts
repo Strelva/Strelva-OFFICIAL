@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { Redis } from "@upstash/redis";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { localEnvironment, signedInContext } from "./support/local-auth";
+import { loadInquiryForm, submitInquiryForm } from "../custom-repo-starter/inquiry-client";
 
 test.skip(
   process.env.STRELVA_LOCAL_AUTH_PROOF !== "1" || process.env.STRELVA_LOCAL_PROVIDER_PROOF !== "1",
@@ -20,7 +21,7 @@ type SurfaceSnapshot = {
     changes: Array<{ requestId: string; status: string; undoAvailable: boolean }>;
     actionReceipts: Array<{ action: string; inquiryId: string | null }>;
     responsibilities: Array<{ id: string; capabilityId: string }>;
-    inquiries: Array<{ id: string; fields: Record<string, string>; capabilityVersion: number; status: string }>;
+    inquiries: Array<{ id: string; fields: Record<string, string>; capabilityVersion: number; status: string; assigneeId?: string | null }>;
     timeline: Array<{ inquiryId: string; type: string; summary: string }>;
   };
   capabilities: Array<{ id: string; status: string; live: { version: number } | null }>;
@@ -31,6 +32,7 @@ type SurfaceSnapshot = {
 type SurfaceBody = {
   snapshot: SurfaceSnapshot;
   work?: SurfaceSnapshot["state"]["requests"][number];
+  change?: { items: Array<{ path: string; after: unknown }> };
   rehearsal?: { passed: boolean; passedCount: number; totalCount: number };
   message?: string;
 };
@@ -110,7 +112,7 @@ async function cleanTenant(
     const indexed = await redis.zrange<string[]>(`leads:${tenantId}`, 0, -1);
     const ids = [...new Set([...(indexed || []), ...leadIds])];
     if (ids.length > 0) await redis.del(...ids.map((id) => `lead:${tenantId}:${id}`));
-    await redis.del(`leads:${tenantId}`);
+    await redis.del(`leads:${tenantId}`, "reb:tenants:all");
   } catch {
     // The tenant is unique to this isolated run. A Redis cleanup blip cannot
     // turn the proof into a false success or touch another tenant's keys.
@@ -140,6 +142,14 @@ test("real local Auth and Postgres preserve an inquiry through publish and undo"
     }).select("id, stable_id").single();
     expect(tenant.error).toBeNull();
     expect(tenant.data?.stable_id).toBeTruthy();
+
+    // The test inserts through the Postgres authority. Invalidate only this
+    // isolated Redis harness's tenant-list cache so the running app sees the
+    // new UUID tenant instead of a list cached by an earlier proof.
+    const redisUrl = process.env.UPSTASH_REDIS_REST_URL!;
+    expect(["localhost", "127.0.0.1"], "Redis must remain isolated to loopback.").toContain(new URL(redisUrl).hostname);
+    const redis = new Redis({ url: redisUrl, token: process.env.UPSTASH_REDIS_REST_TOKEN! });
+    await redis.del("reb:tenants:all");
 
     const membership = await admin.from("memberships").insert({ user_id: owner.userId, tenant_id: tenantId, role: "owner" });
     expect(membership.error).toBeNull();
@@ -214,30 +224,18 @@ test("real local Auth and Postgres preserve an inquiry through publish and undo"
     });
     current = published;
     const capability = published.snapshot.capabilities.find((item) => item.id === workAfterShape?.capabilityId);
-    expect(capability?.status).toMatch(/^live/);
+    expect(capability?.status, published.message).toMatch(/^live/);
     expect(capability?.live?.version).toBeGreaterThan(0);
     expect(published.snapshot.state.changes.some((change) => change.requestId === requestId && change.status.startsWith("published"))).toBe(true);
 
-    const formResponse = await owner.context.request.get(`/api/v1/inquiries/${tenantId}?capabilityId=${encodeURIComponent(capability!.id)}`);
-    expect(formResponse.status()).toBe(200);
-    const form = await json<PublishedInquiryForm>(formResponse);
+    // Exercise the same portable client used by a generated customer site.
+    const form = await loadInquiryForm(env.app, tenantId, capability!.id);
     expect(form.capabilityId).toBe(capability!.id);
     expect(form.version).toBe(capability!.live?.version);
 
     const providerBefore = providerLogCount();
     const fields = fieldsFor(form);
-    const intake = await owner.context.request.post(`/api/v1/leads/${tenantId}`, {
-      data: {
-        source: "inquiry-capability",
-        capabilityId: form.capabilityId,
-        capabilityVersion: form.version,
-        name: fields.name,
-        email: fields.email,
-        message: fields.message,
-        fields,
-      },
-    });
-    expect(intake.status()).toBe(200);
+    await submitInquiryForm(env.app, tenantId, form, fields);
     // Capability captures are supervised. They record the inquiry and leave
     // customer messaging to the governed delivery worker, so a capture must
     // not create an owner notification behind the review boundary.
@@ -250,6 +248,17 @@ test("real local Auth and Postgres preserve an inquiry through publish and undo"
     expect(afterIntake.snapshot.state.actionReceipts.some((receipt) => receipt.action === "record_inquiry" && receipt.inquiryId === record!.id)).toBe(true);
     expect(afterIntake.snapshot.state.timeline.some((event) => event.inquiryId === record!.id && event.type === "record_created")).toBe(true);
 
+    const assigned = await postSurface(owner.context.request, env.app, tenantId, afterIntake.snapshot.revision, {
+      kind: "bulk-record",
+      recordIds: [record!.id],
+      action: "assign",
+    });
+    const assignedRecord = assigned.snapshot.state.inquiries.find((item) => item.id === record!.id);
+    expect(assignedRecord).toMatchObject({ status: "assigned", assigneeId: owner.userId });
+    expect(assigned.change?.items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: `inquiries.${record!.id}.assigneeId`, after: owner.userId }),
+    ]));
+
     const recordPage = await owner.context.newPage();
     page = recordPage;
     await recordPage.setViewportSize({ width: 1280, height: 800 });
@@ -260,6 +269,7 @@ test("real local Auth and Postgres preserve an inquiry through publish and undo"
     await recordPage.goto(`/business/${tenantId}?view=record&inquiry=${encodeURIComponent(record!.id)}`, { waitUntil: "domcontentloaded" });
     await expect(recordPage.getByRole("heading", { name: "Avery Buyer", exact: true })).toBeVisible();
     await expect(recordPage.getByRole("heading", { name: "The submitted input", exact: true })).toBeVisible();
+    await expect(recordPage.getByText(`Assigned to ${owner.userId}`, { exact: true })).toBeVisible();
     await expect(recordPage.getByRole("region", { name: "Facts and outcomes" }).getByText("The customer submitted the inquiry form.", { exact: true })).toBeVisible();
     await expect(recordPage.getByRole("region", { name: "Messages for this inquiry" })).toBeVisible();
     await expect(recordPage.getByRole("button", { name: "Review current message", exact: true })).toBeVisible();
@@ -267,7 +277,6 @@ test("real local Auth and Postgres preserve an inquiry through publish and undo"
     await recordPage.getByRole("button", { name: "Review current message", exact: true }).click();
     const prepared = await preparedResponse;
     expect(prepared.status(), await prepared.text()).toBe(200);
-    const review = (await prepared.json()).review;
     await expect(recordPage.locator("[data-message-review]")).toContainText(fields.email!);
     expect(providerLogCount()).toBe(providerBefore);
     const approvedResponse = recordPage.waitForResponse((response) => response.url().endsWith("/api/inquiry-workspace/message-review") && response.request().postDataJSON().operation === "approve");
@@ -278,15 +287,46 @@ test("real local Auth and Postgres preserve an inquiry through publish and undo"
     await expect(recordPage.getByRole("button", { name: "Send this message", exact: true })).toHaveCount(0);
     expect(providerLogCount()).toBe(providerBefore + 1);
     await recordPage.screenshot({ path: "output/inquiry-approved-message-desktop.png", fullPage: true });
+
+    const readbackFailureFields = { ...fields, name: "Jordan Buyer", email: "readback-loss@example.test" };
+    await submitInquiryForm(env.app, tenantId, form, readbackFailureFields);
+    const afterReadbackIntake = await getSurface(owner.context.request, tenantId);
+    const readbackRecord = afterReadbackIntake.snapshot.state.inquiries.find((item) => item.fields.email === readbackFailureFields.email);
+    expect(readbackRecord).toBeTruthy();
+    leadIds.push(readbackRecord!.id);
+    const prepareFailure = await owner.context.request.post("/api/inquiry-workspace/message-review", {
+      data: { operation: "prepare", tenantId, inquiryId: readbackRecord!.id, action: "reply" },
+      headers: { origin: env.app },
+    });
+    expect(prepareFailure.status(), await prepareFailure.text()).toBe(200);
+    const failureReview = (await prepareFailure.json()).review;
+    const readbackFailurePath = process.env.STRELVA_LOCAL_PROVIDER_READBACK_FAILURE_FILE;
+    expect(readbackFailurePath, "The local proof must inject one provider read-back loss.").toBeTruthy();
+    writeFileSync(readbackFailurePath!, "fail the next provider read-back\n", { mode: 0o600 });
+    const acceptedUnverified = await owner.context.request.post("/api/inquiry-workspace/message-review", {
+      data: { operation: "approve", tenantId, inquiryId: readbackRecord!.id, action: "reply", reviewToken: failureReview.reviewToken, messageDigest: failureReview.messageDigest },
+      headers: { origin: env.app },
+    });
+    expect(acceptedUnverified.status(), await acceptedUnverified.text()).toBe(200);
+    expect((await acceptedUnverified.json()).outcome).toMatchObject({ status: "accepted_unverified", retryable: false });
+    expect(providerLogCount()).toBe(providerBefore + 2);
     const duplicate = await owner.context.request.post("/api/inquiry-workspace/message-review", {
-      data: { operation: "approve", tenantId, inquiryId: record!.id, action: "reply", reviewToken: review.reviewToken, messageDigest: review.messageDigest },
+      data: { operation: "approve", tenantId, inquiryId: readbackRecord!.id, action: "reply", reviewToken: failureReview.reviewToken, messageDigest: failureReview.messageDigest },
       headers: { origin: env.app },
     });
     expect(duplicate.status(), await duplicate.text()).toBe(200);
-    expect((await duplicate.json()).outcome.retryable).toBe(false);
-    expect(providerLogCount()).toBe(providerBefore + 1);
+    const recovered = (await duplicate.json()).outcome;
+    expect(recovered).toMatchObject({ status: "accepted_unverified", retryable: false });
+    expect(providerLogCount()).toBe(providerBefore + 2);
+
+    const afterMessages = await getSurface(owner.context.request, tenantId);
+    const handled = await postSurface(owner.context.request, env.app, tenantId, afterMessages.snapshot.revision, {
+      kind: "bulk-record", recordIds: [record!.id], action: "mark_handled",
+    });
+    expect(handled.snapshot.state.inquiries.find((item) => item.id === record!.id)?.status).toBe("handled");
     await recordPage.reload();
     await expect(recordPage.getByRole("heading", { name: "Avery Buyer", exact: true })).toBeVisible();
+    await expect(recordPage.getByLabel("The submitted input").getByText("handled", { exact: true })).toBeVisible();
     await recordPage.getByRole("button", { name: "Ask Why from recorded evidence", exact: true }).click();
     await expect(recordPage.getByRole("heading", { name: "Recorded steps", exact: true })).toBeVisible();
     await expect(recordPage.getByRole("region", { name: "Recorded steps" }).getByText("The customer submitted the inquiry form.", { exact: true })).toBeVisible();

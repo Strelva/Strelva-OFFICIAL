@@ -1,0 +1,11 @@
+import { beforeEach,describe,expect,it,vi } from "vitest";
+const mocks=vi.hoisted(()=>({actor:vi.fn(),export:vi.fn()}));
+vi.mock("@/platform/workspaces/http",async importOriginal=>({...await importOriginal<typeof import("@/platform/workspaces/http")>(),workspaceHttpActor:mocks.actor}));
+vi.mock("@/platform/workspace-exports/repository",()=>({exportWorkspace:mocks.export}));
+const actor={userId:"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",verifiedEmail:"owner@example.test"};
+const workspaceId="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+beforeEach(()=>{vi.resetAllMocks();vi.stubEnv("STRELVA_WORKSPACE_RELEASE","1");mocks.actor.mockResolvedValue(actor);mocks.export.mockResolvedValue({schemaVersion:1,exportId:"cccccccc-cccc-4ccc-8ccc-cccccccccccc",workspace:{id:workspaceId,name:"Harbor Workshop",kind:"customer"},manifest:{scope:"current_workspace_portability_snapshot"},savedResults:[],nativeApplications:{releases:[],records:[]},economics:{jobs:[],reservations:[],usageReceipts:[],executionOutcomes:[]}});});
+describe("workspace export route",()=>{
+  it("downloads versioned JSON through current owner authority",async()=>{const route=await import("@/app/api/workspace-export/route");const response=await route.POST(new Request("https://strelva.com/api/workspace-export",{method:"POST",headers:{origin:"https://strelva.com","content-type":"application/json"},body:JSON.stringify({workspaceId})}));expect(response.status).toBe(200);expect(response.headers.get("content-disposition")).toContain("harbor-workshop-export.json");expect(response.headers.get("referrer-policy")).toBe("no-referrer");expect(mocks.export).toHaveBeenCalledWith(actor,workspaceId);expect((await response.json()).schemaVersion).toBe(1);});
+  it("returns JSON denial before any export",async()=>{const route=await import("@/app/api/workspace-export/route");mocks.actor.mockResolvedValueOnce(null);const response=await route.POST(new Request("https://strelva.com/api/workspace-export",{method:"POST",headers:{origin:"https://strelva.com","content-type":"application/json"},body:JSON.stringify({workspaceId})}));expect(response.status).toBe(401);expect(mocks.export).not.toHaveBeenCalled();});
+});

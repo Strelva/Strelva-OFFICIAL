@@ -173,7 +173,12 @@ export interface TrackerCell {
   lineage: TrackerCellLineage | null;
 }
 
+export interface TrackerRecordLink { workId: string; rowId: string; linkedRevision: number }
+export interface TrackerRecordCoordination { assigneeId: string | null; links: TrackerRecordLink[] }
+export interface TrackerCoordinationChange { rowId: string; before: TrackerRecordCoordination; after: TrackerRecordCoordination }
+
 export interface TrackerRow {
+  coordination?: TrackerRecordCoordination;
   id: string;
   cells: Record<string, TrackerCell>;
   lineage: TrackerRowLineage | null;
@@ -227,7 +232,7 @@ export interface TrackerHandoffPreview {
   updatedAt: string;
 }
 
-export type TrackerCommandKind = "update_cell" | "add_row" | "delete_row" | "bulk_update" | "undo_change";
+export type TrackerCommandKind = "update_cell" | "add_row" | "delete_row" | "bulk_update" | "undo_change" | "coordinate_records";
 
 export interface TrackerCommandBase {
   commandId: string;
@@ -262,6 +267,14 @@ export interface TrackerBulkUpdateCommand extends TrackerCommandBase {
   value: string;
 }
 
+export interface TrackerCoordinateRecordsCommand extends TrackerCommandBase {
+  kind: "coordinate_records";
+  rowIds: string[];
+  assigneeId?: string | null;
+  link?: TrackerRecordLink;
+  unlink?: Pick<TrackerRecordLink, "workId" | "rowId">;
+}
+
 export interface TrackerUndoCommand extends TrackerCommandBase {
   kind: "undo_change";
   targetCommandId: string;
@@ -279,7 +292,8 @@ export type TrackerCommand =
   | TrackerAddRowCommand
   | TrackerDeleteRowCommand
   | TrackerBulkUpdateCommand
-  | TrackerUndoCommand;
+  | TrackerUndoCommand
+  | TrackerCoordinateRecordsCommand;
 
 export interface TrackerHistoryEntry {
   commandId: string;
@@ -294,6 +308,7 @@ export interface TrackerHistoryEntry {
   after: string | null;
   sourceLineage: TrackerRowLineage | null;
   changes?: TrackerCellChange[];
+  coordinationChanges?: TrackerCoordinationChange[];
   undoesCommandId?: string;
 }
 
@@ -363,7 +378,15 @@ const trackerCommandBaseSchema = z.object({
   at: timestamp,
 });
 
+export const trackerRecordLinkSchema = z.object({ workId: z.string().uuid(), rowId: identifier, linkedRevision: z.number().int().nonnegative() }).strict();
+export const trackerRecordCoordinationSchema = z.object({ assigneeId: z.string().uuid().nullable(), links: z.array(trackerRecordLinkSchema).max(20) }).strict();
+
 export const trackerCommandSchema = z.discriminatedUnion("kind", [
+  trackerCommandBaseSchema.extend({
+    kind: z.literal("coordinate_records"), rowIds: z.array(identifier).min(1).max(1000),
+    assigneeId: z.string().uuid().nullable().optional(), link: trackerRecordLinkSchema.optional(),
+    unlink: trackerRecordLinkSchema.pick({ workId: true, rowId: true }).optional(),
+  }).refine(value => (value.assigneeId !== undefined || value.link !== undefined || value.unlink !== undefined) && !(value.link && value.unlink), "Choose an assignment or record link change"),
   trackerCommandBaseSchema.extend({
     kind: z.literal("update_cell"),
     rowId: identifier,
@@ -433,6 +456,7 @@ const trackerCellSchema = z.object({
 });
 
 const trackerRowSchema = z.object({
+  coordination: trackerRecordCoordinationSchema.optional(),
   id: identifier,
   cells: z.record(z.string(), trackerCellSchema),
   lineage: trackerLineageSchema.nullable(),
@@ -445,7 +469,7 @@ const trackerHistoryEntrySchema = z.object({
   commandId: identifier,
   trackerId: identifier,
   revision: z.number().int().positive(),
-  kind: z.enum(["update_cell", "add_row", "delete_row", "bulk_update", "undo_change"]),
+  kind: z.enum(["update_cell", "add_row", "delete_row", "bulk_update", "undo_change", "coordinate_records"]),
   actorId: identifier,
   at: timestamp,
   rowId: identifier,
@@ -454,6 +478,7 @@ const trackerHistoryEntrySchema = z.object({
   after: cellValue.nullable(),
   sourceLineage: trackerLineageSchema.nullable(),
   changes: z.array(z.object({ rowId: identifier, columnId: identifier, before: cellValue, after: cellValue })).min(1).max(1000).optional(),
+  coordinationChanges: z.array(z.object({ rowId: identifier, before: trackerRecordCoordinationSchema, after: trackerRecordCoordinationSchema })).min(1).max(1000).optional(),
   undoesCommandId: identifier.optional(),
 });
 

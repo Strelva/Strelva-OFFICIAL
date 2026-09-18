@@ -6,6 +6,8 @@ import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import {
   WorkPlanInvalidOutputError,
   WorkPlanNotFoundError,
+  WorkPlanFundingRequiredError,
+  WorkPlanGenerationReplayError,
   WorkPlanUnavailableError,
   WorkPlanUnsupportedOperationError,
   createWorkPlan,
@@ -73,6 +75,8 @@ async function readBody(request: Request): Promise<unknown> {
 function failure(error: unknown) {
   if (error instanceof WorkspaceAccessError) return json({ error: "This workspace is unavailable to your account." }, 403);
   if (error instanceof WorkPlanNotFoundError) return json({ error: "This saved plan is unavailable." }, 404);
+  if (error instanceof WorkPlanFundingRequiredError) return json({ error: error.message, code: "planning_funding_required" }, 428);
+  if (error instanceof WorkPlanGenerationReplayError) return json({ error: error.message, code: "planning_receipt_requires_reconciliation" }, 409);
   if (error instanceof WorkspaceConflictError) return json({ error: "This workspace cannot save another plan right now." }, 409);
   if (error instanceof WorkPlanUnsupportedOperationError) {
     return json({ error: "The request includes work Strelva cannot perform in this workspace yet.", code: "unsupported_operation" }, 422);

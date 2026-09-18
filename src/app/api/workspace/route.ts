@@ -4,9 +4,10 @@ import { WorkspaceOperationPendingError } from "@/platform/workspaces";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionUser } from "@/lib/db/server-client";
+import { isSuperAdminUser } from "@/lib/db/repositories";
 import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
-import { listWorkspaceDiscoveryProducts } from "@/platform/products";
+import { listWorkspaceDiscoveryProducts, listWorkspaceExecutableProducts, type ProductDefinition } from "@/platform/products";
 import {
   acceptHandoff, createAgencyWorkspace, createHandoff, ensurePersonalWorkspace, getWork,
   listPendingAssessments, inspectHandoff, listAgencyDelegations, listAgencyHandoffs, listWork,
@@ -40,7 +41,11 @@ const actions = z.discriminatedUnion("action", [
     resultId: z.string().trim().regex(/^scan_[a-z0-9]+$/i).max(256) }).strict(),
   z.object({ action: z.literal("handoff"), workId: z.string().uuid(), recipientEmail: z.string().trim().email().max(254) }).strict(),
   z.object({ action: z.literal("inspect_handoff"), token: boundedText(256) }).strict(),
-  z.object({ action: z.literal("accept_handoff"), token: boundedText(256), allowAgencyAccess: z.boolean() }).strict(),
+  z.object({ action: z.literal("accept_handoff"), token: boundedText(256),
+    destination: z.discriminatedUnion("kind", [
+      z.object({ kind: z.literal("existing"), workspaceId: z.string().uuid() }).strict(),
+      z.object({ kind: z.literal("new"), name: boundedText(120) }).strict(),
+    ]), allowAgencyAccess: z.boolean() }).strict(),
   z.object({ action: z.literal("revoke_delegation"), delegationId: z.string().uuid() }).strict(),
   z.object({ action: z.literal("revoke_handoff"), handoffId: z.string().uuid() }).strict(),
 ]);
@@ -98,7 +103,7 @@ async function body(request: Request): Promise<unknown> {
 }
 
 function presentDelegation(delegation: Delegation, canRevoke: boolean): WorkspaceDelegation {
-  return { id: delegation.id, workId: delegation.customerWorkId,
+  return { id: delegation.id, workId: delegation.customerWorkId, customerWorkspaceId: delegation.customerWorkspaceId,
     agencyWorkspaceId: delegation.agencyWorkspaceId, status: delegation.status, canRevoke };
 }
 
@@ -155,6 +160,20 @@ function supportsHandoff(work: SavedWork): boolean {
 }
 
 /**
+ * Preserve the catalog's release posture in the browser-safe projection.
+ * A public description with only release-gated operations is not executable
+ * merely because it can be shown in Explore.
+ */
+function workspaceAvailability(product: ProductDefinition): WorkspaceProduct["availability"] {
+  if (product.release.availability === "not_enabled") return "not_enabled";
+  if (product.release.availability === "existing_clients") return "managed";
+  if (product.release.availability !== "public") return "release_gated";
+  return product.operations.some((operation) => operation.support === "supported")
+    ? "available"
+    : "release_gated";
+}
+
+/**
  * Home Finder owns the preview route. The workspace only forwards a
  * server-selected synthetic destination; it never accepts a browser URL or
  * infers a live installation from product availability.
@@ -177,7 +196,9 @@ export async function GET(request: Request) {
     const managedPresence = presentManagedWorkListing(
       await listManagedPresenceWork().catch(() => ({ managedWork: [], unavailable: true })),
     );
-    const work = await listWork(current, selected.id);
+    const allWork = await listWork(current, selected.id);
+    const work = allWork.some(item => item.productId === "product-learning") && !(await isSuperAdminUser(current.userId))
+      ? allWork.filter(item => item.productId !== "product-learning") : allWork;
     const handoffs = selected.kind === "agency" && selected.access === "member"
       ? await listAgencyHandoffs(current, selected.id) : [];
     const agencyDelegations = selected.kind === "agency" && selected.access === "member"
@@ -186,10 +207,16 @@ export async function GET(request: Request) {
       ? (await Promise.all(work.map((item) => listWorkDelegations(current, item.id)))).flat() : [];
     const homeFinderPreview = resolveHomeFinderPreviewHref();
     const products: WorkspaceProduct[] = listWorkspaceDiscoveryProducts().map((product): WorkspaceProduct => ({ id: product.id, name: product.name, description: product.promise,
-      availability: product.release.availability === "public" ? "available"
-        : product.release.availability === "not_enabled" ? "not_enabled" : "managed",
+      availability: workspaceAvailability(product),
       ...(product.id === "homefinder" && homeFinderPreview ? { previewHref: homeFinderPreview } : {}),
     }));
+    // Reaching this projection already proves the local workspace release gate
+    // is enabled. Keep the registry's commercial posture internal while making
+    // the executable routes honestly usable in this authenticated workspace.
+    products.push(...listWorkspaceExecutableProducts().map((product): WorkspaceProduct => ({
+      ...product,
+      availability: "available",
+    })));
     // Inquiry work is intentionally absent while its explicit exposure flag is
     // off. The route still enforces the same flag for direct deep links.
     if (inquiryReleaseEnabled()) products.push({ id: "inquiries", name: "Inquiry work", description: "Keep customer requests moving with a clear, inspectable thread.", availability: "available" });
@@ -226,7 +253,8 @@ export async function POST(request: Request) {
       case "inspect_handoff": {
         const preview = await inspectHandoff(current, input.token);
         return json({ recipientEmail: preview.recipientEmail, agencyName: preview.agencyWorkspace.name,
-          work: presentHandoffWork(preview.work), expiresAt: preview.expiresAt, accepted: preview.status === "accepted" });
+          work: presentHandoffWork(preview.work), expiresAt: preview.expiresAt,
+          destinations: preview.destinations, accepted: preview.status === "accepted" });
       }
       case "create_agency": {
         const workspace = await createAgencyWorkspace(current, input.name);
@@ -259,7 +287,7 @@ export async function POST(request: Request) {
       case "accept_handoff": {
         const addressed = await inspectHandoff(current, input.token);
         if (!supportsHandoff(addressed.work)) return json({ error: "This product does not support handoffs in this release." }, 409);
-        const accepted = await acceptHandoff(current, input.token, input.allowAgencyAccess);
+        const accepted = await acceptHandoff(current, input.token, input.destination, input.allowAgencyAccess);
         return json({ workspaceId: accepted.customerWorkspaceId, workId: accepted.customerWorkId });
       }
       case "revoke_delegation":

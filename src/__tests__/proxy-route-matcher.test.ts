@@ -18,6 +18,11 @@ describe("isPublicRoute", () => {
     expect(isPublicRoute(req("/api/workspace/admin"))).toBe(false);
     expect(isPublicRoute(req("/api/workspaces"))).toBe(false);
   });
+  it("opens only the bounded public-continuation intake", () => {
+    expect(isPublicRoute(req("/api/public-continuation"))).toBe(true);
+    expect(isPublicRoute(req("/api/public-continuation/import"))).toBe(false);
+    expect(isPublicRoute(req("/api/public-continuation/anything-else"))).toBe(false);
+  });
   it("treats exact public paths as public", () => {
     for (const p of ["/", "/no-access", "/api/health", "/api/track", "/api/billing/webhook"]) {
       expect(isPublicRoute(req(p))).toBe(true);
@@ -25,9 +30,15 @@ describe("isPublicRoute", () => {
   });
 
   it("treats public prefixes (and their sub-paths) as public", () => {
-    for (const p of ["/sign-in", "/sign-in/foo", "/sign-up", "/access-request/abc", "/api/v1/content/gldf/hero", "/api/pay/xyz", "/api/internal/domain-map", "/api/webhooks/resend"]) {
+    for (const p of ["/sign-in", "/sign-in/foo", "/sign-up", "/access-request/abc", "/api/v1/content/gldf/hero", "/api/pay/xyz", "/api/internal/domain-map", "/api/webhooks/resend", "/api/agent-access/work/22222222-2222-4222-8222-222222222222"]) {
       expect(isPublicRoute(req(p))).toBe(true);
     }
+  });
+
+  it("keeps integration management session-protected while allowing the bearer-token work route", () => {
+    expect(isPublicRoute(req("/api/agent-access"))).toBe(false);
+    expect(isPublicRoute(req("/api/agent-access/work"))).toBe(false);
+    expect(isPublicRoute(req("/api/agent-access/work/22222222-2222-4222-8222-222222222222"))).toBe(true);
   });
 
   it("treats non-control-plane marketing paths as public (catch-all)", () => {

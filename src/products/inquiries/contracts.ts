@@ -403,6 +403,8 @@ export interface InquiryRecord {
   capabilityVersion: number;
   fields: Record<string, InquiryFieldValue>;
   status: InquiryRecordStatus;
+  /** Current staff owner when the record was explicitly assigned. */
+  assigneeId?: string | null;
   receivedAt: string;
   timelineEventIds: string[];
   createdReceiptId: string;
@@ -710,6 +712,7 @@ export interface BulkInquiryUpdate {
   inquiryIds: string[];
   actorId: string;
   status: Extract<InquiryRecordStatus, "assigned" | "handled" | "blocked">;
+  assigneeId?: string | null;
   why: string;
   now?: string;
 }

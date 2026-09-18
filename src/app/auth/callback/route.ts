@@ -1,4 +1,4 @@
-import { workspaceReturnTarget } from "@/lib/workspace-location";
+import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/lib/workspace-location";
 /**
  * Supabase Auth callback (migration Phase 4) — redirect target for OAuth (Google)
  * and magic-link. Exchanges the `code` for a session and writes the session cookies
@@ -26,7 +26,8 @@ function safeNext(next: string | null): string {
 /** Bounce back to sign-in with a short, URL-safe reason tag so a failed round-trip
  *  is diagnosable from the address bar (and logged) instead of an opaque error. */
 function fail(origin: string, reason: string, next: string): NextResponse {
-  const retryNext = workspaceReturnTarget(next) ? `&next=${encodeURIComponent(next)}` : "";
+  const retryTarget = workspaceReturnTarget(next) || accountReturnTarget(next) || workspaceInvitationReturnTarget(next);
+  const retryNext = retryTarget ? `&next=${encodeURIComponent(retryTarget)}` : "";
   return NextResponse.redirect(`${origin}/sign-in?error=auth_callback&reason=${encodeURIComponent(reason)}${retryNext}`);
 }
 

@@ -3,6 +3,7 @@ import {
   PRODUCT_CATALOG,
   getProductDefinition,
   listReleaseOneProducts,
+  listWorkspaceExecutableProducts,
   listWorkspaceDiscoveryProducts,
   type ProductDefinition,
 } from "@/platform/products";
@@ -80,9 +81,20 @@ describe("platform product catalog", () => {
       "managed_presence",
       "homefinder",
       "tracker",
+      "documents",
     ]);
     expect(listWorkspaceDiscoveryProducts().some((product) => product.id === "domain_monitoring")).toBe(false);
     expect(listWorkspaceDiscoveryProducts().find((product) => product.id === "homefinder")?.release.availability).toBe("not_enabled");
+  });
+
+  it("keeps local executable work out of the commercial catalog", () => {
+    expect(listWorkspaceExecutableProducts()).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "applications", availability: "release_gated" }),
+      expect.objectContaining({ id: "scheduling", availability: "release_gated" }),
+      expect.objectContaining({ id: "investigations", availability: "release_gated" }),
+      expect.objectContaining({ id: "operations", availability: "release_gated" }),
+    ]));
+    expect(PRODUCT_CATALOG.map((product) => String(product.id))).not.toContain("applications");
   });
 
   it("keeps monitoring scoped to managed operations instead of claiming a customer product", () => {

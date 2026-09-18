@@ -65,15 +65,21 @@ describe("workspace product discovery", () => {
       selectedWork: null,
       onHome: () => undefined,
       onNew: () => undefined,
+      onOngoing: () => undefined,
       onAgency: () => undefined,
       onChoose: () => undefined,
       onWorkspace: () => undefined,
+      onOpenClientWork: () => undefined,
       notice: null,
       children: null,
     };
     const html = renderToStaticMarkup(createElement(WorkspaceLayout, layoutProps));
     expect(html).toContain("Harbor Dental");
-    expect(html).toContain("/preview/strelva/website");
+    expect(html).toContain("Authorized sites");
+    expect(html).toContain("Account-authorized website");
+    expect(html).toContain(`href="${snapshot.managedWork[0].href}"`);
+    expect(html).not.toContain('data-testid="website-assignment-handoff"');
+    expect(html).not.toContain("Website installation");
     expect(html).toContain("Recent work");
     expect(html).toContain("AI Visibility assessment");
     expect(html).not.toContain("workspace-products");
@@ -115,9 +121,11 @@ describe("workspace product discovery", () => {
       selectedWork: tracker,
       onHome: () => undefined,
       onNew: () => undefined,
+      onOngoing: () => undefined,
       onAgency: () => undefined,
       onChoose: () => undefined,
       onWorkspace: () => undefined,
+      onOpenClientWork: () => undefined,
       notice: null,
     }, createElement("p", null, "tracker detail")));
     expect(html).toContain("View plan and creation receipt");

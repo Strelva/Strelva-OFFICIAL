@@ -19,6 +19,7 @@ import { AiVisibilityAssessmentResult } from "@/products/ai-visibility";
 import { TrackerHandoffPreview } from "./TrackerHandoffPreview";
 import type {
   WorkspaceAction,
+  WorkspaceHandoffDestination,
   WorkspaceHandoffPreview,
   WorkspaceSnapshot,
   WorkspaceWork,
@@ -55,7 +56,7 @@ export function AccessPanel({ snapshot, currentKind, currentAccess, currentRole,
   if (currentAccess === "delegated_read") return <DelegatedAccessSurface key={contextKey} />;
   if (currentKind === "personal") return <CreateAgency key={contextKey} postAction={postAction} isActive={isActive} onCreated={onAgencyCreated} />;
   if (currentKind === "customer") return <CustomerAccess key={contextKey} snapshot={snapshot} currentRole={currentRole} postAction={postAction} isActive={isActive} onChanged={onChanged} setNotice={setNotice} />;
-  return <AgencyHandoff key={contextKey} snapshot={snapshot} selectedWork={selectedWork} postAction={postAction} isActive={isActive} onChanged={onChanged} setNotice={setNotice} />;
+  return <AgencyHandoff key={contextKey} snapshot={snapshot} currentRole={currentRole} selectedWork={selectedWork} postAction={postAction} isActive={isActive} onChanged={onChanged} setNotice={setNotice} />;
 }
 
 function useActiveContext(contextKey: string) {
@@ -111,7 +112,7 @@ function CreateAgency({ postAction, isActive, onCreated }: { postAction: AccessA
   );
 }
 
-function AgencyHandoff({ snapshot, selectedWork, postAction, isActive, onChanged, setNotice }: { snapshot: WorkspaceSnapshot; selectedWork: WorkspaceWork | null; postAction: AccessActionPoster; isActive: () => boolean; onChanged: () => void; setNotice: (notice: AccessNotice) => void }) {
+function AgencyHandoff({ snapshot, currentRole, selectedWork, postAction, isActive, onChanged, setNotice }: { snapshot: WorkspaceSnapshot; currentRole?: WorkspaceRole; selectedWork: WorkspaceWork | null; postAction: AccessActionPoster; isActive: () => boolean; onChanged: () => void; setNotice: (notice: AccessNotice) => void }) {
   const [recipientEmail, setRecipientEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [createdLink, setCreatedLink] = useState("");
@@ -154,6 +155,7 @@ function AgencyHandoff({ snapshot, selectedWork, postAction, isActive, onChanged
       <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-accent-text">Agency handoff</p>
       <h1 className="mt-4 font-display text-[36px] font-medium leading-tight text-warm-black">Put finished work in the customer’s hands.</h1>
       <p className="mt-4 max-w-2xl text-[14px] leading-relaxed text-gray-muted">The link is bound to the recipient’s signed-in email. Acceptance creates an independent, customer-owned copy. Agency access is never assumed.</p>
+      {currentRole === "owner" ? <div className="mt-5 flex flex-wrap gap-3"><a href={`/workspace/invitations?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-10 items-center rounded-xl border border-gray-border px-4 text-[13px] font-medium text-warm-black hover:bg-gray-bg">Manage workspace invitations</a><a href={`/workspace/export?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-10 items-center rounded-xl border border-gray-border px-4 text-[13px] font-medium text-warm-black hover:bg-gray-bg">Export workspace data</a></div> : null}
       {selectedWork && !isDelegatedCustomerWork && !isUnsupportedWork ? (
         <form onSubmit={createHandoff} className="mt-8 border-y border-gray-border py-6">
           <p className="text-[12px] text-gray-muted">Handoff</p><p className="mt-1 text-[15px] font-medium text-warm-black">{selectedWork.title}</p>
@@ -186,6 +188,7 @@ function CustomerAccess({ snapshot, currentRole, postAction, isActive, onChanged
       <ShieldCheck className="h-6 w-6 text-accent-text" strokeWidth={1.5} />
       <h1 className="mt-5 font-display text-[36px] font-medium text-warm-black">{heading}</h1>
       <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-gray-muted">{description}</p>
+      {currentRole === "owner" ? <div className="mt-5 flex flex-wrap gap-3"><a href={`/workspace/invitations?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-10 items-center rounded-xl border border-gray-border px-4 text-[13px] font-medium text-warm-black hover:bg-gray-bg">Manage workspace invitations</a><a href={`/workspace/export?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`} className="inline-flex min-h-10 items-center rounded-xl border border-gray-border px-4 text-[13px] font-medium text-warm-black hover:bg-gray-bg">Export workspace data</a></div> : null}
       <section className="mt-8"><h2 className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">Agency access</h2>{snapshot.delegations.length ? <ul className="mt-3 divide-y divide-gray-border border-y border-gray-border">{snapshot.delegations.map((delegation) => <li key={delegation.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-[13px] font-medium text-warm-black">Read-only access</p><p className="mt-1 text-[11px] text-gray-muted">{delegation.status === "active" ? "Active" : "Revoked"}</p></div>{delegation.status === "active" && delegation.canRevoke ? <Button size="sm" variant="danger" disabled={submitting} onClick={() => void revoke(delegation.id)}>Revoke access</Button> : null}</li>)}</ul> : <p className="mt-3 text-[13px] text-gray-muted">No agency can access this workspace.</p>}</section>
     </div>
   );
@@ -202,12 +205,25 @@ export interface AccessHandoffOverlayProps {
 
 export function AccessHandoffOverlay({ loading, token, preview, postAction, onAccepted, onClose }: AccessHandoffOverlayProps) {
   const checkboxId = useId();
+  const destinationGroupId = useId();
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const [allowAgencyAccess, setAllowAgencyAccess] = useState(false);
+  const [destinationKind, setDestinationKind] = useState<"existing" | "new">("existing");
+  const [destinationWorkspaceId, setDestinationWorkspaceId] = useState("");
+  const [newBusinessName, setNewBusinessName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const isActive = useActiveContext(`${token || ""}:${preview?.work.id || ""}`);
+  const destinations = preview?.destinations ?? [];
+
+  useEffect(() => {
+    if (!preview) return;
+    setDestinationKind(preview.destinations?.length ? "existing" : "new");
+    setDestinationWorkspaceId("");
+    setNewBusinessName("");
+    setError("");
+  }, [token, preview]);
 
   useEffect(() => {
     previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -235,9 +251,24 @@ export function AccessHandoffOverlay({ loading, token, preview, postAction, onAc
 
   async function accept() {
     if (!token) return;
+    let destination: WorkspaceHandoffDestination;
+    if (destinationKind === "existing") {
+      if (!destinationWorkspaceId) {
+        setError("Choose the business that should receive this copy.");
+        return;
+      }
+      destination = { kind: "existing", workspaceId: destinationWorkspaceId };
+    } else {
+      const name = newBusinessName.trim();
+      if (!name) {
+        setError("Enter a name for the business that should receive this copy.");
+        return;
+      }
+      destination = { kind: "new", name };
+    }
     setSubmitting(true); setError("");
     try {
-      const body = await postAction<{ workspaceId: string; workId: string }>({ action: "accept_handoff", token, allowAgencyAccess }, "This handoff couldn’t be accepted.");
+      const body = await postAction<{ workspaceId: string; workId: string }>({ action: "accept_handoff", token, destination, allowAgencyAccess }, "This handoff couldn’t be accepted.");
       if (isActive()) onAccepted(body.workspaceId, body.workId);
     } catch (cause) { if (isActive()) setError(cause instanceof Error ? cause.message : "This handoff couldn’t be accepted."); }
     finally { if (isActive()) setSubmitting(false); }
@@ -256,6 +287,30 @@ export function AccessHandoffOverlay({ loading, token, preview, postAction, onAc
             {preview.accepted ? <p className="mt-7 flex items-center gap-2 text-[14px] text-positive"><Check className="h-4 w-4" />This handoff has already been accepted.</p> : (
               <div className="mt-7">
                 <p className="text-[14px] font-medium text-warm-black">Accept your own copy</p><p className="mt-1 max-w-2xl text-[13px] leading-relaxed text-gray-muted">This creates customer-owned work in your account. The agency’s original remains separate.</p>
+                <fieldset className="mt-5 rounded-xl border border-gray-border bg-surface-inset p-4">
+                  <legend className="px-1 text-[13px] font-medium text-warm-black">Which business is this for?</legend>
+                  <p className="mt-1 text-[12px] leading-relaxed text-gray-muted">The business you choose will own this copy.</p>
+                  {destinations.length ? <div className="mt-4">
+                    <label htmlFor={`${destinationGroupId}-existing`} className="flex cursor-pointer items-start gap-3 text-[13px] text-warm-black">
+                      <input id={`${destinationGroupId}-existing`} name={destinationGroupId} type="radio" checked={destinationKind === "existing"} onChange={() => { setDestinationKind("existing"); setError(""); }} className="mt-0.5 h-4 w-4 accent-[var(--accent)]" />
+                      <span>Use an existing business</span>
+                    </label>
+                    {destinationKind === "existing" ? <div className="ml-7 mt-3">
+                      <label htmlFor={`${destinationGroupId}-workspace`} className="block text-[11px] text-gray-muted">Business</label>
+                      <select id={`${destinationGroupId}-workspace`} value={destinationWorkspaceId} onChange={(event) => { setDestinationWorkspaceId(event.target.value); setError(""); }} className="mt-1 w-full appearance-none rounded-lg bg-surface px-3.5 py-2 text-[13px] text-warm-black outline-none focus:ring-2 focus:ring-white/10">
+                        <option value="">Choose a business</option>
+                        {destinations.map((destination) => <option key={destination.id} value={destination.id}>{destination.name}</option>)}
+                      </select>
+                    </div> : null}
+                  </div> : null}
+                  <div className={destinations.length ? "mt-5" : "mt-4"}>
+                    <label htmlFor={`${destinationGroupId}-new`} className="flex cursor-pointer items-start gap-3 text-[13px] text-warm-black">
+                      <input id={`${destinationGroupId}-new`} name={destinationGroupId} type="radio" checked={destinationKind === "new"} onChange={() => { setDestinationKind("new"); setError(""); }} className="mt-0.5 h-4 w-4 accent-[var(--accent)]" />
+                      <span>Create a new business</span>
+                    </label>
+                    {destinationKind === "new" ? <div className="ml-7 mt-3"><TextInput label="Business name" value={newBusinessName} onChange={(event) => { setNewBusinessName(event.target.value); setError(""); }} placeholder="Acme Plumbing" maxLength={120} autoComplete="organization" /></div> : null}
+                  </div>
+                </fieldset>
                 <label htmlFor={checkboxId} className="mt-5 flex cursor-pointer items-start gap-3 rounded-xl border border-gray-border bg-surface-inset p-4"><input id={checkboxId} type="checkbox" checked={allowAgencyAccess} onChange={(event) => setAllowAgencyAccess(event.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--accent)]" /><span><span className="block text-[13px] font-medium text-warm-black">Allow {preview.agencyName} read-only access</span><span className="mt-1 block text-[12px] leading-relaxed text-gray-muted">Optional and unchecked by default. You can revoke access later without losing your copy.</span></span></label>
                 {error ? <p role="alert" className="mt-4 text-[13px] text-critical">{error}</p> : null}
                 <Button size="lg" className="mt-5" loading={submitting} onClick={() => void accept()} icon={<ArrowRight className="h-4 w-4" />}>Accept into my workspace</Button>

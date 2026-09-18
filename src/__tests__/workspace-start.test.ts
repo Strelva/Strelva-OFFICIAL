@@ -5,8 +5,10 @@ import { WorkspaceStart } from "@/experience/workspace/WorkspaceStart";
 import {
   createWorkspaceStartContinuation,
   planWorkspaceStart,
+  workspaceStartContinueLabel,
   type WorkspaceStartContext,
 } from "@/experience/workspace/workspace-start";
+import { workspaceWorkLabel } from "@/experience/workspace/work-label";
 
 function context(overrides: Partial<WorkspaceStartContext> = {}): WorkspaceStartContext {
   return {
@@ -15,6 +17,10 @@ function context(overrides: Partial<WorkspaceStartContext> = {}): WorkspaceStart
       { id: "tracker", name: "Spreadsheet tracker", availability: "available" },
       { id: "inquiries", name: "Inquiry work", availability: "available" },
       { id: "managed_presence", name: "Managed Websites", availability: "managed" },
+      { id: "applications", name: "Internal applications", availability: "available" },
+      { id: "scheduling", name: "Scheduling", availability: "available" },
+      { id: "investigations", name: "Ongoing checks", availability: "available" },
+      { id: "operations", name: "Delegated work", availability: "available" },
     ],
     inquiryBusinesses: [{ id: "harbor", title: "Harbor Dental" }],
     managedSites: [{ id: "harbor-site", title: "Harbor Dental", href: "/preview/strelva/website" }],
@@ -36,6 +42,41 @@ describe("workspace start planner", () => {
     expect(plan.route).toBe("tracker");
     expect(plan.suggestedTemplateId).toBe("task-list");
     expect(plan.parts.every((part) => !part.optional && !part.editable)).toBe(true);
+  });
+
+  it("maps natural paraphrases to the supported native proposal", () => {
+    const cases = [
+      ["Build an app for staff requests", "applications"],
+      ["Build a staff request app", "applications"],
+      ["Help my staff request time off", "scheduling"],
+      ["Keep track of overdue invoices", "tracker"],
+      ["Reconcile two spreadsheets", "investigations"],
+      ["Schedule follow-ups for unanswered inquiries", "scheduling"],
+    ] as const;
+
+    for (const [request, route] of cases) {
+      expect(planWorkspaceStart(request, context()), request).toMatchObject({ kind: "supported", status: "ready", route });
+    }
+  });
+
+  it("names the native destination in each horizontal continuation", () => {
+    for (const [request, label] of [
+      ["Build a staff request app", "Prepare application"],
+      ["Help my staff request time off", "Open scheduling"],
+      ["Reconcile two spreadsheets", "Open ongoing checks"],
+      ["Delegate these approved steps", "Open ongoing work"],
+    ] as const) {
+      const plan = planWorkspaceStart(request, context());
+      expect(workspaceStartContinueLabel(plan)).toBe(label);
+    }
+  });
+
+  it("names saved horizontal work by the surface that can reopen it", () => {
+    expect(workspaceWorkLabel({ productId: "applications", resourceKind: "application" })).toBe("Application");
+    expect(workspaceWorkLabel({ productId: "scheduling", resourceKind: "schedule" })).toBe("Schedule");
+    expect(workspaceWorkLabel({ productId: "investigations", resourceKind: "investigation" })).toBe("Ongoing check");
+    expect(workspaceWorkLabel({ productId: "operations", resourceKind: "responsibility" })).toBe("Delegated work");
+    expect(workspaceWorkLabel({ productId: "future", resourceKind: "result" })).toBe("Saved work · view unavailable");
   });
 
   it("keeps a private document request on its reviewable path", () => {

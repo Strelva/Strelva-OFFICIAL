@@ -1,21 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Inter } from "next/font/google";
+import { Geist } from "next/font/google";
 import { PrivacyAwareAnalytics } from "@/components/PrivacyAwareAnalytics";
 import { BRAND_NAME, MARKETING_URL } from "@/lib/brand";
 import "./globals.css";
 
-const fraunces = Fraunces({
-  variable: "--font-display",
-  subsets: ["latin"],
-  display: "swap",
-  axes: ["SOFT", "WONK", "opsz"],
-});
-
-const inter = Inter({
+const geist = Geist({
   variable: "--font-body",
   subsets: ["latin"],
   display: "swap",
-  weight: ["400", "500", "600", "700"],
 });
 
 export const viewport: Viewport = {
@@ -52,7 +44,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${fraunces.variable} ${inter.variable} antialiased`}
+        className={`${geist.variable} antialiased`}
       >
         {children}
         <PrivacyAwareAnalytics />

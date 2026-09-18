@@ -74,13 +74,13 @@ describe("work economics route authority", () => {
     expect(mocks.find).toHaveBeenCalledWith({ userId: actor.id, verifiedEmail: "owner@example.com" }, {
       workspaceId: "11111111-1111-4111-8111-111111111111",
       workId: "22222222-2222-4222-8222-222222222222",
-    });
+    }, expect.objectContaining({ containsTarget: expect.any(Function) }));
   });
 
   it("keeps the payer decision and operator report behind the server actor", async () => {
     const response = await POST(post({ action: "accept", jobId: ledger.id, payerId: "attacker" }));
     expect(response.status).toBe(200);
-    expect(mocks.command).toHaveBeenCalledWith({ userId: actor.id, verifiedEmail: "owner@example.com" }, { action: "accept", jobId: ledger.id, payerId: "attacker" });
+    expect(mocks.command).toHaveBeenCalledWith({ userId: actor.id, verifiedEmail: "owner@example.com" }, { action: "accept", jobId: ledger.id, payerId: "attacker" }, expect.objectContaining({ containsTarget: expect.any(Function) }));
     expect((await response.json()).canAccept).toBe(true);
   });
 

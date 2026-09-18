@@ -1,3 +1,4 @@
+import type { BudgetExecution } from "./runtime";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/db/client";
 import {
@@ -25,10 +26,19 @@ type WorkEconomicsDatabase = {
       job_economics: DbTable;
       job_economics_usage: DbTable;
       job_economics_reservations: DbTable;
+      job_economics_executions: DbTable;
     };
     Views: Record<string, never>;
     Functions: {
       job_economics_command: {
+        Args: { p_command: unknown; p_actor_id: string; p_verified_email: string };
+        Returns: DbRow[];
+      };
+      job_economics_create_with_payer_transition: {
+        Args: { p_command: unknown; p_actor_id: string; p_verified_email: string };
+        Returns: DbRow[];
+      };
+      job_economics_command_with_payer_authority: {
         Args: { p_command: unknown; p_actor_id: string; p_verified_email: string };
         Returns: DbRow[];
       };
@@ -113,7 +123,7 @@ function mapUsage(row: DbRow): JobEconomicsUsage {
     attribution: stringValue(row.attribution) as JobEconomicsUsage["attribution"],
     amountCents,
     known: amountCents !== null,
-    source: "operator_reported",
+    source: row.source === "runtime_reported" ? "runtime_reported" : "operator_reported",
     recordedBy: stringValue(row.recorded_by),
     createdAt: stringValue(row.created_at),
   };
@@ -130,15 +140,38 @@ function mapReservation(row: DbRow): JobEconomicsReservation {
   };
 }
 
+export function mapBudgetExecution(value: unknown): BudgetExecution {
+  if (!value || typeof value !== "object") throw new JobEconomicsPersistenceError("The execution receipt is missing.");
+  const row = value as Record<string, unknown>;
+  if (typeof row.job_id !== "string" || typeof row.execution_key !== "string"
+    || typeof row.maximum_cents !== "number" || typeof row.created_by !== "string"
+    || !["reserved", "running", "finished"].includes(String(row.status))
+    || (row.amount_cents !== null && typeof row.amount_cents !== "number")
+    || (row.billable_cents !== null && typeof row.billable_cents !== "number")) {
+    throw new JobEconomicsPersistenceError("The execution receipt is invalid.");
+  }
+  return {
+    jobId: row.job_id, executionKey: row.execution_key, maximumCents: row.maximum_cents,
+    kind: row.kind as BudgetExecution["kind"], attribution: row.attribution as BudgetExecution["attribution"],
+    status: row.status as BudgetExecution["status"], effect: row.effect as BudgetExecution["effect"],
+    amountCents: row.amount_cents as number | null, billableCents: row.billable_cents as number | null,
+    createdBy: row.created_by,
+    reconciliationReference: typeof row.reconciliation_reference === "string" ? row.reconciliation_reference : null,
+  };
+}
+
 async function inspectionForJob(client: WorkEconomicsDb, job: JobEconomicsRecord): Promise<JobEconomicsInspection> {
-  const [usageResult, reservationResult] = await Promise.all([
+  const [usageResult, reservationResult, executionResult] = await Promise.all([
     client.from("job_economics_usage").select("*").eq("job_id", job.id).order("created_at", { ascending: true }),
     client.from("job_economics_reservations").select("*").eq("job_id", job.id).order("created_at", { ascending: true }),
+    client.from("job_economics_executions").select("*").eq("job_id", job.id).order("created_at", { ascending: true }),
   ]);
   if (usageResult.error) throw new JobEconomicsPersistenceError("Work economics usage could not be read.", { cause: usageResult.error });
   if (reservationResult.error) throw new JobEconomicsPersistenceError("Work economics reservations could not be read.", { cause: reservationResult.error });
+  if (executionResult.error) throw new JobEconomicsPersistenceError("Budget executions could not be read.", { cause: executionResult.error });
   return {
     job,
+    executions: (executionResult.data ?? []).map(mapBudgetExecution),
     usage: (usageResult.data ?? []).map((item) => mapUsage(item as DbRow)),
     reservations: (reservationResult.data ?? []).map((item) => mapReservation(item as DbRow)),
     policy: JOB_ECONOMICS_POLICY,
@@ -165,6 +198,8 @@ function mapDatabaseError(error: unknown): never {
   if (detail.includes("job_economics_unknown_settlement")) throw new JobEconomicsConflictError("Unknown usage cannot be settled as a measured amount.");
   if (detail.includes("job_economics_settlement_mismatch")) throw new JobEconomicsConflictError("The measured settlement must equal known recorded usage.");
   if (detail.includes("job_economics_overage")) throw new JobEconomicsConflictError("The measured amount exceeds the authorized maximum.");
+  if (detail.includes("job_economics_runtime_managed")) throw new JobEconomicsConflictError("Runtime execution owns usage for this budget.");
+  if (detail.includes("job_economics_execution_unresolved")) throw new JobEconomicsConflictError("An action still has an unresolved execution.");
   if (detail.includes("job_economics_invalid_transition")) throw new JobEconomicsConflictError("This work economics record cannot take that action in its current state.");
   if (detail.includes("job_economics_command_invalid")) throw new JobEconomicsValidationError("The work economics command is invalid.");
   throw new JobEconomicsPersistenceError(undefined, { cause: error });
@@ -174,7 +209,10 @@ export async function commandJobEconomics(
   actor: { userId: string; verifiedEmail: string },
   command: JobEconomicsCommand,
 ): Promise<JobEconomicsRecord> {
-  const result = await db().rpc("job_economics_command", {
+  const functionName = command.action === "create"
+    ? "job_economics_create_with_payer_transition"
+    : "job_economics_command_with_payer_authority";
+  const result = await db().rpc(functionName, {
     p_command: command as unknown,
     p_actor_id: actor.userId,
     p_verified_email: actor.verifiedEmail,
@@ -204,6 +242,8 @@ export async function readJobEconomics(
 export interface JobEconomicsTargetQuery {
   workspaceId: string | null;
   workId: string | null;
+  productId?: JobEconomicsRecord["productId"];
+  resourceKind?: JobEconomicsRecord["resourceKind"];
   tenantId: string | null;
   businessId: string | null;
   requestId: string | null;
@@ -218,6 +258,9 @@ export async function findJobEconomics(
   let query = client.from("job_economics").select("*");
   if (target.workspaceId && target.workId) {
     query = query.eq("workspace_id", target.workspaceId).eq("work_id", target.workId);
+  } else if (target.workspaceId && target.productId === "work_plans" && target.resourceKind === "plan" && !target.workId) {
+    query = query.eq("workspace_id", target.workspaceId).is("work_id", null)
+      .eq("product_id", target.productId).eq("resource_kind", target.resourceKind);
   } else if (target.tenantId && target.businessId && target.requestId && target.capabilityId) {
     query = query.eq("tenant_id", target.tenantId)
       .eq("business_id", target.businessId)

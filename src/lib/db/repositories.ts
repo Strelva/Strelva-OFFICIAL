@@ -436,6 +436,32 @@ export async function getContentData(
   }, null);
 }
 
+/**
+ * Strict counterpart for repair/provisioning paths. The public content read is
+ * intentionally best-effort and maps an unavailable source to `null` so a
+ * storefront can fall back to its normal read behavior. A write-capable repair
+ * must distinguish an absent row from an unavailable source, or it could
+ * replace customer content with defaults. This function preserves read errors.
+ */
+export async function getStoredContentData(
+  tenant: string,
+  section: string,
+): Promise<Record<string, unknown> | null> {
+  const label = `getStoredContentData ${tenant}/${section}`;
+  const db = requiredDb(label);
+  const { data, error } = await db
+    .from("content")
+    .select("data")
+    .eq("tenant_id", tenant)
+    .eq("section", section)
+    .maybeSingle();
+  if (error) {
+    console.error(`[db] ${label} failed:`, error instanceof Error ? error.message : error);
+    throw error;
+  }
+  return (data?.data as Record<string, unknown> | undefined) ?? null;
+}
+
 /** Upsert a content section's data. Throws so callers cannot report a rejected
  *  authoritative write as success and can invalidate any stale cache. */
 export async function upsertContentData(

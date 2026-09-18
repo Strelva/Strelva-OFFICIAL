@@ -21,9 +21,16 @@ cannot silently change the denominator or grant authority to build and publish.
 
 ## Three distinct finish lines
 
+The September 14 [architecture clarification](./horizontal-product-brief-2026-09-11.md#september-14-architecture-clarification)
+and [source audit](./horizontal-audit-and-plan-2026-09-11.md) add connected
+acceptance for explicit business ownership, focused recipient use, uninterrupted
+application releases, custom-code delivery and versioned capability expansion.
+These are mandatory target behaviors, not polish left after screen completion.
+Earlier local evidence remains valid only for the narrower behavior it tested.
+
 | Finish line | Acceptance | What cannot count as proof |
 | --- | --- | --- |
-| Horizontal interface | All 14 screens below compose into one navigable experience across supported work types, with clear states for future work | Fourteen titles, duplicate inquiry screens, or links to empty fixtures |
+| Horizontal interface | The behavioral surfaces below compose across the workspace, focused finished experiences and internal console, with clear states for future work | Screen counts, nine independently built interface families, duplicate inquiry screens, or links to empty fixtures |
 | Local product and learning system | All 20 customer-product requirements in the existing ledger and all ten learning requirements below pass their agreed journeys using durable authenticated local state | Mock adapters presented as integrations, model prose presented as execution, or Coming soon on a required behavior |
 | Operated and qualified offering | Separately authorized provider operation and pilots establish reliability, support-inclusive economics, repeat use, and recovery for that offering | Deployment, synthetic users, test counts, or estimated savings |
 
@@ -32,11 +39,20 @@ proof and customer outcomes stay visibly pending. Do not describe a locally
 complete system as a proven commercial product. A working learning system can
 correctly conclude that an offering should be stopped.
 
-## One customer experience, one internal research workspace
+## What owners, staff and Strelva each use
 
-Customer navigation remains New, Search, businesses or clients, recent work, and
-account. R&D is an internal workspace with access controls, not ten new customer
-menu items. Findings appear as useful suggestions or decisions in existing Work.
+Staff and recipients enter only the application, document, form or decision they
+are authorized to use. They do not inherit the creator's workspace or its design
+controls. Creation, ordinary use and ongoing operation share resource identity
+and evidence while enforcing their different permissions. Internal R&D remains
+inside the separate internal environment. The nine interface families are views
+of these shared records and operations, not nine permanent sidebar destinations.
+
+The workspace shell uses a context switcher, Home, search, New and pinned working
+destinations named for the actual resource, such as Website or Staff availability.
+Browse holds the full inventory; account and administration remain accessible.
+R&D is an internal workspace with access controls. Findings appear as useful
+suggestions or decisions beside the affected work.
 Evidence, alternatives, costs, and research methods are available when inspected.
 Research on Strelva itself must never combine private customer evidence without
 its permitted purpose and scope. Agency methods stay private by default.
@@ -53,6 +69,9 @@ until selected and added to the acceptance contract.
 
 These are behavioral gates, not separate products. Shared presentation does not
 require storing every domain in one generic table or replacing native policies.
+The following historical screen names are a coverage checklist, not independent
+engineering assignments or a required navigation layout. Accept the connected
+journeys in the architecture audit before declaring the shared product complete.
 Unsupported future offerings may have useful, clearly labeled Coming soon
 views; they are not installed capabilities and cannot appear in What's live.
 
@@ -171,9 +190,11 @@ not authorize changing a customer's experience.
 
 ## Acceptance evidence and progress reporting
 
-Track three separate denominators: 14 horizontal screen requirements, the
+Track three separate sets of requirements: the horizontal behavior checklist, the
 [20 customer-product requirements](./strelvav2-horizontal-acceptance.md), and R1–R10.
 Do not average them into a persuasive but meaningless product percentage.
+The September 14 architecture cases extend the relevant product requirements;
+they must be explicitly accepted and cannot inherit a prior bounded-app pass.
 
 Each requirement has stable acceptance cases, owner, implementation link,
 evidence link, tested version/environment, remaining gap, and reviewer decision.
@@ -209,13 +230,26 @@ terms are still decisions, not facts selected by this document.
 
 ## Sequence and current implementation limits
 
-The first acceptance artifact should be a versioned trace from source evidence
+The [September 14 build order](./horizontal-audit-and-plan-2026-09-11.md#build-order-and-acceptance-cases)
+owns engineering sequence. Jacob's latest gate is one complete application:
+request, creation, owner use, sharing, employee use, accumulated records,
+proposed change, exact review, publication, recovery and continued use. The live
+application remains the object throughout. Complete and review that experience
+before extending the interaction pattern to documents, websites or other work.
+The broader delivery, operation, reuse and capability requirements remain open
+until separately demonstrated. Finish existing correctness fixes and keep
+internal failure visibility alongside the real runs.
+
+The internal learning acceptance artifact remains a versioned trace from source evidence
 through a rejected alternative, selected experiment, reviewed result, and changed
 decision after new evidence. Persistent access, owned state, historical context,
 cross-system coordination, and an ongoing assignment are possible advantages
 over a generic model. Each proposal must establish which advantage it actually
 needs; where a normal model conversation finishes the job equally well, recommend
 that simpler route rather than inventing a product around it.
+
+The following requirements remain part of the program; their order does not
+override the architecture build order above.
 
 1. Audit and freeze acceptance cases against this contract. Remove unsupported
    percentage claims. Align domain language with the horizontal direction.
@@ -233,12 +267,14 @@ that simpler route rather than inventing a product around it.
    while keeping production off. After authorization, measure actual outcomes
    and rerun the learning loop before calling an offering proven.
 
-Existing assets include workspace state and handoffs, inquiry governance and
-recovery, documents, tracker records, private plan outputs, cost records, and
-R&D candidate comparisons. They do not yet establish a general autonomous
-research service, opportunity inventory, independently evaluated strategy loop,
-cross-capability runtime, or postlaunch learning system. See the existing ledger
-for implementation evidence. This contract selects no new database or workflow
+The September 12 implementation now includes bounded cross-capability execution,
+native private app output, local scheduling/investigation, scoped contributions,
+runtime cost admission and the ten-part internal learning state machine. The
+[acceptance ledger](./strelvav2-horizontal-acceptance.md) records tested behavior
+and remaining gaps. Local state transitions and API fixtures do not establish a
+live autonomous research service, actual postlaunch outcomes, provider-wide
+reliability or an accepted enterprise offering. Jacob's review and exact provider
+activation remain separate. This contract selects no new database or workflow
 vendor and does not relocate client-specific apps into this repository.
 
 ## Research checked for this definition

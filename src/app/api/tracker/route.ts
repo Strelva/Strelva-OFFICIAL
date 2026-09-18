@@ -3,7 +3,7 @@ import { getSessionUser } from "@/lib/db/server-client";
 import { isSuperAdmin } from "@/lib/auth";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError } from "@/platform/workspaces/types";
-import { previewTracker, readSavedTracker, saveNewTracker, editSavedTracker, recordTrackerExperiment } from "@/products/tracker/server";
+import { previewTracker, readSavedTracker, readTrackerCoordinationOptions, saveNewTracker, editSavedTracker, recordTrackerExperiment } from "@/products/tracker/server";
 import { TrackerConflictError, TrackerValidationError } from "@/products/tracker/contracts";
 import { z } from "zod";
 
@@ -26,7 +26,10 @@ export async function GET(request: Request) {
   try {
     const current = await actor();
     if (!current) return json({ error: "Sign in to open your tracker." }, 401);
-    return json({ ...await readSavedTracker(current, new URL(request.url).searchParams.get("workId") ?? ""), canRecordExperiment: await isSuperAdmin() });
+    const query = new URL(request.url).searchParams;
+    const workId = query.get("workId") ?? "";
+    return json({ ...await readSavedTracker(current, workId), canRecordExperiment: await isSuperAdmin(),
+      ...(query.get("coordination") === "1" ? { coordinationOptions: await readTrackerCoordinationOptions(current, workId) } : {}) });
   } catch (error) { return failure(error); }
 }
 export async function POST(request: Request) {

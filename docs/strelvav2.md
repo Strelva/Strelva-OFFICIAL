@@ -6,6 +6,8 @@ The customer-facing product remains Strelva. This codename does not change the s
 
 ## Scope and evidence
 
+- [Current component, material and motion context](./design/current-component-context.md)
+
 - [Definition of done: horizontal product and internal learning](./strelvav2-definition-of-done.md)
 - [Full horizontal acceptance target](./strelvav2-horizontal-acceptance.md)
 - [Product direction](./horizontal-product-brief-2026-09-11.md)

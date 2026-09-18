@@ -143,6 +143,18 @@ describe("account page access handoff", () => {
     expect(mockGetCurrentUserTenants).not.toHaveBeenCalled();
   });
 
+  it("reopens a supported public result after claiming an invitation", async () => {
+    mockWorkspaceReleaseEnabled.mockReturnValue(true);
+    mockClaimPendingInvite.mockResolvedValue({ tenant: "harbor" });
+    const { default: AccountPage } = await import("@/app/(marketing)/account/page");
+
+    await expect(AccountPage({
+      searchParams: Promise.resolve({ next: "/workspace?save=scan_public123" }),
+    })).rejects.toThrow("REDIRECT:/workspace?save=scan_public123");
+
+    expect(mockClaimPendingInvite).toHaveBeenCalledOnce();
+  });
+
   it("keeps invitation failures from being hidden behind a successful landing", async () => {
     mockWorkspaceReleaseEnabled.mockReturnValue(true);
     mockClaimPendingInvite.mockRejectedValueOnce(new Error("Invitation unavailable"));
@@ -187,5 +199,15 @@ describe("account page access handoff", () => {
 
     await expect(AccountPage()).rejects.toThrow("REDIRECT:/sign-in");
     expect(mockClaimPendingInvite).not.toHaveBeenCalled();
+  });
+
+  it("keeps a safe workspace result when a signed-out account link is opened", async () => {
+    mockWorkspaceReleaseEnabled.mockReturnValue(true);
+    mockGetAuthUserId.mockResolvedValue(null);
+    const { default: AccountPage } = await import("@/app/(marketing)/account/page");
+
+    await expect(AccountPage({
+      searchParams: Promise.resolve({ next: "/workspace?save=scan_public123" }),
+    })).rejects.toThrow("REDIRECT:/sign-in?next=%2Fworkspace%3Fsave%3Dscan_public123");
   });
 });

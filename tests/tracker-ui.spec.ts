@@ -5,6 +5,8 @@ import type { TrackerSnapshot } from "../src/products/tracker/contracts";
 const WORKSPACE_ID = "11111111-1111-4111-8111-111111111111";
 const WORK_ID = "tracker-browser-work";
 const TRACKER_ID = "tracker-browser";
+const RELATED_WORK_ID = "55555555-5555-4555-8555-555555555555";
+const MEMBER_ID = "66666666-6666-4666-8666-666666666666";
 const CSV = [
   "Name,Status",
   ...Array.from({ length: 61 }, (_, index) => `Task ${index + 1},${index % 2 ? "in progress" : "queued"}`),
@@ -65,7 +67,7 @@ function workspaceSnapshot(fixture: TrackerFixture) {
   };
 }
 
-async function installTrackerApi(page: Page, options: { initialTracker?: TrackerSnapshot; readOnly?: boolean; conflictNextEdit?: boolean } = {}) {
+async function installTrackerApi(page: Page, options: { initialTracker?: TrackerSnapshot; readOnly?: boolean; conflictNextEdit?: boolean; coordination?: boolean } = {}) {
   const fixture: TrackerFixture = {
     tracker: options.initialTracker ?? null,
     readOnly: options.readOnly ?? false,
@@ -73,15 +75,20 @@ async function installTrackerApi(page: Page, options: { initialTracker?: Tracker
     experimentRecorded: false,
   };
   const preview = sourcePreview();
+  const related = createTracker(preview, { trackerId: "related-tracker", actorId: "owner", title: "Release checklist", at: "2026-09-11T15:00:00.000Z" });
 
   await page.route("**/api/workspace**", async (route) => {
     if (route.request().method() !== "GET") return json(route, { error: "Unsupported workspace fixture request." }, 400);
-    return json(route, workspaceSnapshot(fixture));
+    const snapshot = workspaceSnapshot(fixture);
+    return json(route, { ...snapshot, work: options.coordination ? [...snapshot.work, { ...savedWork(related), id: RELATED_WORK_ID }] : snapshot.work });
   });
 
   await page.route("**/api/tracker**", async (route) => {
     const request = route.request();
     if (request.method() === "GET") {
+      const params = new URL(request.url()).searchParams;
+      if (params.get("coordination") === "1") return json(route, { workId: WORK_ID, workspaceId: WORKSPACE_ID, tracker: fixture.tracker, coordinationOptions: { members: [{ userId: MEMBER_ID, email: "member@example.com" }], trackers: [{ workId: RELATED_WORK_ID, title: related.title, revision: related.revision }] } });
+      if (params.get("workId") === RELATED_WORK_ID) return json(route, { workId: RELATED_WORK_ID, workspaceId: WORKSPACE_ID, tracker: related });
       if (!fixture.tracker) return json(route, { error: "Tracker fixture has not been created." }, 404);
       return json(route, { workId: WORK_ID, workspaceId: WORKSPACE_ID, tracker: fixture.tracker, canRecordExperiment: true });
     }
@@ -209,4 +216,48 @@ test("delegated tracker work stays readable and read only on mobile", async ({ p
   await expect.poll(async () => (await page.locator("[data-frame-main]").boundingBox())?.x ?? -1).toBeLessThanOrEqual(1);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath("tracker-read-only-mobile.png"), fullPage: true });
+});
+
+
+test("selected records retain assignment and exact related records, with conflict recovery and scoped Undo", async ({ page }) => {
+  const initial = createTracker(sourcePreview(), { trackerId: TRACKER_ID, actorId: "owner", title: "Team backlog", at: "2026-09-11T15:00:00.000Z" });
+  const fixture = await installTrackerApi(page, { initialTracker: initial, conflictNextEdit: true, coordination: true });
+  await page.goto(`/workspace?workspaceId=${WORKSPACE_ID}&view=tracker&work=${WORK_ID}`);
+  await page.getByLabel("Select source row 2", { exact: true }).check();
+  await page.getByLabel("Select source row 3", { exact: true }).check();
+  await page.getByText("Assign or link selected records", { exact: true }).click();
+  await page.getByRole("combobox", { name: "Assign to", exact: true }).selectOption(MEMBER_ID);
+  await page.getByRole("combobox", { name: "Link a record from", exact: true }).selectOption(RELATED_WORK_ID);
+  await page.getByRole("combobox", { name: "Related record", exact: true }).selectOption(initial.rows[2]!.id);
+  await page.getByRole("button", { name: "Save assignment and links", exact: true }).click();
+  await expect(page.getByRole("main").getByRole("alert")).toContainText("This work changed");
+  expect(fixture.tracker!.rows[0]!.coordination).toBeUndefined();
+  await page.getByRole("button", { name: "Save assignment and links", exact: true }).click();
+  await expect.poll(() => fixture.tracker!.history.at(-1)?.coordinationChanges?.length).toBe(2);
+  expect(fixture.tracker!.rows[0]!.coordination).toEqual({ assigneeId: MEMBER_ID, links: [{ workId: RELATED_WORK_ID, rowId: initial.rows[2]!.id, linkedRevision: 0 }] });
+  await page.reload();
+  await page.getByText("member@example.com · 1 related", { exact: true }).first().click();
+  await page.screenshot({ path: "/tmp/strelva-tracker-coordination-desktop.png", fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(() => page.getByRole("main").evaluate(element => element.getBoundingClientRect().width)).toBeGreaterThan(380);
+  await page.getByText("member@example.com · 1 related", { exact: true }).first().scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "/tmp/strelva-tracker-coordination-assigned-mobile.png", fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.getByRole("link", { name: "Open related record in Release checklist", exact: true }).first().click();
+  await expect(page.getByText("Showing the linked record.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("table").getByRole("row")).toHaveCount(2);
+  await page.getByRole("button", { name: "Show all records", exact: true }).click();
+  await expect(page.getByRole("table").getByRole("row")).toHaveCount(51);
+  await page.goto(`/workspace?workspaceId=${WORKSPACE_ID}&view=tracker&work=${WORK_ID}`);
+  await page.getByRole("button", { name: "Edit Name, source row 2", exact: true }).click();
+  await page.getByLabel("New cell value").fill("Later cell edit");
+  await page.getByRole("button", { name: "Save edit", exact: true }).click();
+  await page.getByRole("button", { name: "Undo change 1", exact: true }).click();
+  await expect.poll(() => fixture.tracker!.rows[0]!.coordination?.assigneeId).toBeNull();
+  expect(fixture.tracker!.rows[0]!.coordination?.links).toEqual([]);
+  expect(Object.values(fixture.tracker!.rows[0]!.cells).some(cell => cell.value === "Later cell edit")).toBe(true);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(() => page.getByRole("main").evaluate(element => element.getBoundingClientRect().width)).toBeGreaterThan(380);
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: "/tmp/strelva-tracker-coordination-mobile.png", fullPage: true });
 });

@@ -10,7 +10,7 @@ import {
   trackerMappingSelectionSchema,
 } from "@/products/tracker";
 import { TrackerExperience, type TrackerSavedResult, type TrackerTransport } from "../TrackerExperience";
-import type { TrackerTemplateId } from "@/products/tracker/templates";
+import type { TrackerTemplateId } from "@/products/tracker/client";
 
 /** Browser memory only. No server requests, provider calls or persistent storage. */
 function localTransport(workspaceId: string): TrackerTransport {

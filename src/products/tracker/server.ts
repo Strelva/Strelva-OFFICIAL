@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { getSupabase } from "@/lib/db/client";
-import { getWork, saveWork, assertCanSaveWork } from "@/platform/workspaces/repository";
+import type { WorkspaceDb } from "@/platform/workspaces/schema";
+import { getWork, saveWork, assertCanSaveWork, assertWorkspaceMember, listWork } from "@/platform/workspaces/repository";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { previewTrackerImport } from "./import";
 import { createTracker, applyTrackerCommand, parseTrackerSnapshot, trackerWorkPayload } from "./engine";
-import { trackerImportInputSchema, trackerMappingSelectionSchema, trackerCommandSchema, type TrackerSnapshot } from "./contracts";
+import { trackerImportInputSchema, trackerMappingSelectionSchema, trackerCommandSchema, type TrackerSnapshot, type TrackerHistoryEntry } from "./contracts";
 import { summarizeTrackerExperiment, trackerExperimentInputSchema, trackerExperimentSchema } from "./experiment";
 import { summarizeTrackerComparison, trackerExperimentComparisonInputSchema } from "./comparison";
 
@@ -37,12 +38,58 @@ export async function readSavedTracker(actor: WorkspaceActor, workId: string) {
   return { workId: saved.id, workspaceId: saved.workspaceId, tracker };
 }
 
+async function authorizeCoordination(actor: WorkspaceActor, saved: Awaited<ReturnType<typeof readSavedTracker>>, entry: TrackerHistoryEntry) {
+  if (!entry.coordinationChanges?.length) return;
+  await assertWorkspaceMember(actor, saved.workspaceId);
+  const db = getSupabase();
+  if (!db) throw new WorkspaceStoreError("Tracker storage is unavailable.");
+  const checkedMembers = new Set<string>();
+  const targets = new Map<string, Awaited<ReturnType<typeof readSavedTracker>>>();
+  for (const change of entry.coordinationChanges) {
+    if (change.after.assigneeId && change.after.assigneeId !== change.before.assigneeId && !checkedMembers.has(change.after.assigneeId)) {
+      const { data, error } = await (db as unknown as WorkspaceDb).from("workspace_memberships").select("user_id").eq("workspace_id", saved.workspaceId).eq("user_id", change.after.assigneeId).maybeSingle();
+      if (error) throw new WorkspaceStoreError("Workspace membership could not be checked.");
+      if (!data) throw new WorkspaceAccessError("Choose a current workspace member.");
+      checkedMembers.add(change.after.assigneeId);
+    }
+    for (const link of change.after.links) {
+      if (change.before.links.some(previous => previous.workId === link.workId && previous.rowId === link.rowId && previous.linkedRevision === link.linkedRevision)) continue;
+      const target = targets.get(link.workId) ?? await readSavedTracker(actor, link.workId);
+      targets.set(link.workId, target);
+      if (target.workspaceId !== saved.workspaceId) throw new WorkspaceAccessError("Related records must belong to this workspace.");
+      if (target.workId === saved.workId && link.rowId === change.rowId) throw new WorkspaceConflictError("A record cannot link to itself.");
+      if (target.tracker.revision !== link.linkedRevision) throw new WorkspaceConflictError("The related tracker changed. Choose its current record.");
+      if (!target.tracker.rows.some(row => row.id === link.rowId && row.state === "active")) throw new WorkspaceConflictError("The related record is no longer available.");
+    }
+  }
+}
+
+/** Choices come only from the source workspace's current membership and readable trackers. */
+export async function readTrackerCoordinationOptions(actor: WorkspaceActor, workId: string) {
+  const saved = await readSavedTracker(actor, workId);
+  await assertWorkspaceMember(actor, saved.workspaceId);
+  const db = getSupabase();
+  if (!db) throw new WorkspaceStoreError("Workspace choices are unavailable.");
+  const { data: memberships, error } = await (db as unknown as WorkspaceDb).from("workspace_memberships").select("user_id").eq("workspace_id", saved.workspaceId);
+  if (error) throw new WorkspaceStoreError("Workspace members could not be read.");
+  const ids = (memberships ?? []).map(row => String(row.user_id));
+  const { data: users, error: usersError } = ids.length ? await db.from("users").select("id,email").in("id", ids) : { data: [], error: null };
+  if (usersError) throw new WorkspaceStoreError("Workspace member names could not be read.");
+  const work = await listWork(actor, saved.workspaceId);
+  return { members: (users ?? []).map(user => ({ userId: String(user.id), email: String(user.email) })), trackers: work.flatMap(item => {
+    if (item.productId !== "tracker" || item.resourceKind !== "tracker") return [];
+    const tracker = parseTrackerSnapshot((item.payload as { tracker?: unknown } | null)?.tracker);
+    return tracker ? [{ workId: item.id, title: tracker.title, revision: tracker.revision }] : [];
+  }) };
+}
+
 export async function editSavedTracker(actor: WorkspaceActor, workId: string, raw: unknown) {
   const saved = await readSavedTracker(actor, workId);
   // Membership is checked again inside the write transaction. Read delegation
   // does not confer edit authority.
   const command = trackerCommandSchema.parse({ ...(raw && typeof raw === "object" ? raw : {}), trackerId: saved.tracker.id, actorId: actor.userId, at: new Date().toISOString() });
   const tracker = applyTrackerCommand(saved.tracker, command);
+  await authorizeCoordination(actor, saved, tracker.history.at(-1)!);
   const db = getSupabase();
   if (!db) throw new WorkspaceStoreError("Tracker storage is unavailable.");
   const rpc = db as unknown as { rpc(name: string, input: Record<string, unknown>): Promise<{ data: Array<{ payload: { tracker: TrackerSnapshot } }> | null; error: { message: string } | null }> };

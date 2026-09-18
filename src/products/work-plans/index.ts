@@ -6,6 +6,8 @@ export {
   WorkPlanInvalidOutputError,
   WorkPlanNotFoundError,
   WorkPlanUnavailableError,
+  WorkPlanFundingRequiredError,
+  WorkPlanGenerationReplayError,
   WorkPlanUnsupportedOperationError,
   WorkPlanExecutionConflictError,
   WorkPlanExecutionUnsupportedError,
@@ -58,6 +60,7 @@ export type {
 } from "./context";
 export type {
   WorkPlanGenerationInput,
+  WorkPlanGenerationResult,
   WorkPlanGenerator,
 } from "./server";
 export { listWorkPlanOutputs } from "@/platform/workspaces";

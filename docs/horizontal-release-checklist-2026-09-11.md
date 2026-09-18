@@ -1,8 +1,54 @@
-# Horizontal slice release checklist
+# Horizontal release checklist
 
-This is a rollout checklist for the [selected first scope](./horizontal-first-scope-2026-09-11.md).
-It does not authorize a production action. Local implementation and synthetic
-browser evidence are separate from authenticated staging and production evidence.
+This checklist covers the [September 12 horizontal implementation](./strelvav2-horizontal-acceptance.md),
+which extends the [selected first scope](./horizontal-first-scope-2026-09-11.md).
+It does not authorize a production action. Synthetic browser, real local
+Auth/Postgres, hosted staging and production evidence remain separate.
+
+## Current completion evaluation
+
+Jacob requested parallel Sol agents at medium effort to complete the product.
+UI/UX polish remains deferred; usable existing controls, accessibility, honest
+states and recoverable journeys are required now. The eight
+[PRDs](../../.scratch/strelvav2-experience/spec.md) and existing definition of done
+remain the scope; the tracks below are the first implementation wave, not a
+replacement for the full acceptance inventory.
+
+| Track | Required observable evaluation | Independent acceptance |
+| --- | --- | --- |
+| Application continuity | Setup/retry opens the actual correct-business app; owner and employee use, exact candidate review, publication, record-preserving rollback and revocation work | Verify rendered destination and durable authenticated behavior; URL-only and separate mocks cannot close the handoff |
+| Account continuity | Supported context survives authentication and return; wrong-account/business access fails; expired callback recovers; repeat continuation does not duplicate work | Inspect public and authenticated boundaries, privacy in URLs/analytics, and actual retained result |
+| Economics | Payer cap controls admission; concurrent attempts and replay cannot double-charge; trusted known cost reconciles once; unknown cost remains explicit | Exercise denied access, failed receipt/settlement and recovery without repeating an accepted provider effect |
+| Operations | Accepted assignments execute within scope; expired/revoked authority fails before effect; pause/cancel stops future work; lost receipt recovers once | Use isolated real Auth/Postgres, distinguishing simulated external providers from connected provider evidence |
+| Release integration | Focused regressions, typecheck, lint, tests, build, boundaries, ontology, compatibility, version parity and schema/upgrade checks pass | Inspect aggregate failures and source changes; independently evaluate uncovered PRD and learning-loop cases |
+
+Each agent reports changed files, exact command/environment, observed result,
+remaining failures and fixture/provider limits. Skips and unavailable prerequisites
+are open cases, not passes. A test must fail on the consequential incorrect
+outcome it claims to guard. Builders cannot accept their own track solely from
+their test count; the independent evaluation and integration review remain gates.
+Use isolated data, existing browser/authenticated command/API/SQL boundaries and
+separate output directories. Do not weaken acceptance to obtain green checks.
+
+The initial independent evaluation is recorded under
+`output/production-completion/evaluation.md`. The acceptance ledger remains the
+owner of completed proof. Production deployment, migration and provider actions
+must be prepared as exact reviewable operations before crossing their live
+boundary; no local run establishes customer adoption or commercial value.
+
+## First customer release case
+
+Jacob selected The Mooney Firm at attymooney.com and its native Outlook / ADR
+Notable handoff. [PRD 08](../../.scratch/strelvav2-experience/issues/08-acceptance-release-and-customer-value.md#selected-first-case-the-mooney-firm)
+owns that acceptance contract. Strelva retains minimum execution metadata; it
+does not introduce a second firm case or inquiry-status system. Generic inquiry
+and staff-app passes remain broader-product evidence, not proof of this handoff.
+
+The current client source is `/Users/jacobrhinehart/Desktop/mooney-firm-site`.
+Local hardening is isolated in `/Users/jacobrhinehart/Desktop/mooney-native-handoff`
+from recorded release commit `b831abc`, preserving the canonical checkout's
+uncommitted client work. Production data/configuration, mailbox receipt and the
+firm's ADR template/permissions must be verified at the authorized live boundary.
 
 ## Scope to review
 
@@ -14,6 +60,10 @@ browser evidence are separate from authenticated staging and production evidence
   time, outcome, evidence and known provider cost. They do not publish an offering.
 - Website setup suggestions and corrections, scoped business attention, and
   copying an inquiry setup into a fresh draft for another authorized business.
+- Private fixed-part applications, scheduling, recurring record comparisons,
+  owner-approved work with runtime budgets, scoped contributions and source context.
+- Internal evidence and learning work, restricted to active Strelva administrators.
+- Record assignments and links, with source-workspace coordination removed on handoff.
 
 CSV is the supported import format. Excel workbooks, spreadsheet formulas,
 arbitrary generated applications and third-party agent execution are outside this
@@ -67,9 +117,17 @@ businesses and users. Do not point a local fixture at production stores.
 
 The optional browser files are `tests/tracker-authenticated-local.spec.ts`,
 `tests/tracker-handoff-authenticated-local.spec.ts`, and
-`tests/inquiry-authenticated-local.spec.ts`. They require loopback application
+`tests/inquiry-authenticated-local.spec.ts`,
+`tests/horizontal-operations-authenticated-local.spec.ts`,
+`tests/work-authority-authenticated-local.spec.ts`, and
+`tests/tracker-coordination-authenticated-local.spec.ts`, and
+`tests/work-plan-application-authenticated-local.spec.ts`. They require loopback application
 and Supabase URLs and use actual local Auth sessions. They skip unless
-`STRELVA_LOCAL_AUTH_PROOF=1` is set.
+`STRELVA_LOCAL_AUTH_PROOF=1` is set. The September 12
+[local verification note](./work-authority-local-verification-2026-09-12.md)
+records the actual isolated run and its limits. Background responsibility and
+investigation dispatch additionally requires `STRELVA_BACKGROUND_WORK_RELEASE=1`;
+that gate remains off in production.
 
 Create a separate local Supabase project with the forward numeric migrations,
 and keep its keys outside tracked files and logs. Run the app with the matching

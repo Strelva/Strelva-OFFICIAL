@@ -111,7 +111,7 @@ async function mockWorkspace(page: Page, handler: (route: Route) => Promise<void
 test("keeps one navigation around saved work on desktop and mobile", async ({ page }) => {
   await mockWorkspace(page, (route) => fulfill(route, snapshot()));
   await page.goto("/workspace");
-  await expect(page.getByRole("heading", { name: "What would you like to work on?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Your work, ready to continue.|What would you like to accomplish/ })).toBeVisible();
   const navigation = page.getByLabel("Strelva navigation", { exact: true });
   await expect(navigation).toBeVisible();
   await page.screenshot({ path: "test-results/workspace-home-desktop.png", fullPage: true });
@@ -370,13 +370,13 @@ test("keeps managed discovery honest when tenant links are temporarily unavailab
 test("returns from an empty agency view to My work", async ({ page }) => {
   await mockWorkspace(page, (route) => fulfill(route, snapshot({ work: [] })));
   await page.goto("/workspace");
-  await expect(page.getByRole("heading", { name: "What would you like to work on?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Your work, ready to continue.|What would you like to accomplish/ })).toBeVisible();
   await page.getByRole("link", { name: "Strelva home", exact: true }).click();
   await page.getByRole("button", { name: "What would make this more useful?", exact: true }).click();
   await page.getByRole("main").getByRole("button", { name: "Sharing & agency access" }).click();
   await expect(page.getByRole("heading", { name: "Prepare useful work before the customer arrives." })).toBeVisible();
   await page.getByRole("link", { name: "Strelva home", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "What would you like to work on?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Your work, ready to continue.|What would you like to accomplish/ })).toBeVisible();
 });
 
 test("keeps My work and Shared with me context-local and read-only", async ({ page }) => {
@@ -401,13 +401,14 @@ test("keeps My work and Shared with me context-local and read-only", async ({ pa
   await expect(page.getByRole("heading", { name: "Take a closer look." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Shared work", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open Customer-owned assessment" })).toBeVisible();
-  await page.getByRole("button", { name: "Check a business" }).click();
+  await page.getByRole("button", { name: /^Explore offerings/ }).click();
+  await page.getByRole("button", { name: /AI Visibility/ }).click();
   await expect(page.getByRole("button", { name: "Check a business", exact: true })).toBeDisabled();
   await expect(page.getByText("Switch to a workspace you own to create an assessment.")).toBeVisible();
 
   // Returning to owned work changes context before rendering its collection.
   await page.getByLabel("Current workspace").selectOption(PERSONAL_ID);
-  await expect(page.getByRole("heading", { name: "What would you like to work on?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Your work, ready to continue.|What would you like to accomplish/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open Harbor Dental" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open Customer-owned assessment" })).toHaveCount(0);
   await page.screenshot({ path: "test-results/workspace-my-work-restored.png", fullPage: true });
@@ -425,7 +426,7 @@ test("hands work to the named customer with optional access unchecked, then revo
   ];
   const agencySnapshot = () => snapshot({ actor: { email: "agency@example.com", localPreview: false }, workspaces, workspaceId: AGENCY_ID, work: [agencyWork], handoffs });
   const customerSnapshot = () => snapshot({ workspaces, workspaceId: CUSTOMER_ID, work: [work({ id: CUSTOMER_WORK_ID, workspaceId: CUSTOMER_ID })], handoffs: [], delegations: delegationActive ? [{ id: DELEGATION_ID, workId: CUSTOMER_WORK_ID, agencyWorkspaceId: AGENCY_ID, status: "active", canRevoke: true }] : [] });
-  const preview: WorkspaceHandoffPreview = { recipientEmail: "owner@example.com", agencyName: "Northstar Agency", work: agencyWork, expiresAt: "2026-09-12T14:00:00.000Z", accepted: false };
+  const preview: WorkspaceHandoffPreview = { recipientEmail: "owner@example.com", agencyName: "Northstar Agency", work: agencyWork, expiresAt: "2026-09-12T14:00:00.000Z", destinations: [{ id: CUSTOMER_ID, name: "Harbor Dental" }], accepted: false };
 
   await mockWorkspace(page, async (route) => {
     const request = route.request();
@@ -433,7 +434,7 @@ test("hands work to the named customer with optional access unchecked, then revo
       const selected = new URL(request.url()).searchParams.get("workspaceId");
       return fulfill(route, selected === CUSTOMER_ID || customerAccepted ? customerSnapshot() : agencySnapshot());
     }
-    const body = request.postDataJSON() as { action: string; allowAgencyAccess?: boolean };
+    const body = request.postDataJSON() as { action: string; allowAgencyAccess?: boolean; destination?: { kind?: string; workspaceId?: string; name?: string } };
     if (body.action === "handoff") {
       handoffs = [{ id: HANDOFF_ID, sourceWorkId: WORK_ID, recipientEmail: "owner@example.com", status: "pending", expiresAt: preview.expiresAt, createdAt: "2026-09-05T15:00:00.000Z" }];
       return fulfill(route, { token: "recipient-bound-secret" }, 201);
@@ -441,6 +442,7 @@ test("hands work to the named customer with optional access unchecked, then revo
     if (body.action === "inspect_handoff") return fulfill(route, preview);
     if (body.action === "accept_handoff") {
       expect(body.allowAgencyAccess).toBe(true);
+      expect(body.destination).toEqual({ kind: "existing", workspaceId: CUSTOMER_ID });
       customerAccepted = true;
       return fulfill(route, { workspaceId: CUSTOMER_ID, workId: CUSTOMER_WORK_ID });
     }
@@ -469,6 +471,7 @@ test("hands work to the named customer with optional access unchecked, then revo
   await expect(page.getByRole("button", { name: "Accept into my workspace" })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Back to workspace" })).toBeFocused();
+  await page.getByLabel("Business", { exact: true }).selectOption(CUSTOMER_ID);
   await consent.check();
   await page.getByRole("button", { name: "Accept into my workspace" }).click();
   expect(new URL(page.url()).searchParams.has("save")).toBe(false);
@@ -501,13 +504,13 @@ test("hands a tracker to the named customer and keeps optional agency access rea
   const agencySnapshot = () => snapshot({ actor: { email: "agency@example.com", localPreview: false }, workspaces: agencyWorkspaces, workspaceId: AGENCY_ID, work: [agencyWork], handoffs });
   const customerSnapshot = () => snapshot({ actor: { email: "owner@example.com", localPreview: false }, workspaces: customerWorkspaces, workspaceId: CUSTOMER_ID, work: [customerWork], handoffs: [], delegations: [{ id: DELEGATION_ID, workId: CUSTOMER_WORK_ID, agencyWorkspaceId: AGENCY_ID, status: "active", canRevoke: true }] });
   const agencyReaderSnapshot = () => snapshot({ actor: { email: "agency@example.com", localPreview: false }, workspaces: agencyReaderWorkspaces, workspaceId: CUSTOMER_ID, work: [customerWork], handoffs: [], delegations: [{ id: DELEGATION_ID, workId: CUSTOMER_WORK_ID, agencyWorkspaceId: AGENCY_ID, status: "active", canRevoke: false }] });
-  const preview: WorkspaceHandoffPreview = { recipientEmail: "owner@example.com", agencyName: "Northstar Agency", work: { ...agencyWork, tracker: trackerPreview }, expiresAt: "2026-09-12T14:00:00.000Z", accepted: false };
+  const preview: WorkspaceHandoffPreview = { recipientEmail: "owner@example.com", agencyName: "Northstar Agency", work: { ...agencyWork, tracker: trackerPreview }, expiresAt: "2026-09-12T14:00:00.000Z", destinations: [{ id: CUSTOMER_ID, name: "Harbor Dental" }], accepted: false };
 
   await mockWorkspace(page, async (route) => {
     if (route.request().method() === "GET") {
       return fulfill(route, phase === "agency" ? agencySnapshot() : phase === "customer" ? customerSnapshot() : agencyReaderSnapshot());
     }
-    const body = route.request().postDataJSON() as { action: string; allowAgencyAccess?: boolean };
+    const body = route.request().postDataJSON() as { action: string; allowAgencyAccess?: boolean; destination?: { kind?: string; workspaceId?: string; name?: string } };
     if (body.action === "handoff") {
       handoffs = [{ id: HANDOFF_ID, sourceWorkId: TRACKER_WORK_ID, recipientEmail: "owner@example.com", status: "pending", expiresAt: preview.expiresAt, createdAt: "2026-09-05T15:00:00.000Z" }];
       return fulfill(route, { token: "tracker-recipient-secret" }, 201);
@@ -515,6 +518,7 @@ test("hands a tracker to the named customer and keeps optional agency access rea
     if (body.action === "inspect_handoff") return fulfill(route, preview);
     if (body.action === "accept_handoff") {
       expect(body.allowAgencyAccess).toBe(true);
+      expect(body.destination).toEqual({ kind: "existing", workspaceId: CUSTOMER_ID });
       phase = "customer";
       return fulfill(route, { workspaceId: CUSTOMER_ID, workId: CUSTOMER_WORK_ID });
     }
@@ -534,6 +538,7 @@ test("hands a tracker to the named customer and keeps optional agency access rea
   await expect(page.getByRole("cell", { name: "Example" })).toBeVisible();
   const consent = page.getByLabel("Allow Northstar Agency read-only access");
   await expect(consent).not.toBeChecked();
+  await page.getByLabel("Business", { exact: true }).selectOption(CUSTOMER_ID);
   await consent.check();
   await page.getByRole("button", { name: "Accept into my workspace" }).click();
   await expect(page.getByRole("heading", { name: "Shared backlog", exact: true })).toBeVisible();
@@ -766,7 +771,7 @@ test("restores the exact agency result across reload and browser history", async
   await page.reload();
   await expect(page.getByRole("heading", { name: "Agency result", exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Strelva home", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "What would you like to work on?" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Your work, ready to continue.|What would you like to accomplish/ })).toBeVisible();
   await page.goBack();
   await expect(page.getByRole("heading", { name: "Agency result", exact: true })).toBeVisible();
   await expect(page.getByLabel("Current workspace")).toHaveValue(AGENCY_ID);
@@ -777,7 +782,7 @@ test("never substitutes another result for an unavailable deep link", async ({ p
   await page.goto(`/workspace?workspaceId=${PERSONAL_ID}&work=missing`);
   await expect(page.getByRole("heading", { name: "This saved result is unavailable." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Harbor Dental", exact: true })).not.toBeVisible();
-  await page.getByRole("button", { name: "Back to my work" }).click();
+  await page.getByRole("button", { name: "Back to work", exact: true }).click();
   await page.getByRole("button", { name: "Open Harbor Dental", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Harbor Dental", exact: true })).toBeVisible();
 });

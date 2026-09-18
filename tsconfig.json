@@ -45,7 +45,15 @@
     ".next-playwright/types/**/*.ts",
     ".next-playwright/dev/types/**/*.ts",
     ".next-inquiries/types/**/*.ts",
-    ".next-inquiries/dev/types/**/*.ts"
+    ".next-inquiries/dev/types/**/*.ts",
+    ".next-local-review/types/**/*.ts",
+    ".next-local-review/dev/types/**/*.ts",
+    ".next-topology/types/**/*.ts",
+    ".next-topology/dev/types/**/*.ts",
+    ".next-components-restart/types/**/*.ts",
+    ".next-components-restart/dev/types/**/*.ts",
+    ".next-visible-review/types/**/*.ts",
+    ".next-visible-review/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

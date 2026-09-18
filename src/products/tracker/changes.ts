@@ -1,5 +1,7 @@
 import { TrackerConflictError, TrackerValidationError, type TrackerBulkUpdateCommand, type TrackerCellChange, type TrackerHistoryEntry, type TrackerSnapshot, type TrackerUndoCommand } from "./contracts";
 
+import { trackerCoordinationUndoBlock, undoTrackerCoordination } from "./coordination";
+
 export function trackerReceiptChanges(entry: TrackerHistoryEntry): TrackerCellChange[] {
   if (entry.kind === "update_cell" && entry.columnId && entry.before !== null && entry.after !== null) {
     return [{ rowId: entry.rowId, columnId: entry.columnId, before: entry.before, after: entry.after }];
@@ -9,6 +11,7 @@ export function trackerReceiptChanges(entry: TrackerHistoryEntry): TrackerCellCh
 
 /** Undo compensates only the recorded cells. Later records and unrelated edits survive. */
 export function trackerUndoBlock(snapshot: TrackerSnapshot, entry: TrackerHistoryEntry): string | null {
+  if (entry.coordinationChanges) return trackerCoordinationUndoBlock(snapshot, entry);
   const changes = trackerReceiptChanges(entry);
   if (!changes.length || entry.kind === "undo_change") return "This change cannot be undone here.";
   if (snapshot.history.some(item => item.undoesCommandId === entry.commandId)) return "This change has already been undone.";
@@ -25,6 +28,7 @@ export function trackerUndoBlock(snapshot: TrackerSnapshot, entry: TrackerHistor
 
 /** Validates the entire proposal before making any changes. One revision, one receipt. */
 export function applyTrackerCellChange(snapshot: TrackerSnapshot, command: TrackerBulkUpdateCommand | TrackerUndoCommand): TrackerSnapshot {
+  if (command.kind === "undo_change" && snapshot.history.find(entry => entry.commandId === command.targetCommandId)?.coordinationChanges) return undoTrackerCoordination(snapshot, command);
   let changes: TrackerCellChange[];
   if (command.kind === "bulk_update") {
     if (new Set(command.rowIds).size !== command.rowIds.length) throw new TrackerValidationError("duplicate_rows", "Select each row once.");

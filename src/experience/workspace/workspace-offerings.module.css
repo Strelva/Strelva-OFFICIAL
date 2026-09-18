@@ -1,0 +1,78 @@
+.directoryHeader { padding-block: 8px 32px; }
+.directoryHeader h2,.detail h2,.status h2 { color: var(--warm-black); font-family: var(--font-display),serif; font-size: clamp(28px,4vw,42px); font-weight: 400; line-height: 1.15; letter-spacing: -.02em; text-wrap: balance; }
+.directoryHeader>p:last-child,.detail header>p:last-child,.status p { max-width: 660px; margin-top: 14px; color: var(--gray-muted); font-size: 14px; line-height: 1.7; }
+.eyebrow { margin-bottom: 12px; color: var(--accent-text); font-size: 11px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
+.list { border-top: 1px solid var(--gray-border); }
+.row { display: flex; width: 100%; min-width: 0; align-items: center; gap: 18px; padding: 24px 8px; border-bottom: 1px solid var(--gray-border); color: var(--gray-muted); text-align: left; }
+.row:hover { background: var(--surface); }
+.row>span:nth-child(2) { min-width: 0; flex: 1; }
+.row strong { display: block; overflow-wrap: anywhere; color: var(--warm-black); font-size: 18px; font-weight: 500; }
+.row p { max-width: 620px; margin-block: 7px; color: var(--gray-muted); font-size: 13px; line-height: 1.6; }
+.row small { color: var(--accent-text); font-size: 11px; }
+.symbol { display: grid; width: 44px; height: 44px; flex: 0 0 44px; place-items: center; border-radius: 14px; background: var(--surface-raised); color: var(--accent-text); }
+.detail { max-width: 760px; }
+.detail header { padding-bottom: 24px; }
+.back { min-height: 44px; margin-bottom: 18px; color: var(--gray-muted); font-size: 13px; }
+.section,.fields,.accepted { margin-top: 28px; padding-top: 24px; border-top: 1px solid var(--gray-border); }
+.section h3,.fields legend,.accepted h3,.retiredList h3 { margin-bottom: 14px; color: var(--warm-black); font-size: 14px; font-weight: 500; }
+.section>p,.retireForm>p { color: var(--gray-muted); font-size: 13px; line-height: 1.65; }
+.simpleList { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.simpleList li { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 14px; border: 1px solid var(--gray-border); border-radius: 12px; background: var(--surface); color: var(--gray-muted); font-size: 12px; }
+.simpleList li>span:first-child { min-width: 0; }
+.simpleList strong { display: block; color: var(--warm-black); font-weight: 500; overflow-wrap: anywhere; }
+.simpleList small { display: block; margin-top: 3px; line-height: 1.5; }
+.simpleList a { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 6px; color: var(--accent-text); }
+.fields { display: grid; gap: 16px; min-width: 0; }
+.fields label,.retireForm label { display: grid; gap: 8px; color: var(--warm-black); font-size: 13px; }
+.fields input:not([type="radio"]):not([type="checkbox"]),.fields textarea,.fields select,.retireForm textarea { width: 100%; min-width: 0; border: 1px solid var(--gray-border); border-radius: 10px; background: var(--surface-base); padding: 11px 13px; color: var(--warm-black); font-size: 16px; line-height: 1.5; }
+.fields textarea,.retireForm textarea { min-height: 96px; resize: vertical; }
+.checkField,.radioField { display: flex!important; min-height: 40px; align-items: center; gap: 10px!important; }
+.checkField input,.radioField input { width: 18px; height: 18px; flex: 0 0 18px; accent-color: var(--accent); }
+.activationConfirm { display: flex; min-height: 44px; align-items: center; gap: 10px; margin-top: 16px; color: var(--warm-black); font-size: 13px; }
+.activationConfirm input { width: 18px; height: 18px; flex: 0 0 18px; accent-color: var(--accent); }
+.nestedFields { display: grid; gap: 14px; margin-left: 28px; }
+.accepted ul { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.accepted li { display: flex; align-items: flex-start; gap: 10px; color: var(--accent-text); }
+.accepted li span { min-width: 0; }
+.accepted strong,.accepted small { display: block; }
+.accepted strong { color: var(--warm-black); font-size: 13px; font-weight: 500; }
+.accepted small { margin-top: 3px; color: var(--gray-muted); font-size: 12px; line-height: 1.5; }
+.primary,.secondary,.danger { display: inline-flex; min-height: 44px; align-items: center; justify-content: center; gap: 8px; margin-top: 20px; border-radius: 12px; padding: 10px 14px; font-size: 13px; font-weight: 500; }
+.primary { background: var(--accent); color: var(--on-accent); }
+.secondary { border: 1px solid var(--gray-border); color: var(--warm-black); }
+.danger { background: var(--action-danger); color: var(--on-action-danger); }
+.primary:disabled,.secondary:disabled,.danger:disabled { cursor: not-allowed; opacity: .45; }
+.note,.blocked,.retired,.error { margin-top: 18px; border: 1px solid var(--gray-border); padding: 12px 14px; color: var(--gray-muted); font-size: 12px; line-height: 1.65; overflow-wrap: anywhere; }
+.blocked { background: var(--surface-inset); }
+.retired { color: var(--gray-muted); }
+.error { border-color: color-mix(in oklab,var(--critical) 35%,var(--gray-border)); color: var(--critical); }
+.retireForm>div { display: flex; flex-wrap: wrap; gap: 10px; }
+.retiredList { margin-top: 40px; }
+.retiredList button { display: flex; min-height: 44px; align-items: center; gap: 8px; color: var(--gray-muted); }
+.websiteAssignments { margin-bottom:40px; padding:22px; border:1px solid var(--gray-border); border-radius:18px; background:var(--surface); }
+.websiteAssignments header h2 { color:var(--warm-black); font-size:18px; font-weight:500; }
+.websiteAssignments header>p:last-child { max-width:640px; margin:8px 0 18px; color:var(--gray-muted); font-size:12px; line-height:1.6; }
+.bindingActions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:12px; }
+.bindingActions a,.bindingActions button,.availableSites button { min-height:40px; color:var(--accent-text); font-size:12px; }
+.availableSites { display:grid; gap:8px; margin-top:18px; }
+.availableSites h3 { color:var(--warm-black); font-size:13px; font-weight:500; }
+.availableSites>div { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; padding:10px 14px; border:1px solid var(--gray-border); border-radius:12px; }
+.availableSites strong,.availableSites small { display:block; }
+.availableSites strong { color:var(--warm-black); font-size:12px; font-weight:500; }
+.availableSites small { margin-top:3px; color:var(--gray-muted); font-size:11px; }
+.status { max-width: 660px; padding-block: 24px; }
+.status>svg { margin-bottom: 16px; color: var(--accent-text); }
+.homePanel { padding: 24px; border: 1px solid var(--home-panel-border); border-radius: 24px; background: var(--home-panel-bg); box-shadow: var(--home-panel-shadow); }
+.homePanel header { display: flex; align-items: center; gap: 10px; padding: 0 5px 12px; }
+.homePanel header svg { color: var(--home-panel-icon); }
+.homePanel h2 { min-width: 0; flex: 1; color: var(--home-panel-title); font-size: 13px; font-weight: 500; }
+.homePanel header>span { display: grid; min-width: 25px; height: 25px; place-items: center; border-radius: 50%; background: var(--home-summary-count-bg); color: var(--home-summary-count-text); font-size: 11px; }
+.homePanel>p,.homeEmpty p { margin: 8px 5px; color: var(--home-panel-description); font-size: 11px; line-height: 1.6; }
+.homePanel ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.homePanel li button { display: flex; width: 100%; min-width: 0; align-items: center; gap: 8px; border: 1px solid var(--home-row-border); border-radius: 14px; background: var(--home-row-bg); padding: 12px 10px; color: var(--home-panel-title); text-align: left; }
+.homePanel li button>span { min-width: 0; flex: 1; }
+.homePanel strong,.homePanel small { display: block; overflow-wrap: anywhere; }
+.homePanel strong { font-size: 11px; font-weight: 500; }
+.homePanel small { margin-top: 4px; color: var(--home-panel-detail); font-size: 10px; line-height: 1.5; }
+.homePanel>button,.homeEmpty button { min-height: 40px; margin: 8px 5px 0; color: var(--home-panel-action-text); font-size: 11px; }
+@media(max-width:639px) { .row { gap: 12px; padding-block: 20px; } .row>svg { display: none; } .symbol { width: 38px; height: 38px; flex-basis: 38px; } .simpleList li { align-items: flex-start; flex-direction: column; } .nestedFields { margin-left: 0; } }

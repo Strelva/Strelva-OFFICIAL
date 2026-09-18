@@ -37,6 +37,7 @@ import type {
   ResponsibilityDeliveryGate,
 } from "./delivery";
 import { inquiryEmailReadiness } from "./email-consent";
+import { stateForReceive } from "./receive";
 import type {
   InquiryMessageReviewAction,
   InquiryMessageReviewExecution,
@@ -51,6 +52,8 @@ import {
   INQUIRY_MESSAGE_REVIEW_SCHEMA_VERSION,
   InquiryMessageReviewEngineError,
   type InquiryMessageReviewEventMetadata,
+  assertOpenInquiry,
+  assertResponsibilitySponsor,
   dependency,
   errorCode,
   errorMessage,
@@ -232,18 +235,6 @@ function assertCapability(
   return { capability, definition: capability.live };
 }
 
-function assertOpen(status: InquiryRecordStatus): void {
-  if (status === "handled" || status === "blocked") {
-    throwCode("inquiry_changed", "This inquiry is no longer open for message delivery.");
-  }
-}
-
-function assertSponsor(responsibility: ResponsibilityPolicy, actorId: string): void {
-  if (responsibility.sponsorId !== actorId) {
-    throwCode("permission_denied", "Only the current responsibility sponsor can approve this message.");
-  }
-}
-
 function assertEventBinding(
   context: ReviewContext,
   metadata: InquiryMessageReviewEventMetadata,
@@ -285,10 +276,10 @@ async function buildContext(input: {
   const { capability, definition } = assertCapability(snapshot, lead);
   await readyForEmail(input.tenantId, definition, input.deps);
   const status = await overlayStatus(input.tenantId, input.businessId, input.inquiryId, snapshot.state, input.deps);
-  assertOpen(status);
+  assertOpenInquiry(status);
   const responsibility = responsibilityFor(snapshot.state, capability.id, input.responsibilityId);
   if (responsibility.businessId !== input.businessId) throwCode("permission_denied", "This responsibility belongs to another business.");
-  assertSponsor(responsibility, input.actorId);
+  assertResponsibilitySponsor(responsibility, input.actorId);
   if (input.expectedResponsibilityRevision && responsibility.updatedAt !== input.expectedResponsibilityRevision) {
     throwCode("policy_changed", "The current responsibility policy changed. Prepare a fresh review.");
   }
@@ -309,7 +300,8 @@ async function buildContext(input: {
   const messageBody = renderInquiryMessage(message).text;
   const messageDigest = getInquiryDeliveryMessageDigest(message);
   const record = recordFromLead(snapshot.state, capability, lead, status);
-  const state: InquiryEngineState = { ...snapshot.state, inquiries: [record] };
+  const state = stateForReceive(snapshot);
+  state.inquiries = [...state.inquiries.filter((item) => item.id !== record.id), record];
   let evaluation: ResponsibilityEvaluation;
   try {
     const engine = new InquiryEngine({ businessId: input.businessId, state, now: () => input.now.toISOString() });
@@ -685,7 +677,8 @@ async function persistVerifiedReceipt(input: {
     const currentResponsibility = snapshot.state.responsibilities.find((item) => item.id === input.metadata.responsibilityId);
     if (!currentResponsibility || currentResponsibility.sponsorId !== input.metadata.requestedBy) return false;
     const record = recordFromLead(snapshot.state, input.context.capability, input.context.lead, input.context.status);
-    const state: InquiryEngineState = { ...snapshot.state, inquiries: [record] };
+    const state = stateForReceive(snapshot);
+    state.inquiries = [...state.inquiries.filter((item) => item.id !== record.id), record];
     let receipt: import("./contracts").ResponsibilityActionReceipt;
     let updatedState: InquiryEngineState | null = null;
     try {

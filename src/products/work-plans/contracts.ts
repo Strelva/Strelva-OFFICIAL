@@ -1,6 +1,7 @@
 import type { SavedWork, WorkspaceActor } from "@/platform/workspaces";
 import type { OperationEffect } from "@/platform/products";
 import { z } from "zod";
+import { applicationSpecSchema } from "@/products/applications/contracts";
 
 export const WORK_PLAN_PRODUCT_ID = "work_plans" as const;
 export const WORK_PLAN_RESOURCE_KIND = "plan" as const;
@@ -25,7 +26,7 @@ export const workPlanContextSourceReferenceSchema = z.object({
   title: text(160),
   version: contextSourceVersion,
   revision: z.number().int().nonnegative().nullable(),
-  updatedAt: z.string().datetime(),
+  updatedAt: z.string().datetime({ offset: true }),
 }).strict();
 export type WorkPlanContextSourceReference = z.infer<typeof workPlanContextSourceReferenceSchema>;
 
@@ -48,7 +49,19 @@ export type WorkPlanEvidence = z.infer<typeof workPlanEvidenceSchema>;
  * A plan may include a small reviewable draft. The draft is data only until a
  * person explicitly accepts the matching output through the execution route.
  */
+export const workPlanApplicationDraftSchema = z.object({
+  kind: z.literal("application"),
+  title: applicationSpecSchema.shape.title,
+  fields: applicationSpecSchema.shape.fields,
+  components: applicationSpecSchema.shape.components,
+}).strict().superRefine((value, context) => {
+  const { kind: _kind, ...spec } = value;
+  const parsed = applicationSpecSchema.safeParse({ ...spec, maintenanceOwner: "assigned-by-server" });
+  if (!parsed.success) for (const issue of parsed.error.issues) context.addIssue({ code: "custom", message: issue.message, path: issue.path });
+});
+
 export const workPlanOutputDraftSchema = z.discriminatedUnion("kind", [
+  workPlanApplicationDraftSchema,
   z.object({
     kind: z.literal("document"),
     title: text(160),
@@ -109,6 +122,8 @@ export type GeneratedWorkPlan = z.infer<typeof generatedWorkPlanSchema>;
 
 export interface WorkPlanNativeOperation {
   id: string;
+  /** Exact executable capability version selected for this plan. */
+  capabilityVersion?: number;
   productId: string;
   resourceKind: string;
   label: string;
@@ -119,6 +134,7 @@ export interface WorkPlanNativeOperation {
 
 export const workPlanNativeOperationSchema = z.object({
   id: identifier,
+  capabilityVersion: z.number().int().positive().optional(),
   productId: identifier,
   resourceKind: identifier,
   label: text(160),
@@ -164,6 +180,12 @@ export const createWorkPlanRequestSchema = z.object({
   userGoal: text(3_000),
   evidence: z.array(workPlanEvidenceSchema).max(12).optional().default([]),
   sourceWorkIds: z.array(z.string().uuid()).max(6).optional(),
+  /** A payer-created and accepted work-economics job is required for model generation. */
+  planningEconomics: z.object({
+    jobId: z.string().uuid(),
+    executionKey: z.string().trim().min(1).max(100).regex(/^[A-Za-z0-9][A-Za-z0-9_.:-]*$/),
+    maximumCents: z.number().int().nonnegative().max(1_000_000),
+  }).strict().optional(),
 }).strict();
 export type CreateWorkPlanRequest = z.infer<typeof createWorkPlanRequestSchema>;
 
@@ -185,9 +207,11 @@ export const workPlanOutputExecutionReceiptSchema = z.object({
   outputId: identifier,
   planRevision: z.number().int().positive(),
   operationId: identifier,
+  /** Required for newly generated plans; optional for pre-capability receipts. */
+  capabilityVersion: z.number().int().positive().optional(),
   actorId: z.string().uuid(),
   nativeWorkId: z.string().uuid(),
-  completedAt: z.string().datetime(),
+  completedAt: z.string().datetime({ offset: true }),
 }).strict();
 export type WorkPlanOutputExecutionReceipt = z.infer<typeof workPlanOutputExecutionReceiptSchema>;
 
@@ -198,6 +222,7 @@ export const workPlanOutputExecutionSchema = z.object({
   nativeWorkId: z.string().uuid(),
   nativeProductId: identifier,
   nativeResourceKind: identifier,
+  capabilityVersion: z.number().int().positive().optional(),
   receipt: workPlanOutputExecutionReceiptSchema,
 }).strict();
 export type WorkPlanOutputExecution = z.infer<typeof workPlanOutputExecutionSchema>;

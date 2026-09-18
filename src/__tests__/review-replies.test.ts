@@ -15,6 +15,9 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { authenticatedCronRequest } from "@/__tests__/support/cron";
+// Load the route once during collection. Its cold dependency transformation
+// must not outlive a timed test and then run against the next test's reset mocks.
+import { GET as pollGoogleReviews } from "@/app/api/cron/poll-google-reviews/route";
 import {
   lintReplyDraft,
   buildDeterministicReply,
@@ -390,10 +393,7 @@ describe("poll-google-reviews cron: review reply drafting", () => {
   });
 
   it("creates a google review event AND a pending reply-draft event for each new review", async () => {
-    const { GET } = await import(
-      "@/app/api/cron/poll-google-reviews/route"
-    );
-    await GET(authenticatedCronRequest());
+    await pollGoogleReviews(authenticatedCronRequest());
 
     const calls = mockAddEvent.mock.calls as MockAddEventCall[];
 
@@ -409,10 +409,7 @@ describe("poll-google-reviews cron: review reply drafting", () => {
   });
 
   it("draft event is always status=pending (governance: never auto-publish)", async () => {
-    const { GET } = await import(
-      "@/app/api/cron/poll-google-reviews/route"
-    );
-    await GET(authenticatedCronRequest());
+    await pollGoogleReviews(authenticatedCronRequest());
 
     const calls = mockAddEvent.mock.calls as MockAddEventCall[];
     const draftCall = calls.find(
@@ -423,10 +420,7 @@ describe("poll-google-reviews cron: review reply drafting", () => {
   });
 
   it("draft event metadata includes reviewId and draftedReply", async () => {
-    const { GET } = await import(
-      "@/app/api/cron/poll-google-reviews/route"
-    );
-    await GET(authenticatedCronRequest());
+    await pollGoogleReviews(authenticatedCronRequest());
 
     const calls = mockAddEvent.mock.calls as MockAddEventCall[];
     const draftCall = calls.find(

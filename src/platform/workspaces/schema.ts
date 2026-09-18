@@ -30,6 +30,8 @@ export type WorkspaceDatabase = {
           p_token_hash: string;
           p_user_id: string;
           p_verified_email: string;
+          p_customer_workspace_id: string | null;
+          p_customer_workspace_name: string | null;
           p_allow_agency_access: boolean;
         };
         Returns: Array<{

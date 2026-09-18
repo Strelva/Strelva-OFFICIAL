@@ -19,13 +19,20 @@ rewrites the bare admin host root onto the `/admin` path:
   `/sign-in` (a different host, so it can't re-enter the rewrite). The `/admin`
   layout re-checks `isSuperAdmin` as defense in depth.
 
-Nav is a **left rail** (`src/app/admin/AdminRail.tsx`) grouped by purpose — **Overview**,
-then **Clients** (Clients / Leads / Onboard / Pay links / Analytics), **Review** (Actions /
-Drafts / Maintenance), and **System** (Ops / Audit). Every tool is one click and always
+Nav is a **left rail** (`src/app/admin/AdminRail.tsx`) grouped by responsibility:
+**Overview** and **Internal work**, then **Delivery** (managed-site work / Drafts /
+Maintenance), **Support** (Clients / Accounts / Leads / Onboard / Pay links / Analytics),
+and **System administration** (Ops / Uptime / Audit). Every tool is one click and always
 visible; there is no "More" dropdown (the old `NavLinks.tsx` is gone). On a phone the rail
 is hidden and `AdminMobileNav.tsx` gives a top-bar + slide-in drawer with the same nav. All
 `/admin` surfaces share the design system in `src/app/admin/console.tsx`
 (`Panel`/`Vital`/`Meter`/`Grade`/`ClientLogo`, verdict-first, sage + 3 status hues).
+
+`/admin/work` is the map for internal responsibilities. It routes super-admins to the
+existing managed-site delivery, support, local product-learning, contextual work-cost,
+and system surfaces without creating a second queue or cost store. Normal Strelva staff
+do not enter `/admin`; they open the existing exact-job assignment link in the workspace,
+where scope, expiry, acceptance and permission are rechecked.
 
 **Mobile row rule.** Dense list rows (`ClientsCrm.tsx`, `SiteAuditsBoard.tsx`) are a flex
 row on phones and a fixed multi-column grid **only at `md+`** (`flex ... md:grid

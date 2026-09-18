@@ -7,6 +7,14 @@ export {
   listReleaseOneProducts,
   listWorkspaceDiscoveryProducts,
 } from "./catalog";
+export {
+  WORKSPACE_EXECUTABLES,
+  listWorkspaceExecutableProducts,
+} from "./executables";
+export type {
+  WorkspaceExecutableDefinition,
+  WorkspaceExecutableId,
+} from "./executables";
 export type {
   AccessRequirement,
   ApprovalRequirement,

@@ -19,6 +19,7 @@ import {
 } from "./contracts";
 import { applyTrackerMapping, previewTrackerImport, type TrackerImportOptions } from "./import";
 import { applyTrackerCellChange } from "./changes";
+import { applyTrackerCoordination } from "./coordination";
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -144,6 +145,7 @@ export function applyTrackerCommand(snapshot: TrackerSnapshot, command: TrackerC
   if (snapshot.history.some((entry) => entry.commandId === checked.commandId)) {
     throw new TrackerConflictError("This tracker command was already applied.");
   }
+  if (checked.kind === "coordinate_records") return applyTrackerCoordination(snapshot, checked);
   if (checked.kind === "bulk_update" || checked.kind === "undo_change") return applyTrackerCellChange(snapshot, checked);
   if (checked.kind === "update_cell") return applyUpdateCell(snapshot, checked);
   if (checked.kind === "add_row") return applyAddRow(snapshot, checked);
@@ -247,7 +249,14 @@ export function parseTrackerSnapshot(value: unknown): TrackerSnapshot | null {
   const commandIds = new Set<string>();
   for (const entry of snapshot.history) {
     if (commandIds.has(entry.commandId) || entry.trackerId !== snapshot.id || entry.revision > snapshot.revision) return null;
-    if ((entry.kind === "bulk_update" || entry.kind === "undo_change") && !entry.changes?.length) return null;
+    if (entry.kind === "bulk_update" && !entry.changes?.length) return null;
+    if (entry.kind === "coordinate_records" && !entry.coordinationChanges?.length) return null;
+    if (entry.kind === "undo_change" && !entry.changes?.length && !entry.coordinationChanges?.length) return null;
+    const coordinatedRows = new Set<string>();
+    for (const change of entry.coordinationChanges ?? []) {
+      if (!rowIds.has(change.rowId) || coordinatedRows.has(change.rowId)) return null;
+      coordinatedRows.add(change.rowId);
+    }
     if (entry.kind === "undo_change" && !entry.undoesCommandId) return null;
     const changedCells = new Set<string>();
     for (const change of entry.changes ?? []) {

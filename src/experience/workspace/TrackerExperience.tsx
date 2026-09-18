@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/Button";
 import { TextInput } from "@/components/ui/TextInput";
 import { filterTrackerRows } from "@/products/tracker";
 import type { TrackerHistoryEntry, TrackerImportPreview, TrackerMappingSelection, TrackerSnapshot } from "@/products/tracker/contracts";
+import { TrackerCoordinationEditor, TrackerRecordCoordination, useTrackerCoordinationOptions } from "./TrackerCoordination";
 import { TrackerExperimentForm } from "./TrackerExperimentForm";
-import { trackerReceiptChanges, trackerUndoBlock } from "@/products/tracker/changes";
-import { TRACKER_TEMPLATES, trackerTemplateSource, type TrackerTemplateId } from "@/products/tracker/templates";
+import { trackerReceiptChanges, trackerUndoBlock } from "@/products/tracker/client";
+import { TRACKER_TEMPLATES, trackerTemplateSource, type TrackerTemplateId } from "@/products/tracker/client";
 
 type Props = { workspaceId: string; workId?: string; readOnly?: boolean; onSaved?: (id: string) => void; transport?: TrackerTransport; templateId?: TrackerTemplateId };
 type TrackerSourceInput = { fileName: string; mimeType: "text/csv"; content: string };
@@ -40,6 +41,7 @@ async function request(body: Record<string, unknown>) {
 }
 
 function sourceRowLabel(entry: TrackerHistoryEntry): string {
+  if (entry.coordinationChanges) return `${entry.coordinationChanges.length} records`;
   if (entry.changes) return `${new Set(entry.changes.map(change => change.rowId)).size} rows`;
   return entry.sourceLineage ? `Source row ${entry.sourceLineage.sourceRow}` : "Added row";
 }
@@ -50,8 +52,9 @@ function historyDescription(entry: TrackerHistoryEntry, tracker: TrackerSnapshot
     return `Changed ${column?.label ?? "a field"} from “${entry.before ?? ""}” to “${entry.after ?? ""}”`;
   }
   if (entry.kind === "add_row") return "Added a row";
+  if (entry.kind === "coordinate_records") return `Updated assignment or links for ${entry.coordinationChanges?.length ?? 0} records`;
+  if (entry.kind === "undo_change") return "Undid a recorded change";
   if (entry.kind === "bulk_update") return `Changed ${entry.changes?.length ?? 0} fields together`;
-  if (entry.kind === "undo_change") return `Undid a change to ${entry.changes?.length ?? 0} fields`;
   return "Removed a row from the active view";
 }
 
@@ -66,6 +69,7 @@ function TrackerSession({ workspaceId, workId, readOnly = false, onSaved, transp
   const [saved, setSaved] = useState<Saved | null>(null);
   const [title, setTitle] = useState("My tracker");
   const [query, setQuery] = useState("");
+  const [linkedRowId, setLinkedRowId] = useState<string | null>(() => typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("row"));
   const [page, setPage] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -172,7 +176,8 @@ function TrackerSession({ workspaceId, workId, readOnly = false, onSaved, transp
   }
 
   const tracker = saved?.tracker;
-  const matchingRows = tracker ? filterTrackerRows(tracker, { query }) : [];
+  const coordination = useTrackerCoordinationOptions(saved?.workId, !readOnly && transport.mode === "server");
+  const matchingRows = tracker ? filterTrackerRows(tracker, { query }).filter(row => !linkedRowId || row.id === linkedRowId) : [];
   const pageCount = Math.max(1, Math.ceil(matchingRows.length / ROWS_PER_PAGE));
   const currentPage = Math.min(page, pageCount - 1);
   const pageStart = currentPage * ROWS_PER_PAGE;
@@ -258,6 +263,7 @@ function TrackerSession({ workspaceId, workId, readOnly = false, onSaved, transp
         <Button type="submit" disabled={busy || !Object.values(newRow).some(value => value.trim())}>Save record</Button>
         <Button type="button" variant="secondary" disabled={busy} onClick={() => setNewRow(null)}>Cancel new record</Button>
       </form> : null}
+      {linkedRowId ? <div className="flex flex-wrap items-center justify-between gap-3 border-y border-gray-border py-3 text-sm"><p>{tracker.rows.some(row => row.id === linkedRowId && row.state === "active") ? "Showing the linked record." : "This linked record is no longer active or available. Its recorded history remains below."}</p><Button type="button" variant="secondary" onClick={() => { setLinkedRowId(null); const url = new URL(window.location.href); url.searchParams.delete("row"); window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`); }}>Show all records</Button></div> : null}
       <TextInput label="Filter rows" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search any field" />
       {selectedRows.length > 0 && !readOnly ? <form aria-label="Change selected rows" className="space-y-3 border-y border-gray-border py-4" onSubmit={event => { event.preventDefault(); setBulk(current => ({ ...current, reviewed: true })); }}>
         <p>{selectedRows.length} rows selected, including any hidden by your filter.</p>
@@ -271,13 +277,14 @@ function TrackerSession({ workspaceId, workId, readOnly = false, onSaved, transp
         </section> : <Button type="submit" disabled={busy || !bulk.columnId}>Review selected changes</Button>}
         <Button type="button" variant="secondary" disabled={busy} onClick={() => { setSelectedRows([]); setBulk(current => ({ ...current, reviewed: false })); }}>Clear selection</Button>
       </form> : null}
+      {selectedRows.length > 0 && !readOnly && transport.mode === "server" && saved ? <TrackerCoordinationEditor key={selectedRows.join(":")} workId={saved.workId} rowIds={selectedRows} options={coordination.options} error={coordination.error} retry={coordination.retry} disabled={busy} change={changeRows} /> : null}
       <div className="overflow-x-auto rounded-lg border border-gray-border" tabIndex={0} role="region" aria-label="Tracker rows, scroll horizontally for more fields">
         <table id="tracker-rows" className="w-full min-w-max text-left text-sm">
           <caption className="p-3 text-left">{pageStatus} Source: {tracker.source.originalFileName}.</caption>
           <thead><tr>{!readOnly ? <th scope="col" className="p-3"><span className="sr-only">Select rows</span></th> : null}<th scope="col" className="p-3">Source row</th>{tracker.columns.map((column) => <th scope="col" className="p-3" key={column.id}>{column.label}</th>)}</tr></thead>
           <tbody>{visibleRows.map((row) => <tr key={row.id} className="border-t border-gray-border">
             {!readOnly ? <td className="p-3"><input type="checkbox" aria-label={`Select source row ${row.lineage?.sourceRow ?? row.id}`} disabled={busy} checked={selectedRows.includes(row.id)} onChange={event => { setSelectedRows(current => event.target.checked ? [...current, row.id] : current.filter(id => id !== row.id)); setBulk(current => ({ ...current, reviewed: false })); }} /></td> : null}
-            <th scope="row" className="p-3 font-normal">{row.lineage?.sourceRow ?? "Added"}</th>
+            <th scope="row" className="p-3 text-left font-normal">{row.lineage?.sourceRow ?? "Added"}<TrackerRecordCoordination row={row} workspaceId={workspaceId} options={coordination.options} readOnly={readOnly || transport.mode === "local-preview"} disabled={busy} change={changeRows} /></th>
             {tracker.columns.map((column) => {
               const value = row.cells[column.id]?.value ?? row.cells[column.fieldKey]?.value ?? "";
               const label = `Edit ${column.label}, source row ${row.lineage?.sourceRow ?? "added"}`;
@@ -304,7 +311,7 @@ function TrackerSession({ workspaceId, workId, readOnly = false, onSaved, transp
         <h2 id="tracker-history-title" className="font-display text-lg">Edit history</h2>
         {tracker.history.length ? <>
           <p className="mt-2 text-sm text-gray-muted">{tracker.history.length} recorded edit{tracker.history.length === 1 ? "" : "s"}. Showing the latest {Math.min(20, tracker.history.length)}.</p>
-          <ol className="mt-3 space-y-2 text-sm" aria-label="Tracker edit history">{tracker.history.slice(-20).reverse().map((entry) => <li key={entry.commandId} className="rounded-lg border border-gray-border px-3 py-2"><p>{historyDescription(entry, tracker)}</p><p className="mt-1 text-xs text-gray-muted">Revision {entry.revision} · {sourceRowLabel(entry)} · <time dateTime={entry.at}>{new Date(entry.at).toLocaleString()}</time></p>{entry.changes ? <details className="mt-2"><summary>Before and after</summary><ul>{entry.changes.map(change => <li key={`${change.rowId}:${change.columnId}`}>{tracker.columns.find(column => column.id === change.columnId)?.label}: {change.before || "Empty"} → {change.after || "Empty"}</li>)}</ul></details> : null}{!readOnly && entry.kind !== "undo_change" && trackerReceiptChanges(entry).length ? <div className="mt-2"><Button size="sm" variant="secondary" disabled={busy || Boolean(trackerUndoBlock(tracker, entry))} onClick={() => void changeRows({ kind: "undo_change", targetCommandId: entry.commandId })}>Undo change {entry.revision}</Button>{trackerUndoBlock(tracker, entry) ? <p className="mt-1 text-xs text-gray-muted">{trackerUndoBlock(tracker, entry)}</p> : null}</div> : null}</li>)}</ol>
+          <ol className="mt-3 space-y-2 text-sm" aria-label="Tracker edit history">{tracker.history.slice(-20).reverse().map((entry) => <li key={entry.commandId} className="rounded-lg border border-gray-border px-3 py-2"><p>{historyDescription(entry, tracker)}</p><p className="mt-1 text-xs text-gray-muted">Revision {entry.revision} · {sourceRowLabel(entry)} · <time dateTime={entry.at}>{new Date(entry.at).toLocaleString()}</time></p>{entry.changes ? <details className="mt-2"><summary>Before and after</summary><ul>{entry.changes.map(change => <li key={`${change.rowId}:${change.columnId}`}>{tracker.columns.find(column => column.id === change.columnId)?.label}: {change.before || "Empty"} → {change.after || "Empty"}</li>)}</ul></details> : null}{entry.coordinationChanges ? <details className="mt-2"><summary>Assignment and links before and after</summary><ul className="space-y-2">{entry.coordinationChanges.map(change => <li key={change.rowId} className="break-words"><p>Record {tracker.rows.find(row => row.id === change.rowId)?.lineage?.sourceRow ?? "added"}</p><p>{change.before.assigneeId ? coordination.options?.members.find(member => member.userId === change.before.assigneeId)?.email || `Member ${change.before.assigneeId}` : "Unassigned"}, {change.before.links.length} links → {change.after.assigneeId ? coordination.options?.members.find(member => member.userId === change.after.assigneeId)?.email || `Member ${change.after.assigneeId}` : "Unassigned"}, {change.after.links.length} links</p></li>)}</ul></details> : null}{!readOnly && entry.kind !== "undo_change" && (trackerReceiptChanges(entry).length || entry.coordinationChanges?.length) ? <div className="mt-2"><Button size="sm" variant="secondary" disabled={busy || Boolean(trackerUndoBlock(tracker, entry))} onClick={() => void changeRows({ kind: "undo_change", targetCommandId: entry.commandId })}>Undo change {entry.revision}</Button>{trackerUndoBlock(tracker, entry) ? <p className="mt-1 text-xs text-gray-muted">{trackerUndoBlock(tracker, entry)}</p> : null}</div> : null}</li>)}</ol>
         </> : <p className="mt-2 text-sm text-gray-muted">No edits yet. The imported source is preserved.</p>}
       </section>
       {saved?.canRecordExperiment && !readOnly ? <TrackerExperimentForm workId={saved.workId} expectedRevision={saved.tracker.revision} /> : null}

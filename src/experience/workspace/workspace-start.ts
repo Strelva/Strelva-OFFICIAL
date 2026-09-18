@@ -1,6 +1,6 @@
 import type { WorkspaceProduct } from "./contracts";
 
-export type WorkspaceStartRoute = "assessment" | "tracker" | "inquiries" | "website" | "document" | "help";
+export type WorkspaceStartRoute = "assessment" | "tracker" | "inquiries" | "website" | "document" | "applications" | "scheduling" | "investigations" | "operations" | "help";
 export type WorkspaceStartOutcome = "Answer" | "Change" | "Capability" | "Responsibility";
 export type WorkspaceStartPlanKind = "empty" | "supported" | "help";
 export type WorkspaceStartPlanStatus = "ready" | "blocked" | "help";
@@ -84,17 +84,34 @@ export interface WorkspaceStartInput {
   context?: WorkspaceStartContext;
 }
 
+export function workspaceStartContinueLabel(plan: WorkspaceStartPlan): string {
+  if (plan.route === "inquiries") return plan.needsSelection === "business" ? "Choose a business" : "Open inquiry work";
+  if (plan.route === "tracker") return "Open your tracker";
+  if (plan.route === "website") return plan.needsSelection === "site" ? "Choose a website" : "Open your website";
+  if (plan.route === "document") return "Open your document";
+  if (plan.route === "applications") return "Prepare application";
+  if (plan.route === "scheduling") return "Open scheduling";
+  if (plan.route === "investigations") return "Open ongoing checks";
+  if (plan.route === "operations") return "Open ongoing work";
+  return "Continue to business assessment";
+}
+
 const PRODUCT_FOR_ROUTE: Record<Exclude<WorkspaceStartRoute, "help">, string> = {
   assessment: "ai_visibility",
   tracker: "tracker",
   inquiries: "inquiries",
   website: "managed_presence",
   document: "documents",
+  applications: "applications", scheduling: "scheduling", investigations: "investigations", operations: "operations",
 };
 
-const AVAILABLE_PRODUCT_ROUTES: ReadonlySet<WorkspaceStartRoute> = new Set(["assessment", "tracker", "inquiries", "document"]);
+const AVAILABLE_PRODUCT_ROUTES: ReadonlySet<WorkspaceStartRoute> = new Set(["assessment", "tracker", "inquiries", "document", "applications", "scheduling", "investigations", "operations"]);
 
 const ROUTE_COPY: Record<Exclude<WorkspaceStartRoute, "help">, { title: string; summary: string; outcome: WorkspaceStartOutcome }> = {
+  applications: { title: "A private working application", summary: "Create a form and working list from approved parts, then test it before accepting records.", outcome: "Capability" },
+  scheduling: { title: "A working schedule", summary: "Reserve permitted time and prevent overlapping reservations in this workspace.", outcome: "Capability" },
+  investigations: { title: "An ongoing check", summary: "Compare two saved sources, keep the evidence, and check again when due.", outcome: "Responsibility" },
+  operations: { title: "Delegated work", summary: "Review a bounded change, then let Strelva carry its progress and evidence forward.", outcome: "Responsibility" },
   assessment: {
     title: "A business assessment",
     summary: "This looks like a read-only business assessment that you can save and return to.",
@@ -129,9 +146,13 @@ interface Signal {
 }
 
 const SIGNALS: readonly Signal[] = [
+  { route: "applications", pattern: /\b(?:build|create|make|set up|design)\b[\s\S]{0,80}\b(?:app|application|portal)s?\b|\b(?:staff|employee|internal|team)\b[\s-]*(?:request|intake)s?[\s-]*(?:app|application|portal|form)s?\b/i, weight: 5 },
+  { route: "scheduling", pattern: /\b(?:schedule|scheduling|calendar|availability|appointment)s?\b|reserve (?:a |the )?time|\b(?:book|reserve)\b[\s\S]{0,60}\b(?:appointment|slot|time)\b|time[- ]off|(?:vacation|leave) request/i, weight: 5 },
+  { route: "investigations", pattern: /\b(?:compare|reconcile|cross[- ]?check|find differences)\b|\b(?:watch|monitor)\b[\s\S]{0,80}\b(?:change|difference|update)s?\b|\bcheck\b[\s\S]{0,80}\b(?:match|agree|disagree|same|different)\b|\b(?:two|both)\s+(?:source|record|spreadsheet|sheet)s?\b/i, weight: 5 },
+  { route: "operations", pattern: /\bdelegate(?:d)?\b|delegated work|approved work|run these steps|repeatable responsibility|ongoing responsibility|\b(?:have|let)\b[\s\S]{0,60}\b(?:handle|carry out|take care of)\b/i, weight: 5 },
   { route: "document", pattern: /document|procedure|proposal|working note|meeting notes?|brief|memo|draft/i, weight: 4 },
   { route: "inquiries", pattern: /inquir(?:y|ies|e)|customer request|contact form|quote request|booking request|follow[ -]?up|lead(?:s)?|reply/i, weight: 3 },
-  { route: "tracker", pattern: /\bcsv\b|spreadsheet|excel|\brows?\b|\bcolumns?\b|\btracker\b|import|\btable\b|\bdata\b/i, weight: 3 },
+  { route: "tracker", pattern: /\bcsv\b|spreadsheet|excel|\brows?\b|\bcolumns?\b|\btracker\b|import|\btable\b|\bdata\b|\bkeep track(?: of)?\b|\btrack(?:ing)?\b/i, weight: 3 },
   { route: "assessment", pattern: /ai visibility|visibility|discoverab|assessment|what .* understand|find .* business|search result|mention(?:ed)?/i, weight: 3 },
   { route: "website", pattern: /website|web site|homepage|landing page|\bsite\b|\bseo\b|accessib|page speed|web content|domain/i, weight: 3 },
 ];
@@ -147,7 +168,7 @@ function classify(request: string): Exclude<WorkspaceStartRoute, "help"> | null 
   }
   let best: Exclude<WorkspaceStartRoute, "help"> | null = null;
   let score = 0;
-  for (const route of ["document", "inquiries", "tracker", "assessment", "website"] as const) {
+  for (const route of ["applications", "scheduling", "investigations", "operations", "document", "inquiries", "tracker", "assessment", "website"] as const) {
     const next = scores.get(route) || 0;
     if (next > score) {
       best = route;
@@ -173,6 +194,7 @@ function hasAvailableProduct(context: WorkspaceStartContext, route: Exclude<Work
 }
 
 function partsFor(route: Exclude<WorkspaceStartRoute, "help">, request: string): WorkspaceStartPart[] {
+  if (["applications", "scheduling", "investigations", "operations"].includes(route)) return [{ id: "scope", label: ROUTE_COPY[route].title, detail: ROUTE_COPY[route].summary, outcome: ROUTE_COPY[route].outcome }, { id: "control", label: "Your workspace and permissions", detail: "Keep the result private. Review changes and preserve their evidence.", outcome: "Responsibility" }];
   if (route === "assessment") {
     return [
       { id: "business-scope", label: "business in scope", detail: "Use the business details you provide for this assessment.", outcome: "Answer" },
@@ -234,7 +256,7 @@ function emptyPlan(): WorkspaceStartPlan {
     status: "help",
     request: "",
     title: "Start with the result you want.",
-    summary: "Describe a business assessment, a CSV tracker, customer inquiries, work on a connected website, or a private document.",
+    summary: "Describe an assessment, tracker, inquiry workflow, website change, document, application, schedule, ongoing check, or delegated work.",
     parts: [],
     selectedPartIds: [],
     canContinue: false,

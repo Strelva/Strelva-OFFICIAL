@@ -18,7 +18,7 @@ const CENTS = z.number().int().nonnegative().max(MAX_JOB_ECONOMICS_CENTS);
 const ID = z.string().trim().min(1).max(256).regex(/^[A-Za-z0-9][A-Za-z0-9_.:-]*$/);
 const TENANT = z.string().trim().regex(/^[a-z0-9][a-z0-9-]{0,62}$/);
 
-export const JOB_ECONOMICS_PRODUCTS = ["tracker", "ai_visibility", "inquiry"] as const;
+export const JOB_ECONOMICS_PRODUCTS = ["tracker", "ai_visibility", "inquiry", "operations", "work_plans"] as const;
 export type JobEconomicsProduct = (typeof JOB_ECONOMICS_PRODUCTS)[number];
 
 export const JOB_ECONOMICS_RESOURCE_KINDS = [
@@ -26,6 +26,8 @@ export const JOB_ECONOMICS_RESOURCE_KINDS = [
   "private_ai_visibility_work",
   "ai_visibility_assessment",
   "inquiry_capability",
+  "responsibility",
+  "plan",
 ] as const;
 export type JobEconomicsResourceKind = (typeof JOB_ECONOMICS_RESOURCE_KINDS)[number];
 
@@ -79,11 +81,15 @@ export function parseJobEconomicsCommand(value: unknown): JobEconomicsCommand {
     if (command.estimateCents !== null && command.estimateCents > command.maxAuthorizedCents) {
       throw new JobEconomicsValidationError("The estimate cannot exceed the authorized maximum.");
     }
-    if (command.productId === "tracker" || command.productId === "ai_visibility") {
+    if (command.productId !== "inquiry") {
       const expectedKind = command.productId === "tracker"
         ? command.resourceKind === "tracker"
-        : command.resourceKind === "private_ai_visibility_work" || command.resourceKind === "ai_visibility_assessment";
-      if (!expectedKind || !command.workspaceId || !command.workId
+        : command.productId === "operations" ? command.resourceKind === "responsibility"
+          : command.productId === "work_plans" ? command.resourceKind === "plan"
+          : command.resourceKind === "private_ai_visibility_work" || command.resourceKind === "ai_visibility_assessment";
+      const requiresSavedWork = command.productId !== "work_plans";
+      if (!expectedKind || !command.workspaceId || (requiresSavedWork && !command.workId)
+        || (!requiresSavedWork && command.workId !== undefined && command.workId !== null)
         || command.tenantId !== undefined || command.businessId !== undefined
         || command.requestId !== undefined || command.capabilityId !== undefined) {
         throw new JobEconomicsValidationError("This workspace product reference is invalid.");
@@ -144,8 +150,8 @@ export interface JobEconomicsUsage {
   attribution: JobEconomicsAttribution;
   amountCents: number | null;
   known: boolean;
-  /** The first release accepts only an operator report, never provider proof. */
-  source: "operator_reported";
+  /** Neither source is independently verified provider billing. */
+  source: "operator_reported" | "runtime_reported";
   recordedBy: string;
   createdAt: string;
 }
@@ -163,6 +169,7 @@ export interface JobEconomicsInspection {
   job: JobEconomicsRecord;
   usage: JobEconomicsUsage[];
   reservations: JobEconomicsReservation[];
+  executions?: import("./runtime").BudgetExecution[];
   policy: typeof JOB_ECONOMICS_POLICY;
 }
 

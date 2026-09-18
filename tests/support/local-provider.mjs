@@ -1,6 +1,6 @@
 // Explicit opt-in Node preload for isolated local integration tests only.
 // Resend fetches are answered here without opening a provider connection.
-import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, unlinkSync } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 
 if (process.env.STRELVA_LOCAL_PROVIDER_PROOF !== "1") throw new Error("The local provider fixture requires explicit test opt-in.");
@@ -26,6 +26,11 @@ globalThis.fetch = async (input, init) => {
   }
   if (request.method === "GET" && url.pathname === "/emails/receiving") return reply({ object: "list", has_more: false, data: [] });
   if (request.method === "GET" && /^\/emails\/[^/]+$/.test(url.pathname)) {
+    const readbackFailurePath = process.env.STRELVA_LOCAL_PROVIDER_READBACK_FAILURE_FILE;
+    if (readbackFailurePath && existsSync(readbackFailurePath)) {
+      unlinkSync(readbackFailurePath);
+      return reply({ name: "fixture_readback_unavailable", message: "The local provider intentionally lost one read-back." }, 503);
+    }
     const found = messages().find((message) => message.id === url.pathname.split("/").at(-1));
     return found ? reply({ ...found, to: Array.isArray(found.to) ? found.to : [found.to], object: "email", last_event: "delivered" }) : reply({ name: "not_found", message: "No local provider message has that id." }, 404);
   }
