@@ -38,6 +38,33 @@ planning and real outbound delivery have not been exercised there.
 
 ## Production hold
 
-Commit and push internal work to `strelvav2`. Do not merge to production, create a release tag, deploy, run production migrations, or enable live providers without Jacob's explicit authorization.
+Commit and push internal work to `strelvav2`. Jacob authorized preparing draft PRs into `main` on September 19, without publishing the product. Merge approval, release tags, deployments, production migrations and live-provider activation remain separate decisions.
 
-`vercel.json` disables automatic Git deployments for this branch using [Vercel's branch deployment configuration](https://vercel.com/docs/project-configuration/git-configuration). This is a branch-specific guard; manual deployments still require separate authorization.
+`vercel.json` disables all automatic Git deployments using [Vercel's Git deployment configuration](https://vercel.com/docs/project-configuration/git-configuration). Keep this guard in the proposed merge so moving the reviewed code into `main` does not itself request a Vercel deployment. Manual deployments still require separate authorization. This checked-in guard does not attest to the current production revision or change Vercel project settings.
+
+## September 19 PR preparation
+
+The app snapshot `3120dd7` contains the current product implementation. The older
+draft PR #190 stops at `0330f75` and does not contain the subsequent horizontal
+product work. Prepare the current `strelvav2` branch as its replacement; do not
+merge both as separate releases. Marketing belongs in a companion PR in
+`strelva-marketing`, whose checked-in configuration also disables Git deployments.
+
+Both package versions remain `0.1.1`. `strelvav2` is an internal name, not a
+selected `2.0.0` release. A proposed next version is `0.2.0` under the existing
+[pre-1.0 versioning policy](../VERSIONING.md); selecting and applying it requires
+matching package versions and changelog headings in both repositories. Do not
+tag a draft integration checkpoint as a released product.
+
+The [September 18 integrated local verification](./strelvav2-horizontal-acceptance.md#september-18-integrated-local-verification)
+records 388 passing test files, 2,845 passing tests, one skipped test, a successful
+build, compatibility checks and isolated schema rehearsals. That evidence names
+an earlier working tree, not the current PR revision. The September 19 check of
+the committed snapshot found three TypeScript errors in the model-cost evidence
+integration; current PR checks must establish the result after correction.
+
+Human acceptance, production schema and authenticated journeys, real-provider
+evidence, and the Mooney Outlook / ADR Notable handoff remain separate release
+gates. See the [acceptance ledger](./strelvav2-horizontal-acceptance.md) and
+[release checklist](./horizontal-release-checklist-2026-09-11.md). A draft PR or
+green local check does not close those gates.
