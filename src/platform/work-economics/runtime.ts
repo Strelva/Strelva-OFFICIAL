@@ -48,6 +48,7 @@ export interface BudgetExecutionEvidenceContext {
   expectedTarget: BudgetExecutionCommand["expectedTarget"];
   maximumCents: number;
   kind: BudgetExecutionCommand["kind"];
+  attribution: BudgetExecutionCommand["attribution"];
 }
 export interface BudgetExecutionEvidenceResolver {
   /** Read a native receipt or provider billing authority. Never copy a browser-supplied amount. */
@@ -173,6 +174,7 @@ export function createBudgetedReconciler(store: BudgetExecutionStore, allowances
       expectedTarget: parsed.data.expectedTarget,
       maximumCents: parsed.data.maximumCents,
       kind: parsed.data.kind,
+      attribution: parsed.data.attribution,
     });
     const measured = z.object({ effect: z.enum(["accepted", "none"]), amountCents: z.number().int().min(0).max(MAX_JOB_ECONOMICS_CENTS), evidenceReference: z.string().trim().min(1).max(256) }).strict().safeParse(evidence);
     if (!measured.success) throw new JobEconomicsValidationError("A known amount and verified evidence reference are required.");

@@ -13,7 +13,7 @@ import {
 } from "@/server/capabilities";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { executeBudgetedAction, type BudgetExecution } from "@/platform/work-economics";
-import { reconcileBudgetedAction } from "@/platform/work-economics/runtime";
+import { reconcileBudgetedAction, type BudgetExecutionEvidenceContext } from "@/platform/work-economics/runtime";
 import {
   geminiReceiptFromAiSdkResult,
   ProviderEvidenceUnavailableError,
@@ -145,12 +145,8 @@ export interface WorkPlanGenerationInput {
   evidence: readonly WorkPlanEvidence[];
   allowedOperations: readonly WorkPlanNativeOperation[];
   /** Exact admission identity used to bind a provider billing receipt. */
-  executionContext?: {
-    jobId: string;
-    executionKey: string;
-    maximumCents: number;
+  executionContext?: BudgetExecutionEvidenceContext & {
     kind: "model";
-    attribution: "normal" | "strelva_retry";
   };
 }
 
@@ -806,6 +802,8 @@ export async function createWorkPlan(input: {
   } | undefined;
   if (request.planningEconomics) {
     const executionContext = {
+      actor: input.actor,
+      expectedTarget: { workspaceId: request.workspaceId, workId: null },
       jobId: request.planningEconomics.jobId,
       executionKey: request.planningEconomics.executionKey,
       maximumCents: request.planningEconomics.maximumCents,

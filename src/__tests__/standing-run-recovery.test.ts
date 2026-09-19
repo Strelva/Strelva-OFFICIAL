@@ -62,7 +62,7 @@ describe("ongoing job recovery through ordinary execution entrances", () => {
   });
 
   it("the background sweep updates the same ongoing run after a restart", async () => {
-    expect(await sweepDueWork([{ id: workId, productId: "operations", actor }])).toEqual({ processed: 1, failed: 0, remaining: 0 });
+    expect(await sweepDueWork([{ id: workId, productId: "operations", actor }])).toEqual({ processed: 1, failed: 0, remaining: 0, failures: [] });
     expect(fixture.record).toHaveBeenCalledWith(actor, expect.objectContaining({ runId, status: "completed" }));
     expect(fixture.execute).not.toHaveBeenCalled();
   });

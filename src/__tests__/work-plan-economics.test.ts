@@ -87,17 +87,29 @@ describe("planning economics boundary", () => {
       return { disposition: "performed", value: generated, execution: planningReceipt };
     });
 
+    const generate = vi.fn().mockResolvedValue(generated);
     const result = await createWorkPlan({
       actor,
       workspaceId,
       userGoal: "Make a tracker",
       planningEconomics: { jobId: planningReceipt.jobId, executionKey: planningReceipt.executionKey, maximumCents: 100 },
-      generate: vi.fn().mockResolvedValue(generated),
+      generate,
     });
 
     expect(result.planningReceipt).toMatchObject({ effect: "accepted", amountCents: null, maximumCents: 100 });
     expect(presentWorkPlan(result)).toMatchObject({ planningEconomics: { jobId: planningReceipt.jobId, executionKey: planningReceipt.executionKey, amountCents: null } });
     expect(mocks.executeBudgetedAction).toHaveBeenCalledTimes(1);
+    expect(generate).toHaveBeenCalledWith(expect.objectContaining({
+      executionContext: {
+        actor,
+        expectedTarget: { workspaceId, workId: null },
+        jobId: planningReceipt.jobId,
+        executionKey: planningReceipt.executionKey,
+        maximumCents: planningReceipt.maximumCents,
+        kind: "model",
+        attribution: "normal",
+      },
+    }));
     expect(result.plan.estimatedCost).toBeNull();
   });
 

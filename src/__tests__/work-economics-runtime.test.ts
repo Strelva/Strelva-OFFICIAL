@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createBudgetedExecutor, createBudgetedReconciler, type BudgetExecution, type BudgetExecutionStore } from "@/platform/work-economics/runtime";
+import { createProviderEvidenceResolver, ProviderEvidenceMismatchError, type TrustedProviderReceipt } from "@/platform/work-economics/provider-evidence";
 
 const actor = { userId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", verifiedEmail: "owner@example.com" };
 const input = {
@@ -221,6 +222,49 @@ describe("budgeted execution boundary", () => {
     await expect(createBudgetedReconciler(store)(actor, input, {
       async resolve() { return { effect: "accepted", amountCents: null, evidenceReference: "provider:pending" } as never; },
     })).rejects.toThrow("known amount");
+  });
+
+  it.each(["normal", "strelva_retry"] as const)("binds trusted provider evidence to %s attribution", async (attribution) => {
+    const store = storage();
+    const command = { ...input, attribution };
+    await store.claim(actor, command);
+    await store.start(actor, command);
+    await store.finish(actor, command, { effect: "accepted", amountCents: null });
+    const receipt: TrustedProviderReceipt = {
+      version: 1, provider: "billing-gateway", requestId: "request-1",
+      executionKey: input.executionKey, kind: input.kind, attribution,
+      maximumCents: input.maximumCents, billableCents: 20, evidenceReference: "provider:billing:receipt-1",
+    };
+    const read = vi.fn().mockResolvedValue(receipt);
+    const result = await createBudgetedReconciler(store)(actor, command, createProviderEvidenceResolver({ read }));
+    expect(read).toHaveBeenCalledWith({ actor, ...command });
+    expect(result).toMatchObject({ amountCents: 20, reconciliationReference: receipt.evidenceReference });
+  });
+
+  it.each([
+    { attribution: "strelva_retry" as const },
+    { executionKey: "another-execution" },
+    { maximumCents: 101 },
+    { kind: "model" as const },
+  ])("keeps a receipt with mismatched identity held: %j", async (mismatch) => {
+    const store = storage();
+    const command = { ...input, attribution: "normal" as const };
+    await store.claim(actor, command);
+    await store.start(actor, command);
+    await store.finish(actor, command, { effect: "accepted", amountCents: null });
+    const reconcileReceipt = vi.spyOn(store, "reconcile");
+    const settle = vi.fn();
+    const read = vi.fn().mockResolvedValue({
+      version: 1, provider: "billing-gateway", requestId: "request-1",
+      executionKey: input.executionKey, kind: input.kind, attribution: "normal",
+      maximumCents: input.maximumCents, billableCents: 20, evidenceReference: "provider:billing:receipt-1",
+      ...mismatch,
+    });
+    await expect(createBudgetedReconciler(store, { reserve: vi.fn(), settle })(actor, command, createProviderEvidenceResolver({ read })))
+      .rejects.toBeInstanceOf(ProviderEvidenceMismatchError);
+    expect(reconcileReceipt).not.toHaveBeenCalled();
+    expect(settle).not.toHaveBeenCalled();
+    expect(await store.claim(actor, command)).toMatchObject({ claimed: false, execution: { amountCents: null } });
   });
 
   it("recovers failed post-receipt settlement by replaying reconciliation only", async () => {

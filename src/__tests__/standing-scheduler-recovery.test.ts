@@ -195,6 +195,7 @@ describe("local standing scheduler recovery", () => {
       processed: 1,
       failed: 0,
       remaining: 0,
+      failures: [],
     });
     expect(fixture.execute).not.toHaveBeenCalled();
     expect(fixture.record).toHaveBeenLastCalledWith(actor, expect.objectContaining({
