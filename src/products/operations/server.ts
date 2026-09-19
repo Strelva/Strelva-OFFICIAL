@@ -881,3 +881,4 @@ export async function admitAndRunDueStandingResponsibility(actor: WorkspaceActor
 }
 
 export { listDueWork, sweepDueWork } from "./sweep";
+export { listAuthorizedOperationalInbox, listOperationalExceptions } from "./inbox";

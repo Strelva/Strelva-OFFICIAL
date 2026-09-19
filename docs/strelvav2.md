@@ -45,10 +45,10 @@ Commit and push internal work to `strelvav2`. Jacob authorized preparing draft P
 ## September 19 PR preparation
 
 The app snapshot `3120dd7` contains the current product implementation. The older
-draft PR #190 stops at `0330f75` and does not contain the subsequent horizontal
-product work. Prepare the current `strelvav2` branch as its replacement; do not
-merge both as separate releases. Marketing belongs in a companion PR in
-`strelva-marketing`, whose checked-in configuration also disables Git deployments.
+draft PR #190 stopped at `0330f75` and did not contain the subsequent horizontal
+product work. It is closed and superseded by [app draft PR #191](https://github.com/Strelva/Strelva-OFFICIAL/pull/191),
+from `strelvav2` into `main`. [Marketing draft PR #10](https://github.com/Strelva/strelva-marketing/pull/10)
+is the companion candidate; its checked-in configuration also disables Git deployments.
 
 Both package versions remain `0.1.1`. `strelvav2` is an internal name, not a
 selected `2.0.0` release. A proposed next version is `0.2.0` under the existing
@@ -61,7 +61,10 @@ records 388 passing test files, 2,845 passing tests, one skipped test, a success
 build, compatibility checks and isolated schema rehearsals. That evidence names
 an earlier working tree, not the current PR revision. The September 19 check of
 the committed snapshot found three TypeScript errors in the model-cost evidence
-integration; current PR checks must establish the result after correction.
+integration. Release preparation corrected the execution context, operational
+inbox loading and API view mapping, its product import boundary, and two stale
+scheduler test expectations. The [September 19 verification](./strelvav2-horizontal-acceptance.md#september-19-draft-pr-preparation)
+records current local checks and their limits. Hosted CI remains a separate gate.
 
 Human acceptance, production schema and authenticated journeys, real-provider
 evidence, and the Mooney Outlook / ADR Notable handoff remain separate release

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/db/server-client";
 import { isSuperAdminUser } from "@/lib/db/repositories";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
-import { listAuthorizedOperationalInbox, listOperationalExceptions } from "@/products/operations/inbox";
+import { listAuthorizedOperationalInbox, listOperationalExceptions } from "@/products/operations/server";
 
 export const dynamic = "force-dynamic";
 

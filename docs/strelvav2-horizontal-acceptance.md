@@ -551,3 +551,38 @@ were resolved before this combined run. Relative documentation links and
 This closes the named local verification pass. It does not close the full
 production checklist, human acceptance, remaining product choices, external
 provider evidence, or Mooney's live Outlook / ADR Notable acceptance case.
+
+## September 19 draft PR preparation
+
+[App draft PR #191](https://github.com/Strelva/Strelva-OFFICIAL/pull/191) replaces
+the older #190 and targets `main` from `strelvav2`. The companion
+[marketing draft PR #10](https://github.com/Strelva/strelva-marketing/pull/10)
+contains the public-site candidate. Both retain package version `0.1.1`; no
+release tag was created. Both proposed trees disable automatic Vercel Git
+deployments, including after a later merge into `main`. Neither PR was merged.
+
+Fresh checks found and corrected incomplete model-cost evidence context:
+reconciliation now carries attribution, and planning supplies the authenticated
+actor and workspace target. Focused tests check matching provider receipts and
+reject mismatched identity, execution key, maximum or kind without settling the
+held cost. The operational inbox now maps assigned work to the API's supported
+`inbox` view, derives loading from the current request, and excludes aborted
+responses. Its API imports through the product server entry. Two scheduler
+recovery assertions now include the sweep's explicit empty failure list.
+
+The combined local tree passed lint, product boundaries, ontology invariants,
+version parity and 391 Vitest files: 2,872 tests passed and one was skipped.
+The inbox tests render React in jsdom and exercise loading, denied-response
+retry, assigned links and stale responses; they do not replace desktop/mobile
+browser acceptance. Economics changes separately passed 27 focused tests and
+TypeScript checking. The frozen lockfile check and redacted Git secret scan
+also passed. Hosted CI, the current app production build, schema rehearsals,
+and real-browser acceptance are not claimed by this preparation pass. Earlier
+proof retains its recorded revision and environment.
+
+Marketing separately passed lint, TypeScript, version parity and a production
+build. Its targeted production-build Chromium run passed 45 of 47 checks. Two
+checks still expect homepage artifact/tabs controls from an older composition;
+they remain draft-readiness blockers. Account continuation in that browser run
+used a mocked app endpoint. Neither local verification nor PR creation proves
+production operation, live provider delivery, customer acceptance or adoption.

@@ -97,28 +97,41 @@ function AssignmentCard({ item }: { item: Assignment }) {
 }
 
 export function OperationalInbox({ mode }: { mode: "internal" | "assigned" }) {
-  const [exceptions, setExceptions] = useState<Exception[]>([]);
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  return <OperationalInboxContent key={mode} mode={mode} />;
+}
+
+function OperationalInboxContent({ mode }: { mode: "internal" | "assigned" }) {
   const [retry, setRetry] = useState(0);
+  const [result, setResult] = useState<{
+    mode: typeof mode;
+    retry: number;
+    exceptions: Exception[];
+    assignments: Assignment[];
+    error: string;
+  } | null>(null);
   useEffect(() => {
     const abort = new AbortController();
-    setLoading(true);
-    setError("");
-    fetch(`/api/operations/inbox?view=${mode}`, { signal: abort.signal, cache: "no-store" }).then(async (response) => {
+    const view = mode === "assigned" ? "inbox" : "internal";
+    fetch(`/api/operations/inbox?view=${view}`, { signal: abort.signal, cache: "no-store" }).then(async (response) => {
       const body = await response.json() as { error?: string; exceptions?: Exception[]; inbox?: { assignments?: Assignment[] } };
       if (!response.ok) throw new Error(body.error || "The operational inbox could not be loaded.");
       if (abort.signal.aborted) return;
-      setExceptions(Array.isArray(body.exceptions) ? body.exceptions : []);
-      setAssignments(Array.isArray(body.inbox?.assignments) ? body.inbox.assignments : []);
+      setResult({ mode, retry,
+        exceptions: Array.isArray(body.exceptions) ? body.exceptions : [],
+        assignments: Array.isArray(body.inbox?.assignments) ? body.inbox.assignments : [],
+        error: "",
+      });
     }).catch((cause) => {
-      if (!abort.signal.aborted) setError(cause instanceof Error ? cause.message : "The operational inbox could not be loaded.");
-    }).finally(() => { if (!abort.signal.aborted) setLoading(false); });
+      if (!abort.signal.aborted) setResult({ mode, retry, exceptions: [], assignments: [],
+        error: cause instanceof Error ? cause.message : "The operational inbox could not be loaded.",
+      });
+    });
     return () => abort.abort();
   }, [mode, retry]);
 
-  if (loading) return <p role="status" className="text-sm text-gray-muted">Checking exact work records…</p>;
+  // A previous mode or retry cannot supply the current request's content or error.
+  if (!result || result.mode !== mode || result.retry !== retry) return <p role="status" className="text-sm text-gray-muted">Checking exact work records…</p>;
+  const { exceptions, assignments, error } = result;
   if (error) return <section className="rounded-xl border border-warning/25 bg-warning/10 p-4"><p role="alert" className="text-sm text-warm-white">{error}</p><button type="button" className="mt-3 text-sm font-medium text-accent hover:underline" onClick={() => setRetry((value) => value + 1)}>Check again</button></section>;
   if (mode === "assigned") return <section aria-labelledby="assigned-inbox-list" className="space-y-3"><h2 id="assigned-inbox-list" className="sr-only">Assigned work</h2>{assignments.length ? <ul className="space-y-3">{assignments.map((item) => <AssignmentCard key={item.assignmentId} item={item} />)}</ul> : <p className="rounded-xl border border-gray-border p-4 text-sm text-gray-muted">No pending assignments or provider requests are addressed to this verified account.</p>}</section>;
   return <div className="space-y-6">
