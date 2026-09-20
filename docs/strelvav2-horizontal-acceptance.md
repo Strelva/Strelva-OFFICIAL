@@ -312,6 +312,14 @@ authenticated browser output is `/tmp/strelva-billing-ui.log`; the six captures
 are in `/tmp/strelva-billing-ui/`.
 These are isolated local fixture records and do not establish hosted billing,
 Stripe state, or a production deployment.
+A follow-up waited for stable geometry after changing viewport size: the initial
+183.92px blank rail was a frame during the existing 180ms navigation transition,
+not a persistent mobile layout failure. At 390px all three states settled at
+`mainLeft=0`, `mainWidth=390`, `navigationWidth=0` and `scrollWidth=390`.
+The authenticated check passed in `/tmp/strelva-billing-ui/stable-proof.log`;
+replacement captures use `stable-{none,cancelled,active}-{mobile,desktop}.png`
+in that directory. No product source changed for this verification.
+
 
 ### Subscription lifecycle checkpoint
 
