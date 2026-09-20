@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, it } from "vitest";
@@ -53,4 +53,21 @@ it("accepts a clean checkout at the exact compatible revision", () => {
   expect(results.filter((result) => !result.ok || result.skipped)).toEqual([]);
   expect(results).toContainEqual(expect.objectContaining({ name: "fixture:release:checkout", ok: true }));
   expect(results).toContainEqual(expect.objectContaining({ name: "fixture:release:clean", ok: true }));
+});
+
+it("checks the selected isolated client checkout instead of the ordinary working folder", () => {
+  const { folder, manifest } = checkout();
+  const checkoutRoot = mkdtempSync(join(tmpdir(), "strelva-client-checkouts-"));
+  folders.push(checkoutRoot);
+  renameSync(folder, join(checkoutRoot, "fixture"));
+  const results = runWorkspaceChecks(manifest, folder, process.cwd(), { verifyPins: true, checkoutRoot });
+  expect(results.filter(result => !result.ok || result.skipped)).toEqual([]);
+  expect(results).toContainEqual(expect.objectContaining({ name: "fixture:release:checkout", ok: true }));
+});
+
+it("fails when an explicitly selected checkout is absent even if the ordinary checkout is valid", () => {
+  const { folder, manifest } = checkout();
+  const results = runWorkspaceChecks(manifest, folder, process.cwd(), { verifyPins: true, checkoutRoot: join(folder, "unprepared") });
+  expect(results).toContainEqual(expect.objectContaining({ name: "fixture:sibling", ok: false }));
+  expect(results.some(result => result.name === "fixture:release:checkout" && result.ok)).toBe(false);
 });

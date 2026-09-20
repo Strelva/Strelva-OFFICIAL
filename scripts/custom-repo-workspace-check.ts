@@ -96,11 +96,13 @@ export function runWorkspaceChecks(
   manifest: WorkspaceManifest,
   workspaceRoot: string,
   cwd: string,
-  options: { verifyPins?: boolean } = {},
+  options: { verifyPins?: boolean; checkoutRoot?: string } = {},
 ): CheckResult[] {
   const results: CheckResult[] = [];
   const contractVersion = workspaceContractVersion(manifest);
-  const repos = resolveRepoChecks(manifest, workspaceRoot, cwd);
+  const repos = resolveRepoChecks(manifest, workspaceRoot, cwd).map(repo => options.checkoutRoot
+    ? { ...repo, repoDir: path.relative(workspaceRoot, path.resolve(options.checkoutRoot, repo.tenant)) }
+    : repo);
 
   function record(name: string, ok: boolean, detail?: string) {
     results.push({ name, ok, detail: ok ? undefined : detail });

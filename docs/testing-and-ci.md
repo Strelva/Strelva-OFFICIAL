@@ -62,6 +62,18 @@ Use isolated worktrees in the manifest's sibling layout; do not reset a working
 client checkout to obtain this proof. Ignored dependencies and build output do
 not count as source changes.
 
+To keep the isolated client checkouts together, set `CUSTOM_REPO_CHECKOUTS_ROOT`
+to their parent directory. Each checkout must be named for its manifest tenant,
+for example `/tmp/strelva-clients/gldf` and `/tmp/strelva-clients/rohlax`:
+
+```bash
+CUSTOM_REPO_CHECKOUTS_ROOT=/tmp/strelva-clients CUSTOM_REPO_VERIFY_PINS=1 pnpm check:custom-repos
+```
+
+An explicitly selected checkout directory does not fall back to the ordinary
+client working folder. `CUSTOM_REPO_WORKSPACE_ROOT` alone does not relocate
+manifest paths; they remain relative to the control-plane checkout.
+
 Pin verification does not execute each client's own check suite or contact its
 deployment. Run those local checks separately with isolated configuration, then
 record the client revision and result. A production checklist may make external

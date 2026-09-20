@@ -18,6 +18,9 @@ if (!existsSync(manifestPath)) {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as WorkspaceManifest;
   const results = runWorkspaceChecks(manifest, workspaceRoot, cwd, {
     verifyPins: process.env.CUSTOM_REPO_VERIFY_PINS === "1",
+    checkoutRoot: process.env.CUSTOM_REPO_CHECKOUTS_ROOT
+      ? path.resolve(process.env.CUSTOM_REPO_CHECKOUTS_ROOT)
+      : undefined,
   });
 
   for (const result of results) {
