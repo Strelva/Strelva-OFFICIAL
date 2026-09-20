@@ -64,6 +64,16 @@ and `/tmp/strelva-website-surfaces-final.log`. Exact pinned-client compatibility
 also passed 58/58 checks in `/tmp/strelva-website-client-compatibility.log`.
 Subsequent website-review repairs still need their own integration verification.
 
+The candidate checkpoint is `c09f8dd1`. Staging exposed trailing blank lines in
+new files, including migrations `20260920070000`, `20260920070100` and
+`20260920080100`. The follow-up removes only those trailing blank lines; SQL
+statements are unchanged. The original local-applied hash manifest remains
+intact, with before/after source hashes in
+`/tmp/strelva-candidate-migration-whitespace.json`. The normalized candidate
+passed a fresh complete ordered schema rehearsal in
+`/tmp/strelva-website-upgrade-normalized.log`. No persistent database migration
+was repeated for this formatting change.
+
 ## September 20 completion execution
 
 Jacob requested TDD implementation of the completion plan with Luna agents at

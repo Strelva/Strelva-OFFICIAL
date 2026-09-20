@@ -63,4 +63,3 @@ select pg_temp.assert_true(
 );
 
 select 'workspace calendar schema checks passed' as result;
-

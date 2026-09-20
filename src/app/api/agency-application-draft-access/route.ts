@@ -44,4 +44,3 @@ export async function POST(request: Request) {
     return workspaceHttpFailure(error);
   }
 }
-

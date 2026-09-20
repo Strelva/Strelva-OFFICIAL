@@ -165,4 +165,3 @@ $$;
 
 revoke all on function public.record_work_provider_receipt(jsonb) from public, anon, authenticated;
 grant execute on function public.record_work_provider_receipt(jsonb) to service_role;
-

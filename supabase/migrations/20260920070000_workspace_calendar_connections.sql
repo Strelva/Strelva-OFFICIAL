@@ -32,4 +32,3 @@ create index workspace_calendar_connections_workspace_idx
 alter table public.workspace_calendar_connections enable row level security;
 revoke all on table public.workspace_calendar_connections from public, anon, authenticated;
 grant select, insert, update on table public.workspace_calendar_connections to service_role;
-

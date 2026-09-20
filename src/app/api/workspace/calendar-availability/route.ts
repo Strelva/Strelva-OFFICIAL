@@ -25,4 +25,3 @@ export async function GET(request: Request) {
     return workspaceHttpFailure(error);
   }
 }
-

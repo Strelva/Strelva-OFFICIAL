@@ -57,4 +57,3 @@ export function createFixtureCalendarAdapter(provider: "outlook" | "google"): Ca
     },
   };
 }
-

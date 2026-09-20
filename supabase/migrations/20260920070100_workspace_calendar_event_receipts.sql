@@ -43,4 +43,3 @@ create index workspace_calendar_event_receipts_recovery_idx
 alter table public.workspace_calendar_event_receipts enable row level security;
 revoke all on table public.workspace_calendar_event_receipts from public, anon, authenticated;
 grant select, insert, update on table public.workspace_calendar_event_receipts to service_role;
-
