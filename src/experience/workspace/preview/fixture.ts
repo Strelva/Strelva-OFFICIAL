@@ -2,6 +2,7 @@ import type { WorkspaceAction, WorkspaceSnapshot, WorkspaceWork } from "../contr
 import { presentAssessmentWork } from "@/products/assessment";
 import { listOfferingDefinitions } from "@/platform/offerings/definitions";
 import { applicationSchema } from "@/products/applications/contracts";
+import type { ServiceRequest } from "@/platform/service-requests";
 import type { z } from "zod";
 
 export const PREVIEW_SCENARIOS = ["free", "paid", "managed", "business", "agency", "enterprise", "empty", "read-only", "unavailable", "signed-out", "website-audit", "recovery"] as const;
@@ -15,7 +16,9 @@ const AGENCY = "22222222-2222-4222-8222-222222222222";
 const CUSTOMER = "33333333-3333-4333-8333-333333333333";
 const SECOND_CUSTOMER = "66666666-6666-4666-8666-666666666666";
 const STAFF_REQUEST_APP = "88888888-8888-4888-8888-888888888888";
+const PREVIEW_AGENCY_REQUEST = "99999999-9999-4999-8999-999999999991";
 const PREVIEW_ACTOR = "local-preview";
+const PREVIEW_ACTOR_ID = "99999999-9999-4999-8999-999999999995";
 type ApplicationPayload = z.infer<typeof applicationSchema>;
 type PreviewApplication = ApplicationPayload & {
   candidate: NonNullable<ApplicationPayload["candidate"]>;
@@ -150,10 +153,33 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
     saved.set(CUSTOMER, [staffRequestWork(), ...(saved.get(CUSTOMER) || [])]);
   }
   let sequence = 0;
+  let serviceRequestSequence = 0;
   let allowanceAccepted = false;
   let pendingOfferingInstall: string | null = null;
   let staffRequestApplication = initialStaffRequestApplication();
   let installedApplication = options.installedStaffRequest === true;
+  let providerDeliveryStatus: "requested" | "accepted" | "revoked" = "requested";
+  let providerCustomerDecision: "pending" | "confirmed" | "changes_requested" = "pending";
+  let providerDeliveryRevision = 1;
+  const serviceRequests: ServiceRequest[] = [];
+  const serviceRequestKeys = new Map<string, { digest: string; requestId: string }>();
+  if (scenario === "agency") serviceRequests.push({
+    id: PREVIEW_AGENCY_REQUEST,
+    businessId: CUSTOMER,
+    status: "requested",
+    request: "Prepare a private request flow for Harbor Dental.",
+    outcome: "A usable request form and review path.",
+    context: { workspaceName: "Harbor Dental", source: "workspace_help" },
+    scope: ["help_request"],
+    provider: { kind: "agency", agencyWorkspaceId: AGENCY },
+    providerAcceptance: { status: "pending", actorId: null, acceptedAt: null, note: null },
+    installationId: null,
+    deliveryId: null,
+    revision: 1,
+    createdBy: PREVIEW_ACTOR_ID,
+    createdAt: "2026-09-15T12:20:00.000Z",
+    updatedAt: "2026-09-15T12:20:00.000Z",
+  });
   const staffRequestInstallation = {
     id: "77777777-7777-4777-8777-777777777777", businessId: CUSTOMER, definitionId: "private_staff_requests", definitionVersion: "1.0.0",
     status: "draft", revision: 1, configuration: {}, nativeResources: [{ kind: "application", id: "88888888-8888-4888-8888-888888888888" }],
@@ -163,6 +189,38 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
   };
   const accessGrants: Array<{ id: string; recipientEmail: string; views: Array<"form" | "list" | "detail" | "document">; recordRead: "none" | "own" | "all"; recordSubmit: boolean; purpose: string; expiresAt: string; status: "active" | "revoked" }> = [];
   const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  const providerDelivery = () => ({
+    id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", businessId: CUSTOMER, installationId: staffRequestInstallation.id,
+    assignmentId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", status: providerDeliveryStatus, customerDecision: providerCustomerDecision,
+    revision: providerDeliveryRevision, scope: ["submit_requests", "review_requests"], requestedBy: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    requestedAt: "2026-09-15T12:00:00.000Z", expiresAt: "2026-09-22T12:00:00.000Z",
+    acceptedBy: providerDeliveryStatus === "accepted" ? PREVIEW_ACTOR : null, acceptedAt: providerDeliveryStatus === "accepted" ? "2026-09-15T12:05:00.000Z" : null,
+    revokedBy: providerDeliveryStatus === "revoked" ? PREVIEW_ACTOR : null, revokedAt: providerDeliveryStatus === "revoked" ? "2026-09-15T12:10:00.000Z" : null,
+    revocationReason: providerDeliveryStatus === "revoked" ? "Stopped in the local preview." : null,
+    decidedBy: providerCustomerDecision === "pending" ? null : PREVIEW_ACTOR, decidedAt: providerCustomerDecision === "pending" ? null : "2026-09-15T12:15:00.000Z",
+    decisionNote: providerCustomerDecision === "pending" ? null : providerCustomerDecision === "confirmed" ? "Reviewed in the local preview." : "Please adjust the local preview work.",
+    history: [], canManage: true, canAccept: providerDeliveryStatus === "requested",
+  });
+
+  const serviceRequestProvider = (value: unknown): ServiceRequest["provider"] => {
+    if (value && typeof value === "object" && (value as { kind?: unknown }).kind === "strelva") return { kind: "strelva" };
+    if (value && typeof value === "object" && (value as { kind?: unknown; agencyWorkspaceId?: unknown }).kind === "agency"
+      && (value as { agencyWorkspaceId?: unknown }).agencyWorkspaceId === AGENCY) return { kind: "agency", agencyWorkspaceId: AGENCY };
+    throw new Error("The local preview only addresses Strelva or the listed North Studio agency.");
+  };
+  const serviceRequestDigest = (value: Record<string, unknown>) => JSON.stringify({
+    action: value.action,
+    businessId: value.businessId,
+    requestId: value.requestId || null,
+    expectedRevision: value.expectedRevision || null,
+    status: value.status,
+    request: value.request,
+    outcome: value.outcome,
+    context: value.context,
+    scope: value.scope,
+    provider: value.provider,
+  });
+  const serviceRequestResponse = (item: ServiceRequest) => ({ ...item, context: { ...item.context }, scope: [...item.scope], provider: { ...item.provider }, providerAcceptance: { ...item.providerAcceptance } });
 
   // Deliberately has no fallback to fetch: no request can reach identity,
   // persistence, assessments, email, billing, or other live providers.
@@ -177,6 +235,77 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
       installations: installedApplication ? [staffRequestInstallation] : [],
       websiteBindings: [],
     });
+    if ((scenario === "business" || scenario === "agency") && url.pathname === "/api/service-requests") {
+      if ((init?.method || "GET") === "GET") {
+        const requestId = url.searchParams.get("requestId");
+        const businessId = url.searchParams.get("businessId");
+        const providerKind = url.searchParams.get("providerKind");
+        if (providerKind === "strelva") return response({ requests: serviceRequests.filter((item) => item.status === "requested" && item.provider.kind === "strelva" && item.providerAcceptance.status === "pending").map(serviceRequestResponse) });
+        const providerWorkspaceId = url.searchParams.get("providerWorkspaceId");
+        if (providerWorkspaceId) return response({ requests: serviceRequests.filter((item) => item.status === "requested" && item.provider.kind === "agency" && item.provider.agencyWorkspaceId === providerWorkspaceId && item.providerAcceptance.status === "pending").map(serviceRequestResponse) });
+        if (requestId) {
+          const item = serviceRequests.find((candidate) => candidate.id === requestId);
+          return item ? response({ request: serviceRequestResponse(item) }) : response({ error: "The local service request was not found." }, 404);
+        }
+        if (businessId !== CUSTOMER) return response({ error: "This business is unavailable in the local preview." }, 403);
+        return response({ requests: serviceRequests.filter((item) => item.businessId === businessId).map(serviceRequestResponse) });
+      }
+      if (init?.method === "POST" && typeof init.body === "string") {
+        let command: Record<string, unknown>;
+        try { command = JSON.parse(init.body) as Record<string, unknown>; }
+        catch { return response({ error: "The local service request is invalid." }, 400); }
+        if (command.action === "save") {
+          if (command.businessId !== CUSTOMER || typeof command.idempotencyKey !== "string") return response({ error: "This business is unavailable in the local preview." }, 403);
+          let provider: ServiceRequest["provider"];
+          try { provider = serviceRequestProvider(command.provider); }
+          catch (error) { return response({ error: error instanceof Error ? error.message : "The provider is unavailable in the local preview." }, 422); }
+          const digest = serviceRequestDigest(command);
+          const prior = serviceRequestKeys.get(`${CUSTOMER}:${command.idempotencyKey}`);
+          if (prior) {
+            if (prior.digest !== digest) return response({ error: "The local service request retry changed its command." }, 409);
+            const item = serviceRequests.find((candidate) => candidate.id === prior.requestId);
+            return item ? response({ request: serviceRequestResponse(item) }) : response({ error: "The local service request was not found." }, 404);
+          }
+          const now = "2026-09-15T12:20:00.000Z";
+          let item: ServiceRequest;
+          if (typeof command.requestId === "string") {
+            const existing = serviceRequests.find((candidate) => candidate.id === command.requestId);
+            if (!existing) return response({ error: "The local service request was not found." }, 404);
+            if (command.expectedRevision !== existing.revision) return response({ error: "The local service request changed while it was open." }, 409);
+            item = { ...existing, status: command.status === "draft" ? "draft" : "requested", request: String(command.request), outcome: String(command.outcome), context: (command.context || {}) as Record<string, unknown>, scope: Array.isArray(command.scope) ? command.scope.map(String) : existing.scope, provider, revision: existing.revision + 1, updatedAt: now };
+            serviceRequests.splice(serviceRequests.indexOf(existing), 1, item);
+          } else {
+            item = { id: `99999999-9999-4999-8999-${String(++serviceRequestSequence).padStart(12, "0")}`, businessId: CUSTOMER, status: command.status === "draft" ? "draft" : "requested", request: String(command.request), outcome: String(command.outcome), context: (command.context || {}) as Record<string, unknown>, scope: Array.isArray(command.scope) ? command.scope.map(String) : ["help_request"], provider, providerAcceptance: { status: "pending", actorId: null, acceptedAt: null, note: null }, installationId: null, deliveryId: null, revision: 1, createdBy: PREVIEW_ACTOR_ID, createdAt: now, updatedAt: now };
+            serviceRequests.unshift(item);
+          }
+          serviceRequestKeys.set(`${CUSTOMER}:${command.idempotencyKey}`, { digest, requestId: item.id });
+          return response({ request: serviceRequestResponse(item) });
+        }
+        if (command.action === "respond" && typeof command.requestId === "string") {
+          const existing = serviceRequests.find((candidate) => candidate.id === command.requestId);
+          const providerMatches = existing?.provider.kind === "strelva"
+            || (existing?.provider.kind === "agency" && existing.provider.agencyWorkspaceId === AGENCY);
+          if (!existing || !providerMatches) return response({ error: "The local service request was not found." }, 404);
+          if (typeof command.idempotencyKey !== "string") return response({ error: "The local service request is invalid." }, 400);
+          const digest = serviceRequestDigest(command);
+          const key = `${CUSTOMER}:${command.idempotencyKey}`;
+          const prior = serviceRequestKeys.get(key);
+          if (prior) {
+            if (prior.digest !== digest) return response({ error: "The local service request retry changed its command." }, 409);
+            const item = serviceRequests.find((candidate) => candidate.id === prior.requestId);
+            return item ? response({ request: serviceRequestResponse(item) }) : response({ error: "The local service request was not found." }, 404);
+          }
+          if (existing.providerAcceptance.status !== "pending" || (command.decision !== "accepted" && command.decision !== "declined") || command.expectedRevision !== existing.revision) return response({ error: "The local service request changed while it was open." }, 409);
+          const now = "2026-09-15T12:25:00.000Z";
+          const item: ServiceRequest = { ...existing, revision: existing.revision + 1, updatedAt: now, providerAcceptance: { status: command.decision as "accepted" | "declined", actorId: command.decision === "accepted" ? PREVIEW_ACTOR_ID : null, acceptedAt: command.decision === "accepted" ? now : null, note: typeof command.note === "string" && command.note.trim() ? command.note.trim() : null } };
+          serviceRequests.splice(serviceRequests.indexOf(existing), 1, item);
+          serviceRequestKeys.set(key, { digest, requestId: item.id });
+          return response({ request: serviceRequestResponse(item) });
+        }
+        return response({ error: "This service request command is unavailable in the local preview." }, 409);
+      }
+      return response({ error: "Unsupported local service request request." }, 400);
+    }
     if (scenario === "business" && url.pathname === "/api/offerings" && init?.method === "POST" && typeof init.body === "string") {
       if (pendingOfferingInstall === null) {
         pendingOfferingInstall = init.body;
@@ -187,6 +316,19 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
       const current = saved.get(CUSTOMER) || [];
       if (!current.some((work) => work.id === STAFF_REQUEST_APP)) saved.set(CUSTOMER, [staffRequestWork(), ...current]);
       return response({ installation: staffRequestInstallation });
+    }
+    if (scenario === "business" && url.pathname === "/api/offerings/provider-delivery") {
+      if ((init?.method || "GET") === "GET") return response({ deliveries: installedApplication ? [providerDelivery()] : [] });
+      if (init?.method === "POST" && typeof init.body === "string") {
+        const command = JSON.parse(init.body) as { action?: string; decision?: "confirmed" | "changes_requested" };
+        if (command.action === "request") providerDeliveryStatus = "requested";
+        else if (command.action === "accept") providerDeliveryStatus = "accepted";
+        else if (command.action === "revoke") providerDeliveryStatus = "revoked";
+        else if (command.action === "decide" && command.decision) providerCustomerDecision = command.decision;
+        else return response({ error: "This provider delivery command is unavailable in the local preview." }, 422);
+        providerDeliveryRevision += 1;
+        return response({ delivery: providerDelivery() });
+      }
     }
     if (scenario === "business" && url.pathname === "/api/bounded-work" && url.searchParams.get("productId") === "applications" && (init?.method || "GET") === "GET") {
       if (!installedApplication || url.searchParams.get("workId") !== STAFF_REQUEST_APP) return response({ error: "This application is unavailable in the local preview." }, 404);

@@ -61,7 +61,10 @@ export function workspaceInvitationReturnTarget(value: string | null): string | 
 export function replaceWorkspaceLocation(workspaceId: string, workId?: string) {
   const url = new URL(window.location.href);
   url.searchParams.set("workspaceId", workspaceId);
-  if (workId) url.searchParams.set("work", workId);
+  if (workId) {
+    url.searchParams.set("work", workId);
+    url.searchParams.delete("offering");
+  }
   else url.searchParams.delete("work");
   window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
 }

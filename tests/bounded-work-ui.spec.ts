@@ -17,14 +17,16 @@ async function workspace(page: Page, productId: string, readOnly = false, empty 
 test("private app uses its declared form, records and selected result on desktop and mobile", async ({ page }) => {
   await workspace(page, "applications");
   const spec = { title: base.title, maintenanceOwner: "fixture-owner", fields: [{ id: "name", label: "Customer name", type: "text", required: true }], components: [{ kind: "form", fields: ["name"] }, { kind: "list", fields: ["name"] }, { kind: "detail", fields: ["name"] }] };
-  const payload = { ...base, spec, specVersion: 1, status: "installed", versions: [{ version: 1, spec }], rehearsal: { specVersion: 1, checks: [{ name: "Fixed components", passed: true }] }, records: [] as Array<{ id: string; values: Record<string, string> }> };
+  const release = { version: 1, spec, publishedAt: at, publishedBy: "fixture-owner", provenance: "published" as const };
+  const payload = { ...base, spec, specVersion: 1, status: "installed", versions: [{ version: 1, spec }], rehearsal: { specVersion: 1, checks: [{ name: "Fixed components", passed: true }] }, records: [] as Array<{ id: string; values: Record<string, string> }>, recordsRevision: 0, release, releases: [release] };
   const writes: Record<string, unknown>[] = [];
   await page.route("**/api/bounded-work**", route => {
     if (route.request().method() === "POST") {
       const body = route.request().postDataJSON(); writes.push(body);
       expect(body.command.kind).toBe("submit");
-      expect(body.command.expectedRevision).toBe(payload.revision);
+      expect(body.command).toMatchObject({ expectedReleaseVersion: 1, expectedRecordsRevision: 0 });
       payload.records.push(body.command.record); payload.revision++;
+      payload.recordsRevision++;
     }
     return route.fulfill({ json: { id: workId, workspaceId, payload } });
   });
@@ -62,6 +64,33 @@ test("a conflicting reservation preserves the requested time and does not claim 
   await expect(page.getByText(/No external calendar is connected/)).toBeVisible();
 });
 
+test("a native reservation can change time without changing its identity", async ({ page }) => {
+  await workspace(page, "scheduling");
+  const payload = { ...base, revision: 1, availability: [{ start: "2026-10-01T08:00:00.000Z", end: "2026-10-01T23:00:00.000Z" }], reservations: [{ requestId: "visit-1", title: "Consultation", start: "2026-10-01T13:00:00.000Z", end: "2026-10-01T14:00:00.000Z", status: "reserved" }] };
+  const writes: Record<string, unknown>[] = [];
+  await page.route("**/api/bounded-work**", route => {
+    if (route.request().method() === "POST") {
+      const body = route.request().postDataJSON(); writes.push(body);
+      expect(body.command).toMatchObject({ kind: "reschedule", requestId: "visit-1", expectedRevision: 1 });
+      payload.reservations[0] = { ...payload.reservations[0]!, start: "2026-10-01T15:00:00.000Z", end: "2026-10-01T16:00:00.000Z" };
+      payload.revision = 2;
+    }
+    return route.fulfill({ json: { id: workId, workspaceId, payload } });
+  });
+  await page.goto(`/workspace?workspaceId=${workspaceId}&work=${workId}`);
+  await expect(page.getByText("Consultation", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Change time for Consultation", exact: true }).click();
+  await page.getByLabel("New Starts", { exact: true }).fill("2026-10-01T15:00");
+  await page.getByLabel("New Ends", { exact: true }).fill("2026-10-01T16:00");
+  await page.getByRole("button", { name: "Save new time for Consultation", exact: true }).click();
+  await expect(page.getByText("Saved in this workspace.", { exact: true })).toBeVisible();
+  expect(writes).toHaveLength(1);
+  expect(writes[0]!.command).toMatchObject({ kind: "reschedule", requestId: "visit-1" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await expect(page.getByRole("button", { name: "Change time for Consultation", exact: true })).toBeVisible();
+});
+
 test("unchanged sources keep unresolved differences visible and read-only work cannot run", async ({ page }) => {
   await workspace(page, "investigations", true);
   const sourceId = "55555555-5555-4555-8555-555555555555";
@@ -78,16 +107,45 @@ test("unchanged sources keep unresolved differences visible and read-only work c
 
 test("document drafting stays with the document and preserves writing after provider failure", async ({ page }) => {
   await workspace(page, "documents", false, true);
+  const ownerId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const budgetId = "77777777-7777-4777-8777-777777777777";
+  let ledger: Record<string, unknown> | null = null;
+  const budgetCommands: string[] = [];
+  const budgetResponse = () => ({ ledger, executions: [], usage: [], currentActorId: ownerId, canManage: true, canAccept: ledger?.status === "draft" });
+  await page.route("**/api/work-economics**", async route => {
+    if (route.request().method() === "POST") {
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      budgetCommands.push(String(body.action));
+      if (body.action === "create") {
+        ledger = {
+          id: budgetId, workspaceId, workId: null, productId: "work_plans", resourceKind: "plan",
+          tenantId: null, businessId: null, requestId: null, capabilityId: null, payerId: ownerId, currency: "usd",
+          estimateCents: null, maxAuthorizedCents: body.maxAuthorizedCents, reservedCents: 0, usedCents: 0,
+          strelvaRetryCents: 0, actualCents: null, actualKnown: false, status: "draft", createdBy: ownerId,
+          acceptedBy: null, acceptedAt: null, createdAt: at, updatedAt: at,
+        };
+      } else if (body.action === "accept" && ledger) {
+        ledger = { ...ledger, status: "accepted", acceptedBy: ownerId, acceptedAt: at, updatedAt: at };
+      }
+    }
+    return route.fulfill({ json: budgetResponse() });
+  });
   await page.route("**/api/work-plans", route => route.fulfill({ status: 503, json: { error: "Drafting is temporarily unavailable. Your request is unchanged." } }));
   await page.goto(`/workspace?workspaceId=${workspaceId}&view=document`);
   await page.getByLabel("Document title", { exact: true }).fill("Team handover");
   await page.getByLabel("Document text", { exact: true }).fill("Keep this paragraph.");
   await page.getByRole("button", { name: "Draft with Strelva", exact: true }).click();
   await page.getByLabel("The result you want", { exact: true }).fill("Draft a handover procedure for our team.");
+  await page.getByLabel("Maximum planning budget, USD", { exact: true }).fill("1.25");
+  await page.getByRole("button", { name: "Propose planning budget", exact: true }).click();
+  await expect(page.getByText("$1.25", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Accept planning budget", exact: true }).click();
+  await expect(page.getByText("The maximum is accepted. A model call will reserve it before the request starts.", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Prepare document draft", exact: true }).click();
   await expect(page.getByRole("main").getByRole("alert")).toContainText("temporarily unavailable");
   await expect(page.getByLabel("The result you want", { exact: true })).toHaveValue("Draft a handover procedure for our team.");
   await expect(page).toHaveURL(/view=document/);
+  expect(budgetCommands).toEqual(["create", "accept"]);
   await page.getByRole("button", { name: "Write it myself", exact: true }).click();
   await expect(page.getByLabel("Document title", { exact: true })).toHaveValue("Team handover");
   await expect(page.getByLabel("Document text", { exact: true })).toHaveValue("Keep this paragraph.");

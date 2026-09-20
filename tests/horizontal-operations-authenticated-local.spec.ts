@@ -54,6 +54,37 @@ test("approved budgeted work completes a native document edit and refuses anothe
   } finally { await owner.context.close(); await stranger.context.close(); }
 });
 
+test("native scheduling keeps one reservation identity through cancel, reschedule and retry", async ({ browser }) => {
+  const env = localEnvironment();
+  const admin = createClient(env.url, env.service, { auth: { persistSession: false, autoRefreshToken: false } });
+  const owner = await signedInContext(browser, admin, "scheduling-lifecycle-owner");
+  try {
+    const snapshotResponse = await owner.context.request.get("/api/workspace");
+    expect(snapshotResponse.status()).toBe(200);
+    const { workspaceId } = await snapshotResponse.json();
+    let schedule = await post(owner.context.request, "/api/bounded-work", { action: "create", productId: "scheduling", workspaceId, input: { title: "Private availability", availability: [{ start: "2026-10-01T09:00:00Z", end: "2026-10-01T17:00:00Z" }] } }, 201);
+    const reopened = await owner.context.request.get(`/api/bounded-work?productId=scheduling&workId=${schedule.id}`);
+    expect((await reopened.json()).payload.reservations).toEqual([]);
+    schedule = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "scheduling", workId: schedule.id, command: { kind: "reserve", expectedRevision: 0, requestId: "visit-1", title: "Site visit", start: "2026-10-01T10:00:00Z", end: "2026-10-01T11:00:00Z" } });
+    schedule = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "scheduling", workId: schedule.id, command: { kind: "cancel", expectedRevision: 1, requestId: "visit-1" } });
+    expect(schedule.payload.reservations[0]).toMatchObject({ requestId: "visit-1", status: "cancelled" });
+    const cancelRetry = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "scheduling", workId: schedule.id, command: { kind: "cancel", expectedRevision: 1, requestId: "visit-1" } });
+    expect(cancelRetry.payload.reservations).toHaveLength(1);
+    schedule = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "scheduling", workId: schedule.id, command: { kind: "reserve", expectedRevision: 2, requestId: "visit-2", title: "Follow-up", start: "2026-10-01T11:00:00Z", end: "2026-10-01T12:00:00Z" } });
+    schedule = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "scheduling", workId: schedule.id, command: { kind: "reschedule", expectedRevision: 3, requestId: "visit-2", start: "2026-10-01T12:00:00Z", end: "2026-10-01T13:00:00Z" } });
+    const rescheduleRetry = await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "scheduling", workId: schedule.id, command: { kind: "reschedule", expectedRevision: 3, requestId: "visit-2", start: "2026-10-01T12:00:00Z", end: "2026-10-01T13:00:00Z" } });
+    expect(rescheduleRetry.payload.reservations).toEqual(schedule.payload.reservations);
+    await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "scheduling", workId: schedule.id, command: { kind: "reserve", expectedRevision: 4, requestId: "visit-3", title: "Conflict", start: "2026-10-01T13:00:00Z", end: "2026-10-01T14:00:00Z" } });
+    await post(owner.context.request, "/api/bounded-work", { action: "command", productId: "scheduling", workId: schedule.id, command: { kind: "reschedule", expectedRevision: 5, requestId: "visit-2", start: "2026-10-01T13:30:00Z", end: "2026-10-01T14:30:00Z" } }, 409);
+    const final = await owner.context.request.get(`/api/bounded-work?productId=scheduling&workId=${schedule.id}`);
+    expect((await final.json()).payload.reservations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ requestId: "visit-1", status: "cancelled" }),
+      expect.objectContaining({ requestId: "visit-2", status: "reserved", start: "2026-10-01T12:00:00Z", end: "2026-10-01T13:00:00Z" }),
+      expect.objectContaining({ requestId: "visit-3", status: "reserved" }),
+    ]));
+  } finally { await owner.context.close(); }
+});
+
 test("scheduling, generated applications and two-source investigation persist with their native checks", async ({ browser }) => {
   const env = localEnvironment();
   const admin = createClient(env.url, env.service, { auth: { persistSession: false, autoRefreshToken: false } });

@@ -21,7 +21,8 @@ export interface WorkspaceStartProps {
   onWebsiteHandoffBack?: () => void;
   onContinue: (continuation: WorkspaceStartContinuation) => void;
   onHelp: (request: string) => void;
-  onPlan?: (request: string) => void;
+  /** Open the existing model-backed plan flow. The plan is optional for old callers. */
+  onPlan?: (request: string, plan?: WorkspaceStartPlan) => void;
 }
 
 const EXAMPLES = [
@@ -131,7 +132,8 @@ export function WorkspaceStart({ context, initialRequest = "", websiteHandoff = 
         onHelp(plan.helpRequest || plan.request);
         return;
       }
-      (onPlan || onHelp)(plan.helpRequest || plan.request);
+      if (onPlan) onPlan(plan.helpRequest || plan.request, plan);
+      else onHelp(plan.helpRequest || plan.request);
       return;
     }
     if (plan.status !== "ready") {
@@ -152,7 +154,7 @@ export function WorkspaceStart({ context, initialRequest = "", websiteHandoff = 
   const canPreparePlan = Boolean(onPlan) && !context.readOnly;
   function preparePlan() {
     if (!plan || !canPreparePlan) return;
-    onPlan?.(plan.request);
+    onPlan?.(plan.request, plan);
   }
   const selection = plan ? selectionLabel(plan) : null;
   const selectedBusiness = plan?.route === "inquiries" ? context.inquiryBusinesses || [] : [];
@@ -162,7 +164,7 @@ export function WorkspaceStart({ context, initialRequest = "", websiteHandoff = 
     <header className={styles.startHeader}>
       <p className={styles.eyebrow}>New work</p>
       <h1>What should Strelva try?</h1>
-      <p>Describe the result in your own words. Strelva will show the shape first, then take you to the supported flow that can do the work.</p>
+      <p>Describe the result in your own words. You can review what Strelva proposes before any work starts.</p>
     </header>
 
     <form className={styles.startComposer} onSubmit={submit} aria-label="Start new work">
@@ -178,8 +180,10 @@ export function WorkspaceStart({ context, initialRequest = "", websiteHandoff = 
     </section>
 
     {websiteHandoff ? <WebsiteRequestHandoff handoff={websiteHandoff} onBack={onWebsiteHandoffBack} /> : plan ? <section className={styles.startProposal} aria-labelledby={`${formId}-proposal`} aria-live="polite">
-      <div className={styles.startProposalHeader}><div className={styles.startProposalIcon}>{renderPlanIcon(plan.route)}</div><div><p className={styles.eyebrow}>{plan.kind === "help" ? "A narrower path" : plan.outcome || "Proposed shape"}</p><h2 id={`${formId}-proposal`}>{plan.title}</h2></div></div>
+      <div className={styles.startProposalHeader}><div className={styles.startProposalIcon}>{renderPlanIcon(plan.route)}</div><div><p className={styles.eyebrow}>{plan.kind === "help" ? (plan.matchedRoutes?.length ? "Multiple outcomes" : "Request to review") : `Outcome · ${plan.outcome || "Proposed shape"}`}</p><h2 id={`${formId}-proposal`}>{plan.title}</h2></div></div>
       <p className={styles.startProposalSummary}>{plan.summary}</p>
+      {plan.kind === "help" ? <p className={styles.startRequestEcho}><strong>Your request stays intact:</strong> <span>{plan.request}</span></p> : null}
+      <p className={styles.startNextAction}><strong>Next:</strong> {plan.nextAction}</p>
         {plan.kind === "help" ? <><div className={styles.startHelp}><CircleHelp size={17} aria-hidden="true" /><p><strong>Here are the workspace paths to consider.</strong> Strelva can assess a business, turn a CSV into a tracker, handle inquiries for an authorized business, open work on a connected managed website, start a private document, build an application, set up scheduling, compare saved sources, or carry a bounded responsibility. No work has started from this request. {context.readOnly ? "Switch to a workspace you own before preparing a plan." : "You can ask about the closest path when none of these fits."}</p></div>{plan.reason ? <div className={styles.startBlocked} role="status"><CircleHelp size={17} aria-hidden="true" /><p>{plan.reason}</p></div> : null}</> : <>
         <div className={styles.startParts} aria-label="Proposed shape">{plan.parts.map((part) => renderPart(part, selectedPartIds.includes(part.id), () => togglePart(part.id), `${formId}-${part.id}`))}</div>
         {selection ? <label className={styles.startSelect} htmlFor={`${formId}-selection`}><span>{selection}</span><select id={`${formId}-selection`} value={plan.needsSelection === "business" ? businessId : siteId} onChange={(event) => plan.needsSelection === "business" ? setBusinessId(event.target.value) : setSiteId(event.target.value)} required><option value="">Choose one</option>{(plan.needsSelection === "business" ? selectedBusiness : selectedSites).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label> : null}

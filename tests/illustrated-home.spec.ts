@@ -59,6 +59,54 @@ test("Home search filters work and the request field carries the owner's words f
   await expect(page.getByLabel("The result you want", { exact: true })).toHaveValue(goal);
 });
 
+test("Home carries a multi-part request into the existing plan review", async ({ page }) => {
+  await page.goto("/preview/strelva?scenario=business");
+  const request = "Build a staff request app and turn our supplier spreadsheet into a tracker.";
+  await page.getByLabel("What would you like to work on today?", { exact: true }).fill(request);
+  await page.getByRole("button", { name: "Continue with this request", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "What would you like to accomplish?", exact: true })).toBeVisible();
+  await expect(page.getByLabel("The result you want", { exact: true })).toHaveValue(request);
+  await expect(page.getByText("AI planning is available in a configured, signed-in workspace. This preview does not call a model or save a plan.", { exact: true })).toBeVisible();
+});
+
+test("New work keeps the full multi-part request when it opens plan review", async ({ page }) => {
+  await page.goto("/preview/strelva/workspace?scenario=business&view=start");
+  const request = "Build a staff request app and turn our supplier spreadsheet into a tracker.";
+  await page.getByLabel("What do you want to accomplish?", { exact: true }).fill(request);
+  await page.getByRole("button", { name: "Show me the shape", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "A plan that keeps the whole request", exact: true })).toBeVisible();
+  await expect(page.locator("[aria-live='polite']").getByText(request, { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Prepare a plan", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "What would you like to accomplish?", exact: true })).toBeVisible();
+  await expect(page.getByLabel("The result you want", { exact: true })).toHaveValue(request);
+  await expect(page.getByText("AI planning is available in a configured, signed-in workspace. This preview does not call a model or save a plan.", { exact: true })).toBeVisible();
+});
+
+test("Home keeps the next action, saved work, allowance access, and site assignment reachable", async ({ page }) => {
+  await page.goto("/preview/strelva?scenario=business");
+  await expect(page.getByText("Next actions", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open Harbor Dental", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Work allowance", exact: true })).toBeVisible();
+  await expect(page.getByText("Cap needs your acceptance.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Authorized sites", exact: true })).toBeVisible();
+
+  const workspacePicker = page.getByLabel("Current workspace", { exact: true });
+  await expect(workspacePicker).toHaveValue("33333333-3333-4333-8333-333333333333");
+  await workspacePicker.selectOption("11111111-1111-4111-8111-111111111111");
+  await expect(page.getByText("Everything happening in Alex’s work, in one place.", { exact: true })).toBeVisible();
+  await workspacePicker.selectOption("33333333-3333-4333-8333-333333333333");
+  await expect(page.getByText("Everything happening in Harbor Dental, in one place.", { exact: true })).toBeVisible();
+
+  await page.getByRole("button", { name: "Open Harbor Dental", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Harbor Dental", exact: true })).toBeVisible();
+
+  const sidebar = page.getByRole("complementary", { name: "Strelva navigation", exact: true });
+  await sidebar.getByRole("button", { name: "Home", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Work allowance", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Open Settings", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
+});
+
 test("the same business topology remains across primary surfaces and utilities", async ({ page }, info) => {
   await page.goto("/preview/strelva?scenario=free");
   const expected = ["Home", "Work", "Ongoing", "People & access", "Settings"];
@@ -83,7 +131,7 @@ test("the same business topology remains across primary surfaces and utilities",
   await expect(page.getByText("People & access", { exact: true }).first()).toBeVisible();
   await expectSidebar("People & access");
   await page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("button", { name: "Explore offerings", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "More you can do.", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Useful outcomes for this workspace.", exact: true })).toBeVisible();
   await expectSidebar("Explore offerings");
   await page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("button", { name: "Help", exact: true }).click();
   await expect(page.getByRole("heading", { name: "What do you need?", exact: true })).toBeVisible();

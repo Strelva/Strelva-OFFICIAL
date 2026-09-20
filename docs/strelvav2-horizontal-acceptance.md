@@ -1,5 +1,128 @@
 # strelvav2 horizontal acceptance
 
+## September 19 product remediation assignments
+
+Jacob requested implementation orchestration with the explicitly invoked
+`tdd` skill and Luna agents at maximum reasoning effort. The work starts from `cf8c5d71` in draft PR #191.
+The table distinguishes assignment scope from local proof and release approval. Preserve the full horizontal direction; staff requests remain a
+regression journey rather than the whole product strategy.
+
+Each implementation slice must record its observed failing behavior test, the
+fix, passing focused tests and any remaining integration or provider proof.
+Prefer public interfaces and real collaborators. Test doubles belong at external
+boundaries; passing fixtures do not establish real provider operation. Root owns
+integration, the combined checks and this evidence record. Agents do not commit
+or change deployment settings independently.
+
+| Task | Agent | Scope and acceptance | Dependency / state |
+| --- | --- | --- | --- |
+| R1 Navigation continuity | `navigation_tdd` | A pending business switch survives subsequent navigation and stale responses; connected work URLs survive reload and sign-in without stale offering parameters. | Local race, late-save, agency handoff, read-only context and history browser checks pass. |
+| R2 Offering recovery | `offering_experience_tdd` | A conflicting update preserves the customer's input, reloads current state, and lets them review and retry without overwriting another person's change. | Local recovery implemented; real component tests cover conflict, failed refresh and stale responses. |
+| R3 Coherent discovery | `offering_experience_tdd` | One customer discovery surface names outcomes and actual start/request availability; existing specialist products retain their distinct behavior. | Mounted in Layout; focused tests and desktop/mobile preview journeys pass. |
+| R4 Outcome entry and Home | `entry_home_tdd` | Multi-part intent survives entry and existing planning; Home emphasizes actual work and next actions without inventing business metrics. | Local slice implemented; focused behavior and browser tests pass. |
+| R5 Delivery visibility | `offering_experience_tdd` | Home distinguishes requested, accepted, revoked and customer-review states from actual delivery records and shows unavailable evidence honestly. | Local summary implemented and tested against the existing delivery endpoint contract. |
+| R6 Immediate service request | `service_request_tdd` | A customer can save a request before installation; requests retain scope and eligible provider choice without implying acceptance, price, authority or execution. | Local customer save/reopen/edit and agency/Strelva review inboxes implemented; SQL and focused UI tests pass. |
+| R7 Offer completion task map | `offer_modules_plan` | Split Apps, Intake, Bookings, Onboarding, Checks, Websites and commercial behavior into independently testable slices with source owners and dependencies. | Task map recorded; BOOK-01/02 implemented and locally verified. |
+
+The later slices must explicitly cover recipient app editing and practical
+fields; inquiry installation and delivery recovery; real calendar lifecycle;
+document collection and onboarding completion; defined live-source checks;
+managed website continuity; and horizontal payer, usage and subscription
+behavior. Existing engines should be composed before new stores or runtimes are
+introduced. Provider choice, commercial terms and customer prices are not
+selected by this assignment.
+
+### Local implementation and verification
+
+The first batch implements R1–R6, APP-01 and BOOK-01/02. R7 records the remaining
+work with owners and dependencies. The queue below still distinguishes unbuilt
+local behavior from provider and commercial proof; this is not a completed
+horizontal-product or production-release claim.
+
+Observed regression checks cover a pending workspace switch reverting to the
+old workspace, stale save callbacks and agency inbox responses, conflicting
+offering edits, and recipient projection rejecting the newly supported choice field. The fixes preserve
+existing workspace, installation, request, reservation and record identities.
+
+The complete unit suite passes: 402 files, 2,929 tests passed and one skipped.
+Local lint, TypeScript, production build, product boundaries, ontology, version
+parity, isolated workspace SQL and the ordered full-schema upgrade rehearsal
+pass. The new migrations remain unapplied to hosted or production databases.
+
+The affected browser suites finish with all 50 cases verified: 49 passed in the
+combined run; the remaining topology test passed after its stale heading
+expectation was corrected. Both `STRELVA_UI_PREVIEW=1` and
+`STRELVA_WORKSPACE_RELEASE=1` were enabled, with no skips in that run.
+Browser proof includes Home and multi-outcome entry, unified discovery,
+read-only and agency navigation, delayed responses, and desktop/mobile request,
+application and scheduling surfaces. Real local Supabase Auth/Postgres journeys
+separately prove:
+
+- Owner option editing, rehearsal, publication, recipient submission, compatible
+  addition, rejection of a used-option rename, and record-preserving rollback.
+- Scheduling create/read/reserve/cancel/reschedule, conflict rejection and retry
+  identity through the actual `/api/bounded-work` route.
+- Customer service-request save/reopen/edit, preserved scope/context/provider,
+  agency review, rejection of stale review, acceptance of the exact revision,
+  and customer history through the actual request route and Postgres store.
+
+The service-request test cleans up its own synthetic workspaces and request
+receipts. None of these checks establishes live model, calendar, email or other
+provider operation, hosted acceptance, or human product approval. Existing
+production activation restrictions remain in force.
+
+### Subsequent task queue
+
+The remaining work is split by customer behavior below. Queued means an
+assignment exists but its implementation has not been verified. An external
+proof requirement does not block unrelated local implementation. Use synthetic
+data and the existing product seams for local work. Routine field or interface
+choices can follow repository conventions; prices and provider commitments
+cannot be invented.
+
+Follow-up owners are `apps_fields_tdd` for APP, `offering_experience_tdd` for
+INT, `offer_modules_plan` for BOOK, `entry_home_tdd` for ONB,
+`navigation_tdd` for CHECK and WEB, and `service_request_tdd` for BILL. All use
+Luna with maximum reasoning effort. Booking implementation and its real local
+Auth/Postgres API journey pass. Follow-ups wait for the current slice's integration
+review; an assigned task is not a claim that an agent is executing
+it already.
+
+| Task | Customer behavior and first proof | Implementation owner / dependency |
+| --- | --- | --- |
+| APP-01 | Publish a choice field, submit a valid option, reject an invalid option, and preserve records through updates and rollback. | Local implementation, SQL and real local Auth/Postgres owner-to-recipient lifecycle passed; projection compatibility regression passes. |
+| APP-02 | Edit an existing submitted record under an explicit grant; reject a stale revision and preserve correction history. | Apps follow-up, queued after APP-01; define own-record versus shared-record scope in the grant. |
+| APP-03 | Store and reopen a date-only field without timezone conversion. | Apps follow-up, queued; date-time and booking actions remain separate. |
+| APP-04 | Reopen the same published app from Home and connected work after publication and rollback. | Navigation and app integration proof; preserve existing authenticated journey. |
+| INT-01 | Set up the existing inquiry workspace through its offering while retaining the production release gate. | Intake follow-up, queued after discovery; reuse inquiry and offering stores. |
+| INT-02 | Complete intake, assignment, reviewed response, follow-up and failed delivery recovery in one local journey. | Intake follow-up, queued after INT-01; no second inquiry engine. |
+| INT-03 | Verify actual authorized outbound delivery and recipient response. | Intake external proof after INT-02; requires named recipient and provider authority. |
+| BOOK-01 | Exercise scheduling create/read/reserve/cancel through `/api/bounded-work`. | Service, browser-fixture and real local Auth/Postgres API lifecycle proofs passed. |
+| BOOK-02 | Reschedule a local reservation, reject a conflict, and make retries preserve one reservation identity. | Local rescheduling, retries and conflicts passed focused tests and the real local Auth/Postgres API journey. |
+| BOOK-03 | Connect calendar availability, confirmation, reschedule, cancellation and reminders to one actual provider. | Scheduling integration after BOOK-02; provider/account selection and authorized live proof remain open. |
+| ONB-01 | Track customer, employee or supplier requirements with missing, supplied, correction and accepted states. | Onboarding follow-up, queued; reuse native records and assignments, separate from site provisioning. |
+| ONB-02 | Attach an existing document revision to a requirement; preserve what was reviewed when the document changes. | Onboarding follow-up after ONB-01. |
+| ONB-03 | Upload a synthetic file, reopen it through the authorized workspace, and preserve its requirement provenance. | Onboarding follow-up after ONB-02; verify the actual private-storage boundary before implementation. |
+| ONB-04 | Extract proposed information from a document, let a person correct it, and recheck requirements. | Onboarding integration after ONB-03; extraction provider and live communication proof remain separate. |
+| CHECK-01 | Reopen a scheduled saved-source comparison with source versions, changes, no-change and unavailable states. | Checks follow-up, queued; reuse investigations and standing execution. |
+| CHECK-02 | Read one defined external source with freshness, failure and recovery evidence. | Checks integration after CHECK-01; source selection precedes adapter code. |
+| WEB-01 | Preserve site/request identity through request, proposal, review, result and history. | Website follow-up after R6; use existing website governance and delivery paths. |
+| WEB-02 | Reopen the dated canonical site check and history without implying a new scan. | Website follow-up; reuse `scan.ts` and `scan-store.ts`. |
+| WEB-03 | Prove new-customer setup, domains and client-repository continuity. | Website external proof after WEB-01; requires a selected customer/site and deployment authority. |
+| BILL-01 | Display only known payer, allowance and billing-mode facts, including unavailable values. | Commercial follow-up, queued; reuse existing authorities and Settings rather than another billing store. |
+| BILL-02 | Apply a selected subscription entitlement once, preserve existing jobs' payer, and handle out-of-order events. | Commercial integration; exact entitlement terms must be selected before expected amounts can be tested. |
+| BILL-03 | Reconcile a provider receipt to the exact work once; retain unknown costs as unresolved. | Commercial integration; extend existing evidence handling after a real receipt contract is available. |
+| BILL-04 | Prove one-off payments, existing subscriptions and grandfathered agreements remain distinct. | Commercial regression proof; no code change if existing tests already establish the behavior. |
+
+The source survey is retained in
+[`output/product-remediation/offer-module-tasks.md`](../output/product-remediation/offer-module-tasks.md)
+as working detail, not as a separate product contract. The queue here excludes
+the survey's unrelated site-provisioning repair from the current feature batch.
+
+Code and draft PR preparation remain separate from production activation.
+Preserve the existing deployment hold. No live migrations, messages, payments,
+provider writes or release flags are authorized by local implementation proof.
+
 Updated: 2026-09-18. Jacob requested the full horizontal vision, running locally,
 with tested customer journeys and production kept off. This expands the earlier
 [first slice](./horizontal-first-scope-2026-09-11.md); it does not discard its

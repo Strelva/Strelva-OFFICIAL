@@ -6,6 +6,10 @@ import {
   WorkspaceStoreError,
   type WorkspaceActor,
 } from "@/platform/workspaces/types";
+import {
+  APPLICATION_SELECT_OPTION_LIMIT,
+  APPLICATION_SELECT_OPTION_LENGTH_LIMIT,
+} from "./contracts";
 
 /**
  * Application use is a resource grant. It is deliberately separate from the
@@ -61,12 +65,23 @@ export const applicationUseSubmitSchema = z.object({
 }).strict();
 export type ApplicationUseSubmitInput = z.infer<typeof applicationUseSubmitSchema>;
 
-const fieldSchema = z.object({
+const useFieldBase = {
   id: z.string().min(1).max(40),
   label: z.string().trim().min(1).max(80),
-  type: z.enum(["text", "number", "boolean"]),
   required: z.boolean().optional().default(false),
-});
+} as const;
+const fieldSchema = z.discriminatedUnion("type", [
+  z.object({ ...useFieldBase, type: z.literal("text") }),
+  z.object({ ...useFieldBase, type: z.literal("number") }),
+  z.object({ ...useFieldBase, type: z.literal("boolean") }),
+  z.object({
+    ...useFieldBase,
+    type: z.literal("select"),
+    options: z.array(z.string().trim().min(1).max(APPLICATION_SELECT_OPTION_LENGTH_LIMIT))
+      .min(1)
+      .max(APPLICATION_SELECT_OPTION_LIMIT),
+  }),
+]);
 const componentSchema = z.object({
   kind: applicationViewKindSchema,
   fields: z.array(z.string().min(1).max(40)).min(1).max(30),
@@ -79,6 +94,11 @@ const useSpecSchema = z.object({
   if (spec.components.filter(component => component.kind === "form").length > 1) {
     ctx.addIssue({ code: "custom", path: ["components"], message: "This application has more than one submission form." });
   }
+  spec.fields.forEach((field, index) => {
+    if (field.type === "select" && new Set(field.options).size !== field.options.length) {
+      ctx.addIssue({ code: "custom", path: ["fields", index, "options"], message: "Select options must be unique." });
+    }
+  });
 });
 type UseSpec = z.infer<typeof useSpecSchema>;
 
@@ -108,7 +128,7 @@ export interface ApplicationUseSnapshot {
   releaseVersion: number;
   views: Array<{
     kind: ApplicationViewKind;
-    fields: Array<{ id: string; label: string; type: "text" | "number" | "boolean"; required: boolean }>;
+    fields: Array<{ id: string; label: string; type: "text" | "number" | "boolean" | "select"; required: boolean; options?: string[] }>;
   }>;
   records: Array<{ id: string; values: Record<string, string | number | boolean> }>;
   access: {
@@ -255,6 +275,13 @@ function assertSubmittedFieldsAllowed(
   if (Object.keys(input.record.values).some(fieldId => !allowed.has(fieldId))) {
     throw new ApplicationUseAccessError("This field is not part of the released form.");
   }
+  const fields = new Map(parsed.data.fields.map(field => [field.id, field]));
+  for (const [fieldId, value] of Object.entries(input.record.values)) {
+    const field = fields.get(fieldId);
+    if (field?.type === "select" && (typeof value !== "string" || (value !== "" && !field.options.includes(value)))) {
+      throw new ApplicationUseInputError(`${field.label} must use one of the available options.`);
+    }
+  }
   if (parsed.data.fields.some(field => {
     const value = input.record.values[field.id];
     return field.required && (value === undefined || (typeof value === "string" && value.trim() === ""));
@@ -283,7 +310,11 @@ function project(context: ApplicationUseContext, actor: WorkspaceActor, now: Dat
     .map(component => ({
       kind: component.kind,
       fields: component.fields.map(id => fields.get(id)).filter((field): field is UseSpec["fields"][number] => Boolean(field)).map(field => ({
-        id: field.id, label: field.label, type: field.type, required: field.required ?? false,
+        id: field.id,
+        label: field.label,
+        type: field.type,
+        required: field.required ?? false,
+        ...(field.type === "select" ? { options: field.options } : {}),
       })),
     }))
     .filter(component => component.fields.length > 0);

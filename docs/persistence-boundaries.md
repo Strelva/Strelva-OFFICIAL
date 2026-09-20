@@ -77,6 +77,29 @@ the service-role client. RLS remains defense-in-depth because the service-role c
 When moving an operational store to Postgres, change its read path, failure semantics, tests,
 and this table in the same change. Do not update documentation based on a shadow write alone.
 
+## September 19 local request and application additions
+
+Pre-installation service requests use Postgres `service_requests` and
+`service_request_commands` through `src/platform/service-requests`. A request
+retains the customer business, need, scope, selected provider, review decision
+and revision. Command receipts prevent repeated saves and decisions after a
+lost response. Customer edits and provider reviews check the revision they saw.
+A review decision does not create an installation, price, assignment or execution
+permission; linking an existing delivery is a separate checked command.
+
+Request history is bounded to 100 entries. No time-based purge is configured.
+Deleting the customer workspace cascades its requests and command receipts;
+referenced provider workspaces and linked deliveries use restrictive foreign
+keys. Missing request storage reports unavailable rather than an empty inbox.
+This is local implementation behind the workspace release gate, not a deployed
+migration or live provider service.
+
+Application choice fields use the existing application tables and writers.
+Allowed options belong to the versioned definition. Publication and rollback
+validate current records against that definition; adding an option preserves
+records, while removing an option still in use is rejected. No separate record
+store or migration of customer values is introduced.
+
 ## Tenant rename registry completeness
 
 The `authoritativePatterns` list in `src/lib/tenant-rename.ts` is derived from this table.

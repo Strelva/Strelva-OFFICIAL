@@ -4,17 +4,31 @@ import { baseSchema } from "@/platform/bounded-work/contracts";
 /** Bounded-work compatibility keeps a clear failure at these finite limits. */
 export const APPLICATION_RECORD_LIMIT = 1_000;
 export const APPLICATION_VERSION_HISTORY_LIMIT = 100;
+export const APPLICATION_SELECT_OPTION_LIMIT = 20;
+export const APPLICATION_SELECT_OPTION_LENGTH_LIMIT = 80;
 
 const fieldId = z.string()
   .regex(/^[a-z][a-z0-9_]{0,39}$/)
   .refine((value) => !["constructor", "prototype"].includes(value), "Choose a different field name");
 
-const fieldSchema = z.object({
+const fieldBase = {
   id: fieldId,
   label: z.string().trim().min(1).max(80),
-  type: z.enum(["text", "number", "boolean"]),
   required: z.boolean().default(false),
-}).strict();
+} as const;
+
+const fieldSchema = z.discriminatedUnion("type", [
+  z.object({ ...fieldBase, type: z.literal("text") }).strict(),
+  z.object({ ...fieldBase, type: z.literal("number") }).strict(),
+  z.object({ ...fieldBase, type: z.literal("boolean") }).strict(),
+  z.object({
+    ...fieldBase,
+    type: z.literal("select"),
+    options: z.array(z.string().trim().min(1).max(APPLICATION_SELECT_OPTION_LENGTH_LIMIT))
+      .min(1)
+      .max(APPLICATION_SELECT_OPTION_LIMIT),
+  }).strict(),
+]);
 
 const componentSchema = z.object({
   kind: z.enum(["form", "list", "detail", "document"]),
@@ -32,6 +46,11 @@ export const applicationSpecSchema = z.object({
   if (ids.size !== spec.fields.length) {
     ctx.addIssue({ code: "custom", message: "Field names must be unique", path: ["fields"] });
   }
+  spec.fields.forEach((field, index) => {
+    if (field.type === "select" && new Set(field.options).size !== field.options.length) {
+      ctx.addIssue({ code: "custom", message: "Select options must be unique", path: ["fields", index, "options"] });
+    }
+  });
   if (spec.components.some((component) => component.fields.some((id) => !ids.has(id)))) {
     ctx.addIssue({ code: "custom", message: "Components may only reference declared fields", path: ["components"] });
   }

@@ -6,5 +6,6 @@ export const scheduleSchema = baseSchema.extend({ availability: z.array(interval
 export const createScheduleSchema = z.object({ title: z.string().trim().min(1).max(160), availability: z.array(intervalSchema).min(1).max(100) }).strict();
 export const scheduleCommandSchema = z.discriminatedUnion("kind", [
   intervalSchema.extend({ kind: z.literal("reserve"), expectedRevision: z.number().int().nonnegative(), requestId: z.string().min(1).max(100), title: z.string().min(1).max(160) }),
+  intervalSchema.extend({ kind: z.literal("reschedule"), expectedRevision: z.number().int().nonnegative(), requestId: z.string().min(1).max(100) }),
   z.object({ kind: z.literal("cancel"), expectedRevision: z.number().int().nonnegative(), requestId: z.string().min(1) }),
 ]);

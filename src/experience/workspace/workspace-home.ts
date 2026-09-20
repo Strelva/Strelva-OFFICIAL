@@ -5,7 +5,8 @@ export function workspaceHome(work: readonly WorkspaceWork[]) {
   const outputs = new Map<string, number>();
   for (const item of work) if (item.sourceWorkId && !item.unavailableReason) outputs.set(item.sourceWorkId, (outputs.get(item.sourceWorkId) || 0) + 1);
   const attention = work.flatMap(item => {
-    const reason = item.unavailableReason || (item.operation?.status === "needs_attention" ? "This work needs a decision before it can continue." : item.operation?.status === "proposed" ? "Review the proposed work." : item.workPlan?.status === "needs_scoping" ? item.workPlan.summary : null);
+    const reason = item.unavailableReason
+      || (item.operation?.status === "needs_attention" ? item.operation.reason || "This work needs a decision before it can continue." : item.operation?.status === "proposed" ? item.operation.reason || "Review the proposed work." : item.workPlan?.status === "needs_scoping" ? item.workPlan.summary : null);
     return reason ? [{ work: item, reason }] : [];
   });
   const attentionIds = new Set(attention.map(item => item.work.id));

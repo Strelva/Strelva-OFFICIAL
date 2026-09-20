@@ -80,12 +80,13 @@ begin
     'maintenanceOwner', owner_id::text,
     'fields', jsonb_build_array(
       jsonb_build_object('id', 'problem', 'label', 'Problem', 'type', 'text', 'required', true),
+      jsonb_build_object('id', 'priority', 'label', 'Priority', 'type', 'select', 'required', false, 'options', jsonb_build_array('standard', 'urgent')),
       jsonb_build_object('id', 'internal_note', 'label', 'Internal note', 'type', 'text', 'required', false)
     ),
     'components', jsonb_build_array(
-      jsonb_build_object('kind', 'form', 'fields', jsonb_build_array('problem')),
-      jsonb_build_object('kind', 'list', 'fields', jsonb_build_array('problem')),
-      jsonb_build_object('kind', 'detail', 'fields', jsonb_build_array('problem', 'internal_note'))
+      jsonb_build_object('kind', 'form', 'fields', jsonb_build_array('problem', 'priority')),
+      jsonb_build_object('kind', 'list', 'fields', jsonb_build_array('problem', 'priority')),
+      jsonb_build_object('kind', 'detail', 'fields', jsonb_build_array('problem', 'priority', 'internal_note'))
     )
   );
   draft_payload := jsonb_build_object('version', 1, 'revision', 0, 'title', 'Repair requests',
@@ -193,11 +194,20 @@ begin
   exception when others then
     if position('application_use_invalid' in sqlerrm) = 0 then raise; end if;
   end;
+  begin
+    perform public.submit_application_use_record(
+      staff_id, 'application-staff@example.test', target_work_id, grant_row.id, 1,
+      '{"id":"invalid-priority","values":{"problem":"x","priority":"vip"}}', 'invalid-priority'
+    );
+    raise exception 'invalid select option accepted';
+  exception when others then
+    if position('application_record_invalid' in sqlerrm) = 0 then raise; end if;
+  end;
 
   select * into use_row
   from public.submit_application_use_record(
     staff_id, 'application-staff@example.test', target_work_id, grant_row.id, 1,
-    '{"id":"staff-2","values":{"problem":"Broken gate"}}', 'staff-2'
+    '{"id":"staff-2","values":{"problem":"Broken gate","priority":"urgent"}}', 'staff-2'
   );
   perform pg_temp.assert_true(use_row.release_version = 1, 'staff submit returns release one');
   select count(*) into count_before from public.application_records where application_records.work_id = target_work_id;
@@ -207,7 +217,7 @@ begin
   select * into use_row
   from public.submit_application_use_record(
     staff_id, 'application-staff@example.test', target_work_id, grant_row.id, 1,
-    '{"id":"staff-2","values":{"problem":"Broken gate"}}', 'staff-2'
+    '{"id":"staff-2","values":{"problem":"Broken gate","priority":"urgent"}}', 'staff-2'
   );
   select count(*) into count_before from public.application_records where application_records.work_id = target_work_id;
   perform pg_temp.assert_true(count_before = 3 and use_row.release_version = 1, 'idempotent replay does not duplicate');
@@ -221,7 +231,7 @@ begin
   select * into use_row
   from public.submit_application_use_record(
     staff_id, 'application-staff@example.test', target_work_id, grant_row.id, 1,
-    '{"id":"staff-2","values":{"problem":"Broken gate"}}', 'staff-2'
+    '{"id":"staff-2","values":{"problem":"Broken gate","priority":"urgent"}}', 'staff-2'
   );
   perform pg_temp.assert_true(use_row.release_version = 2 and jsonb_array_length(use_row.records) = 2, 'replay returns current permitted projection');
   begin
@@ -237,7 +247,7 @@ begin
   -- A submit grant is rejected when a required native field is not present in
   -- the only released form. This prevents issuing a link for a form that can
   -- never produce a valid native record.
-  incomplete_spec := jsonb_set(app_spec, '{fields,1,required}', 'true'::jsonb);
+  incomplete_spec := jsonb_set(app_spec, '{fields,2,required}', 'true'::jsonb);
   insert into public.application_releases(work_id, workspace_id, version, spec, published_by)
     values (target_work_id, target_workspace_id, 3, incomplete_spec, owner_id);
   update public.application_states set current_release_version = 3 where application_states.work_id = target_work_id;

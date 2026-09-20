@@ -62,6 +62,36 @@ test("finished application is a focused keyboard usable experience with responsi
   await page.screenshot({ path: testInfo.outputPath("application-use-ui-mobile.png"), fullPage: true });
 });
 
+test("finished application renders a bounded select and submits the chosen option", async ({ page }, testInfo) => {
+  const selectSnapshot = {
+    ...snapshot,
+    views: [
+      { kind: "form", fields: [{ id: "priority", label: "Priority", type: "select", required: true, options: ["standard", "urgent"] }] },
+      { kind: "list", fields: [{ id: "priority", label: "Priority", type: "select", required: true, options: ["standard", "urgent"] }] },
+    ],
+    records: [],
+  };
+  let submitted: unknown;
+  await page.route(`**/api/apps/${WORK_ID}`, async route => {
+    if (route.request().method() === "POST") {
+      submitted = route.request().postDataJSON();
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ...selectSnapshot, records: [{ id: "request-2", values: { priority: "urgent" } }] }) });
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(selectSnapshot) });
+  });
+  await page.goto(`/apps/${WORK_ID}`);
+  const priority = page.getByRole("combobox", { name: /Priority/ });
+  await priority.selectOption("urgent");
+  await page.getByRole("button", { name: "Submit record", exact: true }).click();
+  await expect(page.getByRole("status")).toContainText("Record submitted.");
+  expect((submitted as { input?: { record?: { values?: unknown } } }).input?.record?.values).toEqual({ priority: "urgent" });
+  await page.screenshot({ path: testInfo.outputPath("application-use-select-desktop.png"), fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("application-use-select-mobile.png"), fullPage: true });
+});
+
 test("finished application shows a revoked error without exposing the saved experience", async ({ page }, testInfo) => {
   await mockUse(page, { revoked: true });
   await page.goto(`/apps/${WORK_ID}`);

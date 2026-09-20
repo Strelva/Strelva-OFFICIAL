@@ -16,7 +16,7 @@ const catalog = (id: string, availability: WorkspaceProduct["availability"] = "a
 });
 
 describe("workspace product discovery", () => {
-  it("limits the shelf to consumer products and hides operator-only products", () => {
+  it("keeps supported customer products in shared discovery and hides operator-only records", () => {
     expect(discoveryProducts([
       catalog("ai_visibility"),
       catalog("managed_presence", "managed"),
@@ -26,7 +26,7 @@ describe("workspace product discovery", () => {
     ]).map((product) => product.id)).toEqual(["ai_visibility", "managed_presence", "homefinder"]);
   });
 
-  it("does not manufacture a product shelf when the server supplied no catalog", () => {
+  it("does not manufacture discovery entries when the server supplied no catalog", () => {
     expect(discoveryProducts([])).toEqual([]);
   });
 

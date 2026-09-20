@@ -304,7 +304,7 @@ const scheduleCommand = definition({
   productId: "scheduling",
   resourceKind: "schedule",
   label: "Change a schedule",
-  description: "Apply a native schedule reservation or cancellation command.",
+  description: "Apply a native schedule reservation, reschedule, or cancellation command.",
   support: "release_gated",
   owningScope: "resource",
   authority: nativePolicy.authority,
@@ -432,7 +432,7 @@ export const EXECUTABLE_CAPABILITY_QUALIFICATIONS = Object.freeze([
   qualifyCapability(documentEdit, [evidence("documents-command", "document.edit", "A responsibility invokes the revision-checked document command.", "src/__tests__/work-execution.test.ts")], "2026-09-14T00:00:00.000Z", "Local native document command proof."),
   qualifyCapability(createTracker, [evidence("tracker-plan", "create_tracker", "A reviewed plan creates an empty supported tracker.", "src/__tests__/work-plan-execution.test.ts")], "2026-09-14T00:00:00.000Z", "Local native tracker planning proof."),
   qualifyCapability(trackerCommand, [evidence("tracker-command", "tracker.command", "A responsibility invokes the revision-checked tracker command.", "src/__tests__/work-execution.test.ts")], "2026-09-14T00:00:00.000Z", "Local native tracker command proof."),
-  qualifyCapability(scheduleCommand, [evidence("schedule-command", "schedule.command", "Schedule commands reject overlap and preserve native reservation state.", "src/__tests__/bounded-scheduling.test.ts")], "2026-09-14T00:00:00.000Z", "Local native scheduling command proof."),
+  qualifyCapability(scheduleCommand, [evidence("schedule-command", "schedule.command", "Schedule commands reject overlap, preserve reservation identity through reschedule, and keep provider work governed.", "src/__tests__/bounded-scheduling.test.ts")], "2026-09-19T00:00:00.000Z", "Local native scheduling command proof."),
   qualifyCapability(investigationRun, [evidence("investigation-run", "investigation.run", "Investigation runs retain source snapshots and differences.", "src/__tests__/bounded-investigations.test.ts")], "2026-09-14T00:00:00.000Z", "Local native investigation proof."),
   qualifyCapability(learningCollect, [evidence("learning-collect", "learning.collect", "Internal collection keeps evidence within its registered source set.", "src/__tests__/product-learning-service.test.ts")], "2026-09-14T00:00:00.000Z", "Local internal R&D collection proof."),
 ] as const);

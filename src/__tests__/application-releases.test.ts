@@ -67,6 +67,14 @@ const incompatibleSpec = {
   fields: [{ id: "problem", label: "Problem", type: "number" as const, required: true }],
 };
 
+const selectSpecV1 = {
+  title: "Repair requests",
+  maintenanceOwner: owner.userId,
+  fields: [{ id: "priority", label: "Priority", type: "select" as const, required: true, options: ["standard", "urgent"] },
+    { id: "problem", label: "Problem", type: "text" as const, required: true }],
+  components: [{ kind: "form" as const, fields: ["priority", "problem"] }, { kind: "list" as const, fields: ["priority", "problem"] }],
+};
+
 async function createReleasedApplication() {
   const service = createApplicationService(applicationStore());
   const created = await service.create(owner, "workspace-a", specV1);
@@ -152,5 +160,47 @@ describe("native application release and record clocks", () => {
       record: { id: "member-record", values: { problem: "Member report" } },
     });
     expect(saved.records).toHaveLength(1);
+  });
+
+  it("publishes bounded select options, preserves selected records through additive changes and rollback, and rejects used option renames", async () => {
+    const service = createApplicationService(applicationStore());
+    const created = await service.create(owner, "workspace-a", selectSpecV1);
+    await service.rehearse(owner, created.id, { expectedDesignRevision: 0 });
+    await service.publish(owner, created.id, { expectedCandidateRevision: 0, expectedReleaseVersion: null });
+
+    await service.submit(member, created.id, {
+      expectedReleaseVersion: 1,
+      expectedRecordsRevision: 0,
+      record: { id: "r1", values: { priority: "standard", problem: "Loose hinge" } },
+    });
+
+    const additive = {
+      ...selectSpecV1,
+      fields: selectSpecV1.fields.map(field => field.id === "priority" ? { ...field, options: ["standard", "urgent", "vip"] } : field),
+    };
+    await service.revise(owner, created.id, { expectedDesignRevision: 0, spec: additive });
+    await service.rehearse(owner, created.id, { expectedDesignRevision: 1 });
+    await service.publish(owner, created.id, { expectedCandidateRevision: 1, expectedReleaseVersion: 1 });
+    expect((await service.readRuntime(member, created.id)).release.spec.fields[0]).toMatchObject({ type: "select", options: ["standard", "urgent", "vip"] });
+    expect((await service.readRuntime(member, created.id)).records).toEqual([{ id: "r1", values: { priority: "standard", problem: "Loose hinge" } }]);
+
+    await service.rollback(owner, created.id, { expectedDesignRevision: 1, expectedReleaseVersion: 2, version: 1 });
+    expect((await service.readRuntime(member, created.id)).records).toEqual([{ id: "r1", values: { priority: "standard", problem: "Loose hinge" } }]);
+    await expect(service.submit(member, created.id, {
+      expectedReleaseVersion: 1,
+      expectedRecordsRevision: 1,
+      record: { id: "invalid", values: { priority: "vip", problem: "Unsupported priority" } },
+    })).rejects.toThrow(/available options/i);
+
+    const renamed = {
+      ...selectSpecV1,
+      fields: selectSpecV1.fields.map(field => field.id === "priority" ? { ...field, options: ["normal", "urgent"] } : field),
+    };
+    await service.revise(owner, created.id, { expectedDesignRevision: 2, spec: renamed });
+    const rehearsal = await service.rehearse(owner, created.id, { expectedDesignRevision: 3 });
+    expect(rehearsal.payload.rehearsal?.checks.find(check => check.name.includes("Existing records"))?.passed).toBe(false);
+    await expect(service.publish(owner, created.id, { expectedCandidateRevision: 3, expectedReleaseVersion: 1 })).rejects.toThrow(/rehearsal/i);
+    expect((await service.readRuntime(member, created.id)).release.version).toBe(1);
+    expect((await service.readRuntime(member, created.id)).records).toEqual([{ id: "r1", values: { priority: "standard", problem: "Loose hinge" } }]);
   });
 });

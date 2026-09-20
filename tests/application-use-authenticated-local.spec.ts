@@ -9,7 +9,10 @@ test.skip(
 test.setTimeout(180_000);
 
 async function post(request: APIRequestContext, path: string, body: unknown, status = 200) {
-  const response = await request.post(path, { headers: { origin: localEnvironment().app }, data: body });
+  const response = await request.post(path, {
+    headers: { origin: localEnvironment().app, "sec-fetch-site": "same-origin" },
+    data: body,
+  });
   expect(response.status(), await response.text()).toBe(status);
   return response.json();
 }
@@ -53,8 +56,11 @@ test("a verified staff recipient uses one released version while a candidate cha
       workspaceId,
       input: {
         title: "Repair requests",
-        fields: [{ id: "problem", label: "Problem", type: "text", required: true }],
-        components: [{ kind: "form", fields: ["problem"] }, { kind: "list", fields: ["problem"] }],
+        fields: [
+          { id: "problem", label: "Problem", type: "text", required: true },
+          { id: "priority", label: "Priority", type: "select", required: true, options: ["standard", "urgent"] },
+        ],
+        components: [{ kind: "form", fields: ["problem", "priority"] }, { kind: "list", fields: ["problem", "priority"] }],
       },
     }, 201);
     app = await applicationCommand(owner.context.request, app.id, { kind: "rehearse", expectedRevision: app.payload.revision });
@@ -93,6 +99,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     // submit can be retried without asking the staff member to retype it.
     const recover = await failOnce(page, app.id);
     await page.getByLabel("Problem *", { exact: true }).fill("Leaking tap in upstairs bathroom");
+    await page.getByRole("combobox", { name: /Priority/ }).selectOption("standard");
     await page.getByRole("button", { name: "Submit record", exact: true }).click();
     await expect(page.locator("#application-submit-error")).toContainText("current draft is still here");
     await recover();
@@ -102,7 +109,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     await expect(page.getByRole("status")).toContainText("Record submitted.");
     let use = await readUse(staff.context.request, app.id);
     expect(use.releaseVersion).toBe(1);
-    expect(use.records).toEqual([{ id: expect.any(String), values: { problem: "Leaking tap in upstairs bathroom" } }]);
+    expect(use.records).toEqual([{ id: expect.any(String), values: { problem: "Leaking tap in upstairs bathroom", priority: "standard" } }]);
     await page.screenshot({ path: testInfo.outputPath("application-use-desktop.png"), fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -114,9 +121,11 @@ test("a verified staff recipient uses one released version while a candidate cha
     await ownerEditPage.goto(`/workspace?workspaceId=${workspaceId}&work=${app.id}`);
     await ownerEditPage.getByText("Edit proposed app", { exact: true }).click();
     await ownerEditPage.getByRole("button", { name: "Add field", exact: true }).click();
-    await ownerEditPage.getByLabel("Label for New field 2", { exact: true }).fill("Equipment location");
+    await ownerEditPage.getByLabel("Label for New field 3", { exact: true }).fill("Equipment location");
     await ownerEditPage.getByRole("button", { name: "Add field", exact: true }).click();
-    await ownerEditPage.getByLabel("Label for New field 3", { exact: true }).fill("Internal note");
+    await ownerEditPage.getByLabel("Label for New field 4", { exact: true }).fill("Internal note");
+    await ownerEditPage.getByRole("button", { name: "Add option", exact: true }).click();
+    await ownerEditPage.getByLabel("Option 3 for Priority", { exact: true }).fill("vip");
     await ownerEditPage.getByLabel("Show Equipment location in form view", { exact: true }).check();
     await ownerEditPage.getByLabel("Show Equipment location in list view", { exact: true }).check();
     await ownerEditPage.getByLabel("View to add", { exact: true }).selectOption("detail");
@@ -138,6 +147,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     await ownerEditPage.getByRole("button", { name: "Save new draft", exact: true }).click();
     await expect(ownerEditPage.getByText('Field added: "Equipment location" (text, optional).', { exact: true })).toBeVisible();
     await expect(ownerEditPage.getByText('Field added: "Internal note" (text, optional).', { exact: true })).toBeVisible();
+    await expect(ownerEditPage.getByText('Field changed: "Priority"; options change from standard, urgent to standard, urgent, vip.', { exact: true })).toBeVisible();
     await ownerEditPage.close();
 
     // The owner continues using the published form while the candidate is a
@@ -148,6 +158,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     await expect(ownerUsePage.getByLabel("Internal note", { exact: true })).toHaveCount(0);
     await ownerUsePage.getByText("Add another record", { exact: true }).click();
     await ownerUsePage.getByLabel("Problem", { exact: true }).fill("Broken stopcock in utility room");
+    await ownerUsePage.getByRole("combobox", { name: /Priority/ }).selectOption("standard");
     await ownerUsePage.getByRole("button", { name: "Save record", exact: true }).click();
     await expect(ownerUsePage.getByRole("status")).toContainText("Saved in this workspace.");
     const ownerUseResult = await owner.context.request.get(`/api/bounded-work?productId=applications&workId=${app.id}`);
@@ -169,6 +180,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     const review = ownerReviewPage.locator("details").filter({ hasText: "Review changes" });
     await expect(review).toBeVisible();
     await expect(review.getByText('Field added: "Internal note" (text, optional).', { exact: true })).toBeVisible();
+    await expect(review.getByText('Field changed: "Priority"; options change from standard, urgent to standard, urgent, vip.', { exact: true })).toBeVisible();
     await expect(review.getByText('View added: detail showing "Problem", "Internal note".', { exact: true })).toBeVisible();
     await expect(review.getByText("Not checked yet. Check this proposal to verify existing records.", { exact: true })).toBeVisible();
     await review.getByRole("button", { name: "Check proposed change", exact: true }).click();
@@ -203,9 +215,31 @@ test("a verified staff recipient uses one released version while a candidate cha
     expect(publishedOwnerResult.status(), await publishedOwnerResult.text()).toBe(200);
     app = await publishedOwnerResult.json();
     await ownerReviewPage.close();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    const priority = page.getByRole("combobox", { name: /Priority/ });
+    await expect(priority).toBeVisible();
+    await priority.selectOption("urgent");
+    await page.getByLabel("Problem *", { exact: true }).fill("Replacement pipe cutter for van 3");
+    await page.getByRole("button", { name: "Submit record", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText("Record submitted.");
     use = await readUse(staff.context.request, app.id);
     expect(use.releaseVersion).toBe(2);
-    expect(use.records).toHaveLength(1);
+    expect(use.records).toHaveLength(2);
+    expect(use.records[1]?.values).toMatchObject({ problem: "Replacement pipe cutter for van 3", priority: "urgent" });
+
+    // Removing a used choice creates a candidate, but the real rehearsal must
+    // fail before Publish can change the live release.
+    const ownerRemovalPage = await owner.context.newPage();
+    await ownerRemovalPage.goto(`/workspace?workspaceId=${workspaceId}&work=${app.id}`);
+    await ownerRemovalPage.getByText("Edit proposed app", { exact: true }).click();
+    await ownerRemovalPage.getByLabel("Option 1 for Priority", { exact: true }).fill("normal");
+    await ownerRemovalPage.getByRole("button", { name: "Save new draft", exact: true }).click();
+    const removalReview = ownerRemovalPage.locator("details").filter({ hasText: "Review changes" });
+    await expect(removalReview.getByText('Field changed: "Priority"; options change from standard, urgent, vip to normal, urgent, vip.', { exact: true })).toBeVisible();
+    await removalReview.getByRole("button", { name: "Check proposed change", exact: true }).click();
+    await expect(removalReview.getByText("Failed: Existing records fit this version", { exact: true })).toBeVisible();
+    await expect(removalReview.getByRole("button", { name: "Publish", exact: true })).toBeDisabled();
+    await ownerRemovalPage.close();
 
     // The new release includes a hidden native field, but the recipient's
     // released form view does not. Server and browser boundaries reject it.
@@ -230,8 +264,9 @@ test("a verified staff recipient uses one released version while a candidate cha
     });
     use = await readUse(staff.context.request, app.id);
     expect(use.releaseVersion).toBe(1);
-    expect(use.records).toHaveLength(1);
+    expect(use.records).toHaveLength(2);
     expect(use.records[0].values.problem).toBe("Leaking tap in upstairs bathroom");
+    expect(use.records.map((record: { values: { priority?: string } }) => record.values.priority)).toEqual(["standard", "urgent"]);
 
     // Reopen the owner surface to prove the grant list is durable, then revoke
     // the same link through the owner control.
@@ -243,7 +278,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     await reopenedOwnerPage.close();
     await expect(readUse(staff.context.request, app.id, 403)).resolves.toBeNull();
     expect((await staff.context.request.post(`/api/apps/${app.id}`, {
-      headers: { origin: env.app, "content-type": "application/json" },
+      headers: { origin: env.app, "sec-fetch-site": "same-origin", "content-type": "application/json" },
       data: { action: "submit", input: { record: { id: "after-revoke", values: { problem: "denied" } }, releaseVersion: 1, idempotencyKey: "after-revoke" } },
     })).status()).toBe(403);
     await page.reload();

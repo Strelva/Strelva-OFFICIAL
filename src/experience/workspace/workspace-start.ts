@@ -54,6 +54,8 @@ export interface WorkspaceStartPlan {
   kind: WorkspaceStartPlanKind;
   status: WorkspaceStartPlanStatus;
   request: string;
+  /** The discovery context used to shape this proposal. */
+  context?: WorkspaceStartContext;
   route?: WorkspaceStartRoute;
   productId?: string;
   outcome?: WorkspaceStartOutcome;
@@ -62,8 +64,12 @@ export interface WorkspaceStartPlan {
   parts: readonly WorkspaceStartPart[];
   reason?: string;
   helpRequest?: string;
+  /** Native routes found in the request, in the order they were mentioned. */
+  matchedRoutes?: readonly Exclude<WorkspaceStartRoute, "help">[];
   needsSelection?: "business" | "site";
   suggestedTemplateId?: string;
+  /** The next user-visible action this proposal can honestly take. */
+  nextAction: string;
   /** All lines are included until the person removes an optional line. */
   selectedPartIds: readonly string[];
   canContinue: boolean;
@@ -72,6 +78,8 @@ export interface WorkspaceStartPlan {
 export interface WorkspaceStartContinuation {
   request: string;
   route: WorkspaceStartRoute;
+  /** Keep the supplied discovery context available to the mounted native flow. */
+  context?: WorkspaceStartContext;
   productId?: string;
   includedPartIds: readonly string[];
   businessId?: string;
@@ -107,35 +115,40 @@ const PRODUCT_FOR_ROUTE: Record<Exclude<WorkspaceStartRoute, "help">, string> = 
 
 const AVAILABLE_PRODUCT_ROUTES: ReadonlySet<WorkspaceStartRoute> = new Set(["assessment", "tracker", "inquiries", "document", "applications", "scheduling", "investigations", "operations"]);
 
-const ROUTE_COPY: Record<Exclude<WorkspaceStartRoute, "help">, { title: string; summary: string; outcome: WorkspaceStartOutcome }> = {
-  applications: { title: "A private working application", summary: "Create a form and working list from approved parts, then test it before accepting records.", outcome: "Capability" },
-  scheduling: { title: "A working schedule", summary: "Reserve permitted time and prevent overlapping reservations in this workspace.", outcome: "Capability" },
-  investigations: { title: "An ongoing check", summary: "Compare two saved sources, keep the evidence, and check again when due.", outcome: "Responsibility" },
-  operations: { title: "Delegated work", summary: "Review a bounded change, then let Strelva carry its progress and evidence forward.", outcome: "Responsibility" },
+const ROUTE_COPY: Record<Exclude<WorkspaceStartRoute, "help">, { title: string; summary: string; outcome: WorkspaceStartOutcome; nextAction: string }> = {
+  applications: { title: "A private working application", summary: "Create a form and working list from approved parts, then test it before accepting records.", outcome: "Capability", nextAction: "Prepare a plan before creating the application." },
+  scheduling: { title: "A working schedule", summary: "Reserve permitted time and prevent overlapping reservations in this workspace.", outcome: "Capability", nextAction: "Open scheduling and review the permitted times before reserving one." },
+  investigations: { title: "An ongoing check", summary: "Compare two saved sources, keep the evidence, and check again when due.", outcome: "Responsibility", nextAction: "Open ongoing checks and choose the two saved sources to compare." },
+  operations: { title: "Delegated work", summary: "Review a bounded change, then let Strelva carry its progress and evidence forward.", outcome: "Responsibility", nextAction: "Open ongoing work and review the responsibility before it starts." },
   assessment: {
     title: "A business assessment",
     summary: "This looks like a read-only business assessment that you can save and return to.",
     outcome: "Answer",
+    nextAction: "Start the assessment and review its evidence before saving it.",
   },
   tracker: {
     title: "A working tracker",
     summary: "This looks like a CSV-to-tracker setup with the field mapping visible before anything is saved.",
     outcome: "Capability",
+    nextAction: "Open the tracker flow and review the field mapping before saving it.",
   },
   inquiries: {
     title: "An inquiry workflow",
     summary: "This looks like a customer request flow for one selected business, with its shape shown before work begins.",
     outcome: "Capability",
+    nextAction: "Choose the business, then review the inquiry flow before it receives requests.",
   },
   website: {
     title: "A website change",
     summary: "This looks like work on one connected website, with a reviewable change and receipt in the website flow.",
     outcome: "Change",
+    nextAction: "Choose the website, then review the proposed change before anything is sent.",
   },
   document: {
     title: "A private document",
     summary: "This looks like a private document for a procedure, proposal, or working note, with its history kept alongside the text.",
     outcome: "Capability",
+    nextAction: "Open the document draft and review it before saving it to this workspace.",
   },
 };
 
@@ -157,8 +170,12 @@ const SIGNALS: readonly Signal[] = [
   { route: "website", pattern: /website|web site|homepage|landing page|\bsite\b|\bseo\b|accessib|page speed|web content|domain/i, weight: 3 },
 ];
 
+const ROUTE_ORDER = ["applications", "scheduling", "investigations", "operations", "document", "inquiries", "tracker", "assessment", "website"] as const;
+
 function normalizeRequest(value: string): string {
-  return value.trim().replace(/\s+/g, " ");
+  // Preserve the person's wording, punctuation and line breaks for the native
+  // or model-backed flow. Matching operates on whitespace-insensitive regexes.
+  return value.trim();
 }
 
 function classify(request: string): Exclude<WorkspaceStartRoute, "help"> | null {
@@ -168,7 +185,7 @@ function classify(request: string): Exclude<WorkspaceStartRoute, "help"> | null 
   }
   let best: Exclude<WorkspaceStartRoute, "help"> | null = null;
   let score = 0;
-  for (const route of ["applications", "scheduling", "investigations", "operations", "document", "inquiries", "tracker", "assessment", "website"] as const) {
+  for (const route of ROUTE_ORDER) {
     const next = scores.get(route) || 0;
     if (next > score) {
       best = route;
@@ -176,6 +193,25 @@ function classify(request: string): Exclude<WorkspaceStartRoute, "help"> | null 
     }
   }
   return best;
+}
+
+/**
+ * Find separate outcomes without treating every overlapping keyword as a
+ * second intent. For example, "schedule follow-ups for inquiries" contains
+ * both scheduling and inquiry words but is one scheduling request; an
+ * explicit "and then" separates two outcomes that a native flow cannot hold.
+ */
+function matchedRoutes(request: string): Exclude<WorkspaceStartRoute, "help">[] {
+  const clauses = request
+    .split(/\s+(?:and then|and|then|also|plus|as well as|while)\s+|[,;]+/i)
+    .map((clause) => clause.trim())
+    .filter(Boolean);
+  const found: Exclude<WorkspaceStartRoute, "help">[] = [];
+  for (const clause of clauses) {
+    const route = classify(clause);
+    if (route && !found.includes(route)) found.push(route);
+  }
+  return found;
 }
 
 function productFor(context: WorkspaceStartContext, route: Exclude<WorkspaceStartRoute, "help">) {
@@ -255,27 +291,36 @@ function emptyPlan(): WorkspaceStartPlan {
     kind: "empty",
     status: "help",
     request: "",
+    context: undefined,
     title: "Start with the result you want.",
     summary: "Describe an assessment, tracker, inquiry workflow, website change, document, application, schedule, ongoing check, or delegated work.",
     parts: [],
+    matchedRoutes: [],
     selectedPartIds: [],
+    nextAction: "Describe the result you want.",
     canContinue: false,
   };
 }
 
-function helpPlan(request: string, context: WorkspaceStartContext): WorkspaceStartPlan {
+function helpPlan(request: string, context: WorkspaceStartContext, routes: readonly Exclude<WorkspaceStartRoute, "help">[] = []): WorkspaceStartPlan {
   const reason = context.readOnly ? "This workspace is read-only. Switch to a workspace you own before preparing a plan." : undefined;
+  const multiOutcome = routes.length > 1;
   return {
     kind: "help",
     status: reason ? "blocked" : "help",
     route: "help",
     request,
-    title: "Let’s narrow that down together.",
-    summary: "This request does not match a workspace flow yet. You can send it to Strelva with its context so the team can explain the next step.",
+    context,
+    title: multiOutcome ? "A plan that keeps the whole request" : "Let’s narrow that down together.",
+    summary: multiOutcome
+      ? "We’ll prepare one plan for the full request. You can review it before work starts."
+      : "This request does not match a workspace flow yet. You can send it to Strelva with its context so the team can explain the next step.",
     parts: [],
     ...(reason ? { reason } : {}),
     helpRequest: request,
+    matchedRoutes: [...routes],
     selectedPartIds: [],
+    nextAction: multiOutcome ? "Review a plan for these outcomes." : "Ask Strelva to help narrow this request down.",
     canContinue: !reason,
   };
 }
@@ -298,7 +343,9 @@ export function planWorkspaceStart(requestOrInput: string | WorkspaceStartInput,
   const context = typeof requestOrInput === "string" ? suppliedContext : requestOrInput.context || suppliedContext;
   if (!request) return emptyPlan();
 
-  const route = classify(request);
+  const routes = matchedRoutes(request);
+  if (routes.length > 1) return helpPlan(request, context, routes);
+  const route = routes[0] || classify(request);
   if (!route) return helpPlan(request, context);
 
   const copy = ROUTE_COPY[route];
@@ -317,6 +364,7 @@ export function planWorkspaceStart(requestOrInput: string | WorkspaceStartInput,
     kind: "supported",
     status: reason ? "blocked" : "ready",
     request,
+    context,
     route,
     productId: PRODUCT_FOR_ROUTE[route],
     outcome: route === "inquiries" && /follow[ -]?up|remind|reply|respond|ongoing|every/i.test(request) ? "Responsibility" : copy.outcome,
@@ -325,8 +373,14 @@ export function planWorkspaceStart(requestOrInput: string | WorkspaceStartInput,
     parts,
     reason,
     helpRequest: reason ? request : undefined,
+    matchedRoutes: [route],
     needsSelection,
     suggestedTemplateId,
+    nextAction: needsSelection === "business"
+      ? "Choose the business, then review the inquiry flow before it receives requests."
+      : needsSelection === "site"
+        ? "Choose the website, then review the proposed change before anything is sent."
+        : copy.nextAction,
     selectedPartIds,
     canContinue,
   };
@@ -349,6 +403,7 @@ export function createWorkspaceStartContinuation(
     route: plan.route,
     productId: plan.productId,
     includedPartIds: included,
+    ...(plan.context ? { context: plan.context } : {}),
     ...(selections.businessId ? { businessId: selections.businessId } : {}),
     ...(selections.siteId ? { siteId: selections.siteId } : {}),
     ...(selections.trackerTemplateId ? { trackerTemplateId: selections.trackerTemplateId } : {}),

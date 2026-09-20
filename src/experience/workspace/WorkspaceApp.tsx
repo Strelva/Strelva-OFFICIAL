@@ -134,8 +134,16 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
   const [publicSaveError, setPublicSaveError] = useState("");
   const requestRef = useRef(0);
   const activeWorkspaceRef = useRef<string | null>(null);
+  const requestedWorkspaceRef = useRef<string | null>(null);
 
   const loadWorkspace = useCallback(async (workspaceId?: string, preserveNotice = false) => {
+    const locationWorkspaceId = new URLSearchParams(window.location.search).get("workspaceId");
+    const selectedId = workspaceId || locationWorkspaceId;
+    // A response-triggered refresh from the previous render must not replace a
+    // newer workspace selection. Explicit workspace changes set this ref before
+    // starting their request; ordinary navigation reads the current URL.
+    if (workspaceId && requestedWorkspaceRef.current && requestedWorkspaceRef.current !== workspaceId) return;
+    requestedWorkspaceRef.current = selectedId;
     const requestId = ++requestRef.current;
     activeWorkspaceRef.current = null;
     setLoading(true);
@@ -143,12 +151,12 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
     if (!preserveNotice) setNotice(null);
     setSelectedWorkId(null);
     try {
-      const selectedId = workspaceId || new URLSearchParams(window.location.search).get("workspaceId");
       const suffix = selectedId ? `?workspaceId=${encodeURIComponent(selectedId)}` : "";
       const response = await request(`/api/workspace${suffix}`, { cache: "no-store" });
       const data = normalizeWorkspaceSnapshot(await readResponse<WorkspaceSnapshot>(response, "We couldn’t load this workspace."));
-      if (requestId !== requestRef.current) return;
+      if (requestId !== requestRef.current || (requestedWorkspaceRef.current && requestedWorkspaceRef.current !== data.workspaceId)) return;
       activeWorkspaceRef.current = data.workspaceId;
+      requestedWorkspaceRef.current = data.workspaceId;
       setSnapshot(data);
       const params = new URLSearchParams(window.location.search);
       const requestedWork = params.get("work");
@@ -269,6 +277,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
       const body = await postAction<{ work: WorkspaceWork }>({ action: "recover_assessment", workspaceId: snapshot.workspaceId, requestId: pendingRequest }, "This assessment could not be recovered yet.");
       if (activeWorkspaceRef.current !== body.work.workspaceId) return;
       rememberAttempt(null);
+      requestedWorkspaceRef.current = body.work.workspaceId;
       replaceWorkspaceLocation(body.work.workspaceId, body.work.id);
       await loadWorkspace(body.work.workspaceId);
     } catch (cause) { setNotice({ kind: "error", message: cause instanceof Error ? cause.message : "Recovery is unavailable. Try again." }); }
@@ -317,20 +326,31 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
     setNotice(null);
     const url = new URL(window.location.href);
     url.searchParams.delete("standingId");
+    url.searchParams.delete("offering");
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   }
 
+  function workspaceIdForNavigation(fallback: string): string {
+    return new URLSearchParams(window.location.search).get("workspaceId") || fallback;
+  }
+
+  function acceptsWorkspaceCallback(workspaceId: string): boolean {
+    return activeWorkspaceRef.current === workspaceId && requestedWorkspaceRef.current === workspaceId;
+  }
+
   function openWorkFromPlan(id: string, receiptProductId?: string) {
+    if (!snapshot || !acceptsWorkspaceCallback(snapshot.workspaceId)) return;
     const chosen = snapshot?.work.find((work) => work.id === id);
     const productId = chosen?.productId ?? receiptProductId;
+    const workspaceId = snapshot.workspaceId;
     chooseWork(id);
     const url = new URL(window.location.href);
-    url.searchParams.set("workspaceId", snapshot!.workspaceId);
+    url.searchParams.set("workspaceId", workspaceId);
     url.searchParams.set("work", id);
     clearEmbeddedRouteParams(url);
     url.searchParams.set("view", isHorizontalView(productId) ? productId : productId === "tracker" ? "tracker" : productId === "documents" ? "document" : productId === "work_plans" ? "plan" : "work");
     window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-    void loadWorkspace(snapshot!.workspaceId);
+    void loadWorkspace(workspaceId);
   }
 
   function clearEmbeddedRouteParams(url: URL) {
@@ -342,6 +362,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
     url.searchParams.delete("inquiryRecord");
     url.searchParams.delete("trackerWork");
     url.searchParams.delete("row");
+    url.searchParams.delete("offering");
   }
 
   function chooseInquiry(tenantId: string, context?: WorkspaceStartContinuation) {
@@ -363,6 +384,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
   }
 
   function startTracker(context?: WorkspaceStartContinuation) {
+    const workspaceId = workspaceIdForNavigation(snapshot!.workspaceId);
     setMissingWork(false);
     setSelectedWorkId(null);
     setSelectedStandingId(null);
@@ -379,7 +401,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
     setShowAssessment(false);
     setNotice(null);
     const url = new URL(window.location.href);
-    url.searchParams.set("workspaceId", snapshot!.workspaceId);
+    url.searchParams.set("workspaceId", workspaceId);
     url.searchParams.set("view", "tracker");
     url.searchParams.delete("work");
     clearEmbeddedRouteParams(url);
@@ -387,6 +409,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
   }
 
   function startDocument(context?: WorkspaceStartContinuation) {
+    const workspaceId = workspaceIdForNavigation(snapshot!.workspaceId);
     setMissingWork(false);
     setSelectedWorkId(null);
     setSelectedStandingId(null);
@@ -402,7 +425,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
     setShowAssessment(false);
     setNotice(null);
     const url = new URL(window.location.href);
-    url.searchParams.set("workspaceId", snapshot!.workspaceId);
+    url.searchParams.set("workspaceId", workspaceId);
     url.searchParams.set("view", "document");
     url.searchParams.delete("work");
     clearEmbeddedRouteParams(url);
@@ -410,6 +433,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
   }
 
   function startPlan(requestText: string) {
+    const workspaceId = workspaceIdForNavigation(snapshot!.workspaceId);
     setMissingWork(false);
     setSelectedWorkId(null);
     setSelectedStandingId(null);
@@ -425,7 +449,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
     setShowAssessment(false);
     setNotice(null);
     const url = new URL(window.location.href);
-    url.searchParams.set("workspaceId", snapshot!.workspaceId);
+    url.searchParams.set("workspaceId", workspaceId);
     url.searchParams.set("view", "plan");
     url.searchParams.delete("work");
     clearEmbeddedRouteParams(url);
@@ -435,7 +459,8 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
   function startHorizontal(productId: HorizontalView, context?: WorkspaceStartContinuation) {
     if (productId === "applications" && context?.request) { startPlan(context.request); return; }
     setSelectedWorkId(null); setSelectedStandingId(null); setStandingCreating(false); setMissingWork(false); setInquiryTenantId(null); setShowAssessment(false); setHome(false); setView(productId); setNotice(null); setHorizontalRequest(context?.request);
-    const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.set("workspaceId", snapshot!.workspaceId); url.searchParams.set("view", productId); url.searchParams.delete("work");
+    const workspaceId = workspaceIdForNavigation(snapshot!.workspaceId);
+    const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.set("workspaceId", workspaceId); url.searchParams.set("view", productId); url.searchParams.delete("work");
     window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   }
   function openOngoing() {
@@ -443,6 +468,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
     setSelectedWorkId(null); setSelectedStandingId(null); setSelectedAssignmentId(null); setStandingCreating(false); setMissingWork(false); setInquiryTenantId(null); setShowAssessment(false); setHome(false); setView("operations"); setNotice(null); setHorizontalRequest(undefined);
   }
   function openClientWork(workspaceId: string, workId: string) {
+    requestedWorkspaceRef.current = workspaceId;
     const url = new URL(window.location.href);
     clearEmbeddedRouteParams(url);
     url.searchParams.set("workspaceId", workspaceId);
@@ -473,18 +499,20 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
     setView("operations");
     setShowAssessment(false);
     setNotice(null);
+    const workspaceId = workspaceIdForNavigation(snapshot.workspaceId);
     const url = new URL(window.location.href);
     clearEmbeddedRouteParams(url);
-    url.searchParams.set("workspaceId", snapshot.workspaceId);
+    url.searchParams.set("workspaceId", workspaceId);
     url.searchParams.set("view", "operations");
     url.searchParams.set("standingId", standingId);
     url.searchParams.delete("work");
     window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   }
   function horizontalSaved(workId: string) {
-    if (!snapshot) return;
-    setSelectedWorkId(workId); setSelectedStandingId(null); setSelectedAssignmentId(null); setStandingCreating(false); const url = new URL(window.location.href); url.searchParams.set("workspaceId", snapshot.workspaceId); url.searchParams.set("work", workId); url.searchParams.set("view", view); url.searchParams.delete("standingId"); url.searchParams.delete("assignmentId");
-    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`); void loadWorkspace(snapshot.workspaceId, true);
+    if (!snapshot || !acceptsWorkspaceCallback(snapshot.workspaceId)) return;
+    const workspaceId = snapshot.workspaceId;
+    setSelectedWorkId(workId); setSelectedStandingId(null); setSelectedAssignmentId(null); setStandingCreating(false); const url = new URL(window.location.href); url.searchParams.set("workspaceId", workspaceId); url.searchParams.set("work", workId); url.searchParams.set("view", view); url.searchParams.delete("standingId"); url.searchParams.delete("assignmentId");
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`); void loadWorkspace(workspaceId, true);
   }
   function goHome() {
     setMissingWork(false);
@@ -500,16 +528,12 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
     setSelectedAssignmentId(null);
     setStandingCreating(false);
     setShowAssessment(false);
-    const url = new URL(window.location.href);
-    clearEmbeddedRouteParams(url);
-    url.searchParams.delete("work");
-    url.searchParams.set("view", "work");
-    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-    if (snapshot) void loadWorkspace(snapshot.workspaceId, true);
+    if (snapshot) void loadWorkspace(undefined, true);
   }
 
   function handleTrackerSaved(workId: string) {
-    if (!snapshot) return;
+    if (!snapshot || !acceptsWorkspaceCallback(snapshot.workspaceId)) return;
+    const workspaceId = snapshot.workspaceId;
     setMissingWork(false);
     setSelectedWorkId(workId);
     setSelectedStandingId(null);
@@ -523,16 +547,17 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
     setView("tracker");
     setShowAssessment(false);
     const url = new URL(window.location.href);
-    url.searchParams.set("workspaceId", snapshot.workspaceId);
+    url.searchParams.set("workspaceId", workspaceId);
     url.searchParams.set("view", "tracker");
     url.searchParams.set("work", workId);
     clearEmbeddedRouteParams(url);
     window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-    void loadWorkspace(snapshot.workspaceId, true);
+    void loadWorkspace(workspaceId, true);
   }
 
   function handleDocumentSaved(workId: string) {
-    if (!snapshot) return;
+    if (!snapshot || !acceptsWorkspaceCallback(snapshot.workspaceId)) return;
+    const workspaceId = snapshot.workspaceId;
     setMissingWork(false);
     setSelectedWorkId(workId);
     setSelectedStandingId(null);
@@ -546,16 +571,17 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
     setView("document");
     setShowAssessment(false);
     const url = new URL(window.location.href);
-    url.searchParams.set("workspaceId", snapshot.workspaceId);
+    url.searchParams.set("workspaceId", workspaceId);
     url.searchParams.set("view", "document");
     url.searchParams.set("work", workId);
     clearEmbeddedRouteParams(url);
     window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-    void loadWorkspace(snapshot.workspaceId, true);
+    void loadWorkspace(workspaceId, true);
   }
 
   function handlePlanSaved(workId: string) {
-    if (!snapshot) return;
+    if (!snapshot || !acceptsWorkspaceCallback(snapshot.workspaceId)) return;
+    const workspaceId = snapshot.workspaceId;
     setMissingWork(false);
     setSelectedWorkId(workId);
     setSelectedStandingId(null);
@@ -569,12 +595,12 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
     setView("plan");
     setShowAssessment(false);
     const url = new URL(window.location.href);
-    url.searchParams.set("workspaceId", snapshot.workspaceId);
+    url.searchParams.set("workspaceId", workspaceId);
     url.searchParams.set("view", "plan");
     url.searchParams.set("work", workId);
     clearEmbeddedRouteParams(url);
     window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
-    void loadWorkspace(snapshot.workspaceId, true);
+    void loadWorkspace(workspaceId, true);
   }
 
   const trackerContent: React.ReactNode | undefined = snapshot && view === "tracker"
@@ -667,7 +693,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
         managedWorkUnavailable={snapshot.managedWorkUnavailable}
         onHome={goHome}
         onChoose={chooseWork}
-        onNew={(context) => { setMissingWork(false); setSelectedStandingId(null); setStandingCreating(false); setRetryWork(null); setAssessmentStartContext(context?.route === "assessment" ? context : null); setInquiryStartContext(null); setTrackerStartContext(null); setDocumentStartContext(null); setPlanStartRequest(null); const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.set("workspaceId", snapshot.workspaceId); url.searchParams.set("view", "work"); url.searchParams.delete("work"); window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`); setHome(false); setView("work"); setShowAssessment(true); setNotice(null); }}
+        onNew={(context) => { setMissingWork(false); setSelectedStandingId(null); setStandingCreating(false); setRetryWork(null); setAssessmentStartContext(context?.route === "assessment" ? context : null); setInquiryStartContext(null); setTrackerStartContext(null); setDocumentStartContext(null); setPlanStartRequest(null); const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.set("workspaceId", workspaceIdForNavigation(snapshot.workspaceId)); url.searchParams.set("view", "work"); url.searchParams.delete("work"); window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`); setHome(false); setView("work"); setShowAssessment(true); setNotice(null); }}
         onPlan={startPlan}
         onOngoing={openOngoing}
         onHorizontal={startHorizontal}
@@ -691,7 +717,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
         tracker={trackerContent}
         plan={planContent}
         document={documentContent}
-        onWorkspace={(id) => { replaceWorkspaceLocation(id); const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.delete("work"); url.searchParams.delete("view"); window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`); setSelectedStandingId(null); setStandingCreating(false); setHome(true); setView("work"); setInquiryTenantId(null); setInquiryStartContext(null); setTrackerStartContext(null); setDocumentStartContext(null); setPlanStartRequest(null); void loadWorkspace(id); }}
+        onWorkspace={(id) => { requestedWorkspaceRef.current = id; replaceWorkspaceLocation(id); const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.delete("work"); url.searchParams.delete("view"); window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`); setSelectedStandingId(null); setStandingCreating(false); setHome(true); setView("work"); setInquiryTenantId(null); setInquiryStartContext(null); setTrackerStartContext(null); setDocumentStartContext(null); setPlanStartRequest(null); void loadWorkspace(id); }}
         onOpenClientWork={openClientWork}
         notice={<>
         {pendingRequest ? <div role="status" className="mx-4 mt-4 flex flex-wrap items-center gap-4 rounded-xl border border-gray-border p-4 text-sm"><span>An assessment may still need to finish saving.</span>
@@ -713,7 +739,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
               selectedWork={selectedWork}
               postAction={postAction}
               onChanged={() => void loadWorkspace(snapshot.workspaceId, true)}
-              onAgencyCreated={(workspaceId) => void loadWorkspace(workspaceId)}
+              onAgencyCreated={(workspaceId) => { requestedWorkspaceRef.current = workspaceId; void loadWorkspace(workspaceId); }}
               setNotice={setNotice}
             />
           ) : delegatedRead && !selectedWork ? (
@@ -781,6 +807,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
           preview={handoffPreview}
           postAction={postAction}
           onAccepted={(workspaceId, workId) => {
+            requestedWorkspaceRef.current = workspaceId;
             replaceWorkspaceLocation(workspaceId, workId);
             const url = new URL(window.location.href);
             url.hash = "";

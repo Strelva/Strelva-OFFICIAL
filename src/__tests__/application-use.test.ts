@@ -44,14 +44,16 @@ function context(overrides: Partial<ApplicationUseContext> = {}): ApplicationUse
     releaseVersion: 1,
     releasedSpec: {
       title: "Repair requests",
+      maintenanceOwner: ownerId,
+      ownerOnlyMetadata: "retained in the released payload",
       fields: [
-        { id: "problem", label: "Problem", type: "text", required: true },
-        { id: "internalNote", label: "Internal note", type: "text", required: false },
+        { id: "problem", label: "Problem", type: "text", required: true, ownerOnlyLabel: "Internal owner label" },
+        { id: "internalNote", label: "Internal note", type: "text", required: false, ownerOnlyLabel: "Private note" },
       ],
       components: [
-        { kind: "form", fields: ["problem"] },
-        { kind: "list", fields: ["problem"] },
-        { kind: "detail", fields: ["problem", "internalNote"] },
+        { kind: "form", fields: ["problem"], ownerOnlyAudience: "owner" },
+        { kind: "list", fields: ["problem"], ownerOnlyAudience: "owner" },
+        { kind: "detail", fields: ["problem", "internalNote"], ownerOnlyAudience: "owner" },
       ],
     },
     records: [
@@ -93,6 +95,9 @@ describe("focused application use access", () => {
     expect(snapshot.views.map(view => view.kind)).toEqual(["form", "list"]);
     expect(snapshot.records).toEqual([{ id: "mine", values: { problem: "Leaking tap" } }]);
     expect(snapshot.access).toMatchObject({ recordRead: "own", recordSubmit: true });
+    expect(snapshot).not.toHaveProperty("maintenanceOwner");
+    expect(snapshot.views[0]).not.toHaveProperty("ownerOnlyAudience");
+    expect(snapshot.views[0]?.fields[0]).not.toHaveProperty("ownerOnlyLabel");
     expect(snapshot.records[0]).not.toHaveProperty("createdBy");
   });
 
@@ -112,6 +117,35 @@ describe("focused application use access", () => {
       releaseVersion: 1,
       idempotencyKey: "forged-owner-attempt",
     })).toThrow();
+  });
+
+  it("accepts declared select options, preserves optional blanks, and rejects invalid values before the native submit boundary", async () => {
+    const selectContext = context({
+      releasedSpec: {
+        title: "Repair requests",
+        fields: [
+          { id: "priority", label: "Priority", type: "select", required: true, options: ["standard", "urgent"] },
+          { id: "category", label: "Category", type: "select", required: false, options: ["repair", "inspection"] },
+        ],
+        components: [{ kind: "form", fields: ["priority", "category"] }],
+      },
+    });
+    const persistence = fakePersistence(selectContext);
+    const service = createApplicationAccessService(persistence, () => now);
+
+    await service.submit(actor, workId, {
+      record: { id: "valid-priority", values: { priority: "urgent", category: "" } },
+      releaseVersion: 1,
+      idempotencyKey: "valid-priority",
+    });
+    expect(persistence.submitted).toHaveLength(1);
+
+    await expect(service.submit(actor, workId, {
+      record: { id: "invalid-priority", values: { priority: "vip" } },
+      releaseVersion: 1,
+      idempotencyKey: "invalid-priority",
+    })).rejects.toBeInstanceOf(ApplicationUseInputError);
+    expect(persistence.submitted).toHaveLength(1);
   });
 
   it("delegates a permitted record to the native submit seam and keeps the draft retry-safe", async () => {

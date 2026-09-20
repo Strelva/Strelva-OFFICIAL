@@ -33,12 +33,27 @@ export function createSchedulingService(store: BoundedStore = boundedStore) {
         if (prior.start !== command.start || prior.end !== command.end || prior.title !== command.title) throw new WorkspaceConflictError("This request identifier belongs to a different reservation.");
         return work;
       }
+      if (command.kind === "cancel" && prior) {
+        if (prior.status === "cancelled") return work;
+        if (prior.status !== "reserved") throw new WorkspaceConflictError("A provider reservation needs governed provider cancellation or reconciliation.");
+      }
+      if (command.kind === "reschedule") {
+        if (!prior) throw new WorkspaceConflictError("Reservation not found.");
+        if (prior.status === "reserved" && prior.start === command.start && prior.end === command.end) return work;
+        if (prior.status === "cancelled") throw new WorkspaceConflictError("A cancelled reservation cannot be rescheduled.");
+        if (prior.status !== "reserved") throw new WorkspaceConflictError("A provider reservation needs governed provider rescheduling or reconciliation.");
+      }
       const next = advance(work.payload, command.expectedRevision, command.kind, actor);
       if (command.kind === "reserve") {
         const start = Date.parse(command.start), end = Date.parse(command.end);
         if (!next.availability.some(slot => Date.parse(slot.start) <= start && Date.parse(slot.end) >= end)) throw new WorkspaceConflictError("That time is outside permitted availability.");
         if (next.reservations.some(value => value.status !== "cancelled" && Date.parse(value.start) < end && Date.parse(value.end) > start)) throw new WorkspaceConflictError("That time conflicts with another reservation.");
         next.reservations = [...next.reservations, reservationSchema.parse({ ...command, status: "reserved" })];
+      } else if (command.kind === "reschedule") {
+        const start = Date.parse(command.start), end = Date.parse(command.end);
+        if (!next.availability.some(slot => Date.parse(slot.start) <= start && Date.parse(slot.end) >= end)) throw new WorkspaceConflictError("That time is outside permitted availability.");
+        if (next.reservations.some(value => value.requestId !== command.requestId && value.status !== "cancelled" && Date.parse(value.start) < end && Date.parse(value.end) > start)) throw new WorkspaceConflictError("That time conflicts with another reservation.");
+        next.reservations = next.reservations.map(value => value.requestId === command.requestId ? reservationSchema.parse({ ...value, start: command.start, end: command.end, status: "reserved" }) : value);
       } else {
         if (!prior) throw new WorkspaceConflictError("Reservation not found.");
         if (prior.status !== "reserved") throw new WorkspaceConflictError("A provider reservation needs governed provider cancellation or reconciliation.");

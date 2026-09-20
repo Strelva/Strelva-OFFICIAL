@@ -6,6 +6,7 @@ import { productLearningEnabled } from "@/products/product-learning/server";
 import { Panel } from "../console";
 import { workspaceHref } from "./workspace-href";
 import { OperationalInbox } from "@/experience/operations/OperationalInbox";
+import { ServiceRequestInbox } from "@/experience/operations/ServiceRequestInbox";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,9 @@ export default async function InternalWorkPage() {
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
+        <Panel title="Pre-installation service requests" className="lg:col-span-2" bodyClassName="p-[18px]">
+          <ServiceRequestInbox />
+        </Panel>
         <Panel title="Execution exceptions and assignments" className="lg:col-span-2" bodyClassName="p-[18px]">
           <p className="mb-4 max-w-3xl text-[12px] leading-5 text-gray-muted">
             Exact failed, accepted, and uncertain work is projected from the existing responsibility and run records. Safe actions are shown without replaying an accepted or unknown effect.

@@ -59,6 +59,7 @@ export function BusinessHome({
   onOngoing,
   onAccess,
   onSettings,
+  onWorkspace,
   onHelp,
   onExplore,
   onOfferings,
@@ -88,6 +89,7 @@ export function BusinessHome({
   onOngoing: () => void;
   onAccess: () => void;
   onSettings: () => void;
+  onWorkspace: (id: string) => void;
   onHelp: () => void;
   signOut?: ReactNode;
   onWebsiteCommand?: (command: OfferingWebsiteBindingCommand) => Promise<OfferingWebsiteBinding | null>;
@@ -112,6 +114,13 @@ export function BusinessHome({
     .toUpperCase();
 
   const destinations: Destination[] = [
+    ...home.attention.map(({ work, reason }) => ({
+      id: `attention-${work.id}`,
+      title: work.title,
+      detail: reason,
+      kind: "attention",
+      open: () => onOpen(work.id),
+    })),
     ...sites.map((site) => ({
       id: `site-${site.id}`,
       title: site.title,
@@ -138,13 +147,6 @@ export function BusinessHome({
     { id: "people", title: "Invite your team", detail: "Give people the access they need", kind: "people", open: onAccess },
   ];
   const sceneItems = visible.length || destinations.length || readOnly || search ? visible.slice(0, 6) : starters;
-  const counts = [
-    { label: "Needs attention", value: home.attention.length, kind: "attention" },
-    { label: "Saved work", value: snapshot.work.length, kind: "work" },
-    { label: "Applications", value: snapshot.work.filter((item) => item.productId === "applications").length, kind: "applications" },
-    { label: "Documents", value: snapshot.work.filter((item) => item.productId === "documents").length, kind: "documents" },
-  ];
-
   function icon(kind: string) {
     const Icon = kind === "website"
       ? Globe2
@@ -239,25 +241,16 @@ export function BusinessHome({
                   <h1 className="font-display">{readOnly ? "A look inside." : "Your business, at a glance."}</h1>
                   <p>{readOnly ? `Work shared with you by ${name}.` : `Everything happening in ${name}, in one place.`}</p>
                 </div>
-                <span className={styles.scope}>{readOnly ? "Read-only" : "Your workspace"}</span>
+                <div className={styles.workspaceControls}>
+                  <label className={styles.workspacePicker}>
+                    <span className={styles.srOnly}>Current workspace</span>
+                    <select aria-label="Current workspace" value={snapshot.workspaceId} disabled={busy} onChange={(event) => onWorkspace(event.target.value)}>
+                      {snapshot.workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}{workspace.access === "delegated_read" ? " · Read-only" : ""}</option>)}
+                    </select>
+                  </label>
+                  <span className={styles.scope}>{readOnly ? "Read-only" : "Your workspace"}</span>
+                </div>
               </motion.header>
-
-              <div className={styles.metrics}>
-                {counts.map((count, index) => (
-                  <motion.button
-                    key={count.label}
-                    onClick={count.kind === "attention" ? () => { attentionRef.current?.scrollIntoView({ block: "center" }); attentionRef.current?.focus(); } : onWork}
-                    initial={reduceMotion ? false : { opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.26, delay: reduceMotion ? 0 : 0.035 * index, ease: [0.16, 1, 0.3, 1] }}
-                    {...quietMotion}
-                  >
-                    <span className={styles.symbol} data-kind={count.kind}>{icon(count.kind)}</span>
-                    <span><strong>{busy ? "…" : count.value}</strong><small>{count.label}</small></span>
-                    <ChevronRight className={styles.metricArrow} size={15} />
-                  </motion.button>
-                ))}
-              </div>
 
               <section className={styles.scene} aria-label="Your business and work">
                 <div className={styles.ground} aria-hidden="true" />
@@ -324,7 +317,7 @@ export function BusinessHome({
 
             <div className={styles.right}>
               <AtmosphericCard ref={attentionRef} tabIndex={-1} theme="dark" className={styles.attentionCard} contentClassName={`${styles.panel} ${styles.atmosphereContent}`} aria-labelledby="home-attention">
-                <header><span className={styles.symbol} data-kind="attention"><Bell size={17} /></span><h2 id="home-attention">Needs your attention</h2><span className={styles.count}>{busy ? "…" : home.attention.length}</span></header>
+                <header><span className={styles.symbol} data-kind="attention"><Bell size={17} /></span><span className={styles.panelHeading}><small>Next actions</small><h2 id="home-attention">Needs your attention</h2></span><span className={styles.count}>{busy ? "…" : home.attention.length}</span></header>
                 {busy ? <p role="status">Checking your work…</p> : home.attention.length ? (
                   <ul>{home.attention.map(({ work, reason }) => <li key={work.id}><motion.button onClick={() => onOpen(work.id)} {...quietMotion}><span className={styles.symbol} data-kind="attention">{icon(work.productId)}</span><span><strong>{work.title}</strong><small>{reason}</small></span><ChevronRight size={16} /></motion.button></li>)}</ul>
                 ) : <div className={styles.quiet}><Settings2 size={23} /><strong>All caught up.</strong><p>Work that needs a decision will appear here.</p></div>}
@@ -332,13 +325,12 @@ export function BusinessHome({
 
               <section className={styles.panel} aria-labelledby="home-recent">
                 <header><h2 id="home-recent">Recent work</h2><button className={styles.viewAll} onClick={onWork}>View all <ArrowRight size={13} /></button></header>
-                {busy ? <p role="status">Loading saved work…</p> : snapshot.work.length ? (
-                  <ul>{snapshot.work.slice(0, 5).map((work) => <li key={work.id}><motion.button onClick={() => onOpen(work.id)} {...quietMotion}><span className={styles.symbol} data-kind={work.productId}>{icon(work.productId)}</span><span><strong>{work.title}</strong><small>{work.unavailableReason || (work.operation?.status === "needs_attention" ? "Needs attention" : workspaceWorkLabel(work))}</small></span></motion.button></li>)}</ul>
-                ) : <div className={styles.quiet}><FileText size={23} /><strong>Your work starts here.</strong><p>Applications, documents, and other results stay in this workspace.</p>{!readOnly && <button className={styles.begin} onClick={onStart}>Start something new <ArrowRight size={15} /></button>}</div>}
+                {busy ? <p role="status">Loading saved work…</p> : home.results.length ? (
+                  <ul>{home.results.slice(0, 5).map((work) => <li key={work.id}><motion.button onClick={() => onOpen(work.id)} {...quietMotion}><span className={styles.symbol} data-kind={work.productId}>{icon(work.productId)}</span><span><strong>{work.title}</strong><small>{work.unavailableReason || workspaceWorkLabel(work)}</small></span></motion.button></li>)}</ul>
+                ) : <div className={styles.quiet}><FileText size={23} /><strong>{home.attention.length ? "No other saved work yet." : "Your work starts here."}</strong><p>{home.attention.length ? "The next decision is above. New saved work will appear here." : "Start with a useful result and return to it from this workspace."}</p>{!readOnly && <button className={styles.begin} onClick={onStart}>Start something new <ArrowRight size={15} /></button>}</div>}
               </section>
 
-              <BusinessOfferingSummary state={offerings} work={snapshot.work} onOpen={onOfferings} />
-              <WorkspaceAllowanceSummary businessId={snapshot.workspaceId} enabled={current?.kind === "customer" && !readOnly} />
+              {current?.kind === "customer" && !readOnly ? <WorkspaceAllowanceSummary businessId={snapshot.workspaceId} enabled compact onOpenSettings={onSettings} /> : null}
 
               {unassignedSites.length ? <section className={styles.panel} aria-labelledby="home-unassigned-sites">
                 <header><span className={styles.symbol} data-kind="website"><Globe2 size={17} /></span><h2 id="home-unassigned-sites">Authorized sites</h2><span className={styles.count}>{unassignedSites.length}</span></header>
@@ -351,6 +343,8 @@ export function BusinessHome({
                   onCommand={onWebsiteCommand}
                 />}
               </section> : null}
+
+              <BusinessOfferingSummary state={offerings} work={snapshot.work} onOpen={onOfferings} />
 
               <div className={styles.brandCard} aria-hidden="true"><LogoMark className={styles.brandCardMark} /><p className="font-display">A calmer way to build what comes next.</p></div>
               <p className={styles.footer}>Ideas. People. Progress.<br />Held in one place.</p>

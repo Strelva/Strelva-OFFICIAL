@@ -58,6 +58,7 @@
 .request { padding:24px; border:1px solid var(--gray-border); border-radius:24px; background:var(--surface); }
 .request label { display:block; font-size:14px; margin:24px 0 8px; }
 .request textarea { resize:vertical; display:block; width:100%; min-height:160px; max-height:600px; padding:16px; border:1px solid var(--gray-border); border-radius:12px; background:var(--surface-base); color:var(--warm-black); font-size:16px; line-height:1.6; }
+.request select { min-height:42px; max-width:320px; padding:8px 12px; border:1px solid var(--gray-border); border-radius:10px; background:var(--surface-base); color:var(--warm-black); font-size:14px; }
 .request p { margin-top:12px; font-size:12px; color:var(--gray-muted); line-height:1.7; }
 .requestActions { display:flex; flex-wrap:wrap; gap:12px; margin-top:24px; }
 .helpSections { display:grid; grid-template-columns:1fr 1fr; gap:48px; margin-top:48px; }
@@ -85,6 +86,10 @@
 .startProposalIcon { display:grid; width:36px; height:36px; flex:0 0 36px; place-items:center; border:1px solid var(--gray-border); border-radius:10px; background:var(--surface-raised); color:var(--accent-text); }
 .startProposalHeader h2 { margin-top:3px; color:var(--warm-black); font-size:22px; font-weight:500; line-height:1.35; }
 .startProposalSummary { margin-top:16px; max-width:650px; color:var(--gray-muted); font-size:14px; line-height:1.7; }
+.startRequestEcho { margin-top:14px; max-width:650px; padding:12px 14px; border-left:2px solid var(--accent); background:var(--surface-raised); color:var(--gray-muted); font-size:13px; line-height:1.65; }
+.startRequestEcho strong,.startNextAction strong { color:var(--warm-black); font-weight:500; }
+.startRequestEcho span { display:block; margin-top:4px; color:var(--warm-black); white-space:pre-wrap; overflow-wrap:anywhere; }
+.startNextAction { margin-top:14px; max-width:650px; color:var(--gray-muted); font-size:13px; line-height:1.65; }
 .startParts { margin-top:24px; border-top:1px solid var(--gray-border); }
 .startPart { display:flex; min-width:0; align-items:flex-start; gap:12px; padding:16px 0; border-bottom:1px solid var(--gray-border); color:var(--gray-muted); cursor:pointer; }
 .startPart input { position:absolute; opacity:0; pointer-events:none; }

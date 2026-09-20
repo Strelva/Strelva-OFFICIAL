@@ -43,6 +43,8 @@ export {
   applicationSpecSchema,
   applicationSubmitInputSchema,
   APPLICATION_RECORD_LIMIT,
+  APPLICATION_SELECT_OPTION_LIMIT,
+  APPLICATION_SELECT_OPTION_LENGTH_LIMIT,
   APPLICATION_VERSION_HISTORY_LIMIT,
   recordSchema,
 } from "./contracts";
@@ -251,8 +253,11 @@ function validateRecord(spec: ApplicationSpec, record: ApplicationRecord): void 
       if (field.required) throw new WorkspaceConflictError(`${field.label} is required.`);
       continue;
     }
-    const expectedType = field.type === "text" ? "string" : field.type;
+    const expectedType = field.type === "text" || field.type === "select" ? "string" : field.type;
     if (typeof value !== expectedType) throw new WorkspaceConflictError(`${field.label} has the wrong type.`);
+    if (field.type === "select" && !field.options.includes(value as string)) {
+      throw new WorkspaceConflictError(`${field.label} must use one of the available options.`);
+    }
   }
 }
 

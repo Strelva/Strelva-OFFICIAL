@@ -32,7 +32,7 @@ function unitSummary(bucket: WorkAllowanceRecord["buckets"][number]): string {
   return `${bucket.availableUnits} ${label}${bucket.availableUnits === 1 ? "" : "s"} available`;
 }
 
-export function WorkspaceAllowanceSummary({ businessId, enabled }: { businessId: string; enabled: boolean }) {
+export function WorkspaceAllowanceSummary({ businessId, enabled, compact = false, onOpenSettings }: { businessId: string; enabled: boolean; compact?: boolean; onOpenSettings?: () => void }) {
   const request = useWorkspaceRequest();
   const [state, setState] = useState<State>({ status: "loading" });
 
@@ -75,6 +75,30 @@ export function WorkspaceAllowanceSummary({ businessId, enabled }: { businessId:
         error: cause instanceof Error ? cause.message : "The spending cap could not be accepted.",
       } : current);
     }
+  }
+
+  if (compact) {
+    const pending = state.status === "ready" ? state.value.allowances.find((allowance) => allowance.status === "pending_cap_acceptance") : undefined;
+    const pendingForActor = Boolean(pending && state.status === "ready" && pending.payerId === state.value.currentActorId);
+    const message = state.status === "loading"
+      ? "Review allowance and payer details in Settings."
+      : state.status === "error"
+        ? "Allowance status is unavailable. Review it in Settings."
+        : pendingForActor
+          ? "Cap needs your acceptance."
+          : pending
+            ? "Work allowance is pending acceptance."
+            : "Review allowance and payer details in Settings.";
+    const detail = pending
+      ? "Review the cap and payer details in Settings before starting work."
+      : state.status === "error"
+        ? state.message
+        : undefined;
+    return <section className={`${styles.panel} ${styles.compactPanel}`} aria-labelledby="home-allowance">
+      <header><Gauge size={17} aria-hidden="true" /><h2 id="home-allowance">Work allowance</h2></header>
+      <p className={styles.compactNotice} role={pending ? "alert" : state.status === "loading" || state.status === "error" ? "status" : undefined}><strong>{message}</strong>{detail ? <span>{detail}</span> : null}<span className={styles.compactPolicy}>Allowance records are not synchronized to subscription billing.</span></p>
+      {onOpenSettings ? <button type="button" onClick={onOpenSettings}>Open Settings</button> : null}
+    </section>;
   }
 
   if (state.status === "loading") return <section className={styles.panel} aria-labelledby="home-allowance"><header><Gauge size={17} aria-hidden="true" /><h2 id="home-allowance">Work allowance</h2></header><p role="status">Loading allowance…</p></section>;

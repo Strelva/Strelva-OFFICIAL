@@ -3,6 +3,7 @@
 import { ArrowRight, BriefcaseBusiness, CircleAlert, Coins, FileText, RefreshCw, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { WorkAllowanceInspection } from "@/platform/work-economics/allowances";
+import { ServiceRequestInbox } from "@/experience/operations/ServiceRequestInbox";
 import type { WorkspaceSnapshot, WorkspaceWork } from "./contracts";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 import {
@@ -115,6 +116,12 @@ export function AgencyHome({
       <h1 className="mt-3 font-display text-[28px] font-medium leading-tight text-warm-black sm:text-[32px]">Client work</h1>
       <p className="mt-3 text-[14px] leading-relaxed text-gray-muted">Only work currently shared with this agency appears here. Customers keep ownership and control access.</p>
     </header>
+
+    {current?.kind === "agency" && current.access !== "delegated_read" ? <section className="mt-10" aria-labelledby="agency-service-requests-title">
+      <h2 id="agency-service-requests-title" className="text-[15px] font-medium text-warm-black">Service requests</h2>
+      <p className="mt-1 text-[12px] text-gray-muted">Review requests addressed to {agencyName}. A response records review and does not start work.</p>
+      <div className="mt-5"><ServiceRequestInbox providerWorkspaceId={snapshot.workspaceId} surface="workspace" /></div>
+    </section> : null}
 
     <section className="mt-10" aria-labelledby="agency-attention-title">
       <div className="flex flex-wrap items-center justify-between gap-3">

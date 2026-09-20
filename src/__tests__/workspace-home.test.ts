@@ -14,11 +14,14 @@ describe("returning workspace home", () => {
     expect(home.hasWork).toBe(true);
   });
   it("surfaces a recorded execution exception without inventing a failure for waiting work", () => {
-    const failed = work("operation", { productId: "operations", operation: { status: "needs_attention" } });
+    const failed = work("operation", { productId: "operations", operation: { status: "needs_attention", reason: "Review the provider response before retrying." } });
     const waiting = work("waiting", { productId: "operations", operation: { status: "waiting" } });
     const proposed = work("proposed", { productId: "operations", operation: { status: "proposed" } });
     const home = workspaceHome([failed, waiting, proposed]);
-    expect(home.attention.map(item => item.work.id)).toEqual(["operation", "proposed"]);
+    expect(home.attention.map(item => [item.work.id, item.reason])).toEqual([
+      ["operation", "Review the provider response before retrying."],
+      ["proposed", "Review the proposed work."],
+    ]);
     expect(home.results.map(item => item.id)).toEqual(["waiting"]);
   });
   it("retains plans whose remaining outputs are unfinished or unknown", () => {

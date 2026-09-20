@@ -120,6 +120,40 @@ describe("workspace start planner", () => {
     expect(plan.summary).not.toContain("general AI");
   });
 
+  it("keeps a request with more than one outcome on the existing planning path", () => {
+    const request = "Build a staff request app and turn our supplier spreadsheet into a tracker.";
+    const plan = planWorkspaceStart(request, context());
+
+    expect(plan).toMatchObject({
+      kind: "help",
+      route: "help",
+      helpRequest: request,
+      canContinue: true,
+    });
+    expect(plan.matchedRoutes).toEqual(["applications", "tracker"]);
+    expect(plan.nextAction).toContain("plan");
+  });
+
+  it("keeps an ambiguous request intact when the native flow cannot express every part", () => {
+    const request = "Create a tracker, then write a procedure for how the team should use it.";
+    const plan = planWorkspaceStart(request, context({ products: [...context().products!, { id: "documents", name: "Documents", availability: "available" }] }));
+
+    expect(plan.request).toBe(request);
+    expect(plan.helpRequest).toBe(request);
+    expect(plan.matchedRoutes).toEqual(["tracker", "document"]);
+  });
+
+  it("carries the supplied workspace context with the request into a native continuation", () => {
+    const supplied = context({ managedSites: [{ id: "site-1", title: "Workshop", href: "/sites/workshop" }] });
+    const request = "Improve the homepage copy, then check what AI understands about the business.";
+    const plan = planWorkspaceStart({ request, context: supplied });
+
+    expect(plan.request).toBe(request);
+    expect(plan.context).toBe(supplied);
+    expect(plan.matchedRoutes).toEqual(["website", "assessment"]);
+    expect(createWorkspaceStartContinuation(plan)).toBeNull();
+  });
+
   it("does not offer plan creation from an unknown request in a read-only workspace", () => {
     const plan = planWorkspaceStart("Automate everything for my company.", context({ readOnly: true }));
     expect(plan).toMatchObject({ kind: "help", status: "blocked", route: "help", canContinue: false });

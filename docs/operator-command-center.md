@@ -34,6 +34,14 @@ and system surfaces without creating a second queue or cost store. Normal Strelv
 do not enter `/admin`; they open the existing exact-job assignment link in the workspace,
 where scope, expiry, acceptance and permission are rechecked.
 
+The local September 19 addition also shows pre-installation requests addressed to
+Strelva in `/admin/work`. The panel reads the same service-request records that
+customers reopen from Help. Accepting for review or declining records the exact
+reviewed revision; it does not start delivery or agree commercial terms. See the
+[request persistence boundary](./persistence-boundaries.md#september-19-local-request-and-application-additions).
+This surface remains behind the workspace release gate and requires the local
+service-request migration; no production activation is recorded.
+
 **Mobile row rule.** Dense list rows (`ClientsCrm.tsx`, `SiteAuditsBoard.tsx`) are a flex
 row on phones and a fixed multi-column grid **only at `md+`** (`flex ... md:grid
 md:grid-cols-[…]`). Never ship a fixed `grid-cols-[…px…]` at the base breakpoint: the reserved

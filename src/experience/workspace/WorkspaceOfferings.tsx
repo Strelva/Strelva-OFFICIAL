@@ -16,16 +16,33 @@ import type {
 } from "@/platform/offerings";
 import { Button } from "@/components/ui/Button";
 import { workspaceWorkLabel } from "./work-label";
-import type { WorkspaceWork } from "./contracts";
+import type { WorkspaceProduct, WorkspaceWork } from "./contracts";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 import { sameAppHref, type ManagedWorkSummary } from "./workspace-discovery";
+import { offeringRetryFromConflict, preserveOfferingDraftOnConflict } from "./offering-recovery";
+import { composeOfferingDiscovery, type OfferingDiscoveryEntry } from "./offering-discovery";
+import { BusinessProviderStatus, useBusinessProviderDeliveries, type BusinessProviderDeliveryState } from "./business-provider-summary";
 import styles from "./workspace-offerings.module.css";
+
+export type WorkspaceOfferingMutationConflict = {
+  kind: "installation" | "website_binding" | "definition";
+  id: string;
+  message: string;
+  attemptedRevision?: number;
+  authoritativeRevision?: number;
+};
 
 export type WorkspaceOfferingState =
   | { status: "unavailable"; reason: string }
   | { status: "loading" }
   | { status: "error"; message: string }
-  | { status: "ready"; collection: OfferingCollection; saving: boolean; mutationError?: string };
+  | {
+      status: "ready";
+      collection: OfferingCollection;
+      saving: boolean;
+      mutationError?: string;
+      mutationConflict?: WorkspaceOfferingMutationConflict;
+    };
 
 function errorMessage(value: unknown, fallback: string): string {
   if (!value || typeof value !== "object" || Array.isArray(value)) return fallback;
@@ -48,37 +65,92 @@ export function useWorkspaceOfferings({
   unavailableReason: string;
 }) {
   const request = useWorkspaceRequest();
+  const requestEpoch = useRef(0);
   const [state, setState] = useState<WorkspaceOfferingState>(
     enabled ? { status: "loading" } : { status: "unavailable", reason: unavailableReason },
   );
+
+  useEffect(() => {
+    requestEpoch.current += 1;
+  }, [businessId, enabled]);
+
+  const fetchCollection = useCallback(async (): Promise<OfferingCollection> => {
+    const response = await request(`/api/offerings?businessId=${encodeURIComponent(businessId)}`, {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    });
+    const value: unknown = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(errorMessage(value, "Offerings could not be loaded for this business."));
+    return value as OfferingCollection;
+  }, [businessId, request]);
 
   const load = useCallback(async () => {
     if (!enabled) {
       setState({ status: "unavailable", reason: unavailableReason });
       return;
     }
+    const epoch = requestEpoch.current;
     setState({ status: "loading" });
     try {
-      const response = await request(`/api/offerings?businessId=${encodeURIComponent(businessId)}`, {
-        credentials: "same-origin",
-        headers: { Accept: "application/json" },
-      });
-      const value: unknown = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(errorMessage(value, "Offerings could not be loaded for this business."));
-      setState({ status: "ready", collection: value as OfferingCollection, saving: false });
+      const collection = await fetchCollection();
+      if (epoch !== requestEpoch.current) return;
+      setState({ status: "ready", collection, saving: false });
     } catch (cause) {
+      if (epoch !== requestEpoch.current) return;
       setState({
         status: "error",
         message: cause instanceof Error ? cause.message : "Offerings could not be loaded for this business.",
       });
     }
-  }, [businessId, enabled, request, unavailableReason]);
+  }, [enabled, fetchCollection, unavailableReason]);
 
   useEffect(() => { void load(); }, [load]);
 
+  const refreshAfterConflict = useCallback(async (conflict: WorkspaceOfferingMutationConflict) => {
+    const epoch = requestEpoch.current;
+    setState((current) => current.status === "ready"
+      ? { ...current, saving: true, mutationError: undefined, mutationConflict: conflict }
+      : current);
+    try {
+      const collection = await fetchCollection();
+      if (epoch !== requestEpoch.current) return;
+      let authoritativeRevision = conflict.authoritativeRevision;
+      if (conflict.kind === "installation") {
+        authoritativeRevision = collection.installations.find((item) => item.id === conflict.id)?.revision;
+      } else if (conflict.kind === "website_binding") {
+        authoritativeRevision = collection.websiteBindings.find((item) => item.id === conflict.id)?.revision;
+      }
+      setState((current) => current.status === "ready" ? {
+        status: "ready",
+        collection,
+        saving: false,
+        mutationConflict: { ...conflict, authoritativeRevision },
+      } : current);
+    } catch (cause) {
+      if (epoch !== requestEpoch.current) return;
+      setState((current) => current.status === "ready" ? {
+        ...current,
+        saving: false,
+        mutationError: cause instanceof Error ? cause.message : "The latest offering version could not be loaded.",
+        mutationConflict: conflict,
+      } : current);
+    }
+  }, [fetchCollection]);
+
+  function conflictTarget(input: OfferingCommand, message: string): WorkspaceOfferingMutationConflict {
+    if (input.action === "install") return { kind: "definition", id: input.definitionId, message };
+    return {
+      kind: "installation",
+      id: input.installationId,
+      message,
+      attemptedRevision: input.expectedRevision,
+    };
+  }
+
   const command = useCallback(async (input: OfferingCommand) => {
     if (!enabled || state.status !== "ready" || state.saving) return null;
-    setState({ ...state, saving: true, mutationError: undefined });
+    const epoch = requestEpoch.current;
+    setState((current) => current.status === "ready" ? { ...current, saving: true, mutationError: undefined, mutationConflict: undefined } : current);
     try {
       const response = await request("/api/offerings", {
         method: "POST",
@@ -87,9 +159,14 @@ export function useWorkspaceOfferings({
         body: JSON.stringify(input),
       });
       const value: unknown = await response.json().catch(() => null);
+      if (response.status === 409) {
+        await refreshAfterConflict(conflictTarget(input, errorMessage(value, "This offering changed while you were editing.")));
+        return null;
+      }
       if (!response.ok) throw new Error(errorMessage(value, "This offering change could not be saved."));
       const installation = (value as { installation?: OfferingInstallation } | null)?.installation;
       if (!installation) throw new Error("The change was accepted, but its installation record could not be read. Reload offerings before making another change.");
+      if (epoch !== requestEpoch.current) return null;
       setState((current) => current.status === "ready" ? {
         status: "ready",
         saving: false,
@@ -102,15 +179,17 @@ export function useWorkspaceOfferings({
       } : current);
       return installation;
     } catch (cause) {
+      if (epoch !== requestEpoch.current) return null;
       const message = cause instanceof Error ? cause.message : "This offering change could not be saved.";
       setState((current) => current.status === "ready" ? { ...current, saving: false, mutationError: message } : current);
       return null;
     }
-  }, [enabled, request, state]);
+  }, [enabled, refreshAfterConflict, request, state]);
 
   const websiteCommand = useCallback(async (input: OfferingWebsiteBindingCommand) => {
     if (!enabled || state.status !== "ready" || state.saving) return null;
-    setState({ ...state, saving: true, mutationError: undefined });
+    const epoch = requestEpoch.current;
+    setState((current) => current.status === "ready" ? { ...current, saving: true, mutationError: undefined, mutationConflict: undefined } : current);
     try {
       const response = await request("/api/offerings/websites", {
         method: "POST",
@@ -119,9 +198,17 @@ export function useWorkspaceOfferings({
         body: JSON.stringify(input),
       });
       const value: unknown = await response.json().catch(() => null);
+      if (response.status === 409) {
+        const conflict: WorkspaceOfferingMutationConflict = input.action === "bind_managed_website"
+          ? { kind: "website_binding", id: input.tenantId, message: errorMessage(value, "This website assignment changed while you were editing.") }
+          : { kind: "website_binding", id: input.bindingId, message: errorMessage(value, "This website assignment changed while you were editing."), attemptedRevision: input.expectedRevision };
+        await refreshAfterConflict(conflict);
+        return null;
+      }
       if (!response.ok) throw new Error(errorMessage(value, "The website assignment could not be saved."));
       const binding = (value as { websiteBinding?: OfferingWebsiteBinding } | null)?.websiteBinding;
       if (!binding) throw new Error("The website assignment was accepted, but its record could not be read. Reload offerings before trying again.");
+      if (epoch !== requestEpoch.current) return null;
       setState((current) => current.status === "ready" ? {
         status: "ready",
         saving: false,
@@ -134,13 +221,19 @@ export function useWorkspaceOfferings({
       } : current);
       return binding;
     } catch (cause) {
+      if (epoch !== requestEpoch.current) return null;
       const message = cause instanceof Error ? cause.message : "The website assignment could not be saved.";
       setState((current) => current.status === "ready" ? { ...current, saving: false, mutationError: message } : current);
       return null;
     }
-  }, [enabled, request, state]);
+  }, [enabled, refreshAfterConflict, request, state]);
 
-  return { state, reload: load, command, websiteCommand };
+  const retryConflict = useCallback(async () => {
+    if (!enabled || state.status !== "ready" || state.saving || !state.mutationConflict) return;
+    await refreshAfterConflict(state.mutationConflict);
+  }, [enabled, refreshAfterConflict, state]);
+
+  return { state, reload: load, command, websiteCommand, retryConflict };
 }
 
 export function boundManagedWebsiteIds(state: WorkspaceOfferingState): ReadonlySet<string> {
@@ -266,6 +359,12 @@ function configurationFrom(definition: OfferingDefinitionView, installation?: Of
   }));
 }
 
+function configurationDisplayValue(value: unknown): string {
+  if (typeof value === "boolean") return value ? "On" : "Off";
+  if (typeof value === "string" && value.trim()) return value;
+  return "Empty";
+}
+
 function serializeConfiguration(
   fields: readonly OfferingConfigurationField[],
   values: Record<string, string | boolean>,
@@ -320,6 +419,8 @@ function OfferingInstallationView({
   installation,
   work,
   saving,
+  mutationConflict,
+  onRetryConflict,
   onBack,
   onOpenWork,
   onCommand,
@@ -328,26 +429,39 @@ function OfferingInstallationView({
   installation: OfferingInstallation;
   work: readonly WorkspaceWork[];
   saving: boolean;
+  mutationConflict?: WorkspaceOfferingMutationConflict;
+  onRetryConflict?: () => void;
   onBack: () => void;
   onOpenWork: (id: string) => void;
   onCommand: (command: OfferingCommand) => Promise<OfferingInstallation | null>;
 }) {
   const definition = definitionFor(collection, installation);
-  const [configuration, setConfiguration] = useState(() => definition ? configurationFrom(definition, installation) : {});
+  const pristineConfiguration = definition ? configurationFrom(definition, installation) : {};
+  const [draft, setDraft] = useState<{ values: Record<string, string | boolean>; dirty: boolean }>(() => ({ values: pristineConfiguration, dirty: false }));
+  const configuration = draft.dirty ? draft.values : pristineConfiguration;
   const [retireOpen, setRetireOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [publicationConfirmed, setPublicationConfirmed] = useState(false);
   const canManage = collection.permissions.canManage && installation.status !== "retired";
+  const conflictMatchesInstallation = mutationConflict?.kind === "installation" && mutationConflict.id === installation.id;
+  const conflictInput = conflictMatchesInstallation ? mutationConflict : undefined;
+  const conflictReview = conflictInput ? preserveOfferingDraftOnConflict(configuration, conflictInput) : null;
+  const conflictNeedsRefresh = conflictMatchesInstallation && conflictInput?.authoritativeRevision == null;
 
   async function saveConfiguration(event: FormEvent) {
     event.preventDefault();
-    await onCommand({
+    if (conflictNeedsRefresh) return;
+    const retry = conflictReview ? offeringRetryFromConflict(conflictReview) : null;
+    const saved = await onCommand({
       action: "update_configuration",
       businessId: collection.businessId,
       installationId: installation.id,
-      expectedRevision: installation.revision,
+      expectedRevision: retry?.expectedRevision ?? installation.revision,
       configuration: definition ? serializeConfiguration(definition.configurationFields, configuration) : {},
     });
+    if (saved) {
+      setDraft({ values: definition ? configurationFrom(definition, saved) : {}, dirty: false });
+    }
   }
 
   async function retire(event: FormEvent) {
@@ -379,6 +493,19 @@ function OfferingInstallationView({
       <h2>{definition?.name ?? installation.definitionId}</h2>
       <p>{definition?.description ?? "This installed offering uses an older definition that is no longer listed."}</p>
     </header>
+    {conflictMatchesInstallation ? <div className={styles.conflict} role="alert">
+      <strong>{mutationConflict.message}</strong>
+      <p>{conflictInput?.authoritativeRevision != null ? `The latest saved version is revision ${conflictInput.authoritativeRevision}. Review the current version, then save your draft to retry. Nothing was submitted automatically.` : "The latest saved version could not be loaded. Refresh it before retrying; nothing was submitted automatically."}</p>
+      {conflictNeedsRefresh && onRetryConflict ? <button className={styles.secondary} type="button" onClick={onRetryConflict}>Refresh latest version</button> : null}
+      {definition?.configurationFields.length ? <div className={styles.conflictComparison}>
+        <strong>Review saved values against your draft</strong>
+        {definition.configurationFields.map((field) => <div key={field.id}>
+          <span>{field.label}</span>
+          <small>Latest saved: {configurationDisplayValue(installation.configuration[field.id])}</small>
+          <small>Your draft: {configurationDisplayValue(configuration[field.id])}</small>
+        </div>)}
+      </div> : null}
+    </div> : null}
 
     <section className={styles.section} aria-labelledby={`offering-resources-${installation.id}`}>
       <h3 id={`offering-resources-${installation.id}`}>Connected work</h3>
@@ -424,9 +551,9 @@ function OfferingInstallationView({
     </section> : null}
 
     {definition?.configurationFields.length ? <form className={styles.section} onSubmit={saveConfiguration}>
-      <ConfigurationFields fields={definition.configurationFields} values={configuration} disabled={!canManage || saving} onChange={(id, value) => setConfiguration((current) => ({ ...current, [id]: value }))} />
+      <ConfigurationFields fields={definition.configurationFields} values={configuration} disabled={!canManage || saving} onChange={(id, value) => setDraft((current) => ({ values: { ...(current.dirty ? current.values : configuration), [id]: value }, dirty: true }))} />
       <p className={styles.note}>These fields describe the offering record. They do not change the connected application or its published behavior.</p>
-      {canManage ? <button className={styles.primary} type="submit" disabled={saving}>{saving ? "Saving…" : "Save changes"}</button> : <p className={styles.note}>You can view this configuration, but only a business owner or admin can change it.</p>}
+      {canManage ? <button className={styles.primary} type="submit" disabled={saving || conflictNeedsRefresh}>{saving ? "Saving…" : "Save changes"}</button> : <p className={styles.note}>You can view this configuration, but only a business owner or admin can change it.</p>}
     </form> : null}
 
     {installation.status === "retired" ? <p className={styles.retired}>Retired {installation.retiredAt ? new Date(installation.retiredAt).toLocaleDateString() : ""}. {installation.retirementReason}</p> : canManage ? <section className={styles.section}>
@@ -439,7 +566,7 @@ function OfferingInstallationView({
   </div>;
 }
 
-type PresentedDelivery = ProviderDelivery & { canManage: boolean; canAccept: boolean };
+export type PresentedProviderDelivery = ProviderDelivery & { canManage: boolean; canAccept: boolean };
 
 function ProviderDeliveryPanel({ collection, installation, work }: {
   collection: OfferingCollection;
@@ -447,7 +574,7 @@ function ProviderDeliveryPanel({ collection, installation, work }: {
   work: readonly WorkspaceWork[];
 }) {
   const request = useWorkspaceRequest();
-  const [deliveries, setDeliveries] = useState<PresentedDelivery[] | null>(null);
+  const [deliveries, setDeliveries] = useState<PresentedProviderDelivery[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [selectedWorkId, setSelectedWorkId] = useState("");
@@ -460,7 +587,7 @@ function ProviderDeliveryPanel({ collection, installation, work }: {
       const response = await request(`/api/offerings/provider-delivery?businessId=${encodeURIComponent(collection.businessId)}`, { cache: "no-store" });
       const value: unknown = await response.json().catch(() => null);
       if (!response.ok) throw new Error(errorMessage(value, "Provider delivery could not be loaded."));
-      setDeliveries(((value as { deliveries?: PresentedDelivery[] } | null)?.deliveries ?? []).filter((item) => item.installationId === installation.id));
+      setDeliveries(((value as { deliveries?: PresentedProviderDelivery[] } | null)?.deliveries ?? []).filter((item) => item.installationId === installation.id));
       setError(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Provider delivery could not be loaded.");
@@ -684,14 +811,59 @@ function WebsiteAssignments({
   </section>;
 }
 
+function DiscoveryRows({
+  entries,
+  onOffering,
+  onProduct,
+  onRequestSetup,
+}: {
+  entries: readonly OfferingDiscoveryEntry[];
+  onOffering: (entry: OfferingDiscoveryEntry) => void;
+  onProduct?: (productId: string) => void;
+  onRequestSetup?: (entry: OfferingDiscoveryEntry) => void;
+}) {
+  return <div className={styles.discoveryList}>
+    {entries.map((entry) => {
+      function run(target: "product" | "offering", action: OfferingDiscoveryEntry["action"]) {
+        if (action.kind === "request" && onRequestSetup) {
+          onRequestSetup(entry);
+          return;
+        }
+        if (target === "offering") {
+          if (!entry.offering) return;
+          onOffering(entry);
+          return;
+        }
+        if (entry.product && onProduct) onProduct(entry.product.id);
+      }
+      const action = () => run(entry.primaryTarget, entry.action);
+      return <div className={styles.discoveryRow} key={entry.key}>
+        <span className={styles.discoveryBody}>
+          <strong>{entry.title}</strong>
+          <p>{entry.description}</p>
+          <small>{entry.action.kind === "open" ? "Installed for this business" : entry.action.kind === "start" ? "Available to start" : entry.action.kind === "explore" ? "Example only · live setup is not enabled" : "Setup requires a request"}</small>
+        </span>
+        <span className={styles.discoveryActions}>
+          <button type="button" className={styles.discoveryAction} onClick={action}>{entry.action.label}</button>
+          {entry.secondary ? <><small className={styles.discoverySecondaryTitle}>{entry.secondary.title}</small><button type="button" className={styles.discoverySecondaryAction} onClick={() => run(entry.secondary!.target, entry.secondary!.action)}>{entry.secondary.action.label}</button></> : null}
+        </span>
+      </div>;
+    })}
+  </div>;
+}
+
 export function WorkspaceOfferingDirectory({
   state,
   businessName,
   work,
   managedSites,
+  products,
   selectedId,
   onSelect,
   onOpenWork,
+  onOpenProduct,
+  onRequestSetup,
+  onRetryConflict,
   onRetry,
   onCommand,
   onWebsiteCommand,
@@ -700,34 +872,62 @@ export function WorkspaceOfferingDirectory({
   businessName: string;
   work: readonly WorkspaceWork[];
   managedSites: readonly ManagedWorkSummary[];
+  products?: readonly WorkspaceProduct[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
   onOpenWork: (id: string) => void;
+  onOpenProduct?: (id: string) => void;
+  onRequestSetup?: (entry: OfferingDiscoveryEntry) => void;
+  onRetryConflict?: () => void;
   onRetry: () => void;
   onCommand: (command: OfferingCommand) => Promise<OfferingInstallation | null>;
   onWebsiteCommand: (command: OfferingWebsiteBindingCommand) => Promise<OfferingWebsiteBinding | null>;
 }) {
-  if (state.status === "unavailable") return <section className={styles.status}><Box size={22} aria-hidden="true" /><h2>Offerings belong to a business.</h2><p>{state.reason}</p></section>;
-  if (state.status === "loading") return <p className={styles.status} role="status">Loading business offerings…</p>;
-  if (state.status === "error") return <section className={styles.status}><h2>Offerings could not be loaded.</h2><p role="alert">{state.message}</p><button className={styles.secondary} type="button" onClick={onRetry}><RefreshCw size={15} aria-hidden="true" />Try again</button></section>;
+  const discoveryEntries = products
+    ? composeOfferingDiscovery({
+        products,
+        definitions: state.status === "ready" ? state.collection.definitions : [],
+        installations: state.status === "ready" ? state.collection.installations : [],
+      })
+    : null;
+  const renderProductFallback = (statusMessage: string, role: "status" | "alert" = "status", retry = false) => <section aria-labelledby="business-offerings-title">
+    <header className={styles.directoryHeader}><p className={styles.eyebrow}>Explore</p><h2 id="business-offerings-title">Useful outcomes for this workspace.</h2><p>Start work that is available here, or explore an example while business setup is being checked.</p></header>
+    <DiscoveryRows entries={discoveryEntries ?? []} onOffering={() => undefined} onProduct={onOpenProduct} onRequestSetup={onRequestSetup} />
+    <p className={role === "alert" ? styles.error : styles.note} role={role}>{statusMessage}</p>
+    {retry ? <button className={styles.secondary} type="button" onClick={onRetry}><RefreshCw size={15} aria-hidden="true" />Try again</button> : null}
+  </section>;
+  if (state.status === "unavailable") {
+    if (discoveryEntries) return renderProductFallback(state.reason);
+    return <section className={styles.status}><Box size={22} aria-hidden="true" /><h2>Offerings belong to a business.</h2><p>{state.reason}</p></section>;
+  }
+  if (state.status === "loading") {
+    if (discoveryEntries) return renderProductFallback("Checking whether business offerings can be added here…");
+    return <p className={styles.status} role="status">Loading business offerings…</p>;
+  }
+  if (state.status === "error") {
+    if (discoveryEntries) return renderProductFallback(`${state.message} Business offerings remain unavailable until this is checked again.`, "alert", true);
+    return <section className={styles.status}><h2>Offerings could not be loaded.</h2><p role="alert">{state.message}</p><button className={styles.secondary} type="button" onClick={onRetry}><RefreshCw size={15} aria-hidden="true" />Try again</button></section>;
+  }
 
   const selectedInstallation = state.collection.installations.find((installation) => installation.id === selectedId);
-  if (selectedInstallation) return <><OfferingInstallationView key={`${selectedInstallation.id}:${selectedInstallation.revision}`} collection={state.collection} installation={selectedInstallation} work={work} saving={state.saving} onBack={() => onSelect(null)} onOpenWork={onOpenWork} onCommand={onCommand} />{state.mutationError ? <p className={styles.error} role="alert">{state.mutationError}</p> : null}</>;
+  if (selectedInstallation) return <><OfferingInstallationView key={selectedInstallation.id} collection={state.collection} installation={selectedInstallation} work={work} saving={state.saving} mutationConflict={state.mutationConflict} onRetryConflict={onRetryConflict} onBack={() => onSelect(null)} onOpenWork={onOpenWork} onCommand={onCommand} />{state.mutationError ? <p className={styles.error} role="alert">{state.mutationError}</p> : null}</>;
   const selectedDefinition = state.collection.definitions.find((definition) => definition.id === selectedId);
   if (selectedDefinition) return <><OfferingInstallView collection={state.collection} definition={selectedDefinition} businessName={businessName} work={work} saving={state.saving} onBack={() => onSelect(null)} onCommand={onCommand} />{state.mutationError ? <p className={styles.error} role="alert">{state.mutationError}</p> : null}</>;
 
   const currentByDefinition = new Map(state.collection.installations.filter((installation) => installation.status !== "retired").map((installation) => [installation.definitionId, installation]));
   return <section aria-labelledby="business-offerings-title">
-    <header className={styles.directoryHeader}><p className={styles.eyebrow}>Business offerings</p><h2 id="business-offerings-title">What this business can use.</h2><p>Install a supported offering around work the business already owns. Availability does not grant access or promise a provider.</p></header>
+    <header className={styles.directoryHeader}><p className={styles.eyebrow}>{discoveryEntries ? "Explore" : "Business offerings"}</p><h2 id="business-offerings-title">{discoveryEntries ? "Useful outcomes for this business." : "What this business can use."}</h2><p>{discoveryEntries ? "Start work that is available here, or request setup when it needs a connected service or release decision." : "Install a supported offering around work the business already owns. Availability does not grant access or promise a provider."}</p></header>
     <WebsiteAssignments collection={state.collection} sites={managedSites} saving={state.saving} onCommand={onWebsiteCommand} />
-    <div className={styles.list}>{state.collection.definitions.map((definition) => {
+    {discoveryEntries ? <DiscoveryRows entries={discoveryEntries} onOffering={(entry) => {
+      if (entry.offering) onSelect(entry.installation?.id ?? entry.offering.id);
+    }} onProduct={onOpenProduct} onRequestSetup={onRequestSetup} /> : <div className={styles.list}>{state.collection.definitions.map((definition) => {
       const installed = currentByDefinition.get(definition.id);
       return <button type="button" key={`${definition.id}:${definition.version}`} className={styles.row} onClick={() => onSelect(installed?.id ?? definition.id)}>
         <span className={styles.symbol}>{installed ? <Check size={20} aria-hidden="true" /> : <Box size={20} aria-hidden="true" />}</span>
         <span><strong>{definition.name}</strong><p>{definition.description}</p><small>{installed ? installed.status === "draft" ? "Draft setup · publication required" : "Installed for this business" : availabilityLabel(definition)}</small></span>
         <ArrowRight size={17} aria-hidden="true" />
       </button>;
-    })}</div>
+    })}</div>}
     {state.collection.installations.some((installation) => installation.status === "retired") ? <div className={styles.retiredList}><h3>Retired offerings</h3>{state.collection.installations.filter((installation) => installation.status === "retired").map((installation) => <button key={installation.id} type="button" onClick={() => onSelect(installation.id)}>{definitionFor(state.collection, installation)?.name ?? installation.definitionId}<ArrowRight size={14} /></button>)}</div> : null}
     {!state.collection.permissions.canManage ? <p className={styles.note}>This is a permission-limited view. Only a business owner or admin can install, change, or retire offerings.</p> : null}
   </section>;
@@ -737,17 +937,23 @@ export function BusinessOfferingSummary({
   state,
   work,
   onOpen,
+  providerDeliveryState,
 }: {
   state: WorkspaceOfferingState;
   work: readonly WorkspaceWork[];
   onOpen: (id?: string) => void;
+  providerDeliveryState?: BusinessProviderDeliveryState;
 }) {
+  const fetchedProviderDeliveryState = useBusinessProviderDeliveries(state);
   if (state.status === "unavailable") return null;
   if (state.status === "loading") return <section className={styles.homePanel} aria-labelledby="home-offerings"><header><Settings2 size={17} aria-hidden="true" /><h2 id="home-offerings">Installed offerings</h2></header><p role="status">Loading offerings…</p></section>;
   if (state.status === "error") return <section className={styles.homePanel} aria-labelledby="home-offerings"><header><Settings2 size={17} aria-hidden="true" /><h2 id="home-offerings">Installed offerings</h2></header><p>Offering records are unavailable. Your saved work is unchanged.</p><button type="button" onClick={() => onOpen()}>Open offerings</button></section>;
   const current = state.collection.installations.filter((installation) => installation.status !== "retired");
+  const providerState = providerDeliveryState ?? fetchedProviderDeliveryState;
+  const providerDeliveries = providerState.status === "ready" ? providerState.deliveries : [];
   return <section className={styles.homePanel} aria-labelledby="home-offerings">
     <header><Settings2 size={17} aria-hidden="true" /><h2 id="home-offerings">Business offerings</h2><span>{current.length}</span></header>
     {current.length ? <ul>{current.map((installation) => <li key={installation.id}><button type="button" onClick={() => onOpen(installation.id)}><span><strong>{definitionFor(state.collection, installation)?.name ?? installation.definitionId}</strong><small>{installation.status === "draft" ? "Draft setup · publication required" : installation.nativeResources.map((resource) => work.find((item) => item.id === resource.id)?.title ?? resource.kind.replaceAll("_", " ")).join(" · ") || "No connected work"}</small></span><ArrowRight size={14} aria-hidden="true" /></button></li>)}</ul> : <div className={styles.homeEmpty}><p>No offerings are installed for this business. Saved work remains available on its own.</p><button type="button" onClick={() => onOpen()}>Explore offerings</button></div>}
+    <BusinessProviderStatus state={providerState} deliveries={providerDeliveries} installations={current} collection={state.collection} onOpen={onOpen} />
   </section>;
 }

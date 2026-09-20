@@ -113,6 +113,24 @@ export function ApplicationUseRenderer({
                     </fieldset>
                   );
                 }
+                if (field.type === "select") {
+                  return (
+                    <label key={field.id} className="block text-sm text-warm-black">
+                      <span className="block text-[11px] text-gray-muted">{field.label}{field.required ? " *" : ""}</span>
+                      <select
+                        id={`app-field-${field.id}`}
+                        name={`app-field-${field.id}`}
+                        className="mt-1 block min-h-11 w-full rounded-xl border border-gray-border bg-surface px-3 py-2 text-sm"
+                        value={value === undefined ? "" : String(value)}
+                        required={field.required}
+                        onChange={event => updateValue(field.id, event.target.value)}
+                      >
+                        <option value="">Choose an option</option>
+                        {field.options?.map(option => <option key={option} value={option}>{option}</option>)}
+                      </select>
+                    </label>
+                  );
+                }
                 return (
                   <TextInput
                     key={field.id}

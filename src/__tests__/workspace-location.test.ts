@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { accountReturnTarget, workspaceReturnTarget } from "@/lib/workspace-location";
+import { describe, expect, it, vi } from "vitest";
+import { accountReturnTarget, replaceWorkspaceLocation, workspaceReturnTarget } from "@/lib/workspace-location";
 const workspaceId = "22222222-2222-4222-8222-222222222222";
 describe("workspace return destination", () => {
   it("preserves an exact result and workspace through sign-in", () => {
@@ -40,6 +40,26 @@ describe("workspace return destination", () => {
     expect(workspaceReturnTarget(`/workspace?workspaceId=${workspaceId}&view=products&offering=33333333-3333-4333-8333-333333333333`)).toBe(`/workspace?workspaceId=${workspaceId}&view=products&offering=33333333-3333-4333-8333-333333333333`);
     expect(workspaceReturnTarget(`/workspace?workspaceId=${workspaceId}&view=work&offering=private_staff_requests`)).toBeNull();
     expect(workspaceReturnTarget(`/workspace?workspaceId=${workspaceId}&view=products&offering=%2Fprivate`)).toBeNull();
+  });
+
+  it("accepts the cleaned connected-work destination through auth", () => {
+    const target = `/workspace?workspaceId=${workspaceId}&view=work&work=saved-result`;
+    expect(workspaceReturnTarget(target)).toBe(target);
+    expect(accountReturnTarget(`/account?next=${encodeURIComponent(target)}`)).toBe(`/account?next=${encodeURIComponent(target)}`);
+  });
+
+  it("removes a stale offering selection when replacing the location with work", () => {
+    const target = `https://app.strelva.com/workspace?workspaceId=${workspaceId}&view=work&offering=private_staff_requests`;
+    const history = { state: { source: "test" }, replaceState: vi.fn() };
+    const previousWindow = globalThis.window;
+    Object.defineProperty(globalThis, "window", { configurable: true, value: { location: { href: target }, history } });
+    try {
+      replaceWorkspaceLocation(workspaceId, "saved-result");
+      expect(history.replaceState).toHaveBeenCalledWith(history.state, "", `/workspace?workspaceId=${workspaceId}&view=work&work=saved-result`);
+    } finally {
+      if (previousWindow) Object.defineProperty(globalThis, "window", { configurable: true, value: previousWindow });
+      else delete (globalThis as { window?: unknown }).window;
+    }
   });
   it("preserves the business topology and bounded search destinations through sign-in", () => {
     for (const view of ["ongoing", "settings"]) {
