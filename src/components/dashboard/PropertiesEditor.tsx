@@ -577,8 +577,10 @@ export function PropertiesEditor({ activeSection }: PropertiesEditorProps) {
         <VersionHistory
           section={activeSection}
           onRestored={() => {
-            // Re-fetch the section so the editor reflects the restored content
-            fetch(dashboardHref(`/api/content/${activeSection}`), { credentials: "same-origin" })
+            // History recovery creates a draft. Keep the live site unchanged
+            // until the owner reviews it and uses the publish bar.
+            setHasDraft((prev) => ({ ...prev, [activeSection]: true }));
+            fetch(dashboardHref(`/api/content/${activeSection}?draft=true`), { credentials: "same-origin" })
               .then((res) => (res.ok ? res.json() : null))
               .then((d) => {
                 if (d) {

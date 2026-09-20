@@ -19,7 +19,7 @@ Most of these ship from the starter and are probably already here. **Verify each
 5. **`revalidate-route.ts`** at `app/api/revalidate/route.ts` — signed HMAC revalidation so control-plane content edits push to the live site.
 6. **Forms → the owner's inbox (Formspree replacement).** If the site has a contact / quote / booking form and is NOT a full platform tenant, copy **`form-route.template.tsx`** → `app/api/contact/route.ts` and **`scaffold-forms.ts`** → `src/lib/scaffold-forms.ts`, point the form at `POST /api/contact`, and set `RESEND_API_KEY` (send-scoped key from the **Strelva** Resend account) + `SCAFFOLD_FORM_FROM` (`Business Name <forms@mail.strelva.com>`) + `SCAFFOLD_FORM_TO` (owner email) + `SCAFFOLD_SITE_NAME`. Never wire Formspree or a per-client sending domain — all client mail sends from the shared `mail.strelva.com`, branded by the from-name. (A full tenant uses `ScaffoldLeadForm.tsx` → `/api/v1/leads/{tenant}` instead — see README "Forms".)
 
-**Done when:** the site builds, the tracker + GA4 tags are in the rendered `<head>`/layout, `/api/capabilities` returns a manifest, and any form POSTs a real owner-notification email (or logs when the Resend env is unset).
+**Done when:** the site builds, the tracker + GA4 tags are in the rendered `<head>`/layout, `/api/capabilities` returns a manifest, and any form POSTs a real owner-notification email. Missing mail configuration must surface as a setup error instead of a false delivery success.
 
 ---
 

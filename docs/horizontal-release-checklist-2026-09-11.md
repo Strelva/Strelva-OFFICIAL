@@ -5,6 +5,18 @@ which extends the [selected first scope](./horizontal-first-scope-2026-09-11.md)
 It does not authorize a production action. Synthetic browser, real local
 Auth/Postgres, hosted staging and production evidence remain separate.
 
+## Website launch decision
+
+Jacob's September 20 [website focus](./horizontal-product-brief-2026-09-11.md#september-20-website-release-focus)
+sets the current commercial emphasis. Existing managed-site editing, new-site
+creation and outside-site connection require separate acceptance. The
+[website review](./strelvav2-horizontal-acceptance.md#website-release-review)
+records the source gaps and proof. Passing the technical gates below does not
+close new-customer self-service creation, delegated agency website drafting or
+unverified website-to-booking/inquiry connections. Keep those promises out of a
+release until their complete customer journeys are implemented and accepted.
+Existing customer obligations and the selected first customer case below remain.
+
 ## Current completion evaluation
 
 The September 20 completion wave uses Jacob's requested Luna agents at maximum

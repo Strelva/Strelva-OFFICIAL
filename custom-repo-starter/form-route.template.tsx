@@ -21,8 +21,8 @@
  *   SCAFFOLD_FORM_TO    owner inbox(es), comma-separated
  *   SCAFFOLD_SITE_NAME  e.g.  McLear's Cottage   (subject prefix + email header)
  *
- * With no RESEND_API_KEY the handler logs and returns success (safe for local
- * dev / pre-launch). Never throws provider errors to the visitor.
+ * With missing mail configuration the handler returns a setup error instead of
+ * claiming delivery. Never throws provider errors to the visitor.
  */
 import { NextResponse } from "next/server";
 import {
@@ -31,6 +31,7 @@ import {
   renderFormEmailHtml,
   renderFormEmailText,
   rateLimitOk,
+  isStandaloneFormConfigured,
 } from "@/lib/scaffold-forms";
 
 function clientIp(req: Request): string {
@@ -85,10 +86,11 @@ export async function POST(req: Request) {
     const from = process.env.SCAFFOLD_FORM_FROM;
     const to = (process.env.SCAFFOLD_FORM_TO || "").split(",").map((s) => s.trim()).filter(Boolean);
 
-    if (!apiKey || !from || to.length === 0) {
-      // Unconfigured (local/dev/pre-launch): log, don't fail the visitor.
-      console.log(`[form] ${subject} — ${fields.map(([k, v]) => `${k}: ${v}`).join(" | ")}`);
-      return NextResponse.json({ success: true });
+    if (!isStandaloneFormConfigured({ apiKey, from, to })) {
+      // No durable owner inbox exists until these values are configured. Do
+      // not acknowledge a submission that only reached a local log.
+      console.error("[form] standalone delivery is not configured");
+      return NextResponse.json({ error: "This form is not configured for delivery. Please contact the business directly." }, { status: 503 });
     }
 
     const meta = { siteName, formName, submittedAt };

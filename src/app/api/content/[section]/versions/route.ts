@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getVersions, logActivity, logAuditEvent, restoreVersion } from "@/lib/storage";
+import { getVersions, logActivity, logAuditEvent, restoreVersionToDraft } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getActorContext, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
 import { getTemplateManifestForTenant } from "@/lib/template-manifests";
@@ -60,37 +60,34 @@ export async function POST(
       return NextResponse.json({ error: "versionId required" }, { status: 400 });
     }
 
-    const restored = await restoreVersion(
+    const restored = await restoreVersionToDraft(
       section as ContentSection,
       versionId,
-      tenant,
-      actor.isImpersonating ? "admin" : "user"
+      tenant
     );
     if (!restored) {
       return NextResponse.json({ error: "Version not found" }, { status: 404 });
     }
     await logActivity({
       text: actor.isImpersonating
-        ? `Strelva admin restored ${section} from version history`
-        : `Restored ${section} from version history`,
+        ? `Strelva admin restored ${section} to a draft`
+        : `Restored ${section} to a draft`,
       time: new Date().toISOString(),
       type: "admin",
       section,
       actor: actor.isImpersonating ? "admin" : "user",
       changes: restored.changes,
     }, tenant);
-    if (actor.isImpersonating) {
-      await logAuditEvent({
-        tenant,
-        actor,
-        action: "content.version_restored",
-        targetType: "content_section",
-        targetId: section,
-        metadata: { section, versionId },
-      });
-    }
+    await logAuditEvent({
+      tenant,
+      actor,
+      action: "content.draft_saved",
+      targetType: "content_section",
+      targetId: section,
+      metadata: { section, versionId, source: "version_history" },
+    });
 
-    return NextResponse.json({ success: true, version: restored });
+    return NextResponse.json({ success: true, draft: true, version: restored });
   } catch (err) {
     console.error("[versions POST]", section, err);
     return NextResponse.json({ error: "Failed to restore" }, { status: 500 });

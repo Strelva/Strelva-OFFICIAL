@@ -336,40 +336,23 @@ export function ContentWorkspace({
       )}
 
       {viewportMode === "mobile" && (
-        <div className="flex flex-1 min-h-0 items-center justify-center px-6">
-        <div className="max-w-sm text-center">
-          <p className="text-lg font-medium text-warm-white mb-2">
-            Site editor is not available on mobile
-          </p>
-          <p className="text-sm text-gray-muted mb-6">
-            Use a tablet, laptop, or desktop to review {siteName} with the live preview and editing panel. The live site itself still works for visitors on mobile.
-          </p>
-          <div className="grid gap-2">
-            <a
-              href={siteUrl || "/"}
-              className="inline-flex items-center justify-center rounded-lg bg-warm-white px-5 py-2.5 text-sm font-medium text-on-warm-white transition-colors hover:bg-warm-white/90"
-            >
-              View live site
-            </a>
-            <Link
-              href={dashboardHref("/dashboard/chat")}
-              className="inline-flex items-center justify-center rounded-lg border border-gray-border px-5 py-2.5 text-sm font-medium text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white"
-            >
-              Ask Strelva
-            </Link>
-            <Link
-              href={dashboardHref("/dashboard")}
-              className="inline-flex items-center justify-center rounded-lg border border-gray-border px-5 py-2.5 text-sm font-medium text-gray-muted transition-colors hover:bg-surface-raised hover:text-warm-white"
-            >
-              Overview
-            </Link>
+        isEditing ? (
+          <div className="flex flex-1 min-h-0 flex-col">
+            <div className="h-[46%] min-h-[260px] max-h-[430px] shrink-0 border-b border-gray-border">
+              <SitePreview isEditing onToggleEdit={() => setIsEditing(false)} />
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col">
+              {rightPanelContent}
+            </div>
           </div>
-        </div>
-        </div>
+        ) : (
+          <main className="flex flex-1 min-h-0 flex-col">
+            <SitePreview isEditing={false} onToggleEdit={() => setIsEditing(true)} />
+          </main>
+        )
       )}
 
       </div>
-      {viewportMode !== "mobile" && (
       <div className="shrink-0">
         <PublishBar
           hasDrafts={hasAnyDraft}
@@ -378,7 +361,6 @@ export function ContentWorkspace({
           liveSyncEnabled={liveSyncEnabled}
         />
       </div>
-      )}
     </div>
   );
 }

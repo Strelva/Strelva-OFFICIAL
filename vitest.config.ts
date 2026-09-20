@@ -35,6 +35,10 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      // The standalone route is a copied client-site template. Point its
+      // template-only `@/lib` import at the starter helper for route tests;
+      // the application alias below remains unchanged for product code.
+      "@/lib/scaffold-forms": path.resolve(__dirname, "custom-repo-starter/scaffold-forms.ts"),
       "@": path.resolve(__dirname, "src"),
     },
   },

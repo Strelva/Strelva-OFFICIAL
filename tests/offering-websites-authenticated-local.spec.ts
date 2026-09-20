@@ -141,7 +141,8 @@ test("local Auth and Postgres enforce business website assignment through the cu
     await waitForAssignment(ownerPage, "Local Owner Business");
     const ownerAssignment = ownerPage.waitForResponse((response) => response.url().endsWith("/api/offerings/websites") && response.request().method() === "POST");
     await ownerPage.getByRole("button", { name: "Assign Local Owner Website to Local Owner Business", exact: true }).click();
-    expect((await ownerAssignment).status()).toBe(200);
+    const ownerAssignmentResponse = await ownerAssignment;
+    expect(ownerAssignmentResponse.status(), await ownerAssignmentResponse.text()).toBe(200);
     await expect(ownerPage.getByRole("button", { name: "Assign Local Owner Website to Local Owner Business", exact: true })).toHaveCount(0);
     await expect(ownerPage.getByRole("button", { name: "Assign Local Retry Website to Local Owner Business", exact: true })).toBeVisible();
     await expect(ownerPage.getByRole("region", { name: "Your business and work" }).getByRole("button", { name: "Open Local Owner Website", exact: true })).toBeVisible();

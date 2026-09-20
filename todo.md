@@ -16,10 +16,12 @@ confirmed product gap: current onboarding requests an operator build, and
 provisioning assumes a separately built client repository. Do not call that
 path complete from managed-client or workspace tests.
 
-The immediate work is to finish the five website review lanes, resolve supported
-creation and connection scope explicitly, verify the resulting candidate and
-prepare updated PRs. Existing managed website prices remain unchanged. New
-self-service terms and all production actions remain separate decisions.
+The immediate work is to integrate verified website repairs and finish the
+candidate checks. New-customer self-service creation and agency preparation of
+native website drafts remain actual implementation gaps. Website inquiry and
+booking components also need proof on a representative client; an iframe is not
+a native calendar integration. Resolve those promises explicitly before launch.
+Existing managed website prices remain unchanged. New self-service terms and all production actions remain separate decisions.
 
 ## September 19 completion plan
 

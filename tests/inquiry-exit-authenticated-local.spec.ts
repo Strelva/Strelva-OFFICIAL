@@ -241,7 +241,6 @@ test("real Auth blocks future inquiry work after exit while retaining delivery r
   const app = appUrl.origin;
   const proofEnv = { ...env, app };
   const redis = new Redis({ url: process.env.UPSTASH_REDIS_REST_URL!, token: process.env.UPSTASH_REDIS_REST_TOKEN! });
-  const providerBefore = providerLogCount();
   let exited: BusinessFixture | undefined;
   let unrelated: BusinessFixture | undefined;
   const tenants: string[] = [];

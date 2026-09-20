@@ -63,9 +63,12 @@ current contract. Verify both representative consumers with
 
 Two ways to handle form submissions; pick per site:
 
-1. **Platform-integrated** — `ScaffoldLeadForm.tsx` → `/api/v1/leads/{tenant}`. For a
-   full Strelva **tenant**: leads land in the dashboard "Who reached out" and the owner
-   gets the platform's lead email. Use when the site is on the platform.
+1. **Platform-integrated legacy lead** — `ScaffoldLeadForm.tsx` → `/api/v1/leads/{tenant}`.
+   For a full Strelva **tenant**: leads land in the dashboard "Who reached out" and the
+   owner gets the platform's lead email. This path has no published inquiry capability
+   version, so it does not enter the governed reply/follow-up workspace. Use the
+   versioned `StrelvaInquiryForm.tsx` path below when the owner needs that record and
+   responsibility history.
 2. **Standalone email** — `form-route.template.tsx` + `scaffold-forms.ts`. The drop-in
    **Formspree replacement** for ANY site (Studio sites, or any repo not wired as a
    tenant): the form POSTs, the owner is emailed the submission directly via Resend.
@@ -89,7 +92,7 @@ Two ways to handle form submissions; pick per site:
    SCAFFOLD_FORM_TO=owner@theirbiz.com          # comma-separated for multiple recipients
    SCAFFOLD_SITE_NAME=McLear's Cottage
    ```
-   With no `RESEND_API_KEY` the handler logs and returns success (safe for local/pre-launch).
+   If the mail settings are missing, the handler returns a setup error instead of claiming the owner received the message.
 
 **Sending model:** every client site sends from the ONE shared `mail.strelva.com` domain,
 branded per-site by the `SCAFFOLD_FORM_FROM` display name + Reply-To. **No per-client sending

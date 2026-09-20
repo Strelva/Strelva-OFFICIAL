@@ -86,6 +86,19 @@ export function isEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) && value.length <= 254;
 }
 
+/**
+ * A standalone form may acknowledge a submission only when the copied route
+ * has everything it needs to hand it to the mail provider. A local log is not
+ * an owner-visible delivery receipt.
+ */
+export function isStandaloneFormConfigured(config: {
+  apiKey?: string;
+  from?: string;
+  to?: readonly string[];
+}): boolean {
+  return Boolean(config.apiKey?.trim() && config.from?.trim() && config.to?.some((recipient) => recipient.trim()));
+}
+
 export interface FormEmailMeta {
   /** The site the form lives on, e.g. "McLear's Cottage". */
   siteName: string;

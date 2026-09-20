@@ -7,6 +7,7 @@ import {
   renderFormEmailHtml,
   renderFormEmailText,
   MAX_FIELDS,
+  isStandaloneFormConfigured,
 } from "../scaffold-forms";
 
 describe("humanizeKey", () => {
@@ -61,6 +62,15 @@ describe("isEmail", () => {
     expect(isEmail("a@b.co")).toBe(true);
     expect(isEmail("nope")).toBe(false);
     expect(isEmail("a@b")).toBe(false);
+  });
+});
+
+describe("isStandaloneFormConfigured", () => {
+  it("requires a send key, from address, and at least one recipient", () => {
+    expect(isStandaloneFormConfigured({ apiKey: "", from: "forms@mail.example", to: ["owner@example.com"] })).toBe(false);
+    expect(isStandaloneFormConfigured({ apiKey: "re_test", from: "", to: ["owner@example.com"] })).toBe(false);
+    expect(isStandaloneFormConfigured({ apiKey: "re_test", from: "forms@mail.example", to: [] })).toBe(false);
+    expect(isStandaloneFormConfigured({ apiKey: "re_test", from: "forms@mail.example", to: [" owner@example.com "] })).toBe(true);
   });
 });
 

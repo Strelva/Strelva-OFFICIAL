@@ -11,6 +11,7 @@ const mockSetDraftPageConfig = vi.fn();
 const mockClearDraftPageConfig = vi.fn();
 const mockListDrafts = vi.fn();
 const mockGetDraftContent = vi.fn();
+const mockRestoreVersionToDraft = vi.fn();
 const mockGetContent = vi.fn();
 const mockSetContent = vi.fn();
 const mockAppendVersion = vi.fn();
@@ -20,6 +21,7 @@ const mockLogAuditEvent = vi.fn();
 const mockClearDraft = vi.fn();
 const mockAddEvent = vi.fn();
 const mockRevalidateClientSite = vi.fn();
+const mockRequireTenantPermission = vi.fn();
 
 vi.mock("next/headers", () => ({
   headers: vi.fn(() =>
@@ -38,7 +40,7 @@ const mockIsSuperAdmin = vi.fn(() => Promise.resolve(false));
 vi.mock("@/lib/auth", () => ({
   verifyAuth: vi.fn(() => Promise.resolve(true)),
   requireTenantAccess: vi.fn(() => Promise.resolve(null)),
-  requireTenantPermission: vi.fn(() => Promise.resolve(null)),
+  requireTenantPermission: (...args: unknown[]) => mockRequireTenantPermission(...args),
   isSuperAdmin: () => mockIsSuperAdmin(),
   getActorContext: vi.fn(() =>
     Promise.resolve({ isImpersonating: false, email: "owner@example.com" })
@@ -67,6 +69,7 @@ vi.mock("@/lib/storage", () => ({
   clearDraftPageConfig: (...args: unknown[]) => mockClearDraftPageConfig(...args),
   listDrafts: (...args: unknown[]) => mockListDrafts(...args),
   getDraftContent: (...args: unknown[]) => mockGetDraftContent(...args),
+  restoreVersionToDraft: (...args: unknown[]) => mockRestoreVersionToDraft(...args),
   getContent: (...args: unknown[]) => mockGetContent(...args),
   setContent: (...args: unknown[]) => mockSetContent(...args),
   appendVersion: (...args: unknown[]) => mockAppendVersion(...args),
@@ -116,6 +119,7 @@ describe("site editor publish routes", () => {
     mockClearDraftPageConfig.mockResolvedValue(undefined);
     mockListDrafts.mockResolvedValue({});
     mockGetDraftContent.mockResolvedValue(null);
+    mockRestoreVersionToDraft.mockResolvedValue(null);
     mockGetContent.mockResolvedValue({ headline: "Live headline" });
     mockSetContent.mockResolvedValue(undefined);
     mockAppendVersion.mockResolvedValue(undefined);
@@ -125,6 +129,7 @@ describe("site editor publish routes", () => {
     mockClearDraft.mockResolvedValue(undefined);
     mockAddEvent.mockResolvedValue({ id: "evt_1" });
     mockRevalidateClientSite.mockResolvedValue({ success: true, skipped: true });
+    mockRequireTenantPermission.mockResolvedValue(null);
     mockIsSuperAdmin.mockResolvedValue(false);
     mockGetOpenChangeRequest.mockResolvedValue(null);
   });
@@ -177,6 +182,97 @@ describe("site editor publish routes", () => {
     expect(mockSetPageConfig).toHaveBeenCalledWith(PAGE_CONFIG, "test-tenant");
     expect(mockClearDraftPageConfig).toHaveBeenCalledWith("test-tenant");
     expect(mockRevalidateClientSite).toHaveBeenCalledWith("test-tenant", "all");
+  });
+
+  it("POST /api/content/:section/versions restores history into a draft", async () => {
+    const version = {
+      id: "v_older",
+      section: "hero",
+      data: { headline: "Earlier headline" },
+      author: "user",
+      timestamp: "2026-09-20T12:00:00.000Z",
+      status: "rolled-back",
+    };
+    mockRestoreVersionToDraft.mockResolvedValue(version);
+    const { POST } = await import("@/app/api/content/[section]/versions/route");
+
+    const response = await POST(
+      new Request("http://localhost/api/content/hero/versions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ versionId: "v_older" }),
+      }),
+      { params: Promise.resolve({ section: "hero" }) },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ success: true, draft: true, version });
+    expect(mockRestoreVersionToDraft).toHaveBeenCalledWith("hero", "v_older", "test-tenant");
+    expect(mockSetContent).not.toHaveBeenCalled();
+  });
+
+  it("POST /api/content/:section/versions returns 404 without writing when the version is missing", async () => {
+    const { POST } = await import("@/app/api/content/[section]/versions/route");
+
+    const response = await POST(
+      new Request("http://localhost/api/content/hero/versions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ versionId: "v_missing" }),
+      }),
+      { params: Promise.resolve({ section: "hero" }) },
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: "Version not found" });
+    expect(mockSetContent).not.toHaveBeenCalled();
+    expect(mockRevalidateClientSite).not.toHaveBeenCalled();
+    expect(mockLogAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it("POST /api/content/:section/versions returns 500 without success evidence when draft storage fails", async () => {
+    mockRestoreVersionToDraft.mockRejectedValue(new Error("draft store unavailable"));
+    const { POST } = await import("@/app/api/content/[section]/versions/route");
+
+    const response = await POST(
+      new Request("http://localhost/api/content/hero/versions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ versionId: "v_older" }),
+      }),
+      { params: Promise.resolve({ section: "hero" }) },
+    );
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({ error: "Failed to restore" });
+    expect(mockSetContent).not.toHaveBeenCalled();
+    expect(mockRevalidateClientSite).not.toHaveBeenCalled();
+    expect(mockLogAuditEvent).not.toHaveBeenCalled();
+  });
+
+  it("POST /api/content/:section/versions does not restore when content permission is denied", async () => {
+    mockRequireTenantPermission.mockResolvedValue(
+      new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const { POST } = await import("@/app/api/content/[section]/versions/route");
+
+    const response = await POST(
+      new Request("http://localhost/api/content/hero/versions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ versionId: "v_older" }),
+      }),
+      { params: Promise.resolve({ section: "hero" }) },
+    );
+
+    expect(response.status).toBe(403);
+    expect(mockRestoreVersionToDraft).not.toHaveBeenCalled();
+    expect(mockSetContent).not.toHaveBeenCalled();
+    expect(mockRevalidateClientSite).not.toHaveBeenCalled();
+    expect(mockLogAuditEvent).not.toHaveBeenCalled();
   });
 
   it("POST /api/publish reports when publishing only updates Scaffold content", async () => {

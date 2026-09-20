@@ -2,6 +2,11 @@
 
 ## Website release review
 
+Release judgment: ready for continued draft-PR review, not ready to launch the
+complete public self-service website promise. New-site creation, agency native
+website drafting and representative website integration proof remain open.
+Existing-site repairs are being verified independently of those missing paths.
+
 Jacob selected the [website release focus](./horizontal-product-brief-2026-09-11.md#september-20-website-release-focus)
 after reviewing the broader product and customer segments. Five retained Luna
 agents at maximum reasoning effort now inspect the complete website journey.
@@ -21,22 +26,34 @@ major product paths return to the parent as explicit scope decisions. Preserve
 existing completion work and customer behavior; do not create a parallel website
 builder, publishing path or scanner to make the review appear complete.
 
-Before this review, the parent reran the current checkout: 429 unit-test files
-passed, with 3,104 tests passing and one skipped; TypeScript checking also passed.
-Logs are `/tmp/strelva-founder-status-tests.log` and
-`/tmp/strelva-founder-status-typecheck.log`. This is an interim local baseline.
-The completion changes are not yet included in the hosted result for draft
-PR #191 at `59d29399`. Final combined checks and updated PR evidence remain open.
+The verified baseline is committed and pushed in draft PR #191 at `e5ec58bf`.
+It includes the completion work below, before the website-specific follow-up
+repairs. Both repositories now prepare `0.2.0` as Unreleased. Hosted results
+must be checked against their exact revision.
 
-The first source review identifies a release-blocking gap for new-customer
-self-service website creation. `src/app/onboard/page.tsx` redirects the retired
-creation entrance to `/access-request`. `src/app/api/admin/provision/route.ts`
-requires an operator, and `src/lib/provisioning.ts` prepares resources around a
-separately built client repository; it does not generate or deploy that website.
-The shared starter supplies reusable client behavior, not a complete public
-creation journey. The new-customer owner is tracing the remaining path before
-proposing a concrete creation contract. Existing-client readiness must not be
-reported as readiness for that new-customer promise.
+Source review confirms a release-blocking gap for new-customer self-service
+website creation. `/onboard` redirects to `/access-request`; intake stores a lead,
+not a website. The temporary `website-request-draft.ts` handoff stores text in
+session storage for an existing managed website. Operator provisioning prepares
+resources around a separately built repository and leaves repository connection,
+DNS, content and other setup as operator tasks. The starter supplies reusable
+client behavior; the development preview is a synthetic fixture. Neither is a
+public website creation journey. Existing-client readiness must not be reported
+as readiness for that new-customer promise.
+
+The entry review passed four public browser checks and a separate real local
+Auth/Postgres existing-site assignment journey: member and wrong-business writes
+were denied, owner/admin assignment succeeded, Settings links resolved, and exact
+retries stayed idempotent. Logs: `/tmp/strelva-new-website-public-entry.log` and
+`/tmp/strelva-existing-website-auth-3260-correct.log`.
+
+A durable customer-owned website request, a repository/build receipt and a real
+preview target are missing pieces of new creation. A request-only flow followed
+by an operator build would make delivery trackable, but would still be assisted
+creation. It must not silently replace the selected self-service direction.
+Customer approval of a preview, production deployment and domain changes also
+need distinct recorded authority. Existing draft/publish and signed client-preview
+contracts can be reused after a real website exists; they do not generate it.
 
 The first combined CI attempt found six inquiry API imports bypassing the
 product's supported public entry point. The parent exposed the exit resolver and
@@ -44,8 +61,8 @@ its errors through `products/inquiries/server.ts` and routed those imports
 through it. The existing boundary check then passed; four affected route suites
 passed all 37 tests, and TypeScript passed. The refreshed isolated candidate
 passed all 429 coverage-test files (3,104 tests, one skipped), the workspace SQL
-gate and the complete ordered schema upgrade rehearsal. Build and browser gates
-remain in progress. Evidence: `/tmp/strelva-website-boundaries-green.log`,
+gate and the complete ordered schema upgrade rehearsal. The later build and
+browser results are recorded below. Evidence: `/tmp/strelva-website-boundaries-green.log`,
 `/tmp/strelva-website-barrel-focused.log`,
 `/tmp/strelva-website-barrel-typecheck.log`,
 `/tmp/strelva-website-candidate-ci.log` and `/tmp/strelva-website-upgrade.log`.
@@ -73,6 +90,65 @@ intact, with before/after source hashes in
 passed a fresh complete ordered schema rehearsal in
 `/tmp/strelva-website-upgrade-normalized.log`. No persistent database migration
 was repeated for this formatting change.
+
+### Website-specific follow-up
+
+The existing-site review changed history recovery to save a draft, preserving
+live content until the customer publishes. Native editing is available at a
+phone-sized viewport. Focused storage/route tests and desktop/mobile browser
+fixtures passed; fixture proof is not live website publication. Billing copy now
+shows no subscription for an unconnected account instead of implying Growth at
+$199/month. Existing active-plan prices and founder comp remain unchanged.
+
+The standalone starter form now returns 503 when delivery settings are missing,
+instead of acknowledging a message stored only in a log. Its documentation
+separates legacy lead capture, native versioned inquiries and external booking
+embeds. Availability in the starter does not establish installation in a client
+site. The parent ran five affected suites: 34 tests passed in
+`/tmp/strelva-website-followup-focused.log`.
+
+Agency-specific native website draft preparation remains unfinished. Review
+found missing current tenant-authority checks, exit checks and revocation-race
+protection in the proposed implementation, with SQL and Auth/browser proof still
+outstanding. That work is preserved outside the candidate at
+`/tmp/strelva-agency-website-wip-1789931469`, with a hash manifest and gap
+record. Generic agency assignments and delivery records do not establish website editing or publishing
+permission. Publication remains on the existing governed tenant path.
+
+The starter includes a versioned inquiry component and transport, but this review
+did not prove it rendered on a representative client website. Native calendar
+bookings are also not connected by `ScaffoldBooking`, which embeds an outside
+booking page. Public website Checks accept one explicitly selected URL through
+the canonical scanner; they are not automatically installed on every client
+site. Additional intake proof passed 98 tests across nine files in
+`/tmp/strelva-website-customer-activity-vitest-final.log`. A rerun against shared
+port 3214 was not valid acceptance evidence: that server lacked the inquiry
+release and local provider fixture configuration, and returned 500 during the
+stranger-read check. The earlier isolated authenticated inquiry proof remains
+separately recorded; no new live-provider result is claimed.
+
+The parent then ran the complete `pnpm check:ci` on the isolated website follow-up
+candidate: lint, TypeScript, boundaries, ontology, SQL, coverage, dependency audit,
+build and all included browser gates passed in one invocation. Coverage passed
+431 files and 3,112 tests, with one skipped. Public smoke passed 93 cases with 209
+explicitly gated skips; workspace acceptance passed 38 and surface smoke passed
+20. Three focused editor fixtures separately cover the newly added desktop
+history, mobile editing and mobile permission recovery. Strict pinned-client
+compatibility passed 58/58. Logs: `/tmp/strelva-website-followup-ci.log` and
+`/tmp/strelva-website-followup-clients.log`. This candidate adds no migrations.
+Hosted build and secrets checks separately passed for the earlier pushed
+`e5ec58bf`; they do not establish hosted verification of this follow-up.
+
+Additional regression tests then exercised missing-version, failed draft-storage
+and denied-permission recovery, plus the actual copied standalone route's 503
+response without provider calls or visitor-data logging. A test-only Vitest alias
+loads the starter helper without writing temporary files into product source.
+The final full unit run passed 432 files and 3,116 tests, with one skipped;
+TypeScript and targeted lint passed. Logs:
+`/tmp/strelva-website-followup-final-tests.log`,
+`/tmp/strelva-website-followup-final-typecheck.log` and
+`/tmp/strelva-website-followup-final-lint.log`. Only tests, test configuration and
+documentation changed after the fully passing combined CI invocation.
 
 ## September 20 completion execution
 
@@ -226,6 +302,16 @@ business switch clears the previous payer while the next history loads. The
 exact output is `/tmp/strelva-billing-workspace-release-current.log`. The
 broader preview spec reached the allowance assertions but failed later on its
 unrelated Explore-offerings heading, so it is not counted as billing evidence.
+
+The dashboard Plan panel was also rendered against real local Supabase Auth and
+Postgres rows on the local Next host at port `3240`. At both `1280x900` and
+`390x844`, an unconnected account showed “No subscription connected” and “Not
+set up”, a canceled account showed “No active subscription” and “Canceled”, and
+an active Presence account showed “Presence · $99/mo” and “Active”. The exact
+authenticated browser output is `/tmp/strelva-billing-ui.log`; the six captures
+are in `/tmp/strelva-billing-ui/`.
+These are isolated local fixture records and do not establish hosted billing,
+Stripe state, or a production deployment.
 
 ### Subscription lifecycle checkpoint
 

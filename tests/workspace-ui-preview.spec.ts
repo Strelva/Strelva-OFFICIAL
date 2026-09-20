@@ -13,6 +13,11 @@ const EDITOR_HERO = {
 
 async function mockEditorApi(page: Page, options: { denyDrafts?: boolean } = {}) {
   let draft = { ...EDITOR_HERO };
+  const restoredVersion = {
+    ...EDITOR_HERO,
+    headline: "An earlier fictional headline",
+  };
+  let restoredToDraft = false;
   const draftBodies: Record<string, unknown>[] = [];
   const apiRequests: { method: string; path: string }[] = [];
 
@@ -24,6 +29,32 @@ async function mockEditorApi(page: Page, options: { denyDrafts?: boolean } = {})
 
     if (path.endsWith("/publish")) {
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ contentDrafts: {}, pageConfigDraft: false }) });
+    }
+    if (path.endsWith("/content/hero/versions")) {
+      if (request.method() === "GET") {
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify([{
+            id: "v_older",
+            section: "hero",
+            data: restoredVersion,
+            author: "user",
+            timestamp: "2026-09-20T12:00:00.000Z",
+            status: "live",
+            changes: [{ field: "headline", before: EDITOR_HERO.headline, after: restoredVersion.headline }],
+          }]),
+        });
+      }
+      if (request.method() === "POST") {
+        draft = { ...restoredVersion };
+        restoredToDraft = true;
+        return route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ success: true, draft: true, version: { id: "v_older", section: "hero", data: restoredVersion } }),
+        });
+      }
     }
     if (path.endsWith("/page-config")) {
       return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(null) });
@@ -45,7 +76,7 @@ async function mockEditorApi(page: Page, options: { denyDrafts?: boolean } = {})
     return route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "Fixture route not provided." }) });
   });
 
-  return { draftBodies, apiRequests };
+  return { draftBodies, apiRequests, get restoredToDraft() { return restoredToDraft; } };
 }
 
 test("shared navigation remains available while opening and finding work", async ({ page }) => {
@@ -450,4 +481,70 @@ test("isolated Website editor surfaces a permission failure without accepting th
   expect(fixture.draftBodies.some((body) => body.headline === "A denied fictional headline")).toBe(true);
   expect(fixture.apiRequests.some((request) => request.method === "POST" && request.path.endsWith("/publish"))).toBe(false);
   expect(fixture.apiRequests.some((request) => request.method === "DELETE" && request.path.endsWith("/publish"))).toBe(false);
+});
+
+test("website history restores into a draft before publish", async ({ page }) => {
+  const fixture = await mockEditorApi(page);
+  await page.goto("/preview/strelva/website/dashboard/site?editor=1", { waitUntil: "domcontentloaded" });
+  await page.getByRole("button", { name: "Edit site" }).click();
+  await expect(page.getByLabel("Headline").first()).toBeVisible();
+
+  await page.getByRole("button", { name: "History", exact: true }).click();
+  await expect(page.getByText("Last 1 version", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /12:00|just now|user/i }).click();
+  await page.getByRole("button", { name: "Restore to draft", exact: true }).click();
+
+  await expect(page.getByText("Restored to draft. Review before publishing", { exact: true })).toBeVisible();
+  await expect(page.getByText("Draft preview active - review before publishing", { exact: true })).toBeVisible();
+  expect(fixture.restoredToDraft).toBe(true);
+  if (process.env.STRELVA_CAPTURE_WEBSITE_PROOF === "1") {
+    await page.screenshot({ path: "/tmp/strelva-website-history-desktop.png", fullPage: true });
+  }
+  expect(fixture.apiRequests.some((request) => request.method === "POST" && request.path.endsWith("/publish"))).toBe(false);
+});
+
+test("website editor supports a draft change from a phone-sized viewport", async ({ page }) => {
+  const fixture = await mockEditorApi(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/preview/strelva/website/dashboard/site?editor=1", { waitUntil: "domcontentloaded" });
+
+  await page.getByRole("button", { name: "Edit site" }).click();
+  await page.getByLabel("Headline").first().fill("A mobile fictional headline");
+  await expect(page.getByLabel("Headline").first()).toBeFocused();
+  await expect(page.getByText("Draft saved - preview updated", { exact: true })).toBeVisible();
+  await expect(page.getByText("Draft preview active - review before publishing", { exact: true })).toBeVisible();
+  await expect.poll(() => fixture.draftBodies.some((body) => body.headline === "A mobile fictional headline")).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const headlineBox = await page.getByLabel("Headline").first().boundingBox();
+  expect(headlineBox).not.toBeNull();
+  expect(headlineBox!.x).toBeGreaterThanOrEqual(0);
+  expect(headlineBox!.x + headlineBox!.width).toBeLessThanOrEqual(390);
+  const saveButtonBox = await page.getByRole("button", { name: "Save changes", exact: true }).boundingBox();
+  expect(saveButtonBox).not.toBeNull();
+  expect(saveButtonBox!.x).toBeGreaterThanOrEqual(0);
+  expect(saveButtonBox!.x + saveButtonBox!.width).toBeLessThanOrEqual(390);
+  expect(saveButtonBox!.y + saveButtonBox!.height).toBeLessThanOrEqual(844);
+  if (process.env.STRELVA_CAPTURE_WEBSITE_PROOF === "1") {
+    await page.screenshot({ path: "/tmp/strelva-website-editor-mobile.png", fullPage: true });
+  }
+  expect(fixture.apiRequests.some((request) => request.method === "POST" && request.path.endsWith("/publish"))).toBe(false);
+});
+
+test("website editor keeps a mobile permission failure recoverable", async ({ page }) => {
+  const fixture = await mockEditorApi(page, { denyDrafts: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/preview/strelva/website/dashboard/site?editor=1", { waitUntil: "domcontentloaded" });
+
+  await page.getByRole("button", { name: "Edit site" }).click();
+  await page.getByLabel("Headline").first().fill("A denied mobile fictional headline");
+  await expect(page.getByText("Couldn't save. Try again", { exact: false })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save changes", exact: true })).toBeDisabled();
+  const saveButtonBox = await page.getByRole("button", { name: "Save changes", exact: true }).boundingBox();
+  expect(saveButtonBox).not.toBeNull();
+  expect(saveButtonBox!.y + saveButtonBox!.height).toBeLessThanOrEqual(844);
+  expect(fixture.draftBodies.some((body) => body.headline === "A denied mobile fictional headline")).toBe(true);
+  expect(fixture.apiRequests.some((request) => request.method === "POST" && request.path.endsWith("/publish"))).toBe(false);
+  if (process.env.STRELVA_CAPTURE_WEBSITE_PROOF === "1") {
+    await page.screenshot({ path: "/tmp/strelva-website-editor-mobile-permission.png", fullPage: true });
+  }
 });

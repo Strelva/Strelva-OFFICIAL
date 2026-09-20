@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { promises as fs } from "fs";
 import path from "path";
-import { appendVersion, getVersions, restoreVersion, getContent } from "../lib/storage";
+import { appendVersion, getVersions, restoreVersion, restoreVersionToDraft, getContent, getDraftContent, setContent } from "../lib/storage";
 
 /**
  * Content versioning — the revision spine (ontology Phase 4).
@@ -123,6 +123,27 @@ describe("content versioning — append / get / restore", () => {
     // The live published content now reflects the restored version.
     const live = await getContent("hero", TEST_TENANT);
     expect((live as { headline: string }).headline).toBe("v1-original");
+  });
+
+  it("restores an older version into the draft layer without changing live content", async () => {
+    const v1 = await appendVersion("hero", { headline: "v1-original" }, "user", TEST_TENANT);
+    await appendVersion("hero", { headline: "v2-live" }, "user", TEST_TENANT);
+    await setContent("hero", {
+      headline: "v2-live",
+      subheadline: "",
+      tagline: "",
+      ctaText: "",
+      ctaLink: "",
+      backgroundImageUrl: "",
+    }, TEST_TENANT);
+
+    const restored = await restoreVersionToDraft("hero", v1.id, TEST_TENANT);
+
+    expect(restored?.id).toBe(v1.id);
+    expect(restored?.data).toEqual({ headline: "v1-original" });
+    expect(await getDraftContent("hero", TEST_TENANT)).toEqual({ headline: "v1-original" });
+    expect((await getContent("hero", TEST_TENANT) as { headline: string }).headline).toBe("v2-live");
+    expect(await getVersions("hero", TEST_TENANT)).toHaveLength(2);
   });
 
   it("marks a restore with a _restore change entry", async () => {

@@ -10,6 +10,7 @@ import { randomUUID } from "crypto";
 import type { ContentSection, ContentMap } from "../types";
 import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
 import { setContent } from "./content-store";
+import { setDraftContent } from "./draft-store";
 import { dataSourceIsPostgres } from "../db/source-flags";
 import { getSupabase, type Row, type Insert } from "../db/client";
 
@@ -158,4 +159,25 @@ export async function restoreVersion(
   ]);
 
   return restored;
+}
+
+/**
+ * Copy a historical version into the draft layer for owner review.
+ *
+ * History recovery from the website editor must preserve the same draft →
+ * preview → publish boundary as a new edit. The older restoreVersion helper is
+ * retained for the internal undo contract, which intentionally restores live
+ * content, while the self-service editor uses this draft-only operation.
+ */
+export async function restoreVersionToDraft(
+  section: ContentSection,
+  versionId: string,
+  tenant: string = DEFAULT_TENANT,
+): Promise<ContentVersion | null> {
+  const versions = await getVersions(section, tenant);
+  const target = versions.find((v) => v.id === versionId);
+  if (!target) return null;
+
+  await setDraftContent(section, target.data as ContentMap[ContentSection], tenant);
+  return target;
 }
