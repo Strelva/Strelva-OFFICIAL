@@ -22,6 +22,11 @@ exercises the REAL `hasTenantAccess` with the auth primitives (`getSessionUser`,
 
 ### TypeScript strictness
 
+`pnpm typecheck` runs `next typegen` before `tsc --noEmit`. CI uses the same
+command so an untouched checkout gets Next's route and static-image declarations
+without relying on an earlier development server or build. Vitest discovers
+both `.test.ts` and `.test.tsx` files under `src/__tests__`.
+
 `noUncheckedIndexedAccess` is ON in `tsconfig.json` (enabled 2026-07-30). Every array index and record key access is typed `T | undefined` — guard or provide a default. All 637 existing sites were fixed when the flag landed; keep it green. A new `arr[i]` or `record[key]` without a guard will fail typecheck.
 
 ## Playwright (`tests/*.spec.ts`) — two modes

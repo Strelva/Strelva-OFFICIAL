@@ -21,7 +21,7 @@ import { StrelvaSidebar, type StrelvaSection } from "@/experience/app-frame/Stre
 import type { OfferingWebsiteBinding, OfferingWebsiteBindingCommand } from "@/platform/offerings";
 import type { WorkspaceSnapshot } from "./contracts";
 import type { ManagedWorkSummary } from "./workspace-discovery";
-import { BusinessOfferingSummary, boundOfferingResourceIds, WebsiteAssignmentHandoff, type WorkspaceOfferingState } from "./WorkspaceOfferings";
+import { BusinessOfferingSummary, WebsiteAssignmentHandoff, type WorkspaceOfferingState } from "./WorkspaceOfferings";
 import { WorkspaceAllowanceSummary } from "./WorkspaceAllowanceSummary";
 import { workspaceHome } from "./workspace-home";
 import { workspaceWorkLabel } from "./work-label";
@@ -104,9 +104,6 @@ export function BusinessHome({
   const readOnly = current?.access === "delegated_read";
   const name = current?.name || "Your business";
   const home = workspaceHome(snapshot.work);
-  const offeringResourceIds = boundOfferingResourceIds(offerings);
-  const ordinaryResults = home.results.filter((work) => !offeringResourceIds.has(work.id));
-  const ordinaryRecent = snapshot.work.filter((work) => !offeringResourceIds.has(work.id));
   const initials = name
     .split(/\s+/)
     .slice(0, 2)
@@ -122,7 +119,7 @@ export function BusinessHome({
       kind: "website",
       open: () => window.location.assign(site.href),
     })),
-    ...ordinaryResults.map((work) => ({
+    ...home.results.map((work) => ({
       id: work.id,
       title: work.title,
       detail:
@@ -335,9 +332,9 @@ export function BusinessHome({
 
               <section className={styles.panel} aria-labelledby="home-recent">
                 <header><h2 id="home-recent">Recent work</h2><button className={styles.viewAll} onClick={onWork}>View all <ArrowRight size={13} /></button></header>
-                {busy ? <p role="status">Loading saved work…</p> : ordinaryRecent.length ? (
-                  <ul>{ordinaryRecent.slice(0, 5).map((work) => <li key={work.id}><motion.button onClick={() => onOpen(work.id)} {...quietMotion}><span className={styles.symbol} data-kind={work.productId}>{icon(work.productId)}</span><span><strong>{work.title}</strong><small>{work.unavailableReason || (work.operation?.status === "needs_attention" ? "Needs attention" : workspaceWorkLabel(work))}</small></span></motion.button></li>)}</ul>
-                ) : <div className={styles.quiet}><FileText size={23} /><strong>{offeringResourceIds.size ? "Other work starts here." : "Your work starts here."}</strong><p>{offeringResourceIds.size ? "Work connected to an offering is grouped below. Other saved results stay here." : "Applications, documents, and other results stay in this workspace."}</p>{!readOnly && <button className={styles.begin} onClick={onStart}>Start something new <ArrowRight size={15} /></button>}</div>}
+                {busy ? <p role="status">Loading saved work…</p> : snapshot.work.length ? (
+                  <ul>{snapshot.work.slice(0, 5).map((work) => <li key={work.id}><motion.button onClick={() => onOpen(work.id)} {...quietMotion}><span className={styles.symbol} data-kind={work.productId}>{icon(work.productId)}</span><span><strong>{work.title}</strong><small>{work.unavailableReason || (work.operation?.status === "needs_attention" ? "Needs attention" : workspaceWorkLabel(work))}</small></span></motion.button></li>)}</ul>
+                ) : <div className={styles.quiet}><FileText size={23} /><strong>Your work starts here.</strong><p>Applications, documents, and other results stay in this workspace.</p>{!readOnly && <button className={styles.begin} onClick={onStart}>Start something new <ArrowRight size={15} /></button>}</div>}
               </section>
 
               <BusinessOfferingSummary state={offerings} work={snapshot.work} onOpen={onOfferings} />

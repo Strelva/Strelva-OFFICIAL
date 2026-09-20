@@ -48,14 +48,15 @@ const work: WorkspaceWork = {
   createdAt: "2026-09-15T12:00:00.000Z",
 };
 
-function renderDirectory(state: WorkspaceOfferingState, selectedId: string | null): string {
+function renderDirectory(state: WorkspaceOfferingState, selectedId: string | null, availableWork: WorkspaceWork[] = [work]): string {
   return renderToStaticMarkup(createElement(WorkspaceOfferingDirectory, {
     state,
     businessName: "Harbor Dental",
-    work: [work],
+    work: availableWork,
     managedSites: [],
     selectedId,
     onSelect: () => undefined,
+    onOpenWork: () => undefined,
     onRetry: () => undefined,
     onCommand: async () => null,
     onWebsiteCommand: async () => null,
@@ -77,11 +78,11 @@ describe("workspace offering experience", () => {
     expect(html).not.toContain("Installed for this business");
   });
 
-  it("makes provider responsibility a request instead of an accepted commitment", () => {
+  it("starts with customer operation and offers an explicit provider request", () => {
     const html = renderDirectory({ status: "ready", collection, saving: false }, definition.id);
     expect(html).toContain("Your business operates it");
     expect(html).toContain("Request a provider");
-    expect(html).toContain("does not confirm Strelva or a third party accepted the work");
+    expect(html).toContain('name="responsibility" checked=""');
   });
 
   it("requires an explicit publish confirmation before a draft offering can activate", () => {
@@ -107,9 +108,19 @@ describe("workspace offering experience", () => {
     };
     const state: WorkspaceOfferingState = { status: "ready", collection: draft, saving: false };
     const html = renderDirectory(state, installationId);
+    expect(html).toContain("Open Staff requests");
+    expect(html).not.toContain(`<span>${applicationId}</span>`);
     expect(html).toContain("I published the connected application through its review.");
     expect(html).toContain("disabled=\"\"");
     expect([...boundOfferingResourceIds(state)]).toEqual([applicationId]);
+    const unavailable = renderDirectory(state, installationId, []);
+    expect(unavailable).toContain("Connected work unavailable");
+    expect(unavailable).not.toContain("Open Staff requests");
+    const wrongBusiness = renderDirectory(state, installationId, [{ ...work, workspaceId: "other-business" }]);
+    expect(wrongBusiness).not.toContain("Open Staff requests");
+    const inaccessible = renderDirectory(state, installationId, [{ ...work, unavailableReason: "Access is no longer available." }]);
+    expect(inaccessible).toContain("Access is no longer available.");
+    expect(inaccessible).not.toContain("Open Staff requests");
   });
 
   it("mounts the provider lifecycle inside the installed offering", () => {

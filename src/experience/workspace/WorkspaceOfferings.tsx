@@ -14,6 +14,8 @@ import type {
   OfferingWebsiteBinding,
   OfferingWebsiteBindingCommand,
 } from "@/platform/offerings";
+import { Button } from "@/components/ui/Button";
+import { workspaceWorkLabel } from "./work-label";
 import type { WorkspaceWork } from "./contracts";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 import { sameAppHref, type ManagedWorkSummary } from "./workspace-discovery";
@@ -319,6 +321,7 @@ function OfferingInstallationView({
   work,
   saving,
   onBack,
+  onOpenWork,
   onCommand,
 }: {
   collection: OfferingCollection;
@@ -326,6 +329,7 @@ function OfferingInstallationView({
   work: readonly WorkspaceWork[];
   saving: boolean;
   onBack: () => void;
+  onOpenWork: (id: string) => void;
   onCommand: (command: OfferingCommand) => Promise<OfferingInstallation | null>;
 }) {
   const definition = definitionFor(collection, installation);
@@ -378,7 +382,15 @@ function OfferingInstallationView({
 
     <section className={styles.section} aria-labelledby={`offering-resources-${installation.id}`}>
       <h3 id={`offering-resources-${installation.id}`}>Connected work</h3>
-      <ul className={styles.simpleList}>{installation.nativeResources.map((resource) => <li key={`${resource.kind}:${resource.id}`}><strong>{resource.kind.replaceAll("_", " ")}</strong><span>{resource.id}</span></li>)}</ul>
+      <ul className={styles.simpleList}>{installation.nativeResources.map((resource) => {
+        const item = work.find((candidate) => candidate.id === resource.id && candidate.workspaceId === collection.businessId && candidate.resourceKind === resource.kind);
+        const website = resource.kind === "managed_website" ? collection.websiteBindings.find((binding) => binding.id === resource.id && binding.businessId === collection.businessId && binding.status === "active") : undefined;
+        const websiteHref = website?.canOpen && website.tenantActive && website.surface.href ? sameAppHref(website.surface.href) : null;
+        return <li key={`${resource.kind}:${resource.id}`}>
+          <span><strong>{item?.title ?? website?.siteName ?? "Connected work unavailable"}</strong><small>{item ? item.unavailableReason || workspaceWorkLabel(item) : website ? "Managed website" : "This work is no longer available in your current business view."}</small></span>
+          {item && !item.unavailableReason ? <Button type="button" variant="secondary" size="sm" aria-label={`Open ${item.title}`} onClick={() => onOpenWork(item.id)}>Open <ArrowRight size={14} aria-hidden="true" /></Button> : websiteHref ? <a href={websiteHref}>Open <ExternalLink size={14} aria-hidden="true" /></a> : null}
+        </li>;
+      })}</ul>
     </section>
 
     <section className={styles.section} aria-labelledby={`offering-surfaces-${installation.id}`}>
@@ -679,6 +691,7 @@ export function WorkspaceOfferingDirectory({
   managedSites,
   selectedId,
   onSelect,
+  onOpenWork,
   onRetry,
   onCommand,
   onWebsiteCommand,
@@ -689,6 +702,7 @@ export function WorkspaceOfferingDirectory({
   managedSites: readonly ManagedWorkSummary[];
   selectedId: string | null;
   onSelect: (id: string | null) => void;
+  onOpenWork: (id: string) => void;
   onRetry: () => void;
   onCommand: (command: OfferingCommand) => Promise<OfferingInstallation | null>;
   onWebsiteCommand: (command: OfferingWebsiteBindingCommand) => Promise<OfferingWebsiteBinding | null>;
@@ -698,7 +712,7 @@ export function WorkspaceOfferingDirectory({
   if (state.status === "error") return <section className={styles.status}><h2>Offerings could not be loaded.</h2><p role="alert">{state.message}</p><button className={styles.secondary} type="button" onClick={onRetry}><RefreshCw size={15} aria-hidden="true" />Try again</button></section>;
 
   const selectedInstallation = state.collection.installations.find((installation) => installation.id === selectedId);
-  if (selectedInstallation) return <><OfferingInstallationView key={`${selectedInstallation.id}:${selectedInstallation.revision}`} collection={state.collection} installation={selectedInstallation} work={work} saving={state.saving} onBack={() => onSelect(null)} onCommand={onCommand} />{state.mutationError ? <p className={styles.error} role="alert">{state.mutationError}</p> : null}</>;
+  if (selectedInstallation) return <><OfferingInstallationView key={`${selectedInstallation.id}:${selectedInstallation.revision}`} collection={state.collection} installation={selectedInstallation} work={work} saving={state.saving} onBack={() => onSelect(null)} onOpenWork={onOpenWork} onCommand={onCommand} />{state.mutationError ? <p className={styles.error} role="alert">{state.mutationError}</p> : null}</>;
   const selectedDefinition = state.collection.definitions.find((definition) => definition.id === selectedId);
   if (selectedDefinition) return <><OfferingInstallView collection={state.collection} definition={selectedDefinition} businessName={businessName} work={work} saving={state.saving} onBack={() => onSelect(null)} onCommand={onCommand} />{state.mutationError ? <p className={styles.error} role="alert">{state.mutationError}</p> : null}</>;
 

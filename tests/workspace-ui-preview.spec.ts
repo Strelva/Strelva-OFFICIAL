@@ -271,6 +271,33 @@ test("direct customer can inspect an offering setup and its local allowance", as
   await installedApp.click();
   await expect(page.getByRole("heading", { name: "Staff requests", exact: true })).toBeVisible();
 
+  await page.getByRole("button", { name: "Back to work" }).click();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const navigation = page.getByRole("complementary", { name: "Strelva navigation", exact: true });
+  await navigation.getByRole("button", { name: "Home", exact: true }).click();
+  const recent = page.getByRole("region", { name: "Recent work", exact: true });
+  await expect(recent.getByRole("button", { name: /Staff requests/ })).toBeVisible();
+  await recent.getByRole("button", { name: /Staff requests/ }).click();
+  await expect(page.getByRole("heading", { name: "Staff requests", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Back to work" }).click();
+  await navigation.getByRole("button", { name: "Explore offerings", exact: true }).click();
+  await page.getByRole("button", { name: /Staff request application/ }).click();
+  const connected = page.getByRole("region", { name: "Connected work", exact: true });
+  await expect(connected).toContainText("Staff requests");
+  await expect(connected).not.toContainText("88888888-8888-4888-8888-888888888888");
+  for (const width of [320, 360, 768, 1280, 1600]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(connected.getByRole("button", { name: "Open Staff requests", exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    if (process.env.STRELVA_CAPTURE_PRODUCT_EXPERIENCE === "1") {
+      await connected.screenshot({ path: `output/staff-review/connected-work-${width}.png` });
+    }
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await connected.getByRole("button", { name: "Open Staff requests", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name: "Staff requests", exact: true })).toBeVisible();
+
   await page.reload();
   await expect(page.getByRole("heading", { name: "This saved result is unavailable." })).toBeVisible();
   await page.getByRole("button", { name: "Back to work" }).click();

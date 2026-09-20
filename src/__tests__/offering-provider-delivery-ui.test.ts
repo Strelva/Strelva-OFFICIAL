@@ -24,7 +24,7 @@ describe("provider delivery offering UI", () => {
     };
     const html = renderToStaticMarkup(createElement(WorkspaceOfferingDirectory, {
       state: { status: "ready", collection, saving: false }, businessName: "Harbor Dental", work: [], managedSites: [], selectedId: installationId,
-      onSelect: () => undefined, onRetry: () => undefined, onCommand: async () => null, onWebsiteCommand: async () => null,
+      onSelect: () => undefined, onOpenWork: () => undefined, onRetry: () => undefined, onCommand: async () => null, onWebsiteCommand: async () => null,
     }));
     expect(html).toContain("Strelva has been requested as the provider");
     expect(html).toContain("Checking provider delivery");

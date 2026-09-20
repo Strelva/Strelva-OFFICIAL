@@ -154,6 +154,13 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
   let pendingOfferingInstall: string | null = null;
   let staffRequestApplication = initialStaffRequestApplication();
   let installedApplication = options.installedStaffRequest === true;
+  const staffRequestInstallation = {
+    id: "77777777-7777-4777-8777-777777777777", businessId: CUSTOMER, definitionId: "private_staff_requests", definitionVersion: "1.0.0",
+    status: "draft", revision: 1, configuration: {}, nativeResources: [{ kind: "application", id: "88888888-8888-4888-8888-888888888888" }],
+    responsibility: { kind: "provider_requested", providerKind: "strelva", providerName: "Strelva" }, acceptedScope: ["submit_requests", "review_requests"],
+    surfaces: [{ id: "business_workspace", label: "Business workspace", description: "Manage the application.", href: `/preview/strelva/workspace?scenario=business&workspaceId=${CUSTOMER}&view=applications&work=88888888-8888-4888-8888-888888888888&previewSetup=staff-request` }],
+    installedBy: "local-preview", installedAt: "2026-09-15T12:00:00.000Z", updatedBy: "local-preview", updatedAt: "2026-09-15T12:00:00.000Z",
+  };
   const accessGrants: Array<{ id: string; recipientEmail: string; views: Array<"form" | "list" | "detail" | "document">; recordRead: "none" | "own" | "all"; recordSubmit: boolean; purpose: string; expiresAt: string; status: "active" | "revoked" }> = [];
   const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
@@ -167,7 +174,7 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
       businessId: CUSTOMER,
       permissions: { canRead: true, canManage: true, role: "owner" },
       definitions: listOfferingDefinitions(),
-      installations: [],
+      installations: installedApplication ? [staffRequestInstallation] : [],
       websiteBindings: [],
     });
     if (scenario === "business" && url.pathname === "/api/offerings" && init?.method === "POST" && typeof init.body === "string") {
@@ -179,13 +186,7 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
       installedApplication = true;
       const current = saved.get(CUSTOMER) || [];
       if (!current.some((work) => work.id === STAFF_REQUEST_APP)) saved.set(CUSTOMER, [staffRequestWork(), ...current]);
-      return response({ installation: {
-        id: "77777777-7777-4777-8777-777777777777", businessId: CUSTOMER, definitionId: "private_staff_requests", definitionVersion: "1.0.0",
-        status: "draft", revision: 1, configuration: {}, nativeResources: [{ kind: "application", id: "88888888-8888-4888-8888-888888888888" }],
-        responsibility: { kind: "provider_requested", providerKind: "strelva", providerName: "Strelva" }, acceptedScope: ["submit_requests", "review_requests"],
-        surfaces: [{ id: "business_workspace", label: "Business workspace", description: "Manage the application.", href: `/preview/strelva/workspace?scenario=business&workspaceId=${CUSTOMER}&view=applications&work=88888888-8888-4888-8888-888888888888&previewSetup=staff-request` }],
-        installedBy: "local-preview", installedAt: "2026-09-15T12:00:00.000Z", updatedBy: "local-preview", updatedAt: "2026-09-15T12:00:00.000Z",
-      } });
+      return response({ installation: staffRequestInstallation });
     }
     if (scenario === "business" && url.pathname === "/api/bounded-work" && url.searchParams.get("productId") === "applications" && (init?.method || "GET") === "GET") {
       if (!installedApplication || url.searchParams.get("workId") !== STAFF_REQUEST_APP) return response({ error: "This application is unavailable in the local preview." }, 404);

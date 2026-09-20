@@ -46,7 +46,7 @@ jobs:
         run: pnpm lint
 
       - name: Typecheck
-        run: pnpm tsc --noEmit
+        run: pnpm typecheck
 
       - name: Product boundaries
         run: pnpm check:boundaries

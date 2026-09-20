@@ -200,6 +200,13 @@ interaction. It must respect reduced-motion preferences and must not turn real
 business state into looping decoration. Existing data and permission boundaries
 remain.
 
+September 19 return-path refinement: work connected to an offering remains
+available by its own title in Home and Recent work. An offering describes its
+setup and responsibility without replacing the app or result as a destination.
+Connected work opens the existing native view when that work is available to
+the current business and actor. Missing work shows an unavailable state rather
+than a raw resource identifier or an inferred access grant.
+
 ### Public discovery into business Home
 
 On September 15, Jacob accepted the following public-entry interaction decisions

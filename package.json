@@ -33,7 +33,7 @@
     "smoke:workspace": "STRELVA_WORKSPACE_RELEASE=1 playwright test tests/workspace-release.spec.ts",
     "audit:full": "npx tsx --env-file-if-exists=.env.local scripts/full-audit.ts",
     "check:prod": "tsx scripts/production-checklist.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "version:check": "node scripts/check-version-sync.mjs"
   },
   "dependencies": {

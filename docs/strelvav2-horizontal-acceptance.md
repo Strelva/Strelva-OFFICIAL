@@ -586,3 +586,51 @@ checks still expect homepage artifact/tabs controls from an older composition;
 they remain draft-readiness blockers. Account continuation in that browser run
 used a mocked app endpoint. Neither local verification nor PR creation proves
 production operation, live provider delivery, customer acceptance or adoption.
+
+## September 19 staff-request journey and clean-checkout CI
+
+Follow-up to the [module and PR audit](./strelvav2-module-map-2026-09-19.md), based
+on PR head `396facf4137a83ff307f4ed1a059ca15ac7f98ec` plus this change. Installed
+apps remain directly reachable in Home and Recent work. Offering details show
+the connected work's title and an Open action through the existing native router.
+Missing, unavailable, or mismatched-business work does not acquire an Open action.
+The existing business navigation remains in place; Home / Work / Business is
+still a proposal. Provider delivery setup is not simplified by this change.
+
+The staff-request preview now retains its installed-offering record when views
+remount. It remains fictional and resets on reload. The Connected work action
+uses the owned Button primitive. Browser checks cover keyboard activation and
+reflow at 320, 360, 768, 1280 and 1600 pixels; 360 and 1280 pixel renders were
+visually inspected. This does not establish a full component migration.
+
+The hosted TypeScript image-import failure was reproduced in a fresh archive
+checkout without `next-env.d.ts`. Running Next type generation before TypeScript
+resolved it. `pnpm typecheck` now generates these declarations, and CI invokes
+that same command. Vitest now discovers `.test.tsx`, including six previously
+undiscovered offering UI cases. One stale static-render assertion expected conditional
+provider text before choosing a provider; its default-state assertion is now
+accurate, while the browser test still selects provider responsibility and checks
+the unaccepted-request explanation.
+
+Local validation passed: 392 Vitest files, 2,878 tests and one intentional skip;
+lint, TypeScript, product boundaries, version parity, and whitespace checks.
+All 21 Home/workspace preview browser tests passed, including empty, unavailable,
+read-only, reduced-motion, mobile navigation, return-path and retry states.
+Two existing authenticated local application journeys also passed: request-to-app
+with a prepared planning response, and recipient use with safe changes, rollback,
+failed-write recovery and access revocation. Auth and Postgres were actual local
+services with synthetic identities. The planning response remained a fixture.
+No live model, calendar, email, payment, or deployment was invoked.
+
+A third authenticated local browser test passed from the actual staff-request
+offering setup: create the standard app, check and publish it, activate the
+offering, grant a verified staff recipient access, submit on a phone viewport,
+publish a changed field label while preserving the record, and reopen the app
+from Home and Connected work. This journey uses no model response fixture.
+Its uniquely named synthetic records remain in the isolated local database
+because installation references restrict workspace deletion.
+
+These checks prove the named local behavior. They do not establish hosted CI
+success for the new revision, production schema readiness, a released horizontal
+offering, human acceptance, or general provider delivery. The draft PR and
+production deployment hold remain in place.
