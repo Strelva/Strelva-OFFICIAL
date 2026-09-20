@@ -1,5 +1,403 @@
 # strelvav2 horizontal acceptance
 
+## Website release review
+
+Jacob selected the [website release focus](./horizontal-product-brief-2026-09-11.md#september-20-website-release-focus)
+after reviewing the broader product and customer segments. Five retained Luna
+agents at maximum reasoning effort now inspect the complete website journey.
+The parent owns integration, commercial claim reconciliation and release proof.
+These assignments do not establish readiness or authorize live actions.
+
+| Owner | Review and repair scope | Required distinction |
+| --- | --- | --- |
+| `onboarding_completion` | New customer entry, account continuity, website creation/request/provisioning and preview | Customer-executable work versus operator delivery; public audit versus owned website |
+| `apps_completion` | Existing website request, governed change, review, publication, history and recovery | Local provider fixtures versus verified live publication |
+| `intake_checks_completion` | Website visitor inquiry, owner visibility, governed follow-up, booking and Checks connections | A workspace feature versus a connected website outcome |
+| `delivery_completion` | Agency access, website delivery, customer approval, handoff and revocation | Website authority versus an unrelated application grant |
+| `custom_apps_completion` | Website claims, pricing boundaries, customer agreements, migration and activation dependencies | Supported self-service promise versus unimplemented creation/import or unselected commercial terms |
+
+Repairs must follow the existing native owners and proof requirements. Missing
+major product paths return to the parent as explicit scope decisions. Preserve
+existing completion work and customer behavior; do not create a parallel website
+builder, publishing path or scanner to make the review appear complete.
+
+Before this review, the parent reran the current checkout: 429 unit-test files
+passed, with 3,104 tests passing and one skipped; TypeScript checking also passed.
+Logs are `/tmp/strelva-founder-status-tests.log` and
+`/tmp/strelva-founder-status-typecheck.log`. This is an interim local baseline.
+The completion changes are not yet included in the hosted result for draft
+PR #191 at `59d29399`. Final combined checks and updated PR evidence remain open.
+
+The first source review identifies a release-blocking gap for new-customer
+self-service website creation. `src/app/onboard/page.tsx` redirects the retired
+creation entrance to `/access-request`. `src/app/api/admin/provision/route.ts`
+requires an operator, and `src/lib/provisioning.ts` prepares resources around a
+separately built client repository; it does not generate or deploy that website.
+The shared starter supplies reusable client behavior, not a complete public
+creation journey. The new-customer owner is tracing the remaining path before
+proposing a concrete creation contract. Existing-client readiness must not be
+reported as readiness for that new-customer promise.
+
+The first combined CI attempt found six inquiry API imports bypassing the
+product's supported public entry point. The parent exposed the exit resolver and
+its errors through `products/inquiries/server.ts` and routed those imports
+through it. The existing boundary check then passed; four affected route suites
+passed all 37 tests, and TypeScript passed. The refreshed isolated candidate
+passed all 429 coverage-test files (3,104 tests, one skipped), the workspace SQL
+gate and the complete ordered schema upgrade rehearsal. Build and browser gates
+remain in progress. Evidence: `/tmp/strelva-website-boundaries-green.log`,
+`/tmp/strelva-website-barrel-focused.log`,
+`/tmp/strelva-website-barrel-typecheck.log`,
+`/tmp/strelva-website-candidate-ci.log` and `/tmp/strelva-website-upgrade.log`.
+
+That isolated candidate subsequently passed its production build, public browser
+gate (93 passed, 206 explicitly gated skips) and workspace browser gate (38
+passed). Surface smoke initially failed one of 20 cases because its analytics
+assertion expected the older Google section instead of the current unconnected
+state. Inspection of the rendered failure and `AnalyticsLiveView` confirmed
+the current "Connect Google to unlock your analytics" state. The assertion now
+matches that state; all 20 surface cases passed when repeated under the same
+CI environment and synthetic tenant setup. The combined command therefore has
+a recorded failed final stage followed by a passing focused correction, not a
+single entirely green invocation. Logs: `/tmp/strelva-website-candidate-ci.log`
+and `/tmp/strelva-website-surfaces-final.log`. Exact pinned-client compatibility
+also passed 58/58 checks in `/tmp/strelva-website-client-compatibility.log`.
+Subsequent website-review repairs still need their own integration verification.
+
+## September 20 completion execution
+
+Jacob requested TDD implementation of the completion plan with Luna agents at
+maximum reasoning effort. Work starts from `484dd2c1`; the September 19 planning
+changes in `todo.md` and this ledger are retained. The parent agent owns shared
+workspace integration, migration ordering, combined verification and PR updates.
+Each builder owns a bounded lane and reports observed RED/GREEN behavior.
+
+| Implementation lane | Agent | Current assignment |
+| --- | --- | --- |
+| Native apps and bookings | `apps_completion` | Native apps and calendar lifecycle locally verified; now shared stopped-work interface and failure states. |
+| Onboarding and account continuity | `onboarding_completion` | Onboarding and real local account continuity verified; now independent exit/export review. |
+| Delivery | `delivery_completion` | Request-to-delivery composition, scope continuity and explicitly authorized local agency execution. |
+| Intake, checks and billing review | `intake_checks_completion` | Inquiry, public website Checks and fractional billing verified locally; now final calendar response review. |
+| Custom apps and customer exit | `custom_apps_completion` | Custom lifecycle and billing implementation handed off; now stop-work enforcement and retained export. |
+
+Economics/billing and exit behavior continue in the existing agent lanes. The
+remaining hosted/client/marketing preparation stays with the parent. They are
+not complete merely because they are assigned in the plan. Agency
+pagination is locally verified below. Jacob selected Outlook first, Google next,
+and public website changes for Checks. Public
+access remains the selected direction. Paid terms, live actions and deployment
+remain separate from local implementation.
+
+Jacob subsequently selected subscriptions with included usage, with prices and
+included quantities still unset. The selected customer-exit behavior is to stop
+future work and retain records for export until explicit deletion is requested.
+These are implementation decisions, not evidence of completed billing or exit
+flows. No automatic retention deadline or live billing action is authorized.
+
+The shared candidate version is now `0.2.0` in both repositories, with matching
+Unreleased changelog headings and marketing lockfile metadata. Version parity
+passes from the canonical sibling checkouts. This prepares the candidate; no
+release tag, merge or deployment is implied.
+
+### Candidate integration evidence
+
+The parent reran the full unit suite during integration: 425 files passed,
+3,063 tests passed and one test was skipped. TypeScript checking passed. The
+ordered database upgrade rehearsal also passed with the current migration tail,
+including exit, export v2 and fractional provider receipts. These are interim
+results; subsequent review fixes still require the final combined gate.
+
+Marketing version `0.2.0` passed its optimized build, all 76 production Chromium
+checks and all three development-only study checks. Separate app tests exercised
+fresh local email authentication, account continuation from a second marketing
+origin, invitation acceptance and returning to saved work. The fresh-account
+proof seeds the selected customer workspace; it does not establish unattended
+production signup or hosted provider behavior.
+
+The parent also repaired callback origin selection so a loopback Host header
+cannot replace a hosted callback origin. The regression failed before the fix;
+seven callback cases and 55 focused authentication/routing cases passed afterward.
+
+The parent independently repeated both fresh-account paths after the callback
+repair: direct public continuation and the marketing composer on a second origin.
+Both passed using local Supabase email authentication and the configured loopback
+callback host. A localhost mismatch and a development cache crash were resolved
+before the passing run; no hosted authentication result is claimed.
+
+An isolated CI run exposed inherited environment assumptions in two older unit
+test files. Their setup now explicitly isolates the legacy bypass variables,
+and nine focused cases pass with the primary flag disabled, including its
+precedence over an enabled legacy flag. The synthetic surface-smoke subprocess
+now explicitly selects its own primary bypass variables. Public and workspace
+gates continue to disable bypass.
+
+Four older preview browser files lacked their explicit opt-in flag. They now
+use the same development-preview gate as the other preview tests. All eight
+journeys passed separately with preview enabled, covering inquiry editing,
+rehearsal, publication, portfolio continuity, mobile navigation and public brief
+continuation. This separates public smoke from preview evidence without removing
+the preview acceptance cases.
+
+### Pinned client compatibility checkpoint
+
+The parent created isolated detached worktrees of the exact manifest revisions:
+GLDF `fd088c507bcdaec82257c34ddff1b1f94c72fd34` and Rohlax
+`00e4323a9a93029070e802f9da0345cc441b6f59`. Existing client checkouts were not reset
+or edited. Executable platform compatibility and structural client checks passed
+with exact revision and clean-source checks enabled. The new strict release mode
+first failed for a wrong revision, local source edits and a missing checkout;
+the four focused cases then passed, including a clean exact revision.
+
+GLDF's `pnpm check` passed lint, TypeScript, 9 test files / 55 tests and its build.
+Rohlax's `npm run check` passed TypeScript, its 54 structural checks and its build.
+These runs had no production provider credentials and used loopback content URLs.
+Rohlax's structural check is not an executable storefront journey. Live domain,
+mailbox, Stripe and deployment acceptance remain unverified. GLDF's separate
+`check:prod` was not run: it includes an external database rate-limit mutation.
+
+The strict release-check change is pushed as `cab66b0d` in draft PR #191. Its
+pre-push TypeScript check passed from an isolated checkout, and the hosted build
+and secrets checks passed for that exact revision. The concurrent product
+completion changes are not part of that hosted result. No merge or deployment
+was performed.
+
+A follow-up, pushed as `59d29399`, fixes isolated-checkout selection for the command-line gate.
+`CUSTOM_REPO_CHECKOUTS_ROOT` selects tenant-named folders without falling back to
+ordinary client checkouts. Its selection regression failed before the change;
+20 focused release/manifest/contract tests and TypeScript checking passed after
+it. The CLI passed all 58 checks against the exact isolated GLDF and Rohlax
+revisions. The only generated client change, Rohlax's Next route-type import,
+was restored inside that temporary checkout before this strict check.
+Hosted build and secrets checks also passed for `59d29399`.
+
+### Agency client coverage checkpoint
+
+The agency queue now pages through all clients named by active work delegations,
+with at most eight workspace reads per page. Each read uses the existing access
+check and filters to the exact shared work. Other pages are explicitly outside
+the current check; an unavailable client stays visible. Previous/next controls
+reuse the shared Button primitive.
+
+The later-page behavior test failed against the first-eight implementation and
+passed after adding bounded offsets. The browser journey then failed because
+page controls were absent and passed after composition. Eight focused unit
+cases and desktop (1440px) / phone (390px) journeys passed, including keyboard
+activation, later-page failure, and return to the first page. Rendered states
+were inspected. This proves local pagination, not hosted portfolio operation.
+
+### Billing display checkpoint
+
+A failed payer-history read previously displayed both an error and a claim that
+no successor payer existed. It now shows the failure with a retry control and
+withholds that claim and the proposal form until history is known. An empty
+allowance response now states that no allowance is recorded, without presenting
+a free plan. Both browser regressions were observed failing before their fixes
+and passed afterward. A separate business-switch journey confirms that the old
+payer disappears while the new business's history is pending; that journey
+already worked and required no additional implementation.
+
+This closes those display defects only. Subscription entitlements, trusted
+provider-cost reconciliation and selected paid terms remain separate from this
+display proof. On the current candidate at `http://localhost:3214`, the direct
+customer allowance view rendered at both 390px and 1440px without horizontal
+overflow. The compact state says “Billing details are not available yet.” and
+contains no dollar amount, free-plan claim or plan amount. Current captures are
+`/tmp/strelva-billing-allowance-current-mobile.png`,
+`/tmp/strelva-billing-allowance-current-desktop.png`, and the full workspace
+renders at `/tmp/strelva-billing-workspace-current-mobile.png` and
+`/tmp/strelva-billing-workspace-current-desktop.png`. The text and copy check is
+`/tmp/strelva-billing-current-capture.log` and
+`/tmp/strelva-billing-copy-check.log`.
+
+The three billing browser cases in the existing workspace-release spec passed
+against that candidate: unavailable payer history keeps the retry state,
+empty allowance records explain billing status without implying access, and a
+business switch clears the previous payer while the next history loads. The
+exact output is `/tmp/strelva-billing-workspace-release-current.log`. The
+broader preview spec reached the allowance assertions but failed later on its
+unrelated Explore-offerings heading, so it is not counted as billing evidence.
+
+### Subscription lifecycle checkpoint
+
+Configured subscription allowances now read current Stripe item-level billing
+periods as well as older payloads. Differing item periods remain unresolved
+rather than selecting a period arbitrarily. Expanded checkout, subscription
+updates, cancellation, invoice parent subscription identity and the trialing
+invoice case are covered. Trial-to-active changes preserve the same allowance;
+past-due recovery reopens that period without replenishing used units or
+discarding cap acceptance. Missing configuration remains unavailable and does
+not infer grants, a cap or a price.
+
+Trusted receipts bind the gateway request to the exact admitted execution,
+reject a mismatched execution, settle once, and return the existing result on
+replay. The focused billing suite passed 17 files and 136 tests; its exact log
+is `/tmp/strelva-billing-focused-current.log`.
+
+The isolated billing fixture proves the decimal and retry boundaries. Two
+provider-reported `$0.006` receipts retain the exact amount, settle one whole
+cent and retain `0.2` cents. Replaying the second receipt adds no receipt and
+does not advance the remainder. A following one-cent admission is rejected
+against the two-cent cap because the retained fraction counts. A job without
+an allowance retains the same exact evidence and aggregate remainder. Two
+`strelva_retry` receipts use a separate accumulator, settle one Strelva cost
+cent with `0.2` retained, and leave customer `used_cents` and reservations at
+zero. Active recovery after `past_due` reuses the original allowance with its
+accepted cap, grants and consumption count intact. The SQL fixture is
+`tests/work-economics-billing-schema.sql`; the repository run is
+`/tmp/strelva-calendar-802-workspace-sql.log`.
+
+Migrations `20260920080000`, `20260920080100` and `20260920080200` were applied
+only to the synthetic local database. Their SHA-256 values are retained in
+`/tmp/strelva-completion-local-migration-shas.json`; the precise-receipt
+migration is `c9847b9f6abb84961228d4b0a3cec21bf7e21afa291700d6560f17cdea753bcf`.
+Prices, included quantities and customer-facing cap values still require
+commercial selection; the cap values above are synthetic fixture terms. This
+proves local parsing, exact receipt accounting and lifecycle recovery, not live
+subscription provisioning, collection or production billing.
+
+### Native app completion checkpoint
+
+APP-02, APP-03 and APP-04 are implemented locally. Recipient grants explicitly
+choose no editing, own records or all visible records. Corrections retain record
+revisions, append-only history and idempotency receipts. Conflicting edits preserve
+the draft and require a fresh revision; revoked and foreign access are rejected.
+Date-only fields validate real calendar dates and remain YYYY-MM-DD values through
+publication, recipient use, release changes and rollback.
+
+The app agent reports 15 focused Vitest cases, 5 browser UI cases and 2 real local
+Auth/Postgres cases passing. Root's isolated SQL aggregate includes the new edit
+fixture and both application migrations. Migration hashes match the versions
+applied to local Supabase. No provider or production operation was performed.
+The same Luna agent proceeds to Bookings with Jacob's selected order: Outlook,
+then Google Calendar.
+
+Independent review found that a recipient allowed to read shared records but
+edit only their own still saw Edit on other people's records. The projection now
+exposes edit revisions only for records within the edit grant. The focused
+regression failed before the fix and passed afterward; six focused tests and
+desktop/phone keyboard journeys passed. Shared records remain readable. Both
+rendered states were inspected, and scoped authorization still rejects direct
+attempts to edit another person's record.
+
+Two further correction regressions failed before repair: cancelling an edit
+reused the old record ID for a new submission, and forms with read-only list
+fields submitted those fields outside their write scope. The renderer now starts
+a new identity after cancellation and submits only form fields. An isolated SQL
+regression also demonstrated that corrections erased values outside the form.
+Additive migration `20260920010200` preserves those values, still permits clearing
+optional form fields, and records the complete corrected values in history.
+Out-of-form writes remain denied. The expanded SQL gate, 12 focused tests, all
+9 recipient UI checks and both real local Auth journeys pass. The new migration
+was applied only to synthetic local Supabase; the earlier migration stayed
+unchanged.
+
+### Intake, Checks and website history checkpoint
+
+The intake agent reports 9 focused files / 87 tests, the one-URL website UI
+journey, and the joined real local Auth/Postgres/Redis follow-up journey passing.
+External sends and public-page responses use explicit local provider fixtures.
+Public website checks establish a baseline, compare subsequent server-visible
+page evidence, and retain unavailable/recovery outcomes. Empty server-visible
+text does not become an unchanged result.
+
+The parent also exercised the real read-only adapter against `https://example.com`
+on September 20. It returned available server-visible text (125 characters) and
+a content fingerprint with paid diagnostic keys absent. That proves one public
+network read; change detection, scheduling and recovery retain their separate
+controlled-test evidence.
+
+Independent website-history review replaced empty fallbacks with explicit
+unavailable states, including strict optional reads in the existing event and
+scan stores. Legacy callers retain their existing read behavior. The new
+request reference uses nullable `content_versions.request_id`, rather than a
+synthetic content-field change. The mapper regression failed before this repair
+and passed after it; real content fields named `_request_id` remain content.
+Thirty-six focused tests and the ordered full-history migration rehearsal pass.
+The new column was applied only to synthetic local Supabase. A real local Auth
+owner journey verifies unavailable history and keyboard reload at desktop and
+phone sizes, preserving the selected request in the URL. No scan or provider
+write is triggered by opening history.
+
+### Integration checkpoint in progress
+
+The custom-application owner reports a passing real local Auth/Postgres journey:
+create an authorized draft, build in restricted Docker, review the exact artifact,
+release to a named recipient, use its interaction at desktop and phone sizes,
+build/release a second version, retain the recipient's pinned first-version grant,
+and roll back. Eleven focused Vitest tests and the isolated SQL lifecycle fixture
+pass. The separate construction check exercises a working shift-hours calculator,
+keyboard use, bounded output and restricted build access.
+
+This is an operator-authored frontend artifact lifecycle. It does not establish
+arbitrary backend generation, durable records entered inside an artifact, or a
+commercial Custom Software offering. The browser proof covers blocked outgoing
+links, fetches and external scripts. The standalone recipient parent adds a
+scoped `frame-src 'none'` policy that blocks direct `location.href` and
+meta-refresh navigation before a local target receives a request; Chromium does
+not enforce the artifact's `navigate-to` directive by itself. The management
+preview lives inside the shared SPA workspace, so it does not add a persistent
+document policy that would survive a view change and affect unrelated iframes;
+direct self-navigation there remains an operator-reviewed limitation. The
+release remains an operator-reviewed frontend artifact boundary, not a general
+sandbox platform. Economics integration continues with the same agent after
+the bounded review follow-up.
+
+Onboarding now opens through the common workspace route and native discovery,
+with saved-work naming and a return callback. The neutral module sits inside the
+existing navigation and main landmark. A browser regression first failed because
+the route opened the assessment surface; the joined shell check now passes.
+The onboarding owner subsequently completed the local Auth and document
+lifecycle, including original-file downloads with byte/hash verification and
+private response headers. Existing general documents can be attached at an exact
+revision; later edits require reattachment and review. The owner reports 11
+focused tests and an ordinary-customer local Auth/Postgres phone journey passing,
+including outsider denial. Unsupported extraction remains explicit; no OCR or
+external extraction provider is claimed.
+
+Saved custom applications now select their native review surface in the shared
+workspace instead of falling through to a generic result. The route regression
+failed before integration and passed at 1440px and 390px afterward. Both renders
+were inspected; the unavailable response remains visible inside one main
+landmark. Keyboard retry at both sizes issues a fresh read without falsely
+continuing the loading state. The authenticated release journey also keeps
+local interaction working while direct `location.href` and meta-refresh
+attempts receive no loopback request under the parent policy. This does not
+advertise raw-source authoring as a finished customer offering.
+
+The ordered full-history database upgrade rehearsal passed with all six
+September 20 migrations. The isolated workspace gate also passed recipient edit
+and onboarding behavior fixtures. Adding the custom-application lifecycle fixture
+then exposed a mismatch with the existing budget creation contract. The additive
+economics migration resolves
+that mismatch, and the expanded aggregate now passes the custom lifecycle,
+recipient edit and onboarding fixtures. The original six migrations and three
+subsequent attachment, agency-access and economics migrations were applied to
+the synthetic local Supabase stack, with their file hashes retained for
+comparison. No hosted migration was performed. Calendar migration installation
+also passes in the isolated aggregate; its connected behavior remains in progress.
+
+An isolated checkout of marketing commit
+`89eb9ee428f772519b1af9d2dae284e8cdc41b76` passed lint, TypeScript and production
+build. Its complete browser suite produced **61 passing and 20 failing checks**.
+Those failures referenced superseded homepage artwork, tabs or development
+studies. The marketing owner reconciled the assertions with the selected spacious
+homepage and reports all 76 production browser checks passing, plus the three
+unchanged development-study checks in a separate suite. The parent inspected
+the complete test diff and desktop/phone renders. Account continuation in this
+marketing suite still uses a mocked app response; real Auth continuity is a
+separate active lane. The canonical marketing checkout and its untracked
+workspace configuration were preserved.
+The test reconciliation is committed as `9f96440` and pushed to draft marketing
+PR #10. The canonical marketing branch was fast-forwarded without changing its
+untracked workspace configuration. No hosted checks are reported for that
+marketing branch; its passing evidence is local.
+
+A fresh local Auth/Postgres website-assignment browser journey passed after the
+shared workspace changes. It covers business/site identity, owner and admin
+assignment, member and foreign-business denial, Settings links, and exact retry
+without duplicate bindings. This verifies assignment continuity only, not a
+governed website edit, domain handoff, or live customer submission.
+
 ## September 19 product remediation assignments
 
 Jacob requested implementation orchestration with the explicitly invoked
@@ -91,28 +489,28 @@ it already.
 | Task | Customer behavior and first proof | Implementation owner / dependency |
 | --- | --- | --- |
 | APP-01 | Publish a choice field, submit a valid option, reject an invalid option, and preserve records through updates and rollback. | Local implementation, SQL and real local Auth/Postgres owner-to-recipient lifecycle passed; projection compatibility regression passes. |
-| APP-02 | Edit an existing submitted record under an explicit grant; reject a stale revision and preserve correction history. | Apps follow-up, queued after APP-01; define own-record versus shared-record scope in the grant. |
-| APP-03 | Store and reopen a date-only field without timezone conversion. | Apps follow-up, queued; date-time and booking actions remain separate. |
-| APP-04 | Reopen the same published app from Home and connected work after publication and rollback. | Navigation and app integration proof; preserve existing authenticated journey. |
-| INT-01 | Set up the existing inquiry workspace through its offering while retaining the production release gate. | Intake follow-up, queued after discovery; reuse inquiry and offering stores. |
-| INT-02 | Complete intake, assignment, reviewed response, follow-up and failed delivery recovery in one local journey. | Intake follow-up, queued after INT-01; no second inquiry engine. |
+| APP-02 | Edit an existing submitted record under an explicit grant; reject a stale revision and preserve correction history. | Locally implemented September 20: explicit none/own/all edit grants, record revisions/history, idempotent correction receipts and stale-draft recovery; SQL, browser and real local Auth proof pass. |
+| APP-03 | Store and reopen a date-only field without timezone conversion. | Locally implemented September 20: calendar-valid YYYY-MM-DD values across owner/recipient/SQL and release paths. Date-time and booking actions remain separate. |
+| APP-04 | Reopen the same published app from Home and connected work after publication and rollback. | Local authenticated reopen, release and rollback proof passes with existing records retained; hosted activation remains open. |
+| INT-01 | Set up the existing inquiry workspace through its offering while retaining the production release gate. | Installation now binds the customer business to the existing inquiry workspace behind the release gate. Focused and local Auth proof pass; no new inquiry engine. |
+| INT-02 | Complete intake, assignment, reviewed response, follow-up and failed delivery recovery in one local journey. | Joined local Auth/Postgres/Redis proof passes due follow-up, reply recheck, attempt limit, handled suppression, read-back failure, recovery, replay without duplicate sends, undo and reload. Provider transport is simulated. |
 | INT-03 | Verify actual authorized outbound delivery and recipient response. | Intake external proof after INT-02; requires named recipient and provider authority. |
 | BOOK-01 | Exercise scheduling create/read/reserve/cancel through `/api/bounded-work`. | Service, browser-fixture and real local Auth/Postgres API lifecycle proofs passed. |
 | BOOK-02 | Reschedule a local reservation, reject a conflict, and make retries preserve one reservation identity. | Local rescheduling, retries and conflicts passed focused tests and the real local Auth/Postgres API journey. |
-| BOOK-03 | Connect calendar availability, confirmation, reschedule, cancellation and reminders to one actual provider. | Scheduling integration after BOOK-02; provider/account selection and authorized live proof remain open. |
-| ONB-01 | Track customer, employee or supplier requirements with missing, supplied, correction and accepted states. | Onboarding follow-up, queued; reuse native records and assignments, separate from site provisioning. |
-| ONB-02 | Attach an existing document revision to a requirement; preserve what was reviewed when the document changes. | Onboarding follow-up after ONB-01. |
-| ONB-03 | Upload a synthetic file, reopen it through the authorized workspace, and preserve its requirement provenance. | Onboarding follow-up after ONB-02; verify the actual private-storage boundary before implementation. |
-| ONB-04 | Extract proposed information from a document, let a person correct it, and recheck requirements. | Onboarding integration after ONB-03; extraction provider and live communication proof remain separate. |
-| CHECK-01 | Reopen a scheduled saved-source comparison with source versions, changes, no-change and unavailable states. | Checks follow-up, queued; reuse investigations and standing execution. |
-| CHECK-02 | Read one defined external source with freshness, failure and recovery evidence. | Checks integration after CHECK-01; source selection precedes adapter code. |
-| WEB-01 | Preserve site/request identity through request, proposal, review, result and history. | Website follow-up after R6; use existing website governance and delivery paths. |
-| WEB-02 | Reopen the dated canonical site check and history without implying a new scan. | Website follow-up; reuse `scan.ts` and `scan-store.ts`. |
+| BOOK-03 | Connect calendar availability, confirmation, reschedule, cancellation and reminders to one actual provider. | Outlook-first adapter, connection refresh, availability, confirmation, reschedule, cancellation and recovery are locally verified through fixture transport and real local Auth/Postgres; Google follows the same contract. No live OAuth, provider write, reminder or production proof is claimed. |
+| ONB-01 | Track customer, employee or supplier requirements with missing, supplied, correction and accepted states. | Local lifecycle, revision/history and reviewer controls implemented; focused tests, SQL, and authenticated supplier and ordinary-customer phone journeys pass. |
+| ONB-02 | Attach an existing document revision to a requirement; preserve what was reviewed when the document changes. | Exact uploaded and general-document revisions can be attached. Later general-document changes require reattachment and review; immutable uploads remain protected. Focused and local Auth proof pass. |
+| ONB-03 | Upload a synthetic file, reopen it through the authorized workspace, and preserve its requirement provenance. | Private uploads up to 2 MB retain original bytes and provenance. Authorized original downloads verify their bytes/hash; unparsed formats can be reopened. Local Auth and outsider-denial proof pass. |
+| ONB-04 | Extract proposed information from a document, let a person correct it, and recheck requirements. | Local text/CSV/JSON parsing, manual correction and reviewed acceptance implemented. Other formats explicitly report unavailable extraction; paid OCR and live communication remain unverified. |
+| CHECK-01 | Reopen a scheduled saved-source comparison with source versions, changes, no-change and unavailable states. | Durable missing, inaccessible and changed-source outcomes preserve prior evidence and support retry. Local investigation and standing-execution recovery tests pass. |
+| CHECK-02 | Read one defined external source with freshness, failure and recovery evidence. | One URL is monitored over time through the existing audit reader and scheduled investigation engine. Local proof covers baseline, unchanged, price changes without score changes, unavailable/recovery and limited server-visible text. No rendered-browser page coverage is claimed. |
+| WEB-01 | Preserve site/request identity through request, proposal, review, result and history. | Governed event references flow into published versions; request history retains proposal, decision and outcome stages. Root repaired provenance storage and unavailable states; provider writes remain unverified. |
+| WEB-02 | Reopen the dated canonical site check and history without implying a new scan. | Dated canonical history reopens through the existing store without triggering another scan. Strict reads expose unavailable storage; real local Auth desktop/phone retry proof passes. Hosted scans remain separate. |
 | WEB-03 | Prove new-customer setup, domains and client-repository continuity. | Website external proof after WEB-01; requires a selected customer/site and deployment authority. |
 | BILL-01 | Display only known payer, allowance and billing-mode facts, including unavailable values. | Commercial follow-up, queued; reuse existing authorities and Settings rather than another billing store. |
 | BILL-02 | Apply a selected subscription entitlement once, preserve existing jobs' payer, and handle out-of-order events. | Commercial integration; exact entitlement terms must be selected before expected amounts can be tested. |
 | BILL-03 | Reconcile a provider receipt to the exact work once; retain unknown costs as unresolved. | Commercial integration; extend existing evidence handling after a real receipt contract is available. |
-| BILL-04 | Prove one-off payments, existing subscriptions and grandfathered agreements remain distinct. | Commercial regression proof; no code change if existing tests already establish the behavior. |
+| BILL-04 | Prove one-off payments, existing subscriptions and grandfathered agreements remain distinct. | Existing billing-mode guard and related tests cover these distinctions. Preserve this regression at the release revision; do not treat it as missing billing implementation. |
 
 The source survey is retained in
 [`output/product-remediation/offer-module-tasks.md`](../output/product-remediation/offer-module-tasks.md)
@@ -157,7 +555,7 @@ proof does not cover it.
 | Installed offerings | Customer-workspace installation record, native resource references, configuration, retirement and server-authored entrances; default staff-request draft creation and dual-owner website binding pass isolated SQL checks, including rename, revocation and tenant deletion; route-shaped browser setup and lost-response retry pass; direct website assignment now passes an isolated local Auth/Postgres browser journey | Coordinated native configuration and provider acceptance remain open |
 | Context | Shared bounded preparation for selected planning sources and granted work context; likely-secret redaction is defense in depth | Live connectors, automatic source selection with explicit use authority, and general business knowledge |
 | Assignments | Explicit accepted assignments to run approved finite work using current identity and native permissions; independent review, isolated SQL, command tests and three route-shaped desktop/mobile browser tests pass, including expiry before effect, exact-claim recovery and retry cases | Real local Auth/Postgres browser execution; outside-guest least-privilege native writes, paid delegated work, provider service commitments |
-| Allowances | Configured period/unit allowances, payer cap acceptance, operator-awarded contribution credits and trusted execution accounting; isolated SQL, runtime retry tests and independent review pass | Actual subscription synchronization, customer prices and royalties; unconfirmed receipt failures require explicit reconciliation |
+| Allowances | Configured period/unit allowances, payer cap acceptance, operator-awarded contribution credits, explicit subscription entitlement projection and trusted provider receipt settlement; isolated SQL, runtime retry tests and focused billing tests pass | Prices and included quantities remain unset; no royalties, live Stripe charging, provider quota enforcement or production activation; provider outcomes that remain unconfirmed require explicit reconciliation, while fractional receipts retain exact evidence and aggregate their remainder |
 | Experience | Offering views, explicit website assignment, allowance summary, assignment links and accurate discovery state in the existing workspace; Home and Settings expose the same assignment command and remain useful without a website; desktop/mobile fixture journeys and the isolated local Auth/Postgres assignment journey cover permission denial, owner/admin success, native destinations and exact retry | Installation-scoped agency permissions, general branded portals and domain lifecycle |
 | External AI | Personal integration token tied to its verified issuer, exact work and native read/propose grant; token lifecycle, bounded HTTP requests, bearer-route authentication and aggregate isolated SQL checks pass | Host-specific connectors, independent agent identity and broader execution |
 
@@ -435,15 +833,20 @@ customer form shape before any production claim.
 
 The work-economics boundary requires a payer-authorized maximum before
 admission. Atomic reservations prevent concurrent or duplicate execution from
-exceeding that admission or charging twice. Trusted native receipt evidence can
-reconcile a known zero-cost operation exactly once; unknown provider cost keeps
-the authorized hold instead of becoming a fabricated zero. Accepted actions
-with an interrupted settlement retain recoverable receipts and cannot replay
-the provider action, while unauthorized and cross-workspace reconciliation are
-rejected. Current native operations supply the concrete zero-cost evidence.
-Provider model billing still lacks a verified usage adapter and pricing
-contract, so paid model cost reconciliation, provider quota enforcement,
-refund policy, Stripe charging and payer transitions are not claimed.
+exceeding that admission or charging twice. Trusted provider receipts bind a
+gateway request id and exact provider amount to the admitted execution once;
+fractional cents retain exact evidence while aggregate whole-cent settlement
+keeps the remainder, and Strelva-caused retries use a separate accumulator
+without customer spend. Unknown provider cost keeps the authorized hold
+instead of becoming a fabricated zero. Accepted actions with an interrupted
+settlement retain recoverable receipts and cannot replay the provider action,
+while unauthorized and cross-workspace reconciliation are rejected. Current
+native operations supply the concrete zero-cost evidence. The selected paid
+model is subscription included usage through explicit server-configured
+allowance terms, with prices and included quantities still unset; provider
+dollars are not passed through to customers.
+The local Stripe projection and gateway receipt adapter do not claim provider
+quota enforcement, refunds, live charging, or production billing activation.
 
 ## September 18 provider-delivery acceptance and security evidence
 
@@ -757,3 +1160,98 @@ These checks prove the named local behavior. They do not establish hosted CI
 success for the new revision, production schema readiness, a released horizontal
 offering, human acceptance, or general provider delivery. The draft PR and
 production deployment hold remain in place.
+
+## September 20 agency authoring completion proof
+
+The request-to-delivery path now reaches an actual bounded agency work outcome
+for one installed native application. The [authenticated local journey](../tests/agency-application-authoring-authenticated-local.spec.ts)
+uses real loopback Supabase Auth and Postgres identities for the customer owner,
+the named agency operator and an outsider. The customer saves and accepts the
+request, selects the exact accepted scope and native application resource,
+names the operator, and creates the existing provider-delivery assignment. The
+operator accepts the assignment and completes the native execution receipt.
+
+Before the customer grant, the operator can inspect and rehearse the exact
+application but cannot save a draft. The customer then grants draft-edit
+authority for that application and operator only. At 390 by 844 CSS pixels the
+operator changes a field label, submits with keyboard focus and Enter, and the
+candidate revision and history are recorded. A stale expected revision is
+rejected. At 1280 by 900 the customer reviews the exact diff and publishes
+Version 2; the operator has no publish control. The customer confirms the
+completed delivery, which links the delivery history to the request. An
+outsider is denied, and revoking the grant denies the operator's next API write
+and removes the save action after reload.
+
+The final run passed one Playwright test in 9.8 seconds. Its log is
+`/tmp/strelva-agency-authoring-final.log`. The inspected desktop and phone
+captures are under
+`/tmp/strelva-agency-authoring-final/agency-application-authori-ee244-it-for-customer-publication-desktop/`.
+The focused delivery and application tests passed 7 files / 39 tests, and
+`pnpm typecheck` passed. The isolated SQL fixture
+`tests/agency-application-authoring-schema.sql` passed with the additive
+authority fix; the run is recorded in `/tmp/strelva-agency-authoring-sql-check-30201.log`.
+
+The authority contract is implemented by
+[`20260920030200_agency_application_draft_authority.sql`](../supabase/migrations/20260920030200_agency_application_draft_authority.sql)
+and its alias correction
+[`20260920030201_agency_application_draft_authority_fix.sql`](../supabase/migrations/20260920030201_agency_application_draft_authority_fix.sql).
+Their frozen SHA-256 values are `af89e348f6b0b109f64576afd4075a54d1eef7694b4dbb7d980cc14ed140f26a`
+and `64aa72cae8bfbf1e5d52e1d83800553d0d4c2e9649985d747cc8f5f34898359a`.
+The migrations were applied only to local Supabase; no production or external
+agency system was contacted.
+
+This proves one customer-approved agency operator can build and return an exact
+native application draft for customer publication. The grant is revocable,
+expires with the active delivery and assignment, and does not add customer
+workspace membership or access to another resource. Local delivery remains
+zero-cost rehearsal and execution; no rate, payment, service-level promise or
+commercial commitment was selected. General agency portals, arbitrary backend
+authoring, hosted provider operation and production release remain unproved.
+
+## September 20 calendar and stopped-work completion proof
+
+The Outlook-first calendar path now runs through one owned contract for
+connection configuration, token refresh, availability, reservation sync,
+reschedule, cancellation and recovery. Outlook calendar-view paging and
+timezone normalization are covered; Google availability uses paginated event
+data when an existing event must be excluded, so a self-overlap does not hide a
+different busy event. Accepted, failed-readback and unknown outcomes retain the
+provider event identity and stable idempotency key. A failed or timed-out write
+remains recoverable evidence and is never blindly repeated.
+
+The focused calendar suite passed 6 files / 48 tests, including connection
+refresh and CAS races, route boundaries, Outlook paging/timezones, Google
+self-overlap, reservation conflict and stopped-work cleanup. The isolated
+workspace SQL and ordered-upgrade checks passed after the calendar and exit
+schema changes; the final SQL log is
+`/private/tmp/strelva-calendar-exit-final-verify.log`. The service review passed
+16 tests in `/private/tmp/strelva-calendar-exit-service-final-verify.log`.
+
+The [calendar Auth journey](../tests/calendar-exit-authenticated-local.spec.ts)
+passed one Playwright test in 2.6 seconds against local Supabase Auth/Postgres
+and a synthetic Outlook transport. It creates and confirms a reservation,
+completes the workspace exit, proves new reservation and reschedule requests
+are rejected, keeps availability/readback available, and lets the stopped owner
+cancel the accepted event. A delegated reader remains read-only. The exact run
+is recorded in `/private/tmp/strelva-calendar-exit-authenticated-3230-final.log`.
+The retained calendar layout captures are `/private/tmp/strelva-calendar-desktop.png`,
+`/private/tmp/strelva-calendar-mobile.png` and
+`/private/tmp/strelva-calendar-mobile-calendar.png`; the Auth test's temporary
+Playwright output was replaced by a later run, while its assertions remain in
+the log above.
+
+The [stopped-work Auth journey](../tests/workspace-exit-authenticated-local.spec.ts)
+passed one Playwright test in 3.0 seconds. It exercises a transient exit-read
+failure, keyboard completion, an HTTP workspace export response with a
+completed lifecycle state, reopening the same workspace, disabled New/Resume/
+Publish controls, retained records and a closed mobile menu. The exact run is
+`/private/tmp/strelva-workspace-exit-ui-proof-final-fixed3.log`; the inspected
+captures are `/tmp/strelva-workspace-exit-reopened-desktop.png`,
+`/tmp/strelva-workspace-exit-reopened-mobile.png` and
+`/tmp/strelva-workspace-exit-reopened-mobile-closed.png`.
+
+These are local authenticated proofs with a synthetic provider transport. No
+live OAuth, provider write, reminder, production migration, deployment or
+external calendar account was used. Token refresh and explicit owner cleanup
+remain available after exit; new work and rescheduling stay blocked, and
+unknown outcomes retain their recovery path.

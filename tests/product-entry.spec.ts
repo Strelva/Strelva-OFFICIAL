@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 const result = { business: "Fictional Bakery", url: "https://bakery.example", score: 70, grade: "C", verdict: "Fictional test result. No provider was queried.", signals: [{ id: "identity", label: "Business identity", pass: true, detail: "Fictional evidence.", weight: 20 }], citation: { probed: false, mentioned: false, recommended: false, note: "No live probe in this test." }, topFix: "Explain the business clearly.", measurementStatus: "partial", readinessMeasured: true };
+const workspaceReleaseEnabled = process.env.STRELVA_WORKSPACE_RELEASE === "1";
 
 test("public assessment stays in the product, preserves input on failure, and offers private continuation", async ({ page }) => {
   let failed = false;
@@ -16,7 +17,11 @@ test("public assessment stays in the product, preserves input on failure, and of
   await expect(page.getByLabel("Business name", { exact: true })).toHaveValue("Fictional Bakery");
   await page.getByRole("button", { name: "Run my AI audit" }).click();
   await expect(page.getByRole("heading", { name: "Fictional Bakery" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Save a copy/ })).toHaveAttribute("href", "/workspace?save=scan_fixture");
+  if (workspaceReleaseEnabled) {
+    await expect(page.getByRole("link", { name: /Save a copy/ })).toHaveAttribute("href", "/workspace?save=scan_fixture");
+  } else {
+    await expect(page.getByRole("link", { name: /Save a copy/ })).toHaveCount(0);
+  }
   for (const width of [320, 360, 768, 1280, 1600]) {
     await page.setViewportSize({ width, height: 900 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -30,7 +35,11 @@ test("website audit supports legacy URL input and keeps result actions in the pr
   await page.getByRole("button", { name: "Scan My Site" }).click();
   await expect(page.getByText("Your site scored 80/100.")).toBeVisible();
   await expect(page).toHaveURL(url => url.searchParams.get("report") === `audit_${"a".repeat(32)}`);
-  await expect(page.getByRole("link", { name: "Save to my work" })).toHaveAttribute("href", `/workspace?save=audit_${"a".repeat(32)}`);
+  if (workspaceReleaseEnabled) {
+    await expect(page.getByRole("link", { name: "Save to my work" })).toHaveAttribute("href", `/workspace?save=audit_${"a".repeat(32)}`);
+  } else {
+    await expect(page.getByRole("link", { name: "Save to my work" })).toHaveCount(0);
+  }
   await expect(page.getByRole("link", { name: "Check AI Visibility" })).toHaveAttribute("href", "/ai-visibility");
   await expect(page.getByRole("button", { name: "Save as PDF" })).toBeVisible();
   for (const width of [320, 360, 768, 1280, 1600]) {
@@ -45,7 +54,7 @@ test("mobile product navigation overlays the work and the form remains scrollabl
   await page.goto("/ai-visibility");
   const before = await page.getByRole("main").boundingBox();
   await page.getByRole("button", { name: "Open navigation" }).click();
-  await expect(page.getByRole("dialog", { name: "Strelva navigation", exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Strelva workspace navigation", exact: true })).toBeVisible();
   const after = await page.getByRole("main").boundingBox();
   expect(after?.width).toBe(before?.width);
   await page.keyboard.press("Escape");

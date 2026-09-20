@@ -50,14 +50,22 @@ const definitions: readonly OfferingDefinition[] = [
     name: "Customer inquiry intake",
     description: "Review customer inquiries and decide what happens next.",
     availability: "release_gated",
-    installability: "not_enabled",
-    installationNote: "Inquiry setup is not available from this page yet. Existing inquiry work remains available through its current access.",
+    installability: "available",
+    installationNote: "Connect the existing inquiry workspace for this business. The release gate still controls whether the offering can be surfaced outside the local workspace.",
     requiredResources: [{ kind: "inquiry_workspace", minimum: 1, maximum: 1, description: "An inquiry workspace verified through its tenant authority." }],
     scopes: [{ id: "handle_inquiries", label: "Handle inquiries", description: "Use the governed inquiry handling path.", required: true }],
     surfaces: [{ id: "inquiry_workspace", label: "Inquiry workspace", description: "The existing inquiry handling surface.", href: null, required: true }],
     configurationFields: [],
-    resolveSurfaces() {
-      return [{ id: "inquiry_workspace", label: "Inquiry workspace", description: "The existing inquiry handling surface.", href: null }];
+    resolveSurfaces(resources, businessId, status) {
+      const workspace = resources.find((resource) => resource.kind === "inquiry_workspace");
+      return [{
+        id: "inquiry_workspace",
+        label: "Inquiry workspace",
+        description: "The existing inquiry handling surface.",
+        href: workspace && status === "active"
+          ? `/workspace?workspaceId=${encodeURIComponent(businessId)}&view=inquiries&inquiryWorkspaceId=${encodeURIComponent(workspace.id)}`
+          : null,
+      }];
     },
   },
   {

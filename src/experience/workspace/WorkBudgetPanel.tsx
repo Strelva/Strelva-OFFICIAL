@@ -6,7 +6,7 @@ import type { JobEconomicsRecord, JobEconomicsUsage } from "@/platform/work-econ
 import type { BudgetExecution } from "@/platform/work-economics/runtime";
 
 type BudgetResponse = { executions?: BudgetExecution[]; ledger: JobEconomicsRecord | null; usage: JobEconomicsUsage[]; currentActorId: string; canManage: boolean; canAccept: boolean };
-type Props = { workspaceId: string; workId: string; productId: "tracker" | "ai_visibility" | "operations"; resourceKind: string; readOnly?: boolean; refreshKey?: string };
+type Props = { workspaceId: string; workId: string; productId: "tracker" | "ai_visibility" | "operations"; resourceKind: string; readOnly?: boolean; newWorkBlocked?: boolean; refreshKey?: string };
 const dollars = (cents: number | null) => cents === null ? "Not recorded" : new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(cents / 100);
 function cents(value: FormDataEntryValue | null): number | null {
   if (value === null || value === "") return null;
@@ -23,7 +23,7 @@ export function WorkBudgetPanel(props: Props) {
   </details>;
 }
 
-function BudgetEditor({ workspaceId, workId, productId, resourceKind, readOnly, refreshKey }: Props) {
+function BudgetEditor({ workspaceId, workId, productId, resourceKind, readOnly, newWorkBlocked, refreshKey }: Props) {
   const [data, setData] = useState<BudgetResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -37,7 +37,8 @@ function BudgetEditor({ workspaceId, workId, productId, resourceKind, readOnly, 
     return () => controller.abort();
   }, [workspaceId, workId, refreshKey]);
   async function command(body: Record<string, unknown>) {
-    if (readOnly || busy) return;
+    const recoveryAction = body.action === "cancel";
+    if (readOnly || busy || (newWorkBlocked && !recoveryAction)) return;
     setBusy(true); setError(""); setNotice("");
     try {
       const response = await fetch("/api/work-economics", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -57,10 +58,10 @@ function BudgetEditor({ workspaceId, workId, productId, resourceKind, readOnly, 
   return <div className="mt-4 space-y-4 text-sm" aria-busy={busy}>
     <p className="text-gray-muted">{automated ? "Strelva reserves the approved amount before each supported action and records its cost. This local budget does not charge your card or set limits at external providers." : "This is an internal work budget. It does not charge your card or limit external providers. Manually reported costs are separate from verified provider bills."}</p>
     {error ? <p role="alert" className="text-critical">{error}</p> : null}
-    {retry && !readOnly ? <div className="space-y-2"><p>The previous change could not be confirmed. Retry the same request before making another change.</p><Button disabled={busy} onClick={() => void command(retry)}>Retry budget change</Button></div> : null}
+    {retry && !readOnly && (!newWorkBlocked || retry.action === "cancel") ? <div className="space-y-2"><p>The previous change could not be confirmed. Retry the same request before making another change.</p><Button disabled={busy} onClick={() => void command(retry)}>Retry budget change</Button></div> : null}
     {notice ? <p role="status">{notice}</p> : null}
     {!data && !error ? <p role="status">Loading the budget…</p> : null}
-    {data && !job ? canManage ? <form className="space-y-3" onSubmit={event => {
+    {data && !job ? canManage && !newWorkBlocked ? <form className="space-y-3" onSubmit={event => {
       event.preventDefault(); const form = new FormData(event.currentTarget);
       try { void command({ action: "create", workspaceId, workId, productId, resourceKind, payerId: data.currentActorId, estimateCents: cents(form.get("estimate")), maxAuthorizedCents: cents(form.get("maximum")) }); }
       catch (cause) { setError(cause instanceof Error ? cause.message : "Check the amounts."); }
@@ -80,12 +81,12 @@ function BudgetEditor({ workspaceId, workId, productId, resourceKind, readOnly, 
         <div><dt className="text-gray-muted">Strelva retries, excluded</dt><dd>{dollars(job.strelvaRetryCents)}</dd></div>
         <div><dt className="text-gray-muted">Final cost</dt><dd>{job.actualKnown ? dollars(job.actualCents) : unresolved ? "Awaiting cost verification" : job.status === "cancelled" ? "Budget cancelled" : "Budget still open"}</dd></div>
       </dl>
-      {job.status === "draft" && data?.canAccept && !readOnly ? <Button disabled={busy || Boolean(retry)} onClick={() => void command({ action: "accept", jobId: job.id })}>Accept this budget</Button> : null}
-      {canManage && !automated && (job.status === "accepted" || job.status === "reserved") ? <form className="space-y-3" onSubmit={event => { event.preventDefault(); const form = new FormData(event.currentTarget); try { void command({ action: "reserve", jobId: job.id, amountCents: cents(form.get("reserve")), idempotencyKey: crypto.randomUUID() }); } catch (cause) { setError(cause instanceof Error ? cause.message : "Check the amount."); } }}>
+      {job.status === "draft" && data?.canAccept && !readOnly && !newWorkBlocked ? <Button disabled={busy || Boolean(retry)} onClick={() => void command({ action: "accept", jobId: job.id })}>Accept this budget</Button> : null}
+      {canManage && !newWorkBlocked && !automated && (job.status === "accepted" || job.status === "reserved") ? <form className="space-y-3" onSubmit={event => { event.preventDefault(); const form = new FormData(event.currentTarget); try { void command({ action: "reserve", jobId: job.id, amountCents: cents(form.get("reserve")), idempotencyKey: crypto.randomUUID() }); } catch (cause) { setError(cause instanceof Error ? cause.message : "Check the amount."); } }}>
         <TextInput label="Reserve for this work, USD" name="reserve" type="number" min={0} max={(job.maxAuthorizedCents - job.reservedCents) / 100} step="0.01" required />
         <Button type="submit" variant="secondary">Reserve amount</Button>
       </form> : null}
-      {canManage && !automated && (job.status === "accepted" || job.status === "reserved") ? <details><summary className="cursor-pointer">Record a cost</summary><form className="mt-3 space-y-3" onSubmit={event => {
+      {canManage && !newWorkBlocked && !automated && (job.status === "accepted" || job.status === "reserved") ? <details><summary className="cursor-pointer">Record a cost</summary><form className="mt-3 space-y-3" onSubmit={event => {
         event.preventDefault(); const form = new FormData(event.currentTarget);
         try { void command({ action: "report_usage", jobId: job.id, idempotencyKey: crypto.randomUUID(), kind: form.get("kind"), attribution: form.get("retry") ? "strelva_retry" : "normal", amountCents: cents(form.get("cost")) }); }
         catch (cause) { setError(cause instanceof Error ? cause.message : "Check the amount."); }
@@ -96,7 +97,7 @@ function BudgetEditor({ workspaceId, workId, productId, resourceKind, readOnly, 
         <label className="flex items-center gap-2"><input type="checkbox" name="retry" />Strelva caused this retry</label>
         <Button type="submit" variant="secondary">Record cost</Button>
       </form></details> : null}
-      {canManage && (job.status === "accepted" || job.status === "reserved") && !unresolved && Boolean(data?.usage.length) && data?.usage.every(item => item.known) ? <Button variant="secondary" onClick={() => void command({ action: "settle", jobId: job.id, actualCents: job.usedCents })}>Close budget at {dollars(job.usedCents)}</Button> : null}
+      {canManage && !newWorkBlocked && (job.status === "accepted" || job.status === "reserved") && !unresolved && Boolean(data?.usage.length) && data?.usage.every(item => item.known) ? <Button variant="secondary" onClick={() => void command({ action: "settle", jobId: job.id, actualCents: job.usedCents })}>Close budget at {dollars(job.usedCents)}</Button> : null}
       {canManage && job.status !== "cancelled" && job.status !== "settled" ? <Button variant="secondary" disabled={busy} onClick={() => void command({ action: "cancel", jobId: job.id })}>Cancel unused budget</Button> : null}
       {data?.executions?.length ? <section aria-label="Action costs"><h3 className="font-medium">Action costs</h3>
         <ul className="mt-2 space-y-3">{data.executions.map(item => <li key={item.executionKey} className="flex flex-wrap justify-between gap-x-4 gap-y-1 border-b border-gray-border pb-2">

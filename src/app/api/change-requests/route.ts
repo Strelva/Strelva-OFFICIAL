@@ -141,6 +141,7 @@ export async function POST(request: Request) {
           kind: "custom_code_or_design_request",
           requestKind,
           workflowStatus: "requested",
+          workflowHistory: [{ status: "requested", actor: "customer", at: requestedAt.toISOString() }],
           requestedAt: requestedAt.toISOString(),
           triageDueAt: getTriageDueAt(requestedAt),
           deliveryModel,

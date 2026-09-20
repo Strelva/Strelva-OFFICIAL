@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { getCurrentUserTenants, requireTenantAccess } from "@/lib/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import type { InquiryCapabilityDefinition, InquiryWork } from "./contracts";
+import { resolveInquiryWorkspace } from "./workspace-exit";
 import {
   getInquiryRepository,
   type InquiryRepository,
@@ -134,7 +135,12 @@ export async function discoverInquiryPortfolio(
     try {
       const config = await getTenantConfig(tenantId);
       if (!config?.active) continue;
-      const businessId = config.stableId ?? tenantId;
+      const workspace = await resolveInquiryWorkspace({
+        tenantId,
+        tenantStableId: config.stableId,
+        fallbackBusinessId: config.stableId ?? tenantId,
+      });
+      const businessId = workspace.businessId;
       const snapshot = await repository.getSnapshot(tenantId, businessId);
       if (!snapshot || snapshot.tenantId !== tenantId || snapshot.businessId !== businessId) continue;
       const businessName = safeText(config.siteName, tenantId);
@@ -161,7 +167,12 @@ export async function resolveInquiryPattern(
     if (await requireTenantAccess(tenantId)) continue;
     const config = await getTenantConfig(tenantId);
     if (!config?.active) continue;
-    const businessId = config.stableId ?? tenantId;
+    const workspace = await resolveInquiryWorkspace({
+      tenantId,
+      tenantStableId: config.stableId,
+      fallbackBusinessId: config.stableId ?? tenantId,
+    });
+    const businessId = workspace.businessId;
     const snapshot = await repository.getSnapshot(tenantId, businessId);
     if (!snapshot || snapshot.tenantId !== tenantId || snapshot.businessId !== businessId) continue;
     for (const capability of snapshot.state.capabilities) {
@@ -178,7 +189,13 @@ export async function resolveInquiryPattern(
       // turn a stale portfolio reference into source-definition access.
       if (await requireTenantAccess(tenantId)) return null;
       const freshConfig = await getTenantConfig(tenantId);
-      if (!freshConfig?.active || (freshConfig.stableId ?? tenantId) !== businessId) return null;
+      if (!freshConfig?.active) return null;
+      const freshWorkspace = await resolveInquiryWorkspace({
+        tenantId,
+        tenantStableId: freshConfig.stableId,
+        fallbackBusinessId: freshConfig.stableId ?? tenantId,
+      });
+      if (freshWorkspace.businessId !== businessId) return null;
       const fresh = await repository.getSnapshot(tenantId, businessId);
       const live = fresh?.state.capabilities.find((item) => item.id === capability.id);
       if (
@@ -213,7 +230,13 @@ export async function resolveInquiryPatternVersion(
   for (const tenantId of tenantIds) {
     if (await requireTenantAccess(tenantId)) continue;
     const config = await getTenantConfig(tenantId);
-    if (!config?.active || (config.stableId ?? tenantId) !== sourceBusinessId) continue;
+    if (!config?.active) continue;
+    const workspace = await resolveInquiryWorkspace({
+      tenantId,
+      tenantStableId: config.stableId,
+      fallbackBusinessId: config.stableId ?? tenantId,
+    });
+    if (workspace.businessId !== sourceBusinessId) continue;
     const snapshot = await repository.getSnapshot(tenantId, sourceBusinessId);
     const live = snapshot?.state.capabilities.find((item) => item.id === sourceCapabilityId);
     if (!snapshot || snapshot.tenantId !== tenantId || snapshot.businessId !== sourceBusinessId || live?.status !== "live" || !live.live || live.live.businessId !== sourceBusinessId || live.live.id !== sourceCapabilityId) continue;
@@ -222,7 +245,13 @@ export async function resolveInquiryPatternVersion(
     // command, which leaves the target pin unchanged.
     if (await requireTenantAccess(tenantId)) return null;
     const freshConfig = await getTenantConfig(tenantId);
-    if (!freshConfig?.active || (freshConfig.stableId ?? tenantId) !== sourceBusinessId) return null;
+    if (!freshConfig?.active) return null;
+    const freshWorkspace = await resolveInquiryWorkspace({
+      tenantId,
+      tenantStableId: freshConfig.stableId,
+      fallbackBusinessId: freshConfig.stableId ?? tenantId,
+    });
+    if (freshWorkspace.businessId !== sourceBusinessId) return null;
     const fresh = await repository.getSnapshot(tenantId, sourceBusinessId);
     const current = fresh?.state.capabilities.find((item) => item.id === sourceCapabilityId);
     if (!fresh || fresh.tenantId !== tenantId || fresh.businessId !== sourceBusinessId || current?.status !== "live" || !current.live || current.live.businessId !== sourceBusinessId || current.live.id !== sourceCapabilityId) return null;

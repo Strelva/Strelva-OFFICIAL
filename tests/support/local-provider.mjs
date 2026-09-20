@@ -24,7 +24,14 @@ globalThis.fetch = async (input, init) => {
     appendFileSync(logPath, `${JSON.stringify({ ...body, id, idempotencyKey, created_at: new Date().toISOString() })}\n`, { mode: 0o600 });
     return reply({ id });
   }
-  if (request.method === "GET" && url.pathname === "/emails/receiving") return reply({ object: "list", has_more: false, data: [] });
+  if (request.method === "GET" && url.pathname === "/emails/receiving") {
+    const readbackFailurePath = process.env.STRELVA_LOCAL_PROVIDER_READBACK_FAILURE_FILE;
+    if (readbackFailurePath && existsSync(readbackFailurePath)) {
+      unlinkSync(readbackFailurePath);
+      return reply({ name: "fixture_readback_unavailable", message: "The local provider intentionally lost one receiving read-back." }, 503);
+    }
+    return reply({ object: "list", has_more: false, data: [] });
+  }
   if (request.method === "GET" && /^\/emails\/[^/]+$/.test(url.pathname)) {
     const readbackFailurePath = process.env.STRELVA_LOCAL_PROVIDER_READBACK_FAILURE_FILE;
     if (readbackFailurePath && existsSync(readbackFailurePath)) {

@@ -96,6 +96,8 @@ export interface InquiryMessageReviewDependencies {
   resolveAction?: ResolveApprovalAction;
   emailReady?: (tenantId: string) => Promise<boolean>;
   allowExternalSends?: boolean;
+  /** Test/host seam for the durable workspace exit authority. */
+  isWorkspaceExited?: (tenantId: string) => Promise<boolean>;
 }
 
 interface ReviewContext {
@@ -789,6 +791,7 @@ export async function executeInquiryMessageReview(
     now: () => now,
     resolveRoute: deps.resolveRoute,
     allowExternalSends: deps.allowExternalSends,
+    isWorkspaceExited: deps.isWorkspaceExited,
     getPolicy: async () => {
       try {
         latestContext = await buildContext({

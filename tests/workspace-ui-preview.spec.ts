@@ -166,15 +166,19 @@ test("direct customer can inspect an offering setup and its local allowance", as
   await expect(page.getByRole("heading", { name: "Business offerings" })).toBeVisible();
   const allowance = page.getByRole("region", { name: "Work allowance" });
   await expect(allowance).toContainText("Cap needs your acceptance");
-  await expect(allowance).toContainText("not synchronized to subscription billing");
+  await expect(allowance).toContainText("Billing details are not available yet.");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(allowance).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.setViewportSize({ width: 1440, height: 1000 });
   if (process.env.STRELVA_CAPTURE_PRODUCT_EXPERIENCE === "1") {
     await page.screenshot({ path: "output/product-experience/business-home-desktop.png", fullPage: true });
     await allowance.screenshot({ path: "output/product-experience/work-allowance-desktop.png" });
   }
 
   await page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("button", { name: "Explore offerings", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "What this business can use." })).toBeVisible();
-  await expect(page.getByText("Availability does not grant access or promise a provider.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Useful outcomes for this business." })).toBeVisible();
+  await expect(page.getByText("Start work that is available here, or request setup when it needs a connected service or release decision.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Website assignments" })).toBeVisible();
   if (process.env.STRELVA_CAPTURE_PRODUCT_EXPERIENCE === "1") {
     await page.screenshot({ path: "output/product-experience/offering-directory-desktop.png", fullPage: true });
@@ -182,12 +186,14 @@ test("direct customer can inspect an offering setup and its local allowance", as
 
   await page.getByRole("button", { name: "Assign to this business" }).click();
   await expect(page.getByText("Assigned to this business · You can open it")).toBeVisible();
-  await page.getByRole("button", { name: /Managed website changes/ }).click();
+  const managedWebsiteChanges = page.locator('[class*="discoveryRow"]').filter({ hasText: "Managed website changes" }).first();
+  await managedWebsiteChanges.getByRole("button", { name: "Start setup", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Install Managed website changes" })).toBeVisible();
   await expect(page.locator("form").getByRole("combobox")).toHaveValue("99999999-9999-4999-8999-999999999999");
   await page.getByRole("button", { name: "Back to offerings" }).click();
 
-  await page.getByRole("button", { name: /Staff request application/ }).click();
+  const staffRequestOffering = page.locator('[class*="discoveryRow"]').filter({ hasText: "Staff request application" }).first();
+  await staffRequestOffering.getByRole("button", { name: "Start setup", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Install Staff request application" })).toBeVisible();
   await expect(page.getByText("Create the standard staff request application")).toBeVisible();
   if (process.env.STRELVA_CAPTURE_PRODUCT_EXPERIENCE === "1") {
@@ -281,7 +287,8 @@ test("direct customer can inspect an offering setup and its local allowance", as
   await expect(page.getByRole("heading", { name: "Staff requests", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Back to work" }).click();
   await navigation.getByRole("button", { name: "Explore offerings", exact: true }).click();
-  await page.getByRole("button", { name: /Staff request application/ }).click();
+  const installedStaffRequestOffering = page.locator('[class*="discoveryRow"]').filter({ hasText: "Staff request application" }).first();
+  await installedStaffRequestOffering.getByRole("button", { name: "Open", exact: true }).click();
   const connected = page.getByRole("region", { name: "Connected work", exact: true });
   await expect(connected).toContainText("Staff requests");
   await expect(connected).not.toContainText("88888888-8888-4888-8888-888888888888");

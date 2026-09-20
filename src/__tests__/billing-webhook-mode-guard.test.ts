@@ -57,9 +57,11 @@ vi.mock("@/lib/monitoring", () => ({
 
 const mockSendNewSignupEmail = vi.fn();
 const mockSendPaymentFailedEmail = vi.fn();
+const mockSendPaymentPastDueEmail = vi.fn();
 vi.mock("@/lib/delivery-email", () => ({
   sendNewSignupEmail: (...args: unknown[]) => mockSendNewSignupEmail(...args),
   sendPaymentFailedEmail: (...args: unknown[]) => mockSendPaymentFailedEmail(...args),
+  sendPaymentPastDueEmail: (...args: unknown[]) => mockSendPaymentPastDueEmail(...args),
 }));
 
 vi.mock("stripe", () => {
@@ -87,6 +89,7 @@ beforeEach(() => {
   mockRedisSet.mockResolvedValue("OK");
   mockSendNewSignupEmail.mockResolvedValue(true);
   mockSendPaymentFailedEmail.mockResolvedValue(true);
+  mockSendPaymentPastDueEmail.mockResolvedValue(true);
   // Default: non-production (idempotency short-circuits to "claimed" without Redis).
   mockIsProductionEnv.mockReturnValue(false);
   // Default: no Redis (matches non-prod idempotency short-circuit).
@@ -573,6 +576,15 @@ describe("billing webhook checkout.session.completed mode guard", () => {
         businessName: "Acme Co",
         ownerEmail: "owner@acme.com",
         tenantUrl: "https://admin.strelva.com/admin/clients/acme",
+      }),
+    );
+    expect(mockSendPaymentPastDueEmail).toHaveBeenCalledTimes(1);
+    expect(mockSendPaymentPastDueEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        email: "owner@acme.com",
+        businessName: "Acme Co",
+        dashboardUrl: "https://admin.strelva.com/admin/clients/acme",
+        tenantId: "acme",
       }),
     );
   });

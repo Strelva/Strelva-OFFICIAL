@@ -3,6 +3,10 @@ import { scheduleSchema, scheduleCommandSchema, reservationSchema, createSchedul
 export { scheduleSchema, scheduleCommandSchema } from "./contracts";
 import { WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { advance, boundedStore, initial, readBounded, type BoundedStore } from "@/platform/bounded-work/repository";
+import { createCalendarSchedulingService } from "./calendar/service";
+import { readWorkspaceExitCompleted } from "./calendar/service";
+import { createCalendarAdapter } from "./calendar/adapters";
+import { createFixtureCalendarAdapter } from "./calendar/fixture";
 type Reservation = z.infer<typeof reservationSchema>;
 export interface SchedulingProvider {
   /** Must use the provider's idempotency mechanism with the supplied stable key. */
@@ -12,7 +16,11 @@ export interface SchedulingProvider {
   /** Supplied by the governed provider integration, never by browser input. */
   authorize(actor: WorkspaceActor, workspaceId: string, workId: string, reservation: Reservation): Promise<void>;
 }
-export function createSchedulingService(store: BoundedStore = boundedStore) {
+export interface SchedulingServiceDeps {
+  workspaceExitCompleted?: (workspaceId: string) => Promise<boolean>;
+}
+export function createSchedulingService(store: BoundedStore = boundedStore, dependencies: SchedulingServiceDeps = {}) {
+  const workspaceExitCompleted = dependencies.workspaceExitCompleted ?? readWorkspaceExitCompleted;
   const read = (actor: WorkspaceActor, id: string) => readBounded(store, actor, id, "scheduling", scheduleSchema);
   async function save(actor: WorkspaceActor, work: Awaited<ReturnType<typeof read>>, payload: z.infer<typeof scheduleSchema>) {
     const saved = await store.update(actor, work, work.payload.revision, scheduleSchema.parse(payload));
@@ -36,6 +44,9 @@ export function createSchedulingService(store: BoundedStore = boundedStore) {
       if (command.kind === "cancel" && prior) {
         if (prior.status === "cancelled") return work;
         if (prior.status !== "reserved") throw new WorkspaceConflictError("A provider reservation needs governed provider cancellation or reconciliation.");
+      }
+      if ((command.kind === "reserve" || command.kind === "reschedule") && await workspaceExitCompleted(work.workspaceId)) {
+        throw new WorkspaceConflictError("New scheduling work is stopped for this workspace. Existing reservations remain available for review.");
       }
       if (command.kind === "reschedule") {
         if (!prior) throw new WorkspaceConflictError("Reservation not found.");
@@ -66,6 +77,9 @@ export function createSchedulingService(store: BoundedStore = boundedStore) {
       let work = await read(actor, id); await store.member(actor, work.workspaceId);
       let reservation = work.payload.reservations.find(value => value.requestId === requestId);
       if (!reservation || reservation.status === "cancelled") throw new WorkspaceConflictError("Reservation unavailable.");
+      if (reservation.status === "reserved" && await workspaceExitCompleted(work.workspaceId)) {
+        throw new WorkspaceConflictError("New calendar provider work is stopped for this workspace. The reservation remains available for review.");
+      }
       await provider.authorize(actor, work.workspaceId, id, reservation);
       const key = `schedule:${work.workspaceId}:${id}:${requestId}`;
       if (reservation.status === "reserved") {
@@ -99,3 +113,27 @@ export function createSchedulingService(store: BoundedStore = boundedStore) {
   };
 }
 export const { create: createWorkspaceSchedule, read: readWorkspaceSchedule, command: changeWorkspaceSchedule } = createSchedulingService();
+
+// Routes consume scheduling through this product entry point. Keeping the
+// provider and connection implementations behind the entry avoids coupling
+// unrelated route modules to calendar internals.
+export {
+  configureWorkspaceCalendarConnection,
+  assertWorkspaceCalendarManager,
+  assertWorkspaceCalendarWriteAllowed,
+  getWorkspaceCalendarConnection,
+  listWorkspaceCalendarConnections,
+  markWorkspaceCalendarConnectionError,
+  readCalendarEventReceipt,
+  revokeWorkspaceCalendarConnection,
+  saveCalendarEventReceipt,
+  saveWorkspaceCalendarConnection,
+} from "./calendar/repository";
+export { calendarOAuthConfiguration, calendarOAuthRedirectUri, consumeCalendarOAuthState, createCalendarOAuthState, exchangeCalendarOAuthCode } from "./calendar/oauth";
+export { CalendarProviderError, createCalendarAdapter, createGoogleCalendarAdapter, createOutlookCalendarAdapter } from "./calendar/adapters";
+export type { CalendarEventReceipt } from "./calendar/repository";
+export type { CalendarAdapter, CalendarCredentials, ProviderCalendar } from "./calendar/adapters";
+export { createCalendarSchedulingService, listWorkspaceProviderCalendars, readWorkspaceProviderAvailability } from "./calendar/service";
+export const calendarSchedulingService = createCalendarSchedulingService(undefined, {
+  adapter: provider => process.env.STRELVA_CALENDAR_FIXTURE === "1" ? createFixtureCalendarAdapter(provider) : createCalendarAdapter(provider),
+});

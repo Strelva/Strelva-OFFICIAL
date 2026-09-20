@@ -1,10 +1,11 @@
 import { z } from "zod";
+import { workspaceExitStateSchema } from "@/platform/workspace-exit/contracts";
 
 const instant = z.string().datetime({ offset: true });
 const cents = z.number().int().nonnegative().nullable();
 
 export const workspaceExportSchema = z.object({
-  schemaVersion: z.literal(1),
+  schemaVersion: z.literal(2),
   exportId: z.string().uuid(),
   exportedAt: instant,
   workspace: z.object({
@@ -21,15 +22,20 @@ export const workspaceExportSchema = z.object({
       z.literal("native_application_releases"), z.literal("native_application_records"),
       z.literal("economics_authorizations"), z.literal("economics_reservations"),
       z.literal("economics_usage_receipts"), z.literal("economics_execution_outcomes"),
+      z.literal("onboarding_cases"), z.literal("onboarding_attachment_references"),
+      z.literal("workspace_exit_state"),
     ]),
     omitted: z.tuple([
       z.literal("credentials"), z.literal("provider_connection_data"),
       z.literal("invitation_tokens"), z.literal("agent_tokens"),
       z.literal("idempotency_keys"), z.literal("command_digests"),
       z.literal("internal_product_learning"), z.literal("operator_notes"),
+      z.literal("onboarding_raw_attachment_bytes"), z.literal("deletion_and_retention_policy"),
     ]),
-    unavailable: z.array(z.object({ category: z.string().min(1), reason: z.string().min(1) }).strict()).length(5),
+    unavailable: z.array(z.object({ category: z.string().min(1), reason: z.string().min(1) }).strict()).length(9),
     maximumBytes: z.literal(2_000_000),
+    attachmentMaximumBytes: z.literal(2_000_000),
+    maxAttachmentReferences: z.literal(500),
   }).strict(),
   savedResults: z.array(z.object({
     id: z.string().uuid(), productId: z.string(), resourceKind: z.string(), title: z.string().nullable(),
@@ -39,6 +45,23 @@ export const workspaceExportSchema = z.object({
     releases: z.array(z.object({ workId: z.string().uuid(), version: z.number().int().positive(), spec: z.unknown(), publishedAt: instant.nullable(), publicationSource: z.enum(["published", "legacy_migrated"]) }).strict()),
     records: z.array(z.object({ workId: z.string().uuid(), recordId: z.string(), values: z.unknown(), recordSource: z.enum(["submitted", "legacy_migrated"]), createdAt: instant, updatedAt: instant }).strict()),
   }).strict(),
+  onboarding: z.object({
+    cases: z.array(z.object({
+      workId: z.string().uuid(), title: z.string().min(1).max(160), case: z.unknown(), createdAt: instant, updatedAt: instant,
+    }).strict()),
+    attachments: z.array(z.object({
+      workId: z.string().uuid(), caseWorkId: z.string().uuid(), requirementId: z.string().uuid(),
+      title: z.string().min(1).max(160), originalName: z.string().min(1).max(180),
+      contentType: z.string().min(1).max(120), size: z.number().int().nonnegative().max(2_000_000),
+      sha256: z.string().regex(/^[a-f0-9]{64}$/), uploadedAt: instant,
+      downloadReference: z.string().regex(/^\/api\/onboarding\/file\?workId=[0-9a-f-]{36}$/),
+      extraction: z.object({
+        status: z.enum(["available", "unavailable"]), provider: z.enum(["local-text", "existing-document", "none"]),
+        message: z.string().min(1).max(500), truncated: z.boolean(),
+      }).strict(),
+    }).strict()),
+  }).strict(),
+  lifecycle: z.object({ exit: workspaceExitStateSchema.nullable() }).strict(),
   economics: z.object({
     jobs: z.array(z.object({
       id: z.string().uuid(), workId: z.string().uuid(), productId: z.string(), resourceKind: z.string(),

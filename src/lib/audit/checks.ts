@@ -360,11 +360,12 @@ async function checkMobile(
 // ---------------------------------------------------------------------------
 async function buildAuditContext(
   startUrl: string
-): Promise<{ ctx: AuditContext; fetchedUrl: string }> {
+): Promise<{ ctx: AuditContext; fetchedUrl: string; httpStatus?: number }> {
   let html = "";
   let fetchedUrl = startUrl;
   let headers = new Headers();
   let fetchOk = false;
+  let httpStatus: number | undefined;
 
   try {
     const res = await fetchWithTimeout(startUrl, 15_000);
@@ -372,6 +373,7 @@ async function buildAuditContext(
     fetchedUrl = res.url || startUrl;
     headers = res.headers;
     fetchOk = res.ok;
+    httpStatus = res.status;
   } catch {
     if (startUrl.startsWith("https://")) {
       try {
@@ -381,6 +383,7 @@ async function buildAuditContext(
         fetchedUrl = res.url || httpUrl;
         headers = res.headers;
         fetchOk = res.ok;
+        httpStatus = res.status;
       } catch {
         // proceed with empty html — modules reflect missing data honestly
       }
@@ -420,16 +423,36 @@ async function buildAuditContext(
     sitemapXml,
     llmsTxt,
   };
-  return { ctx, fetchedUrl };
+  return { ctx, fetchedUrl, httpStatus };
 }
 
 // ---------------------------------------------------------------------------
 // Run all checks
 // ---------------------------------------------------------------------------
-export async function runAudit(
+export interface AuditRunSnapshot {
+  /** The URL requested by the caller after the protocol default is applied. */
+  url: string;
+  /** The final URL after the canonical audit fetch follows redirects. */
+  fetchedUrl: string;
+  /** Visible single-page text with scripts, styles, and templates removed. */
+  visibleText: string;
+  /** HTTP response status when the canonical fetch received one. */
+  httpStatus?: number;
+  /** False when the canonical fetch only produced an unavailable/challenge response. */
+  fetchOk: boolean;
+  /** The same category results returned by runAudit. */
+  categories: CategoryResult[];
+}
+
+/**
+ * Run the canonical site audit and return the page snapshot used by the
+ * modules. Consumers that need durable change evidence can hash visibleText
+ * beside the existing category results without creating another fetcher.
+ */
+export async function runAuditSnapshot(
   inputUrl: string,
   opts?: { traffic?: TrafficProfile }
-): Promise<CategoryResult[]> {
+): Promise<AuditRunSnapshot> {
   let url = inputUrl.trim();
   if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
 
@@ -442,7 +465,7 @@ export async function runAudit(
   // Insights API on that Cloud project.
   const apiKey = process.env.GOOGLE_PAGESPEED_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 
-  const { ctx, fetchedUrl } = await buildAuditContext(url);
+  const { ctx, fetchedUrl, httpStatus } = await buildAuditContext(url);
 
   // PageSpeed (one shared call) feeds the two performance categories.
   const psData = await fetchPageSpeedData(fetchedUrl, apiKey);
@@ -478,5 +501,12 @@ export async function runAudit(
     if (refs.length > 0) cat.guides = refs;
   }
 
-  return categories;
+  return { url, fetchedUrl, visibleText: ctx.visibleText, httpStatus, fetchOk: ctx.fetchOk, categories };
+}
+
+export async function runAudit(
+  inputUrl: string,
+  opts?: { traffic?: TrafficProfile }
+): Promise<CategoryResult[]> {
+  return (await runAuditSnapshot(inputUrl, opts)).categories;
 }

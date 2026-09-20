@@ -41,6 +41,7 @@ interface Props {
   onNavigate?: (section: NavigableSection) => void;
   onSearch?: () => void;
   onStart?: () => void;
+  startDisabled?: boolean;
   signedIn?: boolean;
   signInHref?: string;
   signOut?: ReactNode;
@@ -59,6 +60,7 @@ export function StrelvaSidebar({
   onNavigate,
   onSearch,
   onStart,
+  startDisabled = false,
   signedIn = true,
   signInHref,
   signOut,
@@ -95,8 +97,8 @@ export function StrelvaSidebar({
     <nav className={styles.primary} aria-label="Main">{PRIMARY_ITEMS.map(primaryItem)}</nav>
     <div className={styles.utilities} aria-label="Workspace utilities">
       {onStart
-        ? <button type="button" className={styles.newAction} onClick={() => { onCloseMobile?.(); onStart(); }}><Plus size={16} strokeWidth={1.6} aria-hidden="true" /><span>New</span></button>
-        : <Link className={styles.newAction} href={`${appBase}/workspace?view=start`} onClick={onCloseMobile}><Plus size={16} strokeWidth={1.6} aria-hidden="true" /><span>New</span></Link>}
+        ? <button type="button" className={styles.newAction} disabled={startDisabled} aria-disabled={startDisabled || undefined} onClick={() => { onCloseMobile?.(); onStart(); }}><Plus size={16} strokeWidth={1.6} aria-hidden="true" /><span>New</span></button>
+        : <Link className={styles.newAction} aria-disabled={startDisabled || undefined} tabIndex={startDisabled ? -1 : undefined} href={`${appBase}/workspace?view=start`} onClick={(event) => { if (startDisabled) event.preventDefault(); onCloseMobile?.(); }}><Plus size={16} strokeWidth={1.6} aria-hidden="true" /><span>New</span></Link>}
       {UTILITY_ITEMS.map(utilityItem)}
     </div>
     {contextualNavigation ? <div className={styles.contextual}>{contextualNavigation}</div> : <div className={styles.spacer} />}

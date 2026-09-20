@@ -47,4 +47,29 @@ describe("Supabase auth callback continuation", () => {
       `https://app.strelva.com/sign-in?error=auth_callback&reason=provider%3Aaccess_denied&next=${encodeURIComponent(target)}`,
     );
   });
+
+  it("keeps a local callback on the browser's loopback host", async () => {
+    const { GET } = await import("@/app/auth/callback/route");
+    const target = "/workspace/account?continue=public";
+    const response = await GET(new NextRequest(
+      `http://localhost:3000/auth/callback?error=access_denied&next=${encodeURIComponent(target)}`,
+      { headers: { host: "127.0.0.1:3000" } },
+    ));
+
+    expect(response.headers.get("location")).toBe(
+      `http://127.0.0.1:3000/sign-in?error=auth_callback&reason=provider%3Aaccess_denied&next=${encodeURIComponent(target)}`,
+    );
+  });
+
+  it.each(["127.0.0.1:3000", "localhost:3000", "other.example"])("preserves the hosted callback origin when Host is %s", async (host) => {
+    const { GET } = await import("@/app/auth/callback/route");
+    const target = "/workspace/account?continue=public";
+    const response = await GET(new NextRequest(
+      `https://app.strelva.com/auth/callback?error=access_denied&next=${encodeURIComponent(target)}`,
+      { headers: { host } },
+    ));
+    expect(response.headers.get("location")).toBe(
+      `https://app.strelva.com/sign-in?error=auth_callback&reason=provider%3Aaccess_denied&next=${encodeURIComponent(target)}`,
+    );
+  });
 });

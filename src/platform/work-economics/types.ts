@@ -18,7 +18,7 @@ const CENTS = z.number().int().nonnegative().max(MAX_JOB_ECONOMICS_CENTS);
 const ID = z.string().trim().min(1).max(256).regex(/^[A-Za-z0-9][A-Za-z0-9_.:-]*$/);
 const TENANT = z.string().trim().regex(/^[a-z0-9][a-z0-9-]{0,62}$/);
 
-export const JOB_ECONOMICS_PRODUCTS = ["tracker", "ai_visibility", "inquiry", "operations", "work_plans"] as const;
+export const JOB_ECONOMICS_PRODUCTS = ["tracker", "ai_visibility", "inquiry", "operations", "work_plans", "custom-applications"] as const;
 export type JobEconomicsProduct = (typeof JOB_ECONOMICS_PRODUCTS)[number];
 
 export const JOB_ECONOMICS_RESOURCE_KINDS = [
@@ -28,6 +28,7 @@ export const JOB_ECONOMICS_RESOURCE_KINDS = [
   "inquiry_capability",
   "responsibility",
   "plan",
+  "custom-application",
 ] as const;
 export type JobEconomicsResourceKind = (typeof JOB_ECONOMICS_RESOURCE_KINDS)[number];
 
@@ -86,7 +87,8 @@ export function parseJobEconomicsCommand(value: unknown): JobEconomicsCommand {
         ? command.resourceKind === "tracker"
         : command.productId === "operations" ? command.resourceKind === "responsibility"
           : command.productId === "work_plans" ? command.resourceKind === "plan"
-          : command.resourceKind === "private_ai_visibility_work" || command.resourceKind === "ai_visibility_assessment";
+            : command.productId === "custom-applications" ? command.resourceKind === "custom-application"
+            : command.resourceKind === "private_ai_visibility_work" || command.resourceKind === "ai_visibility_assessment";
       const requiresSavedWork = command.productId !== "work_plans";
       if (!expectedKind || !command.workspaceId || (requiresSavedWork && !command.workId)
         || (!requiresSavedWork && command.workId !== undefined && command.workId !== null)

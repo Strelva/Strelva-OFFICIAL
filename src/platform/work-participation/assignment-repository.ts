@@ -5,6 +5,7 @@ import {
   WorkspaceAccessError,
   WorkspaceConflictError,
   WorkspaceStoreError,
+  WORKSPACE_EXIT_STOPPED_MESSAGE,
   type WorkspaceActor,
 } from "@/platform/workspaces/types";
 import {
@@ -35,6 +36,7 @@ function identity(actor: WorkspaceActor) {
 function fail(error: { message: string } | null): void {
   if (!error) return;
   if (/workspace_access_denied|operational_assignment_denied/.test(error.message)) throw new WorkspaceAccessError();
+  if (error.message.includes("workspace_exit_future_work_blocked")) throw new WorkspaceConflictError(WORKSPACE_EXIT_STOPPED_MESSAGE);
   if (/operational_assignment_conflict|responsibility_revision_conflict|operational_assignment_expired/.test(error.message)) {
     throw new WorkspaceConflictError("This assignment or its approved work changed. Reload before continuing.");
   }
@@ -60,6 +62,7 @@ function assignment(raw: unknown): OperationalAssignment {
     assigneeUserId: value.assignee_user_id,
     assigneeEmail: value.assignee_email,
     assigneeKind: value.assignee_kind,
+    assigneeWorkspaceId: value.assignee_workspace_id ?? null,
     scope: value.scope,
     status: value.status,
     offeredAt: value.offered_at,
@@ -90,11 +93,13 @@ function assigned(raw: unknown): AssignedResponsibility {
 
 export const postgresOperationalAssignments: OperationalAssignmentStore = {
   async offer(actor, workId, input: OperationalAssignmentOffer) {
-    const { data, error } = await client().rpc("offer_operational_assignment", {
+    const rpcName = input.assigneeKind === "agency" ? "offer_agency_operational_assignment" : "offer_operational_assignment";
+    const { data, error } = await client().rpc(rpcName, {
       ...identity(actor),
       p_work_id: workId,
       p_assignee_email: input.assigneeEmail,
       p_assignee_kind: input.assigneeKind,
+      ...(input.assigneeKind === "agency" ? { p_agency_workspace_id: input.agencyWorkspaceId } : {}),
       p_expires_at: input.expiresAt,
       p_idempotency_key: input.idempotencyKey,
     });

@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+test.skip(process.env.STRELVA_UI_PREVIEW !== "1", "Requires the explicit development-only interface preview.");
+
 test.describe("inquiry migration browser journey", () => {
   test("edits the actual form, rehearses and inspects the published after view", async ({ page }) => {
     await page.goto("/preview/strelva/inquiries");

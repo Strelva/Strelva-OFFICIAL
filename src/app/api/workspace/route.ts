@@ -1,6 +1,7 @@
 import { savePublicWebsiteAudit } from "@/products/website-audit/server";
 import { recoverAssessment } from "@/products/assessment/server";
 import { WorkspaceOperationPendingError } from "@/platform/workspaces";
+import { readWorkspaceExit, readWorkspaceExitCompleted } from "@/platform/workspace-exit";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionUser } from "@/lib/db/server-client";
@@ -190,6 +191,26 @@ export async function GET(request: Request) {
     z.string().uuid().parse(selectedId);
     const selected = workspaces.find((workspace) => workspace.id === selectedId);
     if (!selected) return json({ error: "Workspace unavailable." }, 404);
+    let workspaceExitState = null;
+    let workspaceExitReadStatus: "available" | "completed" | "not_owner" | "unavailable" = selected.role === "owner" ? "available" : "not_owner";
+    if (selected.role === "owner") {
+      try {
+        workspaceExitState = (await readWorkspaceExit(current, selected.id)).state;
+      } catch {
+        // An owner must not be shown mutation controls when the durable stop
+        // state cannot be checked. The browser receives an explicit status so
+        // it can fail closed without claiming that an exit was completed.
+        workspaceExitReadStatus = "unavailable";
+      }
+    } else {
+      try {
+        workspaceExitReadStatus = await readWorkspaceExitCompleted(selected.id) ? "completed" : "available";
+      } catch {
+        // Members receive only the completion bit. A failed check still
+        // disables mutations instead of presenting an active workspace.
+        workspaceExitReadStatus = "unavailable";
+      }
+    }
     // Managed presence is a compatibility projection of existing tenant
     // entities. A transient tenant read must not make unrelated private work
     // unavailable; the product reports a bounded status alongside successes.
@@ -223,6 +244,8 @@ export async function GET(request: Request) {
     const snapshot: WorkspaceSnapshot = {
       actor: { email: current.verifiedEmail, localPreview: false },
       workspaces: workspaces.map(({ id, kind, name, access, role }) => ({ id, kind, name, access, role })), workspaceId: selected.id,
+      workspaceExitState,
+      workspaceExitReadStatus,
       work: work.map((item) => presentWorkspaceWork(item, {
         access: selected.access === "delegated_read" ? "delegated_read" : selected.kind === "personal" ? "owned" : "member",
       })),

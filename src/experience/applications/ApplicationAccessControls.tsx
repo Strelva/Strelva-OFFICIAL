@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { TextInput } from "@/components/ui/TextInput";
-import type { ApplicationRecordReadScope, ApplicationViewKind } from "@/products/applications/client";
+import type { ApplicationRecordEditScope, ApplicationRecordReadScope, ApplicationViewKind } from "@/products/applications/client";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 
 type ApplicationStatus = "draft" | "installed" | "retired";
@@ -13,6 +13,7 @@ type IssuedGrant = {
   recipientEmail: string;
   views: ApplicationViewKind[];
   recordRead: ApplicationRecordReadScope;
+  recordEdit: ApplicationRecordEditScope;
   recordSubmit: boolean;
   expiresAt: string;
   status: "active" | "revoked";
@@ -68,6 +69,7 @@ function grantFromResponse(body: unknown): { grant: IssuedGrant; href: string } 
       recipientEmail: grant.recipientEmail,
       views: grant.views as ApplicationViewKind[],
       recordRead: grant.recordRead === "all" || grant.recordRead === "own" ? grant.recordRead : "none",
+      recordEdit: grant.recordEdit === "all" || grant.recordEdit === "own" ? grant.recordEdit : "none",
       recordSubmit: grant.recordSubmit === true,
       expiresAt: grant.expiresAt,
       status: grant.status === "revoked" ? "revoked" : "active",
@@ -91,6 +93,7 @@ export function ApplicationAccessControls({ workId, status, hasRelease, canManag
   const [recipientEmail, setRecipientEmail] = useState("");
   const [views, setViews] = useState<ApplicationViewKind[]>(["form", "list"]);
   const [recordRead, setRecordRead] = useState<ApplicationRecordReadScope>("own");
+  const [recordEdit, setRecordEdit] = useState<ApplicationRecordEditScope>("none");
   const [recordSubmit, setRecordSubmit] = useState(true);
   const [purpose, setPurpose] = useState("Submit records");
   const [expiresAt, setExpiresAt] = useState(defaultExpiry);
@@ -163,6 +166,7 @@ export function ApplicationAccessControls({ workId, status, hasRelease, canManag
           recipientEmail,
           views,
           recordRead,
+          recordEdit,
           recordSubmit,
           purpose,
           expiresAt: expiryIso(expiresAt),
@@ -244,6 +248,7 @@ export function ApplicationAccessControls({ workId, status, hasRelease, canManag
           </fieldset>
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="text-sm">Records they can see<select className="mt-1 block min-h-11 w-full rounded-xl border border-gray-border bg-surface px-3 py-2 text-sm" value={recordRead} disabled={disabled || busy} onChange={event => setRecordRead(event.target.value as ApplicationRecordReadScope)}><option value="none">No records</option><option value="own">Only records they submit</option><option value="all">All records</option></select></label>
+            <label className="text-sm">Records they can edit<select className="mt-1 block min-h-11 w-full rounded-xl border border-gray-border bg-surface px-3 py-2 text-sm" value={recordEdit} disabled={disabled || busy} onChange={event => { const next = event.target.value as ApplicationRecordEditScope; setRecordEdit(next); if (next !== "none" && recordRead === "none") setRecordRead(next); }}><option value="none">No editing</option><option value="own">Their submitted records</option><option value="all">All visible records</option></select></label>
             <TextInput label="Link expires" type="datetime-local" value={expiresAt} min={new Date().toISOString().slice(0, 16)} required disabled={disabled || busy} onChange={event => setExpiresAt(event.target.value)} />
           </div>
           <TextInput label="Why they need it" value={purpose} maxLength={500} required disabled={disabled || busy} onChange={event => setPurpose(event.target.value)} />

@@ -1,5 +1,6 @@
 import { getSupabase } from "@/lib/db/client";
 import { OfferingAccessError, OfferingConflictError, OfferingNotFoundError, OfferingStoreError, type OfferingActor } from "./types";
+import { WORKSPACE_EXIT_STOPPED_MESSAGE } from "@/platform/workspaces/types";
 import { providerDeliverySchema, type ProviderDelivery, type ProviderDeliveryStore } from "./provider-delivery";
 
 type Failure = { message?: string; code?: string } | null;
@@ -19,6 +20,7 @@ function fail(error: Failure): void {
   if (!error) return;
   const message = `${error.code ?? ""} ${error.message ?? ""}`;
   if (message.includes("provider_delivery_denied")) throw new OfferingAccessError();
+  if (message.includes("workspace_exit_future_work_blocked")) throw new OfferingConflictError(WORKSPACE_EXIT_STOPPED_MESSAGE);
   if (message.includes("provider_delivery_not_found")) throw new OfferingNotFoundError("The provider delivery request was not found.");
   if (message.includes("provider_delivery_") || error.code === "23505") throw new OfferingConflictError("The provider delivery request changed. Reload before continuing.");
   throw new OfferingStoreError("The provider delivery change could not be confirmed.");

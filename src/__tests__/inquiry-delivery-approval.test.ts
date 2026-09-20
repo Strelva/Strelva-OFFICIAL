@@ -169,6 +169,7 @@ async function fixture() {
     listEvents,
     resolveRoute: route,
     emailReady: async () => true,
+    isWorkspaceExited: async () => false,
   };
   return { repository, events, base };
 }

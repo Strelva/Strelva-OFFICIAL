@@ -31,8 +31,25 @@ function fail(origin: string, reason: string, next: string): NextResponse {
   return NextResponse.redirect(`${origin}/sign-in?error=auth_callback&reason=${encodeURIComponent(reason)}${retryNext}`);
 }
 
+function callbackOrigin(request: NextRequest): string {
+  const canonical = new URL(request.url);
+  const loopbackHosts = ["localhost", "127.0.0.1", "[::1]"];
+  if (!loopbackHosts.includes(canonical.hostname)) return canonical.origin;
+  const host = request.headers.get("host");
+  if (host) {
+    try {
+      const incoming = new URL(`${canonical.protocol}//${host}`);
+      if (loopbackHosts.includes(incoming.hostname)) return incoming.origin;
+    } catch {
+      // Keep the framework-provided origin for malformed or non-local hosts.
+    }
+  }
+  return canonical.origin;
+}
+
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
+  const origin = callbackOrigin(request);
   const code = searchParams.get("code");
   const next = safeNext(searchParams.get("next"));
 

@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   release: vi.fn(),
   prepare: vi.fn(),
   approve: vi.fn(),
+  workspace: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -18,6 +19,10 @@ vi.mock("@/lib/auth", () => ({
   requireTenantPermission: mocks.permission,
 }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.config }));
+vi.mock("@/products/inquiries/workspace-exit", () => ({
+  INQUIRY_WORKSPACE_EXIT_CODE: "workspace_exit_future_work_blocked",
+  resolveInquiryWorkspace: mocks.workspace,
+}));
 vi.mock("@/products/inquiries", () => ({
   inquiryReleaseEnabled: mocks.release,
   prepareInquiryMessageReview: mocks.prepare,
@@ -59,6 +64,7 @@ describe("authenticated inquiry message review route", () => {
     mocks.access.mockResolvedValue(null);
     mocks.permission.mockResolvedValue(null);
     mocks.config.mockResolvedValue(config);
+    mocks.workspace.mockResolvedValue({ businessId: "business-a", workspaceIds: [], exitCompleted: false });
     mocks.prepare.mockResolvedValue(review);
     mocks.approve.mockResolvedValue({
       inquiryId: "inquiry-1",
@@ -67,6 +73,16 @@ describe("authenticated inquiry message review route", () => {
       reason: "provider read-back unavailable",
       retryable: true,
     });
+  });
+
+  it("does not create a new message review after the mapped workspace exits", async () => {
+    mocks.workspace.mockResolvedValue({ businessId: "customer-workspace", workspaceIds: ["customer-workspace"], exitCompleted: true });
+
+    const response = await POST(postRequest({ operation: "prepare", tenantId: "tenant-a", inquiryId: "inquiry-1", action: "reply" }));
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: "workspace_exit_future_work_blocked" });
+    expect(mocks.prepare).not.toHaveBeenCalled();
   });
 
   it("keeps prepare and approve closed before authentication when release is disabled", async () => {

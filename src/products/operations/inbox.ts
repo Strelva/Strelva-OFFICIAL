@@ -311,7 +311,7 @@ export async function listOperationalExceptions(): Promise<OperationalExceptionP
 export async function listAuthorizedOperationalInbox(actor: WorkspaceActor): Promise<OperationalInbox> {
   const verifiedEmail = actor.verifiedEmail.trim().toLowerCase();
   const [assignmentRows, workRows, membershipRows, workspaceRows, providerRows] = await Promise.all([
-    selectRows("operational_assignments", "id,workspace_id,work_id,sponsor_id,sponsor_email,assignee_user_id,assignee_email,assignee_kind,status,offered_at,expires_at,work_scope"),
+    selectRows("operational_assignments", "id,workspace_id,work_id,sponsor_id,sponsor_email,assignee_user_id,assignee_email,assignee_kind,assignee_workspace_id,status,offered_at,expires_at,work_scope"),
     selectRows("saved_product_work", "id,workspace_id,title,payload"),
     selectRows("workspace_memberships", "workspace_id,user_id,role"),
     selectRows("workspaces", "id,name"),
@@ -333,7 +333,9 @@ export async function listAuthorizedOperationalInbox(actor: WorkspaceActor): Pro
       || text(item.assignee_email).trim().toLowerCase() !== verifiedEmail
       || !["offered", "accepted"].includes(text(item.status))
       || Date.parse(text(item.expires_at)) <= now
-      || !membershipKeys.has(`${workspaceId}:${actor.userId}`)
+      || !(text(item.assignee_kind) === "agency"
+        ? membershipKeys.has(`${text(item.assignee_workspace_id)}:${actor.userId}`)
+        : membershipKeys.has(`${workspaceId}:${actor.userId}`))
       || !ownerKeys.has(`${workspaceId}:${text(item.sponsor_id)}`)) continue;
     const saved = workById.get(workId);
     const payload = parseResponsibility(saved?.payload);

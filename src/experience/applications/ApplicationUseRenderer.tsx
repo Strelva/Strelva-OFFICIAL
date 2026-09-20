@@ -9,6 +9,8 @@ export interface ApplicationUseDraft {
   values: Record<string, string | number | boolean>;
   recordId: string;
   idempotencyKey: string;
+  expectedRecordRevision?: number;
+  editingRecordId?: string;
 }
 
 export interface ApplicationUseRendererProps {
@@ -35,8 +37,15 @@ function displayValue(value: string | number | boolean | undefined): string {
   return String(value);
 }
 
-function fieldInputType(type: "text" | "number" | "boolean"): "text" | "number" {
-  return type === "number" ? "number" : "text";
+function fieldInputType(type: "text" | "number" | "boolean" | "date"): "text" | "number" | "date" {
+  if (type === "number") return "number";
+  if (type === "date") return "date";
+  return "text";
+}
+
+function nextIdempotencyKey(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
 export function ApplicationUseRenderer({
@@ -50,6 +59,8 @@ export function ApplicationUseRenderer({
   onSubmit,
 }: ApplicationUseRendererProps) {
   const formView = snapshot.views.find(view => view.kind === "form");
+  const editAllowed = snapshot.access.recordEdit === "own" || snapshot.access.recordEdit === "all";
+  const editing = draft.editingRecordId !== undefined;
   const recordViews = snapshot.views.filter(view => view.kind === "list" || view.kind === "detail" || view.kind === "document");
   const recordsHeading = recordViews.some(view => view.kind !== "document") ? "Records" : "Documents";
   const recordFields = useMemo(() => {
@@ -73,17 +84,35 @@ export function ApplicationUseRenderer({
     onSubmit(draft);
   }
 
+  function beginEdit(record: ApplicationUseSnapshot["records"][number]) {
+    if (record.revision === undefined) return;
+    const editableFields = new Set(formView?.fields.map(field => field.id) ?? []);
+    onDraftChange({
+      values: Object.fromEntries(Object.entries(record.values).filter(([fieldId]) => editableFields.has(fieldId))),
+      recordId: record.id,
+      idempotencyKey: nextIdempotencyKey(),
+      expectedRecordRevision: record.revision,
+      editingRecordId: record.id,
+    });
+  }
+
+  function cancelEdit() {
+    onDraftChange({ values: {}, recordId: nextIdempotencyKey(), idempotencyKey: nextIdempotencyKey() });
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
       <header className="max-w-3xl space-y-3">
         <h1 className="font-display text-3xl font-medium leading-tight text-warm-black sm:text-4xl">{snapshot.title}</h1>
       </header>
 
-      {formView && snapshot.access.recordSubmit ? (
+      {submitMessage ? <p role="status" className="rounded-lg border border-sage/30 bg-sage/5 px-3 py-2 text-sm text-sage-dark">{submitMessage}</p> : null}
+
+      {formView && (snapshot.access.recordSubmit || (editAllowed && editing)) ? (
         <section aria-labelledby="application-form-heading" className="rounded-2xl border border-gray-border bg-surface p-5 shadow-sm sm:p-7">
           <div className="mb-6 space-y-2">
-            <h2 id="application-form-heading" className="font-display text-2xl font-medium text-warm-black">{viewLabel("form")}</h2>
-            <p className="text-sm leading-6 text-gray-fg">Enter the details below. Keep this tab open if you need to retry.</p>
+            <h2 id="application-form-heading" className="font-display text-2xl font-medium text-warm-black">{draft.editingRecordId ? "Correct a record" : viewLabel("form")}</h2>
+            <p className="text-sm leading-6 text-gray-fg">{draft.editingRecordId ? "Save a correction to the record. If someone changed it first, your correction stays here so you can review it." : "Enter the details below. Keep this tab open if you need to retry."}</p>
           </div>
           <form className="space-y-5" onSubmit={submit} aria-busy={busy}>
             <div className="grid gap-5 sm:grid-cols-2">
@@ -146,9 +175,9 @@ export function ApplicationUseRenderer({
               })}
             </div>
             {submitError ? <p id="application-submit-error" role="alert" className="rounded-lg border border-terra/30 bg-terra/5 px-3 py-2 text-sm text-terra">{submitError}</p> : null}
-            {submitMessage ? <p role="status" className="rounded-lg border border-sage/30 bg-sage/5 px-3 py-2 text-sm text-sage-dark">{submitMessage}</p> : null}
             <div className="flex flex-wrap items-center gap-3">
-              <Button type="submit" loading={busy} disabled={busy} aria-describedby={submitError ? "application-submit-error" : undefined}>Submit record</Button>
+              <Button type="submit" loading={busy} disabled={busy} aria-describedby={submitError ? "application-submit-error" : undefined}>{draft.editingRecordId ? "Save correction" : "Submit record"}</Button>
+              {draft.editingRecordId ? <Button type="button" variant="secondary" disabled={busy} onClick={cancelEdit}>Cancel correction</Button> : null}
               {onReload && submitError ? <Button type="button" variant="secondary" disabled={busy} onClick={onReload}>Reload application</Button> : null}
             </div>
           </form>
@@ -175,6 +204,7 @@ export function ApplicationUseRenderer({
                       </div>
                     ))}
                   </dl>
+                  {formView && editAllowed && record.revision !== undefined ? <Button type="button" variant="secondary" className="mt-5" onClick={() => beginEdit(record)}>Edit record</Button> : null}
                 </article>
               ))}
             </div>

@@ -7,7 +7,7 @@ const targetId = "33333333-3333-4333-8333-333333333333";
 const budgetId = "44444444-4444-4444-8444-444444444444";
 const ownerId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const at = "2026-09-12T12:00:00.000Z";
-async function fixture(page: Page, mode: "proposal" | "unknown" | "readonly" = "proposal", budgetUnavailable = false) {
+async function fixture(page: Page, mode: "proposal" | "unknown" | "readonly" = "proposal", budgetUnavailable = false, stopped = false) {
   const readOnly = mode === "readonly";
   const payload = { version: 1, revision: 0, title: "Update our handover", intent: "Keep the team document current", ownerId,
     status: mode === "unknown" ? "needs_attention" : "proposed", createdAt: at, updatedAt: at,
@@ -21,7 +21,8 @@ async function fixture(page: Page, mode: "proposal" | "unknown" | "readonly" = "
   const commands: string[] = [];
   await page.route("**/api/workspace**", route => route.fulfill({ json: {
     actor: { email: "owner@example.com", localPreview: false }, workspaceId,
-    workspaces: [{ id: workspaceId, name: "Team workspace", kind: "personal", access: readOnly ? "delegated_read" : "member" }],
+    workspaces: [{ id: workspaceId, name: "Team workspace", kind: "personal", role: readOnly ? "member" : "owner", access: readOnly ? "delegated_read" : "member" }],
+    ...(stopped ? { workspaceExitReadStatus: "completed" } : {}),
     work: [{ id: workId, workspaceId, title: payload.title, productId: "operations", resourceKind: "responsibility", payload: null, input: {}, createdAt: at }],
     handoffs: [], delegations: [], products: [{ id: "operations", name: "Delegated work", description: "Local proof", availability: "available" }],
   } }));
@@ -49,6 +50,7 @@ async function fixture(page: Page, mode: "proposal" | "unknown" | "readonly" = "
     }
     return route.fulfill({ json: { ledger, executions, usage: [], currentActorId: ownerId, canManage: !readOnly, canAccept: !readOnly && ledger.status === "draft" } });
   });
+  await page.route("**/api/operational-assignments**", route => route.fulfill({ json: null }));
   await page.goto(`/workspace?workspaceId=${workspaceId}&work=${workId}`);
   await expect(page.getByRole("heading", { name: payload.title, exact: true })).toBeVisible();
   return commands;
@@ -105,4 +107,22 @@ test("unavailable budget storage prevents starting work and exposes recovery", a
   await expect(page.getByRole("main").getByRole("alert")).toContainText("budget could not be checked");
   await expect(page.getByRole("button", { name: "Reload current state" })).toBeVisible();
   expect(commands).toEqual([]);
+});
+
+test("a stopped owner can review and reconcile an uncertain action without starting new work", async ({ page }) => {
+  await fixture(page, "unknown", false, true);
+  await expect(page.getByText("New work is paused for this workspace.", { exact: false }).first()).toBeVisible();
+  await expect(page.getByText("Resolve an interrupted action", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry the failed step", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Continue approved work", exact: true })).toHaveCount(0);
+  await page.screenshot({ path: "/tmp/strelva-ongoing-stopped-owner-desktop.png", fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: "/tmp/strelva-ongoing-stopped-owner-mobile.png", fullPage: true });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.getByText("Resolve an interrupted action", { exact: true }).click();
+  await expect(page.getByLabel("Evidence from the actual result")).toBeVisible();
+  await page.getByLabel("Evidence from the actual result").fill("The customer confirmed the document now contains the updated terms.");
+  await page.getByRole("button", { name: "Record verified outcome", exact: true }).click();
+  await expect(page.getByText("Resolve an interrupted action", { exact: true })).toBeVisible();
 });

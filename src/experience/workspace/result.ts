@@ -117,7 +117,7 @@ export interface WorkspacePresentationOptions {
 }
 
 export function presentWorkspaceWork(work: SavedWork, options: WorkspacePresentationOptions = {}): WorkspaceWork {
-  const horizontalKinds: Record<string, string> = { applications: "application", scheduling: "schedule", investigations: "investigation", operations: "responsibility", "product-learning": "learning" };
+  const horizontalKinds: Record<string, string> = { "custom-applications": "custom-application", onboarding: "case", applications: "application", scheduling: "schedule", investigations: "investigation", operations: "responsibility", "product-learning": "learning" };
   if (horizontalKinds[work.productId] === work.resourceKind) {
     const value = work.payload && typeof work.payload === "object" && !Array.isArray(work.payload) ? work.payload as Record<string, unknown> : null;
     const status = typeof value?.status === "string" ? value.status : undefined;

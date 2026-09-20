@@ -1030,3 +1030,130 @@ test("recovers the same assessment after a lost response and reload", async ({ p
   await expect(page).toHaveURL(new RegExp(`work=${WORK_ID}`));
   await expect(page.getByRole("button",{name:"Recover assessment"})).toHaveCount(0);
 });
+
+for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844 }]) {
+test(`agency queue pages through all clients and reports unavailable work at ${viewport.width}px`, async ({ page }) => {
+  await page.setViewportSize(viewport);
+  const customers: WorkspaceSnapshot["workspaces"] = Array.from({ length: 10 }, (_, index) => ({
+    id: `90000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+    kind: "customer", name: `Page Client ${index + 1}`, access: "delegated_read",
+  }));
+  const workspaces: WorkspaceSnapshot["workspaces"] = [{ id: AGENCY_ID, kind: "agency", name: "North Studio", access: "member" }, ...customers];
+  const delegations: WorkspaceSnapshot["delegations"] = customers.map((customer, index) => ({
+    id: `delegation-${index}`, workId: `shared-${index}`, customerWorkspaceId: customer.id,
+    agencyWorkspaceId: AGENCY_ID, status: "active", canRevoke: false,
+  }));
+  await mockWorkspace(page, route => {
+    const selected = new URL(route.request().url()).searchParams.get("workspaceId") || AGENCY_ID;
+    if (selected === customers[9]!.id) return fulfill(route, { error: "Temporarily unavailable" }, 503);
+    const index = customers.findIndex(customer => customer.id === selected);
+    return fulfill(route, snapshot({ workspaceId: selected, workspaces, delegations,
+      work: index < 0 ? [] : [work({ id: `shared-${index}`, workspaceId: selected, title: `Review client ${index + 1}`, operation: { status: "needs_attention" } })],
+    }));
+  });
+  await page.goto(`/workspace?workspaceId=${AGENCY_ID}`);
+  await expect(page.getByText("Clients 1–8 of 10", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Next clients", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("Clients 9–10 of 10", { exact: true })).toBeVisible();
+  await expect(page.getByText("Review client 9", { exact: true })).toBeVisible();
+  await expect(page.getByText("Shared-work check unavailable", { exact: true })).toBeVisible();
+  await page.screenshot({ path: `/tmp/strelva-agency-page-${viewport.width}.png`, fullPage: true });
+  await expect(page.getByRole("button", { name: "Next clients", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "Previous clients", exact: true }).click();
+  await expect(page.getByText("Clients 1–8 of 10", { exact: true })).toBeVisible();
+  await expect(page.getByText("Review client 1", { exact: true })).toBeVisible();
+});
+}
+
+test("unavailable payer history does not claim that no payer exists", async ({ page }) => {
+  await mockWorkspace(page, route => fulfill(route, snapshot({ workspaceId: CUSTOMER_ID,
+    workspaces: [{ id: CUSTOMER_ID, kind: "customer", name: "Harbor Dental", access: "member", role: "owner" }], work: [],
+  })));
+  await page.route("**/api/work-economics/payer-transition**", route => fulfill(route, { error: "Payer history could not be loaded." }, 503));
+  await page.route("**/api/work-allowances?**", route => fulfill(route, { error: "Allowance unavailable." }, 503));
+  await page.goto(`/workspace?workspaceId=${CUSTOMER_ID}&view=settings`);
+  await expect(page.getByText("Payer history could not be loaded.", { exact: true })).toBeVisible();
+  await expect(page.getByText("No successor payer has been accepted for future jobs.", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Retry payer history", exact: true })).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "Retry payer history", exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "/tmp/strelva-billing-unavailable-mobile.png" });
+});
+
+test("empty allowance records explain billing status without implying access", async ({ page }) => {
+  await mockWorkspace(page, route => fulfill(route, snapshot({ workspaceId: CUSTOMER_ID,
+    workspaces: [{ id: CUSTOMER_ID, kind: "customer", name: "Harbor Dental", access: "member", role: "owner" }], work: [],
+  })));
+  await page.route("**/api/work-allowances?**", route => fulfill(route, { allowances: [], currentActorId: "owner", policy: { stripeSynchronized: false }, subscription: {
+    subscriptionId: "sub_past_due",
+    customerId: "cus_harbor",
+    configKey: "included-standard",
+    status: "past_due",
+    periodStart: "2026-09-01T00:00:00.000Z",
+    periodEnd: "2026-10-01T00:00:00.000Z",
+    lastEventCreated: 1_800_000_000,
+    synchronizedAt: "2026-09-20T12:00:00.000Z",
+  } }));
+  await page.goto(`/workspace?workspaceId=${CUSTOMER_ID}&view=settings`);
+  await expect(page.getByText("No work allowance is recorded for this business.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Payment needs attention. No new included work is added while billing is past due.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Only recorded allowances can be used for work.", { exact: true })).toBeVisible();
+});
+
+test("switching businesses clears the previous payer while the next history loads", async ({ page }) => {
+  const nextId = "98989898-9898-4989-8989-989898989898";
+  const workspaces: WorkspaceSnapshot["workspaces"] = [
+    { id: CUSTOMER_ID, kind: "customer", name: "Harbor Dental", access: "member", role: "owner" },
+    { id: nextId, kind: "customer", name: "Lake Bakery", access: "member", role: "owner" },
+  ];
+  await mockWorkspace(page, route => fulfill(route, snapshot({ workspaceId: new URL(route.request().url()).searchParams.get("workspaceId") || CUSTOMER_ID, workspaces, work: [] })));
+  let pending: Route | undefined;
+  await page.route("**/api/work-economics/payer-transition**", route => {
+    if (new URL(route.request().url()).searchParams.get("workspaceId") === nextId) { pending = route; return; }
+    return fulfill(route, { currentActorId: "owner", transitions: [], pending: null, current: { id: "accepted", successorEmail: "harbor-payer@example.test", status: "accepted", acceptedAt: "2026-09-20T12:00:00Z" } });
+  });
+  await page.goto(`/workspace?workspaceId=${CUSTOMER_ID}&view=settings`);
+  await expect(page.getByText("harbor-payer@example.test", { exact: false })).toBeVisible();
+  await page.getByLabel("Current workspace").selectOption(nextId);
+  await expect(page).toHaveURL(new RegExp(nextId));
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect.poll(() => Boolean(pending)).toBe(true);
+  await expect(page.getByText("harbor-payer@example.test", { exact: false })).toHaveCount(0);
+  await fulfill(pending!, { currentActorId: "owner", transitions: [], pending: null, current: null });
+  await expect(page.getByText("No successor payer has been accepted for future jobs.", { exact: true })).toBeVisible();
+});
+
+test("onboarding opens inside the shared workspace navigation", async ({ page }) => {
+  await mockWorkspace(page, route => fulfill(route, snapshot({ workspaceId: CUSTOMER_ID,
+    workspaces: [{ id: CUSTOMER_ID, kind: "customer", name: "Harbor Dental", access: "member", role: "owner" }], work: [],
+  })));
+  await page.route("**/api/onboarding?**", route => fulfill(route, { cases: [] }));
+  await page.goto(`/workspace?workspaceId=${CUSTOMER_ID}&view=onboarding`);
+  await expect(page.getByRole("heading", { name: "Collect the right records.", exact: true })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "Strelva navigation", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Case title", { exact: true })).toBeVisible();
+  await expect(page.getByRole("main")).toHaveCount(1);
+});
+
+for (const width of [1440, 390]) {
+test(`saved custom applications reopen in the shared workspace and expose unavailable records at ${width}px`, async ({ page }) => {
+  await page.setViewportSize({ width, height: 900 });
+  await mockWorkspace(page, route => fulfill(route, snapshot({ workspaceId: CUSTOMER_ID,
+    workspaces: [{ id: CUSTOMER_ID, kind: "customer", name: "Harbor Dental", access: "member", role: "owner" }],
+    work: [work({ id: CUSTOMER_WORK_ID, workspaceId: CUSTOMER_ID, productId: "custom-applications", resourceKind: "custom-application", title: "Appointment estimator", payload: null })],
+  })));
+  let retryStarted = false;
+  await page.route(`**/api/custom-applications/${CUSTOMER_WORK_ID}/manage`, route => fulfill(route, { error: retryStarted ? "The build record is still unavailable. Your saved application remains." : "Custom build records are temporarily unavailable." }, 503));
+  await page.goto(`/workspace?workspaceId=${CUSTOMER_ID}&work=${CUSTOMER_WORK_ID}`);
+  await expect(page.getByText("Custom build records are temporarily unavailable.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Loading custom application…", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Try again", exact: true }).focus();
+  retryStarted = true;
+  await page.keyboard.press("Enter");
+  await expect(page.getByText("The build record is still unavailable. Your saved application remains.", { exact: true })).toBeVisible();
+  if (width > 768) await expect(page.getByRole("complementary", { name: "Strelva navigation", exact: true })).toBeVisible();
+  await expect(page.getByRole("main")).toHaveCount(1);
+  await page.screenshot({ path: `/tmp/strelva-custom-shell-${width}.png`, fullPage: true });
+});
+}

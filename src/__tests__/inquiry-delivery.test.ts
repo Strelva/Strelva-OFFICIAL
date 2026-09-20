@@ -82,6 +82,7 @@ function deps(
     transport,
     now: () => NOW,
     resolveRoute: async () => route,
+    isWorkspaceExited: async () => false,
     ...extra,
   };
 }
@@ -148,6 +149,92 @@ describe("inquiry delivery connector", () => {
     expect(result.reason).toBe("owner paused inquiry handling");
     expect(transport.send).not.toHaveBeenCalled();
     expect((await store.listTimeline?.({ tenantId: inquiry.tenantId, inquiryId: inquiry.id }))?.[0]?.outcome).toBe("blocked");
+  });
+
+  it("blocks a new delivery after exit while preserving accepted receipt recovery", async () => {
+    const store = createMemoryInquiryDeliveryStore();
+    const transport: InquiryOutboundTransport = {
+      send: vi.fn(async () => ({ status: "accepted" as const, providerMessageId: "provider-exit", acceptedAt: NOW.toISOString() })),
+      verify: vi.fn()
+        .mockResolvedValueOnce({ status: "unverified" as const, reason: "provider readback delayed", retryable: true })
+        .mockResolvedValueOnce({ status: "verified" as const, evidence: ["provider readback"] }),
+    };
+    const first = await deliverInquiryAction(inquiry, "reply", {
+      policy: policy(),
+      responsibilityGate: gate(),
+      deps: deps(store, transport),
+    });
+    const recovered = await deliverInquiryAction(inquiry, "reply", {
+      policy: policy(),
+      responsibilityGate: gate(),
+      deps: deps(store, transport, { isWorkspaceExited: async () => true }),
+    });
+
+    expect(first.status).toBe("accepted_unverified");
+    expect(recovered.status).toBe("verified");
+    expect(transport.send).toHaveBeenCalledTimes(1);
+    expect(transport.verify).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not claim a new provider send after exit", async () => {
+    const store = createMemoryInquiryDeliveryStore();
+    const transport: InquiryOutboundTransport = {
+      send: vi.fn(async () => ({ status: "accepted" as const })),
+      verify: vi.fn(async () => ({ status: "unavailable" as const, reason: "not used" })),
+    };
+    const result = await deliverInquiryAction(inquiry, "reply", {
+      policy: policy(),
+      responsibilityGate: gate(),
+      deps: deps(store, transport, { isWorkspaceExited: async () => true }),
+    });
+
+    expect(result).toMatchObject({ status: "paused", reason: "workspace_exit_future_work_blocked" });
+    expect(transport.send).not.toHaveBeenCalled();
+  });
+
+  it("rechecks exit after claiming and retires a late claim before provider send", async () => {
+    const store = createMemoryInquiryDeliveryStore();
+    const transport: InquiryOutboundTransport = {
+      send: vi.fn(async () => ({ status: "accepted" as const })),
+      verify: vi.fn(async () => ({ status: "unavailable" as const, reason: "not used" })),
+    };
+    let reads = 0;
+    const result = await deliverInquiryAction(inquiry, "reply", {
+      policy: policy(),
+      responsibilityGate: gate(),
+      deps: deps(store, transport, { isWorkspaceExited: async () => ++reads > 1 }),
+    });
+
+    expect(result).toMatchObject({ status: "paused", reason: "workspace_exit_future_work_blocked" });
+    expect(reads).toBe(2);
+    expect(transport.send).not.toHaveBeenCalled();
+    expect(await store.getCheckpoint({ tenantId: inquiry.tenantId, inquiryId: inquiry.id, action: "reply" })).toMatchObject({
+      status: "failed",
+      failureReason: "workspace_exit_future_work_blocked",
+      retryable: false,
+    });
+  });
+
+  it("keeps an unknown provider outcome available for reconciliation after exit", async () => {
+    const store = createMemoryInquiryDeliveryStore();
+    const transport: InquiryOutboundTransport = {
+      send: vi.fn(async () => ({ status: "unknown" as const, reason: "provider receipt pending" })),
+      verify: vi.fn(async () => ({ status: "unavailable" as const, reason: "reconciliation reads the provider separately" })),
+    };
+    const first = await deliverInquiryAction(inquiry, "reply", {
+      policy: policy(),
+      responsibilityGate: gate(),
+      deps: deps(store, transport),
+    });
+    const afterExit = await deliverInquiryAction(inquiry, "reply", {
+      policy: policy(),
+      responsibilityGate: gate(),
+      deps: deps(store, transport, { isWorkspaceExited: async () => true }),
+    });
+
+    expect(first.status).toBe("reconciliation_required");
+    expect(afterExit).toMatchObject({ status: "reconciliation_required", reason: "prior_attempt_may_have_reached_provider" });
+    expect(transport.send).toHaveBeenCalledTimes(1);
   });
 
   it("keeps supervised actions blocked until an exact, current approval exists", async () => {

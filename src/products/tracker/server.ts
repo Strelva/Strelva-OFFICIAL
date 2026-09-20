@@ -3,12 +3,14 @@ import { z } from "zod";
 import { getSupabase } from "@/lib/db/client";
 import type { WorkspaceDb } from "@/platform/workspaces/schema";
 import { getWork, saveWork, assertCanSaveWork, assertWorkspaceMember, listWork } from "@/platform/workspaces/repository";
-import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
+import { WORKSPACE_EXIT_STOPPED_MESSAGE, WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { previewTrackerImport } from "./import";
 import { createTracker, applyTrackerCommand, parseTrackerSnapshot, trackerWorkPayload } from "./engine";
 import { trackerImportInputSchema, trackerMappingSelectionSchema, trackerCommandSchema, type TrackerSnapshot, type TrackerHistoryEntry } from "./contracts";
 import { summarizeTrackerExperiment, trackerExperimentInputSchema, trackerExperimentSchema } from "./experiment";
 import { summarizeTrackerComparison, trackerExperimentComparisonInputSchema } from "./comparison";
+
+export { parseTrackerCsv } from "./csv";
 
 const uuid = z.string().uuid();
 const createSchema = z.object({ workspaceId: uuid, input: trackerImportInputSchema, title: z.string().trim().min(1).max(160), mapping: z.array(trackerMappingSelectionSchema).max(50).optional() });
@@ -95,6 +97,7 @@ export async function editSavedTracker(actor: WorkspaceActor, workId: string, ra
   const rpc = db as unknown as { rpc(name: string, input: Record<string, unknown>): Promise<{ data: Array<{ payload: { tracker: TrackerSnapshot } }> | null; error: { message: string } | null }> };
   const { data, error } = await rpc.rpc("update_tracker_work", { p_work_id: saved.workId, p_workspace_id: saved.workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail, p_expected_revision: command.baseRevision, p_payload: trackerWorkPayload(tracker) });
   if (error?.message.includes("workspace_access_denied")) throw new WorkspaceAccessError();
+  if (error?.message.includes("workspace_exit_future_work_blocked")) throw new WorkspaceConflictError(WORKSPACE_EXIT_STOPPED_MESSAGE);
   if (error?.message.includes("tracker_revision_conflict")) throw new WorkspaceConflictError();
   if (error || !data?.[0]) throw new WorkspaceStoreError("The edit could not be confirmed.");
   const persisted = parseTrackerSnapshot(data[0].payload.tracker);

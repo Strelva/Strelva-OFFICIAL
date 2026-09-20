@@ -1,4 +1,5 @@
 export type {
+  ApplicationRecordEditScope,
   ApplicationRecordReadScope,
   ApplicationUseSnapshot,
   ApplicationViewKind,

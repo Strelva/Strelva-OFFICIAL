@@ -27,6 +27,7 @@ interface Props {
   onAccess?: () => void;
   onSearch?: () => void;
   onStart?: () => void;
+  startDisabled?: boolean;
   contentId?: string;
   rightRail?: ReactNode;
   rightRailOpen?: boolean;
@@ -35,7 +36,7 @@ interface Props {
 }
 
 /** Shared presentation only. Each resource retains its existing server authorization and runtime. */
-export function StrelvaShell({ children, active, title = "Strelva", context, navigation, actions, notice, accountName = "Your account", accountDetail, signedIn = true, signInHref, signOut, appBase = "", onNavigate, onAccess, onSearch, onStart, contentId = "strelva-main", rightRail, rightRailOpen, onCloseRightRail, rightRailTriggerRef }: Props) {
+export function StrelvaShell({ children, active, title = "Strelva", context, navigation, actions, notice, accountName = "Your account", accountDetail, signedIn = true, signInHref, signOut, appBase = "", onNavigate, onAccess, onSearch, onStart, startDisabled = false, contentId = "strelva-main", rightRail, rightRailOpen, onCloseRightRail, rightRailTriggerRef }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const menuRef = useRef<HTMLButtonElement>(null);
   const ready = useHydrationReady();
@@ -70,6 +71,7 @@ export function StrelvaShell({ children, active, title = "Strelva", context, nav
             onNavigate={onNavigate ? (section) => section === "access" && onAccess ? onAccess() : onNavigate(section) : undefined}
             onSearch={onSearch}
             onStart={onStart}
+            startDisabled={startDisabled}
             signedIn={signedIn}
             signInHref={signInHref}
             signOut={signOut}

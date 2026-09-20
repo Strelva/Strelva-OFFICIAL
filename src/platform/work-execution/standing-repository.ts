@@ -4,6 +4,7 @@ import {
   WorkspaceAccessError,
   WorkspaceConflictError,
   WorkspaceStoreError,
+  WORKSPACE_EXIT_STOPPED_MESSAGE,
   type WorkspaceActor,
 } from "@/platform/workspaces/types";
 import { assertCanSaveWork, assertWorkspaceMember } from "@/platform/workspaces/repository";
@@ -129,6 +130,7 @@ function integer(value: unknown, field: string): number {
 function databaseError(error: DbFailure, fallback: string): never {
   const detail = `${text(error?.code)} ${text(error?.message)}`;
   if (detail.includes("standing_workspace_denied") || detail.includes("standing_identity_denied")) throw new WorkspaceAccessError();
+  if (detail.includes("workspace_exit_future_work_blocked")) throw new WorkspaceConflictError(WORKSPACE_EXIT_STOPPED_MESSAGE);
   if (detail.includes("standing_not_found")) throw new WorkspaceAccessError();
   if (detail.includes("standing_revision_conflict") || detail.includes("standing_version_conflict")
     || detail.includes("standing_trigger_conflict") || detail.includes("standing_admission_blocked")

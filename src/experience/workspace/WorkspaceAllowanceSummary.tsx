@@ -32,6 +32,18 @@ function unitSummary(bucket: WorkAllowanceRecord["buckets"][number]): string {
   return `${bucket.availableUnits} ${label}${bucket.availableUnits === 1 ? "" : "s"} available`;
 }
 
+function subscriptionSummary(value: AllowanceResponse): string {
+  const subscription = value.subscription;
+  if (!subscription) return "Billing details are not available yet.";
+  if (subscription.status === "unavailable") return "We couldn't confirm included work from billing. No included work is added until billing is confirmed.";
+  if (subscription.status === "cancelled") return "This subscription has ended. Existing allowance records remain available; no new included work is added.";
+  if (subscription.status === "past_due") return "Payment needs attention. No new included work is added while billing is past due.";
+  if (subscription.status === "grandfathered") return "This business uses a grandfathered agreement. Existing allowance rules continue to apply.";
+  if (subscription.status === "pending") return "We're waiting for billing confirmation before adding included work.";
+  if (subscription.status === "trialing") return "Trial billing is confirmed. The allowance below is separate from your invoice.";
+  return "Subscription billing is confirmed. The allowance below is separate from your invoice.";
+}
+
 export function WorkspaceAllowanceSummary({ businessId, enabled, compact = false, onOpenSettings }: { businessId: string; enabled: boolean; compact?: boolean; onOpenSettings?: () => void }) {
   const request = useWorkspaceRequest();
   const [state, setState] = useState<State>({ status: "loading" });
@@ -96,14 +108,14 @@ export function WorkspaceAllowanceSummary({ businessId, enabled, compact = false
         : undefined;
     return <section className={`${styles.panel} ${styles.compactPanel}`} aria-labelledby="home-allowance">
       <header><Gauge size={17} aria-hidden="true" /><h2 id="home-allowance">Work allowance</h2></header>
-      <p className={styles.compactNotice} role={pending ? "alert" : state.status === "loading" || state.status === "error" ? "status" : undefined}><strong>{message}</strong>{detail ? <span>{detail}</span> : null}<span className={styles.compactPolicy}>Allowance records are not synchronized to subscription billing.</span></p>
+      <p className={styles.compactNotice} role={pending ? "alert" : state.status === "loading" || state.status === "error" ? "status" : undefined}><strong>{message}</strong>{detail ? <span>{detail}</span> : null}<span className={styles.compactPolicy}>{state.status === "ready" ? subscriptionSummary(state.value) : "Billing details are unavailable until allowances load."}</span></p>
       {onOpenSettings ? <button type="button" onClick={onOpenSettings}>Open Settings</button> : null}
     </section>;
   }
 
   if (state.status === "loading") return <section className={styles.panel} aria-labelledby="home-allowance"><header><Gauge size={17} aria-hidden="true" /><h2 id="home-allowance">Work allowance</h2></header><p role="status">Loading allowance…</p></section>;
   if (state.status === "error") return <section className={styles.panel} aria-labelledby="home-allowance"><header><Gauge size={17} aria-hidden="true" /><h2 id="home-allowance">Work allowance</h2></header><p>Allowance records are unavailable. Installed offerings and saved work are unchanged.</p><button type="button" onClick={() => void load()}><RefreshCw size={13} aria-hidden="true" />Try again</button></section>;
-  if (!state.value.allowances.length) return null;
+  if (!state.value.allowances.length) return <section className={styles.panel} aria-labelledby="home-allowance"><header><Gauge size={17} aria-hidden="true" /><h2 id="home-allowance">Work allowance</h2></header><p>No work allowance is recorded for this business.</p><p className={styles.policy}>{subscriptionSummary(state.value)}</p><p className={styles.policy}>Only recorded allowances can be used for work.</p></section>;
 
   return <section className={styles.panel} aria-labelledby="home-allowance">
     <header><Gauge size={17} aria-hidden="true" /><h2 id="home-allowance">Work allowance</h2><span>{state.value.allowances.length}</span></header>
@@ -111,12 +123,12 @@ export function WorkspaceAllowanceSummary({ businessId, enabled, compact = false
       const canAccept = allowance.status === "pending_cap_acceptance" && allowance.payerId === state.value.currentActorId;
       return <li key={allowance.id}>
         <div className={styles.allowanceHead}><strong>{allowance.status === "pending_cap_acceptance" ? "Cap needs your acceptance" : allowance.status === "closed" ? "Closed period" : "Active period"}</strong><small>{period(allowance)}</small></div>
-        <dl><div><dt>Operational cap</dt><dd>{money(allowance.spendingCapCents)}</dd></div><div><dt>Recorded cost</dt><dd>{money(allowance.actualCostCents)}</dd></div></dl>
+        <dl><div><dt>Named payer</dt><dd>{allowance.payerId === state.value.currentActorId ? "You" : "Named business payer"}</dd></div><div><dt>Operational cap</dt><dd>{money(allowance.spendingCapCents)}</dd></div><div><dt>Recorded cost</dt><dd>{money(allowance.actualCostCents)}</dd></div></dl>
         <p>{allowance.buckets.map(unitSummary).join(" · ")}</p>
         {canAccept ? <button type="button" disabled={Boolean(state.acceptingId)} onClick={() => void accept(allowance.id)}>{state.acceptingId === allowance.id ? "Accepting…" : `Accept ${money(allowance.spendingCapCents)} cap`}</button> : null}
       </li>;
     })}</ul>
-    <p className={styles.policy}>Locally configured. This cap limits operational cost; it is not an invoice price and is not synchronized to subscription billing.</p>
+    <p className={styles.policy}>{state.value.allowances.some((allowance) => allowance.source === "subscription_configured") ? "This allowance covers configured subscription usage. The cap limits operational spending; it is separate from your invoice." : "This allowance was set up for this business. The cap limits operational spending; it is separate from your invoice."} {subscriptionSummary(state.value)}</p>
     {state.error ? <p className={styles.error} role="alert">{state.error}</p> : null}
   </section>;
 }

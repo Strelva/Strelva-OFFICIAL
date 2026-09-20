@@ -5,6 +5,7 @@ import {
   WorkspaceAccessError,
   WorkspaceConflictError,
   WorkspaceStoreError,
+  WORKSPACE_EXIT_STOPPED_MESSAGE,
   type AcceptedHandoff,
   type Delegation,
   type Handoff,
@@ -46,6 +47,7 @@ const CONFLICT_FAILURES = [
   "workspace_limit_reached",
   "saved_work_limit_reached",
   "pending_handoff_limit_reached",
+  "workspace_exit_future_work_blocked",
 ] as const;
 
 function workspaceDbFailure(error: DbFailure, fallback: string): never {
@@ -54,7 +56,7 @@ function workspaceDbFailure(error: DbFailure, fallback: string): never {
     throw new WorkspaceAccessError();
   }
   if (CONFLICT_FAILURES.some((value) => detail.includes(value))) {
-    throw new WorkspaceConflictError();
+    throw new WorkspaceConflictError(detail.includes("workspace_exit_future_work_blocked") ? WORKSPACE_EXIT_STOPPED_MESSAGE : undefined);
   }
   throw new WorkspaceStoreError(fallback);
 }
@@ -256,6 +258,35 @@ async function delegatedWorkIds(userId: string, workspaceId?: string): Promise<s
   return (data ?? []).map((row) => asString((row as DbRow).customer_work_id)).filter(Boolean);
 }
 
+/**
+ * An accepted agency assignment grants access to its exact customer work row
+ * for the duration of that assignment. It does not make the agency a member
+ * of the customer workspace and is deliberately checked only for one work id.
+ */
+async function assignedAgencyWorkAccess(userId: string, verifiedEmail: string, workspaceId: string, workId: string): Promise<boolean> {
+  const rpc = db() as unknown as {
+    rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: DbFailure }>;
+  };
+  const { data, error } = await rpc.rpc("agency_can_read_assigned_work", {
+    p_user_id: userId,
+    p_verified_email: verifiedEmail,
+    p_workspace_id: workspaceId,
+    p_work_id: workId,
+  });
+  if (error) workspaceDbFailure(error, "Assigned work access is unavailable");
+  return data === true;
+}
+
+/**
+ * Provider delivery is part of the agency read grant. Callers that read an
+ * assignment envelope must use the same exact active-delivery check as native
+ * work reads, so revoking the installation also closes the assignment view.
+ */
+export async function agencyAssignedWorkAccess(input: WorkspaceActor, workspaceId: string, workId: string): Promise<boolean> {
+  const a = actor(input);
+  return assignedAgencyWorkAccess(a.userId, a.verifiedEmail, workspaceId, workId);
+}
+
 export async function listWork(input: WorkspaceActor, workspaceId: string): Promise<SavedWork[]> {
   const a = actor(input);
   const role = await directRole(a.userId, workspaceId);
@@ -278,8 +309,8 @@ export async function getWork(input: WorkspaceActor, id: string): Promise<SavedW
   const work = mapWork(data as DbRow);
   if (await directRole(a.userId, work.workspaceId)) return work;
   const delegated = await delegatedWorkIds(a.userId, work.workspaceId);
-  if (!delegated.includes(id)) throw new WorkspaceAccessError();
-  return work;
+  if (delegated.includes(id) || await assignedAgencyWorkAccess(a.userId, a.verifiedEmail, work.workspaceId, id)) return work;
+  throw new WorkspaceAccessError();
 }
 
 export async function assertCanSaveWork(input: WorkspaceActor, workspaceId: string): Promise<void> {

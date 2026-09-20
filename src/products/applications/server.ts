@@ -4,6 +4,8 @@ import {
   WorkspaceAccessError,
   WorkspaceConflictError,
   WorkspaceStoreError,
+  WORKSPACE_EXIT_RESOURCES_STOPPED_MESSAGE,
+  WORKSPACE_EXIT_STOPPED_MESSAGE,
   type SavedWork,
   type WorkspaceActor,
 } from "@/platform/workspaces/types";
@@ -29,6 +31,7 @@ import {
   type ApplicationRuntime,
   type ApplicationSpec,
 } from "./contracts";
+import { isApplicationDateOnly } from "./date-only";
 
 export {
   applicationCandidateSchema,
@@ -154,8 +157,14 @@ function isMissingRelation(error: DbFailure): boolean {
 
 function mapDbFailure(error: DbFailure, fallback: string): never {
   const detail = `${error?.code ?? ""} ${error?.message ?? ""}`.toLowerCase();
-  if (detail.includes("access_denied") || detail.includes("verified_identity_required")) {
+  if (detail.includes("access_denied") || detail.includes("agency_application_draft_edit_denied") || detail.includes("verified_identity_required")) {
     throw new WorkspaceAccessError();
+  }
+  if (detail.includes("workspace_exit_future_work_blocked")) {
+    throw new WorkspaceConflictError(WORKSPACE_EXIT_STOPPED_MESSAGE);
+  }
+  if (detail.includes("workspace_exit_resource_stopped")) {
+    throw new WorkspaceConflictError(WORKSPACE_EXIT_RESOURCES_STOPPED_MESSAGE);
   }
   if (
     detail.includes("revision_conflict") ||
@@ -253,10 +262,13 @@ function validateRecord(spec: ApplicationSpec, record: ApplicationRecord): void 
       if (field.required) throw new WorkspaceConflictError(`${field.label} is required.`);
       continue;
     }
-    const expectedType = field.type === "text" || field.type === "select" ? "string" : field.type;
+    const expectedType = field.type === "text" || field.type === "select" || field.type === "date" ? "string" : field.type;
     if (typeof value !== expectedType) throw new WorkspaceConflictError(`${field.label} has the wrong type.`);
     if (field.type === "select" && !field.options.includes(value as string)) {
       throw new WorkspaceConflictError(`${field.label} must use one of the available options.`);
+    }
+    if (field.type === "date" && !isApplicationDateOnly(value)) {
+      throw new WorkspaceConflictError(`${field.label} must be a real date in YYYY-MM-DD format.`);
     }
   }
 }
@@ -442,6 +454,18 @@ async function ensureManager(store: BoundedStore, actor: WorkspaceActor, work: S
   if (!durableDb(store) && work.createdBy !== actor.userId) throw new WorkspaceAccessError("Application design access is required.");
 }
 
+/**
+ * Candidate writes have a second durable authority: a customer may name one
+ * active agency operator for one installed application draft. The database
+ * RPC rechecks that grant together with the current assignment, delivery,
+ * installation, sponsor, membership, and candidate revision while holding
+ * the work lock. In-memory stores have no delegated authority surface, so
+ * they retain the manager-only behavior used by focused unit tests.
+ */
+async function ensureCandidateEditor(store: BoundedStore, actor: WorkspaceActor, work: SavedWork): Promise<void> {
+  if (!durableDb(store)) await ensureManager(store, actor, work);
+}
+
 /** Builds private initial state; persistence and plan-output receipts retain their existing transaction boundaries. */
 export function createApplicationDraft(raw: unknown, actor: WorkspaceActor) {
   const spec = applicationSpecSchema.parse(raw);
@@ -518,7 +542,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     const input = applicationReviseInputSchema.parse(raw);
     const db = durableDb(store);
     const permission = await load(store, actor, id);
-    await ensureManager(store, actor, permission.work);
+    await ensureCandidateEditor(store, actor, permission.work);
     if (db) {
       await durableRpc(db, "update_application_candidate", {
         p_work_id: id,
@@ -553,7 +577,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     const input = applicationRehearseInputSchema.parse(raw);
     const db = durableDb(store);
     const permission = await load(store, actor, id);
-    await ensureManager(store, actor, permission.work);
+    await ensureCandidateEditor(store, actor, permission.work);
     if (db) {
       await durableRpc(db, "rehearse_application_candidate", {
         p_work_id: id,
@@ -716,7 +740,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     // before translation so stale dashboard links retain their conflict UX.
     if (durableDb(store)) {
       const loaded = await load(store, actor, id);
-      if (command.kind !== "submit") await ensureManager(store, actor, loaded.work);
+      if (command.kind !== "submit" && command.kind !== "revise" && command.kind !== "rehearse") await ensureManager(store, actor, loaded.work);
       const aggregateRevision = "expectedRevision" in command ? command.expectedRevision : undefined;
       const designRevision = "expectedDesignRevision" in command ? command.expectedDesignRevision : undefined;
       if (aggregateRevision !== undefined) {
@@ -897,3 +921,30 @@ export const rehearseApplication = rehearseWorkspaceApplication;
 export const publishApplication = publishWorkspaceApplication;
 export const rollbackApplication = rollbackWorkspaceApplication;
 export const submitApplicationRecord = submitWorkspaceApplicationRecord;
+
+/**
+ * Rehearse the exact application named by an accepted operational assignment.
+ * The database RPC rechecks the accepted delivery and native resource before
+ * writing the rehearsal receipt; this entry point intentionally skips the
+ * ordinary customer-manager gate because the assignment is the scoped grant.
+ */
+export async function rehearseApplicationCandidateForAssignment(
+  actor: WorkspaceActor,
+  workId: string,
+  expectedDesignRevision: number,
+) {
+  const loaded = await load(boundedStore, actor, workId);
+  if (loaded.state.candidate.designRevision !== expectedDesignRevision) {
+    throw new WorkspaceConflictError("This application candidate changed. Reload before rehearsing it.");
+  }
+  const db = durableDb(boundedStore);
+  if (!db) throw new WorkspaceStoreError("Application release storage is unavailable.");
+  await durableRpc(db, "rehearse_application_candidate", {
+    p_work_id: workId,
+    p_workspace_id: loaded.work.workspaceId,
+    p_expected_design_revision: expectedDesignRevision,
+    p_user_id: actor.userId,
+    p_verified_email: actor.verifiedEmail,
+  }, "The application candidate could not be rehearsed.");
+  return readWorkspaceApplication(actor, workId);
+}

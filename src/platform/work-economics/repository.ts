@@ -16,6 +16,7 @@ import {
   type JobEconomicsRecord,
   type JobEconomicsUsage,
 } from "./types";
+import { WORKSPACE_EXIT_STOPPED_MESSAGE } from "@/platform/workspaces/types";
 
 type DbRow = Record<string, unknown>;
 type DbTable = { Row: DbRow; Insert: DbRow; Update: DbRow; Relationships: [] };
@@ -186,6 +187,7 @@ function failureDetail(error: unknown): string {
 
 function mapDatabaseError(error: unknown): never {
   const detail = failureDetail(error);
+  if (detail.includes("workspace_exit_future_work_blocked")) throw new JobEconomicsConflictError(WORKSPACE_EXIT_STOPPED_MESSAGE);
   if (detail.includes("job_economics_identity_denied")) throw new JobEconomicsAccessError("A verified signed-in identity is required.");
   if (detail.includes("job_economics_workspace_denied")) throw new JobEconomicsAccessError();
   if (detail.includes("job_economics_payer_required")) throw new JobEconomicsPayerError();

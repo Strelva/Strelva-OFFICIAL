@@ -22,6 +22,11 @@ import {
   recordInquiryEvidence,
   validateInquiryFields,
 } from "@/products/inquiries/server";
+import {
+  INQUIRY_WORKSPACE_EXIT_CODE,
+  InquiryWorkspaceExitUnavailableError,
+  resolveInquiryWorkspace,
+} from "@/products/inquiries/server";
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -129,10 +134,26 @@ export async function POST(
         return corsJson({ error: "Invalid inquiry submission" }, 400);
       }
 
+      let workspace: Awaited<ReturnType<typeof resolveInquiryWorkspace>>;
+      try {
+        workspace = await resolveInquiryWorkspace({
+          tenantId: tenant,
+          tenantStableId: config.stableId,
+          fallbackBusinessId: config.stableId ?? tenant,
+        });
+      } catch (error) {
+        if (error instanceof InquiryWorkspaceExitUnavailableError) {
+          return corsJson({ error: "Inquiry intake is temporarily unavailable.", code: error.code }, 503);
+        }
+        throw error;
+      }
+      if (workspace.exitCompleted) {
+        return corsJson({ error: "Inquiry intake is stopped for this workspace.", code: INQUIRY_WORKSPACE_EXIT_CODE }, 409);
+      }
       const inquiryRepository = getInquiryRepository();
-      const businessId = config.stableId ?? tenant;
+      const businessId = workspace.businessId;
       const snapshot = await inquiryRepository.getSnapshot(tenant, businessId);
-      const capability = snapshot?.state.capabilities.find((item) => item.id === capabilityId && item.businessId === (config.stableId ?? tenant));
+      const capability = snapshot?.state.capabilities.find((item) => item.id === capabilityId && item.businessId === businessId);
       const published = capability ? projectPublishedInquiry(capability) : null;
       if (!published) return corsJson({ error: "Inquiry form unavailable." }, 404);
       if (published.version !== Number(capabilityVersion)) {
@@ -172,6 +193,24 @@ export async function POST(
         return corsJson({ error: "Inquiry capture is temporarily unavailable." }, 503);
       }
       if (captured.status === "unavailable") return corsJson({ error: "Inquiry capture is temporarily unavailable." }, 503);
+      // Re-read the mapped workspace after Redis capture. A concurrent exit
+      // may leave the lead as retained evidence, but it must not proceed into
+      // a new durable inquiry receipt or delivery path.
+      try {
+        const afterCapture = await resolveInquiryWorkspace({
+          tenantId: tenant,
+          tenantStableId: config.stableId,
+          fallbackBusinessId: businessId,
+        });
+        if (afterCapture.exitCompleted) {
+          return corsJson({ error: "Inquiry intake is stopped for this workspace.", code: INQUIRY_WORKSPACE_EXIT_CODE }, 409);
+        }
+      } catch (error) {
+        if (error instanceof InquiryWorkspaceExitUnavailableError) {
+          return corsJson({ error: "Inquiry provenance is temporarily unavailable.", code: error.code }, 503);
+        }
+        throw error;
+      }
       const durableLead = captured.status === "captured" || captured.status === "duplicate" ? captured.lead : undefined;
       if (durableLead) {
         const evidence = await recordInquiryEvidence({

@@ -88,6 +88,15 @@ describe("content versioning — append / get / restore", () => {
     expect(head!.changes).toEqual(changes);
   });
 
+  it("retains the governed request identity beside the published version", async () => {
+    const requestId = "evt_website_request_123";
+    await appendVersion("hero", { headline: "Requested change" }, "user", TEST_TENANT, [], requestId);
+
+    const [head] = await getVersions("hero", TEST_TENANT);
+    expect(head!.requestId).toBe(requestId);
+    expect(head!.changes).toEqual([]);
+  });
+
   it("restores an older version: appends a new head equal to it AND preserves the prior head", async () => {
     const v1Data = { headline: "v1-original" };
     const v2Data = { headline: "v2-latest" };

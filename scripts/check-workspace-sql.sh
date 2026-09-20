@@ -145,6 +145,23 @@ create table public.memberships (
   unique (user_id,tenant_id)
 );
 SQL
+
+# Inquiry capability state is kept on the workspace SQL cluster as well as the
+# focused inquiry cluster below, so its tenant-to-customer exit mapping is
+# exercised against the same offering and exit tables used by the aggregate.
+psql "${psql_args[@]}" <<'SQL'
+create or replace function public.set_tenant_stable_id() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  select stable_id into new.tenant_stable_id from public.tenants where id = new.tenant_id;
+  if new.tenant_stable_id is null then
+    raise exception 'tenant_stable_id_not_found';
+  end if;
+  return new;
+end;
+$$;
+SQL
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260911100000_inquiry_capability_workspace.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260915060000_offering_websites.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/offering-websites-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260918120000_public_continuation_imports.sql"
@@ -246,6 +263,38 @@ do $$ begin
   end if;
 end $$;
 SQL
+
+# September 20 completion migrations and focused behavioral fixtures.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920010000_application_date_fields.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920010100_application_record_edits.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920010200_application_edit_field_preservation.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920020000_onboarding_work.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920020100_onboarding_attachment_immutability.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920030000_agency_provider_delivery.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920030100_agency_work_access.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920030200_agency_application_draft_authority.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920030201_agency_application_draft_authority_fix.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920040000_offering_inquiry_workspace.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920050000_custom_application_lifecycle.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920050100_custom_application_economics.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920070000_workspace_calendar_connections.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920070100_workspace_calendar_event_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920080000_subscription_allowance_entitlements.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920080100_trusted_provider_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920080200_precise_provider_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920100000_workspace_exit.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920100100_workspace_export_v2.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920100200_workspace_exit_export_boundaries.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920110000_inquiry_workspace_exit.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-exit-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-workspace-exit-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-export-v2-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/application-record-edits-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/onboarding-work-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/custom-application-lifecycle-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-calendar-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/work-economics-billing-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-application-authoring-schema.sql"
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

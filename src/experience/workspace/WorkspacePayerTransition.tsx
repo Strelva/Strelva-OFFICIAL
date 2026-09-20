@@ -12,6 +12,7 @@ export function WorkspacePayerTransition({ workspaceId, canPropose }: { workspac
   const [notice, setNotice] = useState("");
 
   const load = useCallback(async (signal?: AbortSignal) => {
+    setError("");
     try {
       const response = await fetch(`/api/work-economics/payer-transition?workspaceId=${encodeURIComponent(workspaceId)}`, { cache: "no-store", signal });
       const body = await response.json();
@@ -42,13 +43,13 @@ export function WorkspacePayerTransition({ workspaceId, canPropose }: { workspac
   return <section className="mt-7 space-y-4" aria-labelledby="payer-transition-heading" aria-busy={busy}>
     <div><h3 id="payer-transition-heading" className="text-sm font-medium text-warm-black">Payer for future jobs</h3>
       <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-muted">An accepted change applies only to jobs created afterward. Existing budgets, reservations, recorded costs, and unresolved holds keep their original payer and limit.</p></div>
-    {error ? <p role="alert" className="text-sm text-critical">{error}</p> : null}
+    {error ? <div className="space-y-3"><p role="alert" className="text-sm text-critical">{error}</p><Button variant="secondary" disabled={busy} onClick={() => void load()}>Retry payer history</Button></div> : null}
     {notice ? <p role="status" className="text-sm text-positive">{notice}</p> : null}
     {!data && !error ? <p role="status" className="text-sm text-gray-muted">Loading payer history…</p> : null}
-    {data?.current ? <p className="text-sm"><strong>Current accepted successor:</strong> {data.current.successorEmail} <span className="text-gray-muted">since {new Date(data.current.acceptedAt!).toLocaleString()}</span></p> : <p className="text-sm text-gray-muted">No successor payer has been accepted for future jobs.</p>}
+    {data?.current ? <p className="text-sm"><strong>Current accepted successor:</strong> {data.current.successorEmail} <span className="text-gray-muted">since {new Date(data.current.acceptedAt!).toLocaleString()}</span></p> : data ? <p className="text-sm text-gray-muted">No successor payer has been accepted for future jobs.</p> : null}
     {pending ? <div className="rounded-xl border border-gray-border bg-surface-inset p-4 text-sm"><p><strong>Pending:</strong> {pending.successorEmail}</p><p className="mt-1 text-gray-muted">Proposed by {pending.proposerEmail}. Only this addressed verified person can accept.</p>
       <div className="mt-3 flex flex-wrap gap-2">{addressed ? <><Button disabled={busy} onClick={() => void command({ action: "accept", transitionId: pending.id })}>Accept future payer role</Button><Button variant="secondary" disabled={busy} onClick={() => void command({ action: "reject", transitionId: pending.id })}>Decline</Button></> : null}{canPropose ? <Button variant="secondary" disabled={busy} onClick={() => void command({ action: "revoke", transitionId: pending.id })}>Revoke proposal</Button> : null}</div>
-    </div> : canPropose ? <form className="max-w-md space-y-3" onSubmit={event => { event.preventDefault(); const form = new FormData(event.currentTarget); void command({ action: "propose", workspaceId, successorEmail: form.get("successorEmail") }); }}>
+    </div> : canPropose && data ? <form className="max-w-md space-y-3" onSubmit={event => { event.preventDefault(); const form = new FormData(event.currentTarget); void command({ action: "propose", workspaceId, successorEmail: form.get("successorEmail") }); }}>
       <TextInput label="Verified payer email" name="successorEmail" type="email" maxLength={254} required />
       <Button type="submit" disabled={busy}>Propose new payer</Button>
     </form> : null}

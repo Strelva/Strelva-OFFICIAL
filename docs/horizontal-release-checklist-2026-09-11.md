@@ -7,7 +7,10 @@ Auth/Postgres, hosted staging and production evidence remain separate.
 
 ## Current completion evaluation
 
-Jacob requested parallel Sol agents at medium effort to complete the product.
+The September 20 completion wave uses Jacob's requested Luna agents at maximum
+reasoning effort and TDD. The [current completion plan](../todo.md#september-19-completion-plan)
+and [dated acceptance record](./strelvav2-horizontal-acceptance.md#september-20-completion-execution)
+own the full backlog and proof; earlier evaluation records retain their dates.
 UI/UX polish remains deferred; usable existing controls, accessibility, honest
 states and recoverable journeys are required now. The eight
 [PRDs](../../.scratch/strelvav2-experience/spec.md) and existing definition of done
@@ -81,15 +84,33 @@ pnpm test
 pnpm build
 pnpm check:ontology
 pnpm check:boundaries
-pnpm check:custom-repos
+CUSTOM_REPO_VERIFY_PINS=1 pnpm check:custom-repos
 pnpm version:check
 PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-sql
+PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-upgrade
 ```
+
+Use isolated, clean client checkouts at the manifest's exact compatible commits
+for the strict custom-repository gate. Follow the [test environment contract](./testing-and-ci.md)
+to select `CUSTOM_REPO_CHECKOUTS_ROOT`. A development run that skips missing repositories
+does not satisfy this release gate.
 
 Inspect desktop and mobile inquiry, tracker and sharing journeys, including
 loading, empty, unavailable, read-only and stale-edit states. Use unique
 Playwright output directories for parallel runs. Synthetic browser API responses
 prove interaction behavior; they do not prove an authenticated deployed database.
+
+## Candidate migration dependency
+
+The September 20 candidate adds workspace, calendar, billing, exit and export
+contracts. Rehearse the complete ordered tail with `pnpm check:workspace-upgrade`,
+then compare hosted migration history before selecting the pending subset.
+Apply the authorized additive schema before deploying code that calls it. In
+particular, inquiry capture and delivery now resolve installed resources through
+`read_inquiry_workspace_exit`; an unavailable authority stops a new submission or
+send instead of bypassing a recorded exit. A workspace release flag does not
+remove this existing-client dependency. Keep production deployment disabled
+until schema order, current client compatibility and rollback are reviewed.
 
 ## Authenticated staging proof
 

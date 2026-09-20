@@ -260,4 +260,48 @@ describe("workspace help service request", () => {
     await act(async () => pending[2]!.resolve(response({ requests: [] })));
     expect(container.textContent).not.toContain("Request from the first business");
   });
+
+  it("opens exact delivery controls for an accepted agency request", async () => {
+    const agencyId = "20000000-0000-4000-8000-000000000003";
+    const accepted = {
+      ...saved,
+      provider: { kind: "agency" as const, agencyWorkspaceId: agencyId },
+      providerAcceptance: { status: "accepted" as const, actorId: "10000000-0000-0000-8000-000000000005", acceptedAt: "2026-09-20T12:00:00.000Z", note: "Accepted for review." },
+      scope: ["submit_requests", "review_requests"],
+    };
+    const calls: string[] = [];
+    const transport = async (input: RequestInfo | URL) => {
+      const url = String(input);
+      calls.push(url);
+      if (url.includes("/api/service-requests")) return response({ requests: [accepted] });
+      if (url.includes("/api/offerings?")) return response({
+        businessId,
+        permissions: { canRead: true, canManage: true, role: "owner" },
+        definitions: [], websiteBindings: [],
+        installations: [{
+          id: "10000000-0000-4000-8000-000000000003", businessId, status: "active", acceptedScope: accepted.scope,
+          nativeResources: [{ kind: "application", id: "10000000-0000-4000-8000-000000000004" }],
+          responsibility: { kind: "provider_requested", providerKind: "agency", providerName: "North Studio", agencyWorkspaceId: agencyId },
+        }],
+      });
+      if (url.includes("/api/workspace?")) return response({ work: [{ id: "20000000-0000-4000-8000-000000000001", title: "Approved request work", productId: "operations", resourceKind: "responsibility" }] });
+      if (url.includes("/api/offerings/provider-delivery")) return response({ deliveries: [] });
+      throw new Error(`Unexpected request ${url}`);
+    };
+    await act(async () => root.render(createElement(
+      WorkspaceRequestContext.Provider,
+      { value: transport },
+      createElement(WorkspaceHelp, { workspaceId: businessId }),
+    )));
+    await act(async () => {});
+    await act(async () => container.querySelector<HTMLButtonElement>("ul button")!.click());
+    expect(container.textContent).toContain("Move this accepted request into delivery");
+    const review = Array.from(container.querySelectorAll<HTMLButtonElement>("button")).find((button) => button.textContent?.includes("Review delivery options"));
+    expect(review).toBeDefined();
+    await act(async () => review!.click());
+    await act(async () => {});
+    expect(calls.some((url) => url.includes("/api/offerings?")).valueOf()).toBe(true);
+    expect(container.textContent).toContain("Exact accepted scope");
+    expect(container.textContent).toContain("Create exact provider assignment");
+  });
 });

@@ -28,10 +28,18 @@ const responsibility = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("customer_operated"), providerName: z.string().trim().min(1).max(120) }).strict(),
   z.object({
     kind: z.literal("provider_requested"),
-    providerKind: z.enum(["strelva", "named_third_party"]),
+    providerKind: z.enum(["strelva", "agency", "named_third_party"]),
     providerName: z.string().trim().min(1).max(120),
+    agencyWorkspaceId: z.string().uuid().optional(),
     requestNote: z.string().trim().min(1).max(500).optional(),
-  }).strict(),
+  }).strict().superRefine((value, ctx) => {
+    if (value.providerKind === "agency" && !value.agencyWorkspaceId) {
+      ctx.addIssue({ code: "custom", path: ["agencyWorkspaceId"], message: "Choose the agency workspace." });
+    }
+    if (value.providerKind !== "agency" && value.agencyWorkspaceId) {
+      ctx.addIssue({ code: "custom", path: ["agencyWorkspaceId"], message: "An agency workspace is only valid for an agency provider." });
+    }
+  }),
 ]);
 const nativeResource = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("application"), id: UUID }).strict(),

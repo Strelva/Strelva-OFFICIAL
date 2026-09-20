@@ -61,14 +61,23 @@ export async function GET(request: Request) {
     if (!current) return json({ error: { code: "unauthenticated", message: "Sign in with a confirmed email." } }, 401);
     const businessId = new URL(request.url).searchParams.get("businessId") ?? "";
     const deliveries = await service().list(current, businessId);
-    const canManage = (await new OfferingService(new PostgresOfferingStore()).list(current, businessId)).permissions.canManage;
+    let canManage = false;
+    try {
+      canManage = (await new OfferingService(new PostgresOfferingStore()).list(current, businessId)).permissions.canManage;
+    } catch (error) {
+      // Agency members are intentionally not customer-workspace members. Their
+      // delivery list is still readable, but a missing or failed offering read
+      // must remain a source failure rather than looking like no permission.
+      if (!(error instanceof OfferingAccessError)) throw error;
+    }
     const isInternalStaff = await isSuperAdminUser(current.userId);
     return json({ deliveries: await Promise.all(deliveries.map(async (delivery) => {
       const assigned = await inspectOperationalAssignment(current, delivery.assignmentId).catch(() => null);
       return {
         ...delivery,
         canManage,
-        canAccept: delivery.status === "requested" && isInternalStaff && assigned?.assignment.assigneeUserId === current.userId,
+        canAccept: delivery.status === "requested" && assigned?.assignment.assigneeUserId === current.userId
+          && (assigned.assignment.assigneeKind === "agency" || isInternalStaff),
       };
     })) });
   } catch (error) { return failure(error); }

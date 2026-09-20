@@ -320,4 +320,14 @@ describe("proxy frame policy", () => {
     expect(csp).toContain("frame-ancestors 'self' http://localhost:3000");
     expect(csp).not.toContain("frame-ancestors 'none'");
   });
+
+  it("allows the local Supabase loopback in the development connection policy", () => {
+    const csp = buildContentSecurityPolicy({
+      isPreview: false,
+      host: "127.0.0.1:3000",
+      protocol: "http:",
+    });
+
+    expect(csp).toContain("connect-src 'self' https://api.stripe.com https://*.supabase.co https://*.upstash.io https://generativelanguage.googleapis.com https://api.resend.com ws://localhost:* http://localhost:* http://127.0.0.1:*");
+  });
 });

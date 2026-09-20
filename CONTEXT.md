@@ -35,6 +35,19 @@ adoption gaps remain in the foundation inventory.
 
 ## Current product work
 
+Jacob's latest direction makes websites the main current commercial focus and
+self-service the primary experience. The [website release focus](./docs/horizontal-product-brief-2026-09-11.md#september-20-website-release-focus)
+owns that decision. Read the [website release review](./docs/strelvav2-horizontal-acceptance.md#website-release-review)
+for the distinction between existing managed sites, new customer creation and
+outside-site connection. Supporting workspace capabilities remain available
+according to their own evidence; the new focus does not certify a self-service
+website builder or change existing customer obligations.
+
+The September 20 completion work prepares shared version `0.2.0` as an
+Unreleased candidate. The [current execution record](./docs/strelvav2-horizontal-acceptance.md#september-20-completion-execution)
+owns the latest implementation and verification state; [the completion plan](./todo.md#september-19-completion-plan)
+separates local work from operating and production requirements.
+
 The [September 16 transition and hypotheses](./docs/horizontal-product-brief-2026-09-11.md#september-16-transition-and-hypotheses)
 explain the move from hiring Strelva for defined delivery toward using a product
 to improve and operate business work. Improving existing work and enabling

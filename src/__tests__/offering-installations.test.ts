@@ -18,6 +18,8 @@ const BUSINESS_A = "96000000-0000-4000-8000-000000000010";
 const BUSINESS_B = "96000000-0000-4000-8000-000000000011";
 const APP_A = "96000000-0000-4000-8000-000000000020";
 const APP_B = "96000000-0000-4000-8000-000000000021";
+const INQUIRY_A = "96000000-0000-4000-8000-000000000030";
+const INQUIRY_B = "96000000-0000-4000-8000-000000000031";
 const owner: OfferingActor = { userId: "owner-a", verifiedEmail: "owner@example.com" };
 const member: OfferingActor = { userId: "member-a", verifiedEmail: "member@example.com" };
 const outsider: OfferingActor = { userId: "owner-b", verifiedEmail: "outside@example.com" };
@@ -33,6 +35,7 @@ class MemoryOfferingStore implements OfferingStore {
     [outsider.userId, { [BUSINESS_B]: { role: "owner", canManage: true } }],
   ]);
   readonly applicationBusiness = new Map([[APP_A, BUSINESS_A], [APP_B, BUSINESS_B]]);
+  readonly inquiryBusiness = new Map([[INQUIRY_A, BUSINESS_A], [INQUIRY_B, BUSINESS_B]]);
   readonly releasedApplications = new Set([APP_A, APP_B]);
 
   private async access(actor: OfferingActor, businessId: string): Promise<OfferingAccess> {
@@ -80,6 +83,10 @@ class MemoryOfferingStore implements OfferingStore {
       const binding = this.websiteBindings.get(resource.id);
       if (!binding || binding.businessId !== input.businessId || binding.status !== "active") {
         throw new OfferingConflictError("Website attachment is unavailable to this business.");
+      }
+    } else if (resource?.kind === "inquiry_workspace") {
+      if (this.inquiryBusiness.get(resource.id) !== input.businessId) {
+        throw new OfferingConflictError("Native resource is outside this business.");
       }
     } else {
       throw new OfferingConflictError("Native resource is outside this business.");
@@ -322,11 +329,11 @@ describe("offering installation interface", () => {
     await expect(service.read(owner, BUSINESS_A, created.id)).rejects.toBeInstanceOf(OfferingAccessError);
   });
 
-  it("requires an explicit website attachment and keeps the inquiry descriptor unavailable", async () => {
+  it("requires an explicit website attachment and makes the existing inquiry workspace installable", async () => {
     const service = new OfferingService(new MemoryOfferingStore());
     const definitions = (await service.list(owner, BUSINESS_A)).definitions;
     expect(definitions.find((item) => item.id === "managed_website_changes")?.installability).toBe("available");
-    expect(definitions.find((item) => item.id === "customer_inquiry_intake")?.installability).toBe("not_enabled");
+    expect(definitions.find((item) => item.id === "customer_inquiry_intake")?.installability).toBe("available");
     await expect(service.execute(owner, installCommand({
       definitionId: "managed_website_changes",
       nativeResources: [{ kind: "managed_website", id: APP_A }],
@@ -334,6 +341,31 @@ describe("offering installation interface", () => {
       surfaceIds: ["managed_website"],
       configuration: {},
     }))).rejects.toThrow(/attachment|business/i);
+  });
+
+  it("installs the customer inquiry intake against the business-owned workspace and resolves its destination", async () => {
+    const service = new OfferingService(new MemoryOfferingStore());
+    const installation = await service.execute(owner, installCommand({
+      definitionId: "customer_inquiry_intake",
+      idempotencyKey: "inquiry-intake:first",
+      configuration: {},
+      nativeResources: [{ kind: "inquiry_workspace", id: INQUIRY_A }],
+      acceptedScope: ["handle_inquiries"],
+      surfaceIds: ["inquiry_workspace"],
+    }));
+    expect(installation.status).toBe("active");
+    expect(installation.surfaces).toEqual([expect.objectContaining({
+      id: "inquiry_workspace",
+      href: `/workspace?workspaceId=${BUSINESS_A}&view=inquiries&inquiryWorkspaceId=${INQUIRY_A}`,
+    })]);
+    await expect(service.execute(owner, installCommand({
+      definitionId: "customer_inquiry_intake",
+      idempotencyKey: "inquiry-intake:other-business",
+      configuration: {},
+      nativeResources: [{ kind: "inquiry_workspace", id: INQUIRY_B }],
+      acceptedScope: ["handle_inquiries"],
+      surfaceIds: ["inquiry_workspace"],
+    }))).rejects.toThrow(/outside this business/i);
   });
 
   it("attaches a website only through dual ownership and does not turn business access into tenant access", async () => {

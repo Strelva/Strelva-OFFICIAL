@@ -2,6 +2,7 @@ export {
   MAX_PERIOD_SPENDING_CAP_CENTS,
   MAX_WORK_ALLOWANCE_UNITS,
   WORK_ALLOWANCE_SOURCE,
+  WORK_ALLOWANCE_SOURCES,
   WORK_ALLOWANCE_UNIT_KINDS,
   WorkAllowanceAccessError,
   WorkAllowanceConflictError,
@@ -19,6 +20,8 @@ export type {
   WorkAllowanceReservation,
   WorkAllowanceReservationInput,
   WorkAllowanceSettlementInput,
+  WorkAllowanceSource,
+  WorkAllowanceSubscriptionFact,
   WorkAllowanceUnitKind,
 } from "./allowances-types";
 export {

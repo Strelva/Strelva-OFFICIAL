@@ -6,7 +6,7 @@ Strelva has one product version across two repositories:
 - `strelva-marketing` contains the public marketing site and Strelva Labs index.
 
 Both `package.json` files must always contain the same [Semantic
-Versioning](https://semver.org/) value. The current version is `0.1.1`.
+Versioning](https://semver.org/) value. The current candidate version is `0.2.0`; it is not a production release.
 
 ## Release history
 
@@ -14,6 +14,7 @@ Versioning](https://semver.org/) value. The current version is `0.1.1`.
 |---|---|
 | `0.1.0` | Initial Strelva baseline |
 | `0.1.1` | Strelva Labs introduction |
+| `0.2.0` | Unreleased workspace and public-site candidate |
 
 Before `1.0.0`, minor versions may represent larger product changes and patch
 versions may represent smaller public releases. A release that changes only one

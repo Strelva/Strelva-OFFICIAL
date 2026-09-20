@@ -8,6 +8,7 @@ import {
   type ServiceRequest,
   type ServiceRequestActor,
 } from "./types";
+import { WORKSPACE_EXIT_STOPPED_MESSAGE } from "@/platform/workspaces/types";
 import type { ServiceRequestListQuery, ServiceRequestStore } from "./service";
 
 type Failure = { code?: string; message?: string } | null;
@@ -28,6 +29,7 @@ function failure(error: Failure): never | void {
   const detail = `${error.code ?? ""} ${error.message ?? ""}`;
   if (detail.includes("service_request_not_found")) throw new ServiceRequestNotFoundError();
   if (detail.includes("service_request_access_denied") || detail.includes("service_request_provider_ineligible")) throw new ServiceRequestAccessError();
+  if (detail.includes("workspace_exit_future_work_blocked")) throw new ServiceRequestConflictError(WORKSPACE_EXIT_STOPPED_MESSAGE);
   if (detail.includes("service_request_") || error.code === "23505" || error.code === "23503" || error.code === "23514") {
     throw new ServiceRequestConflictError("The service request could not be confirmed. Reload before continuing.");
   }

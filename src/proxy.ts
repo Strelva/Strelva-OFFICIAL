@@ -311,7 +311,7 @@ export function buildContentSecurityPolicy(params: {
           d.startsWith("script-src")
             ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http://localhost:*"
             : d.startsWith("connect-src")
-              ? `${d} ws://localhost:* http://localhost:*`
+              ? `${d} ws://localhost:* http://localhost:* http://127.0.0.1:*`
               : d
         );
 

@@ -139,7 +139,7 @@ function lead(): LeadRecord {
 async function runSweep(
   state: ReturnType<InquiryEngine["snapshot"]>,
   transport: InquiryOutboundTransport,
-  options: { store?: ReturnType<typeof createMemoryInquiryDeliveryStore>; repository?: ReturnType<typeof createInMemoryInquiryRepository>; useProviderOverride?: boolean; now?: string } = {},
+  options: { store?: ReturnType<typeof createMemoryInquiryDeliveryStore>; repository?: ReturnType<typeof createInMemoryInquiryRepository>; useProviderOverride?: boolean; now?: string; workspaceExitCompleted?: (businessId: string) => Promise<boolean> } = {},
 ) {
   const repository = options.repository ?? createInMemoryInquiryRepository();
   await repository.compareAndSwap({ tenantId: TENANT, businessId: BUSINESS, expectedRevision: null, state });
@@ -162,6 +162,10 @@ async function runSweep(
         reason: "test_provider_readback_no_reply",
       }),
     }),
+    // The in-memory repository fixture has no offering-installation authority;
+    // inject that explicit fixture result instead of silently bypassing the
+    // production exit reader.
+    workspaceExitCompleted: options.workspaceExitCompleted ?? (async () => false),
   };
   return runDueInquiryFollowUps(sweepOptions);
 }
@@ -178,6 +182,28 @@ describe("default inquiry follow-up status projection", () => {
     const mail = transport();
     const result = await runSweep(followUpState("handled"), mail);
     expect(result).toMatchObject({ candidates: 1, due: 0, attempted: 0, accepted: 0 });
+    expect(mail.send).not.toHaveBeenCalled();
+  });
+
+  it("skips new inquiry sends after the linked workspace exit while leaving delivery receipts alone", async () => {
+    const mail = transport();
+    const result = await runSweep(followUpState(), mail, { workspaceExitCompleted: async () => true });
+    expect(result).toMatchObject({ candidates: 0, due: 0, attempted: 0, accepted: 0 });
+    expect(mail.send).not.toHaveBeenCalled();
+  });
+
+  it("rechecks the workspace exit while refreshing policy before a send", async () => {
+    const mail = transport();
+    let exitReads = 0;
+    const result = await runSweep(followUpState(), mail, {
+      workspaceExitCompleted: async () => {
+        exitReads += 1;
+        return exitReads > 1;
+      },
+    });
+
+    expect(exitReads).toBeGreaterThanOrEqual(2);
+    expect(result.accepted).toBe(0);
     expect(mail.send).not.toHaveBeenCalled();
   });
 

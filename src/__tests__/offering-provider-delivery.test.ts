@@ -20,6 +20,7 @@ const APPLICATION = "10000000-0000-4000-8000-000000000009";
 const OWNER_ID = "10000000-0000-4000-8000-000000000005";
 const PROVIDER_ID = "10000000-0000-4000-8000-000000000006";
 const OTHER_ID = "10000000-0000-4000-8000-000000000007";
+const AGENCY = "10000000-0000-4000-8000-000000000010";
 const at = "2026-09-18T12:00:00.000Z";
 const expiresAt = "2026-09-20T12:00:00.000Z";
 
@@ -42,7 +43,7 @@ function assignment(status: OperationalAssignment["status"] = "offered"): Operat
   return {
     id: ASSIGNMENT, workspaceId: BUSINESS, workId: "10000000-0000-4000-8000-000000000008",
     sponsorId: OWNER_ID, sponsorEmail: owner.verifiedEmail, assigneeUserId: PROVIDER_ID,
-    assigneeEmail: provider.verifiedEmail, assigneeKind: "strelva", scope: ["operate"], status,
+    assigneeEmail: provider.verifiedEmail, assigneeKind: "strelva", assigneeWorkspaceId: null, scope: ["operate"], status,
     offeredAt: at, expiresAt, acceptedAt: status === "accepted" ? at : null,
     revokedAt: status === "revoked" ? at : null, revokedBy: status === "revoked" ? OWNER_ID : null,
   };
@@ -113,7 +114,7 @@ function harness() {
     },
     async accept(actor, assignmentId) {
       if (actor.userId !== PROVIDER_ID || assignmentId !== ASSIGNMENT || assigned.status === "revoked") throw new OfferingAccessError();
-      assigned = assignment("accepted");
+      assigned = { ...assigned, status: "accepted", acceptedAt: at };
       return structuredClone(assigned);
     },
     async revoke(actor, assignmentId) {
@@ -146,6 +147,19 @@ describe("offering provider delivery", () => {
     expect(accepted).toMatchObject({ status: "accepted", acceptedBy: PROVIDER_ID, customerDecision: "pending" });
     expect(accepted.history.map((event) => event.kind)).toEqual(["requested", "accepted"]);
     expect((await test.service.execute(provider, { action: "accept", deliveryId: first.id })).id).toBe(first.id);
+  });
+
+  it("uses the named agency workspace as the provider boundary without changing the delivery lifecycle", async () => {
+    const test = harness();
+    test.setInstallation(installation({
+      kind: "provider_requested", providerKind: "agency", providerName: "Northstar Agency",
+      agencyWorkspaceId: AGENCY, requestNote: "Review the exact local workflow.",
+    }));
+    test.setAssignment({ ...assignment(), assigneeKind: "agency", assigneeWorkspaceId: AGENCY });
+    const requested = await test.service.execute(owner, request);
+    expect(requested).toMatchObject({ status: "requested", customerDecision: "pending" });
+    const accepted = await test.service.execute(provider, { action: "accept", deliveryId: requested.id });
+    expect(accepted).toMatchObject({ status: "accepted", acceptedBy: PROVIDER_ID });
   });
 
   it("recovers when assignment acceptance commits before the delivery receipt", async () => {

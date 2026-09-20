@@ -27,8 +27,10 @@ export type OfferingResponsibility =
     }
   | {
       kind: "provider_requested";
-      providerKind: "strelva" | "named_third_party";
+      providerKind: "strelva" | "agency" | "named_third_party";
       providerName: string;
+      /** Required for an agency request; keeps the named provider workspace explicit. */
+      agencyWorkspaceId?: string;
       requestNote?: string;
     };
 

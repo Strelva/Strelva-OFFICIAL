@@ -19,14 +19,16 @@ function emptyDraft(): ApplicationUseDraft {
   return { values: {}, recordId: token(), idempotencyKey: token() };
 }
 
-function errorMessage(response: Response, body: unknown, fallback: string): string {
+function errorMessage(response: Response, body: unknown, fallback: string, editing: boolean): string {
+  if (response.status === 409) return editing
+    ? "That record changed. Your correction is still here. Reload before trying again."
+    : "This application changed. Your current draft is still here. Reload before trying again.";
   if (body && typeof body === "object" && typeof (body as { error?: unknown }).error === "string") {
     const detail = (body as { error: string }).error;
     return response.status >= 500 ? `${detail} Your current draft is still here.` : detail;
   }
   if (response.status === 401) return "Sign in with a confirmed email to use this application.";
   if (response.status === 403) return "This application link is no longer available to your account.";
-  if (response.status === 409) return "This application changed. Reload and try again.";
   return fallback;
 }
 
@@ -104,11 +106,12 @@ export function ApplicationUseExperience({ workId }: { workId: string }) {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "submit",
+          action: currentDraft.expectedRecordRevision !== undefined && currentDraft.editingRecordId === currentDraft.recordId ? "edit" : "submit",
           input: {
             record: { id: currentDraft.recordId, values: currentDraft.values },
             releaseVersion: snapshot.releaseVersion,
             idempotencyKey: currentDraft.idempotencyKey,
+            ...(currentDraft.expectedRecordRevision !== undefined ? { expectedRecordRevision: currentDraft.expectedRecordRevision } : {}),
           },
         }),
       });
@@ -129,13 +132,19 @@ export function ApplicationUseExperience({ workId }: { workId: string }) {
           }
         }
         if (response.status === 409) setCanReload(true);
-        setSubmitError(errorMessage(response, body, "The record could not be submitted. Your current draft is still here."));
+        setSubmitError(errorMessage(
+          response,
+          body,
+          "The record could not be submitted. Your current draft is still here.",
+          currentDraft.expectedRecordRevision !== undefined && currentDraft.editingRecordId === currentDraft.recordId,
+        ));
         return;
       }
       setSnapshot(body as ApplicationUseSnapshot);
+      const wasEditing = currentDraft.expectedRecordRevision !== undefined && currentDraft.editingRecordId === currentDraft.recordId;
       const next = emptyDraft();
       updateDraft(next);
-      setMessage("Record submitted.");
+      setMessage(wasEditing ? "Correction saved." : "Record submitted.");
     } catch {
       setSubmitError("The record could not be confirmed. Your current draft is still here.");
     } finally {

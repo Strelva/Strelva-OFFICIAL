@@ -1,5 +1,154 @@
 # Strelva product experience: state and next work
 
+## September 20 website release focus
+
+Jacob selected websites as the main current offer, with self-service as the
+primary experience and agencies participating around client-owned work. The
+[product brief](./docs/horizontal-product-brief-2026-09-11.md#september-20-website-release-focus)
+owns the direction; the [website release review](./docs/strelvav2-horizontal-acceptance.md#website-release-review)
+owns assignments, findings and proof. Read those before the historical backlog
+below. Existing horizontal work and customer compatibility obligations remain.
+
+The parent has verified a candidate baseline through unit coverage, TypeScript,
+build, schema upgrade, browser gates and pinned client checks. Website-specific
+review and repairs are in progress. New-customer self-service creation is a
+confirmed product gap: current onboarding requests an operator build, and
+provisioning assumes a separately built client repository. Do not call that
+path complete from managed-client or workspace tests.
+
+The immediate work is to finish the five website review lanes, resolve supported
+creation and connection scope explicitly, verify the resulting candidate and
+prepare updated PRs. Existing managed website prices remain unchanged. New
+self-service terms and all production actions remain separate decisions.
+
+## September 19 completion plan
+
+Reviewed against `484dd2c1`, the current acceptance ledger, the eight experience
+PRDs and the implementation owners linked below. The earlier 20 follow-up tasks
+cover offering modules; they are not the complete release backlog. This section
+is the current completion sequence. Older sections retain their dated evidence.
+The [acceptance ledger](./docs/strelvav2-horizontal-acceptance.md) remains the
+owner of proof, and the [PRDs](../.scratch/strelvav2-experience/spec.md) remain
+the detailed requirements. No new commercial offer or production authority is
+created by this plan.
+
+### Already done, so do not rebuild
+
+- The first remediation batch is committed and pushed in
+  [draft PR #191](https://github.com/Strelva/Strelva-OFFICIAL/pull/191).
+  Hosted build and secrets checks pass for `484dd2c1`. Draft CI does not run
+  all browser acceptance gates.
+- Local proof covers workspace continuity, offering conflict recovery, unified
+  discovery, saved service requests and provider review, app choice fields and
+  native reservation rescheduling.
+- Native app publication, recipient submission, versioned updates, rollback,
+  reuse and revocation already exist. Remaining app work extends that lifecycle.
+- The inquiry engine already has a connected local submission, staff assignment,
+  governed reply, receipt and failure journey. INT-02 must close the remaining
+  offering-entry, follow-up and recovery evidence, not recreate the engine.
+- Provisioning retries already preserve persisted secrets and customized sections;
+  inquiry portfolio failures already expose unavailable tenants. Focused tests
+  cover both. Their older unchecked repair entries below are historical.
+- Payer transition, budget admission, recurring saved-source jobs and a bounded
+  workspace export have local proof. Payment collection, arbitrary integrations,
+  complete account closure and live operation do not follow from that proof.
+
+### Work required to complete the customer product
+
+“Build” means a missing behavior. “Connect/prove” means useful implementation
+already exists but the joined journey or operating evidence is incomplete.
+Existing task IDs refer to the [module queue](./docs/strelvav2-horizontal-acceptance.md#subsequent-task-queue).
+
+| Work | What must be finished | Completion evidence and owner |
+| --- | --- | --- |
+| Public entry and first use | Connect/prove the chosen public result through account creation, business selection, invitations and return. Review unfamiliar-user requests and unsupported requests; select the public first-value promise without changing the accepted page composition by assumption. | A new customer and a new recipient reach the intended result, recover a failed callback, and return without operator repair. Public signup already has a workspace-release-gated source path. P4; navigation and marketing owners. |
+| Apps | Build explicit recipient record editing and date-only fields; prove the same published app reopens through Home, change and rollback. | Own/shared record edit policy is explicit; stale edits fail without losing input; dates do not shift timezone; records survive release changes. APP-02/03/04; app owner. |
+| Intake | Build the missing offering-installation connection to the existing inquiry lifecycle, prove due follow-up and recovery, then prove actual delivery and response. | Setup, receive, assign, reviewed reply, follow-up and recovery use the same request and receipt. A failed read-back never repeats an accepted send. INT-01/02/03; inquiry owner. |
+| Bookings | Connect the native schedule to one selected real calendar and define timezone, availability, confirmation, change, cancellation and reminder behavior. | A booking and its provider record agree after success, conflict, timeout and retry. BOOK-03; scheduling owner. Local rescheduling is already complete. |
+| Onboarding | Build requirements with missing/supplied/correction/accepted states; attach exact document versions; support private uploads and reviewed extraction. | Customer, employee or supplier onboarding can finish with a visible outstanding-items list. Replacing a document does not silently preserve an obsolete approval. ONB-01 through ONB-04; onboarding owner, reusing records/documents. |
+| Checks | Persist an unavailable run outcome when a source cannot be read or changes during a check; prove recovery and add one defined external source adapter. | Changed, unchanged, stale and unavailable sources remain distinguishable; scheduled work reopens the exact evidence and can pause/recover. CHECK-01/02; investigations owner. Existing saved-source scheduling is not a new build. |
+| Agency or Strelva delivery | Join request review, agreed scope, provider commitment, named operator, necessary permissions, cost acceptance, delivery, customer review and provider exit. | “Accepted for review” cannot become “work started” by implication. A complete self-service-to-provider-to-customer journey preserves the same business, request and resource. R6 plus PRDs 05/06; service-request/delivery owners. Existing delivery/assignment services must be reused. The request-link API has no customer UI and needs explicit request-to-delivery scope matching. |
+| Agency execution | Extend review-only agency participation into an explicit assignment and delivery contract. Current provider delivery accepts only Strelva, and current assignments reject nonzero costs. | A customer can authorize a named agency for exact work, review the result, revoke access and change providers while retaining records. This is new behavior, not an already-working paid agency handoff. PRDs 05/06; collaboration/delivery owners, after scope and commercial decisions. |
+| Websites | Prove request-to-governed-change continuity and dated site-check history. Prove interrupted setup preserves existing configuration; verify a representative client install and domain handoff. | One site retains identity, edits and credentials across retry, change, review and recovery. WEB-01/02/03 plus provisioning-resume verification; website and client-repository owners. |
+| Custom-built applications | Connect the existing isolated build adapter to an authorized, budgeted resource with review, tests, release, maintenance ownership and recovery. | One custom result can be built, reviewed, released to its intended user, changed and recovered without a manual untracked handoff. The current container build produces an artifact; it is not a customer deployment lifecycle. PRD 03 and the custom-app acceptance row; app/build owners. Commercial Custom Software packaging remains a separate decision. |
+| Costs and payment | Connect trusted provider usage to settlement, present payer/allowance facts clearly, implement selected subscription entitlements and verify historical agreements. | Known cost closes the exact hold once; unknown cost stays unresolved; concurrent/replayed events do not create duplicate charges; preserve the already-tested distinctions between one-off payments, subscriptions and grandfathered customers. BILL-01 through BILL-04, P6; economics and billing owners. Prices, included usage, overages and refund terms must be selected before charging behavior is finalized. |
+| Leaving or changing provider | Complete the exit journey around existing export: cancel future work, resolve outstanding obligations, revoke participation, hand over maintained resources and apply selected retention rules. | Customer data remains usable, active work has a named successor or stopped state, and the export states omissions and handles its size limit. PRD 04; workspace/economics/delivery owners. A download is not account closure. |
+| Agency and personal-AI breadth | Complete agency queue coverage for the chosen scale and prove restricted-member and sponsored-agent journeys. Add a named external assistant connector only if it is included in the offer. | Partial/unavailable client coverage is explicit; scoped access can be revoked without losing customer work. The existing REST contribution entrance is not an MCP connector or arbitrary execution permission. PRD 05; collaboration owner. |
+| Usable, accepted interface | Review complete customer journeys, repair misleading states and dead ends, finish necessary shared-control adoption, then review visual composition. | Desktop, phone, keyboard, loading, empty, denied, error and recovery states work for realistic content. Jacob reviews first use, self-service, staff use and managed handoff. P3/P5; experience and component owners. Image generation and aesthetic exploration remain deferred. |
+
+### Separate operating and release requirements
+
+1. **Prove the selected customer case.** The Mooney Firm's website submission must
+   reach the approved Outlook destination and required ADR Notable workflow.
+   Verify actual vendor/mailbox receipt, uncertain-outcome recovery, monitoring,
+   repeat use and operating effort. Preserve the firm's existing systems;
+   do not add a second case-management pipeline. The exact configuration and
+   authorized live rehearsal remain prerequisites. [Owning checklist](./docs/horizontal-release-checklist-2026-09-11.md#first-customer-release-case).
+2. **Prove the operating model.** Exercise due work, provider interruption,
+   unknown cost, failed evidence writes, operator escalation and recovery in the
+   intended hosted environment. A missing portfolio read must never mean all
+   work is healthy. Name who handles exceptions and measure their effort.
+3. **Finish internal learning evidence.** Keep the existing learning lifecycle.
+   Exercise it with permitted real observations, a measured capability trial,
+   contradictory evidence and an explicit keep/change/stop decision. Record
+   setup, correction, support and provider cost separately. Do not rebuild ten
+   research services or treat synthetic users as demand. [Definition of done](./docs/strelvav2-definition-of-done.md#the-ten-part-learning-loop).
+4. **Prepare the release as an exact operation.** Check current hosted migration
+   state, rehearse the pending order and recovery, verify pinned client revisions in isolated checkouts, storefront/revalidation
+   compatibility and existing agreements, select the shared version, align both
+   changelogs and public claims, rerun marketing checks against its own revision,
+   and prepare activation and rollback steps.
+   Hosted browser/Auth/provider evidence and human acceptance remain separate
+   from green CI. Merging into main, migrations and deployment are distinct
+   actions. [Versioning](./VERSIONING.md) and [release checklist](./docs/horizontal-release-checklist-2026-09-11.md).
+5. **Qualify commercial claims.** Observe useful first use, a later change and
+   voluntary return; include support and recovery in the economics. Public
+   access does not establish willingness to pay or a supported enterprise offer.
+   Enterprise identity lifecycle, organization policy, audit/export, retention
+   and service commitments need a selected contract before enterprise claims.
+
+### Execution order and decisions
+
+The next local implementation wave is recipient editing/date fields, onboarding
+requirements, and the request-to-delivery connection in parallel. Run inquiry,
+scheduled-check and website continuity proofs beside them, fixing only demonstrated
+gaps. Custom-app release integration is a separate substantial workstream.
+Economics, exit behavior and operator recovery must be completed before taking
+ongoing paid responsibility. Prepare provider adapters against selected contracts
+and synthetic responses, then perform authorized external proof. Finish customer
+acceptance and release preparation before activation; visual refinement follows
+usable behavior, as already directed.
+
+Public access is already the selected direction; the hosted signup path and
+release flags still need verified activation. Do not ask Jacob to choose public
+versus invite-only again.
+
+Jacob selected Outlook first, followed by Google Calendar, for booking
+integrations. Checks will first monitor public website changes. These choices
+authorize the adapters and local verification; connected-account proof remains
+a separate operating requirement.
+
+Jacob selected subscriptions with included usage for paid customers. Prices and
+included quantities remain unset. On customer exit, stop future work and retain
+records for export until the customer explicitly requests deletion. Do not add
+an automatic deletion deadline.
+
+The dependent decisions are: the public first-value promise; recipient edit
+scope; paid plan amounts and provider
+commitments; and the actual enterprise or personal-AI
+connector promise, if included. Prepare concrete choices at each boundary.
+These decisions do not block unrelated local implementation. Existing operator
+awards are local allowance units; their references are not yet bound to accepted
+contribution records. If rewards are offered, specify eligibility, attribution
+and correction before connecting subscription credits or other benefits.
+Contribution credits or equity are not prerequisites for self-service, request review or
+delivery; no reward promise should be inferred from participation.
+
+This plan does not declare every listed capability a launch-day commercial
+offer. Full horizontal local acceptance, production activation and qualification
+of each operated offering remain distinct finish lines. No new public release
+date or completion percentage is supported by the available evidence.
+
 Updated September 18, 2026. Read the overview and next steps first; the numbered
 sections below preserve the full journey checklist. This file is the work index.
 The [product brief](./docs/horizontal-product-brief-2026-09-11.md) owns selected

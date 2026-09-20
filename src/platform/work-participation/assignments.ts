@@ -7,9 +7,17 @@ export const operationalAssignmentStatusSchema = z.enum(["offered", "accepted", 
 export const operationalAssignmentOfferSchema = z.object({
   assigneeEmail: z.string().trim().toLowerCase().email().max(254),
   assigneeKind: operationalAssigneeKindSchema,
+  agencyWorkspaceId: z.string().uuid().optional(),
   expiresAt: z.string().datetime({ offset: true }),
   idempotencyKey: z.string().trim().min(1).max(100).regex(/^[A-Za-z0-9][A-Za-z0-9_.:-]*$/),
-}).strict();
+}).strict().superRefine((value, ctx) => {
+  if (value.assigneeKind === "agency" && !value.agencyWorkspaceId) {
+    ctx.addIssue({ code: "custom", path: ["agencyWorkspaceId"], message: "Choose the agency workspace for this assignment." });
+  }
+  if (value.assigneeKind !== "agency" && value.agencyWorkspaceId) {
+    ctx.addIssue({ code: "custom", path: ["agencyWorkspaceId"], message: "An agency workspace is only valid for an agency assignment." });
+  }
+});
 
 export const operationalAssignmentSchema = z.object({
   id: z.string().uuid(),
@@ -20,6 +28,7 @@ export const operationalAssignmentSchema = z.object({
   assigneeUserId: z.string().uuid(),
   assigneeEmail: z.string().email(),
   assigneeKind: operationalAssigneeKindSchema,
+  assigneeWorkspaceId: z.string().uuid().nullable().optional(),
   scope: z.tuple([z.literal("operate")]),
   status: operationalAssignmentStatusSchema,
   offeredAt: z.string().datetime({ offset: true }),

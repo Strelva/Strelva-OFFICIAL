@@ -72,6 +72,7 @@ describe("workspace start planner", () => {
   });
 
   it("names saved horizontal work by the surface that can reopen it", () => {
+    expect(workspaceWorkLabel({ productId: "onboarding", resourceKind: "case" })).toBe("Onboarding");
     expect(workspaceWorkLabel({ productId: "applications", resourceKind: "application" })).toBe("Application");
     expect(workspaceWorkLabel({ productId: "scheduling", resourceKind: "schedule" })).toBe("Schedule");
     expect(workspaceWorkLabel({ productId: "investigations", resourceKind: "investigation" })).toBe("Ongoing check");

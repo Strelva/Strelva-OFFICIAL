@@ -635,6 +635,7 @@ export type Database = {
       content_versions: {
         Row: {
           author: string
+          request_id: string | null
           changes: Json | null
           created_at: string
           data: Json
@@ -646,6 +647,7 @@ export type Database = {
         }
         Insert: {
           author: string
+          request_id?: string | null
           changes?: Json | null
           created_at?: string
           data: Json
@@ -657,6 +659,7 @@ export type Database = {
         }
         Update: {
           author?: string
+          request_id?: string | null
           changes?: Json | null
           created_at?: string
           data?: Json

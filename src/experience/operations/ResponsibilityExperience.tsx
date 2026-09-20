@@ -6,8 +6,9 @@ import type { WorkspaceWork } from "@/experience/workspace/contracts";
 import { WorkBudgetPanel } from "@/experience/workspace/WorkBudgetPanel";
 import { responsibilitySchema, type Responsibility } from "@/platform/work-execution/engine";
 import { operationalAssignmentSchema, type OperationalAssignment } from "@/platform/work-participation/assignments";
-type Props = { workspaceId: string; workId?: string; standingId?: string; assignmentId?: string; sources: WorkspaceWork[]; readOnly?: boolean; initialRequest?: string; onSaved(id: string): void };
+type Props = { workspaceId: string; workId?: string; standingId?: string; assignmentId?: string; sources: WorkspaceWork[]; readOnly?: boolean; newWorkBlocked?: boolean; initialRequest?: string; onSaved(id: string): void };
 type Saved = { id: string; workspaceId: string; payload: Responsibility };
+const NEW_WORK_PAUSED_COPY = "New work is paused for this workspace. Existing work remains available to review and reconcile.";
 const label: Record<Responsibility["status"], string> = { proposed: "Ready for your review", ready: "Ready to continue", running: "Work in progress", waiting: "Waiting for the next check", paused: "Paused", needs_attention: "Needs your decision", completed: "Completed", cancelled: "Cancelled" };
 export function ResponsibilityExperience(props: Props) {
   if (props.assignmentId) return <AssignedResponsibilityExperience {...props} assignmentId={props.assignmentId} />;
@@ -46,7 +47,7 @@ function parseAssignedView(value: unknown, workspaceId: string): AssignedView {
   return { assignment, responsibility };
 }
 
-function AssignedResponsibilityExperience({ workspaceId, assignmentId }: Props & { assignmentId: string }) {
+function AssignedResponsibilityExperience({ workspaceId, assignmentId, readOnly, newWorkBlocked }: Props & { assignmentId: string }) {
   const [view, setView] = useState<AssignedView | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -62,7 +63,7 @@ function AssignedResponsibilityExperience({ workspaceId, assignmentId }: Props &
     return () => abort.abort();
   }, [assignmentId, retry, workspaceId]);
   async function action(kind: "accept" | "run") {
-    if (!view || busy) return;
+    if (!view || readOnly || newWorkBlocked || busy) return;
     setBusy(true); setError("");
     try {
       const response = await fetch("/api/operational-assignments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: kind, assignmentId }) });
@@ -76,10 +77,11 @@ function AssignedResponsibilityExperience({ workspaceId, assignmentId }: Props &
   const assignment = view?.assignment;
   const work = view?.responsibility.payload;
   const status = assignment ? effectiveAssignmentStatus(assignment) : null;
-  const canRun = status === "accepted" && Boolean(work && ["ready", "waiting"].includes(work.status));
+  const canRun = !readOnly && !newWorkBlocked && status === "accepted" && Boolean(work && ["ready", "waiting"].includes(work.status));
   return <section className="mx-auto w-full max-w-3xl space-y-6 px-4 py-6" aria-busy={busy}>
     <header className="space-y-2"><p className="text-sm text-gray-muted">Assigned approved job</p><h1 className="font-display text-3xl">{work?.title || "Opening assigned work"}</h1><p className="max-w-2xl text-sm text-gray-muted">{work?.intent || "Checking the exact scope, sponsor, and current permission."}</p></header>
     {error ? <section className="rounded-xl border border-gray-border p-4" aria-labelledby="assignment-unavailable-heading"><h2 id="assignment-unavailable-heading" className="font-medium">Assigned job unavailable</h2><p className="mt-2 text-sm text-gray-muted" role="alert">{error}</p><p className="mt-2 text-sm text-gray-muted">The offer may have expired, been revoked, or your workspace access may have changed.</p><Button className="mt-4" variant="secondary" onClick={() => setRetry(value => value + 1)}>Check again</Button></section> : null}
+    {newWorkBlocked && !readOnly ? <p className="text-sm text-gray-muted">{NEW_WORK_PAUSED_COPY}</p> : null}
     {!view && !error ? <p role="status">Opening the exact approved job…</p> : null}
     {view && assignment && work ? <>
       <section className="rounded-xl border border-gray-border p-4" aria-labelledby="assigned-scope-heading">
@@ -88,7 +90,7 @@ function AssignedResponsibilityExperience({ workspaceId, assignmentId }: Props &
         <ol className="mt-4 space-y-2">{work.steps.map((step, index) => <li key={step.id} className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-border pt-3 text-sm"><span>{index + 1}. {step.operation.replaceAll(".", " ")}</span><span className="text-gray-muted">{step.status.replaceAll("_", " ")}</span></li>)}</ol>
         <p className="mt-4 text-sm text-gray-muted">This permission only operates this approved job. It cannot approve, reconcile, export, change a budget, or start paid work.</p>
       </section>
-      {status === "offered" ? <div className="space-y-2"><Button disabled={busy} onClick={() => void action("accept")}>Accept this assignment</Button><p className="text-sm text-gray-muted">Acceptance is explicit. Nothing runs until you accept and choose to continue.</p></div> : null}
+      {!readOnly && !newWorkBlocked && status === "offered" ? <div className="space-y-2"><Button disabled={busy} onClick={() => void action("accept")}>Accept this assignment</Button><p className="text-sm text-gray-muted">Acceptance is explicit. Nothing runs until you accept and choose to continue.</p></div> : null}
       {canRun ? <div className="space-y-2"><Button disabled={busy} onClick={() => void action("run")}>Run next approved step</Button><p className="text-sm text-gray-muted">Permission and the sponsor’s owner status are checked again immediately before the local action.</p></div> : null}
       {status === "accepted" && work.status === "completed" ? <p role="status" className="text-sm">This assigned job is complete.</p> : null}
       {status === "revoked" || status === "expired" ? <p role="status" className="rounded-xl border border-gray-border p-4 text-sm">This assignment is {status}. No further step can run.</p> : null}
@@ -105,7 +107,7 @@ function isAssignable(payload: Responsibility): boolean {
       && !(step.operation === "tracker.command" && step.input.kind === "coordinate_records")));
 }
 
-function OperationalAssignmentPanel({ workspaceId, saved }: { workspaceId: string; saved: Saved }) {
+function OperationalAssignmentPanel({ workspaceId, saved, newWorkBlocked }: { workspaceId: string; saved: Saved; newWorkBlocked?: boolean }) {
   const [assignment, setAssignment] = useState<OperationalAssignment | null>(null);
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState(""), [copied, setCopied] = useState(false);
   const [email, setEmail] = useState(""), [kind, setKind] = useState<OperationalAssignment["assigneeKind"]>("staff"), [expires, setExpires] = useState("");
@@ -124,7 +126,7 @@ function OperationalAssignmentPanel({ workspaceId, saved }: { workspaceId: strin
     return () => abort.abort();
   }, [retry, saved.id]);
   async function offer(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault(); if (busy || !expires) return;
+    event.preventDefault(); if (newWorkBlocked || busy || !expires) return;
     const expiresAt = new Date(expires).toISOString();
     const signature = JSON.stringify([saved.id, email.trim().toLowerCase(), kind, expiresAt]);
     const attempt = offerAttempt.current?.signature === signature ? offerAttempt.current : { signature, key: `offer:${crypto.randomUUID()}` };
@@ -146,7 +148,7 @@ function OperationalAssignmentPanel({ workspaceId, saved }: { workspaceId: strin
     finally { setBusy(false); }
   }
   const status = assignment ? effectiveAssignmentStatus(assignment) : null;
-  const canOffer = isAssignable(saved.payload) && (!assignment || status === "revoked" || status === "expired");
+  const canOffer = !newWorkBlocked && isAssignable(saved.payload) && (!assignment || status === "revoked" || status === "expired");
   const link = assignment ? assignmentLink(workspaceId, assignment.id) : "";
   return <section className="rounded-xl border border-gray-border p-4" aria-labelledby="exact-assignment-heading">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-sm text-gray-muted">One person, one approved job</p><h2 id="exact-assignment-heading" className="mt-1 font-medium">Exact-job assignment</h2></div>{status ? <span className="rounded-full border border-gray-border px-3 py-1 text-sm capitalize">{status}</span> : null}</div>
@@ -159,7 +161,7 @@ function OperationalAssignmentPanel({ workspaceId, saved }: { workspaceId: strin
   </section>;
 }
 
-function FiniteResponsibilityExperience({ workspaceId, workId, sources, readOnly, initialRequest, onSaved }: Props) {
+function FiniteResponsibilityExperience({ workspaceId, workId, sources, readOnly, newWorkBlocked, initialRequest, onSaved }: Props) {
   const alive = useRef(true);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const [saved, setSaved] = useState<Saved | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState("");
@@ -190,7 +192,8 @@ function FiniteResponsibilityExperience({ workspaceId, workId, sources, readOnly
     return { ...value, payload: responsibilitySchema.parse(value.payload) };
   }
   async function action(kind: string, extra: Record<string, unknown> = {}) {
-    if (!saved || readOnly || busy) return;
+    const recoveryAction = kind === "reconcile" || kind === "cancel";
+    if (!saved || readOnly || busy || (newWorkBlocked && !recoveryAction)) return;
     setBusy(true); setError("");
     try {
       let base = saved;
@@ -204,7 +207,7 @@ function FiniteResponsibilityExperience({ workspaceId, workId, sources, readOnly
       let current = kind === "run" ? base : await post({ action: "command", workId: base.id, command: { kind, expectedRevision: base.payload.revision, ...extra } });
       if (!alive.current) return;
       setSaved(current);
-      if (kind === "approve" || kind === "run" || kind === "resume" || kind === "retry" || (kind === "reconcile" && extra.resolution === "completed")) {
+      if (!newWorkBlocked && (kind === "approve" || kind === "run" || kind === "resume" || kind === "retry" || (kind === "reconcile" && extra.resolution === "completed"))) {
         for (let step = 0; step < 20 && (current.payload.status === "ready" || (step === 0 && current.payload.status === "waiting")); step++) {
           if (!alive.current) break;
           current = await post({ action: "run", workId: current.id }); if (alive.current) setSaved(current);
@@ -214,7 +217,7 @@ function FiniteResponsibilityExperience({ workspaceId, workId, sources, readOnly
     finally { setBusy(false); }
   }
   async function create(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault(); if (readOnly || busy) return; setBusy(true); setError("");
+    event.preventDefault(); if (readOnly || newWorkBlocked || busy) return; setBusy(true); setError("");
     try {
       const steps = [];
       if (checkId) steps.push({ id: "check", operation: "investigation.run", workId: checkId, input: {}, dependsOn: [], maximumCents: 0 });
@@ -227,9 +230,9 @@ function FiniteResponsibilityExperience({ workspaceId, workId, sources, readOnly
   return <section className="mx-auto w-full max-w-3xl space-y-6 px-4 py-6" aria-busy={busy}>
     <header><p className="text-sm text-gray-muted">{current ? label[current.status] : "Delegated work"}</p><h1 className="mt-2 font-display text-3xl">{current?.title || "What should Strelva take care of?"}</h1><p className="mt-3 text-sm text-gray-muted">{current?.intent || "Choose an existing check or describe an exact document change. Review the work before it starts."}</p></header>
     {error ? <div role="alert" className="space-y-2 text-sm"><p>{error}</p>{workId ? <Button variant="secondary" onClick={() => { setError(""); setRetryLoad(value => value + 1); }}>Reload current state</Button> : null}</div> : null}
-    {readOnly ? <p className="text-sm text-gray-muted">Read-only access. The owner controls execution and decisions.</p> : null}
+    {readOnly ? <p className="text-sm text-gray-muted">Read-only access. The owner controls execution and decisions.</p> : newWorkBlocked ? <p className="text-sm text-gray-muted">{NEW_WORK_PAUSED_COPY}</p> : null}
     {!current && workId && !error ? <p role="status">Opening saved work…</p> : null}
-    {!current && !workId && !readOnly ? <form onSubmit={create} className="space-y-5">
+    {!current && !workId && !readOnly && !newWorkBlocked ? <form onSubmit={create} className="space-y-5">
       <TextInput label="Result you want" value={intent} onChange={event => setIntent(event.target.value)} maxLength={4000} required />
       <label className="block text-sm">Check these sources first (optional)<select className="mt-2 min-h-11 w-full rounded-lg border border-gray-border bg-white p-3" value={checkId} onChange={event => setCheckId(event.target.value)}><option value="">No source check</option>{sources.filter(work => work.productId === "investigations").map(work => <option key={work.id} value={work.id}>{work.title}</option>)}</select></label>
       <label className="block text-sm">Document to update (optional)<select className="mt-2 min-h-11 w-full rounded-lg border border-gray-border bg-white p-3" value={targetId} onChange={event => { setTargetId(event.target.value); setDocumentRevision(null); }}><option value="">No document change</option>{sources.filter(work => work.productId === "documents").map(work => <option key={work.id} value={work.id}>{work.title}</option>)}</select></label>
@@ -245,17 +248,17 @@ function FiniteResponsibilityExperience({ workspaceId, workId, sources, readOnly
         {step.operation === "document.edit" ? <details className="mt-3 text-sm"><summary className="cursor-pointer">Review the exact document change</summary><h3 className="mt-3 font-medium">{String(step.input.title || "Document")}</h3><p className="mt-2 whitespace-pre-wrap break-words">{String(step.input.text || "")}</p></details> : null}
         {["unknown", "accepted", "running"].includes(step.status) && !readOnly ? <details className="mt-3 text-sm"><summary className="cursor-pointer">Resolve an interrupted action</summary><form className="mt-3 space-y-3" onSubmit={event => { event.preventDefault(); const data = new FormData(event.currentTarget); void action("reconcile", { stepId: step.id, resolution: data.get("resolution"), evidence: data.get("evidence") }); }}><label className="block">Verified outcome<select name="resolution" className="ml-2 border p-2"><option value="completed">The action completed</option>{step.effect !== "accepted" ? <option value="not_applied">The action did not happen</option> : null}</select></label><TextInput name="evidence" label="Evidence from the actual result" required maxLength={2000} /><Button type="submit" disabled={busy}>Record verified outcome</Button></form></details> : null}
       </li>)}</ol>
-      {!readOnly ? <OperationalAssignmentPanel workspaceId={workspaceId} saved={saved!} /> : null}
+      {!readOnly ? <OperationalAssignmentPanel workspaceId={workspaceId} saved={saved!} newWorkBlocked={newWorkBlocked} /> : null}
       {!readOnly ? <div className="flex flex-wrap gap-3">
-        {current.status === "proposed" ? <Button disabled={busy} onClick={() => void action("approve")}>Approve and start this work</Button> : null}
-        {current.status === "ready" || current.status === "waiting" ? <Button disabled={busy} onClick={() => void action("run")}>Continue approved work</Button> : null}
-        {current.status === "paused" ? <Button disabled={busy} onClick={() => void action("resume")}>Resume</Button> : null}
-        {current.status === "needs_attention" && current.steps.some(step => step.status === "failed" && step.effect === "none") ? <Button disabled={busy} onClick={() => void action("retry")}>Retry the failed step</Button> : null}
-        {["ready", "running", "waiting"].includes(current.status) ? <Button variant="secondary" disabled={busy} onClick={() => void action("pause")}>Pause</Button> : null}
+        {!newWorkBlocked && current.status === "proposed" ? <Button disabled={busy} onClick={() => void action("approve")}>Approve and start this work</Button> : null}
+        {!newWorkBlocked && (current.status === "ready" || current.status === "waiting") ? <Button disabled={busy} onClick={() => void action("run")}>Continue approved work</Button> : null}
+        {!newWorkBlocked && current.status === "paused" ? <Button disabled={busy} onClick={() => void action("resume")}>Resume</Button> : null}
+        {!newWorkBlocked && current.status === "needs_attention" && current.steps.some(step => step.status === "failed" && step.effect === "none") ? <Button disabled={busy} onClick={() => void action("retry")}>Retry the failed step</Button> : null}
+        {!newWorkBlocked && ["ready", "running", "waiting"].includes(current.status) ? <Button variant="secondary" disabled={busy} onClick={() => void action("pause")}>Pause</Button> : null}
         {!["cancelled", "completed"].includes(current.status) ? <Button variant="secondary" disabled={busy} onClick={() => void action("cancel")}>Cancel remaining work</Button> : null}
       </div> : null}
       <details className="text-sm"><summary className="cursor-pointer">Decisions and execution history</summary><ol className="mt-3 space-y-2">{current.history.map(event => <li key={event.revision}>{event.kind} {event.detail ? `· ${event.detail}` : ""}<span className="ml-2 text-gray-muted">{new Date(event.at).toLocaleString()}</span></li>)}</ol></details>
-      <WorkBudgetPanel workspaceId={workspaceId} workId={saved!.id} productId="operations" resourceKind="responsibility" readOnly={readOnly} refreshKey={String(current.revision)} />
+      <WorkBudgetPanel workspaceId={workspaceId} workId={saved!.id} productId="operations" resourceKind="responsibility" readOnly={readOnly} newWorkBlocked={newWorkBlocked} refreshKey={String(current.revision)} />
     </> : null}
   </section>;
 }
@@ -288,6 +291,7 @@ type StandingResponsibilityPickerProps = {
   sources: WorkspaceWork[];
   selectedId?: string;
   readOnly?: boolean;
+  newWorkBlocked?: boolean;
   onCreatingChange?: (creating: boolean) => void;
   onOpen(id: string): void;
   onCreated(id: string): void;
@@ -298,7 +302,7 @@ type StandingResponsibilityPickerProps = {
  * only offers the currently supported, read-only saved investigation scope;
  * all other native mutations remain in the finite responsibility flow.
  */
-export function StandingResponsibilityPicker({ workspaceId, sources, selectedId, readOnly, onCreatingChange, onOpen, onCreated }: StandingResponsibilityPickerProps) {
+export function StandingResponsibilityPicker({ workspaceId, sources, selectedId, readOnly, newWorkBlocked, onCreatingChange, onOpen, onCreated }: StandingResponsibilityPickerProps) {
   const [items, setItems] = useState<StandingResponsibilitySummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -328,7 +332,7 @@ export function StandingResponsibilityPicker({ workspaceId, sources, selectedId,
 
   async function create(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (readOnly || busy || !sourceId) return;
+    if (readOnly || newWorkBlocked || busy || !sourceId) return;
     setBusy(true); setError("");
     try {
       const interval = Number(everyMinutes);
@@ -366,11 +370,12 @@ export function StandingResponsibilityPicker({ workspaceId, sources, selectedId,
   return <section className="rounded-xl border border-gray-border p-4" aria-labelledby="ongoing-work-entry-heading">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><p className="text-sm text-gray-muted">Ongoing work</p><h2 id="ongoing-work-entry-heading" className="mt-1 font-medium">Saved checks that can run again</h2><p className="mt-1 max-w-2xl text-sm text-gray-muted">Each check has its own run and result. The approved scope stays visible for review.</p></div>
-      {!readOnly ? <Button variant="secondary" disabled={busy} onClick={() => { const next = !creating; setCreating(next); onCreatingChange?.(next); setError(""); }}>{creating ? "Close" : "New ongoing work"}</Button> : null}
+      {!readOnly && !newWorkBlocked ? <Button variant="secondary" disabled={busy} onClick={() => { const next = !creating; setCreating(next); onCreatingChange?.(next); setError(""); }}>{creating ? "Close" : "New ongoing work"}</Button> : null}
     </div>
+    {newWorkBlocked && !readOnly ? <p className="mt-3 text-sm text-gray-muted">{NEW_WORK_PAUSED_COPY}</p> : null}
     {error ? <p className="mt-3 text-sm" role="alert">{error}</p> : null}
     {loading ? <p className="mt-3 text-sm" role="status">Loading ongoing work…</p> : items.length ? <ul className="mt-4 space-y-2" role="list">{items.map(item => <li key={item.id}><button type="button" className={`w-full rounded-lg border p-3 text-left ${selectedId === item.id ? "border-accent" : "border-gray-border"}`} aria-current={selectedId === item.id ? "page" : undefined} onClick={() => onOpen(item.id)}><span className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium">{item.policy.title}</span><span className="text-sm text-gray-muted">{standingActionLabel(item.policy.status)}</span></span><span className="mt-1 block text-sm text-gray-muted">Version {item.policy.version} · {item.policy.scope.steps.length} saved check{item.policy.scope.steps.length === 1 ? "" : "s"}</span></button></li>)}</ul> : <p className="mt-4 text-sm text-gray-muted">No ongoing work has been created.</p>}
-    {creating ? <form className="mt-5 space-y-4 border-t border-gray-border pt-4" onSubmit={create}>
+    {creating && !readOnly && !newWorkBlocked ? <form className="mt-5 space-y-4 border-t border-gray-border pt-4" onSubmit={create}>
       <h3 className="font-medium">New ongoing work</h3>
       <TextInput label="Name" value={title} onChange={event => setTitle(event.target.value)} maxLength={160} required />
       <TextInput label="Result" value={intent} onChange={event => setIntent(event.target.value)} maxLength={4000} required />
@@ -401,7 +406,7 @@ function standingRunLabel(status: string): string {
   return status === "admitted" ? "Accepted" : status === "running" ? "In progress" : status === "waiting" ? "Waiting" : status === "needs_attention" ? "Needs your decision" : status === "completed" ? "Completed" : status === "failed" ? "Could not finish" : status === "cancelled" ? "Cancelled" : status;
 }
 
-function StandingResponsibilityExperience({ workspaceId, standingId, sources, readOnly }: Props & { standingId: string }) {
+function StandingResponsibilityExperience({ workspaceId, standingId, sources, readOnly, newWorkBlocked }: Props & { standingId: string }) {
   const alive = useRef(true);
   const [view, setView] = useState<StandingView | null>(null);
   const [busy, setBusy] = useState(false);
@@ -424,14 +429,16 @@ function StandingResponsibilityExperience({ workspaceId, standingId, sources, re
     return result as Record<string, unknown>;
   }
   async function action(body: Record<string, unknown>) {
-    if (readOnly || busy || !view) return;
+    const command = body.action === "standing_command" && body.command && typeof body.command === "object" ? body.command as { kind?: unknown } : null;
+    const recoveryAction = body.action === "standing_reconcile" || body.action === "standing_cancel" || command?.kind === "revoke";
+    if (readOnly || busy || !view || (newWorkBlocked && !recoveryAction)) return;
     setBusy(true); setError("");
     try { await postStanding(body); if (alive.current) setRetryLoad(value => value + 1); }
     catch (cause) { if (alive.current) setError(cause instanceof Error ? cause.message : "The ongoing work change could not be confirmed."); }
     finally { if (alive.current) setBusy(false); }
   }
   async function runCheck() {
-    if (readOnly || busy || !view || view.policy.policy.status !== "active") return;
+    if (readOnly || newWorkBlocked || busy || !view || view.policy.policy.status !== "active") return;
     setBusy(true); setError("");
     try {
       const pending = pendingCheck.current || { triggerKey: `manual:${Date.now()}` };
@@ -474,14 +481,14 @@ function StandingResponsibilityExperience({ workspaceId, standingId, sources, re
       <div className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="font-display text-3xl">{policy?.title || "Ongoing work"}</h1><p className="mt-2 max-w-2xl text-sm text-gray-muted">{policy?.intent || "Opening the approved scope and its runs."}</p></div>{policy ? <span className="rounded-full border border-gray-border px-3 py-1 text-sm">{standingActionLabel(policy.status)}</span> : null}</div>
     </header>
     {error ? <div role="alert" className="space-y-2 text-sm"><p>{error}</p><Button variant="secondary" onClick={() => { setError(""); setRetryLoad(value => value + 1); }}>Reload current state</Button></div> : null}
-    {readOnly ? <p className="text-sm text-gray-muted">Read-only access. The owner or workspace admin makes changes and decisions.</p> : null}
+    {readOnly ? <p className="text-sm text-gray-muted">Read-only access. The owner or workspace admin makes changes and decisions.</p> : newWorkBlocked ? <p className="text-sm text-gray-muted">{NEW_WORK_PAUSED_COPY}</p> : null}
     {!view && !error ? <p role="status">Opening ongoing work…</p> : null}
     {view && policy ? <>
       <section className="rounded-xl border border-gray-border p-4" aria-labelledby="standing-scope-heading"><div className="flex flex-wrap items-baseline justify-between gap-3"><h2 id="standing-scope-heading" className="font-medium">What it checks</h2><p className="text-sm text-gray-muted">{policy.status === "proposed" ? "Proposed version" : "Approved version"} {policy.version}</p></div><ul className="mt-3 space-y-2 text-sm" role="list">{policy.scope.steps.map(step => <li key={step.id} className="flex flex-wrap items-center justify-between gap-2"><span>{sourceTitle(step.workId)}</span><a className="underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&work=${encodeURIComponent(step.workId)}`}>Open saved record</a></li>)}</ul><p className="mt-3 text-sm text-gray-muted">{policy.trigger.kind === "manual" ? "Run this saved check whenever you need one." : `Runs follow a ${Math.round(policy.trigger.everySeconds / 60)} minute schedule · next check ${new Date(policy.trigger.nextAt).toLocaleString()}`}</p><p className="mt-2 text-sm text-gray-muted">{policy.limits.maxRuns === null ? "There is no fixed check limit in this setup." : `Up to ${policy.limits.maxRuns} checks can run with this setup.`}</p>{policy.exclusions.length || policy.escalation ? <p className="mt-2 text-sm text-gray-muted">Operator notes: {[...policy.exclusions, policy.escalation].filter(Boolean).join(" · ")}</p> : null}</section>
-      <section className="rounded-xl border border-gray-border p-4" aria-labelledby="standing-runs-heading"><div className="flex items-baseline justify-between gap-3"><h2 id="standing-runs-heading" className="font-medium">Runs</h2><span className="text-sm text-gray-muted">{view.runs.length}</span></div>{view.runs.length ? <ul className="mt-3 space-y-3" role="list">{view.runs.map(run => <li key={run.id} className="border-t border-gray-border pt-3 text-sm"><div className="flex flex-wrap justify-between gap-3"><span className="font-medium">{sourceTitle(policy.scope.steps[0]?.workId || "")}</span><span>{standingRunLabel(run.status)}</span></div><p className="mt-1 text-gray-muted">Checked {new Date(run.createdAt).toLocaleString()}</p>{run.wakeAt ? <p className="mt-1 text-gray-muted">Waiting until {new Date(run.wakeAt).toLocaleString()}</p> : null}{run.lastError ? <p className="mt-1" role="alert">{run.lastError}</p> : null}<div className="mt-2 flex flex-wrap gap-2">{!readOnly && !["completed", "cancelled"].includes(run.status) ? <><Button disabled={busy} onClick={() => void action({ action: "standing_run", runId: run.id })}>Continue run</Button><Button variant="secondary" disabled={busy} onClick={() => void action({ action: "standing_cancel", runId: run.id })}>Cancel run</Button></> : null}</div>{run.receipts.some(receipt => ["unknown", "accepted", "running"].includes(receipt.status)) && !readOnly ? <details className="mt-3"><summary className="cursor-pointer">Resolve an exception</summary><form className="mt-3 space-y-3" onSubmit={event => void reconcile(run, event)}><input type="hidden" name="stepId" value={run.receipts.find(receipt => ["unknown", "accepted", "running"].includes(receipt.status))?.stepId || ""} /><label className="block">Verified outcome<select name="resolution" className="ml-2 border border-gray-border p-2"><option value="completed">The action completed</option>{run.receipts.some(receipt => receipt.effect !== "accepted") ? <option value="not_applied">The action did not happen</option> : null}</select></label><TextInput name="evidence" label="Evidence from the actual result" required maxLength={2000} /><Button type="submit" disabled={busy}>Record decision</Button></form></details> : null}<details className="mt-3 text-sm"><summary className="cursor-pointer text-gray-muted">Run details</summary><ul className="mt-2 space-y-1 text-gray-muted" role="list">{run.receipts.map(receipt => <li key={`${receipt.stepId}-${receipt.attempt}`}>{receipt.stepId} · {receipt.status} · effect {receipt.effect}</li>)}</ul></details></li>)}</ul> : <p className="mt-3 text-sm text-gray-muted">No runs yet.</p>}</section>
+      <section className="rounded-xl border border-gray-border p-4" aria-labelledby="standing-runs-heading"><div className="flex items-baseline justify-between gap-3"><h2 id="standing-runs-heading" className="font-medium">Runs</h2><span className="text-sm text-gray-muted">{view.runs.length}</span></div>{view.runs.length ? <ul className="mt-3 space-y-3" role="list">{view.runs.map(run => <li key={run.id} className="border-t border-gray-border pt-3 text-sm"><div className="flex flex-wrap justify-between gap-3"><span className="font-medium">{sourceTitle(policy.scope.steps[0]?.workId || "")}</span><span>{standingRunLabel(run.status)}</span></div><p className="mt-1 text-gray-muted">Checked {new Date(run.createdAt).toLocaleString()}</p>{run.wakeAt ? <p className="mt-1 text-gray-muted">Waiting until {new Date(run.wakeAt).toLocaleString()}</p> : null}{run.lastError ? <p className="mt-1" role="alert">{run.lastError}</p> : null}<div className="mt-2 flex flex-wrap gap-2">{!readOnly && !["completed", "cancelled"].includes(run.status) ? <>{!newWorkBlocked ? <Button disabled={busy} onClick={() => void action({ action: "standing_run", runId: run.id })}>Continue run</Button> : null}<Button variant="secondary" disabled={busy} onClick={() => void action({ action: "standing_cancel", runId: run.id })}>Cancel run</Button></> : null}</div>{run.receipts.some(receipt => ["unknown", "accepted", "running"].includes(receipt.status)) && !readOnly ? <details className="mt-3"><summary className="cursor-pointer">Resolve an exception</summary><form className="mt-3 space-y-3" onSubmit={event => void reconcile(run, event)}><input type="hidden" name="stepId" value={run.receipts.find(receipt => ["unknown", "accepted", "running"].includes(receipt.status))?.stepId || ""} /><label className="block">Verified outcome<select name="resolution" className="ml-2 border border-gray-border p-2"><option value="completed">The action completed</option>{run.receipts.some(receipt => receipt.effect !== "accepted") ? <option value="not_applied">The action did not happen</option> : null}</select></label><TextInput name="evidence" label="Evidence from the actual result" required maxLength={2000} /><Button type="submit" disabled={busy}>Record decision</Button></form></details> : null}<details className="mt-3 text-sm"><summary className="cursor-pointer text-gray-muted">Run details</summary><ul className="mt-2 space-y-1 text-gray-muted" role="list">{run.receipts.map(receipt => <li key={`${receipt.stepId}-${receipt.attempt}`}>{receipt.stepId} · {receipt.status} · effect {receipt.effect}</li>)}</ul></details></li>)}</ul> : <p className="mt-3 text-sm text-gray-muted">No runs yet.</p>}</section>
       <section className="rounded-xl border border-gray-border p-4" aria-labelledby="standing-decisions-heading"><div className="flex flex-wrap items-baseline justify-between gap-3"><h2 id="standing-decisions-heading" className="font-medium">Decisions</h2><span className="text-sm text-gray-muted">Receipts remain attached to each run.</span></div><p className="mt-2 text-sm text-gray-muted">Completed and uncertain outcomes stay visible after cancellation so a later decision cannot repeat a check blindly.</p></section>
       <details className="rounded-xl border border-gray-border p-4"><summary className="cursor-pointer font-medium">History</summary><p className="mt-3 text-sm text-gray-muted">Current policy revision {policy.revision}.</p><section className="mt-4" aria-labelledby="standing-jobs-heading"><div className="flex items-baseline justify-between gap-3"><h2 id="standing-jobs-heading" className="font-medium">Jobs</h2><span className="text-sm text-gray-muted">{view.jobs.length}</span></div>{view.jobs.length ? <ul className="mt-3 space-y-3" role="list">{view.jobs.map(job => <li key={job.id} className="border-t border-gray-border pt-3 text-sm"><div className="flex justify-between gap-3"><span className="font-medium">{sourceTitle(policy.scope.steps[0]?.workId || "")}</span><span className="text-gray-muted">{job.status === "accepted" ? "Accepted" : "Cancelled"}</span></div><p className="mt-1 text-gray-muted">Accepted {new Date(job.acceptedAt).toLocaleString()}</p><details className="mt-2"><summary className="cursor-pointer text-gray-muted">Job details</summary><p className="mt-2 text-gray-muted">Trigger {job.triggerKey} · approved version {job.policyVersion}</p></details></li>)}</ul> : <p className="mt-3 text-sm text-gray-muted">No jobs have been admitted.</p>}</section></details>
-      {!readOnly ? <div className="flex flex-wrap gap-3">{policy.status === "proposed" ? <Button disabled={busy} onClick={() => void action({ action: "standing_command", standingId, command: { kind: "approve", expectedRevision: policy.revision } })}>Approve ongoing work</Button> : null}{policy.status === "active" ? <Button variant="secondary" disabled={busy} onClick={() => void action({ action: "standing_command", standingId, command: { kind: "pause", expectedRevision: policy.revision } })}>Pause</Button> : null}{policy.status === "paused" ? <Button disabled={busy} onClick={() => void action({ action: "standing_command", standingId, command: { kind: "resume", expectedRevision: policy.revision } })}>Resume</Button> : null}{policy.status !== "revoked" ? <Button variant="secondary" disabled={busy} onClick={() => void action({ action: "standing_command", standingId, command: { kind: "revoke", expectedRevision: policy.revision } })}>Stop</Button> : null}{policy.status === "active" ? <Button disabled={busy} onClick={() => void runCheck()}>Run now</Button> : null}</div> : null}
+      {!readOnly ? <div className="flex flex-wrap gap-3">{!newWorkBlocked && policy.status === "proposed" ? <Button disabled={busy} onClick={() => void action({ action: "standing_command", standingId, command: { kind: "approve", expectedRevision: policy.revision } })}>Approve ongoing work</Button> : null}{!newWorkBlocked && policy.status === "active" ? <Button variant="secondary" disabled={busy} onClick={() => void action({ action: "standing_command", standingId, command: { kind: "pause", expectedRevision: policy.revision } })}>Pause</Button> : null}{!newWorkBlocked && policy.status === "paused" ? <Button disabled={busy} onClick={() => void action({ action: "standing_command", standingId, command: { kind: "resume", expectedRevision: policy.revision } })}>Resume</Button> : null}{policy.status !== "revoked" ? <Button variant="secondary" disabled={busy} onClick={() => void action({ action: "standing_command", standingId, command: { kind: "revoke", expectedRevision: policy.revision } })}>Stop</Button> : null}{!newWorkBlocked && policy.status === "active" ? <Button disabled={busy} onClick={() => void runCheck()}>Run now</Button> : null}</div> : null}
     </> : null}
   </section>;
 }

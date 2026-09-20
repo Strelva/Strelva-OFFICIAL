@@ -79,14 +79,21 @@ export interface ProviderOfferingGateway {
 
 function assertProviderRequest(installation: OfferingInstallation): void {
   if (installation.status !== "active") throw new OfferingConflictError("Activate the offering before requesting provider delivery.");
-  if (installation.responsibility.kind !== "provider_requested" || installation.responsibility.providerKind !== "strelva") {
-    throw new OfferingConflictError("This delivery path supports only an explicit Strelva provider request.");
+  if (installation.responsibility.kind !== "provider_requested"
+    || !["strelva", "agency"].includes(installation.responsibility.providerKind)) {
+    throw new OfferingConflictError("This delivery path requires an explicit Strelva or agency provider request.");
   }
 }
 
-function assertAssignment(delivery: { businessId: string; assignmentId: string; nativeResourceIds?: readonly string[] }, assigned: Awaited<ReturnType<ProviderAssignmentGateway["inspect"]>>): void {
+function assertAssignment(
+  delivery: { businessId: string; assignmentId: string; nativeResourceIds?: readonly string[] },
+  assigned: Awaited<ReturnType<ProviderAssignmentGateway["inspect"]>>,
+  expectedProvider: { kind: "strelva" | "agency"; agencyWorkspaceId?: string },
+): void {
   if (assigned.assignment.id !== delivery.assignmentId || assigned.assignment.workspaceId !== delivery.businessId
-    || assigned.responsibility.workspaceId !== delivery.businessId || assigned.assignment.assigneeKind !== "strelva") {
+    || assigned.responsibility.workspaceId !== delivery.businessId
+    || assigned.assignment.assigneeKind !== expectedProvider.kind
+    || (expectedProvider.kind === "agency" && assigned.assignment.assigneeWorkspaceId !== expectedProvider.agencyWorkspaceId)) {
     throw new OfferingConflictError("The provider assignment no longer matches this delivery request.");
   }
   if (delivery.nativeResourceIds) {
@@ -118,7 +125,14 @@ export class ProviderDeliveryService {
       assertProviderRequest(installation);
       if (!(await this.offerings.canManage(actor, command.businessId))) throw new OfferingAccessError("Owner or admin access is required to request provider delivery.");
       const assigned = await this.assignments.inspect(actor, command.assignmentId);
-      assertAssignment({ ...command, nativeResourceIds: installation.nativeResources.map((resource) => resource.id) }, assigned);
+      const responsibility = installation.responsibility;
+      assertAssignment(
+        { ...command, nativeResourceIds: installation.nativeResources.map((resource) => resource.id) },
+        assigned,
+        responsibility.kind === "provider_requested" && responsibility.providerKind === "agency"
+          ? { kind: "agency", agencyWorkspaceId: responsibility.agencyWorkspaceId }
+          : { kind: "strelva" },
+      );
       if (assigned.assignment.sponsorId !== actor.userId || !["offered", "accepted"].includes(assigned.assignment.status)) {
         throw new OfferingAccessError("The provider assignment must be offered by this customer owner.");
       }
@@ -136,14 +150,28 @@ export class ProviderDeliveryService {
     });
     if (command.action === "accept") {
       const assigned = await this.assignments.inspect(actor, delivery.assignmentId);
-      assertAssignment(delivery, assigned);
-      if (assigned.assignment.assigneeUserId !== actor.userId || assigned.assignment.assigneeKind !== "strelva") throw new OfferingAccessError();
-      const accepted = await this.assignments.accept(actor, delivery.assignmentId);
-      if (accepted.status !== "accepted") throw new OfferingConflictError("The exact provider assignment was not accepted.");
+      if (assigned.assignment.assigneeUserId !== actor.userId) throw new OfferingAccessError();
+      if (assigned.assignment.assigneeKind === "agency") {
+        const expectedProvider = { kind: "agency" as const, agencyWorkspaceId: assigned.assignment.assigneeWorkspaceId ?? undefined };
+        assertAssignment(delivery, assigned, expectedProvider);
+        const accepted = await this.assignments.accept(actor, delivery.assignmentId);
+        if (accepted.status !== "accepted") throw new OfferingConflictError("The exact provider assignment was not accepted.");
+        const current = await this.assignments.inspect(actor, delivery.assignmentId);
+        assertAssignment(delivery, current, expectedProvider);
+        return this.store.accept(actor, delivery.id);
+      }
       const installation = await this.offerings.read(actor, delivery.businessId, delivery.installationId);
       assertProviderRequest(installation);
+      const responsibility = installation.responsibility;
+      const expectedProvider = responsibility.kind === "provider_requested" && responsibility.providerKind === "agency"
+        ? { kind: "agency" as const, agencyWorkspaceId: responsibility.agencyWorkspaceId }
+        : { kind: "strelva" as const };
+      assertAssignment(delivery, assigned, expectedProvider);
+      if (assigned.assignment.assigneeKind !== expectedProvider.kind) throw new OfferingAccessError();
+      const accepted = await this.assignments.accept(actor, delivery.assignmentId);
+      if (accepted.status !== "accepted") throw new OfferingConflictError("The exact provider assignment was not accepted.");
       const current = await this.assignments.inspect(actor, delivery.assignmentId);
-      assertAssignment({ ...delivery, nativeResourceIds: installation.nativeResources.map((resource) => resource.id) }, current);
+      assertAssignment({ ...delivery, nativeResourceIds: installation.nativeResources.map((resource) => resource.id) }, current, expectedProvider);
       return this.store.accept(actor, delivery.id);
     }
 
@@ -153,7 +181,16 @@ export class ProviderDeliveryService {
     }
 
     const assigned = await this.assignments.inspect(actor, delivery.assignmentId);
-    assertAssignment(delivery, assigned);
+    const installation = await this.offerings.read(actor, delivery.businessId, delivery.installationId);
+    assertProviderRequest(installation);
+    const responsibility = installation.responsibility;
+    assertAssignment(
+      delivery,
+      assigned,
+      responsibility.kind === "provider_requested" && responsibility.providerKind === "agency"
+        ? { kind: "agency", agencyWorkspaceId: responsibility.agencyWorkspaceId }
+        : { kind: "strelva" },
+    );
     if (assigned.responsibility.payload.status !== "completed") {
       throw new OfferingConflictError("Customer confirmation requires completed assigned work.");
     }

@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+test.skip(process.env.STRELVA_UI_PREVIEW !== "1", "Requires the explicit development-only interface preview.");
+
 test("retained public brief names its context and only writable destinations", async ({ page }) => {
   await page.goto("/preview/strelva/workspace/account?state=continuation", { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { name: "Continue “Give every inquiry a next step.”" })).toBeVisible();

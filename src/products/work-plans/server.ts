@@ -12,12 +12,12 @@ import {
   requireExactExecutableCapability,
 } from "@/server/capabilities";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
-import { executeBudgetedAction, type BudgetExecution } from "@/platform/work-economics";
-import { reconcileBudgetedAction, type BudgetExecutionEvidenceContext } from "@/platform/work-economics/runtime";
+import { executeBudgetedAction, recordTrustedProviderReceipt, type BudgetExecution } from "@/platform/work-economics";
+import { type BudgetExecutionEvidenceContext } from "@/platform/work-economics/runtime";
 import {
   geminiReceiptFromAiSdkResult,
   ProviderEvidenceUnavailableError,
-  reconciliationFromTrustedProviderReceipt,
+  trustedReceiptFromAiSdkResult,
   trustedProviderReceiptSchema,
   type TrustedProviderReceipt,
 } from "@/platform/work-economics/provider-evidence";
@@ -244,30 +244,7 @@ function trustedReceiptFromFallbackResult(
   // billing extension may use its provider key in metadata in the future.
   const provider = modelLabel.split("/")[0] || "unknown";
   if (provider === "google") return geminiReceiptFromAiSdkResult(result, context);
-  const value = result && typeof result === "object" && !Array.isArray(result)
-    ? result as Record<string, unknown>
-    : null;
-  const metadata = value?.providerMetadata;
-  const providerValue = metadata && typeof metadata === "object" && !Array.isArray(metadata)
-    ? (metadata as Record<string, unknown>)[provider]
-    : null;
-  const billing = providerValue && typeof providerValue === "object" && !Array.isArray(providerValue)
-    ? (providerValue as Record<string, unknown>).billing
-    : null;
-  if (!billing || typeof billing !== "object" || Array.isArray(billing)) return null;
-  const candidate = billing as Record<string, unknown>;
-  if (typeof candidate.requestId !== "string" || typeof candidate.billableCents !== "number" || typeof candidate.evidenceReference !== "string") return null;
-  return {
-    version: 1,
-    provider,
-    requestId: candidate.requestId,
-    executionKey: context.executionKey,
-    kind: context.kind,
-    attribution: context.attribution,
-    maximumCents: context.maximumCents,
-    billableCents: candidate.billableCents,
-    evidenceReference: candidate.evidenceReference,
-  };
+  return trustedReceiptFromAiSdkResult(result, context, provider);
 }
 
 function nativeOperationCatalog(): WorkPlanNativeOperation[] {
@@ -832,18 +809,7 @@ export async function createWorkPlan(input: {
     planningReceipt = result.execution;
     if (generation.providerEvidence) {
       try {
-        planningReceipt = await reconcileBudgetedAction(input.actor, {
-          jobId: executionContext.jobId,
-          executionKey: executionContext.executionKey,
-          maximumCents: executionContext.maximumCents,
-          kind: executionContext.kind,
-          attribution: executionContext.attribution,
-          expectedTarget: { workspaceId: request.workspaceId, workId: null },
-        }, {
-          async resolve(context) {
-            return reconciliationFromTrustedProviderReceipt(context, generation.providerEvidence);
-          },
-        });
+        planningReceipt = (await recordTrustedProviderReceipt(executionContext, generation.providerEvidence)).execution;
         planningReconciliation = { status: "settled" };
       } catch (error) {
         if (!(error instanceof ProviderEvidenceUnavailableError)) throw error;

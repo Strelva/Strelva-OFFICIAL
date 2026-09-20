@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createBudgetedExecutor, createBudgetedReconciler, type BudgetExecution, type BudgetExecutionStore } from "@/platform/work-economics/runtime";
-import { createProviderEvidenceResolver, ProviderEvidenceMismatchError, type TrustedProviderReceipt } from "@/platform/work-economics/provider-evidence";
+import { createProviderEvidenceResolver, ProviderEvidenceMismatchError, ProviderEvidencePrecisionError, reconciliationFromTrustedProviderReceipt, trustedReceiptFromAiSdkResult, type TrustedProviderReceipt } from "@/platform/work-economics/provider-evidence";
 
 const actor = { userId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", verifiedEmail: "owner@example.com" };
 const input = {
@@ -284,6 +284,32 @@ describe("budgeted execution boundary", () => {
       reconciliationReference: "provider:usage:receipt-2",
     });
     expect(settlements).toBe(2);
+  });
+
+  it("converts an exact decimal gateway bill to ledger cents without floating point rounding", async () => {
+    const receipt = trustedReceiptFromAiSdkResult({
+      providerMetadata: { gateway: { cost: "0.10", requestId: "gateway-request-1" } },
+    }, { actor, ...input, attribution: "normal" as const }, "google");
+    expect(receipt).toMatchObject({ provider: "vercel-ai-gateway", billableUsd: "0.10" });
+    expect(reconciliationFromTrustedProviderReceipt({ actor, ...input, attribution: "normal" }, receipt)).toMatchObject({ amountCents: 10 });
+  });
+
+  it("keeps a fractional-cent gateway bill unresolved instead of rounding it", () => {
+    const receipt = trustedReceiptFromAiSdkResult({
+      providerMetadata: { gateway: { cost: "0.001", requestId: "gateway-request-fraction" } },
+    }, { actor, ...input, attribution: "normal" as const }, "google");
+    expect(() => reconciliationFromTrustedProviderReceipt({ actor, ...input, attribution: "normal" }, receipt)).toThrow(ProviderEvidencePrecisionError);
+    expect(() => reconciliationFromTrustedProviderReceipt({ actor, ...input, attribution: "normal" }, receipt)).toThrow(/fraction of a cent/i);
+  });
+
+  it("does not treat token metadata or an unbound gateway cost as a billable receipt", () => {
+    expect(trustedReceiptFromAiSdkResult({
+      usage: { inputTokens: 10, outputTokens: 20 },
+      providerMetadata: { "google.generative-ai": { usageMetadata: { promptTokenCount: 10 } } },
+    }, { actor, ...input, attribution: "normal" as const }, "google.generative-ai")).toBeNull();
+    expect(trustedReceiptFromAiSdkResult({
+      providerMetadata: { gateway: { cost: "0.10" } },
+    }, { actor, ...input, attribution: "normal" as const }, "google")).toBeNull();
   });
 
 });

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { Redis } from "@upstash/redis";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
@@ -17,14 +17,14 @@ type SurfaceSnapshot = {
   business: { id: string; name: string; role: string };
   state: {
     requests: Array<{ id: string; capabilityId: string; state: string; draft?: { version: number; form: { title: string }; connections: Array<{ id: string; status: string; consent: string }> } | null }>;
-    capabilities: Array<{ id: string; status: string; live: { version: number } | null }>;
+    capabilities: Array<{ id: string; status: string; live: { version: number; followUp?: { maxAttempts: number } } | null }>;
     changes: Array<{ requestId: string; status: string; undoAvailable: boolean }>;
     actionReceipts: Array<{ action: string; inquiryId: string | null }>;
     responsibilities: Array<{ id: string; capabilityId: string }>;
     inquiries: Array<{ id: string; fields: Record<string, string>; capabilityVersion: number; status: string; assigneeId?: string | null }>;
     timeline: Array<{ inquiryId: string; type: string; summary: string }>;
   };
-  capabilities: Array<{ id: string; status: string; live: { version: number } | null }>;
+  capabilities: Array<{ id: string; status: string; live: { version: number; followUp?: { maxAttempts: number } } | null }>;
   available: boolean;
   readOnly: boolean;
 };
@@ -49,6 +49,11 @@ function providerLogCount(): number {
   const path = process.env.STRELVA_LOCAL_PROVIDER_LOG;
   if (!path || !existsSync(path)) return 0;
   return readFileSync(path, "utf8").split("\n").filter(Boolean).length;
+}
+
+function clearProviderReadbackFailure(): void {
+  const path = process.env.STRELVA_LOCAL_PROVIDER_READBACK_FAILURE_FILE;
+  if (path && existsSync(path)) unlinkSync(path);
 }
 
 async function json<T>(response: Awaited<ReturnType<APIRequestContext["get"]>>): Promise<T> {
@@ -120,6 +125,7 @@ async function cleanTenant(
 }
 
 test("real local Auth and Postgres preserve an inquiry through publish and undo", async ({ browser }) => {
+  clearProviderReadbackFailure();
   const env = localEnvironment();
   const admin = createClient(env.url, env.service, { auth: { persistSession: false, autoRefreshToken: false } });
   const owner = await signedInContext(browser, admin, "inquiry-owner");
@@ -170,6 +176,7 @@ test("real local Auth and Postgres preserve an inquiry through publish and undo"
       input: {
         intent: "Collect seller inquiries and route them to Maria, with a follow-up if nobody replies.",
         title: "Seller inquiry",
+        followUpAfterMinutes: 1,
       },
     });
     current = started;
@@ -208,7 +215,12 @@ test("real local Auth and Postgres preserve an inquiry through publish and undo"
     expect(responsibility).toBeTruthy();
     current = await postSurface(owner.context.request, env.app, tenantId, current.snapshot.revision, {
       kind: "update-responsibility", responsibilityId: responsibility!.id,
-      input: { hours: { timezone: "UTC", days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "23:59" } },
+      input: {
+        hours: { timezone: "UTC", days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "23:59" },
+        preAuthorizedActions: ["reply", "send_message", "schedule_follow_up"],
+        approval: [],
+        budget: { dailyMessages: 20, timezone: "UTC" },
+      },
     });
 
     const rehearsed = await postSurface(owner.context.request, env.app, tenantId, current.snapshot.revision, {
@@ -226,6 +238,7 @@ test("real local Auth and Postgres preserve an inquiry through publish and undo"
     const capability = published.snapshot.capabilities.find((item) => item.id === workAfterShape?.capabilityId);
     expect(capability?.status, published.message).toMatch(/^live/);
     expect(capability?.live?.version).toBeGreaterThan(0);
+    expect(capability?.live?.followUp?.maxAttempts).toBe(1);
     expect(published.snapshot.state.changes.some((change) => change.requestId === requestId && change.status.startsWith("published"))).toBe(true);
 
     // Exercise the same portable client used by a generated customer site.
@@ -283,7 +296,8 @@ test("real local Auth and Postgres preserve an inquiry through publish and undo"
     await recordPage.getByRole("button", { name: "Send this message", exact: true }).click();
     const approved = await approvedResponse;
     expect(approved.status(), await approved.text()).toBe(200);
-    expect((await approved.json()).outcome.status).toMatch(/^(verified|delivered)$/);
+    const approvedBody = await approved.json() as { outcome: { status: string; reason?: string } };
+    expect(approvedBody.outcome.status, JSON.stringify(approvedBody)).toMatch(/^(verified|delivered)$/);
     await expect(recordPage.getByRole("button", { name: "Send this message", exact: true })).toHaveCount(0);
     expect(providerLogCount()).toBe(providerBefore + 1);
     await recordPage.screenshot({ path: "output/inquiry-approved-message-desktop.png", fullPage: true });
@@ -320,10 +334,93 @@ test("real local Auth and Postgres preserve an inquiry through publish and undo"
     expect(providerLogCount()).toBe(providerBefore + 2);
 
     const afterMessages = await getSurface(owner.context.request, tenantId);
-    const handled = await postSurface(owner.context.request, env.app, tenantId, afterMessages.snapshot.revision, {
-      kind: "bulk-record", recordIds: [record!.id], action: "mark_handled",
+    const promoted = await postSurface(owner.context.request, env.app, tenantId, afterMessages.snapshot.revision, {
+      kind: "promote-responsibility", responsibilityId: responsibility!.id,
+    });
+    expect(promoted.snapshot.state.responsibilities.find((item) => item.id === responsibility!.id)).toMatchObject({
+      trust: "trusted",
+      allowedActions: expect.arrayContaining(["send_message", "reply", "schedule_follow_up"]),
+    });
+    const handled = await postSurface(owner.context.request, env.app, tenantId, promoted.snapshot.revision, {
+      kind: "bulk-record", recordIds: [record!.id, readbackRecord!.id], action: "mark_handled",
     });
     expect(handled.snapshot.state.inquiries.find((item) => item.id === record!.id)?.status).toBe("handled");
+    expect(handled.snapshot.state.inquiries.find((item) => item.id === readbackRecord!.id)?.status).toBe("handled");
+
+    // Exercise the due worker through its authenticated local cron seam with a
+    // second, untouched inquiry. The first pass sends the governed owner
+    // notification and acknowledgement; the follow-up pass then proves the
+    // provider read-back before sending. A deliberately unavailable read-back
+    // is recoverable, and the durable max-attempt marker makes the later replay
+    // send nothing.
+    expect(capability?.live?.version).toBeGreaterThan(0);
+    expect(published.snapshot.state.capabilities.find((item) => item.id === capability!.id)?.live).toMatchObject({ version: capability!.live!.version });
+    const noReplyFields = { ...fields, name: "No Reply Buyer", email: "no-reply-follow-up@example.test" };
+    await submitInquiryForm(env.app, tenantId, form, noReplyFields);
+    const afterNoReplyIntake = await getSurface(owner.context.request, tenantId);
+    const noReplyRecord = afterNoReplyIntake.snapshot.state.inquiries.find((item) => item.fields.email === noReplyFields.email);
+    expect(noReplyRecord).toBeTruthy();
+    leadIds.push(noReplyRecord!.id);
+    expect(capability?.live?.version).toBeGreaterThan(0);
+
+    const cronSecret = process.env.CRON_SECRET;
+    expect(cronSecret, "The local proof must configure the cron secret.").toBeTruthy();
+    const runFollowUpCron = async () => {
+      const response = await owner.context.request.get("/api/cron/inquiry-follow-ups", {
+        headers: { authorization: `Bearer ${cronSecret}` },
+      });
+      expect(response.status(), await response.text()).toBe(200);
+      return json<{ results: Array<{ inquiryId: string; action: string; status: string; reason?: string }> }>(response);
+    };
+
+    const providerBeforeFollowUp = providerLogCount();
+    const acknowledgementSweep = await runFollowUpCron();
+    expect(acknowledgementSweep.results).toEqual(expect.arrayContaining([
+      expect.objectContaining({ inquiryId: noReplyRecord!.id, action: "owner_notification", status: "verified" }),
+    ]));
+    expect(providerLogCount()).toBe(providerBeforeFollowUp + 2);
+
+    // Move the accepted acknowledgement behind the one-minute rule without
+    // waiting in the browser test. This edits only this proof tenant's local
+    // delivery checkpoint and leaves the lead/source record intact.
+    const replyCheckpointKey = `reb:inquiry-delivery:${encodeURIComponent(tenantId)}:${encodeURIComponent(noReplyRecord!.id)}:reply`;
+    const replyCheckpoint = await redis.get<Record<string, unknown>>(replyCheckpointKey);
+    expect(replyCheckpoint).toMatchObject({ status: "verified", attempts: 1 });
+    if (!replyCheckpoint) throw new Error("The acknowledgement checkpoint was not persisted.");
+    await redis.set(replyCheckpointKey, { ...replyCheckpoint, acceptedAt: new Date(Date.now() - 5 * 60 * 1000).toISOString() }, { ex: 90 * 24 * 60 * 60 });
+
+    const followUpReadbackFailurePath = process.env.STRELVA_LOCAL_PROVIDER_READBACK_FAILURE_FILE;
+    expect(followUpReadbackFailurePath, "The local proof must configure a provider read-back failure path.").toBeTruthy();
+    writeFileSync(followUpReadbackFailurePath!, "fail one follow-up recheck\n", { mode: 0o600 });
+    const unavailableSweep = await runFollowUpCron();
+    expect(unavailableSweep.results).toEqual(expect.arrayContaining([
+      expect.objectContaining({ inquiryId: noReplyRecord!.id, action: "schedule_follow_up", status: "paused" }),
+    ]));
+    expect(providerLogCount()).toBe(providerBeforeFollowUp + 2);
+
+    const recoveredSweep = await runFollowUpCron();
+    expect(recoveredSweep.results).toEqual(expect.arrayContaining([
+      expect.objectContaining({ inquiryId: noReplyRecord!.id, action: "schedule_follow_up", status: "verified" }),
+    ]));
+    expect(providerLogCount()).toBe(providerBeforeFollowUp + 3);
+    const followUpCheckpointKey = `reb:inquiry-delivery:${encodeURIComponent(tenantId)}:${encodeURIComponent(noReplyRecord!.id)}:schedule_follow_up`;
+    const followUpCheckpoint = await redis.get<Record<string, unknown>>(followUpCheckpointKey);
+    expect(followUpCheckpoint).toMatchObject({ status: "verified", attempts: 1 });
+
+    const replaySweep = await runFollowUpCron();
+    expect(replaySweep.results).toEqual(expect.arrayContaining([
+      expect.objectContaining({ inquiryId: noReplyRecord!.id, action: "schedule_follow_up", status: "verified" }),
+    ]));
+    expect(providerLogCount()).toBe(providerBeforeFollowUp + 3);
+
+    const handledNoReply = await postSurface(owner.context.request, env.app, tenantId, afterNoReplyIntake.snapshot.revision, {
+      kind: "bulk-record", recordIds: [noReplyRecord!.id], action: "mark_handled",
+    });
+    expect(handledNoReply.snapshot.state.inquiries.find((item) => item.id === noReplyRecord!.id)?.status).toBe("handled");
+    const handledSweep = await runFollowUpCron();
+    expect(handledSweep.results.some((result) => result.inquiryId === noReplyRecord!.id)).toBe(false);
+    expect(providerLogCount()).toBe(providerBeforeFollowUp + 3);
+
     await recordPage.reload();
     await expect(recordPage.getByRole("heading", { name: "Avery Buyer", exact: true })).toBeVisible();
     await expect(recordPage.getByLabel("The submitted input").getByText("handled", { exact: true })).toBeVisible();

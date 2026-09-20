@@ -5,6 +5,9 @@ vi.mock("@/lib/redis", () => ({ getRedis: () => null }));
 vi.mock("@/lib/auth", () => ({ getTenantRole: async () => "owner", roleHasPermission: () => true }));
 vi.mock("@/lib/connections", () => ({ getConnections: async () => [] }));
 vi.mock("@/products/inquiries/email-consent", () => ({ projectInquiryEmailConnection: async () => ({ status: "not_configured" }) }));
+vi.mock("@/products/inquiries/workspace-exit", () => ({
+  assertInquiryWorkspaceOpen: vi.fn(async () => undefined),
+}));
 import { executeInquirySurface } from "@/products/inquiries/server";
 import { InquiryEngine } from "@/products/inquiries/inquiry-engine";
 import { createInMemoryInquiryRepository } from "@/products/inquiries/repository";

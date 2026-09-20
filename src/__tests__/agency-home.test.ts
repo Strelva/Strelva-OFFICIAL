@@ -68,6 +68,27 @@ describe("agency home projection", () => {
     expect(value.omittedCount).toBe(2);
   });
 
+  it("loads later client pages without repeating earlier clients or broadening shared work", async () => {
+    const customers = Array.from({ length: 10 }, (_, index) => ({
+      id: `client-${index}`, kind: "customer" as const, name: `Client ${index}`, access: "delegated_read" as const,
+    }));
+    const agency = snapshot({
+      workspaces: [{ id: AGENCY, kind: "agency", name: "North Studio", access: "member" }, ...customers],
+      delegations: customers.map((client, index) => ({ id: `d-${index}`, workId: `w-${index}`, customerWorkspaceId: client.id, agencyWorkspaceId: AGENCY, status: "active" as const, canRevoke: false })),
+    });
+    const requested: string[] = [];
+    const request = vi.fn<typeof fetch>(async (input) => {
+      const id = new URL(String(input), "https://strelva.test").searchParams.get("workspaceId")!;
+      requested.push(id);
+      return Response.json({ ...agency, workspaceId: id, work: [work(`w-${id.slice(7)}`, id), work("unshared", id)] });
+    });
+    const result = await loadAgencyClientSnapshots(request, agency, undefined, 8);
+    expect(requested).toEqual(["client-8", "client-9"]);
+    expect(result.clients.flatMap((client) => client.work.map((item) => item.id))).toEqual(["w-8", "w-9"]);
+    expect(result.totalCount).toBe(10);
+    expect(result.omittedCount).toBe(8);
+  });
+
   it("rechecks each client through the existing workspace route and rejects mixed workspace data", async () => {
     const requested: string[] = [];
     const agency = snapshot({

@@ -2,6 +2,7 @@ import type { AiVisibilityResult } from "@/products/ai-visibility/contracts";
 import type { AssessmentResult } from "@/products/assessment";
 import type { TrackerExperimentComparison } from "@/products/tracker/client";
 import type { TrackerHandoffPreview } from "@/products/tracker/contracts";
+import type { WorkspaceExitState } from "@/platform/workspace-exit/contracts";
 
 /** Browser response contract. Internal membership and invitation secrets stay server-side. */
 export interface WorkspaceSummary {
@@ -119,6 +120,10 @@ export interface WorkspaceSnapshot {
   actor: { email: string; localPreview: boolean };
   workspaces: WorkspaceSummary[];
   workspaceId: string;
+  /** Completed owner exit state, when the current actor can read it. */
+  workspaceExitState?: WorkspaceExitState | null;
+  /** Whether the durable exit state could be checked for this snapshot. */
+  workspaceExitReadStatus?: "available" | "completed" | "not_owner" | "unavailable";
   work: WorkspaceWork[];
   pendingAssessments?: Array<{ id: string; status: string; createdAt: string }>;
   /** Existing managed sites visible to this verified account, if any. */

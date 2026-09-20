@@ -292,3 +292,121 @@ test("a verified staff recipient uses one released version while a candidate cha
     await staff.context.close();
   }
 });
+
+test("a verified recipient edits a date record through a stale correction and recovers it", async ({ browser }) => {
+  const env = localEnvironment();
+  const admin = createClient(env.url, env.service, { auth: { persistSession: false, autoRefreshToken: false } });
+  const owner = await signedInContext(browser, admin, "application-edit-owner");
+  const staff = await signedInContext(browser, admin, "application-edit-staff");
+  const editor = await signedInContext(browser, admin, "application-edit-all");
+  try {
+    const workspace = await owner.context.request.get("/api/workspace");
+    expect(workspace.status(), await workspace.text()).toBe(200);
+    const { workspaceId } = await workspace.json();
+
+    let app = await post(owner.context.request, "/api/bounded-work", {
+      action: "create",
+      productId: "applications",
+      workspaceId,
+      input: {
+        title: "Repair appointments",
+        fields: [
+          { id: "visit_date", label: "Visit date", type: "date", required: true },
+          { id: "problem", label: "Problem", type: "text", required: true },
+        ],
+        components: [{ kind: "form", fields: ["visit_date", "problem"] }, { kind: "list", fields: ["visit_date", "problem"] }],
+      },
+    }, 201);
+    app = await applicationCommand(owner.context.request, app.id, { kind: "rehearse", expectedRevision: app.payload.revision });
+    app = await applicationCommand(owner.context.request, app.id, { kind: "install", expectedRevision: app.payload.revision });
+
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    await post(owner.context.request, `/api/apps/${app.id}/access`, {
+      recipientEmail: staff.email,
+      views: ["form", "list"],
+      recordRead: "all",
+      recordEdit: "own",
+      recordSubmit: true,
+      purpose: "Correct appointment records",
+      expiresAt,
+    }, 201);
+    await post(owner.context.request, `/api/apps/${app.id}/access`, {
+      recipientEmail: editor.email,
+      views: ["form", "list"],
+      recordRead: "all",
+      recordEdit: "all",
+      recordSubmit: false,
+      purpose: "Review all appointment corrections",
+      expiresAt,
+    }, 201);
+
+    const page = await staff.context.newPage();
+    await page.goto(`/apps/${app.id}`);
+    await expect(page.getByRole("heading", { name: "Repair appointments", exact: true })).toBeVisible();
+    await page.getByLabel("Visit date *", { exact: true }).fill("2024-02-29");
+    await page.getByLabel("Problem *", { exact: true }).fill("Loose front door");
+    await page.getByRole("button", { name: "Submit record", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText("Record submitted.");
+
+    let use = await readUse(staff.context.request, app.id);
+    expect(use.records).toHaveLength(1);
+    expect(use.records[0]).toMatchObject({ values: { visit_date: "2024-02-29", problem: "Loose front door" }, revision: 1 });
+    const recordId = use.records[0].id as string;
+
+    await page.getByRole("button", { name: "Edit record", exact: true }).click();
+    await page.getByLabel("Visit date *", { exact: true }).fill("2024-03-01");
+    await page.getByLabel("Problem *", { exact: true }).fill("Correction kept after conflict");
+
+    await post(editor.context.request, `/api/apps/${app.id}`, {
+      action: "edit",
+      input: {
+        record: { id: recordId, values: { visit_date: "2024-03-02", problem: "Editor changed this first" } },
+        releaseVersion: 1,
+        expectedRecordRevision: 1,
+        idempotencyKey: "editor-first-correction",
+      },
+    });
+    await page.getByRole("button", { name: "Save correction", exact: true }).click();
+    await expect(page.locator("#application-submit-error")).toContainText("Your correction is still here");
+    await expect(page.getByLabel("Visit date *", { exact: true })).toHaveValue("2024-03-01");
+    await expect(page.getByLabel("Problem *", { exact: true })).toHaveValue("Correction kept after conflict");
+    use = await readUse(staff.context.request, app.id);
+    expect(use.records[0]).toMatchObject({ values: { visit_date: "2024-03-02", problem: "Editor changed this first" }, revision: 2 });
+
+    await page.getByRole("button", { name: "Reload application", exact: true }).click();
+    await page.getByRole("button", { name: "Cancel correction", exact: true }).click();
+    await page.getByRole("button", { name: "Edit record", exact: true }).click();
+    await page.getByLabel("Visit date *", { exact: true }).fill("2024-03-03");
+    await page.getByLabel("Problem *", { exact: true }).fill("Correction recovered");
+    await page.getByRole("button", { name: "Save correction", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText("Correction saved.");
+    use = await readUse(staff.context.request, app.id);
+    expect(use.records[0]).toMatchObject({ values: { visit_date: "2024-03-03", problem: "Correction recovered" }, revision: 3 });
+
+    await post(staff.context.request, `/api/apps/${app.id}`, {
+      action: "edit",
+      input: {
+        record: { id: recordId, values: { visit_date: "2024-02-30", problem: "Invalid date" } },
+        releaseVersion: 1,
+        expectedRecordRevision: 3,
+        idempotencyKey: "invalid-date-rejected",
+      },
+    }, 400);
+    await post(editor.context.request, `/api/apps/${app.id}`, {
+      action: "edit",
+      input: {
+        record: { id: recordId, values: { visit_date: "2024-03-02", problem: "Editor changed this first" } },
+        releaseVersion: 1,
+        expectedRecordRevision: 1,
+        idempotencyKey: "editor-first-correction",
+      },
+    });
+    use = await readUse(staff.context.request, app.id);
+    expect(use.records[0]).toMatchObject({ values: { visit_date: "2024-03-03", problem: "Correction recovered" }, revision: 3 });
+    await page.close();
+  } finally {
+    await owner.context.close();
+    await staff.context.close();
+    await editor.context.close();
+  }
+});

@@ -184,6 +184,13 @@ export async function resolveEventAction(
         : workflowStatus === "declined"
           ? "dismissed"
           : existing.status; // a non-terminal step keeps it pending
+      const priorHistory = Array.isArray(existing.metadata?.workflowHistory)
+        ? existing.metadata.workflowHistory.filter((entry): entry is { status: string; actor: string; at: string } => Boolean(entry)
+          && typeof entry === "object"
+          && typeof (entry as Record<string, unknown>).status === "string"
+          && typeof (entry as Record<string, unknown>).actor === "string"
+          && typeof (entry as Record<string, unknown>).at === "string")
+        : [];
       return {
         ...existing,
         status: nextStatus,
@@ -196,6 +203,7 @@ export async function resolveEventAction(
           quoteRequired: workflowStatus === "quoted" ? true : existing.metadata?.quoteRequired,
           shippedAt: workflowStatus === "shipped" ? now : existing.metadata?.shippedAt,
           workflowUpdatedAt: now,
+          workflowHistory: [...priorHistory, { status: workflowStatus, actor: actorId, at: now }],
         },
       };
     });
@@ -396,6 +404,7 @@ async function executeResolvedEventAction(
         "user",
         tenantId,
         diffFields(current, draft as unknown as Record<string, unknown>),
+        eventId,
       );
       await recordSectionUpdate(section, tenantId);
       const { revalidatePath } = await import("next/cache");

@@ -2,12 +2,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { InquiryCapabilityState } from "@/products/inquiries/contracts";
 import { projectPublishedInquiry } from "@/products/inquiries/storefront";
 
-const mocks = vi.hoisted(() => ({ release: vi.fn(), tenant: vi.fn(), snapshot: vi.fn() }));
+const mocks = vi.hoisted(() => ({ release: vi.fn(), tenant: vi.fn(), snapshot: vi.fn(), workspace: vi.fn() }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.tenant }));
 vi.mock("@/products/inquiries/server", async () => ({
+  ...(await import("@/products/inquiries/workspace-exit")),
   inquiryReleaseEnabled: mocks.release,
   getInquiryRepository: () => ({ getSnapshot: mocks.snapshot }),
   projectPublishedInquiry: (await import("@/products/inquiries/storefront")).projectPublishedInquiry,
+}));
+vi.mock("@/products/inquiries/workspace-exit", () => ({
+  INQUIRY_WORKSPACE_EXIT_CODE: "workspace_exit_future_work_blocked",
+  resolveInquiryWorkspace: mocks.workspace,
 }));
 import { GET } from "@/app/api/v1/inquiries/[tenant]/route";
 
@@ -31,6 +36,7 @@ describe("public inquiry form read", () => {
     mocks.release.mockReturnValue(true);
     mocks.tenant.mockResolvedValue({ active: true, stableId: "stable-business" });
     mocks.snapshot.mockResolvedValue({ state: { capabilities: [capability] } });
+    mocks.workspace.mockResolvedValue({ businessId: "stable-business", workspaceIds: [], exitCompleted: false, mapped: false });
   });
 
   it("publishes only the form and its exact version, never private routing", async () => {
@@ -42,6 +48,19 @@ describe("public inquiry form read", () => {
     expect(JSON.stringify(body)).not.toContain("routing");
     expect(mocks.snapshot).toHaveBeenCalledWith("example", "stable-business");
     expect(response.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("reads a mapped customer workspace and hides a stopped form", async () => {
+    mocks.workspace.mockResolvedValueOnce({ businessId: "customer-workspace", workspaceIds: ["customer-workspace"], exitCompleted: false, mapped: true });
+    mocks.snapshot.mockResolvedValueOnce({ state: { capabilities: [{ ...capability, businessId: "customer-workspace", live: { ...capability.live!, businessId: "customer-workspace" } }] } });
+    const mapped = await request();
+    expect(mapped.status).toBe(200);
+    expect(mocks.snapshot).toHaveBeenCalledWith("example", "customer-workspace");
+
+    mocks.workspace.mockResolvedValueOnce({ businessId: "customer-workspace", workspaceIds: ["customer-workspace"], exitCompleted: true, mapped: true });
+    const stopped = await request();
+    expect(stopped.status).toBe(409);
+    expect(await stopped.json()).toMatchObject({ code: "workspace_exit_future_work_blocked" });
   });
 
   it("does not expose a draft, paused form, or foreign definition", () => {

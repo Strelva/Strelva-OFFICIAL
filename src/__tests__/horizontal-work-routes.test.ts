@@ -12,7 +12,9 @@ import { GET as getBounded, POST as postBounded } from "@/app/api/bounded-work/r
 
 const owner = { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", email: "Owner@Example.com", email_confirmed_at: "2026-09-12T00:00:00Z" };
 const outsider = { ...owner, id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", email: "other@example.com" };
+const agency = { ...owner, id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", email: "operator@agency.example.com" };
 const workspaceId = "11111111-1111-4111-8111-111111111111";
+const agencyWorkspaceId = "22222222-2222-4222-8222-222222222222";
 type Row = Record<string, unknown>;
 
 /** Auth and SQL are external boundaries. Route, schemas, product services, and
@@ -20,7 +22,7 @@ type Row = Record<string, unknown>;
 function databaseBoundary() {
   const tables: Record<string, Row[]> & { workspace_memberships: Row[]; saved_product_work: Row[]; workspace_delegations: Row[] } = {
     workspace_memberships: [{ workspace_id: workspaceId, user_id: owner.id, role: "owner" }],
-    saved_product_work: [], workspace_delegations: [], standing_responsibility_jobs: [], standing_responsibility_runs: [], application_states: [], application_releases: [], application_records: [], job_economics: [], job_economics_usage: [], job_economics_reservations: [], job_economics_executions: [],
+    saved_product_work: [], workspace_delegations: [], operational_assignments: [], offering_provider_deliveries: [], offering_installations: [], standing_responsibility_jobs: [], standing_responsibility_runs: [], application_states: [], application_releases: [], application_records: [], job_economics: [], job_economics_usage: [], job_economics_reservations: [], job_economics_executions: [],
   };
   let rpcError: string | null = null;
   let lostCommitResponse: string | null = null;
@@ -144,6 +146,30 @@ function databaseBoundary() {
         touchApplication(String(args.p_work_id), String(args.p_user_id), "retire", { status: "retired" });
         return { data: [structuredClone(state)], error: null };
       }
+      if (name === "agency_can_read_assigned_work") {
+        const assignment = tables.operational_assignments!.find((row) => row.workspace_id === args.p_workspace_id
+          && row.assignee_user_id === args.p_user_id && row.assignee_kind === "agency" && row.status === "accepted");
+        if (!assignment) return { data: false, error: null };
+        const expiry = Date.parse(String(assignment.expires_at ?? ""));
+        if (!Number.isFinite(expiry) || expiry <= Date.now()) return { data: false, error: null };
+        const agencyMembership = tables.workspace_memberships.find((row) => row.workspace_id === assignment.assignee_workspace_id && row.user_id === args.p_user_id);
+        const sponsorMembership = tables.workspace_memberships.find((row) => row.workspace_id === args.p_workspace_id && row.user_id === assignment.sponsor_id && row.role === "owner");
+        const responsibility = tables.saved_product_work!.find((row) => row.id === assignment.work_id && row.workspace_id === args.p_workspace_id);
+        const payload = responsibility?.payload as Row | undefined;
+        const steps = Array.isArray(payload?.steps) ? payload.steps : [];
+        const target = String(args.p_work_id);
+        const targetIsAssigned = assignment.work_id === target || steps.some((step) => (step as Row).workId === target);
+        const delivery = tables.offering_provider_deliveries!.find((row) => row.assignment_id === assignment.id
+          && row.business_workspace_id === args.p_workspace_id && row.status === "accepted");
+        const installation = delivery && tables.offering_installations!.find((row) => row.id === delivery.installation_id
+          && row.business_workspace_id === args.p_workspace_id && row.status === "active"
+          && (row.responsibility as Row)?.providerKind === "agency"
+          && (row.responsibility as Row)?.agencyWorkspaceId === assignment.assignee_workspace_id
+          && Array.isArray(row.native_resources) && (row.native_resources as Row[]).some((resource) => resource.id === target
+            || (assignment.work_id === target && steps.some((step) => (step as Row).workId === resource.id))));
+        return { data: Boolean(agencyMembership && sponsorMembership && payload?.ownerId === assignment.sponsor_id
+          && payload?.approvedBy === assignment.sponsor_id && payload?.approvedAt && targetIsAssigned && installation), error: null };
+      }
       if (name === "job_economics_execution_command") {
         const input = args.p_command as Row;
         const budget = tables.job_economics!.find(row => row.id === input.jobId)!;
@@ -245,6 +271,48 @@ describe("horizontal work HTTP authority and execution", () => {
     expect((await getOperations(read("operations", work.id))).status).toBe(403);
     expect((await postBounded(post("bounded-work", { action: "command", productId: "applications", workId: app.id, command: { kind: "retire", expectedRevision: 0 } }))).status).toBe(403);
     expect((await postOperations(post("operations", { action: "run", workId: work.id }))).status).toBe(403);
+  });
+
+  it("requires a live exact agency assignment for native work reads", async () => {
+    const app = await createApplication();
+    const responsibility = await createResponsibility(app.id);
+    const responsibilityRow = database.tables.saved_product_work.find((row) => row.id === responsibility.id)!;
+    const approvedAt = new Date().toISOString();
+    responsibilityRow.payload = {
+      ...(responsibilityRow.payload as Row),
+      status: "ready",
+      ownerId: owner.id,
+      approvedBy: owner.id,
+      approvedAt,
+    };
+    database.tables.workspace_memberships.push({ workspace_id: agencyWorkspaceId, user_id: agency.id, role: "owner" });
+    const assignmentId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    const installationId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+    const assignment = {
+      id: assignmentId, workspace_id: workspaceId, work_id: responsibility.id, sponsor_id: owner.id,
+      assignee_user_id: agency.id, assignee_kind: "agency", assignee_workspace_id: agencyWorkspaceId,
+      status: "accepted", expires_at: new Date(Date.now() + 60_000).toISOString(),
+    };
+    database.tables.operational_assignments!.push(assignment);
+    const delivery = {
+      id: "ffffffff-ffff-4fff-8fff-ffffffffffff", assignment_id: assignmentId,
+      business_workspace_id: workspaceId, installation_id: installationId, status: "accepted",
+    };
+    database.tables.offering_provider_deliveries!.push(delivery);
+    database.tables.offering_installations!.push({
+      id: installationId, business_workspace_id: workspaceId, status: "active",
+      responsibility: { kind: "provider_requested", providerKind: "agency", agencyWorkspaceId },
+      native_resources: [{ kind: "application", id: app.id }],
+    });
+
+    boundary.session.mockResolvedValue(agency);
+    expect((await getBounded(read("bounded-work", app.id))).status).toBe(200);
+
+    assignment.expires_at = "not-a-timestamp";
+    expect((await getBounded(read("bounded-work", app.id))).status).toBe(403);
+    assignment.expires_at = new Date(Date.now() + 60_000).toISOString();
+    delivery.status = "revoked";
+    expect((await getBounded(read("bounded-work", app.id))).status).toBe(403);
   });
 
   it("approves and completes a native action once, then returns its durable result", async () => {

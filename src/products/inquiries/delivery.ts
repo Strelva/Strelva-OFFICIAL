@@ -29,6 +29,7 @@ import { addTenantActivity } from "@/lib/tenant-crm";
 import { renderEmailHtml, renderEmailText } from "@/lib/email/layout";
 import { createEmailInquiryTransport } from "./delivery-email";
 import { createRedisInquiryDeliveryStore } from "./delivery-store";
+import { INQUIRY_WORKSPACE_EXIT_CODE, isInquiryWorkspaceExited } from "./workspace-exit";
 import type { EmailAudience } from "@/lib/email/send";
 import {
   actorForAction,
@@ -535,7 +536,10 @@ function isFreshRecheck(recheck: InquiryFollowUpRecheck, now: Date): boolean {
   const checkedAt = toDate(recheck.checkedAt);
   if (!checkedAt) return false;
   const age = now.getTime() - checkedAt.getTime();
-  return age >= 0 && age <= 5 * 60 * 1000;
+  // A provider read starts after the worker's clock is captured, so a fresh
+  // read can be a few milliseconds ahead of that clock. Keep the bounded
+  // window while allowing that normal request ordering.
+  return age >= -60 * 1000 && age <= 5 * 60 * 1000;
 }
 
 async function appendTimelineSafe(
@@ -728,6 +732,19 @@ export async function deliverInquiryAction(
     return { ...evaluated, status: "reconciliation_required", reason: "prior_attempt_may_have_reached_provider", attemptId: checkpoint.attemptId, retryable: false };
   }
 
+  // Exit blocks a new claim, while the checkpoint branches above remain
+  // available to verify or reconcile an already accepted or ambiguous write.
+  try {
+    const exited = await (deps.isWorkspaceExited ?? ((tenantId: string) => isInquiryWorkspaceExited({ tenantId })))(inquiry.tenantId);
+    if (exited) {
+      const reason = INQUIRY_WORKSPACE_EXIT_CODE;
+      await appendTimelineSafe(store, timelineFor(inquiry, action, blockedTimelineType(action), reason, "blocked", now.toISOString()));
+      return { ...evaluated, status: "paused", reason, retryable: false };
+    }
+  } catch {
+    return { ...evaluated, status: "unavailable", reason: "inquiry_workspace_exit_unavailable", retryable: false };
+  }
+
   if (action === "schedule_follow_up") {
     if (!deps.getFollowUpRecheck) {
       const reason = "fresh_no_reply_check_required";
@@ -816,6 +833,31 @@ export async function deliverInquiryAction(
   const attemptId = claim.attemptId;
   await appendTimelineSafe(store, timelineFor(inquiry, action, action === "schedule_follow_up" ? "follow_up_scheduled" : "routed", action === "schedule_follow_up" ? "follow-up claimed for delivery" : `message routed to ${message.audience}`, "recorded", now.toISOString()));
   try {
+    // The exit can complete after the pre-claim read but before the provider
+    // boundary. Retire this fresh claim before any external write so a late
+    // stop cannot turn into a new provider message.
+    try {
+      const exited = await (deps.isWorkspaceExited ?? ((tenantId: string) => isInquiryWorkspaceExited({ tenantId })))(inquiry.tenantId);
+      if (exited) {
+        let stopped: InquiryDeliveryCheckpoint;
+        try {
+          stopped = await store.markFailed({
+            tenantId: inquiry.tenantId,
+            inquiryId: inquiry.id,
+            action,
+            attemptId,
+            reason: INQUIRY_WORKSPACE_EXIT_CODE,
+            retryable: false,
+          });
+        } catch {
+          return { ...evaluated, status: "reconciliation_required", reason: "workspace_exit_marker_unavailable", attemptId, retryable: false };
+        }
+        const timelinePersisted = await appendTimelineSafe(store, timelineFor(inquiry, action, blockedTimelineType(action), INQUIRY_WORKSPACE_EXIT_CODE, "blocked", now.toISOString()));
+        return { ...evaluated, status: "paused", reason: INQUIRY_WORKSPACE_EXIT_CODE, attemptId, retryable: false, timelinePersisted, acceptedAt: stopped.acceptedAt, providerMessageId: stopped.providerMessageId };
+      }
+    } catch {
+      return { ...evaluated, status: "unavailable", reason: "inquiry_workspace_exit_unavailable", attemptId, retryable: false };
+    }
     const sent = await transport.send(message);
     if (sent.status === "rejected") {
       let failed: InquiryDeliveryCheckpoint;

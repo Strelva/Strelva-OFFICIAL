@@ -1,11 +1,13 @@
 import { z } from "zod";
 import { baseSchema } from "@/platform/bounded-work/contracts";
+import { applicationDateOnlySchema } from "./date-only";
 
 /** Bounded-work compatibility keeps a clear failure at these finite limits. */
 export const APPLICATION_RECORD_LIMIT = 1_000;
 export const APPLICATION_VERSION_HISTORY_LIMIT = 100;
 export const APPLICATION_SELECT_OPTION_LIMIT = 20;
 export const APPLICATION_SELECT_OPTION_LENGTH_LIMIT = 80;
+export const APPLICATION_RECORD_HISTORY_LIMIT = 100;
 
 const fieldId = z.string()
   .regex(/^[a-z][a-z0-9_]{0,39}$/)
@@ -21,6 +23,7 @@ const fieldSchema = z.discriminatedUnion("type", [
   z.object({ ...fieldBase, type: z.literal("text") }).strict(),
   z.object({ ...fieldBase, type: z.literal("number") }).strict(),
   z.object({ ...fieldBase, type: z.literal("boolean") }).strict(),
+  z.object({ ...fieldBase, type: z.literal("date") }).strict(),
   z.object({
     ...fieldBase,
     type: z.literal("select"),
@@ -171,6 +174,8 @@ export const applicationSubmitInputSchema = z.object({
   expectedRecordsRevision: expectedRevision,
   record: recordSchema,
 }).strict();
+
+export const applicationDateValueSchema = applicationDateOnlySchema;
 
 /**
  * The command route keeps the old aggregate revision for compatibility. New

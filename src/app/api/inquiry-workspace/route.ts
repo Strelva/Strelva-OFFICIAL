@@ -13,6 +13,12 @@ import {
   parseInquirySurfaceAction,
   readInquirySurface,
 } from "@/products/inquiries/server";
+import {
+  INQUIRY_WORKSPACE_EXIT_CODE,
+  InquiryWorkspaceExitBlockedError,
+  InquiryWorkspaceExitUnavailableError,
+  resolveInquiryWorkspace,
+} from "@/products/inquiries/server";
 
 export const dynamic = "force-dynamic";
 
@@ -50,7 +56,12 @@ async function contextFor(request: Request, body?: Record<string, unknown>) {
   if (denied) return { error: denied } as const;
   const config = await getTenantConfig(tenant);
   if (!config || !config.active) return { error: json({ error: "Business unavailable." }, 404) } as const;
-  return { tenantId: tenant, config, businessId: config.stableId ?? tenant } as const;
+  const workspace = await resolveInquiryWorkspace({
+    tenantId: tenant,
+    tenantStableId: config.stableId,
+    fallbackBusinessId: config.stableId ?? tenant,
+  });
+  return { tenantId: tenant, config, businessId: workspace.businessId, exitCompleted: workspace.exitCompleted } as const;
 }
 
 function expectedRevision(value: unknown): number | null | undefined {
@@ -60,6 +71,8 @@ function expectedRevision(value: unknown): number | null | undefined {
 }
 
 function failure(error: unknown) {
+  if (error instanceof InquiryWorkspaceExitBlockedError) return json({ error: error.message, code: error.code }, 409);
+  if (error instanceof InquiryWorkspaceExitUnavailableError) return json({ error: error.message, code: error.code }, 503);
   if (error instanceof InquiryConcurrencyError) return json({ error: error.message, currentRevision: error.current?.revision ?? null }, 409);
   if (error instanceof InquiryValidationError) return json({ error: error.message }, 400);
   if (error instanceof InquiryPersistenceError) return json({ error: "Inquiry workspace is temporarily unavailable." }, 503);
@@ -94,6 +107,7 @@ export async function POST(request: Request) {
     if (!body) return json({ error: "Invalid request body." }, 400);
     const context = await contextFor(request, body);
     if ("error" in context && context.error) return context.error;
+    if (context.exitCompleted) return json({ error: "Inquiry configuration is stopped for this workspace.", code: INQUIRY_WORKSPACE_EXIT_CODE }, 409);
     const actorId = await getAuthUserId();
     if (!actorId) return json({ error: "Unauthorized" }, 401);
     const revision = expectedRevision(body.expectedRevision);

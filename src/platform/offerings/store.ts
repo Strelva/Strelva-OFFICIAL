@@ -1,5 +1,6 @@
 import { getSupabase } from "@/lib/db/client";
 import type { OfferingDb } from "./schema";
+import { WORKSPACE_EXIT_STOPPED_MESSAGE } from "@/platform/workspaces/types";
 import {
   OFFERING_NATIVE_RESOURCE_KINDS,
   OfferingAccessError,
@@ -108,11 +109,16 @@ function mapResponsibility(value: unknown): OfferingResponsibility {
   if (row.kind === "customer_operated" && text(row.providerName)) {
     return { kind: "customer_operated", providerName: text(row.providerName) };
   }
-  if (row.kind === "provider_requested" && (row.providerKind === "strelva" || row.providerKind === "named_third_party") && text(row.providerName)) {
+  if (row.kind === "provider_requested"
+    && (row.providerKind === "strelva" || row.providerKind === "agency" || row.providerKind === "named_third_party")
+    && text(row.providerName)) {
+    const agencyWorkspaceId = optionalText(row.agencyWorkspaceId);
+    if (row.providerKind === "agency" && !agencyWorkspaceId) throw new OfferingStoreError();
     return {
       kind: "provider_requested",
       providerKind: row.providerKind,
       providerName: text(row.providerName),
+      ...(row.providerKind === "agency" ? { agencyWorkspaceId } : {}),
       ...(optionalText(row.requestNote) ? { requestNote: optionalText(row.requestNote) } : {}),
     };
   }
@@ -178,6 +184,7 @@ function mapWebsiteBinding(row: DbRow): OfferingWebsiteBindingRecord {
 function failure(error: DbFailure): never {
   const detail = `${error?.code ?? ""} ${error?.message ?? ""}`;
   if (/offering_(actor|membership|business|manage|tenant_owner)_/.test(detail)) throw new OfferingAccessError();
+  if (detail.includes("workspace_exit_future_work_blocked")) throw new OfferingConflictError(WORKSPACE_EXIT_STOPPED_MESSAGE);
   if (detail.includes("offering_installation_not_found") || detail.includes("offering_website_binding_not_found")) throw new OfferingNotFoundError();
   if (detail.includes("offering_") || error?.code === "23505") throw new OfferingConflictError();
   throw new OfferingStoreError();

@@ -3,6 +3,7 @@ import {
   WorkspaceAccessError,
   WorkspaceConflictError,
   WorkspaceStoreError,
+  WORKSPACE_EXIT_STOPPED_MESSAGE,
   type WorkspaceActor,
 } from "./types";
 
@@ -63,6 +64,9 @@ function asNumber(value: unknown): number | null {
 function dbError(error: DbError): never {
   const detail = `${error?.code ?? ""} ${error?.message ?? ""}`;
   if (detail.includes("workspace_access_denied")) throw new WorkspaceAccessError();
+  if (detail.includes("workspace_exit_future_work_blocked")) {
+    throw new WorkspaceConflictError(WORKSPACE_EXIT_STOPPED_MESSAGE);
+  }
   if (detail.includes("work_plan_revision_conflict") ||
       detail.includes("work_plan_output_invalid") ||
       detail.includes("work_plan_output_unsupported") ||

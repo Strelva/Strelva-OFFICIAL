@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { isTenantId } from "@/lib/scaffold-contracts";
 import { getTenantConfig } from "@/lib/tenants";
 import { getInquiryRepository, inquiryReleaseEnabled, projectPublishedInquiry } from "@/products/inquiries/server";
+import { INQUIRY_WORKSPACE_EXIT_CODE, resolveInquiryWorkspace } from "@/products/inquiries/server";
 
 export const dynamic = "force-dynamic";
 
@@ -25,8 +26,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ tena
   try {
     const config = await getTenantConfig(tenant);
     if (!config || !config.active) return json({ error: "Inquiry form unavailable." }, 404);
-    const snapshot = await getInquiryRepository().getSnapshot(tenant, config.stableId ?? tenant);
-    const capability = snapshot?.state.capabilities.find((item) => item.id === capabilityId && item.businessId === (config.stableId ?? tenant));
+    const workspace = await resolveInquiryWorkspace({
+      tenantId: tenant,
+      tenantStableId: config.stableId,
+      fallbackBusinessId: config.stableId ?? tenant,
+    });
+    if (workspace.exitCompleted) return json({ error: "Inquiry form is stopped for this workspace.", code: INQUIRY_WORKSPACE_EXIT_CODE }, 409);
+    const snapshot = await getInquiryRepository().getSnapshot(tenant, workspace.businessId);
+    const capability = snapshot?.state.capabilities.find((item) => item.id === capabilityId && item.businessId === workspace.businessId);
     const projection = capability ? projectPublishedInquiry(capability) : null;
     return projection ? json(projection) : json({ error: "Inquiry form unavailable." }, 404);
   } catch {

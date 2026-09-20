@@ -61,4 +61,17 @@ describe("work economics command boundary", () => {
       metadata: { source: "provider" },
     })).toThrow(JobEconomicsValidationError);
   });
+
+  it("accepts the custom application saved-work pair and rejects a mismatched kind", () => {
+    expect(parseJobEconomicsCommand({
+      ...workspaceRef,
+      productId: "custom-applications",
+      resourceKind: "custom-application",
+    })).toMatchObject({ productId: "custom-applications", resourceKind: "custom-application" });
+    expect(() => parseJobEconomicsCommand({
+      ...workspaceRef,
+      productId: "custom-applications",
+      resourceKind: "tracker",
+    })).toThrow(JobEconomicsValidationError);
+  });
 });

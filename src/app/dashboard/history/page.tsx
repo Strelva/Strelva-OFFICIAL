@@ -1,23 +1,39 @@
 import Link from "next/link";
 import { requireDashboardView } from "@/lib/dashboard-auth";
 import { getActivity, getSiteSnapshots } from "@/lib/storage";
+import { getEvents } from "@/lib/events";
+import { getScanHistory, getScanSummary } from "@/lib/scan-store";
 import { withClientFallbackRoot } from "@/lib/client-fallback";
 import { SiteSafetyPanel } from "@/components/dashboard/SiteSafetyPanel";
+import { WebsiteRequestHistory } from "@/components/dashboard/WebsiteRequestHistory";
+import { DatedSiteCheckHistory } from "@/components/dashboard/DatedSiteCheckHistory";
 
 /** Website > History — the change log + rollback safety net. Lives under the
  *  Website pillar (not the dashboard): "revert to a last good version" and the
  *  recent-changes trail are site-management tools, not at-a-glance metrics. */
-export default async function SiteHistoryPage() {
+export default async function SiteHistoryPage({ searchParams }: { searchParams?: Promise<{ request?: string }> }) {
   const { tenant, clientFallbackRoot } = await requireDashboardView();
+  const params = searchParams ? await searchParams : {};
 
-  const [activity, snapshots] = await Promise.all([
-    getActivity(tenant, { actor: "ai" }).catch(() => []),
+  const [activity, snapshots, events, scanHistory, latestScan] = await Promise.allSettled([
+    getActivity(tenant, { actor: "ai" }),
     // The full saved-version history (daily + manual backups) so the owner can
     // restore ANY good version, not just the latest.
-    getSiteSnapshots(tenant, 60).catch(() => []),
+    getSiteSnapshots(tenant, 60),
+    getEvents(tenant, { limit: 60, requireStore: true }),
+    getScanHistory(tenant, { requireStore: true }),
+    getScanSummary(tenant, { requireStore: true }),
   ]);
-  const recentChanges = activity.slice(0, 12);
+  const recentChanges = activity.status === "fulfilled" ? activity.value.slice(0, 12) : [];
   const dashboardHref = (path: string) => withClientFallbackRoot(clientFallbackRoot, path);
+
+  const historyHref = `${dashboardHref("/dashboard/history")}${params.request ? `?request=${encodeURIComponent(params.request)}` : ""}`;
+  const unavailable = (message: string) => (
+    <section role="alert" className="rounded-2xl border border-glass-border bg-glass p-5">
+      <p className="text-sm text-gray-muted">{message}</p>
+      <a href={historyHref} className="mt-3 inline-flex text-sm text-accent underline underline-offset-4">Reload history</a>
+    </section>
+  );
 
   return (
     <div className="h-full overflow-y-auto animate-route-enter px-4 py-6 sm:px-8 sm:py-8">
@@ -30,11 +46,22 @@ export default async function SiteHistoryPage() {
             History &amp; safety
           </h1>
           <p className="mt-1.5 text-[13px] leading-relaxed text-gray-muted">
-            Every change made to your site, and a one-click way to roll back to a known-good version.
+            Recent website requests, saved versions and dated site checks.
           </p>
         </div>
 
-        <SiteSafetyPanel snapshots={snapshots} />
+        {snapshots.status === "fulfilled" ? <SiteSafetyPanel snapshots={snapshots.value} /> : unavailable("Saved versions are temporarily unavailable.")}
+
+        {events.status === "fulfilled" ? <WebsiteRequestHistory events={events.value} dashboardHref={dashboardHref} selectedRequestId={params.request} /> : unavailable("Website request history is temporarily unavailable.")}
+
+        {scanHistory.status === "rejected" || latestScan.status === "rejected" ? unavailable("Site check history is temporarily unavailable.") : null}
+        {scanHistory.status === "fulfilled" && latestScan.status === "fulfilled" ? (
+          <DatedSiteCheckHistory latest={latestScan.value} history={scanHistory.value} dashboardHref={dashboardHref} />
+        ) : scanHistory.status === "fulfilled" && scanHistory.value.length > 0 ? (
+          <DatedSiteCheckHistory latest={null} history={scanHistory.value} dashboardHref={dashboardHref} />
+        ) : latestScan.status === "fulfilled" && latestScan.value ? (
+          <DatedSiteCheckHistory latest={latestScan.value} history={[]} dashboardHref={dashboardHref} />
+        ) : null}
 
         <section className="rounded-2xl border border-glass-border bg-glass p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
@@ -53,7 +80,7 @@ export default async function SiteHistoryPage() {
               Reports
             </Link>
           </div>
-          {recentChanges.length > 0 ? (
+          {activity.status === "rejected" ? unavailable("Recent changes are temporarily unavailable.") : recentChanges.length > 0 ? (
             <div className="grid gap-2 sm:grid-cols-2">
               {recentChanges.map((entry) => (
                 <div

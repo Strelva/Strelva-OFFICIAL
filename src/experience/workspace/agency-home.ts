@@ -44,6 +44,7 @@ export interface AgencyQueueItem {
 export function agencyClientTargets(
   snapshot: WorkspaceSnapshot,
   limit = MAX_AGENCY_CLIENT_LOADS,
+  offset = 0,
 ): { targets: AgencyClientTarget[]; totalCount: number; omittedCount: number } {
   const current = snapshot.workspaces.find((workspace) => workspace.id === snapshot.workspaceId);
   if (current?.kind !== "agency" || current.access === "delegated_read") {
@@ -64,10 +65,12 @@ export function agencyClientTargets(
       : []
   ));
   const boundedLimit = Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : MAX_AGENCY_CLIENT_LOADS;
+  const start = Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0;
+  const targets = all.slice(start, start + boundedLimit);
   return {
-    targets: all.slice(0, boundedLimit),
+    targets,
     totalCount: all.length,
-    omittedCount: Math.max(0, all.length - boundedLimit),
+    omittedCount: all.length - targets.length,
   };
 }
 
@@ -91,8 +94,9 @@ export async function loadAgencyClientSnapshots(
   request: typeof fetch,
   snapshot: WorkspaceSnapshot,
   signal?: AbortSignal,
+  offset = 0,
 ): Promise<AgencyClientLoadResult> {
-  const selection = agencyClientTargets(snapshot);
+  const selection = agencyClientTargets(snapshot, MAX_AGENCY_CLIENT_LOADS, offset);
   const loaded = await Promise.all(selection.targets.map(async (target) => {
     try {
       const response = await request(`/api/workspace?workspaceId=${encodeURIComponent(target.id)}`, {

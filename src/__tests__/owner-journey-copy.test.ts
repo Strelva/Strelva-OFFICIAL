@@ -86,7 +86,8 @@ describe("owner journey copy and links", () => {
     const maintenance = readRepoFile("src/app/api/cron/maintenance/route.ts");
 
     expect(historyPage).toContain("getSiteSnapshots(tenant, 60)");
-    expect(historyPage).toContain("<SiteSafetyPanel snapshots={snapshots} />");
+    expect(historyPage).toContain('snapshots.status === "fulfilled"');
+    expect(historyPage).toContain("<SiteSafetyPanel snapshots={snapshots.value} />");
     expect(safetyPanel).toContain("Revert to a last good version");
     expect(safetyPanel).toContain("Save a version now");
     // Per-row restore over the whole version history, not just the latest.

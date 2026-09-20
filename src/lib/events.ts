@@ -270,10 +270,13 @@ export async function addEvent(
  */
 export async function getEventsRaw(
   tenantId: string,
-  opts?: { status?: string; limit?: number }
+  opts?: { status?: string; limit?: number; requireStore?: boolean }
 ): Promise<UnifiedEvent[]> {
   const redis = getRedis();
-  if (!redis) return [];
+  if (!redis) {
+    if (opts?.requireStore) throw new Error("Website request storage is unavailable.");
+    return [];
+  }
 
   const limit = opts?.limit ?? 50;
   // Window note: we only scan the `limit * 2` most-recent zset entries (newest
@@ -318,7 +321,7 @@ export async function getEventsRaw(
  */
 export async function getEvents(
   tenantId: string,
-  opts?: { status?: string; limit?: number }
+  opts?: { status?: string; limit?: number; requireStore?: boolean }
 ): Promise<UnifiedEvent[]> {
   const events = await getEventsRaw(tenantId, opts);
   return hydrateGovernedFromPg(tenantId, events);

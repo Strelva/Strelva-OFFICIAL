@@ -4,7 +4,7 @@ import { memoryBoundedStore, owner } from "./fixtures/bounded-store";
 
 describe("scheduling commands", () => {
   it("reserves permitted time, rejects overlap and reopens an identical retry", async () => {
-    const service = createSchedulingService(memoryBoundedStore());
+    const service = createSchedulingService(memoryBoundedStore(), { workspaceExitCompleted: async () => false });
     const schedule = await service.create(owner, "workspace-a", { title: "Consultations", availability: [{ start: "2026-09-20T09:00:00Z", end: "2026-09-20T12:00:00Z" }] });
     const command = { kind: "reserve", expectedRevision: 0, requestId: "request-1", title: "Roof inspection", start: "2026-09-20T09:00:00Z", end: "2026-09-20T10:00:00Z" };
     const booked = await service.command(owner, schedule.id, command);
@@ -13,7 +13,7 @@ describe("scheduling commands", () => {
     await expect(service.command(owner, schedule.id, { ...command, requestId: "request-2", expectedRevision: 1, start: "2026-09-20T09:30:00Z" })).rejects.toThrow(/conflict/i);
   });
   it("reschedules the same reservation, preserves it on conflict, and reopens an identical retry", async () => {
-    const service = createSchedulingService(memoryBoundedStore());
+    const service = createSchedulingService(memoryBoundedStore(), { workspaceExitCompleted: async () => false });
     const schedule = await service.create(owner, "workspace-a", { title: "Consultations", availability: [{ start: "2026-09-20T09:00:00Z", end: "2026-09-20T12:00:00Z" }] });
     const original = { kind: "reserve" as const, expectedRevision: 0, requestId: "request-1", title: "Roof inspection", start: "2026-09-20T09:00:00Z", end: "2026-09-20T10:00:00Z" };
     await service.command(owner, schedule.id, original);
@@ -29,7 +29,7 @@ describe("scheduling commands", () => {
     expect(final.find(value => value.requestId === original.requestId)).toMatchObject({ start: moved.start, end: moved.end, status: "reserved" });
   });
   it("cancels a native reservation and reopens the same cancellation retry", async () => {
-    const service = createSchedulingService(memoryBoundedStore());
+    const service = createSchedulingService(memoryBoundedStore(), { workspaceExitCompleted: async () => false });
     const schedule = await service.create(owner, "workspace-a", { title: "Consultations", availability: [{ start: "2026-09-20T09:00:00Z", end: "2026-09-20T12:00:00Z" }] });
     const reservation = { kind: "reserve" as const, expectedRevision: 0, requestId: "request-1", title: "Roof inspection", start: "2026-09-20T09:00:00Z", end: "2026-09-20T10:00:00Z" };
     await service.command(owner, schedule.id, reservation);
@@ -42,7 +42,7 @@ describe("scheduling commands", () => {
     expect(retried.payload.history).toHaveLength(2);
   });
   it("keeps provider-accepted reservations on the governed lifecycle", async () => {
-    const service = createSchedulingService(memoryBoundedStore());
+    const service = createSchedulingService(memoryBoundedStore(), { workspaceExitCompleted: async () => false });
     const schedule = await service.create(owner, "workspace-a", { title: "Consultations", availability: [{ start: "2026-09-20T09:00:00Z", end: "2026-09-20T12:00:00Z" }] });
     await service.command(owner, schedule.id, { kind: "reserve", expectedRevision: 0, requestId: "request-1", title: "Roof inspection", start: "2026-09-20T09:00:00Z", end: "2026-09-20T10:00:00Z" });
     const provider = { authorize: async () => {}, reserve: async () => ({ providerId: "calendar-1" }), find: async () => ({ providerId: "calendar-1" }), verify: async () => true };
@@ -52,7 +52,7 @@ describe("scheduling commands", () => {
     expect((await service.read(owner, schedule.id)).payload.reservations[0]).toMatchObject({ status: "accepted", providerId: "calendar-1", verification: "verified", start: "2026-09-20T09:00:00Z", end: "2026-09-20T10:00:00Z" });
   });
   it("never sends twice after an accepted write with failed verification or an interrupted response", async () => {
-    const service = createSchedulingService(memoryBoundedStore());
+    const service = createSchedulingService(memoryBoundedStore(), { workspaceExitCompleted: async () => false });
     const schedule = await service.create(owner, "workspace-a", { title: "Visits", availability: [{ start: "2026-09-20T09:00:00Z", end: "2026-09-20T12:00:00Z" }] });
     await service.command(owner, schedule.id, { kind: "reserve", expectedRevision: 0, requestId: "r1", title: "Visit", start: "2026-09-20T09:00:00Z", end: "2026-09-20T10:00:00Z" });
     const externalBookings: string[] = [];
@@ -64,11 +64,27 @@ describe("scheduling commands", () => {
     expect(externalBookings).toEqual(["booking-1"]);
   });
   it("revoked provider authority prevents the external reservation", async () => {
-    const service = createSchedulingService(memoryBoundedStore());
+    const service = createSchedulingService(memoryBoundedStore(), { workspaceExitCompleted: async () => false });
     const schedule = await service.create(owner, "workspace-a", { title: "Visits", availability: [{ start: "2026-09-20T09:00:00Z", end: "2026-09-20T12:00:00Z" }] });
     await service.command(owner, schedule.id, { kind: "reserve", expectedRevision: 0, requestId: "r1", title: "Visit", start: "2026-09-20T09:00:00Z", end: "2026-09-20T10:00:00Z" });
     await expect(service.deliver(owner, schedule.id, "r1", { authorize: async () => { throw new Error("Approval revoked"); }, reserve: async () => { throw new Error("must not run"); }, find: async () => null, verify: async () => true })).rejects.toThrow("Approval revoked");
     expect((await service.read(owner, schedule.id)).payload.reservations[0]!.status).toBe("reserved");
+  });
+
+  it("does not admit a new reservation after the workspace exit decision", async () => {
+    const service = createSchedulingService(memoryBoundedStore(), { workspaceExitCompleted: async () => true });
+    const schedule = await service.create(owner, "workspace-a", { title: "Visits", availability: [{ start: "2026-09-20T09:00:00Z", end: "2026-09-20T12:00:00Z" }] });
+    await expect(service.command(owner, schedule.id, { kind: "reserve", expectedRevision: 0, requestId: "exit-r1", title: "Visit", start: "2026-09-20T09:00:00Z", end: "2026-09-20T10:00:00Z" })).rejects.toThrow(/stopped for this workspace/i);
+  });
+
+  it("does not reschedule an existing local reservation after the workspace exit decision", async () => {
+    const store = memoryBoundedStore();
+    const setup = createSchedulingService(store, { workspaceExitCompleted: async () => false });
+    const schedule = await setup.create(owner, "workspace-a", { title: "Visits", availability: [{ start: "2026-09-20T09:00:00Z", end: "2026-09-20T12:00:00Z" }] });
+    await setup.command(owner, schedule.id, { kind: "reserve", expectedRevision: 0, requestId: "exit-r1", title: "Visit", start: "2026-09-20T09:00:00Z", end: "2026-09-20T10:00:00Z" });
+    const service = createSchedulingService(store, { workspaceExitCompleted: async () => true });
+    await expect(service.command(owner, schedule.id, { kind: "reschedule", expectedRevision: 1, requestId: "exit-r1", start: "2026-09-20T10:00:00Z", end: "2026-09-20T11:00:00Z" })).rejects.toThrow(/stopped for this workspace/i);
+    expect((await service.read(owner, schedule.id)).payload.reservations[0]).toMatchObject({ status: "reserved", start: "2026-09-20T09:00:00Z" });
   });
 
 });

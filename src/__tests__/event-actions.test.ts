@@ -252,6 +252,24 @@ describe("resolveEventAction", () => {
       "tenant-a"
     );
     expect(mockClearDraft).toHaveBeenCalledWith("contact", "tenant-a");
+    expect(mockAppendVersion).toHaveBeenCalledWith(
+      "contact",
+      {
+        email: "new@example.com",
+        locationTitle: "Studio",
+        locationDescription: "Street parking nearby.",
+        instagramUrl: "",
+        facebookUrl: "",
+      },
+      "user",
+      "tenant-a",
+      [
+        { field: "email", before: "old@example.com", after: "new@example.com" },
+        { field: "locationTitle", before: "undefined", after: "Studio" },
+        { field: "locationDescription", before: "undefined", after: "Street parking nearby." },
+      ],
+      "evt_1",
+    );
     expect(mockSetContent.mock.invocationCallOrder[0]!).toBeLessThan(
       mockResolveEvent.mock.invocationCallOrder[0]!,
     );

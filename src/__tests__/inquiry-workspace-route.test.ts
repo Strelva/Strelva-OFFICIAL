@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => {
     permissionForAction: vi.fn(),
     read: vi.fn(),
     execute: vi.fn(),
+    workspace: vi.fn(),
     InquiryConcurrencyError,
     InquiryPersistenceError,
     InquiryValidationError,
@@ -37,7 +38,8 @@ vi.mock("@/lib/auth", () => ({
 vi.mock("@/lib/tenant", () => ({ getTenantFromHeaders: mocks.routedTenant }));
 vi.mock("@/lib/subscription", () => ({ requireActiveSubscription: async () => null }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.config }));
-vi.mock("@/products/inquiries/server", () => ({
+vi.mock("@/products/inquiries/server", async () => ({
+  ...(await import("@/products/inquiries/workspace-exit")),
   inquiryReleaseEnabled: mocks.release,
   parseInquirySurfaceAction: mocks.parse,
   inquiryPermissionForAction: mocks.permissionForAction,
@@ -46,6 +48,11 @@ vi.mock("@/products/inquiries/server", () => ({
   InquiryConcurrencyError: mocks.InquiryConcurrencyError,
   InquiryPersistenceError: mocks.InquiryPersistenceError,
   InquiryValidationError: mocks.InquiryValidationError,
+}));
+vi.mock("@/products/inquiries/workspace-exit", () => ({
+  resolveInquiryWorkspace: mocks.workspace,
+  InquiryWorkspaceExitBlockedError: class InquiryWorkspaceExitBlockedError extends Error {},
+  InquiryWorkspaceExitUnavailableError: class InquiryWorkspaceExitUnavailableError extends Error {},
 }));
 
 import { GET, POST } from "@/app/api/inquiry-workspace/route";
@@ -80,6 +87,12 @@ describe("authenticated inquiry workspace route", () => {
     mocks.permissionForAction.mockReturnValue("content:write");
     mocks.read.mockResolvedValue(surface);
     mocks.execute.mockResolvedValue(surface);
+    mocks.workspace.mockImplementation(async ({ fallbackBusinessId }: { fallbackBusinessId: string }) => ({
+      businessId: fallbackBusinessId,
+      workspaceIds: [],
+      exitCompleted: false,
+      mapped: false,
+    }));
   });
 
   it("keeps both methods closed before authentication when the release is disabled", async () => {
@@ -119,7 +132,7 @@ describe("authenticated inquiry workspace route", () => {
     expect(mocks.parse).toHaveBeenCalledWith(browserAction, "owner-1", "business-stable");
     expect(mocks.permission).toHaveBeenCalledWith("tenant-a", "content:write");
     expect(mocks.execute).toHaveBeenCalledWith({
-      context: { tenantId: "tenant-a", businessId: "business-stable", config },
+      context: { tenantId: "tenant-a", businessId: "business-stable", config, exitCompleted: false },
       action: canonicalAction,
       expectedRevision: 3,
       actorId: "owner-1",

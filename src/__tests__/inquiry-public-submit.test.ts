@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   snapshot: vi.fn(),
   tenant: vi.fn(),
   evidence: vi.fn(),
+  workspace: vi.fn(),
 }));
 
 vi.mock("@/lib/leads", () => ({ captureLead: mocks.capture, recordLead: mocks.legacy }));
@@ -20,7 +21,13 @@ vi.mock("@/lib/lead-spam", () => ({
   scoreLeadSpam: () => ({ isSpam: false, score: 0, signals: [] }),
 }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.tenant }));
+vi.mock("@/products/inquiries/workspace-exit", () => ({
+  INQUIRY_WORKSPACE_EXIT_CODE: "workspace_exit_future_work_blocked",
+  InquiryWorkspaceExitUnavailableError: class InquiryWorkspaceExitUnavailableError extends Error {},
+  resolveInquiryWorkspace: mocks.workspace,
+}));
 vi.mock("@/products/inquiries/server", async () => ({
+  ...(await import("@/products/inquiries/workspace-exit")),
   getInquiryRepository: () => ({ getSnapshot: mocks.snapshot, compareAndSwap: vi.fn() }),
   inquiryReleaseEnabled: mocks.release,
   projectPublishedInquiry: (await import("@/products/inquiries/storefront")).projectPublishedInquiry,
@@ -93,7 +100,19 @@ describe("public inquiry capability submission", () => {
     mocks.release.mockReturnValue(true);
     mocks.snapshot.mockResolvedValue({ state: { capabilities: [capability] } });
     mocks.tenant.mockResolvedValue({ active: true, stableId: "stable-business" });
+    mocks.workspace.mockResolvedValue({ businessId: "stable-business", workspaceIds: [], exitCompleted: false });
     mocks.evidence.mockResolvedValue({ status: "recorded", receiptId: "receipt-1", timelineEventIds: ["event-1", "event-2"] });
+  });
+
+  it("rejects new intake after the mapped customer workspace exits", async () => {
+    mocks.workspace.mockResolvedValue({ businessId: "customer-workspace", workspaceIds: ["customer-workspace"], exitCompleted: true });
+
+    const response = await request(capabilityBody());
+
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: "workspace_exit_future_work_blocked" });
+    expect(mocks.capture).not.toHaveBeenCalled();
+    expect(mocks.evidence).not.toHaveBeenCalled();
   });
 
   it("persists the exact published capability version and structured fields", async () => {
@@ -124,6 +143,26 @@ describe("public inquiry capability submission", () => {
       receivedAt: time,
     }));
     expect(mocks.legacy).not.toHaveBeenCalled();
+  });
+
+  it("reads the published capability from the mapped customer workspace", async () => {
+    const mappedBusinessId = "customer-workspace";
+    mocks.workspace.mockResolvedValue({ businessId: mappedBusinessId, workspaceIds: [mappedBusinessId], exitCompleted: false, mapped: true });
+    mocks.snapshot.mockResolvedValue({
+      state: {
+        capabilities: [{
+          ...capability,
+          businessId: mappedBusinessId,
+          live: { ...capability.live!, businessId: mappedBusinessId },
+        }],
+      },
+    });
+
+    const response = await request(capabilityBody());
+
+    expect(response.status).toBe(200);
+    expect(mocks.snapshot).toHaveBeenCalledWith("acme", mappedBusinessId);
+    expect(mocks.evidence).toHaveBeenCalledWith(expect.objectContaining({ businessId: mappedBusinessId }));
   });
 
   it("rejects a stale rendered version before persistence", async () => {

@@ -15,6 +15,7 @@ import { AgencyHome } from "./AgencyHome";
 import { WorkspaceBusinessSettings } from "./WorkspaceBusinessSettings";
 import { WebsiteAssignmentHandoff } from "./WorkspaceOfferings";
 import { workspaceWorkLabel } from "./work-label";
+import { workspaceExitBlocksChanges, workspaceExitIsStopped } from "./workspace-exit-ui";
 import {
   WorkspaceOfferingDirectory,
   boundManagedWebsiteIds,
@@ -54,7 +55,7 @@ interface Props {
   onTracker?: (context?: WorkspaceStartContinuation) => void;
   onWebsite?: (site: ManagedWorkSummary, context?: WorkspaceStartContinuation) => void | false;
   onDocument?: (context?: WorkspaceStartContinuation) => void;
-  onHorizontal?: (productId: "applications" | "scheduling" | "investigations" | "operations", context?: WorkspaceStartContinuation) => void;
+  onHorizontal?: (productId: "onboarding" | "applications" | "scheduling" | "investigations" | "operations", context?: WorkspaceStartContinuation) => void;
   trackerTemplates?: readonly WorkspaceStartTemplate[];
   inquiryBusinesses?: readonly { id: string; title: string }[];
   inquiry?: WorkspaceInquiryTarget;
@@ -112,6 +113,9 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     return () => window.cancelAnimationFrame(frame);
   }, [section]);
   const current = snapshot.workspaces.find(item => item.id === snapshot.workspaceId);
+  const workspaceStopped = workspaceExitIsStopped(snapshot.workspaceExitState, snapshot.workspaceExitReadStatus);
+  const workspaceExitUnavailable = snapshot.workspaceExitReadStatus === "unavailable";
+  const workspaceExitBlocks = workspaceExitBlocksChanges(snapshot.workspaceExitState, snapshot.workspaceExitReadStatus);
   const canSaveServiceRequest = current?.kind === "customer"
     && current.access !== "delegated_read"
     && (current.role === "owner" || current.role === "admin");
@@ -122,14 +126,17 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
       .map((workspace) => ({ label: workspace.name, provider: { kind: "agency" as const, agencyWorkspaceId: workspace.id } })),
   ] : undefined;
   const readOnly = current?.access === "delegated_read";
+  const workspaceMutationReadOnly = readOnly || workspaceExitBlocks;
   const offeringUnavailableReason = current?.kind !== "customer"
     ? "Choose a customer business workspace to view its installations. Personal and agency workspaces remain separate."
     : readOnly
       ? "This work-share does not include business-wide offering access. The customer can add direct business membership when that access is appropriate."
+      : workspaceExitBlocks
+        ? "This workspace has stopped. Existing offerings remain available to review."
       : "Offering access is unavailable in this workspace.";
   const offerings = useWorkspaceOfferings({
     businessId: snapshot.workspaceId,
-    enabled: current?.kind === "customer" && !readOnly,
+    enabled: current?.kind === "customer" && !workspaceMutationReadOnly,
     unavailableReason: offeringUnavailableReason,
   });
   const products = discoveryProducts(snapshot.products);
@@ -234,6 +241,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
   }
 
   function openStart() {
+    if (workspaceExitBlocks) return;
     setStartOpen(true);
     setSection("home");
     setProductId(null);
@@ -268,6 +276,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
   }
 
   function continueStart(continuation: WorkspaceStartContinuation) {
+    if (workspaceExitBlocks) return;
     if (continuation.route === "assessment") {
       setStartOpen(false);
       onNew(continuation);
@@ -305,7 +314,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
   }
 
   const startContext: WorkspaceStartContext = {
-    readOnly,
+    readOnly: workspaceMutationReadOnly,
     products,
     inquiryBusinesses,
     managedSites: sites,
@@ -330,23 +339,34 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     </div>;
   }
 
+  const workspaceHref = `${appBase || ""}/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`;
+  const exportHref = `${appBase || ""}/workspace/export?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`;
+  const stoppedBanner = workspaceExitBlocks ? <div role="status" aria-label={workspaceExitUnavailable ? "Workspace status unavailable" : "Workspace stopped"} className="mx-4 mt-4 flex flex-wrap items-start justify-between gap-4 rounded-xl border border-gray-border bg-surface-inset px-4 py-3 text-[13px] sm:mx-7">
+    <div className="min-w-0 max-w-2xl"><strong className="font-medium text-warm-black">{workspaceExitUnavailable ? "Workspace status is temporarily unavailable." : "Work in this workspace has stopped."}</strong><p className="mt-1 leading-relaxed text-gray-muted">Existing records remain available to review and export. New work and publishing stay disabled until the workspace status can be confirmed{workspaceExitUnavailable ? "." : " while retained items remain available for explicit review or recovery."}</p></div>
+    <div className="flex shrink-0 flex-wrap gap-x-4 gap-y-2"><Link className="font-medium text-warm-black underline-offset-2 hover:underline" href={workspaceHref + "&view=work"}>Review retained work</Link><Link className="font-medium text-warm-black underline-offset-2 hover:underline" href={exportHref}>Export retained records</Link></div>
+  </div> : null;
+  const stoppedHome = <div className={styles.page} aria-labelledby="workspace-stopped-title">
+    <header className={styles.pageHeader}><p className={styles.eyebrow}>Workspace status</p><h1 id="workspace-stopped-title">{workspaceExitUnavailable ? "Workspace changes are paused." : "Work in this workspace has stopped."}</h1><p>{workspaceExitUnavailable ? "The workspace status could not be confirmed, so new work and publishing are paused. Saved work remains available to inspect." : "Saved work remains available to inspect. Open My work to review retained records or export a copy for your records."}</p></header>
+    <div className="flex flex-wrap gap-3"><Link className={styles.primaryAction} href={workspaceHref + "&view=work"}>Review retained work<ArrowRight size={17} /></Link><Link className={styles.secondaryAction} href={exportHref}>Export retained records<ArrowRight size={17} /></Link></div>
+  </div>;
+
   function renderProductBody() {
     if (!product) return null;
-    if (product.id === "applications" || product.id === "scheduling" || product.id === "investigations" || product.id === "operations") {
+    if (product.id === "onboarding" || product.id === "applications" || product.id === "scheduling" || product.id === "investigations" || product.id === "operations") {
       const id = product.id;
-      return <><h2>{product.name}</h2><p>{product.description}</p><button className={styles.primaryAction} type="button" disabled={readOnly || !onHorizontal} onClick={() => onHorizontal?.(id)}>Get started<ArrowRight size={17} /></button></>;
+      return <><h2>{product.name}</h2><p>{product.description}</p><button className={styles.primaryAction} type="button" disabled={workspaceMutationReadOnly || !onHorizontal} onClick={() => onHorizontal?.(id)}>Get started<ArrowRight size={17} /></button></>;
     }
     if (product.id === "ai_visibility") {
-      return <><h2>Understand what AI can find.</h2><p>Check a business, inspect the evidence, and keep the assessment in your work. Share a copy when you want someone else to use it.</p><p>This is an assessment at a point in time. It does not activate monitoring or change your website.</p><button className={styles.primaryAction} type="button" disabled={readOnly || product.availability !== "available"} onClick={() => onNew()}>Check a business<ArrowRight size={17} /></button>{readOnly && <p>Switch to a workspace you own to create an assessment.</p>}</>;
+      return <><h2>Understand what AI can find.</h2><p>Check a business, inspect the evidence, and keep the assessment in your work. Share a copy when you want someone else to use it.</p><p>This is an assessment at a point in time. It does not activate monitoring or change your website.</p><button className={styles.primaryAction} type="button" disabled={workspaceMutationReadOnly || product.availability !== "available"} onClick={() => onNew()}>Check a business<ArrowRight size={17} /></button>{workspaceMutationReadOnly && <p>{workspaceExitUnavailable ? "Workspace status is temporarily unavailable, so new work is paused." : workspaceStopped ? "Work in this workspace has stopped." : "Switch to a workspace you own to create an assessment."}</p>}</>;
     }
     if (product.id === "inquiries") {
-      return <><h2>Keep customer requests moving.</h2><p>Start with one request in a selected business scope. Review its shape, result, and receipt in one inspectable thread.</p>{inquiryBusinesses.length > 0 ? <div className={styles.productChoices}>{inquiryBusinesses.map((business) => <button key={business.id} type="button" className={styles.secondaryAction} onClick={() => openInquiry(business.id)}><MessageSquareText size={17} />Open {business.title}<ArrowRight size={17} /></button>)}</div> : <p>No business scopes are available to this account yet.</p>}</>;
+      return <><h2>Keep customer requests moving.</h2><p>Start with one request in a selected business scope. Review its shape, result, and receipt in one inspectable thread.</p>{inquiryBusinesses.length > 0 ? <div className={styles.productChoices}>{inquiryBusinesses.map((business) => <button key={business.id} type="button" className={styles.secondaryAction} disabled={workspaceMutationReadOnly} onClick={() => openInquiry(business.id)}><MessageSquareText size={17} />Open {business.title}<ArrowRight size={17} /></button>)}</div> : <p>No business scopes are available to this account yet.</p>}</>;
     }
     if (product.id === "tracker") {
-      return <><h2>Turn a CSV into working data.</h2><p>Import a small CSV, review the proposed fields, and keep the resulting tracker in this workspace.</p><button className={styles.primaryAction} type="button" disabled={readOnly || product.availability !== "available" || !onTracker} onClick={() => onTracker?.()}>Start a tracker<ArrowRight size={17} /></button>{readOnly && <p>Switch to a workspace you own to create a tracker.</p>}</>;
+      return <><h2>Turn a CSV into working data.</h2><p>Import a small CSV, review the proposed fields, and keep the resulting tracker in this workspace.</p><button className={styles.primaryAction} type="button" disabled={workspaceMutationReadOnly || product.availability !== "available" || !onTracker} onClick={() => onTracker?.()}>Start a tracker<ArrowRight size={17} /></button>{workspaceMutationReadOnly && <p>{workspaceExitUnavailable ? "Workspace status is temporarily unavailable, so new work is paused." : workspaceStopped ? "Work in this workspace has stopped." : "Switch to a workspace you own to create a tracker."}</p>}</>;
     }
     if (product.id === "documents") {
-      return <><h2>Keep a useful document close.</h2><p>Write a procedure, proposal, or working note, review it before saving, and keep a history you can inspect or undo.</p><button className={styles.primaryAction} type="button" disabled={readOnly || product.availability !== "available" || !onDocument} onClick={() => onDocument?.()}>Start a document<ArrowRight size={17} /></button>{readOnly && <p>Switch to a workspace you own to create a document.</p>}</>;
+      return <><h2>Keep a useful document close.</h2><p>Write a procedure, proposal, or working note, review it before saving, and keep a history you can inspect or undo.</p><button className={styles.primaryAction} type="button" disabled={workspaceMutationReadOnly || product.availability !== "available" || !onDocument} onClick={() => onDocument?.()}>Start a document<ArrowRight size={17} /></button>{workspaceMutationReadOnly && <p>{workspaceExitUnavailable ? "Workspace status is temporarily unavailable, so new work is paused." : workspaceStopped ? "Work in this workspace has stopped." : "Switch to a workspace you own to create a document."}</p>}</>;
     }
     if (product.id === "managed_presence") {
       return <><h2>Your website, with the work around it.</h2><p>Open your website to work with its content, review changes, and see the connected information available for your business.</p>{sites.length ? workList(0) : <p>No managed website is connected to this account. You can ask Strelva about a build or an existing site.</p>}<button type="button" className={styles.secondaryAction} onClick={() => navigate("help")}>Talk about your website<ArrowRight size={17} /></button></>;
@@ -354,7 +374,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     return <><h2>Try the search before you connect it.</h2><p>Home Finder is a brokerage-branded home search. This preview uses synthetic listings and never sends or stores buyer inquiries.</p>{product.previewHref ? <a className={styles.primaryAction} href={product.previewHref} target="_blank" rel="noreferrer">Try Home Finder<ArrowRight size={17} /></a> : <p>Its synthetic preview is not available from this environment yet.</p>}<p>A live installation needs brokerage approval, permitted listing data, and verified inquiry delivery.</p><button type="button" className={styles.secondaryAction} onClick={() => navigate("help", "I’d like early access to Home Finder. Please tell me what enabling a live brokerage installation would require.")}>Ask about early access<ArrowRight size={17} /></button></>;
   }
 
-  if (home && !startOpen && section === "home" && current?.kind !== "agency") return <BusinessHome
+  if (home && !startOpen && section === "home" && current?.kind !== "agency" && !workspaceExitBlocks) return <BusinessHome
     snapshot={snapshot} sites={assignedSites} unassignedSites={unassignedSites} siteAssignmentsKnown={siteAssignmentsKnown} offerings={offerings.state} busy={busy} notice={notice} managedWorkUnavailable={managedWorkUnavailable}
     appBase={appBase} accountHref={`${appBase || ""}/workspace/account`} signOut={signOut}
     onExplore={() => navigate("products")}
@@ -367,13 +387,14 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     active={agency ? "access" : home ? startOpen ? undefined : section : workingSection}
     title={!home ? inquiry ? "Inquiry work" : tracker !== undefined ? "Tracker" : plan !== undefined ? "Work plan" : document !== undefined ? "Document" : agency ? "People & access" : workingTitle || (selectedWork ? "Your work" : "New assessment") : startOpen ? "New" : section === "home" ? "Strelva" : section === "products" ? "Explore offerings" : section === "settings" ? "Settings" : section === "ongoing" ? "Ongoing" : section === "help" ? "Help" : "Work"}
     accountName={person} accountDetail={snapshot.actor.email}
-    onNavigate={navigate} onAccess={openAccess} onSearch={openSearch} onStart={openStart} navigation={undefined}
+    onNavigate={navigate} onAccess={openAccess} onSearch={openSearch} onStart={openStart} startDisabled={workspaceExitBlocks} navigation={undefined}
     context={<label><span className="sr-only">Current workspace</span><select value={snapshot.workspaceId} disabled={busy} onChange={event => { setStartOpen(false); setSection("home"); setProductId(null); setOfferingId(null); setQuery(""); onWorkspace(event.target.value); }}>{snapshot.workspaces.map(item => <option key={item.id} value={item.id}>{item.name}{item.access === "delegated_read" ? " · Read-only" : ""}</option>)}</select></label>}
-    actions={!home ? inquiry ? <button type="button" onClick={() => navigate("work")}>My work</button> : tracker !== undefined || plan !== undefined || document !== undefined ? selectedWork ? <button type="button" onClick={onAgency}>Sharing & access</button> : <button type="button" onClick={() => navigate("work")}>My work</button> : <button type="button" onClick={agency ? () => navigate("home") : onAgency}>{agency ? "Back to home" : "Sharing & access"}</button> : undefined}
+    actions={!home ? inquiry ? <button type="button" onClick={() => navigate("work")}>My work</button> : tracker !== undefined || plan !== undefined || document !== undefined ? selectedWork ? <button type="button" onClick={onAgency}>Sharing & access</button> : <button type="button" onClick={() => navigate("work")}>My work</button> : <button type="button" aria-label={agency ? "Back to home" : "Sharing & access"} onClick={agency ? () => navigate("home") : onAgency}><span className="sm:hidden" aria-hidden="true">{agency ? "Back" : "Access"}</span><span className="hidden sm:inline" aria-hidden="true">{agency ? "Back to home" : "Sharing & access"}</span></button> : undefined}
     notice={notice} contentId="workspace-main"
   >
+    {stoppedBanner}
     <div ref={scrollRef} className={styles.scroll} aria-busy={busy || undefined}>
-      {!home ? <div className={styles.detail}><button type="button" className={styles.back} onClick={() => navigate(workingSection)}><ArrowLeft size={16} />Back to {workingSection === "ongoing" ? "ongoing" : "work"}</button>{sourcePlanHref ? <Link className={styles.textAction} href={sourcePlanHref}><FileSearch size={15} aria-hidden="true" />View plan and creation receipt<ArrowRight size={15} aria-hidden="true" /></Link> : null}{inquiry ? <InquiryServerWorkspaceExperience tenantId={inquiry.tenantId} adapter={inquiry.adapter} initialSnapshot={inquiry.initialSnapshot} initialView={inquiry.initialView} initialRequestId={inquiry.initialRequestId} initialInquiryId={inquiry.initialInquiryId} initialRequestText={inquiry.initialRequestText} basePath="/workspace" routePrefix="inquiry" /> : tracker !== undefined ? tracker : plan !== undefined ? plan : document !== undefined ? document : children}</div> : startOpen ? <WorkspaceStart context={startContext} websiteHandoff={websiteHandoff} onWebsiteHandoffBack={() => setWebsiteHandoff(null)} onContinue={continueStart} onHelp={(request) => navigate("help", request)} onPlan={onPlan} /> : section === "home" && current?.kind === "agency" ? <AgencyHome snapshot={snapshot} busy={busy} onWorkspace={onWorkspace} onOpenWork={openWork} onOpenClientWork={onOpenClientWork} onStart={openStart} /> : section === "settings" ? <WorkspaceBusinessSettings workspace={current} sites={assignedSites} unassignedSites={unassignedSites} offerings={offerings.state} onWebsiteCommand={offerings.websiteCommand} onRetryWebsiteAssignments={offerings.reload} siteAssignmentState={siteAssignmentState} managedWorkUnavailable={managedWorkUnavailable} accountHref={`${appBase || ""}/workspace/account`} /> : section === "help" ? <WorkspaceHelp key={helpRequest} workspaceName={current?.name} workspaceId={canSaveServiceRequest ? snapshot.workspaceId : undefined} providerOptions={serviceRequestProviders} hasManagedService={assignedSites.length > 0} onAgency={onAgency} initialRequest={helpRequest} /> : section === "products" ? <div className={styles.page}>
+      {!home ? <div className={styles.detail}><button type="button" className={styles.back} onClick={() => navigate(workingSection)}><ArrowLeft size={16} />Back to {workingSection === "ongoing" ? "ongoing" : "work"}</button>{sourcePlanHref ? <Link className={styles.textAction} href={sourcePlanHref}><FileSearch size={15} aria-hidden="true" />View plan and creation receipt<ArrowRight size={15} aria-hidden="true" /></Link> : null}{inquiry ? <InquiryServerWorkspaceExperience tenantId={inquiry.tenantId} adapter={inquiry.adapter} initialSnapshot={inquiry.initialSnapshot} initialView={inquiry.initialView} initialRequestId={inquiry.initialRequestId} initialInquiryId={inquiry.initialInquiryId} initialRequestText={inquiry.initialRequestText} basePath="/workspace" routePrefix="inquiry" /> : tracker !== undefined ? tracker : plan !== undefined ? plan : document !== undefined ? document : children}</div> : workspaceExitBlocks ? stoppedHome : startOpen ? <WorkspaceStart context={startContext} websiteHandoff={websiteHandoff} onWebsiteHandoffBack={() => setWebsiteHandoff(null)} onContinue={continueStart} onHelp={(request) => navigate("help", request)} onPlan={onPlan} /> : section === "home" && current?.kind === "agency" ? <AgencyHome snapshot={snapshot} busy={busy} onWorkspace={onWorkspace} onOpenWork={openWork} onOpenClientWork={onOpenClientWork} onStart={openStart} /> : section === "settings" ? <WorkspaceBusinessSettings workspace={current} sites={assignedSites} unassignedSites={unassignedSites} offerings={offerings.state} onWebsiteCommand={offerings.websiteCommand} onRetryWebsiteAssignments={offerings.reload} siteAssignmentState={siteAssignmentState} managedWorkUnavailable={managedWorkUnavailable} accountHref={`${appBase || ""}/workspace/account`} /> : section === "help" ? <WorkspaceHelp key={helpRequest} workspaceName={current?.name} workspaceId={canSaveServiceRequest ? snapshot.workspaceId : undefined} providerOptions={serviceRequestProviders} hasManagedService={assignedSites.length > 0} onAgency={onAgency} initialRequest={helpRequest} /> : section === "products" ? <div className={styles.page}>
         {offeringId ? <WorkspaceOfferingDirectory state={offerings.state} businessName={current?.name || "This business"} work={snapshot.work} managedSites={sites} products={products} selectedId={offeringId} onSelect={openOffering} onOpenWork={openWork} onOpenProduct={(id) => { setOfferingId(null); setProductId(id); }} onRequestSetup={(entry) => navigate("help", `I want setup help for ${entry.offering?.name ?? entry.title} for ${current?.name ?? "this business"}. ${entry.offering?.installationNote || entry.product?.description || entry.description}`)} onRetryConflict={offerings.retryConflict} onRetry={offerings.reload} onCommand={offerings.command} onWebsiteCommand={offerings.websiteCommand} /> : product ? <>
           <button type="button" className={styles.back} onClick={() => setProductId(null)}><ArrowLeft size={16} />All products</button>
           <header className={styles.pageHeader}><p className={styles.eyebrow}>{product.id === "homefinder" ? "Preview · early access" : product.availability === "available" ? "Available to use" : product.availability === "managed" ? "Managed service" : "Not available yet"}</p><h1 ref={productHeadingRef} tabIndex={-1}>{product.name}</h1><p>{product.description}</p></header>

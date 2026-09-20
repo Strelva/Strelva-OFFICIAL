@@ -21,10 +21,21 @@ export const trustedProviderReceiptSchema = z.object({
   kind: z.enum(["provider", "model", "tool", "human"]),
   attribution: z.enum(["normal", "strelva_retry"]),
   maximumCents: z.number().int().min(0).max(MAX_JOB_ECONOMICS_CENTS),
-  billableCents: z.number().int().min(0).max(MAX_JOB_ECONOMICS_CENTS),
+  /**
+   * The existing ledger settles whole cents. A gateway may report a decimal
+   * dollar amount instead. Keep that value as a string so the conversion below
+   * never goes through binary floating point or silently rounds a fraction of a
+   * cent.
+   */
+  billableCents: z.number().int().min(0).max(MAX_JOB_ECONOMICS_CENTS).optional(),
+  billableUsd: z.string().trim().regex(/^(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/).max(32).optional(),
   /** Opaque provider/billing evidence reference. It must not contain a secret. */
   evidenceReference: z.string().trim().min(1).max(256),
-}).strict();
+}).strict().superRefine((value, context) => {
+  if ((value.billableCents === undefined) === (value.billableUsd === undefined)) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: "Supply exactly one billable amount." });
+  }
+});
 export type TrustedProviderReceipt = z.infer<typeof trustedProviderReceiptSchema>;
 
 export type ProviderEvidenceFailureCode =
@@ -33,7 +44,8 @@ export type ProviderEvidenceFailureCode =
   | "provider_receipt_timeout"
   | "provider_receipt_invalid"
   | "provider_receipt_mismatch"
-  | "provider_receipt_read_failed";
+  | "provider_receipt_read_failed"
+  | "provider_receipt_precision_unresolved";
 
 /**
  * This is an actionable exception, not a settlement. Callers must leave the
@@ -62,6 +74,75 @@ export class ProviderEvidenceMismatchError extends ProviderEvidenceUnavailableEr
   }
 }
 
+/**
+ * The provider supplied a real decimal amount, but the shared ledger cannot
+ * represent it without rounding. Keep the execution held until an exact-cent
+ * receipt or a ledger with finer precision is selected.
+ */
+export class ProviderEvidencePrecisionError extends ProviderEvidenceUnavailableError {
+  constructor(message = "The provider bill is a fraction of a cent and cannot be represented by the current cent ledger.") {
+    super("provider_receipt_precision_unresolved", message, { retryable: false });
+    this.name = "ProviderEvidencePrecisionError";
+  }
+}
+
+/** Convert a decimal dollar string to cents only when the conversion is exact. */
+function exactCentsFromUsd(value: string): number {
+  const normalized = value.trim();
+  const match = /^(0|[1-9][0-9]*)(?:\.([0-9]+))?$/.exec(normalized);
+  if (!match) throw new ProviderEvidencePrecisionError("The provider bill is not a valid decimal dollar amount.");
+  const whole = Number(match[1]);
+  const fraction = match[2] ?? "";
+  if (!Number.isSafeInteger(whole) || whole > Math.floor(MAX_JOB_ECONOMICS_CENTS / 100)) {
+    throw new ProviderEvidencePrecisionError("The provider bill is outside the supported ledger range.");
+  }
+  if (fraction.length > 2 && /[1-9]/.test(fraction.slice(2))) {
+    throw new ProviderEvidencePrecisionError();
+  }
+  const cents = whole * 100 + Number(fraction.slice(0, 2).padEnd(2, "0") || "0");
+  if (!Number.isSafeInteger(cents) || cents > MAX_JOB_ECONOMICS_CENTS) {
+    throw new ProviderEvidencePrecisionError("The provider bill is outside the supported ledger range.");
+  }
+  return cents;
+}
+
+function billableCentsFromReceipt(receipt: TrustedProviderReceipt): number {
+  return receipt.billableCents ?? exactCentsFromUsd(receipt.billableUsd!);
+}
+
+/** Validate provider identity and the decimal amount before durable storage. */
+export function assertTrustedProviderReceiptMatchesContext(
+  context: BudgetExecutionEvidenceContext,
+  value: unknown,
+): TrustedProviderReceipt {
+  const parsed = trustedProviderReceiptSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new ProviderEvidenceUnavailableError(
+      "provider_receipt_invalid",
+      "The provider returned no complete trusted billing receipt.",
+      { retryable: false },
+    );
+  }
+  const receipt = parsed.data;
+  if (receipt.executionKey !== context.executionKey
+    || receipt.kind !== context.kind
+    || receipt.attribution !== context.attribution
+    || receipt.maximumCents !== context.maximumCents) {
+    throw new ProviderEvidenceMismatchError(
+      "The provider billing receipt does not match this exact execution.",
+    );
+  }
+  if (receipt.billableUsd !== undefined) {
+    const amount = Number(receipt.billableUsd);
+    if (!Number.isFinite(amount) || amount < 0 || amount > context.maximumCents / 100) {
+      throw new ProviderEvidenceMismatchError(
+        "The provider billed more than the admitted maximum.",
+      );
+    }
+  }
+  return receipt;
+}
+
 /** A read-only server-side source for a durable provider/billing receipt. */
 export interface ProviderEvidenceReader {
   /**
@@ -80,23 +161,7 @@ export function reconciliationFromTrustedProviderReceipt(
   context: BudgetExecutionEvidenceContext,
   value: unknown,
 ): BudgetExecutionReconciliation {
-  const parsed = trustedProviderReceiptSchema.safeParse(value);
-  if (!parsed.success) {
-    throw new ProviderEvidenceUnavailableError(
-      "provider_receipt_invalid",
-      "The provider returned no complete trusted billing receipt.",
-      { retryable: false },
-    );
-  }
-  const receipt = parsed.data;
-  if (receipt.executionKey !== context.executionKey
-    || receipt.kind !== context.kind
-    || receipt.attribution !== context.attribution
-    || receipt.maximumCents !== context.maximumCents) {
-    throw new ProviderEvidenceMismatchError(
-      "The provider billing receipt does not match this exact execution.",
-    );
-  }
+  const receipt = assertTrustedProviderReceiptMatchesContext(context, value);
   if (!receipt.requestId.trim() || !receipt.evidenceReference.trim()) {
     throw new ProviderEvidenceUnavailableError(
       "provider_receipt_missing",
@@ -104,14 +169,15 @@ export function reconciliationFromTrustedProviderReceipt(
       { retryable: true },
     );
   }
-  if (receipt.billableCents > context.maximumCents) {
+  const billableCents = billableCentsFromReceipt(receipt);
+  if (billableCents > context.maximumCents) {
     throw new ProviderEvidenceMismatchError(
       "The provider billed more than the admitted maximum.",
     );
   }
   return {
     effect: "accepted",
-    amountCents: receipt.billableCents,
+    amountCents: billableCents,
     evidenceReference: receipt.evidenceReference,
   };
 }
@@ -168,23 +234,74 @@ export function trustedReceiptFromAiSdkResult(
   const providerValue = providerMetadata[provider]
     ?? providerMetadata[provider.split("/")[0]!]
     ?? providerMetadata[provider.split(".")[0]!];
-  if (!providerValue || typeof providerValue !== "object" || Array.isArray(providerValue)) return null;
+  if (!providerValue || typeof providerValue !== "object" || Array.isArray(providerValue)) {
+    return vercelGatewayReceiptFromAiSdkResult(result, context);
+  }
   const billing = (providerValue as Record<string, unknown>).billing;
-  if (!billing || typeof billing !== "object" || Array.isArray(billing)) return null;
-  const candidate = billing as Record<string, unknown>;
-  const requestId = candidate.requestId;
-  const billableCents = candidate.billableCents;
-  const evidenceReference = candidate.evidenceReference;
-  if (typeof requestId !== "string" || typeof billableCents !== "number" || typeof evidenceReference !== "string") return null;
+  if (billing && typeof billing === "object" && !Array.isArray(billing)) {
+    const candidate = billing as Record<string, unknown>;
+    const requestId = candidate.requestId;
+    const billableCents = candidate.billableCents;
+    const billableUsd = candidate.billableUsd;
+    const evidenceReference = candidate.evidenceReference;
+    if (typeof requestId !== "string" || typeof evidenceReference !== "string") return null;
+    if (typeof billableCents !== "number" && typeof billableUsd !== "string") return null;
+    return trustedProviderReceiptSchema.parse({
+      version: 1,
+      provider,
+      requestId,
+      executionKey: context.executionKey,
+      kind: context.kind,
+      attribution: context.attribution,
+      maximumCents: context.maximumCents,
+      ...(typeof billableCents === "number" ? { billableCents } : { billableUsd }),
+      evidenceReference,
+    });
+  }
+
+  return vercelGatewayReceiptFromAiSdkResult(result, context);
+}
+
+/**
+ * Vercel AI Gateway exposes the exact request cost in
+ * `providerMetadata.gateway.cost`. The value is in dollars and can be a
+ * fraction of a cent. A response/request id is required before the metadata
+ * can become a durable receipt; a cost alone is only an observation.
+ */
+export function vercelGatewayReceiptFromAiSdkResult(
+  result: unknown,
+  context: BudgetExecutionEvidenceContext,
+): TrustedProviderReceipt | null {
+  if (!result || typeof result !== "object" || Array.isArray(result)) return null;
+  const value = result as Record<string, unknown>;
+  const metadata = value.providerMetadata;
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return null;
+  const gateway = (metadata as Record<string, unknown>).gateway;
+  if (!gateway || typeof gateway !== "object" || Array.isArray(gateway)) return null;
+  const candidate = gateway as Record<string, unknown>;
+  const cost = candidate.cost;
+  const requestId = candidate.requestId
+    ?? candidate.request_id
+    ?? (value.response && typeof value.response === "object" && !Array.isArray(value.response)
+      ? (value.response as Record<string, unknown>).id
+      : undefined);
+  if ((typeof cost !== "number" && typeof cost !== "string") || typeof requestId !== "string" || !requestId.trim()) return null;
+  const decimalCost = typeof cost === "number"
+    ? Number.isFinite(cost) && cost >= 0 ? String(cost) : null
+    : cost.trim();
+  if (!decimalCost) return null;
+  const evidenceReference = typeof candidate.evidenceReference === "string" && candidate.evidenceReference.trim()
+    ? candidate.evidenceReference
+    : `vercel-ai-gateway:${requestId}`;
   return trustedProviderReceiptSchema.parse({
     version: 1,
-    provider,
+    provider: "vercel-ai-gateway",
     requestId,
     executionKey: context.executionKey,
     kind: context.kind,
     attribution: context.attribution,
     maximumCents: context.maximumCents,
-    billableCents,
+    billableUsd: decimalCost,
     evidenceReference,
   });
 }

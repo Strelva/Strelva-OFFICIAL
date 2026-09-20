@@ -34,6 +34,7 @@ function matchesSavedWork(command: CreateJobEconomicsCommand, work: SavedWork): 
     return work.productId === "tracker" && work.resourceKind === "tracker";
   }
   if (command.productId === "operations") return work.productId === "operations" && work.resourceKind === "responsibility";
+  if (command.productId === "custom-applications") return work.productId === "custom-applications" && work.resourceKind === "custom-application";
   return work.productId === "ai_visibility"
     && (work.resourceKind === "private_ai_visibility_work" || work.resourceKind === "ai_visibility_assessment");
 }
@@ -141,6 +142,7 @@ export async function assertJobTargetAccess(actor: WorkspaceActor, job: JobEcono
   if (!job.workId || !job.workspaceId
     || (job.productId === "operations" && job.resourceKind !== "responsibility")
     || (job.productId === "tracker" && (job.resourceKind !== "tracker"))
+    || (job.productId === "custom-applications" && job.resourceKind !== "custom-application")
     || (job.productId === "ai_visibility"
       && job.resourceKind !== "private_ai_visibility_work"
       && job.resourceKind !== "ai_visibility_assessment")) {

@@ -3,7 +3,6 @@ import { z } from "zod";
 import { getSupabase } from "@/lib/db/client";
 import type { WorkspaceActor } from "@/platform/workspaces";
 import {
-  WORK_ALLOWANCE_SOURCE,
   WORK_ALLOWANCE_UNIT_KINDS,
   WorkAllowanceAccessError,
   WorkAllowanceConflictError,
@@ -11,6 +10,7 @@ import {
   WorkAllowancePayerError,
   WorkAllowancePersistenceError,
   WorkAllowanceValidationError,
+  type WorkAllowanceSubscriptionFact,
   type OperatorAllowanceCommand,
   type PayerAllowanceCommand,
   type WorkAllowanceInspection,
@@ -41,6 +41,17 @@ const bucketResult = z.object({
   availableUnits: z.number().int().nonnegative(),
 }).strict();
 
+const subscriptionFactResult = z.object({
+  subscriptionId: z.string().min(1),
+  customerId: z.string().nullable(),
+  configKey: z.string().min(1),
+  status: z.enum(["pending", "active", "trialing", "past_due", "cancelled", "grandfathered", "unavailable"]),
+  periodStart: z.string(),
+  periodEnd: z.string(),
+  lastEventCreated: z.number().int().nonnegative(),
+  synchronizedAt: z.string(),
+}).strict();
+
 const allowanceResult = z.object({
   id: z.string().uuid(),
   workspaceId: z.string().uuid(),
@@ -52,16 +63,20 @@ const allowanceResult = z.object({
   reservedCapCents: z.number().int().nonnegative(),
   consumedCapCents: z.number().int().nonnegative(),
   actualCostCents: z.number().int().nonnegative(),
-  source: z.literal(WORK_ALLOWANCE_SOURCE),
+  source: z.enum(["local_configured", "subscription_configured"]),
   status: z.enum(["pending_cap_acceptance", "active", "closed"]),
   capAcceptedBy: z.string().uuid().nullable(),
   capAcceptedAt: z.string().nullable(),
   createdBy: z.string().uuid(),
   createdAt: z.string(),
   buckets: z.array(bucketResult),
+  subscription: subscriptionFactResult.nullable().optional(),
 }).strict();
 
-const inspectionResult = z.object({ allowances: z.array(allowanceResult) }).strict();
+const inspectionResult = z.object({
+  allowances: z.array(allowanceResult),
+  subscription: subscriptionFactResult.nullable().optional(),
+}).strict();
 const reservationResult = z.object({
   allowanceId: z.string().uuid(),
   jobId: z.string().uuid(),
@@ -84,6 +99,21 @@ const POLICY = Object.freeze({
   spendingCapMeaning: "operational_cost_limit_not_invoice_price",
   contributionPayouts: false,
 } as const);
+
+function policyFor(subscription: WorkAllowanceSubscriptionFact | null | undefined) {
+  const synchronized = Boolean(subscription && subscription.status !== "unavailable");
+  return {
+    ...POLICY,
+    stripeSynchronized: synchronized,
+    subscriptionState: !subscription
+      ? "not_configured" as const
+      : subscription.status === "unavailable"
+        ? "unavailable" as const
+        : subscription.status === "pending"
+          ? "pending" as const
+          : "synchronized" as const,
+  };
+}
 
 function client(): SupabaseClient<AllowanceDatabase> {
   const value = getSupabase();
@@ -131,7 +161,7 @@ export async function readStoredWorkAllowances(
   if (error) fail(error, "Allowances could not be read.");
   const parsed = inspectionResult.safeParse(data);
   if (!parsed.success) throw new WorkAllowancePersistenceError("Allowance storage returned an invalid record.");
-  return { ...parsed.data, policy: POLICY };
+  return { ...parsed.data, policy: policyFor(parsed.data.subscription) };
 }
 
 export async function applyOperatorAllowanceCommand(actor: WorkspaceActor, command: OperatorAllowanceCommand): Promise<string> {

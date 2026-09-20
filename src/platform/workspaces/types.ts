@@ -6,6 +6,9 @@ export interface WorkspaceActor {
   verifiedEmail: string;
 }
 
+export const WORKSPACE_EXIT_STOPPED_MESSAGE = "New work is stopped for this workspace. Existing records remain available for review.";
+export const WORKSPACE_EXIT_RESOURCES_STOPPED_MESSAGE = "Resources are stopped for this workspace. Existing records remain available for review.";
+
 export interface Workspace {
   id: string;
   kind: WorkspaceKind;

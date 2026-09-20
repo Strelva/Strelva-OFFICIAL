@@ -36,8 +36,9 @@ test("an owner publishes, shares, updates, and resumes the staff request offerin
 
     const navigation = page.getByRole("complementary", { name: "Strelva navigation", exact: true });
     await navigation.getByRole("button", { name: "Explore offerings", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "What this business can use.", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: /Staff request application/ }).click();
+    await expect(page.getByRole("heading", { name: "Useful outcomes for this business.", exact: true })).toBeVisible();
+    const staffRequestOffering = page.locator('[class*="discoveryRow"]').filter({ hasText: "Staff request application" }).first();
+    await staffRequestOffering.getByRole("button", { name: "Start setup", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Install Staff request application", exact: true })).toBeVisible();
     await expect(page.getByText("Create the standard staff request application", { exact: true })).toBeVisible();
     await expect(page.getByRole("radio", { name: "Your business operates it", exact: true })).toBeChecked();
@@ -58,7 +59,8 @@ test("an owner publishes, shares, updates, and resumes the staff request offerin
     await navigation.getByRole("button", { name: "Home", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Your business, at a glance.", exact: true })).toBeVisible();
     await navigation.getByRole("button", { name: "Explore offerings", exact: true }).click();
-    await page.getByRole("button", { name: /Staff request application/ }).click();
+    const draftStaffRequestOffering = page.locator('[class*="discoveryRow"]').filter({ hasText: "Staff request application" }).first();
+    await draftStaffRequestOffering.getByRole("button", { name: "Open", exact: true }).click();
     await expect(page.getByText("Draft setup", { exact: true })).toBeVisible();
     await page.getByLabel("I published the connected application through its review.", { exact: true }).check();
     await page.getByRole("button", { name: "Activate released offering", exact: true }).click();
@@ -112,7 +114,8 @@ test("an owner publishes, shares, updates, and resumes the staff request offerin
 
     await page.getByRole("button", { name: "Back to work", exact: true }).click();
     await navigation.getByRole("button", { name: "Explore offerings", exact: true }).click();
-    await page.getByRole("button", { name: /Staff request application/ }).click();
+    const installedStaffRequestOffering = page.locator('[class*="discoveryRow"]').filter({ hasText: "Staff request application" }).first();
+    await installedStaffRequestOffering.getByRole("button", { name: "Open", exact: true }).click();
     const connected = page.getByRole("region", { name: "Connected work", exact: true });
     await expect(connected).toContainText("Staff requests");
     await expect(connected).not.toContainText(appId!);

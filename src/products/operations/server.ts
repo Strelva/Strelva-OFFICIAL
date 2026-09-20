@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { getWork, assertWorkspaceMember } from "@/platform/workspaces/repository";
+import { getWork, assertWorkspaceMember, agencyAssignedWorkAccess } from "@/platform/workspaces/repository";
 import { isSuperAdminUser } from "@/lib/db/repositories";
 import { WorkspaceAccessError, WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { editWorkspaceDocument, readWorkspaceDocument } from "@/products/documents/server";
@@ -7,7 +7,7 @@ import { documentCommandSchema, changeDocument } from "@/products/documents/cont
 import { editSavedTracker, readSavedTracker } from "@/products/tracker/server";
 import { trackerCommandSchema } from "@/products/tracker/contracts";
 import { applyTrackerCommand } from "@/products/tracker/client";
-import { changeWorkspaceApplication, readWorkspaceApplication } from "@/products/applications/server";
+import { changeWorkspaceApplication, readWorkspaceApplication, rehearseApplicationCandidateForAssignment } from "@/products/applications/server";
 import { applicationCommandSchema } from "@/products/applications/contracts";
 import { changeWorkspaceSchedule, readWorkspaceSchedule } from "@/products/scheduling/server";
 import { scheduleCommandSchema } from "@/products/scheduling/contracts";
@@ -61,12 +61,25 @@ import {
 
 type InvestigationRun = Awaited<ReturnType<typeof readWorkspaceInvestigation>>["payload"]["runs"][number];
 function findingReceipt(run: InvestigationRun, reused = false) {
-  return { requestId: run.requestId, at: run.at, result: run.result, differenceCount: run.differences.length, sourceCount: run.sources.length, reused };
+  return {
+    requestId: run.requestId,
+    at: run.at,
+    result: run.result,
+    differenceCount: run.differences.length,
+    sourceCount: run.sources.length,
+    ...(run.unavailableReason ? { unavailableReason: run.unavailableReason } : {}),
+    ...(run.retryable !== undefined ? { retryable: run.retryable } : {}),
+    ...(run.sourceStates ? { sourceStates: run.sourceStates } : {}),
+    reused,
+  };
 }
 async function reusableFinding(actor: WorkspaceActor, workspaceId: string, work: Awaited<ReturnType<typeof readWorkspaceInvestigation>>) {
   const latest = work.payload.runs.at(-1);
-  if (!latest) return null;
-  const sources = await Promise.all(work.payload.sources.map(source => getWork(actor, source.workId)));
+  if (!latest || latest.result === "unavailable") return null;
+  // A public page must be read again before dependent work trusts it. Saved
+  // work can use its durable revision receipt as before.
+  if (work.payload.sources.some(source => "kind" in source)) return null;
+  const sources = await Promise.all(work.payload.sources.map(source => "workId" in source ? getWork(actor, source.workId) : null));
   return sources.every(source => source && source.workspaceId === workspaceId
     && latest.sources.some(captured => captured.workId === source.id && captured.updatedAt === source.updatedAt)) ? latest : null;
 }
@@ -90,7 +103,7 @@ function nativeInvocationContext(
   workspaceId: string,
   step: StepInput,
   capability: QualifiedExecutableCapability,
-  extras: Pick<CapabilityInvocationContext, "responsibilityId" | "executionKey" | "budgetId"> = {},
+  extras: Pick<CapabilityInvocationContext, "responsibilityId" | "executionKey" | "budgetId" | "delegated"> = {},
 ): CapabilityInvocationContext {
   return {
     actor,
@@ -110,7 +123,7 @@ function rawRecord(input: unknown): Record<string, unknown> {
 async function assertNativeTarget(context: CapabilityInvocationContext, checkFreshness = false) {
   if (!context.workId || !context.capabilityId || context.capabilityVersion === undefined) throw new WorkspaceAccessError();
   if (context.responsibilityId) await assertStandingExecutionAllowed(context.actor, context.workspaceId, context.responsibilityId);
-  await assertWorkspaceMember(context.actor, context.workspaceId);
+  if (!context.delegated) await assertWorkspaceMember(context.actor, context.workspaceId);
   const target = await getWork(context.actor, context.workId);
   const capability = requireExactExecutableCapability(context.capabilityId, context.capabilityVersion, "runner");
   if (!target || target.workspaceId !== context.workspaceId
@@ -190,6 +203,16 @@ const nativeCapabilityAdapters: CapabilityAdapterMap = new Map([
       }
     },
     async perform(context, input) {
+      const command = applicationCommandSchema.parse(input);
+      if (context.delegated && command.kind === "rehearse") {
+        const expectedDesignRevision = command.expectedDesignRevision ?? command.expectedRevision;
+        if (expectedDesignRevision === undefined) throw new WorkspaceConflictError("A candidate revision is required.");
+        return (await rehearseApplicationCandidateForAssignment(
+          context.actor,
+          context.workId!,
+          expectedDesignRevision,
+        )).payload;
+      }
       const saved = await changeWorkspaceApplication(context.actor, context.workId!, input);
       return saved.payload;
     },
@@ -301,13 +324,14 @@ export function createNativeExecutionAdapter(guard?: NativeExecutionGuard): Exec
       await nativeCapabilityInvoker.inspect(capability.definition.id, capability.definition.version, nativeInvocationContext(actor, workspaceId, step, capability), step.input);
     },
     async recheck(actor, workspaceId, step, responsibilityId) {
+      const delegated = Boolean(guard && responsibilityId);
       if (guard && responsibilityId) await guard(actor, workspaceId, responsibilityId, step);
       if (responsibilityId) await assertStandingExecutionAllowed(actor, workspaceId, responsibilityId);
       const capability = selectedRunnerCapability(step);
       await nativeCapabilityInvoker.recheck(
         capability.definition.id,
         capability.definition.version,
-        nativeInvocationContext(actor, workspaceId, step, capability, { responsibilityId }),
+        nativeInvocationContext(actor, workspaceId, step, capability, { responsibilityId, delegated }),
         step.input,
       );
     },
@@ -324,10 +348,11 @@ export function createNativeExecutionAdapter(guard?: NativeExecutionGuard): Exec
         if (responsibility.payload.status !== "running" || active?.status !== "running" || `${responsibilityId}:${active.id}:${active.attempt}` !== executionKey) throw new WorkspaceConflictError("This work was paused or cancelled before the native action.");
         // A direct adapter call is still an execution boundary. Recheck the
         // exact qualified command before any waiting or reconciliation branch.
+        const delegated = Boolean(guard);
         await nativeCapabilityInvoker.recheck(
           capability.definition.id,
           capability.definition.version,
-          nativeInvocationContext(actor, workspaceId, step, capability, { responsibilityId, executionKey, budgetId }),
+          nativeInvocationContext(actor, workspaceId, step, capability, { responsibilityId, executionKey, budgetId, delegated }),
           step.input,
         );
         if (capability.definition.adapterKey === "investigations.run") {
@@ -345,13 +370,20 @@ export function createNativeExecutionAdapter(guard?: NativeExecutionGuard): Exec
         const nativeResult = await nativeCapabilityInvoker.perform(
           capability.definition.id,
           capability.definition.version,
-          nativeInvocationContext(actor, workspaceId, step, capability, { responsibilityId, executionKey, budgetId }),
+          nativeInvocationContext(actor, workspaceId, step, capability, { responsibilityId, executionKey, budgetId, delegated }),
           step.input,
         );
         let result: unknown = nativeResult;
         if (capability.definition.adapterKey === "investigations.run") {
           const investigation = nativeResult as Awaited<ReturnType<typeof readWorkspaceInvestigation>>["payload"];
           const latest = investigation.runs.at(-1);
+          if (latest?.result === "unavailable") return {
+            effect: "none",
+            status: "waiting",
+            wakeAt: investigation.nextRunAt,
+            result: { workId: step.workId, operation: step.operation, finding: findingReceipt(latest) },
+            reason: "The saved source was unavailable. The check will retry after its backoff.",
+          };
           if (latest?.differences.length) return { effect: "accepted", status: "needs_decision", result: { workId: step.workId, finding: findingReceipt(latest) }, reason: "The sources disagree. Review the differences before allowing the dependent change." };
           result = latest ? { workId: step.workId, revision: investigation.revision, finding: findingReceipt(latest) } : { workId: step.workId, revision: investigation.revision };
         }
@@ -417,8 +449,17 @@ export function assertOperationalAssignmentScope(payload: Responsibility, requir
   }
 }
 
-async function assignedSnapshot(actor: WorkspaceActor, assignmentId: string, access: "normal" | "checkpoint" | "inspect" = "normal") {
+async function assignedSnapshot(
+  actor: WorkspaceActor,
+  assignmentId: string,
+  access: "normal" | "checkpoint" | "inspect" = "normal",
+  requireProviderDelivery = true,
+) {
   const saved = await operationalAssignments.read(actor, assignmentId, access);
+  if (requireProviderDelivery && saved.assignment.assigneeKind === "agency"
+    && !(await agencyAssignedWorkAccess(actor, saved.responsibility.workspaceId, saved.responsibility.id))) {
+    throw new WorkspaceAccessError();
+  }
   if (saved.assignment.assigneeKind === "strelva" && saved.assignment.assigneeUserId === actor.userId
     && !(await isSuperAdminUser(actor.userId))) {
     throw new WorkspaceAccessError();
@@ -471,7 +512,10 @@ export async function offerOperationalAssignment(actor: WorkspaceActor, workId: 
 }
 
 export async function acceptOperationalAssignment(actor: WorkspaceActor, assignmentId: string) {
-  await assignedSnapshot(actor, assignmentId, "inspect");
+  // The provider delivery acceptance path accepts the assignment first, then
+  // accepts the delivery. Requiring an already accepted delivery here would
+  // create a circular prerequisite.
+  await assignedSnapshot(actor, assignmentId, "inspect", false);
   return operationalAssignments.accept(actor, assignmentId);
 }
 
@@ -580,6 +624,10 @@ async function verifyReconciliation(actor: WorkspaceActor, saved: SavedResponsib
     // cannot resume, so a later source edit must not strand that known outcome.
     if (saved.payload.status !== "cancelled") {
       for (const reference of run.sources) {
+        // A public website receipt is the result of the guarded read itself.
+        // It has no saved-work row to re-read here; the investigation runner
+        // already performed its stability recheck before recording the receipt.
+        if (reference.kind === "public_website") continue;
         const source = await getWork(actor, reference.workId);
         if (!source || source.workspaceId !== saved.workspaceId || source.updatedAt !== reference.updatedAt) throw new WorkspaceConflictError("A compared source changed. Review a fresh check before allowing dependent work.");
       }

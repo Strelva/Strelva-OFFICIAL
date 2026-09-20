@@ -95,6 +95,7 @@ echo "== surface smoke (synthetic tenant, no Redis) =="
 rm -f -- "$fixture_path"
 cp tests/fixtures/tenants.fixture.json "$fixture_path"
 DATA_SOURCE=file CONTENT_SOURCE=file TENANTS_SOURCE=file CI=true \
+  SCAFFOLD_DEV_UNGATED_ACCESS=1 SCAFFOLD_DEV_TENANT=gldf \
   UPSTASH_REDIS_REST_URL="" UPSTASH_REDIS_REST_TOKEN="" \
   KV_REST_API_URL="" KV_REST_API_TOKEN="" \
   pnpm smoke:surfaces

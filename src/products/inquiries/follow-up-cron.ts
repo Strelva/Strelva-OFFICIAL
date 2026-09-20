@@ -44,6 +44,7 @@ import {
   type InquiryCaptureRepairStore,
 } from "./reconciliation";
 import { createRedisInquiryDeliveryStore } from "./delivery-store";
+import { INQUIRY_WORKSPACE_EXIT_CODE, resolveInquiryWorkspace } from "./workspace-exit";
 
 const DEFAULT_FOLLOW_UP_BUDGET_HOURS = 7 * 24;
 
@@ -58,6 +59,8 @@ export interface InquiryFollowUpSweepOptions {
   store?: InquiryDeliveryDependencies["store"];
   captureRepairQueue?: InquiryCaptureRepairStore;
   allowExternalSends?: boolean;
+  /** Test/host override for the workspace exit authority. */
+  workspaceExitCompleted?: (businessId: string) => Promise<boolean>;
 }
 
 export interface InquiryFollowUpSweepResult {
@@ -134,34 +137,88 @@ export async function runDueInquiryFollowUps(
   let due = 0;
   let attempted = 0;
 
-  const captureRepairs = await reconcileInquiryCaptureRepairs({
-    queue: options.captureRepairQueue,
-    repository,
-    leads: leadsReader,
-    tenantIds: active.map((tenant) => tenant.id),
-    businessIds: Object.fromEntries(active.map((tenant) => [tenant.id, tenant.stableId ?? tenant.id])),
-    now,
-  });
+  const repairBusinessIds: Record<string, string> = {};
+  const repairTenantIds: string[] = [];
+  for (const tenant of active) {
+    const fallbackBusinessId = tenant.stableId ?? tenant.id;
+    try {
+      const resolution = options.workspaceExitCompleted
+        ? {
+          businessId: fallbackBusinessId,
+          workspaceIds: [],
+          exitCompleted: await options.workspaceExitCompleted(fallbackBusinessId),
+          mapped: false,
+        }
+        : await resolveInquiryWorkspace({
+          tenantId: tenant.id,
+          tenantStableId: tenant.stableId,
+          fallbackBusinessId,
+        });
+      repairBusinessIds[tenant.id] = resolution.businessId;
+      repairTenantIds.push(tenant.id);
+    } catch {
+      // A missing exit authority must not make repair discovery guess the
+      // tenant's business identity. The next sweep can retry this tenant.
+    }
+  }
+  const captureRepairs = repairTenantIds.length > 0
+    ? await reconcileInquiryCaptureRepairs({
+      queue: options.captureRepairQueue,
+      repository,
+      leads: leadsReader,
+      tenantIds: repairTenantIds,
+      businessIds: repairBusinessIds,
+      now,
+    })
+    : { status: "processed" as const, queued: 0, processed: 0, recorded: 0, stale: 0, failed: 0 };
   if (captureRepairs.status === "unavailable") counts.failed += 1;
   else counts.failed += captureRepairs.failed;
 
   for (const tenant of active) {
+    const businessId = tenant.stableId ?? tenant.id;
+    let workspaceResolution: Awaited<ReturnType<typeof resolveInquiryWorkspace>>;
+    try {
+      if (options.workspaceExitCompleted) {
+        // Tests and explicitly hosted local fixtures own their authority
+        // through this injected reader. Production always uses the durable
+        // offering-to-workspace mapping above this seam.
+        workspaceResolution = {
+          businessId,
+          workspaceIds: [],
+          exitCompleted: await options.workspaceExitCompleted(businessId),
+          mapped: false,
+        };
+      } else {
+        workspaceResolution = await resolveInquiryWorkspace({
+          tenantId: tenant.id,
+          tenantStableId: tenant.stableId,
+          fallbackBusinessId: businessId,
+        });
+      }
+    } catch {
+      counts.failed += 1;
+      continue;
+    }
+    const inquiryBusinessId = workspaceResolution.businessId;
     let snapshot: InquiryWorkspaceSnapshot | null;
     let leads: LeadRecord[];
     let recordOverlays: Awaited<ReturnType<InquiryRepository["getRecordOverlays"]>> = [];
     try {
-      const businessId = tenant.stableId ?? tenant.id;
       [snapshot, leads, recordOverlays] = await Promise.all([
-        repository.getSnapshot(tenant.id, businessId),
+        repository.getSnapshot(tenant.id, inquiryBusinessId),
         leadsReader(tenant.id, 500),
         typeof repository.getRecordOverlays === "function"
-          ? repository.getRecordOverlays(tenant.id, businessId)
+          ? repository.getRecordOverlays(tenant.id, inquiryBusinessId)
           : Promise.resolve([]),
       ]);
     } catch {
       counts.failed += 1;
       continue;
     }
+    const exitCompleted = options.workspaceExitCompleted
+      ? await options.workspaceExitCompleted(snapshot?.businessId ?? inquiryBusinessId)
+      : workspaceResolution.exitCompleted;
+    if (exitCompleted) continue;
     const overlaysByInquiryId = new Map((recordOverlays || []).map((overlay) => [overlay.inquiryId, overlay]));
     for (const lead of leads) {
       if (!lead.capabilityId || !Number.isSafeInteger(lead.capabilityVersion)) continue;
@@ -187,19 +244,34 @@ export async function runDueInquiryFollowUps(
         allowExternalSends: options.allowExternalSends,
         now: () => now,
         resolveRoute: (currentInquiry, currentPolicy) => resolveInquiryRoute(currentInquiry, currentPolicy),
+        isWorkspaceExited: async () => options.workspaceExitCompleted
+          ? options.workspaceExitCompleted(snapshot?.businessId ?? inquiryBusinessId)
+          : (await resolveInquiryWorkspace({
+            tenantId: tenant.id,
+            tenantStableId: tenant.stableId,
+            fallbackBusinessId: inquiryBusinessId,
+          })).exitCompleted,
         getPolicy: async (tenantId, currentInquiry) => {
-          const current = await repository.getSnapshot(tenantId, tenant.stableId ?? tenant.id);
+          const current = await repository.getSnapshot(tenantId, inquiryBusinessId);
           const currentDefinition = currentCapability(current, {
             ...lead,
             capabilityId: currentInquiry.capabilityId ?? lead.capabilityId,
             capabilityVersion: currentInquiry.capabilityVersion ?? lead.capabilityVersion,
           });
           if (!currentDefinition || (!currentDefinition.routing && !currentDefinition.followUp)) return null;
+          const refreshedExit = options.workspaceExitCompleted
+            ? await options.workspaceExitCompleted(current?.businessId ?? inquiryBusinessId)
+            : (await resolveInquiryWorkspace({
+              tenantId: tenant.id,
+              tenantStableId: tenant.stableId,
+              fallbackBusinessId: inquiryBusinessId,
+            })).exitCompleted;
+          if (refreshedExit) return { ...sweepPolicy(currentDefinition), paused: true, pauseReason: INQUIRY_WORKSPACE_EXIT_CODE };
           return sweepPolicy(currentDefinition);
         },
         getResponsibilityGate: async (tenantId, currentInquiry, action, message) => {
-          const current = await repository.getSnapshot(tenantId, tenant.stableId ?? tenant.id);
-          const currentOverlays = await repository.getRecordOverlays(tenantId, tenant.stableId ?? tenant.id, [currentInquiry.id]);
+          const current = await repository.getSnapshot(tenantId, inquiryBusinessId);
+          const currentOverlays = await repository.getRecordOverlays(tenantId, inquiryBusinessId, [currentInquiry.id]);
           const currentOverlay = currentOverlays.find((item) => item.inquiryId === currentInquiry.id);
           const currentStatus = current
             ? recordedInquiryStatus(current.state, currentInquiry.id, currentOverlay?.status ?? "new")
@@ -403,11 +475,18 @@ export async function runDueInquiryFollowUps(
         : null;
       if (followUpAnchorMs !== null && now.getTime() < followUpAnchorMs) continue;
 
-      const evaluated = evaluateInquiryDelivery(inquiry, "schedule_follow_up", policy, null, now);
+      // Once an acknowledgement exists, the configured delay belongs to that
+      // accepted message. Keep the original intake time for reply evidence,
+      // but evaluate and deliver the follow-up against the durable acceptance
+      // checkpoint so a recent intake cannot make a due follow-up look early.
+      const followUpInquiry = latestReplyCheckpoint?.acceptedAt
+        ? { ...inquiry, receivedAt: latestReplyCheckpoint.acceptedAt }
+        : inquiry;
+      const evaluated = evaluateInquiryDelivery(followUpInquiry, "schedule_follow_up", policy, null, now);
       if (evaluated.status === "not_due") continue;
       due += 1;
       attempted += 1;
-      const result = await runInquiryFollowUp(inquiry, { deps: dependencies });
+      const result = await runInquiryFollowUp(followUpInquiry, { deps: dependencies });
       results.push(result);
       classify(result, counts);
     }

@@ -5,6 +5,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { getRedis } from "@/lib/redis";
 import { getLeads } from "@/lib/leads";
 import { getInquiryRepository, inquiryReleaseEnabled } from "@/products/inquiries/server";
+import { resolveInquiryWorkspace } from "@/products/inquiries/server";
 
 export const dynamic = "force-dynamic";
 
@@ -24,13 +25,18 @@ export async function GET(request: Request) {
     if (denied) return denied;
     const config = await getTenantConfig(tenant);
     if (!config || !config.active) return json({ error: "Business unavailable." }, 404);
+    const workspace = await resolveInquiryWorkspace({
+      tenantId: tenant,
+      tenantStableId: config.stableId,
+      fallbackBusinessId: config.stableId ?? tenant,
+    });
     const redis = getRedis();
     if (!redis) return json({ records: null, recordsAvailable: false }, 503);
     const limitValue = Number(new URL(request.url).searchParams.get("limit") || 50);
     const limit = Number.isSafeInteger(limitValue) ? Math.max(1, Math.min(limitValue, 500)) : 50;
     const [records, overlays] = await Promise.all([
       getLeads(tenant, limit),
-      getInquiryRepository().getRecordOverlays(tenant, config.stableId ?? tenant),
+      getInquiryRepository().getRecordOverlays(tenant, workspace.businessId),
     ]);
     return json({ records, recordsAvailable: true, recordOverlays: overlays });
   } catch {

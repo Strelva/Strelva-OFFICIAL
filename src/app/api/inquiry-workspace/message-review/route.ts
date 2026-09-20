@@ -7,6 +7,7 @@ import {
   inquiryReleaseEnabled,
   prepareInquiryMessageReview,
 } from "@/products/inquiries";
+import { INQUIRY_WORKSPACE_EXIT_CODE, resolveInquiryWorkspace } from "@/products/inquiries/server";
 import type {
   InquiryMessageReviewAction,
   InquiryMessageReviewOutcome,
@@ -96,7 +97,12 @@ async function contextFor(body: Record<string, unknown>) {
   if (denied) return { error: denied } as const;
   const config = await getTenantConfig(tenant);
   if (!config || !config.active) return { error: json({ error: "Business unavailable." }, 404) } as const;
-  return { tenantId: tenant, businessId: config.stableId ?? tenant } as const;
+  const workspace = await resolveInquiryWorkspace({
+    tenantId: tenant,
+    tenantStableId: config.stableId,
+    fallbackBusinessId: config.stableId ?? tenant,
+  });
+  return { tenantId: tenant, businessId: workspace.businessId, exitCompleted: workspace.exitCompleted } as const;
 }
 
 function errorDetails(error: unknown): { code: string; message: string; status: number } {
@@ -123,6 +129,7 @@ function errorDetails(error: unknown): { code: string; message: string; status: 
     current_policy_unavailable: { message: "The current responsibility policy is temporarily unavailable.", status: 503 },
     persistence_unavailable: { message: "The message review could not be saved.", status: 503 },
     delivery_unavailable: { message: "Message delivery is temporarily unavailable.", status: 503 },
+    [INQUIRY_WORKSPACE_EXIT_CODE]: { message: "Inquiry delivery is stopped for this workspace.", status: 409 },
   };
   const matched = known[code];
   if (matched) return { code, ...matched };
@@ -169,6 +176,9 @@ export async function POST(request: Request) {
     const id = inquiryId(body.inquiryId);
     const requestedAction = action(body.action);
     if (!requestOperation || !id || !requestedAction) return json({ error: "A review operation, inquiryId, and action are required." }, 400);
+    if (requestOperation === "prepare" && context.exitCompleted) {
+      return json({ error: "Inquiry delivery is stopped for this workspace.", code: INQUIRY_WORKSPACE_EXIT_CODE }, 409);
+    }
     const denied = await requireTenantPermission(context.tenantId, "content:write");
     if (denied) return denied;
 
@@ -192,6 +202,9 @@ export async function POST(request: Request) {
     const digest = messageDigest(body.messageDigest);
     if (!token || !digest) return json({ error: "A server-issued review token and message digest are required." }, 400);
     const outcome = await approveInquiryMessageReview({ ...baseInput, reviewToken: token, messageDigest: digest });
+    if (outcome.reason === INQUIRY_WORKSPACE_EXIT_CODE) {
+      return json({ error: "Inquiry delivery is stopped for this workspace.", code: INQUIRY_WORKSPACE_EXIT_CODE }, 409);
+    }
     const safe = safeOutcome(outcome, id, requestedAction);
     if (!safe) return json({ error: "The send outcome could not be confirmed. Refresh before trying again.", code: "invalid_delivery_outcome" }, 503);
     return json({ outcome: safe });

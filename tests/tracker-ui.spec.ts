@@ -7,6 +7,7 @@ const WORK_ID = "tracker-browser-work";
 const TRACKER_ID = "tracker-browser";
 const RELATED_WORK_ID = "55555555-5555-4555-8555-555555555555";
 const MEMBER_ID = "66666666-6666-4666-8666-666666666666";
+const workspaceReleaseEnabled = process.env.STRELVA_WORKSPACE_RELEASE === "1";
 const CSV = [
   "Name,Status",
   ...Array.from({ length: 61 }, (_, index) => `Task ${index + 1},${index % 2 ? "in progress" : "queued"}`),
@@ -18,6 +19,10 @@ type TrackerFixture = {
   conflictNextEdit: boolean;
   experimentRecorded: boolean;
 };
+
+test.beforeEach(() => {
+  test.skip(!workspaceReleaseEnabled, "workspace tracker acceptance runs in the explicit workspace-release suite");
+});
 
 function json(route: Route, body: unknown, status = 200) {
   return route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
@@ -140,9 +145,9 @@ async function writeExperiment(page: Page) {
   await page.getByLabel("What are we testing?").fill("Compare imported review time");
   await page.getByLabel("Workload and comparison method").fill("61-row CSV with a manual review baseline");
   await page.getByLabel("Previous approach, minutes").fill("60");
-  await page.getByLabel("Setup, minutes").fill("5");
-  await page.getByLabel("Review, minutes").fill("20");
-  await page.getByLabel("Corrections, minutes").fill("3");
+  await page.getByLabel("Setup, minutes", { exact: true }).fill("5");
+  await page.getByLabel("Review, minutes", { exact: true }).fill("20");
+  await page.getByLabel("Corrections, minutes", { exact: true }).fill("3");
   await page.getByLabel("Checks, evidence and failures").fill("All imported rows were reviewed; no provider write was made.");
   await page.getByRole("button", { name: "Record experiment", exact: true }).click();
 }

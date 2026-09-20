@@ -8,6 +8,8 @@ export interface CapabilityInvocationContext {
   workspaceId: string;
   workId?: string;
   responsibilityId?: string;
+  /** True only for an accepted, exact operational assignment recheck. */
+  delegated?: boolean;
   executionKey?: string;
   budgetId?: string;
   /** The accepted step's optimistic source clock, checked by native recheck. */

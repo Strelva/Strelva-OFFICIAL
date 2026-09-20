@@ -15,6 +15,7 @@ interface ContentVersion {
   timestamp: string;
   status: "live" | "rolled-back";
   changes?: { field: string; before: string; after: string }[];
+  requestId?: string;
 }
 
 // Legacy format — kept for backward compatibility with old snapshots
@@ -26,6 +27,7 @@ interface ActivityEntry {
   actor?: "user" | "ai" | "admin";
   changes?: { field: string; before: string; after: string }[];
   snapshot?: unknown;
+  requestId?: string;
 }
 
 interface VersionHistoryProps {
@@ -103,6 +105,7 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
             changes: v.changes,
             snapshot: v.data,
             _versionId: v.id,
+            requestId: v.requestId,
           }));
           setEntries(mapped);
           return;
@@ -206,6 +209,7 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
           <span className="text-[11px] text-gray-muted">
             {relativeTime(selected.time)} · {selected.actor ?? "user"}
           </span>
+          {selected.requestId ? <span className="text-[11px] text-gray-muted">Request {selected.requestId.slice(-8)}</span> : null}
         </div>
 
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-gray-bg-alt shrink-0">
@@ -286,6 +290,7 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
                   </span>
                 </div>
                 <div className="text-[11px] text-gray-muted mt-0.5 truncate">{summary}</div>
+                {entry.requestId ? <div className="text-[10px] text-gray-faint mt-0.5">Governed request {entry.requestId.slice(-8)}</div> : null}
               </button>
             </li>
           );

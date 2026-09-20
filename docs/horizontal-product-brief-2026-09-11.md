@@ -1,8 +1,44 @@
 # Strelva horizontal product brief
 
-Status: direction confirmed by Jacob on September 11 and clarified through September 16,
+Status: direction confirmed by Jacob on September 11 and clarified through September 20,
 2026. Local implementation of the topology below is authorized. This records
 product intent, not implemented capability or production release approval.
+
+## September 20 website release focus
+
+Jacob selected websites as the main current commercial focus, with self-service
+as the primary experience. The intended customer promise is to create a useful
+business website and keep improving it as the business grows. Agencies use the
+same product for separately owned client work; Strelva or an agency may provide
+help when requested. Human delivery must be identified wherever the current
+implementation still requires it.
+
+The release review now follows the website journey: first visit, account entry,
+creation or supported connection, preview, publication, customer activity, later
+changes and recovery. Intake, bookings, documents and Checks support that journey
+where their connections are implemented and verified. Broader workspace and app
+capabilities remain part of the product, with their existing acceptance and
+compatibility obligations retained. They do not define the main launch promise.
+
+Three entry paths need separate evidence: an existing Strelva-managed website,
+a new website for a new customer, and a website hosted outside Strelva. An audit
+of a public URL does not establish ownership, editing access or an import path.
+The established managed-client implementation does not by itself prove public
+self-service creation. New website creation, outside-site connection and each
+publishing path must be described according to their actual supported behavior.
+
+Candidate customer segments span independent professionals, small businesses,
+growing teams, larger departments and agencies. The initial evaluation emphasis
+is small businesses, growing teams and small web/digital agencies. This is a
+selected research focus, not evidence of demand or enterprise readiness. New
+self-service prices, included quantities and the free-to-paid boundary remain
+open; subscriptions with included usage and a spending cap remain the selected
+paid model. Existing managed website prices and accepted customer agreements
+remain unchanged.
+
+The [acceptance ledger](./strelvav2-horizontal-acceptance.md#website-release-review)
+owns findings and proof. Local preparation remains authorized; production
+activation and external actions retain their existing approval boundaries.
 
 ## Product
 

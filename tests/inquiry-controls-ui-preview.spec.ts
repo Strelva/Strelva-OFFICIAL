@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+test.skip(process.env.STRELVA_UI_PREVIEW !== "1", "Requires the explicit development-only interface preview.");
+
 async function startInquiry(page: Page) {
   await page.goto("/preview/strelva/inquiries");
   await page.getByRole("button", { name: "New", exact: true }).click();

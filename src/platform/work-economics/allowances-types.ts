@@ -8,6 +8,9 @@ export const WORK_ALLOWANCE_UNIT_KINDS = [
 ] as const;
 export type WorkAllowanceUnitKind = (typeof WORK_ALLOWANCE_UNIT_KINDS)[number];
 
+export const WORK_ALLOWANCE_SOURCES = ["local_configured", "subscription_configured"] as const;
+export type WorkAllowanceSource = (typeof WORK_ALLOWANCE_SOURCES)[number];
+/** The legacy local award source remains the default for operator commands. */
 export const WORK_ALLOWANCE_SOURCE = "local_configured" as const;
 export const MAX_WORK_ALLOWANCE_UNITS = 1_000_000;
 export const MAX_PERIOD_SPENDING_CAP_CENTS = 100_000_000;
@@ -109,24 +112,38 @@ export interface WorkAllowanceRecord {
   reservedCapCents: number;
   consumedCapCents: number;
   actualCostCents: number;
-  source: typeof WORK_ALLOWANCE_SOURCE;
+  source: WorkAllowanceSource;
   status: "pending_cap_acceptance" | "active" | "closed";
   capAcceptedBy: string | null;
   capAcceptedAt: string | null;
   createdBy: string;
   createdAt: string;
   buckets: WorkAllowanceBucket[];
+  subscription?: WorkAllowanceSubscriptionFact | null;
+}
+
+export interface WorkAllowanceSubscriptionFact {
+  subscriptionId: string;
+  customerId: string | null;
+  configKey: string;
+  status: "pending" | "active" | "trialing" | "past_due" | "cancelled" | "grandfathered" | "unavailable";
+  periodStart: string;
+  periodEnd: string;
+  lastEventCreated: number;
+  synchronizedAt: string;
 }
 
 export interface WorkAllowanceInspection {
   allowances: WorkAllowanceRecord[];
+  subscription?: WorkAllowanceSubscriptionFact | null;
   policy: {
-    stripeSynchronized: false;
+    stripeSynchronized: boolean;
     pricesDefined: false;
     customerUsageSource: "trusted_execution_receipts";
     retriesConsumeCustomerAllowance: false;
     spendingCapMeaning: "operational_cost_limit_not_invoice_price";
     contributionPayouts: false;
+    subscriptionState?: "not_configured" | "pending" | "synchronized" | "unavailable";
   };
 }
 

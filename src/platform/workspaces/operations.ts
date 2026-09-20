@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { getSupabase } from "@/lib/db/client";
 import { assertCanSaveWork, getWork } from "./repository";
-import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor, type SaveWorkInput } from "./types";
+import { WORKSPACE_EXIT_STOPPED_MESSAGE, WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor, type SaveWorkInput } from "./types";
 
 export interface WorkspaceOperation {
   id: string; workspace_id: string; created_by: string; product_id: string;
@@ -19,6 +19,7 @@ export async function operationRequest(actor: WorkspaceActor, workspaceId: strin
     p_action: action, p_id: id, p_workspace_id: workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail, ...extra,
   });
   if (error?.message.includes("workspace_access_denied")) throw new WorkspaceAccessError();
+  if (error?.message.includes("workspace_exit_future_work_blocked")) throw new WorkspaceConflictError(WORKSPACE_EXIT_STOPPED_MESSAGE);
   if (error?.message.includes("operation_in_progress")) throw new WorkspaceOperationPendingError();
   if (error?.message.includes("operation_input_conflict") || error?.message.includes("operation_attempt_limit")) throw new WorkspaceConflictError();
   if (error || !data?.[0]) throw new WorkspaceStoreError("Assessment state could not be confirmed");

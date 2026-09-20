@@ -4,13 +4,14 @@ const mocks = vi.hoisted(() => ({
   user: vi.fn(), rate: vi.fn(), score: vi.fn(), personal: vi.fn(), list: vi.fn(), work: vi.fn(), getWork: vi.fn(),
   save: vi.fn(), createAgency: vi.fn(), handoff: vi.fn(), inspect: vi.fn(), accept: vi.fn(),
   revoke: vi.fn(), cancel: vi.fn(), handoffs: vi.fn(), agencyDelegations: vi.fn(), workDelegations: vi.fn(),
-  pending: vi.fn(), operation: vi.fn(), saveAudit: vi.fn(), preflight: vi.fn(), runPrivate: vi.fn(), savePublicResult: vi.fn(), managedWork: vi.fn(),
+  pending: vi.fn(), operation: vi.fn(), saveAudit: vi.fn(), preflight: vi.fn(), runPrivate: vi.fn(), savePublicResult: vi.fn(), managedWork: vi.fn(), exitRead: vi.fn(), exitCompleted: vi.fn(),
 }));
 vi.mock("@/lib/db/server-client", () => ({ getSessionUser: mocks.user }));
 vi.mock("@/lib/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate }));
 vi.mock("@/products/ai-visibility/server", () => ({ runPrivateAiVisibilityAssessment: mocks.runPrivate, savePublicAiVisibilityResult: mocks.savePublicResult }));
 vi.mock("@/products/website-audit/server", () => ({ savePublicWebsiteAudit: mocks.saveAudit }));
 vi.mock("@/products/managed-presence/server", () => ({ listManagedPresenceWork: mocks.managedWork }));
+vi.mock("@/platform/workspace-exit", () => ({ readWorkspaceExit: mocks.exitRead, readWorkspaceExitCompleted: mocks.exitCompleted }));
 vi.mock("@/platform/workspaces", async () => {
   const types = await import("@/platform/workspaces/types");
   const { WorkspaceOperationPendingError } = await import("@/platform/workspaces/operations");
@@ -79,6 +80,8 @@ beforeEach(() => {
   mocks.agencyDelegations.mockResolvedValue([]);
   mocks.workDelegations.mockResolvedValue([]);
   mocks.managedWork.mockResolvedValue({ managedWork: [], unavailable: false });
+  mocks.exitRead.mockResolvedValue({ state: null, successors: [] });
+  mocks.exitCompleted.mockResolvedValue(false);
 });
 
 describe("release-one private workspace routes", () => {
@@ -99,6 +102,45 @@ describe("release-one private workspace routes", () => {
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     expect(await response.json()).toMatchObject({ workspaceId, work: [{ id: workId }], actor: { email: "owner@example.com" } });
     expect(mocks.work).toHaveBeenCalledWith({ userId: "actor", verifiedEmail: "owner@example.com" }, workspaceId);
+  });
+  it("reports an owner exit-state read failure so the browser can fail closed", async () => {
+    mocks.exitRead.mockRejectedValue(new Error("temporary exit-state store failure"));
+
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ workspaceExitState: null, workspaceExitReadStatus: "unavailable" });
+  });
+  it("checks member completion without asking for the owner-only exit record", async () => {
+    mocks.list.mockResolvedValue([{ ...workspace, role: "member" }]);
+
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ workspaceExitState: null, workspaceExitReadStatus: "available" });
+    expect(mocks.exitRead).not.toHaveBeenCalled();
+    expect(mocks.exitCompleted).toHaveBeenCalledWith(workspaceId);
+  });
+
+  it("shows members a completed exit without disclosing owner-only details", async () => {
+    mocks.list.mockResolvedValue([{ ...workspace, role: "member" }]);
+    mocks.exitCompleted.mockResolvedValue(true);
+
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ workspaceExitState: null, workspaceExitReadStatus: "completed" });
+    expect(mocks.exitRead).not.toHaveBeenCalled();
+  });
+
+  it("fails closed for members when completion status is unavailable", async () => {
+    mocks.list.mockResolvedValue([{ ...workspace, role: "member" }]);
+    mocks.exitCompleted.mockRejectedValue(new Error("temporary exit-state store failure"));
+
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ workspaceExitState: null, workspaceExitReadStatus: "unavailable" });
   });
   it("exposes locally executable products only inside the enabled workspace release", async () => {
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "0");

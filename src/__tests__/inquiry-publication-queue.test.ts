@@ -3,6 +3,9 @@ import type { InquiryRepository, PublicationClaim } from "@/products/inquiries/r
 
 const mocks = vi.hoisted(() => ({ addEvent: vi.fn() }));
 vi.mock("@/lib/events", () => ({ addEvent: mocks.addEvent }));
+vi.mock("@/products/inquiries/workspace-exit", () => ({
+  assertInquiryWorkspaceOpen: vi.fn(async () => undefined),
+}));
 
 import { queueInquiryPublication } from "@/products/inquiries/server";
 

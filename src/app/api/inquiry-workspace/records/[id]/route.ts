@@ -3,6 +3,7 @@ import { requireTenantAccess, verifyAuth } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
 import { getInquiryRepository, inquiryReleaseEnabled, readInquiryRecord } from "@/products/inquiries/server";
+import { resolveInquiryWorkspace } from "@/products/inquiries/server";
 
 export const dynamic = "force-dynamic";
 
@@ -25,11 +26,16 @@ export async function GET(
     if (denied) return denied;
     const config = await getTenantConfig(tenant);
     if (!config || !config.active) return json({ error: "Business unavailable." }, 404);
+    const workspace = await resolveInquiryWorkspace({
+      tenantId: tenant,
+      tenantStableId: config.stableId,
+      fallbackBusinessId: config.stableId ?? tenant,
+    });
     const { id } = await params;
     if (!id || id.length > 256) return json({ error: "Inquiry record unavailable." }, 404);
     const result = await readInquiryRecord({
       tenantId: tenant,
-      businessId: config.stableId ?? tenant,
+      businessId: workspace.businessId,
       inquiryId: id,
       repository: getInquiryRepository(),
     });

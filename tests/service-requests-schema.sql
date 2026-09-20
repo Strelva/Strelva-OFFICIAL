@@ -157,7 +157,7 @@ begin
   select * into saved from public.save_service_request(
     owner_id,'service-owner@example.test',business_id,null,null,'requested',
     'Have Strelva prepare the flow','A private request form and review path.',
-    '{"currentProcess":"email"}'::jsonb,array['prepare_request_flow']::text[],
+    '{"currentProcess":"email"}'::jsonb,array['submit_requests','review_requests']::text[],
     '{"kind":"strelva"}'::jsonb,'service-request:strelva',repeat('f',64)
   );
   select * into saved from public.respond_service_request(
@@ -204,7 +204,7 @@ begin
     requested_by,expires_at,accepted_by,accepted_at,history
   ) values (
     'a9000000-0000-4000-8000-000000000022',business_id,app.id,assignment.id,'accepted',
-    array['prepare_request_flow'],'service-request-delivery',repeat('3',64),owner_id,clock_timestamp()+interval '1 day',
+    array['submit_requests','review_requests'],'service-request-delivery',repeat('3',64),owner_id,clock_timestamp()+interval '1 day',
     strelva_id,clock_timestamp(),jsonb_build_array(jsonb_build_object('kind','requested','actorId',owner_id::text,'at',clock_timestamp()),jsonb_build_object('kind','accepted','actorId',strelva_id::text,'at',clock_timestamp()))
   ) returning * into delivery;
 

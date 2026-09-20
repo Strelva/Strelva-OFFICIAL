@@ -29,7 +29,13 @@ test("current owner downloads a bounded usable workspace snapshot while other ac
     await page.getByRole("button",{name:"Download workspace JSON"}).click();
     const download=await downloadPromise; const path=await download.path(); if(!path)throw new Error("Export download path unavailable");
     const snapshot=JSON.parse(await readFile(path,"utf8"));
-    expect(snapshot).toMatchObject({schemaVersion:1,workspace:{id:workspaceId,name:"Harbor Export",kind:"customer"},manifest:{scope:"current_workspace_portability_snapshot"}});
+    expect(snapshot).toMatchObject({schemaVersion:2,workspace:{id:workspaceId,name:"Harbor Export",kind:"customer"},manifest:{scope:"current_workspace_portability_snapshot"},onboarding:{cases:[],attachments:[]},lifecycle:{exit:null}});
+    expect(snapshot.manifest.unavailable).toEqual(expect.arrayContaining([
+      expect.objectContaining({ category: "custom_application_artifacts_and_releases" }),
+      expect.objectContaining({ category: "calendar_connections_and_event_receipts" }),
+      expect.objectContaining({ category: "inquiry_records_and_followups" }),
+      expect.objectContaining({ category: "offering_installations_and_provider_delivery" }),
+    ]));
     expect(snapshot.savedResults).toHaveLength(1); expect(snapshot.savedResults[0].input).toBeUndefined();
     expect(snapshot.economics.jobs[0]).toMatchObject({actualKnown:false,actualCents:null});
     expect(JSON.stringify(snapshot)).not.toContain("privatePrompt");

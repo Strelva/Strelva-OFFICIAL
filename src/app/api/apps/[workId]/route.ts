@@ -72,9 +72,14 @@ export async function POST(
     const actor = await workspaceHttpActor();
     if (!actor) return json({ error: "Sign in with a confirmed email to submit a record." }, 401);
     const body = await readWorkspaceBody(request, 120_000);
-    const input = z.object({ action: z.literal("submit"), input: z.unknown() }).strict().parse(body);
-    if (input.action !== "submit") return json({ error: "This application does not support that action." }, 422);
-    return json(await applicationAccessService.submit(actor, await workId(params), input.input));
+    const input = z.discriminatedUnion("action", [
+      z.object({ action: z.literal("submit"), input: z.unknown() }).strict(),
+      z.object({ action: z.literal("edit"), input: z.unknown() }).strict(),
+    ]).parse(body);
+    const normalizedWorkId = await workId(params);
+    return json(input.action === "edit"
+      ? await applicationAccessService.edit(actor, normalizedWorkId, input.input)
+      : await applicationAccessService.submit(actor, normalizedWorkId, input.input));
   } catch (error) {
     return failure(error);
   }

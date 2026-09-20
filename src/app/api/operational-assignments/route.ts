@@ -15,6 +15,7 @@ import {
   revokeOperationalAssignment,
   runOperationalAssignment,
 } from "@/products/operations/server";
+import { agencyAssignedWorkAccess } from "@/platform/workspaces/repository";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -28,9 +29,15 @@ export async function GET(request: Request) {
       z.object({ assignmentId: z.string().uuid(), workId: z.undefined() }),
       z.object({ assignmentId: z.undefined(), workId: z.string().uuid() }),
     ]).parse(Object.fromEntries(new URL(request.url).searchParams));
-    return json(query.assignmentId
-      ? await inspectOperationalAssignment(actor, query.assignmentId)
-      : await inspectOperationalAssignmentForWork(actor, query.workId!));
+    if (query.assignmentId) {
+      const result = await inspectOperationalAssignment(actor, query.assignmentId);
+      if (result.assignment.assigneeKind === "agency" && result.assignment.sponsorId !== actor.userId
+        && !(await agencyAssignedWorkAccess(actor, result.responsibility.workspaceId, result.responsibility.id))) {
+        return json({ error: "This work is unavailable to your account." }, 403);
+      }
+      return json(result);
+    }
+    return json(await inspectOperationalAssignmentForWork(actor, query.workId!));
   } catch (error) {
     return workspaceHttpFailure(error);
   }

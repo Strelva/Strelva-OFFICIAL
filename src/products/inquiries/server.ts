@@ -41,10 +41,17 @@ import { ensurePatternResponsibility, executePatternCopyAction, executePatternUp
 import { listPatternInstallations } from "./inquiry-pattern-updates";
 import { explainWhyWithDelivery, projectInquiryDeliveryTimeline, withoutInquiryDeliveryProjection } from "./delivery-surface";
 import { placeholderInquiryRecords, projectedInquiryRecords } from "./record-projection";
+import { assertInquiryWorkspaceOpen } from "./workspace-exit";
 
 export { recordedInquiryAssignee, recordedInquiryStatus } from "./record-projection";
 
 export { inquiryReleaseEnabled } from "./release";
+export {
+  INQUIRY_WORKSPACE_EXIT_CODE,
+  InquiryWorkspaceExitBlockedError,
+  InquiryWorkspaceExitUnavailableError,
+  resolveInquiryWorkspace,
+} from "./workspace-exit";
 export { executeInquiryPublication } from "./publication";
 export { getInquiryRepository } from "./repository";
 export { publicationClaimToken } from "./repository";
@@ -93,6 +100,7 @@ export async function readInquiryWorkspace(input: ReadInquiryWorkspaceInput): Pr
 export async function saveInquiryWorkspace(
   input: CompareAndSwapInput & { repository?: InquiryRepository },
 ): Promise<CompareAndSwapResult> {
+  await assertInquiryWorkspaceOpen({ tenantId: input.tenantId });
   return (input.repository ?? getInquiryRepository()).compareAndSwap(input);
 }
 
@@ -140,6 +148,7 @@ export interface QueueInquiryPublicationResult {
  * function, and the claim token is never returned to the browser.
  */
 export async function queueInquiryPublication(input: QueueInquiryPublicationInput): Promise<QueueInquiryPublicationResult> {
+  await assertInquiryWorkspaceOpen({ tenantId: input.tenantId });
   const repository = input.repository ?? getInquiryRepository();
   const claim = await repository.claimPublication(input);
   if (!claim.acquired) {

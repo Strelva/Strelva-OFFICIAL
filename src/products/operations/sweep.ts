@@ -17,6 +17,11 @@ export interface SweepFailure {
   };
 }
 
+export interface SweepDependencies {
+  readInvestigation?: typeof readWorkspaceInvestigation;
+  runInvestigation?: typeof runWorkspaceInvestigation;
+}
+
 function failureMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : "The due work could not be completed.";
   return message.slice(0, 2_000);
@@ -43,7 +48,9 @@ async function recordedFailure(item: DueWork): Promise<SweepFailure["recorded"]>
   }
 }
 
-export async function sweepDueWork(due: DueWork[], deadlineMs = 20000) {
+export async function sweepDueWork(due: DueWork[], deadlineMs = 20000, dependencies: SweepDependencies = {}) {
+  const readInvestigation = dependencies.readInvestigation ?? readWorkspaceInvestigation;
+  const runInvestigation = dependencies.runInvestigation ?? runWorkspaceInvestigation;
   const started = Date.now(); let processed = 0, failed = 0;
   const failures: SweepFailure[] = [];
   for (const item of due.slice(0, 30)) {
@@ -52,8 +59,8 @@ export async function sweepDueWork(due: DueWork[], deadlineMs = 20000) {
       if (item.productId === "operations") await workspaceResponsibilityCommands.run(item.actor, item.id);
       else if (item.productId === "operations-standing") await admitAndRunDueStandingResponsibility(item.actor, item.id);
       else if (item.productId === "investigations") {
-        const target = await readWorkspaceInvestigation(item.actor, item.id);
-        await runWorkspaceInvestigation(item.actor, item.id, { expectedRevision: target.payload.revision, requestId: `due:${item.id}:${target.payload.revision}` });
+        const target = await readInvestigation(item.actor, item.id);
+        await runInvestigation(item.actor, item.id, { expectedRevision: target.payload.revision, requestId: `due:${item.id}:${target.payload.revision}` });
       } else {
         const target = await readWorkspaceLearning(item.actor, item.id);
         await collectWorkspaceLearning(item.actor, item.id, target.learning.revision);

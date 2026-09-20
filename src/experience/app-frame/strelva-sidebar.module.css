@@ -10,8 +10,9 @@
 .navItem span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .utilities { display:grid; gap:3px; margin-top:16px; padding-top:13px; border-top:1px solid var(--navigation-border); }
 .utilityItem,.newAction { display:flex; align-items:center; gap:10px; width:100%; min-height:36px; padding:7px 12px; border-radius:10px; color:var(--navigation-utility-text); text-align:left; font-size:11px; }
-.utilityItem:hover,.utilityItem[aria-current="page"],.newAction:hover { background:var(--navigation-hover-bg); color:var(--navigation-active-text); }
+.utilityItem:hover,.utilityItem[aria-current="page"],.newAction:hover:not(:disabled):not([aria-disabled="true"]) { background:var(--navigation-hover-bg); color:var(--navigation-active-text); }
 .newAction { color:var(--navigation-action-text); }
+.newAction:disabled,.newAction[aria-disabled="true"] { cursor:not-allowed; opacity:.5; }
 .utilityItem svg,.newAction svg { flex:0 0 auto; }
 .utilityItem span,.newAction span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .contextual { min-height:0; overflow-y:auto; margin-top:14px; padding-top:12px; border-top:1px solid var(--navigation-border); }

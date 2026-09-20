@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   tenants: vi.fn(),
   access: vi.fn(),
   config: vi.fn(),
+  workspace: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -19,6 +20,7 @@ vi.mock("@/lib/auth", () => ({
   requireTenantAccess: mocks.access,
 }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.config }));
+vi.mock("@/products/inquiries/workspace-exit", () => ({ resolveInquiryWorkspace: mocks.workspace }));
 
 import {
   discoverInquiryPortfolio,
@@ -99,6 +101,12 @@ describe("inquiry portfolio discovery", () => {
       siteName: tenantId === "active" ? "Active Business" : "Inactive Business",
       active: tenantId !== "inactive",
     }));
+    mocks.workspace.mockImplementation(async ({ fallbackBusinessId }: { fallbackBusinessId: string }) => ({
+      businessId: fallbackBusinessId,
+      workspaceIds: [],
+      exitCompleted: false,
+      mapped: false,
+    }));
   });
 
   it("returns whitelisted attention and opaque live-pattern summaries for granted active tenants", async () => {
@@ -140,6 +148,7 @@ describe("inquiry pattern resolution", () => {
     mocks.tenants.mockResolvedValue(["active"]);
     mocks.access.mockResolvedValue(null);
     mocks.config.mockResolvedValue({ id: "active", stableId: "active-business", siteName: "Active Business", active: true });
+    mocks.workspace.mockResolvedValue({ businessId: "active-business", workspaceIds: [], exitCompleted: false, mapped: false });
   });
 
   it("reauthorizes and rereads the exact live version before returning only copy input", async () => {

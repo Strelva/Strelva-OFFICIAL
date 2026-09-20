@@ -343,6 +343,8 @@ export interface InquiryDeliveryDependencies {
     inquiry: InquiryDeliverySubmission,
     now: string,
   ) => Promise<InquiryFollowUpRecheck | null | undefined>;
+  /** Re-read the owning customer workspace immediately before a new claim. */
+  isWorkspaceExited?: (tenantId: string) => Promise<boolean>;
   /** Override in tests or a host that deliberately permits a mocked send. */
   allowExternalSends?: boolean;
 }

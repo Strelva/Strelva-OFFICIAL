@@ -26,6 +26,9 @@ vi.mock("@/lib/redis", () => ({ getRedis: mocks.redis }));
 vi.mock("@/lib/leads", () => ({ getLeads: mocks.leads }));
 vi.mock("@/lib/auth", () => ({ getTenantRole: mocks.role, roleHasPermission: mocks.hasPermission }));
 vi.mock("@/products/inquiries/delivery-store", () => ({ createRedisInquiryDeliveryStore: () => mocks.deliveryStore }));
+vi.mock("@/products/inquiries/workspace-exit", () => ({
+  assertInquiryWorkspaceOpen: vi.fn(async () => undefined),
+}));
 
 const TENANT_ID = "tenant-a";
 const BUSINESS_ID = "buffalo-realty";

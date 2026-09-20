@@ -12,6 +12,7 @@ export function WorkspaceOngoing({
   selectedAssignmentId,
   creatingStanding,
   readOnly,
+  newWorkBlocked = false,
   initialRequest,
   onCreatingStandingChange,
   onOpenStanding,
@@ -25,6 +26,8 @@ export function WorkspaceOngoing({
   selectedAssignmentId: string | null;
   creatingStanding: boolean;
   readOnly: boolean;
+  /** Stop/paused work blocks new commands while leaving owner recovery available. */
+  newWorkBlocked?: boolean;
   initialRequest?: string;
   onCreatingStandingChange: (creating: boolean) => void;
   onOpenStanding: (id: string) => void;
@@ -45,6 +48,7 @@ export function WorkspaceOngoing({
       sources={sources}
       selectedId={selectedStandingId || undefined}
       readOnly={readOnly}
+      newWorkBlocked={newWorkBlocked}
       onCreatingChange={onCreatingStandingChange}
       onOpen={onOpenStanding}
       onCreated={onOpenStanding}
@@ -65,6 +69,7 @@ export function WorkspaceOngoing({
       assignmentId={selectedAssignmentId || undefined}
       sources={sources}
       readOnly={readOnly}
+      newWorkBlocked={newWorkBlocked}
       initialRequest={initialRequest}
       onSaved={onSaved}
     /> : null}

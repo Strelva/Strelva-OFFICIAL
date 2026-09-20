@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { getSupabase } from "@/lib/db/client";
 import {
+  WORKSPACE_EXIT_RESOURCES_STOPPED_MESSAGE,
   WorkspaceAccessError,
   WorkspaceConflictError,
   WorkspaceStoreError,
@@ -10,6 +11,7 @@ import {
   APPLICATION_SELECT_OPTION_LIMIT,
   APPLICATION_SELECT_OPTION_LENGTH_LIMIT,
 } from "./contracts";
+import { isApplicationDateOnly } from "./date-only";
 
 /**
  * Application use is a resource grant. It is deliberately separate from the
@@ -22,6 +24,9 @@ export type ApplicationViewKind = z.infer<typeof applicationViewKindSchema>;
 export const applicationRecordReadScopeSchema = z.enum(["none", "own", "all"]);
 export type ApplicationRecordReadScope = z.infer<typeof applicationRecordReadScopeSchema>;
 
+export const applicationRecordEditScopeSchema = z.enum(["none", "own", "all"]);
+export type ApplicationRecordEditScope = z.infer<typeof applicationRecordEditScopeSchema>;
+
 const emailSchema = z.string().trim().toLowerCase().email().max(254);
 const expirySchema = z.string().datetime({ offset: true });
 const primitiveSchema = z.union([z.string().max(10000), z.number().finite(), z.boolean()]);
@@ -30,6 +35,8 @@ export const applicationUseGrantInputSchema = z.object({
   recipientEmail: emailSchema,
   views: z.array(applicationViewKindSchema).min(1).max(4),
   recordRead: applicationRecordReadScopeSchema.default("none"),
+  /** Existing links default to no record editing. */
+  recordEdit: applicationRecordEditScopeSchema.default("none"),
   recordSubmit: z.boolean().default(false),
   purpose: z.string().trim().min(1).max(500),
   expiresAt: expirySchema,
@@ -39,6 +46,12 @@ export const applicationUseGrantInputSchema = z.object({
   }
   if (value.recordSubmit && !value.views.includes("form")) {
     ctx.addIssue({ code: "custom", path: ["recordSubmit"], message: "Record submission requires the form view." });
+  }
+  if (value.recordEdit !== "none" && !value.views.includes("form")) {
+    ctx.addIssue({ code: "custom", path: ["recordEdit"], message: "Record editing requires the form view." });
+  }
+  if (value.recordEdit !== "none" && value.recordRead === "none") {
+    ctx.addIssue({ code: "custom", path: ["recordEdit"], message: "Record editing requires a record view." });
   }
 });
 export type ApplicationUseGrantInput = z.infer<typeof applicationUseGrantInputSchema>;
@@ -52,7 +65,8 @@ export const applicationUseGrantSchema = applicationUseGrantInputSchema.extend({
   createdAt: z.string().datetime({ offset: true }),
   revokedAt: z.string().datetime({ offset: true }).nullable().optional(),
 });
-export type ApplicationUseGrant = z.infer<typeof applicationUseGrantSchema>;
+/** Optional keeps older test fixtures and compatibility adapters source-compatible; parsed rows always carry the default. */
+export type ApplicationUseGrant = Omit<z.infer<typeof applicationUseGrantSchema>, "recordEdit"> & { recordEdit?: ApplicationRecordEditScope };
 
 /** Browser input. Native application validation remains authoritative. */
 export const applicationUseSubmitSchema = z.object({
@@ -65,6 +79,11 @@ export const applicationUseSubmitSchema = z.object({
 }).strict();
 export type ApplicationUseSubmitInput = z.infer<typeof applicationUseSubmitSchema>;
 
+export const applicationUseEditSchema = applicationUseSubmitSchema.extend({
+  expectedRecordRevision: z.number().int().positive(),
+}).strict();
+export type ApplicationUseEditInput = z.infer<typeof applicationUseEditSchema>;
+
 const useFieldBase = {
   id: z.string().min(1).max(40),
   label: z.string().trim().min(1).max(80),
@@ -74,6 +93,7 @@ const fieldSchema = z.discriminatedUnion("type", [
   z.object({ ...useFieldBase, type: z.literal("text") }),
   z.object({ ...useFieldBase, type: z.literal("number") }),
   z.object({ ...useFieldBase, type: z.literal("boolean") }),
+  z.object({ ...useFieldBase, type: z.literal("date") }),
   z.object({
     ...useFieldBase,
     type: z.literal("select"),
@@ -108,6 +128,7 @@ const rawRecordSchema = z.object({
   // Ownership comes only from canonical application_records.created_by. It is
   // internal to the access projection and is never returned to the browser.
   createdBy: z.string().uuid().nullable(),
+  revision: z.number().int().positive().optional(),
 }).strict();
 type RawRecord = z.infer<typeof rawRecordSchema>;
 
@@ -128,12 +149,13 @@ export interface ApplicationUseSnapshot {
   releaseVersion: number;
   views: Array<{
     kind: ApplicationViewKind;
-    fields: Array<{ id: string; label: string; type: "text" | "number" | "boolean" | "select"; required: boolean; options?: string[] }>;
+    fields: Array<{ id: string; label: string; type: "text" | "number" | "boolean" | "date" | "select"; required: boolean; options?: string[] }>;
   }>;
-  records: Array<{ id: string; values: Record<string, string | number | boolean> }>;
+  records: Array<{ id: string; values: Record<string, string | number | boolean>; revision?: number }>;
   access: {
     views: ApplicationViewKind[];
     recordRead: ApplicationRecordReadScope;
+    recordEdit: ApplicationRecordEditScope;
     recordSubmit: boolean;
     expiresAt: string;
   };
@@ -153,6 +175,13 @@ export interface ApplicationUsePersistence {
     actor: WorkspaceActor,
     workId: string,
     input: ApplicationUseSubmitInput,
+    access: ApplicationUseGrant,
+  ): Promise<ApplicationUseContext>;
+  /** Recipient edit boundary. Implementations must recheck grant, ownership and record revision while holding the work lock. */
+  edit?(
+    actor: WorkspaceActor,
+    workId: string,
+    input: ApplicationUseEditInput,
     access: ApplicationUseGrant,
   ): Promise<ApplicationUseContext>;
 }
@@ -196,10 +225,13 @@ function rpcFailure(
   if (/application_use_denied|verified_identity_required|workspace_access_denied|grant_not_found|recipient_unverified|application_design_access_denied/.test(detail)) {
     throw new ApplicationUseAccessError();
   }
+  if (/workspace_exit_resource_stopped/.test(detail)) {
+    throw new ApplicationUseConflictError(WORKSPACE_EXIT_RESOURCES_STOPPED_MESSAGE);
+  }
   if (/application_use_invalid|application_record_invalid|application_schema_invalid/.test(detail)) {
     throw new ApplicationUseInputError(invalidMessage);
   }
-  if (/application_use_conflict|application_use_expired|grant_revoked|release_version_conflict|application_release_conflict|application_records_revision_conflict|application_record_duplicate|application_record_limit_reached|idempotency_conflict/.test(detail)) {
+  if (/application_use_conflict|application_use_expired|grant_revoked|release_version_conflict|application_release_conflict|application_records_revision_conflict|application_record_duplicate|application_record_limit_reached|application_record_revision_conflict|application_edit_history_limit|idempotency_conflict/.test(detail)) {
     throw new ApplicationUseConflictError("This application changed or the use grant is no longer active.");
   }
   throw new ApplicationUseUnavailableError();
@@ -214,6 +246,7 @@ function parseGrant(value: unknown, fallbackWorkId: string, fallbackWorkspaceId?
     recipientEmail: row.recipient_email ?? row.recipientEmail,
     views: row.views,
     recordRead: row.record_read_scope ?? row.recordRead ?? "none",
+    recordEdit: row.record_edit_scope ?? row.recordEdit ?? "none",
     recordSubmit: row.record_submit ?? row.recordSubmit ?? false,
     purpose: row.purpose,
     expiresAt: row.expires_at ?? row.expiresAt,
@@ -281,6 +314,9 @@ function assertSubmittedFieldsAllowed(
     if (field?.type === "select" && (typeof value !== "string" || (value !== "" && !field.options.includes(value)))) {
       throw new ApplicationUseInputError(`${field.label} must use one of the available options.`);
     }
+    if (field?.type === "date" && (typeof value !== "string" || !isApplicationDateOnly(value))) {
+      throw new ApplicationUseInputError(`${field.label} must be a real date in YYYY-MM-DD format.`);
+    }
   }
   if (parsed.data.fields.some(field => {
     const value = input.record.values[field.id];
@@ -290,18 +326,27 @@ function assertSubmittedFieldsAllowed(
   }
 }
 
+function assertEditableRecordAllowed(context: ApplicationUseContext, actor: WorkspaceActor, grant: ApplicationUseGrant, input: ApplicationUseEditInput): void {
+  const scope = grant.recordEdit ?? "none";
+  if (scope === "none") throw new ApplicationUseAccessError("This application does not allow record editing from your account.");
+  const raw = context.records.map(safeRecord).find(record => record?.id === input.record.id);
+  if (!raw) throw new ApplicationUseAccessError("That record is no longer available to your account.");
+  if (scope === "own" && raw.createdBy !== actor.userId) throw new ApplicationUseAccessError("That record is not yours to edit.");
+}
+
 function project(context: ApplicationUseContext, actor: WorkspaceActor, now: Date): ApplicationUseSnapshot {
   const grant = assertUsable(context, actor, now);
   const parsed = useSpecSchema.safeParse(context.releasedSpec);
   if (!parsed.success) throw new ApplicationUseUnavailableError("The released application cannot be displayed.");
   const spec: UseSpec = parsed.data;
   const grantedViews = new Set(grant.views);
+  const canUseForm = grant.recordSubmit || (grant.recordEdit ?? "none") !== "none";
   const formCount = spec.components.filter(component => component.kind === "form").length;
-  if (grant.recordSubmit && formCount !== 1) {
+  if (canUseForm && formCount !== 1) {
     throw new ApplicationUseAccessError("This application does not expose one usable submission form.");
   }
   const form = spec.components.find(component => component.kind === "form");
-  if (grant.recordSubmit && form && spec.fields.some(field => field.required && !form.fields.includes(field.id))) {
+  if (canUseForm && form && spec.fields.some(field => field.required && !form.fields.includes(field.id))) {
     throw new ApplicationUseAccessError("This application form is incompatible with its current release. Ask the owner to update it.");
   }
   const fields = new Map(spec.fields.map(field => [field.id, field]));
@@ -325,7 +370,8 @@ function project(context: ApplicationUseContext, actor: WorkspaceActor, now: Dat
     if (!record) return [];
     if (grant.recordRead === "own" && record.createdBy !== actor.userId) return [];
     const safeValues = Object.fromEntries(Object.entries(record.values).filter(([key]) => visibleFields.has(key)));
-    return [{ id: record.id, values: safeValues }];
+    const editable = grant.recordEdit === "all" || (grant.recordEdit === "own" && record.createdBy === actor.userId);
+    return [{ id: record.id, values: safeValues, ...(editable && record.revision ? { revision: record.revision } : {}) }];
   });
   return {
     workId: context.workId,
@@ -333,7 +379,7 @@ function project(context: ApplicationUseContext, actor: WorkspaceActor, now: Dat
     releaseVersion: context.releaseVersion,
     views,
     records,
-    access: { views: grant.views, recordRead: grant.recordRead, recordSubmit: grant.recordSubmit, expiresAt: grant.expiresAt },
+    access: { views: grant.views, recordRead: grant.recordRead, recordEdit: grant.recordEdit ?? "none", recordSubmit: grant.recordSubmit, expiresAt: grant.expiresAt },
   };
 }
 
@@ -367,7 +413,7 @@ export class ApplicationUseInputError extends Error {
 
 export const postgresApplicationUsePersistence: ApplicationUsePersistence = {
   async inspect(actor, workId) {
-    const { data, error } = await db().rpc("read_application_use", {
+    const { data, error } = await db().rpc("read_application_use_v2", {
       ...identity(actor),
       p_work_id: z.string().uuid().parse(workId),
     });
@@ -383,12 +429,13 @@ export const postgresApplicationUsePersistence: ApplicationUsePersistence = {
     return rpcRows(data).map(value => parseGrant(value, workId));
   },
   async grant(actor, workId, input) {
-    const { data, error } = await db().rpc("grant_application_use", {
+    const { data, error } = await db().rpc("grant_application_use_with_edit", {
       ...identity(actor),
       p_work_id: z.string().uuid().parse(workId),
       p_recipient_email: input.recipientEmail,
       p_views: input.views,
       p_record_read_scope: input.recordRead,
+      p_record_edit_scope: input.recordEdit,
       p_record_submit: input.recordSubmit,
       p_purpose: input.purpose,
       p_expires_at: input.expiresAt,
@@ -405,11 +452,24 @@ export const postgresApplicationUsePersistence: ApplicationUsePersistence = {
     rpcFailure(error);
   },
   async submit(actor, workId, input, access) {
-    const { data, error } = await db().rpc("submit_application_use_record", {
+    const { data, error } = await db().rpc("submit_application_use_record_v2", {
       ...identity(actor),
       p_work_id: z.string().uuid().parse(workId),
       p_grant_id: z.string().uuid().parse(access.id),
       p_release_version: input.releaseVersion,
+      p_record: input.record,
+      p_idempotency_key: input.idempotencyKey,
+    });
+    rpcFailure(error, "Check the record fields and try again.");
+    return parseContext(data, workId);
+  },
+  async edit(actor, workId, input, access) {
+    const { data, error } = await db().rpc("edit_application_use_record", {
+      ...identity(actor),
+      p_work_id: z.string().uuid().parse(workId),
+      p_grant_id: z.string().uuid().parse(access.id),
+      p_release_version: input.releaseVersion,
+      p_expected_record_revision: input.expectedRecordRevision,
       p_record: input.record,
       p_idempotency_key: input.idempotencyKey,
     });
@@ -447,6 +507,19 @@ export function createApplicationAccessService(
       assertSubmittedFieldsAllowed(current, grant, input);
       if (input.releaseVersion !== current.releaseVersion) throw new ApplicationUseConflictError("This application has a newer released version. Reload before submitting.");
       const saved = await persistence.submit(actor, normalizedWorkId, input, grant);
+      return project(saved, actor, clock());
+    },
+    async edit(actor: WorkspaceActor, workId: string, raw: unknown): Promise<ApplicationUseSnapshot> {
+      const input = applicationUseEditSchema.parse(raw);
+      const normalizedWorkId = z.string().uuid().parse(workId);
+      const current = await persistence.inspect(actor, normalizedWorkId);
+      const grant = assertUsable(current, actor, clock());
+      assertEditableRecordAllowed(current, actor, grant, input);
+      if ((grant.recordEdit ?? "none") === "none") throw new ApplicationUseAccessError("This application does not allow record editing from your account.");
+      assertSubmittedFieldsAllowed(current, grant, { record: input.record, releaseVersion: input.releaseVersion, idempotencyKey: input.idempotencyKey });
+      if (input.releaseVersion !== current.releaseVersion) throw new ApplicationUseConflictError("This application has a newer released version. Reload before editing.");
+      if (!persistence.edit) throw new ApplicationUseUnavailableError("Record editing is temporarily unavailable.");
+      const saved = await persistence.edit(actor, normalizedWorkId, input, grant);
       return project(saved, actor, clock());
     },
     async grant(actor: WorkspaceActor, workId: string, raw: unknown): Promise<{ grant: ApplicationUseGrant; href: string }> {

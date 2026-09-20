@@ -61,7 +61,7 @@ test("a conflicting reservation preserves the requested time and does not claim 
   await expect(page.getByRole("main").getByRole("alert")).toContainText("conflicts");
   await expect(page.getByLabel("Reservation name")).toHaveValue("Consultation");
   await expect(page.getByText("No time has been reserved yet.")).toBeVisible();
-  await expect(page.getByText(/No external calendar is connected/)).toBeVisible();
+  await expect(page.getByText(/held in this workspace first, then can be synced to a connected calendar/)).toBeVisible();
 });
 
 test("a native reservation can change time without changing its identity", async ({ page }) => {
@@ -78,7 +78,7 @@ test("a native reservation can change time without changing its identity", async
     return route.fulfill({ json: { id: workId, workspaceId, payload } });
   });
   await page.goto(`/workspace?workspaceId=${workspaceId}&work=${workId}`);
-  await expect(page.getByText("Consultation", { exact: true })).toBeVisible();
+  await expect(page.getByRole("listitem").filter({ hasText: "Consultation" }).first()).toBeVisible();
   await page.getByRole("button", { name: "Change time for Consultation", exact: true }).click();
   await page.getByLabel("New Starts", { exact: true }).fill("2026-10-01T15:00");
   await page.getByLabel("New Ends", { exact: true }).fill("2026-10-01T16:00");

@@ -1,6 +1,6 @@
 import { getSupabase } from "@/lib/db/client";
 import { getWork, saveWork, assertCanSaveWork } from "@/platform/workspaces/repository";
-import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
+import { WORKSPACE_EXIT_STOPPED_MESSAGE, WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { responsibilitySchema, type Responsibility } from "./engine";
 import { z } from "zod";
 
@@ -19,6 +19,7 @@ export async function persistResponsibility(actor: WorkspaceActor, workId: strin
   const rpc = client as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: Array<{ payload: unknown }> | null; error: { message: string } | null }> };
   const { data, error } = await rpc.rpc("update_work_responsibility", { p_work_id: workId, p_workspace_id: workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail, p_expected_revision: expectedRevision, p_payload: payload });
   if (error?.message.includes("workspace_access_denied")) throw new WorkspaceAccessError();
+  if (error?.message.includes("workspace_exit_future_work_blocked")) throw new WorkspaceConflictError(WORKSPACE_EXIT_STOPPED_MESSAGE);
   if (error?.message.includes("responsibility_revision_conflict")) throw new WorkspaceConflictError("This work changed. Reload its latest state.");
   if (error?.message.includes("standing_execution_blocked")) {
     throw new WorkspaceConflictError("This ongoing responsibility is paused, revoked, or no longer current.");
