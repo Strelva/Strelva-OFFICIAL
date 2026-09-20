@@ -16,7 +16,9 @@ if (!existsSync(manifestPath)) {
   process.exitCode = 1;
 } else {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as WorkspaceManifest;
-  const results = runWorkspaceChecks(manifest, workspaceRoot, cwd);
+  const results = runWorkspaceChecks(manifest, workspaceRoot, cwd, {
+    verifyPins: process.env.CUSTOM_REPO_VERIFY_PINS === "1",
+  });
 
   for (const result of results) {
     const status = result.skipped ? "SKIP" : result.ok ? "PASS" : "FAIL";

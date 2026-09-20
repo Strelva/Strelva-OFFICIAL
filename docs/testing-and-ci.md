@@ -51,6 +51,23 @@ The **dev-access bypass** (`REB_DEV_UNGATED_ACCESS=1` / `SCAFFOLD_DEV_UNGATED_AC
   so it needs no DB/Redis/prod. The owner **Today** page is the exception (its verdict + activity
   feed are backend-driven), so its smoke is a render-check only.
 
+## Pinned client release checks
+
+`pnpm check:custom-repos` retains its development behavior: executable platform
+contract checks plus structural checks for available sibling repositories.
+For a release checkout, run `CUSTOM_REPO_VERIFY_PINS=1 pnpm check:custom-repos`.
+This additionally requires every declared client repository to exist, have its
+exact `compatibleCommit` checked out, and have no tracked or untracked changes.
+Use isolated worktrees in the manifest's sibling layout; do not reset a working
+client checkout to obtain this proof. Ignored dependencies and build output do
+not count as source changes.
+
+Pin verification does not execute each client's own check suite or contact its
+deployment. Run those local checks separately with isolated configuration, then
+record the client revision and result. A production checklist may make external
+writes even when its name says “check”; inspect it before running it against a
+live environment.
+
 ## Workspace schema checks
 
 `pnpm check:workspace-sql` builds the current workspace and recovery schema in

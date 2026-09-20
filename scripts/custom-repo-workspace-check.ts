@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "fs";
 import path from "path";
+import { execFileSync } from "node:child_process";
 import { runPlatformContractConformance } from "./custom-repo-conformance";
 
 /**
@@ -95,6 +96,7 @@ export function runWorkspaceChecks(
   manifest: WorkspaceManifest,
   workspaceRoot: string,
   cwd: string,
+  options: { verifyPins?: boolean } = {},
 ): CheckResult[] {
   const results: CheckResult[] = [];
   const contractVersion = workspaceContractVersion(manifest);
@@ -151,10 +153,22 @@ export function runWorkspaceChecks(
 
     const repoPath = path.join(workspaceRoot, repo.repoDir);
     if (!existsSync(repoPath)) {
-      recordSkip(`${repo.tenant}:sibling`, `repo not checked out at ${repoPath}`);
+      if (options.verifyPins) record(`${repo.tenant}:sibling`, false, `release checkout missing at ${repoPath}`);
+      else recordSkip(`${repo.tenant}:sibling`, `repo not checked out at ${repoPath}`);
       continue;
     }
     record(`${repo.tenant}:repo`, true);
+    if (options.verifyPins) {
+      try {
+        const actual = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoPath, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+        record(`${repo.tenant}:release:checkout`, actual === repo.compatibleCommit,
+          `expected ${repo.compatibleCommit}; checkout is ${actual}`);
+        const changes = execFileSync("git", ["status", "--porcelain", "--untracked-files=normal"], { cwd: repoPath, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+        record(`${repo.tenant}:release:clean`, !changes, "checkout has local changes; use an isolated checkout of the pinned revision");
+      } catch {
+        record(`${repo.tenant}:release:checkout`, false, "could not verify the client checkout revision");
+      }
+    }
     checkPackageScripts(repo);
     for (const file of repo.requiredFiles) checkFile(repo, file);
     checkReleaseManifest(repo);
