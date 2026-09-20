@@ -3,7 +3,7 @@ const ID = /^[a-z0-9_-]{1,128}$/i;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 const RECORD_ID = /^[a-z0-9_.:-]{1,200}$/i;
 const INVITATION_TOKEN = /^[A-Za-z0-9_-]{43}$/;
-const VIEWS = new Set(["work", "ongoing", "settings", "products", "access", "help", "inquiries", "tracker", "document", "plan", "start", "applications", "scheduling", "investigations", "operations", "product-learning"]);
+const VIEWS = new Set(["work", "ongoing", "settings", "products", "access", "help", "inquiries", "tracker", "document", "plan", "start", "websites", "applications", "scheduling", "investigations", "operations", "product-learning"]);
 const INQUIRY_VIEWS = new Set(["home", "new", "shape", "work", "plan", "preview", "rehearsal", "receipt", "search", "record", "why", "responsibility", "connections", "onboarding", "account", "attention", "patterns"]);
 
 export function workspaceReturnTarget(value: string | null): string | null {

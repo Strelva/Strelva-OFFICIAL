@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { accountReturnTarget, replaceWorkspaceLocation, workspaceReturnTarget } from "@/lib/workspace-location";
+
+it("preserves website creation and saved website destinations through sign-in", () => {
+  expect(workspaceReturnTarget("/workspace?view=websites")).toBe("/workspace?view=websites");
+  expect(accountReturnTarget("/account?next=%2Fworkspace%3Fview%3Dwebsites%26work%3Dsite-draft")).toBe("/account?next=%2Fworkspace%3Fview%3Dwebsites%26work%3Dsite-draft");
+});
 const workspaceId = "22222222-2222-4222-8222-222222222222";
 describe("workspace return destination", () => {
   it("preserves an exact result and workspace through sign-in", () => {

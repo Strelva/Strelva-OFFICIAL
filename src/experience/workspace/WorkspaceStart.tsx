@@ -26,6 +26,7 @@ export interface WorkspaceStartProps {
 }
 
 const EXAMPLES = [
+  { label: "Create my website", request: "Create a website for my business.", icon: Globe2 },
   { label: "Handle customer inquiries", request: "We need a better way to handle customer inquiries and follow up when nobody replies.", icon: MessageSquareText },
   { label: "Turn a file into a tracker", request: "Turn my spreadsheet into a tracker I can filter and keep up to date.", icon: Table2 },
   { label: "Check a business", request: "Help me see what AI can understand about my business.", icon: FileSearch },
@@ -36,7 +37,7 @@ const EXAMPLES = [
 function renderPlanIcon(route: WorkspaceStartPlan["route"]): ReactNode {
   if (route === "inquiries") return <MessageSquareText size={19} aria-hidden="true" />;
   if (route === "tracker") return <Table2 size={19} aria-hidden="true" />;
-  if (route === "website") return <Globe2 size={19} aria-hidden="true" />;
+  if (route === "website" || route === "websites") return <Globe2 size={19} aria-hidden="true" />;
   if (route === "document") return <FileText size={19} aria-hidden="true" />;
   return <FileSearch size={19} aria-hidden="true" />;
 }

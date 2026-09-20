@@ -5,6 +5,9 @@ marketing site in lockstep. Their `package.json` versions must always match.
 
 ## 0.2.0 - Unreleased
 
+- Create private website drafts from business briefs, review exact revisions, and download buildable website projects.
+- Select published inquiry and booking connections for exported websites, with durable booking receipts and readback recovery.
+- Let authorized agencies prepare managed website drafts for customer review and publication.
 - Bring saved work, native applications, inquiries, documents, recurring work and provider requests into one business workspace.
 - Add recipient record corrections, date-only fields and onboarding document review with preserved revisions.
 - Prepare governed provider delivery, calendar connections, public website checks and budgeted custom-application lifecycles for local acceptance.

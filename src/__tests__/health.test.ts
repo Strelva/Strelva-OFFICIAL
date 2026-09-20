@@ -4,6 +4,7 @@ const mockGetRedis = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/redis", () => ({ getRedis: mockGetRedis }));
 
 import { getServiceHealth } from "@/lib/health";
+import packageJson from "../../package.json";
 
 // Env vars that drive the external checks — cleared so they read "not configured"
 // (and never make a real network call) in tests.
@@ -30,6 +31,12 @@ afterEach(() => {
 });
 
 describe("getServiceHealth", () => {
+  it("reports the checked-in product version when no deployment override is set", async () => {
+    vi.stubEnv("APP_VERSION", "");
+    mockGetRedis.mockReturnValue(null);
+    const report = await getServiceHealth();
+    expect(report.version).toBe(packageJson.version);
+  });
   it("reports healthy when nothing is configured / erroring", async () => {
     mockGetRedis.mockReturnValue(null);
     const report = await getServiceHealth();

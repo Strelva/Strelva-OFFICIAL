@@ -7,6 +7,7 @@ import type { WorkspaceWork } from "./contracts";
  */
 export function workspaceWorkLabel(work: Pick<WorkspaceWork, "productId" | "resourceKind" | "assessment">): string {
   const labels: Record<string, string> = {
+    "websites:website": "Website",
     "custom-applications:custom-application": "Custom application",
     "onboarding:case": "Onboarding",
     "applications:application": "Application",

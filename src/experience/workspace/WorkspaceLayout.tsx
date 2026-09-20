@@ -21,6 +21,7 @@ import {
   boundManagedWebsiteIds,
   useWorkspaceOfferings,
 } from "./WorkspaceOfferings";
+import { planWorkspaceStart, createWorkspaceStartContinuation } from "./workspace-start";
 import type { WorkspaceStartContext, WorkspaceStartContinuation, WorkspaceStartTemplate, WorkspaceStartWebsiteHandoff } from "./workspace-start";
 import styles from "./workspace-surface.module.css";
 
@@ -55,7 +56,7 @@ interface Props {
   onTracker?: (context?: WorkspaceStartContinuation) => void;
   onWebsite?: (site: ManagedWorkSummary, context?: WorkspaceStartContinuation) => void | false;
   onDocument?: (context?: WorkspaceStartContinuation) => void;
-  onHorizontal?: (productId: "onboarding" | "applications" | "scheduling" | "investigations" | "operations", context?: WorkspaceStartContinuation) => void;
+  onHorizontal?: (productId: "websites" | "onboarding" | "applications" | "scheduling" | "investigations" | "operations", context?: WorkspaceStartContinuation) => void;
   trackerTemplates?: readonly WorkspaceStartTemplate[];
   inquiryBusinesses?: readonly { id: string; title: string }[];
   inquiry?: WorkspaceInquiryTarget;
@@ -300,7 +301,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
       openInquiry(business.id, continuation);
       return;
     }
-    if (continuation.route === "applications" || continuation.route === "scheduling" || continuation.route === "investigations" || continuation.route === "operations") {
+    if (continuation.route === "websites" || continuation.route === "applications" || continuation.route === "scheduling" || continuation.route === "investigations" || continuation.route === "operations") {
       if (!onHorizontal) return; setStartOpen(false); onHorizontal(continuation.route, continuation); return;
     }
     if (continuation.route === "website") {
@@ -326,7 +327,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
       inquiries: Boolean(onInquiry),
       website: Boolean(onWebsite || sites.length),
       document: Boolean(onDocument),
-      applications: Boolean(onHorizontal), scheduling: Boolean(onHorizontal), investigations: Boolean(onHorizontal), operations: Boolean(onHorizontal),
+      websites: Boolean(onHorizontal), applications: Boolean(onHorizontal), scheduling: Boolean(onHorizontal), investigations: Boolean(onHorizontal), operations: Boolean(onHorizontal),
       help: true,
     },
   };
@@ -352,7 +353,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
 
   function renderProductBody() {
     if (!product) return null;
-    if (product.id === "onboarding" || product.id === "applications" || product.id === "scheduling" || product.id === "investigations" || product.id === "operations") {
+    if (product.id === "websites" || product.id === "onboarding" || product.id === "applications" || product.id === "scheduling" || product.id === "investigations" || product.id === "operations") {
       const id = product.id;
       return <><h2>{product.name}</h2><p>{product.description}</p><button className={styles.primaryAction} type="button" disabled={workspaceMutationReadOnly || !onHorizontal} onClick={() => onHorizontal?.(id)}>Get started<ArrowRight size={17} /></button></>;
     }
@@ -378,7 +379,17 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     snapshot={snapshot} sites={assignedSites} unassignedSites={unassignedSites} siteAssignmentsKnown={siteAssignmentsKnown} offerings={offerings.state} busy={busy} notice={notice} managedWorkUnavailable={managedWorkUnavailable}
     appBase={appBase} accountHref={`${appBase || ""}/workspace/account`} signOut={signOut}
     onExplore={() => navigate("products")}
-    onOpen={openWork} onStart={openStart} onRequest={onPlan} onWorkspace={onWorkspace}
+    onOpen={openWork} onStart={openStart}
+    onCreateWebsite={onHorizontal && snapshot.products.some((entry) => entry.id === "websites" && entry.availability === "available") ? () => onHorizontal("websites") : undefined}
+    onRequest={onPlan ? (request) => {
+      const plan = planWorkspaceStart(request, startContext);
+      if (plan.route === "websites" && plan.canContinue) {
+        const continuation = createWorkspaceStartContinuation(plan, plan.selectedPartIds);
+        if (continuation) { continueStart(continuation); return; }
+      }
+      onPlan(request);
+    } : undefined}
+    onWorkspace={onWorkspace}
     onWork={() => navigate("work")} onOngoing={() => navigate("ongoing")} onAccess={openAccess} onSettings={() => navigate("settings")} onHelp={() => navigate("help")} onOfferings={openOffering}
     onWebsiteCommand={offerings.websiteCommand} onRetryWebsiteAssignments={offerings.reload}
   />;

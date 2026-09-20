@@ -1,11 +1,133 @@
 # strelvav2 horizontal acceptance
 
+## Self-service website implementation follow-through
+
+After the review below, Jacob instructed the team to implement the missing flows.
+Five Luna agents continue at maximum reasoning effort: onboarding owns website
+contracts, persistence and APIs; apps owns the editor; custom apps owns generation,
+repository artifacts and launch adapters; delivery owns agency website drafting;
+intake owns client inquiry/booking connections. The parent owns workspace routing,
+auth return continuity, shared integration and acceptance. This is implementation
+authority, not permission to deploy, migrate hosted data, send live messages or
+select new commercial prices. The [product brief](./horizontal-product-brief-2026-09-11.md#self-service-website-implementation)
+owns the intended customer behavior. The dated review below remains the baseline,
+not the completion result of this new work.
+
+September 20 local integration proof: a signed-in customer in a personal workspace
+can create a website from a business name and description, view its actual HTML,
+approve the saved preview, reload it and generate a changed version. The changed
+version clears the earlier approval. Desktop (1440px) and mobile (390px) journeys
+passed against real loopback Supabase Auth/Postgres, including stale approval and
+unrelated-account rejection. The private preview is scriptless, permits only
+same-origin framing and keeps page navigation within the selected revision.
+The exported tar archive extracts and builds with the same saved content hash;
+the built home page matches the exported preview bytes. Tests live in
+`tests/website-creation-authenticated-local.spec.ts` and
+`src/__tests__/website-preview.test.ts`. Logs: `/tmp/strelva-website-creation-check.log`
+and `/tmp/strelva-website-all-focused.log` (six suites, 39 tests at this checkpoint).
+These are local results, not evidence of hosted deployment or live booking.
+
+The default generator currently creates a three-page website from the supplied
+brief with empty unsupported business facts. A configured structured-model adapter
+exists separately; the default path does not make paid model calls. Local launch
+preparation saves a receipt for the exact approved downloadable project and permits
+later revisions. It does not create a GitHub repository, deploy to Vercel or connect
+a domain. The prepared state, reload, private download and subsequent edit passed
+on desktop and mobile in `/tmp/strelva-website-preparation-browser.log`.
+Candidates also retain renderer and complete artifact digests. Preview and export
+reject changed rendering or generated runtime files instead of changing approved
+files under the same content hash. The focused preview, route and interface suites
+passed 17 tests in `/tmp/strelva-website-root-current.log` after this addition.
+
+Public entry now preserves a prepared brief through local sign-in and creates a
+website through the canonical service. A stable request identifier reopens the
+same draft on retry. The public-brief journey and the marketing-to-Auth/Postgres
+journey each passed; marketing's focused browser checks passed 3/3. The marketing
+entry and its isolated production build are recorded in sibling draft PR #10 at
+`c8d0b11`. Neither repository has deployed this website flow.
+
+Website forms are selected explicitly from the customer's authorized managed
+website bindings. The customer chooses an inquiry form and booking calendar,
+regenerates the private preview and reviews the new revision. An empty new
+personal workspace does not inherit a tenant or forms. Connection selection,
+empty state and changed-approval behavior have focused tests; desktop and mobile
+creation journeys passed with the empty state. Exported forms use the published
+native inquiry and calendar contracts. Private previews do not submit forms.
+
+Public booking receipts retain a durable request fingerprint and original slot
+before a provider write. Repeating the same request returns its receipt; reusing
+its identifier for different visitor or slot data is rejected. Pending receipts
+expose a readback action, which reconciles existing native calendar evidence
+without creating another reservation. Request identifiers persist across form
+remounts. Receipt lookups follow the current tenant slug while retaining the
+original booking identity and fingerprint. An uncertain cancellation retries only
+through an explicit cancellation request after fresh event and receipt checks;
+readback itself remains read-only. An accepted delete with failed readback is
+not repeated. Existing receipt recovery remains available after revocation; new work
+still requires the active native binding and published grant.
+
+September 20 integration checkpoint: the coverage gate passed 456 Vitest files,
+with 3,265 passing tests and one skipped test
+(`/tmp/strelva-website-final-coverage.log`). The isolated
+production build and 25 artifact tests passed; compiled preview/export traces
+include both generated runtime files. TypeScript, ESLint, product boundaries,
+ontology and shared version parity passed. Clean workspace SQL and ordered upgrade
+rehearsals passed through migration `20260920123000`. These checks use local
+fixtures and do not establish live calendar operation, hosted migration or
+production release.
+
+The fresh agency Auth journey passed on a dedicated local process at port 3291.
+It exercises customer, agency and unrelated accounts, explicit draft permission,
+native draft preparation, customer publication, revocation and rejection of
+further agency changes. The retained rerun passed in 12.1 seconds
+(`/tmp/strelva-agency-fresh-3291-capture-test.log`), with desktop/mobile captures
+and trace in `/tmp/strelva-agency-3291-captures-1719/`. Fresh process isolation
+was sufficient; no extra SQL grants or migrations were used for this rerun.
+No production provider or customer data was used.
+The native booking journey now passes against local Supabase Auth/Postgres,
+loopback Redis and a synthetic Outlook adapter. It creates and publishes a native
+inquiry, publishes an explicit booking grant, selects both forms in the website
+editor, exports and builds that actual project, submits a visitor inquiry and
+reserves, changes and cancels a booking. Owner-side inquiry and schedule reads
+confirm the results. The proof caught and repaired a direct table read that
+bypassed the offering store's supported RPC path. No table permissions were
+expanded. Logs: `/tmp/strelva-public-booking-final.log` (one passing journey, 7.8 seconds).
+The same run changes and cancels the reservation at 390px after confirming it
+on desktop. Captures are `/tmp/strelva-native-booking-confirmed-desktop.png`
+and `/tmp/strelva-native-booking-confirmed-mobile.png`. Rendered review found
+unstyled visitor controls; the shared generated renderer now gives them the
+existing site colors, full-width fields, visible focus and 44px minimum controls.
+
+Fixture setup requires a local Redis REST endpoint for the governed publication
+queue. Direct fixture tenant insertion and cleanup invalidate only that local
+tenant cache. This avoids repeated tests reading the previous fixture's tenant
+list. Native booking proof does not verify live Outlook or Google accounts.
+
+Final public smoke in the isolated candidate checkout passed 94 cases with
+215 explicit skips. Separate workspace acceptance passed 38/38 and owner/operator
+surfaces passed 20/20. Public smoke used empty provider configuration and excluded the
+unrelated temporary billing spec present only in the working checkout. Logs:
+`/tmp/strelva-completion-public-smoke-gated-rerun.log`,
+`/tmp/strelva-final-workspace-smoke.log` and
+`/tmp/strelva-final-surface-smoke.log`. The separate authenticated website rerun
+passed desktop and mobile 2/2 (`/tmp/strelva-final-website-ui-rerun.log`).
+
+The four migration sources used by the local SQL checks are frozen at:
+
+| Migration | SHA-256 |
+| --- | --- |
+| [20260920120000_websites.sql](../supabase/migrations/20260920120000_websites.sql) | `4ba720c088c78a40b8723246b42730f85b9f89c98f1f248624eb2e7d7568a2cc` |
+| [20260920121000_agency_managed_website_draft_authority.sql](../supabase/migrations/20260920121000_agency_managed_website_draft_authority.sql) | `436fb9c854427a14c91a33ad73c5207542419f23c139aee82e1a485749b19fbe` |
+| [20260920122000_public_website_bookings.sql](../supabase/migrations/20260920122000_public_website_bookings.sql) | `e7774fbead71c1dd2ae8c4b5c45cae80479ec30faae5ebb4ce0140dfc28b8066` |
+| [20260920123000_public_website_booking_fingerprints.sql](../supabase/migrations/20260920123000_public_website_booking_fingerprints.sql) | `8193e2eef865c159af85c565b7c67b0b6f9d339fcb8997ef2411038918ca469e` |
+
 ## Website release review
 
-Release judgment: ready for continued draft-PR review, not ready to launch the
-complete public self-service website promise. New-site creation, agency native
-website drafting and representative website integration proof remain open.
-Existing-site repairs are being verified independently of those missing paths.
+Baseline judgment before the implementation above: ready for continued draft-PR
+review, not ready to launch the complete public self-service website promise.
+At that checkpoint, new-site creation, agency native website drafting and
+representative website integration proof remained open. The implementation
+record above supersedes this baseline where it supplies newer evidence.
 
 Jacob selected the [website release focus](./horizontal-product-brief-2026-09-11.md#september-20-website-release-focus)
 after reviewing the broader product and customer segments. Five retained Luna

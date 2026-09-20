@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { WorkspaceConflictError } from "@/platform/workspaces/types";
 
-export const operationSchema = z.enum(["document.edit", "tracker.command", "investigation.run", "schedule.command", "application.command", "learning.collect"]);
+export const operationSchema = z.enum(["document.edit", "tracker.command", "investigation.run", "schedule.command", "application.command", "website.draft", "learning.collect"]);
 export const stepInputSchema = z.object({
   id: z.string().regex(/^[a-z][a-z0-9_-]{0,39}$/), operation: operationSchema,
   workId: z.string().uuid(), input: z.record(z.string(), z.unknown()),

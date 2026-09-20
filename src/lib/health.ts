@@ -6,8 +6,8 @@
 
 import { getRedis } from "./redis";
 import { getSupabase } from "./db/client";
+import { version as productVersion } from "../../package.json";
 
-const APP_VERSION = process.env.APP_VERSION || "0.1.0";
 const TIMEOUT_MS = 3_000;
 
 export type ServiceStatus = "ok" | "not configured" | "error";
@@ -138,5 +138,5 @@ export async function getServiceHealth(): Promise<HealthReport> {
   const anyError = Object.values(checks).some((c) => c.status === "error");
   const status: HealthReport["status"] = coreDown ? "down" : anyError ? "degraded" : "healthy";
 
-  return { status, version: APP_VERSION, timestamp: new Date().toISOString(), checks };
+  return { status, version: process.env.APP_VERSION || productVersion, timestamp: new Date().toISOString(), checks };
 }

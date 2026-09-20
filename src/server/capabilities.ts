@@ -59,6 +59,15 @@ export const learningCollectCapabilityInputSchema = z.object({
   expectedRevision: z.number().int().nonnegative().optional(),
 }).strict();
 
+/** A managed website draft step names the installed binding and one native
+ * content section. The operator's proposed data is stored separately by the
+ * website authority service and can never replace this accepted scope. */
+export const websiteDraftCapabilityInputSchema = z.object({
+  kind: z.literal("draft"),
+  bindingId: z.string().uuid(),
+  section: z.string().trim().min(1).max(80),
+}).strict();
+
 function definition<TInput, TResult>(
   value: Omit<ExecutableCapabilityDefinition<TInput, TResult>, "contractVersion">,
 ): ExecutableCapabilityDefinition<TInput, TResult> {
@@ -195,6 +204,36 @@ const applicationCommand = definition({
   compatibility: compatible(1, 1, "application", ["runner", "api", "contextual"]),
   inputSchema: applicationCommandSchema,
   resultSchema: applicationSchema,
+});
+
+const websiteDraft = definition({
+  id: "website.draft",
+  version: 1,
+  family: "managed-websites",
+  productId: "websites",
+  resourceKind: "managed_website",
+  label: "Prepare a managed website draft",
+  description: "Save one reviewed draft section for an exact managed website delivery.",
+  support: "release_gated",
+  owningScope: "resource" as const,
+  authority: {
+    requirements: ["scoped_delegation", "operator", "tenant_membership"] as const,
+    approval: "customer_approval" as const,
+    recheckAtExecution: true as const,
+    scope: "same_tenant" as const,
+  },
+  cost: nativeCost,
+  execution: {
+    effect: "propose_change" as const,
+    idempotency: { mode: "native_command" as const, retry: "reconcile_only" as const, keyFields: ["workId", "bindingId", "section", "preparationId"] },
+    reconciliation: { mode: "native_receipt" as const, acceptedWriteClosed: true as const },
+    verification: { mode: "native_receipt" as const, evidence: "local_receipt" as const },
+  },
+  adapterKey: "websites.draft",
+  entrances: ["runner", "api", "contextual"] as const,
+  compatibility: compatible(1, 1, "managed_website", ["runner", "api", "contextual"]),
+  inputSchema: websiteDraftCapabilityInputSchema,
+  resultSchema: anyObjectSchema,
 });
 
 const createDocument = definition({
@@ -394,6 +433,7 @@ const learningCollect = definition({
 export const EXECUTABLE_CAPABILITY_DEFINITIONS = Object.freeze([
   createApplication,
   applicationCommand,
+  websiteDraft,
   createDocument,
   documentEdit,
   createTracker,
@@ -428,6 +468,7 @@ const evidence = (
 export const EXECUTABLE_CAPABILITY_QUALIFICATIONS = Object.freeze([
   qualifyCapability(createApplication, [evidence("applications-plan", "create_application", "A reviewed plan creates one actor-owned draft.", "src/__tests__/work-plan-application.test.ts")], "2026-09-14T00:00:00.000Z", "Local native application planning and draft creation proof."),
   qualifyCapability(applicationCommand, [evidence("applications-command", "application.command", "Application rehearsal and installation use the native command.", "src/__tests__/horizontal-work-routes.test.ts")], "2026-09-14T00:00:00.000Z", "Local native application command proof."),
+  qualifyCapability(websiteDraft, [evidence("managed-website-draft-command", "website.draft", "An accepted website delivery records a revision receipt without granting publication.", "src/__tests__/agency-managed-website-draft.test.tsx")], "2026-09-20T00:00:00.000Z", "Local managed website agency draft authority proof."),
   qualifyCapability(createDocument, [evidence("documents-plan", "create_document", "A reviewed plan creates a private document.", "src/__tests__/work-plan-execution.test.ts")], "2026-09-14T00:00:00.000Z", "Local native document planning proof."),
   qualifyCapability(documentEdit, [evidence("documents-command", "document.edit", "A responsibility invokes the revision-checked document command.", "src/__tests__/work-execution.test.ts")], "2026-09-14T00:00:00.000Z", "Local native document command proof."),
   qualifyCapability(createTracker, [evidence("tracker-plan", "create_tracker", "A reviewed plan creates an empty supported tracker.", "src/__tests__/work-plan-execution.test.ts")], "2026-09-14T00:00:00.000Z", "Local native tracker planning proof."),

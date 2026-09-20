@@ -29,6 +29,22 @@ function context(overrides: Partial<WorkspaceStartContext> = {}): WorkspaceStart
 }
 
 describe("workspace start planner", () => {
+  it("starts a new website without requiring an existing managed site", () => {
+    const plan = planWorkspaceStart("Create a website for my bakery", context({
+      managedSites: [],
+      products: [{ id: "websites", name: "Websites", availability: "available" }],
+    }));
+    expect(plan).toMatchObject({ route: "websites", productId: "websites", status: "ready", canContinue: true });
+    expect(plan.needsSelection).toBeUndefined();
+    expect(workspaceStartContinueLabel(plan)).toBe("Create your website");
+    expect(createWorkspaceStartContinuation(plan, plan.selectedPartIds)).toMatchObject({ route: "websites", request: "Create a website for my bakery" });
+  });
+
+  it("keeps changes to an existing website on its governed managed path", () => {
+    expect(planWorkspaceStart("Update the opening hours on my website", context())).toMatchObject({ route: "website", productId: "managed_presence", status: "ready" });
+    expect(workspaceWorkLabel({ productId: "websites", resourceKind: "website" })).toBe("Website");
+  });
+
   it("maps a plain assessment request to an Answer shape without running work", () => {
     const plan = planWorkspaceStart("Help me see what AI understands about my business.", context());
 

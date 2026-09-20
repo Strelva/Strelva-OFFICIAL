@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowRight, BriefcaseBusiness, CircleAlert, Coins, FileText, RefreshCw, Users } from "lucide-react";
+import { ArrowRight, BriefcaseBusiness, CircleAlert, Coins, FileText, Globe2, RefreshCw, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { WorkAllowanceInspection } from "@/platform/work-economics/allowances";
-import type { AgencyApplicationDraftWork } from "@/platform/offerings";
+import type { AgencyApplicationDraftWork, AgencyManagedWebsiteDraftWork } from "@/platform/offerings";
 import { Button } from "@/components/ui/Button";
 import { ServiceRequestInbox } from "@/experience/operations/ServiceRequestInbox";
 import type { WorkspaceSnapshot, WorkspaceWork } from "./contracts";
@@ -71,6 +71,8 @@ export function AgencyHome({
   const [credits, setCredits] = useState<AgencyCreditPeriod[]>([]);
   const [applicationDrafts, setApplicationDrafts] = useState<AgencyApplicationDraftWork[] | null>(null);
   const [applicationDraftError, setApplicationDraftError] = useState("");
+  const [websiteDrafts, setWebsiteDrafts] = useState<AgencyManagedWebsiteDraftWork[] | null>(null);
+  const [websiteDraftError, setWebsiteDraftError] = useState("");
   const current = snapshot.workspaces.find((workspace) => workspace.id === snapshot.workspaceId);
   const agencyName = current?.name || "Your agency";
 
@@ -115,6 +117,28 @@ export function AgencyHome({
 
   useEffect(() => {
     const controller = new AbortController();
+    setWebsiteDrafts(null);
+    setWebsiteDraftError("");
+    if (current?.kind !== "agency" || current.access === "delegated_read") return () => controller.abort();
+    void request(`/api/agency-website-draft-access?agencyWorkspaceId=${encodeURIComponent(snapshot.workspaceId)}`, {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+      signal: controller.signal,
+    }).then(async (response) => {
+      const value = await response.json().catch(() => null) as { websites?: AgencyManagedWebsiteDraftWork[]; error?: unknown } | null;
+      if (!response.ok) {
+        const detail = typeof value?.error === "string" ? value.error : "Assigned website drafts could not be loaded.";
+        throw new Error(detail);
+      }
+      if (!controller.signal.aborted) setWebsiteDrafts(value?.websites ?? []);
+    }).catch((cause) => {
+      if (!controller.signal.aborted) setWebsiteDraftError(cause instanceof Error ? cause.message : "Assigned website drafts could not be loaded.");
+    });
+    return () => controller.abort();
+  }, [current?.access, current?.kind, request, snapshot.workspaceId]);
+
+  useEffect(() => {
+    const controller = new AbortController();
     setApplicationDrafts(null);
     setApplicationDraftError("");
     if (current?.kind !== "agency" || current.access === "delegated_read") return () => controller.abort();
@@ -138,6 +162,7 @@ export function AgencyHome({
   const totalClients = clients.status === "ready" ? clients.result.totalCount : selection.totalCount;
   const omittedCount = clients.status === "ready" ? clients.result.omittedCount : selection.omittedCount;
   const readyApplicationDrafts = applicationDrafts ?? [];
+  const readyWebsiteDrafts = websiteDrafts ?? [];
 
   return <div className="mx-auto w-full max-w-5xl px-6 py-10 sm:px-8 lg:px-12" aria-busy={busy || clients.status === "loading" || undefined}>
     <header className="max-w-2xl border-b border-gray-border pb-8">
@@ -159,6 +184,15 @@ export function AgencyHome({
         const editable = draft.draftGrantStatus === "active" && Boolean(draft.draftGrantExpiresAt) && Date.parse(draft.draftGrantExpiresAt!) > Date.now();
         return <li key={`${draft.assignmentId}:${draft.applicationWorkId}`} className="flex items-center gap-4 px-2 py-4"><FileText className="shrink-0 text-accent-text" size={18} aria-hidden="true" /><span className="min-w-0 flex-1"><strong className="block truncate text-[14px] font-medium text-warm-black">{draft.applicationTitle}</strong><small className="mt-1 block text-[12px] text-gray-muted">{draft.customerWorkspaceName} · {editable ? "Draft editing granted" : "Waiting for customer draft-edit permission"}</small></span><a className="shrink-0 text-[13px] text-warm-black underline" href={`/agency-applications/${encodeURIComponent(draft.applicationWorkId)}`}>Open draft</a></li>;
       })}</ul> : <p className="mt-4 border-y border-gray-border py-5 text-[13px] text-gray-muted">No accepted agency application delivery is assigned to you.</p>}
+    </section> : null}
+
+    {current?.kind === "agency" && current.access !== "delegated_read" ? <section className="mt-10" aria-labelledby="agency-website-drafts-title">
+      <h2 id="agency-website-drafts-title" className="text-[15px] font-medium text-warm-black">Assigned website drafts</h2>
+      <p className="mt-1 text-[12px] text-gray-muted">Open the exact managed website named by an active customer delivery. Preparation appears only after the customer grants it; publishing stays with the customer.</p>
+      {websiteDrafts === null && !websiteDraftError ? <p role="status" className="mt-4 text-[13px] text-gray-muted">Checking assigned website drafts…</p> : websiteDraftError ? <p role="alert" className="mt-4 text-[13px] text-critical">{websiteDraftError}</p> : readyWebsiteDrafts.length ? <ul className="mt-4 divide-y divide-gray-border border-y border-gray-border">{readyWebsiteDrafts.map((draft) => {
+        const permission = draft.draftGrantStatus === "active" ? "Draft preparation granted" : "Waiting for customer draft permission";
+        return <li key={`${draft.assignmentId}:${draft.managedWebsiteBindingId}`} className="flex items-center gap-4 px-2 py-4"><Globe2 className="shrink-0 text-accent-text" size={18} aria-hidden="true" /><span className="min-w-0 flex-1"><strong className="block truncate text-[14px] font-medium text-warm-black">{draft.siteName}</strong><small className="mt-1 block text-[12px] text-gray-muted">{draft.customerWorkspaceName} · {permission}</small></span><a className="shrink-0 text-[13px] text-warm-black underline" href={`/agency-websites/${encodeURIComponent(draft.managedWebsiteBindingId)}`}>Open website</a></li>;
+      })}</ul> : <p className="mt-4 border-y border-gray-border py-5 text-[13px] text-gray-muted">No accepted agency website delivery is assigned to you.</p>}
     </section> : null}
 
     <section className="mt-10" aria-labelledby="agency-attention-title">

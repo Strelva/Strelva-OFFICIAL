@@ -4,6 +4,7 @@ import {
 } from "@/lib/db/middleware-client";
 import { isSupabaseAuthConfigured } from "@/lib/db/server-client";
 import { validateCronRequest } from "@/lib/cron-auth";
+import { WEBSITE_PREVIEW_CSP, isWebsiteCandidatePreviewPath } from "@/lib/website-preview-policy";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDevAccessTenant, isDevAccessBypassEnabled } from "./lib/dev-access";
@@ -278,9 +279,11 @@ function getPreviewFrameAncestors(host: string, protocol: string): string[] {
 export function buildContentSecurityPolicy(params: {
   isPreview: boolean;
   isLivePreview?: boolean;
+  isWebsiteCandidate?: boolean;
   host: string;
   protocol: string;
 }): string {
+  if (params.isWebsiteCandidate) return WEBSITE_PREVIEW_CSP;
   if (params.isLivePreview) {
     return [
       "default-src 'self' https: data: blob:",
@@ -321,16 +324,20 @@ export function buildContentSecurityPolicy(params: {
 function applySecurityHeaders(response: NextResponse, req: NextRequest): NextResponse {
   applyMiddlewareSupabaseResponse(req, response);
   const livePreviewRequest = isLivePreviewRequest(req);
+  const websiteCandidate = isWebsiteCandidatePreviewPath(req.nextUrl.pathname);
   response.headers.set(
     "Content-Security-Policy",
     buildContentSecurityPolicy({
       isPreview: isPreviewRequest(req),
       isLivePreview: livePreviewRequest,
+      isWebsiteCandidate: websiteCandidate,
       host: req.headers.get("host") || "",
       protocol: req.nextUrl.protocol,
     })
   );
-  if (isPreviewRequest(req) || livePreviewRequest) {
+  if (websiteCandidate) {
+    response.headers.set("X-Frame-Options", "SAMEORIGIN");
+  } else if (isPreviewRequest(req) || livePreviewRequest) {
     response.headers.delete("X-Frame-Options");
   } else {
     response.headers.set("X-Frame-Options", "DENY");

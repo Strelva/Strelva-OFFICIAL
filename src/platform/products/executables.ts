@@ -6,6 +6,7 @@
  * released product, an installation, a price, or an accepted provider duty.
  */
 export type WorkspaceExecutableId =
+  | "websites"
   | "onboarding"
   | "applications"
   | "scheduling"
@@ -20,6 +21,12 @@ export interface WorkspaceExecutableDefinition {
 }
 
 export const WORKSPACE_EXECUTABLES = [
+  {
+    id: "websites",
+    name: "Websites",
+    description: "Create a website draft, preview it, and prepare the approved version for launch.",
+    availability: "release_gated",
+  },
   {
     id: "onboarding",
     name: "Onboarding",

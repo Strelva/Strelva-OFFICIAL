@@ -1,0 +1,45 @@
+.root { width: 100%; max-width: 1120px; margin: 0 auto; padding: 40px 48px 72px; }
+.header { max-width: 760px; }
+.eyebrow { margin: 0 0 14px; color: var(--accent-text); font-size: 12px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; }
+.header h1 { color: var(--warm-black); font-family: var(--font-display), serif; font-size: clamp(30px, 4vw, 46px); line-height: 1.15; font-weight: 400; letter-spacing: -.025em; }
+.header p { margin-top: 14px; color: var(--gray-muted); font-size: 15px; line-height: 1.7; }
+.requestCard { display: grid; gap: 18px; max-width: 820px; margin-top: 34px; padding: 24px; border: 1px solid var(--gray-border); border-radius: 18px; background: var(--surface); }
+.briefForm { display: grid; gap: 18px; }
+.formGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.status { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 28px; padding: 12px 14px; border: 1px solid var(--gray-border); border-radius: 12px; background: var(--surface-inset); color: var(--gray-muted); font-size: 13px; line-height: 1.5; }
+.status strong { color: var(--warm-black); font-weight: 500; }
+.status[data-tone="attention"] { border-color: color-mix(in srgb, var(--terra) 45%, var(--gray-border)); }
+.alert { max-width: 820px; margin-top: 24px; padding: 13px 15px; border: 1px solid color-mix(in srgb, var(--terra) 45%, var(--gray-border)); border-radius: 12px; color: var(--terra); font-size: 13px; line-height: 1.6; }
+.notice { max-width: 820px; margin-top: 18px; color: var(--gray-muted); font-size: 13px; line-height: 1.6; }
+.previewSection { margin-top: 34px; }
+.sectionHeading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.sectionHeading h2 { color: var(--warm-black); font-size: 18px; font-weight: 500; }
+.sectionHeading span { color: var(--gray-muted); font-size: 12px; }
+.preview { display: grid; gap: 14px; padding: 20px; border: 1px solid var(--gray-border); border-radius: 18px; background: var(--surface-inset); }
+.previewTop { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--gray-border); }
+.previewTop > div { display: grid; gap: 4px; }
+.previewActions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px; }
+.previewTop strong { color: var(--warm-black); font-size: 15px; font-weight: 500; }
+.previewTop span { color: var(--gray-muted); font-size: 12px; }
+.previewLink { display: inline-flex; align-items: center; gap: 6px; color: var(--accent-text); font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
+.previewFrame { min-height: 540px; overflow: hidden; border: 1px solid var(--gray-border); border-radius: 12px; background: var(--surface); }
+.previewFrame iframe { display: block; width: 100%; min-height: 540px; border: 0; background: var(--surface); }
+.previewMeta { color: var(--gray-muted); font-size: 12px; line-height: 1.5; }
+.history { max-width: 820px; margin-top: 40px; padding-top: 24px; border-top: 1px solid var(--gray-border); }
+.history h2 { color: var(--warm-black); font-size: 17px; font-weight: 500; }
+.historyList { display: grid; gap: 12px; margin-top: 14px; }
+.historyList li { display: grid; gap: 4px; padding-bottom: 12px; border-bottom: 1px solid var(--gray-border); color: var(--gray-muted); font-size: 13px; line-height: 1.5; }
+.historyList strong { color: var(--warm-black); font-weight: 500; }
+.historyList time { color: var(--gray-subtle); font-size: 11px; }
+.srStatus { margin-top: 28px; color: var(--gray-muted); font-size: 14px; }
+@media (max-width: 767px) {
+  .root { padding: 28px 16px 56px; }
+  .requestCard { margin-top: 24px; padding: 18px; }
+  .formGrid { grid-template-columns: 1fr; }
+  .preview { padding: 14px; }
+  .previewFrame, .previewFrame iframe { min-height: 420px; }
+  .actions > * { width: 100%; }
+  .previewTop { align-items: flex-start; flex-direction: column; }
+  .previewActions { justify-content: flex-start; }
+}

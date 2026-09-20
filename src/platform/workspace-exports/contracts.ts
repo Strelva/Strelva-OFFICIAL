@@ -3,6 +3,18 @@ import { workspaceExitStateSchema } from "@/platform/workspace-exit/contracts";
 
 const instant = z.string().datetime({ offset: true });
 const cents = z.number().int().nonnegative().nullable();
+const publicBookingProvider = z.enum(["outlook", "google"]);
+const publicBookingGrant = z.object({
+  id: z.string().uuid(), tenantStableId: z.string().uuid(), businessWorkspaceId: z.string().uuid(), workId: z.string().uuid(),
+  capabilityId: z.string(), capabilityVersion: z.number().int().positive(), inquiryCapabilityId: z.string(), inquiryVersion: z.number().int().positive(),
+  provider: publicBookingProvider, displayName: z.string(), timeZone: z.string(), status: z.enum(["published", "revoked"]), revision: z.number().int().positive(),
+  publishedAt: instant, createdAt: instant, updatedAt: instant, revokedAt: instant.nullable(), revocationReason: z.string().nullable(),
+}).strict();
+const publicBookingReceipt = z.object({
+  reservationId: z.string().uuid(), grantId: z.string().uuid(), tenantId: z.string(), capabilityId: z.string(), version: z.number().int().positive(),
+  provider: publicBookingProvider, inquiryId: z.string(), title: z.string(), start: instant, end: instant, timeZone: z.string(),
+  status: z.enum(["pending", "confirmed", "cancelled"]), createdAt: instant, updatedAt: instant,
+}).strict();
 
 export const workspaceExportSchema = z.object({
   schemaVersion: z.literal(2),
@@ -75,6 +87,8 @@ export const workspaceExportSchema = z.object({
     usageReceipts: z.array(z.object({ jobId: z.string().uuid(), kind: z.enum(["provider", "model", "tool", "human"]), attribution: z.enum(["normal", "strelva_retry"]), amountCents: cents, source: z.enum(["operator_reported", "runtime_reported"]), createdAt: instant }).strict()),
     executionOutcomes: z.array(z.object({ jobId: z.string().uuid(), maximumCents: z.number().int().nonnegative(), kind: z.enum(["provider", "model", "tool", "human"]), attribution: z.enum(["normal", "strelva_retry"]), status: z.enum(["reserved", "running", "finished"]), effect: z.enum(["accepted", "none", "unknown"]).nullable(), amountCents: cents, billableCents: cents, createdAt: instant, startedAt: instant.nullable(), finishedAt: instant.nullable(), reconciliationReference: z.string().nullable() }).strict()),
   }).strict(),
+  /** Optional for compatibility with pre-booking exports; populated after the booking migration. */
+  publicBookings: z.object({ grants: z.array(publicBookingGrant), receipts: z.array(publicBookingReceipt) }).strict().optional(),
 }).strict();
 
 export type WorkspaceExportSnapshot = z.infer<typeof workspaceExportSchema>;

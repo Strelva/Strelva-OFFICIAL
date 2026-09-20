@@ -34,7 +34,7 @@ type FixtureAdapter = CalendarAdapter & {
   setBusyIntervals(value: Array<{ start: string; end: string; sourceId?: string }>): void;
 };
 
-function adapterFixture(options: { provider?: CalendarProvider; loseCreate?: boolean; loseReadback?: boolean; wrongReadback?: boolean; busyConflict?: boolean; availabilityError?: boolean; wrongUpdateIdentity?: boolean; busyIntervals?: Array<{ start: string; end: string; sourceId?: string }> } = {}): FixtureAdapter {
+function adapterFixture(options: { provider?: CalendarProvider; loseCreate?: boolean; loseReadback?: boolean; loseRemove?: boolean; loseDeleteReadback?: boolean; wrongReadback?: boolean; busyConflict?: boolean; availabilityError?: boolean; wrongUpdateIdentity?: boolean; busyIntervals?: Array<{ start: string; end: string; sourceId?: string }> } = {}): FixtureAdapter {
   const calls = { create: 0, update: 0, remove: 0, find: 0 };
   const event = { id: "event-1", title: "Roof inspection", start: reservation.start, end: reservation.end, calendarId: connection.calendarId, timeZone: connection.timeZone, observedAt: "2026-09-20T15:00:00.000Z" };
   let currentEvent = event;
@@ -53,12 +53,18 @@ function adapterFixture(options: { provider?: CalendarProvider; loseCreate?: boo
     async findByIdempotencyKey() { calls.find += 1; return calls.create ? currentEvent : null; },
     async get(_credentials, input) {
       if (input.eventId && input.eventId !== currentEvent.id) return null;
+      if (options.loseDeleteReadback && calls.remove > 0) throw new Error("delete readback unavailable");
       if (readback === "missing" || deleted) return null;
       if (readback === "wrong") return { ...currentEvent, start: "2026-09-20T11:00:00Z", end: "2026-09-20T12:00:00Z" };
       return currentEvent;
     },
     async update(_credentials, input) { calls.update += 1; currentEvent = { ...currentEvent, start: input.start, end: input.end }; if (wrongAfterUpdate) readback = "wrong"; return options.wrongUpdateIdentity ? { ...currentEvent, id: "event-2" } : currentEvent; },
-    async remove() { calls.remove += 1; deleted = true; return { id: event.id, observedAt: event.observedAt }; },
+    async remove() {
+      calls.remove += 1;
+      if (options.loseRemove && calls.remove === 1) throw new Error("response lost");
+      deleted = !options.loseDeleteReadback;
+      return { id: event.id, observedAt: event.observedAt };
+    },
     setReadback(mode) { readback = mode; },
     setReadbackAfterUpdate(value) { wrongAfterUpdate = value; },
     setBusy(value) { busy = value; busyInterval = { start: "2026-09-20T10:00:00Z", end: "2026-09-20T11:00:00Z" }; },
@@ -66,7 +72,7 @@ function adapterFixture(options: { provider?: CalendarProvider; loseCreate?: boo
   };
 }
 
-async function prepared(options: { provider?: CalendarProvider; loseCreate?: boolean; loseReadback?: boolean; wrongReadback?: boolean; busyConflict?: boolean; availabilityError?: boolean; wrongUpdateIdentity?: boolean; hideReceiptReads?: boolean; workspaceExitStopped?: boolean; busyIntervals?: Array<{ start: string; end: string; sourceId?: string }> } = {}) {
+async function prepared(options: { provider?: CalendarProvider; loseCreate?: boolean; loseReadback?: boolean; loseRemove?: boolean; loseDeleteReadback?: boolean; wrongReadback?: boolean; busyConflict?: boolean; availabilityError?: boolean; wrongUpdateIdentity?: boolean; hideReceiptReads?: boolean; workspaceExitStopped?: boolean; busyIntervals?: Array<{ start: string; end: string; sourceId?: string }> } = {}) {
   const store = memoryBoundedStore();
   const local = createSchedulingService(store, { workspaceExitCompleted: async () => false });
   const schedule = await local.create(owner, "workspace-a", { title: "Consultations", availability: [interval] });
@@ -116,6 +122,31 @@ describe("workspace calendar scheduling lifecycle", () => {
     expect(recovered.payload.reservations[0]).toMatchObject({ status: "accepted", providerId: "event-1" });
     expect(adapter.calls.create).toBe(1);
     expect(adapter.calls.find).toBe(1);
+  });
+
+  it("retries an uncertain cancellation only after rechecking the existing event", async () => {
+    const { schedule, calendar, adapter } = await prepared({ loseRemove: true });
+    const accepted = await calendar.create(owner, schedule.id, reservation.requestId, "outlook");
+    const unresolved = await calendar.cancel(owner, schedule.id, reservation.requestId, { provider: "outlook", expectedRevision: accepted.payload.revision });
+    expect(unresolved.payload.reservations[0]).toMatchObject({ status: "unknown", syncOperation: "delete", providerId: "event-1" });
+
+    const readOnlyRecovery = await calendar.recover(owner, schedule.id, reservation.requestId, "outlook");
+    expect(readOnlyRecovery.payload.reservations[0]).toMatchObject({ status: "unknown", syncOperation: "delete", providerId: "event-1" });
+    expect(adapter.calls.remove).toBe(1);
+
+    const cancelled = await calendar.cancel(owner, schedule.id, reservation.requestId, { provider: "outlook", expectedRevision: unresolved.payload.revision });
+    expect(cancelled.payload.reservations[0]).toMatchObject({ status: "cancelled", providerId: "event-1", verification: "verified" });
+    expect(adapter.calls.remove).toBe(2);
+  });
+
+  it("keeps an accepted cancellation terminal when delete readback fails", async () => {
+    const { schedule, calendar, adapter, receipts } = await prepared({ loseDeleteReadback: true });
+    const accepted = await calendar.create(owner, schedule.id, reservation.requestId, "outlook");
+    const cancelled = await calendar.cancel(owner, schedule.id, reservation.requestId, { provider: "outlook", expectedRevision: accepted.payload.revision });
+    expect(cancelled.payload.reservations[0]).toMatchObject({ status: "cancelled", providerId: "event-1", verification: "failed", syncOperation: undefined });
+    expect(receipts.latest()).toMatchObject({ status: "failed", operation: "delete", lastError: "delete readback unavailable" });
+    await expect(calendar.cancel(owner, schedule.id, reservation.requestId, { provider: "outlook", expectedRevision: cancelled.payload.revision })).rejects.toMatchObject({ name: "WorkspaceConflictError" });
+    expect(adapter.calls.remove).toBe(1);
   });
 
   it("routes accepted changes and cancellation through the same external event identity", async () => {

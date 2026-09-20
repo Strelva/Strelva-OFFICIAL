@@ -12,6 +12,7 @@ import { applicationCommandSchema } from "@/products/applications/contracts";
 import { changeWorkspaceSchedule, readWorkspaceSchedule } from "@/products/scheduling/server";
 import { scheduleCommandSchema } from "@/products/scheduling/contracts";
 import { runWorkspaceInvestigation, readWorkspaceInvestigation } from "@/products/investigations/server";
+import { agencyWebsiteDraftAdapter } from "@/products/operations/website-draft-adapter";
 import {
   CapabilityUnavailableError,
   createCapabilityInvoker,
@@ -217,6 +218,7 @@ const nativeCapabilityAdapters: CapabilityAdapterMap = new Map([
       return saved.payload;
     },
   }],
+  ["websites.draft", agencyWebsiteDraftAdapter],
   ["scheduling.command", {
     key: "scheduling.command",
     async inspect(context) {
@@ -389,7 +391,26 @@ export function createNativeExecutionAdapter(guard?: NativeExecutionGuard): Exec
         }
         // Native result stays at its stable link; don't duplicate full private records in receipts.
         const record = result && typeof result === "object" ? result as Record<string, unknown> : {};
-        return { effect: "accepted", status: "completed", result: { workId: step.workId, operation: step.operation, ...(record.finding ? { finding: record.finding } : {}) } };
+        return {
+          effect: "accepted",
+          status: "completed",
+          result: {
+            workId: step.workId,
+            operation: step.operation,
+            ...(record.finding ? { finding: record.finding } : {}),
+            ...(capability.definition.adapterKey === "websites.draft" ? {
+              websiteDraft: {
+                assignmentId: record.assignmentId,
+                preparationId: record.preparationId,
+                revisionId: record.revisionId,
+                bindingId: record.bindingId,
+                section: record.section,
+                revision: record.revision,
+                dataHash: record.dataHash,
+              },
+            } : {}),
+          },
+        };
       } catch (error) {
         // Native validation/access/conflict errors occur before an accepted database write.
         if (error instanceof WorkspaceAccessError || error instanceof WorkspaceConflictError) return { effect: "none", status: "failed", reason: error.message };
@@ -441,8 +462,9 @@ export function assertOperationalAssignmentScope(payload: Responsibility, requir
     if (definition.cost.mode !== "none" || definition.cost.source !== "native_local"
       || definition.cost.maximumCents !== 0 || definition.execution.effect === "external_side_effect"
       || definition.support === "internal_only" || definition.support === "managed_only"
-      || !["document.edit", "tracker.command", "investigation.run", "schedule.command", "application.command"].includes(definition.id)
+      || !["document.edit", "tracker.command", "investigation.run", "schedule.command", "application.command", "website.draft"].includes(definition.id)
       || (definition.id === "application.command" && !["revise", "rehearse", "install"].includes(String(input.kind)))
+      || (definition.id === "website.draft" && (input.kind !== "draft" || typeof input.bindingId !== "string" || input.bindingId !== step.workId || typeof input.section !== "string"))
       || (definition.id === "tracker.command" && input.kind === "coordinate_records")) {
       throw new WorkspaceConflictError(`The operation ${definition.id}@${definition.version} cannot be delegated.`);
     }

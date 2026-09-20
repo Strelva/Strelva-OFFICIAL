@@ -16,6 +16,8 @@ Strelva remains the control plane; the custom repo is the public website runtime
 | `ScaffoldTracker.tsx` | Client-side analytics beacon → `/api/v1/track/{tenant}` (page views, booking clicks, **phone-call taps**, orders — powers the weekly report) |
 | `ScaffoldLeadForm.tsx` | Self-contained contact/quote form → `/api/v1/leads/{tenant}` (captures real people into the dashboard's "Who reached out") — the **platform-integrated** form path (Strelva tenants) |
 | `StrelvaInquiryForm.tsx` + `inquiry-client.ts` | Fixed inquiry renderer and versioned transport for the inquiry-first release. Reads only the published form; submissions retain its capability ID and version. |
+| `StrelvaBookingForm.tsx` + `booking-client.ts` | Fixed native booking renderer and versioned transport. Reads published slots and uses the control plane's governed calendar path for reservation, change, and cancellation receipts. |
+| `StrelvaInquiryBookingForm.tsx` | Optional composition that mounts the explicit inquiry and native booking connections together. |
 | `form-route.template.tsx` | Drop-in `app/api/contact/route.ts` — the **standalone Formspree replacement**: emails the owner every submission via Resend on the shared `mail.strelva.com` domain, clearly labeled (site + form + all fields). No platform tenant needed. Config: `RESEND_API_KEY` / `SCAFFOLD_FORM_FROM` / `SCAFFOLD_FORM_TO` / `SCAFFOLD_SITE_NAME` |
 | `scaffold-forms.ts` | Pure helpers behind `form-route.template.tsx` (`normalizeSubmission`, `renderFormEmailHtml/Text`, in-memory rate limit) — turn any form payload into a clean owner-notification email |
 | `ScaffoldLocalBusinessSchema.tsx` | Server-rendered LocalBusiness JSON-LD `<script>` (the schema our audit engine grades sites on) |
@@ -58,6 +60,56 @@ and a deployed client component. Adding these starter files alone does not
 install the form on an existing client site. Existing lead forms keep their
 current contract. Verify both representative consumers with
 `pnpm check:custom-repos` before an authorized rollout.
+
+## Native booking capability
+
+Copy `StrelvaBookingForm.tsx` and `booking-client.ts` together into a client
+repository when the control plane has published a native booking capability for
+that tenant:
+
+```tsx
+<StrelvaConnectedBookingForm
+  baseUrl="https://app.strelva.com"
+  tenant="your-tenant"
+  capabilityId="the-approved-booking-capability-id"
+  range={{ from: "2026-10-01T00:00:00.000Z", to: "2026-10-08T00:00:00.000Z" }}
+/>
+```
+
+The public contract returns only the displayed schedule, provider name,
+timezone, and an opaque reservation management token. Workspace, work, and
+provider event identifiers never cross into the client site. A successful
+reservation is returned only after the native calendar path has made its
+provider readback decision; a pending result is labeled as pending and offers
+Check booking status without repeating the reservation. A confirmed receipt
+can request a time change or cancellation. Request identifiers persist across
+form remounts so retrying an interrupted submission reuses its original claim.
+
+For a page that offers both paths, copy `StrelvaInquiryBookingForm.tsx` with
+the two renderer pairs and pass the published inquiry capability, booking
+capability, and bounded booking range. The booking path records its visitor
+inquiry before it asks the connected native calendar to confirm the selected
+time.
+
+This component does not turn `ScaffoldBooking.tsx` into a native calendar
+integration. `ScaffoldBooking.tsx` remains the legacy external iframe for sites
+that still use an independently hosted scheduler. A native form requires a
+published capability, a bound native schedule, a connected calendar, and the
+release gate. Adding these starter files alone does not create that binding or
+send a provider write.
+
+## Generated website capability runtime
+
+The website generator can include the same inquiry and booking protocol in a
+static export when the control plane supplies a server-validated published
+projection. The projection contains only the public API origin, tenant slug,
+capability ids, published versions, and a bounded booking range. It never comes
+from the website brief and never contains workspace, provider, grant, or event
+identifiers. In that case the export includes
+`website-generation/capability-runtime.mjs`; it mounts the forms from the
+`data-strelva-capability` sections and supports inquiry submission plus booking
+reserve, change, and cancellation. Without the projection, the export stays a
+static site and contains no capability runtime script.
 
 ## Forms (contact / quote / booking) — the Formspree replacement
 

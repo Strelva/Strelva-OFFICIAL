@@ -40,6 +40,30 @@ The [acceptance ledger](./strelvav2-horizontal-acceptance.md#website-release-rev
 owns findings and proof. Local preparation remains authorized; production
 activation and external actions retain their existing approval boundaries.
 
+### Self-service website implementation
+
+After the website review, Jacob requested implementation of the missing customer
+journey. A person describes their business, receives a real saved website draft,
+previews and edits that same artifact, approves its exact revision and prepares
+it for launch. Returning to the workspace reopens the saved site. An agency is
+optional; an operator build request is not a substitute for this path.
+
+Private drafts can start in the person's own workspace. Published client sites
+retain their own repository and deployment. The control plane owns the brief,
+version history, customer authority and launch evidence; reusable client rendering
+belongs in the starter before use in generated client repositories. A preview
+must come from the saved artifact that export and launch use, not a separate
+fictional example. Edits invalidate approval of an older candidate. Failed or
+unconfigured providers must leave a visible, recoverable state without claiming
+that a website went live.
+
+The same implementation wave finishes explicit agency draft preparation for
+existing managed sites and connects versioned inquiries and native bookings to
+representative client pages. It preserves native tenant publication and provider
+approval boundaries. Public URL checks still do not establish ownership or an
+import capability. New commercial amounts are not selected by this instruction;
+existing customer terms and the production activation boundary remain unchanged.
+
 ## Product
 
 The mission is to make ambition affordable: give businesses access to an

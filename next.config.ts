@@ -5,6 +5,16 @@ const nextConfig: NextConfig = {
   // Instruction files are user-owned; next dev must not rewrite them.
   agentRules: false,
   distDir: process.env.PLAYWRIGHT_DIST_DIR || ".next",
+  // The generated website export copies this dependency into each client
+  // repository and the private preview route reads it while building a
+  // candidate. Keep it in standalone server output tracing as well as the
+  // source tree so preview/export does not fall back to an incomplete bundle.
+  outputFileTracingIncludes: {
+    "/*": [
+      "./custom-repo-starter/website-generation/renderer.mjs",
+      "./custom-repo-starter/website-generation/capability-runtime.mjs",
+    ],
+  },
   // The dev-tools badge defaults to bottom-left, where it sits on top of the
   // dashboard sidebar's account footer during local walks. Move it out of the
   // way. Dev-only — has no effect on a production build.

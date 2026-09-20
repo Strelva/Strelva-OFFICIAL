@@ -65,7 +65,8 @@ create table public.users (
 );
 
 create table public.tenants (
-  id text primary key
+  id text primary key,
+  subscription_status text not null default 'none'
 );
 SQL
 
@@ -286,6 +287,10 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920100000_wor
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920100100_workspace_export_v2.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920100200_workspace_exit_export_boundaries.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920110000_inquiry_workspace_exit.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920120000_websites.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920121000_agency_managed_website_draft_authority.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920122000_public_website_bookings.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920123000_public_website_booking_fingerprints.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-exit-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-workspace-exit-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-export-v2-schema.sql"
@@ -295,6 +300,9 @@ psql "${psql_args[@]}" --file="$repo_root/tests/custom-application-lifecycle-sch
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-calendar-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/work-economics-billing-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-application-authoring-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/websites-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-managed-website-draft-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/public-website-bookings-schema.sql"
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

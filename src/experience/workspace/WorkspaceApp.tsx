@@ -26,6 +26,7 @@ import { LocalDocumentPreview } from "./preview/LocalDocumentPreview";
 import { WorkPlanExperience } from "./WorkPlanExperience";
 import { WorkBudgetPanel } from "./WorkBudgetPanel";
 import { OnboardingExperience } from "@/products/onboarding/client";
+import { WebsiteExperience } from "@/experience/websites/WebsiteExperience";
 import { CustomApplicationManageExperience } from "@/experience/custom-applications/CustomApplicationManageExperience";
 import { BoundedWorkExperience } from "@/experience/operations/BoundedWorkExperience";
 import { LearningExperience } from "@/experience/operations/LearningExperience";
@@ -45,8 +46,8 @@ import type { WorkspaceInquiryTarget } from "./WorkspaceLayout";
 import type { WorkspaceStartContinuation } from "./workspace-start";
 import { workspaceExitBlocksChanges, workspaceExitIsStopped } from "./workspace-exit-ui";
 
-type HorizontalView = "custom-applications" | "onboarding" | "applications" | "scheduling" | "investigations" | "operations" | "product-learning";
-const isHorizontalView = (value: string | null | undefined): value is HorizontalView => Boolean(value && ["custom-applications", "onboarding", "applications", "scheduling", "investigations", "operations", "product-learning"].includes(value));
+type HorizontalView = "websites" | "custom-applications" | "onboarding" | "applications" | "scheduling" | "investigations" | "operations" | "product-learning";
+const isHorizontalView = (value: string | null | undefined): value is HorizontalView => Boolean(value && ["websites", "custom-applications", "onboarding", "applications", "scheduling", "investigations", "operations", "product-learning"].includes(value));
 type View = "work" | "agency" | "inquiries" | "tracker" | "document" | "plan" | HorizontalView;
 type Notice = { kind: "success" | "error"; message: string } | null;
 
@@ -698,7 +699,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
     <WorkspaceFrame>
       <div inert={Boolean(handoffLoading || (handoffToken && handoffPreview) || publicSaveResultId) || undefined}>
       <WorkspaceLayout appBase={appBase} signOut={signOut} key={snapshot.workspaceId} snapshot={snapshot} home={home} agency={view === "agency"} busy={loading} selectedWork={showAssessment ? null : selectedWork}
-        workingTitle={view === "operations" ? "Ongoing work" : view === "applications" ? "Applications" : view === "scheduling" ? "Reservations" : view === "investigations" ? "Saved checks" : view === "product-learning" ? "Learning" : undefined}
+        workingTitle={view === "websites" ? "Website" : view === "operations" ? "Ongoing work" : view === "applications" ? "Applications" : view === "scheduling" ? "Reservations" : view === "investigations" ? "Saved checks" : view === "product-learning" ? "Learning" : undefined}
         workingSection={view === "operations" ? "ongoing" : "work"}
         managedWork={snapshot.managedWork}
         managedWorkUnavailable={snapshot.managedWorkUnavailable}
@@ -798,11 +799,12 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
               onOpenWork={openWorkFromPlan}
               onSaved={horizontalSaved}
             />
+              : view === "websites" ? <WebsiteExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} readOnly={workspaceReadOnly} initialRequest={horizontalRequest} onSaved={horizontalSaved} />
               : view === "custom-applications" ? selectedWork?.productId === view ? <CustomApplicationManageExperience key={selectedWork.id} workId={selectedWork.id} readOnly={Boolean(workspaceReadOnly || currentWorkspace?.role === "member")} /> : <p role="status">Select a saved custom application to review its delivery.</p>
               : view === "onboarding" ? <OnboardingExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} initialCaseId={selectedWork?.productId === view ? selectedWork.id : undefined} readOnly={workspaceReadOnly} onSaved={horizontalSaved} />
               : view === "product-learning" ? <LearningExperience workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} sources={snapshot.work} readOnly={workspaceReadOnly} onSaved={horizontalSaved} />
               : <BoundedWorkExperience key={`${snapshot.workspaceId}:${view}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} productId={view} sources={snapshot.work} readOnly={workspaceReadOnly} workspaceStopped={workspaceStopped} calendarRecoveryAllowed={calendarRecoveryAllowed} initialRequest={horizontalRequest} onSaved={horizontalSaved} />}
-            {selectedWork && view !== "product-learning" && !snapshot.actor.localPreview ? <WorkAuthorityPanel key={selectedWork.id} workId={selectedWork.id} canManage={!workspaceReadOnly && (currentWorkspace?.role === "owner" || currentWorkspace?.role === "admin")} sources={snapshot.work} /> : null}
+            {selectedWork && view !== "product-learning" && view !== "websites" && !snapshot.actor.localPreview ? <WorkAuthorityPanel key={selectedWork.id} workId={selectedWork.id} canManage={!workspaceReadOnly && (currentWorkspace?.role === "owner" || currentWorkspace?.role === "admin")} sources={snapshot.work} /> : null}
           </> : selectedWork?.assessment?.kind === "website_audit" && selectedWork.assessment.payload ? (
             <WebsiteAuditPage key={selectedWork.id} initialResult={selectedWork.assessment.payload} saved />
           ) : selectedWork?.assessment?.kind === "ai_visibility" ? (

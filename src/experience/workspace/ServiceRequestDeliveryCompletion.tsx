@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import type { AgencyApplicationDraftGrant, OfferingInstallation, ProviderDelivery } from "@/platform/offerings";
 import type { ServiceRequest } from "@/platform/service-requests";
+import { AgencyWebsiteCustomerControls } from "@/experience/agency-website/AgencyWebsiteCustomerControls";
+import { sameAppHref } from "./workspace-discovery";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 
 type DeliveryView = ProviderDelivery & { canManage?: boolean; canAccept?: boolean };
@@ -45,6 +47,17 @@ function requestKey(prefix: string): string {
 }
 
 /**
+ * Installation surfaces are server-generated tenant links. Keep the customer
+ * review destination attached to that trusted surface instead of sending a
+ * bare /dashboard/site path through a multi-site workspace.
+ */
+function websiteEditorHref(installation: OfferingInstallation): string | null {
+  const surface = installation.surfaces?.find((item) => item.id === "managed_website");
+  const base = surface?.href ? sameAppHref(surface.href) : null;
+  return base ? `${base.replace(/\/$/, "")}/dashboard/site` : null;
+}
+
+/**
  * Customer-side completion for an already accepted service request. Every
  * mutation calls the existing assignment, provider-delivery, or request
  * service; this component does not create a second delivery lifecycle.
@@ -81,6 +94,10 @@ export function ServiceRequestDeliveryCompletion({ request, installation, respon
   const applicationWorkId = installation.nativeResources.length === 1 && installation.nativeResources[0]?.kind === "application"
     ? installation.nativeResources[0].id
     : null;
+  const websiteBindingId = installation.nativeResources.length === 1 && installation.nativeResources[0]?.kind === "managed_website"
+    ? installation.nativeResources[0].id
+    : null;
+  const customerWebsiteHref = websiteEditorHref(installation);
   const draftGrantActive = draftGrant?.status === "active" && Number.isFinite(Date.parse(draftGrant.expiresAt)) && Date.parse(draftGrant.expiresAt) > Date.now();
 
   useEffect(() => {
@@ -270,9 +287,10 @@ export function ServiceRequestDeliveryCompletion({ request, installation, respon
     {deliveryState === "ready" && delivery ? <div className="space-y-3 rounded-lg border border-gray-border bg-surface p-3 text-sm">
       <p className="text-gray-muted">Delivery status: <strong className="font-medium text-warm-black">{delivery.status}</strong>. Assignment: {assignment?.status ?? (assignmentState === "error" ? "unavailable" : "refreshing")}.</p>
       <p className="text-gray-muted">The provider must accept the assignment and run the approved work. The native execution receipt remains attached to the assigned responsibility.</p>
-      <p className="text-xs leading-5 text-gray-muted">The assignment permits the named provider to work on this exact resource. A separate draft permission is required before an agency operator can revise the application. Publishing remains a customer decision.</p>
+      <p className="text-xs leading-5 text-gray-muted">The assignment permits the named provider to work on this exact resource. Website preparation or application revision requires a separate customer grant. Publishing remains a customer decision.</p>
       <a className="underline" href={`/workspace?workspaceId=${encodeURIComponent(currentRequest.businessId)}&view=operations&assignmentId=${encodeURIComponent(delivery.assignmentId)}`}>Open assigned work</a>
       {applicationWorkId && delivery.status === "accepted" ? <a className="block underline" href={`/workspace?workspaceId=${encodeURIComponent(currentRequest.businessId)}&work=${encodeURIComponent(applicationWorkId)}`}>Review application draft and publish when ready</a> : null}
+      {providerKind === "agency" && websiteBindingId && delivery.status === "accepted" && assignment?.status === "accepted" && assignmentState === "ready" ? <AgencyWebsiteCustomerControls deliveryId={delivery.id} bindingId={websiteBindingId} customerWebsiteHref={customerWebsiteHref} /> : null}
       {providerKind === "agency" && applicationWorkId && delivery.status === "accepted" && assignment?.status === "accepted" && assignmentState === "ready" && draftAccessState === "ready" ? <div className="space-y-3 rounded-lg border border-gray-border p-3">
         <h4 className="font-medium text-warm-black">Application draft editing</h4>
         <p className="text-xs leading-5 text-gray-muted">This permission names {assignment.assigneeEmail ? <strong className="font-medium text-warm-black">{assignment.assigneeEmail}</strong> : "the current agency operator"} and applies only to the installed application above. You can revoke it separately; it also closes when this assignment or delivery expires.</p>

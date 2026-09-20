@@ -134,6 +134,18 @@ export { CalendarProviderError, createCalendarAdapter, createGoogleCalendarAdapt
 export type { CalendarEventReceipt } from "./calendar/repository";
 export type { CalendarAdapter, CalendarCredentials, ProviderCalendar } from "./calendar/adapters";
 export { createCalendarSchedulingService, listWorkspaceProviderCalendars, readWorkspaceProviderAvailability } from "./calendar/service";
+export { readWorkspaceExitCompleted } from "./calendar/service";
 export const calendarSchedulingService = createCalendarSchedulingService(undefined, {
   adapter: provider => process.env.STRELVA_CALENDAR_FIXTURE === "1" ? createFixtureCalendarAdapter(provider) : createCalendarAdapter(provider),
 });
+
+// Public website booking routes consume this product entry point. The
+// resolver, receipt store, and governed calendar adapter stay server-only.
+export { createPublicWebsiteBookingService, resolvePublishedPublicBooking } from "./public-booking-server";
+export { recoverPublicWebsiteBooking } from "./public-booking-recovery";
+export { listPublicWebsiteBookingGrants, publishPublicWebsiteBookingGrant, revokePublicWebsiteBookingGrant } from "./public-booking-admin";
+export {
+  PublicBookingError,
+  publicBookingRangeSchema,
+  publicBookingVisitorSchema,
+} from "./public-booking";

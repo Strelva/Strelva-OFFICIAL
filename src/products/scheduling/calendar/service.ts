@@ -459,8 +459,9 @@ export function createCalendarSchedulingService(store: BoundedStore = boundedSto
     const provider = parseProvider(input.provider);
     assertReservationProvider(current, provider);
     if (current.status === "reserved") return changeLocal(actor, work, scheduleCommandSchema.parse({ kind: "cancel", expectedRevision: input.expectedRevision, requestId }));
-    if (current.status === "unknown" || current.status === "writing") return recover(actor, workId, requestId, provider);
-    if (current.status !== "accepted" || !current.providerId) throw new WorkspaceConflictError("The provider reservation needs recovery before it can be cancelled.");
+    const retryingDelete = current.status === "unknown" && current.syncOperation === "delete";
+    if (!retryingDelete && (current.status === "unknown" || current.status === "writing")) return recover(actor, workId, requestId, provider);
+    if ((!retryingDelete && current.status !== "accepted") || !current.providerId) throw new WorkspaceConflictError("The provider reservation needs recovery before it can be cancelled.");
     if (work.payload.revision !== input.expectedRevision) throw new WorkspaceConflictError("This work changed. Reload before trying again.");
     await assertProviderWriteAllowed(work.workspaceId, true);
     const bound = await connection(actor, work.workspaceId, provider);
@@ -468,37 +469,51 @@ export function createCalendarSchedulingService(store: BoundedStore = boundedSto
     const adapter = adapterFor(provider);
     const targetReceipt = await receipts.read(actor, work.workspaceId, work.id, requestId, provider);
     assertReceiptCalendar(targetReceipt, bound, true);
+    if (retryingDelete && (!targetReceipt || targetReceipt.operation !== "delete" || targetReceipt.status !== "unknown" || targetReceipt.externalEventId !== current.providerId)) {
+      throw new WorkspaceConflictError("The cancellation receipt is inconsistent. Recover it before retrying the provider event.");
+    }
     const providerEvent = await adapter.get(bound, { calendarId: bound.calendarId, eventId: current.providerId });
-    if (!providerEvent) throw new WorkspaceConflictError("The provider reservation no longer exists. Refresh before cancelling it.");
+    if (!providerEvent) {
+      if (!retryingDelete) throw new WorkspaceConflictError("The provider reservation no longer exists. Refresh before cancelling it.");
+      work = await finalize(actor, work, requestId, { status: "cancelled", provider, verification: "verified", syncOperation: undefined, syncError: undefined, pendingStart: undefined, pendingEnd: undefined });
+      await receipts.save(actor, { ...targetReceipt!, status: "verified", lastError: undefined, observedAt: new Date().toISOString() });
+      return work;
+    }
     if (!matchesReservationEvent(providerEvent, current, bound, { eventId: current.providerId })) throw new WorkspaceConflictError("The provider reservation changed elsewhere. Review its current details before cancelling it.");
-    const key = `schedule:${work.workspaceId}:${work.id}:${requestId}:delete:${input.expectedRevision + 1}`;
+    const key = retryingDelete ? targetReceipt!.idempotencyKey : `schedule:${work.workspaceId}:${work.id}:${requestId}:delete:${input.expectedRevision + 1}`;
     const pending = { ...current, status: "writing" as const, provider, syncOperation: "delete" as const, syncError: undefined };
     const next = advance(work.payload, input.expectedRevision, "provider_delete_claim", actor);
     next.reservations = next.reservations.map(item => item.requestId === requestId ? pending : item);
     work = await save(actor, work, next);
     await receipts.save(actor, receiptFor({ work, reservation: pending, connection: bound, idempotencyKey: key, operation: "delete", status: "writing", externalEventId: current.providerId }));
+    let result: Awaited<ReturnType<CalendarAdapter["remove"]>>;
     try {
-      const result = await adapter.remove(bound, { calendarId: bound.calendarId, eventId: current.providerId, ...(providerEvent.versionTag ? { versionTag: providerEvent.versionTag } : {}) });
-      const acceptedReceipt = await receipts.save(actor, receiptFor({ work, reservation: pending, connection: bound, idempotencyKey: key, operation: "delete", status: "accepted", externalEventId: current.providerId, observedAt: result.observedAt }));
-      let verified = false;
-      let verificationError: unknown;
-      try {
-        verified = (await adapter.get(bound, { calendarId: bound.calendarId, eventId: current.providerId })) === null;
-      } catch (error) {
-        verificationError = error;
-      }
-      await receipts.save(actor, {
-        ...acceptedReceipt,
-        status: verified ? "verified" : "failed",
-        lastError: verified ? undefined : verificationError instanceof Error ? verificationError.message : "The provider accepted the cancellation but readback did not confirm it.",
-        observedAt: result.observedAt,
-      });
-      work = await finalize(actor, work, requestId, { status: "cancelled", providerId: current.providerId, provider, verification: verified ? "verified" : "failed", syncOperation: undefined, syncError: undefined });
-      return work;
+      result = await adapter.remove(bound, { calendarId: bound.calendarId, eventId: current.providerId, ...(providerEvent.versionTag ? { versionTag: providerEvent.versionTag } : {}) });
     } catch (error) {
       await receipts.save(actor, receiptFor({ work, reservation: pending, connection: bound, idempotencyKey: key, operation: "delete", status: "unknown", externalEventId: current.providerId, lastError: error instanceof Error ? error.message : "Provider response was lost." }));
       return markUnknown(actor, work, requestId, "delete", error);
     }
+    const acceptedReceipt = await receipts.save(actor, receiptFor({ work, reservation: pending, connection: bound, idempotencyKey: key, operation: "delete", status: "accepted", externalEventId: current.providerId, observedAt: result.observedAt }));
+    let verified = false;
+    let verificationError: unknown;
+    try {
+      verified = (await adapter.get(bound, { calendarId: bound.calendarId, eventId: current.providerId })) === null;
+    } catch (error) {
+      verificationError = error;
+    }
+    const lastError = verified
+      ? undefined
+      : verificationError instanceof Error
+        ? verificationError.message
+        : "The provider accepted the cancellation but readback did not confirm it.";
+    await receipts.save(actor, {
+      ...acceptedReceipt,
+      status: verified ? "verified" : "failed",
+      lastError,
+      observedAt: result.observedAt,
+    });
+    work = await finalize(actor, work, requestId, { status: "cancelled", providerId: current.providerId, provider, verification: verified ? "verified" : "failed", syncOperation: undefined, syncError: undefined });
+    return work;
   }
 
   async function changeLocal(actor: WorkspaceActor, work: ScheduleWork, command: z.infer<typeof scheduleCommandSchema>) {

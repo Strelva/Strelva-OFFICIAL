@@ -1,6 +1,6 @@
 import type { WorkspaceProduct } from "./contracts";
 
-export type WorkspaceStartRoute = "assessment" | "tracker" | "inquiries" | "website" | "document" | "applications" | "scheduling" | "investigations" | "operations" | "help";
+export type WorkspaceStartRoute = "assessment" | "tracker" | "inquiries" | "website" | "websites" | "document" | "applications" | "scheduling" | "investigations" | "operations" | "help";
 export type WorkspaceStartOutcome = "Answer" | "Change" | "Capability" | "Responsibility";
 export type WorkspaceStartPlanKind = "empty" | "supported" | "help";
 export type WorkspaceStartPlanStatus = "ready" | "blocked" | "help";
@@ -96,6 +96,7 @@ export function workspaceStartContinueLabel(plan: WorkspaceStartPlan): string {
   if (plan.route === "inquiries") return plan.needsSelection === "business" ? "Choose a business" : "Open inquiry work";
   if (plan.route === "tracker") return "Open your tracker";
   if (plan.route === "website") return plan.needsSelection === "site" ? "Choose a website" : "Open your website";
+  if (plan.route === "websites") return "Create your website";
   if (plan.route === "document") return "Open your document";
   if (plan.route === "applications") return "Prepare application";
   if (plan.route === "scheduling") return "Open scheduling";
@@ -109,13 +110,15 @@ const PRODUCT_FOR_ROUTE: Record<Exclude<WorkspaceStartRoute, "help">, string> = 
   tracker: "tracker",
   inquiries: "inquiries",
   website: "managed_presence",
+  websites: "websites",
   document: "documents",
   applications: "applications", scheduling: "scheduling", investigations: "investigations", operations: "operations",
 };
 
-const AVAILABLE_PRODUCT_ROUTES: ReadonlySet<WorkspaceStartRoute> = new Set(["assessment", "tracker", "inquiries", "document", "applications", "scheduling", "investigations", "operations"]);
+const AVAILABLE_PRODUCT_ROUTES: ReadonlySet<WorkspaceStartRoute> = new Set(["assessment", "tracker", "inquiries", "websites", "document", "applications", "scheduling", "investigations", "operations"]);
 
 const ROUTE_COPY: Record<Exclude<WorkspaceStartRoute, "help">, { title: string; summary: string; outcome: WorkspaceStartOutcome; nextAction: string }> = {
+  websites: { title: "Your website", summary: "Turn your business description into a saved website draft that you can preview and change.", outcome: "Capability", nextAction: "Create a draft, review it, then choose when to prepare it for launch." },
   applications: { title: "A private working application", summary: "Create a form and working list from approved parts, then test it before accepting records.", outcome: "Capability", nextAction: "Prepare a plan before creating the application." },
   scheduling: { title: "A working schedule", summary: "Reserve permitted time and prevent overlapping reservations in this workspace.", outcome: "Capability", nextAction: "Open scheduling and review the permitted times before reserving one." },
   investigations: { title: "An ongoing check", summary: "Compare two saved sources, keep the evidence, and check again when due.", outcome: "Responsibility", nextAction: "Open ongoing checks and choose the two saved sources to compare." },
@@ -159,6 +162,7 @@ interface Signal {
 }
 
 const SIGNALS: readonly Signal[] = [
+  { route: "websites", pattern: /\b(?:build|create|make|generate|design|start|launch)\b[\s\S]{0,80}\b(?:website|web site|landing page)\b|\bnew website\b/i, weight: 7 },
   { route: "applications", pattern: /\b(?:build|create|make|set up|design)\b[\s\S]{0,80}\b(?:app|application|portal)s?\b|\b(?:staff|employee|internal|team)\b[\s-]*(?:request|intake)s?[\s-]*(?:app|application|portal|form)s?\b/i, weight: 5 },
   { route: "scheduling", pattern: /\b(?:schedule|scheduling|calendar|availability|appointment)s?\b|reserve (?:a |the )?time|\b(?:book|reserve)\b[\s\S]{0,60}\b(?:appointment|slot|time)\b|time[- ]off|(?:vacation|leave) request/i, weight: 5 },
   { route: "investigations", pattern: /\b(?:compare|reconcile|cross[- ]?check|find differences)\b|\b(?:watch|monitor)\b[\s\S]{0,80}\b(?:change|difference|update)s?\b|\bcheck\b[\s\S]{0,80}\b(?:match|agree|disagree|same|different)\b|\b(?:two|both)\s+(?:source|record|spreadsheet|sheet)s?\b/i, weight: 5 },
@@ -170,7 +174,7 @@ const SIGNALS: readonly Signal[] = [
   { route: "website", pattern: /website|web site|homepage|landing page|\bsite\b|\bseo\b|accessib|page speed|web content|domain/i, weight: 3 },
 ];
 
-const ROUTE_ORDER = ["applications", "scheduling", "investigations", "operations", "document", "inquiries", "tracker", "assessment", "website"] as const;
+const ROUTE_ORDER = ["websites", "applications", "scheduling", "investigations", "operations", "document", "inquiries", "tracker", "assessment", "website"] as const;
 
 function normalizeRequest(value: string): string {
   // Preserve the person's wording, punctuation and line breaks for the native
@@ -230,7 +234,7 @@ function hasAvailableProduct(context: WorkspaceStartContext, route: Exclude<Work
 }
 
 function partsFor(route: Exclude<WorkspaceStartRoute, "help">, request: string): WorkspaceStartPart[] {
-  if (["applications", "scheduling", "investigations", "operations"].includes(route)) return [{ id: "scope", label: ROUTE_COPY[route].title, detail: ROUTE_COPY[route].summary, outcome: ROUTE_COPY[route].outcome }, { id: "control", label: "Your workspace and permissions", detail: "Keep the result private. Review changes and preserve their evidence.", outcome: "Responsibility" }];
+  if (["websites", "applications", "scheduling", "investigations", "operations"].includes(route)) return [{ id: "scope", label: ROUTE_COPY[route].title, detail: ROUTE_COPY[route].summary, outcome: ROUTE_COPY[route].outcome }, { id: "control", label: "Your workspace and permissions", detail: "Keep the result private. Review changes and preserve their evidence.", outcome: "Responsibility" }];
   if (route === "assessment") {
     return [
       { id: "business-scope", label: "business in scope", detail: "Use the business details you provide for this assessment.", outcome: "Answer" },

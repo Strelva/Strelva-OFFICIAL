@@ -15,5 +15,16 @@ export async function exportWorkspace(actor: WorkspaceActor, workspaceId: string
   if (error) throw new WorkspaceStoreError("Workspace export is unavailable");
   const parsed = workspaceExportSchema.safeParse(data);
   if (!parsed.success) throw new WorkspaceStoreError("Workspace export did not match its versioned schema");
-  return parsed.data;
+  const bookings = await db.rpc("export_public_website_bookings", { p_workspace_id: id, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail });
+  if (bookings.error?.message?.includes("workspace_export_denied")) throw new WorkspaceAccessError();
+  if (bookings.error) throw new WorkspaceStoreError("Public booking records are unavailable for this export.");
+  if (!bookings.data || typeof bookings.data !== "object" || Array.isArray(bookings.data)) {
+    throw new WorkspaceStoreError("Public booking records did not match their export schema");
+  }
+  const enriched = workspaceExportSchema.safeParse({
+    ...parsed.data,
+    publicBookings: bookings.data,
+  });
+  if (!enriched.success) throw new WorkspaceStoreError("Public booking records did not match their export schema");
+  return enriched.data;
 }

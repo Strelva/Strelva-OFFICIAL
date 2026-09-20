@@ -39,7 +39,10 @@ Jacob's latest direction makes websites the main current commercial focus and
 self-service the primary experience. The [website release focus](./docs/horizontal-product-brief-2026-09-11.md#september-20-website-release-focus)
 owns that decision. Read the [website release review](./docs/strelvav2-horizontal-acceptance.md#website-release-review)
 for the distinction between existing managed sites, new customer creation and
-outside-site connection. Supporting workspace capabilities remain available
+outside-site connection. The subsequent [self-service implementation record](./docs/strelvav2-horizontal-acceptance.md#self-service-website-implementation-follow-through)
+records the working local creation, private preview, approval and downloadable
+website flow. Launch preparation currently prepares files; it does not deploy
+the website or connect a domain. Supporting workspace capabilities remain available
 according to their own evidence; the new focus does not certify a self-service
 website builder or change existing customer obligations.
 

@@ -54,6 +54,7 @@ export function BusinessHome({
   notice,
   onOpen,
   onStart,
+  onCreateWebsite,
   onRequest,
   onWork,
   onOngoing,
@@ -84,6 +85,7 @@ export function BusinessHome({
   notice?: ReactNode;
   onOpen: (id: string) => void;
   onStart: () => void;
+  onCreateWebsite?: () => void;
   onRequest?: (request: string) => void;
   onWork: () => void;
   onOngoing: () => void;
@@ -141,6 +143,7 @@ export function BusinessHome({
     `${item.title} ${item.detail}`.toLowerCase().includes(search.toLowerCase()),
   );
   const starters: Destination[] = [
+    ...(onCreateWebsite ? [{ id: "website", title: "Create your website", detail: "Describe your business and review a draft", kind: "website", open: onCreateWebsite }] : []),
     { id: "application", title: "Create an application", detail: "Build something people can use", kind: "applications", open: onStart },
     { id: "document", title: "Create a document", detail: "Make a useful work product", kind: "documents", open: onStart },
     { id: "ongoing", title: "Set up ongoing work", detail: "Create a repeatable check", kind: "operations", open: onStart },
