@@ -184,7 +184,10 @@ describe("workspace start planner", () => {
       onHelp: () => undefined,
     }));
     expect(html).toContain("data-workspace-start");
-    expect(html).toContain("What should Strelva try?");
+    expect(html).toContain("What does your business need?");
+    expect(html).toContain("Create a staff request app");
+    expect(html).toContain("Organize onboarding");
+    expect(html).toContain("Have Strelva build my website");
     expect(html).toContain("Show me the shape");
     expect(html).toContain("Handle customer inquiries");
     expect(html).toContain("Turn a file into a tracker");

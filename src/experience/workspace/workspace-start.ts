@@ -1,6 +1,6 @@
 import type { WorkspaceProduct } from "./contracts";
 
-export type WorkspaceStartRoute = "assessment" | "tracker" | "inquiries" | "website" | "websites" | "document" | "applications" | "scheduling" | "investigations" | "operations" | "help";
+export type WorkspaceStartRoute = "assessment" | "tracker" | "inquiries" | "website" | "websites" | "document" | "onboarding" | "applications" | "scheduling" | "investigations" | "operations" | "help";
 export type WorkspaceStartOutcome = "Answer" | "Change" | "Capability" | "Responsibility";
 export type WorkspaceStartPlanKind = "empty" | "supported" | "help";
 export type WorkspaceStartPlanStatus = "ready" | "blocked" | "help";
@@ -64,6 +64,8 @@ export interface WorkspaceStartPlan {
   parts: readonly WorkspaceStartPart[];
   reason?: string;
   helpRequest?: string;
+  /** A provider request opens review, never a self-service generator or delivery promise. */
+  deliveryMode?: "service";
   /** Native routes found in the request, in the order they were mentioned. */
   matchedRoutes?: readonly Exclude<WorkspaceStartRoute, "help">[];
   needsSelection?: "business" | "site";
@@ -98,6 +100,7 @@ export function workspaceStartContinueLabel(plan: WorkspaceStartPlan): string {
   if (plan.route === "website") return plan.needsSelection === "site" ? "Choose a website" : "Open your website";
   if (plan.route === "websites") return "Create your website";
   if (plan.route === "document") return "Open your document";
+  if (plan.route === "onboarding") return "Organize onboarding";
   if (plan.route === "applications") return "Prepare application";
   if (plan.route === "scheduling") return "Open scheduling";
   if (plan.route === "investigations") return "Open ongoing checks";
@@ -112,12 +115,14 @@ const PRODUCT_FOR_ROUTE: Record<Exclude<WorkspaceStartRoute, "help">, string> = 
   website: "managed_presence",
   websites: "websites",
   document: "documents",
+  onboarding: "onboarding",
   applications: "applications", scheduling: "scheduling", investigations: "investigations", operations: "operations",
 };
 
-const AVAILABLE_PRODUCT_ROUTES: ReadonlySet<WorkspaceStartRoute> = new Set(["assessment", "tracker", "inquiries", "websites", "document", "applications", "scheduling", "investigations", "operations"]);
+const AVAILABLE_PRODUCT_ROUTES: ReadonlySet<WorkspaceStartRoute> = new Set(["assessment", "tracker", "inquiries", "websites", "document", "onboarding", "applications", "scheduling", "investigations", "operations"]);
 
 const ROUTE_COPY: Record<Exclude<WorkspaceStartRoute, "help">, { title: string; summary: string; outcome: WorkspaceStartOutcome; nextAction: string }> = {
+  onboarding: { title: "Onboarding requirements", summary: "Keep requirements, private documents and their review status together.", outcome: "Capability", nextAction: "Open onboarding, define the requirements, and review supplied documents before accepting them." },
   websites: { title: "Your website", summary: "Turn your business description into a saved website draft that you can preview and change.", outcome: "Capability", nextAction: "Create a draft, review it, then choose when to prepare it for launch." },
   applications: { title: "A private working application", summary: "Create a form and working list from approved parts, then test it before accepting records.", outcome: "Capability", nextAction: "Prepare a plan before creating the application." },
   scheduling: { title: "A working schedule", summary: "Reserve permitted time and prevent overlapping reservations in this workspace.", outcome: "Capability", nextAction: "Open scheduling and review the permitted times before reserving one." },
@@ -162,6 +167,7 @@ interface Signal {
 }
 
 const SIGNALS: readonly Signal[] = [
+  { route: "onboarding", pattern: /\b(?:organize|collect|manage|review|track|set up|create)\b[\s\S]{0,80}\bonboarding\b|\bonboarding\s+(?:requirements|checklist|case|documents)\b/i, weight: 7 },
   { route: "websites", pattern: /\b(?:build|create|make|generate|design|start|launch)\b[\s\S]{0,80}\b(?:website|web site|landing page)\b|\bnew website\b/i, weight: 7 },
   { route: "applications", pattern: /\b(?:build|create|make|set up|design)\b[\s\S]{0,80}\b(?:app|application|portal)s?\b|\b(?:staff|employee|internal|team)\b[\s-]*(?:request|intake)s?[\s-]*(?:app|application|portal|form)s?\b/i, weight: 5 },
   { route: "scheduling", pattern: /\b(?:schedule|scheduling|calendar|availability|appointment)s?\b|reserve (?:a |the )?time|\b(?:book|reserve)\b[\s\S]{0,60}\b(?:appointment|slot|time)\b|time[- ]off|(?:vacation|leave) request/i, weight: 5 },
@@ -174,7 +180,7 @@ const SIGNALS: readonly Signal[] = [
   { route: "website", pattern: /website|web site|homepage|landing page|\bsite\b|\bseo\b|accessib|page speed|web content|domain/i, weight: 3 },
 ];
 
-const ROUTE_ORDER = ["websites", "applications", "scheduling", "investigations", "operations", "document", "inquiries", "tracker", "assessment", "website"] as const;
+const ROUTE_ORDER = ["onboarding", "websites", "applications", "scheduling", "investigations", "operations", "document", "inquiries", "tracker", "assessment", "website"] as const;
 
 function normalizeRequest(value: string): string {
   // Preserve the person's wording, punctuation and line breaks for the native
@@ -234,7 +240,7 @@ function hasAvailableProduct(context: WorkspaceStartContext, route: Exclude<Work
 }
 
 function partsFor(route: Exclude<WorkspaceStartRoute, "help">, request: string): WorkspaceStartPart[] {
-  if (["websites", "applications", "scheduling", "investigations", "operations"].includes(route)) return [{ id: "scope", label: ROUTE_COPY[route].title, detail: ROUTE_COPY[route].summary, outcome: ROUTE_COPY[route].outcome }, { id: "control", label: "Your workspace and permissions", detail: "Keep the result private. Review changes and preserve their evidence.", outcome: "Responsibility" }];
+  if (["websites", "onboarding", "applications", "scheduling", "investigations", "operations"].includes(route)) return [{ id: "scope", label: ROUTE_COPY[route].title, detail: ROUTE_COPY[route].summary, outcome: ROUTE_COPY[route].outcome }, { id: "control", label: "Your workspace and permissions", detail: "Keep the result private. Review changes and preserve their evidence.", outcome: "Responsibility" }];
   if (route === "assessment") {
     return [
       { id: "business-scope", label: "business in scope", detail: "Use the business details you provide for this assessment.", outcome: "Answer" },
@@ -297,7 +303,7 @@ function emptyPlan(): WorkspaceStartPlan {
     request: "",
     context: undefined,
     title: "Start with the result you want.",
-    summary: "Describe an assessment, tracker, inquiry workflow, website change, document, application, schedule, ongoing check, or delegated work.",
+    summary: "Describe an assessment, tracker, inquiry workflow, website delivery, document, onboarding requirements, application, schedule, ongoing check, or delegated work.",
     parts: [],
     matchedRoutes: [],
     selectedPartIds: [],
@@ -329,6 +335,30 @@ function helpPlan(request: string, context: WorkspaceStartContext, routes: reado
   };
 }
 
+function requestsWebsiteService(request: string): boolean {
+  if (!/\b(?:website|web site|landing page)\b/i.test(request)) return false;
+  // Negated or explicitly self-service requests stay on the existing planning path.
+  if (/\b(?:do not|don['’]t|not|never)\b[^.!?;\n]{0,60}\b(?:strelva|agency|24[- ]hour|24 hours?)\b|\b(?:myself|ourselves|self[- ]service)\b/i.test(request)) return false;
+  return /\b(?:have|hire|ask|pay|get|want|need|like)\b[^.!?;\n]{0,40}\bstrelva\b[^.!?;\n]{0,40}\b(?:build|create|make|design|deliver)\b|\b(?:agency[- ]built|done[- ]for[- ](?:me|us|you)|24[- ]hour|24 hours?)\b/i.test(request);
+}
+
+function websiteServicePlan(request: string, context: WorkspaceStartContext): WorkspaceStartPlan {
+  const plan = helpPlan(request, context);
+  const reason = plan.reason || (context.native?.help === false
+    ? "Service requests are unavailable in this workspace. Nothing has been submitted."
+    : undefined);
+  return {
+    ...plan,
+    deliveryMode: "service",
+    title: "Have Strelva build your website",
+    summary: "Keep your brief together for a website delivery request. You do not need to build the website yourself.",
+    nextAction: "Review the request with Strelva. Scope, price and the delivery deadline require separate acceptance.",
+    status: reason ? "blocked" : "help",
+    reason,
+    canContinue: !reason,
+  };
+}
+
 function blockedReason(context: WorkspaceStartContext, route: Exclude<WorkspaceStartRoute, "help">): string | undefined {
   if (context.readOnly) return "This workspace is read-only. Switch to a workspace you own before starting new work.";
   if (!supportedFlowMounted(context, route)) return "This flow is not available in the current workspace. Nothing has been started.";
@@ -346,6 +376,7 @@ export function planWorkspaceStart(requestOrInput: string | WorkspaceStartInput,
   const request = normalizeRequest(typeof requestOrInput === "string" ? requestOrInput : requestOrInput.request);
   const context = typeof requestOrInput === "string" ? suppliedContext : requestOrInput.context || suppliedContext;
   if (!request) return emptyPlan();
+  if (requestsWebsiteService(request)) return websiteServicePlan(request, context);
 
   const routes = matchedRoutes(request);
   if (routes.length > 1) return helpPlan(request, context, routes);
@@ -394,22 +425,33 @@ export function createWorkspaceStartContinuation(
   plan: WorkspaceStartPlan,
   includedPartIds: readonly string[] = plan.selectedPartIds,
   selections: Pick<WorkspaceStartContinuation, "businessId" | "siteId" | "trackerTemplateId"> = {},
+  currentContext: WorkspaceStartContext = plan.context || {},
 ): WorkspaceStartContinuation | null {
-  if (plan.kind !== "supported" || plan.status !== "ready" || !plan.route || (!plan.canContinue && !plan.needsSelection)) return null;
+  if (plan.kind !== "supported" || plan.status !== "ready" || !plan.route || plan.route === "help" || (!plan.canContinue && !plan.needsSelection)) return null;
+  // Discovery is a UI constraint, not authorization. Native services must still
+  // recheck the actor, business and resource before every read or mutation.
+  if (blockedReason(currentContext, plan.route)) return null;
+  if (plan.productId !== PRODUCT_FOR_ROUTE[plan.route]) return null;
+  if (selections.businessId && plan.route !== "inquiries") return null;
+  if (selections.siteId && plan.route !== "website") return null;
+  if (selections.trackerTemplateId && plan.route !== "tracker") return null;
+  const businessId = selections.businessId || (plan.route === "inquiries" && currentContext.inquiryBusinesses?.length === 1 ? currentContext.inquiryBusinesses[0]!.id : undefined);
+  const siteId = selections.siteId || (plan.route === "website" && currentContext.managedSites?.length === 1 ? currentContext.managedSites[0]!.id : undefined);
+  if (plan.route === "inquiries" && (!businessId || !currentContext.inquiryBusinesses?.some((item) => item.id === businessId))) return null;
+  if (plan.route === "website" && (!siteId || !currentContext.managedSites?.some((item) => item.id === siteId))) return null;
+  if (selections.trackerTemplateId && !currentContext.trackerTemplates?.some((item) => item.id === selections.trackerTemplateId)) return null;
   const allowed = new Set(plan.parts.map((part) => part.id));
   const required = new Set(plan.parts.filter((part) => !part.optional).map((part) => part.id));
   const included = [...new Set(includedPartIds)].filter((id) => allowed.has(id));
   if ([...required].some((id) => !included.includes(id))) return null;
-  if (plan.needsSelection === "business" && !selections.businessId) return null;
-  if (plan.needsSelection === "site" && !selections.siteId) return null;
   return {
     request: plan.request,
     route: plan.route,
     productId: plan.productId,
     includedPartIds: included,
-    ...(plan.context ? { context: plan.context } : {}),
-    ...(selections.businessId ? { businessId: selections.businessId } : {}),
-    ...(selections.siteId ? { siteId: selections.siteId } : {}),
+    context: currentContext,
+    ...(businessId ? { businessId } : {}),
+    ...(siteId ? { siteId } : {}),
     ...(selections.trackerTemplateId ? { trackerTemplateId: selections.trackerTemplateId } : {}),
   };
 }

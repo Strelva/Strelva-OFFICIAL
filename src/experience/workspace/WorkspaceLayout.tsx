@@ -301,7 +301,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
       openInquiry(business.id, continuation);
       return;
     }
-    if (continuation.route === "websites" || continuation.route === "applications" || continuation.route === "scheduling" || continuation.route === "investigations" || continuation.route === "operations") {
+    if (continuation.route === "websites" || continuation.route === "onboarding" || continuation.route === "applications" || continuation.route === "scheduling" || continuation.route === "investigations" || continuation.route === "operations") {
       if (!onHorizontal) return; setStartOpen(false); onHorizontal(continuation.route, continuation); return;
     }
     if (continuation.route === "website") {
@@ -327,7 +327,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
       inquiries: Boolean(onInquiry),
       website: Boolean(onWebsite || sites.length),
       document: Boolean(onDocument),
-      websites: Boolean(onHorizontal), applications: Boolean(onHorizontal), scheduling: Boolean(onHorizontal), investigations: Boolean(onHorizontal), operations: Boolean(onHorizontal),
+      websites: Boolean(onHorizontal), onboarding: Boolean(onHorizontal), applications: Boolean(onHorizontal), scheduling: Boolean(onHorizontal), investigations: Boolean(onHorizontal), operations: Boolean(onHorizontal),
       help: true,
     },
   };
@@ -355,7 +355,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     if (!product) return null;
     if (product.id === "websites" || product.id === "onboarding" || product.id === "applications" || product.id === "scheduling" || product.id === "investigations" || product.id === "operations") {
       const id = product.id;
-      return <><h2>{product.name}</h2><p>{product.description}</p><button className={styles.primaryAction} type="button" disabled={workspaceMutationReadOnly || !onHorizontal} onClick={() => onHorizontal?.(id)}>Get started<ArrowRight size={17} /></button></>;
+      return <><h2>{product.name}</h2><p>{product.description}</p><button className={styles.primaryAction} type="button" disabled={workspaceMutationReadOnly || product.availability !== "available" || !onHorizontal} onClick={() => { if (!workspaceMutationReadOnly && product.availability === "available") onHorizontal?.(id); }}>Get started<ArrowRight size={17} /></button></>;
     }
     if (product.id === "ai_visibility") {
       return <><h2>Understand what AI can find.</h2><p>Check a business, inspect the evidence, and keep the assessment in your work. Share a copy when you want someone else to use it.</p><p>This is an assessment at a point in time. It does not activate monitoring or change your website.</p><button className={styles.primaryAction} type="button" disabled={workspaceMutationReadOnly || product.availability !== "available"} onClick={() => onNew()}>Check a business<ArrowRight size={17} /></button>{workspaceMutationReadOnly && <p>{workspaceExitUnavailable ? "Workspace status is temporarily unavailable, so new work is paused." : workspaceStopped ? "Work in this workspace has stopped." : "Switch to a workspace you own to create an assessment."}</p>}</>;
@@ -383,8 +383,12 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     onCreateWebsite={onHorizontal && snapshot.products.some((entry) => entry.id === "websites" && entry.availability === "available") ? () => onHorizontal("websites") : undefined}
     onRequest={onPlan ? (request) => {
       const plan = planWorkspaceStart(request, startContext);
-      if (plan.route === "websites" && plan.canContinue) {
-        const continuation = createWorkspaceStartContinuation(plan, plan.selectedPartIds);
+      if (plan.deliveryMode === "service") {
+        navigate("help", request);
+        return;
+      }
+      if (plan.kind === "supported" && plan.canContinue) {
+        const continuation = createWorkspaceStartContinuation(plan, plan.selectedPartIds, {}, startContext);
         if (continuation) { continueStart(continuation); return; }
       }
       onPlan(request);
