@@ -9,7 +9,7 @@ export type DeliveryCommitmentWriter = (actor: ServiceRequestActor, input: Deliv
 export class DeliveryCommitmentService {
   constructor(private readonly write: DeliveryCommitmentWriter) {}
 
-  execute(actor: ServiceRequestActor, raw: unknown): Promise<ServiceRequest> {
+  async execute(actor: ServiceRequestActor, raw: unknown): Promise<ServiceRequest> {
     const parsed = deliveryCommitmentCommandSchema.safeParse(raw);
     if (!parsed.success) throw new ServiceRequestValidationError("Check the delivery scope, terms, revision, and evidence.");
     const command = parsed.data;
