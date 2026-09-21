@@ -3,8 +3,6 @@ import { createClient } from "@supabase/supabase-js";
 import { expect, test } from "@playwright/test";
 import { localEnvironment, signedInContext } from "./support/local-auth";
 
-// Generic public smoke excludes this isolated suite. The dedicated launch job
-// sets the flag and rejects any skipped, failed, or flaky critical journey.
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Auth.");
 test.beforeAll(() => { localEnvironment(); });
 test.setTimeout(240_000);
@@ -22,17 +20,17 @@ for (const width of [1440, 390]) {
   let businessId="";
   const tenantId=`launch-${randomUUID().slice(0,8)}`;
   try {
-    // Public entry selects the native outcome. No admin creates this business.
+    // Observe the browser command before navigation. A full-page continuation
+    // may legitimately release its old CDP response body; verify stored state
+    // through the exact replay and the new route instead.
     await page.goto("/workspace/business/new?start=applications");
     await page.getByLabel("Business name",{exact:true}).fill(`Juniper launch ${width}`);
-    const setupResponse=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/workspace/businesses"&&r.request().method()==="POST");
+    const setupRequest=page.waitForRequest(r=>new URL(r.url()).pathname==="/api/workspace/businesses"&&r.method()==="POST");
     await page.getByRole("button",{name:"Continue with this business",exact:true}).click();
-    const created=await setupResponse;
-    expect(created.status(),await created.text()).toBe(200);
-    const entry=await created.json();businessId=entry.workspaceId;
-    const setupCommand=created.request().postDataJSON();
-    expect(entry.requestId).toBeNull();
-    await expect(page).toHaveURL(new RegExp(`workspaceId=${businessId}&view=applications`));
+    const setupCommand=(await setupRequest).postDataJSON();
+    await expect(page).toHaveURL(/\/workspace\?workspaceId=[a-f0-9-]+&view=applications$/);
+    businessId=new URL(page.url()).searchParams.get("workspaceId")!;
+    expect(businessId).toMatch(/^[a-f0-9-]{36}$/);
     const repeated=await owner.context.request.post("/api/workspace/businesses",{headers:{origin:env.app},data:setupCommand});
     expect(repeated.status(),await repeated.text()).toBe(200);
     expect(await repeated.json()).toMatchObject({workspaceId:businessId,requestId:null,alreadyCreated:true});
@@ -44,7 +42,6 @@ for (const width of [1440, 390]) {
     const app=await appResponse.json();
     await page.goto(`/workspace?workspaceId=${businessId}&work=${app.id}`);
     await expect(page.getByRole("heading",{name:"Team requests",exact:true})).toBeVisible();
-    // A native customer later requests an agency website in this same business.
     await page.goto(`/workspace?workspaceId=${businessId}&view=help`);
     await page.getByLabel("What are you trying to do?",{exact:true}).fill("Have Strelva build our website.");
     const requestResponse=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/service-requests"&&r.request().method()==="POST");
@@ -68,6 +65,9 @@ for (const width of [1440, 390]) {
     await operatorPage.getByLabel("The required inputs are ready and I can take this delivery.",{exact:true}).check();
     await operatorPage.getByRole("button",{name:"Propose 24-hour delivery",exact:true}).click();
     await expect(operatorPage.getByText("Scope and terms need your acceptance",{exact:true})).toBeVisible();
+    await page.goto(`/workspace?workspaceId=${businessId}`);
+    await expect(page.getByRole("heading",{name:"Strelva delivery",exact:true})).toBeVisible();
+    await expect(page.locator(`a[href="/workspace/delivery/${requestId}"]`).first()).toBeVisible();
     await page.goto(`/workspace/delivery/${requestId}`);
     await expect(page.getByRole("button",{name:"Propose 24-hour delivery",exact:true})).toHaveCount(0);
     const agreedResponse=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/service-requests/delivery"&&r.request().method()==="POST");
@@ -79,7 +79,7 @@ for (const width of [1440, 390]) {
     expect(repeatAgreement.status(),await repeatAgreement.text()).toBe(200);
     expect((await repeatAgreement.json()).request.deliveryCommitment.dueAt).toBe(dueAt);
 
-    // Represent an existing agency-built site, not a generated or live deployment.
+    // Represents an agency-built site; this fixture is not a live deployment.
     const tenant=await admin.from("tenants").insert({id:tenantId,site_name:"Local review website",active:true}).select("stable_id").single();
     expect(tenant.error).toBeNull();
     const bindingId=randomUUID();
@@ -100,6 +100,8 @@ for (const width of [1440, 390]) {
     expect((await stranger.context.request.get(`/api/service-requests/delivery?requestId=${requestId}`)).status()).toBe(403);
     await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await page.screenshot({path:testInfo.outputPath(`delivery-${width}.png`),fullPage:true});
+    await page.goto(`/workspace?workspaceId=${businessId}`);
+    await expect(page.getByText("Customer accepted this delivery",{exact:true})).toBeVisible();
     await page.goto(`/workspace?workspaceId=${businessId}&work=${app.id}`);
     await expect(page.getByRole("heading",{name:"Team requests",exact:true})).toBeVisible();
     const businesses=await owner.context.request.get("/api/workspace/businesses");
