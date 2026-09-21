@@ -45,10 +45,10 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Metadata and delivery contract regressions
+      - name: Metadata, delivery, entry, and UI regressions
         run: |
           pnpm test:workspace-target
-          pnpm exec vitest run src/__tests__/service-delivery-commitment.test.ts src/__tests__/service-requests.test.ts src/__tests__/workspace-start-launch.test.ts
+          pnpm exec vitest run src/__tests__/service-delivery-commitment.test.ts src/__tests__/service-requests.test.ts src/__tests__/workspace-start-launch.test.ts src/__tests__/business-entry.test.ts src/__tests__/business-entry-route.test.ts src/__tests__/delivery-client.test.ts src/__tests__/delivery-launch-ui.test.tsx src/__tests__/workspace-launch-return.test.ts
       - name: Full ordered upgrade and delivery lifecycle
         run: |
           export PATH="$(pg_config --bindir):$PATH"
@@ -71,3 +71,69 @@ jobs:
             test-results/
           if-no-files-found: ignore
           retention-days: 3
+
+  authenticated-journeys:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      CI: true
+      STRELVA_LOCAL_AUTH_PROOF: '1'
+      STRELVA_APPLICATION_USE_JOURNEY: '1'
+      STRELVA_WORKSPACE_RELEASE: '1'
+      REB_DEV_UNGATED_ACCESS: '0'
+      SCAFFOLD_DEV_UNGATED_ACCESS: '0'
+      EMAIL_SENDING_ENABLED: 'false'
+      CUSTOMER_EMAIL_ENABLED: 'false'
+      OPERATOR_EMAILS_ENABLED: 'false'
+      PROSPECT_EMAILS_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.117.0
+      - name: Install browser
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Start disposable Auth and Postgres, without hosted credentials
+        run: bash scripts/prepare-launch-auth-stack.sh
+      - name: Exercise real Auth, native tools, and agency delivery
+        run: |
+          set -euo pipefail
+          pnpm exec next dev --hostname 127.0.0.1 --port 3100 > "$RUNNER_TEMP/strelva-proof-app.log" 2>&1 &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in $(seq 1 90); do
+            if curl --fail --silent http://127.0.0.1:3100/sign-in > /dev/null; then ready=1; break; fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then break; fi
+            sleep 2
+          done
+          if [ "$ready" != 1 ]; then echo 'The isolated app failed to start.' >&2; exit 1; fi
+          export PLAYWRIGHT_JSON_OUTPUT_FILE="$RUNNER_TEMP/launch-results.json"
+          pnpm exec playwright test tests/launch-business-authenticated-local.spec.ts tests/application-use-authenticated-local.spec.ts tests/onboarding-authenticated-local.spec.ts tests/service-request-authenticated-local.spec.ts --workers=1 --retries=0 --reporter=line,json
+          node scripts/check-launch-browser-results.mjs "$RUNNER_TEMP/launch-results.json"
+      - name: Retain synthetic browser outcomes and screenshots, not credentials
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: authenticated-launch-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/launch-results.json
+            test-results/**/*.png
+          if-no-files-found: ignore
+          retention-days: 3
+      - name: Stop the disposable stack
+        if: always()
+        run: |
+          if [ -n "${STRELVA_AUTH_STACK_DIR:-}" ] && [ -f "$STRELVA_AUTH_STACK_DIR/supabase/config.toml" ]; then
+            supabase stop --workdir "$STRELVA_AUTH_STACK_DIR" --no-backup
+          fi

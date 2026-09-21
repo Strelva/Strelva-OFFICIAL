@@ -1,0 +1,115 @@
+import { randomUUID } from "node:crypto";
+import { createClient } from "@supabase/supabase-js";
+import { expect, test } from "@playwright/test";
+import { localEnvironment, signedInContext } from "./support/local-auth";
+
+// Generic public smoke excludes this isolated suite. The dedicated launch job
+// sets the flag and rejects any skipped, failed, or flaky critical journey.
+test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Auth.");
+test.beforeAll(() => { localEnvironment(); });
+test.setTimeout(240_000);
+
+for (const width of [1440, 390]) {
+ test(`fresh business, native work, and agency delivery retain one owner at ${width}px`, async ({browser}, testInfo) => {
+  const env=localEnvironment();
+  const admin=createClient(env.url,env.service,{auth:{persistSession:false,autoRefreshToken:false}});
+  const owner=await signedInContext(browser,admin,`launch-owner-${width}`);
+  const operator=await signedInContext(browser,admin,`launch-operator-${width}`);
+  const stranger=await signedInContext(browser,admin,`launch-stranger-${width}`);
+  const page=await owner.context.newPage();
+  page.setDefaultTimeout(30_000);
+  await page.setViewportSize({width,height:900});
+  let businessId="";
+  const tenantId=`launch-${randomUUID().slice(0,8)}`;
+  try {
+    // Public entry selects the native outcome. No admin creates this business.
+    await page.goto("/workspace/business/new?start=applications");
+    await page.getByLabel("Business name",{exact:true}).fill(`Juniper launch ${width}`);
+    const setupResponse=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/workspace/businesses"&&r.request().method()==="POST");
+    await page.getByRole("button",{name:"Continue with this business",exact:true}).click();
+    const created=await setupResponse;
+    expect(created.status(),await created.text()).toBe(200);
+    const entry=await created.json();businessId=entry.workspaceId;
+    const setupCommand=created.request().postDataJSON();
+    expect(entry.requestId).toBeNull();
+    await expect(page).toHaveURL(new RegExp(`workspaceId=${businessId}&view=applications`));
+    const repeated=await owner.context.request.post("/api/workspace/businesses",{headers:{origin:env.app},data:setupCommand});
+    expect(repeated.status(),await repeated.text()).toBe(200);
+    expect(await repeated.json()).toMatchObject({workspaceId:businessId,requestId:null,alreadyCreated:true});
+    expect((await stranger.context.request.get(`/api/workspace?workspaceId=${businessId}`)).status()).toBe(403);
+
+    // Use the actual native app service, with no model or website purchase.
+    const appResponse=await owner.context.request.post("/api/bounded-work",{headers:{origin:env.app},data:{action:"create",productId:"applications",workspaceId:businessId,input:{title:"Team requests",fields:[{id:"request",label:"Request",type:"text",required:true}],components:[{kind:"form",fields:["request"]},{kind:"list",fields:["request"]}]}}});
+    expect(appResponse.status(),await appResponse.text()).toBe(201);
+    const app=await appResponse.json();
+    await page.goto(`/workspace?workspaceId=${businessId}&work=${app.id}`);
+    await expect(page.getByRole("heading",{name:"Team requests",exact:true})).toBeVisible();
+    // A native customer later requests an agency website in this same business.
+    await page.goto(`/workspace?workspaceId=${businessId}&view=help`);
+    await page.getByLabel("What are you trying to do?",{exact:true}).fill("Have Strelva build our website.");
+    const requestResponse=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/service-requests"&&r.request().method()==="POST");
+    await page.getByRole("button",{name:"Save request",exact:true}).click();
+    const requested=await requestResponse;
+    expect(requested.status(),await requested.text()).toBe(200);
+    let item=(await requested.json()).request;
+    expect(item.businessId).toBe(businessId);expect(item.deliveryCommitment).toBeNull();
+    const requestId=item.id;
+
+    // Synthetic local operator identity only. No production grants or bypass.
+    expect((await admin.from("super_admins").insert({user_id:operator.userId,email:operator.email})).error).toBeNull();
+    const accepted=await operator.context.request.post("/api/service-requests",{headers:{origin:env.app},data:{action:"respond",requestId,expectedRevision:item.revision,decision:"accepted",note:"Local acceptance proof only",idempotencyKey:randomUUID()}});
+    expect(accepted.status(),await accepted.text()).toBe(200);item=(await accepted.json()).request;
+    expect(item.deliveryCommitment).toBeNull();
+    const operatorPage=await operator.context.newPage();operatorPage.setDefaultTimeout(30_000);
+    await operatorPage.setViewportSize({width,height:900});
+    await operatorPage.goto(`/workspace/delivery/${requestId}`);
+    await operatorPage.getByLabel("Agreed terms reference",{exact:true}).fill("Synthetic quote Q-LOCAL. No billing.");
+    await operatorPage.getByLabel("Exact delivery definition",{exact:true}).fill("Tested review website. Final-domain publication is separately approved.");
+    await operatorPage.getByLabel("The required inputs are ready and I can take this delivery.",{exact:true}).check();
+    await operatorPage.getByRole("button",{name:"Propose 24-hour delivery",exact:true}).click();
+    await expect(operatorPage.getByText("Scope and terms need your acceptance",{exact:true})).toBeVisible();
+    await page.goto(`/workspace/delivery/${requestId}`);
+    await expect(page.getByRole("button",{name:"Propose 24-hour delivery",exact:true})).toHaveCount(0);
+    const agreedResponse=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/service-requests/delivery"&&r.request().method()==="POST");
+    await page.getByRole("button",{name:"Accept scope and start 24-hour delivery",exact:true}).click();
+    const agreed=await agreedResponse;expect(agreed.status(),await agreed.text()).toBe(200);item=(await agreed.json()).request;
+    const dueAt=item.deliveryCommitment.dueAt;
+    expect(Date.parse(dueAt)-Date.parse(item.deliveryCommitment.startedAt)).toBe(24*60*60*1000);
+    const repeatAgreement=await owner.context.request.post("/api/service-requests/delivery",{headers:{origin:env.app},data:agreed.request().postDataJSON()});
+    expect(repeatAgreement.status(),await repeatAgreement.text()).toBe(200);
+    expect((await repeatAgreement.json()).request.deliveryCommitment.dueAt).toBe(dueAt);
+
+    // Represent an existing agency-built site, not a generated or live deployment.
+    const tenant=await admin.from("tenants").insert({id:tenantId,site_name:"Local review website",active:true}).select("stable_id").single();
+    expect(tenant.error).toBeNull();
+    const bindingId=randomUUID();
+    const binding=await admin.from("offering_website_bindings").insert({id:bindingId,business_workspace_id:businessId,tenant_stable_id:tenant.data!.stable_id,tenant_id_at_binding:tenantId,site_name_at_binding:"Local review website",idempotency_key:randomUUID(),command_digest:"a".repeat(64),created_by:owner.userId,updated_by:owner.userId});
+    expect(binding.error).toBeNull();
+    await operatorPage.reload();
+    await operatorPage.getByLabel("Customer website",{exact:true}).selectOption(bindingId);
+    await operatorPage.getByLabel("Repository, owner/name",{exact:true}).fill("example/local-proof-site");
+    await operatorPage.getByLabel("Full commit SHA",{exact:true}).fill("a".repeat(40));
+    await operatorPage.getByLabel("Public HTTPS review URL",{exact:true}).fill("https://review.example.com/local-proof");
+    for(const label of ["Desktop checked","Mobile checked","Primary action checked"]) await operatorPage.getByLabel(label,{exact:true}).check();
+    await operatorPage.getByRole("button",{name:"Submit for customer review",exact:true}).click();
+    await expect(operatorPage.getByText("Ready for customer review",{exact:true})).toBeVisible();
+    await page.reload();
+    await page.getByLabel("Decision or blocker note",{exact:true}).fill("Accepted the synthetic result for this local test.");
+    await page.getByRole("button",{name:"Accept delivered result",exact:true}).click();
+    await expect(page.getByText("Customer accepted this delivery",{exact:true})).toBeVisible();
+    expect((await stranger.context.request.get(`/api/service-requests/delivery?requestId=${requestId}`)).status()).toBe(403);
+    await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await page.screenshot({path:testInfo.outputPath(`delivery-${width}.png`),fullPage:true});
+    await page.goto(`/workspace?workspaceId=${businessId}&work=${app.id}`);
+    await expect(page.getByRole("heading",{name:"Team requests",exact:true})).toBeVisible();
+    const businesses=await owner.context.request.get("/api/workspace/businesses");
+    expect((await businesses.json()).businesses.filter((value:{id:string})=>value.id===businessId)).toHaveLength(1);
+    await operatorPage.close();
+  } finally {
+    await page.close();
+    if(businessId) await admin.from("workspaces").delete().eq("id",businessId);
+    await admin.from("tenants").delete().eq("id",tenantId);
+    for(const identity of [owner,operator,stranger]) {await identity.context.close();await admin.auth.admin.deleteUser(identity.userId).catch(()=>{});}
+  }
+ });
+}
