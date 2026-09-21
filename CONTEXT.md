@@ -35,6 +35,10 @@ adoption gaps remain in the foundation inventory.
 
 ## Current product work
 
+Use **The Mooney Firm, attymooney.com**, as the default product example and
+walkthrough from now on. The [website release focus](./docs/horizontal-product-brief-2026-09-11.md#september-20-website-release-focus)
+records this choice and links its existing customer acceptance requirements.
+
 Jacob's latest direction makes websites the main current commercial focus and
 self-service the primary experience. The [website release focus](./docs/horizontal-product-brief-2026-09-11.md#september-20-website-release-focus)
 owns that decision. Read the [website release review](./docs/strelvav2-horizontal-acceptance.md#website-release-review)

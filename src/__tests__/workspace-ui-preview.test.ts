@@ -5,6 +5,12 @@ import type { WorkspaceSnapshot } from "@/experience/workspace/contracts";
 
 describe("isolated Strelva interface preview", () => {
   it.each([
+    ["preview", "1", true], ["production", "1", false],
+    ["development", "1", false], [undefined, "1", false], ["preview", "", false],
+  ])("only enables hosted fixtures on an opted-in Vercel preview: %s / %s", (target, enabled, expected) => {
+    expect(strelvaUiPreviewEnabled({ NODE_ENV: "production", VERCEL_ENV: target, STRELVA_UI_PREVIEW: enabled } as NodeJS.ProcessEnv)).toBe(expected);
+  });
+  it.each([
     ["production", "1", false], ["test", "1", false], ["development", "", false], ["development", "true", false], ["development", "1", true],
   ])("requires explicit development opt-in: %s / %s", (mode, enabled, expected) => {
     expect(strelvaUiPreviewEnabled({ NODE_ENV: mode, STRELVA_UI_PREVIEW: enabled } as NodeJS.ProcessEnv)).toBe(expected);

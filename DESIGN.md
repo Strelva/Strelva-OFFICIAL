@@ -50,6 +50,28 @@ design specification.
 
 ## Latest foundation decisions
 
+### September 20 horizontal workspace direction
+
+Jacob selected a shared horizontal frame with the work itself in the main
+surface and contextual instructions, changes and review beside it. Website,
+inquiry and staff-application work retain their own useful interfaces within
+that frame; website navigation must not become the global product navigation.
+The Mooney Firm is the default example.
+
+The latest visual direction uses neutral black, white and gray surfaces,
+strong rounded panels and controls, and selective green for actions, selection
+and meaningful status. Avoid an overall green tint. Retain the owned Strelva
+mark and Geist typography. The generated concepts explore composition and
+geometry; they do not replace component APIs or certify contrast or behavior.
+
+The [website concept](./output/imagegen/strelva-horizontal-bw-green/01-website.png),
+[inquiry concept](./output/imagegen/strelva-horizontal-bw-green/02-inquiries.png)
+and [staff-app concept](./output/imagegen/strelva-horizontal-bw-green/03-staff-app.png)
+record the latest exploration. [Generation prompts](./output/imagegen/strelva-horizontal-bw-green/prompts.md)
+retain the constraints. These are not implemented screens. This selected page
+direction supersedes the earlier foundations-only scope for this work; exact
+component adoption and rendered acceptance remain pending.
+
 Jacob selected Geist Sans for interface text, the custom Strelva lettering for
 the logo, prominent gloss, selective atmospheric material, and equally finished
 light and dark components. Current work is foundations and components only, with

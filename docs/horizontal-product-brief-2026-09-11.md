@@ -13,6 +13,15 @@ same product for separately owned client work; Strelva or an agency may provide
 help when requested. Human delivery must be identified wherever the current
 implementation still requires it.
 
+Jacob selected **The Mooney Firm, attymooney.com**, as the default example for
+product discussions, website walkthroughs, demonstrations and release reviews
+from September 20 onward. Ground explanations in what the firm can do through
+its website and what Strelva actually handles. Label sample records and simulated
+outcomes explicitly; using the firm as the example does not establish live
+integration or authorize changes to its website or customer data. The existing
+[first customer release case](./horizontal-release-checklist-2026-09-11.md#first-customer-release-case)
+owns the Outlook / ADR Notable handoff requirements.
+
 The release review now follows the website journey: first visit, account entry,
 creation or supported connection, preview, publication, customer activity, later
 changes and recovery. Intake, bookings, documents and Checks support that journey

@@ -11,6 +11,7 @@ import { getDevAccessTenant, isDevAccessBypassEnabled } from "./lib/dev-access";
 import { MARKETING_HOSTS, isMarketingHost } from "./lib/marketing-hosts";
 import { parseTenantHost } from "./lib/tenant-host";
 import { CONTROL_PLANE_URL } from "./lib/brand";
+import { strelvaHostedPreviewEnabled } from "./experience/workspace/preview/enabled";
 
 export { isMarketingHost } from "./lib/marketing-hosts";
 export { validateCronRequest } from "@/lib/cron-auth";
@@ -478,6 +479,17 @@ export default async function proxy(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
   const devAccessBypass = isDevAccessBypassEnabled();
   const devPreviewRequest = devAccessBypass && req.nextUrl.searchParams.get("preview") === "true";
+
+  // Hosted review enters synthetic UI only. Real APIs, dashboards and their
+  // authentication gates remain unchanged; this never creates a session.
+  if (strelvaHostedPreviewEnabled() && ["/", "/sign-in", "/sign-up", "/workspace"].includes(pathname)) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/preview/strelva/workspace";
+    url.search = "";
+    const view = req.nextUrl.searchParams.get("view");
+    if (view) url.searchParams.set("view", view);
+    return applySecurityHeaders(NextResponse.redirect(url), req);
+  }
 
   // Public demo entry: /demo -> the demo tenant's dashboard (read-only, no auth).
   if (pathname === "/demo" || pathname === "/demo/") {

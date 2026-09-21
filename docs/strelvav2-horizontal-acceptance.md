@@ -1481,3 +1481,24 @@ live OAuth, provider write, reminder, production migration, deployment or
 external calendar account was used. Token refresh and explicit owner cleanup
 remain available after exit; new work and rescheduling stay blocked, and
 unknown outcomes retain their recovery path.
+
+
+### September 20 hosted interface preview
+
+The protected Vercel preview at https://strelva-app-staging-strelva.vercel.app
+now redirects its root, sign-in, sign-up and workspace entrance to the existing
+synthetic workspace. This requires both `VERCEL_ENV=preview` and
+`STRELVA_UI_PREVIEW=1`. Production authentication and real API authorization
+are unchanged. Jacob explicitly requested entry without staging database setup.
+
+Deployment `dpl_H7F56mPZV8FDTfoQeCSSzVujEtds` contains the release candidate plus
+the hosted fixture entry patch. Local validation: 45 focused tests, TypeScript
+and scoped ESLint passed. Hosted browser checks passed on desktop and mobile:
+sign-in reaches the synthetic workspace, the interface directory opens, and
+agency and managed-website surfaces respond. No browser runtime exceptions were
+observed. Rendered inspection found a missing decorative image in workspace home;
+this is not a completed visual acceptance.
+
+The preview uses fictional data and resets changes on reload. It establishes
+interface access only, not Supabase sign-in, durable saves, live integrations,
+billing or release readiness. Vercel team protection remains enabled.
