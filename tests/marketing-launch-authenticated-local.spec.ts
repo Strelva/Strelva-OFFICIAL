@@ -77,7 +77,7 @@ for (const width of [1440, 390]) {
           expect(saved.requestId).toBeNull();
           if (entry.start === "onboarding") {
             await expectReady(page.getByRole("heading", { name: "Start an onboarding case", exact: true })).toBeVisible();
-            await expectReady(page.getByRole("button", { name: "Start private case", exact: true })).toBeEnabled();
+            await expectReady(page.getByRole("button", { name: "Create case", exact: true })).toBeEnabled();
           } else {
             await expectReady(page.getByLabel("Name", { exact: true })).toBeEditable();
             await expectReady(page.getByRole("button", { name: "Create private app", exact: true })).toBeVisible();
