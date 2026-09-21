@@ -37,7 +37,7 @@ export async function GET(request: Request) {
       const id = z.string().uuid().parse(requestId);
       const saved = await new ServiceRequestService(PostgresServiceRequestStore).read(current, id);
       const permissions = await readServiceDeliveryPermissions(current, id);
-      return json({ request: saved, permissions });
+      return json({ actorId: current.userId, request: saved, permissions });
     }
     const providerWorkspaceId = params.get("providerWorkspaceId");
     if (!providerWorkspaceId && params.get("providerKind") !== "strelva") throw new ServiceRequestValidationError();
