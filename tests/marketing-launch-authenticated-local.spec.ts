@@ -7,6 +7,9 @@ const enabled = process.env.STRELVA_LOCAL_AUTH_PROOF === "1" && process.env.STRE
 test.skip(!enabled, "Requires the paired marketing candidate and isolated loopback Auth/Postgres.");
 test.use({ trace: "off", video: "off" });
 test.setTimeout(180_000);
+// The paired app is a cold development server. Wait for route compilation,
+// without retrying any test or treating this timeout as a production latency SLO.
+const expectReady = expect.configure({ timeout: 30_000 });
 
 function marketingOrigin(): string {
   const url = new URL(process.env.STRELVA_MARKETING_BASE_URL || "");
@@ -41,19 +44,19 @@ for (const width of [1440, 390]) {
         await page.goto(marketingOrigin());
         await page.getByRole("link", { name: entry.link, exact: true }).click();
         const destination = businessStartHref(entry.start);
-        await expect(page).toHaveURL(url => url.origin === env.app && url.pathname === "/sign-in" && url.searchParams.get("next") === destination);
+        await expectReady(page).toHaveURL(url => url.origin === env.app && url.pathname === "/sign-in" && url.searchParams.get("next") === destination);
         await owner.context.addCookies(cookies);
         await page.reload();
-        await expect(page).toHaveURL(`${env.app}${destination}`);
+        await expectReady(page).toHaveURL(`${env.app}${destination}`);
         await page.getByLabel("Business name", { exact: true }).fill(`Marketing ${entry.start} ${width}`);
         if (entry.start === "website") {
-          await expect(page.getByLabel("Request for Strelva", { exact: true })).toHaveValue(businessStartRequest("website"));
+          await expectReady(page.getByLabel("Request for Strelva", { exact: true })).toHaveValue(businessStartRequest("website"));
         }
         const setupRequest = page.waitForRequest(request => new URL(request.url()).pathname === "/api/workspace/businesses" && request.method() === "POST");
         await page.getByRole("button", { name: entry.start === "website" ? "Save business and request" : "Continue with this business", exact: true }).click();
         const command = (await setupRequest).postDataJSON();
         expect(command.initialRequest).toBe(entry.start === "website" ? businessStartRequest("website") : null);
-        await expect(page).toHaveURL(url => entry.start === "website"
+        await expectReady(page).toHaveURL(url => entry.start === "website"
           ? /^\/workspace\/delivery\/[a-f0-9-]{36}$/.test(url.pathname)
           : url.pathname === "/workspace" && url.searchParams.get("view") === businessStartView(entry.start) && Boolean(url.searchParams.get("workspaceId")));
         const repeated = await owner.context.request.post("/api/workspace/businesses", { headers: { origin: env.app }, data: command });
@@ -69,11 +72,16 @@ for (const width of [1440, 390]) {
             businessId, request: businessStartRequest("website"),
             providerAcceptance: { status: "pending" }, deliveryCommitment: null,
           });
-          await expect(page.getByRole("main")).toContainText(businessStartRequest("website"));
+          await expectReady(page.getByRole("main")).toContainText(businessStartRequest("website"));
         } else {
           expect(saved.requestId).toBeNull();
-          if (entry.start === "onboarding") await expect(page.getByRole("heading", { name: "Start an onboarding case" })).toBeVisible();
-          else await expect(page.getByRole("main")).toContainText("Application");
+          if (entry.start === "onboarding") {
+            await expectReady(page.getByRole("heading", { name: "Start an onboarding case", exact: true })).toBeVisible();
+            await expectReady(page.getByRole("button", { name: "Start private case", exact: true })).toBeEnabled();
+          } else {
+            await expectReady(page.getByLabel("Name", { exact: true })).toBeEditable();
+            await expectReady(page.getByRole("button", { name: "Create private app", exact: true })).toBeVisible();
+          }
         }
         const businesses = await owner.context.request.get("/api/workspace/businesses");
         expect(businesses.status()).toBe(200);
