@@ -1,0 +1,73 @@
+name: Launch verification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'supabase/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/launch-verification.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: launch-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  persisted-delivery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Retain exact reviewed source
+        run: |
+          mkdir -p /tmp/strelva-source
+          git archive --format=tar.gz --prefix=strelva-source/ HEAD > /tmp/strelva-source/source.tar.gz
+          git rev-parse HEAD > /tmp/strelva-source/commit.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reviewed-source-${{ github.run_id }}
+          path: /tmp/strelva-source/
+          retention-days: 1
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Metadata and delivery contract regressions
+        run: |
+          pnpm test:workspace-target
+          pnpm exec vitest run src/__tests__/service-delivery-commitment.test.ts src/__tests__/service-requests.test.ts src/__tests__/workspace-start-launch.test.ts
+      - name: Full ordered upgrade and delivery lifecycle
+        run: |
+          export PATH="$(pg_config --bindir):$PATH"
+          pnpm check:workspace-upgrade
+      - name: Install browser
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Workspace browser acceptance, including draft PRs
+        run: pnpm smoke:workspace
+        env:
+          CI: true
+          REB_DEV_UNGATED_ACCESS: '0'
+          SCAFFOLD_DEV_UNGATED_ACCESS: '0'
+      - name: Retain browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: launch-browser-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 3

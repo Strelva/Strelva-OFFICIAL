@@ -132,5 +132,6 @@ fi
 printf 'Expected migration rerun rejection preserved the applied schema.\n'
 
 psql "${psql_args[@]}" --file="$schema_test"
+psql "${psql_args[@]}" --file="$repo_root/tests/service-delivery-commitments-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
