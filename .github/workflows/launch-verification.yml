@@ -108,12 +108,16 @@ jobs:
       - name: Exercise real Auth, native tools, and agency delivery
         run: |
           set -euo pipefail
-          pnpm exec next dev --hostname 127.0.0.1 --port 3100 > "$RUNNER_TEMP/strelva-proof-app.log" 2>&1 &
+          # Next normalizes loopback request URLs to localhost. Use the same
+          # exact origin in the browser and server; do not relax CSRF checks.
+          export PLAYWRIGHT_BASE_URL=http://localhost:3100
+          export NEXT_PUBLIC_APP_URL=http://localhost:3100
+          pnpm exec next dev --hostname localhost --port 3100 > "$RUNNER_TEMP/strelva-proof-app.log" 2>&1 &
           app_pid=$!
           trap 'kill "$app_pid" 2>/dev/null || true' EXIT
           ready=0
           for attempt in $(seq 1 90); do
-            if curl --fail --silent http://127.0.0.1:3100/sign-in > /dev/null; then ready=1; break; fi
+            if curl --fail --silent http://localhost:3100/sign-in > /dev/null; then ready=1; break; fi
             if ! kill -0 "$app_pid" 2>/dev/null; then break; fi
             sleep 2
           done
@@ -129,6 +133,7 @@ jobs:
           path: |
             ${{ runner.temp }}/launch-results.json
             test-results/**/*.png
+            test-results/**/error-context.md
           if-no-files-found: ignore
           retention-days: 3
       - name: Stop the disposable stack
