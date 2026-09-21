@@ -6,16 +6,17 @@ import { z } from "zod";
 import { Button } from "@/components/ui/Button";
 import { TextInput, TextArea, SelectInput } from "@/components/ui/TextInput";
 import { businessEntryInputSchema, businessEntryResultSchema, type BusinessEntryInput } from "@/platform/workspaces/business-entry-contract";
+import { businessStartHref, businessStartRequest, businessStartView, type BusinessStartProduct } from "@/lib/business-start";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 
 const choicesSchema = z.object({ actorId: z.string().uuid(), businesses: z.array(z.object({ id: z.string().uuid(), name: z.string() })) });
-export type BusinessStartProduct = "applications" | "onboarding" | "tracker" | "document" | "help";
+export type { BusinessStartProduct } from "@/lib/business-start";
 function message(body: unknown, fallback: string): string {
   return body && typeof body === "object" && typeof (body as { error?: unknown }).error === "string" ? String((body as { error: string }).error) : fallback;
 }
 
 /** Explicit ownership setup. The server saves the optional request atomically. */
-export function BusinessSetupPanel({ initialRequest = "", startProduct = "help" }: { initialRequest?: string; startProduct?: BusinessStartProduct }) {
+export function BusinessSetupPanel({ startProduct = "help", initialRequest = businessStartRequest(startProduct) }: { initialRequest?: string; startProduct?: BusinessStartProduct }) {
   const transport = useWorkspaceRequest();
   const [choices, setChoices] = useState<z.infer<typeof choicesSchema> | null>(null);
   const [selected, setSelected] = useState("new");
@@ -86,18 +87,18 @@ export function BusinessSetupPanel({ initialRequest = "", startProduct = "help" 
       const result = businessEntryResultSchema.safeParse(body);
       if (!result.success) throw new Error("Setup returned an unconfirmed result. Retry the retained setup.");
       sessionStorage.removeItem(key); setPending(null);
-      window.location.assign(result.data.requestId ? `/workspace/delivery/${result.data.requestId}` : `/workspace?workspaceId=${encodeURIComponent(result.data.workspaceId)}&view=${startProduct}`);
+      window.location.assign(result.data.requestId ? `/workspace/delivery/${result.data.requestId}` : `/workspace?workspaceId=${encodeURIComponent(result.data.workspaceId)}&view=${businessStartView(startProduct)}`);
     } catch (cause) { if (isCurrent()) setError(cause instanceof Error ? cause.message : "Setup is not confirmed. Retry the retained setup."); }
     finally { mutation.current = false; if (isCurrent()) setSaving(false); }
   }
   if (loading) return <p role="status">Checking the businesses you can manage…</p>;
-  if (!choices) return <section className="space-y-4"><p role="alert">{error || "Business access is unavailable."}</p>{signIn ? <Link href={`/sign-in?next=${encodeURIComponent(`/workspace/business/new?start=${startProduct}`)}`}>Sign in to continue</Link> : <Button variant="secondary" onClick={() => setAttempt(value => value + 1)}>Check again</Button>}</section>;
+  if (!choices) return <section className="space-y-4"><p role="alert">{error || "Business access is unavailable."}</p>{signIn ? <Link href={`/sign-in?next=${encodeURIComponent(businessStartHref(startProduct))}`}>Sign in to continue</Link> : <Button variant="secondary" onClick={() => setAttempt(value => value + 1)}>Check again</Button>}</section>;
   const locked = saving || Boolean(pending);
   return <form className="space-y-4" aria-label="Choose the customer business" onSubmit={event => void save(event)}>
     <h2 className="text-xl">Which business is this for?</h2><p className="text-gray-muted">Use a business you manage or create one. No website purchase is required. Existing personal work stays separate.</p>
     {choices.businesses.length ? <SelectInput label="Business" value={selected} disabled={locked} onChange={event => setSelected(event.target.value)} options={[{value:"new",label:"Create a new business"},...choices.businesses.map(item=>({value:item.id,label:item.name}))]} /> : null}
     {selected === "new" ? <TextInput label="Business name" value={name} maxLength={120} required disabled={locked} onChange={event => setName(event.target.value)} /> : null}
-    {startProduct === "help" || request ? <TextArea label="Request for Strelva" value={request} maxLength={3000} rows={5} disabled={locked} onChange={event => setRequest(event.target.value)} /> : null}
+    {startProduct === "help" || startProduct === "website" || request ? <TextArea label="Request for Strelva" value={request} maxLength={3000} rows={5} disabled={locked} onChange={event => setRequest(event.target.value)} /> : null}
     {pending ? <p role="status">A setup request is retained. Retrying uses the same business and request identity, not a second creation.</p> : null}
     {error ? <p role="alert">{error}</p> : null}
     <Button type="submit" disabled={saving || (selected === "new" && !name.trim())}>{saving ? "Saving…" : pending ? "Retry retained setup" : request.trim() ? "Save business and request" : "Continue with this business"}</Button>

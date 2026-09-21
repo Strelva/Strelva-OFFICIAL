@@ -1,3 +1,5 @@
+import { isBusinessStartProduct } from "./business-start";
+
 /** Navigation hints only. APIs still authorize the requested workspace and work. */
 const ID = /^[a-z0-9_-]{1,128}$/i;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
@@ -15,7 +17,7 @@ export function workspaceReturnTarget(value: string | null): string | null {
     const entry = [...target.searchParams][0];
     if (!entry) return null;
     const [key, item] = entry;
-    if (target.pathname === "/workspace/business/new" && key === "start" && ["applications", "onboarding", "tracker", "document", "help"].includes(item)) return `${target.pathname}?${target.searchParams}`;
+    if (target.pathname === "/workspace/business/new" && key === "start" && isBusinessStartProduct(item)) return `${target.pathname}?${target.searchParams}`;
     if (target.pathname === "/workspace/delivery" && ((key === "providerKind" && item === "strelva") || ((key === "businessId" || key === "providerWorkspaceId") && UUID.test(item)))) return `${target.pathname}?${target.searchParams}`;
     return null;
   }
