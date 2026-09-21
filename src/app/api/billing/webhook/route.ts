@@ -17,6 +17,7 @@ import { sendNewSignupEmail, sendPaymentFailedEmail, sendPaymentPastDueEmail } f
 import { OPERATOR_URL } from "@/lib/brand";
 import { getAccountForTenant, setAccountSubscription, type AccountSubscriptionItem } from "@/lib/accounts";
 import { getStripe } from "@/lib/billing";
+import { syncConfiguredSubscriptionAllowance } from "@/platform/work-economics";
 
 const PROCESSED_EVENT_TTL_SECONDS = 60 * 60 * 24 * 30;
 const PROCESSING_STALE_MINUTES = 5;
@@ -523,9 +524,11 @@ export async function POST(req: Request) {
           // trialing) and flips to "active" when the trial's first invoice.paid
           // fires. Best-effort: fall back to "active" if the lookup fails.
           let subscriptionStatus: "active" | "trialing" = "active";
+          let retrievedSubscription: Stripe.Subscription | null = null;
           if (subscriptionId) {
             try {
               const sub = await stripe.subscriptions.retrieve(subscriptionId);
+              retrievedSubscription = sub;
               if (sub.status === "trialing") subscriptionStatus = "trialing";
             } catch {
               // keep "active" — a paid checkout completed
@@ -558,6 +561,24 @@ export async function POST(req: Request) {
             },
             event
           );
+          // A checkout session usually carries only the subscription id. When
+          // the retrieved subscription is available, use its period and
+          // metadata for the durable allowance projection, while preserving
+          // session metadata as a fallback for workspace-scoped setup.
+          if (retrievedSubscription) {
+            await syncConfiguredSubscriptionAllowance({
+              ...event,
+              data: {
+                object: {
+                  ...retrievedSubscription,
+                  metadata: {
+                    ...(session.metadata ?? {}),
+                    ...(retrievedSubscription.metadata ?? {}),
+                  },
+                },
+              },
+            });
+          }
           // Operator notification (Noah + Jacob) on the SIGNUP moment. Checkout
           // completes once per subscription creation — renewals arrive as
           // invoice.paid, NOT here — so this fires on the first activation only
@@ -617,6 +638,7 @@ export async function POST(req: Request) {
           subscriptionPastDueSince: null,
           ...(subscriptionId ? { stripeSubscriptionId: subscriptionId } : {}),
         }, event);
+        await syncConfiguredSubscriptionAllowance(event);
         // Refresh the account snapshot on renewal so a multi-site account's
         // status/MRR stays current (best-effort; no-ops for a single-site sub).
         try {
@@ -643,6 +665,7 @@ export async function POST(req: Request) {
           subscriptionStatus: "past_due",
           subscriptionPastDueSince: pastDueSince,
         }, event);
+        await syncConfiguredSubscriptionAllowance(event);
         // alert() now routes to Slack AND Sentry — a failed customer payment
         // must not be invisible if Sentry is unconfigured (it usually is).
         alert("billing_payment_failed", "critical", {
@@ -732,6 +755,7 @@ export async function POST(req: Request) {
             : undefined) ??
           null;
         await applyTenantSubscriptionStatus(deletedTenantId, { subscriptionStatus: "cancelled" }, event);
+        await syncConfiguredSubscriptionAllowance(event);
         alert("billing_subscription_cancelled", "high", { tenantId: deletedTenantId ?? "unknown" });
         // Mark the account's bundled subscription canceled (zeroes its MRR, flips
         // the other bundled sites to cancelled too).
@@ -787,6 +811,7 @@ export async function POST(req: Request) {
           },
           event,
         );
+        await syncConfiguredSubscriptionAllowance(event);
         // Keep the account snapshot current on any sub update (plan change,
         // pause, reactivation). Best-effort; a sync hiccup must not 500 the ack.
         try {

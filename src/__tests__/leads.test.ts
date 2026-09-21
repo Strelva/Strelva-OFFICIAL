@@ -23,7 +23,7 @@ beforeEach(() => {
   vi.setSystemTime(clock);
 });
 
-import { recordLead, getLeads, getLeadSummary } from "@/lib/leads";
+import { captureLead, recordLead, getLeads, getLeadSummary } from "@/lib/leads";
 
 describe("leads store", () => {
   it("captures a submission with name + message", async () => {
@@ -32,6 +32,24 @@ describe("leads store", () => {
     expect(leads).toHaveLength(1);
     expect(leads[0]!.name).toBe("Sarah Chen");
     expect(leads[0]!.message).toBe("Saturday?");
+  });
+
+  it("retains structured inquiry fields and can read the duplicate lead for provenance repair", async () => {
+    const input = {
+      name: "Ada Rivera",
+      email: "ada@example.com",
+      message: "Soon",
+      source: "inquiry-capability",
+      fields: { name: "Ada Rivera", email: "ada@example.com", timeline: "Soon" },
+      capabilityId: "cap_inquiry",
+      capabilityVersion: 2,
+    };
+    const first = await captureLead("t1", input, { notifyOwner: false });
+    expect(first.status).toBe("captured");
+    if (first.status !== "captured") return;
+    expect(first.lead).toMatchObject({ fields: input.fields, capabilityId: "cap_inquiry", capabilityVersion: 2 });
+    const second = await captureLead("t1", input, { notifyOwner: false });
+    expect(second).toMatchObject({ status: "duplicate", lead: { id: first.lead.id } });
   });
 
   it("dedupes a double-submit of the same submission", async () => {

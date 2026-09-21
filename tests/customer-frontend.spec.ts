@@ -155,7 +155,7 @@ test("the sign-in page renders the current Supabase sign-in surface", async ({ r
   const response = await request.get("/sign-in");
   expect(response.status()).toBeLessThan(400);
   const html = await response.text();
-  expect(html).toContain("Sign in to your dashboard");
+  expect(html).toContain("Sign in to your work.");
   expect(html).not.toContain("Dashboard sign-in is paused");
 });
 

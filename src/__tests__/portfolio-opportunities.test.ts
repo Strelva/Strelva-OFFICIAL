@@ -115,9 +115,11 @@ describe("scanPortfolioOpportunities", () => {
     // Biggest-lever first: the 2-client groups precede the 1-client group.
     expect(snap.groups[snap.groups.length - 1]!.kind).toBe("low_health");
     expect(snap.totalOpportunities).toBe(5); // 2 unreplied + 2 stale + 1 low-health
+    expect(snap.availability).toBe("complete");
+    expect(snap.incomplete).toEqual([]);
   });
 
-  it("degrades a per-tenant read failure to no signal rather than failing the scan", async () => {
+  it("keeps a per-tenant read failure explicit while preserving other signals", async () => {
     mockGetAllTenants.mockResolvedValue([
       { id: "acme", siteName: "Acme Co", active: true },
       { id: "bolt", siteName: "Bolt Studio", active: true },
@@ -130,6 +132,23 @@ describe("scanPortfolioOpportunities", () => {
     const snap = await scanPortfolioOpportunities();
     const unreplied = snap.groups.find((g) => g.kind === "unreplied_reviews");
     expect(unreplied?.clients.map((c) => c.tenantId)).toEqual(["acme"]);
+    expect(snap.availability).toBe("partial");
+    expect(snap.incomplete).toEqual([
+      { source: "reviews", tenantId: "bolt", siteName: "Bolt Studio" },
+    ]);
+  });
+
+  it("never calls an unreadable client directory a verified empty opportunity scan", async () => {
+    mockGetAllTenants.mockRejectedValue(new Error("redis down"));
+
+    const snap = await scanPortfolioOpportunities();
+
+    expect(snap).toEqual({
+      groups: [],
+      totalOpportunities: 0,
+      availability: "unavailable",
+      incomplete: [{ source: "client_directory" }],
+    });
   });
 
   it("returns nothing when there is no latent work", async () => {
@@ -137,6 +156,8 @@ describe("scanPortfolioOpportunities", () => {
     const snap = await scanPortfolioOpportunities();
     expect(snap.groups).toEqual([]);
     expect(snap.totalOpportunities).toBe(0);
+    expect(snap.availability).toBe("complete");
+    expect(snap.incomplete).toEqual([]);
   });
 });
 

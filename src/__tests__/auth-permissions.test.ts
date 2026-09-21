@@ -42,6 +42,8 @@ describe("auth permission helpers", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv("SCAFFOLD_DEV_UNGATED_ACCESS", undefined);
+    vi.stubEnv("REB_DEV_UNGATED_ACCESS", "0");
     mockGetSessionUser.mockResolvedValue(VERIFIED);
     mockGetMembershipRole.mockResolvedValue(null);
     mockIsSuperAdminUser.mockResolvedValue(false);

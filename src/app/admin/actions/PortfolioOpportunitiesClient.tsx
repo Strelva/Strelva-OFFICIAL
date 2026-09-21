@@ -57,6 +57,35 @@ function FlowStrip() {
 /** Reasons that are "nothing to do", not a failure, so we don't alarm the operator. */
 const BENIGN_REASONS = new Set(["already_drafted", "no_unreplied_review", "nothing_to_draft"]);
 
+function incompleteReadMessage(snapshot: PortfolioOpportunitiesSnapshot): string {
+  if (snapshot.incomplete.some((read) => read.source === "client_directory")) {
+    return "The client directory could not be read, so this opportunity scan is unavailable.";
+  }
+
+  const names = snapshot.incomplete
+    .map((read) => read.siteName || read.tenantId)
+    .filter((name): name is string => Boolean(name));
+  const sourceLabels = Array.from(
+    new Set(
+      snapshot.incomplete.map((read) =>
+        read.source === "site_health"
+          ? "site health"
+          : read.source === "reviews"
+            ? "reviews"
+            : "retention signals",
+      ),
+    ),
+  );
+  if (names.length > 0) {
+    const shown = names.slice(0, 3).join(", ");
+    const remainder = names.length - Math.min(names.length, 3);
+    return remainder > 0
+      ? `${sourceLabels.join(" and ")} could not be checked for ${shown} and ${remainder} more client${remainder === 1 ? "" : "s"}.`
+      : `${sourceLabels.join(" and ")} could not be checked for ${shown}.`;
+  }
+  return `${sourceLabels.join(" and ")} could not be checked.`;
+}
+
 export function PortfolioOpportunitiesClient({
   snapshot,
 }: {
@@ -99,10 +128,47 @@ export function PortfolioOpportunitiesClient({
     [router],
   );
 
-  if (snapshot.totalOpportunities === 0) return null;
+  const readsIncomplete = snapshot.incomplete.length > 0;
+  if (snapshot.totalOpportunities === 0 && !readsIncomplete) return null;
 
   return (
     <div className="max-w-3xl space-y-4">
+      {readsIncomplete && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm"
+        >
+          <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" strokeWidth={2} aria-hidden="true" />
+          <div className="min-w-0">
+            <p className="font-medium text-warm-white">This opportunity scan is incomplete.</p>
+            <p className="mt-0.5 text-[12.5px] leading-relaxed text-gray-muted">
+              {incompleteReadMessage(snapshot)}
+            </p>
+            <Link
+              href="/admin/actions"
+              className="mt-2 inline-flex min-h-8 items-center rounded-lg text-[12px] font-semibold text-warning underline decoration-warning/40 underline-offset-2 hover:decoration-warning"
+            >
+              Retry reads
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {snapshot.totalOpportunities === 0 ? (
+        <div className="rounded-2xl border border-glass-border bg-glass px-6 py-10 text-center">
+          <p className="text-[14px] font-semibold text-warm-white">No verified opportunities to display yet</p>
+          <p className="mx-auto mt-1.5 max-w-sm text-[12.5px] leading-relaxed text-gray-muted">
+            The reads that completed returned no opportunities. Retry before treating the portfolio as clear.
+          </p>
+          <Link
+            href="/admin/actions"
+            className="mt-4 inline-flex min-h-10 items-center rounded-lg bg-accent px-3.5 py-2 text-[12.5px] font-semibold text-on-accent hover:bg-accent/90"
+          >
+            Retry reads
+          </Link>
+        </div>
+      ) : (
+        <>
       <div className="space-y-3">
         <div>
           <h2 className="flex items-center gap-2.5 font-display text-[26px] sm:text-[30px] font-medium tracking-[-0.02em] text-warm-white">
@@ -207,6 +273,8 @@ export function PortfolioOpportunitiesClient({
           );
         })}
       </div>
+        </>
+      )}
     </div>
   );
 }

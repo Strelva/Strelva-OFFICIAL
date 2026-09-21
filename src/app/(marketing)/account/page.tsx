@@ -9,10 +9,22 @@ import {
 import { getDevAccessTenant } from "@/lib/dev-access";
 import type { TenantConfig } from "@/lib/types";
 import Link from "next/link";
+import { workspaceReleaseEnabled } from "@/platform/workspace-release";
+import { inquiryReleaseEnabled } from "@/products/inquiries/server";
+import { workspaceReturnTarget } from "@/lib/workspace-location";
 
 export const dynamic = "force-dynamic";
 
-export default async function AccountPage() {
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ managed?: string | string[]; next?: string | string[] }>;
+} = {}) {
+  const params = await searchParams;
+  const managedRequested = params?.managed === "1";
+  const workspaceTarget = workspaceReleaseEnabled() && typeof params?.next === "string"
+    ? workspaceReturnTarget(params.next)
+    : null;
   const userId = await getAuthUserId();
 
   if (!userId) {
@@ -22,7 +34,7 @@ export default async function AccountPage() {
       if (config && isActiveTenant(config)) redirect(getTenantDashboardFallbackUrl(config));
       redirect(`/dashboard?tenant=${devTenant}`);
     }
-    redirect("/sign-in");
+    redirect(workspaceTarget ? `/sign-in?next=${encodeURIComponent(workspaceTarget)}` : "/sign-in");
   }
 
   // Super admins go straight to the operator console — it already has
@@ -32,6 +44,15 @@ export default async function AccountPage() {
   }
 
   const claimedInvite = await claimPendingInviteForCurrentUser();
+  if (inquiryReleaseEnabled() && !managedRequested) {
+    if (workspaceTarget) redirect(workspaceTarget);
+    redirect("/business");
+  }
+  // Claim an existing invitation before entering the shared environment. This
+  // changes only the landing destination; membership and site gates still own
+  // access. The explicit managed path keeps the existing recovery/chooser flow.
+  if (workspaceReleaseEnabled() && !managedRequested) redirect(workspaceTarget || "/workspace");
+
   if (claimedInvite) {
     const config = await getTenantConfig(claimedInvite.tenant);
     if (config && isActiveTenant(config)) redirect(getTenantDashboardFallbackUrl(config));

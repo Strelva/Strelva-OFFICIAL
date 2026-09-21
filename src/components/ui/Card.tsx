@@ -1,5 +1,6 @@
 import { forwardRef, type HTMLAttributes } from "react";
 import { cn } from "@/lib/cn";
+import styles from "./primitives.module.css";
 
 type CardVariant = "default" | "interactive";
 
@@ -8,11 +9,11 @@ interface CardProps extends HTMLAttributes<HTMLDivElement> {
   padding?: "none" | "sm" | "md" | "lg";
 }
 
-const paddingStyles: Record<string, string> = {
+const paddingStyles: Record<string, string | undefined> = {
   none: "",
-  sm: "p-3",
-  md: "p-4",
-  lg: "px-5 py-4",
+  sm: styles.cardSmall,
+  md: styles.cardMedium,
+  lg: styles.cardLarge,
 };
 
 export const Card = forwardRef<HTMLDivElement, CardProps>(
@@ -20,9 +21,10 @@ export const Card = forwardRef<HTMLDivElement, CardProps>(
     <div
       ref={ref}
       className={cn(
-        "bg-surface rounded-2xl",
+        "bg-surface",
+        styles.card,
         paddingStyles[padding],
-        variant === "interactive" && "reb-card-glow transition-shadow duration-150",
+        variant === "interactive" && styles.cardInteractive,
         className,
       )}
       {...rest}

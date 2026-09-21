@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { scoreAiVisibility, type ScoreInput } from "@/lib/ai-visibility/score";
-import { saveAiVisibilityResult } from "@/lib/ai-visibility/results";
+import { scoreAiVisibility, type ScoreInput, saveAiVisibilityResult } from "@/products/ai-visibility/server";
 import { isRateLimitedWindowedAsync, rateLimitKey } from "@/lib/rate-limit";
 
 /**
@@ -9,7 +8,7 @@ import { isRateLimitedWindowedAsync, rateLimitKey } from "@/lib/rate-limit";
  *
  * POST { business, url?, category?, city? } -> AiVisibilityResult JSON.
  *
- * Reuses the existing scorer in `src/lib/ai-visibility/score.ts` verbatim — no
+ * Reuses the product scorer in `src/products/ai-visibility/server.ts` — no
  * scoring logic lives here. The scorer already degrades gracefully without
  * GOOGLE_GENERATIVE_AI_API_KEY (readiness-only mode), so a missing key is not an
  * error here. This route only validates input and surfaces failures cleanly.

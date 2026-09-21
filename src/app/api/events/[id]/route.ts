@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantPermission } from "@/lib/auth";
+import { getAuthUserId, verifyAuth, requireTenantPermission } from "@/lib/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { resolveEventAction } from "@/lib/event-actions";
@@ -11,6 +11,8 @@ export async function PATCH(
 ) {
   const authed = await verifyAuth();
   if (!authed) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const actorId = await getAuthUserId();
+  if (!actorId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { id } = await params;
 
@@ -33,7 +35,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    const result = await resolveEventAction(tenant, id, status);
+    const result = await resolveEventAction(tenant, id, status, actorId);
     if (result.reason === "not_found" || result.reason === "wrong_tenant") {
       return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }

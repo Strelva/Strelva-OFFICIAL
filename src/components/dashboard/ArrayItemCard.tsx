@@ -284,7 +284,7 @@ export function ArrayItemCard({
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                  className="text-[11px] font-medium text-terra hover:text-[#943a24] transition-colors"
+                  className="text-[11px] font-medium text-critical hover:text-critical transition-colors"
                 >
                   Yes
                 </button>

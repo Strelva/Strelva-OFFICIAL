@@ -5,19 +5,33 @@ import { usePathname } from "next/navigation";
 import type { CSSProperties } from "react";
 import {
   LayoutGrid, Users, Building2, Inbox, UserPlus, CreditCard, BarChart3,
-  Zap, FileText, Wrench, Activity, ScrollText, Globe, type LucideIcon,
+  Zap, FileText, Wrench, Activity, ScrollText, Globe, BriefcaseBusiness,
+  type LucideIcon,
 } from "lucide-react";
 import { LogoMark } from "@/components/Logo";
 
 interface Item { href: string; label: string; icon: LucideIcon; exact?: boolean; badgeKey?: string; hot?: boolean }
 interface Group { label?: string; items: Item[] }
 
-// Nav is grouped by what the operator is doing, not hidden behind a "More" menu:
-// the client book + lifecycle tools, the review queues, then the system views.
+// Nav is grouped by responsibility, not hidden behind a "More" menu: delivery,
+// customer support, then restricted system administration.
 export const NAV: Group[] = [
-  { items: [{ href: "/admin", label: "Overview", icon: LayoutGrid, exact: true }] },
   {
-    label: "Clients",
+    items: [
+      { href: "/admin", label: "Overview", icon: LayoutGrid, exact: true },
+      { href: "/admin/work", label: "Internal work", icon: BriefcaseBusiness },
+    ],
+  },
+  {
+    label: "Delivery",
+    items: [
+      { href: "/admin/actions", label: "Managed-site work", icon: Zap, badgeKey: "actions", hot: true },
+      { href: "/admin/drafts", label: "Drafts", icon: FileText },
+      { href: "/admin/digests", label: "Maintenance", icon: Wrench },
+    ],
+  },
+  {
+    label: "Support",
     items: [
       { href: "/admin/clients", label: "Clients", icon: Users, badgeKey: "clients" },
       { href: "/admin/accounts", label: "Accounts", icon: Building2, badgeKey: "accounts" },
@@ -28,15 +42,7 @@ export const NAV: Group[] = [
     ],
   },
   {
-    label: "Review",
-    items: [
-      { href: "/admin/actions", label: "Actions", icon: Zap, badgeKey: "actions", hot: true },
-      { href: "/admin/drafts", label: "Drafts", icon: FileText },
-      { href: "/admin/digests", label: "Maintenance", icon: Wrench },
-    ],
-  },
-  {
-    label: "System",
+    label: "System administration",
     items: [
       { href: "/admin/ops", label: "Ops", icon: Activity, badgeKey: "ops", hot: true },
       { href: "/admin/uptime", label: "Uptime", icon: Globe },

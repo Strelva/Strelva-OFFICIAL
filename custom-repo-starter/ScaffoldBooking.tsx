@@ -4,7 +4,9 @@
  * Wraps a booking widget in a lazy, responsive iframe — Calendly or any generic
  * iframe-embeddable booking URL (Acuity, Cal.com, SavvyCal, a practice-management
  * scheduler, …). "Book online" is the Growth-tier transact promise; this is the
- * drop-in.
+ * drop-in. The iframe does not create a Strelva calendar reservation or receipt;
+ * wire `trackBookingClick` from `ScaffoldTracker.tsx` separately when a click
+ * metric is wanted.
  *
  * Server-safe on purpose: NO "use client". Booking is embedded as a plain
  * `<iframe>`, so it renders identical markup on server and client (no hydration

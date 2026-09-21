@@ -1,0 +1,27 @@
+.panel { padding:24px; border:1px solid var(--home-panel-border); border-radius:24px; background:var(--home-panel-bg); box-shadow:var(--home-panel-shadow); }
+.compactPanel { min-width:0; }
+.compactNotice { margin:8px 5px; color:var(--home-panel-description); font-size:11px; line-height:1.6; }
+.compactNotice strong,.compactNotice span { display:block; overflow-wrap:anywhere; }
+.compactNotice strong { color:var(--home-panel-title); font-size:12px; font-weight:500; }
+.compactNotice span { margin-top:4px; }
+.compactNotice .compactPolicy { margin-top:8px; color:var(--home-panel-detail); font-size:10px; }
+.panel header { display:flex; align-items:center; gap:10px; padding:0 5px 12px; }
+.panel header>svg { color:var(--home-panel-icon); }
+.panel h2 { min-width:0; flex:1; color:var(--home-panel-title); font-size:13px; font-weight:500; }
+.panel header>span { display:grid; min-width:25px; height:25px; place-items:center; border-radius:50%; background:var(--home-summary-count-bg); color:var(--home-summary-count-text); font-size:11px; }
+.panel>p { margin:8px 5px; color:var(--home-panel-description); font-size:11px; line-height:1.6; }
+.panel>button,.panel li>button { display:inline-flex; min-height:40px; align-items:center; gap:7px; margin:8px 5px 0; color:var(--home-panel-action-text); font-size:11px; }
+.panel>ul { display:grid; gap:8px; margin:0; padding:0; list-style:none; }
+.panel>ul>li { padding:12px 10px; border:1px solid var(--home-row-border); border-radius:14px; background:var(--home-row-bg); color:var(--home-panel-title); }
+.allowanceHead strong,.allowanceHead small { display:block; overflow-wrap:anywhere; }
+.allowanceHead strong { font-size:11px; font-weight:500; }
+.allowanceHead small { margin-top:4px; color:var(--home-panel-detail); font-size:10px; line-height:1.5; }
+.panel dl { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
+.panel dl div { min-width:0; }
+.panel dt { color:var(--home-panel-label); font-size:9px; }
+.panel dd { margin-top:2px; font-size:11px; font-variant-numeric:tabular-nums; }
+.panel li>p { margin-top:9px; color:var(--home-panel-detail); font-size:10px; line-height:1.5; overflow-wrap:anywhere; }
+.panel li>button { margin-left:0; }
+.panel button:disabled { cursor:not-allowed; opacity:.5; }
+.policy { border-top:1px solid var(--home-row-border); padding-top:10px; }
+.error { color:var(--home-error-text)!important; }

@@ -7,6 +7,13 @@ import { computeOverallScore, scoreToGrade } from "@/lib/audit/scoring";
 import { findingsFromCategories, stripFabricatedEstimates } from "@/lib/lead-audit";
 import type { AuditResult } from "@/lib/audit/types";
 
+import { saveAuditReport } from "@/lib/audit-report-store";
+
+async function retainedResponse(result: AuditResult) {
+  const reportId = await saveAuditReport(result, { name: "", email: "", url: result.url });
+  return NextResponse.json({ ...result, ...(reportId ? { reportId: `audit_${reportId}` } : {}) });
+}
+
 const MAX_SCANS_PER_DAY = 3;
 
 async function checkRateLimit(
@@ -122,7 +129,7 @@ export async function POST(request: NextRequest) {
     try {
       const cached = await cacheRedis.get(cacheKey);
       if (cached) {
-        return NextResponse.json(typeof cached === "string" ? JSON.parse(cached) : cached);
+        return retainedResponse(typeof cached === "string" ? JSON.parse(cached) : cached as AuditResult);
       }
     } catch {
       // Cache miss or error — proceed with fresh audit
@@ -154,7 +161,7 @@ export async function POST(request: NextRequest) {
       await cacheRedis.set(cacheKey, JSON.stringify(result), { ex: 3600 }).catch(() => {});
     }
 
-    return NextResponse.json(result);
+    return retainedResponse(result);
   } catch (err) {
     Sentry.captureException(err, {
       tags: { feature: "audit-scan" },

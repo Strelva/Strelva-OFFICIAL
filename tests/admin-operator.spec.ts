@@ -10,12 +10,25 @@ test("admin operator surfaces: overview feed, client cockpit, drafts", async ({ 
 
   // Grouped console nav (post-redesign).
   await expect(page.getByRole("navigation").getByRole("link", { name: "Overview" })).toHaveAttribute("href", "/admin");
+  await expect(page.getByRole("navigation").getByRole("link", { name: "Internal work" })).toHaveAttribute("href", "/admin/work");
   await expect(page.getByRole("navigation").getByRole("link", { name: "Clients" })).toHaveAttribute("href", "/admin/clients");
+  await expect(page.getByRole("navigation").getByRole("link", { name: "Managed-site work" })).toHaveAttribute("href", "/admin/actions");
   await expect(page.getByRole("navigation").getByRole("link", { name: "Drafts" })).toHaveAttribute("href", "/admin/drafts");
 
   // The overview is now the "Needs you" attention feed, not the old client table.
   await expect(page.getByRole("heading", { name: "Overview", exact: true })).toBeVisible();
   await expect(page.getByText("Needs you").first()).toBeVisible();
+
+  // The internal topology routes staff delivery, support, product learning,
+  // operating costs, and system administration without widening admin access.
+  await page.goto("/admin/work");
+  await expect(page.getByRole("heading", { name: "Internal work", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Staff delivery entry" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Managed-site delivery" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Customer support" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Offering development" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Operating costs" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Restricted system administration" })).toBeVisible();
 
   // Client cockpit: the invite flow moved here, and the Start-plan control lives here.
   await page.goto("/admin/clients/gldf");

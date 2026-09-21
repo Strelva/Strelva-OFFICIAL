@@ -321,7 +321,7 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
             )}
             <button
               onClick={() => onWorkflowAction(event.id, "shipped")}
-              className="h-9 rounded-lg bg-success-dim px-2.5 text-[12px] font-medium text-success hover:bg-success hover:text-white flex items-center justify-center gap-1.5 transition-colors"
+              className="h-9 rounded-lg bg-success-dim px-2.5 text-[12px] font-medium text-success hover:bg-success hover:text-on-positive flex items-center justify-center gap-1.5 transition-colors"
               title="Mark shipped"
             >
               <PackageCheck className="w-4 h-4" strokeWidth={1.5} />
@@ -344,7 +344,7 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
               <button
                 onClick={() => setTestimonialModalOpen(true)}
                 disabled={disabled}
-                className="h-9 rounded-lg bg-sage/10 px-2.5 text-[12px] font-medium text-sage hover:bg-sage hover:text-white flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                className="h-9 rounded-lg bg-sage/10 px-2.5 text-[12px] font-medium text-sage hover:bg-accent hover:text-on-accent flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
                 title="Use as Testimonial"
               >
                 <Quote className="w-4 h-4" strokeWidth={1.5} />
@@ -354,7 +354,7 @@ export function QueueCard({ event, onApprove, onDismiss, onWorkflowAction, disab
             <button
               onClick={() => onApprove(event.id)}
               disabled={disabled}
-              className="h-9 rounded-lg bg-success-dim px-2.5 text-[12px] font-medium text-success hover:bg-success hover:text-white flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+              className="h-9 rounded-lg bg-success-dim px-2.5 text-[12px] font-medium text-success hover:bg-success hover:text-on-positive flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
               title="Make live"
             >
               <Check className="w-4 h-4" strokeWidth={2} />

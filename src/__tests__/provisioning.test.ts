@@ -4,8 +4,10 @@ const mockCreateTenant = vi.hoisted(() => vi.fn());
 const mockGetTenantConfig = vi.hoisted(() => vi.fn());
 const mockCreateInvite = vi.hoisted(() => vi.fn());
 const mockSetContent = vi.hoisted(() => vi.fn());
+const mockGetStoredContent = vi.hoisted(() => vi.fn());
 const mockIsVercelConfigured = vi.hoisted(() => vi.fn());
 const mockCreateVercelProject = vi.hoisted(() => vi.fn());
+const mockGetVercelProject = vi.hoisted(() => vi.fn());
 const mockSetVercelEnv = vi.hoisted(() => vi.fn());
 const mockAddVercelDomain = vi.hoisted(() => vi.fn());
 const mockSetAnalyticsConfig = vi.hoisted(() => vi.fn());
@@ -15,7 +17,10 @@ vi.mock("@/lib/tenants", () => ({
   getTenantConfig: mockGetTenantConfig,
 }));
 vi.mock("@/lib/invites", () => ({ createInvite: mockCreateInvite }));
-vi.mock("@/lib/storage", () => ({ setContent: mockSetContent }));
+vi.mock("@/lib/storage", () => ({
+  getStoredContent: mockGetStoredContent,
+  setContent: mockSetContent,
+}));
 // Spy on the analytics auto-write but keep deriveScDomain real so the test
 // verifies provisioning persists the ACTUAL siteUrl-derived GSC property.
 vi.mock("@/lib/analytics", async (importActual) => {
@@ -25,6 +30,7 @@ vi.mock("@/lib/analytics", async (importActual) => {
 vi.mock("@/lib/vercel", () => ({
   isVercelConfigured: mockIsVercelConfigured,
   createVercelProject: mockCreateVercelProject,
+  getVercelProject: mockGetVercelProject,
   setVercelEnv: mockSetVercelEnv,
   addVercelDomain: mockAddVercelDomain,
 }));
@@ -50,6 +56,7 @@ beforeEach(() => {
   mockGetTenantConfig.mockResolvedValue(null);
   mockCreateInvite.mockResolvedValue(true);
   mockSetContent.mockResolvedValue(undefined);
+  mockGetStoredContent.mockResolvedValue(null);
   mockSetAnalyticsConfig.mockResolvedValue({
     tenantId: "acme",
     gscProperty: "sc-domain:acmehvac.com",
@@ -58,6 +65,7 @@ beforeEach(() => {
   });
   mockIsVercelConfigured.mockReturnValue(true);
   mockCreateVercelProject.mockResolvedValue({ ok: true, data: { id: "prj_1", name: "acme-site" } });
+  mockGetVercelProject.mockResolvedValue({ ok: false, error: "Project not found" });
   mockSetVercelEnv.mockResolvedValue({ ok: true, data: { set: ["TENANT_ID"] } });
   mockAddVercelDomain.mockResolvedValue({ ok: true, data: { domain: "acmehvac.com" } });
 });
@@ -141,7 +149,11 @@ describe("provisionTenant", () => {
     // A prior partial run created the record but failed later. Re-running must
     // continue (not bail) so the operator can complete provisioning.
     mockCreateTenant.mockRejectedValue(new Error("Tenant \"acme\" already exists"));
-    mockGetTenantConfig.mockResolvedValue({ id: "acme", siteName: "Acme HVAC" });
+    mockGetTenantConfig.mockResolvedValue({
+      id: "acme",
+      siteName: "Acme HVAC",
+      revalidationSecret: "persisted-secret",
+    });
 
     const result = await provisionTenant(baseInput);
 
@@ -149,6 +161,95 @@ describe("provisionTenant", () => {
     expect(result.steps.length).toBeGreaterThan(1);
     // It actually proceeds to the later steps instead of bailing.
     expect(mockCreateVercelProject).toHaveBeenCalled();
+    expect(result.clientEnv.REVALIDATION_SECRET).toBe("persisted-secret");
+    expect(mockSetVercelEnv).toHaveBeenCalledWith(
+      "prj_1",
+      expect.objectContaining({ REVALIDATION_SECRET: "persisted-secret" }),
+    );
+  });
+
+  it("preserves the persisted secret after an interrupted tenant step", async () => {
+    const persistedSecret = "a".repeat(64);
+    mockCreateTenant.mockRejectedValue(new Error('Tenant "acme" already exists'));
+    mockGetTenantConfig.mockResolvedValue({
+      id: "acme",
+      siteName: "Acme HVAC",
+      revalidationSecret: persistedSecret,
+    });
+
+    const result = await provisionTenant(baseInput);
+
+    expect(result.clientEnv.REVALIDATION_SECRET).toBe(persistedSecret);
+    expect(mockSetVercelEnv).toHaveBeenCalledWith(
+      "prj_1",
+      expect.objectContaining({ REVALIDATION_SECRET: persistedSecret }),
+    );
+    expect(mockCreateTenant.mock.calls[0]![0].revalidationSecret).not.toBe(persistedSecret);
+  });
+
+  it("preserves customized sections and seeds only missing sections on resume", async () => {
+    const customizedHero = { headline: "Our saved headline" };
+    mockCreateTenant.mockRejectedValue(new Error('Tenant "acme" already exists'));
+    mockGetTenantConfig.mockResolvedValue({
+      id: "acme",
+      siteName: "Acme HVAC",
+      revalidationSecret: "persisted-secret",
+    });
+    mockGetStoredContent.mockImplementation(async (section: string) =>
+      section === "hero" ? customizedHero : null,
+    );
+
+    const result = await provisionTenant(baseInput);
+
+    expect(stepStatus(result.steps, "seed")).toBe("ok");
+    expect(mockSetContent).toHaveBeenCalledTimes(8);
+    expect(mockSetContent).not.toHaveBeenCalledWith("hero", expect.anything(), "acme");
+    expect(result.steps.find((s) => s.key === "seed")?.detail).toContain("1 existing sections preserved");
+  });
+
+  it("fails closed when stored-content inspection fails", async () => {
+    mockCreateTenant.mockRejectedValue(new Error('Tenant "acme" already exists'));
+    mockGetTenantConfig.mockResolvedValue({
+      id: "acme",
+      siteName: "Acme HVAC",
+      revalidationSecret: "persisted-secret",
+    });
+    mockGetStoredContent.mockRejectedValue(new Error("content database unavailable"));
+
+    const result = await provisionTenant(baseInput);
+
+    expect(stepStatus(result.steps, "seed")).toBe("failed");
+    expect(mockSetContent).not.toHaveBeenCalled();
+    expect(result.steps.find((s) => s.key === "seed")?.detail).toContain("content database unavailable");
+  });
+
+  it("recovers the exact existing Vercel project identity before configuring it", async () => {
+    mockCreateVercelProject.mockResolvedValue({ ok: false, error: "Project already exists" });
+    mockGetVercelProject.mockResolvedValue({
+      ok: true,
+      data: { id: "prj_existing", name: "acme-site" },
+    });
+
+    const result = await provisionTenant(baseInput);
+
+    expect(stepStatus(result.steps, "vercel_project")).toBe("ok");
+    expect(mockGetVercelProject).toHaveBeenCalledWith("acme-site");
+    expect(mockSetVercelEnv).toHaveBeenCalledWith("prj_existing", expect.anything());
+    expect(mockAddVercelDomain).toHaveBeenCalledWith("prj_existing", "acmehvac.com");
+    expect(result.steps.find((s) => s.key === "vercel_project")?.detail).toContain("prj_existing");
+  });
+
+  it("does not rotate or configure a secret when an existing tenant has none", async () => {
+    mockCreateTenant.mockRejectedValue(new Error('Tenant "acme" already exists'));
+    mockGetTenantConfig.mockResolvedValue({ id: "acme", siteName: "Acme HVAC" });
+
+    const result = await provisionTenant(baseInput);
+
+    expect(stepStatus(result.steps, "tenant")).toBe("failed");
+    expect(stepStatus(result.steps, "vercel_env")).toBe("failed");
+    expect(result.clientEnv.REVALIDATION_SECRET).toBeUndefined();
+    expect(mockSetVercelEnv).not.toHaveBeenCalled();
+    expect(result.steps.find((s) => s.key === "vercel_env")?.detail).toContain("refusing to configure");
   });
 
   it("skips the invite when there is no owner email", async () => {

@@ -35,6 +35,7 @@ export const TENANT_SCOPED_TABLES = [
   "collection_entries", "reviews", "suggestions", "content", "content_versions",
   "domain_claims", "draft_content", "draft_page_config", "inbox_items",
   "integrations", "invites", "mail_log", "memberships", "newsletter_subscribers",
+  "inquiry_record_overlays", "inquiry_publication_claims", "inquiry_workspaces", "job_economics",
   "page_config", "pay_links", "reward_members", "reward_transactions",
   "scan_history", "scan_results", "search_console_data", "site_metrics",
   "site_snapshots", "social_posts", "subscription_items", "unified_events",
@@ -106,12 +107,26 @@ export function tenantRedisPatterns(tenantId: string, ownerEmail?: string): stri
     `reb:scan:${tenantId}`,
     `reb:scan:hist:${tenantId}`,
     `reb:site-audit:${tenantId}`,
+    `reb:inquiry-delivery:${tenantId}:*`,
+    `reb:inquiry-delivery-claim:${tenantId}:*`,
+    `reb:inquiry-delivery-provider:${tenantId}:*`,
+    `reb:inquiry-delivery-event:${tenantId}:*`,
+    `reb:inquiry-timeline:${tenantId}:*`,
+    `reb:inquiry-budget:${tenantId}:*`,
+    `reb:inquiry-reply:${tenantId}:*`,
+    `reb:inquiry-reply-state:${tenantId}:*`,
+    `reb:inquiry-capture-repair:${tenantId}`,
+    `reb:inquiry-capture-repair-job:${tenantId}:*`,
+    `reb:inquiry-capture-repair-claim:${tenantId}:*`,
+    // This reverse index is keyed by an opaque reply address. The value is
+    // tenant-scoped and is filtered in findTenantRedisKeys before deletion.
+    `reb:inquiry-reply-target:*`,
   ];
   if (ownerEmail) p.push(`reb:invites:${ownerEmail.toLowerCase()}`);
   return p;
 }
 
-export async function findTenantRedisKeys(patterns: string[]): Promise<string[]> {
+export async function findTenantRedisKeys(patterns: string[], tenantId?: string): Promise<string[]> {
   const redis = getRedis();
   if (!redis) return [];
   const found = new Set<string>();
@@ -124,7 +139,17 @@ export async function findTenantRedisKeys(patterns: string[]): Promise<string[]>
     do {
       const [next, keys] = await redis.scan(cursor, { match: pattern, count: 500 });
       cursor = String(next);
-      for (const k of keys) found.add(k);
+      for (const k of keys) {
+        if (pattern === "reb:inquiry-reply-target:*" && tenantId) {
+          const raw = await redis.get<unknown>(k);
+          let value: unknown = raw;
+          if (typeof raw === "string") {
+            try { value = JSON.parse(raw); } catch { value = null; }
+          }
+          if (!value || typeof value !== "object" || (value as { tenantId?: unknown }).tenantId !== tenantId) continue;
+        }
+        found.add(k);
+      }
     } while (cursor !== "0");
   }
   return [...found];
@@ -202,6 +227,7 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
   const redis = getRedis();
   const tenantKeys = await findTenantRedisKeys(
     tenantRedisPatterns(tenantId, tenant?.ownerEmail ?? undefined),
+    tenantId,
   );
   if (executed && redis && tenantKeys.length) await redis.del(...tenantKeys);
   for (const k of tenantKeys) summary.redis!.push({ target: k, found: 1, deleted: executed });

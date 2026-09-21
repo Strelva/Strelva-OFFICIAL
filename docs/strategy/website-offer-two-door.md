@@ -1,8 +1,9 @@
 # Strelva Websites — Two-Door Offer (hardened)
 
-> ⚠️ **SUPERSEDED 2026-06-26.** The one-time build fee was dropped in favor of a
-> pure **3-tier monthly subscription** (Presence $99 / Growth $199 / Scale $499,
-> no upfront). See `AGENTS.md` § "The Model" and the vault canonical note
+> ⚠️ **SUPERSEDED; current offer updated 2026-07-23.** The public offer is a paid
+> custom build quoted after a short call, plus monthly management from $99.
+> Fixed build prices and the later no-upfront experiment are both obsolete.
+> See `AGENTS.md` § "The Model" and the vault canonical note
 > `1-projects/scaffold-web/pricing-and-billing.md`. The competitive claims,
 > objection table, scope walls, and ownership/positioning below are still useful
 > reference; the **pricing + structure are obsolete.**

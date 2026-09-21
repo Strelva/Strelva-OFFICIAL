@@ -1,7 +1,16 @@
 # Strelva current product focus
 
-Status: **active strategy**
-Updated: 2026-07-14
+Status: **managed-presence baseline during product transition**
+Updated: 2026-09-05
+
+The founder's current direction is a common conversational interface with User,
+Paid User, Client, and Enterprise relationships. All existing clients retain
+Client status. The source and account transition is described in
+[`2026-09-05-product-structure-and-agency-experiment.md`](2026-09-05-product-structure-and-agency-experiment.md).
+The managed-presence and acquisition loops below remain the implemented
+baseline; their website-first assumptions do not constrain the new general-user
+experience. This update does not claim that open conversational signup or
+standalone paid subscriptions are already available.
 
 ## Strategic position
 
@@ -9,15 +18,28 @@ Strelva is a **managed business-presence operating service with a software
 control plane**. Customers buy a presence that stays accurate, converts demand,
 and produces proof. They do not buy a self-serve website builder.
 
-The product model has one core and one acquisition wedge:
+This names the implemented product scope, not the company-level position.
+[`../gtm/POSITIONING.md`](../gtm/POSITIONING.md) is authoritative for how Strelva
+frames the larger relationship: the business keeps getting better without the
+owner operating more technology. Managed presence is the current installed proof
+and commercial entry, not the limit of the brand.
+
+The product model has one core, one implemented acquisition wedge, and one
+time-boxed GTM experiment:
 
 - **Core:** managed presence—bespoke Site Property, governed Strelva actions,
   reputation/content upkeep, live evidence, and interpreted reports.
 - **Wedge:** AI Visibility—a durable, shareable scorecard that makes an emerging
   discovery problem legible and creates a path into monitoring and managed fixes.
+- **GTM experiment:** release-led Buffalo capabilities—free working utilities that
+  test whether continuous useful releases create ecosystem use, re-entry, sharing,
+  and trust without becoming a separate content business or disguised funnel. Any
+  private website/workflow demand is secondary pull, not the experiment's purpose. The
+  canonical experiment and decision layer is [`../gtm/`](../gtm/README.md).
 
-These are complementary, not competing products. AI Visibility earns attention;
-the managed-presence loop delivers and retains the outcome.
+These are complementary, not competing products. AI Visibility remains the
+implemented product wedge; capability drops test a broader distribution engine;
+the managed-presence loop delivers and retains the commercial outcome.
 
 ## Current product loop
 
@@ -30,6 +52,15 @@ AI Visibility result
   → governed Strelva action
   → provider/site change
   → Analytics evidence + Report narrative
+
+Buffalo capability result (pilot)
+  → useful artifact
+  → use / reuse / share / citation / correction
+  → ecosystem trust + next release signal
+
+Optional private pull
+  → Access Request, qualified Delivery Lead, or scoped software conversation
+  → managed Tenant + Site Property or bounded private implementation
 ```
 
 The canonical domain model is [`../product-ontology.md`](../product-ontology.md).
@@ -58,7 +89,29 @@ layer: custom-repository delivery, content/config authority, client dashboard,
 governed agent work, approval queue, reputation workflows, Analytics, Reports,
 operator portfolio management, and billing.
 
+## Sanctioned expansion: Managed Google Presence
+
+Managed Google Presence is the one accepted near-term product expansion because
+it deepens revenue and responsibility for existing local-presence clients. The
+working commercial shape is one add-on at `$149/month/location`, bundled at the
+account level for multi-location relationships.
+
+This is not a claim that the add-on is live. Review ingestion and the governed
+write engine for replies, posts, hours, and photos are implemented. External
+writes remain conditional on Google API approval, tenant authorization, and
+quota. The sellable proof layer still needs GBP-native performance evidence,
+geogrid map-pack tracking, and explicit multi-location selection. The ordered
+path and scope live in `gbp-service-addon.md` and `strelva-full-offering.md`.
+
+This expansion does not relax the validation gates below. It is wallet-share on
+the current managed-presence product, not evidence for a broader platform.
+
 ## Immediate strategy: validate pull, then deepen the loop
+
+This section gates further investment in the AI Visibility product wedge. It does
+not block the separate, bounded public-capability roadmap in
+[`../gtm/ROADMAP.md`](../gtm/ROADMAP.md), which is evaluated on public usefulness
+and ecosystem behavior rather than managed-presence conversion.
 
 Run a controlled market-contact test before expanding the feature surface:
 

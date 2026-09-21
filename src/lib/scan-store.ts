@@ -124,9 +124,12 @@ export async function pushScanHistory(tenant: string, point: ScanHistoryPoint): 
 }
 
 /** Read a tenant's scan history, oldest-to-newest (for a left-to-right sparkline). */
-export async function getScanHistory(tenant: string): Promise<ScanHistoryPoint[]> {
+export async function getScanHistory(tenant: string, options: { requireStore?: boolean } = {}): Promise<ScanHistoryPoint[]> {
   const redis = getRedis();
-  if (!redis) return [];
+  if (!redis) {
+    if (options.requireStore) throw new Error("Site check storage is unavailable.");
+    return [];
+  }
   try {
     const raw = await redis.lrange(scanHistoryKey(tenant), 0, SCAN_HISTORY_MAX - 1);
     const points = raw.map((item) =>
@@ -134,6 +137,7 @@ export async function getScanHistory(tenant: string): Promise<ScanHistoryPoint[]
     );
     return points.reverse();
   } catch (err) {
+    if (options.requireStore) throw err;
     console.warn("[scan-store] history read failed", tenant, err);
     return [];
   }
@@ -168,13 +172,17 @@ export async function getScanBaseline(tenant: string): Promise<ScanHistoryPoint 
 }
 
 /** Read the latest scan summary for a tenant, or null if never scanned. */
-export async function getScanSummary(tenant: string): Promise<ScanSummary | null> {
+export async function getScanSummary(tenant: string, options: { requireStore?: boolean } = {}): Promise<ScanSummary | null> {
   const redis = getRedis();
-  if (!redis) return null;
+  if (!redis) {
+    if (options.requireStore) throw new Error("Site check storage is unavailable.");
+    return null;
+  }
   try {
     const cached = await redis.get<ScanSummary>(scanKey(tenant));
     return cached ?? null;
   } catch (err) {
+    if (options.requireStore) throw err;
     console.warn("[scan-store] read failed", tenant, err);
     return null;
   }

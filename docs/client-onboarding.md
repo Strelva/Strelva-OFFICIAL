@@ -2,9 +2,12 @@
 
 The one master checklist for taking a new client from **signed lead → live managed client**. Each step names its **owner**, how to **verify** it, and links the deep runbook where one exists. Work top to bottom; a phase isn't done until its Verify passes.
 
-**Owner: you (Noah) run all of it.** The only steps that need the **client** are the ones on their own accounts — the Google Search Console / GA4 grants and the DNS records — because you can't grant yourself access to their Google or their registrar. `Auto` = the provision script does the step for you.
+**Owner: the Strelva operator runs all of it.** The only steps that need the
+**client** are the ones on their own accounts, such as Google Search Console / GA4
+grants and DNS records, because Strelva cannot grant itself access. `Auto` means
+the provision script performs the step.
 
-**Tiers (packaging, not code flags):** Custom builds are scoped and quoted before work starts. Ongoing management is Presence $99/mo (one-page) · Growth $199/mo (multi-page + booking/basic ecom, the anchor) · Scale $499/mo (+ content engine, multi-location).
+**Tiers (packaging, not code flags):** Custom builds are scoped, quoted, and paid separately before work starts. Ongoing management begins at go-live: Presence $99/mo (one-page) · Growth $199/mo (multi-page + booking/basic ecom, the anchor) · Scale $499/mo (+ content engine, multi-location).
 
 ---
 
@@ -120,7 +123,7 @@ Only if replacing an existing site (like RHM's old Apache site → the Strelva b
 
 ## Phase 7 — Billing on (You)
 
-- [ ] Confirm the build invoice is paid, then start the selected Stripe management subscription at go-live.
+- [ ] Confirm the build invoice is paid according to the accepted quote, then start the selected Stripe management subscription at go-live.
 - [ ] Grandfathered clients (gldf, rohlax) stay on `STRIPE_BILLING_GRANDFATHER_TENANTS` — no subscription.
 
 **Verify:** the client is active in Stripe at the agreed tier (or on the grandfather list), and `check:prod`'s grandfather-or-402 rule passes.
@@ -149,7 +152,7 @@ Copy a row per new client. (The activation-only version lives in [activation-run
 
 ---
 
-## Known issues / TODO
+## Current verification note
 
 - **Env example gaps (DONE 2026-07-30):** `SUPABASE_URL`, `SECRETS_ENC_KEY`, `SUPER_ADMIN_EMAILS`, and `APPROVE_LINK_SECRET` are all documented in `.env.example` and validated in `scripts/production-checklist.ts`. No outstanding env gaps.
 - **Orphaned Vercel secrets (DONE 2026-07-30):** All 11 orphaned vars removed from prod + preview + dev: `CLERK_SECRET_KEY`, `CLERK_WEBHOOK_SECRET`, `CLERK_DOMAIN`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_CLERK_DOMAIN`, `NEXT_PUBLIC_CLERK_SIGN_IN_URL`, `NEXT_PUBLIC_CLERK_SIGN_UP_URL`, `SANITY_API_TOKEN`, `SANITY_WEBHOOK_SECRET`, `REVALIDATION_SECRET`, `CORS_ORIGINS`. Kept: `NEXT_PUBLIC_SANITY_DATASET` + `NEXT_PUBLIC_SANITY_PROJECT_ID` (legacy image-URL resolution).

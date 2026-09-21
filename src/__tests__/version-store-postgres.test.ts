@@ -191,4 +191,30 @@ describe("version-store Postgres dual-path", () => {
     // versionToInsert coalesces undefined changes -> null for the JSON column.
     expect(insert.changes).toBeNull();
   });
+
+  it("stores and reads the governed request identity without exposing a fake field diff", async () => {
+    const requestId = "evt_website_request_123";
+    await appendVersion("hero", { title: "Requested" }, "user", "gldf", [], requestId);
+    const insert = supa.lastInsert as Record<string, unknown>;
+    expect(insert.request_id).toBe(requestId);
+    expect(insert.changes).toEqual([]);
+
+    supa.result = {
+      data: [{
+        id: "v_request",
+        tenant_id: "gldf",
+        section: "hero",
+        data: { title: "Requested" },
+        author: "user",
+        created_at: "2026-09-20T12:00:00.000Z",
+        status: "live",
+        request_id: requestId,
+        changes: [{ field: "_request_id", before: "Old content value", after: "New content value" }],
+      }],
+      error: null,
+    };
+    const [version] = await getVersions("hero", "gldf");
+    expect(version!.requestId).toBe(requestId);
+    expect(version!.changes).toEqual([{ field: "_request_id", before: "Old content value", after: "New content value" }]);
+  });
 });

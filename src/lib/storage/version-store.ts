@@ -10,6 +10,7 @@ import { randomUUID } from "crypto";
 import type { ContentSection, ContentMap } from "../types";
 import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
 import { setContent } from "./content-store";
+import { setDraftContent } from "./draft-store";
 import { dataSourceIsPostgres } from "../db/source-flags";
 import { getSupabase, type Row, type Insert } from "../db/client";
 
@@ -21,6 +22,8 @@ export interface ContentVersion {
   timestamp: string;
   status: "live" | "rolled-back";
   changes?: { field: string; before: string; after: string }[];
+  /** The governed website request that produced this published version. */
+  requestId?: string;
 }
 
 // --- Authoritative Postgres helpers ---------------------------------------
@@ -41,6 +44,7 @@ function versionToInsert(v: ContentVersion, tenant: string): Insert<"content_ver
     created_at: v.timestamp,
     status: v.status,
     changes: (v.changes ?? null) as Insert<"content_versions">["changes"],
+    request_id: v.requestId ?? null,
   };
 }
 
@@ -53,6 +57,7 @@ function mapPgVersionRow(row: Row<"content_versions">): ContentVersion {
     timestamp: row.created_at,
     status: row.status as ContentVersion["status"],
     changes: (row.changes as ContentVersion["changes"]) ?? undefined,
+    ...(row.request_id ? { requestId: row.request_id } : {}),
   };
 }
 
@@ -86,7 +91,8 @@ export async function appendVersion(
   data: unknown,
   author: "user" | "ai" | "admin",
   tenant: string = DEFAULT_TENANT,
-  changes?: { field: string; before: string; after: string }[]
+  changes?: { field: string; before: string; after: string }[],
+  requestId?: string,
 ): Promise<ContentVersion> {
   const version: ContentVersion = {
     // crypto.randomUUID() is collision-safe under concurrent calls; the old
@@ -98,6 +104,7 @@ export async function appendVersion(
     timestamp: new Date().toISOString(),
     status: "live",
     changes,
+    ...(requestId ? { requestId } : {}),
   };
 
   if (dataSourceIsPostgres()) {
@@ -152,4 +159,25 @@ export async function restoreVersion(
   ]);
 
   return restored;
+}
+
+/**
+ * Copy a historical version into the draft layer for owner review.
+ *
+ * History recovery from the website editor must preserve the same draft →
+ * preview → publish boundary as a new edit. The older restoreVersion helper is
+ * retained for the internal undo contract, which intentionally restores live
+ * content, while the self-service editor uses this draft-only operation.
+ */
+export async function restoreVersionToDraft(
+  section: ContentSection,
+  versionId: string,
+  tenant: string = DEFAULT_TENANT,
+): Promise<ContentVersion | null> {
+  const versions = await getVersions(section, tenant);
+  const target = versions.find((v) => v.id === versionId);
+  if (!target) return null;
+
+  await setDraftContent(section, target.data as ContentMap[ContentSection], tenant);
+  return target;
 }

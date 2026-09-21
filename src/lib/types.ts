@@ -785,6 +785,12 @@ export interface CustomChangeRequestMetadata {
   adminOwner?: string;
   shippedAt?: string;
   notes?: string;
+  /** Append-only request/proposal/review/result stages for customer history. */
+  workflowHistory?: Array<{
+    status: CustomChangeRequestStatus;
+    actor: string;
+    at: string;
+  }>;
 }
 
 // --- Weekly Brief Types ---

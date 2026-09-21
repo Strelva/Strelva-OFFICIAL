@@ -3,6 +3,7 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import styles from "./primitives.module.css";
 
 /* -------------------------------------------------- */
 /*  Button                                             */
@@ -16,6 +17,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize;
   loading?: boolean;
   icon?: ReactNode;
+  static?: boolean;
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
@@ -23,30 +25,34 @@ const variantStyles: Record<ButtonVariant, string> = {
   // an off-brand second primary across the product). Use `contrast` only for the
   // rare single highest-emphasis action where sage isn't enough separation.
   primary:
-    "bg-accent text-on-accent hover:bg-accent/85 disabled:opacity-50",
+    "bg-accent text-on-accent enabled:hover:bg-accent/85",
   secondary:
-    "bg-surface border border-gray-border text-warm-black hover:bg-gray-bg disabled:opacity-50",
+    "bg-surface text-warm-black enabled:hover:bg-gray-bg",
   ghost:
-    "text-gray-muted hover:text-warm-black hover:bg-gray-bg disabled:opacity-50",
+    "text-gray-muted enabled:hover:text-warm-black enabled:hover:bg-gray-bg",
   danger:
-    "text-terra hover:text-white hover:bg-terra disabled:opacity-50",
+    "text-critical enabled:hover:text-on-action-danger enabled:hover:bg-action-danger",
   contrast:
-    "bg-warm-white text-warm-black hover:bg-warm-white/90 disabled:opacity-50",
+    "bg-warm-white text-on-warm-white enabled:hover:bg-warm-white/90",
 };
 
-const sizeStyles: Record<ButtonSize, string> = {
-  sm: "px-2.5 py-1 text-[11px] gap-1 rounded-full",
-  md: "px-4 py-1.5 text-[13px] gap-1.5 rounded-full",
-  lg: "px-5 py-2.5 text-[13px] gap-2 rounded-full",
+const sizeStyles: Record<ButtonSize, string | undefined> = {
+  sm: styles.small,
+  md: styles.medium,
+  lg: styles.large,
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ variant = "primary", size = "md", loading, icon, className, children, disabled, ...rest }, ref) => (
+  ({ variant = "primary", size = "md", loading, icon, static: isStatic, className, children, disabled, ...rest }, ref) => (
     <button
       ref={ref}
       disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      data-static={isStatic || undefined}
       className={cn(
-        "inline-flex items-center justify-center font-medium transition-colors duration-150 shrink-0",
+        styles.control,
+        styles.button,
+        variant === "secondary" && styles.outlined,
         variantStyles[variant],
         sizeStyles[size],
         className,
@@ -54,9 +60,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       {...rest}
     >
       {loading ? (
-        <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" strokeWidth={1.5} />
+        <Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin shrink-0" strokeWidth={2} />
       ) : icon ? (
-        <span className="shrink-0">{icon}</span>
+        <span aria-hidden="true" className={styles.icon}>{icon}</span>
       ) : null}
       {children}
     </button>
@@ -73,36 +79,40 @@ interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: "sm" | "md" | "lg";
   variant?: "default" | "ghost" | "danger";
   loading?: boolean;
+  static?: boolean;
   children: ReactNode;
 }
 
-const iconSizeStyles: Record<string, string> = {
-  sm: "w-8 h-8 min-w-[32px] min-h-[32px]",
-  md: "w-10 h-10 min-w-[40px] min-h-[40px]",
-  lg: "w-11 h-11 min-w-[44px] min-h-[44px]",
+const iconSizeStyles: Record<string, string | undefined> = {
+  sm: styles.small,
+  md: styles.medium,
+  lg: styles.large,
 };
 
-const iconVariantStyles: Record<string, string> = {
-  default: "text-gray-muted hover:text-warm-black hover:bg-gray-bg",
-  ghost: "text-gray-subtle hover:text-gray-muted hover:bg-gray-bg",
-  danger: "text-gray-subtle hover:text-terra hover:bg-terra/5",
+const iconVariantStyles: Record<string, string | undefined> = {
+  default: "text-gray-muted enabled:hover:text-warm-black enabled:hover:bg-gray-bg",
+  ghost: "text-gray-subtle enabled:hover:text-gray-muted enabled:hover:bg-gray-bg",
+  danger: "text-critical enabled:hover:text-on-action-danger enabled:hover:bg-action-danger",
 };
 
 export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(
-  ({ label, size = "md", variant = "default", loading, className, children, disabled, ...rest }, ref) => (
+  ({ label, size = "md", variant = "default", loading, static: isStatic, className, children, disabled, ...rest }, ref) => (
     <button
       ref={ref}
       aria-label={label}
       disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      data-static={isStatic || undefined}
       className={cn(
-        "inline-flex items-center justify-center rounded-full transition-colors duration-150 shrink-0 disabled:opacity-50",
+        styles.control,
+        styles.iconButton,
         iconSizeStyles[size],
         iconVariantStyles[variant],
         className,
       )}
       {...rest}
     >
-      {loading ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} /> : children}
+      {loading ? <Loader2 aria-hidden="true" className="size-4 motion-safe:animate-spin" strokeWidth={2} /> : children}
     </button>
   ),
 );

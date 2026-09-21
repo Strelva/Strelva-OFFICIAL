@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import {
   getAiVisibilityResult,
   recordAiVisibilityResultView,
-} from "@/lib/ai-visibility/results";
+} from "@/products/ai-visibility/server";
 
 export async function GET(
   _request: Request,

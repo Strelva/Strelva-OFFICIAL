@@ -526,6 +526,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
                   kind: "custom_code_or_design_request",
                   requestKind: "custom_design",
                   workflowStatus: "requested",
+                  workflowHistory: [{ status: "requested", actor: "customer", at: requestedAt.toISOString() }],
                   requestedAt: requestedAt.toISOString(),
                   triageDueAt: getTriageDueAt(requestedAt),
                   deliveryModel,

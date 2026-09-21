@@ -1,5 +1,8 @@
 {
   "framework": "nextjs",
+  "git": {
+    "deploymentEnabled": false
+  },
   "crons": [
     {
       "path": "/api/cron/domain-monitor",
@@ -86,8 +89,16 @@
       "schedule": "0 */3 * * *"
     },
     {
+      "path": "/api/cron/inquiry-follow-ups",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/heartbeat",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/workspace-work",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

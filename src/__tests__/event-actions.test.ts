@@ -16,6 +16,12 @@ const mockRevalidateClientSite = vi.fn();
 const mockUpdateBusinessHours = vi.fn();
 const mockCreateGbpPost = vi.fn();
 const mockPublishReviewReply = vi.fn();
+const mockMarkExecutionExternalAccepted = vi.fn();
+const mockExecuteInquiryPublication = vi.fn();
+const mockIsInquiryMessageReviewEvent = vi.fn();
+const mockAuthorizeInquiryMessageReviewActor = vi.fn();
+const mockExecuteInquiryMessageReview = vi.fn();
+const mockReconcileInquiryMessageReview = vi.fn();
 
 vi.mock("../lib/events", () => ({
   getEvent: (...args: unknown[]) => mockGetEvent(...args),
@@ -25,7 +31,18 @@ vi.mock("../lib/events", () => ({
   resolveEvent: (...args: unknown[]) => mockResolveEvent(...args),
   claimEventAction: (...args: unknown[]) => mockClaimEventAction(...args),
   finishEventAction: (...args: unknown[]) => mockFinishEventAction(...args),
-  markExecutionExternalAccepted: vi.fn(async () => {}),
+  markExecutionExternalAccepted: (...args: unknown[]) => mockMarkExecutionExternalAccepted(...args),
+}));
+
+vi.mock("@/products/inquiries/server", () => ({
+  executeInquiryPublication: (...args: unknown[]) => mockExecuteInquiryPublication(...args),
+}));
+
+vi.mock("@/products/inquiries", () => ({
+  isInquiryMessageReviewEvent: (...args: unknown[]) => mockIsInquiryMessageReviewEvent(...args),
+  authorizeInquiryMessageReviewActor: (...args: unknown[]) => mockAuthorizeInquiryMessageReviewActor(...args),
+  executeInquiryMessageReview: (...args: unknown[]) => mockExecuteInquiryMessageReview(...args),
+  reconcileInquiryMessageReview: (...args: unknown[]) => mockReconcileInquiryMessageReview(...args),
 }));
 
 vi.mock("../lib/suggestions", () => ({
@@ -78,6 +95,7 @@ describe("resolveEventAction", () => {
     mockClaimEventAction.mockResolvedValue({ acquired: true, attemptId: "attempt_1" });
     mockFinishEventAction.mockResolvedValue(undefined);
     mockRevalidateClientSite.mockResolvedValue(undefined);
+    mockIsInquiryMessageReviewEvent.mockReturnValue(false);
   });
 
   it("does not execute suggestion side effects for already resolved events", async () => {
@@ -113,6 +131,68 @@ describe("resolveEventAction", () => {
 
     expect(result).toEqual({ changed: false, reason: "wrong_tenant" });
     expect(mockResolveEvent).not.toHaveBeenCalled();
+  });
+
+  const inquiryPublicationEvent = () => ({
+      id: "evt_inquiry_publish",
+      tenantId: "tenant-a",
+      source: "website",
+      type: "change_request",
+      status: "pending",
+      metadata: {
+        kind: "inquiry_capability_publish",
+        publicationClaimId: "claim-1",
+        capabilityId: "cap-1",
+        version: 2,
+      },
+    });
+
+  it("resolves an inquiry publication only after its executor records verified acceptance", async () => {
+    mockGetEvent.mockResolvedValue(inquiryPublicationEvent());
+    mockExecuteInquiryPublication.mockResolvedValue({ accepted: true, verified: true });
+    mockResolveEvent.mockResolvedValue({ changed: true });
+
+    const result = await resolveEventAction("tenant-a", "evt_inquiry_publish", "approved");
+
+    expect(result).toEqual({ changed: true });
+    expect(mockExecuteInquiryPublication).toHaveBeenCalledWith({ tenantId: "tenant-a", eventId: "evt_inquiry_publish", claimId: "claim-1" });
+    expect(mockMarkExecutionExternalAccepted).toHaveBeenCalledWith("evt_inquiry_publish");
+    expect(mockResolveEvent).toHaveBeenCalledWith("evt_inquiry_publish", "approved", { actor: "user" });
+  });
+
+  it("closes an accepted inquiry publication when read-back verification fails", async () => {
+    mockGetEvent.mockResolvedValue(inquiryPublicationEvent());
+    mockExecuteInquiryPublication.mockResolvedValue({ accepted: true, verified: false, reason: "readback unavailable" });
+    mockResolveEvent.mockResolvedValue({ changed: true });
+
+    const result = await resolveEventAction("tenant-a", "evt_inquiry_publish", "approved");
+
+    expect(result).toEqual({ changed: true, reason: "readback unavailable" });
+    expect(mockMarkExecutionExternalAccepted).toHaveBeenCalledWith("evt_inquiry_publish");
+    expect(mockResolveEvent).toHaveBeenCalledWith("evt_inquiry_publish", "approved", { actor: "user" });
+  });
+
+  it("keeps a rejected inquiry publication pending", async () => {
+    mockGetEvent.mockResolvedValue(inquiryPublicationEvent());
+    mockExecuteInquiryPublication.mockResolvedValue({ accepted: false, verified: false, reason: "stale inquiry version" });
+
+    const result = await resolveEventAction("tenant-a", "evt_inquiry_publish", "approved");
+
+    expect(result).toEqual({ changed: false, reason: "stale inquiry version" });
+    expect(mockMarkExecutionExternalAccepted).not.toHaveBeenCalled();
+    expect(mockResolveEvent).not.toHaveBeenCalled();
+  });
+
+  it("dismisses an inquiry publication without executing it", async () => {
+    mockGetEvent.mockResolvedValue(inquiryPublicationEvent());
+    mockResolveEvent.mockResolvedValue({ changed: true });
+
+    const result = await resolveEventAction("tenant-a", "evt_inquiry_publish", "dismissed");
+
+    expect(result).toEqual({ changed: true });
+    expect(mockExecuteInquiryPublication).not.toHaveBeenCalled();
+    expect(mockMarkExecutionExternalAccepted).not.toHaveBeenCalled();
+    expect(mockResolveEvent).toHaveBeenCalledWith("evt_inquiry_publish", "dismissed", { actor: "user" });
   });
 
   it("executes an approved pending suggestion once", async () => {
@@ -172,6 +252,24 @@ describe("resolveEventAction", () => {
       "tenant-a"
     );
     expect(mockClearDraft).toHaveBeenCalledWith("contact", "tenant-a");
+    expect(mockAppendVersion).toHaveBeenCalledWith(
+      "contact",
+      {
+        email: "new@example.com",
+        locationTitle: "Studio",
+        locationDescription: "Street parking nearby.",
+        instagramUrl: "",
+        facebookUrl: "",
+      },
+      "user",
+      "tenant-a",
+      [
+        { field: "email", before: "old@example.com", after: "new@example.com" },
+        { field: "locationTitle", before: "undefined", after: "Studio" },
+        { field: "locationDescription", before: "undefined", after: "Street parking nearby." },
+      ],
+      "evt_1",
+    );
     expect(mockSetContent.mock.invocationCallOrder[0]!).toBeLessThan(
       mockResolveEvent.mock.invocationCallOrder[0]!,
     );
@@ -364,5 +462,61 @@ describe("resolveEventAction", () => {
     expect(result).toEqual({ changed: true });
     expect(mockPublishReviewReply).not.toHaveBeenCalled();
     expect(mockResolveEvent).toHaveBeenCalledWith("evt_rr", "dismissed", { actor: "user" });
+  });
+
+  function acceptedInquiryReviewEvent(state: "processing" | "external_accepted" = "external_accepted") {
+    return {
+      id: "evt_inquiry_message",
+      tenantId: "tenant-a",
+      type: "change_request",
+      status: "pending",
+      metadata: {
+        kind: "inquiry_delivery_approval",
+        execution: {
+          state,
+          action: "approved",
+          actor: "original-sponsor",
+          attemptId: "attempt-message",
+          startedAt: "2026-09-11T12:00:00.000Z",
+        },
+      },
+    };
+  }
+
+  it("requires the current actor to be authorized before resolving accepted message recovery", async () => {
+    const event = acceptedInquiryReviewEvent();
+    mockIsInquiryMessageReviewEvent.mockReturnValue(true);
+    mockGetEvent.mockResolvedValue(event);
+    mockAuthorizeInquiryMessageReviewActor.mockResolvedValue({ allowed: false, reason: "permission_denied" });
+
+    const result = await resolveEventAction("tenant-a", event.id, "approved", "different-member");
+
+    expect(result).toEqual({ changed: false, reason: "permission_denied" });
+    expect(mockAuthorizeInquiryMessageReviewActor).toHaveBeenCalledWith({ tenantId: "tenant-a", event, actorId: "different-member" });
+    expect(mockReconcileInquiryMessageReview).not.toHaveBeenCalled();
+    expect(mockResolveEvent).not.toHaveBeenCalled();
+  });
+
+  it("resolves an authorized accepted-unverified message without sending again", async () => {
+    const event = acceptedInquiryReviewEvent();
+    mockIsInquiryMessageReviewEvent.mockReturnValue(true);
+    mockGetEvent.mockResolvedValue(event);
+    mockAuthorizeInquiryMessageReviewActor.mockResolvedValue({ allowed: true });
+    mockReconcileInquiryMessageReview.mockResolvedValue({
+      accepted: true,
+      safeToResolve: true,
+      receiptPersisted: true,
+      verified: false,
+      status: "accepted_unverified",
+      reason: "provider read-back unavailable",
+    });
+    mockResolveEvent.mockResolvedValue({ changed: true });
+
+    const result = await resolveEventAction("tenant-a", event.id, "approved", "original-sponsor");
+
+    expect(result).toEqual({ changed: true, reason: "provider read-back unavailable" });
+    expect(mockReconcileInquiryMessageReview).toHaveBeenCalledWith({ tenantId: "tenant-a", event, actorId: "original-sponsor" });
+    expect(mockResolveEvent).toHaveBeenCalledWith(event.id, "approved", { actor: "original-sponsor" });
+    expect(mockExecuteInquiryMessageReview).not.toHaveBeenCalled();
   });
 });

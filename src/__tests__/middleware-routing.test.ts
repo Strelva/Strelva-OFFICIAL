@@ -281,6 +281,15 @@ describe("proxy host routing helpers", () => {
 });
 
 describe("proxy frame policy", () => {
+  it("keeps generated website previews scriptless and frameable only by the same origin", () => {
+    const csp = buildContentSecurityPolicy({ isPreview: false, isWebsiteCandidate: true, host: "localhost:3240", protocol: "http:" });
+    expect(csp).toContain("default-src 'none'");
+    expect(csp).toContain("frame-ancestors 'self'");
+    expect(csp).toContain("form-action 'none'");
+    expect(csp).toContain("sandbox allow-same-origin");
+    expect(csp).not.toContain("script-src");
+    expect(csp).not.toContain("unsafe-eval");
+  });
   it("blocks framing for normal public pages", () => {
     const csp = buildContentSecurityPolicy({
       isPreview: false,
@@ -319,5 +328,15 @@ describe("proxy frame policy", () => {
     expect(csp).toContain("base-uri 'self' https:");
     expect(csp).toContain("frame-ancestors 'self' http://localhost:3000");
     expect(csp).not.toContain("frame-ancestors 'none'");
+  });
+
+  it("allows the local Supabase loopback in the development connection policy", () => {
+    const csp = buildContentSecurityPolicy({
+      isPreview: false,
+      host: "127.0.0.1:3000",
+      protocol: "http:",
+    });
+
+    expect(csp).toContain("connect-src 'self' https://api.stripe.com https://*.supabase.co https://*.upstash.io https://generativelanguage.googleapis.com https://api.resend.com ws://localhost:* http://localhost:* http://127.0.0.1:*");
   });
 });

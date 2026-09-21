@@ -15,7 +15,7 @@ One login, one monthly report, one bill.
 - **Custom website**, hand-built (never a template), on your own domain, hosted. `[live]`
 - **Update by chat** — tell the AI "add my Saturday brunch special" and it makes the
   change; you never touch code. `[live]`
-- **Business OS dashboard** — Today, Analytics, Reviews, Reports, Settings, all in one. `[live]`
+- **Owner dashboard** — Today, Analytics, Reviews, Reports, Settings, all in one. `[live]`
 - **Weekly + monthly reports** by email — proof it's working, in plain English. `[live]`
 - **Lead capture** — every form submission surfaced as "who reached out," phone-tap
   tracking, bot-spam filtered out automatically. `[live]`
@@ -25,7 +25,7 @@ One login, one monthly report, one bill.
 
 ## 2. Your Google Presence (GBP add-on — ONE plan, priced PER LOCATION)
 
-- **Managed Google Presence — +$149/mo/location** (or +$129 for an easy-yes anchor). Everything: reviews + replies, managed posts, profile optimization, GBP performance report, geogrid map-pack rank, competitive monitoring.
+- **Managed Google Presence — +$149/mo/location.** Everything: reviews + replies, managed posts, profile optimization, GBP performance report, geogrid map-pack rank, competitive monitoring.
 - **Multi-location = the plan per location, all bundled on ONE account + one bill** (e.g. Twin Trees, 2 locations = 2 x $149). No tiers, no per-location gating — each location is its own Google profile to manage.
 - Deliberately un-tiered: geogrid (the renewal hook) is included for everyone; splitting into tiers is a volume-stage decision, not a now decision.
 
@@ -102,7 +102,7 @@ One login, one monthly report, one bill.
 | GBP performance report | — | ✅ |
 | Map-pack geogrid rank | — | ✅ |
 | Competitive monitoring | — | ✅ |
-| **Add-on price (per location)** | — | **+$149/mo** ($129 easy-yes) |
+| **Add-on price (per location)** | — | **+$149/mo** |
 
 *Multi-location = the plan per location, bundled on one account + one bill.*
 

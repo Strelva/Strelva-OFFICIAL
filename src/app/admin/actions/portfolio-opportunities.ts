@@ -15,7 +15,9 @@
  *     cards in each client's own "Needs you" queue.
  * Both land in each client's PENDING queue for owner/operator approval — never
  * auto-published. Every scan read and every draft is per-tenant isolated: one
- * client failing degrades that client, never the whole pass.
+ * client failing degrades that client, never the whole pass. Read failures are
+ * carried in the snapshot so an empty opportunity list is never presented as
+ * verified when coverage is incomplete.
  *
  * Pure of auth/HTTP (like portfolio-actions.ts): the page reads the scan, the
  * server action gates super-admin then calls the draft dispatcher.
@@ -59,6 +61,14 @@ export interface PortfolioOpportunitiesSnapshot {
   groups: OpportunityGroup[];
   /** Total client-opportunities across every group. */
   totalOpportunities: number;
+  availability: "complete" | "partial" | "unavailable";
+  incomplete: PortfolioOpportunitiesIncompleteRead[];
+}
+
+export interface PortfolioOpportunitiesIncompleteRead {
+  source: "client_directory" | "site_health" | "reviews" | "retention";
+  tenantId?: string;
+  siteName?: string;
 }
 
 function hasReply(reply: string | undefined | null): boolean {
@@ -78,14 +88,35 @@ interface TenantSignals {
   lowGrade: ScanSummary["grade"] | null;
 }
 
+interface TenantSignalsRead {
+  signals: TenantSignals;
+  incomplete: PortfolioOpportunitiesIncompleteRead[];
+}
+
 async function collectSignals(
   tenant: { id: string; siteName?: string },
   scan: ScanSummary | null,
-): Promise<TenantSignals> {
-  const [reviews, retention] = await Promise.all([
-    getReviews(tenant.id).catch(() => []),
-    getOwnerRetentionSignals(tenant.id).catch(() => null),
+): Promise<TenantSignalsRead> {
+  const siteName = tenant.siteName || tenant.id;
+  const [reviewsRead, retentionRead] = await Promise.all([
+    getReviews(tenant.id)
+      .then((reviews) => ({ available: true as const, value: reviews }))
+      .catch(() => ({ available: false as const, value: [] as Awaited<ReturnType<typeof getReviews>> })),
+    getOwnerRetentionSignals(tenant.id)
+      .then((retention) => ({ available: true as const, value: retention }))
+      .catch(() => ({ available: false as const, value: null })),
   ]);
+
+  const incomplete: PortfolioOpportunitiesIncompleteRead[] = [];
+  if (!reviewsRead.available) {
+    incomplete.push({ source: "reviews", tenantId: tenant.id, siteName });
+  }
+  if (!retentionRead.available) {
+    incomplete.push({ source: "retention", tenantId: tenant.id, siteName });
+  }
+
+  const reviews = reviewsRead.value;
+  const retention = retentionRead.value;
 
   const unrepliedReviews = reviews.filter((r) => !hasReply(r.reply)).length;
   const staleDays =
@@ -95,11 +126,14 @@ async function collectSignals(
   const lowGrade = scan && LOW_HEALTH_GRADES.has(scan.grade) ? scan.grade : null;
 
   return {
-    tenantId: tenant.id,
-    siteName: tenant.siteName || tenant.id,
-    unrepliedReviews,
-    staleDays,
-    lowGrade,
+    signals: {
+      tenantId: tenant.id,
+      siteName,
+      unrepliedReviews,
+      staleDays,
+      lowGrade,
+    },
+    incomplete,
   };
 }
 
@@ -107,20 +141,51 @@ async function collectSignals(
  * Scan every active client for latent, not-yet-drafted work and group it by
  * opportunity kind. Each per-tenant read degrades to "no signal" rather than
  * failing the whole snapshot, so a transient backend blip can never 500 the
- * overview. Empty groups are dropped; groups are ordered by how many clients
- * they touch (biggest lever first).
+ * overview, while the missing source and client remain explicit. Empty groups
+ * are dropped; groups are ordered by how many clients they touch (biggest lever
+ * first).
  */
 export async function scanPortfolioOpportunities(): Promise<PortfolioOpportunitiesSnapshot> {
-  const tenants = (await getAllTenants().catch(() => [])).filter(isActiveTenant);
-  if (tenants.length === 0) return { groups: [], totalOpportunities: 0 };
+  let tenants: Awaited<ReturnType<typeof getAllTenants>>;
+  try {
+    tenants = (await getAllTenants()).filter(isActiveTenant);
+  } catch (error) {
+    console.error(
+      "[portfolio-opportunities] client directory unavailable:",
+      error instanceof Error ? error.message : error,
+    );
+    return {
+      groups: [],
+      totalOpportunities: 0,
+      availability: "unavailable",
+      incomplete: [{ source: "client_directory" }],
+    };
+  }
+  if (tenants.length === 0) {
+    return { groups: [], totalOpportunities: 0, availability: "complete", incomplete: [] };
+  }
 
   // One MGET for every tenant's latest health grade, then per-tenant signal reads.
-  const scans = await getScanSummaries(tenants.map((t) => t.id)).catch(
-    () => ({}) as Record<string, ScanSummary | null>,
-  );
-  const signals = await Promise.all(
+  let scans: Record<string, ScanSummary | null>;
+  let scanReadIncomplete: PortfolioOpportunitiesIncompleteRead[] = [];
+  try {
+    scans = await getScanSummaries(tenants.map((t) => t.id));
+  } catch (error) {
+    console.error(
+      "[portfolio-opportunities] site health unavailable:",
+      error instanceof Error ? error.message : error,
+    );
+    scans = {};
+    scanReadIncomplete = [{ source: "site_health" }];
+  }
+  const reads = await Promise.all(
     tenants.map((t) => collectSignals(t, scans[t.id] ?? null)),
   );
+  const incomplete = [
+    ...scanReadIncomplete,
+    ...reads.flatMap((read) => read.incomplete),
+  ];
+  const signals = reads.map((read) => read.signals);
 
   const unreplied = signals.filter((s) => s.unrepliedReviews > 0);
   const stale = signals.filter((s) => s.staleDays !== null);
@@ -178,7 +243,12 @@ export async function scanPortfolioOpportunities(): Promise<PortfolioOpportuniti
 
   groups.sort((a, b) => b.clients.length - a.clients.length);
   const totalOpportunities = groups.reduce((sum, g) => sum + g.clients.length, 0);
-  return { groups, totalOpportunities };
+  return {
+    groups,
+    totalOpportunities,
+    availability: incomplete.length > 0 ? "partial" : "complete",
+    incomplete,
+  };
 }
 
 export interface OpportunityDraftResult {

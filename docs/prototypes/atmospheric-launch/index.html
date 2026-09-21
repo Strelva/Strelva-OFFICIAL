@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#101518">
+  <link rel="preload" href="inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <script>if(new URLSearchParams(location.search).get("theme")==="light"){document.documentElement.dataset.theme="light";document.querySelector('meta[name="theme-color"]').content="#f2f3ef"}</script>
+  <title>Strelva / Atmospheric studies</title>
+  <link rel="stylesheet" href="atmosphere.css?v=20260917-cardlight">
+  <link rel="stylesheet" href="cloud-cards.css?v=20260917-cardlight">
+  <script src="study.js?v=20260917-cardlight" defer></script>
+  <script src="cloud-material.js?v=20260917-cardlight" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#content">Skip to content</a>
+  <svg class="svg-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+    <symbol id="cairn" viewBox="0 0 48 48"><circle cx="24.5" cy="7.2" r="3.4" fill="var(--accent)"/><ellipse cx="20.5" cy="15.9" rx="6.6" ry="4" fill="currentColor" transform="rotate(-8 20.5 15.9)"/><ellipse cx="22.5" cy="26.4" rx="9.4" ry="4.9" fill="currentColor" transform="rotate(5 22.5 26.4)"/><ellipse cx="24" cy="38.5" rx="12.2" ry="5.6" fill="currentColor" transform="rotate(-3 24 38.5)"/></symbol>
+    <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".82" numOctaves="3" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>
+  </defs></svg>
+  <main>
+    <header class="masthead"><a href="#" class="brand" aria-label="Strelva, top of page"><svg aria-hidden="true"><use href="#cairn"/></svg><span>Strelva</span></a><span class="edition">Material studies / 01</span></header>
+    <section id="content" tabindex="-1" class="intro" aria-labelledby="title"><div><p class="eyebrow">Strelva / Material laboratory</p><h1 id="title">Moving atmosphere.<br>Actual glass.</h1></div><p class="lede">Indigo depth. Sage light. Uneven cloud layers.<br>Six working materials behind the same card,<br class="desktop-break"> with separate light and dark palettes.</p></section>
+    <div class="toolbar"><div class="themes" role="group" aria-label="Color theme"><button data-theme-choice="dark" aria-pressed="true">Dark</button><button data-theme-choice="light" aria-pressed="false">Light</button></div><button id="motion" aria-pressed="false">Pause motion <span aria-hidden="true">Ⅱ</span></button><button id="glass-toggle" aria-pressed="false">Remove glass</button><label class="blur-control">Blur <input id="blur" aria-label="Glass blur" type="range" min="0" max="40" step="8" value="24"><output for="blur">24 px</output></label><span class="spec">24 px padding / 24 px corners</span></div>
+    <section class="studies" aria-label="Six atmospheric material studies"></section>
+    <footer><p>Six materials. One shared card layout.</p><p><a href="https://21st.dev/@manuarora700/components/background-gradient-animation">21st.dev / Aceternity source</a> · <a href="https://github.com/enisbu/tw-easing-gradients">Easing reference</a></p></footer>
+  </main>
+  <dialog aria-labelledby="detail-title"><button id="close" aria-label="Close material details">Close <span aria-hidden="true">×</span></button><p class="eyebrow">Material recipe</p><h2 id="detail-title"></h2><p id="detail-copy"></p><dl><div><dt>Geometry</dt><dd>8 px grid / 24 px inset / 24 px corners</dd></div><div><dt>Glass</dt><dd id="recipe-blur">24 px backdrop blur with a tinted fill; an opaque panel when filtering is unavailable.</dd></div><div><dt>Motion</dt><dd>WebGL cloud shader at up to 24 fps, with moving CSS light layers. Paused offscreen, when hidden or by your motion preference.</dd></div><div><dt>Mark</dt><dd>Original Strelva cairn, unchanged geometry</dd></div></dl></dialog>
+</body></html>

@@ -14,7 +14,7 @@
  *
  * Run: `pnpm check:ontology`. Exits non-zero on a violation.
  */
-import { readFileSync, readdirSync } from "fs";
+import { existsSync, readFileSync, readdirSync } from "fs";
 import path from "path";
 import { execSync } from "child_process";
 
@@ -37,11 +37,13 @@ const SIZE_GRANDFATHER = new Set([
 ]);
 
 function tsFiles(): string[] {
-  const out = execSync(`git ls-files 'src/**/*.ts' 'src/**/*.tsx' 'scripts/**/*.ts'`, {
+  const out = execSync(`git ls-files -z --cached --others --exclude-standard -- 'src/**/*.ts' 'src/**/*.tsx' 'scripts/**/*.ts'`, {
     cwd: repoRoot,
     encoding: "utf8",
   });
-  return out.split("\n").filter(Boolean);
+  // Check new files before staging, and omit tracked paths removed by a move.
+  return [...new Set(out.split("\0").filter(Boolean))]
+    .filter((rel) => existsSync(path.join(repoRoot, rel)));
 }
 
 for (const rel of tsFiles()) {

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en" data-theme="dark" data-paused="true">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Strelva / Typography options</title>
+<style>
+@font-face{font-family:Inter;src:url('./inter-latin.woff2') format('woff2');font-weight:100 900;font-display:swap}
+*{box-sizing:border-box}body{margin:0;background:#ffffff;color:#203238;font:14px/20px Inter, sans-serif}main{max-width:1440px;margin:auto;padding:48px}header{display:flex;justify-content:space-between;align-items:center;gap:24px}a{color:inherit}h1{font-size:32px;line-height:40px;letter-spacing:-.8px;font-weight:500;margin:40px 0 12px}p{margin:0}nav{display:flex;gap:8px;flex-wrap:wrap;margin:24px 0 40px}button,select{font:inherit;min-height:44px;padding:8px 16px;border-radius:12px;border:1px solid #aeb9b8;background:transparent;color:inherit;cursor:pointer}button:focus-visible,a:focus-visible{outline:2px solid #446853;outline-offset:3px}nav button[aria-pressed=true]{background:#203238;color:#f2f3ef}button:hover{box-shadow:inset 0 0 0 1px currentColor}.options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}.option{min-width:0}.label{font-size:14px;font-weight:500;margin:0 0 16px}.card{position:relative;isolation:isolate;overflow:hidden;min-height:352px;border-radius:24px;padding:24px;display:grid;grid-template-rows:auto 1fr auto;gap:24px;background:#223039;box-shadow:0 8px 24px -16px #20323844;color:#eff3ef}.material{position:absolute;inset:0;z-index:-2;background:radial-gradient(ellipse at 25% 65%,#789178,transparent 70%),#243448}.canvas-material{width:100%;height:100%;display:block}.card::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;pointer-events:none;background:linear-gradient(135deg,#ffffff12,transparent 50%),#24323f70;backdrop-filter:blur(28px);box-shadow:inset 0 0 0 1px #ffffff30,inset 0 1px 0 #ffffff70}.top,.bottom{display:flex;align-items:center;justify-content:space-between;gap:16px}.top{font-size:12px;line-height:16px}.top span:first-child{display:flex;align-items:center;gap:8px}.top svg{width:24px;height:24px}.body{align-self:end}.body h2{font-size:24px;line-height:32px;letter-spacing:-.4px;font-weight:500;margin:0 0 8px}.body p{font-size:14px;line-height:20px;min-height:40px;max-width:30ch;color:inherit}.bottom{font-size:12px;line-height:16px;flex-wrap:wrap}.bottom button{background:#edf1e9;color:#203238;border:0}.note{margin-top:16px;color:#516267;line-height:24px}.clear{background:#9aa9a7;color:#142d36}.clear .material{opacity:.55;filter:blur(5px);transform:scale(1.08)}.clear::before{background:linear-gradient(135deg,#eef3ed55,transparent 50%,#c9d4d522),#ccd7d26b;backdrop-filter:blur(10px);box-shadow:inset 0 0 0 1px #ffffff80,inset 0 2px 0 #ffffffb3,inset 0 -1px 0 #344d5a40}.clear .bottom button{background:#213b44;color:#f1f4ee}.mineral{background:#bcbcaf;color:#28352f}.mineral .material{background:radial-gradient(ellipse at 10% 0,#d0d0bc,transparent 65%),radial-gradient(ellipse at 95% 90%,#a5b4ae,transparent 75%),#bcbcaf}.mineral::before{background:repeating-linear-gradient(105deg,#ffffff05 0 1px,transparent 1px 4px);backdrop-filter:none;box-shadow:inset 0 0 0 1px #52625928,inset 0 1px 0 #ffffff50}.mineral .bottom button{background:#34483e;color:#f3f3eb}.options[data-choice]:not([data-choice=all]){grid-template-columns:minmax(0,560px);justify-content:center}.option[hidden]{display:none}dialog{border:1px solid #aab8b2;border-radius:24px;padding:24px;max-width:calc(100vw - 48px);background:#e4e9e2;color:#203238}dialog::backdrop{background:#182b3655}dialog p{margin-bottom:24px}@media(max-width:1000px){main{padding:24px}.options{grid-template-columns:1fr}.card{min-height:320px}h1{font-size:28px;line-height:36px}}@media(prefers-reduced-transparency:reduce){.card::before{background:#273943;backdrop-filter:none}.clear::before{background:#bdcac7}.mineral::before{background:#bcbcaf}}@media(forced-colors:active){.material,.card::before{display:none}.card{background:Canvas;color:CanvasText;border:1px solid CanvasText}}
+
+:root { --motion-gooey: linear(0, .14 10%, .46 22%, .79 38%, .96 55%, 1.035 72%, 1.012 88%, 1); }
+.options { align-items: start; }
+.card { display: block; min-height: 0; transition: border-radius 360ms var(--motion-gooey); }
+.card[data-collapsed=true] { border-radius: 32px; }
+.top { min-height: 44px; }
+.card-tools { display: flex; gap: 4px; }
+.card-tools button { display: grid; place-items: center; width: 44px; padding: 0; border: 0; color: inherit; }
+.card-tools button:focus-visible { outline-color: currentColor; outline-offset: -3px; }
+.card-tools svg { width: 18px; height: 18px; }
+.disclosure { display: grid; grid-template-rows: 1fr; margin-top: 24px; opacity: 1; transition: grid-template-rows 360ms var(--motion-gooey), margin-top 360ms var(--motion-gooey), opacity 160ms ease; }
+.disclosure-inner { min-height: 0; overflow: hidden; }
+.disclosure-content .body { align-self: stretch; }
+.disclosure-content { min-height: 212px; display: flex; flex-direction: column; justify-content: flex-end; gap: 24px; padding: 4px; }
+.card[data-collapsed=true] .disclosure { grid-template-rows: 0fr; margin-top: 0; opacity: 0; }
+.card [data-collapse] svg { transition: transform 200ms ease; }
+.card[data-collapsed=true] [data-collapse] svg { transform: rotate(180deg); }
+.restore-row { display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:0 0 24px; }
+#restore:disabled { opacity:.45;cursor:default; }
+@media(prefers-reduced-motion:reduce) { .card,.disclosure,.card [data-collapse] svg { transition:none; } }
+
+@font-face{font-family:Fraunces;src:url('./fraunces-latin.woff2') format('woff2');font-weight:100 900;font-display:swap}
+.card.clear,.card.mineral{background:#223039;color:#eff3ef}
+.card.clear .material,.card.mineral .material{opacity:1;filter:none;transform:none;background:radial-gradient(ellipse at 25% 65%,#789178,transparent 70%),#243448}
+.card.clear::before,.card.mineral::before{background:linear-gradient(135deg,#ffffff12,transparent 50%),#24323f70;backdrop-filter:blur(28px);box-shadow:inset 0 0 0 1px #ffffff30,inset 0 1px 0 #ffffff70}
+.card.clear .bottom button,.card.mineral .bottom button{background:#edf1e9;color:#203238}
+.card.smoked .body h2{font:600 24px/32px Inter,sans-serif;letter-spacing:-.4px}
+.card.clear .body h2{font:400 28px/36px Fraunces,serif;letter-spacing:-.3px;font-variation-settings:'SOFT' 0,'WONK' 0}
+.card.mineral .body h2{font:500 24px/32px Inter,sans-serif;letter-spacing:-.3px}
+.card.mineral .body p{font-size:16px;line-height:24px}
+.card .body h2{min-height:72px}
+.card .body p{min-height:72px}
+@media(prefers-reduced-transparency:reduce){.card.clear::before,.card.mineral::before{background:#273943;backdrop-filter:none}}
+@media(forced-colors:active){.card.clear,.card.mineral{background:Canvas;color:CanvasText}}
+</style>
+<script src="cloud-material.js?v=options1" defer></script></head>
+<body><main><header><a href="./?theme=light">← Material study</a><span>Strelva / Typography comparison</span></header><h1>Three type directions.</h1><p>Same smoked glass and copy. Compare hierarchy, weight and the role of serif type.</p><nav aria-label="Material comparison"><button data-choice="all" aria-pressed="true">Compare all</button><button data-choice="smoked" aria-pressed="false">1 · Precise sans</button><button data-choice="clear" aria-pressed="false">2 · Editorial serif</button><button data-choice="mineral" aria-pressed="false">3 · Open sans</button></nav><div class="restore-row"><button id="restore" disabled>Restore closed cards</button><span id="card-status" role="status" aria-live="polite">All cards visible</span></div><section class="options" data-choice="all" aria-label="Typography options"></section><dialog><p>This is a material comparison. No product changes have been saved.</p><button onclick="this.closest('dialog').close()">Close</button></dialog></main>
+<script>
+const options=[['smoked','Precise sans','Inter 600 heading, 14/20 body. Compact and direct; suited to repeated product cards.'],['clear','Editorial serif','Fraunces 400 heading, Inter body and controls. More expressive; best for a featured result or introduction.'],['mineral','Open sans','Inter 500 heading, 16/24 body. More breathing room; costs a little density.']];
+const mark='<svg viewBox="0 0 48 48" fill="currentColor" aria-hidden="true"><circle cx="24.5" cy="7.2" r="3.4"/><ellipse cx="20.5" cy="15.9" rx="6.6" ry="4" transform="rotate(-8 20.5 15.9)"/><ellipse cx="22.5" cy="26.4" rx="9.4" ry="4.9" transform="rotate(5 22.5 26.4)"/><ellipse cx="24" cy="38.5" rx="12.2" ry="5.6" transform="rotate(-3 24 38.5)"/></svg>';
+document.querySelector('.options').innerHTML=options.map(([id,name,note],i)=>`<article class="option" data-option="${id}"><h2 class="label">${i+1} / ${name}</h2><div class="card ${id}"><div class="material" aria-hidden="true">${true?'<canvas class="canvas-material" data-variant="0"></canvas>':''}</div><div class="top"><span>${mark} Strelva</span><div class="card-tools"><button data-collapse="${id}" aria-label="Collapse ${name}" aria-expanded="true" aria-controls="content-${id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 14 6-6 6 6"/></svg></button><button data-close="${id}" aria-label="Close ${name}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg></button></div></div><div class="disclosure" id="content-${id}"><div class="disclosure-inner"><div class="disclosure-content"><div class="body"><h2>A clearer first impression.</h2><p>Review the wording and layout together before deciding what to publish.</p></div><div class="bottom"><span>Example draft</span><button data-open="${id}" aria-haspopup="dialog">View example ↗</button></div></div></div></div></div><p class="note">${note}</p></article>`).join('');
+const closed = new Set();
+function choose(choice){if(!['all',...options.map(x=>x[0])].includes(choice))choice='all';document.querySelector('.options').dataset.choice=choice;document.querySelectorAll('[data-option]').forEach(el=>el.hidden=closed.has(el.dataset.option)||(choice!=='all'&&el.dataset.option!==choice));document.querySelectorAll('[data-choice]').forEach(el=>{if(el.tagName==='BUTTON')el.setAttribute('aria-pressed',String(el.dataset.choice===choice))});const url=new URL(location);url.searchParams.set('variant',choice);history.replaceState(null,'',url)}
+document.querySelectorAll('button[data-choice]').forEach(el=>el.onclick=()=>choose(el.dataset.choice));choose(new URLSearchParams(location.search).get('variant')||'all');document.querySelectorAll('[data-open]').forEach(el=>el.onclick=()=>document.querySelector('dialog').showModal());
+
+const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+const exits = new Map();
+function reportCards() {
+  document.querySelector('#restore').disabled = closed.size === 0 && exits.size === 0;
+  document.querySelector('#card-status').textContent = closed.size ? `${closed.size} card${closed.size === 1 ? '' : 's'} closed` : 'All cards visible';
+}
+document.querySelectorAll('[data-collapse]').forEach(button => button.addEventListener('click', () => {
+  const card = button.closest('.card');
+  const collapsed = card.dataset.collapsed !== 'true';
+  card.dataset.collapsed = String(collapsed);
+  button.setAttribute('aria-expanded', String(!collapsed));
+  button.setAttribute('aria-label', `${collapsed ? 'Expand' : 'Collapse'} ${options.find(item => item[0] === button.dataset.collapse)[1]}`);
+  card.querySelector('.disclosure').inert = collapsed;
+}));
+document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', async () => {
+  const id = button.dataset.close;
+  if (exits.has(id)) return;
+  const article = button.closest('.option');
+  const animation = article.animate([{opacity:1,clipPath:'inset(0% 0% round 24px)'},{opacity:.8,clipPath:'inset(7% 3% round 40px)',offset:.45},{opacity:0,clipPath:'inset(45% 12% round 48px)'}], {duration:reducedMotion.matches ? 0 : 220,easing:'ease-out',fill:'forwards'});
+  exits.set(id, animation);
+  article.inert = true;
+  document.querySelector('#restore').disabled = false;
+  document.querySelector('#restore').focus();
+  try { await animation.finished; } catch { return; }
+  if (exits.get(id) !== animation) return;
+  closed.add(id); article.hidden = true; article.inert = false;
+  animation.cancel(); exits.delete(id); reportCards();
+}));
+document.querySelector('#restore').addEventListener('click', () => {
+  exits.forEach((animation,id) => { animation.cancel(); document.querySelector(`[data-option="${id}"]`).inert = false; });
+  exits.clear(); closed.clear();
+  choose(document.querySelector('.options').dataset.choice);
+  document.querySelectorAll('.option:not([hidden])').forEach(article => {
+    article.animate([{opacity:0,transform:'translateY(8px)'},{opacity:1,transform:'translateY(0)'}], {duration:reducedMotion.matches ? 0 : 200,easing:'ease-out'});
+  });
+  reportCards();
+  document.querySelector('.option:not([hidden]) [data-collapse]')?.focus();
+});
+reducedMotion.addEventListener('change', () => { if(reducedMotion.matches) exits.forEach(animation => animation.finish()); });
+</script></body></html>

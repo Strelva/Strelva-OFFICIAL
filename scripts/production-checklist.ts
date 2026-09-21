@@ -119,7 +119,7 @@ function checkEnvVar(name: string, required: boolean, secret = true): boolean {
     else warnedEnvVars.add(name);
     return false;
   }
-  const display = secret ? `${value.slice(0, 8)}...` : value;
+  const display = secret ? "redacted" : value;
   log({ name: `ENV: ${name}`, status: "ok", message: `Set (${display})` });
   return true;
 }

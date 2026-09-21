@@ -1,0 +1,133 @@
+.card {
+  --atmosphere-base: #192735;
+  --atmosphere-glass: #162532b8;
+  --atmosphere-reflection: #e6f5ef14;
+  --atmosphere-edge-light: #ffffff59;
+  --atmosphere-opaque: #1b2b38;
+  --atmosphere-text: #edf2ee;
+  --atmosphere-text-secondary: #c0cdc9;
+  --atmosphere-muted: var(--atmosphere-text-secondary);
+  --atmosphere-inner: #142430e8;
+  --atmosphere-border: #e9f3eb30;
+  --atmosphere-focus: #d8eac8;
+  --atmosphere-control: #182833;
+  --atmosphere-control-hover: #304550;
+  --atmosphere-shadow: #06111e38;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-width: 0;
+  padding: 24px;
+  border-radius: 24px;
+  color: var(--atmosphere-text);
+  background: var(--atmosphere-base);
+  box-shadow: inset 0 0 0 1px var(--atmosphere-border);
+}
+
+.card[data-palette="light"] {
+  --atmosphere-base: #ced8d4;
+  --atmosphere-glass: #d3dbd733;
+  --atmosphere-reflection: #ffffff0d;
+  --atmosphere-edge-light: #ffffff40;
+  --atmosphere-opaque: #d3dcd5;
+  --atmosphere-text: #20343b;
+  --atmosphere-text-secondary: #425c61;
+  --atmosphere-inner: #e2e8dfec;
+  --atmosphere-border: #536c781f;
+  --atmosphere-focus: #31504a;
+  --atmosphere-control: #eff5e9;
+  --atmosphere-control-hover: #dae5d6;
+  --atmosphere-shadow: #52677624;
+  box-shadow: 0 8px 24px -16px var(--atmosphere-shadow), inset 0 0 0 1px var(--atmosphere-border);
+}
+
+.card.card:focus-visible { border-radius: 24px; outline: 2px solid var(--atmosphere-focus); outline-offset: 2px; }
+
+.material {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--atmosphere-base);
+}
+
+.canvas { display: block; width: 100%; height: 100%; filter: blur(14px); transform: scale(1.15); }
+
+.card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(135deg, var(--atmosphere-reflection), transparent 42%, transparent 70%, var(--atmosphere-reflection)), var(--atmosphere-glass);
+  backdrop-filter: blur(var(--atmosphere-blur, 32px)) saturate(125%);
+  -webkit-backdrop-filter: blur(var(--atmosphere-blur, 32px)) saturate(125%);
+  box-shadow: inset 0 0 0 1px var(--atmosphere-border), inset 0 1px 0 var(--atmosphere-edge-light), inset 0 -1px 0 var(--atmosphere-shadow);
+}
+
+.content {
+  position: relative;
+  min-width: 0;
+  padding: 0;
+  color: var(--atmosphere-text);
+  overflow-wrap: anywhere;
+}
+
+.motionControls { position: relative; display: flex; justify-content: flex-end; margin-top: 8px; }
+
+.motionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  max-width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 12px;
+  color: var(--atmosphere-text);
+  background: var(--atmosphere-control);
+  font: inherit;
+  font-size: 12px;
+  line-height: 24px;
+  cursor: pointer;
+  transition: background-color 120ms ease, transform 120ms ease;
+}
+
+.motionButton svg { flex-shrink: 0; }
+.motionButton.motionButton:focus-visible { border-radius: 12px; outline: 2px solid var(--atmosphere-focus); outline-offset: 2px; }
+.motionButton:disabled { cursor: default; }
+@media (hover: hover) {
+  .motionButton:hover:not(:disabled) { background: var(--atmosphere-control-hover); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .motionButton:active:not(:disabled) { transform: scale(0.96); }
+}
+
+.card[data-renderer="fallback"] .canvas { visibility: hidden; }
+.card[data-renderer="fallback"]::before { background: var(--atmosphere-opaque); backdrop-filter: none; -webkit-backdrop-filter: none; }
+.card[data-motion="fallback"] .motionControls,
+.card[data-motion="static"] .motionControls { position: relative; display: none; }
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .card::before { background: var(--atmosphere-opaque); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .card::before { background: var(--atmosphere-opaque); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+@media (forced-colors: active) {
+  .material, .card::before { display: none; }
+  .card, .content { background: Canvas; color: CanvasText; box-shadow: none; border: 1px solid CanvasText; }
+  .motionControls { position: relative; display: none; }
+  .card::before { backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+
+.header { display: flex; align-items: center; gap: 16px; }
+.header > div { min-width: 0; }
+.icon { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 12px; background: var(--atmosphere-inner); }
+.detail { display: flex; align-items: flex-start; gap: 16px; padding: 16px; border-radius: 16px; background: var(--atmosphere-inner); }
+.detail > svg { flex: none; }
+.detail > div { min-width: 0; }
+.footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; color: var(--atmosphere-muted); }

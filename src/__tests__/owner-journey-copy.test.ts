@@ -86,7 +86,8 @@ describe("owner journey copy and links", () => {
     const maintenance = readRepoFile("src/app/api/cron/maintenance/route.ts");
 
     expect(historyPage).toContain("getSiteSnapshots(tenant, 60)");
-    expect(historyPage).toContain("<SiteSafetyPanel snapshots={snapshots} />");
+    expect(historyPage).toContain('snapshots.status === "fulfilled"');
+    expect(historyPage).toContain("<SiteSafetyPanel snapshots={snapshots.value} />");
     expect(safetyPanel).toContain("Revert to a last good version");
     expect(safetyPanel).toContain("Save a version now");
     // Per-row restore over the whole version history, not just the latest.
@@ -113,8 +114,11 @@ describe("owner journey copy and links", () => {
     const maintenance = readRepoFile("src/app/api/cron/maintenance/route.ts");
 
     expect(packageJson).toContain('"@vercel/analytics"');
-    expect(rootLayout).toContain('import { Analytics } from "@vercel/analytics/next"');
-    expect(rootLayout).toContain("<Analytics />");
+    expect(rootLayout).toContain("<PrivacyAwareAnalytics />");
+    const analyticsBoundary = readRepoFile("src/components/PrivacyAwareAnalytics.tsx");
+    expect(analyticsBoundary).toContain('import { Analytics } from "@vercel/analytics/next"');
+    expect(analyticsBoundary).toContain("<Analytics />");
+    expect(analyticsBoundary).toContain("analyticsAllowedPath(pathname)");
     expect(dashboardPage).toContain("getOwnerRetentionSignals(tenant)");
     expect(dashboardPage).toContain('<EngagementTracker event="dashboard-open" />');
     expect(dashboardPage).toContain("<RetentionPanel signals={retentionSignals} />");

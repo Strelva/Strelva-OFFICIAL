@@ -7,10 +7,10 @@
 export { DEFAULT_TENANT } from "./core";
 
 // Content
-export { getContent, setContent, SECTION_TO_TYPE } from "./content-store";
+export { getContent, getStoredContent, setContent, SECTION_TO_TYPE } from "./content-store";
 
 // Versions
-export { appendVersion, getVersions, restoreVersion } from "./version-store";
+export { appendVersion, getVersions, restoreVersion, restoreVersionToDraft } from "./version-store";
 export type { ContentVersion } from "./version-store";
 
 // Drafts

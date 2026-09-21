@@ -1,6 +1,6 @@
 # Strelva Launch Blockers
 
-> **Status: current release gate (updated 2026-07-30).** Only `Current
+> **Status: current release gate (updated 2026-09-18).** Only `Current
 > Blockers` and `Waived Blockers` determine release status. The long evidence
 > record below is historical. Current architecture and commands live in
 > `production-readiness.md`: Supabase Auth, Postgres, and `app.strelva.com`.
@@ -14,6 +14,15 @@ This file tracks launch blockers that cannot be resolved by code changes alone. 
 ## Current Blockers
 
 _No current blockers from the original release gate — both prior entries are resolved (2026-07-12): Rohlax revalidation is wired and the apex + admin serve; the seed demo tenant `summit` and `jacobtest` are deactivated._
+
+### strelvav2 customer-journey and activation acceptance
+
+- Status: blocked
+- Owner: implementation team; Jacob owns human acceptance and live activation.
+- Scope: the new horizontal product on branch `strelvav2`, not a claim that the existing Managed Websites production service has stopped working.
+- Reference: [horizontal acceptance](./strelvav2-horizontal-acceptance.md) and [release evaluation gates](./horizontal-release-checklist-2026-09-11.md#current-completion-evaluation).
+- Required closure: complete the mandatory PRD journeys with independently reviewed evidence, resolve operating and commercial choices at their dependent boundary, prepare the exact migration/environment/deployment and recovery steps, and obtain the necessary live-action authority. Fixture-only results, local builds and resolved historical launch blockers cannot close this gate.
+- Current gaps include account/result continuity, complete application handoffs, provider-cost reconciliation, authenticated delegated operation, custom application release integration and specified provider/service lifecycle. The acceptance ledger retains their current scope and proof limits.
 
 ### Security and dependency blockers (2026-07-30 audit — RESOLVED 2026-07-30)
 
@@ -171,7 +180,7 @@ Move an item here only with owner approval in the release note. Each waiver must
   - Do not overwrite the values already passing the checker unless the provider dashboard says they are wrong. If a generated secret must be rotated, generate it with `openssl rand -hex 32`, update the matching provider or caller, run `vercel env pull .env.production.local --environment=production`, then rerun `pnpm check:prod`.
   - Redeploy the Vercel Production app after env changes. Prefer the Vercel dashboard or a clean release branch; check `git status --short` first and do not run `vercel deploy --prod` from a dirty local working tree. After redeploy, run the Vercel-host freshness probe with `PLAYWRIGHT_BASE_URL=https://strelva.com PLAYWRIGHT_TENANT_ORIGIN=https://greatlakesdriedfruit.com pnpm exec playwright test tests/customer-frontend.spec.ts -g "signed-out dashboard customers"` and confirm `https://strelva.com/sign-in` serves `Sign in to Strelva | Strelva`.
 - Required Vercel Production env values now pass after pulling `vercel env pull .env.production.local --environment=production`: `CLERK_WEBHOOK_SECRET`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, and `REB_CUSTOM_REQUEST_SECRET` are set. `NEXT_PUBLIC_APP_URL` remains required only if Google, Instagram, or Calendly OAuth is enabled. Provider sources were Clerk Dashboard -> Webhooks -> `https://strelva.com/api/clerk/webhook`, Upstash Redis -> REST API, Sentry project settings -> Client Keys / DSN, and a generated shared custom-storefront bearer secret. Historical add commands for the resolved env handoff were `vercel env add CLERK_WEBHOOK_SECRET production`, `vercel env add UPSTASH_REDIS_REST_URL production`, `vercel env add UPSTASH_REDIS_REST_TOKEN production`, `vercel env add SENTRY_DSN production`, `vercel env add NEXT_PUBLIC_SENTRY_DSN production`, and `vercel env add REB_CUSTOM_REQUEST_SECRET production`.
-- `STRIPE_SCAFFOLD_PRICE_ID` is intentionally unpinned: client sites are free for now and the admin-side price is undecided. `pnpm check:prod` skips the price check when the env var is unset and only validates the recurring-monthly-USD shape when it is set.
+- The public offer is a paid custom build plus monthly management. `STRIPE_SCAFFOLD_PRICE_ID`, when set, must be a live recurring monthly USD Stripe price; build quotes and payments remain separate from the recurring subscription price.
 - `pnpm check:prod` now confirms Upstash Redis connectivity with `PING: PONG`; the remaining Redis warning is only that the tenant cache is empty and will populate on first request.
 - `docs/design-kit.md` exists and covers WCAG 2.2 AA, Core Web Vitals, AI surfaces, and template expansion rules.
 - `vercel whoami` returns `rhinehart514-5576`, and `vercel env ls production` can read encrypted Production env variable names for `rhinehart514-gmailcoms-projects/scaffold-web`.

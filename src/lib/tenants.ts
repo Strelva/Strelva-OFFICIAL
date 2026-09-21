@@ -199,6 +199,7 @@ function transformTenantSecrets(
 
 async function loadTenants(): Promise<TenantConfig[]> {
   const redis = getRedis();
+  let redisReadFailed = false;
 
   // Try Redis cache first
   if (redis) {
@@ -206,13 +207,16 @@ async function loadTenants(): Promise<TenantConfig[]> {
       const cached = await redis.get<TenantConfig[]>(REDIS_KEY);
       if (cached) return transformTenantSecrets(cached, decryptSecret);
     } catch {
-      // Redis failed — continue to source of truth
+      redisReadFailed = true;
     }
   }
 
-  // In-memory fallback TTL check (used when Redis is down or not configured)
+  // A missing Redis key is the cross-process invalidation signal, so it must
+  // fall through to Postgres. Use the process-local copy only when Redis is
+  // unavailable; otherwise another instance could keep serving a removed or
+  // newly added tenant until this TTL expires.
   const now = Date.now();
-  if (_memCache && now - _memCacheTime < CACHE_TTL_SECONDS * 1000) return _memCache;
+  if ((!redis || redisReadFailed) && _memCache && now - _memCacheTime < CACHE_TTL_SECONDS * 1000) return _memCache;
 
   let tenants: TenantConfig[] | undefined;
 

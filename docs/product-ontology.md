@@ -1,14 +1,37 @@
 # Strelva product ontology
 
 Status: **normative**
-Updated: 2026-07-30
+Updated: 2026-09-11
+
+The [inquiry-first product specification](./inquiry-first-product-spec-2026-09-11.md)
+is authoritative for the selected local migration. It supersedes the generic
+conversational experience and surface examples below where they conflict.
+Existing managed-presence vocabulary remains authoritative for deployed
+compatibility and behavior that has not migrated.
+
+## Product transition
+
+The founder's current direction is one accessible conversational Strelva
+experience for Users, Paid Users, Clients, and Enterprise accounts. Existing
+managed clients retain Client status. Standard paid access and personalized
+managed service are independent facts; neither status grants permissions.
+Agencies are a partner relationship with explicit delegated access, not an
+additional user tier.
+
+The managed-presence model below describes the existing delivery system and its
+compatibility vocabulary. It must not impose a website or tenant requirement on
+general Strelva users. The transition is specified in
+[`strategy/2026-09-05-product-structure-and-agency-experiment.md`](strategy/2026-09-05-product-structure-and-agency-experiment.md);
+[`../src/README.md`](../src/README.md) defines source boundaries. Shared
+conversation access and account-owned persistence are not yet deployed by this
+structural migration.
 
 This document defines what the product is, the concepts it owns, and the
 language code and product work should use. It exists to keep commercial
 packaging, customer experience, delivery architecture, and persistence from
 collapsing into one overloaded idea of a “feature.”
 
-## Product definition
+## Existing managed-presence product
 
 Strelva is a **managed business-presence operating service with a software
 control plane**. The customer buys an outcome—an effective presence that is
@@ -146,7 +169,92 @@ The resulting Delivery Lead is Strelva’s pre-tenant sales/delivery record.
 ### Customer Inquiry
 
 A lead captured for a Tenant through its public Site Property. It is recent
-customer activity, not Strelva’s own sales lead and not a full CRM record.
+customer activity, not Strelva’s own sales lead and not a full CRM record. In
+the inquiry-first product it is a durable instance handled by an exact published
+Capability version. Pause, Undo, or a later Capability edit cannot erase it.
+
+### Record
+
+A Record is a typed thing one Business works with, such as an inquiry, booking,
+page, listing, customer, quote, or review. It has stable identity, typed fields,
+links, and a timeline. Customer Inquiry is the first Record type in the selected
+migration.
+
+### Capability, Capability Version, and Rule
+
+A **Capability** is a reusable, governed ability to create, inspect, or operate
+a kind of business work. A **Capability Version** fixes its inputs, outputs,
+rules, approved interface parts, and supported actions. Inquiry intake is one
+implemented kind; scheduling, investigation, and other horizontal kinds must
+earn their own execution evidence. A **Rule** is a versioned condition and
+consequence. A published version is never edited in place. Existing Tenant
+Capability, Site Capability, and Agent Capability remain distinct compatibility
+terms. This broader product definition does not rename or generalize the current
+inquiry contracts by itself.
+
+### Change and Work
+
+A **Change** is a proposed, previewable, reversible modification to Records, a
+Capability, or a Rule. It holds exact versions, authorization, and an inverse.
+Its receipt is the human-readable diff and result.
+
+**Work** is the durable thread from a person's intent to an answer, Change,
+Capability, or Responsibility. It is used for recent work and history. It does
+not grant authority and is not a generic replacement for those records.
+
+### Responsibility
+
+A Responsibility is an explicit, ongoing assignment with a policy boundary over
+named work and capabilities. The current inquiry implementation binds it to one
+Capability. It states what
+Strelva may do, must never do, and must ask a person to approve. It also records
+limits, escalation, voice, hours, and supervised or trusted status. Promotion
+is the explicit action that changes this status. Service
+scope, provider connection, and actor role do not imply a Responsibility.
+
+### Rehearsal
+
+A Rehearsal is a saved, rerunnable execution of one Capability Version against
+synthetic inputs with external writes blocked. Its named check results are
+evidence for publishing only that exact version.
+
+### Receipt
+
+A Receipt is structured, durable evidence of an action. It records actor, what
+happened, why, target, version, evidence, outcome, and any supported inverse.
+Activity copy may summarize a Receipt but does not replace it.
+
+### Research project, source, claim, and opportunity
+
+A **Research Project** is a scoped investigation with a question, owner, permitted
+sources, research responsibility, and budget. It uses the shared Work model;
+the term does not imply an autonomous research runtime is already implemented.
+
+A **Source** is a retrievable reference or permitted captured item with origin,
+time, access scope, and freshness. A **Claim** is a versioned assertion linked to
+supporting and contradictory sources, with its segment and limits explicit.
+
+An **Observation** describes evidence actually recorded, including whether it is
+direct behavior or someone reporting behavior. An **Inference** interprets that
+evidence. An **Unknown** names something not established. Repetition and synthetic
+agreement cannot silently promote an inference into an observation.
+
+An **Opportunity** connects a pattern of behavior, constraint, and unresolved job
+to a possible improvement. A **Possibility** is one proposed response. Neither
+is a supported Capability or an authorization to implement one.
+
+A **Capability Assessment** compares a dated technical claim with task-specific
+feasibility evidence, remaining constraints, and cost. It differs from an
+installed Capability or a provider permission.
+
+An **Experiment** is a versioned comparison with an expectation, workload,
+baseline, alternatives, measures, results, and decision. A **Qualification
+Decision** records whether evidence supports offering, revising, or stopping the
+work. It is separate from deployment approval and never grants provider access.
+
+See the [completion contract](./strelvav2-definition-of-done.md) for acceptance
+and current limits. These research concepts are proposed durable product records,
+not a claim that their full runtime exists today.
 
 ### Commercial Plan
 

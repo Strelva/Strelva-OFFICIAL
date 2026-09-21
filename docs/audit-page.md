@@ -154,7 +154,7 @@ Because it divides by the sum of the weights actually present, a category emitte
 
 ### Public `strelva.com/audit` + quick-tool tabs + extensions (marketing repo)
 
-As of the **2026-07-14 consolidation**, the public marketing site has NO scoring engine of its own — `~/strelva-marketing` is a thin forwarder:
+As of the **2026-07-14 consolidation**, the public marketing site has NO scoring engine of its own — `./strelva-marketing` is a thin forwarder:
 
 - `strelva.com/audit` "Full Report" → `POST /api/audit-lead` → this repo's `POST /api/audit/lead` (runs `runAudit`, stores the shareable report, emails the prospect).
 - The quick single-tool tabs + the 4 Chrome extensions' deep-links (`?tool=seo-audit|schema|mobile|accessibility|security`) → marketing `POST /api/tools/scan` → this repo's `POST /api/audit/scan` (`src/lib/tools/canonical.ts`), which maps each tool to its canonical category (`schema`→`ai-readability`, `mobile`→`web-vitals`+`mobile`, …).
@@ -209,11 +209,10 @@ Future work must go through `scan.ts` / `scan-store`, not a new store:
 
 ## Known issues / TODO
 
-**[HIGH][bug] Tenant rename registry missing several Redis-authoritative keys (`src/lib/tenant-rename.ts`).** `authoritativePatterns` does not include `google-meta:${t}` (GBP write state — silently stranded on rename), `review-replies:recent:${t}`, `reb:review-nudge-sent:${t}`, `reb:order-review-request-sent:${t}:*`, or `reb:review-reply-declined:${t}:*` (the declined-reply veto is 180-day durable). A tenant rename silently orphans these keys under the old slug. Add all five patterns to `authoritativePatterns` and update the completeness unit test assertions to cover them.
-
 **[MEDIUM][security] Rate-limit on `/api/audit/scan` opens to unlimited throughput when Redis is absent (`src/app/api/audit/scan/route.ts`).** `checkRateLimit` returns `{ allowed: true }` when `getRedis()` returns null, so a Redis outage (or a dev env with no Redis configured) removes the public rate limit entirely. Consider fail-closed: return `{ allowed: false }` when Redis is unavailable, or at minimum log/alert on the bypass.
 
 **Closed (DONE 2026-07-30):**
 - SSRF guard (`validateUrlSafety`) added to `scoreAiVisibility` (`src/lib/ai-visibility/score.ts`) before every `fetchText` call.
 - `Cache-Control: private` added to both v1 collections routes via `TENANT_PRIVATE_CACHE` constant.
 - Newsletter HTML sanitizer drops `style` from `ALLOWED_ATTR` — CSS injection path closed.
+- Tenant rename registry includes GBP metadata and review/order dedup authorities.

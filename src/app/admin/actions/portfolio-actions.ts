@@ -9,8 +9,9 @@
  * external write that fails leaves its item pending and is reported honestly.
  *
  * Pure of auth/HTTP: the page reads `getPortfolioActions`, the server action
- * gates super-admin then calls `bulkResolvePortfolioActions`. Every read
- * degrades to empty so a transient backend blip can never 500 the overview.
+ * gates super-admin then calls `bulkResolvePortfolioActions`. A transient read
+ * failure keeps the overview usable, but is carried as an explicit incomplete
+ * source so an empty result can never masquerade as a verified clear queue.
  */
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 import { getEvents } from "@/lib/events";
@@ -41,10 +42,28 @@ export interface PortfolioActionGroup {
   capped: boolean;
 }
 
+export type PortfolioActionsAvailability = "complete" | "partial" | "unavailable";
+
+/** A source that was not read successfully while building the snapshot. */
+export interface PortfolioActionsIncompleteRead {
+  /** Stable source identity for the operator UI and future telemetry. */
+  source: "client_directory" | "pending_approvals";
+  /** Present for a tenant-scoped pending-approval read. */
+  tenantId?: string;
+  /** Safe display identity captured before the failed tenant-scoped read. */
+  siteName?: string;
+  /** A bounded read can be successful yet still leave unseen pending events. */
+  capped?: boolean;
+}
+
 export interface PortfolioActionsSnapshot {
   groups: PortfolioActionGroup[];
   totalItems: number;
   totalClients: number;
+  /** `complete` is the only state in which an empty queue means clear. */
+  availability: PortfolioActionsAvailability;
+  /** Explicit source/tenant identity for reads that could not be verified. */
+  incomplete: PortfolioActionsIncompleteRead[];
 }
 
 /**
@@ -78,48 +97,103 @@ export function describePortfolioAction(event: UnifiedEvent): string {
 
 /**
  * Every pending approval across every active client, grouped by client and
- * ordered by how much each client is waiting on (busiest first). Per-tenant and
- * per-read failures degrade to empty rather than failing the whole snapshot.
+ * ordered by how much each client is waiting on (busiest first). Successful
+ * tenants remain usable when another tenant fails, while every failed source is
+ * carried in `incomplete` so the caller can make the uncertainty visible.
  */
 /** Per-tenant pending fetch cap. When a tenant's pending read returns this many
  *  raw events, more may be waiting than we surface — flagged as `capped`. */
 export const PORTFOLIO_EVENTS_LIMIT = 100;
 
 export async function getPortfolioActions(): Promise<PortfolioActionsSnapshot> {
-  const tenants = (await getAllTenants().catch(() => [])).filter(isActiveTenant);
+  let tenants: Awaited<ReturnType<typeof getAllTenants>>;
+  try {
+    tenants = (await getAllTenants()).filter(isActiveTenant);
+  } catch (error) {
+    // Without the directory we do not know which clients exist, so this is a
+    // fully unavailable snapshot rather than a verified empty portfolio.
+    console.error(
+      "[portfolio-actions] client directory unavailable:",
+      error instanceof Error ? error.message : error,
+    );
+    return {
+      groups: [],
+      totalItems: 0,
+      totalClients: 0,
+      availability: "unavailable",
+      incomplete: [{ source: "client_directory" }],
+    };
+  }
 
-  const groups = await Promise.all(
-    tenants.map(async (t): Promise<PortfolioActionGroup> => {
-      const events = await getEvents(t.id, {
-        status: "pending",
-        limit: PORTFOLIO_EVENTS_LIMIT,
-      }).catch(() => [] as UnifiedEvent[]);
-      const items = events.filter(isPortfolioApprovable).map(
-        (e): PortfolioActionItem => ({
-          id: e.id,
-          tenantId: t.id,
-          label: describePortfolioAction(e),
-          title: e.title,
-          createdAt: e.createdAt,
-          type: e.type,
-          metadata: e.metadata,
-        }),
-      );
-      return {
-        tenantId: t.id,
-        siteName: t.siteName || t.id,
-        items,
-        capped: events.length >= PORTFOLIO_EVENTS_LIMIT,
-      };
+  const reads = await Promise.all(
+    tenants.map(async (t) => {
+      const siteName = t.siteName || t.id;
+      try {
+        const events = await getEvents(t.id, {
+          status: "pending",
+          limit: PORTFOLIO_EVENTS_LIMIT,
+        });
+        const items = events.filter(isPortfolioApprovable).map(
+          (e): PortfolioActionItem => ({
+            id: e.id,
+            tenantId: t.id,
+            label: describePortfolioAction(e),
+            title: e.title,
+            createdAt: e.createdAt,
+            type: e.type,
+            metadata: e.metadata,
+          }),
+        );
+        return {
+          group: {
+            tenantId: t.id,
+            siteName,
+            items,
+            capped: events.length >= PORTFOLIO_EVENTS_LIMIT,
+          } satisfies PortfolioActionGroup,
+          incomplete:
+            events.length >= PORTFOLIO_EVENTS_LIMIT
+              ? {
+                  source: "pending_approvals" as const,
+                  tenantId: t.id,
+                  siteName,
+                  capped: true,
+                }
+              : null,
+        };
+      } catch (error) {
+        // Keep other clients visible, but do not present this tenant as clear.
+        console.error(
+          `[portfolio-actions] pending approvals unavailable for ${t.id}:`,
+          error instanceof Error ? error.message : error,
+        );
+        return {
+          group: null,
+          incomplete: {
+            source: "pending_approvals" as const,
+            tenantId: t.id,
+            siteName,
+          },
+        };
+      }
     }),
   );
+
+  const incomplete = reads.flatMap((read) => (read.incomplete ? [read.incomplete] : []));
+  const groups = reads.flatMap((read) => (read.group ? [read.group] : []));
 
   const nonEmpty = groups
     .filter((g) => g.items.length > 0)
     .sort((a, b) => b.items.length - a.items.length);
   const totalItems = nonEmpty.reduce((sum, g) => sum + g.items.length, 0);
 
-  return { groups: nonEmpty, totalItems, totalClients: nonEmpty.length };
+  return {
+    groups: nonEmpty,
+    totalItems,
+    totalClients: nonEmpty.length,
+    availability: incomplete.length > 0 ? "partial" : "complete",
+    incomplete,
+  };
 }
 
 export interface PortfolioResolveInput {

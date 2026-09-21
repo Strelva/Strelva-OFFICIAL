@@ -1,9 +1,7 @@
 /**
- * Shareable audit-report store. When a prospect runs the gated full audit on the
- * marketing site, the result is persisted here under a short id so the emailed
- * (and on-page) "View full report" link resolves to the sendable one-pager for a
- * while after the scan. Redis-backed, TTL-bounded — not a system of record; the
- * lead itself is captured separately (Slack + the leads board).
+ * Retained public audit reports for product and legacy lead flows. Bearer links
+ * expire after 60 days. This is not private account history: explicit imports
+ * copy a validated result into Postgres-owned saved work, without lead details.
  */
 
 import { getRedis } from "./redis";

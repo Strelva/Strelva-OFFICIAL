@@ -76,7 +76,7 @@ export function DraftActions({
         <button
           onClick={() => handleAction("approve")}
           disabled={loading !== null}
-          className="flex-1 min-h-[44px] px-5 py-2.5 rounded-lg text-sm font-medium bg-positive hover:bg-positive0 text-white transition-colors disabled:opacity-50"
+          className="flex-1 min-h-[44px] px-5 py-2.5 rounded-lg text-sm font-medium bg-positive hover:bg-positive0 text-on-positive transition-colors disabled:opacity-50"
         >
           {loading === "approve" ? "Approving…" : "Approve"}
         </button>

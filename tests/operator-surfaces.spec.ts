@@ -16,6 +16,7 @@ test.skip(
 
 const SURFACES: Array<[string, RegExp]> = [
   ["/admin", /Overview/],
+  ["/admin/work", /Internal work/],
   ["/admin/clients", /Clients/],
   ["/admin/leads", /Leads/],
   ["/admin/analytics", /Search \+ Analytics/],
@@ -35,3 +36,23 @@ for (const [path, heading] of SURFACES) {
     await expect(page.getByRole("heading", { name: heading }).first()).toBeVisible();
   });
 }
+
+test("internal navigation remains usable on desktop and mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/admin/work", { waitUntil: "domcontentloaded" });
+  const desktopNav = page.locator("aside").filter({ has: page.getByRole("navigation") }).first();
+  await expect(desktopNav.getByRole("link", { name: "Internal work" })).toHaveAttribute("aria-current", "page");
+  await expect(desktopNav.getByText("Delivery", { exact: true })).toBeVisible();
+  await expect(desktopNav.getByText("Support", { exact: true })).toBeVisible();
+  await expect(desktopNav.getByText("System administration", { exact: true })).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByRole("button", { name: "Open menu" })).toBeVisible();
+  await page.getByRole("button", { name: "Open menu" }).click();
+  const drawer = page.getByRole("dialog", { name: "Navigation" });
+  await expect(drawer.getByRole("link", { name: "Internal work" })).toHaveAttribute("aria-current", "page");
+  await expect(drawer.getByText("Delivery", { exact: true })).toBeVisible();
+  await expect(drawer.getByText("Support", { exact: true })).toBeVisible();
+  await expect(drawer.getByText("System administration", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});

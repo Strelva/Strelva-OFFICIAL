@@ -14,7 +14,7 @@ import {
   setCachedContent,
 } from "./content-cache";
 import { addSentryBreadcrumb } from "../sentry-context";
-import { getContentData, upsertContentData } from "../db/repositories";
+import { getContentData, getStoredContentData, upsertContentData } from "../db/repositories";
 import { contentSourceIsPostgres } from "../db/source-flags";
 import { getTenantContentDefault } from "../tenant-content-defaults";
 
@@ -152,6 +152,36 @@ export async function getContent<K extends ContentSection>(
     await setCachedContent(section, tenant, data);
   }
   return data;
+}
+
+/**
+ * Read only a section that is actually persisted for a tenant.
+ *
+ * `getContent` intentionally resolves defaults for the public read path. That
+ * is the right behavior for a storefront, but it is unsafe for repair or
+ * provisioning retries: a default result does not tell the caller whether the
+ * section is absent or whether a customer saved it. Callers that may write
+ * should use this helper so an absent section is distinguishable from a saved
+ * section and customer edits are never replaced by a baseline.
+ *
+ * A Postgres read failure is allowed to throw from this helper. Repair code
+ * must stop rather than interpreting an unavailable source as an empty
+ * section.
+ */
+export async function getStoredContent<K extends ContentSection>(
+  section: K,
+  tenant: string = DEFAULT_TENANT,
+): Promise<ContentMap[K] | null> {
+  if (contentSourceIsPostgres()) {
+    const pgRaw = await getStoredContentData(tenant, SECTION_TO_TYPE[section]);
+    return pgRaw ? transformSanityImages(section, pgRaw) : null;
+  }
+
+  const store = await readDevContent(tenant);
+  const stored = store[section];
+  return stored === undefined || stored === null
+    ? null
+    : stored as ContentMap[K];
 }
 
 export async function setContent<K extends ContentSection>(

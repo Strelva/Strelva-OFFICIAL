@@ -9,9 +9,10 @@ import {
 
 /**
  * Owner self-serve: the signed-in owner of a tenant starts their OWN monthly
- * management subscription at go-live. Scoped to the caller's tenant
- * via requireTenantAccess; the Stripe customer email comes from their auth, not
- * request input. Super admins create checkouts for other tenants via
+ * management subscription at go-live. The separate build quote/payment is not
+ * represented by this route. Scoped to the caller's tenant via
+ * requireTenantPermission; the Stripe customer email comes from their auth, not request
+ * input. Super admins create checkouts for other tenants via
  * /api/billing/create-subscription — this route is only ever the caller's own.
  */
 export async function POST() {

@@ -4,12 +4,14 @@ import {
 } from "@/lib/db/middleware-client";
 import { isSupabaseAuthConfigured } from "@/lib/db/server-client";
 import { validateCronRequest } from "@/lib/cron-auth";
+import { WEBSITE_PREVIEW_CSP, isWebsiteCandidatePreviewPath } from "@/lib/website-preview-policy";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDevAccessTenant, isDevAccessBypassEnabled } from "./lib/dev-access";
 import { MARKETING_HOSTS, isMarketingHost } from "./lib/marketing-hosts";
 import { parseTenantHost } from "./lib/tenant-host";
 import { CONTROL_PLANE_URL } from "./lib/brand";
+import { strelvaHostedPreviewEnabled } from "./experience/workspace/preview/enabled";
 
 export { isMarketingHost } from "./lib/marketing-hosts";
 export { validateCronRequest } from "@/lib/cron-auth";
@@ -56,6 +58,14 @@ const PUBLIC_EXACT = new Set([
   "/",
   "/no-access",
   "/api/ai-visibility",
+  // Accepts only a bounded public brief and writes an encrypted browser cookie.
+  // The sibling import route remains session-protected.
+  "/api/public-continuation",
+  // Own confirmed-session authorization; return JSON 401/503, never sign-in HTML.
+  "/api/workspace",
+  "/api/workspace-invitations",
+  "/api/workspace-invitations/revoke",
+  "/api/workspace-export",
   "/api/health",
   "/api/newsletter/subscribe",
   "/api/track",
@@ -66,6 +76,10 @@ const PUBLIC_EXACT = new Set([
 const PUBLIC_PREFIXES = [
   "/sign-in",
   "/sign-up",
+  // The page discloses only bounded invitation terms. Acceptance and all data
+  // access still require the exact verified Supabase identity.
+  "/workspace/invitations/accept/",
+  "/api/workspace-invitations/accept/",
   "/access-request",
   "/ai-visibility",
   "/onboard",
@@ -73,6 +87,12 @@ const PUBLIC_PREFIXES = [
   "/api/audit/",
   "/api/onboard/",
   "/api/pay/",
+  // Signed provider callbacks authenticate themselves with the provider
+  // signature, so Supabase session auth must not intercept them.
+  "/api/webhooks/",
+  // External personal integrations authenticate with a scoped bearer token in
+  // the route. The management route remains behind the Supabase session gate.
+  "/api/agent-access/work/",
   "/api/approve",
   "/api/v1/",
   "/api/cron/",
@@ -260,9 +280,11 @@ function getPreviewFrameAncestors(host: string, protocol: string): string[] {
 export function buildContentSecurityPolicy(params: {
   isPreview: boolean;
   isLivePreview?: boolean;
+  isWebsiteCandidate?: boolean;
   host: string;
   protocol: string;
 }): string {
+  if (params.isWebsiteCandidate) return WEBSITE_PREVIEW_CSP;
   if (params.isLivePreview) {
     return [
       "default-src 'self' https: data: blob:",
@@ -293,7 +315,7 @@ export function buildContentSecurityPolicy(params: {
           d.startsWith("script-src")
             ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http://localhost:*"
             : d.startsWith("connect-src")
-              ? `${d} ws://localhost:* http://localhost:*`
+              ? `${d} ws://localhost:* http://localhost:* http://127.0.0.1:*`
               : d
         );
 
@@ -303,16 +325,20 @@ export function buildContentSecurityPolicy(params: {
 function applySecurityHeaders(response: NextResponse, req: NextRequest): NextResponse {
   applyMiddlewareSupabaseResponse(req, response);
   const livePreviewRequest = isLivePreviewRequest(req);
+  const websiteCandidate = isWebsiteCandidatePreviewPath(req.nextUrl.pathname);
   response.headers.set(
     "Content-Security-Policy",
     buildContentSecurityPolicy({
       isPreview: isPreviewRequest(req),
       isLivePreview: livePreviewRequest,
+      isWebsiteCandidate: websiteCandidate,
       host: req.headers.get("host") || "",
       protocol: req.nextUrl.protocol,
     })
   );
-  if (isPreviewRequest(req) || livePreviewRequest) {
+  if (websiteCandidate) {
+    response.headers.set("X-Frame-Options", "SAMEORIGIN");
+  } else if (isPreviewRequest(req) || livePreviewRequest) {
     response.headers.delete("X-Frame-Options");
   } else {
     response.headers.set("X-Frame-Options", "DENY");
@@ -453,6 +479,17 @@ export default async function proxy(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
   const devAccessBypass = isDevAccessBypassEnabled();
   const devPreviewRequest = devAccessBypass && req.nextUrl.searchParams.get("preview") === "true";
+
+  // Hosted review enters synthetic UI only. Real APIs, dashboards and their
+  // authentication gates remain unchanged; this never creates a session.
+  if (strelvaHostedPreviewEnabled() && ["/", "/sign-in", "/sign-up", "/workspace"].includes(pathname)) {
+    const url = req.nextUrl.clone();
+    url.pathname = "/preview/strelva/workspace";
+    url.search = "";
+    const view = req.nextUrl.searchParams.get("view");
+    if (view) url.searchParams.set("view", view);
+    return applySecurityHeaders(NextResponse.redirect(url), req);
+  }
 
   // Public demo entry: /demo -> the demo tenant's dashboard (read-only, no auth).
   if (pathname === "/demo" || pathname === "/demo/") {

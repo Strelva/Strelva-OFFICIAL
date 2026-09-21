@@ -14,6 +14,39 @@ import type {
   PortfolioResolveResult,
 } from "./portfolio-actions";
 
+function incompleteReadMessage(snapshot: PortfolioActionsSnapshot): string {
+  if (snapshot.incomplete.some((read) => read.source === "client_directory")) {
+    return "The client directory could not be read, so no portfolio-wide clear state is available.";
+  }
+
+  const pendingReads = snapshot.incomplete.filter((read) => read.source === "pending_approvals");
+  const cappedTenants = pendingReads
+    .filter((read) => read.capped)
+    .map((read) => read.siteName || read.tenantId || "a client");
+  const failedTenants = pendingReads
+    .filter((read) => !read.capped)
+    .map((read) => read.siteName || read.tenantId || "a client");
+  if (cappedTenants.length > 0 && failedTenants.length === 0) {
+    const shown = cappedTenants.slice(0, 3);
+    const remainder = cappedTenants.length - shown.length;
+    const names = shown.join(", ");
+    return remainder > 0
+      ? `The pending approval read reached its limit for ${names} and ${remainder} more client${remainder === 1 ? "" : "s"}; more items may be waiting.`
+      : `The pending approval read reached its limit for ${names}; more items may be waiting.`;
+  }
+  if (failedTenants.length === 0) {
+    return "Some portfolio approvals could not be checked.";
+  }
+  const shown = failedTenants.slice(0, 3);
+  const remainder = failedTenants.length - shown.length;
+  const names = shown.join(", ");
+  return remainder > 0
+    ? `Pending approvals could not be checked for ${names} and ${remainder} more client${remainder === 1 ? "" : "s"}.`
+    : cappedTenants.length > 0
+      ? `Pending approvals could not be checked for ${names}; another client reached the read limit and may have more items waiting.`
+      : `Pending approvals could not be checked for ${names}.`;
+}
+
 /** Translate a resolveEventAction failure reason into operator-facing text. The
  *  item stays pending; we never claim a failed external write succeeded. */
 function failureMessage(reason?: string): string {
@@ -179,6 +212,7 @@ export function PortfolioActionsClient({ snapshot }: { snapshot: PortfolioAction
   );
 
   const anyProcessing = processing.size > 0;
+  const readsIncomplete = snapshot.incomplete.length > 0;
 
   return (
     <div className="max-w-3xl space-y-6">
@@ -218,7 +252,28 @@ export function PortfolioActionsClient({ snapshot }: { snapshot: PortfolioAction
         )}
       </div>
 
-      {totalItems === 0 ? (
+      {readsIncomplete && (
+        <div
+          role="alert"
+          className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm"
+        >
+          <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" strokeWidth={2} aria-hidden="true" />
+          <div className="min-w-0">
+            <p className="font-medium text-warm-white">This portfolio view is incomplete.</p>
+            <p className="mt-0.5 text-[12.5px] leading-relaxed text-gray-muted">
+              {incompleteReadMessage(snapshot)}
+            </p>
+            <Link
+              href="/admin/actions"
+              className="mt-2 inline-flex min-h-8 items-center rounded-lg text-[12px] font-semibold text-warning underline decoration-warning/40 underline-offset-2 hover:decoration-warning"
+            >
+              Retry reads
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {totalItems === 0 && !readsIncomplete ? (
         <AdminEmpty
           tone="good"
           icon={<Check className="h-5 w-5" strokeWidth={2} />}
@@ -226,6 +281,19 @@ export function PortfolioActionsClient({ snapshot }: { snapshot: PortfolioAction
           description="Nothing across any client needs drafting or approval right now."
           action={{ label: "Back to overview", href: "/admin" }}
         />
+      ) : totalItems === 0 ? (
+        <div className="rounded-2xl border border-glass-border bg-glass px-6 py-10 text-center">
+          <p className="text-[14px] font-semibold text-warm-white">No verified approvals to display yet</p>
+          <p className="mx-auto mt-1.5 max-w-sm text-[12.5px] leading-relaxed text-gray-muted">
+            The reads that completed returned no items. Retry before treating the portfolio as clear.
+          </p>
+          <Link
+            href="/admin/actions"
+            className="mt-4 inline-flex min-h-10 items-center rounded-lg bg-accent px-3.5 py-2 text-[12.5px] font-semibold text-on-accent hover:bg-accent/90"
+          >
+            Retry reads
+          </Link>
+        </div>
       ) : (
         <div className="space-y-4">
           {groups.map((group) => {
@@ -312,7 +380,7 @@ export function PortfolioActionsClient({ snapshot }: { snapshot: PortfolioAction
                               type="button"
                               onClick={() => resolve([item])}
                               disabled={anyProcessing}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-gray-bg px-2.5 py-1.5 text-[12px] font-medium text-gray-fg transition-colors hover:bg-success hover:text-white disabled:opacity-50"
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-gray-bg px-2.5 py-1.5 text-[12px] font-medium text-gray-fg transition-colors hover:bg-success hover:text-on-positive disabled:opacity-50"
                             >
                               {busy ? (
                                 <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />

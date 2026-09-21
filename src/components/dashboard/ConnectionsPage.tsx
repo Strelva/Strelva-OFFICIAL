@@ -17,6 +17,7 @@ import {
 } from "@/lib/integration-registry";
 import { SourceHealthBadge } from "./SourceHealthBadge";
 import { useDashboardOptional } from "./DashboardContext";
+import { GoogleResourceSelector } from "./GoogleResourceSelector";
 
 export interface Connection {
   id: string;
@@ -287,6 +288,8 @@ export function ConnectionsPage() {
       <p className="text-[13px] text-gray-faint mb-6 sm:mb-8">
         {connectedCount} of {totalCount} connected
       </p>
+
+      <GoogleResourceSelector connected={sourceState.providerStatuses.google?.status === "connected"} />
 
       {showHero && featured && (
         <button

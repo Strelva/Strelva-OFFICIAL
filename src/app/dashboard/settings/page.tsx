@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AlertTriangle, Code2, Download, ExternalLink, Image as ImageIcon, Link2, Plus, Sparkles, Trash2 } from "lucide-react";
 
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
+import { getCurrentPlanDisplay } from "@/components/dashboard/billing-display";
 import { ConfirmDialog } from "@/components/dashboard/ConfirmDialog";
 import { OwnershipSection } from "@/components/dashboard/OwnershipSection";
 import { ContentAutonomyPanel } from "@/components/dashboard/ContentAutonomyPanel";
@@ -1301,6 +1302,12 @@ function BillingSection() {
   const status = dashboard?.subscriptionStatus ?? "none";
   const isFounderComp = dashboard?.planOverride === "founder_comp";
   const copy = isFounderComp ? FOUNDER_COMP_COPY : BILLING_STATUS_COPY[status];
+  const currentPlan = getCurrentPlanDisplay({
+    status,
+    isFounderComp,
+    commercialPlanLabel: dashboard?.commercialPlanLabel ?? "Growth",
+    commercialPlanMonthlyCents: dashboard?.commercialPlanMonthlyCents ?? 19_900,
+  });
 
   return (
     <div className="rounded-lg border border-glass-border overflow-hidden">
@@ -1311,9 +1318,7 @@ function BillingSection() {
           </div>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[20px] font-medium text-warm-white">
-              {isFounderComp
-                ? "Founder comp"
-                : `${dashboard?.commercialPlanLabel ?? "Growth"} · $${((dashboard?.commercialPlanMonthlyCents ?? 19_900) / 100).toLocaleString()}/mo`}
+              {currentPlan}
             </span>
             <span className={`text-[11px] font-medium px-2 py-0.5 rounded ${copy.className}`}>
               {copy.label}

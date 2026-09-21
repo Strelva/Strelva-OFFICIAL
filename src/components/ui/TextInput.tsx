@@ -4,7 +4,30 @@ import { forwardRef, useId, useRef, useEffect, useCallback, type InputHTMLAttrib
 import { cn } from "@/lib/cn";
 
 const BASE =
-  "w-full bg-surface-inset border-0 rounded-lg px-3.5 py-2 text-[13px] text-warm-black placeholder-gray-subtle outline-none focus:ring-2 focus:ring-white/10 transition-all duration-150";
+  "w-full min-h-10 bg-surface-inset border border-gray-border rounded-xl px-4 py-2 text-base sm:text-sm leading-5 text-warm-black placeholder-gray-subtle outline-none transition-colors duration-150 focus:border-accent-text focus-visible:ring-2 focus-visible:ring-accent-text/40 disabled:cursor-not-allowed disabled:opacity-60";
+
+function mergeDescribedBy(...ids: Array<string | undefined>) {
+  const seen = new Set<string>();
+  return ids
+    .flatMap((value) => value?.split(/\s+/) ?? [])
+    .filter((value) => value && !seen.has(value) && seen.add(value))
+    .join(" ");
+}
+
+function fieldIds(id: string, helperText?: string, error?: string) {
+  return {
+    helperId: helperText && !error ? `${id}-description` : undefined,
+    errorId: error ? `${id}-error` : undefined,
+  };
+}
+
+function FieldMessage({ id, children, error = false }: { id: string; children: ReactNode; error?: boolean }) {
+  return (
+    <p id={id} className={cn("text-xs leading-4", error ? "text-terra" : "text-gray-muted")} role={error ? "alert" : undefined}>
+      {children}
+    </p>
+  );
+}
 
 /* -------------------------------------------------- */
 /*  TextInput (text, url, tel, email, date)            */
@@ -17,24 +40,28 @@ interface TextInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "si
 }
 
 export const TextInput = forwardRef<HTMLInputElement, TextInputProps>(
-  ({ label, error, helperText, className, id: idProp, ...rest }, ref) => {
+  ({ label, error, helperText, className, id: idProp, "aria-describedby": ariaDescribedBy, "aria-invalid": ariaInvalid, ...rest }, ref) => {
     const autoId = useId();
     const id = idProp || autoId;
+    const { helperId, errorId } = fieldIds(id, helperText, error);
+    const describedBy = mergeDescribedBy(ariaDescribedBy, helperId, errorId);
     return (
-      <div>
+      <div className="grid gap-1">
         {label && (
-          <label htmlFor={id} className="block text-[11px] text-gray-muted mb-0.5">
+          <label htmlFor={id} className="block text-xs leading-4 text-gray-muted">
             {label}
           </label>
         )}
         <input
           ref={ref}
           id={id}
-          className={cn(BASE, error && "border-terra focus:border-terra focus:ring-terra/20", className)}
+          aria-describedby={describedBy || undefined}
+          aria-invalid={error ? true : ariaInvalid}
+          className={cn(BASE, error && "border-terra focus:border-terra focus-visible:ring-terra/40", className)}
           {...rest}
         />
-        {error && <p className="text-[11px] text-terra mt-0.5">{error}</p>}
-        {helperText && !error && <p className="text-[11px] text-gray-muted mt-0.5">{helperText}</p>}
+        {errorId && <FieldMessage id={errorId} error>{error}</FieldMessage>}
+        {helperId && <FieldMessage id={helperId}>{helperText}</FieldMessage>}
       </div>
     );
   },
@@ -48,12 +75,15 @@ TextInput.displayName = "TextInput";
 interface TextAreaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   label?: string;
   error?: string;
+  helperText?: string;
 }
 
 export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
-  ({ label, error, className, id: idProp, onChange, ...rest }, ref) => {
+  ({ label, error, helperText, className, id: idProp, onChange, "aria-describedby": ariaDescribedBy, "aria-invalid": ariaInvalid, ...rest }, ref) => {
     const autoId = useId();
     const id = idProp || autoId;
+    const { helperId, errorId } = fieldIds(id, helperText, error);
+    const describedBy = mergeDescribedBy(ariaDescribedBy, helperId, errorId);
     const internalRef = useRef<HTMLTextAreaElement | null>(null);
 
     const autoResize = useCallback(() => {
@@ -68,9 +98,9 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
     }, [autoResize, rest.value]);
 
     return (
-      <div>
+      <div className="grid gap-1">
         {label && (
-          <label htmlFor={id} className="block text-[11px] text-gray-muted mb-0.5">
+          <label htmlFor={id} className="block text-xs leading-4 text-gray-muted">
             {label}
           </label>
         )}
@@ -81,15 +111,18 @@ export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(
             else if (ref) ref.current = el;
           }}
           id={id}
+          aria-describedby={describedBy || undefined}
+          aria-invalid={error ? true : ariaInvalid}
           rows={2}
-          className={cn(BASE, "resize-none leading-relaxed overflow-hidden", error && "border-terra", className)}
+          className={cn(BASE, "min-h-12 resize-none leading-6 overflow-hidden", error && "border-terra focus:border-terra focus-visible:ring-terra/40", className)}
           onChange={(e) => {
             onChange?.(e);
             autoResize();
           }}
           {...rest}
         />
-        {error && <p className="text-[11px] text-terra mt-0.5">{error}</p>}
+        {errorId && <FieldMessage id={errorId} error>{error}</FieldMessage>}
+        {helperId && <FieldMessage id={helperId}>{helperText}</FieldMessage>}
       </div>
     );
   },
@@ -109,23 +142,28 @@ interface SelectInputProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   options: SelectOption[];
   error?: string;
+  helperText?: string;
 }
 
 export const SelectInput = forwardRef<HTMLSelectElement, SelectInputProps>(
-  ({ label, options, error, className, id: idProp, ...rest }, ref) => {
+  ({ label, options, error, helperText, className, id: idProp, "aria-describedby": ariaDescribedBy, "aria-invalid": ariaInvalid, ...rest }, ref) => {
     const autoId = useId();
     const id = idProp || autoId;
+    const { helperId, errorId } = fieldIds(id, helperText, error);
+    const describedBy = mergeDescribedBy(ariaDescribedBy, helperId, errorId);
     return (
-      <div>
+      <div className="grid gap-1">
         {label && (
-          <label htmlFor={id} className="block text-[11px] text-gray-muted mb-0.5">
+          <label htmlFor={id} className="block text-xs leading-4 text-gray-muted">
             {label}
           </label>
         )}
         <select
           ref={ref}
           id={id}
-          className={cn(BASE, "appearance-none", error && "border-terra", className)}
+          aria-describedby={describedBy || undefined}
+          aria-invalid={error ? true : ariaInvalid}
+          className={cn(BASE, "appearance-none", error && "border-terra focus:border-terra focus-visible:ring-terra/40", className)}
           {...rest}
         >
           {options.map((opt) => (
@@ -134,7 +172,8 @@ export const SelectInput = forwardRef<HTMLSelectElement, SelectInputProps>(
             </option>
           ))}
         </select>
-        {error && <p className="text-[11px] text-terra mt-0.5">{error}</p>}
+        {errorId && <FieldMessage id={errorId} error>{error}</FieldMessage>}
+        {helperId && <FieldMessage id={helperId}>{helperText}</FieldMessage>}
       </div>
     );
   },
@@ -147,7 +186,7 @@ SelectInput.displayName = "SelectInput";
 
 export function FieldLabel({ htmlFor, children }: { htmlFor?: string; children: ReactNode }) {
   return (
-    <label htmlFor={htmlFor} className="block text-[11px] text-gray-muted mb-0.5">
+    <label htmlFor={htmlFor} className="block text-xs leading-4 text-gray-muted">
       {children}
     </label>
   );

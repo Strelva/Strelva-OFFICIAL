@@ -8,10 +8,12 @@ import { getClientFallbackRoot, isClientFallbackRoot, withClientFallbackRoot } f
 import { getInvite } from "@/lib/invites";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantSiteName } from "@/lib/tenant-display";
+import { workspaceReleaseEnabled } from "@/platform/workspace-release";
+import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/lib/workspace-location";
 
 export const metadata: Metadata = {
-  title: "Create dashboard access",
-  description: "Create an invited Strelva dashboard account, or request your build first.",
+  title: "Create your Strelva account",
+  description: "Create a Strelva account to continue your work or access a managed website.",
 };
 
 export const dynamic = "force-dynamic";
@@ -70,6 +72,11 @@ export default async function SignUpPage({
   searchParams: Promise<AuthSearchParams>;
 }) {
   const params = await searchParams;
+  const workspaceOpen = workspaceReleaseEnabled();
+  const requestedNext = searchValue(params.next);
+  const workspaceTarget = workspaceOpen ? workspaceReturnTarget(requestedNext) : null;
+  const invitationTarget = workspaceOpen ? workspaceInvitationReturnTarget(requestedNext) : null;
+  const accountTarget = workspaceOpen ? accountReturnTarget(requestedNext) : null;
   const invite = await getInviteContext(params);
 
   if (invite) {
@@ -99,7 +106,10 @@ export default async function SignUpPage({
           </section>
 
           <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
-            <SupabaseSignIn next="/account" prefillEmail={invite.email} />
+            <SupabaseSignIn
+              next={workspaceTarget ? `/account?next=${encodeURIComponent(workspaceTarget)}` : accountTarget || "/account"}
+              prefillEmail={invite.email}
+            />
           </section>
         </div>
       </main>
@@ -136,6 +146,39 @@ export default async function SignUpPage({
 
           <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
             <SupabaseSignIn next={dashboardPath} />
+          </section>
+        </div>
+      </main>
+    );
+  }
+
+  if (workspaceReleaseEnabled()) {
+    return (
+      <main className="marketing-root min-h-dvh px-5 py-5 md:px-8">
+        <AuthDocumentTitle title="Create your Strelva account" />
+        <div className="relative z-10 mx-auto grid min-h-[calc(100dvh-40px)] max-w-[1120px] items-center gap-10 py-16 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,420px)]">
+          <section>
+            <Link
+              href="/"
+              className="inline-flex w-fit items-center gap-2 text-[13px] font-medium text-m-text-2 transition-colors hover:text-m-text"
+            >
+              <ArrowLeft className="size-4" />
+              Strelva
+            </Link>
+            <p className="mt-12 text-[14px] font-medium text-m-text-3">Your Strelva work</p>
+            <h1 className="mt-4 max-w-[720px] text-5xl font-semibold leading-[0.96] tracking-normal text-m-text sm:text-6xl">
+              Start your work here.
+            </h1>
+            <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-m-text-2">
+              Sign in or create an account to save private work and return to it. Already manage a Strelva website? Use the email connected to that site.
+            </p>
+            <Link href="/access-request" className="mt-6 inline-flex text-[13px] text-m-text-2 underline underline-offset-2 hover:text-m-text">
+              Need a managed website? Request your build
+            </Link>
+          </section>
+
+          <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
+            <SupabaseSignIn next={invitationTarget || workspaceTarget || accountTarget || "/workspace"} />
           </section>
         </div>
       </main>

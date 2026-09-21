@@ -49,6 +49,13 @@ describe("tenant-rename authoritative-store registry", () => {
       `reb:review-alert-sent:${SLUG}:`,
       `reb:order-review-request-sent:${SLUG}:`,
       `reb:review-reply-declined:${SLUG}:`,
+      `reb:inquiry-delivery-provider:${SLUG}:`,
+      `reb:inquiry-delivery-event:${SLUG}:`,
+      `reb:inquiry-reply:${SLUG}:`,
+      `reb:inquiry-reply-state:${SLUG}:`,
+      `reb:inquiry-capture-repair:${SLUG}`,
+      `reb:inquiry-capture-repair-job:${SLUG}:`,
+      `reb:inquiry-capture-repair-claim:${SLUG}:`,
     ];
     for (const stem of required) {
       expect(

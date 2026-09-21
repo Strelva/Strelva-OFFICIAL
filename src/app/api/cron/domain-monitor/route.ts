@@ -7,7 +7,7 @@ import {
   getAlertSignature,
   setAlertSignature,
 } from "@/lib/domain-monitor-store";
-import { sendDomainAlertEmail } from "@/lib/delivery-email";
+import { sendDomainAlertEmail } from "@/products/domain-monitor/server";
 import { OPERATOR_URL } from "@/lib/brand";
 
 export const maxDuration = 300;

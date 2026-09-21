@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import type { AiVisibilityResult } from "@/lib/ai-visibility/score";
+import type { AiVisibilityResult } from "@/products/ai-visibility/contracts";
 
 const mocks = vi.hoisted(() => ({
   rateLimited: vi.fn(),
@@ -16,8 +16,8 @@ vi.mock("@/lib/rate-limit", () => ({
   isRateLimitedWindowedAsync: mocks.rateLimited,
   rateLimitKey: vi.fn(() => "test:127.0.0.1"),
 }));
-vi.mock("@/lib/ai-visibility/score", () => ({ scoreAiVisibility: mocks.score }));
-vi.mock("@/lib/ai-visibility/results", () => ({
+vi.mock("@/products/ai-visibility/server", () => ({
+  scoreAiVisibility: mocks.score,
   saveAiVisibilityResult: mocks.saveResult,
   getAiVisibilityResult: mocks.getResult,
 }));

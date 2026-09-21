@@ -450,8 +450,12 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
   it("enforces a clean dependency audit during production checks", () => {
     const source = readFileSync(path.join(process.cwd(), "scripts/production-checklist.ts"), "utf8");
     const packageJson = readFileSync(path.join(process.cwd(), "package.json"), "utf8");
-    const pnpmWorkspace = readFileSync(path.join(process.cwd(), "pnpm-workspace.yaml"), "utf8");
-    const packageData = JSON.parse(packageJson) as { scripts?: Record<string, string> };
+    const lockfile = readFileSync(path.join(process.cwd(), "pnpm-lock.yaml"), "utf8");
+    const packageData = JSON.parse(packageJson) as {
+      scripts?: Record<string, string>;
+      packageManager?: string;
+      pnpm?: { overrides?: Record<string, string> };
+    };
     const ci = readFileSync(path.join(process.cwd(), ".github/workflows/ci.yml"), "utf8");
     const designKit = readFileSync(path.join(process.cwd(), "docs/design-kit.md"), "utf8");
     const domainSetup = readFileSync(path.join(process.cwd(), "docs/domain-setup.md"), "utf8");
@@ -608,11 +612,11 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("pnpm audit reported vulnerabilities; resolve them before release:");
     expect(source).toContain("slice(0, 8)");
     expect(packageJson).toContain('"check:release"');
-    // pnpm v11 reads root overrides from pnpm-workspace.yaml. Keep fast-uri at
-    // the current patched line rather than relying on an ignored package.json key.
-    expect(pnpmWorkspace).toContain('fast-uri: "3.1.5"');
-    expect(pnpmWorkspace).not.toContain('fast-uri: "3.1.1"');
-    expect(pnpmWorkspace).not.toContain('fast-uri: "3.1.2"');
+    // The pinned pnpm 10 toolchain reads overrides from package.json. Check
+    // that the lockfile also resolves the selected override.
+    expect(packageData.packageManager).toMatch(/^pnpm@10\./);
+    expect(packageData.pnpm?.overrides?.["fast-uri"]).toBe("3.1.6");
+    expect(lockfile).toContain("  fast-uri: 3.1.6");
     expect(releaseGate).toBe("pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && pnpm check:prod && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke");
     expect(launchGate).toBe("pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke");
     expect(packageJson).toContain("PLAYWRIGHT_BUILT_APP=1");

@@ -59,6 +59,17 @@ export const authoritativePatterns = (t: string): string[] => [
   `reb:review-alert-sent:${t}:*`, // per-review new-review alert dedup markers
   `reb:order-review-request-sent:${t}:*`, // per-order review-request dedup markers
   `reb:review-reply-declined:${t}:*`, // 180-day per-review decline veto (prevents re-draft after owner dismissal)
+  `reb:inquiry-delivery:${t}:*`, // inquiry delivery checkpoint and accepted-write marker
+  `reb:inquiry-delivery-claim:${t}:*`, // in-flight delivery claim
+  `reb:inquiry-delivery-provider:${t}:*`, // accepted provider id -> inquiry lookup
+  `reb:inquiry-delivery-event:${t}:*`, // signed provider-event deduplication
+  `reb:inquiry-timeline:${t}:*`, // inquiry delivery evidence timeline
+  `reb:inquiry-budget:${t}:*`, // tenant responsibility daily budget reservation
+  `reb:inquiry-reply:${t}:*`, // tenant-scoped reply address -> inquiry lookup
+  `reb:inquiry-reply-state:${t}:*`, // verified inbound reply state
+  `reb:inquiry-capture-repair:${t}`, // durable capture-repair due index
+  `reb:inquiry-capture-repair-job:${t}:*`, // capture-repair payloads
+  `reb:inquiry-capture-repair-claim:${t}:*`, // capture-repair leases
 ];
 
 export type RenameResult = {
@@ -124,6 +135,46 @@ export async function rekeyTenantRedis(oldSlug: string, newSlug: string): Promis
     }
   } catch (err) {
     out.redisErrors.push(`events: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // Capture repair due work is a sorted-set index, not a JSON string. Move its
+  // members explicitly before the generic string-key pass below.
+  try {
+    const oldRepairIndex = `reb:inquiry-capture-repair:${oldSlug}`;
+    const newRepairIndex = `reb:inquiry-capture-repair:${newSlug}`;
+    const members = (await redis.zrange<string[]>(oldRepairIndex, 0, -1, { withScores: true })) ?? [];
+    for (let i = 0; i < members.length; i += 2) {
+      const member = typeof members[i] === "string" ? members[i] : String(members[i]);
+      const score = Number(members[i + 1]);
+      if (member && Number.isFinite(score)) await redis.zadd(newRepairIndex, { score, member });
+    }
+    if (members.length) {
+      await redis.del(oldRepairIndex);
+      out.movedKeys++;
+    }
+  } catch (err) {
+    out.redisErrors.push(`reb:inquiry-capture-repair:*: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  // The inbound reply reverse index is intentionally keyed by the opaque
+  // tracking address so a signed provider event can resolve a tenant without
+  // trusting provider supplied tags. Its value is tenant scoped, so rename
+  // the embedded identity in place while leaving the address key stable.
+  try {
+    let cursor = "0";
+    do {
+      const [next, keys] = await redis.scan(cursor, { match: "reb:inquiry-reply-target:*", count: 250 });
+      cursor = next;
+      for (const key of keys) {
+        const value = await redis.get(key);
+        const { value: rewritten, changed } = rewriteBlobTenant(value, oldSlug, newSlug);
+        if (!changed) continue;
+        await redis.set(key, rewritten);
+        out.rewrittenBlobs++;
+      }
+    } while (cursor !== "0");
+  } catch (err) {
+    out.redisErrors.push(`reb:inquiry-reply-target:*: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   // 2) Generic authoritative prefixes: SCAN → copy value (rewriting an embedded

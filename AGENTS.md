@@ -1,8 +1,50 @@
 # Strelva control plane
 
-This repository is the Strelva Websites control plane. It owns the multi-tenant owner dashboard, operator console, governed website-management agent, audit engine, billing and operational integrations, and the versioned API consumed by client sites.
+This repository owns the Managed Websites control plane and the current local
+implementation of Strelva's common customer interface. It includes the owner
+dashboard, workspace, operator console, governed website agent, audit engine,
+billing integrations and versioned API consumed by client sites. Local interface
+capability does not establish a production release or a new commercial offering.
 
-Production `strelva.com` marketing lives in the sibling `strelva-marketing` repository. Each paid client site is a separate custom repository and Vercel project. Do not move marketing presentation or client-specific frontend behavior into this control plane. Strelva's Custom Software division is not defined by this repository; do not turn the Websites product into a claim about that unresolved offering.
+Public `strelva.com` presentation belongs in the sibling `strelva-marketing`
+repository. Each paid client site has its own repository and Vercel project.
+Keep public presentation and client-specific frontend behavior with their owners.
+Company and cross-product decisions remain in the workspace context; this
+repository does not define Strelva's unresolved Custom Software offering.
+
+## Start with the existing records
+
+Read [CONTEXT.md](./CONTEXT.md) for current scope, evidence and release attention.
+For interface work, also read `~/.codex/DESIGN.md`, [DESIGN.md](./DESIGN.md) and
+the [foundation inventory](./docs/component-system.md). Follow its links to the
+relevant color, motion or material contract and inspect the named implementation.
+The [component handoff](./docs/design/current-component-context.md) records local
+adoption and verification, not a second set of component rules.
+
+Reuse the existing Markdown owners. Put operating instructions here, design
+decisions in DESIGN.md or its focused contracts, component APIs and migration
+status in component-system.md, and dated proof in the existing verification
+record. Link to an owner rather than copying its rules into another handoff.
+
+## Build from tokens and atoms
+
+- Start with the surface's semantic roles and owned atoms, then compose the
+  content and interaction. Inspect source and rendered states before reuse.
+- Extend or repair the owning primitive when its contract is missing. Do not
+  rebuild its appearance, focus, sizing or motion in page CSS. Layout remains
+  free to be spacious, asymmetric or otherwise suited to the work.
+- Existing code is implementation evidence, not automatic design approval.
+  The foundation inventory names legacy fields/tabs and other migration gaps;
+  do not propagate those gaps as the new standard.
+- Preserve accessibility and working behavior during adoption. Verify relevant
+  keyboard, focus, loading, error, empty and permission states as well as geometry.
+- Keep marketing and product component APIs explicit. There is no shared package;
+  do not import sibling source or claim parity from matching colors and blur.
+- Generated images and reference studies may explore composition. They do not
+  select tokens, replace real component inspection or resolve open design choices.
+- Update the owning contract and adoption evidence with a component change.
+  Distinguish recorded direction, source implementation, verified use, human
+  acceptance and deployment. Never mark the system migrated from a gallery alone.
 
 ## Product and compatibility boundaries
 
@@ -26,7 +68,7 @@ The implementation and focused tests are the closest sources of truth. Use these
 | Operator console routes and responsibilities | `docs/operator-command-center.md` |
 | Storefront compatibility | `src/app/api/v1/`, `src/lib/scaffold-contracts.ts`, `release-manifest.json`, and `custom-repo-starter/` |
 | Product versioning | both repositories' `package.json`, then `VERSIONING.md` |
-| Visual and interaction decisions | `DESIGN.md`, `src/app/globals.css`, and the shipped components named there |
+| Visual direction and component ownership | [DESIGN.md](./DESIGN.md), [component system](./docs/component-system.md), and the source owners linked there |
 
 The live system has these non-negotiable boundaries:
 
@@ -68,6 +110,8 @@ pnpm smoke:surfaces      # Owner and operator surface smoke tests with local fix
 pnpm check:prod          # Production-readiness checks
 pnpm check:custom-repos  # Executable custom-repository compatibility checks
 pnpm check:ontology      # Persistence and lifecycle invariants
+pnpm check:workspace-sql # Isolated PostgreSQL workspace and recovery migration checks
+pnpm check:workspace-upgrade # Ordered pre-workspace to current isolated migration rehearsal
 pnpm version:check       # App and marketing product-version parity
 ```
 
@@ -81,3 +125,16 @@ pnpm version:check       # App and marketing product-version parity
 - Persistence, tenant identity, auth, cron, billing, email, governance, or external-write changes require focused failure-path tests as well as the normal success path.
 - User-facing changes require rendered inspection of realistic content, relevant empty/loading/error/permission states, and the affected desktop and mobile journey. A build or screenshot alone is not proof of behavior.
 - Never claim a production result from local evidence. State separately what was proven locally, in preview, and in production.
+
+The workspace SQL check requires PostgreSQL server binaries (`postgres`, `initdb`,
+`pg_ctl`, `psql`) on PATH; `libpq` alone is insufficient. On this workstation use
+`PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH npm run check:workspace-sql`.
+The script creates an isolated Unix-socket cluster, applies only the workspace
+and recovery migrations, tests permissions and failure paths, and stops the cluster.
+It does not connect to or migrate production.
+
+Use the same PostgreSQL PATH for `pnpm check:workspace-upgrade`. That script
+applies the retained ordered repository history through the documented
+pre-workspace baseline, seeds representative legacy rows, then applies and checks
+the full workspace/recovery tail in a separate isolated cluster. It also does not
+connect to or migrate production.

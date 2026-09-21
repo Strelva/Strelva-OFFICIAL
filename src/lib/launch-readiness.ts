@@ -1,7 +1,7 @@
 import type { ActivityEntry } from "@/lib/storage";
 import type { TenantReadinessResult } from "@/lib/production-readiness-rules";
 import type { TenantConfig } from "@/lib/types";
-import type { Thread } from "@/lib/threads";
+import type { Thread } from "@/lib/conversation-types";
 import { getTenantDeliveryModel } from "@/lib/custom-repos";
 import { isBillingConfigured, billingLabel } from "@/lib/billing-type";
 

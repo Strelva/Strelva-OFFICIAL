@@ -38,7 +38,7 @@ const OWNER_SURFACES: Array<[string, RegExp]> = [
   ["/dashboard/settings", /How much Strelva handles on its own/],
   ["/dashboard/store", /Products/],
   ["/dashboard/history", /History & safety/],
-  ["/dashboard/analytics", /How people find you on Google/],
+  ["/dashboard/analytics", /Connect Google to unlock your analytics/],
   ["/dashboard/google", /Connect your Google listing/],
 ];
 

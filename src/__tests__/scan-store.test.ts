@@ -38,6 +38,15 @@ const summaryWithIssues: ScanSummary = {
 beforeEach(() => vi.clearAllMocks());
 
 describe("scan-store summary", () => {
+  it("preserves unavailable evidence for history reads that require the store", async () => {
+    mockGetRedis.mockReturnValue(null);
+    await expect(getScanSummary("gldf", { requireStore: true })).rejects.toThrow();
+    await expect(getScanHistory("gldf", { requireStore: true })).rejects.toThrow();
+    mockGetRedis.mockReturnValue({ get: vi.fn().mockRejectedValue(new Error("summary offline")), lrange: vi.fn().mockRejectedValue(new Error("history offline")) });
+    await expect(getScanSummary("gldf", { requireStore: true })).rejects.toThrow("summary offline");
+    await expect(getScanHistory("gldf", { requireStore: true })).rejects.toThrow("history offline");
+  });
+
   it("saveScanSummary writes under reb:scan:{tenant} with a TTL", async () => {
     const set = vi.fn().mockResolvedValue("OK");
     mockGetRedis.mockReturnValue({ set });

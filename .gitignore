@@ -10,10 +10,13 @@
 
 # testing
 /coverage
+/test-results/
+/output/playwright*/
 
 # next.js
 /.next/
 /.next-playwright/
+/.next-*/
 /out/
 
 # production
@@ -57,6 +60,14 @@ next-env.d.ts
 *.png
 *.jpeg
 *.jpg
+!docs/design/references/strelva-brand-system-2026-09-17.png
+!docs/design/references/strelva-context-field-2026-09-17.png
+!docs/design/references/strelva-action-field-2026-09-17.png
+!docs/design/references/strelva-evidence-field-2026-09-17.png
+!docs/design/references/strelva-blur-material-study-2026-09-17.png
+!docs/design/references/strelva-layered-wash-2026-09-17.png
+!docs/design/references/strelva-watercolor-blur-material-2026-09-17.png
+.validation-artifacts/
 blueprint-*.md
 full-page-snapshot.md
 PRODUCT.md
@@ -91,3 +102,6 @@ clear-stale-reval-failures.mjs
 
 # Playwright UX-capture build output (disposable, never deploy)
 .next-playwright/
+
+# Reviewed Strelva atmospheric brandkit proposal
+!docs/design/references/strelva-atmospheric-brandkit-v2-2026-09-17.png

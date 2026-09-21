@@ -110,7 +110,8 @@ describe("getPortfolioActions", () => {
     expect(snap.groups[1]!.tenantId).toBe("bolt");
     // The archived tenant never appears.
     expect(snap.groups.some((g) => g.tenantId === "gone")).toBe(false);
-    // A tenant whose read failed doesn't 500 the whole snapshot.
+    expect(snap.availability).toBe("complete");
+    expect(snap.incomplete).toEqual([]);
   });
 
   it("threads each event's type + metadata so the queue can render the real diff", async () => {
@@ -143,9 +144,31 @@ describe("getPortfolioActions", () => {
     const small = snap.groups.find((g) => g.tenantId === "small");
     expect(big?.capped).toBe(true);
     expect(small?.capped).toBe(false);
+    expect(snap.availability).toBe("partial");
+    expect(snap.incomplete).toEqual([
+      { source: "pending_approvals", tenantId: "big", siteName: "Big Co", capped: true },
+    ]);
   });
 
-  it("degrades a per-tenant read failure to an empty group", async () => {
+  it("blocks a false clear when the capped read contains no approvable items", async () => {
+    mockGetAllTenants.mockResolvedValue([{ id: "big", siteName: "Big Co", active: true }]);
+    mockGetEvents.mockResolvedValue(
+      Array.from({ length: 100 }, (_, i) =>
+        evt({ id: `signal-${i}`, tenantId: "big", type: "booking" }),
+      ),
+    );
+
+    const snap = await getPortfolioActions();
+
+    expect(snap.groups).toEqual([]);
+    expect(snap.totalItems).toBe(0);
+    expect(snap.availability).toBe("partial");
+    expect(snap.incomplete).toEqual([
+      { source: "pending_approvals", tenantId: "big", siteName: "Big Co", capped: true },
+    ]);
+  });
+
+  it("keeps a per-tenant read failure explicit while preserving other clients", async () => {
     mockGetAllTenants.mockResolvedValue([
       { id: "acme", siteName: "Acme Co", active: true },
       { id: "bolt", siteName: "Bolt Studio", active: true },
@@ -158,6 +181,39 @@ describe("getPortfolioActions", () => {
     const snap = await getPortfolioActions();
     expect(snap.totalClients).toBe(1);
     expect(snap.groups[0]!.tenantId).toBe("acme");
+    expect(snap.availability).toBe("partial");
+    expect(snap.incomplete).toEqual([
+      { source: "pending_approvals", tenantId: "bolt", siteName: "Bolt Studio" },
+    ]);
+  });
+
+  it("never calls a fully unreadable client directory a clear portfolio", async () => {
+    mockGetAllTenants.mockRejectedValue(new Error("redis down"));
+
+    const snap = await getPortfolioActions();
+
+    expect(snap).toEqual({
+      groups: [],
+      totalItems: 0,
+      totalClients: 0,
+      availability: "unavailable",
+      incomplete: [{ source: "client_directory" }],
+    });
+    expect(mockGetEvents).not.toHaveBeenCalled();
+  });
+
+  it("marks a verified empty directory complete", async () => {
+    mockGetAllTenants.mockResolvedValue([]);
+
+    const snap = await getPortfolioActions();
+
+    expect(snap).toEqual({
+      groups: [],
+      totalItems: 0,
+      totalClients: 0,
+      availability: "complete",
+      incomplete: [],
+    });
   });
 });
 

@@ -6,7 +6,7 @@ export default defineConfig({
     environment: "node",
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
-    include: ["src/__tests__/**/*.test.ts", "custom-repo-starter/__tests__/**/*.test.ts"],
+    include: ["src/__tests__/**/*.test.ts", "src/__tests__/**/*.test.tsx", "custom-repo-starter/__tests__/**/*.test.ts"],
     exclude: ["node_modules"],
     coverage: {
       provider: "v8",
@@ -35,6 +35,10 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      // The standalone route is a copied client-site template. Point its
+      // template-only `@/lib` import at the starter helper for route tests;
+      // the application alias below remains unchanged for product code.
+      "@/lib/scaffold-forms": path.resolve(__dirname, "custom-repo-starter/scaffold-forms.ts"),
       "@": path.resolve(__dirname, "src"),
     },
   },

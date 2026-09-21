@@ -22,6 +22,12 @@ import {
 } from "./governed-work/shadow";
 import type { ContentMap, ContentSection } from "./types";
 import type { CustomChangeRequestStatus } from "./types";
+import {
+  authorizeInquiryMessageReviewActor,
+  executeInquiryMessageReview,
+  isInquiryMessageReviewEvent,
+  reconcileInquiryMessageReview,
+} from "@/products/inquiries";
 
 export type EventWorkflowAction =
   | "approved"
@@ -64,6 +70,11 @@ const CUSTOM_WORKFLOW_ACTIONS = new Set<EventWorkflowAction>([
   "declined",
 ]);
 
+const INQUIRY_PUBLICATION_KINDS = new Set([
+  "inquiry_capability_publish",
+  "inquiry_capability_undo",
+]);
+
 function workflowStatusFromAction(action: EventWorkflowAction): CustomChangeRequestStatus | null {
   if (action === "approved" || action === "dismissed") return null;
   return action;
@@ -93,7 +104,8 @@ export async function escalateEventToOwner(
 export async function resolveEventAction(
   tenantId: string,
   eventId: string,
-  action: EventWorkflowAction
+  action: EventWorkflowAction,
+  actorId = "user",
 ): Promise<{ changed: boolean; reason?: string }> {
   // Redis-authoritative read: this path EXECUTES the event's payload (the
   // external write), so it must see live metadata — an owner-edited review reply,
@@ -103,6 +115,35 @@ export async function resolveEventAction(
   if (!event) return { changed: false, reason: "not_found" };
   if (event.tenantId !== tenantId) return { changed: false, reason: "wrong_tenant" };
   if (event.status !== "pending") return { changed: false, reason: "already_resolved" };
+
+  // A message review has a provider checkpoint in addition to its event. If a
+  // process stopped after the provider accepted the message, recover the
+  // receipt and resolve the existing event without calling the provider again.
+  // This also covers a process that died while the event was still marked
+  // processing: the durable delivery marker is the only safe source of truth.
+  if (
+    isInquiryMessageReviewEvent(event) &&
+    (event.metadata?.execution?.state === "external_accepted" || event.metadata?.execution?.state === "processing")
+  ) {
+    // Reconciliation may close an accepted provider write without sending
+    // again. It still resolves the governed event, so the current clicker must
+    // be the live responsibility sponsor before we allow that transition.
+    // Never infer authorization from the event's requestedBy metadata or from
+    // the actor that started the abandoned attempt.
+    const authorized = await authorizeInquiryMessageReviewActor({ tenantId, event, actorId });
+    if (!authorized.allowed) {
+      return { changed: false, reason: authorized.reason || "permission_denied" };
+    }
+    const recovery = await reconcileInquiryMessageReview({ tenantId, event, actorId });
+    if (!recovery.safeToResolve) {
+      return { changed: false, reason: recovery.reason || "responsibility_receipt_reconciliation_required" };
+    }
+    if (event.metadata?.execution?.state === "processing") await markExecutionExternalAccepted(eventId);
+    const resolved = await resolveEvent(eventId, "approved", { actor: actorId });
+    return resolved.changed
+      ? { changed: true, ...(recovery.verified ? {} : { reason: recovery.reason || "accepted_unverified" }) }
+      : { changed: false, reason: "already_resolved" };
+  }
 
   // Recovery exit for a wedged "external_accepted" event: the non-idempotent
   // external write already succeeded (that is what the marker means) but the
@@ -143,6 +184,13 @@ export async function resolveEventAction(
         : workflowStatus === "declined"
           ? "dismissed"
           : existing.status; // a non-terminal step keeps it pending
+      const priorHistory = Array.isArray(existing.metadata?.workflowHistory)
+        ? existing.metadata.workflowHistory.filter((entry): entry is { status: string; actor: string; at: string } => Boolean(entry)
+          && typeof entry === "object"
+          && typeof (entry as Record<string, unknown>).status === "string"
+          && typeof (entry as Record<string, unknown>).actor === "string"
+          && typeof (entry as Record<string, unknown>).at === "string")
+        : [];
       return {
         ...existing,
         status: nextStatus,
@@ -155,6 +203,7 @@ export async function resolveEventAction(
           quoteRequired: workflowStatus === "quoted" ? true : existing.metadata?.quoteRequired,
           shippedAt: workflowStatus === "shipped" ? now : existing.metadata?.shippedAt,
           workflowUpdatedAt: now,
+          workflowHistory: [...priorHistory, { status: workflowStatus, actor: actorId, at: now }],
         },
       };
     });
@@ -171,7 +220,7 @@ export async function resolveEventAction(
     return { changed: false, reason: "invalid_action" };
   }
 
-  const claim = await claimEventAction(eventId, action, "user");
+  const claim = await claimEventAction(eventId, action, actorId);
   if (!claim.acquired) return { changed: false, reason: claim.reason };
 
   // Governed-work execution shadow (SEPARATE flag, default OFF, best-effort). Only
@@ -184,7 +233,7 @@ export async function resolveEventAction(
     action === "approved" ? await shadowStartExecutionAttempt(eventId, claim.attemptId) : null;
 
   try {
-    const result = await executeResolvedEventAction(tenantId, eventId, action, event);
+    const result = await executeResolvedEventAction(tenantId, eventId, action, event, actorId);
     await finishEventAction(eventId, claim.attemptId, {
       state: result.changed ? "completed" : "failed",
       reason: result.reason,
@@ -207,7 +256,62 @@ async function executeResolvedEventAction(
   eventId: string,
   action: "approved" | "dismissed",
   event: NonNullable<Awaited<ReturnType<typeof getEvent>>>,
+  actorId: string,
 ): Promise<{ changed: boolean; reason?: string }> {
+
+  if (isInquiryMessageReviewEvent(event)) {
+    const authorized = await authorizeInquiryMessageReviewActor({ tenantId, event, actorId });
+    if (!authorized.allowed) return { changed: false, reason: authorized.reason || "permission_denied" };
+    if (action === "dismissed") {
+      const resolved = await resolveEvent(eventId, "dismissed", { actor: actorId });
+      return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
+    }
+
+    const execution = await executeInquiryMessageReview({ tenantId, eventId, event, actorId });
+    // Once the provider has accepted a message, close the duplicate barrier
+    // before any receipt or event-resolution work. A receipt persistence blip
+    // therefore leaves a recoverable, blocking event instead of enabling a
+    // second provider call.
+    if (execution.accepted) await markExecutionExternalAccepted(eventId);
+    if (!execution.accepted) return { changed: false, reason: execution.reason || "delivery_unavailable" };
+    if (!execution.safeToResolve || !execution.receiptPersisted) {
+      return { changed: false, reason: execution.reason || "responsibility_receipt_reconciliation_required" };
+    }
+    const resolved = await resolveEvent(eventId, "approved", { actor: actorId });
+    if (!resolved.changed) return { changed: false, reason: "already_resolved" };
+    return execution.verified
+      ? { changed: true }
+      : { changed: true, reason: execution.reason || "accepted_unverified" };
+  }
+
+  if (
+    event.type === "change_request" &&
+    typeof event.metadata?.kind === "string" &&
+    INQUIRY_PUBLICATION_KINDS.has(event.metadata.kind)
+  ) {
+    if (action === "approved") {
+      const claimId = typeof event.metadata?.publicationClaimId === "string"
+        ? event.metadata.publicationClaimId.trim()
+        : "";
+      if (!claimId) return { changed: false, reason: "inquiry_publication_claim_missing" };
+      const { executeInquiryPublication } = await import("@/products/inquiries/server");
+      const publication = await executeInquiryPublication({ tenantId, eventId, claimId });
+      if (!publication.accepted) {
+        return { changed: false, reason: publication.reason || "inquiry_publication_failed" };
+      }
+      // Provider acceptance closes the write before event resolution. A failed
+      // read-back remains accepted and non-retryable; its verification evidence
+      // is recorded by the inquiry executor.
+      await markExecutionExternalAccepted(eventId);
+      const resolved = await resolveEvent(eventId, "approved", { actor: "user" });
+      if (!resolved.changed) return { changed: false, reason: "already_resolved" };
+      return publication.verified
+        ? { changed: true }
+        : { changed: true, reason: publication.reason || "accepted_unverified" };
+    }
+    const resolved = await resolveEvent(eventId, "dismissed", { actor: "user" });
+    return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
+  }
 
   // For approvals that actually do something external (post to Google, send an
   // email, publish content), validate + perform the effect BEFORE flipping the
@@ -300,6 +404,7 @@ async function executeResolvedEventAction(
         "user",
         tenantId,
         diffFields(current, draft as unknown as Record<string, unknown>),
+        eventId,
       );
       await recordSectionUpdate(section, tenantId);
       const { revalidatePath } = await import("next/cache");

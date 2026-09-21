@@ -52,7 +52,7 @@ Strelva is a **control plane**, not a website host.
 - The wire contract is **v1, frozen, additive-only**. `x-reb-*` header names and
   `reb:` Redis prefixes are **permanently frozen** — values migrate (point at
   `app.strelva.com`), names never do. A breaking change is a v2 sibling.
-- **Marketing** (`strelva.com`) is a separate static repo (`~/strelva-marketing`).
+- **Marketing** (`strelva.com`) is a separate static repo nested at `./strelva-marketing`.
 - **Billing is off** until the grandfather list (`STRIPE_BILLING_GRANDFATHER_TENANTS`)
   ships in the same deploy that sets `STRIPE_SCAFFOLD_PRICE_ID`.
 

@@ -10,9 +10,9 @@ const PAST_DUE_GRACE_DAYS = 3;
 
 /**
  * Admin-side billing is "on" only when STRIPE_SCAFFOLD_PRICE_ID is configured.
- * While client sites are free and admin pricing is undecided, this returns
- * false and subscription gates short-circuit to "active" so the dashboard
- * isn't locked out for tenants that never paid.
+ * If recurring billing is deliberately disabled, subscription gates
+ * short-circuit to "active" so existing tenants are not unexpectedly locked
+ * out. This fallback is not a public free-site offer.
  */
 export function isBillingEnabled(): boolean {
   return Boolean(process.env.STRIPE_SCAFFOLD_PRICE_ID);

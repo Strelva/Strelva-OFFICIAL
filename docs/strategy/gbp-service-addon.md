@@ -17,9 +17,10 @@
 - **The gap to sellable** = the client-facing VALUE layer: GBP-native performance
   insights, map-pack rank (geogrid), broader profile editing, multi-location — plus
   that API grant.
-- **Price:** DFY GBP management runs ~$200-300/mo/location standalone. Bundle it at
-  **+$99 / +$149 / +$199/mo** tiered to the site plan (anchor **$149**). High margin
-  because the work is largely automatable and CAC is ~zero (existing site clients).
+- **Price:** DFY GBP management runs ~$200-300/mo/location standalone. The
+  accepted Strelva shape is one **+$149/month/location** add-on. It is not tiered
+  by website plan. Margin remains strong because work is largely automatable and
+  acquisition cost is near zero for existing clients.
 
 ## 1. What Strelva already has (the head start)
 
@@ -48,7 +49,6 @@
 - **Multi-location** — OAuth blindly takes `accounts[0]/locations[0]`; no picker,
   no roster.
 - Post scheduling / content calendar (posts are one-shot on approval).
-- The `google-meta` tenant-rename gap (linkage strands on a slug rename).
 
 ## 2. The GBP API reality (what's automatable)
 
@@ -128,7 +128,6 @@ per-location hard cost (~$25/mo tier). CAC ~0 (upsell to existing site clients).
 5. **Broaden profile editing** — description, categories, services, attributes, special
    hours (all Business Information API v1). The day-to-day of "managing" a GBP.
 6. **Post scheduling / content calendar** — recurring posts vs. one-shot-on-approval.
-7. **Close the `google-meta` tenant-rename gap** (in AGENTS.md's known-issues).
 
 ## 6. Risks / gotchas
 
@@ -139,7 +138,8 @@ per-location hard cost (~$25/mo tier). CAC ~0 (upsell to existing site clients).
 - **Verification / owner-or-manager access must be granted per location** before you can
   manage programmatically — an onboarding step, not automatable.
 - **Q&A + messaging can't be automated** — set expectations; Q&A monitoring is manual.
-- **Geogrid is a real recurring cost** — price it into the higher tier, don't eat it flat.
+- **Geogrid is a real recurring cost** — include it in the `$149` price model
+  and do not absorb an unmeasured scan cadence.
 
 ## 7. Bottom line / recommendation
 
@@ -197,13 +197,17 @@ tested, waiting on Google API access, `[build]` = to build for the add-on.
 - Combined monthly report: site performance + GBP performance + map-rank movement `[build]` (extend the existing report engine)
 - Multi-location: account roster + per-location GBP (ties into the org-layer accounts) `[build]`
 
-## Tiering (which features land in which add-on tier)
+## Current packaging
 
 Single plan, everything included (per location): review monitor + DFY replies + ask-toolkit,
 managed Google Posts, profile optimization (hours/photos/categories/services), monthly GBP
 performance report, map-pack geogrid rank, competitive monitoring. One-time setup/optimization
 $99-149. Multi-location = the plan per location bundled on one account/bill. À la carte
 pass-through: suspension reinstatement ~$750, review dispute ~$425.
+
+The cost research below preserves some earlier tier terminology so its provider
+math remains traceable. It is not the current packaging decision. Translate all
+modeled scenarios back to the one `$149/month/location` plan.
 
 ## What unlocks each pillar
 - Pillars 1-3 (reviews / posts / profile) are almost entirely **`[built·blocked]` → the

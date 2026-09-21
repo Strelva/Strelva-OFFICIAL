@@ -41,7 +41,7 @@ export default function DashboardError({
         <div className="flex items-center justify-center gap-3">
           <button
             onClick={reset}
-            className="flex items-center gap-2 px-4 py-2 rounded-md bg-sage hover:bg-sage-dark text-sm text-white transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-md bg-accent hover:bg-accent/85 text-sm text-on-accent transition-colors"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             Try again

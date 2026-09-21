@@ -15,6 +15,7 @@ interface ContentVersion {
   timestamp: string;
   status: "live" | "rolled-back";
   changes?: { field: string; before: string; after: string }[];
+  requestId?: string;
 }
 
 // Legacy format — kept for backward compatibility with old snapshots
@@ -26,6 +27,7 @@ interface ActivityEntry {
   actor?: "user" | "ai" | "admin";
   changes?: { field: string; before: string; after: string }[];
   snapshot?: unknown;
+  requestId?: string;
 }
 
 interface VersionHistoryProps {
@@ -103,6 +105,7 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
             changes: v.changes,
             snapshot: v.data,
             _versionId: v.id,
+            requestId: v.requestId,
           }));
           setEntries(mapped);
           return;
@@ -145,8 +148,10 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
           body: JSON.stringify({ versionId }),
         });
       } else {
-        // Legacy: PUT snapshot directly
-        res = await fetch(dashboardHref(`/api/content/${section}`), {
+        // Legacy snapshots use the same draft boundary. A history action must
+        // never publish directly; the owner reviews it in the preview and uses
+        // the publish bar when ready.
+        res = await fetch(dashboardHref(`/api/content/${section}?draft=true`), {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           credentials: "same-origin",
@@ -184,7 +189,7 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
       <EmptyState
         icon={<History className="w-[18px] h-[18px] text-gray-muted" strokeWidth={1.5} />}
         title="No previous versions"
-        description="Versions appear after changes are published live. Draft-only saves stay pending until you publish."
+        description="Versions appear after changes are published live. Restoring a version creates a draft for review; it stays pending until you publish."
         className="h-full"
       />
     );
@@ -206,6 +211,7 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
           <span className="text-[11px] text-gray-muted">
             {relativeTime(selected.time)} · {selected.actor ?? "user"}
           </span>
+          {selected.requestId ? <span className="text-[11px] text-gray-muted">Request {selected.requestId.slice(-8)}</span> : null}
         </div>
 
         <div className="flex items-center justify-between px-4 py-2 border-b border-gray-border bg-gray-bg-alt shrink-0">
@@ -217,14 +223,14 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
             icon={!restoring ? <RotateCcw className="w-3 h-3" strokeWidth={1.5} /> : undefined}
             onClick={handleRestore}
           >
-            Restore this version
+            Restore to draft
           </Button>
         </div>
 
         {status === "success" && (
           <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-border bg-positive0/[0.04] shrink-0">
             <Check className="w-3 h-3 text-positive" strokeWidth={1.5} />
-            <span className="text-[11px] text-positive">Restored. Preview updated</span>
+            <span className="text-[11px] text-positive">Restored to draft. Review before publishing</span>
           </div>
         )}
         {status === "error" && (
@@ -286,6 +292,7 @@ export function VersionHistory({ section, onRestored }: VersionHistoryProps) {
                   </span>
                 </div>
                 <div className="text-[11px] text-gray-muted mt-0.5 truncate">{summary}</div>
+                {entry.requestId ? <div className="text-[10px] text-gray-faint mt-0.5">Governed request {entry.requestId.slice(-8)}</div> : null}
               </button>
             </li>
           );

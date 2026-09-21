@@ -1,0 +1,409 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  user: vi.fn(), rate: vi.fn(), score: vi.fn(), personal: vi.fn(), list: vi.fn(), work: vi.fn(), getWork: vi.fn(),
+  save: vi.fn(), createAgency: vi.fn(), handoff: vi.fn(), inspect: vi.fn(), accept: vi.fn(),
+  revoke: vi.fn(), cancel: vi.fn(), handoffs: vi.fn(), agencyDelegations: vi.fn(), workDelegations: vi.fn(),
+  pending: vi.fn(), operation: vi.fn(), saveAudit: vi.fn(), preflight: vi.fn(), runPrivate: vi.fn(), savePublicResult: vi.fn(), managedWork: vi.fn(), exitRead: vi.fn(), exitCompleted: vi.fn(),
+}));
+vi.mock("@/lib/db/server-client", () => ({ getSessionUser: mocks.user }));
+vi.mock("@/lib/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate }));
+vi.mock("@/products/ai-visibility/server", () => ({ runPrivateAiVisibilityAssessment: mocks.runPrivate, savePublicAiVisibilityResult: mocks.savePublicResult }));
+vi.mock("@/products/website-audit/server", () => ({ savePublicWebsiteAudit: mocks.saveAudit }));
+vi.mock("@/products/managed-presence/server", () => ({ listManagedPresenceWork: mocks.managedWork }));
+vi.mock("@/platform/workspace-exit", () => ({ readWorkspaceExit: mocks.exitRead, readWorkspaceExitCompleted: mocks.exitCompleted }));
+vi.mock("@/platform/workspaces", async () => {
+  const types = await import("@/platform/workspaces/types");
+  const { WorkspaceOperationPendingError } = await import("@/platform/workspaces/operations");
+  return { ...types, WorkspaceOperationPendingError, operationRequest: mocks.operation, listPendingAssessments: mocks.pending, assertCanSaveWork: mocks.preflight, ensurePersonalWorkspace: mocks.personal, listWorkspaces: mocks.list,
+    listWork: mocks.work, getWork: mocks.getWork, saveWork: mocks.save, createAgencyWorkspace: mocks.createAgency,
+    createHandoff: mocks.handoff, inspectHandoff: mocks.inspect, acceptHandoff: mocks.accept,
+    revokeDelegation: mocks.revoke, revokeHandoff: mocks.cancel, listAgencyHandoffs: mocks.handoffs,
+    listAgencyDelegations: mocks.agencyDelegations, listWorkDelegations: mocks.workDelegations };
+});
+
+import { GET, POST } from "@/app/api/workspace/route";
+import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError } from "@/platform/workspaces/types";
+import { createTrackerFromImport } from "@/products/tracker";
+
+const workspaceId = "11111111-1111-4111-8111-111111111111";
+const workId = "22222222-2222-4222-8222-222222222222";
+const otherId = "33333333-3333-4333-8333-333333333333";
+const workspace = { id: workspaceId, kind: "personal", name: "My work", access: "member", role: "owner" };
+const result = { business: "Example", score: 70, grade: "C", verdict: "Readiness signals found", topFix: "Add business schema",
+  signals: [], citation: { probed: false, mentioned: false, recommended: false, note: "Not measured" } };
+const work = { id: workId, workspaceId, title: "Example", productId: "ai_visibility", resourceKind: "ai_visibility_assessment",
+  payload: result, input: {}, createdAt: "2026-09-05T00:00:00Z" };
+const trackerSnapshot = createTrackerFromImport(
+  { fileName: "handoff.csv", content: "Name,Status\nExample,Open\nSecond,Closed", mimeType: "text/csv" },
+  { trackerId: "tracker-handoff", actorId: "actor", title: "Handoff tracker", at: "2026-09-05T00:00:00.000Z" },
+);
+const trackerWork = { id: otherId, workspaceId, title: "Handoff tracker", productId: "tracker", resourceKind: "tracker", payload: { tracker: trackerSnapshot }, input: {}, createdAt: "2026-09-05T00:00:00Z" };
+
+function request(value: unknown, headers: Record<string, string> = {}) {
+  return new Request("https://strelva.com/api/workspace", { method: "POST",
+    headers: { origin: "https://strelva.com", "content-type": "application/json", ...headers }, body: JSON.stringify(value) });
+}
+
+beforeEach(() => {
+  vi.resetAllMocks();
+  vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+  mocks.user.mockResolvedValue({ id: "actor", email: "OWNER@example.com", email_confirmed_at: "2026-09-05" });
+  mocks.rate.mockResolvedValue(false);
+  mocks.pending.mockResolvedValue([]);
+  mocks.personal.mockResolvedValue(workspace);
+  mocks.list.mockResolvedValue([workspace]);
+  mocks.work.mockResolvedValue([work]);
+  mocks.getWork.mockResolvedValue(work);
+  mocks.inspect.mockResolvedValue({ recipientEmail: "owner@example.com", agencyWorkspace: { name: "Agency" }, work, status: "pending", expiresAt: "2026-09-12" });
+  mocks.save.mockResolvedValue(work);
+  mocks.score.mockResolvedValue(result);
+  mocks.preflight.mockResolvedValue(undefined);
+  mocks.runPrivate.mockImplementation(async ({ actor, workspaceId, input }: {
+    actor: { userId: string; verifiedEmail: string };
+    workspaceId: string;
+    input: Record<string, unknown>;
+  }) => {
+    const selected = (await mocks.list(actor)).find((item: { id: string; access: string }) => item.id === workspaceId && item.access === "member");
+    if (!selected) throw new WorkspaceAccessError();
+    await mocks.preflight(actor, workspaceId);
+    if (await mocks.rate(`workspace:assessment:${actor.userId}`, 10, 86_400_000)) {
+      const error = new Error("daily limit");
+      error.name = "PrivateAiVisibilityAssessmentRateLimitError";
+      throw error;
+    }
+    const scored = await mocks.score(input);
+    return mocks.save(actor, workspaceId, { productId: "ai_visibility", resourceKind: "ai_visibility_assessment", title: String(input.business), payload: scored, input });
+  });
+  mocks.savePublicResult.mockResolvedValue({ work, created: true });
+  mocks.handoffs.mockResolvedValue([]);
+  mocks.agencyDelegations.mockResolvedValue([]);
+  mocks.workDelegations.mockResolvedValue([]);
+  mocks.managedWork.mockResolvedValue({ managedWork: [], unavailable: false });
+  mocks.exitRead.mockResolvedValue({ state: null, successors: [] });
+  mocks.exitCompleted.mockResolvedValue(false);
+});
+
+describe("release-one private workspace routes", () => {
+  it("fails closed while the release gate is off", async () => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "0");
+    expect((await GET(new Request("https://strelva.com/api/workspace"))).status).toBe(503);
+    expect((await POST(request({ action: "create_agency", name: "Example" }))).status).toBe(503);
+    expect(mocks.user).not.toHaveBeenCalled();
+  });
+  it.each([null, { id: "actor", email: "unverified@example.com" }])("requires a verified session", async (user) => {
+    mocks.user.mockResolvedValue(user);
+    expect((await GET(new Request("https://strelva.com/api/workspace"))).status).toBe(401);
+    expect(mocks.personal).not.toHaveBeenCalled();
+  });
+  it("loads a no-tenant person's private work without tenant or billing authority", async () => {
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+    expect(await response.json()).toMatchObject({ workspaceId, work: [{ id: workId }], actor: { email: "owner@example.com" } });
+    expect(mocks.work).toHaveBeenCalledWith({ userId: "actor", verifiedEmail: "owner@example.com" }, workspaceId);
+  });
+  it("reports an owner exit-state read failure so the browser can fail closed", async () => {
+    mocks.exitRead.mockRejectedValue(new Error("temporary exit-state store failure"));
+
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ workspaceExitState: null, workspaceExitReadStatus: "unavailable" });
+  });
+  it("checks member completion without asking for the owner-only exit record", async () => {
+    mocks.list.mockResolvedValue([{ ...workspace, role: "member" }]);
+
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ workspaceExitState: null, workspaceExitReadStatus: "available" });
+    expect(mocks.exitRead).not.toHaveBeenCalled();
+    expect(mocks.exitCompleted).toHaveBeenCalledWith(workspaceId);
+  });
+
+  it("shows members a completed exit without disclosing owner-only details", async () => {
+    mocks.list.mockResolvedValue([{ ...workspace, role: "member" }]);
+    mocks.exitCompleted.mockResolvedValue(true);
+
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ workspaceExitState: null, workspaceExitReadStatus: "completed" });
+    expect(mocks.exitRead).not.toHaveBeenCalled();
+  });
+
+  it("fails closed for members when completion status is unavailable", async () => {
+    mocks.list.mockResolvedValue([{ ...workspace, role: "member" }]);
+    mocks.exitCompleted.mockRejectedValue(new Error("temporary exit-state store failure"));
+
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ workspaceExitState: null, workspaceExitReadStatus: "unavailable" });
+  });
+  it("exposes locally executable products only inside the enabled workspace release", async () => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "0");
+    expect((await GET(new Request("https://strelva.com/api/workspace"))).status).toBe(503);
+
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+    expect(response.status).toBe(200);
+    const products = (await response.json()).products as Array<{ id: string; availability: string }>;
+    expect(products).toEqual(expect.arrayContaining([
+      { id: "applications", name: "Internal applications", description: "Collect and use business records in a private form and working list.", availability: "available" },
+      { id: "scheduling", name: "Scheduling", description: "Reserve available time and keep conflicting requests out of the schedule.", availability: "available" },
+      { id: "investigations", name: "Ongoing checks", description: "Compare two permitted records and notice when they disagree.", availability: "available" },
+      { id: "operations", name: "Delegated work", description: "Approve a bounded result and keep its progress, decisions, and evidence together.", availability: "available" },
+    ]));
+  });
+  it("includes authorized managed websites as tenant links without cloning saved work", async () => {
+    mocks.managedWork.mockResolvedValue({ managedWork: [{ id: "gldf", title: "Great Lakes Dried Fruit", href: "https://app.strelva.com/client/gldf/dashboard", productId: "managed_presence", relationship: "client" }], unavailable: false });
+
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ managedWork: [{ id: "gldf", productId: "managed_presence", relationship: "client" }] });
+    expect(mocks.save).not.toHaveBeenCalled();
+  });
+  it("keeps unrelated private work available when managed discovery is unavailable", async () => {
+    mocks.managedWork.mockRejectedValue(new Error("tenant store unavailable"));
+
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ workspaceId, work: [{ id: workId }], managedWork: [], managedWorkUnavailable: true });
+  });
+  it("propagates only the browser-safe managed-work projection and bounded availability", async () => {
+    mocks.managedWork.mockResolvedValue({
+      managedWork: [{
+        id: "tenant-gldf",
+        title: "Great Lakes Dried Fruit",
+        href: "https://app.strelva.com/client/gldf/dashboard",
+        productId: "managed_presence",
+        relationship: "client",
+        operatorToken: "must-not-leak",
+      }],
+      unavailable: true,
+    });
+
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+    expect(response.status).toBe(200);
+    const output = await response.json();
+    expect(output.managedWork).toEqual([{
+      id: "tenant-gldf",
+      title: "Great Lakes Dried Fruit",
+      href: "https://app.strelva.com/client/gldf/dashboard",
+      productId: "managed_presence",
+      relationship: "client",
+    }]);
+    expect(output.managedWorkUnavailable).toBe(true);
+    expect(JSON.stringify(output)).not.toContain("token");
+  });
+  it("does not disclose another workspace's contents", async () => {
+    const response = await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${otherId}`));
+    expect(response.status).toBe(404);
+    expect(mocks.work).not.toHaveBeenCalled();
+  });
+  it("rejects cross-origin and missing-origin mutations", async () => {
+    for (const origin of ["https://attacker.example", ""]) {
+      expect((await POST(request({ action: "create_agency", name: "Example" }, { origin }))).status).toBe(403);
+    }
+    expect(mocks.createAgency).not.toHaveBeenCalled();
+  });
+  it("rejects non-JSON and oversized payloads", async () => {
+    expect((await POST(request({}, { "content-type": "text/plain" }))).status).toBe(415);
+    expect((await POST(request({ action: "create_agency", name: "x".repeat(13000) }))).status).toBe(400);
+    expect(mocks.createAgency).not.toHaveBeenCalled();
+  });
+  it("rejects browser-selected product execution and forged results", async () => {
+    expect((await POST(request({ action: "assess", workspaceId, business: "Example", productId: "homefinder", payload: result }))).status).toBe(400);
+    expect(mocks.score).not.toHaveBeenCalled();
+  });
+  it("keeps unenabled products unavailable and foreign work from breaking the list", async () => {
+    mocks.work.mockResolvedValue([work, { ...work, id: otherId, productId: "homefinder", payload: { privateData: "not sent" } }]);
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+    expect(response.status).toBe(200);
+    const output = await response.json();
+    expect(output.work[1].payload).toBeNull();
+    expect(output.products.find((product: { id: string }) => product.id === "homefinder").availability).toBe("not_enabled");
+    expect(output.products.find((product: { id: string }) => product.id === "tracker").availability).toBe("available");
+    expect(output.products.find((product: { id: string }) => product.id === "documents").availability).toBe("release_gated");
+    expect(output.products.find((product: { id: string }) => product.id === "applications").availability).toBe("available");
+    expect(output.products.find((product: { id: string }) => product.id === "domain_monitoring")).toBeUndefined();
+  });
+  it("authorizes workspace writes before incurring scoring cost", async () => {
+    mocks.list.mockResolvedValue([{ ...workspace, access: "delegated_read" }]);
+    expect((await POST(request({ action: "assess", workspaceId, business: "Example" }))).status).toBe(403);
+    expect(mocks.score).not.toHaveBeenCalled();
+  });
+  it("enforces the per-user daily budget before scoring", async () => {
+    mocks.rate.mockImplementation(async (key: string) => key.startsWith("workspace:assessment:"));
+    expect((await POST(request({ action: "assess", workspaceId, business: "Example" }))).status).toBe(429);
+    expect(mocks.score).not.toHaveBeenCalled();
+  });
+  it("checks persistence capacity before spending on an assessment", async () => {
+    mocks.preflight.mockRejectedValue(new WorkspaceConflictError());
+    expect((await POST(request({ action: "assess", workspaceId, business: "Example" }))).status).toBe(409);
+    expect(mocks.score).not.toHaveBeenCalled();
+  });
+  it("stores server-produced results privately without using the public result saver", async () => {
+    const response = await POST(request({ action: "assess", workspaceId, business: "Example" }));
+    expect(response.status).toBe(201);
+    expect(mocks.save).toHaveBeenCalledWith(expect.any(Object), workspaceId,
+      expect.objectContaining({ productId: "ai_visibility", payload: result }));
+    const output = await response.json();
+    expect(output).not.toHaveProperty("shareUrl");
+    expect(output.work.id).toBe(workId);
+  });
+  it("imports a retained public result only through the explicit private-copy action", async () => {
+    const response = await POST(request({ action: "save_public_result", workspaceId, resultId: "scan_abc123" }));
+    expect(response.status).toBe(201);
+    expect(mocks.savePublicResult).toHaveBeenCalledWith({
+      actor: { userId: "actor", verifiedEmail: "owner@example.com" },
+      workspaceId,
+      resultId: "scan_abc123",
+    });
+    expect(await response.json()).toMatchObject({ work: { id: workId }, alreadySaved: false });
+  });
+  it("keeps retained-result failures honest at the HTTP boundary", async () => {
+    const unavailable = new Error("internal retained-result details");
+    unavailable.name = "PublicAiVisibilityResultUnavailableError";
+    mocks.savePublicResult.mockRejectedValueOnce(unavailable);
+    const unavailableResponse = await POST(request({ action: "save_public_result", workspaceId, resultId: "scan_abc123" }));
+    expect(unavailableResponse.status).toBe(404);
+    expect(await unavailableResponse.json()).toEqual({ error: "That public scorecard is no longer available to save." });
+
+    const limited = new Error("internal limiter details");
+    limited.name = "PublicAiVisibilityImportRateLimitError";
+    mocks.savePublicResult.mockRejectedValueOnce(limited);
+    const limitedResponse = await POST(request({ action: "save_public_result", workspaceId, resultId: "scan_abc123" }));
+    expect(limitedResponse.status).toBe(429);
+    expect(await limitedResponse.json()).toEqual({ error: "You've reached the daily saved-result limit. Try again tomorrow." });
+  });
+  it("does not report a successful save when storage fails", async () => {
+    mocks.save.mockRejectedValue(new WorkspaceStoreError("database secret details"));
+    const response = await POST(request({ action: "assess", workspaceId, business: "Example" }));
+    expect(response.status).toBe(503);
+    expect(await response.text()).not.toContain("secret");
+  });
+  it("creates a recipient-bound handoff, returning the token only at creation", async () => {
+    mocks.handoff.mockResolvedValue({ token: "opaque-once", handoff: { tokenHash: "secret-hash" } });
+    const response = await POST(request({ action: "handoff", workId, recipientEmail: "client@example.com" }));
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({ token: "opaque-once" });
+  });
+  it("supports only valid Tracker and assessment handoffs, preserving delegated denial", async () => {
+    mocks.getWork.mockResolvedValue(trackerWork);
+    mocks.handoff.mockResolvedValue({ token: "tracker-token", handoff: { tokenHash: "secret-hash" } });
+    const created = await POST(request({ action: "handoff", workId: otherId, recipientEmail: "client@example.com" }));
+    expect(created.status).toBe(201);
+    expect(await created.json()).toEqual({ token: "tracker-token" });
+
+    mocks.handoff.mockClear();
+    mocks.getWork.mockResolvedValue({ ...trackerWork, payload: { tracker: { invalid: true } } });
+    expect((await POST(request({ action: "handoff", workId: otherId, recipientEmail: "client@example.com" }))).status).toBe(409);
+    expect(mocks.handoff).not.toHaveBeenCalled();
+
+    mocks.getWork.mockResolvedValue({ ...trackerWork, productId: "homefinder", resourceKind: "external_homefinder_installation" });
+    expect((await POST(request({ action: "handoff", workId: otherId, recipientEmail: "client@example.com" }))).status).toBe(409);
+    expect(mocks.handoff).not.toHaveBeenCalled();
+
+    mocks.getWork.mockResolvedValue(trackerWork);
+    mocks.handoff.mockRejectedValue(new WorkspaceAccessError());
+    expect((await POST(request({ action: "handoff", workId: otherId, recipientEmail: "client@example.com" }))).status).toBe(403);
+  });
+  it("uses a POST body to inspect handoffs and returns only the approved preview", async () => {
+    mocks.inspect.mockResolvedValue({ recipientEmail: "owner@example.com", agencyWorkspace: { name: "Agency" }, work, status: "pending", expiresAt: "2026-09-12" });
+    const response = await POST(request({ action: "inspect_handoff", token: "opaque-once" }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ agencyName: "Agency", work: { id: workId } });
+  });
+  it("returns a bounded addressed Tracker preview without reading the source work directly", async () => {
+    mocks.inspect.mockResolvedValue({ recipientEmail: "owner@example.com", agencyWorkspace: { name: "Agency" }, work: trackerWork, status: "pending", expiresAt: "2026-09-12" });
+    const response = await POST(request({ action: "inspect_handoff", token: "tracker-token" }));
+    expect(response.status).toBe(200);
+    const output = await response.json();
+    expect(mocks.getWork).not.toHaveBeenCalled();
+    expect(output.work).toMatchObject({ productId: "tracker", payload: null, tracker: { title: "Handoff tracker", revision: 0, rowCount: 2, historyCount: 0 } });
+    expect(output.work.tracker.source).toEqual({ fileName: "handoff.csv", sizeBytes: trackerSnapshot.source.sizeBytes });
+    expect(output.work.tracker.rows).toHaveLength(2);
+    expect(output.work.input).toEqual({});
+    expect(JSON.stringify(output)).not.toContain("originalSource");
+  });
+  it("rejects wrong-recipient preview without leaking work", async () => {
+    mocks.inspect.mockRejectedValue(new WorkspaceAccessError());
+    const response = await POST(request({ action: "inspect_handoff", token: "opaque-once" }));
+    expect(response.status).toBe(403);
+    expect(await response.json()).not.toHaveProperty("work");
+  });
+  it("requires explicit agency-access consent and passes false without promotion", async () => {
+    expect((await POST(request({ action: "accept_handoff", token: "opaque" }))).status).toBe(400);
+    mocks.accept.mockResolvedValue({ customerWorkspaceId: workspaceId, customerWorkId: workId });
+    const destination = { kind: "new" as const, name: "Customer business" };
+    expect((await POST(request({ action: "accept_handoff", token: "opaque", destination, allowAgencyAccess: false }))).status).toBe(200);
+    expect(mocks.accept).toHaveBeenCalledWith(expect.any(Object), "opaque", destination, false);
+  });
+  it("rejects malformed addressed Tracker acceptance before the generic copy RPC", async () => {
+    mocks.inspect.mockResolvedValue({ recipientEmail: "owner@example.com", agencyWorkspace: { name: "Agency" }, work: { ...trackerWork, payload: { tracker: { invalid: true } } }, status: "pending", expiresAt: "2026-09-12" });
+    const response = await POST(request({ action: "accept_handoff", token: "opaque", destination: { kind: "new", name: "Customer business" }, allowAgencyAccess: false }));
+    expect(response.status).toBe(409);
+    expect(mocks.accept).not.toHaveBeenCalled();
+  });
+  it("does not turn a failed revocation into success", async () => {
+    mocks.revoke.mockResolvedValue(false);
+    expect((await POST(request({ action: "revoke_delegation", delegationId: otherId }))).status).toBe(403);
+  });
+  it("does not expose invitation hashes in agency snapshots", async () => {
+    mocks.list.mockResolvedValue([{ ...workspace, kind: "agency" }]);
+    mocks.handoffs.mockResolvedValue([{ id: otherId, sourceWorkId: workId, recipientEmail: "client@example.com", status: "pending", tokenHash: "must-not-leak" }]);
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+    expect(response.status).toBe(200);
+    expect(await response.text()).not.toContain("must-not-leak");
+  });
+  it("includes the customer scope needed to separate one agency's active delegations", async () => {
+    mocks.list.mockResolvedValue([{ ...workspace, kind: "agency" }]);
+    mocks.agencyDelegations.mockResolvedValue([{
+      id: otherId,
+      customerWorkspaceId: "44444444-4444-4444-8444-444444444444",
+      customerWorkId: workId,
+      agencyWorkspaceId: workspaceId,
+      scope: ["work:read"],
+      status: "active",
+      createdAt: "2026-09-15T12:00:00.000Z",
+    }]);
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+    expect(response.status).toBe(200);
+    expect((await response.json()).delegations).toEqual([expect.objectContaining({
+      workId,
+      customerWorkspaceId: "44444444-4444-4444-8444-444444444444",
+      agencyWorkspaceId: workspaceId,
+      status: "active",
+    })]);
+  });
+});
+
+describe("assessment recovery and website report routes", () => {
+  it("keeps recoverable operation IDs scoped to direct members", async () => {
+    mocks.pending.mockResolvedValue([{ id: otherId, status: "ready", createdAt: "today" }]);
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+    expect((await response.json()).pendingAssessments).toEqual([{ id: otherId, status: "ready", createdAt: "today" }]);
+    expect(mocks.pending).toHaveBeenCalledWith({ userId: "actor", verifiedEmail: "owner@example.com" },workspaceId);
+    mocks.pending.mockClear(); mocks.list.mockResolvedValue([{ ...workspace, access:"delegated_read" }]);
+    const delegated = await GET(new Request("https://strelva.com/api/workspace"));
+    expect((await delegated.json()).pendingAssessments).toEqual([]);
+    expect(mocks.pending).not.toHaveBeenCalled();
+  });
+  it("recovers from server-owned inputs and rejects browser-supplied replacements", async () => {
+    mocks.operation.mockResolvedValue({product_id:"ai_visibility",input:{business:"Server business",url:"https://example.com"}});
+    expect((await POST(request({action:"recover_assessment",workspaceId,requestId:otherId}))).status).toBe(200);
+    expect(mocks.runPrivate).toHaveBeenCalledWith(expect.objectContaining({requestId:otherId,input:expect.objectContaining({business:"Server business"})}));
+    expect((await POST(request({action:"recover_assessment",workspaceId,requestId:otherId,business:"Forged"}))).status).toBe(400);
+  });
+  it("passes only the retained audit ID, never an uploaded result", async () => {
+    const resultId=`audit_${"a".repeat(32)}`; mocks.saveAudit.mockResolvedValue(work);
+    expect((await POST(request({action:"save_website_audit",workspaceId,resultId}))).status).toBe(200);
+    expect(mocks.saveAudit).toHaveBeenCalledWith({actor:{userId:"actor",verifiedEmail:"owner@example.com"},workspaceId,resultId});
+    expect((await POST(request({action:"save_website_audit",workspaceId,resultId,payload:result}))).status).toBe(400);
+  });
+});

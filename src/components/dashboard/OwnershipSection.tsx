@@ -18,6 +18,7 @@ import {
 
 import { useDashboardOptional } from "@/components/dashboard/DashboardContext";
 import { Button } from "@/components/ui/Button";
+import type { OffboardingCheckpoint, OffboardingSnapshot } from "@/lib/offboarding";
 
 type Domain = { domain: string; status: "connected" | "pending"; isApex: boolean };
 type SubscriptionStatus = "active" | "trialing" | "past_due" | "cancelled" | "none";
@@ -97,6 +98,7 @@ export function OwnershipSection() {
   const [error, setError] = useState("");
   const [billingError, setBillingError] = useState("");
   const [openingPortal, setOpeningPortal] = useState(false);
+  const [offboarding, setOffboarding] = useState<OffboardingSnapshot | null>(null);
 
   const subscriptionStatus = dashboard?.subscriptionStatus ?? "none";
   const apiHref = useMemo(
@@ -110,6 +112,13 @@ export function OwnershipSection() {
       .then((data) => setDomains(data.domains || []))
       .catch(() => setDomains([]))
       .finally(() => setLoadingDomains(false));
+  }, [apiHref]);
+
+  useEffect(() => {
+    fetch(apiHref("/api/offboarding/status"), { credentials: "same-origin" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: OffboardingSnapshot | null) => setOffboarding(data))
+      .catch(() => setOffboarding(null));
   }, [apiHref]);
 
   async function downloadExport(kind: "content" | "assets") {
@@ -219,6 +228,22 @@ export function OwnershipSection() {
         <div className={`rounded-lg border px-4 py-3 text-[12px] ${error ? "border-warning/20 bg-warning/10 text-warning" : "border-positive/20 bg-positive/10 text-positive"}`}>
           {error || notice}
         </div>
+      )}
+
+      {offboarding && (
+        <section className="rounded-xl border border-glass-border bg-glass p-5" aria-labelledby="offboarding-status-title">
+          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-gray-muted">Exit status</p>
+              <h3 id="offboarding-status-title" className="mt-1 text-[18px] font-medium text-warm-white">See what is ready before anything changes</h3>
+              <p className="mt-1.5 text-[12px] leading-relaxed text-gray-muted">This checklist reads your current exports, domains, billing state, and connected accounts. It does not cancel, delete, or revoke anything.</p>
+            </div>
+            {offboarding.requestedAt ? <span className="shrink-0 text-[11px] text-gray-faint">File handoff requested</span> : null}
+          </div>
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {offboarding.checkpoints.map((checkpoint) => <OffboardingCheckpointCard key={checkpoint.id} checkpoint={checkpoint} apiHref={apiHref} />)}
+          </div>
+        </section>
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -403,6 +428,31 @@ export function OwnershipSection() {
           </div>
         </section>
       </div>
+    </div>
+  );
+}
+
+function OffboardingCheckpointCard({ checkpoint, apiHref }: { checkpoint: OffboardingCheckpoint; apiHref: (path: string) => string }) {
+  const stateCopy: Record<OffboardingCheckpoint["state"], string> = {
+    ready: "Ready",
+    pending: "In progress",
+    attention: "Keep in place",
+    manual: "You will do this",
+  };
+  const stateClass: Record<OffboardingCheckpoint["state"], string> = {
+    ready: "bg-positive/10 text-positive",
+    pending: "bg-accent-dim text-accent",
+    attention: "bg-warning/10 text-warning",
+    manual: "bg-gray-bg text-gray-muted",
+  };
+  return (
+    <div className="rounded-lg border border-gray-border bg-surface-raised p-3.5">
+      <div className="flex items-start justify-between gap-3">
+        <h4 className="text-[13px] font-medium text-warm-white">{checkpoint.label}</h4>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${stateClass[checkpoint.state]}`}>{stateCopy[checkpoint.state]}</span>
+      </div>
+      <p className="mt-2 text-[12px] leading-relaxed text-gray-muted">{checkpoint.detail}</p>
+      {checkpoint.href ? <a href={apiHref(checkpoint.href)} className="mt-2 inline-flex text-[11px] font-medium text-accent underline-offset-2 hover:underline">Open step</a> : null}
     </div>
   );
 }

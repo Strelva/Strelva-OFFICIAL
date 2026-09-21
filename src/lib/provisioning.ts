@@ -12,7 +12,7 @@
 import { randomBytes } from "node:crypto";
 import { createTenant, getTenantConfig } from "./tenants";
 import { createInvite } from "./invites";
-import { setContent } from "./storage";
+import { getStoredContent, setContent } from "./storage";
 import { setAnalyticsConfig, deriveScDomain } from "./analytics";
 import { defaults } from "./defaults";
 import { CUSTOM_REPO_CONTRACT_VERSION } from "./custom-repos";
@@ -20,6 +20,7 @@ import { CONTROL_PLANE_URL } from "./brand";
 import type { ContentSection, ContentMap, BillingType, CommercialPlanKey, PresenceProfile } from "./types";
 import {
   createVercelProject,
+  getVercelProject,
   setVercelEnv,
   addVercelDomain,
   isVercelConfigured,
@@ -107,29 +108,31 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     ? `https://${productionDomain}`
     : `https://${subdomain}.strelva.com`;
   const revalidateUrl = `${siteUrl}/api/v1/revalidate`;
-  // Generate a high-entropy secret for signed revalidation requests from the custom repo.
-  // Rotate this secret if a client repo key material is suspected compromised; see
-  // `src/lib/scaffold-contracts.ts` for the verification/signing contract.
-  const revalidationSecret = randomBytes(32).toString("hex");
-
   let tenantId = subdomain;
+  let tenantWasCreated = false;
+  let revalidationSecret: string | undefined;
 
-  // The env the client repo (and its Vercel project) needs. Computed up front so
-  // it's returned even if a later step fails — the secret is the load-bearing
-  // value Jacob pastes into the hand-built repo.
-  const clientEnv: Record<string, string> = {
+  const baseClientEnv: Record<string, string> = {
     TENANT_ID: subdomain,
     SCAFFOLD_API_URL: CONTROL_PLANE_API,
     NEXT_PUBLIC_SCAFFOLD_API_URL: CONTROL_PLANE_API,
     NEXT_PUBLIC_TENANT_ID: subdomain,
-    REVALIDATION_SECRET: revalidationSecret,
     NEXT_PUBLIC_SITE_NAME: input.siteName,
     NEXT_PUBLIC_SITE_URL: siteUrl,
     OWNER_EMAIL: input.ownerEmail || "",
   };
+  // Do not manufacture a client secret before we know whether this is a new
+  // tenant or a resume. An existing tenant's decrypted persisted secret is the
+  // only value a retry may use.
+  let clientEnv: Record<string, string> = baseClientEnv;
 
   // 1. Tenant record — the hard prerequisite. Bail if it fails.
   try {
+    // Generate a high-entropy secret only for a genuinely new tenant. A retry
+    // must reuse the value already persisted through the tenant encryption
+    // boundary; creating a replacement here would make the storefront and
+    // control plane disagree about signed revalidation.
+    const generatedRevalidationSecret = randomBytes(32).toString("hex");
     const tenant = await createTenant({
       subdomain,
       siteName: input.siteName,
@@ -142,7 +145,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       adminDomain,
       siteUrl,
       revalidateUrl,
-      revalidationSecret,
+      revalidationSecret: generatedRevalidationSecret,
       // Billing — set at provision time so the tenant is never born with "No plan set"
       // when the operator already knows how this client is billed.
       billingType: input.billingType,
@@ -163,6 +166,9 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       branding: { initials: initials(input.siteName) },
     });
     tenantId = tenant.id;
+    tenantWasCreated = true;
+    revalidationSecret = tenant.revalidationSecret ?? generatedRevalidationSecret;
+    clientEnv = { ...baseClientEnv, REVALIDATION_SECRET: revalidationSecret };
     steps.push({
       key: "tenant",
       label: "Create tenant record",
@@ -180,11 +186,17 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       : null;
     if (existing) {
       tenantId = existing.id;
+      revalidationSecret = existing.revalidationSecret;
+      if (revalidationSecret) {
+        clientEnv = { ...baseClientEnv, REVALIDATION_SECRET: revalidationSecret };
+      }
       steps.push({
         key: "tenant",
         label: "Create tenant record",
-        status: "skipped",
-        detail: "Tenant already exists — resuming the remaining steps",
+        status: revalidationSecret ? "skipped" : "failed",
+        detail: revalidationSecret
+          ? "Tenant already exists — reused its persisted revalidation secret"
+          : "Tenant already exists, but its persisted revalidation secret is unavailable; refusing to rotate it",
       });
     } else {
       steps.push({
@@ -221,20 +233,43 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       ...(input.presence ? { businessModel: input.presence } : {}),
     },
   };
-  // setContent is an idempotent upsert, so re-running provision to recover a
-  // partial seed is safe (it overwrites, never duplicates). We capture the
-  // reason for each failed section so the operator sees WHY, not just a count.
+  // New tenants need the complete baseline. A retry must inspect the storage
+  // source first: getContent intentionally resolves defaults, so using it here
+  // would mistake an absent section for a saved customer edit. Only write a
+  // section when storage confirms it is absent.
   let seeded = 0;
+  let preserved = 0;
   const seedFailures: string[] = [];
-  for (const section of SEED_SECTIONS) {
-    try {
-      await setContent(section, seedDefaults[section], tenantId);
-      seeded++;
-    } catch (err) {
-      seedFailures.push(`${section} (${err instanceof Error ? err.message : String(err)})`);
+  let sectionsToSeed: ContentSection[] = SEED_SECTIONS;
+  if (!tenantWasCreated) {
+    // Preflight every section before writing any of them. If the source is
+    // unavailable, a null-like result must never let a later iteration write
+    // defaults into a customer tenant.
+    sectionsToSeed = [];
+    for (const section of SEED_SECTIONS) {
+      try {
+        const stored = await getStoredContent(section, tenantId);
+        if (stored !== null) {
+          preserved++;
+        } else {
+          sectionsToSeed.push(section);
+        }
+      } catch (err) {
+        seedFailures.push(`${section} (${err instanceof Error ? err.message : String(err)})`);
+      }
     }
   }
-  const allSeeded = seeded === SEED_SECTIONS.length;
+  if (seedFailures.length === 0) {
+    for (const section of sectionsToSeed) {
+      try {
+        await setContent(section, seedDefaults[section], tenantId);
+        seeded++;
+      } catch (err) {
+        seedFailures.push(`${section} (${err instanceof Error ? err.message : String(err)})`);
+      }
+    }
+  }
+  const allSeeded = seedFailures.length === 0;
   steps.push({
     key: "seed",
     label: "Seed starter content",
@@ -242,8 +277,10 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
     // unseeded sections fall back to read-time defaults and have no edit base.
     status: allSeeded ? "ok" : "failed",
     detail: allSeeded
-      ? `${seeded}/${SEED_SECTIONS.length} sections`
-      : `${seeded}/${SEED_SECTIONS.length} sections — failed: ${seedFailures.join(", ")}. Re-run provision to retry (safe; overwrites).`,
+      ? tenantWasCreated
+        ? `${seeded}/${SEED_SECTIONS.length} sections`
+        : `${seeded} missing sections seeded · ${preserved} existing sections preserved`
+      : `${seeded} seeded · ${preserved} existing preserved — failed: ${seedFailures.join(", ")}. Re-run provision to retry missing sections.`,
   });
 
   // 2b. Analytics config — persist the siteUrl-derived GSC property (and leave a
@@ -299,6 +336,7 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
 
   // 4. Vercel project.
   let projectId: string | null = null;
+  const projectName = `${tenantId}-site`;
   if (!isVercelConfigured()) {
     steps.push({
       key: "vercel_project",
@@ -307,17 +345,43 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
       detail: "VERCEL_API_TOKEN not set",
     });
   } else {
-    const r = await createVercelProject(`${tenantId}-site`);
+    const r = await createVercelProject(projectName);
     if (r.ok) {
       projectId = r.data.id;
       steps.push({ key: "vercel_project", label: "Create Vercel project", status: "ok", detail: r.data.name });
     } else {
-      steps.push({ key: "vercel_project", label: "Create Vercel project", status: "failed", detail: r.error });
+      // A prior run may have created the project before losing its response.
+      // Resolve the exact project identity before continuing; an existence
+      // error alone is not enough to safely configure env or domains.
+      const recovered = await getVercelProject(projectName);
+      if (recovered.ok) {
+        projectId = recovered.data.id;
+        steps.push({
+          key: "vercel_project",
+          label: "Create Vercel project",
+          status: "ok",
+          detail: `Recovered existing project ${recovered.data.name} (${recovered.data.id})`,
+        });
+      } else {
+        steps.push({
+          key: "vercel_project",
+          label: "Create Vercel project",
+          status: "failed",
+          detail: `${r.error}; project identity recovery failed: ${recovered.error}`,
+        });
+      }
     }
   }
 
   // 5. Vercel env (needs the project).
-  if (projectId) {
+  if (!revalidationSecret) {
+    steps.push({
+      key: "vercel_env",
+      label: "Set Vercel env vars",
+      status: "failed",
+      detail: "Persisted revalidation secret unavailable; refusing to configure a mismatched secret",
+    });
+  } else if (projectId) {
     const r = await setVercelEnv(projectId, clientEnv);
     steps.push(
       r.ok
@@ -346,6 +410,11 @@ export async function provisionTenant(input: ProvisionInput): Promise<ProvisionR
   }
 
   const manualNext = [
+    ...(!revalidationSecret
+      ? [
+          "CRITICAL:revalidation-secret|Restore the tenant's persisted revalidation secret|Provisioning will not rotate or guess this credential during recovery.",
+        ]
+      : []),
     // Phase: deploy — DNS + repo connect
     productionDomain
       ? `DEPLOY:dns|Point ${productionDomain} at Vercel|A 76.76.21.21 (root) or CNAME cname.vercel-dns.com (www). Verify in the Vercel dashboard.`

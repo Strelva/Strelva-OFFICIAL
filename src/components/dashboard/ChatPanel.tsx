@@ -29,6 +29,7 @@ import type { AgentResultContract, AgentResultReceipt, AgentResultStatus } from 
 import type { UnifiedEvent } from "@/lib/types";
 import type { EditableNode } from "@/lib/editor-types";
 import { formatEditablePathValue, getEditablePathValue } from "@/lib/editable-path";
+import { ConversationStreamDecoder, type ConversationStreamEvent } from "@/experience/conversation/stream";
 
 const SUGGESTION_CHIPS = [
   { label: "Add this week's update", icon: Clock, description: "Tell me what changed and I'll update the site for you" },
@@ -502,10 +503,9 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
           { id: assistantId, role: "assistant", content: "", timestamp: assistantTs },
         ]);
 
-        const decoder = new TextDecoder();
+        const streamDecoder = new ConversationStreamDecoder<AgentResultContract, { __inlineTool?: string }>();
         let fullText = "";
         let visibleText = "";
-        let buffer = "";
         let agentResult: AgentResultContract | null = null;
         let streamFinished = false;
         let finishReveal: (() => void) | null = null;
@@ -539,78 +539,41 @@ export function ChatPanel({ threadId, ownerName, onThreadCreated, variant = "ful
           }
         }, 28);
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value, { stream: true });
-          buffer += chunk;
-
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-
-          for (const line of lines) {
-            if (line.startsWith("__TOOL__")) {
-              setToolStatus(line.slice(8));
+        const applyStreamEvents = (events: ConversationStreamEvent<AgentResultContract, { __inlineTool?: string }>[]) => {
+          for (const event of events) {
+            if (event.type === "tool") {
+              setToolStatus(event.label);
               continue;
             }
-            if (line.startsWith("__RESULT__")) {
-              try {
-                agentResult = JSON.parse(line.slice(10)) as AgentResultContract;
-              } catch {
-                agentResult = null;
-              }
+            if (event.type === "result") {
+              agentResult = event.result;
               continue;
             }
-            if (line.startsWith("__TOOL_DONE__")) {
+            if (event.type === "tool-done") {
               // Consume the marker (cards are tracked via __CARD__ now).
               continue;
             }
-            if (line.startsWith("__CARD__")) {
-              try {
-                const card = JSON.parse(line.slice(8)) as { __inlineTool?: string };
-                if (card.__inlineTool) {
-                  setToolCards((prev) => [
-                    ...prev,
-                    { id: makeClientId(`card_${toolIdCounterRef.current++}`), tool: card.__inlineTool!, data: card },
-                  ]);
-                }
-              } catch {
-                // Ignore a malformed card line rather than dumping JSON into the text.
+            if (event.type === "card") {
+              const card = event.card;
+              if (card?.__inlineTool) {
+                setToolCards((prev) => [
+                  ...prev,
+                  { id: makeClientId(`card_${toolIdCounterRef.current++}`), tool: card.__inlineTool!, data: card },
+                ]);
               }
               continue;
             }
-            fullText += line + "\n";
+            fullText += event.text;
+            if (fullText) setToolStatus(null);
           }
+        };
 
-          if (
-            buffer &&
-            !buffer.startsWith("__TOOL__") &&
-            !buffer.startsWith("__TOOL_DONE__") &&
-            !buffer.startsWith("__RESULT__") &&
-            !buffer.startsWith("__CARD__")
-          ) {
-            fullText += buffer;
-            buffer = "";
-          }
-
-          if (fullText) {
-            setToolStatus(null);
-          }
-
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          applyStreamEvents(streamDecoder.push(value));
         }
-
-        if (buffer) {
-          if (buffer.startsWith("__RESULT__")) {
-            try {
-              agentResult = JSON.parse(buffer.slice(10)) as AgentResultContract;
-            } catch {
-              agentResult = null;
-            }
-          } else if (!buffer.startsWith("__TOOL__") && !buffer.startsWith("__TOOL_DONE__") && !buffer.startsWith("__CARD__")) {
-            fullText += buffer;
-          }
-        }
+        applyStreamEvents(streamDecoder.finish());
         streamFinished = true;
         await revealComplete;
         setToolStatus(null);

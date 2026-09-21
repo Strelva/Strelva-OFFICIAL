@@ -1,3 +1,4 @@
+import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/lib/workspace-location";
 /**
  * Supabase Auth callback (migration Phase 4) — redirect target for OAuth (Google)
  * and magic-link. Exchanges the `code` for a session and writes the session cookies
@@ -18,18 +19,37 @@ export const dynamic = "force-dynamic";
 
 /** Only allow same-origin relative redirects (no open-redirect via ?next=). */
 function safeNext(next: string | null): string {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) return "/account";
+  if (!next || !next.startsWith("/") || next.startsWith("//") || /[\\\u0000-\u001f]/.test(next)) return "/account";
   return next;
 }
 
 /** Bounce back to sign-in with a short, URL-safe reason tag so a failed round-trip
  *  is diagnosable from the address bar (and logged) instead of an opaque error. */
-function fail(origin: string, reason: string): NextResponse {
-  return NextResponse.redirect(`${origin}/sign-in?error=auth_callback&reason=${encodeURIComponent(reason)}`);
+function fail(origin: string, reason: string, next: string): NextResponse {
+  const retryTarget = workspaceReturnTarget(next) || accountReturnTarget(next) || workspaceInvitationReturnTarget(next);
+  const retryNext = retryTarget ? `&next=${encodeURIComponent(retryTarget)}` : "";
+  return NextResponse.redirect(`${origin}/sign-in?error=auth_callback&reason=${encodeURIComponent(reason)}${retryNext}`);
+}
+
+function callbackOrigin(request: NextRequest): string {
+  const canonical = new URL(request.url);
+  const loopbackHosts = ["localhost", "127.0.0.1", "[::1]"];
+  if (!loopbackHosts.includes(canonical.hostname)) return canonical.origin;
+  const host = request.headers.get("host");
+  if (host) {
+    try {
+      const incoming = new URL(`${canonical.protocol}//${host}`);
+      if (loopbackHosts.includes(incoming.hostname)) return incoming.origin;
+    } catch {
+      // Keep the framework-provided origin for malformed or non-local hosts.
+    }
+  }
+  return canonical.origin;
 }
 
 export async function GET(request: NextRequest) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
+  const origin = callbackOrigin(request);
   const code = searchParams.get("code");
   const next = safeNext(searchParams.get("next"));
 
@@ -38,7 +58,7 @@ export async function GET(request: NextRequest) {
   const providerError = searchParams.get("error_description") || searchParams.get("error");
   if (providerError) {
     console.error("[auth/callback] provider returned error:", providerError);
-    return fail(origin, `provider:${providerError.slice(0, 120)}`);
+    return fail(origin, `provider:${providerError.slice(0, 120)}`, next);
   }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -48,7 +68,7 @@ export async function GET(request: NextRequest) {
 
   if (!code || !url || !key) {
     console.error("[auth/callback] missing code/env", { hasCode: !!code, hasUrl: !!url, hasKey: !!key });
-    return fail(origin, !code ? "no_code" : "no_env");
+    return fail(origin, !code ? "no_code" : "no_env", next);
   }
 
   // Build the success redirect first; the Supabase client writes session cookies
@@ -80,7 +100,7 @@ export async function GET(request: NextRequest) {
       return response;
     }
     console.error("[auth/callback] exchangeCodeForSession failed:", error.message);
-    return fail(origin, `exchange:${error.message.slice(0, 120)}`);
+    return fail(origin, `exchange:${error.message.slice(0, 120)}`, next);
   }
 
   return response;

@@ -1,0 +1,117 @@
+/* Defaults live below utilities so existing className overrides stay usable. */
+@layer components {
+  .control {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .control:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  .control[aria-busy="true"] { cursor: progress; }
+
+  .small { --control-height: 2rem; --control-padding: 0.25rem; }
+  .medium { --control-height: 2.5rem; --control-padding: 0.5rem; }
+  .large { --control-height: 3rem; --control-padding: 0.75rem; }
+
+  .button {
+    min-block-size: var(--control-height);
+    padding-block: var(--control-padding);
+    padding-inline: 1rem;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+    text-align: center;
+  }
+
+  .button.small { padding-inline: 0.75rem; }
+  .outlined { box-shadow: inset 0 0 0 1px var(--gray-border); }
+  .icon { display: inline-flex; flex-shrink: 0; align-items: center; }
+
+  .iconButton {
+    min-inline-size: var(--control-height);
+    min-block-size: var(--control-height);
+    padding: 0.25rem;
+  }
+
+  .card { border-radius: 1.5rem; }
+  .cardSmall { padding: 1rem; border-radius: 1rem; }
+  .cardMedium { padding: 1.5rem; }
+  .cardLarge { padding: 2rem; }
+
+  @media (hover: hover) {
+    .cardInteractive:hover { box-shadow: inset 0 0 0 1px var(--gray-border); }
+  }
+
+  .toggle {
+    min-inline-size: 3rem;
+    min-block-size: 2.75rem;
+    padding: 0.25rem;
+    background: transparent;
+  }
+
+  .toggleSmall { min-inline-size: 2.75rem; }
+
+  .toggleTrack {
+    position: relative;
+    display: block;
+    inline-size: 2.5rem;
+    block-size: 1.5rem;
+    border-radius: 9999px;
+    pointer-events: none;
+  }
+
+  .toggleThumb {
+    position: absolute;
+    inset-block-start: 0.125rem;
+    inset-inline-start: 0.125rem;
+    inline-size: 1.25rem;
+    block-size: 1.25rem;
+    border-radius: 9999px;
+  }
+
+  .toggleSmall .toggleTrack { inline-size: 2rem; block-size: 1.25rem; }
+  .toggleSmall .toggleThumb { inline-size: 1rem; block-size: 1rem; }
+  .toggle[aria-checked="true"] .toggleThumb { inset-inline-start: calc(100% - 1.375rem); }
+  .toggleSmall[aria-checked="true"] .toggleThumb { inset-inline-start: calc(100% - 1.125rem); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .control {
+      transition: background-color 120ms, color 120ms, opacity 120ms, scale 120ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .control:not(.toggle):not([data-static]):enabled:active { scale: 0.96; }
+    .toggleTrack { transition: background-color 120ms; }
+    .toggleThumb { transition: inset-inline-start 120ms cubic-bezier(0.2, 0.8, 0.2, 1), background-color 120ms; }
+    .cardInteractive { transition: box-shadow 120ms; }
+  }
+
+  @media (pointer: coarse) {
+    .button, .iconButton { min-inline-size: 2.75rem; min-block-size: 2.75rem; }
+  }
+
+  @media (forced-colors: active) {
+    .outlined, .toggleTrack { border: 1px solid ButtonText; }
+    .toggleThumb { background: ButtonText; }
+    .toggle[aria-checked="true"] .toggleTrack { background: Highlight; }
+    .toggle[aria-checked="true"] .toggleThumb { background: HighlightText; }
+  }
+}
+
+/* Override the legacy global focus geometry without changing other controls. */
+.control.control:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+  border-radius: 0.75rem;
+}
+
+@media (forced-colors: active) {
+  .control.control:focus-visible { outline-color: Highlight; }
+}

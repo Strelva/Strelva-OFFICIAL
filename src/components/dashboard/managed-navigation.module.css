@@ -1,0 +1,14 @@
+.navigation { min-width:0; }
+.navigation h2 { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.navigation a svg,.navigation button svg { flex-shrink:0; }
+.navigation a>span { flex:1; min-width:0; }
+.navigation a>small { flex-shrink:0; font-size:12px; color:var(--gray-muted); }
+.navigation .count { margin-left:auto; font-size:12px; color:var(--accent-text); }
+.navigation .preview { color:var(--warning); }
+.operator { margin-top:16px; border-top:1px solid var(--gray-border); }
+.history { margin-top:16px; }
+.thread { display:flex; align-items:center; min-width:0; }
+.thread a { min-width:0; flex:1; }
+.thread strong,.thread small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:400; }
+.thread small { font-size:12px; color:var(--gray-muted); }
+.navigation .thread .deleteThread { flex-shrink:0; width:40px; min-height:44px; padding:8px; justify-content:center; }

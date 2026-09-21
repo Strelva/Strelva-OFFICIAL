@@ -1,79 +1,156 @@
-# Strelva Roadmap + Current State
+# Strelva roadmap and current state
 
-> The live "where are we / what's next" doc. `operating-model.md` is the
-> historical roadmap (superseded); this is current. Last updated 2026-07-30.
+Status: **current execution record**
 
-## Where the platform is (2026-07-30)
+Updated: **2026-08-01**
 
-**Mature and production-solid.** The control plane does what it needs to; the
-work now is landing and launching clients, not building more platform.
+This document answers “where are we and what happens next?” Product boundaries
+remain authoritative in `product-ontology.md`; product experiments in
+`strategy/current-product-focus.md`; GTM decisions and experiments in `gtm/`;
+production verification in `production-readiness.md`.
 
-Shipped today (all on `main`, deployed, health-verified):
-- **Full security audit + remediation** — 28 high/critical fixed, deps CVEs
-  cleared (0 high in the prod runtime), 48 docs refreshed. `noUncheckedIndexedAccess`
-  on. See `docs/audit-2026-07-30-deep-audit.md`.
-- **Lead spam gate** — content scorer on every public intake (`/api/access-request/intake`,
-  `/api/v1/leads/[tenant]`) + all client email forms (cocard/mclears/orange-crate)
-  + the scaffold starter. See `src/lib/lead-spam.ts`.
-- **Operator controls** — per-client control of everything that was client-only /
-  env-only / unsettable: report cadence, review reply mode, AI content autonomy,
-  auto-approve threshold, Google/Yelp ids, visibility trade/towns, and a
-  **per-client email override** (arm one verified client while the global switch
-  stays paused, no redeploy). Plus create-only fields (`siteUrl`/`industry`/AI
-  persona/business rules/capability manifest) now editable in `TenantEditor`.
-- **Org layer LIVE** — accounts group multiple sites under one payer for bundled
-  billing (`src/lib/accounts.ts` + `/admin/accounts`). First real account:
-  **Twin Trees** (2 sites, $300/mo bundled). See AGENTS.md "Accounts / org layer".
-- **Ops** — dropped `jacob@strelva.com` from operator email notifications.
+## Current call
 
-## Active work
+The control plane is not the bottleneck. The next proof is market and delivery:
 
-- **Twin Trees** (first multi-site account, landed): 2 locations (Fayetteville +
-  Camillus), bundled at $300/mo ($150 each), websites only.
-  - Account + both tenant records + bundled plan: **DONE** (pre-billing, tenants
-    `trialing` for dashboard access).
-  - **Noah is building the 2 repos** (the actual sites). Then: wire each to its
-    tenant (revalidation secret, domain, capability manifest) from the client
-    cockpit.
-  - **Go-live:** create the live $300 bundled Stripe subscription (one customer,
-    2 line items). The billing webhook then syncs it to the account + flips both
-    tenants `active`. Set the account contact email when known + invite the owner.
+1. finish the AI Visibility five-contact test before expanding that wedge;
+2. run one triggered managed-presence cohort with a prepared correction after
+   the scorecard result is known;
+3. land and launch current client work;
+4. unlock Managed Google Presence as wallet-share on existing clients without
+   turning it into another speculative platform.
 
-## Product expansion: Managed Google Presence add-on (SANCTIONED, decided 2026-07-31)
+Do not answer weak market pull by adding platform surface area.
 
-The one net-new build worth doing, because it's **revenue/wallet-share on existing
-clients, not product for its own sake.** A GBP-management add-on on top of the website
-subscription: **one plan, +$149/mo per location** (everything incl. geogrid), multi-location
-= the plan per location bundled on one account. NOT on the live marketing site yet — internal
-plan. Full detail: `docs/strategy/gbp-service-addon.md` + `docs/strategy/strelva-full-offering.md`.
+## Observed repository state
 
-The GBP write engine is already built; ordered path to launch:
-1. **File the Google Business Profile API access request NOW** — multi-day manual review,
-   gates everything already built. This is the critical path; start it first.
-2. **GBP performance insights** (Performance API v1) — the "what your profile did" report.
-3. **Map-pack geogrid** — lean Geogrid.dev (API-first, ~$5-10/loc); the ROI proof.
-4. Multi-location GBP roster + broader profile-field editing.
+- `main` is synchronized with `origin/main` at `34a2e4f`.
+- Local verification on 2026-08-01: typecheck passes; Vitest reports 246
+  passing files, 2,013 passing tests, and one intentional skip. Lint is red with
+  10 `no-explicit-any` errors in `scripts/inspect-tenant.ts` plus seven warnings.
+  `pnpm check:ci` stopped at lint and did not reach surface smoke.
+- `https://app.strelva.com/api/health` returned healthy on 2026-08-01, with
+  Redis, Supabase, Stripe, and Gemini all reporting `ok`. This proves provider
+  reachability at that moment, not that every route or the current commit is
+  production-verified.
+- GitHub Actions did not run the latest `main` checks. The newest Security and
+  CI jobs stopped before receiving a runner because the GitHub account reported
+  failed payments or an insufficient spending limit. Local green checks are not
+  CI evidence until that external account block is cleared and a fresh run passes.
 
-## Platform next (small, demand-driven — build when a client needs it)
+## Product state
 
-- **Go-live bundled billing** for Twin Trees (the Stripe sub above) — triggered by launch.
-- **Postgres org-layer read-flip** — the `accounts`/`subscriptions` tables are
-  applied as option value; flip account-aware reads onto them only when scale
-  (many multi-site accounts) makes the Redis store the wrong home. Not now.
+The managed-presence loop is implemented end to end:
 
-## Strategic priority (the actual roadmap)
+```text
+acquire → qualify → deliver a Site Property → observe → govern → act → prove
+```
 
-Per the Jun 17 Garrett plan: the priority is **OWSH sales + revenue — landing and launching
-clients, and deepening wallet share — not platform for its own sake.** The platform was never
-the bottleneck and now demonstrably isn't. Highest-leverage moves: (1) a signed/launched
-client (Twin Trees now), then the next one; (2) the GBP add-on, because it's more revenue per
-client you already have. Resist building an eighth admin control. Dec fork holds (OWSH
-traction -> all-in; else best job from the pipeline).
+Core implemented:
 
-## Deliberate backlog (documented, low priority)
+- AI Visibility result identity, shareability, monitoring-interest capture,
+  and Delivery Lead promotion;
+- bespoke custom-repository delivery through the additive `/api/v1` contract
+  and signed revalidation;
+- owner Today, Ask Strelva, Website, Analytics, Reports, Reviews, and Settings
+  surfaces;
+- governed content and provider actions, approval queues, versions, activity,
+  reports, billing, and operator portfolio control;
+- accounts and bundled billing for multi-site relationships through the live
+  Redis account store, with the Postgres org schema retained as expand-only
+  option value.
 
-- Audit leftovers, all low/defense-in-depth: `reb:tenants:all` decrypted-cache
-  (60s TTL), Sentry `withSentryConfig` org/project/auth-token wiring, the two
-  remaining transitive moderate advisories (OTel via Sentry). Nothing blocking.
-- Full `supabase gen types` is current as of 2026-07-30; re-run after any new
-  migration (CI-ideal: fail if `database.types.ts` older than newest migration).
+Conditionally operable:
+
+- client lifecycle and end-customer mail, which remain paused unless their
+  independent audience policies are enabled;
+- Google Business Profile writes, which are built but depend on Google API
+  approval, tenant authorization, and quota;
+- production behavior that depends on live provider configuration or data.
+
+Validation-gated:
+
+- deeper AI Visibility monitoring and live citation probing;
+- broad self-serve website building;
+- vertical operating systems, workflow catalogs, and generalized Business
+  Profiles without repeated paid or behavioral evidence.
+
+## Commercial truth
+
+- A client buys a quoted, paid custom build plus recurring management.
+- Current recurring plan keys remain Presence `$99`, Growth `$199`, and Scale
+  `$499` per month. The accepted plan and monthly amount are persisted per tenant.
+- One-time pay links collect build payments or other invoices and never imply a
+  subscription.
+- Managed Google Presence is a sanctioned add-on at `$149/month/location`, with
+  multi-location billing bundled at the account level. It is not ready to sell
+  as a complete service until the external API gate and the proof layer below
+  are complete.
+
+## Active delivery
+
+- **Twin Trees:** the repository record says the two-location account and bundled
+  `$300/month` website plan exist. The two custom sites, live Stripe subscription,
+  owner contact, and owner invite remain delivery/go-live work. Treat those as
+  recorded operator state until rechecked in the live systems.
+- **The Mooney Firm:** Jacob selected `attymooney.com` for the first native
+  website-to-business acceptance case on September 18. The live contact page
+  was inspected without submitting it. Current website source and September 8
+  release evidence belong to `/Users/jacobrhinehart/Desktop/mooney-firm-site`;
+  the older prototypes and `mooney-firm-live-inquiry` checkout are historical.
+  The selected workflow hands off to Outlook / ADR Notable and does not create
+  a Strelva case tracker. Actual mailbox receipt, approved ADR configuration and
+  customer use remain unverified. See the [work index](../todo.md).
+
+## Market experiments
+
+All six experiments in `gtm/EXPERIMENTS.md` remain queued. The immediate order is:
+
+1. **E001:** send AI Visibility scorecards to five non-friends and measure
+   forwarding, monitoring/fix requests, confusion, and managed-presence progress.
+2. Prepare three golden prepared-change receipts without contacting the market.
+3. **E006 C1:** run the 12-business seasonal home-services cohort as the only
+   direct outbound cell. Do not add AI Visibility unless E001 proves it changes
+   action.
+4. Use returned evidence to choose the next single cell. Keep advisor or host
+   recruitment bounded while C1 runs.
+5. Run the Buffalo capability-release pilot and positioning interviews as
+   separate experiments with their own success criteria. Do not blend their
+   evidence into managed-presence conversion.
+
+## Managed Google Presence launch path
+
+The existing engine already covers review ingestion, reply governance, posts,
+hours, photos, and read-back verification. The ordered launch path is:
+
+1. confirm or obtain Google Business Profile API access and usable account quota;
+2. add GBP Performance API evidence for calls, directions, views, and searches;
+3. ingest an API-capable geogrid provider for map-pack proof;
+4. add explicit multi-location account/location selection;
+5. broaden governed profile fields and only then consider scheduling depth.
+
+Do not call the add-on live because write code exists. Provider approval,
+connection state, performance evidence, and geogrid are separate completion gates.
+
+## Platform work that remains deliberately small
+
+- Remove the `any` usage from `scripts/inspect-tenant.ts` so the authoritative
+  lint and CI-faithful gates can run. Keep nested marketing/prototype build output
+  outside the root ESLint traversal or add explicit workspace ignores before
+  relying on `eslint .` in this combined local checkout.
+- Clear the GitHub Actions billing/spending block and obtain fresh CI evidence.
+- Move account reads to the Postgres org layer only when multi-site scale makes
+  the live Redis account store the wrong authority.
+- Replace remaining portfolio-wide Redis `KEYS` use in revenue reads before
+  account volume makes it operationally expensive.
+- Move heavy per-tenant cron fan-out to a real queue only when measured duration
+  approaches the Vercel limit; `mapPool` is sufficient today.
+- Re-run generated database types after every applied migration and keep the
+  current CI/readiness checks authoritative.
+
+## Documentation rule
+
+This file records current state and priorities. Dated plans and audit finding
+records remain evidence, not live backlog. When code closes a documented issue,
+update the current owning document in the same change instead of leaving a
+struck-through archaeology log.

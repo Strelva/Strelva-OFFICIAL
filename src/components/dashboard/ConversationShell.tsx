@@ -1,10 +1,16 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
-import { ShieldAlert, Menu } from "lucide-react";
-import { HistorySidebar } from "./HistorySidebar";
-import { MobileNav } from "./MobileNav";
+import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Eye, MessageCircle, ShieldAlert } from "lucide-react";
+import { useHydrationReady } from "@/experience/app-frame";
+import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
+import { MANAGED_WEBSITES_LABEL } from "@/products/managed-presence";
+import { RELATIONSHIP_STATUS_LABELS } from "@/platform/relationships";
+import { ManagedNavigation } from "./ManagedNavigation";
+import { PropertySwitcher } from "./PropertySwitcher";
 import { SectionSubNav } from "./SectionSubNav";
+import { ChatPanel } from "./ChatPanel";
 import { useDashboard } from "./DashboardContext";
 
 interface ConversationShellProps {
@@ -15,94 +21,79 @@ interface ConversationShellProps {
   accountEmail?: string | null;
   isSuperAdmin?: boolean;
   pendingCount?: number;
-  /** Whether the tenant runs a storefront — adds the Store sub-tab to the Website sub-nav. */
   hasStore?: boolean;
-  /** Super-admin inspect mode is active — show the inspect strip + preview markers. */
   inspect?: boolean;
-  /** Business name shown in the "Inspecting {name}" strip. */
   inspectTenantName?: string;
-  /** Exit-inspect link (clears the cookie, returns to the admin client page). */
   inspectExitHref?: string;
+  /** Canonical shared app origin when a managed website is on a customer host. */
+  appBase?: string;
+  signedIn?: boolean;
+  signOut?: ReactNode;
 }
 
 export function ConversationShell({
-  children,
-  businessName,
-  businessLogoUrl,
-  accountName,
-  accountEmail,
-  isSuperAdmin = false,
-  pendingCount = 0,
-  hasStore = false,
-  inspect = false,
-  inspectTenantName,
-  inspectExitHref,
+  children, businessName, accountName, accountEmail, isSuperAdmin = false,
+  pendingCount = 0, hasStore = false, inspect = false, inspectTenantName,
+  inspectExitHref, appBase = "", signedIn = true, signOut,
 }: ConversationShellProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  // Admins can preview the dashboard exactly as the client sees it — hides the
-  // admin chrome (impersonation banner + Admin badge). Cosmetic only; it changes
-  // nothing about permissions or what the API will accept.
+  // Cosmetic client preview does not change the actor or server authorization.
   const [viewAsClient, setViewAsClient] = useState(false);
-  const { impersonation } = useDashboard();
+  const [discussionOpen, setDiscussionOpen] = useState(false);
+  const hydrationReady = useHydrationReady();
+  const pathname = usePathname();
+  const discussionTriggerRef = useRef<HTMLButtonElement>(null);
+  const { dashboardBasePath, impersonation, relationship } = useDashboard();
+  const effectivePathname = dashboardBasePath && pathname?.startsWith(dashboardBasePath)
+    ? pathname.slice(dashboardBasePath.length) || "/dashboard" : pathname || "";
+  const isChatRoute = effectivePathname === "/dashboard/chat" || effectivePathname.startsWith("/dashboard/chat/");
+
+  useEffect(() => {
+    if (!isChatRoute) return;
+    const frame = window.requestAnimationFrame(() => setDiscussionOpen(false));
+    return () => window.cancelAnimationFrame(frame);
+  }, [isChatRoute]);
+
+  const relationshipLabel = relationship && relationship.status !== "user" ? RELATIONSHIP_STATUS_LABELS[relationship.status] : null;
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-surface-base text-warm-black" data-dashboard>
-      {/* Navigation sidebar */}
-      <HistorySidebar
-        businessName={businessName}
-        businessLogoUrl={businessLogoUrl}
-        accountName={accountName}
-        accountEmail={accountEmail}
-        isSuperAdmin={isSuperAdmin}
-        viewAsClient={viewAsClient}
-        onToggleViewAsClient={isSuperAdmin ? () => setViewAsClient((v) => !v) : undefined}
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-        pendingCount={pendingCount}
-        inspect={inspect}
-        inspectTenantName={inspectTenantName}
-        inspectExitHref={inspectExitHref}
-      />
-
-      {/* Main content area */}
-      <main id="main-content" className="flex-1 flex flex-col min-w-0 dashboard-gradient">
-        {impersonation.isActive && !viewAsClient && (
-          <div className="shrink-0 border-b border-warning/30 bg-warning/12 px-4 py-2 text-warning">
-            <div className="flex items-center gap-2 text-[12px]">
-              <ShieldAlert className="h-4 w-4 text-warning" strokeWidth={1.7} />
-              <span className="font-medium text-warning">Acting as Strelva admin</span>
-              <span className="hidden sm:inline text-warning/80">
-                {impersonation.actorEmail || "Super admin"} is viewing tenant {impersonation.tenantId}. Admin saves are audit logged.
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Mobile header with menu toggle */}
-        <header className="lg:hidden flex items-center gap-3 px-4 h-14 border-b border-glass-border bg-surface-base/90 backdrop-blur-xl shrink-0">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="w-10 h-10 rounded-lg flex items-center justify-center text-gray-muted hover:text-warm-black hover:bg-gray-bg transition-colors"
-            aria-label="Open navigation"
-          >
-            <Menu className="w-5 h-5" strokeWidth={1.5} />
-          </button>
-          <div className="min-w-0">
-            <span className="block text-[13px] font-medium text-warm-black leading-tight truncate">{businessName || "Dashboard"}</span>
-            <span className="block text-[11px] text-gray-muted leading-tight truncate">Strelva</span>
-          </div>
-        </header>
-
-        {/* The single Website sub-nav (Preview / Content / Media / Store / History);
-            null on every non-Website route. */}
-        <SectionSubNav hasStore={hasStore} />
-
-        {/* Content — add bottom padding on mobile for tab bar */}
-        <div className="flex-1 min-h-0 pb-16 lg:pb-0">{children}</div>
-      </main>
-
-      {/* Mobile bottom tab bar */}
-      <MobileNav pendingCount={pendingCount} />
-    </div>
+    <StrelvaShell
+      active="work"
+      title={MANAGED_WEBSITES_LABEL}
+      appBase={appBase}
+      signedIn={signedIn}
+      signOut={signOut}
+      accountName={accountName}
+      accountDetail={[accountEmail, relationshipLabel].filter(Boolean).join(" · ") || undefined}
+      context={<PropertySwitcher fallbackName={businessName} />}
+      navigation={<ManagedNavigation businessName={businessName} pendingCount={pendingCount} isSuperAdmin={isSuperAdmin} viewAsClient={viewAsClient} onToggleViewAsClient={() => setViewAsClient((value) => !value)} appBase={appBase} />}
+      contentId="main-content"
+      notice={<>
+        {inspect && <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-warning/30 bg-warning/12 px-6 py-3 text-[12px] text-warning">
+          <Eye size={16} aria-hidden="true" /><strong className="font-medium">Inspecting {inspectTenantName || businessName}</strong><span>Operator preview</span>
+          {inspectExitHref && <a className="ml-auto inline-flex min-h-10 items-center rounded-xl px-4 underline underline-offset-4" href={inspectExitHref}>Exit inspection</a>}
+        </div>}
+        {impersonation.isActive && !viewAsClient && <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-warning/30 bg-warning/12 px-6 py-3 text-[12px] text-warning">
+          <ShieldAlert size={16} aria-hidden="true" /><strong className="font-medium">Acting as Strelva admin</strong>
+          <span>{impersonation.actorEmail || "Super admin"} is viewing {businessName}. Admin saves are audit logged.</span>
+        </div>}
+      </>}
+      actions={!isChatRoute ? <button
+        ref={discussionTriggerRef} type="button" onClick={() => setDiscussionOpen((open) => !open)} disabled={!hydrationReady}
+        className="inline-flex shrink-0 items-center gap-2 border border-gray-border bg-surface-raised text-warm-black hover:border-accent/35"
+        aria-expanded={discussionOpen} aria-controls="managed-discussion"
+      ><MessageCircle size={16} aria-hidden="true" /><span>Ask Strelva</span></button> : undefined}
+      rightRail={!isChatRoute ? <OptionalManagedDiscussion open={discussionOpen} ownerName={accountName} /> : undefined}
+      rightRailOpen={!isChatRoute && discussionOpen}
+      onCloseRightRail={() => setDiscussionOpen(false)}
+      rightRailTriggerRef={discussionTriggerRef}
+    >
+      <SectionSubNav hasStore={hasStore} />
+      <div className="flex min-h-0 flex-1">{children}</div>
+    </StrelvaShell>
   );
+}
+
+/** Keep the tenant conversation dormant until requested; never mount two chats. */
+function OptionalManagedDiscussion({ open, ownerName }: { open: boolean; ownerName: string }) {
+  return open ? <ChatPanel ownerName={ownerName} variant="compact" /> : null;
 }

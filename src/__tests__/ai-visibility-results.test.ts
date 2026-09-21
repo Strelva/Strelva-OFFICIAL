@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AiVisibilityResult } from "@/lib/ai-visibility/score";
+import type { AiVisibilityResult } from "@/products/ai-visibility/contracts";
 
 const redis = vi.hoisted(() => ({
   set: vi.fn(),
@@ -15,7 +15,7 @@ import {
   getAiVisibilityResult,
   recordAiVisibilityResultView,
   saveAiVisibilityResult,
-} from "@/lib/ai-visibility/results";
+} from "@/products/ai-visibility/server";
 
 const result: AiVisibilityResult = {
   business: "Acme Plumbing",

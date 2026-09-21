@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, useMemo, type ReactNode, type Dispatch, type SetStateAction } from "react";
 import type { EditableNode } from "@/lib/editor-types";
+import { resolveRelationship, type RelationshipSnapshot } from "@/platform/relationships";
 
 type Panel = "content" | "preview" | "chat";
 type RightTab = "properties" | "chat" | "layout" | "request";
@@ -111,6 +112,10 @@ interface DashboardContextValue {
   commercialPlanLabel: string;
   commercialPlanMonthlyCents: number;
 
+  // Contextual product relationship. This is display metadata only; tenant
+  // authorization and billing guards remain server-side concerns.
+  relationship: RelationshipSnapshot;
+
   // Super-admin visibility
   impersonation: ImpersonationContext;
 
@@ -121,6 +126,8 @@ interface DashboardContextValue {
 }
 
 const DashboardContext = createContext<DashboardContextValue | null>(null);
+
+const DEFAULT_RELATIONSHIP = resolveRelationship();
 
 export function useDashboard() {
   const ctx = useContext(DashboardContext);
@@ -156,6 +163,7 @@ export function DashboardProvider({
   planOverride = null,
   commercialPlanLabel = "Growth",
   commercialPlanMonthlyCents = 19_900,
+  relationship = DEFAULT_RELATIONSHIP,
   impersonation,
   readOnly = false,
 }: {
@@ -172,6 +180,7 @@ export function DashboardProvider({
   planOverride?: PlanOverride;
   commercialPlanLabel?: string;
   commercialPlanMonthlyCents?: number;
+  relationship?: RelationshipSnapshot;
   impersonation?: ImpersonationContext;
   readOnly?: boolean;
 }) {
@@ -361,6 +370,7 @@ export function DashboardProvider({
       planOverride,
       commercialPlanLabel,
       commercialPlanMonthlyCents,
+      relationship,
       impersonation: impersonation || { isActive: false, actorEmail: null, actorName: null, isSuperAdmin: false, tenantId },
       readOnly,
     }),
@@ -373,6 +383,7 @@ export function DashboardProvider({
       editReceipts, addEditReceipts, markDraftReceipts, tenantId, siteUrl, previewUrl,
       liveSyncEnabled, dashboardBasePath, dashboardHref, siteModel, autoPublish, subscriptionStatus,
       hasStripeCustomer, planOverride, commercialPlanLabel, commercialPlanMonthlyCents, impersonation, readOnly,
+      relationship,
     ],
   );
 

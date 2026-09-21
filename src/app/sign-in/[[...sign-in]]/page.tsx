@@ -1,3 +1,4 @@
+import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/lib/workspace-location";
 import type { Metadata } from "next";
 import { SupabaseSignIn } from "@/components/auth/SupabaseSignIn";
 import { LogoFull } from "@/components/Logo";
@@ -8,10 +9,12 @@ import { getClientFallbackRoot, isClientFallbackRoot, withClientFallbackRoot } f
 import { getInvite } from "@/lib/invites";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantSiteName } from "@/lib/tenant-display";
+import { workspaceReleaseEnabled } from "@/platform/workspace-release";
+import { WorkspaceSignIn } from "@/experience/workspace/WorkspaceSignIn";
 
 export const metadata: Metadata = {
-  title: "Dashboard access",
-  description: "Sign in to a delivered Strelva dashboard, or request your build first.",
+  title: "Sign in to your Strelva work",
+  description: "Sign in to Strelva to continue your work or open your managed website.",
 };
 
 export const dynamic = "force-dynamic";
@@ -70,6 +73,14 @@ export default async function SignInPage({
   searchParams: Promise<AuthSearchParams>;
 }) {
   const params = await searchParams;
+  const workspaceOpen = workspaceReleaseEnabled();
+  const requestedNext = searchValue(params.next);
+  const workspaceTarget = workspaceReturnTarget(requestedNext);
+  const invitationTarget = workspaceOpen ? workspaceInvitationReturnTarget(requestedNext) : null;
+  const accountTarget = workspaceOpen ? accountReturnTarget(requestedNext) : null;
+  const inviteNext = workspaceTarget
+    ? `/account?next=${encodeURIComponent(workspaceTarget)}`
+    : accountTarget || "/account";
   const invite = await getInviteContext(params);
   if (invite) {
     return (
@@ -96,12 +107,14 @@ export default async function SignInPage({
           </section>
 
           <section className="rounded-[28px] border border-m-rule bg-m-paper p-5 shadow-[0_34px_120px_oklch(4%_0.01_255_/_0.42)] sm:p-6">
-            <SupabaseSignIn next="/account" prefillEmail={invite.email} />
+            <SupabaseSignIn next={inviteNext} prefillEmail={invite.email} />
           </section>
         </div>
       </main>
     );
   }
+
+  if (workspaceOpen && (workspaceTarget || invitationTarget)) return <WorkspaceSignIn next={workspaceTarget || invitationTarget!} failed={searchValue(params.error) === "auth_callback"} />;
 
   const tenantAuth = await getTenantAuthContext();
   if (tenantAuth) {
@@ -140,7 +153,7 @@ export default async function SignInPage({
 
   return (
     <main className="marketing-root min-h-dvh px-5 py-5 md:px-8">
-      <AuthDocumentTitle title="Sign in to your dashboard" />
+      <AuthDocumentTitle title="Sign in to your Strelva work" />
       <div className="relative z-10 mx-auto grid min-h-[calc(100dvh-40px)] max-w-[1120px] items-center gap-10 py-16 lg:grid-cols-[minmax(0,0.95fr)_minmax(360px,420px)]">
         <section>
           <Link
@@ -149,15 +162,16 @@ export default async function SignInPage({
           >
             <LogoFull />
           </Link>
-          <p className="mt-12 text-[14px] font-medium text-m-text-3">Dashboard access</p>
+          <p className="mt-12 text-[14px] font-medium text-m-text-3">Your Strelva work</p>
           <h1 className="mt-4 max-w-[720px] font-display text-3xl font-normal leading-[1.05] text-m-text sm:text-4xl">
-            Sign in to your dashboard.
+            Sign in to your work.
           </h1>
           <p className="mt-6 max-w-[620px] text-[16px] leading-[1.7] text-m-text-2">
-            Use the email connected to your site to open your Strelva dashboard
-            and see what is working. No site yet?{" "}
-            <Link href="/access-request" className="text-m-text underline underline-offset-2 hover:text-m-text-2">
-              Request your build
+            Use the email connected to your Strelva account to continue. If you
+            manage a Strelva website, we&apos;ll open its existing dashboard. New
+            here?{" "}
+            <Link href="/ai-visibility" className="text-m-text underline underline-offset-2 hover:text-m-text-2">
+              Try the free AI Visibility audit
             </Link>
             .
           </p>
@@ -172,7 +186,7 @@ export default async function SignInPage({
               ) : null}
             </p>
           )}
-          <SupabaseSignIn next="/account" />
+          <SupabaseSignIn next={invitationTarget || accountTarget || (workspaceOpen ? "/workspace" : "/account")} />
         </section>
       </div>
     </main>

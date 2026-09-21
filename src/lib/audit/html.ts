@@ -4,7 +4,7 @@
  * Turns an `AuditResult` into a clean, self-contained one-page HTML document
  * (inline CSS, no external assets, print-friendly) that a prospect or client
  * can be sent or print to PDF. Modeled on the AI-Visibility artifact
- * (`src/lib/ai-visibility/html.ts`) for branding consistency: muted palette,
+ * (`src/products/ai-visibility/html.ts`) for branding consistency: muted palette,
  * calm typography, no emojis, no em dashes, a single clear CTA.
  *
  * Pure function: same input -> same output, no IO, no env reads. Safe to call

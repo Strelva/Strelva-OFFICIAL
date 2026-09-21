@@ -52,6 +52,31 @@ export async function createVercelProject(
   }
 }
 
+/**
+ * Resolve a project by its exact Vercel name. Provisioning uses this after an
+ * interrupted create request: a conflict or lost response is not sufficient
+ * identity to safely attach env vars and domains, so recovery must read the
+ * provider's project id first.
+ */
+export async function getVercelProject(
+  name: string,
+): Promise<VercelResult<{ id: string; name: string }>> {
+  const token = vercelToken();
+  if (!token) return { ok: false, error: "VERCEL_API_TOKEN not set" };
+  try {
+    const res = await fetch(
+      `${VERCEL_API}/v9/projects/${encodeURIComponent(name)}${teamQuery()}`,
+      { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" },
+    );
+    if (!res.ok) return { ok: false, error: await errorMessage(res) };
+    const data = (await res.json()) as { id?: string; name?: string };
+    if (!data.id || !data.name) return { ok: false, error: "Vercel project response has no identity" };
+    return { ok: true, data: { id: data.id, name: data.name } };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "request failed" };
+  }
+}
+
 /** Set encrypted env vars on a project. Idempotent: an "already exists" key is
  *  treated as success so re-running onboarding doesn't fail. */
 export async function setVercelEnv(

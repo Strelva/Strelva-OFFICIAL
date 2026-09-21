@@ -11,6 +11,9 @@ on:
   # never enforced. No branch filter = every PR runs lint/typecheck/test/
   # coverage/build/audit/smoke before it can merge.
   pull_request:
+    # ready_for_review is explicit so the expensive browser gates run when a
+    # draft becomes reviewable; the default activity list does not include it.
+    types: [opened, synchronize, reopened, ready_for_review]
     paths-ignore: ["**.md", "docs/**", ".vscode/**", "LICENSE"]
 
 # Cancel a superseded run when new commits land on the same branch/PR. This is the
@@ -29,7 +32,7 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: 9
+          version: 10.34.5
 
       - uses: actions/setup-node@v4
         with:
@@ -43,7 +46,32 @@ jobs:
         run: pnpm lint
 
       - name: Typecheck
-        run: pnpm tsc --noEmit
+        run: pnpm typecheck
+
+      - name: Product boundaries
+        run: pnpm check:boundaries
+
+      - name: Ontology invariants
+        run: pnpm check:ontology
+
+      - name: Workspace ownership SQL
+        run: |
+          postgres_bin_dir="/opt/homebrew/opt/postgresql@18/bin"
+          if [ ! -x "$postgres_bin_dir/initdb" ]; then
+            postgres_bin_dir="$(pg_config --bindir 2>/dev/null || true)"
+          fi
+          if [ -z "$postgres_bin_dir" ] || [ ! -x "$postgres_bin_dir/initdb" ]; then
+            echo "PostgreSQL server binaries are unavailable (need initdb, pg_ctl, postgres, psql)." >&2
+            exit 1
+          fi
+          for postgres_command in initdb pg_ctl postgres psql; do
+            if [ ! -x "$postgres_bin_dir/$postgres_command" ]; then
+              echo "PostgreSQL server command is unavailable: $postgres_command" >&2
+              exit 1
+            fi
+          done
+          export PATH="$postgres_bin_dir:$PATH"
+          pnpm check:workspace-sql
 
       - name: Test (with coverage gate)
         run: pnpm test:coverage
@@ -61,17 +89,18 @@ jobs:
       # The Playwright e2e smoke (~2.5 min, the most expensive part) runs only on a
       # NON-DRAFT pull request. It skips draft-PR pushes (iterate cheaply — fast
       # checks only) and main pushes (the PR already validated the same squashed
-      # tree). lint/typecheck/vitest/build above still run on every event. Mark a PR
-      # "ready for review" to run the e2e gate before merge.
+      # tree). lint/typecheck/vitest/build above still run on every event. The
+      # ready_for_review activity is listed above so marking a draft ready runs the
+      # e2e gate before merge.
       - name: Cache Playwright browsers
-        if: github.event.pull_request.draft == false
+        if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
         id: playwright-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
       - name: Install Playwright browsers
-        if: github.event.pull_request.draft == false
+        if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
         # On a cache hit only install the OS deps (fast); the ~100MB chromium
         # download is restored from cache. On a miss, install both.
         run: |
@@ -82,21 +111,23 @@ jobs:
           fi
 
       - name: Smoke tests
-        if: github.event.pull_request.draft == false
-        # Runs against `next dev` (see playwright.config.ts). Dev mode is
-        # deliberate: it tolerates a missing Clerk key (prod `next start` throws
-        # "Missing publishableKey" with no auth env) and keeps the lenient
-        # content/tenant dev-file fallbacks the public-route tests rely on. The
-        # webServer timeout in playwright.config.ts is sized for cold Turbopack
-        # compile on a CI runner.
+        if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+        # Runs against `next dev` (see playwright.config.ts), matching the
+        # fixture-backed public/auth-gate route harness. It does not contact a
+        # production provider. The webServer timeout is sized for cold
+        # Turbopack compile on a CI runner.
         run: pnpm smoke
+
+      - name: Workspace browser acceptance (fixture-backed)
+        if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+        run: pnpm smoke:workspace
         env:
           CI: true
           SCAFFOLD_DEV_UNGATED_ACCESS: "0"
           REB_DEV_UNGATED_ACCESS: "0"
 
       - name: Surface smoke
-        if: github.event.pull_request.draft == false
+        if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
         # Ungated console coverage — needs the dev super-admin bypass ON
         # (REB_DEV_UNGATED_ACCESS=1 + REB_DEV_TENANT=gldf, set by smoke:surfaces) to
         # reach the /admin console and resolve the owner dashboard, whereas the public
@@ -111,7 +142,34 @@ jobs:
         # DB/Redis/prod access. (Re-enabled once the `font-display` @utility replaced
         # the arbitrary `font-[family-name:...]` class that crashed Turbopack dev.)
         run: |
-          cp tests/fixtures/tenants.fixture.json dev-tenants.json
+          fixture="dev-tenants.json"
+          backup="$(mktemp)"
+          had_fixture=0
+          if [ -e "$fixture" ] || [ -L "$fixture" ]; then
+            cp -a -- "$fixture" "$backup"
+            had_fixture=1
+          fi
+          restore_fixture() {
+            status=$?
+            trap - EXIT INT TERM HUP
+            set +e
+            cleanup_status=0
+            rm -f -- "$fixture" || cleanup_status=$?
+            if [ "$had_fixture" -eq 1 ]; then
+              cp -a -- "$backup" "$fixture" || cleanup_status=$?
+            fi
+            rm -f -- "$backup" || cleanup_status=$?
+            if [ "$status" -eq 0 ] && [ "$cleanup_status" -ne 0 ]; then
+              status="$cleanup_status"
+            fi
+            exit "$status"
+          }
+          trap restore_fixture EXIT
+          trap 'exit 129' HUP
+          trap 'exit 130' INT
+          trap 'exit 143' TERM
+          rm -f -- "$fixture"
+          cp tests/fixtures/tenants.fixture.json "$fixture"
           pnpm smoke:surfaces
         env:
           CI: true

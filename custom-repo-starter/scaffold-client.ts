@@ -144,6 +144,11 @@ export const scaffoldRoutes = {
     `/api/${SCAFFOLD_CONTRACT_VERSION}/page-config/${tenant}`,
   publicSiteCapabilities: (tenant: string) =>
     `/api/${SCAFFOLD_CONTRACT_VERSION}/site-capabilities/${tenant}`,
+  /** Published native booking capability. The route never exposes provider or workspace identifiers. */
+  publicBooking: (tenant: string) =>
+    `/api/${SCAFFOLD_CONTRACT_VERSION}/bookings/${tenant}`,
+  publicBookingReservations: (tenant: string) =>
+    `/api/${SCAFFOLD_CONTRACT_VERSION}/bookings/${tenant}/reservations`,
   publicTrack: (tenant: string) =>
     `/api/${SCAFFOLD_CONTRACT_VERSION}/track/${tenant}`,
   publicCollection: (tenant: string, type: string) =>

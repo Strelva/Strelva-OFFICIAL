@@ -274,7 +274,7 @@ export function AssetPickerModal({ open, onClose, onSelect }: AssetPickerModalPr
                   <p className="text-sm text-gray-muted mb-3">No photos yet</p>
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-sage text-white text-[13px] font-medium hover:bg-sage/90 transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-accent text-on-accent text-[13px] font-medium hover:bg-accent/90 transition-colors"
                   >
                     <Upload className="w-4 h-4" strokeWidth={1.5} />
                     Upload your first photo

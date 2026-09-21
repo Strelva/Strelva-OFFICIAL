@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAiVisibilityResult } from "@/lib/ai-visibility/results";
+import { getAiVisibilityResult } from "@/products/ai-visibility/server";
 import {
   createDeliveryStatusToken,
   getExistingLeadToken,
