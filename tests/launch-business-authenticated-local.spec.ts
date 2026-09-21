@@ -34,9 +34,11 @@ for (const width of [1440, 390]) {
     const repeated=await owner.context.request.post("/api/workspace/businesses",{headers:{origin:env.app},data:setupCommand});
     expect(repeated.status(),await repeated.text()).toBe(200);
     expect(await repeated.json()).toMatchObject({workspaceId:businessId,requestId:null,alreadyCreated:true});
-    expect((await stranger.context.request.get(`/api/workspace?workspaceId=${businessId}`)).status()).toBe(403);
+    // The existing workspace contract hides an unavailable workspace's existence.
+    const strangerWorkspace=await stranger.context.request.get(`/api/workspace?workspaceId=${businessId}`);
+    expect(strangerWorkspace.status()).toBe(404);
+    expect(await strangerWorkspace.json()).toEqual({error:"Workspace unavailable."});
 
-    // Use the actual native app service, with no model or website purchase.
     const appResponse=await owner.context.request.post("/api/bounded-work",{headers:{origin:env.app},data:{action:"create",productId:"applications",workspaceId:businessId,input:{title:"Team requests",fields:[{id:"request",label:"Request",type:"text",required:true}],components:[{kind:"form",fields:["request"]},{kind:"list",fields:["request"]}]}}});
     expect(appResponse.status(),await appResponse.text()).toBe(201);
     const app=await appResponse.json();
