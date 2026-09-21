@@ -84,9 +84,22 @@ for (const width of [1440, 390]) {
     // Represents an agency-built site; this fixture is not a live deployment.
     const tenant=await admin.from("tenants").insert({id:tenantId,site_name:"Local review website",active:true}).select("stable_id").single();
     expect(tenant.error).toBeNull();
-    const bindingId=randomUUID();
-    const binding=await admin.from("offering_website_bindings").insert({id:bindingId,business_workspace_id:businessId,tenant_stable_id:tenant.data!.stable_id,tenant_id_at_binding:tenantId,site_name_at_binding:"Local review website",idempotency_key:randomUUID(),command_digest:"a".repeat(64),created_by:owner.userId,updated_by:owner.userId});
-    expect(binding.error).toBeNull();
+    const bindingCommand={action:"bind_managed_website",businessId,tenantId,idempotencyKey:randomUUID()};
+    // A business owner is not automatically the owner of an existing website.
+    // Exercise the real HTTP/RPC boundary instead of granting direct table access.
+    const unowned=await owner.context.request.post("/api/offerings/websites",{headers:{origin:env.app},data:bindingCommand});
+    expect(unowned.status(),await unowned.text()).toBe(403);
+    const membership=await admin.from("memberships").insert({user_id:owner.userId,tenant_id:tenantId,role:"owner"});
+    expect(membership.error).toBeNull();
+    const binding=await owner.context.request.post("/api/offerings/websites",{headers:{origin:env.app},data:bindingCommand});
+    expect(binding.status(),await binding.text()).toBe(200);
+    const bindingId=(await binding.json()).websiteBinding.id as string;
+    expect(bindingId).toMatch(/^[a-f0-9-]{36}$/);
+    const repeatedBinding=await owner.context.request.post("/api/offerings/websites",{headers:{origin:env.app},data:bindingCommand});
+    expect(repeatedBinding.status(),await repeatedBinding.text()).toBe(200);
+    expect((await repeatedBinding.json()).websiteBinding.id).toBe(bindingId);
+    const unrelatedBinding=await stranger.context.request.post("/api/offerings/websites",{headers:{origin:env.app},data:bindingCommand});
+    expect(unrelatedBinding.status(),await unrelatedBinding.text()).toBe(403);
     await operatorPage.reload();
     await operatorPage.getByLabel("Customer website",{exact:true}).selectOption(bindingId);
     await operatorPage.getByLabel("Repository, owner/name",{exact:true}).fill("example/local-proof-site");
