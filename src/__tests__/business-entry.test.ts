@@ -1,0 +1,21 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { businessEntryInputSchema } from "@/platform/workspaces/business-entry-contract";
+import { enterCustomerBusiness } from "@/platform/workspaces/business-entry";
+import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError } from "@/platform/workspaces/types";
+const mocks = vi.hoisted(() => ({ rpc: vi.fn(), available: true }));
+vi.mock("@/lib/db/client", () => ({ getSupabase: () => mocks.available ? { rpc: mocks.rpc } : null }));
+const actor = { userId: "b9100000-0000-4000-8000-000000000001", verifiedEmail: "Owner@Example.test" };
+const id = "b9100000-0000-4000-8000-000000000002";
+const input = { destination: {kind:"new",name:"Juniper"}, initialRequest:"Have Strelva build our website.", idempotencyKey:"b9100000-0000-4000-8000-000000000003" };
+beforeEach(() => { mocks.available=true; mocks.rpc.mockReset().mockResolvedValue({data:{workspaceId:id,requestId:null,alreadyCreated:false},error:null}); });
+describe("ordinary customer business entry",()=>{
+  it("uses one actor-bound RPC for ownership and the optional request", async()=>{await enterCustomerBusiness(actor,input);expect(mocks.rpc).toHaveBeenCalledOnce();expect(mocks.rpc.mock.calls[0]).toMatchObject(["enter_customer_business",{p_user_id:actor.userId,p_verified_email:"owner@example.test",p_name:"Juniper",p_business_id:null,p_request_text:input.initialRequest,p_command_id:input.idempotencyKey}]);});
+  it("preserves command digest for retries, changes it when request or actor changes",async()=>{await enterCustomerBusiness(actor,input);await enterCustomerBusiness(actor,input);await enterCustomerBusiness(actor,{...input,initialRequest:"Another request"});await enterCustomerBusiness({...actor,userId:id},input);const hashes=mocks.rpc.mock.calls.map(c=>c[1].p_command_digest);expect(hashes[0]).toBe(hashes[1]);expect(new Set(hashes).size).toBe(3);});
+  it("selects an existing business without implicitly creating another",async()=>{await enterCustomerBusiness(actor,{...input,destination:{kind:"existing",workspaceId:id},initialRequest:null});expect(mocks.rpc.mock.calls[0]![1]).toMatchObject({p_business_id:id,p_name:null,p_request_text:null});});
+  it.each([{...input,destination:{kind:"new",name:" "}}, {...input,destination:{kind:"existing",workspaceId:"bad"}}, {...input,idempotencyKey:"bad"}, {...input,initialRequest:"x".repeat(3001)}, {...input,destination:{kind:"new",name:"Business",role:"owner"}}, {...input,provider:{kind:"agency"}}])("rejects malformed or expanded inputs before storage",async raw=>{expect(businessEntryInputSchema.safeParse(raw).success).toBe(false);await expect(enterCustomerBusiness(actor,raw)).rejects.toThrow();expect(mocks.rpc).not.toHaveBeenCalled();});
+  it("does not invent storage when unconfigured",async()=>{mocks.available=false;await expect(enterCustomerBusiness(actor,input)).rejects.toBeInstanceOf(WorkspaceStoreError);});
+  it.each(["verified_identity_required","service_request_access_denied"])("fails closed for %s",async message=>{mocks.rpc.mockResolvedValue({data:null,error:{message}});await expect(enterCustomerBusiness(actor,input)).rejects.toBeInstanceOf(WorkspaceAccessError);});
+  it.each(["workspace_limit_reached","business_entry_idempotency_conflict","workspace_exit_future_work_blocked"])("preserves conflict %s",async message=>{mocks.rpc.mockResolvedValue({data:null,error:{message}});await expect(enterCustomerBusiness(actor,input)).rejects.toBeInstanceOf(WorkspaceConflictError);});
+  it("rejects malformed success instead of assuming ownership",async()=>{mocks.rpc.mockResolvedValue({data:{workspaceId:"bad"},error:null});await expect(enterCustomerBusiness(actor,input)).rejects.toBeInstanceOf(WorkspaceStoreError);});
+  it("does not leak backend error details",async()=>{mocks.rpc.mockResolvedValue({data:null,error:{message:"secret database details"}});await expect(enterCustomerBusiness(actor,input)).rejects.not.toThrow("secret database details");});
+});

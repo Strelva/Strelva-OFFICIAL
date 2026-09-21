@@ -24,9 +24,9 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-for command_name in initdb pg_ctl psql; do
+for command_name in initdb pg_ctl psql grep; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
-    printf 'Required PostgreSQL command is unavailable: %s\n' "$command_name" >&2
+    printf 'Required upgrade-check command is unavailable: %s\n' "$command_name" >&2
     exit 1
   fi
 done
@@ -119,7 +119,7 @@ if psql "${psql_args[@]}" --single-transaction --file="$repo_root/supabase/migra
   printf 'The workspace migration unexpectedly ran twice.\n' >&2
   exit 1
 fi
-if ! rg -q "already exists|duplicate" "$rerun_log"; then
+if ! grep -Eq "already exists|duplicate" "$rerun_log"; then
   cat "$rerun_log" >&2
   printf 'The expected migration rerun failure was not observed.\n' >&2
   exit 1
@@ -132,5 +132,7 @@ fi
 printf 'Expected migration rerun rejection preserved the applied schema.\n'
 
 psql "${psql_args[@]}" --file="$schema_test"
+psql "${psql_args[@]}" --file="$repo_root/tests/service-delivery-commitments-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/customer-business-entry-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

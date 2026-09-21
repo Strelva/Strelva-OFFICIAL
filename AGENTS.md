@@ -12,6 +12,16 @@ Keep public presentation and client-specific frontend behavior with their owners
 Company and cross-product decisions remain in the workspace context; this
 repository does not define Strelva's unresolved Custom Software offering.
 
+## September 21 implementation scope
+
+Keep agency website delivery and independent native tools in the same customer
+business. A service request must not become a self-service generation assignment.
+Native apps and onboarding do not require a website purchase. Reuse the existing
+client-repository, workspace, native-product and authority paths. A 24-hour service
+requires an explicitly accepted scope and deadline; a request is not acceptance.
+This implementation direction does not authorize deployment, billing, provider
+calls, hosted migrations or changes to existing customer agreements.
+
 ## Start with the existing records
 
 Read [CONTEXT.md](./CONTEXT.md) for current scope, evidence and release attention.

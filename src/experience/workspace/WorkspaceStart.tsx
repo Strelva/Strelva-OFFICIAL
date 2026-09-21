@@ -26,7 +26,9 @@ export interface WorkspaceStartProps {
 }
 
 const EXAMPLES = [
-  { label: "Create my website", request: "Create a website for my business.", icon: Globe2 },
+  { label: "Create a staff request app", request: "Create a staff request app for our team.", icon: Table2 },
+  { label: "Organize onboarding", request: "Organize supplier onboarding requirements.", icon: FileText },
+  { label: "Have Strelva build my website", request: "Have Strelva build a website for my business.", icon: Globe2 },
   { label: "Handle customer inquiries", request: "We need a better way to handle customer inquiries and follow up when nobody replies.", icon: MessageSquareText },
   { label: "Turn a file into a tracker", request: "Turn my spreadsheet into a tracker I can filter and keep up to date.", icon: Table2 },
   { label: "Check a business", request: "Help me see what AI can understand about my business.", icon: FileSearch },
@@ -128,6 +130,11 @@ export function WorkspaceStart({ context, initialRequest = "", websiteHandoff = 
 
   function continueToSupportedFlow() {
     if (!plan) return;
+    if (plan.deliveryMode === "service") {
+      if (context.readOnly || context.native?.help === false || !plan.canContinue) return;
+      onHelp(plan.helpRequest || plan.request);
+      return;
+    }
     if (plan.kind === "help") {
       if (!plan.canContinue) {
         onHelp(plan.helpRequest || plan.request);
@@ -141,7 +148,7 @@ export function WorkspaceStart({ context, initialRequest = "", websiteHandoff = 
       onHelp(plan.helpRequest || plan.request);
       return;
     }
-    const continuation = createWorkspaceStartContinuation(plan, selectedPartIds, { businessId: businessId || undefined, siteId: siteId || undefined, trackerTemplateId: trackerTemplateId || undefined });
+    const continuation = createWorkspaceStartContinuation(plan, selectedPartIds, { businessId: businessId || undefined, siteId: siteId || undefined, trackerTemplateId: trackerTemplateId || undefined }, context);
     if (!continuation) {
       setError(plan.needsSelection === "business" ? "Choose the business this work concerns." : plan.needsSelection === "site" ? "Choose the website this work concerns." : "Keep the required parts selected before continuing.");
       return;
@@ -152,7 +159,7 @@ export function WorkspaceStart({ context, initialRequest = "", websiteHandoff = 
   const canContinue = plan?.kind === "help"
     ? plan.canContinue
     : plan?.status === "ready" && (!plan.needsSelection || (plan.needsSelection === "business" ? Boolean(businessId) : Boolean(siteId)));
-  const canPreparePlan = Boolean(onPlan) && !context.readOnly;
+  const canPreparePlan = Boolean(onPlan) && !context.readOnly && plan?.deliveryMode !== "service";
   function preparePlan() {
     if (!plan || !canPreparePlan) return;
     onPlan?.(plan.request, plan);
@@ -164,7 +171,7 @@ export function WorkspaceStart({ context, initialRequest = "", websiteHandoff = 
   return <div className={styles.startPage} data-workspace-start>
     <header className={styles.startHeader}>
       <p className={styles.eyebrow}>New work</p>
-      <h1>What should Strelva try?</h1>
+      <h1>What does your business need?</h1>
       <p>Describe the result in your own words. You can review what Strelva proposes before any work starts.</p>
     </header>
 
@@ -185,14 +192,14 @@ export function WorkspaceStart({ context, initialRequest = "", websiteHandoff = 
       <p className={styles.startProposalSummary}>{plan.summary}</p>
       {plan.kind === "help" ? <p className={styles.startRequestEcho}><strong>Your request stays intact:</strong> <span>{plan.request}</span></p> : null}
       <p className={styles.startNextAction}><strong>Next:</strong> {plan.nextAction}</p>
-        {plan.kind === "help" ? <><div className={styles.startHelp}><CircleHelp size={17} aria-hidden="true" /><p><strong>Here are the workspace paths to consider.</strong> Strelva can assess a business, turn a CSV into a tracker, handle inquiries for an authorized business, open work on a connected managed website, start a private document, build an application, set up scheduling, compare saved sources, or carry a bounded responsibility. No work has started from this request. {context.readOnly ? "Switch to a workspace you own before preparing a plan." : "You can ask about the closest path when none of these fits."}</p></div>{plan.reason ? <div className={styles.startBlocked} role="status"><CircleHelp size={17} aria-hidden="true" /><p>{plan.reason}</p></div> : null}</> : <>
+        {plan.kind === "help" ? <><div className={styles.startHelp}><CircleHelp size={17} aria-hidden="true" /><p><strong>Here are the workspace paths to consider.</strong> Strelva can assess a business, turn a CSV into a tracker, handle inquiries for an authorized business, open work on a connected managed website, start a private document, organize onboarding requirements, build an application, set up scheduling, compare saved sources, or carry a bounded responsibility. No work has started from this request. {context.readOnly ? "Switch to a workspace you own before preparing a plan." : "You can ask about the closest path when none of these fits."}</p></div>{plan.reason ? <div className={styles.startBlocked} role="status"><CircleHelp size={17} aria-hidden="true" /><p>{plan.reason}</p></div> : null}</> : <>
         <div className={styles.startParts} aria-label="Proposed shape">{plan.parts.map((part) => renderPart(part, selectedPartIds.includes(part.id), () => togglePart(part.id), `${formId}-${part.id}`))}</div>
         {selection ? <label className={styles.startSelect} htmlFor={`${formId}-selection`}><span>{selection}</span><select id={`${formId}-selection`} value={plan.needsSelection === "business" ? businessId : siteId} onChange={(event) => plan.needsSelection === "business" ? setBusinessId(event.target.value) : setSiteId(event.target.value)} required><option value="">Choose one</option>{(plan.needsSelection === "business" ? selectedBusiness : selectedSites).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label> : null}
         {templates.length ? <label className={styles.startSelect} htmlFor={`${formId}-template`}><span>Starting shape <small>Optional</small></span><select id={`${formId}-template`} value={trackerTemplateId} onChange={(event) => setTrackerTemplateId(event.target.value)}><option value="">Start from a blank tracker</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.label}</option>)}</select></label> : null}
         {plan.status === "blocked" ? <div className={styles.startBlocked} role="status"><CircleHelp size={17} aria-hidden="true" /><p>{plan.reason}</p></div> : null}
       </>}
       {error ? <p className={styles.startError} role="alert">{error}</p> : null}
-      <div className={styles.startProposalActions}>{plan.kind === "help" ? <><button type="button" className={styles.primaryAction} disabled={!canContinue} onClick={continueToSupportedFlow}>Prepare a plan<ArrowRight size={16} /></button><button type="button" className={styles.secondaryAction} onClick={() => onHelp(plan.helpRequest || plan.request)}>Ask about available paths<ArrowRight size={16} /></button></> : plan.status === "blocked" ? <>{canPreparePlan ? <button type="button" className={styles.primaryAction} onClick={preparePlan}>Prepare a plan<ArrowRight size={16} /></button> : null}<button type="button" className={styles.secondaryAction} onClick={continueToSupportedFlow}>Ask about this path<ArrowRight size={16} /></button></> : <><button type="button" className={styles.primaryAction} disabled={!canContinue} onClick={continueToSupportedFlow}>{workspaceStartContinueLabel(plan)}<ArrowRight size={16} /></button>{canPreparePlan ? <button type="button" className={styles.secondaryAction} onClick={preparePlan}>Prepare a plan<ArrowRight size={16} /></button> : null}</>}</div>
+      <div className={styles.startProposalActions}>{plan.kind === "help" ? <><button type="button" className={styles.primaryAction} disabled={!canContinue} onClick={continueToSupportedFlow}>{plan.deliveryMode === "service" ? "Review website request" : "Prepare a plan"}<ArrowRight size={16} /></button><button type="button" className={styles.secondaryAction} onClick={() => onHelp(plan.helpRequest || plan.request)}>Ask about available paths<ArrowRight size={16} /></button></> : plan.status === "blocked" ? <>{canPreparePlan ? <button type="button" className={styles.primaryAction} onClick={preparePlan}>Prepare a plan<ArrowRight size={16} /></button> : null}<button type="button" className={styles.secondaryAction} onClick={continueToSupportedFlow}>Ask about this path<ArrowRight size={16} /></button></> : <><button type="button" className={styles.primaryAction} disabled={!canContinue} onClick={continueToSupportedFlow}>{workspaceStartContinueLabel(plan)}<ArrowRight size={16} /></button>{canPreparePlan ? <button type="button" className={styles.secondaryAction} onClick={preparePlan}>Prepare a plan<ArrowRight size={16} /></button> : null}</>}</div>
       {plan.status === "blocked" && context.readOnly ? <p className={styles.startFootnote}>Use the workspace selector above to switch to a workspace you own. No work has been created.</p> : null}
     </section> : null}
   </div>;

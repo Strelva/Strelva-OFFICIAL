@@ -4,6 +4,8 @@ import { SupabaseSignIn } from "@/components/auth/SupabaseSignIn";
 import { LogoFull } from "@/components/Logo";
 import Link from "next/link";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { getSessionUser } from "@/lib/db/server-client";
 import { AuthDocumentTitle } from "@/components/AuthDocumentTitle";
 import { getClientFallbackRoot, isClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
 import { getInvite } from "@/lib/invites";
@@ -112,6 +114,17 @@ export default async function SignInPage({
         </div>
       </main>
     );
+  }
+
+  // Public product starts also serve returning customers. Revalidate the user
+  // with Auth before continuing; cookie presence is not authentication. Keep
+  // explicit email selection and callback failure on the sign-in surface.
+  // The bounded destination still performs its own resource authorization.
+  const resumeTarget = workspaceTarget || invitationTarget || accountTarget;
+  if (workspaceOpen && resumeTarget && typeof params.next === "string"
+    && params.email === undefined && params.error === undefined) {
+    const user = await getSessionUser().catch(() => null);
+    if (user?.id && user.email && user.email_confirmed_at) redirect(resumeTarget);
   }
 
   if (workspaceOpen && (workspaceTarget || invitationTarget)) return <WorkspaceSignIn next={workspaceTarget || invitationTarget!} failed={searchValue(params.error) === "auth_callback"} />;

@@ -39,9 +39,15 @@ Use **The Mooney Firm, attymooney.com**, as the default product example and
 walkthrough from now on. The [website release focus](./docs/horizontal-product-brief-2026-09-11.md#september-20-website-release-focus)
 records this choice and links its existing customer acceptance requirements.
 
-Jacob's latest direction makes websites the main current commercial focus and
-self-service the primary experience. The [website release focus](./docs/horizontal-product-brief-2026-09-11.md#september-20-website-release-focus)
-owns that decision. Read the [website release review](./docs/strelvav2-horizontal-acceptance.md#website-release-review)
+Jacob's September 21 direction keeps Strelva's agency website delivery and
+independently useful native business tools in the same product. A customer who
+hires Strelva must not have to build the website themselves. A native-tool user
+must not need a website purchase. The agency intends a 24-hour website offer;
+its accepted scope, clock start and delivery definition still require explicit
+commercial selection before publication. No price, refund or unlimited-work
+policy is implied. The September 20
+[website release focus](./docs/horizontal-product-brief-2026-09-11.md#september-20-website-release-focus)
+is historical where it makes self-service websites the primary release gate. Read the [website release review](./docs/strelvav2-horizontal-acceptance.md#website-release-review)
 for the distinction between existing managed sites, new customer creation and
 outside-site connection. The subsequent [self-service implementation record](./docs/strelvav2-horizontal-acceptance.md#self-service-website-implementation-follow-through)
 records the working local creation, private preview, approval and downloadable
@@ -55,7 +61,7 @@ Unreleased candidate. The [current execution record](./docs/strelvav2-horizontal
 owns the latest implementation and verification state; [the completion plan](./todo.md#september-19-completion-plan)
 separates local work from operating and production requirements.
 
-The [September 16 transition and hypotheses](./docs/horizontal-product-brief-2026-09-11.md#september-16-transition-and-hypotheses)
+The September 16 [transition and hypotheses](./docs/horizontal-product-brief-2026-09-11.md#september-16-transition-and-hypotheses)
 explain the move from hiring Strelva for defined delivery toward using a product
 to improve and operate business work. Improving existing work and enabling
 previously unaffordable work are equally part of the direction. The

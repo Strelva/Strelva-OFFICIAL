@@ -23,6 +23,7 @@ import type { WorkspaceSnapshot } from "./contracts";
 import type { ManagedWorkSummary } from "./workspace-discovery";
 import { BusinessOfferingSummary, WebsiteAssignmentHandoff, type WorkspaceOfferingState } from "./WorkspaceOfferings";
 import { WorkspaceAllowanceSummary } from "./WorkspaceAllowanceSummary";
+import { useBusinessDeliveries } from "./useBusinessDeliveries";
 import { workspaceHome } from "./workspace-home";
 import { workspaceWorkLabel } from "./work-label";
 import styles from "./business-home.module.css";
@@ -108,6 +109,13 @@ export function BusinessHome({
   const readOnly = current?.access === "delegated_read";
   const name = current?.name || "Your business";
   const home = workspaceHome(snapshot.work);
+  const deliveryScope = current?.kind === "customer" && !readOnly && ["owner", "admin"].includes(current.role || "") ? snapshot.workspaceId : undefined;
+  const deliveries = useBusinessDeliveries(deliveryScope);
+  const deliveryItems = deliveries.state.status === "ready" ? deliveries.state.items : [];
+  const deliveryAttention = deliveryItems.filter(item => item.attention);
+  const attentionCount = home.attention.length + deliveryAttention.length;
+  const deliveryPending = deliveries.state.status === "loading";
+  const deliveryUnavailable = deliveries.state.status === "error";
   const initials = name
     .split(/\s+/)
     .slice(0, 2)
@@ -116,6 +124,10 @@ export function BusinessHome({
     .toUpperCase();
 
   const destinations: Destination[] = [
+    ...deliveryItems.filter(item => item.attention || item.handling).map(item => ({
+      id: `delivery-${item.id}`, title: item.title, detail: item.detail,
+      kind: item.attention ? "attention" : "operations", open: () => window.location.assign(item.href),
+    })),
     ...home.attention.map(({ work, reason }) => ({
       id: `attention-${work.id}`,
       title: work.title,
@@ -143,13 +155,14 @@ export function BusinessHome({
     `${item.title} ${item.detail}`.toLowerCase().includes(search.toLowerCase()),
   );
   const starters: Destination[] = [
-    ...(onCreateWebsite ? [{ id: "website", title: "Create your website", detail: "Describe your business and review a draft", kind: "website", open: onCreateWebsite }] : []),
+    { id: "agency-website", title: "Have Strelva build your website", detail: "Review scope and delivery before work starts", kind: "website", open: () => onRequest ? onRequest("Have Strelva build our website.") : onHelp() },
+    ...(onCreateWebsite ? [{ id: "website", title: "Create your website", detail: "Prepare a self-service draft instead", kind: "website", open: onCreateWebsite }] : []),
     { id: "application", title: "Create an application", detail: "Build something people can use", kind: "applications", open: onStart },
-    { id: "document", title: "Create a document", detail: "Make a useful work product", kind: "documents", open: onStart },
+    { id: "onboarding", title: "Organize onboarding", detail: "Keep requirements and private documents together", kind: "documents", open: () => onRequest ? onRequest("Organize supplier onboarding requirements.") : onStart() },
     { id: "ongoing", title: "Set up ongoing work", detail: "Create a repeatable check", kind: "operations", open: onStart },
     { id: "people", title: "Invite your team", detail: "Give people the access they need", kind: "people", open: onAccess },
   ];
-  const sceneItems = visible.length || destinations.length || readOnly || search ? visible.slice(0, 6) : starters;
+  const sceneItems = visible.length || destinations.length || readOnly || search ? visible.slice(0, 6) : starters.slice(0, 6);
   function icon(kind: string) {
     const Icon = kind === "website"
       ? Globe2
@@ -225,7 +238,7 @@ export function BusinessHome({
           <header className={styles.topbar}>
             <button ref={menuRef} className={styles.menu} aria-label={navigationOpen ? "Close navigation" : "Open navigation"} aria-expanded={navigationOpen} onClick={() => setNavigationOpen(!navigationOpen)}><LayoutGrid size={20} /></button>
             <label className={styles.search}><Search size={17} aria-hidden="true" /><input ref={searchRef} aria-label="Find your work" placeholder="Search your business and work…" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
-            <button className={styles.iconButton} aria-label="See work needing attention" onClick={() => { attentionRef.current?.scrollIntoView({ block: "center" }); attentionRef.current?.focus(); }}><Bell size={19} />{home.attention.length > 0 && <span className={styles.notificationDot} />}</button>
+            <button className={styles.iconButton} aria-label="See work needing attention" onClick={() => { attentionRef.current?.scrollIntoView({ block: "center" }); attentionRef.current?.focus(); }}><Bell size={19} />{attentionCount > 0 && <span className={styles.notificationDot} />}</button>
             <a className={styles.avatar} href={accountHref} aria-label={`${snapshot.actor.email.split("@")[0]} ${snapshot.actor.email}`}>{initials}</a>
           </header>
           {notice}
@@ -311,7 +324,7 @@ export function BusinessHome({
                 <form className={styles.composer} onSubmit={submit}>
                   <span className={styles.spark}><LogoMark className={styles.composerMark} /></span>
                   <label className={styles.srOnly} htmlFor="home-request">What would you like to work on today?</label>
-                  <input id="home-request" placeholder="Tell Strelva what your business needs…" value={request} onChange={(event) => setRequest(event.target.value)} disabled={busy} />
+                  <input id="home-request" placeholder="Tell Strelva what your business needs…" maxLength={3000} value={request} onChange={(event) => setRequest(event.target.value)} disabled={busy} />
                   <button className={styles.suggestion} type="button" onClick={() => setRequest("Build an application for my team")}>Build an app</button>
                   <motion.button className={styles.submit} type="submit" disabled={!request.trim() || busy} aria-label="Continue with this request" whileTap={reduceMotion ? undefined : { transform: "scale(0.96)" }} transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}><ArrowRight size={19} /></motion.button>
                 </form>
@@ -320,11 +333,16 @@ export function BusinessHome({
 
             <div className={styles.right}>
               <AtmosphericCard ref={attentionRef} tabIndex={-1} theme="dark" className={styles.attentionCard} contentClassName={`${styles.panel} ${styles.atmosphereContent}`} aria-labelledby="home-attention">
-                <header><span className={styles.symbol} data-kind="attention"><Bell size={17} /></span><span className={styles.panelHeading}><small>Next actions</small><h2 id="home-attention">Needs your attention</h2></span><span className={styles.count}>{busy ? "…" : home.attention.length}</span></header>
-                {busy ? <p role="status">Checking your work…</p> : home.attention.length ? (
-                  <ul>{home.attention.map(({ work, reason }) => <li key={work.id}><motion.button onClick={() => onOpen(work.id)} {...quietMotion}><span className={styles.symbol} data-kind="attention">{icon(work.productId)}</span><span><strong>{work.title}</strong><small>{reason}</small></span><ChevronRight size={16} /></motion.button></li>)}</ul>
-                ) : <div className={styles.quiet}><Settings2 size={23} /><strong>All caught up.</strong><p>Work that needs a decision will appear here.</p></div>}
+                <header><span className={styles.symbol} data-kind="attention"><Bell size={17} /></span><span className={styles.panelHeading}><small>Next actions</small><h2 id="home-attention">Needs your attention</h2></span><span className={styles.count}>{busy || deliveryPending ? "…" : attentionCount}</span></header>
+                {busy || deliveryPending ? <p role="status">Checking your work…</p> : attentionCount ? (
+                  <ul>{deliveryAttention.map(item => <li key={`delivery-${item.id}`}><a href={item.href}><strong>{item.title}</strong><small>{item.detail}</small></a></li>)}{home.attention.map(({ work, reason }) => <li key={work.id}><motion.button onClick={() => onOpen(work.id)} {...quietMotion}><span className={styles.symbol} data-kind="attention">{icon(work.productId)}</span><span><strong>{work.title}</strong><small>{reason}</small></span><ChevronRight size={16} /></motion.button></li>)}</ul>
+                ) : deliveryUnavailable ? <p role="status">Delivery decisions could not be checked. <button type="button" onClick={deliveries.refresh}>Check again</button></p> : <div className={styles.quiet}><Settings2 size={23} /><strong>All caught up.</strong><p>Work that needs a decision will appear here.</p></div>}
               </AtmosphericCard>
+
+              {deliveryScope ? <section className={styles.panel} aria-labelledby="home-deliveries">
+                <header><h2 id="home-deliveries">Strelva delivery</h2><a href={`/workspace/delivery?businessId=${encodeURIComponent(deliveryScope)}`}>View all</a></header>
+                {deliveryPending ? <p role="status">Checking accepted work…</p> : deliveries.state.status === "error" ? <p role="status">{deliveries.state.message} <button type="button" onClick={deliveries.refresh}>Check again</button></p> : deliveryItems.length ? <ul>{deliveryItems.slice(0, 5).map(item => <li key={item.id}><a href={item.href}><strong>{item.title}</strong><small>{item.detail}</small></a></li>)}</ul> : <p>No service request has been accepted for delivery. <button type="button" onClick={onHelp}>Ask Strelva for work</button></p>}
+              </section> : null}
 
               <section className={styles.panel} aria-labelledby="home-recent">
                 <header><h2 id="home-recent">Recent work</h2><button className={styles.viewAll} onClick={onWork}>View all <ArrowRight size={13} /></button></header>

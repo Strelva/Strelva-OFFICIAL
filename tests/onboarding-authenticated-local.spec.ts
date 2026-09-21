@@ -31,7 +31,8 @@ test("real local Auth can create, review, accept, reopen, and isolate onboarding
     await page.getByRole("button", { name: "Create case", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Vendor onboarding" })).toBeVisible();
     await expect(page.getByText(/Private files can be up to 2 MB/)).toBeVisible();
-
+    // The saved case must finish its shell handoff before a new upload begins.
+    await expect(page.locator('input[type="file"]')).toBeEnabled();
     const uploadResponse = page.waitForResponse((response) => response.url().endsWith("/api/onboarding/upload") && response.request().method() === "POST");
     const originalBytes = Buffer.from("%PDF-1.4\nsynthetic identity proof\n%%EOF");
     await page.locator('input[type="file"]').setInputFiles({ name: "tax-id.pdf", mimeType: "application/pdf", buffer: originalBytes });
