@@ -39,11 +39,24 @@ for (const width of [1440, 390]) {
     expect(strangerWorkspace.status()).toBe(404);
     expect(await strangerWorkspace.json()).toEqual({error:"Workspace unavailable."});
 
-    const appResponse=await owner.context.request.post("/api/bounded-work",{headers:{origin:env.app},data:{action:"create",productId:"applications",workspaceId:businessId,input:{title:"Team requests",fields:[{id:"request",label:"Request",type:"text",required:true}],components:[{kind:"form",fields:["request"]},{kind:"list",fields:["request"]}]}}});
+    // The customer creates and publishes the first app through its real UI.
+    // Do not seed the result with an API call and call that first-use proof.
+    await page.getByLabel("Name",{exact:true}).fill("Team requests");
+    await page.getByLabel("Field 1",{exact:true}).fill("Request");
+    const appCreation=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/bounded-work"&&r.request().method()==="POST");
+    await page.getByRole("button",{name:"Create private app",exact:true}).click();
+    const appResponse=await appCreation;
     expect(appResponse.status(),await appResponse.text()).toBe(201);
     const app=await appResponse.json();
-    await page.goto(`/workspace?workspaceId=${businessId}&work=${app.id}`);
     await expect(page.getByRole("heading",{name:"Team requests",exact:true})).toBeVisible();
+    await page.getByRole("button",{name:"Check proposed change",exact:true}).click();
+    await expect(page.getByRole("button",{name:"Publish",exact:true})).toBeEnabled();
+    await page.getByRole("button",{name:"Publish",exact:true}).click();
+    await expect(page.getByText(/Version 1 is live/)).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole("heading",{name:"Team requests",exact:true})).toBeVisible();
+    await expect(page.getByText(/Version 1 is live/)).toBeVisible();
+
     await page.goto(`/workspace?workspaceId=${businessId}&view=help`);
     await page.getByLabel("What are you trying to do?",{exact:true}).fill("Have Strelva build our website.");
     const requestResponse=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/service-requests"&&r.request().method()==="POST");
@@ -119,6 +132,7 @@ for (const width of [1440, 390]) {
     await expect(page.getByText("Customer accepted this delivery",{exact:true})).toBeVisible();
     await page.goto(`/workspace?workspaceId=${businessId}&work=${app.id}`);
     await expect(page.getByRole("heading",{name:"Team requests",exact:true})).toBeVisible();
+    await expect(page.getByText(/Version 1 is live/)).toBeVisible();
     const businesses=await owner.context.request.get("/api/workspace/businesses");
     expect((await businesses.json()).businesses.filter((value:{id:string})=>value.id===businessId)).toHaveLength(1);
     await operatorPage.close();
