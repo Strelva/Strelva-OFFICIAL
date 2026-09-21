@@ -5,26 +5,36 @@ set -euo pipefail
 [[ -z "${SUPABASE_ACCESS_TOKEN:-}" && -z "${SUPABASE_SERVICE_ROLE_KEY:-}" && -z "${NEXT_PUBLIC_SUPABASE_URL:-}" && "${VERCEL_ENV:-}" != production ]] || { echo 'Refusing inherited provider or hosted database configuration.' >&2; exit 1; }
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 stack="$(mktemp -d "$RUNNER_TEMP/strelva-auth.XXXXXX")"
+# Other runner services may already own Supabase's default ports. Select unused
+# ports without stopping or attaching to those unrelated services.
+read -r api_port db_port shadow_port < <(python3 - <<'PY'
+import socket
+sockets = [socket.socket() for _ in range(3)]
+for item in sockets: item.bind(('0.0.0.0', 0))
+print(*(item.getsockname()[1] for item in sockets))
+for item in sockets: item.close()
+PY
+)
 mkdir -p "$stack/supabase/migrations"
 cp "$root"/supabase/migrations/*.sql "$stack/supabase/migrations/"
 cat > "$stack/supabase/config.toml" <<CONFIG
-project_id = "strelva-proof-${GITHUB_RUN_ID:-local}"
+project_id = "strelva-proof-${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}"
 [api]
 enabled = true
-port = 54321
+port = $api_port
 schemas = ["public", "graphql_public"]
 extra_search_path = ["public", "extensions"]
 max_rows = 1000
 [db]
-port = 54322
-shadow_port = 54320
+port = $db_port
+shadow_port = $shadow_port
 major_version = 17
 health_timeout = "5m"
 [db.seed]
 enabled = false
 [studio]
 enabled = false
-[inbucket]
+[local_smtp]
 enabled = false
 [analytics]
 enabled = false
@@ -43,7 +53,6 @@ enable_signup = true
 enable_signup = true
 enable_confirmations = false
 CONFIG
-# Store local credentials privately. Never upload stack logs or the status file.
 umask 077
 printf 'STRELVA_AUTH_STACK_DIR=%s\n' "$stack" >> "$GITHUB_ENV"
 if ! supabase start --workdir "$stack" > "$stack/start.log" 2>&1; then
