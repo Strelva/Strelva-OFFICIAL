@@ -339,7 +339,9 @@ function requestsWebsiteService(request: string): boolean {
   if (!/\b(?:website|web site|landing page)\b/i.test(request)) return false;
   // Negated or explicitly self-service requests stay on the existing planning path.
   if (/\b(?:do not|don['’]t|not|never)\b[^.!?;\n]{0,60}\b(?:strelva|agency|24[- ]hour|24 hours?)\b|\b(?:myself|ourselves|self[- ]service)\b/i.test(request)) return false;
-  return /\b(?:have|hire|ask|pay|get|want|need|like)\b[^.!?;\n]{0,40}\bstrelva\b[^.!?;\n]{0,40}\b(?:build|create|make|design|deliver)\b|\b(?:agency[- ]built|done[- ]for[- ](?:me|us|you)|24[- ]hour|24 hours?)\b/i.test(request);
+  if (/\bstrelva\b[^.!?;\n]{0,40}\b(?:do not|don['’]t|not|never|cannot|can['’]t)\b[^.!?;\n]{0,30}\b(?:build|create|make|design|deliver)\b/i.test(request)) return false;
+  const providerFirst = /\bstrelva[\s,]*(?:(?:can|could|would|will)\s+(?:you\s+)?)?(?:please\s+)?(?:build|create|make|design|deliver)\b/i.test(request);
+  return providerFirst || /\b(?:have|hire|ask|pay|get|want|need|like)\b[^.!?;\n]{0,40}\bstrelva\b[^.!?;\n]{0,40}\b(?:build|create|make|design|deliver)\b|\b(?:agency[- ]built|done[- ]for[- ](?:me|us|you)|24[- ]hour|24 hours?)\b/i.test(request);
 }
 
 function websiteServicePlan(request: string, context: WorkspaceStartContext): WorkspaceStartPlan {
