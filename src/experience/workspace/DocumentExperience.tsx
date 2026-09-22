@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { TextInput, TextArea } from "@/components/ui/TextInput";
+import { useWorkspaceIntent } from "./WorkspaceIntent";
 import { WorkPlanExperience } from "./WorkPlanExperience";
 import type { WorkspaceWork } from "./contracts";
 import type { WorkspaceDocument } from "@/products/documents/contracts";
@@ -31,7 +32,8 @@ const serverTransport: DocumentTransport = {
 type Props = { workspaceId: string; workId?: string; readOnly?: boolean; onSaved?: (workId: string) => void; transport?: DocumentTransport; initialRequestText?: string; sources?: readonly WorkspaceWork[] };
 
 export function DocumentExperience(props: Props) {
-  return <DocumentSession key={`${props.workspaceId}:${props.workId ?? "new"}`} {...props} />;
+  const { request } = useWorkspaceIntent();
+  return <DocumentSession key={`${props.workspaceId}:${props.workId ?? "new"}`} {...props} initialRequestText={props.initialRequestText || request} />;
 }
 
 function DocumentSession({ workspaceId, workId, readOnly, onSaved, transport = serverTransport, initialRequestText, sources = [] }: Props) {

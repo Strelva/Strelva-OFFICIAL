@@ -114,3 +114,20 @@
 @media(max-width:1023px) { .home,.page,.detail { padding:32px; } .home { padding-top:64px; } }
 @media(max-width:639px) { .home,.page,.detail { padding:24px; } .home { padding-top:48px; } .starts,.helpSections,.startExampleList { grid-template-columns:1fr; } .starts { gap:12px; margin-top:32px; } .starts>button { padding:20px; min-height:96px; } .recent { margin-top:40px; } .homeFoot { flex-direction:column; align-items:flex-start; gap:8px; margin-top:32px; } .productRow { gap:16px; padding-block:24px; } .productRow strong { font-size:20px; } .productSymbol { width:40px; height:48px; border-radius:12px; } .productRow>svg { display:none; } .request { padding:20px; } .sectionHeading { align-items:baseline; } .startPage { padding:40px 24px 56px; } .startComposer { padding:20px; } .startProposal { margin-top:40px; } .startSelect { align-items:flex-start; flex-direction:column; gap:8px; } .startSelect select { width:100%; max-width:none; } .startPartMeta { display:none; } }
 @media(prefers-reduced-motion:reduce) { .starts>button { transition:none; } }
+
+/* September 22 shared workspace composition. Atoms keep their own contracts. */
+.page { max-width:1200px; }
+.pageHeader h1 { font-size:32px; line-height:40px; font-weight:500; }
+.pageHeader { padding:8px 0 32px; }
+.startPage { padding:32px 24px 48px; max-width:816px; }
+.startHeader h1 { font-size:32px; line-height:40px; font-weight:500; }
+.startExamples { margin-top:24px; }
+.startExampleList { gap:8px; }
+.startProposal { margin-top:32px; }
+.scroll { overscroll-behavior:contain; }
+.workRow strong { white-space:normal; overflow-wrap:anywhere; }
+@media(max-width:640px) {
+  .page,.detail { padding:24px 16px; }
+  .pageHeader h1,.startHeader h1 { font-size:24px; line-height:32px; }
+  .startPage { padding:24px 16px 40px; }
+}

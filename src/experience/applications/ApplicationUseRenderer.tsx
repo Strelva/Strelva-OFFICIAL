@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo } from "react";
+import { FormEvent, useMemo, useId } from "react";
 import { Button } from "@/components/ui/Button";
 import { TextInput } from "@/components/ui/TextInput";
 import type { ApplicationUseSnapshot, ApplicationViewKind } from "@/products/applications/client";
@@ -14,6 +14,7 @@ export interface ApplicationUseDraft {
 }
 
 export interface ApplicationUseRendererProps {
+  presentation?: "preview";
   snapshot: ApplicationUseSnapshot;
   draft: ApplicationUseDraft;
   busy?: boolean;
@@ -49,6 +50,7 @@ function nextIdempotencyKey(): string {
 }
 
 export function ApplicationUseRenderer({
+  presentation,
   snapshot,
   draft,
   busy = false,
@@ -58,6 +60,7 @@ export function ApplicationUseRenderer({
   onDraftChange,
   onSubmit,
 }: ApplicationUseRendererProps) {
+  const instanceId = useId();
   const formView = snapshot.views.find(view => view.kind === "form");
   const editAllowed = snapshot.access.recordEdit === "own" || snapshot.access.recordEdit === "all";
   const editing = draft.editingRecordId !== undefined;
@@ -101,17 +104,17 @@ export function ApplicationUseRenderer({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+    <div className={presentation === "preview" ? "flex min-w-0 flex-col gap-6 p-4 sm:p-6" : "mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-12 lg:px-8"}>
       <header className="max-w-3xl space-y-3">
-        <h1 className="font-display text-3xl font-medium leading-tight text-warm-black sm:text-4xl">{snapshot.title}</h1>
+        {presentation === "preview" ? <h3 className="text-xl font-medium text-warm-black">{snapshot.title}</h3> : <h1 className="font-display text-3xl font-medium leading-tight text-warm-black sm:text-4xl">{snapshot.title}</h1>}
       </header>
 
       {submitMessage ? <p role="status" className="rounded-lg border border-sage/30 bg-sage/5 px-3 py-2 text-sm text-sage-dark">{submitMessage}</p> : null}
 
       {formView && (snapshot.access.recordSubmit || (editAllowed && editing)) ? (
-        <section aria-labelledby="application-form-heading" className="rounded-2xl border border-gray-border bg-surface p-5 shadow-sm sm:p-7">
+        <section aria-labelledby={`${instanceId}-form-heading`} className="rounded-2xl border border-gray-border bg-surface p-5 shadow-sm sm:p-7">
           <div className="mb-6 space-y-2">
-            <h2 id="application-form-heading" className="font-display text-2xl font-medium text-warm-black">{draft.editingRecordId ? "Correct a record" : viewLabel("form")}</h2>
+            <h2 id={`${instanceId}-form-heading`} className="font-display text-2xl font-medium text-warm-black">{draft.editingRecordId ? "Correct a record" : viewLabel("form")}</h2>
             <p className="text-sm leading-6 text-gray-fg">{draft.editingRecordId ? "Save a correction to the record. If someone changed it first, your correction stays here so you can review it." : "Enter the details below. Keep this tab open if you need to retry."}</p>
           </div>
           <form className="space-y-5" onSubmit={submit} aria-busy={busy}>
@@ -121,13 +124,13 @@ export function ApplicationUseRenderer({
                 if (field.type === "boolean") {
                   return (
                     <fieldset key={field.id} className="space-y-2">
-                      <legend className="block text-[11px] text-gray-muted">{field.label}{field.required ? " *" : ""}</legend>
+                      <legend className="block text-xs text-gray-muted">{field.label}{field.required ? " *" : ""}</legend>
                       <div className="flex flex-wrap gap-2">
                         {[true, false].map(option => (
                           <label key={String(option)} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-gray-border px-3.5 py-2 text-sm text-warm-black">
                             <input
-                              id={`app-field-${field.id}-${option ? "yes" : "no"}`}
-                              name={`app-field-${field.id}`}
+                              id={`${instanceId}-field-${field.id}-${option ? "yes" : "no"}`}
+                              name={`${instanceId}-field-${field.id}`}
                               type="radio"
                               value={String(option)}
                               checked={value === option}
@@ -145,10 +148,10 @@ export function ApplicationUseRenderer({
                 if (field.type === "select") {
                   return (
                     <label key={field.id} className="block text-sm text-warm-black">
-                      <span className="block text-[11px] text-gray-muted">{field.label}{field.required ? " *" : ""}</span>
+                      <span className="block text-xs text-gray-muted">{field.label}{field.required ? " *" : ""}</span>
                       <select
-                        id={`app-field-${field.id}`}
-                        name={`app-field-${field.id}`}
+                        id={`${instanceId}-field-${field.id}`}
+                        name={`${instanceId}-field-${field.id}`}
                         className="mt-1 block min-h-11 w-full rounded-xl border border-gray-border bg-surface px-3 py-2 text-sm"
                         value={value === undefined ? "" : String(value)}
                         required={field.required}
@@ -163,7 +166,7 @@ export function ApplicationUseRenderer({
                 return (
                   <TextInput
                     key={field.id}
-                    id={`app-field-${field.id}`}
+                    id={`${instanceId}-field-${field.id}`}
                     label={`${field.label}${field.required ? " *" : ""}`}
                     type={fieldInputType(field.type)}
                     inputMode={field.type === "number" ? "decimal" : undefined}
@@ -185,9 +188,9 @@ export function ApplicationUseRenderer({
       ) : null}
 
       {recordViews.length > 0 && snapshot.access.recordRead !== "none" ? (
-        <section aria-labelledby="application-records-heading" className="space-y-4">
+        <section aria-labelledby={`${instanceId}-records-heading`} className="space-y-4">
           <div className="space-y-2">
-            <h2 id="application-records-heading" className="font-display text-2xl font-medium text-warm-black">{recordsHeading}</h2>
+            <h2 id={`${instanceId}-records-heading`} className="font-display text-2xl font-medium text-warm-black">{recordsHeading}</h2>
           </div>
           {snapshot.records.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-gray-border bg-surface-inset px-5 py-8 text-sm text-gray-muted">There are no records to show yet.</p>
@@ -199,7 +202,7 @@ export function ApplicationUseRenderer({
                   <dl className="grid gap-3 sm:grid-cols-2">
                     {recordFields.map(field => (
                       <div key={field.id} className="min-w-0">
-                        <dt className="text-[11px] uppercase tracking-[0.1em] text-gray-muted">{field.label}</dt>
+                        <dt className="text-xs uppercase tracking-[0.1em] text-gray-muted">{field.label}</dt>
                         <dd className="mt-1 break-words text-sm text-warm-black">{displayValue(record.values[field.id])}</dd>
                       </div>
                     ))}

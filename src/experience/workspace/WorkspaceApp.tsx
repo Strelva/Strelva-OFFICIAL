@@ -705,6 +705,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
         managedWorkUnavailable={snapshot.managedWorkUnavailable}
         onHome={goHome}
         onChoose={chooseWork}
+        onCreatedApp={id => openWorkFromPlan(id, "applications")}
         onNew={(context) => { if (workspaceExitBlocks) return; setMissingWork(false); setSelectedStandingId(null); setStandingCreating(false); setRetryWork(null); setAssessmentStartContext(context?.route === "assessment" ? context : null); setInquiryStartContext(null); setTrackerStartContext(null); setDocumentStartContext(null); setPlanStartRequest(null); const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.set("workspaceId", workspaceIdForNavigation(snapshot.workspaceId)); url.searchParams.set("view", "work"); url.searchParams.delete("work"); window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`); setHome(false); setView("work"); setShowAssessment(true); setNotice(null); }}
         onPlan={startPlan}
         onOngoing={openOngoing}

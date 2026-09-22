@@ -6,12 +6,20 @@ import { IconButton } from "@/components/ui/Button";
 import { searchWorkspaceItems, type WorkspaceSearchItem } from "./workspace-search";
 import styles from "./workspace-search.module.css";
 
-export function WorkspaceSearchDialog({ open, items, scopeName, onClose }: { open: boolean; items: readonly WorkspaceSearchItem[]; scopeName: string; onClose: () => void }) {
+export function WorkspaceSearchDialog({ open, items, scopeName, storageKey, onClose }: { storageKey?: string; open: boolean; items: readonly WorkspaceSearchItem[]; scopeName: string; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const trigger = useRef<HTMLElement | null>(null);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState(0);
+  useEffect(() => {
+    if (!storageKey) return;
+    const frame = window.requestAnimationFrame(() => {
+      try { setQuery((window.sessionStorage.getItem(storageKey) || "").slice(0, 3000)); }
+      catch { /* Search still works when storage is unavailable. */ }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [storageKey]);
   const id = useId();
   const results = useMemo(() => searchWorkspaceItems(items, query), [items, query]);
   const activeIndex = Math.min(selected, Math.max(0, results.length - 1));
@@ -44,7 +52,7 @@ export function WorkspaceSearchDialog({ open, items, scopeName, onClose }: { ope
       <header className={styles.header}>
         <Search size={20} aria-hidden="true" />
         <label className={styles.srOnly} htmlFor={`${id}-query`}>Search {scopeName}</label>
-        <input ref={input} id={`${id}-query`} placeholder="Search your work…" value={query} onChange={event => { setQuery(event.target.value); setSelected(0); }} role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={`${id}-results`} aria-activedescendant={results.length ? `${id}-result-${activeIndex}` : undefined} onKeyDown={event => {
+        <input ref={input} id={`${id}-query`} placeholder="Search your work…" value={query} onChange={event => { setQuery(event.target.value); setSelected(0); if (storageKey) { try { window.sessionStorage.setItem(storageKey, event.target.value.slice(0, 3000)); } catch { /* Keep the query in this dialog. */ } } }} role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={`${id}-results`} aria-activedescendant={results.length ? `${id}-result-${activeIndex}` : undefined} onKeyDown={event => {
           if (event.nativeEvent.isComposing) return;
           if (event.key === "ArrowDown" || event.key === "ArrowUp") {
             event.preventDefault();

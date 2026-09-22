@@ -130,12 +130,12 @@ async function mockWorkspace(page: Page, handler: (route: Route) => Promise<void
 }
 
 async function expectBusinessHome(page: Page) {
-  await expect(page.getByRole("heading", { name: "Your business, at a glance.", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What would you like to do?", exact: true })).toBeVisible();
 }
 
 async function openWorkspaceHelp(page: Page) {
   await page.getByRole("complementary", { name: "Strelva navigation", exact: true })
-    .getByRole("button", { name: "Help", exact: true })
+    .getByRole("link", { name: "Help", exact: true })
     .click();
 }
 
@@ -266,7 +266,7 @@ test("creates a private assessment and restores it after reload", async ({ page 
   });
 
   await page.goto("/workspace");
-  await page.getByRole("button", { name: "Explore offerings", exact: true }).click();
+  await page.getByRole("link", { name: "Apps & templates", exact: true }).click();
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await expect(page.getByRole("heading", { name: "AI Visibility", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Check a business" }).click();
@@ -516,7 +516,7 @@ test("keeps My work and Shared with me context-local and read-only", async ({ pa
 
   await page.goto("/workspace");
   await page.getByLabel("Current workspace").selectOption(CUSTOMER_ID);
-  await expect(page.getByRole("heading", { name: "A look inside.", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your shared work.", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Recent work", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open Customer-owned assessment" })).toBeVisible();
   await page.getByRole("button", { name: /^Explore offerings/ }).click();
@@ -856,7 +856,7 @@ test("does not add a completed assessment to a workspace selected while it was r
   });
 
   await page.goto("/workspace");
-  await page.getByRole("button", { name: "Explore offerings", exact: true }).click();
+  await page.getByRole("link", { name: "Apps & templates", exact: true }).click();
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await expect(page.getByRole("heading", { name: "AI Visibility", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Check a business", exact: true }).click();
@@ -1117,7 +1117,7 @@ test("switching businesses clears the previous payer while the next history load
   await expect(page.getByText("harbor-payer@example.test", { exact: false })).toBeVisible();
   await page.getByLabel("Current workspace").selectOption(nextId);
   await expect(page).toHaveURL(new RegExp(nextId));
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("link", { name: "Settings", exact: true }).click();
   await expect.poll(() => Boolean(pending)).toBe(true);
   await expect(page.getByText("harbor-payer@example.test", { exact: false })).toHaveCount(0);
   await fulfill(pending!, { currentActorId: "owner", transitions: [], pending: null, current: null });

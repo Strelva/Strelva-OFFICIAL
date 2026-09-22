@@ -9,34 +9,21 @@ concurrency:
   cancel-in-progress: true
 jobs:
   review:
-    if: github.repository == 'Strelva/Strelva-OFFICIAL' && github.event.pull_request.number == 195 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feat/self-service-experience-20260922'
-    permissions:
-      contents: write
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Commit exact locally reviewed UI edits to the existing review branch
-        env:
-          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          branch='feat/self-service-experience-20260922'
-          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
-          test "$(git ls-remote origin refs/heads/$branch | cut -f1)" = "$EXPECTED_HEAD"
-          node scripts/ui-review/apply.mjs
-          git config user.name 'Strelva UI review'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'Integrate self-service templates, native previews and continuous customer requests'
-          git push origin "HEAD:refs/heads/$branch"
+          persist-credentials: false
       - uses: pnpm/action-setup@v4
         with:
           version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint && pnpm typecheck
       - run: pnpm test
@@ -50,11 +37,9 @@ jobs:
           STRELVA_WORKSPACE_RELEASE: '0'
           REB_DEV_UNGATED_ACCESS: '0'
           PLAYWRIGHT_JSON_OUTPUT_FILE: ui-results.json
-      - name: Retain reviewed source and result revision
+      - name: Record exact source revision
         if: always()
-        run: |
-          git rev-parse HEAD > ui-commit.txt
-          git archive --format=tar.gz HEAD > ui-reviewed-source.tar.gz
+        run: git rev-parse HEAD > ui-commit.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -62,6 +47,5 @@ jobs:
           path: |
             ui-commit.txt
             ui-results.json
-            ui-reviewed-source.tar.gz
             test-results/
-          retention-days: 3
+          retention-days: 7

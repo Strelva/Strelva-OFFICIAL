@@ -1,7 +1,7 @@
 import type { WorkspaceAction, WorkspaceSnapshot, WorkspaceWork } from "../contracts";
 import { presentAssessmentWork } from "@/products/assessment";
 import { listOfferingDefinitions } from "@/platform/offerings/definitions";
-import { applicationSchema } from "@/products/applications/contracts";
+import { applicationSchema, applicationSpecSchema } from "@/products/applications/contracts";
 import type { ServiceRequest } from "@/platform/service-requests";
 import type { z } from "zod";
 
@@ -126,6 +126,8 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
       canRevoke: false,
     }] : [],
     products: [
+      { id: "applications", name: "Applications", description: "Private apps with working forms and records.", availability: "available" },
+      { id: "onboarding", name: "Onboarding", description: "Collect requirements and private documents.", availability: "available" },
       { id: "ai_visibility", name: "AI Visibility", description: "See what AI can understand about a business.", availability: "available" },
       { id: "managed_presence", name: "Managed Websites", description: "Your website and the work that keeps it useful.", availability: "managed" },
       { id: "inquiries", name: "Inquiry work", description: "Keep customer requests moving with a clear, inspectable thread.", availability: "available" },
@@ -335,7 +337,20 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
       return response({ id: STAFF_REQUEST_APP, payload: staffRequestApplication });
     }
     if (scenario === "business" && url.pathname === "/api/bounded-work" && init?.method === "POST" && typeof init.body === "string") {
-      const body = JSON.parse(init.body) as { productId?: string; action?: string; workId?: string; command?: Record<string, unknown> };
+      const body = JSON.parse(init.body) as { productId?: string; action?: string; workId?: string; workspaceId?: string; input?: Record<string, unknown>; command?: Record<string, unknown> };
+      if (body.productId === "applications" && body.action === "create") {
+        if (body.workspaceId !== CUSTOMER) return response({ error: "The fixture only creates in its customer business." }, 403);
+        const parsed = applicationSpecSchema.safeParse({ ...body.input, maintenanceOwner: PREVIEW_ACTOR });
+        if (!parsed.success) return response({ error: "Check the proposed app fields." }, 422);
+        // Synthetic in-memory fixture only. Real persistence is tested separately.
+        if (installedApplication) return response({ error: "This fixture already has an app. Reload the isolated preview to start over." }, 409);
+        const spec = parsed.data;
+        staffRequestApplication = { ...initialStaffRequestApplication(), title: spec.title, spec, versions: [{ version: 1, spec }], candidate: { designRevision: 0, specVersion: 1, spec, rehearsal: null } };
+        installedApplication = true;
+        const work = { ...staffRequestWork(), title: spec.title };
+        saved.set(CUSTOMER, [work, ...(saved.get(CUSTOMER) || [])]);
+        return response(work, 201);
+      }
       if (body.productId !== "applications" || body.action !== "command" || body.workId !== STAFF_REQUEST_APP || !body.command) return response({ error: "This application command is unavailable in the local preview." }, 422);
       const command = body.command;
       const now = "2026-09-15T12:05:00.000Z";

@@ -26,8 +26,8 @@ test.describe("inquiry control surfaces", () => {
     await expect(page.getByText(/If nobody replies within 2 hours/).first()).toBeVisible();
 
     await page.getByRole("button", { name: "Plan", exact: true }).click();
-    await page.getByRole("button", { name: "Work", exact: true }).click();
-    await page.getByRole("button", { name: "Home", exact: true }).click();
+    await page.getByRole("link", { name: "Work", exact: true }).click();
+    await page.getByRole("link", { name: "Home", exact: true }).click();
     await page.getByRole("button", { name: "Read the responsibility", exact: true }).click();
     await page.getByLabel("Responsibility title").fill("Handle seller inquiries carefully");
     await page.getByLabel("Scope").fill("Route seller inquiries and prepare a bounded follow-up during approved hours.");
@@ -46,7 +46,7 @@ test.describe("inquiry control surfaces", () => {
     await page.getByRole("button", { name: "Run rehearsal", exact: true }).click();
     await expect(page.getByRole("heading", { name: "8 of 8 checks passed", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Make live", exact: true }).click();
-    await page.getByRole("button", { name: "Work", exact: true }).click();
+    await page.getByRole("link", { name: "Work", exact: true }).click();
     await page.getByRole("button", { name: "Review rehearsal", exact: true }).click();
     await page.getByRole("button", { name: "Send test inquiry", exact: true }).click();
 

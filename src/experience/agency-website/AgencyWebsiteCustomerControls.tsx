@@ -72,12 +72,12 @@ export function AgencyWebsiteCustomerControls({ deliveryId, bindingId, customerW
 
   return <section className="rounded-xl border border-gray-border bg-white p-5" aria-labelledby="agency-website-permission-title">
     <h2 id="agency-website-permission-title" className="text-base font-medium text-warm-black">Agency website preparation</h2>
-    <p className="mt-2 text-sm leading-relaxed text-gray-muted">Name the operator on the accepted website delivery so they can prepare a draft revision. Publication and customer membership remain under your native website controls.</p>
+    <p className="mt-2 text-sm leading-relaxed text-gray-muted">Allow the operator assigned to this delivery to prepare website changes. Publishing still requires your approval. This does not grant business membership.</p>
     {state === "loading" ? <p role="status" className="mt-4 text-sm text-gray-muted">Checking the current permission…</p> : null}
     {state === "error" ? <div className="mt-4 space-y-3"><p role="alert" className="text-sm text-critical">{error}</p><Button variant="secondary" onClick={() => setReload((value) => value + 1)}>Retry</Button></div> : null}
-    {state === "ready" && grant && active ? <div className="mt-4 space-y-3"><p className="text-sm text-warm-black">Draft preparation is enabled for the named operator. It expires at {grant.expiresAt}.</p><Button variant="secondary" disabled={busy} onClick={() => void change("revoke")}>Revoke draft preparation</Button>{websiteHref ? <Link className="block text-sm text-warm-black underline underline-offset-4" href={websiteHref}>Review and publish in website editor</Link> : null}</div> : null}
-    {state === "ready" && grant && !active ? <div className="mt-4 space-y-3"><p className="text-sm text-gray-muted">Draft preparation is revoked or expired. Existing website history remains recorded.</p><Button className="mt-1" disabled={busy} onClick={() => void change("grant")}>Grant draft preparation</Button></div> : null}
-    {state === "ready" && !grant ? <Button className="mt-4" disabled={busy} onClick={() => void change("grant")}>Grant draft preparation</Button> : null}
+    {state === "ready" && grant && active ? <div className="mt-4 space-y-3"><p className="text-sm text-warm-black">Draft preparation is enabled for the named operator. It expires at {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(grant.expiresAt))}.</p><Button variant="secondary" disabled={busy} onClick={() => void change("revoke")}>Remove draft access</Button>{websiteHref ? <Link className="block text-sm text-warm-black underline underline-offset-4" href={websiteHref}>Review and publish in website editor</Link> : null}</div> : null}
+    {state === "ready" && grant && !active ? <div className="mt-4 space-y-3"><p className="text-sm text-gray-muted">Draft preparation is revoked or expired. Existing website history remains recorded.</p><Button className="mt-1" disabled={busy} onClick={() => void change("grant")}>Allow website draft changes</Button></div> : null}
+    {state === "ready" && !grant ? <Button className="mt-4" disabled={busy} onClick={() => void change("grant")}>Allow website draft changes</Button> : null}
     {error && state === "ready" ? <p role="alert" className="mt-3 text-sm text-critical">{error}</p> : null}
   </section>;
 }

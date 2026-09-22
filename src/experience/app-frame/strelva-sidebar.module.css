@@ -37,7 +37,7 @@
 .signIn { display:flex; align-items:center; justify-content:center; min-height:44px; border:1px solid var(--gray-border); border-radius:12px; color:var(--warm-black); font-size:14px; }
 .mobileClose { display:none; place-items:center; width:44px; height:44px; border-radius:12px; color:var(--gray-muted); }
 .sidebar :is(a,button,select):focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-@media(max-width:1023px) { .sidebar { display:none; } .sidebar[data-open="true"] { display:flex; } .mobileClose { display:grid; } .sidebar[data-standalone="true"][data-open="true"] { position:fixed; inset:0 auto 0 0; width:min(280px,calc(100vw - 32px)); z-index:100; box-shadow:24px 0 80px #0005; } }
+@media(max-width:1023px) { .sidebar { display:none; } .sidebar[data-open="true"] { display:flex; } .mobileClose { display:grid; } .sidebar[data-standalone="true"][data-open="true"] { position:fixed; inset:0 auto 0 0; width:min(280px,calc(100vw - 32px)); z-index:100; box-shadow:var(--navigation-overlay-shadow); } }
 @media(max-height:620px) { .sidebar { overflow-y:auto; } .body { flex:none; overflow:visible; } }
 @media(pointer:coarse) { .footer .navItem,.signOut { min-height:44px; } }
 @media(prefers-reduced-motion:reduce) { .navItem,.newAction { transition:none; } }

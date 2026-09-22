@@ -75,7 +75,7 @@ export function StrelvaSidebar({ active, appBase = "", workspaceId, accountName,
     </div>
     {businessContext ? <div className={styles.businessContext}>{businessContext}</div> : null}
     <div className={styles.body}>
-      <div className={styles.utilities}>
+      <div className={styles.utilities} aria-label="Workspace utilities">
         {onStart ? <button type="button" className={styles.newAction} disabled={startDisabled} onClick={() => { onCloseMobile?.(); onStart(); }}><Plus size={18} aria-hidden="true" /><span>New</span></button> : <Link className={styles.newAction} href={newHref} aria-disabled={startDisabled || undefined} tabIndex={startDisabled ? -1 : undefined} onClick={event => { if (startDisabled) event.preventDefault(); onCloseMobile?.(); }}><Plus size={18} aria-hidden="true" /><span>New</span></Link>}
         {onSearch ? <button type="button" className={styles.navItem} onClick={() => { onCloseMobile?.(); onSearch(); }} title="Search (Ctrl or Command + K)"><Search size={18} aria-hidden="true" /><span>Search</span></button> : <Link className={styles.navItem} href={searchHref} onClick={onCloseMobile}><Search size={18} aria-hidden="true" /><span>Search</span></Link>}
         {item({ id: "products", label: "Apps & templates", icon: LayoutGrid })}

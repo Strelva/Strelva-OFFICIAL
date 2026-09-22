@@ -136,11 +136,11 @@ describe("managed website agency draft authority", () => {
       return jsonResponse({ grant: granted ? grant : null });
     });
     const { container, root } = await render(createElement(AgencyWebsiteCustomerControls, { deliveryId, bindingId }));
-    const grantButton = [...container.querySelectorAll("button")].find((button) => button.textContent === "Grant draft preparation");
+    const grantButton = [...container.querySelectorAll("button")].find((button) => button.textContent === "Allow website draft changes");
     expect(grantButton).toBeTruthy();
     await act(async () => grantButton?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(requests[0]).toEqual({ action: "grant", deliveryId, bindingId });
-    const revokeButton = [...container.querySelectorAll("button")].find((button) => button.textContent === "Revoke draft preparation");
+    const revokeButton = [...container.querySelectorAll("button")].find((button) => button.textContent === "Remove draft access");
     expect(revokeButton).toBeTruthy();
     await act(async () => revokeButton?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(requests[1]).toEqual({ action: "revoke", grantId });
@@ -159,7 +159,7 @@ describe("managed website agency draft authority", () => {
     });
     const { container, root } = await render(createElement(AgencyWebsiteCustomerControls, { deliveryId, bindingId }));
     expect(container.textContent).toContain("revoked or expired");
-    const grantButton = [...container.querySelectorAll("button")].find((button) => button.textContent === "Grant draft preparation");
+    const grantButton = [...container.querySelectorAll("button")].find((button) => button.textContent === "Allow website draft changes");
     expect(grantButton).toBeTruthy();
     await act(async () => grantButton?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(requests[0]).toEqual({ action: "grant", deliveryId, bindingId });
@@ -181,7 +181,7 @@ describe("managed website agency draft authority", () => {
     resolveFirst(jsonResponse({ grant: null }));
     await act(async () => { await first; });
     expect(container.textContent).toContain("Draft preparation is enabled");
-    expect(container.textContent).not.toContain("Grant draft preparation");
+    expect(container.textContent).not.toContain("Allow website draft changes");
     act(() => root.unmount());
     container.remove();
   });

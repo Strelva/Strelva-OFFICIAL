@@ -1,5 +1,7 @@
 "use client";
 
+import { useWorkspaceIntent } from "@/experience/workspace/WorkspaceIntent";
+import { onboardingRequestPrefill } from "./request-prefill";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -9,6 +11,7 @@ import type { OnboardingAttachableDocument, OnboardingCase, OnboardingCaseRecord
 export type OnboardingExperienceProps = {
   workspaceId: string;
   initialCaseId?: string;
+  initialRequest?: string;
   /** Lets the common workspace refresh its saved-work selection after a mutation. */
   onSaved?: (workId: string) => void;
   /** Delegated readers can inspect the case without seeing mutation controls. */
@@ -31,7 +34,13 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export function OnboardingExperience({ workspaceId, initialCaseId, onSaved, readOnly = false }: OnboardingExperienceProps) {
+export function OnboardingExperience(props: OnboardingExperienceProps) {
+  const intent = useWorkspaceIntent();
+  const request = props.initialRequest || intent.request;
+  return <OnboardingSession key={`${props.workspaceId}:${props.initialCaseId || request}`} {...props} initialRequest={request} />;
+}
+
+function OnboardingSession({ workspaceId, initialCaseId, initialRequest = "", onSaved, readOnly = false }: OnboardingExperienceProps) {
   const [records, setRecords] = useState<OnboardingCaseRecord[]>([]);
   const [availableDocuments, setAvailableDocuments] = useState<OnboardingAttachableDocument[]>([]);
   const [selectedId, setSelectedId] = useState(initialCaseId ?? "");
@@ -45,9 +54,9 @@ export function OnboardingExperience({ workspaceId, initialCaseId, onSaved, read
   const [document, setDocument] = useState<OnboardingDocumentRecord | null>(null);
   const [uploadRequirementId, setUploadRequirementId] = useState("");
   const [title, setTitle] = useState("");
-  const [subjectType, setSubjectType] = useState<OnboardingCase["subjectType"]>("customer");
+  const [subjectType, setSubjectType] = useState<OnboardingCase["subjectType"]>(() => onboardingRequestPrefill(initialRequest).subjectType);
   const [subjectLabel, setSubjectLabel] = useState("");
-  const [requirementsText, setRequirementsText] = useState("");
+  const [requirementsText, setRequirementsText] = useState(() => onboardingRequestPrefill(initialRequest).requirementsText);
   const [fieldLabel, setFieldLabel] = useState("");
   const [assigneeEmail, setAssigneeEmail] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
@@ -151,6 +160,7 @@ export function OnboardingExperience({ workspaceId, initialCaseId, onSaved, read
             <h1 className="mt-2 font-display text-3xl">Collect the right records.</h1>
             <p className="mt-3 text-sm leading-6 text-gray-muted">Keep each requirement, document version, reviewer, and decision together. Automatic extraction stays proposed until a person accepts it.</p>
           </header>
+          {initialRequest && !initialCaseId ? <aside className="rounded-xl border border-gray-border p-4 text-sm"><h2 className="font-medium">Your request</h2><p className="mt-2 whitespace-pre-wrap text-gray-muted">{initialRequest}</p></aside> : null}
           {readOnly ? <p className="rounded-xl border border-gray-border bg-surface-inset px-4 py-3 text-sm text-gray-muted">This case is available for review only.</p> : <Card padding="md">
             <h2 className="font-medium">Start an onboarding case</h2>
             <form className="mt-4 grid gap-3" onSubmit={(event) => void create(event)}>

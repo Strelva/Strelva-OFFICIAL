@@ -32,10 +32,10 @@ test("an owner publishes, shares, updates, and resumes the staff request offerin
     const page = await owner.context.newPage();
     page.setDefaultTimeout(20_000);
     await page.goto(`/workspace?workspaceId=${workspaceId}`, { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: "Your business, at a glance.", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "What would you like to do?", exact: true })).toBeVisible();
 
     const navigation = page.getByRole("complementary", { name: "Strelva navigation", exact: true });
-    await navigation.getByRole("button", { name: "Explore offerings", exact: true }).click();
+    await navigation.getByRole("link", { name: "Apps & templates", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Useful outcomes for this business.", exact: true })).toBeVisible();
     const staffRequestOffering = page.locator('[class*="discoveryRow"]').filter({ hasText: "Staff request application" }).first();
     await staffRequestOffering.getByRole("button", { name: "Start setup", exact: true }).click();
@@ -56,9 +56,9 @@ test("an owner publishes, shares, updates, and resumes the staff request offerin
 
     // The offering stays in draft until the connected application is released
     // and the owner explicitly activates it.
-    await navigation.getByRole("button", { name: "Home", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Your business, at a glance.", exact: true })).toBeVisible();
-    await navigation.getByRole("button", { name: "Explore offerings", exact: true }).click();
+    await navigation.getByRole("link", { name: "Home", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "What would you like to do?", exact: true })).toBeVisible();
+    await navigation.getByRole("link", { name: "Apps & templates", exact: true }).click();
     const draftStaffRequestOffering = page.locator('[class*="discoveryRow"]').filter({ hasText: "Staff request application" }).first();
     await draftStaffRequestOffering.getByRole("button", { name: "Open", exact: true }).click();
     await expect(page.getByText("Draft setup", { exact: true })).toBeVisible();
@@ -106,14 +106,14 @@ test("an owner publishes, shares, updates, and resumes the staff request offerin
     await expect(staffPage.getByText("Replace the reception printer", { exact: true })).toBeVisible();
     await staffPage.screenshot({ path: testInfo.outputPath("staff-request-offering-mobile.png"), fullPage: true });
 
-    await navigation.getByRole("button", { name: "Home", exact: true }).click();
+    await navigation.getByRole("link", { name: "Home", exact: true }).click();
     const recent = page.getByRole("region", { name: "Recent work", exact: true });
     await expect(recent.getByRole("button", { name: /Staff requests/ })).toBeVisible();
     await recent.getByRole("button", { name: /Staff requests/ }).click();
     await expect(page.getByRole("heading", { name: "Staff requests", exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "Back to work", exact: true }).click();
-    await navigation.getByRole("button", { name: "Explore offerings", exact: true }).click();
+    await navigation.getByRole("link", { name: "Apps & templates", exact: true }).click();
     const installedStaffRequestOffering = page.locator('[class*="discoveryRow"]').filter({ hasText: "Staff request application" }).first();
     await installedStaffRequestOffering.getByRole("button", { name: "Open", exact: true }).click();
     const connected = page.getByRole("region", { name: "Connected work", exact: true });

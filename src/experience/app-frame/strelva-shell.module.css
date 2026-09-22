@@ -16,8 +16,8 @@
   .mobileMenu { display:grid; place-items:center; flex-shrink:0; width:44px; height:44px; border-radius:12px; }
   .header { min-height:56px; padding:4px 16px 4px 8px; gap:8px; }
   .context { max-width:45vw; }
-  .shell[data-navigation-open="true"]::after { content:""; position:fixed; inset:0; z-index:90; background:rgb(0 0 0 / .48); pointer-events:none; }
-  .shell[data-navigation-open="true"] > [role="dialog"] { position:fixed; inset:0 auto 0 0; z-index:100; width:min(280px,calc(100vw - 32px)); height:100dvh; flex-basis:0; box-shadow:24px 0 80px #0005; }
+  .shell[data-navigation-open="true"]::after { content:""; position:fixed; inset:0; z-index:90; background:var(--overlay-scrim); pointer-events:none; }
+  .shell[data-navigation-open="true"] > [role="dialog"] { position:fixed; inset:0 auto 0 0; z-index:100; width:min(280px,calc(100vw - 32px)); height:100dvh; flex-basis:0; box-shadow:var(--navigation-overlay-shadow); }
 }
 @media(max-width:479px) { .context { max-width:calc(100vw - 160px); margin-left:auto; } .actions button { padding:8px; } }
 @media(prefers-reduced-motion:reduce) { .shell * { scroll-behavior:auto; } }

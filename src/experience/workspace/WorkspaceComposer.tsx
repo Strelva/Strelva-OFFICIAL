@@ -35,7 +35,6 @@ function ComposerSession({ initialRequest = "", draftKey, disabled = false, plac
     if (!draftKey || initialRequest) return;
     try {
       const saved = readRequestDraft(window.sessionStorage, draftKey);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (saved) setRequest(saved);
     } catch { /* The editor still works without browser storage. */ }
   }, [draftKey, initialRequest]);

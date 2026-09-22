@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { ApplicationDraftEditor } from "@/experience/applications/ApplicationDraftEditor";
+import { ApplicationDraftPreview } from "@/experience/applications/ApplicationDraftPreview";
+import { validateApplicationDraft, type ApplicationDraftSpec } from "@/experience/applications/app-templates";
 import { Button } from "@/components/ui/Button";
 import { TextArea, TextInput } from "@/components/ui/TextInput";
 import { TRACKER_TEMPLATES } from "@/products/tracker/client";
@@ -18,6 +21,10 @@ type Props = {
 
 export function WorkPlanOutputPreview({ onOpenWork, workspaceId, planWorkId, plan, output, disabled, completed }: Props) {
   const draft = output.draft;
+  const [application, setApplication] = useState<ApplicationDraftSpec | null>(() => draft?.kind === "application" ? { title: draft.title, fields: structuredClone(draft.fields), components: structuredClone(draft.components) } : null);
+  const [attemptLocked, setAttemptLocked] = useState(false);
+  const attempt = useRef<Record<string, unknown> | null>(null);
+  const submitting = useRef(false);
   const [title, setTitle] = useState(draft?.title ?? output.title);
   const [text, setText] = useState(draft?.kind === "document" ? draft.text : "");
   const [templateId, setTemplateId] = useState(draft?.kind === "tracker" ? draft.templateId : "tasks");
@@ -28,13 +35,16 @@ export function WorkPlanOutputPreview({ onOpenWork, workspaceId, planWorkId, pla
   const allowed = Boolean(operationId && output.nativeOperationIds.includes(operationId));
   const needsDetails = plan.status !== "ready" || plan.neededInputs.some(input => input.required) || plan.requiredDecisions.length > 0;
   async function create() {
-    if (!draft || !allowed || disabled || busy || needsDetails || execution) return;
+    if (!draft || !allowed || disabled || submitting.current || needsDetails || execution || (application && validateApplicationDraft(application))) return;
+    submitting.current = true;
+    setAttemptLocked(true);
     setBusy(true); setError("");
     try {
-      const response = await fetch("/api/work-plans/execute", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+      attempt.current ??= {
         workspaceId, planWorkId, outputId: output.id, expectedPlanRevision: plan.metadata.revision, operationId,
-        inputs: draft.kind === "document" ? { title, text } : draft.kind === "application" ? { title, fields: draft.fields, components: draft.components } : { title, templateId },
-      }) });
+        inputs: draft.kind === "document" ? { title, text } : draft.kind === "application" ? application : { title, templateId },
+      };
+      const response = await fetch("/api/work-plans/execute", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(attempt.current) });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "The output could not be saved. Retry to check the same request.");
       setExecution(result);
@@ -43,7 +53,7 @@ export function WorkPlanOutputPreview({ onOpenWork, workspaceId, planWorkId, pla
       // workspace refresh can replace this plan with a pre-receipt snapshot.
       if (draft.kind === "application" && onOpenWork) onOpenWork(result.nativeWorkId, result.nativeProductId);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The output could not be confirmed. Retry the same request."); }
-    finally { setBusy(false); }
+    finally { submitting.current = false; setBusy(false); }
   }
   if (!draft || !allowed) return <p className="text-sm text-gray-muted">This part needs further preparation before it can run.</p>;
   const resultName = draft.kind === "document" ? "document" : draft.kind === "application" ? "app" : "tracker";
@@ -53,19 +63,19 @@ export function WorkPlanOutputPreview({ onOpenWork, workspaceId, planWorkId, pla
     {onOpenWork ? <Button type="button" onClick={() => onOpenWork(execution.nativeWorkId, execution.nativeProductId)}>Open {resultName}</Button> : <a className="underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&work=${encodeURIComponent(execution.nativeWorkId)}`}>Open {resultName}</a>}
   </section>;
   const blocked = Boolean(disabled || busy || needsDetails);
-  return <form className="mt-4 space-y-3" onSubmit={event => { event.preventDefault(); void create(); }} aria-busy={busy}>
+  return <section className="mt-4 space-y-4" aria-busy={busy}>
     <h4 className="text-sm font-medium">{draft.kind === "application" ? "Review the application" : "Review and edit the draft"}</h4>
-    <TextInput label={draft.kind === "document" ? "Document title" : draft.kind === "application" ? "App name" : "Tracker title"} value={title} maxLength={160} required disabled={blocked} onChange={event => setTitle(event.target.value)} />
-    {draft.kind === "document" ? <TextArea label="Document draft" rows={10} value={text} maxLength={12000} disabled={blocked} onChange={event => setText(event.target.value)} /> : draft.kind === "application" ? <section className="space-y-3 text-sm" aria-label="Proposed app">
-      <h5 className="font-medium">Information it will keep</h5><dl className="space-y-2">{draft.fields.map(field => <div key={field.id} className="flex flex-wrap justify-between gap-3 border-b border-gray-border py-2"><dt>{field.label}</dt><dd className="text-gray-muted">{field.type === "boolean" ? "Yes or no" : field.type === "number" ? "Number" : field.type === "select" ? `Choose one${field.options?.length ? `: ${field.options.join(", ")}` : ""}` : "Text"}{field.required ? " · Required" : ""}</dd></div>)}</dl>
-      <p className="text-gray-muted">People can {draft.components.map(component => component.kind === "form" ? "add records" : component.kind === "list" ? "browse records" : component.kind === "detail" ? "inspect a record" : "read a record as a document").join(", ")}.</p>
-      <p className="text-gray-muted">Starts with no records. Review it in your business before publishing and giving people access.</p>
-    </section> : <>
-      <label className="block text-sm">Starting fields<select className="mt-1 block w-full rounded border border-gray-border bg-surface p-2" value={templateId} disabled={blocked} onChange={event => setTemplateId(event.target.value as typeof templateId)}>{TRACKER_TEMPLATES.map(template => <option key={template.id} value={template.id}>{template.name}</option>)}</select></label>
+    {draft.kind !== "application" ? <TextInput label={draft.kind === "document" ? "Document title" : "Tracker title"} value={title} maxLength={160} required disabled={blocked || attemptLocked} onChange={event => setTitle(event.target.value)} /> : null}
+    {draft.kind === "document" ? <TextArea label="Document draft" rows={10} value={text} maxLength={12000} disabled={blocked || attemptLocked} onChange={event => setText(event.target.value)} /> : draft.kind === "application" && application ? <div className="grid min-w-0 gap-6 xl:grid-cols-2">
+      <ApplicationDraftEditor value={application} onChange={setApplication} disabled={blocked || attemptLocked} />
+      <ApplicationDraftPreview spec={application} />
+    </div> : <>
+      <label className="block text-sm">Starting fields<select className="mt-1 block w-full rounded border border-gray-border bg-surface p-2" value={templateId} disabled={blocked || attemptLocked} onChange={event => setTemplateId(event.target.value as typeof templateId)}>{TRACKER_TEMPLATES.map(template => <option key={template.id} value={template.id}>{template.name}</option>)}</select></label>
       <p className="text-sm text-gray-muted">{TRACKER_TEMPLATES.find(template => template.id === templateId)?.fields.join(", ")}. Starts empty, with no invented records.</p>
     </>}
     {error ? <div className="space-y-2 text-sm"><p role="alert" className="text-critical">{error}</p><a className="underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&work=${encodeURIComponent(planWorkId)}`}>Reload the saved plan and its receipts</a></div> : null}
+    {attemptLocked && error ? <p className="text-sm text-gray-muted">Retry checks the exact same output. Reload the saved plan before changing this proposal.</p> : null}
     {needsDetails ? <p className="text-sm text-gray-muted">Add the missing details and prepare a revised plan first.</p> : null}
-    <Button type="submit" disabled={blocked || !title.trim()}>{busy ? "Saving…" : draft.kind === "document" ? "Create private document" : draft.kind === "application" ? "Create application" : "Create this tracker"}</Button>
-  </form>;
+    <Button type="button" onClick={() => void create()} disabled={blocked || (application ? Boolean(validateApplicationDraft(application)) : !title.trim())}>{busy ? "Saving…" : draft.kind === "document" ? "Create private document" : draft.kind === "application" ? "Create application" : "Create this tracker"}</Button>
+  </section>;
 }

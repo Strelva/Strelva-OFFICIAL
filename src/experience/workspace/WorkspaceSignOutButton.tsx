@@ -3,6 +3,7 @@
 import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { clearRequestDrafts } from "./request-draft";
 import { createBrowserSupabase } from "@/lib/db/browser-client";
 
 interface Props {
@@ -30,9 +31,10 @@ export function WorkspaceSignOutButton({ className }: Props) {
         return;
       }
       try {
+        clearRequestDrafts(window.sessionStorage);
         for (let index = window.sessionStorage.length - 1; index >= 0; index -= 1) {
           const key = window.sessionStorage.key(index);
-          if (key?.startsWith("strelva:workspace-") || key?.startsWith("strelva:public-result-")) {
+          if (key?.startsWith("strelva:search-query:") || key?.startsWith("strelva:template-draft:") || key?.startsWith("strelva:workspace-") || key?.startsWith("strelva:public-result-")) {
             window.sessionStorage.removeItem(key);
           }
         }

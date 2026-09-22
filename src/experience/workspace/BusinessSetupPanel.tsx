@@ -99,9 +99,9 @@ export function BusinessSetupPanel({ startProduct = "help", initialRequest = bus
     {choices.businesses.length ? <SelectInput label="Business" value={selected} disabled={locked} onChange={event => setSelected(event.target.value)} options={[{value:"new",label:"Create a new business"},...choices.businesses.map(item=>({value:item.id,label:item.name}))]} /> : null}
     {selected === "new" ? <TextInput label="Business name" value={name} maxLength={120} required disabled={locked} onChange={event => setName(event.target.value)} /> : null}
     {startProduct === "help" || startProduct === "website" || request ? <TextArea label="Request for Strelva" value={request} maxLength={3000} rows={5} disabled={locked} onChange={event => setRequest(event.target.value)} /> : null}
-    {pending ? <p role="status">A setup request is retained. Retrying uses the same business and request identity, not a second creation.</p> : null}
+    {pending ? <p role="status">Your setup is saved for recovery. Retrying will not create another business.</p> : null}
     {error ? <p role="alert">{error}</p> : null}
-    <Button type="submit" disabled={saving || (selected === "new" && !name.trim())}>{saving ? "Saving…" : pending ? "Retry retained setup" : request.trim() ? "Save business and request" : "Continue with this business"}</Button>
+    <Button type="submit" disabled={saving || (selected === "new" && !name.trim())}>{saving ? "Saving…" : pending ? "Retry safely" : request.trim() ? "Save business and request" : "Continue with this business"}</Button>
     <p className="text-sm text-gray-muted">Saving a request does not accept a price or deadline, start delivery, grant provider access, or send email.</p>
   </form>;
 }

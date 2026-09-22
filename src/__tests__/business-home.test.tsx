@@ -72,7 +72,7 @@ describe("business home", () => {
     expect(html).toContain("Needs your attention");
     expect(html).toContain("Review urgency field");
     expect(html).toContain("Opening checklist");
-    expect(html).toContain("Next actions");
+    expect(html).toContain("Your apps and work");
     expect(html).not.toMatch(/>Applications<|>Documents</);
   });
 

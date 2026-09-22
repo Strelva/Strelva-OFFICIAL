@@ -192,7 +192,7 @@ test("business composer, context, integrations and navigation use working destin
   );
   await page.getByLabel("What do you need?").fill("Appointment preferences");
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
-  await page.getByRole("button", { name: "Home", exact: true }).click();
+  await page.getByRole("link", { name: "Home", exact: true }).click();
   await expect(
     page.getByRole("button", { name: /Appointment preferences.*Draft/ }),
   ).toBeVisible();
@@ -214,7 +214,7 @@ test("business composer, context, integrations and navigation use working destin
   await expect(page.getByLabel("What do you need?")).toHaveValue(
     "Connect scheduling",
   );
-  await page.getByRole("button", { name: "Help", exact: true }).click();
+  await page.getByRole("link", { name: "Help", exact: true }).click();
   await expect(
     page.getByRole("link", { name: "Email hello@strelva.com" }),
   ).toHaveAttribute("href", "mailto:hello@strelva.com");
