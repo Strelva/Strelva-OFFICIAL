@@ -176,7 +176,7 @@ export function WorkspaceStart({ context, initialRequest = "", draftKey, onDraft
       <p>Describe the result in your own words. You can review what Strelva proposes before any work starts.</p>
     </header>
 
-    <WorkspaceComposer initialRequest={request} draftKey={draftKey} disabled={Boolean(context.readOnly)} autoFocus onSubmit={submit} onTemplates={onTemplates} onEdited={() => setPlan(null)} />
+    <WorkspaceComposer initialRequest={request} draftKey={draftKey} disabled={Boolean(context.readOnly)} autoFocus onSubmit={submit} onTemplates={onTemplates} onEdited={(value) => { setRequest(value); onDraftChange?.(value); setPlan(null); }} />
 
     <section className={styles.startExamples} aria-labelledby={`${formId}-examples`}>
       <div className={styles.startSectionHeading}><h2 id={`${formId}-examples`}>Try an example</h2><span>Optional</span></div>
