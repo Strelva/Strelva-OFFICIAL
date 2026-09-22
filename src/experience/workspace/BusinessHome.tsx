@@ -34,6 +34,7 @@ interface Props {
   onStart: () => void;
   onCreateWebsite?: () => void;
   onRequest?: (request: string) => void;
+  onDraftChange?: (request: string) => void;
   onWork: () => void;
   onOngoing: () => void;
   onAccess: () => void;
@@ -46,7 +47,7 @@ interface Props {
 }
 
 /** The start and return surface, using the same frame as every saved result. */
-export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignmentsKnown, offerings, busy, notice, onOpen, onStart, onCreateWebsite, onRequest, onWork, onOngoing, onAccess, onSettings, onWorkspace, onHelp, onExplore, onOfferings, appBase = "", accountHref, signOut, managedWorkUnavailable, onWebsiteCommand, onRetryWebsiteAssignments }: Props) {
+export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignmentsKnown, offerings, busy, notice, onOpen, onStart, onCreateWebsite, onRequest, onDraftChange, onWork, onOngoing, onAccess, onSettings, onWorkspace, onHelp, onExplore, onOfferings, appBase = "", accountHref, signOut, managedWorkUnavailable, onWebsiteCommand, onRetryWebsiteAssignments }: Props) {
   const current = snapshot.workspaces.find(space => space.id === snapshot.workspaceId);
   const readOnly = current?.access === "delegated_read";
   const name = current?.name || "Your business";
@@ -86,7 +87,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
       <section className={styles.start} aria-labelledby="business-start-title">
         <header className={styles.greeting}><p>{readOnly ? "Shared with you" : name}</p><h1 id="business-start-title" className="font-display">{readOnly ? "Your shared work." : "What would you like to do?"}</h1>{readOnly ? <p>Review work shared by {name}. Only its owners can make changes.</p> : null}</header>
         {!readOnly ? <>
-          <WorkspaceComposer key={`${snapshot.actor.email}:${snapshot.workspaceId}`} draftKey={requestDraftKey({ actorEmail: snapshot.actor.email, workspaceId: snapshot.workspaceId })} disabled={busy} onSubmit={request} onTemplates={onExplore} placeholder="Describe an app, a change, or something you need done…" />
+          <WorkspaceComposer key={`${snapshot.actor.email}:${snapshot.workspaceId}`} draftKey={requestDraftKey({ actorEmail: snapshot.actor.email, workspaceId: snapshot.workspaceId })} disabled={busy} onSubmit={request} onEdited={onDraftChange} onTemplates={onExplore} placeholder="Describe an app, a change, or something you need done…" />
           <div className={styles.starters} aria-label="Start with an example">
             <Button variant="ghost" size="sm" disabled={busy} onClick={() => request("Create a staff request app for our team.")}><LayoutGrid size={16} aria-hidden="true" />Create an app</Button>
             <Button variant="ghost" size="sm" disabled={busy} onClick={() => request("Organize supplier onboarding requirements.")}><FileText size={16} aria-hidden="true" />Organize onboarding</Button>
