@@ -36,6 +36,12 @@ describe("native request restoration", () => {
       expect(JSON.parse(other.node.textContent!)).toEqual({ request: "", route: "", ready: true });
     }
   });
+  it("keeps an explicitly cleared draft empty instead of resurrecting a retained request", async () => {
+    retainRequestIntent(sessionStorage, "cleared", "Old supplier request", "onboarding");
+    const { node, root } = await render(<WorkspaceIntent draftKey="cleared" request="new" current route="onboarding"><IntentProbe /></WorkspaceIntent>);
+    await act(async () => root.render(<WorkspaceIntent draftKey="cleared" request="" current route="start"><IntentProbe /></WorkspaceIntent>));
+    expect(JSON.parse(node.textContent!)).toEqual({ request: "", route: "start", ready: true });
+  });
   it("prefers the current request and rejects corrupted or executable-looking routes", async () => {
     retainRequestIntent(sessionStorage, "draft", "old", "document");
     const current = await render(<WorkspaceIntent draftKey="draft" request="new" route="applications"><IntentProbe /></WorkspaceIntent>);

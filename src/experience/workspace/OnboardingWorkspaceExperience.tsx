@@ -1,6 +1,6 @@
 "use client";
 
-import { OnboardingExperience, type OnboardingExperienceProps } from "@/products/onboarding/OnboardingExperience";
+import { OnboardingExperience, type OnboardingExperienceProps } from "@/products/onboarding/client";
 import { useWorkspaceIntent } from "./WorkspaceIntent";
 
 /** Shell request context stays outside the native onboarding product. */

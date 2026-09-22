@@ -6,7 +6,7 @@ interface RequestIntent { request: string; route: string; ready: boolean }
 const IntentContext = createContext<RequestIntent>({ request: "", route: "", ready: true });
 export function useWorkspaceIntent() { return useContext(IntentContext); }
 
-type Props = { request: string; route?: string; draftKey: string; children: ReactNode };
+type Props = { request: string; current?: boolean; route?: string; draftKey: string; children: ReactNode };
 const ROUTES = new Set(["start", "plan", "help", "assessment", "document", "tracker", "inquiries", "website", "websites", "applications", "onboarding", "scheduling", "investigations", "operations"]);
 
 /** Request data only. Never authorization to execute, share, or publish work. */
@@ -17,7 +17,7 @@ export function retainRequestIntent(storage: Pick<Storage, "setItem">, draftKey:
 }
 
 export function WorkspaceIntent(props: Props) { return <IntentSession key={props.draftKey} {...props} />; }
-function IntentSession({ request, route = "start", draftKey, children }: Props) {
+function IntentSession({ request, current = false, route = "start", draftKey, children }: Props) {
   const [retained, setRetained] = useState<RequestIntent>({ request: "", route: "", ready: false });
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -33,5 +33,5 @@ function IntentSession({ request, route = "start", draftKey, children }: Props) 
     });
     return () => window.cancelAnimationFrame(frame);
   }, [draftKey]);
-  return <IntentContext.Provider value={request ? { request, route, ready: true } : retained}>{children}</IntentContext.Provider>;
+  return <IntentContext.Provider value={current || request ? { request, route, ready: true } : retained}>{children}</IntentContext.Provider>;
 }

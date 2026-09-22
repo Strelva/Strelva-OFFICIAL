@@ -94,6 +94,7 @@ function initialOfferingId(): string | null {
 export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], managedWorkUnavailable, home, agency, busy, selectedWork, workingTitle, workingSection = "work", onHome, onNew, onPlan, onOngoing, onAgency, onInquiry, onTracker, onWebsite, onDocument, onHorizontal, trackerTemplates, inquiryBusinesses = [], inquiry, tracker, plan, document, onCreatedApp, onChoose, onWorkspace, onOpenClientWork, notice, children }: Props) {
   const [requestText, setRequestText] = useState("");
   const [requestRoute, setRequestRoute] = useState("start");
+  const [requestCurrent, setRequestCurrent] = useState(false);
   const [startDraft, setStartDraft] = useState("");
   const [startSession, setStartSession] = useState(0);
   const draftKey = requestDraftKey({ actorEmail: snapshot.actor.email, workspaceId: snapshot.workspaceId });
@@ -252,6 +253,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
   }
 
   function rememberRequest(request: string, route = "start") {
+    setRequestCurrent(true);
     setRequestText(request);
     setRequestRoute(route);
     try { retainRequestIntent(window.sessionStorage, draftKey, request, route); } catch { /* In-memory request remains available. */ }
@@ -415,7 +417,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     return <><h2>Try the search before you connect it.</h2><p>Home Finder is a brokerage-branded home search. This preview uses synthetic listings and never sends or stores buyer inquiries.</p>{product.previewHref ? <a className={styles.primaryAction} href={product.previewHref} target="_blank" rel="noreferrer">Try Home Finder<ArrowRight size={17} /></a> : <p>Its synthetic preview is not available from this environment yet.</p>}<p>A live installation needs brokerage approval, permitted listing data, and verified inquiry delivery.</p><button type="button" className={styles.secondaryAction} onClick={() => navigate("help", "I’d like early access to Home Finder. Please tell me what enabling a live brokerage installation would require.")}>Ask about early access<ArrowRight size={17} /></button></>;
   }
 
-  if (home && !startOpen && section === "home" && current?.kind !== "agency" && !workspaceExitBlocks) return <WorkspaceIntent request={requestText} route={requestRoute} draftKey={draftKey}><BusinessHome
+  if (home && !startOpen && section === "home" && current?.kind !== "agency" && !workspaceExitBlocks) return <WorkspaceIntent request={requestText} current={requestCurrent} route={requestRoute} draftKey={draftKey}><BusinessHome
     snapshot={snapshot} sites={assignedSites} unassignedSites={unassignedSites} siteAssignmentsKnown={siteAssignmentsKnown} offerings={offerings.state} busy={busy} notice={notice} managedWorkUnavailable={managedWorkUnavailable}
     appBase={appBase} accountHref={`${appBase || ""}/workspace/account`} signOut={signOut}
     onExplore={() => navigate("products")}
@@ -432,7 +434,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     ...snapshot.work.map(work => ({ id: work.id, title: work.title, detail: workspaceWorkLabel(work), href: `${appBase || ""}/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&work=${encodeURIComponent(work.id)}`, onOpen: () => openWork(work.id) })),
     ...assignedSites.map(site => ({ id: `site-${site.id}`, title: site.title, detail: "Managed website", href: site.href })),
   ];
-  return <WorkspaceIntent request={requestText} route={requestRoute} draftKey={draftKey}><StrelvaShell appBase={appBase} signOut={signOut}
+  return <WorkspaceIntent request={requestText} current={requestCurrent} route={requestRoute} draftKey={draftKey}><StrelvaShell appBase={appBase} signOut={signOut}
     workspaceId={snapshot.workspaceId} searchItems={searchItems} searchScopeName={current?.name || "Your work"} recentWork={searchItems.filter(item => !item.id.startsWith("site-"))}
     active={agency ? "access" : home ? startOpen ? undefined : section : workingSection}
     title={!home ? inquiry ? "Inquiry work" : tracker !== undefined ? "Tracker" : plan !== undefined ? "Work plan" : document !== undefined ? "Document" : agency ? "People & access" : workingTitle || (selectedWork ? "Your work" : "New assessment") : startOpen ? "New" : section === "home" ? "Strelva" : section === "products" ? "Apps & templates" : section === "settings" ? "Settings" : section === "ongoing" ? "Ongoing" : section === "help" ? "Help" : "Work"}
