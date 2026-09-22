@@ -487,3 +487,12 @@ The existing business explorer is retained at `/explore`, including legacy links
 This is a local implementation decision, not deployment authority or evidence
 that arbitrary requests can execute. The [current handoff](../strelva-marketing/docs/design/session-landing.md)
 and [public checklist](./todo.md#2-public-discovery-and-first-value) track proof and gaps.
+
+
+## September 22 self-service workspace
+
+The customer web application uses the persistent StrelvaShell/AppFrame across Home, New, native work and account/managed surfaces. BusinessHome is now a request-first working surface, not the illustrated scene. New, Search and Apps & templates are stable destinations. Native editors remain usable directly; conversation is an input, not a replacement for forms, records or previews. Agency website delivery remains distinct from a self-service website draft.
+
+WorkspaceComposer owns the shared request editor. Actor/business-scoped session drafts retain words, not permission. Editing a request invalidates its previous proposal. Native products receive explicit continuation properties from experience adapters; they must not import experience state. Search displays every matching authorized item supplied to the shell and preserves its scoped query. This is not a new server-wide search index.
+
+The template library contains curated native application schemas. Preview uses the actual recipient renderer with local-only test data. A private app is created through the existing native API; publication, access, stored records and version compatibility remain native responsibilities. Previewing does not publish, grant access, invoke a model or save test records. An unconfirmed create is never automatically retried. Desktop packaging remains future work; this change does not add a native desktop runtime.

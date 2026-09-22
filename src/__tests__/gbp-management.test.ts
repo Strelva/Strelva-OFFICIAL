@@ -16,6 +16,9 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// HTTP is mocked below. Resolve its public test hosts without a real DNS lookup.
+vi.mock("node:dns", () => ({ promises: { lookup: vi.fn(async () => ({ address: "93.184.216.34", family: 4 })) } }));
+
 // ─── Mock: Redis ──────────────────────────────────────────────────────────────
 
 const mockRedisGet = vi.fn((_key: string) => Promise.resolve(null as unknown));
@@ -127,6 +130,7 @@ describe("updateBusinessHours", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFetch.mockReset();
     mockGetConnection.mockResolvedValue(connectedWithScope());
     setupGbpMeta();
   });
@@ -261,6 +265,7 @@ describe("createGbpPost", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFetch.mockReset();
     mockGetConnection.mockResolvedValue(connectedWithScope());
     setupGbpMeta();
   });
@@ -361,6 +366,7 @@ describe("createGbpPost", () => {
 describe("agent create_gbp_post tool: governance enforcement", () => {
   it("always produces a pending event — never auto-publishes GBP posts", async () => {
     vi.clearAllMocks();
+    mockFetch.mockReset();
     mockGetConnection.mockResolvedValue(connectedWithScope());
     setupGbpMeta();
     mockAddEvent.mockResolvedValue({ id: "evt_post_draft" });
@@ -407,6 +413,7 @@ describe("agent create_gbp_post tool: governance enforcement", () => {
 describe("uploadGbpPhoto", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFetch.mockReset();
     mockGetConnection.mockResolvedValue(connectedWithScope());
     setupGbpMeta();
   });
@@ -474,6 +481,7 @@ describe("uploadGbpPhoto", () => {
 describe("getGbpState", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFetch.mockReset();
   });
 
   it("returns null when not connected", async () => {

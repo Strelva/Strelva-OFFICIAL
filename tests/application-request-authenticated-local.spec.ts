@@ -72,7 +72,7 @@ test("an owner starts with a request and delivers an application through the UI,
     const staff = await employee.context.newPage();
     await staff.setViewportSize({ width: 390, height: 844 });
     await staff.goto(`/apps/${appId}`);
-    await staff.getByLabel("Equipment needed *", { exact: true }).fill("Pipe inspection camera for the Elm Street job");
+    await staff.getByLabel("Equipment needed", { exact: true }).fill("Pipe inspection camera for the Elm Street job");
     await staff.getByRole("button", { name: "Submit record", exact: true }).click();
     await expect(staff.getByText("Pipe inspection camera for the Elm Street job", { exact: true })).toBeVisible();
     await page.reload();
@@ -82,16 +82,16 @@ test("an owner starts with a request and delivers an application through the UI,
     await page.getByRole("button", { name: "Save new draft", exact: true }).click();
     await expect(page.getByText(/label changes from "Equipment needed" to "Equipment and job"/)).toBeVisible();
     await staff.reload();
-    await expect(staff.getByLabel("Equipment needed *", { exact: true })).toBeVisible();
+    await expect(staff.getByLabel("Equipment needed", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Check proposed change", exact: true }).click();
     // A compatible submission arriving after review must not require the owner
     // to restart an unchanged design review or lose that submission.
-    await staff.getByLabel("Equipment needed *", { exact: true }).fill("Replacement pipe cutter for van 3");
+    await staff.getByLabel("Equipment needed", { exact: true }).fill("Replacement pipe cutter for van 3");
     await staff.getByRole("button", { name: "Submit record", exact: true }).click();
     await expect(staff.getByText("Replacement pipe cutter for van 3", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Publish", exact: true }).click();
     await staff.reload();
-    await expect(staff.getByLabel("Equipment and job *", { exact: true })).toBeVisible();
+    await expect(staff.getByLabel("Equipment and job", { exact: true })).toBeVisible();
     await expect(staff.getByText("Pipe inspection camera for the Elm Street job", { exact: true })).toBeVisible();
     await expect(staff.getByText("Replacement pipe cutter for van 3", { exact: true })).toBeVisible();
     await staff.screenshot({ path: testInfo.outputPath("equipment-requests-phone.png"), fullPage: true });

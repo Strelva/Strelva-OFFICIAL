@@ -844,8 +844,8 @@ function DiscoveryRows({
           <small>{entry.action.kind === "open" ? "Installed for this business" : entry.action.kind === "start" ? "Available to start" : entry.action.kind === "explore" ? "Example only · live setup is not enabled" : "Setup requires a request"}</small>
         </span>
         <span className={styles.discoveryActions}>
-          <button type="button" className={styles.discoveryAction} onClick={action}>{entry.action.label}</button>
-          {entry.secondary ? <><small className={styles.discoverySecondaryTitle}>{entry.secondary.title}</small><button type="button" className={styles.discoverySecondaryAction} onClick={() => run(entry.secondary!.target, entry.secondary!.action)}>{entry.secondary.action.label}</button></> : null}
+          <button type="button" className={styles.discoveryAction} aria-label={`${entry.title}: ${entry.action.label}`} onClick={action}>{entry.action.label}</button>
+          {entry.secondary ? <><small className={styles.discoverySecondaryTitle}>{entry.secondary.title}</small><button type="button" className={styles.discoverySecondaryAction} aria-label={`${entry.secondary.title}: ${entry.secondary.action.label}`} onClick={() => run(entry.secondary!.target, entry.secondary!.action)}>{entry.secondary.action.label}</button></> : null}
         </span>
       </div>;
     })}

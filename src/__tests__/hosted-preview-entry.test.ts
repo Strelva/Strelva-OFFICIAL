@@ -9,7 +9,7 @@ vi.mock("@/lib/db/middleware-client", () => ({
 import proxy from "@/proxy";
 
 afterEach(() => vi.unstubAllEnvs());
-const request = (path: string) => new NextRequest(`https://strelva-app-staging-strelva.vercel.app${path}`);
+const request = (path: string) => new NextRequest(`https://strelva-app-staging-strelva.vercel.app${path}`, { headers: { host: "strelva-app-staging-strelva.vercel.app" } });
 
 describe("hosted fixture entry", () => {
   it("opens the fixture without granting access to real dashboard or API routes", async () => {

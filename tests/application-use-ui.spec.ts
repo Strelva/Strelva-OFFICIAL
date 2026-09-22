@@ -47,8 +47,8 @@ test("finished application is a focused keyboard usable experience with responsi
   await page.goto(`/apps/${WORK_ID}`);
   await expect(page.getByRole("heading", { name: "Repair requests", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Records", exact: true })).toBeVisible();
-  await page.getByLabel("Problem *", { exact: true }).fill("Broken gate");
-  await page.getByLabel("Problem *", { exact: true }).press("Tab");
+  await page.getByLabel("Problem", { exact: true }).fill("Broken gate");
+  await page.getByLabel("Problem", { exact: true }).press("Tab");
   await expect(page.getByRole("button", { name: "Submit record", exact: true })).toBeFocused();
   await page.getByRole("button", { name: "Submit record", exact: true }).press("Enter");
   await expect(page.getByRole("status")).toContainText("Record submitted.");
@@ -127,7 +127,7 @@ test("corrections submit form fields while preserving visible office notes", asy
   });
   await page.goto(`/apps/${WORK_ID}`);
   await page.getByRole("button", { name: "Edit record", exact: true }).click();
-  await page.getByLabel("Problem *", { exact: true }).fill("Door handle needs repair");
+  await page.getByLabel("Problem", { exact: true }).fill("Door handle needs repair");
   await page.getByRole("button", { name: "Save correction", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Correction saved.");
   await expect(page.getByRole("article")).toContainText("Use the side entrance");
@@ -151,7 +151,7 @@ test("cancelling a correction starts a distinct new record", async ({ page }) =>
   await page.goto(`/apps/${WORK_ID}`);
   await page.getByRole("button", { name: "Edit record", exact: true }).click();
   await page.getByRole("button", { name: "Cancel correction", exact: true }).click();
-  await page.getByLabel("Problem *", { exact: true }).fill("Broken gate");
+  await page.getByLabel("Problem", { exact: true }).fill("Broken gate");
   await page.getByRole("button", { name: "Submit record", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Record submitted.");
   await expect(page.getByRole("article", { name: "Record 1", exact: true })).toContainText("Loose front door");
@@ -180,7 +180,7 @@ for (const width of [1440, 390]) {
     await expect(sharedRecord.getByRole("button", { name: "Edit record" })).toHaveCount(0);
     await ownRecord.getByRole("button", { name: "Edit record" }).focus();
     await page.keyboard.press("Enter");
-    await expect(page.getByLabel("Problem *", { exact: true })).toHaveValue("Loose front door");
+    await expect(page.getByLabel("Problem", { exact: true })).toHaveValue("Loose front door");
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: `/tmp/strelva-app-edit-scope-${width}.png`, fullPage: true });
   });
@@ -226,12 +226,12 @@ test("an edit-only recipient keeps a date correction after a stale response", as
   await expect(page.getByRole("button", { name: "Edit record", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Edit record", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Correct a record", exact: true })).toBeVisible();
-  await page.getByLabel("Visit date *", { exact: true }).fill("2024-02-29");
-  await page.getByLabel("Problem *", { exact: true }).fill("Broken gate");
+  await page.getByLabel("Visit date", { exact: true }).fill("2024-02-29");
+  await page.getByLabel("Problem", { exact: true }).fill("Broken gate");
   await page.getByRole("button", { name: "Save correction", exact: true }).click();
-  await expect(page.locator("#application-submit-error")).toContainText("Your correction is still here");
-  await expect(page.getByLabel("Visit date *", { exact: true })).toHaveValue("2024-02-29");
-  await expect(page.getByLabel("Problem *", { exact: true })).toHaveValue("Broken gate");
+  await expect(page.locator('[id$="application-submit-error"]')).toContainText("Your correction is still here");
+  await expect(page.getByLabel("Visit date", { exact: true })).toHaveValue("2024-02-29");
+  await expect(page.getByLabel("Problem", { exact: true })).toHaveValue("Broken gate");
   await page.getByRole("button", { name: "Save correction", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Correction saved.");
   expect((submitted as { action?: string; input?: { expectedRecordRevision?: number; record?: { id?: string; values?: unknown } } }).action).toBe("edit");

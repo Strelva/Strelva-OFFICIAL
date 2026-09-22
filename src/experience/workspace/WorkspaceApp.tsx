@@ -25,7 +25,7 @@ import { DocumentExperience } from "./DocumentExperience";
 import { LocalDocumentPreview } from "./preview/LocalDocumentPreview";
 import { WorkPlanExperience } from "./WorkPlanExperience";
 import { WorkBudgetPanel } from "./WorkBudgetPanel";
-import { OnboardingExperience } from "@/products/onboarding/client";
+import { OnboardingWorkspaceExperience } from "./OnboardingWorkspaceExperience";
 import { WebsiteExperience } from "@/experience/websites/WebsiteExperience";
 import { CustomApplicationManageExperience } from "@/experience/custom-applications/CustomApplicationManageExperience";
 import { BoundedWorkExperience } from "@/experience/operations/BoundedWorkExperience";
@@ -362,6 +362,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
   }
 
   function clearEmbeddedRouteParams(url: URL) {
+    url.searchParams.delete("template");
     url.searchParams.delete("standingId");
     url.searchParams.delete("assignmentId");
     url.searchParams.delete("tenantId");
@@ -705,6 +706,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
         managedWorkUnavailable={snapshot.managedWorkUnavailable}
         onHome={goHome}
         onChoose={chooseWork}
+        onCreatedApp={id => openWorkFromPlan(id, "applications")}
         onNew={(context) => { if (workspaceExitBlocks) return; setMissingWork(false); setSelectedStandingId(null); setStandingCreating(false); setRetryWork(null); setAssessmentStartContext(context?.route === "assessment" ? context : null); setInquiryStartContext(null); setTrackerStartContext(null); setDocumentStartContext(null); setPlanStartRequest(null); const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.set("workspaceId", workspaceIdForNavigation(snapshot.workspaceId)); url.searchParams.set("view", "work"); url.searchParams.delete("work"); window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`); setHome(false); setView("work"); setShowAssessment(true); setNotice(null); }}
         onPlan={startPlan}
         onOngoing={openOngoing}
@@ -801,7 +803,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
             />
               : view === "websites" ? <WebsiteExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} readOnly={workspaceReadOnly} initialRequest={horizontalRequest} onSaved={horizontalSaved} />
               : view === "custom-applications" ? selectedWork?.productId === view ? <CustomApplicationManageExperience key={selectedWork.id} workId={selectedWork.id} readOnly={Boolean(workspaceReadOnly || currentWorkspace?.role === "member")} /> : <p role="status">Select a saved custom application to review its delivery.</p>
-              : view === "onboarding" ? <OnboardingExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} initialCaseId={selectedWork?.productId === view ? selectedWork.id : undefined} readOnly={workspaceReadOnly} onSaved={horizontalSaved} />
+              : view === "onboarding" ? <OnboardingWorkspaceExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} initialCaseId={selectedWork?.productId === view ? selectedWork.id : undefined} initialRequest={horizontalRequest} readOnly={workspaceReadOnly} onSaved={horizontalSaved} />
               : view === "product-learning" ? <LearningExperience workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} sources={snapshot.work} readOnly={workspaceReadOnly} onSaved={horizontalSaved} />
               : <BoundedWorkExperience key={`${snapshot.workspaceId}:${view}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} productId={view} sources={snapshot.work} readOnly={workspaceReadOnly} workspaceStopped={workspaceStopped} calendarRecoveryAllowed={calendarRecoveryAllowed} initialRequest={horizontalRequest} onSaved={horizontalSaved} />}
             {selectedWork && view !== "product-learning" && view !== "websites" && !snapshot.actor.localPreview ? <WorkAuthorityPanel key={selectedWork.id} workId={selectedWork.id} canManage={!workspaceReadOnly && (currentWorkspace?.role === "owner" || currentWorkspace?.role === "admin")} sources={snapshot.work} /> : null}
@@ -871,11 +873,14 @@ function WorkspaceFrame({ children }: { children: React.ReactNode }) {
 function WorkspaceLoading({ label }: { label: string }) {
   return (
     <WorkspaceFrame>
-      <StrelvaShell signedIn={false} title="Your Strelva">
-      <div role="status" className="flex flex-1 items-center justify-center gap-3 text-[14px] text-gray-muted">
-        <Loader2 className="h-4 w-4 animate-spin" />{label}
+      <div inert className="contents">
+        <StrelvaShell signedIn={false} title="Your Strelva">
+          <div className="flex flex-1 items-center justify-center gap-3 text-sm text-gray-muted">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />{label}
+          </div>
+        </StrelvaShell>
       </div>
-      </StrelvaShell>
+      <p role="status" className="sr-only">{label}</p>
     </WorkspaceFrame>
   );
 }

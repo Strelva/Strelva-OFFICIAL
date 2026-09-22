@@ -7,7 +7,7 @@ export default async function WorkspacePreviewAlias({ searchParams }: { searchPa
   if (!strelvaUiPreviewEnabled()) notFound();
   const source = await searchParams;
   const params = new URLSearchParams();
-  for (const name of ["view", "work", "scenario", "workspaceId", "search", "offering", "standingId", "assignmentId", "row", "previewSetup"]) {
+  for (const name of ["view", "work", "scenario", "workspaceId", "search", "template", "offering", "standingId", "assignmentId", "row", "previewSetup"]) {
     const value = source[name];
     if (typeof value === "string") params.set(name, value);
   }

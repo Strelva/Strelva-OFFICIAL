@@ -17,7 +17,7 @@ async function post(request: APIRequestContext, path: string, data: unknown, sta
 
 async function openSettings(page: Page, workspaceId: string) {
   await page.goto(`/workspace?workspaceId=${workspaceId}`);
-  await page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("link", { name: "Settings", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Payer for future jobs", exact: true })).toBeVisible();
   return page.getByRole("region", { name: "Payer for future jobs", exact: true });
 }

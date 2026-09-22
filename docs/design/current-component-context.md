@@ -199,3 +199,12 @@ Jacob subsequently confirmed the session direction replaces the homepage. It now
 owns `/` in marketing; the preview route is only an alias. Public routing, local
 brief recovery and the retained `/explore` journey are recorded in the session
 handoff. Deployment and signup-to-work continuity remain separate unfinished work.
+
+
+## September 22 self-service implementation and review
+
+PR #195 (`feat/self-service-experience-20260922`) introduces the shared request-first Home, native template library, editable recipient previews, request continuity and complete matching-result search. Existing native delivery, tenant membership, app publication and record-preservation contracts remain unchanged. Git deployments remain disabled; no production deployment, migration, provider action or billing change was performed.
+
+At `1bba329da044d05c1fb88b1d916932186a5e2cfb`, GitHub Self-service review run `35755957415` passed lint, type checking, the full unit suite and production build. Its 48 isolated browser journeys produced 35 passed and 13 failed, with zero skips or retries. Captures were inspected for desktop/mobile Home, template discovery and navigation. Most failures were old labels or disclosure/row selectors; those are updated without removing their underlying website-assignment, read-only, inquiry or publication assertions. The native onboarding import boundary was also corrected, and editing a request now immediately invalidates the old proposal.
+
+The next exact-head run is the acceptance authority; the preceding result is not a clean browser gate. The read-only `.github/workflows/self-service-review.yml` retains the tested SHA, JSON report and captures. Local focused regression tests cover template validation, private creation, double-submit prevention, wrong-business responses, ambiguous-write recovery, onboarding continuation and stale proposals. Fixtures contain synthetic data and no live provider operations. Authenticated production, physical-device and screen-reader acceptance remain separate.

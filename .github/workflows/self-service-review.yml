@@ -1,0 +1,61 @@
+name: Self-service review
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+concurrency:
+  group: self-service-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  review:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Retain exact candidate source
+        run: |
+          mkdir -p /tmp/strelva-ui-source
+          git archive --format=tar.gz --prefix=strelva-source/ HEAD > /tmp/strelva-ui-source/source.tar.gz
+          git rev-parse HEAD > /tmp/strelva-ui-source/commit.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: self-service-source-${{ github.run_id }}
+          path: /tmp/strelva-ui-source/
+          retention-days: 1
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint && pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Customer UI journeys
+        run: pnpm exec playwright test tests/illustrated-home.spec.ts tests/self-service-library.spec.ts tests/shared-frame.spec.ts tests/application-use-ui.spec.ts tests/workspace-ui-preview.spec.ts --retries=0 --reporter=line,json
+        env:
+          CI: true
+          STRELVA_UI_PREVIEW: '1'
+          STRELVA_WORKSPACE_RELEASE: '0'
+          REB_DEV_UNGATED_ACCESS: '0'
+          PLAYWRIGHT_JSON_OUTPUT_FILE: ui-results.json
+      - name: Record exact source revision
+        if: always()
+        run: git rev-parse HEAD > ui-commit.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: self-service-review-${{ github.run_id }}
+          path: |
+            ui-commit.txt
+            ui-results.json
+            test-results/
+          retention-days: 7

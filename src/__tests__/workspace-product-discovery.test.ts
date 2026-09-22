@@ -75,7 +75,7 @@ describe("workspace product discovery", () => {
     };
     const html = renderToStaticMarkup(createElement(WorkspaceLayout, layoutProps));
     expect(html).toContain("Harbor Dental");
-    expect(html).toContain("Authorized sites");
+    expect(html).toContain("Websites available to your account");
     expect(html).toContain("Account-authorized website");
     expect(html).toContain(`href="${snapshot.managedWork[0].href}"`);
     expect(html).not.toContain('data-testid="website-assignment-handoff"');

@@ -188,7 +188,7 @@ describe("workspace start planner", () => {
     expect(html).toContain("Create a staff request app");
     expect(html).toContain("Organize onboarding");
     expect(html).toContain("Have Strelva build my website");
-    expect(html).toContain("Show me the shape");
+    expect(html).toContain("Continue with this request");
     expect(html).toContain("Handle customer inquiries");
     expect(html).toContain("Turn a file into a tracker");
     expect(html).toContain("Check a business");

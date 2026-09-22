@@ -1,3 +1,6 @@
+/* Preserve the foundation order even when a component chunk loads first. */
+@layer theme, base, components, utilities;
+
 /* Defaults live below utilities so existing className overrides stay usable. */
 @layer components {
   .control {

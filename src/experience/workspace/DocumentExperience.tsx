@@ -1,5 +1,7 @@
 "use client";
 
+import { useWorkspaceIntent } from "./WorkspaceIntent";
+
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { TextInput, TextArea } from "@/components/ui/TextInput";
@@ -31,7 +33,9 @@ const serverTransport: DocumentTransport = {
 type Props = { workspaceId: string; workId?: string; readOnly?: boolean; onSaved?: (workId: string) => void; transport?: DocumentTransport; initialRequestText?: string; sources?: readonly WorkspaceWork[] };
 
 export function DocumentExperience(props: Props) {
-  return <DocumentSession key={`${props.workspaceId}:${props.workId ?? "new"}`} {...props} />;
+  const intent = useWorkspaceIntent();
+  if (!props.workId && !props.initialRequestText && !intent.ready) return <p role="status">Opening your request…</p>;
+  return <DocumentSession key={`${props.workspaceId}:${props.workId ?? "new"}`} {...props} initialRequestText={props.initialRequestText || (!props.workId && intent.route === "document" ? intent.request : undefined)} />;
 }
 
 function DocumentSession({ workspaceId, workId, readOnly, onSaved, transport = serverTransport, initialRequestText, sources = [] }: Props) {

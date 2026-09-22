@@ -20,7 +20,7 @@ test.describe("inquiry migration browser journey", () => {
     await expect(page.getByText("Read back exact definition from isolated fixture memory; no live website was changed.", { exact: true })).toBeVisible();
     await page.locator("main").evaluate((element) => { element.scrollTop = 0; });
     await page.screenshot({ path: "output/inquiry-receipt-desktop-verified.png", fullPage: true });
-    await page.getByRole("button", { name: "Work", exact: true }).click();
+    await page.getByRole("link", { name: "Work", exact: true }).click();
     await page.getByRole("button", { name: "Review rehearsal" }).click();
     await page.getByRole("button", { name: "Send test inquiry", exact: true }).click();
     await expect(page.getByRole("main")).toContainText("Rehearsal customer");

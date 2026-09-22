@@ -306,7 +306,7 @@ export function AppFrame({
 
       <div className={styles.body} inert={mobileNavigationModal || undefined}>
         {(header || navigation) && (
-          <div className={styles.header} role="banner">
+          <div className={styles.header} role="banner" inert={mobileRailModal || undefined}>
             {navigation && showNavigationToggle && (
               <button
                 type="button"
@@ -320,7 +320,7 @@ export function AppFrame({
                 {collapsed ? <PanelLeftOpen size={17} strokeWidth={1.5} /> : <PanelLeftClose size={17} strokeWidth={1.5} />}
               </button>
             )}
-            <div className={styles.headerContent}>{header}</div>
+            <div className={styles.headerContent} inert={mobileRailModal || undefined}>{header}</div>
           </div>
         )}
         {notice}
@@ -329,7 +329,7 @@ export function AppFrame({
           className={styles.columns}
           data-right-rail={railIsOpen ? "open" : "closed"}
         >
-          <main id={contentId} className={styles.main} data-frame-main>
+          <main id={contentId} className={styles.main} data-frame-main inert={mobileRailModal || undefined}>
             {children}
           </main>
           {rightRail && (

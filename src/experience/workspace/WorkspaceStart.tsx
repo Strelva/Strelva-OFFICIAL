@@ -1,7 +1,9 @@
 "use client";
 
 import { ArrowRight, Check, CircleHelp, Clipboard, FileSearch, FileText, Globe2, MessageSquareText, Table2 } from "lucide-react";
-import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
+import { WorkspaceComposer } from "./WorkspaceComposer";
+import { Button } from "@/components/ui/Button";
 import styles from "./workspace-surface.module.css";
 import {
   createWorkspaceStartContinuation,
@@ -17,6 +19,9 @@ import {
 export interface WorkspaceStartProps {
   context: WorkspaceStartContext;
   initialRequest?: string;
+  draftKey?: string;
+  onTemplates?: () => void;
+  onDraftChange?: (request: string) => void;
   websiteHandoff?: WorkspaceStartWebsiteHandoff | null;
   onWebsiteHandoffBack?: () => void;
   onContinue: (continuation: WorkspaceStartContinuation) => void;
@@ -51,7 +56,7 @@ function selectionLabel(plan: WorkspaceStartPlan): string | null {
 }
 
 function renderPart(part: WorkspaceStartPart, selected: boolean, onToggle: () => void, inputId: string) {
-  const body = <><span className={styles.startPartCopy}><strong>{part.label}</strong><small>{part.detail}</small></span><span className={styles.startPartMeta}>{part.outcome}</span></>;
+  const body = <><span className={styles.startPartCopy}><strong>{part.label}</strong><small>{part.detail}</small></span></>;
   if (!part.editable) return <div key={part.id} className={styles.startPart}><span className={styles.startPartCheck} aria-hidden="true"><Check size={15} /></span>{body}</div>;
   return <label key={part.id} htmlFor={inputId} className={styles.startPart}><input id={inputId} type="checkbox" checked={selected} onChange={onToggle} /><span className={styles.startPartCheck} aria-hidden="true"><Check size={15} /></span>{body}</label>;
 }
@@ -91,23 +96,19 @@ function WebsiteRequestHandoff({ handoff, onBack }: { handoff: WorkspaceStartWeb
   </section>;
 }
 
-export function WorkspaceStart({ context, initialRequest = "", websiteHandoff = null, onWebsiteHandoffBack, onContinue, onHelp, onPlan }: WorkspaceStartProps) {
-  const [request, setRequest] = useState(initialRequest);
-  const [plan, setPlan] = useState<WorkspaceStartPlan | null>(null);
-  const [selectedPartIds, setSelectedPartIds] = useState<readonly string[]>([]);
-  const [businessId, setBusinessId] = useState("");
-  const [siteId, setSiteId] = useState("");
-  const [trackerTemplateId, setTrackerTemplateId] = useState("");
+export function WorkspaceStart({ context, initialRequest = "", draftKey, onTemplates, onDraftChange, websiteHandoff = null, onWebsiteHandoffBack, onContinue, onHelp, onPlan }: WorkspaceStartProps) {
+  const [composerSeed, setComposerSeed] = useState(initialRequest);
+  const [plan, setPlan] = useState<WorkspaceStartPlan | null>(() => initialRequest.trim() ? planWorkspaceStart(initialRequest, context) : null);
+  const [selectedPartIds, setSelectedPartIds] = useState<readonly string[]>(() => plan?.selectedPartIds || []);
+  const [businessId, setBusinessId] = useState(() => plan?.route === "inquiries" && context.inquiryBusinesses?.length === 1 ? context.inquiryBusinesses[0]!.id : "");
+  const [siteId, setSiteId] = useState(() => plan?.route === "website" && context.managedSites?.length === 1 ? context.managedSites[0]!.id : "");
+  const [trackerTemplateId, setTrackerTemplateId] = useState(() => plan?.suggestedTemplateId || "");
   const [error, setError] = useState("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const formId = useId();
 
-  useEffect(() => {
-    textareaRef.current?.focus();
-  }, []);
 
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function submit(request: string) {
+    onDraftChange?.(request);
     const next = planWorkspaceStart(request, context);
     setPlan(next);
     setSelectedPartIds(next.selectedPartIds);
@@ -118,10 +119,10 @@ export function WorkspaceStart({ context, initialRequest = "", websiteHandoff = 
   }
 
   function chooseExample(value: string) {
-    setRequest(value);
+    setComposerSeed(value);
     setPlan(null);
     setError("");
-    textareaRef.current?.focus();
+    onDraftChange?.(value);
   }
 
   function togglePart(partId: string) {
@@ -175,27 +176,22 @@ export function WorkspaceStart({ context, initialRequest = "", websiteHandoff = 
       <p>Describe the result in your own words. You can review what Strelva proposes before any work starts.</p>
     </header>
 
-    <form className={styles.startComposer} onSubmit={submit} aria-label="Start new work">
-      <label htmlFor={`${formId}-request`}>What do you want to accomplish?</label>
-      <textarea ref={textareaRef} id={`${formId}-request`} value={request} onChange={(event) => { setRequest(event.target.value); setPlan(null); setError(""); }} placeholder="For example, help me keep customer requests moving…" maxLength={3000} required rows={4} />
-      <p>Start with the outcome. You can leave out passwords and private customer information.</p>
-      <div className={styles.startComposerActions}><button type="submit" className={styles.primaryAction}><ArrowRight size={16} />Show me the shape</button></div>
-    </form>
+    <div className="mt-6"><WorkspaceComposer key={composerSeed} initialRequest={composerSeed} draftKey={draftKey} disabled={context.readOnly} autoFocus={!plan} onTemplates={onTemplates} onSubmit={submit} onChange={request => { setPlan(null); setError(""); onDraftChange?.(request); }} placeholder="Describe an app, a change, or something you need done…" /></div>
 
     <section className={styles.startExamples} aria-labelledby={`${formId}-examples`}>
       <div className={styles.startSectionHeading}><h2 id={`${formId}-examples`}>Try an example</h2><span>Optional</span></div>
-      <div className={styles.startExampleList}>{EXAMPLES.map(({ label, request: exampleRequest, icon: ExampleIcon }) => <button key={label} type="button" className={styles.startExample} onClick={() => chooseExample(exampleRequest)}><ExampleIcon size={16} aria-hidden="true" /><span>{label}</span><ArrowRight size={14} aria-hidden="true" /></button>)}</div>
+      <div className={styles.startExampleList}>{EXAMPLES.map(({ label, request: exampleRequest, icon: ExampleIcon }) => <Button key={label} type="button" variant="ghost" className={styles.startExample} onClick={() => chooseExample(exampleRequest)}><ExampleIcon size={16} aria-hidden="true" /><span>{label}</span><ArrowRight size={14} aria-hidden="true" /></Button>)}</div>
     </section>
 
     {websiteHandoff ? <WebsiteRequestHandoff handoff={websiteHandoff} onBack={onWebsiteHandoffBack} /> : plan ? <section className={styles.startProposal} aria-labelledby={`${formId}-proposal`} aria-live="polite">
-      <div className={styles.startProposalHeader}><div className={styles.startProposalIcon}>{renderPlanIcon(plan.route)}</div><div><p className={styles.eyebrow}>{plan.kind === "help" ? (plan.matchedRoutes?.length ? "Multiple outcomes" : "Request to review") : `Outcome · ${plan.outcome || "Proposed shape"}`}</p><h2 id={`${formId}-proposal`}>{plan.title}</h2></div></div>
+      <div className={styles.startProposalHeader}><div className={styles.startProposalIcon}>{renderPlanIcon(plan.route)}</div><div><p className={styles.eyebrow}>{plan.kind === "help" ? (plan.matchedRoutes?.length ? "Multiple outcomes" : "Request to review") : "Proposed next step"}</p><h2 id={`${formId}-proposal`}>{plan.title}</h2></div></div>
       <p className={styles.startProposalSummary}>{plan.summary}</p>
       {plan.kind === "help" ? <p className={styles.startRequestEcho}><strong>Your request stays intact:</strong> <span>{plan.request}</span></p> : null}
       <p className={styles.startNextAction}><strong>Next:</strong> {plan.nextAction}</p>
-        {plan.kind === "help" ? <><div className={styles.startHelp}><CircleHelp size={17} aria-hidden="true" /><p><strong>Here are the workspace paths to consider.</strong> Strelva can assess a business, turn a CSV into a tracker, handle inquiries for an authorized business, open work on a connected managed website, start a private document, organize onboarding requirements, build an application, set up scheduling, compare saved sources, or carry a bounded responsibility. No work has started from this request. {context.readOnly ? "Switch to a workspace you own before preparing a plan." : "You can ask about the closest path when none of these fits."}</p></div>{plan.reason ? <div className={styles.startBlocked} role="status"><CircleHelp size={17} aria-hidden="true" /><p>{plan.reason}</p></div> : null}</> : <>
-        <div className={styles.startParts} aria-label="Proposed shape">{plan.parts.map((part) => renderPart(part, selectedPartIds.includes(part.id), () => togglePart(part.id), `${formId}-${part.id}`))}</div>
+        {plan.kind === "help" ? <><div className={styles.startHelp}><CircleHelp size={17} aria-hidden="true" /><p><strong>Choose a supported next step.</strong> Strelva can assess a business, turn a CSV into a tracker, handle inquiries for an authorized business, open work on a connected managed website, start a private document, organize onboarding requirements, build an application, set up scheduling, compare saved sources, or carry a bounded responsibility. No work has started from this request. {context.readOnly ? "Switch to a workspace you own before preparing a plan." : "You can ask about the closest path when none of these fits."}</p></div>{plan.reason ? <div className={styles.startBlocked} role="status"><CircleHelp size={17} aria-hidden="true" /><p>{plan.reason}</p></div> : null}</> : <>
+        <div className={styles.startParts} aria-label="Proposed result">{plan.parts.map((part) => renderPart(part, selectedPartIds.includes(part.id), () => togglePart(part.id), `${formId}-${part.id}`))}</div>
         {selection ? <label className={styles.startSelect} htmlFor={`${formId}-selection`}><span>{selection}</span><select id={`${formId}-selection`} value={plan.needsSelection === "business" ? businessId : siteId} onChange={(event) => plan.needsSelection === "business" ? setBusinessId(event.target.value) : setSiteId(event.target.value)} required><option value="">Choose one</option>{(plan.needsSelection === "business" ? selectedBusiness : selectedSites).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label> : null}
-        {templates.length ? <label className={styles.startSelect} htmlFor={`${formId}-template`}><span>Starting shape <small>Optional</small></span><select id={`${formId}-template`} value={trackerTemplateId} onChange={(event) => setTrackerTemplateId(event.target.value)}><option value="">Start from a blank tracker</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.label}</option>)}</select></label> : null}
+        {templates.length ? <label className={styles.startSelect} htmlFor={`${formId}-template`}><span>Starting template <small>Optional</small></span><select id={`${formId}-template`} value={trackerTemplateId} onChange={(event) => setTrackerTemplateId(event.target.value)}><option value="">Start from a blank tracker</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.label}</option>)}</select></label> : null}
         {plan.status === "blocked" ? <div className={styles.startBlocked} role="status"><CircleHelp size={17} aria-hidden="true" /><p>{plan.reason}</p></div> : null}
       </>}
       {error ? <p className={styles.startError} role="alert">{error}</p> : null}

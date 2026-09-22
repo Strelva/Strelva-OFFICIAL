@@ -33,7 +33,7 @@ export function workspaceReturnTarget(value: string | null): string | null {
       : key === "tenantId" ? !ID.test(item)
       : key === "inquiryView" ? !INQUIRY_VIEWS.has(item)
       : key === "inquiryRequest" || key === "inquiryRecord" ? !ID.test(item)
-      : key === "offering" ? !ID.test(item) || params.get("view") !== "products"
+      : key === "offering" || key === "template" ? !ID.test(item) || params.get("view") !== "products"
       : key === "standingId" || key === "assignmentId" ? !UUID.test(item) || !["operations", "ongoing"].includes(params.get("view") || "")
       : key === "search" ? item !== "1" || params.get("view") !== "work"
       : key === "row" ? !RECORD_ID.test(item) || params.get("view") !== "tracker" || !params.get("work")

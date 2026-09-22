@@ -67,10 +67,10 @@ describe("agency and native entry interfaces",()=>{
   expect(container.querySelector<HTMLInputElement>("input")?.value).toBe("Juniper");
   await act(async()=>container.querySelector("form")!.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
   expect(JSON.parse(String(calls[1]!.init?.body))).toEqual(command);await resolve(1,{error:"Uncertain"},503);
-  expect(sessionStorage.getItem(`strelva:business-entry:${actorId}`)).toBe(JSON.stringify(command));expect(button("Retry retained setup")).toBeTruthy();
+  expect(sessionStorage.getItem(`strelva:business-entry:${actorId}`)).toBe(JSON.stringify(command));expect(button("Retry safely")).toBeTruthy();
  });
  it("does not load another actor's retained business setup",async()=>{
   sessionStorage.setItem(`strelva:business-entry:${businessId}`,JSON.stringify({destination:{kind:"new",name:"Other business"},initialRequest:saved.request,idempotencyKey:businessId}));
-  await render(createElement(BusinessSetupPanel));await resolve(0,{actorId,businesses:[]});expect(container.querySelector<HTMLInputElement>("input")?.value).toBe("");expect(button("Retry retained setup")).toBeUndefined();
+  await render(createElement(BusinessSetupPanel));await resolve(0,{actorId,businesses:[]});expect(container.querySelector<HTMLInputElement>("input")?.value).toBe("");expect(button("Retry safely")).toBeUndefined();
  });
 });
