@@ -14,7 +14,7 @@ export interface WorkspaceComposerProps {
   autoFocus?: boolean;
   onSubmit: (request: string) => void | Promise<void>;
   onTemplates?: () => void;
-  onEdited?: () => void;
+  onEdited?: (request: string) => void;
 }
 
 export function WorkspaceComposer(props: WorkspaceComposerProps) {
@@ -53,7 +53,7 @@ function ComposerSession({ initialRequest = "", draftKey, disabled = false, plac
 
   function change(value: string) {
     setRequest(value);
-    onEdited?.();
+    onEdited?.(value);
     setError("");
     if (!draftKey) return;
     try { setStorageUnavailable(!writeRequestDraft(window.sessionStorage, draftKey, value)); }
