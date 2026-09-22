@@ -101,8 +101,11 @@ function Session({ initialRequest, workspaceId, workId, productId, readOnly = fa
     request(`/api/bounded-work?productId=${productId}&workId=${encodeURIComponent(workId)}`, { signal: controller.signal, cache: "no-store" }).then(response).then(body => { if (!controller.signal.aborted) setSaved(decode(productId, body)); }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "This work could not be loaded."); }).finally(() => { if (!controller.signal.aborted) setBusy(false); });
     return () => controller.abort();
   }, [productId, request, workId, reload]);
+  const writing = useRef(false);
+  const handingOff = Boolean(saved && !workId);
   async function write(body: Record<string, unknown>) {
-    if ((readOnly && !draftEditOnly) || busy) return false;
+    if ((readOnly && !draftEditOnly) || busy || handingOff || writing.current) return false;
+    writing.current = true;
     setBusy(true); setError(""); setNotice("");
     try {
       const result = decode(productId, await response(await request("/api/bounded-work", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ productId, ...body }) })));
@@ -111,7 +114,7 @@ function Session({ initialRequest, workspaceId, workId, productId, readOnly = fa
       if (!workId) onSaved(result.id);
       return true;
     } catch (cause) { if (active.current) setError(cause instanceof Error ? cause.message : "This change could not be confirmed. Reload before trying a different change."); return false; }
-    finally { if (active.current) setBusy(false); }
+    finally { writing.current = false; if (active.current) setBusy(false); }
   }
   const command: Command = (input, action = "command") => {
     if (!saved) return Promise.resolve(false);
@@ -131,7 +134,7 @@ function Session({ initialRequest, workspaceId, workId, productId, readOnly = fa
     {draftEditOnly ? <p role="status" className="text-sm text-gray-muted">You can revise this exact application draft and run its checks. The customer reviews and publishes it.</p> : null}
     {error ? <div role="alert" className="space-y-2 text-sm text-critical"><p>{error}</p>{workId ? <Button variant="secondary" disabled={busy} onClick={() => setReload(value => value + 1)}>Reload current work</Button> : null}</div> : null}
     {notice ? <p role="status" className="text-sm">{notice}</p> : null}
-    {workId && !saved ? <p role="status">{busy ? "Loading your work…" : "No result is available to display."}</p> : saved ? <>
+    {handingOff && saved ? <p role="status" className="text-sm text-gray-muted">Saved. Opening your work before the next change. <a className="underline underline-offset-4" href={`?workspaceId=${encodeURIComponent(workspaceId)}&view=${productId}&work=${encodeURIComponent(saved.id)}`}>Open saved work</a></p> : workId && !saved ? <p role="status">{busy ? "Loading your work…" : "No result is available to display."}</p> : saved ? <>
       {productId === "applications" ? <ApplicationResult value={saved.payload as Application} workId={saved.id} canManage={!readOnly || draftEditOnly} draftEditOnly={draftEditOnly} disabled={disabled} command={command} /> : productId === "scheduling" ? <ScheduleResult value={saved.payload as Schedule} disabled={disabled} calendarRecoveryAllowed={calendarRecoveryAllowed} command={command} workspaceId={workspaceId} workId={saved.id} onChanged={() => setReload(value => value + 1)} /> : <InvestigationResult value={saved.payload as Investigation} disabled={disabled} command={command} sources={sources} workspaceId={workspaceId} />}
       <details className={group}><summary className="cursor-pointer text-sm">History and responsibility</summary><p className="text-sm text-gray-muted">Revision {saved.payload.revision}. Created {time(saved.payload.createdAt)}.</p>{productId === "applications" ? <p className="break-all text-sm">Maintenance owner: {(saved.payload as Application).spec.maintenanceOwner}</p> : null}<ol className="space-y-2 text-sm">{saved.payload.history.slice().reverse().map(item => <li key={item.revision}>{item.kind.replaceAll("_", " ")} · {time(item.at)}<span className="block break-all text-gray-muted">Recorded actor: {item.actorId}</span></li>)}</ol></details>
     </> : !readOnly ? <>{productId === "applications" ? <CopyApplication sources={sources} disabled={disabled} copy={sourceWorkId => write({ action: "from_source", workspaceId, sourceWorkId })} /> : null}<Create productId={productId} sources={sources} disabled={disabled} create={input => write({ action: "create", workspaceId, input })} /></> : null}
