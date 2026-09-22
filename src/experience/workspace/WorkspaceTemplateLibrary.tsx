@@ -123,6 +123,18 @@ function TemplateSession({ workspaceId, actorEmail, businessName, canCreate, onC
   function openCreated(id: string) {
     if (onCreated) onCreated(id);
   }
+  function startAnother() {
+    if (busy || mutation.current) return;
+    const fresh = templateDraft(template);
+    setDraft(fresh);
+    setState("editing");
+    setWorkId(undefined);
+    setCheckedSavedWork(false);
+    setError("");
+    if (!remember(fresh, "editing")) {
+      setError("Your new draft is open, but browser storage is unavailable. Keep this tab open until you save.");
+    }
+  }
   async function create() {
     if (!ready || !canCreate || invalid || mutation.current || state !== "editing") return;
     if (!remember(draft, "unconfirmed")) { setError("Allow session storage before saving. Nothing was sent."); return; }
@@ -148,7 +160,7 @@ function TemplateSession({ workspaceId, actorEmail, businessName, canCreate, onC
     <div className={styles.editorGrid}><ApplicationDraftEditor value={draft} onChange={edit} disabled={busy || state !== "editing" || !canCreate} /><div className={styles.preview}>{invalid ? <p role="status" className={styles.notice}>Complete the field names and choices to try this app.</p> : <ApplicationDraftPreview spec={draft} />}</div></div>
     <div className={styles.savebar}>
       <div><strong>{state === "created" ? "Your private app is ready." : `Save to ${businessName}`}</strong><p>{state === "created" ? "Open it to check, publish, and choose who can use it." : "Starts with no records. Nothing is published or shared."}</p></div>
-      {state === "created" && workId ? onCreated ? <Button onClick={() => openCreated(workId)}>Open app<ArrowRight size={16} /></Button> : <Link className={styles.openApp} href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=applications&work=${encodeURIComponent(workId)}`}>Open app<ArrowRight size={16} /></Link> : <Button onClick={() => void create()} loading={busy} disabled={!canCreate || Boolean(invalid) || state !== "editing"}>Create private app</Button>}
+      {state === "created" && workId ? <div className={styles.saveActions}>{onCreated ? <Button onClick={() => openCreated(workId)}>Open app<ArrowRight size={16} /></Button> : <Link className={styles.openApp} href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=applications&work=${encodeURIComponent(workId)}`}>Open app<ArrowRight size={16} /></Link>}<Button type="button" variant="secondary" onClick={startAnother}>Start another app</Button></div> : <Button onClick={() => void create()} loading={busy} disabled={!canCreate || Boolean(invalid) || state !== "editing"}>Create private app</Button>}
     </div>
     {!canCreate ? <p role="status" className={styles.notice}>Choose an editable workspace with applications enabled to create this app. The preview is still available.</p> : null}
     {invalid && state === "editing" ? <p role="status" className={styles.notice}>Check the proposed fields: {invalid}</p> : null}
