@@ -1,7 +1,7 @@
 name: Assemble reviewed UI changes
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  push:
+    branches: ['feat/self-service-experience-20260922']
     paths:
       - '.github/workflows/ui-integration-once.yml'
       - 'scripts/.ui-integration-*.json'
@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   assemble:
-    if: github.repository == 'Strelva/Strelva-OFFICIAL' && github.event.pull_request.number == 195 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feat/self-service-experience-20260922'
+    if: github.repository == 'Strelva/Strelva-OFFICIAL' && github.ref == 'refs/heads/feat/self-service-experience-20260922'
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -20,11 +20,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.sha }}
           persist-credentials: true
       - name: Apply final four checksum-verified fixes
         env:
-          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          EXPECTED_HEAD: ${{ github.sha }}
         run: |
           python3 - <<'PY'
           import hashlib, json, os, pathlib, subprocess
