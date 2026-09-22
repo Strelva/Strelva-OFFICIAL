@@ -51,6 +51,22 @@ test("read-only users can inspect templates without creating apps", async ({ pag
   await expect(page.getByLabel("App name", { exact: true })).toBeDisabled();
 });
 
+test("a visible request edit replaces the previously submitted request across tools", async ({ page }) => {
+  await page.goto("/preview/strelva?scenario=business");
+  const composer = page.getByLabel("What do you want to accomplish?", { exact: true });
+  await composer.fill("Organize customer onboarding.");
+  await page.getByRole("button", { name: "Continue with this request", exact: true }).click();
+  const edited = "Organize supplier onboarding.\n- Insurance certificate\n- Signed agreement";
+  await page.getByLabel("What do you want to accomplish?", { exact: true }).fill(edited);
+  await page.getByRole("button", { name: "Apps & templates", exact: true }).click();
+  await page.getByText("More tools and managed services", { exact: true }).click();
+  await page.getByRole("button", { name: "Onboarding: Start", exact: true }).click();
+  await page.getByRole("button", { name: "Get started", exact: true }).click();
+  await expect(page.getByText(edited, { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Subject", { exact: true })).toHaveValue("supplier");
+  await expect(page.getByLabel("Requirements", { exact: true })).toHaveValue("Insurance certificate\nSigned agreement");
+});
+
 test("supplier onboarding keeps the original request and explicit checklist", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=business");
   const request = "Organize supplier onboarding.\n- Insurance certificate\n- Signed agreement";
