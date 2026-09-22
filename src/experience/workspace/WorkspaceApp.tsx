@@ -25,7 +25,7 @@ import { DocumentExperience } from "./DocumentExperience";
 import { LocalDocumentPreview } from "./preview/LocalDocumentPreview";
 import { WorkPlanExperience } from "./WorkPlanExperience";
 import { WorkBudgetPanel } from "./WorkBudgetPanel";
-import { OnboardingExperience } from "@/products/onboarding/client";
+import { OnboardingWorkspaceExperience as OnboardingExperience } from "./OnboardingWorkspaceExperience";
 import { WebsiteExperience } from "@/experience/websites/WebsiteExperience";
 import { CustomApplicationManageExperience } from "@/experience/custom-applications/CustomApplicationManageExperience";
 import { BoundedWorkExperience } from "@/experience/operations/BoundedWorkExperience";

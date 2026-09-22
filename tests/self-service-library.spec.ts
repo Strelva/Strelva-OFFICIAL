@@ -12,9 +12,9 @@ for (const width of [1440, 390]) test(`template customization and native app cre
   await page.getByLabel("Field 2 name", { exact: true }).fill("What do you need?");
   const preview = page.getByRole("region", { name: "Interactive app preview", exact: true });
   await expect(preview.getByRole("heading", { name: "Studio requests", exact: true })).toBeVisible();
-  await preview.getByLabel("Name", { exact: true }).fill("Test person");
-  await preview.getByLabel("What do you need?", { exact: true }).fill("Preview-only equipment request");
-  await preview.getByLabel("Urgency", { exact: true }).selectOption("Normal");
+  await preview.getByLabel("Name *", { exact: true }).fill("Test person");
+  await preview.getByLabel("What do you need? *", { exact: true }).fill("Preview-only equipment request");
+  await preview.getByLabel("Urgency *", { exact: true }).selectOption("Normal");
   await preview.getByRole("button", { name: "Submit record", exact: true }).click();
   await expect(preview.getByText("Test record added. Nothing was saved or shared.", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -26,7 +26,7 @@ for (const width of [1440, 390]) test(`template customization and native app cre
   await expect(page.getByText("Preview-only equipment request", { exact: true })).toHaveCount(0);
   await page.getByText("Review changes", { exact: true }).click();
   await expect(page.getByRole("button", { name: "Publish", exact: true })).toBeDisabled();
-  await page.getByRole("button", { name: "Run checks", exact: true }).click();
+  await page.getByRole("button", { name: "Check proposed change", exact: true }).click();
   await expect(page.getByRole("button", { name: "Publish", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(page.getByRole("button", { name: "Save record", exact: true })).toBeVisible();
@@ -56,7 +56,7 @@ test("supplier onboarding keeps the original request and explicit checklist", as
   const request = "Organize supplier onboarding.\n- Insurance certificate\n- Signed agreement";
   await page.getByLabel("What do you want to accomplish?", { exact: true }).fill(request);
   await page.getByRole("button", { name: "Continue with this request", exact: true }).click();
-  await page.getByRole("button", { name: "Organize onboarding", exact: true }).click();
+  await page.getByRole("region", { name: "Onboarding requirements", exact: true }).getByRole("button", { name: "Organize onboarding", exact: true }).click();
   await expect(page.getByText(request, { exact: true })).toBeVisible();
   await expect(page.getByLabel("Subject", { exact: true })).toHaveValue("supplier");
   await expect(page.getByLabel("Requirements", { exact: true })).toHaveValue("Insurance certificate\nSigned agreement");

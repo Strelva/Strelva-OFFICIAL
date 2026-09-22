@@ -92,7 +92,7 @@ test("shared navigation remains available while opening and finding work", async
   await expect(page.getByRole("button", { name: "Open Harbor Dental", exact: true })).toBeVisible();
   await page.getByRole("link", { name: /^Apps & templates/ }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
-  await page.getByRole("button", { name: /Home Finder/ }).click();
+  await page.locator('[class*="discoveryRow"]').filter({ hasText: "Home Finder" }).getByRole("button", { name: "Explore example", exact: true }).click();
   await expect(page.getByText("Preview · early access", { exact: true }).last()).toBeVisible();
   await expect(page.getByRole("link", { name: /Try Home Finder/ })).toHaveAttribute("href", /127\.0\.0\.1:3213\/embed\/agency-preview/);
   await page.getByRole("button", { name: "Ask about early access" }).click();
@@ -106,7 +106,7 @@ test("shared workspace resumes inquiry work inside the one Strelva frame", async
   await page.goto("/preview/strelva?scenario=managed");
   await page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("link", { name: "Apps & templates", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
-  await page.getByRole("button", { name: /Inquiry work/ }).click();
+  await page.locator('[class*="discoveryRow"]').filter({ hasText: "Inquiry work" }).getByRole("button", { name: "Start", exact: true }).click();
   await page.getByRole("button", { name: "Open Buffalo Realty", exact: true }).click();
   await expect(page.getByRole("heading", { name: "What should Strelva handle?" })).toBeVisible();
   await expect(page.getByLabel("Strelva navigation", { exact: true })).toHaveCount(1);
@@ -122,20 +122,22 @@ test("shared workspace resumes inquiry work inside the one Strelva frame", async
 
 test("account-authorized websites stay separate from business installations", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=managed");
-  const sites = page.getByRole("region", { name: "Authorized sites" });
-  await expect(sites).toContainText("Websites you can access through your account.");
-  await expect(sites).toContainText("Business assignment is managed in a customer business workspace.");
+  await page.getByText(/Websites available to your account/).click();
+  const sites = page.getByRole("group", { name: "Websites available to your account", exact: true });
+  await expect(sites).toContainText("These websites are available through your account.");
+  await expect(sites).toContainText("Assign them from the appropriate customer business.");
   await expect(sites.getByRole("link", { name: /Harbor Dental.*Account-authorized website/ })).toHaveAttribute("href", "/preview/strelva/website");
   await expect(sites.getByRole("button", { name: /Assign .* Harbor Dental/ })).toHaveCount(0);
 });
 
 test("a business owner can assign an authorized website from Home and keep website controls native", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=business");
+  await page.getByText(/Websites available to your account/).click();
   const handoff = page.getByTestId("website-assignment-handoff");
   await expect(handoff).toContainText("Assign a website to Harbor Dental");
   await expect(handoff).toContainText("Domains, connections, and billing stay in that website's native controls.");
   await handoff.getByRole("button", { name: "Assign Harbor Dental to Harbor Dental" }).click();
-  await expect(page.getByRole("region", { name: "Your business and work" }).getByRole("button", { name: "Open Harbor Dental", exact: true }).first()).toBeVisible();
+  await expect(page.getByRole("region", { name: "Your apps and work", exact: true }).getByRole("link", { name: /Harbor Dental.*Managed website/ })).toBeVisible();
   await expect(page.getByTestId("website-assignment-handoff")).toHaveCount(0);
 
   await page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("link", { name: "Settings", exact: true }).click();
@@ -196,6 +198,7 @@ test("a business owner can propose a future payer and the exact addressee can ac
 test("direct customer can inspect an offering setup and its local allowance", async ({ page }) => {
   test.slow();
   await page.goto("/preview/strelva?scenario=business");
+  await page.getByText("Usage and connected services", { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Business offerings" })).toBeVisible();
   const allowance = page.getByRole("region", { name: "Work allowance" });
   await expect(allowance).toContainText("Cap needs your acceptance");
@@ -349,13 +352,15 @@ test("direct customer can inspect an offering setup and its local allowance", as
 
 test("empty workspace can create an explicitly fictional local assessment", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=empty");
-  await expect(page.getByText(/Start with something useful./)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Start with something you can use.", exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Apps & templates", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
-  await expect(page.getByRole("button", { name: /AI Visibility.*Available · Free assessment/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Inquiry work.*Available to use/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Inquiry work.*Free assessment/ })).toHaveCount(0);
-  await page.getByRole("button", { name: /AI Visibility/ }).click();
+  const assessment = page.locator('[class*="discoveryRow"]').filter({ hasText: "AI Visibility" });
+  await expect(assessment).toContainText("Available to start");
+  const inquiries = page.locator('[class*="discoveryRow"]').filter({ hasText: "Inquiry work" });
+  await expect(inquiries).toContainText("Available to start");
+  await expect(inquiries).not.toContainText("Free assessment");
+  await page.locator('[class*="discoveryRow"]').filter({ hasText: "AI Visibility" }).getByRole("button", { name: "Start", exact: true }).click();
   await page.getByRole("button", { name: "Check a business", exact: true }).click();
   await page.getByLabel("Business name").fill("Fictional Bakery");
   await page.getByLabel("Website", { exact: true }).fill("bakery.example");
@@ -365,7 +370,7 @@ test("empty workspace can create an explicitly fictional local assessment", asyn
   await page.reload();
   await expect(page.getByRole("heading", { name: "This saved result is unavailable." })).toBeVisible();
   await page.getByRole("link", { name: "Strelva home", exact: true }).click();
-  await expect(page.getByText(/Start with something useful./)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Start with something you can use.", exact: true })).toBeVisible();
 });
 
 test("mobile navigation closes on Escape and selection, and does not overflow", async ({ page }) => {
@@ -385,7 +390,7 @@ test("mobile navigation closes on Escape and selection, and does not overflow", 
   await navigation.getByRole("link", { name: /^Apps & templates/ }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await expect(navigation).not.toBeVisible();
-  await expect(page.getByRole("heading", { name: "More you can do." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Make it yours.", exact: true })).toBeVisible();
 });
 
 test("agency home opens exact authorized client work and survives a partial client load", async ({ page }) => {
@@ -418,9 +423,9 @@ test("shared read-only work cannot start an assessment", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Your shared work." })).toBeVisible();
   await page.getByRole("link", { name: /^Apps & templates/ }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Offerings belong to a business." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Useful outcomes for this workspace.", exact: true })).toBeVisible();
   await expect(page.getByText("This work-share does not include business-wide offering access.", { exact: false })).toBeVisible();
-  await page.getByRole("button", { name: /AI Visibility/ }).click();
+  await page.locator('[class*="discoveryRow"]').filter({ hasText: "AI Visibility" }).getByRole("button", { name: "Start", exact: true }).click();
   await expect(page.getByRole("button", { name: "Check a business", exact: true })).toBeDisabled();
   await expect(page.getByText("Switch to a workspace you own to create an assessment.")).toBeVisible();
 });

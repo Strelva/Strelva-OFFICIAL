@@ -96,6 +96,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
   const [startOpen, setStartOpen] = useState(initialStartOpen);
   const [query, setQuery] = useState("");
   const [requestText, setRequestText] = useState("");
+  const [moreToolsOpen, setMoreToolsOpen] = useState(false);
   const draftKey = requestDraftKey({ actorEmail: snapshot.actor.email, workspaceId: snapshot.workspaceId });
   const [productId, setProductId] = useState<string | null>(null);
   const [offeringId, setOfferingId] = useState<string | null>(initialOfferingId);
@@ -430,7 +431,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
           </div>
         </> : <>
           <WorkspaceTemplateLibrary key={`${snapshot.actor.email}:${snapshot.workspaceId}`} workspaceId={snapshot.workspaceId} actorEmail={snapshot.actor.email} businessName={current?.name || "Your business"} canCreate={!workspaceMutationReadOnly && Boolean(onHorizontal) && products.some(item => item.id === "applications" && item.availability === "available")} onRequest={openRequest} onCreated={onCreatedApp} />
-          <details className="mt-8 border-t border-gray-border pt-4"><summary className="cursor-pointer py-4 text-base font-medium">More tools and managed services</summary>
+          <details open={moreToolsOpen} onToggle={event => setMoreToolsOpen(event.currentTarget.open)} className="mt-8 border-t border-gray-border pt-4"><summary className="cursor-pointer py-4 text-base font-medium">More tools and managed services</summary>
           <WorkspaceOfferingDirectory state={offerings.state} businessName={current?.name || "This business"} work={snapshot.work} managedSites={sites} products={products} selectedId={null} onSelect={openOffering} onOpenWork={openWork} onOpenProduct={(id) => { setOfferingId(null); setProductId(id); }} onRequestSetup={(entry) => navigate("help", `I want setup help for ${entry.offering?.name ?? entry.title} for ${current?.name ?? "this business"}. ${entry.offering?.installationNote || entry.product?.description || entry.description}`)} onRetryConflict={offerings.retryConflict} onRetry={offerings.reload} onCommand={offerings.command} onWebsiteCommand={offerings.websiteCommand} />
           </details>
           <div className={styles.invitation}><h2>Website health</h2><p>Check SEO, speed, security, and accessibility, then export the report.</p><Link className={styles.textAction} href="/audit">Open website audit<ArrowRight size={16} /></Link></div>

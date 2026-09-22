@@ -14,6 +14,7 @@ export interface WorkspaceComposerProps {
   autoFocus?: boolean;
   onSubmit: (request: string) => void | Promise<void>;
   onTemplates?: () => void;
+  onEdited?: () => void;
 }
 
 export function WorkspaceComposer(props: WorkspaceComposerProps) {
@@ -21,7 +22,7 @@ export function WorkspaceComposer(props: WorkspaceComposerProps) {
 }
 
 /** One request editor. Routing, permission and execution remain with its caller. */
-function ComposerSession({ initialRequest = "", draftKey, disabled = false, placeholder = "What would you like to do?", autoFocus = false, onSubmit, onTemplates }: WorkspaceComposerProps) {
+function ComposerSession({ initialRequest = "", draftKey, disabled = false, placeholder = "What would you like to do?", autoFocus = false, onSubmit, onTemplates, onEdited }: WorkspaceComposerProps) {
   const id = useId();
   const textarea = useRef<HTMLTextAreaElement>(null);
   const submitting = useRef(false);
@@ -52,6 +53,7 @@ function ComposerSession({ initialRequest = "", draftKey, disabled = false, plac
 
   function change(value: string) {
     setRequest(value);
+    onEdited?.();
     setError("");
     if (!draftKey) return;
     try { setStorageUnavailable(!writeRequestDraft(window.sessionStorage, draftKey, value)); }

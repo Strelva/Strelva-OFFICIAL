@@ -1,6 +1,5 @@
 "use client";
 
-import { useWorkspaceIntent } from "@/experience/workspace/WorkspaceIntent";
 import { onboardingRequestPrefill } from "./request-prefill";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
@@ -35,8 +34,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export function OnboardingExperience(props: OnboardingExperienceProps) {
-  const intent = useWorkspaceIntent();
-  const request = props.initialRequest || intent.request;
+  const request = props.initialRequest || "";
   return <OnboardingSession key={`${props.workspaceId}:${props.initialCaseId || request}`} {...props} initialRequest={request} />;
 }
 

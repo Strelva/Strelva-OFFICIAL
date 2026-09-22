@@ -110,7 +110,7 @@ test("keeps global and website navigation together on mobile", async ({ page }) 
   await page.goto(managedPath("/dashboard/site"), { waitUntil: "domcontentloaded" });
   const trigger = page.getByRole("button", { name: "Open navigation", exact: true });
   await trigger.click();
-  const navigation = page.getByRole("dialog", { name: "Strelva navigation", exact: true });
+  const navigation = page.getByRole("dialog", { name: "Strelva workspace navigation", exact: true });
   await expect(navigation).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Strelva home", exact: true })).toBeVisible();
   await expect(navigation.getByRole("link", { name: "Website", exact: true })).toBeVisible();

@@ -86,7 +86,7 @@ test("Home keeps decisions, allowance, business switching and site assignment re
   await expect(page.getByRole("heading", { name: "Work allowance", exact: true })).toBeVisible();
   await expect(page.getByText("Cap needs your acceptance.", { exact: true })).toBeVisible();
   await page.getByText(/Websites available to your account/).click();
-  await expect(page.getByRole("button", { name: "Assign to this business", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Assign Harbor Dental to Harbor Dental", exact: true })).toBeVisible();
   const picker = page.getByLabel("Current workspace", { exact: true });
   await expect(picker).toHaveValue("33333333-3333-4333-8333-333333333333");
   await picker.selectOption("11111111-1111-4111-8111-111111111111");
