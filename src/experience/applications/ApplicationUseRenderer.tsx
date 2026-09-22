@@ -153,6 +153,7 @@ export function ApplicationUseRenderer({
                         id={`${instanceId}-field-${field.id}`}
                         name={`${instanceId}-field-${field.id}`}
                         className="mt-1 block min-h-11 w-full rounded-xl border border-gray-border bg-surface px-3 py-2 text-sm"
+                        aria-label={field.label}
                         value={value === undefined ? "" : String(value)}
                         required={field.required}
                         onChange={event => updateValue(field.id, event.target.value)}
@@ -168,6 +169,7 @@ export function ApplicationUseRenderer({
                     key={field.id}
                     id={`${instanceId}-field-${field.id}`}
                     label={`${field.label}${field.required ? " *" : ""}`}
+                    aria-label={field.label}
                     type={fieldInputType(field.type)}
                     inputMode={field.type === "number" ? "decimal" : undefined}
                     value={value === undefined ? "" : String(value)}
