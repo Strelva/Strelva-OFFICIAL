@@ -1,9 +1,24 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { compareWorkspaceTarget, REQUIRED_WORKSPACE_RELATIONS } from "../check-workspace-target.mjs";
+import { compareWorkspaceTarget, readCandidateMigrations, REQUIRED_WORKSPACE_RELATIONS } from "../check-workspace-target.mjs";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 const now = Date.parse("2026-09-21T12:00:00Z");
 const project = "zthifbnrtsirdekzzlxs";
 const sha = "6490eb9906150dc27dd7a7abfadc3fe8d68b6c73";
+test("reads the repository's forward history without manual rollback or verification helpers", () => {
+  const migrations = readCandidateMigrations(new URL("../../supabase/migrations", import.meta.url));
+  assert.ok(migrations.some(item => item.version === "20260921220000"));
+  assert.ok(migrations.every(item => /^\d{14}$/.test(item.version)));
+});
+test("rejects an unrecognized non-versioned SQL file instead of hiding a migration", () => {
+  const directory = mkdtempSync(join(tmpdir(), "strelva-target-test-"));
+  try {
+    writeFileSync(join(directory, "new-business-entry.sql"), "select 1;");
+    assert.throws(() => readCandidateMigrations(directory), /non-versioned/);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
 function input() {
   const migrations = [{ version: "20260920120000", name: "websites" }, { version: "20260920121000", name: "agency_managed_website_draft_authority" }];
   return {
