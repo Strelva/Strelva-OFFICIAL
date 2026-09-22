@@ -121,7 +121,14 @@ export function compareWorkspaceTarget(catalog, deployment, migrations, options)
 }
 
 export function readCandidateMigrations(directory) {
-  return readdirSync(directory).filter(name => name.endsWith(".sql")).map(name => {
+  // These retained manual helpers are not forward migrations. Keep the list
+  // explicit so an accidentally misnamed new migration still fails closed.
+  const helpers = new Set([
+    "rollback-identity-spine-expand.sql",
+    "rollback-org-layer-phase0.sql",
+    "verify-identity-spine-expand.sql",
+  ]);
+  return readdirSync(directory).filter(name => name.endsWith(".sql") && !helpers.has(name)).sort().map(name => {
     const match = /^(\d{14})_(.+)\.sql$/.exec(name);
     if (!match) throw new Error("Candidate contains a non-versioned SQL migration filename.");
     return { version: match[1], name: match[2] };

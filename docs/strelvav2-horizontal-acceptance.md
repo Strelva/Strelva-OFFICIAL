@@ -1502,3 +1502,348 @@ this is not a completed visual acceptance.
 The preview uses fictional data and resets changes on reload. It establishes
 interface access only, not Supabase sign-in, durable saves, live integrations,
 billing or release readiness. Vercel team protection remains enabled.
+
+## September 21 production preparation evidence
+
+Observed September 21, 2026 EDT (September 22 01:20–01:30 UTC). Jacob authorized
+preparation and required that no client site go down. No hosted migration,
+configuration write, deployment, DNS change, billing action or provider message
+was performed. Vercel reads, Supabase read-only SQL, a configuration dry-run and
+low-volume public GETs supplied the hosted evidence below. Supabase CLI used its
+normal temporary login-role initialization; submitted SQL explicitly opened
+read-only transactions with finite statement timeouts.
+
+The [release checklist](./horizontal-release-checklist-2026-09-11.md#september-21-production-preparation)
+owns execution order, acceptance, stop conditions and recovery requirements.
+This record separates observations from uncompleted production acceptance.
+
+### Exact source and production artifacts
+
+The candidate app is `9d5e877af89853fb6197db85235889a8eb0733ee`; marketing is
+`029525e9130a368aefd83d9f3ce2971751622599`. Both are version `0.2.0`.
+[App merged-commit CI](https://github.com/Strelva/Strelva-OFFICIAL/actions/runs/35668720566)
+and security passed. [PR-head launch verification](https://github.com/Strelva/Strelva-OFFICIAL/actions/runs/35667702142)
+passed its persisted-delivery and isolated Auth journeys. [Marketing merged-commit verification](https://github.com/Strelva/strelva-marketing/actions/runs/35668736611)
+passed. These are repository/isolated evidence, not live delivery proof.
+
+The existing CLI login `rhinehart514-5576` read team
+`team_CXZExgSqBSV3zeOqPfmLcclS` (`strelva`). This supersedes the earlier connector
+403 as an access blocker. No project link or Git integration was changed.
+
+| Project | Observed production deployment | Source metadata |
+| --- | --- | --- |
+| `strelva-admin` (`prj_AzaQBS8jM9E5RVgHuMWnQju0GIxb`) | `dpl_Fq9bPeQbCXyG9BASDM2ZPYNwuXgJ` / `strelva-admin-n2ooddsde-strelva.vercel.app` | `7507748ba56c28663325a95b5551749e2a96c576`; **gitDirty=1** |
+| `strelva-marketing` (`prj_rXjFhzPg23OGR9leQ3TMVq16IGwa`) | `dpl_8Uo7oaVYgNPYV7gvW9Tx6T3fDM8Y` | `abc5c69c1e96de2fdda5ecf18948e9361bdd226a` |
+| `greatlakesdriedfruits` | `dpl_DfGh3dTeC8mscC5uWPikZN1pFkvj` | `a751d63d3d3e8f8495017970084054393096afde` |
+| `rohlax-wellness` | `dpl_EEsPa5yxk1qE1C7YAUyXYSJRN2u1` | `9ed876b57ee7c7f922bfb3f75f01b26a71a38dcb` |
+| `mooney-firm` | `dpl_HcdQVhZ7zYTFkE2eNoBnjsFsLxB1` | `af54ad7167d47de22d75ed87df0ae6034c1588e9`; **gitDirty=1** |
+
+These are recovery candidates, not rehearsed recovery proof. Rebuilding a dirty
+artifact's named commit does not recreate that artifact. The app project's Git
+link still names `rhinehart514/REB`; the checked-out repository uses
+`Strelva/Strelva-OFFICIAL`. Both candidates disable automatic Git deployment.
+Prepare any eventual Git-link repair separately; do not reconnect automatic
+production deployment while preparing the release.
+
+The control-plane deployment has `app.strelva.com`, `admin.strelva.com`,
+`admin.greatlakesdriedfruit.com`, `admin.rohlaxwellness.com`,
+`www.rohlaxwellness.com`, `demo.scaffoldweb.com` and `*.scaffoldweb.com` aliases.
+Therefore an app promotion can affect client hosts even when their own Vercel
+projects are untouched. The project inventory returned 19 projects with no next
+page. `attymooney.com` is not in the observed Mooney project's aliases; its
+public site responded, but its actual hosting relationship remains unresolved.
+
+### Database, configuration and recovery findings
+
+Current Vercel production `SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_URL` both
+resolve to `https://zthifbnrtsirdekzzlxs.supabase.co`. The corresponding Supabase
+project is `scaffold-web`, healthy in `us-east-1`, Postgres `17.6.1.127`.
+Current project configuration does not independently prove the August app
+artifact's effective runtime environment. Source flags are currently configured
+as `postgres`; secret values were not written to this evidence.
+
+After Jacob authenticated the CLI, the catalog query read 21 recorded applied
+migrations and 48 public tables. Compared with 82 forward candidate migrations:
+
+- **62 candidate migrations are absent from recorded history**, from
+  `20260905190000_release_one_workspaces` through
+  `20260921220000_customer_business_entry`. The twelve required workspace/native
+  relations checked by the target tool are absent.
+- **One applied migration is absent from candidate history:**
+  `20260802120000_report_snapshots`. Its stored statements create the immutable
+  report table, its tenant/capture index, RLS and table comment. The observed SQL
+  is retained for reconciliation, not submitted for re-execution or deletion.
+- No same-version/different-name mismatch was found. This is not a complete
+  schema-equivalence result. Columns, constraints, public function definitions/
+  ACLs and table-size metadata were captured without reading customer content.
+- Pending `20260920060000_content_version_request_id.sql` adds a nullable column
+  and a **non-concurrent** index to existing `content_versions`. Its observed
+  total size was 106,496 bytes with an estimate of 11 rows. That small sample
+  does not remove locking risk or establish a zero-interruption operation.
+  New foreign keys also reference existing `users`/`tenants`; rehearse their locks.
+- Backup metadata returned `pitr_enabled=false`, `backups=null`,
+  `physical_backup_data={}`, `walg_enabled=true`. This does **not** verify an
+  available recoverable backup. No restore test or backup creation was performed.
+
+The target checker returned `blocked`, with missing relations, unapplied
+candidate history and unrecognized applied history. It correctly retained
+`releaseApproved=false`. Its deployment mapping provenance remains qualified
+as current project configuration rather than a proven effective runtime mapping.
+
+Supabase `config pull --dry-run` reported `wrote=false`. Its supported-field diff
+shows default auth site URL `https://scaffoldweb.com`, email confirmations on,
+Google auth enabled, and redirects including `https://*.strelva.com/**` plus
+legacy/client/local origins. Prepare an explicit canonical-app auth change and
+verify callback/recovery before selecting it; do not remove existing customer
+redirects by copying a local configuration. SMTP/mailbox delivery remains unproved.
+
+Production project environment names include encryption, Stripe, Supabase,
+Redis and grandfathering variables. The API did not expose effective values for
+some settings, including grandfathering and governed-work flags; presence alone
+is not verification. Workspace/background/inquiry release flags and audience
+mail switches were not in the project-level production list. Shared/deployment
+settings and runtime behavior still need verification before declaring defaults.
+
+### Existing-client baseline and separate DNS defect
+
+Read-only tenant routing metadata found 12 active and 2 inactive records. Active
+IDs: `cocard-anderson`, `gldf`, `leslie-bookkeeping`, `mclears`, `orange-crate`,
+`rhm-innovations`, `rohlax`, `spacejam-storage`, `strelva`, `twintrees-camillus`,
+`twintrees-fayetteville`, `vermont-unlimited`. `demo` and `summit` are inactive.
+Several active records lack a production domain. Reconcile their intended hosts
+and dependencies rather than asserting they are unused. No owner contact data,
+customer content or payment identifiers were exported.
+
+A public GET sweep covered 34 explicit hosts (no wildcard enumeration, forms,
+login submissions or authenticated cron calls). Thirty-three ended at HTTP 200;
+one of those was Drover's Vercel protection login, **not an application pass**.
+GLDF/Rohlax owner domains ended at their `/client/<tenant>/sign-in` pages.
+Homepage responses do not prove assets, interactions, transactions or client
+acceptance. No production browser journey or paid provider test ran.
+
+`rohlaxwellness.com` returned 200, but **`www.rohlaxwellness.com` did not resolve**
+(curl exit 6). Local DNS, Cloudflare `1.1.1.1` and Google `8.8.8.8` returned
+`931bd7b36e7b2348.vercel-dns-017.com/.` as its CNAME target: a literal trailing
+slash is present. Authoritative nameservers are `dax.ns.cloudflare.com` and
+`vivienne.ns.cloudflare.com`. Vercel confirms the `www` alias belongs to
+`strelva-admin`, has no configured redirect, and is DNS-misconfigured.
+
+Prepared separate repair proposal: in the existing Cloudflare zone, replace
+only the malformed `www` CNAME target with Vercel's current rank-1 recommendation,
+`c51a194a5cafbd83.vercel-dns-017.com` (no slash). Before execution, confirm the
+intended `www` page on that project, capture the complete current DNS record
+including proxy status/TTL, and re-read Vercel's recommendation. Preserve the
+apex and all admin/MX/TXT records. Verify authoritative and two recursive DNS
+answers, TLS, expected page/redirect and both apex/admin journeys afterward.
+If the intended website belongs to another project, prepare that distinct alias
+operation instead of silently pointing `www` at the wrong application. This is
+an existing defect, not a change caused by preparation; no DNS mutation occurred.
+
+A TLS-verified request using `curl --connect-to` to test the recommended target
+without changing DNS failed certificate verification (exit 60). Verification
+was not bypassed. Certificate readiness and intended hostname routing therefore
+remain part of this repair's preparation; a CNAME edit alone is not proven to
+restore the HTTPS journey.
+
+### New local verification and preparation-tool repair
+
+The offline target check could not read this repository because it treated the
+three retained rollback/verification SQL helpers as malformed migrations. The
+repair excludes only those explicit helper filenames and continues to reject
+unknown non-versioned SQL. Its new regression reads the actual repository
+history; another verifies rejection of an accidentally unversioned migration.
+No runtime, application, provider or customer behavior was changed.
+
+- `pnpm test:workspace-target`: **27 passed**, no skips/failures.
+- `pnpm typecheck`: passed (existing Sentry deprecation warning).
+- Focused ESLint for the two changed scripts: passed.
+- `PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-upgrade`:
+  passed in an isolated Unix-socket PostgreSQL cluster, then stopped. This
+  repository-history rehearsal omits production-only `report_snapshots`; it is
+  not an actual-production-snapshot upgrade or old-app compatibility rehearsal.
+- A separate isolated variant inserted the observed `report_snapshots` SQL
+  before the workspace tail, seeded one synthetic report, ran the complete
+  existing upgrade assertions, then confirmed that report survived. Passed and
+  stopped its cluster. This narrows the unknown-history concern; it does not
+  reproduce the live database, its traffic or the dirty production app artifact.
+- Strict manifest client pins in isolated worktrees: **58/58 passed**.
+- Isolated checkouts at observed live GLDF/Rohlax source SHAs: **54/54 passed**
+  with pin verification deliberately off because those are not manifest pins.
+  These checks exercise platform contract/structure, not each client's entire
+  build/browser suite or all 12 active tenant journeys.
+- `pnpm version:check`: both repositories `0.2.0`.
+
+Sanitized local artifacts are in
+`output/production-completion/launch-2026-09-21/`: Vercel inventory/project aliases,
+public HTTP baseline, catalog/deployment mapping, target comparison, all 82
+candidate and 62 pending filenames with SHA-256 digests, schema metadata,
+observed report migration SQL, tenant routing, backup metadata, auth summary and
+local check logs. They contain no authentication keys. Snapshots must be refreshed
+before execution; they are not an approval packet or a production success claim.
+
+Remaining execution blockers: Rohlax `www` repair acceptance; verified effective
+runtime/store mapping; missing production migration source reconciliation;
+old/new app compatibility and bounded-lock rehearsal against a representative
+restored schema; proven backup/recovery; auth/email acceptance; all affected
+client journeys; exact approved configuration and hosted artifact; bounded real
+agency/provider acceptance; named operational monitoring/recovery ownership;
+then app acceptance followed by marketing exposure. No blocker is waived.
+
+
+## September 21 authorized remediation and recovery rehearsal
+
+This receipt follows the user's instruction to make the prepared updates while
+preserving every client site's availability. It supersedes the earlier
+preparation status only for the completed actions below.
+
+### Production change verified
+
+Supabase project `zthifbnrtsirdekzzlxs` now uses
+`https://app.strelva.com` as Auth `site_url`, replacing
+`https://scaffoldweb.com`. A minimal isolated config declared only this property;
+the push reported one update and the subsequent diff reported zero declared
+updates. The twelve undeclared remote config differences were left untouched,
+including redirects, Google, confirmation and MFA settings. The previous
+single-property config was retained for reversal. This proves the configuration
+change, not delivery of a live email or completion of a production login.
+
+### Private backup and restored-data upgrade
+
+A restricted local directory outside the repository holds logical schema, data
+and role dumps for `public`, `auth`, `storage` and `supabase_migrations`. No raw
+customer/Auth records or credentials were added to this evidence record.
+The dumps restored successfully into an isolated PostgreSQL 18 cluster exposed
+only through a local Unix socket. The cluster was stopped after verification.
+All pending September migrations then applied successfully to that restored
+copy. Before/after row fingerprints across 83 pre-existing tables found no
+record changes; the migration tail added 65 tables. These are local recovery
+and data-preservation results, not production migration or client-journey proof.
+
+Limitations: production runs PostgreSQL 17; this is a local logical database
+recovery point, not PITR or an off-device recovery guarantee. Storage metadata
+is included but object blobs are not. Redis-authoritative operational state
+still needs its own recovery evidence. The old deployed app has a dirty-source
+marker; its exact behavior is not established by checking out its reported SHA.
+
+### Source reconciliation and safer migration execution
+
+Recovered `20260802120000_report_snapshots.sql` from the actual applied migration
+statements and restored it to repository history. The ordered rehearsal now
+includes this baseline and checks preservation of a synthetic report and RLS.
+The pending content-version column change obtains its lock with `NOWAIT`;
+its index is a separate concurrent migration with bounded lock/statement waits
+and explicit index validation. No hosted migration history or schema was changed.
+Current source inventory is 84 migrations, with 63 pending against the captured
+21-entry production history; refresh live history before executing anything.
+
+Verification: 27 target-check tests passed; TypeScript passed; the full isolated
+ordered upgrade passed, including immediate column-lock rejection without schema
+change, continued client write-lock acquisition while index construction waited,
+valid index retry and rejection of an incompatible existing index. The actual
+restored-data upgrade also passed as described above. Neither test establishes
+zero downtime under production traffic.
+
+### Remaining launch gates
+
+Cloudflare sign-in and DNS repair authority were supplied by the user. Chrome
+control subsequently failed with `Sky Computer Use native pipe closed before
+response`, including after session resets. No DNS or alias change was made.
+The malformed Rohlax `www` CNAME, intended project routing and certificate
+readiness still require repair and HTTPS verification. The apex remains a
+separate working route and must be preserved.
+
+No production deployment, production schema migration, client-site rollout,
+Stripe mutation or live application email was performed. Remaining gates are
+working DNS/TLS, effective deployed runtime/store mapping, Redis/object recovery,
+old/new client compatibility, auth/email journeys, exact release configuration
+and hosted artifact, real agency/provider acceptance and monitoring ownership.
+The launch remains blocked; no client-availability gate is waived.
+
+Post-change HTTPS GET checks returned 200 for the Rohlax apex, GLDF public site,
+both client admin sign-in destinations and `app.strelva.com`. Rohlax `www` still
+failed DNS resolution. These are reachability checks, not authenticated journey
+acceptance; the sanitized receipt is `post-auth-http-check.json` in the existing
+local production-completion artifact directory.
+
+
+## September 21 recovery coverage and compatibility follow-through
+
+The user explicitly authorized recovery completion, safe pending migrations,
+deployment/acceptance, and marketing exposure after production passes. The user
+selected a controlled email recipient for live testing; its address stays out
+of this public evidence record. No new production mutation has occurred in this
+follow-through as of this receipt.
+
+### Recovery and live target evidence
+
+- Exported 644 Redis keys using read-only SCAN and per-key atomic DUMP/PTTL/TYPE
+  plus logical-value reads. Restored every key into an isolated local Redis
+  server with no TCP listener and compared all 644 logical values successfully.
+  An RDB recovery artifact, original TTLs, capture timestamps and SHA-256 digests
+  remain in the restricted backup directory outside the repository. The server
+  was stopped. The initial serialized-byte comparison was not equivalent across
+  Redis encodings; the successful check compares the actual restored values.
+- This is an approximately 37-second rolling capture, not a database-wide
+  atomic snapshot or PITR. TTL was disabled only in the isolated validation;
+  recovery must preserve original expiry deadlines and omit expired entries.
+  Never replay accepted provider actions or restore the full snapshot over new
+  customer activity automatically. Provider-native backup/off-device retention
+  remains a separate recovery gap.
+- The configured Vercel Blob store listed zero blobs; Supabase Storage listed
+  zero buckets. The database dump contained no direct Sanity CDN or Vercel Blob
+  URLs. These findings do not inventory every static/external asset in all client
+  repositories and do not establish a backup of arbitrary third-party assets.
+- Current production environment export confirms the configured Supabase and
+  Redis endpoints. Seven values are provider-redacted, including the encryption
+  key, Resend key and grandfathered-tenant setting; `[SENSITIVE]` is a placeholder,
+  not a usable secret or a verified value. No environment variable was replaced.
+- Pulling environment variables for the READY production deployment failed:
+  Vercel requires INITIALIZING state for that operation. Exact effective server
+  configuration is not established by the current project export. Separately,
+  13 deployed browser scripts expose the expected Supabase origin
+  `https://zthifbnrtsirdekzzlxs.supabase.co`, and `/api/health` reports healthy Redis,
+  Supabase, Stripe and Gemini dependencies. This does not reveal server secret
+  values or prove customer workflows.
+
+### Compatibility evidence
+
+Vercel's deployed-file inventory contained 1,239 source entries. SHA-1 comparison
+against the reported Git revision matched 1,208; the 31 differences were outside
+application runtime source (local fixture/export/tool metadata). All deployed
+`src/` runtime files and package configuration matched the reported source.
+This narrows the dirty-source uncertainty; preserve the immutable deployed
+artifact rather than claiming a rebuilt artifact is identical.
+
+Compared a schema-only restore of the captured baseline with the upgraded
+restored database. All 1,665 pre-existing catalog entries checked were unchanged:
+column types/defaults/nullability/order, function definitions/ACLs, constraints,
+RLS policies and table RLS/ACLs. There were 2,472 new entries. The earlier 83-table
+row fingerprint comparison also passed. These are database compatibility checks;
+they do not replace running both applications against the same isolated service
+or authenticated customer acceptance.
+
+The actual deployed GLDF/Rohlax source revisions again passed 54/54 structural
+contract checks. Production read-only browser checks with GLDF passed five of
+six cases: public rendering, mobile geometry and signed-out access redirects.
+The same five read-only cases also passed against Rohlax.
+The sixth expected the candidate's new sign-in wording and failed against the
+older production page; it is recorded as failed, not waived or hidden.
+
+### Execution remains gated
+
+Chrome native control recovered enough to open a tab, but navigation was again
+rejected because the active application changed. An isolated in-app browser is
+unavailable. Rohlax's existing `www` DNS/TLS repair therefore remains unresolved.
+Live controlled signup/email and agency acceptance are prepared but not executed.
+No hosted migration, deployment, new release flag, marketing activation or email
+was performed in this follow-through. Required next evidence: stable browser
+access and DNS repair; effective critical settings/old-new hosted compatibility;
+controlled authenticated acceptance; then app promotion and marketing exposure.
+
+Clean-candidate follow-up: commit `b4b73f69` passed the 27 target-check tests,
+typecheck, full ordered workspace upgrade and workspace/inquiry SQL checks.
+The changes are isolated in draft PR #193; unrelated local edits were excluded.
+All 24 public capability/content API reads across the 12 active tenants returned
+200 JSON responses without an error envelope. These are baseline read checks,
+not proof of authenticated writes or candidate production behavior. GitHub CI
+was still running at this checkpoint; the secrets check had passed.

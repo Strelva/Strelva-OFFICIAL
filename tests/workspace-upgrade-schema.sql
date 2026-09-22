@@ -12,6 +12,12 @@ $$;
 -- Rows from the documented pre-workspace schema survive the upgrade, including
 -- the stable identity mirror populated by the earlier identity-spine trigger.
 select pg_temp.assert_true(
+  exists(select 1 from public.report_snapshots where tenant_id = 'upgrade-site'
+    and period = '2026-08' and metrics = '{"retained":true}'::jsonb)
+  and (select relrowsecurity from pg_class where oid = 'public.report_snapshots'::regclass),
+  'existing report snapshots and their RLS survive the full upgrade'
+);
+select pg_temp.assert_true(
   exists(select 1 from public.tenants where id = 'upgrade-site' and site_name = 'Upgrade Fixture Site'),
   'the representative tenant survives the workspace upgrade'
 );

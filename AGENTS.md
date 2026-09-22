@@ -96,6 +96,7 @@ The live system has these non-negotiable boundaries:
 
 ## Consequential actions and trust boundaries
 
+- Existing client sites must remain available throughout release preparation and rollout. Treat shared control-plane aliases, storefront APIs, databases and Redis authorities as client dependencies. Do not proceed with a production rollout until old/new compatibility, bounded migration locking, client acceptance checks and recovery are established in the [release checklist](./docs/horizontal-release-checklist-2026-09-11.md#september-21-production-preparation).
 - Content and external-surface changes pass through `src/lib/ai-governance.ts` and the existing event/approval path. Google Business writes and review replies must not gain a direct publish path. The only standing exception is a tenant's explicit review-reply `auto` mode, including its existing delay and re-check before posting.
 - For non-idempotent external writes, an accepted provider write resolves the approval. A failed read-back creates separate verification-failure evidence; it must not leave the approval retryable and risk a duplicate write.
 - All application email goes through `src/lib/email/send.ts`, with an explicit audience and the switches in `src/lib/email-enabled.ts`. Provider errors throw; intentional suppression or a missing key returns `false`.

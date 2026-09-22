@@ -88,11 +88,14 @@ It is the regular CI gate.
 
 `pnpm check:workspace-upgrade` is the ordered-history rehearsal. It applies every
 repository migration through the documented pre-workspace baseline
-`20260729180000_org_layer_phase0_accounts.sql`, seeds representative tenant,
-membership and content rows, then applies every later workspace/recovery
+`20260802120000_report_snapshots.sql`, seeds representative tenant,
+membership, content and report rows, then applies every later workspace/recovery
 migration. It checks identity preservation, service-role-only creation, browser
 denial, RLS, verified and unverified owners, and atomic rejection of a duplicate
-migration. It never connects to a hosted or production database.
+migration. It also checks that the content-version column change fails immediately
+under conflicting locks, concurrent index creation does not queue out client
+writes, a valid index can be retried, and an incompatible index is rejected.
+It never connects to a hosted or production database.
 
 Both commands require PostgreSQL server binaries. On this workstation:
 
@@ -104,6 +107,14 @@ PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-upgrade
 The upgrade rehearsal is a deliberate release check rather than a per-push CI
 step because it replays the full retained history. Run it when the workspace
 migration tail or its baseline changes and before authorizing a real migration.
+
+The content-version index migration uses `-- pg-delta: transaction=false` and
+`CREATE INDEX CONCURRENTLY`. Use Supabase CLI 2.117.0 (which supports this directive) or `psql` without a
+wrapping transaction. The local rehearsal uses `psql`. Supabase's GitHub integration
+does not honor this directive. A failed concurrent build can leave an invalid
+index; inspect and explicitly repair it before retrying. The migration rejects
+an incompatible or invalid existing index instead of silently accepting it.
+See [Supabase migration execution](https://supabase.com/docs/guides/local-development/cli-workflows).
 
 ## Internal product-learning acceptance
 

@@ -7,15 +7,193 @@ Auth/Postgres, hosted staging and production evidence remain separate.
 
 ## Website launch decision
 
-Jacob's September 20 [website focus](./horizontal-product-brief-2026-09-11.md#september-20-website-release-focus)
-sets the current commercial emphasis. Existing managed-site editing, new-site
-creation and outside-site connection require separate acceptance. The
-[website review](./strelvav2-horizontal-acceptance.md#website-release-review)
-records the source gaps and proof. Passing the technical gates below does not
-close new-customer self-service creation, delegated agency website drafting or
-unverified website-to-booking/inquiry connections. Keep those promises out of a
-release until their complete customer journeys are implemented and accepted.
-Existing customer obligations and the selected first customer case below remain.
+The [September 21 release direction](./strelvav2.md#september-21-release-direction)
+supersedes the September 20 self-service emphasis. Agency website delivery and
+independently usable native apps/onboarding belong to the same business.
+Request intake does not start the 24-hour commitment. Existing customer
+obligations and the selected first customer case below remain. Use the dated
+evidence and the preparation sequence below rather than treating old unchecked
+feature lists as current missing implementations.
+
+## September 21 production preparation
+
+**Status: prepared sequence; production execution blocked. No client site may
+go down.** The [dated evidence](./strelvav2-horizontal-acceptance.md#september-21-production-preparation-evidence)
+owns observed values and test results. [AGENTS.md](../AGENTS.md#consequential-actions-and-trust-boundaries)
+owns live-action authorization. No production deploy, schema change, environment
+write, DNS change, billing action or provider message is authorized by this plan.
+
+### Pinned release and evidence
+
+- App candidate: `9d5e877af89853fb6197db85235889a8eb0733ee` (merged PR #192).
+- Marketing candidate: `029525e9130a368aefd83d9f3ce2971751622599` (merged PR #11).
+- Shared version: `0.2.0`, still unreleased. Follow [VERSIONING.md](../VERSIONING.md)
+  for final release headings and tags; do not rename storefront compatibility symbols.
+- The offline migration-checker repair prepared after the app merge is not in
+  that candidate. Review/commit it separately; if included in a new release SHA,
+  record the new SHA and its applicable checks rather than inheriting CI results.
+- Use clean isolated release checkouts. The working REB checkout contains
+  unrelated `tsconfig.json` changes and untracked work; marketing also has local
+  untracked files. Neither is a deploy source.
+
+The [authorized recovery and compatibility follow-through](./strelvav2-horizontal-acceptance.md#september-21-recovery-coverage-and-compatibility-follow-through)
+records the later Redis restore, storage inventory, deployed-source comparison
+and schema compatibility results. The user's subsequent explicit release
+authorization is recorded there; remaining safety gates still apply.
+
+### Gate 1: establish every affected client dependency
+
+1. Refresh Vercel project/deployment IDs, aliases, source metadata, database and
+   Redis mappings. Inventory all active tenants and storefront consumers after
+   read-only database access is available. The 19-project Vercel list is a
+   discovery inventory, not proof that every project is a paid client or that
+   all customer systems are on this team.
+2. Preserve all client repository deployments, DNS records, domains, compatibility
+   secrets and tenant identities. No client migration is proposed. The current
+   control plane directly serves GLDF/Rohlax admin domains and the Rohlax `www`
+   alias, in addition to shared `/api/v1/*` services.
+3. Resolve the independently discovered Rohlax `www` DNS defect through a
+   separately reviewed, explicitly authorized repair. Do not combine it with
+   this release or treat its current failure as an acceptable new baseline.
+4. Record each site's critical read journey, expected redirects and latency/error
+   baseline. Include content, assets, navigation, catalog where used, signed-out
+   owner entry, and the read paths behind forms/bookings. An HTTP 200 on a login
+   page or generic fallback is not a successful customer journey.
+5. Compare candidate contracts against both manifest-pinned client revisions
+   and the actual deployed client revisions. Local structural checks do not
+   replace authenticated browser or real provider proof.
+
+### Gate 2: inspect and rehearse the exact database delta
+
+The configured project origin is `https://zthifbnrtsirdekzzlxs.supabase.co`.
+Do not execute SQL until the authorized connection is independently matched
+to the running app. Supabase CLI access was subsequently provided. Read-only catalog inspection
+found 62 unapplied candidate migrations and the production-only
+`20260802120000_report_snapshots` entry. The dated evidence records the exact
+comparison, backup metadata and schema observations.
+
+Use [workspace-target-snapshot.sql](../scripts/workspace-target-snapshot.sql)
+with an approved read-only connection. It opens a read-only transaction and
+limits statement time. Keep connection credentials out of command output and
+tracked files. The comparison was executed against captured metadata and returned blocked;
+refresh its inputs before any future decision:
+
+```sh
+pnpm check:workspace-target --catalog /private/path/catalog.json \
+  --deployment /private/path/deployment.json \
+  --expected-project-ref zthifbnrtsirdekzzlxs \
+  --expected-source-sha 7507748ba56c28663325a95b5551749e2a96c576
+```
+
+The deployment JSON requires `observedAt`, `deploymentId`, `sourceSha`,
+`supabaseOrigin` and `catalogProjectRef`. Refresh both snapshots within one
+hour; the expected source SHA is the observed live deployment's metadata,
+not the candidate commit. The live deployment reports `gitDirty=1`, so that
+SHA does not reconstruct its exact artifact. Preserve its immutable deployment.
+The checker verifies metadata only and always returns `releaseApproved: false`.
+
+1. Reconcile the captured `report_snapshots` migration without dropping its
+   existing table or blindly repairing migration history. Preserve its observed
+   SQL as evidence until restored to a reviewed source owner. Compare full
+   migration history, names, SQL definitions, RPC signatures/grants,
+   extensions, triggers, RLS, relevant indexes and data invariants. Classify drift
+   before selecting the pending ordered subset; do not run all 82 candidate files.
+2. Review each pending statement for table locks, rewrites, constraint validation,
+   index creation and changed function behavior. Choose finite lock and statement
+   limits from a representative rehearsal; no unlimited lock wait, destructive
+   downgrade, wholesale replay or blind automatic retry is acceptable. In
+   particular, `20260920060000_content_version_request_id.sql` alters the live
+   `content_versions` table and creates a non-concurrent index. Prepare and
+   rehearse a compatible bounded/online execution strategy before approving it;
+   its small current size is not permission to block client writes.
+3. Verify a recoverable backup/PITR point and rehearse restoration to a separate
+   isolated target. Include Postgres, Auth configuration, required storage and
+   Redis-authoritative operational state per [persistence boundaries](./persistence-boundaries.md).
+   Record backup identifiers, retention, restore time and acceptable recovery loss
+   with the operator. Current API evidence reports PITR disabled and no listed
+   backups; a usable recovery point is therefore unverified. A backup existing
+   is not a successful recovery rehearsal.
+4. Run the current production behavior against the upgraded isolated schema,
+   then the candidate against that same schema. Include concurrent legacy reads/
+   writes and representative client requests while migration statements execute.
+   The existing full-upgrade test proves ordering/invariants, not this compatibility
+   or production lock behavior.
+5. If any pending step requires customer downtime or cannot preserve old-app
+   behavior, stop and redesign/split it. A frontend rollback cannot repair an
+   incompatible shared database change. Do not silently choose a new production
+   database or dual authority as a workaround.
+
+### Gate 3: prepare a configuration delta, not a replacement environment
+
+| Boundary | Required preparation |
+| --- | --- |
+| Data and crypto | Verify running app and next deployment use the intended Supabase/Redis; preserve existing encryption and HMAC keys. Confirm Postgres source flags and current governed-work authority rather than flipping them from an example file. |
+| Auth and continuation | Verify Supabase site URL/redirect allowlist, email provider/templates, ordinary verified identities, invitation claiming and expired/wrong-account recovery. Check `PUBLIC_CONTINUATION_SECRET` or its existing `INTERNAL_API_SECRET` fallback. |
+| Exposure | Explicitly select `STRELVA_WORKSPACE_RELEASE`; keep inquiries, customer topology and background work at their existing state unless separately qualified. `REB_DEV_UNGATED_ACCESS` and fixture preview must not expose production. |
+| Email | Review the four independent switches in [email-enabled.ts](../src/lib/email-enabled.ts). Client mail defaults off; operator/prospect mail default on; customer mail defaults off. One switch is not a global send stop. Supabase Auth mail needs separate verification. |
+| Billing | Preserve current live Stripe configuration, webhook verification and `gldf`/`rohlax` exemptions. A present variable with a redacted value is not a verified setting. No new price, subscription, entitlement or charge is prepared for activation. |
+| Providers and crons | Inventory enabled existing jobs and credentials. Keep new background effects off until separately accepted. Do not disable existing customer jobs to make the new release appear quiet. |
+| Marketing | Verify canonical app origin and both public entry journeys against the qualified app. Publish only after app acceptance; no client domain move is involved. |
+
+Record each proposed variable's current presence, verified effective behavior,
+proposed value/reference, affected scope and reason. Preserve secret values in
+the provider's secret store. Project settings apply to a new deployment and do
+not prove an older artifact's environment; see [Vercel environment scope](https://vercel.com/docs/environment-variables).
+Environment changes require a fresh authorized production deployment, not
+rebuilding an old artifact by assumption.
+
+### Gate 4: prepare hosted acceptance and separate approval packets
+
+The packet is not ready for execution until it contains exact project IDs,
+database identity, migration filenames/digests, verified recovery points,
+configuration delta, candidate artifact IDs, affected aliases and named operator.
+Prepare these as separate actions so one approval cannot imply another:
+
+1. **Isolated hosted qualification:** selected private target with isolated
+   Auth/Postgres/Redis and outbound effects controlled. No preview may share live
+   stores or operational schedules by accident. Record any hosting cost before approval.
+2. **Additive schema operation:** exact reviewed pending subset, transaction and
+   timeout strategy, old-app compatibility proof, lock observations and recovery.
+3. **App release:** new immutable artifact from a clean candidate, approved
+   environment, pre-promotion acceptance and precise alias/promotion operation.
+4. **Bounded live acceptance:** approved test account/business, recipient/calendar
+   where relevant, allowed writes, maximum cost, operator and cleanup. Never run
+   synthetic browser fixtures or authenticated cron routes against customers.
+5. **Marketing release:** exact artifact, app acceptance receipt and public checks.
+6. **Rohlax DNS repair:** its own exact record change and verification, separately
+   from the app/schema release.
+
+Minimum acceptance: ordinary signup/email/callback recovery; native app creation,
+publication, record retention and revocation; private onboarding version review;
+agency request left unaccepted until mutual scope agreement; actual repository/
+commit binding; delivery review; wrong-business denial; legacy client owner access;
+storefront reads and governed preview/revalidation; preserved billing agreements.
+Use desktop and phone, including denied, unavailable and retry states.
+The Mooney Outlook/ADR case retains its [separate customer contract](#first-customer-release-case).
+
+### Stop conditions and recovery
+
+- Do not start on an unresolved client availability failure, unknown target,
+  unverified backup, unexplained schema drift or missing old-app compatibility.
+- During any authorized release, stop promotion on a critical client journey
+  failure, changed tenant routing, unexpected authorization/billing denial,
+  database lock contention, elevated errors or duplicate external effect.
+  Recheck from an independent request before classifying a transient probe;
+  do not wait for multiple customer reports.
+- Pin the observed app and marketing deployments as recovery candidates, and
+  verify that they remain usable before executing. The current app is a dirty
+  build: rebuilding its recorded SHA is not an equivalent rollback.
+- Restore the known artifact/routing only under the reviewed operation; retain
+  additive schema and customer records if old-app compatibility is proven.
+  Never restore the entire production database over newly accepted customer work
+  as an automatic rollback. Recover evidence/accounting without repeating a
+  successful email, booking or payment.
+- Preserve existing customer services while stopping only newly introduced
+  effects. Reverify client journeys, backlog/cron health, provider receipts and
+  ordinary authentication after recovery.
+- Human acceptance, a named on-call operator, alert destinations, observation
+  duration and concrete baseline-relative thresholds must be recorded before
+  public activation. These remain open; HTTP probes alone do not close them.
 
 ## Current completion evaluation
 

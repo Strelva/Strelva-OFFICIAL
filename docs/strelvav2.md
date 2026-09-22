@@ -81,11 +81,19 @@ A reviewed merge is therefore code integration, not production activation.
 No release flag, domain, billing configuration or hosted schema is selected by
 a GitHub workflow result.
 
-The current connection cannot access the Strelva Vercel team: the authorized
-team/deployment read returns 403. The actual deployed revision and database
-mapping must be established before any hosted migration or promotion. The
-previously inspected Supabase project is not assumed to be that target merely
-because its name is familiar.
+The earlier connector returned 403. On September 21 the existing Vercel CLI
+login successfully read the Strelva team, production deployments and project
+configuration. The [dated preparation evidence](./strelvav2-horizontal-acceptance.md#september-21-production-preparation-evidence)
+records the actual deployment IDs, configured Supabase origin and their limits.
+Read-only Supabase catalog access subsequently identified the actual migration
+gap and unrecognized history. Their reconciliation and deployed-runtime mapping
+remain gates; current project settings alone do not prove an older deployment's
+effective environment.
+
+The [prepared rollout checklist](./horizontal-release-checklist-2026-09-11.md#september-21-production-preparation)
+implements Jacob's requirement that no client site go down. Preparation does not
+authorize production changes. Existing client aliases on the control-plane
+project make compatibility a prerequisite to any app rollout.
 
 The hosted operation needs the exact application and marketing artifacts,
 environment and provider scopes, actual database history and schema delta,

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-baseline_migration="20260729180000_org_layer_phase0_accounts.sql"
+baseline_migration="20260802120000_report_snapshots.sql"
 upgrade_migration="20260905190000_release_one_workspaces.sql"
 schema_test="$repo_root/tests/workspace-upgrade-schema.sql"
 cluster_root="$(mktemp -d "${TMPDIR:-/tmp}/strelva-workspace-upgrade.XXXXXX")"
@@ -92,6 +92,8 @@ insert into public.memberships (user_id, tenant_id, role)
   values ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'upgrade-site', 'owner');
 insert into public.content (tenant_id, section, data)
   values ('upgrade-site', 'hero', '{"headline":"Before the workspace upgrade"}'::jsonb);
+insert into public.report_snapshots (tenant_id, period, metrics)
+  values ('upgrade-site', '2026-08', '{"retained":true}'::jsonb);
 SQL
 
 tail_started=0
@@ -104,7 +106,65 @@ for migration in $(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -na
     tail_started=1
   fi
   printf 'Applying ordered workspace/recovery migration: %s\n' "$migration_name"
+  if [[ "$migration_name" == "20260920060000_content_version_request_id.sql" ]]; then
+    # A reader must make the metadata change fail immediately, not queue an
+    # exclusive lock that would hold up subsequent client requests.
+    PGAPPNAME=strelva-column-holder psql "${psql_args[@]}" \
+      -c 'begin; lock table public.content_versions in access share mode; select pg_sleep(2); rollback;' \
+      > "$cluster_root/column-holder.log" 2>&1 &
+    holder_pid=$!
+    lock_ready=0
+    for attempt in $(seq 1 40); do
+      if [[ "$(psql "${psql_args[@]}" -Atc "select exists(select 1 from pg_locks l join pg_stat_activity a on a.pid=l.pid where a.application_name='strelva-column-holder' and l.relation='public.content_versions'::regclass and l.granted);")" == t ]]; then lock_ready=1; break; fi
+      sleep 0.025
+    done
+    [[ "$lock_ready" == 1 ]] || { printf 'Reader lock fixture failed.\n' >&2; exit 1; }
+    if PGOPTIONS='-c statement_timeout=500ms' psql "${psql_args[@]}" --file="$migration" > "$cluster_root/column-contention.log" 2>&1; then
+      printf 'Column migration incorrectly accepted a conflicting client lock.\n' >&2; exit 1
+    fi
+    grep -q 'could not obtain lock' "$cluster_root/column-contention.log"
+    [[ "$(psql "${psql_args[@]}" -Atc "select not exists(select 1 from information_schema.columns where table_schema='public' and table_name='content_versions' and column_name='request_id');")" == t ]]
+    wait "$holder_pid"
+    printf 'Column contention failed immediately and left the schema unchanged.\n'
+  fi
+  if [[ "$migration_name" == "20260920060100_content_version_request_index.sql" ]]; then
+    # Simulate concurrent maintenance. The index may wait/fail, but a client
+    # writer must still acquire its normal lock while that index is waiting.
+    PGAPPNAME=strelva-index-holder psql "${psql_args[@]}" \
+      -c 'begin; lock table public.content_versions in share update exclusive mode; select pg_sleep(3); rollback;' \
+      > "$cluster_root/index-holder.log" 2>&1 &
+    holder_pid=$!
+    lock_ready=0
+    for attempt in $(seq 1 40); do
+      if [[ "$(psql "${psql_args[@]}" -Atc "select exists(select 1 from pg_locks l join pg_stat_activity a on a.pid=l.pid where a.application_name='strelva-index-holder' and l.relation='public.content_versions'::regclass and l.granted);")" == t ]]; then lock_ready=1; break; fi
+      sleep 0.025
+    done
+    [[ "$lock_ready" == 1 ]] || { printf 'Index lock fixture failed.\n' >&2; exit 1; }
+    PGAPPNAME=strelva-waiting-index psql "${psql_args[@]}" --file="$migration" > "$cluster_root/index-contention.log" 2>&1 &
+    index_pid=$!
+    index_waiting=0
+    for attempt in $(seq 1 40); do
+      if [[ "$(psql "${psql_args[@]}" -Atc "select exists(select 1 from pg_stat_activity where application_name='strelva-waiting-index' and wait_event_type='Lock');")" == t ]]; then index_waiting=1; break; fi
+      sleep 0.025
+    done
+    [[ "$index_waiting" == 1 ]] || { printf 'Index did not reach the contention boundary.\n' >&2; exit 1; }
+    psql "${psql_args[@]}" -c 'begin; lock table public.content_versions in row exclusive mode nowait; rollback;' >/dev/null
+    if wait "$index_pid"; then printf 'Expected bounded index lock timeout was absent.\n' >&2; exit 1; fi
+    grep -q 'lock timeout' "$cluster_root/index-contention.log"
+    wait "$holder_pid"
+    printf 'Client writer remained available during a bounded index lock wait.\n'
+  fi
   psql "${psql_args[@]}" --file="$migration" >/dev/null
+  if [[ "$migration_name" == "20260920060100_content_version_request_index.sql" ]]; then
+    psql "${psql_args[@]}" --file="$migration" > "$cluster_root/index-retry.log" 2>&1
+    psql "${psql_args[@]}" -c 'alter index public.content_versions_tenant_request_idx rename to content_versions_expected_idx; create index content_versions_tenant_request_idx on public.content_versions (request_id);' >/dev/null
+    if psql "${psql_args[@]}" --file="$migration" > "$cluster_root/index-wrong-definition.log" 2>&1; then
+      printf 'An incompatible existing index was incorrectly accepted.\n' >&2; exit 1
+    fi
+    grep -q 'content_version_request_index_not_ready' "$cluster_root/index-wrong-definition.log"
+    psql "${psql_args[@]}" -c 'drop index public.content_versions_tenant_request_idx; alter index public.content_versions_expected_idx rename to content_versions_tenant_request_idx;' >/dev/null
+    printf 'Valid index retry passed; incompatible index was rejected.\n'
+  fi
 done
 
 if [[ "$tail_started" -ne 1 ]]; then

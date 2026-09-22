@@ -1,6 +1,6 @@
 # Strelva Launch Blockers
 
-> **Status: current release gate (updated 2026-09-18).** Only `Current
+> **Status: current release gate (updated 2026-09-21).** Only `Current
 > Blockers` and `Waived Blockers` determine release status. The long evidence
 > record below is historical. Current architecture and commands live in
 > `production-readiness.md`: Supabase Auth, Postgres, and `app.strelva.com`.
@@ -22,7 +22,14 @@ _No current blockers from the original release gate — both prior entries are r
 - Scope: the new horizontal product on branch `strelvav2`, not a claim that the existing Managed Websites production service has stopped working.
 - Reference: [horizontal acceptance](./strelvav2-horizontal-acceptance.md) and [release evaluation gates](./horizontal-release-checklist-2026-09-11.md#current-completion-evaluation).
 - Required closure: complete the mandatory PRD journeys with independently reviewed evidence, resolve operating and commercial choices at their dependent boundary, prepare the exact migration/environment/deployment and recovery steps, and obtain the necessary live-action authority. Fixture-only results, local builds and resolved historical launch blockers cannot close this gate.
-- Current gaps include account/result continuity, complete application handoffs, provider-cost reconciliation, authenticated delegated operation, custom application release integration and specified provider/service lifecycle. The acceptance ledger retains their current scope and proof limits.
+- September 21 preparation verified merged implementation/CI and read the actual hosted metadata. Current execution blockers are recorded in the [dated preparation evidence](./strelvav2-horizontal-acceptance.md#september-21-production-preparation-evidence): 63 pending migrations after source reconciliation, shared client-host compatibility, complete operational recovery, auth/email and real delivery acceptance. The [authorized remediation receipt](./strelvav2-horizontal-acceptance.md#september-21-authorized-remediation-and-recovery-rehearsal) records the successful private logical restore, restored-data upgrade, lock-failure checks and production Auth canonical URL correction; these do not close the remaining gates. The [prepared sequence](./horizontal-release-checklist-2026-09-11.md#september-21-production-preparation) preserves client availability. Older feature-gap lists do not override the September 21 release direction.
+
+### Existing Rohlax www availability defect (September 21)
+
+- Status: blocked
+- Owner: Jacob for DNS authority; implementation team for exact preparation and verification.
+- Evidence: `www.rohlaxwellness.com` fails DNS resolution; two public resolvers return a CNAME containing a trailing slash. The apex responds successfully. Vercel reports the www alias as misconfigured on `strelva-admin`.
+- Required closure: execute and verify the authorized DNS/alias repair in the [dated evidence](./strelvav2-horizontal-acceptance.md#september-21-production-preparation-evidence), preserving all other client records and intended page routing. User supplied Cloudflare sign-in and repair authority; native browser control is currently disconnected. No DNS change has been made. Do not bundle the repair into a launch or accept the failure as the new baseline.
 
 ### Security and dependency blockers (2026-07-30 audit — RESOLVED 2026-07-30)
 
