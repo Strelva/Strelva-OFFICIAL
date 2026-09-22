@@ -48,7 +48,7 @@ test("an owner publishes, shares, updates, and resumes the staff request offerin
     await expect(page).toHaveURL(new RegExp(`workspaceId=${workspaceId}.*work=`));
     const appId = new URL(page.url()).searchParams.get("work");
     expect(appId).toMatch(/^[0-9a-f-]{36}$/);
-    await expect(page.getByRole("heading", { name: "Staff requests", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Staff requests", exact: true, level: 1 })).toBeVisible();
 
     await page.getByRole("tab", { name: "Edit app", exact: true }).click();
   await page.getByRole("button", { name: "Check proposed change", exact: true }).click();
@@ -64,7 +64,7 @@ test("an owner publishes, shares, updates, and resumes the staff request offerin
     await navigation.getByRole("link", { name: "Apps & templates", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
     const draftStaffRequestOffering = page.locator('[class*="discoveryRow"]').filter({ hasText: "Staff request application" }).first();
-    await draftStaffRequestOffering.getByRole("button", { name: "Open", exact: true }).click();
+    await draftStaffRequestOffering.getByRole("button", { name: "Staff request application: Open", exact: true }).click();
     await expect(page.getByText("Draft setup", { exact: true })).toBeVisible();
     await page.getByLabel("I published the connected application through its review.", { exact: true }).check();
     await page.getByRole("button", { name: "Activate released offering", exact: true }).click();
@@ -74,7 +74,7 @@ test("an owner publishes, shares, updates, and resumes the staff request offerin
     await expect(connectedBeforeUse.getByRole("button", { name: "Open Staff requests", exact: true })).toHaveCount(1);
     await connectedBeforeUse.getByRole("button", { name: "Open Staff requests", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`work=${appId}`));
-    await expect(page.getByRole("heading", { name: "Staff requests", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Staff requests", exact: true, level: 1 })).toBeVisible();
 
     await page.getByRole("tab", { name: "Sharing", exact: true }).click();
   await page.getByLabel("Recipient email", { exact: true }).fill(recipient.email);
@@ -86,8 +86,8 @@ test("an owner publishes, shares, updates, and resumes the staff request offerin
     staffPage.setDefaultTimeout(20_000);
     await staffPage.setViewportSize({ width: 390, height: 844 });
     await staffPage.goto(`/apps/${appId}`, { waitUntil: "domcontentloaded" });
-    await expect(staffPage.getByRole("heading", { name: "Staff requests", exact: true })).toBeVisible();
-    await staffPage.getByLabel("Request *", { exact: true }).fill("Replace the reception printer");
+    await expect(staffPage.getByRole("heading", { name: "Staff requests", exact: true, level: 1 })).toBeVisible();
+    await staffPage.getByLabel("Request", { exact: true }).fill("Replace the reception printer");
     await staffPage.getByRole("button", { name: "Submit record", exact: true }).click();
     await expect(staffPage.getByRole("status")).toContainText("Record submitted.");
     await expect(staffPage.getByText("Replace the reception printer", { exact: true })).toBeVisible();
@@ -106,11 +106,11 @@ test("an owner publishes, shares, updates, and resumes the staff request offerin
     await expect(page.getByText(/Version 2 is live/)).toBeVisible();
   await page.getByRole("tab", { name: "Use app", exact: true }).click();
     await page.getByText("Add another record", { exact: true }).click();
-    await expect(page.getByLabel("Request details", { exact: true })).toBeVisible();
+    await expect(page.getByRole("tabpanel", { name: "Use app", exact: true }).getByLabel("Request details", { exact: true })).toBeVisible();
     await expect(page.getByText("Replace the reception printer", { exact: true })).toBeVisible();
 
     await staffPage.reload({ waitUntil: "domcontentloaded" });
-    await expect(staffPage.getByLabel("Request details *", { exact: true })).toBeVisible();
+    await expect(staffPage.getByLabel("Request details", { exact: true })).toBeVisible();
     await expect(staffPage.getByText("Replace the reception printer", { exact: true })).toBeVisible();
     await staffPage.screenshot({ path: testInfo.outputPath("staff-request-offering-mobile.png"), fullPage: true });
 
@@ -118,18 +118,18 @@ test("an owner publishes, shares, updates, and resumes the staff request offerin
     const recent = page.getByRole("region", { name: "Your apps and work", exact: true });
     await expect(recent.getByRole("button", { name: /Staff requests/ })).toBeVisible();
     await recent.getByRole("button", { name: /Staff requests/ }).click();
-    await expect(page.getByRole("heading", { name: "Staff requests", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Staff requests", exact: true, level: 1 })).toBeVisible();
 
     await page.getByRole("button", { name: "Back to work", exact: true }).click();
     await navigation.getByRole("link", { name: "Apps & templates", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
     const installedStaffRequestOffering = page.locator('[class*="discoveryRow"]').filter({ hasText: "Staff request application" }).first();
-    await installedStaffRequestOffering.getByRole("button", { name: "Open", exact: true }).click();
+    await installedStaffRequestOffering.getByRole("button", { name: "Staff request application: Open", exact: true }).click();
     const connected = page.getByRole("region", { name: "Connected work", exact: true });
     await expect(connected).toContainText("Staff requests");
     await expect(connected).not.toContainText(appId!);
     await connected.getByRole("button", { name: "Open Staff requests", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Staff requests", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Staff requests", exact: true, level: 1 })).toBeVisible();
   } finally {
     await owner.context.close();
     await recipient.context.close();

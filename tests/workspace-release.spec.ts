@@ -457,6 +457,7 @@ test("keeps product discovery coherent and managed work scoped to authorized lin
 
   await page.goto(`/workspace?workspaceId=${CUSTOMER_ID}&view=products`);
   const refreshedMain = page.getByRole("main");
+  await refreshedMain.getByText("More tools and managed services", { exact: true }).click();
   const refreshedOutcome = (name: string) => refreshedMain.locator('[class*="discoveryRow"]').filter({ hasText: name }).first();
   await refreshedOutcome("Inquiry work").getByRole("button", { name: "Start" }).click();
   await expect(refreshedMain.getByRole("heading", { name: "Inquiry work", exact: true })).toBeVisible();
@@ -465,6 +466,7 @@ test("keeps product discovery coherent and managed work scoped to authorized lin
 
   await page.goto(`/workspace?workspaceId=${CUSTOMER_ID}&view=products`);
   const finalMain = page.getByRole("main");
+  await finalMain.getByText("More tools and managed services", { exact: true }).click();
   const finalOutcome = finalMain.locator('[class*="discoveryRow"]').filter({ hasText: "Home Finder" }).first();
   await finalOutcome.getByRole("button", { name: "Explore example" }).click();
   await expect(finalMain.getByRole("heading", { name: "Home Finder", exact: true })).toBeVisible();

@@ -257,7 +257,7 @@ test("review fixture connects a prepared request result, owner use, employee use
 
   await page.goto(`/apps/${workId}`);
   await expect(page.getByRole("heading", { name: "Equipment requests", exact: true })).toBeVisible();
-  await page.getByLabel("Equipment needed *", { exact: true }).fill("Replacement pipe cutter");
+  await page.getByLabel("Equipment needed", { exact: true }).fill("Replacement pipe cutter");
   await page.getByRole("button", { name: "Submit record", exact: true }).click();
   await expect(page.getByRole("status")).toContainText("Record submitted.");
   await expect(page.getByText("Pipe inspection camera", { exact: true })).toBeVisible();
@@ -277,7 +277,7 @@ test("review fixture connects a prepared request result, owner use, employee use
   await page.screenshot({ path: testInfo.outputPath("application-review-fixture.png"), fullPage: true });
 
   await page.goto(`/apps/${workId}`);
-  await expect(page.getByLabel("Equipment and job *", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Equipment and job", { exact: true })).toBeVisible();
   await expect(page.getByText("Pipe inspection camera", { exact: true })).toBeVisible();
   await expect(page.getByText("Replacement pipe cutter", { exact: true })).toBeVisible();
 
@@ -298,7 +298,7 @@ test("review fixture connects a prepared request result, owner use, employee use
   expect(rollback.body.payload.release.version).toBe(1);
 
   await page.goto(`/apps/${workId}`);
-  await expect(page.getByLabel("Equipment needed *", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Equipment needed", { exact: true })).toBeVisible();
   await expect(page.getByText("Pipe inspection camera", { exact: true })).toBeVisible();
   await expect(page.getByText("Replacement pipe cutter", { exact: true })).toBeVisible();
 

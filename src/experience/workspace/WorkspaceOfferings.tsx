@@ -845,7 +845,7 @@ function DiscoveryRows({
         </span>
         <span className={styles.discoveryActions}>
           <button type="button" className={styles.discoveryAction} aria-label={`${entry.title}: ${entry.action.label}`} onClick={action}>{entry.action.label}</button>
-          {entry.secondary ? <><small className={styles.discoverySecondaryTitle}>{entry.secondary.title}</small><button type="button" className={styles.discoverySecondaryAction} aria-label={`${entry.title}: ${entry.secondary.action.label}`} onClick={() => run(entry.secondary!.target, entry.secondary!.action)}>{entry.secondary.action.label}</button></> : null}
+          {entry.secondary ? <><small className={styles.discoverySecondaryTitle}>{entry.secondary.title}</small><button type="button" className={styles.discoverySecondaryAction} aria-label={`${entry.secondary.title}: ${entry.secondary.action.label}`} onClick={() => run(entry.secondary!.target, entry.secondary!.action)}>{entry.secondary.action.label}</button></> : null}
         </span>
       </div>;
     })}

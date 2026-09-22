@@ -96,6 +96,8 @@ test("shared navigation remains available while opening and finding work", async
   await expect(page.getByText("Preview · early access", { exact: true }).last()).toBeVisible();
   await expect(page.getByRole("link", { name: /Try Home Finder/ })).toHaveAttribute("href", /127\.0\.0\.1:3213\/embed\/agency-preview/);
   await page.getByRole("button", { name: "Ask about early access" }).click();
+  await expect(page.getByRole("heading", { name: "Choose a business for this request.", exact: true })).toBeVisible();
+  await page.getByText("Contact the team without setting up a business", { exact: true }).click();
   await expect(page.getByLabel("What are you trying to do?")).toHaveValue(/enabling a live brokerage installation/);
   await page.getByLabel("What are you trying to do?").fill("Bring my existing WordPress website.");
   await expect(page.getByRole("link", { name: "Open email" })).toHaveAttribute("href", /Bring%20my%20existing%20WordPress/);
@@ -269,7 +271,7 @@ test("direct customer can inspect an offering setup and its local allowance", as
     const url = new URL(page.url());
     return { workspaceId: url.searchParams.get("workspaceId"), view: url.searchParams.get("view"), work: url.searchParams.get("work") };
   }).toEqual({ workspaceId: "33333333-3333-4333-8333-333333333333", view: "applications", work: "88888888-8888-4888-8888-888888888888" });
-  await expect(page.getByRole("heading", { name: "Staff requests", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Staff requests", exact: true, level: 1 })).toBeVisible();
   await expect(page.getByText("No version is live yet.", { exact: false })).toBeVisible();
 
   await page.getByRole("tab", { name: "Edit app", exact: true }).click();
@@ -279,7 +281,7 @@ test("direct customer can inspect an offering setup and its local allowance", as
   await expect(page.getByText(/Version 1 is live/)).toBeVisible();
   await page.getByRole("tab", { name: "Use app", exact: true }).click();
 
-  await page.getByLabel("What do you need?", { exact: true }).fill("Replace the reception printer");
+  await page.getByRole("tabpanel", { name: "Use app", exact: true }).getByLabel("What do you need?", { exact: true }).fill("Replace the reception printer");
   await page.getByRole("button", { name: "Save record", exact: true }).click();
   await expect(page.getByText("Replace the reception printer", { exact: true }).first()).toBeVisible();
 
@@ -294,13 +296,14 @@ test("direct customer can inspect an offering setup and its local allowance", as
   await page.getByLabel("Label for What do you need?", { exact: true }).fill("Request details");
   await page.getByRole("button", { name: "Save new draft", exact: true }).click();
   await expect(page.getByText(/label changes from "What do you need\?" to "Request details"/)).toBeVisible();
-  await expect(page.getByLabel("What do you need?", { exact: true })).toHaveCount(1);
+  await page.getByRole("tab", { name: "Use app", exact: true }).click();
+  await expect(page.getByRole("tabpanel", { name: "Use app", exact: true }).getByLabel("What do you need?", { exact: true })).toHaveCount(1);
   await page.getByRole("tab", { name: "Edit app", exact: true }).click();
   await page.getByRole("button", { name: "Check proposed change", exact: true }).click();
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(page.getByText(/Version 2 is live/)).toBeVisible();
   await page.getByRole("tab", { name: "Use app", exact: true }).click();
-  await expect(page.getByLabel("Request details", { exact: true })).toHaveCount(1);
+  await expect(page.getByRole("tabpanel", { name: "Use app", exact: true }).getByLabel("Request details", { exact: true })).toHaveCount(1);
   await expect(page.getByText("Replace the reception printer", { exact: true }).first()).toBeVisible();
 
   await page.getByRole("tab", { name: "Edit app", exact: true }).click();
@@ -310,7 +313,7 @@ test("direct customer can inspect an offering setup and its local allowance", as
   await recovery.getByRole("button", { name: "Restore released version", exact: true }).click();
   await expect(page.getByText(/Version 1 is live/)).toBeVisible();
   await page.getByRole("tab", { name: "Use app", exact: true }).click();
-  await expect(page.getByLabel("What do you need?", { exact: true })).toHaveCount(1);
+  await expect(page.getByRole("tabpanel", { name: "Use app", exact: true }).getByLabel("What do you need?", { exact: true })).toHaveCount(1);
   await expect(page.getByText("Replace the reception printer", { exact: true }).first()).toBeVisible();
 
   await page.getByRole("tab", { name: "Sharing", exact: true }).click();
@@ -321,7 +324,7 @@ test("direct customer can inspect an offering setup and its local allowance", as
   const installedApp = page.getByRole("button", { name: "Open Staff requests", exact: true });
   await expect(installedApp).toHaveCount(1);
   await installedApp.click();
-  await expect(page.getByRole("heading", { name: "Staff requests", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Staff requests", exact: true, level: 1 })).toBeVisible();
 
   await page.getByRole("button", { name: "Back to work" }).click();
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -330,12 +333,12 @@ test("direct customer can inspect an offering setup and its local allowance", as
   const recent = page.getByRole("region", { name: "Your apps and work", exact: true });
   await expect(recent.getByRole("button", { name: /Staff requests/ })).toBeVisible();
   await recent.getByRole("button", { name: /Staff requests/ }).click();
-  await expect(page.getByRole("heading", { name: "Staff requests", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Staff requests", exact: true, level: 1 })).toBeVisible();
   await page.getByRole("button", { name: "Back to work" }).click();
   await navigation.getByRole("link", { name: "Apps & templates", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   const installedStaffRequestOffering = page.locator('[class*="discoveryRow"]').filter({ hasText: "Staff request application" }).first();
-  await installedStaffRequestOffering.getByRole("button", { name: "Open", exact: true }).click();
+  await installedStaffRequestOffering.getByRole("button", { name: "Staff request application: Open", exact: true }).click();
   const connected = page.getByRole("region", { name: "Connected work", exact: true });
   await expect(connected).toContainText("Staff requests");
   await expect(connected).not.toContainText("88888888-8888-4888-8888-888888888888");
@@ -350,7 +353,7 @@ test("direct customer can inspect an offering setup and its local allowance", as
   await page.setViewportSize({ width: 390, height: 844 });
   await connected.getByRole("button", { name: "Open Staff requests", exact: true }).focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { name: "Staff requests", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Staff requests", exact: true, level: 1 })).toBeVisible();
 
   await page.reload();
   await expect(page.getByRole("heading", { name: "This saved result is unavailable." })).toBeVisible();

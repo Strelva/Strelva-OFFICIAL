@@ -159,8 +159,8 @@ test("a verified staff recipient uses one released version while a candidate cha
     await expect(ownerUsePage.getByText(/Version 1 is live\..*live use continues/i)).toBeVisible();
     await expect(ownerUsePage.getByRole("tabpanel", { name: "Use app", exact: true }).getByLabel("Internal note", { exact: true })).toHaveCount(0);
     await ownerUsePage.getByText("Add another record", { exact: true }).click();
-    await ownerUsePage.getByLabel("Problem", { exact: true }).fill("Broken stopcock in utility room");
-    await ownerUsePage.getByRole("combobox", { name: /Priority/ }).selectOption("standard");
+    await ownerUsePage.getByRole("tabpanel", { name: "Use app", exact: true }).getByLabel("Problem", { exact: true }).fill("Broken stopcock in utility room");
+    await ownerUsePage.getByRole("tabpanel", { name: "Use app", exact: true }).getByRole("combobox", { name: /Priority/ }).selectOption("standard");
     await ownerUsePage.getByRole("button", { name: "Save record", exact: true }).click();
     await expect(ownerUsePage.getByRole("status")).toContainText("Saved in this workspace.");
     const ownerUseResult = await owner.context.request.get(`/api/bounded-work?productId=applications&workId=${app.id}`);
@@ -277,8 +277,8 @@ test("a verified staff recipient uses one released version while a candidate cha
     // the same link through the owner control.
     const reopenedOwnerPage = await owner.context.newPage();
     await reopenedOwnerPage.goto(`/workspace?workspaceId=${workspaceId}&work=${app.id}`);
-    await expect(reopenedOwnerPage.getByText(`Link for ${staff.email}`, { exact: true })).toBeVisible();
     await reopenedOwnerPage.getByRole("tab", { name: "Sharing", exact: true }).click();
+    await expect(reopenedOwnerPage.getByText(`Link for ${staff.email}`, { exact: true })).toBeVisible();
     await reopenedOwnerPage.getByRole("button", { name: "Revoke link", exact: true }).click();
     await expect(reopenedOwnerPage.getByText(`Access revoked for ${staff.email}`, { exact: true })).toBeVisible();
     await reopenedOwnerPage.close();

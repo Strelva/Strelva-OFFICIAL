@@ -873,11 +873,14 @@ function WorkspaceFrame({ children }: { children: React.ReactNode }) {
 function WorkspaceLoading({ label }: { label: string }) {
   return (
     <WorkspaceFrame>
-      <StrelvaShell signedIn={false} title="Your Strelva">
-      <div role="status" className="flex flex-1 items-center justify-center gap-3 text-[14px] text-gray-muted">
-        <Loader2 className="h-4 w-4 animate-spin" />{label}
+      <div inert className="contents">
+        <StrelvaShell signedIn={false} title="Your Strelva">
+          <div className="flex flex-1 items-center justify-center gap-3 text-sm text-gray-muted">
+            <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />{label}
+          </div>
+        </StrelvaShell>
       </div>
-      </StrelvaShell>
+      <p role="status" className="sr-only">{label}</p>
     </WorkspaceFrame>
   );
 }
