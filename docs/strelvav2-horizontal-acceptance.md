@@ -1847,11 +1847,3 @@ All 24 public capability/content API reads across the 12 active tenants returned
 200 JSON responses without an error envelope. These are baseline read checks,
 not proof of authenticated writes or candidate production behavior. GitHub CI
 was still running at this checkpoint; the secrets check had passed.
-
-Clean-candidate follow-up: commit `b4b73f69` passed the 27 target-check tests,
-typecheck, full ordered workspace upgrade and workspace/inquiry SQL checks.
-The changes are isolated in draft PR #193; unrelated local edits were excluded.
-All 24 public capability/content API reads across the 12 active tenants returned
-200 JSON responses without an error envelope. These are baseline read checks,
-not proof of authenticated writes or candidate production behavior. GitHub CI
-was still running at this checkpoint; the secrets check had passed.
