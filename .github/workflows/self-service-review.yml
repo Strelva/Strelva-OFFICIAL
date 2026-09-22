@@ -1,0 +1,49 @@
+name: Self-service review
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+concurrency:
+  group: self-service-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  review:
+    if: github.repository == 'Strelva/Strelva-OFFICIAL' && github.event.pull_request.number == 195 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feat/self-service-experience-20260922'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Package isolated dependency tree
+        run: |
+          mkdir -p review-artifacts
+          tar -czf review-artifacts/dependencies.tar.gz node_modules
+          git rev-parse HEAD > review-artifacts/commit.txt
+          sha256sum pnpm-lock.yaml > review-artifacts/lock.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: self-service-dependencies-${{ github.run_id }}
+          path: review-artifacts/
+          retention-days: 1
+      - run: pnpm lint && pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: self-service-diagnostics-${{ github.run_id }}
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 3
