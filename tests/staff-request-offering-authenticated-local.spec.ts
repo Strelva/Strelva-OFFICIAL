@@ -39,7 +39,7 @@ test("an owner publishes, shares, updates, and resumes the staff request offerin
   await page.getByText("More tools and managed services", { exact: true }).click();
     await expect(page.getByRole("heading", { name: "Useful outcomes for this business.", exact: true })).toBeVisible();
     const staffRequestOffering = page.locator('[class*="discoveryRow"]').filter({ hasText: "Staff request application" }).first();
-    await staffRequestOffering.getByRole("button", { name: "Start setup", exact: true }).click();
+    await staffRequestOffering.getByRole("button", { name: "Staff request application: Start setup", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Install Staff request application", exact: true })).toBeVisible();
     await expect(page.getByText("Create the standard staff request application", { exact: true })).toBeVisible();
     await expect(page.getByRole("radio", { name: "Your business operates it", exact: true })).toBeChecked();

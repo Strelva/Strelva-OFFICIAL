@@ -92,7 +92,7 @@ test("shared navigation remains available while opening and finding work", async
   await expect(page.getByRole("button", { name: "Open Harbor Dental", exact: true })).toBeVisible();
   await page.getByRole("link", { name: /^Apps & templates/ }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
-  await page.locator('[class*="discoveryRow"]').filter({ hasText: "Home Finder" }).getByRole("button", { name: "Explore example", exact: true }).click();
+  await page.locator('[class*="discoveryRow"]').filter({ hasText: "Home Finder" }).getByRole("button", { name: "Home Finder: Explore example", exact: true }).click();
   await expect(page.getByText("Preview · early access", { exact: true }).last()).toBeVisible();
   await expect(page.getByRole("link", { name: /Try Home Finder/ })).toHaveAttribute("href", /127\.0\.0\.1:3213\/embed\/agency-preview/);
   await page.getByRole("button", { name: "Ask about early access" }).click();
@@ -106,7 +106,7 @@ test("shared workspace resumes inquiry work inside the one Strelva frame", async
   await page.goto("/preview/strelva?scenario=managed");
   await page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("link", { name: "Apps & templates", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
-  await page.locator('[class*="discoveryRow"]').filter({ hasText: "Inquiry work" }).getByRole("button", { name: "Start", exact: true }).click();
+  await page.locator('[class*="discoveryRow"]').filter({ hasText: "Inquiry work" }).getByRole("button", { name: "Inquiry work: Start", exact: true }).click();
   await page.getByRole("button", { name: "Open Buffalo Realty", exact: true }).click();
   await expect(page.getByRole("heading", { name: "What should Strelva handle?" })).toBeVisible();
   await expect(page.getByLabel("Strelva navigation", { exact: true })).toHaveCount(1);
@@ -224,13 +224,13 @@ test("direct customer can inspect an offering setup and its local allowance", as
   await page.getByRole("button", { name: "Assign to this business" }).click();
   await expect(page.getByText("Assigned to this business · You can open it")).toBeVisible();
   const managedWebsiteChanges = page.locator('[class*="discoveryRow"]').filter({ hasText: "Managed website changes" }).first();
-  await managedWebsiteChanges.getByRole("button", { name: "Start setup", exact: true }).click();
+  await managedWebsiteChanges.getByRole("button", { name: "Managed website changes: Start setup", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Install Managed website changes" })).toBeVisible();
   await expect(page.locator("form").getByRole("combobox")).toHaveValue("99999999-9999-4999-8999-999999999999");
   await page.getByRole("button", { name: "Back to offerings" }).click();
 
   const staffRequestOffering = page.locator('[class*="discoveryRow"]').filter({ hasText: "Staff request application" }).first();
-  await staffRequestOffering.getByRole("button", { name: "Start setup", exact: true }).click();
+  await staffRequestOffering.getByRole("button", { name: "Staff request application: Start setup", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Install Staff request application" })).toBeVisible();
   await expect(page.getByText("Create the standard staff request application")).toBeVisible();
   if (process.env.STRELVA_CAPTURE_PRODUCT_EXPERIENCE === "1") {
@@ -369,7 +369,7 @@ test("empty workspace can create an explicitly fictional local assessment", asyn
   const inquiries = page.locator('[class*="discoveryRow"]').filter({ hasText: "Inquiry work" });
   await expect(inquiries).toContainText("Available to start");
   await expect(inquiries).not.toContainText("Free assessment");
-  await page.locator('[class*="discoveryRow"]').filter({ hasText: "AI Visibility" }).getByRole("button", { name: "Start", exact: true }).click();
+  await page.locator('[class*="discoveryRow"]').filter({ hasText: "AI Visibility" }).getByRole("button", { name: "AI Visibility: Start", exact: true }).click();
   await page.getByRole("button", { name: "Check a business", exact: true }).click();
   await page.getByLabel("Business name").fill("Fictional Bakery");
   await page.getByLabel("Website", { exact: true }).fill("bakery.example");
@@ -434,7 +434,7 @@ test("shared read-only work cannot start an assessment", async ({ page }) => {
   await page.getByText("More tools and managed services", { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Useful outcomes for this workspace.", exact: true })).toBeVisible();
   await expect(page.getByText("This work-share does not include business-wide offering access.", { exact: false })).toBeVisible();
-  await page.locator('[class*="discoveryRow"]').filter({ hasText: "AI Visibility" }).getByRole("button", { name: "Start", exact: true }).click();
+  await page.locator('[class*="discoveryRow"]').filter({ hasText: "AI Visibility" }).getByRole("button", { name: "AI Visibility: Start", exact: true }).click();
   await expect(page.getByRole("button", { name: "Check a business", exact: true })).toBeDisabled();
   await expect(page.getByText("Switch to a workspace you own to create an assessment.")).toBeVisible();
 });

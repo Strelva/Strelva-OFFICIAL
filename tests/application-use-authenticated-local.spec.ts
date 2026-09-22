@@ -99,12 +99,12 @@ test("a verified staff recipient uses one released version while a candidate cha
     // A failed request leaves the current draft in memory so the same native
     // submit can be retried without asking the staff member to retype it.
     const recover = await failOnce(page, app.id);
-    await page.getByLabel("Problem *", { exact: true }).fill("Leaking tap in upstairs bathroom");
+    await page.getByLabel("Problem", { exact: true }).fill("Leaking tap in upstairs bathroom");
     await page.getByRole("combobox", { name: /Priority/ }).selectOption("standard");
     await page.getByRole("button", { name: "Submit record", exact: true }).click();
     await expect(page.locator('[id$="application-submit-error"]')).toContainText("current draft is still here");
     await recover();
-    await expect(page.getByLabel("Problem *", { exact: true })).toHaveValue("Leaking tap in upstairs bathroom");
+    await expect(page.getByLabel("Problem", { exact: true })).toHaveValue("Leaking tap in upstairs bathroom");
 
     await page.getByRole("button", { name: "Submit record", exact: true }).click();
     await expect(page.getByRole("status")).toContainText("Record submitted.");
@@ -223,7 +223,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     const priority = page.getByRole("combobox", { name: /Priority/ });
     await expect(priority).toBeVisible();
     await priority.selectOption("urgent");
-    await page.getByLabel("Problem *", { exact: true }).fill("Replacement pipe cutter for van 3");
+    await page.getByLabel("Problem", { exact: true }).fill("Replacement pipe cutter for van 3");
     await page.getByRole("button", { name: "Submit record", exact: true }).click();
     await expect(page.getByRole("status")).toContainText("Record submitted.");
     use = await readUse(staff.context.request, app.id);
@@ -349,8 +349,8 @@ test("a verified recipient edits a date record through a stale correction and re
     const page = await staff.context.newPage();
     await page.goto(`/apps/${app.id}`);
     await expect(page.getByRole("heading", { name: "Repair appointments", exact: true })).toBeVisible();
-    await page.getByLabel("Visit date *", { exact: true }).fill("2024-02-29");
-    await page.getByLabel("Problem *", { exact: true }).fill("Loose front door");
+    await page.getByLabel("Visit date", { exact: true }).fill("2024-02-29");
+    await page.getByLabel("Problem", { exact: true }).fill("Loose front door");
     await page.getByRole("button", { name: "Submit record", exact: true }).click();
     await expect(page.getByRole("status")).toContainText("Record submitted.");
 
@@ -360,8 +360,8 @@ test("a verified recipient edits a date record through a stale correction and re
     const recordId = use.records[0].id as string;
 
     await page.getByRole("button", { name: "Edit record", exact: true }).click();
-    await page.getByLabel("Visit date *", { exact: true }).fill("2024-03-01");
-    await page.getByLabel("Problem *", { exact: true }).fill("Correction kept after conflict");
+    await page.getByLabel("Visit date", { exact: true }).fill("2024-03-01");
+    await page.getByLabel("Problem", { exact: true }).fill("Correction kept after conflict");
 
     await post(editor.context.request, `/api/apps/${app.id}`, {
       action: "edit",
@@ -374,16 +374,16 @@ test("a verified recipient edits a date record through a stale correction and re
     });
     await page.getByRole("button", { name: "Save correction", exact: true }).click();
     await expect(page.locator('[id$="application-submit-error"]')).toContainText("Your correction is still here");
-    await expect(page.getByLabel("Visit date *", { exact: true })).toHaveValue("2024-03-01");
-    await expect(page.getByLabel("Problem *", { exact: true })).toHaveValue("Correction kept after conflict");
+    await expect(page.getByLabel("Visit date", { exact: true })).toHaveValue("2024-03-01");
+    await expect(page.getByLabel("Problem", { exact: true })).toHaveValue("Correction kept after conflict");
     use = await readUse(staff.context.request, app.id);
     expect(use.records[0]).toMatchObject({ values: { visit_date: "2024-03-02", problem: "Editor changed this first" }, revision: 2 });
 
     await page.getByRole("button", { name: "Reload application", exact: true }).click();
     await page.getByRole("button", { name: "Cancel correction", exact: true }).click();
     await page.getByRole("button", { name: "Edit record", exact: true }).click();
-    await page.getByLabel("Visit date *", { exact: true }).fill("2024-03-03");
-    await page.getByLabel("Problem *", { exact: true }).fill("Correction recovered");
+    await page.getByLabel("Visit date", { exact: true }).fill("2024-03-03");
+    await page.getByLabel("Problem", { exact: true }).fill("Correction recovered");
     await page.getByRole("button", { name: "Save correction", exact: true }).click();
     await expect(page.getByRole("status")).toContainText("Correction saved.");
     use = await readUse(staff.context.request, app.id);
@@ -430,8 +430,8 @@ test("self-service template becomes a private native app, then a live app withou
     await page.getByRole("button", { name: "Preview Staff requests", exact: true }).click();
     await page.getByLabel("App name", { exact: true }).fill("Studio requests");
     const preview = page.getByRole("region", { name: "Interactive app preview", exact: true });
-    await preview.getByLabel("Name *", { exact: true }).fill("Preview user");
-    await preview.getByLabel("Request *", { exact: true }).fill("This stays in preview");
+    await preview.getByLabel("Name", { exact: true }).fill("Preview user");
+    await preview.getByLabel("Request", { exact: true }).fill("This stays in preview");
     await preview.getByRole("combobox", { name: /Urgency/ }).selectOption("Normal");
     await preview.getByRole("button", { name: "Submit record", exact: true }).click();
     await expect(preview.getByText("Test record added. Nothing was saved or shared.", { exact: true })).toBeVisible();

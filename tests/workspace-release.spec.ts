@@ -269,7 +269,7 @@ test("creates a private assessment and restores it after reload", async ({ page 
   await page.goto("/workspace");
   await page.getByRole("link", { name: "Apps & templates", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
-  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await page.getByRole("button", { name: "AI Visibility: Start", exact: true }).click();
   await expect(page.getByRole("heading", { name: "AI Visibility", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Check a business" }).click();
   await expect(page.getByRole("heading", { name: "See what AI can understand about this business." })).toBeVisible();
@@ -429,10 +429,12 @@ test("keeps product discovery coherent and managed work scoped to authorized lin
 
   await page.goto("/workspace");
   const home = page.getByRole("main");
+  await home.getByText(/Websites available to your account/).click();
   await expect(home.getByRole("link", { name: /Harbor Dental website/ })).toHaveAttribute("href", "https://app.strelva.com/client/harbor/dashboard");
   await expect(home.getByRole("link", { name: /Northstar portfolio/ })).toHaveAttribute("href", "https://app.strelva.com/client/northstar/dashboard");
   await page.goto(`/workspace?workspaceId=${CUSTOMER_ID}&view=products`);
   const main = page.getByRole("main");
+  await main.getByText("More tools and managed services", { exact: true }).click();
   await expect(main.getByRole("heading", { name: "Useful outcomes for this business.", exact: true })).toBeVisible();
   const outcome = (name: string) => main.locator('[class*="discoveryRow"]').filter({ hasText: name }).first();
   await expect(outcome("AI Visibility")).toContainText("Start");
@@ -523,7 +525,7 @@ test("keeps My work and Shared with me context-local and read-only", async ({ pa
   await expect(page.getByRole("button", { name: "Open Customer-owned assessment" })).toBeVisible();
   await page.getByRole("link", { name: /^Apps & templates/ }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
-  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await page.getByRole("button", { name: "AI Visibility: Start", exact: true }).click();
   await expect(page.getByRole("button", { name: "Check a business", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "New", exact: true })).toBeDisabled();
 
@@ -861,7 +863,7 @@ test("does not add a completed assessment to a workspace selected while it was r
   await page.goto("/workspace");
   await page.getByRole("link", { name: "Apps & templates", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
-  await page.getByRole("button", { name: "Start", exact: true }).click();
+  await page.getByRole("button", { name: "AI Visibility: Start", exact: true }).click();
   await expect(page.getByRole("heading", { name: "AI Visibility", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Check a business", exact: true }).click();
   await page.getByLabel("Business name").fill("Original workspace assessment");
@@ -1020,8 +1022,9 @@ test("recovers the same assessment after a lost response and reload", async ({ p
     return fulfill(route,{work:work()});
   });
   await page.goto("/workspace");
-  await page.getByRole("button",{name:"Explore offerings", exact:true}).click();
-  await page.getByRole("button",{name:"Start", exact:true}).click();
+  await page.getByRole("link",{name:"Apps & templates", exact:true}).click();
+  await page.getByText("More tools and managed services", { exact: true }).click();
+  await page.getByRole("button",{name:"AI Visibility: Start", exact:true}).click();
   await expect(page.getByRole("heading",{name:"AI Visibility", exact:true})).toBeVisible();
   await page.getByRole("button",{name:"Check a business", exact:true}).click();
   await page.getByRole("textbox",{name:"Business name"}).fill("Harbor Dental");

@@ -13,9 +13,9 @@ for (const width of [1440, 390]) test(`template customization and native app cre
   if (width < 1100) await page.getByRole("button", { name: "Try preview", exact: true }).click();
   const preview = page.getByRole("region", { name: "Interactive app preview", exact: true });
   await expect(preview.getByRole("heading", { name: "Studio requests", exact: true })).toBeVisible();
-  await preview.getByLabel("Name *", { exact: true }).fill("Test person");
-  await preview.getByLabel("What do you need? *", { exact: true }).fill("Preview-only equipment request");
-  await preview.getByLabel("Urgency *", { exact: true }).selectOption("Normal");
+  await preview.getByLabel("Name", { exact: true }).fill("Test person");
+  await preview.getByLabel("What do you need?", { exact: true }).fill("Preview-only equipment request");
+  await preview.getByLabel("Urgency", { exact: true }).selectOption("Normal");
   await preview.getByRole("button", { name: "Submit record", exact: true }).click();
   await expect(preview.getByText("Test record added. Nothing was saved or shared.", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);

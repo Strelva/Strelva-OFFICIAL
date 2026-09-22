@@ -41,7 +41,7 @@ for (const width of [1440, 390]) {
 
     // The customer creates and publishes the first app through its real UI.
     // Do not seed the result with an API call and call that first-use proof.
-    await page.getByLabel("Name",{exact:true}).fill("Team requests");
+    await page.getByRole("form", { name: "Application setup" }).getByLabel("App name",{exact:true}).fill("Team requests");
     await page.getByLabel("Field 1",{exact:true}).fill("Request");
     const appCreation=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/bounded-work"&&r.request().method()==="POST");
     await page.getByRole("button",{name:"Create private app",exact:true}).click();

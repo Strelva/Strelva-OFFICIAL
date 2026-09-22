@@ -79,7 +79,7 @@ for (const width of [1440, 390]) {
             await expectReady(page.getByRole("heading", { name: "Start an onboarding case", exact: true })).toBeVisible();
             await expectReady(page.getByRole("button", { name: "Create case", exact: true })).toBeEnabled();
           } else {
-            await expectReady(page.getByLabel("Name", { exact: true })).toBeEditable();
+            await expectReady(page.getByRole("form", { name: "Application setup" }).getByLabel("App name", { exact: true })).toBeEditable();
             await expectReady(page.getByRole("button", { name: "Create private app", exact: true })).toBeVisible();
           }
         }
