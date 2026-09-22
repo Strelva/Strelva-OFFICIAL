@@ -1,0 +1,35 @@
+name: Assemble reviewed UI fixes
+on:
+  pull_request:
+    types: [synchronize, reopened]
+permissions:
+  contents: read
+jobs:
+  assemble:
+    if: github.repository == 'Strelva/Strelva-OFFICIAL' && github.event.pull_request.number == 195 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feat/self-service-experience-20260922'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply reviewed source without changing workflows
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test -f scripts/ui-fix/apply.mjs || exit 0
+          branch='feat/self-service-experience-20260922'
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          test "$(git ls-remote origin refs/heads/$branch | cut -f1)" = "$EXPECTED_HEAD"
+          node scripts/ui-fix/apply.mjs
+          git config user.name 'Strelva UI review'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Fix request proposal continuity and preserve managed journeys in the shared shell'
+          git push origin "HEAD:refs/heads/$branch"
+          git rev-parse HEAD
