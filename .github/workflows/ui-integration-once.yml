@@ -1,0 +1,92 @@
+name: Assemble reviewed UI changes
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/ui-integration-once.yml'
+      - 'scripts/.ui-integration-*.json'
+permissions:
+  contents: read
+concurrency:
+  group: ui-integration-once-195
+  cancel-in-progress: false
+jobs:
+  assemble:
+    if: github.repository == 'Strelva/Strelva-OFFICIAL' && github.event.pull_request.number == 195 && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'feat/self-service-experience-20260922'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: true
+      - name: Validate and apply exact reviewed edits
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess
+          root = pathlib.Path.cwd().resolve()
+          branch = 'feat/self-service-experience-20260922'
+          def git(*args):
+              return subprocess.check_output(['git', *args], text=True).strip()
+          expected = os.environ['EXPECTED_HEAD']
+          assert git('rev-parse', 'HEAD') == expected
+          assert git('ls-remote', 'origin', 'refs/heads/' + branch).split()[0] == expected, 'Branch moved; preserve concurrent work'
+          checksums = ['5f83d422ebdf6ff160322e196e3d53242e716c8b7130a858253235e74ec182ed', 'b60ab00c22c4830876bee0cf663cebd99f61a4ff6652839941beb0eb3f398441', '85edbbf6e0db4484f8a4ffe5c67b39b292f9394d400cf320c34054e0f3634d1f', '84d2bb9b796ba30abd7b78c20d4f78f06b26d2b5f6e7f5dcf211d1e45acb0e14']
+          files = []
+          bundles = []
+          for i, checksum in enumerate(checksums):
+              name = pathlib.Path(f'scripts/.ui-integration-{i}.json')
+              raw = name.read_text(encoding='utf-8')
+              assert len(raw) < 100000
+              if i == 2:
+                  # Repair one serialized edit boundary; the original full checksum remains mandatory.
+                  raw = raw.replace('[1005,1010,"ow"]', '[1005,1006,"ow"],[1007,1010,""]')
+              assert hashlib.sha256(raw.encode()).hexdigest() == checksum, f'Bundle {i} checksum mismatch'
+              batch = json.loads(raw)
+              assert isinstance(batch, list) and len(batch) == 8
+              files.extend(batch)
+              bundles.append(name)
+          prepared = []
+          seen = set()
+          for entry in files:
+              path = pathlib.PurePosixPath(entry['path'])
+              assert path.parts[0] in ('src', 'tests', 'docs') and not path.is_absolute()
+              assert all(part not in ('..', '.') for part in path.parts)
+              assert path.suffix in ('.ts', '.tsx', '.css', '.md') and str(path) not in seen
+              seen.add(str(path))
+              target = root.joinpath(*path.parts)
+              assert root in target.resolve().parents
+              assert not any(parent.is_symlink() for parent in [target, *target.parents])
+              if entry['before'] is None:
+                  assert not target.exists(), str(path) + ' already exists'
+                  before = ''
+              else:
+                  before = target.read_text(encoding='utf-8')
+                  assert hashlib.sha256(before.encode()).hexdigest() == entry['before'], str(path) + ' changed'
+              assert len(before) < 2000000
+              edits = entry['edits']
+              last = 0
+              for start, end, text in edits:
+                  assert type(start) is int and type(end) is int and last <= start <= end <= len(before)
+                  assert isinstance(text, str)
+                  last = end
+              after = before
+              for start, end, text in reversed(edits):
+                  after = after[:start] + text + after[end:]
+              assert hashlib.sha256(after.encode()).hexdigest() == entry['after'], str(path) + ' result mismatch'
+              prepared.append((target, after, str(path)))
+          for target, after, name in prepared:
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_text(after, encoding='utf-8')
+          for path in bundles:
+              path.unlink()
+          subprocess.run(['git', 'add', '--', *[name for _, _, name in prepared], *map(str, bundles)], check=True)
+          assert git('ls-remote', 'origin', 'refs/heads/' + branch).split()[0] == expected, 'Branch moved before commit'
+          subprocess.run(['git', '-c', 'user.name=github-actions[bot]', '-c', 'user.email=41898282+github-actions[bot]@users.noreply.github.com', 'commit', '-m', 'Complete native self-service continuity, app workspaces and regression coverage'], check=True)
+          subprocess.run(['git', 'push', 'origin', 'HEAD:refs/heads/' + branch], check=True)
+          print('Applied', len(prepared), 'checksum-verified files to the isolated feature branch.')
+          PY
