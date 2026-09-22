@@ -42,6 +42,22 @@ describe("template creation and recovery", () => {
     expect(node.textContent).toContain("Your private app is ready");
     expect(node.querySelector(`a[href*="${appId}"]`)).toBeTruthy();
   });
+  it("can start a fresh copy after creating from the same template", async () => {
+    const ids = ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"];
+    const request = vi.fn(async () => new Response(JSON.stringify({ id: ids[vi.mocked(request).mock.calls.length - 1] ?? ids[0], workspaceId, productId: "applications" }), { status: 201 })) as unknown as typeof fetch;
+    const node = await render(request);
+    await act(async () => button(node, "Create private app").click());
+    expect(node.textContent).toContain("Your private app is ready");
+    await act(async () => button(node, "Start another app").click());
+    expect(node.textContent).not.toContain("Your private app is ready");
+    expect(button(node, "Create private app").disabled).toBe(false);
+    const appName = [...node.querySelectorAll("input")].find(input => input.parentElement?.textContent?.includes("App name"));
+    expect(appName?.value).toBe("Staff requests");
+    await act(async () => button(node, "Create private app").click());
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(node.textContent).toContain("Your private app is ready");
+  });
+
   it("does not retry an ambiguous write and retains recovery state across reopen", async () => {
     const request = vi.fn(async () => { throw new Error("Network lost"); }) as unknown as typeof fetch;
     const first = await render(request);
