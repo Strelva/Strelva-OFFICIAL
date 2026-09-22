@@ -401,6 +401,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     onOpen={openWork} onStart={openStart}
     onCreateWebsite={onHorizontal && snapshot.products.some((entry) => entry.id === "websites" && entry.availability === "available") ? () => onHorizontal("websites") : undefined}
     onRequest={openRequest}
+    onDraftChange={rememberRequest}
     onWorkspace={onWorkspace}
     onWork={() => navigate("work")} onOngoing={() => navigate("ongoing")} onAccess={openAccess} onSettings={() => navigate("settings")} onHelp={() => navigate("help")} onOfferings={openOffering}
     onWebsiteCommand={offerings.websiteCommand} onRetryWebsiteAssignments={offerings.reload}
