@@ -45,6 +45,22 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Temporary, read-only review toolchain for this UI branch. Includes only
+      # installed dependencies and pnpm, never .git, environment files, or credentials.
+      - name: Retain locked review toolchain
+        if: github.head_ref == 'codex/web-app-ux-self-service-20260922'
+        run: |
+          mkdir -p /tmp/strelva-review-toolchain
+          tar -czf /tmp/strelva-review-toolchain/dependencies.tar.gz node_modules
+          cp -R "$(dirname "$(dirname "$(readlink -f "$(command -v pnpm)")")")" /tmp/strelva-review-toolchain/pnpm
+          sha256sum pnpm-lock.yaml > /tmp/strelva-review-toolchain/lockfile.sha256
+      - uses: actions/upload-artifact@v4
+        if: github.head_ref == 'codex/web-app-ux-self-service-20260922'
+        with:
+          name: review-toolchain-${{ github.run_id }}
+          path: /tmp/strelva-review-toolchain/
+          retention-days: 1
+          compression-level: 0
       - name: Metadata, delivery, entry, and UI regressions
         run: |
           pnpm test:workspace-target
@@ -108,8 +124,7 @@ jobs:
       - name: Exercise real Auth, native tools, and agency delivery
         run: |
           set -euo pipefail
-          # Next normalizes loopback request URLs to localhost. Use the same
-          # exact origin in the browser and server; do not relax CSRF checks.
+          # Match the actual normalized loopback origin without relaxing CSRF.
           export PLAYWRIGHT_BASE_URL=http://localhost:3100
           export NEXT_PUBLIC_APP_URL=http://localhost:3100
           pnpm exec next dev --hostname localhost --port 3100 > "$RUNNER_TEMP/strelva-proof-app.log" 2>&1 &
