@@ -1,77 +1,23 @@
 "use client";
 
-import { useRef, useState, type FormEvent, type ReactNode } from "react";
-import { AnimatePresence, motion, MotionConfig, useReducedMotion } from "motion/react";
-import {
-  ArrowRight,
-  Bell,
-  BriefcaseBusiness,
-  ChevronRight,
-  FileText,
-  Globe2,
-  LayoutGrid,
-  Search,
-  Settings2,
-  Users,
-  Workflow,
-} from "lucide-react";
-import { AtmosphericCard } from "@/components/ui/atmosphere/AtmosphericCard";
-import { LogoMark } from "@/components/Logo";
-import { StrelvaSidebar, type StrelvaSection } from "@/experience/app-frame/StrelvaSidebar";
+import type { ReactNode } from "react";
+import { ArrowRight, Bell, FileText, Globe2, LayoutGrid, Plus, Workflow } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { StrelvaShell, type StrelvaSection } from "@/experience/app-frame/StrelvaShell";
 import type { OfferingWebsiteBinding, OfferingWebsiteBindingCommand } from "@/platform/offerings";
 import type { WorkspaceSnapshot } from "./contracts";
 import type { ManagedWorkSummary } from "./workspace-discovery";
+import type { WorkspaceSearchItem } from "./workspace-search";
 import { BusinessOfferingSummary, WebsiteAssignmentHandoff, type WorkspaceOfferingState } from "./WorkspaceOfferings";
 import { WorkspaceAllowanceSummary } from "./WorkspaceAllowanceSummary";
+import { WorkspaceComposer } from "./WorkspaceComposer";
+import { requestDraftKey } from "./request-draft";
 import { useBusinessDeliveries } from "./useBusinessDeliveries";
 import { workspaceHome } from "./workspace-home";
 import { workspaceWorkLabel } from "./work-label";
 import styles from "./business-home.module.css";
 
-type Destination = {
-  id: string;
-  title: string;
-  detail: string;
-  kind: string;
-  open: () => void;
-};
-
-const paths = [
-  "M350 226 C176 223 130 87 164 78",
-  "M350 226 C526 220 585 79 544 78",
-  "M350 226 C176 241 93 247 112 248",
-  "M350 226 C522 238 585 258 594 263",
-  "M350 226 C208 293 184 384 217 393",
-  "M350 226 C476 292 513 375 505 393",
-];
-
-export function BusinessHome({
-  snapshot,
-  sites,
-  unassignedSites,
-  siteAssignmentsKnown,
-  offerings,
-  busy,
-  notice,
-  onOpen,
-  onStart,
-  onCreateWebsite,
-  onRequest,
-  onWork,
-  onOngoing,
-  onAccess,
-  onSettings,
-  onWorkspace,
-  onHelp,
-  onExplore,
-  onOfferings,
-  appBase = "",
-  accountHref,
-  signOut,
-  managedWorkUnavailable,
-  onWebsiteCommand,
-  onRetryWebsiteAssignments,
-}: {
+interface Props {
   appBase?: string;
   accountHref: string;
   onExplore: () => void;
@@ -97,15 +43,11 @@ export function BusinessHome({
   signOut?: ReactNode;
   onWebsiteCommand?: (command: OfferingWebsiteBindingCommand) => Promise<OfferingWebsiteBinding | null>;
   onRetryWebsiteAssignments?: () => void;
-}) {
-  const [request, setRequest] = useState("");
-  const [search, setSearch] = useState("");
-  const [navigationOpen, setNavigationOpen] = useState(false);
-  const reduceMotion = useReducedMotion();
-  const menuRef = useRef<HTMLButtonElement>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
-  const attentionRef = useRef<HTMLElement>(null);
-  const current = snapshot.workspaces.find((space) => space.id === snapshot.workspaceId);
+}
+
+/** The start and return surface, using the same frame as every saved result. */
+export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignmentsKnown, offerings, busy, notice, onOpen, onStart, onCreateWebsite, onRequest, onWork, onOngoing, onAccess, onSettings, onWorkspace, onHelp, onExplore, onOfferings, appBase = "", accountHref, signOut, managedWorkUnavailable, onWebsiteCommand, onRetryWebsiteAssignments }: Props) {
+  const current = snapshot.workspaces.find(space => space.id === snapshot.workspaceId);
   const readOnly = current?.access === "delegated_read";
   const name = current?.name || "Your business";
   const home = workspaceHome(snapshot.work);
@@ -116,83 +58,20 @@ export function BusinessHome({
   const attentionCount = home.attention.length + deliveryAttention.length;
   const deliveryPending = deliveries.state.status === "loading";
   const deliveryUnavailable = deliveries.state.status === "error";
-  const initials = name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((word) => word[0])
-    .join("")
-    .toUpperCase();
-
-  const destinations: Destination[] = [
-    ...deliveryItems.filter(item => item.attention || item.handling).map(item => ({
-      id: `delivery-${item.id}`, title: item.title, detail: item.detail,
-      kind: item.attention ? "attention" : "operations", open: () => window.location.assign(item.href),
-    })),
-    ...home.attention.map(({ work, reason }) => ({
-      id: `attention-${work.id}`,
-      title: work.title,
-      detail: reason,
-      kind: "attention",
-      open: () => onOpen(work.id),
-    })),
-    ...sites.map((site) => ({
-      id: `site-${site.id}`,
-      title: site.title,
-      detail: "Managed website",
-      kind: "website",
-      open: () => window.location.assign(site.href),
-    })),
-    ...home.results.map((work) => ({
-      id: work.id,
-      title: work.title,
-      detail:
-        workspaceWorkLabel(work),
-      kind: work.productId,
-      open: () => onOpen(work.id),
-    })),
+  const workHref = (id: string) => `${appBase}/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&work=${encodeURIComponent(id)}`;
+  const searchItems: WorkspaceSearchItem[] = [
+    ...snapshot.work.map(work => ({ id: work.id, title: work.title, detail: workspaceWorkLabel(work), href: workHref(work.id), onOpen: () => onOpen(work.id) })),
+    ...sites.map(site => ({ id: `site-${site.id}`, title: site.title, detail: "Managed website", href: site.href })),
+    ...deliveryItems.map(item => ({ id: `delivery-${item.id}`, title: item.title, detail: item.detail, href: item.href })),
   ];
-  const visible = destinations.filter((item) =>
-    `${item.title} ${item.detail}`.toLowerCase().includes(search.toLowerCase()),
-  );
-  const starters: Destination[] = [
-    { id: "agency-website", title: "Have Strelva build your website", detail: "Review scope and delivery before work starts", kind: "website", open: () => onRequest ? onRequest("Have Strelva build our website.") : onHelp() },
-    ...(onCreateWebsite ? [{ id: "website", title: "Create your website", detail: "Prepare a self-service draft instead", kind: "website", open: onCreateWebsite }] : []),
-    { id: "application", title: "Create an application", detail: "Build something people can use", kind: "applications", open: onStart },
-    { id: "onboarding", title: "Organize onboarding", detail: "Keep requirements and private documents together", kind: "documents", open: () => onRequest ? onRequest("Organize supplier onboarding requirements.") : onStart() },
-    { id: "ongoing", title: "Set up ongoing work", detail: "Create a repeatable check", kind: "operations", open: onStart },
-    { id: "people", title: "Invite your team", detail: "Give people the access they need", kind: "people", open: onAccess },
-  ];
-  const sceneItems = visible.length || destinations.length || readOnly || search ? visible.slice(0, 6) : starters.slice(0, 6);
-  function icon(kind: string) {
-    const Icon = kind === "website"
-      ? Globe2
-      : kind === "applications"
-        ? LayoutGrid
-        : kind === "documents"
-          ? FileText
-          : kind === "operations"
-            ? Workflow
-            : kind === "people"
-              ? Users
-              : kind === "attention"
-                ? Bell
-                : BriefcaseBusiness;
-    return <Icon size={18} strokeWidth={1.6} aria-hidden="true" />;
-  }
+  const recentWork = home.results.map(work => ({ id: work.id, title: work.title, detail: workspaceWorkLabel(work), href: workHref(work.id), onOpen: () => onOpen(work.id) }));
 
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    if (!request.trim() || readOnly || busy) return;
-    if (onRequest) onRequest(request.trim());
+  function request(value: string) {
+    if (readOnly || busy) return;
+    if (onRequest) onRequest(value);
     else onStart();
   }
-
-  function navigate(section: Exclude<StrelvaSection, "account">) {
-    if (section === "home") {
-      setSearch("");
-      setNavigationOpen(false);
-      return;
-    }
+  function navigate(section: StrelvaSection) {
     if (section === "work") onWork();
     if (section === "ongoing") onOngoing();
     if (section === "access") onAccess();
@@ -201,178 +80,47 @@ export function BusinessHome({
     if (section === "help") onHelp();
   }
 
-  const quietMotion = reduceMotion
-    ? {}
-    : {
-        whileHover: { y: -3 },
-        whileTap: { y: 0, scale: 0.96 },
-      };
+  return <StrelvaShell active="home" title={name} appBase={appBase} workspaceId={snapshot.workspaceId} accountName={snapshot.actor.email.split("@")[0] || "Your account"} accountDetail={snapshot.actor.email} signOut={signOut} onNavigate={navigate} onAccess={onAccess} onStart={onStart} startDisabled={readOnly || busy} searchItems={searchItems} searchScopeName={name} recentWork={recentWork} notice={notice} contentId="business-home-main"
+    businessContext={<label><span className={styles.srOnly}>Current workspace</span><select aria-label="Current workspace" value={snapshot.workspaceId} disabled={busy} onChange={event => onWorkspace(event.target.value)}>{snapshot.workspaces.map(workspace => <option key={workspace.id} value={workspace.id}>{workspace.name}{workspace.access === "delegated_read" ? " · Read-only" : ""}</option>)}</select></label>}>
+    <div className={styles.home} aria-busy={busy || undefined}>
+      <section className={styles.start} aria-labelledby="business-start-title">
+        <header className={styles.greeting}><p>{readOnly ? "Shared with you" : name}</p><h1 id="business-start-title" className="font-display">{readOnly ? "Your shared work." : "What would you like to do?"}</h1>{readOnly ? <p>Review work shared by {name}. Only its owners can make changes.</p> : null}</header>
+        {!readOnly ? <>
+          <WorkspaceComposer key={`${snapshot.actor.email}:${snapshot.workspaceId}`} draftKey={requestDraftKey({ actorEmail: snapshot.actor.email, workspaceId: snapshot.workspaceId })} disabled={busy} onSubmit={request} onTemplates={onExplore} placeholder="Describe an app, a change, or something you need done…" />
+          <div className={styles.starters} aria-label="Start with an example">
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => request("Create a staff request app for our team.")}><LayoutGrid size={16} aria-hidden="true" />Create an app</Button>
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => request("Organize supplier onboarding requirements.")}><FileText size={16} aria-hidden="true" />Organize onboarding</Button>
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => request("Have Strelva build our website.")}><Globe2 size={16} aria-hidden="true" />Have Strelva build a website</Button>
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => request("Set up an ongoing responsibility for our business.")}><Workflow size={16} aria-hidden="true" />Set up ongoing work</Button>
+          </div>
+        </> : null}
+      </section>
 
-  return (
-    <MotionConfig reducedMotion="user" transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}>
-      <div
-        className={styles.root}
-        onKeyDown={(event) => {
-          if (event.key === "Escape" && navigationOpen) {
-            setNavigationOpen(false);
-            menuRef.current?.focus();
-          }
-        }}
-      >
-        <a className={styles.skip} href="#business-home-main">Skip to your business</a>
-        <StrelvaSidebar
-          active="home"
-          appBase={appBase}
-          accountName={snapshot.actor.email.split("@")[0] || "Your account"}
-          accountDetail={snapshot.actor.email}
-          mobileOpen={navigationOpen}
-          onCloseMobile={() => setNavigationOpen(false)}
-          onNavigate={navigate}
-          onSearch={() => { setNavigationOpen(false); searchRef.current?.focus(); }}
-          onStart={onStart}
-          signOut={signOut}
-          standalone
-        />
+      {managedWorkUnavailable ? <p role="status" className={styles.notice}>Some websites could not be loaded. <a href={accountHref}>Check website access</a></p> : null}
 
-        <div className={styles.workspace}>
-          <header className={styles.topbar}>
-            <button ref={menuRef} className={styles.menu} aria-label={navigationOpen ? "Close navigation" : "Open navigation"} aria-expanded={navigationOpen} onClick={() => setNavigationOpen(!navigationOpen)}><LayoutGrid size={20} /></button>
-            <label className={styles.search}><Search size={17} aria-hidden="true" /><input ref={searchRef} aria-label="Find your work" placeholder="Search your business and work…" value={search} onChange={(event) => setSearch(event.target.value)} /></label>
-            <button className={styles.iconButton} aria-label="See work needing attention" onClick={() => { attentionRef.current?.scrollIntoView({ block: "center" }); attentionRef.current?.focus(); }}><Bell size={19} />{attentionCount > 0 && <span className={styles.notificationDot} />}</button>
-            <a className={styles.avatar} href={accountHref} aria-label={`${snapshot.actor.email.split("@")[0]} ${snapshot.actor.email}`}>{initials}</a>
-          </header>
-          {notice}
-          {managedWorkUnavailable && <p role="status" className={styles.connectionNotice}>Some websites could not be loaded. <a href={accountHref}>Check website access</a></p>}
+      <section className={styles.section} aria-labelledby="home-attention">
+        <header className={styles.sectionHeader}><h2 id="home-attention"><Bell size={18} aria-hidden="true" />Needs your attention</h2>{!busy && !deliveryPending && attentionCount > 0 ? <span className={styles.count}>{attentionCount}</span> : null}</header>
+        {busy || deliveryPending ? <p role="status" className={styles.muted}>Checking your work…</p> : attentionCount ? <ul className={styles.list}>
+          {deliveryAttention.map(item => <li key={`delivery-${item.id}`}><a className={styles.row} href={item.href}><span><strong>{item.title}</strong><small>{item.detail}</small></span><ArrowRight size={16} aria-hidden="true" /></a></li>)}
+          {home.attention.map(({ work, reason }) => <li key={work.id}><button type="button" className={styles.row} onClick={() => onOpen(work.id)}><span><strong>{work.title}</strong><small>{reason}</small></span><ArrowRight size={16} aria-hidden="true" /></button></li>)}
+        </ul> : !deliveryUnavailable ? <p className={styles.muted}>Nothing needs a decision right now.</p> : null}
+        {deliveryUnavailable ? <p role="status" className={styles.notice}>Delivery decisions could not be checked. <button type="button" onClick={deliveries.refresh}>Check again</button></p> : null}
+      </section>
 
-          <main id="business-home-main" className={styles.main} aria-busy={busy}>
-            <div className={styles.center}>
-              <motion.header
-                className={styles.greeting}
-                initial={reduceMotion ? false : { opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
-              >
-                <div>
-                  <span className={styles.welcome}>Welcome back</span>
-                  <h1 className="font-display">{readOnly ? "A look inside." : "Your business, at a glance."}</h1>
-                  <p>{readOnly ? `Work shared with you by ${name}.` : `Everything happening in ${name}, in one place.`}</p>
-                </div>
-                <div className={styles.workspaceControls}>
-                  <label className={styles.workspacePicker}>
-                    <span className={styles.srOnly}>Current workspace</span>
-                    <select aria-label="Current workspace" value={snapshot.workspaceId} disabled={busy} onChange={(event) => onWorkspace(event.target.value)}>
-                      {snapshot.workspaces.map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}{workspace.access === "delegated_read" ? " · Read-only" : ""}</option>)}
-                    </select>
-                  </label>
-                  <span className={styles.scope}>{readOnly ? "Read-only" : "Your workspace"}</span>
-                </div>
-              </motion.header>
+      <section className={styles.section} aria-labelledby="home-work">
+        <header className={styles.sectionHeader}><h2 id="home-work">Your apps and work</h2><Button variant="ghost" size="sm" onClick={onWork}>View all{home.results.length + sites.length ? ` (${home.results.length + sites.length})` : ""}<ArrowRight size={16} aria-hidden="true" /></Button></header>
+        {busy ? <p role="status" className={styles.muted}>Loading saved work…</p> : sites.length || home.results.length ? <ul className={styles.list}>
+          {sites.map(site => <li key={`site-${site.id}`}><a href={site.href} className={styles.row}><Globe2 size={18} aria-hidden="true" /><span><strong>{site.title}</strong><small>Managed website</small></span><ArrowRight size={16} aria-hidden="true" /></a></li>)}
+          {home.results.slice(0, 6).map(work => <li key={work.id}><button type="button" className={styles.row} onClick={() => onOpen(work.id)}>{work.productId === "applications" ? <LayoutGrid size={18} aria-hidden="true" /> : <FileText size={18} aria-hidden="true" />}<span><strong>{work.title}</strong><small>{workspaceWorkLabel(work)}</small></span><ArrowRight size={16} aria-hidden="true" /></button></li>)}
+        </ul> : <div className={styles.empty}><LayoutGrid size={24} aria-hidden="true" /><div><h3>{readOnly ? "No saved work has been shared here yet." : "Start with something you can use."}</h3><p>{readOnly ? "Shared apps, documents, and results will appear here." : "Choose an app template or describe what your business needs. No website purchase is required."}</p></div>{!readOnly ? <Button variant="secondary" onClick={onExplore}><Plus size={16} aria-hidden="true" />Browse apps &amp; templates</Button> : null}</div>}
+        {!readOnly && onCreateWebsite ? <button type="button" className={styles.textAction} disabled={busy} onClick={onCreateWebsite}>Prefer to build a website yourself? Start a private draft.<ArrowRight size={16} aria-hidden="true" /></button> : null}
+      </section>
 
-              <section className={styles.scene} aria-label="Your business and work">
-                <div className={styles.ground} aria-hidden="true" />
-                <svg className={styles.paths} viewBox="0 0 700 450" fill="none" aria-hidden="true">
-                  {paths.slice(0, busy ? 0 : sceneItems.length).map((path, index) => (
-                    <motion.path
-                      key={path}
-                      d={path}
-                      initial={reduceMotion ? false : { pathLength: 0, opacity: 0 }}
-                      animate={{ pathLength: 1, opacity: 1 }}
-                      transition={{ duration: reduceMotion ? 0.2 : 0.72, delay: reduceMotion ? 0 : 0.12 + index * 0.045, ease: [0.16, 1, 0.3, 1] }}
-                    />
-                  ))}
-                </svg>
-                <motion.img
-                  data-testid="strelva-business-illustration"
-                  className={styles.illustration}
-                  src="/images/workspace/business-home.png"
-                  alt=""
-                  width="1254"
-                  height="1254"
-                  initial={reduceMotion ? false : { opacity: 0, y: 12, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                />
-                <div className={styles.businessName}><strong className="font-display">{name}</strong><span>Your business, held together.</span></div>
+      {deliveryScope && deliveryItems.length ? <section className={styles.section} aria-labelledby="home-deliveries"><header className={styles.sectionHeader}><h2 id="home-deliveries">Strelva delivery</h2><a className={styles.textAction} href={`/workspace/delivery?businessId=${encodeURIComponent(deliveryScope)}`}>View all<ArrowRight size={16} /></a></header><ul className={styles.list}>{deliveryItems.slice(0, 5).map(item => <li key={item.id}><a className={styles.row} href={item.href}><span><strong>{item.title}</strong><small>{item.detail}</small></span><ArrowRight size={16} aria-hidden="true" /></a></li>)}</ul></section> : null}
 
-                {busy ? <p role="status" className={styles.sceneNote}>Loading your work…</p> : (
-                  <motion.ul layout={!reduceMotion} className={styles.destinations}>
-                    <AnimatePresence initial={false} mode="popLayout">
-                      {sceneItems.map((item) => (
-                        <motion.li
-                          layout={!reduceMotion}
-                          key={item.id}
-                          initial={reduceMotion ? false : { opacity: 0, transform: "scale(0.96)" }}
-                          animate={{ opacity: 1, transform: "scale(1)" }}
-                          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, transform: "scale(0.96)" }}
-                          transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
-                        >
-                          <motion.button onClick={item.open} aria-label={destinations.length ? `Open ${item.title}` : `Start ${item.title}`} {...quietMotion}>
-                            <span className={styles.symbol} data-kind={item.kind}>{icon(item.kind)}</span>
-                            <span><strong>{item.title}</strong><small>{item.detail}</small></span>
-                            <ChevronRight size={17} aria-hidden="true" />
-                          </motion.button>
-                        </motion.li>
-                      ))}
-                    </AnimatePresence>
-                  </motion.ul>
-                )}
-                {!busy && search && !visible.length && <motion.p role="status" className={styles.sceneNote} initial={{ opacity: 0 }} animate={{ opacity: 1 }}>No work matches “{search}”. <button onClick={() => setSearch("")}>Clear search</button></motion.p>}
-                {!busy && !destinations.length && !search && <p className={styles.emptyNote}>{readOnly ? "No saved work has been shared here yet." : "Start with something useful. Your saved work will gather around your business."}</p>}
-              </section>
+      {unassignedSites.length ? <details className={styles.details}><summary>Websites available to your account <span>{unassignedSites.length}</span></summary><p className={styles.muted}>{current?.kind !== "customer" ? "These websites are available through your account. Assign them from the appropriate customer business." : siteAssignmentsKnown ? "These websites are not yet assigned to this business." : "Business assignments could not be confirmed."}</p>{current?.kind !== "customer" ? <ul className={styles.list}>{unassignedSites.map(site => <li key={site.id}><a className={styles.row} href={site.href}><span><strong>{site.title}</strong><small>Account-authorized website</small></span><ArrowRight size={16} /></a></li>)}</ul> : <WebsiteAssignmentHandoff businessName={name} state={managedWorkUnavailable ? { status: "unavailable", reason: "Linked website access is unavailable right now." } : offerings} sites={unassignedSites} onRetry={onRetryWebsiteAssignments} onCommand={onWebsiteCommand} />}</details> : null}
 
-              {!readOnly && (
-                <form className={styles.composer} onSubmit={submit}>
-                  <span className={styles.spark}><LogoMark className={styles.composerMark} /></span>
-                  <label className={styles.srOnly} htmlFor="home-request">What would you like to work on today?</label>
-                  <input id="home-request" placeholder="Tell Strelva what your business needs…" maxLength={3000} value={request} onChange={(event) => setRequest(event.target.value)} disabled={busy} />
-                  <button className={styles.suggestion} type="button" onClick={() => setRequest("Build an application for my team")}>Build an app</button>
-                  <motion.button className={styles.submit} type="submit" disabled={!request.trim() || busy} aria-label="Continue with this request" whileTap={reduceMotion ? undefined : { transform: "scale(0.96)" }} transition={{ duration: 0.14, ease: [0.16, 1, 0.3, 1] }}><ArrowRight size={19} /></motion.button>
-                </form>
-              )}
-            </div>
-
-            <div className={styles.right}>
-              <AtmosphericCard ref={attentionRef} tabIndex={-1} theme="dark" className={styles.attentionCard} contentClassName={`${styles.panel} ${styles.atmosphereContent}`} aria-labelledby="home-attention">
-                <header><span className={styles.symbol} data-kind="attention"><Bell size={17} /></span><span className={styles.panelHeading}><small>Next actions</small><h2 id="home-attention">Needs your attention</h2></span><span className={styles.count}>{busy || deliveryPending ? "…" : attentionCount}</span></header>
-                {busy || deliveryPending ? <p role="status">Checking your work…</p> : attentionCount ? (
-                  <ul>{deliveryAttention.map(item => <li key={`delivery-${item.id}`}><a href={item.href}><strong>{item.title}</strong><small>{item.detail}</small></a></li>)}{home.attention.map(({ work, reason }) => <li key={work.id}><motion.button onClick={() => onOpen(work.id)} {...quietMotion}><span className={styles.symbol} data-kind="attention">{icon(work.productId)}</span><span><strong>{work.title}</strong><small>{reason}</small></span><ChevronRight size={16} /></motion.button></li>)}</ul>
-                ) : deliveryUnavailable ? <p role="status">Delivery decisions could not be checked. <button type="button" onClick={deliveries.refresh}>Check again</button></p> : <div className={styles.quiet}><Settings2 size={23} /><strong>All caught up.</strong><p>Work that needs a decision will appear here.</p></div>}
-              </AtmosphericCard>
-
-              {deliveryScope ? <section className={styles.panel} aria-labelledby="home-deliveries">
-                <header><h2 id="home-deliveries">Strelva delivery</h2><a href={`/workspace/delivery?businessId=${encodeURIComponent(deliveryScope)}`}>View all</a></header>
-                {deliveryPending ? <p role="status">Checking accepted work…</p> : deliveries.state.status === "error" ? <p role="status">{deliveries.state.message} <button type="button" onClick={deliveries.refresh}>Check again</button></p> : deliveryItems.length ? <ul>{deliveryItems.slice(0, 5).map(item => <li key={item.id}><a href={item.href}><strong>{item.title}</strong><small>{item.detail}</small></a></li>)}</ul> : <p>No service request has been accepted for delivery. <button type="button" onClick={onHelp}>Ask Strelva for work</button></p>}
-              </section> : null}
-
-              <section className={styles.panel} aria-labelledby="home-recent">
-                <header><h2 id="home-recent">Recent work</h2><button className={styles.viewAll} onClick={onWork}>View all <ArrowRight size={13} /></button></header>
-                {busy ? <p role="status">Loading saved work…</p> : home.results.length ? (
-                  <ul>{home.results.slice(0, 5).map((work) => <li key={work.id}><motion.button onClick={() => onOpen(work.id)} {...quietMotion}><span className={styles.symbol} data-kind={work.productId}>{icon(work.productId)}</span><span><strong>{work.title}</strong><small>{work.unavailableReason || workspaceWorkLabel(work)}</small></span></motion.button></li>)}</ul>
-                ) : <div className={styles.quiet}><FileText size={23} /><strong>{home.attention.length ? "No other saved work yet." : "Your work starts here."}</strong><p>{home.attention.length ? "The next decision is above. New saved work will appear here." : "Start with a useful result and return to it from this workspace."}</p>{!readOnly && <button className={styles.begin} onClick={onStart}>Start something new <ArrowRight size={15} /></button>}</div>}
-              </section>
-
-              {current?.kind === "customer" && !readOnly ? <WorkspaceAllowanceSummary businessId={snapshot.workspaceId} enabled compact onOpenSettings={onSettings} /> : null}
-
-              {unassignedSites.length ? <section className={styles.panel} aria-labelledby="home-unassigned-sites">
-                <header><span className={styles.symbol} data-kind="website"><Globe2 size={17} /></span><h2 id="home-unassigned-sites">Authorized sites</h2><span className={styles.count}>{unassignedSites.length}</span></header>
-                <p className={styles.panelNote}>{current?.kind !== "customer" ? "Websites you can access through your account. Business assignment is managed in a customer business workspace." : siteAssignmentsKnown ? "Available to your account, but not assigned to this business." : "Available to your account. Business assignment cannot be read from this view."}</p>
-                {current?.kind !== "customer" ? <ul>{unassignedSites.slice(0, 5).map((site) => <li key={site.id}><a href={site.href}><strong>{site.title}</strong><small>Account-authorized website</small></a></li>)}</ul> : <WebsiteAssignmentHandoff
-                  businessName={name}
-                  state={managedWorkUnavailable ? { status: "unavailable", reason: "Linked website access is unavailable right now." } : offerings}
-                  sites={unassignedSites.slice(0, 5)}
-                  onRetry={onRetryWebsiteAssignments}
-                  onCommand={onWebsiteCommand}
-                />}
-              </section> : null}
-
-              <BusinessOfferingSummary state={offerings} work={snapshot.work} onOpen={onOfferings} />
-
-              <div className={styles.brandCard} aria-hidden="true"><LogoMark className={styles.brandCardMark} /><p className="font-display">A calmer way to build what comes next.</p></div>
-              <p className={styles.footer}>Ideas. People. Progress.<br />Held in one place.</p>
-            </div>
-          </main>
-        </div>
-      </div>
-    </MotionConfig>
-  );
+      <details className={styles.details}><summary>Usage and connected services</summary><div className={styles.connections}>{current?.kind === "customer" && !readOnly ? <WorkspaceAllowanceSummary businessId={snapshot.workspaceId} enabled compact onOpenSettings={onSettings} /> : null}<BusinessOfferingSummary state={offerings} work={snapshot.work} onOpen={onOfferings} /></div></details>
+    </div>
+  </StrelvaShell>;
 }
