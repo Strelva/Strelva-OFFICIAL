@@ -17,6 +17,16 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           persist-credentials: false
+      - name: Retain exact integration source
+        run: |
+          mkdir -p /tmp/strelva-ui-source
+          git archive --format=tar.gz --prefix=strelva-source/ HEAD > /tmp/strelva-ui-source/source.tar.gz
+          git rev-parse HEAD > /tmp/strelva-ui-source/commit.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: self-service-source-${{ github.run_id }}
+          path: /tmp/strelva-ui-source/
+          retention-days: 1
       - uses: pnpm/action-setup@v4
         with:
           version: 10.34.5
@@ -25,17 +35,6 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Package isolated dependency tree
-        run: |
-          mkdir -p review-artifacts
-          tar -czf review-artifacts/dependencies.tar.gz node_modules
-          git rev-parse HEAD > review-artifacts/commit.txt
-          sha256sum pnpm-lock.yaml > review-artifacts/lock.sha256
-      - uses: actions/upload-artifact@v4
-        with:
-          name: self-service-dependencies-${{ github.run_id }}
-          path: review-artifacts/
-          retention-days: 1
       - run: pnpm lint && pnpm typecheck
       - run: pnpm test
       - run: pnpm build
