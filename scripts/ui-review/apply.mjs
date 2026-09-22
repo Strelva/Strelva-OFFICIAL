@@ -23,7 +23,7 @@ for (const row of rows) {
   for (const edit of [...row.edits].sort((a, b) => b.start - a.start)) {
     if (!Number.isInteger(edit.start) || !Number.isInteger(edit.end) || edit.start < 0 || edit.end < edit.start || edit.end > boundary || typeof edit.text !== 'string') throw new Error(`Invalid edit: ${row.path}`);
     // Correct four transport transcription characters; the final source digest still must match.
-    if (row.path === 'src/experience/applications/ApplicationUseRenderer.tsx' && [6748, 7525, 9077, 9187].includes(edit.start) && edit.text === '(`${instanceId}-') edit.text = '{`${instanceId}-';
+    if (row.path === 'src/experience/applications/ApplicationUseRenderer.tsx' && [6748, 7525, 9077, 9187].includes(edit.start) && edit.text === '(`${instanceId}-') edit.text = '={`${instanceId}-';
     after = Buffer.concat([after.subarray(0, edit.start), Buffer.from(edit.text), after.subarray(edit.end)]);
     boundary = edit.start;
   }
