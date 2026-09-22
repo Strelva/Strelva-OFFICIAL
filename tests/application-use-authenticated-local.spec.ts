@@ -72,6 +72,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     const ownerPage = await owner.context.newPage();
     await ownerPage.goto(`/workspace?workspaceId=${workspaceId}&work=${app.id}`);
     await expect(ownerPage.getByRole("heading", { name: "Repair requests", exact: true })).toBeVisible();
+    await ownerPage.getByRole("tab", { name: "Sharing", exact: true }).click();
     await expect(ownerPage.getByRole("heading", { name: "Give someone a link", exact: true })).toBeVisible();
     await ownerPage.getByLabel("Recipient email", { exact: true }).fill(staff.email);
     await ownerPage.getByRole("button", { name: "Issue access link", exact: true }).click();
@@ -101,7 +102,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     await page.getByLabel("Problem *", { exact: true }).fill("Leaking tap in upstairs bathroom");
     await page.getByRole("combobox", { name: /Priority/ }).selectOption("standard");
     await page.getByRole("button", { name: "Submit record", exact: true }).click();
-    await expect(page.locator("#application-submit-error")).toContainText("current draft is still here");
+    await expect(page.locator('[id$="application-submit-error"]')).toContainText("current draft is still here");
     await recover();
     await expect(page.getByLabel("Problem *", { exact: true })).toHaveValue("Leaking tap in upstairs bathroom");
 
@@ -119,6 +120,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     // remains unchanged until the separate review and Publish action below.
     const ownerEditPage = await owner.context.newPage();
     await ownerEditPage.goto(`/workspace?workspaceId=${workspaceId}&work=${app.id}`);
+    await ownerEditPage.getByRole("tab", { name: "Edit app", exact: true }).click();
     await ownerEditPage.getByText("Edit proposed app", { exact: true }).click();
     await ownerEditPage.getByRole("button", { name: "Add field", exact: true }).click();
     await ownerEditPage.getByLabel("Label for New field 3", { exact: true }).fill("Equipment location");
@@ -155,7 +157,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     const ownerUsePage = await owner.context.newPage();
     await ownerUsePage.goto(`/workspace?workspaceId=${workspaceId}&work=${app.id}`);
     await expect(ownerUsePage.getByText(/Version 1 is live\..*live use continues/i)).toBeVisible();
-    await expect(ownerUsePage.getByLabel("Internal note", { exact: true })).toHaveCount(0);
+    await expect(ownerUsePage.getByRole("tabpanel", { name: "Use app", exact: true }).getByLabel("Internal note", { exact: true })).toHaveCount(0);
     await ownerUsePage.getByText("Add another record", { exact: true }).click();
     await ownerUsePage.getByLabel("Problem", { exact: true }).fill("Broken stopcock in utility room");
     await ownerUsePage.getByRole("combobox", { name: /Priority/ }).selectOption("standard");
@@ -177,6 +179,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     // the owner publishes this checked proposal.
     const ownerReviewPage = await owner.context.newPage();
     await ownerReviewPage.goto(`/workspace?workspaceId=${workspaceId}&work=${app.id}`);
+    await ownerReviewPage.getByRole("tab", { name: "Edit app", exact: true }).click();
     const review = ownerReviewPage.locator("details").filter({ hasText: "Review changes" });
     await expect(review).toBeVisible();
     await expect(review.getByText('Field added: "Internal note" (text, optional).', { exact: true })).toBeVisible();
@@ -193,6 +196,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     // the rail is hidden, the review uses the viewport, and the drawer can be
     // opened and closed without displacing the work.
     await ownerReviewPage.reload({ waitUntil: "domcontentloaded" });
+    await ownerReviewPage.getByRole("tab", { name: "Edit app", exact: true }).click();
     await expect(ownerReviewPage.getByText("Review changes", { exact: true })).toBeVisible();
     const mobileNavigation = ownerReviewPage.getByRole("complementary", { name: "Strelva navigation", exact: true });
     await expect(mobileNavigation).not.toBeVisible();
@@ -231,6 +235,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     // fail before Publish can change the live release.
     const ownerRemovalPage = await owner.context.newPage();
     await ownerRemovalPage.goto(`/workspace?workspaceId=${workspaceId}&work=${app.id}`);
+    await ownerRemovalPage.getByRole("tab", { name: "Edit app", exact: true }).click();
     await ownerRemovalPage.getByText("Edit proposed app", { exact: true }).click();
     await ownerRemovalPage.getByLabel("Option 1 for Priority", { exact: true }).fill("normal");
     await ownerRemovalPage.getByRole("button", { name: "Save new draft", exact: true }).click();
@@ -273,6 +278,7 @@ test("a verified staff recipient uses one released version while a candidate cha
     const reopenedOwnerPage = await owner.context.newPage();
     await reopenedOwnerPage.goto(`/workspace?workspaceId=${workspaceId}&work=${app.id}`);
     await expect(reopenedOwnerPage.getByText(`Link for ${staff.email}`, { exact: true })).toBeVisible();
+    await reopenedOwnerPage.getByRole("tab", { name: "Sharing", exact: true }).click();
     await reopenedOwnerPage.getByRole("button", { name: "Revoke link", exact: true }).click();
     await expect(reopenedOwnerPage.getByText(`Access revoked for ${staff.email}`, { exact: true })).toBeVisible();
     await reopenedOwnerPage.close();
@@ -367,7 +373,7 @@ test("a verified recipient edits a date record through a stale correction and re
       },
     });
     await page.getByRole("button", { name: "Save correction", exact: true }).click();
-    await expect(page.locator("#application-submit-error")).toContainText("Your correction is still here");
+    await expect(page.locator('[id$="application-submit-error"]')).toContainText("Your correction is still here");
     await expect(page.getByLabel("Visit date *", { exact: true })).toHaveValue("2024-03-01");
     await expect(page.getByLabel("Problem *", { exact: true })).toHaveValue("Correction kept after conflict");
     use = await readUse(staff.context.request, app.id);
@@ -409,4 +415,60 @@ test("a verified recipient edits a date record through a stale correction and re
     await staff.context.close();
     await editor.context.close();
   }
+});
+
+test("self-service template becomes a private native app, then a live app without copying preview records", async ({ browser }, info) => {
+  const env = localEnvironment();
+  const admin = createClient(env.url, env.service, { auth: { persistSession: false, autoRefreshToken: false } });
+  const owner = await signedInContext(browser, admin, "template-owner");
+  try {
+    const workspaceResponse = await owner.context.request.get("/api/workspace");
+    expect(workspaceResponse.status(), await workspaceResponse.text()).toBe(200);
+    const { workspaceId } = await workspaceResponse.json();
+    const page = await owner.context.newPage();
+    await page.goto(`/workspace?workspaceId=${workspaceId}&view=products`);
+    await page.getByRole("button", { name: "Preview Staff requests", exact: true }).click();
+    await page.getByLabel("App name", { exact: true }).fill("Studio requests");
+    const preview = page.getByRole("region", { name: "Interactive app preview", exact: true });
+    await preview.getByLabel("Name *", { exact: true }).fill("Preview user");
+    await preview.getByLabel("Request *", { exact: true }).fill("This stays in preview");
+    await preview.getByRole("combobox", { name: /Urgency/ }).selectOption("Normal");
+    await preview.getByRole("button", { name: "Submit record", exact: true }).click();
+    await expect(preview.getByText("Test record added. Nothing was saved or shared.", { exact: true })).toBeVisible();
+    await page.screenshot({ path: info.outputPath("template-private-preview-desktop.png"), fullPage: true });
+    const createdResponse = page.waitForResponse(response => response.url().includes("/api/bounded-work") && response.request().method() === "POST");
+    await page.getByRole("button", { name: "Create private app", exact: true }).click();
+    const response = await createdResponse;
+    expect(response.status(), await response.text()).toBe(201);
+    const app = await response.json();
+    expect(app.workspaceId).toBe(workspaceId);
+    expect(app.productId).toBe("applications");
+    expect(app.payload.spec.title).toBe("Studio requests");
+    expect(app.payload.records).toEqual([]);
+    expect(app.payload.releases || []).toHaveLength(0);
+    await page.getByRole("button", { name: "Open app", exact: true }).click();
+    await expect(page.getByRole("tab", { name: "Preview", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Studio requests", exact: true }).first()).toBeVisible();
+    await page.getByRole("tab", { name: "Edit app", exact: true }).click();
+    const review = page.locator("details").filter({ has: page.locator("summary").filter({ hasText: /^Review changes$/ }) });
+    if (!await review.evaluate(element => (element as HTMLDetailsElement).open)) await review.locator("summary").click();
+    await review.getByRole("button", { name: "Check proposed change", exact: true }).click();
+    await expect(review.getByRole("button", { name: "Publish", exact: true })).toBeEnabled();
+    await review.getByRole("button", { name: "Publish", exact: true }).click();
+    await expect(page.getByText(/Version 1 is live\./).first()).toBeVisible();
+    await page.getByRole("tab", { name: "Use app", exact: true }).click();
+    const use = page.getByRole("tabpanel", { name: "Use app", exact: true });
+    await expect(use.getByText("This stays in preview", { exact: true })).toHaveCount(0);
+    await page.getByRole("tab", { name: "Sharing", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Give someone a link", exact: true })).toBeVisible();
+    // No grant is created by choosing a template, previewing it, or publishing it.
+    const links = await owner.context.request.get(`/api/apps/${app.id}/access`);
+    expect(links.status(), await links.text()).toBe(200);
+    expect((await links.json()).grants).toHaveLength(0);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+    await expect(page.getByRole("tab", { name: "Use app", exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: info.outputPath("self-service-live-app-mobile.png"), fullPage: true });
+  } finally { await owner.context.close(); }
 });

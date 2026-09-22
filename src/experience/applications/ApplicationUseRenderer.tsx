@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useId } from "react";
+import { FormEvent, useId, useMemo } from "react";
 import { Button } from "@/components/ui/Button";
 import { TextInput } from "@/components/ui/TextInput";
 import type { ApplicationUseSnapshot, ApplicationViewKind } from "@/products/applications/client";
@@ -112,9 +112,9 @@ export function ApplicationUseRenderer({
       {submitMessage ? <p role="status" className="rounded-lg border border-sage/30 bg-sage/5 px-3 py-2 text-sm text-sage-dark">{submitMessage}</p> : null}
 
       {formView && (snapshot.access.recordSubmit || (editAllowed && editing)) ? (
-        <section aria-labelledby={`${instanceId}-form-heading`} className="rounded-2xl border border-gray-border bg-surface p-5 shadow-sm sm:p-7">
+        <section aria-labelledby={`${instanceId}-application-form-heading`} className="rounded-2xl border border-gray-border bg-surface p-5 shadow-sm sm:p-7">
           <div className="mb-6 space-y-2">
-            <h2 id={`${instanceId}-form-heading`} className="font-display text-2xl font-medium text-warm-black">{draft.editingRecordId ? "Correct a record" : viewLabel("form")}</h2>
+            <h2 id={`${instanceId}-application-form-heading`} className="font-display text-2xl font-medium text-warm-black">{draft.editingRecordId ? "Correct a record" : viewLabel("form")}</h2>
             <p className="text-sm leading-6 text-gray-fg">{draft.editingRecordId ? "Save a correction to the record. If someone changed it first, your correction stays here so you can review it." : "Enter the details below. Keep this tab open if you need to retry."}</p>
           </div>
           <form className="space-y-5" onSubmit={submit} aria-busy={busy}>
@@ -129,11 +129,12 @@ export function ApplicationUseRenderer({
                         {[true, false].map(option => (
                           <label key={String(option)} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-gray-border px-3.5 py-2 text-sm text-warm-black">
                             <input
-                              id={`${instanceId}-field-${field.id}-${option ? "yes" : "no"}`}
-                              name={`${instanceId}-field-${field.id}`}
+                              id={`${instanceId}-app-field-${field.id}-${option ? "yes" : "no"}`}
+                              name={`${instanceId}-app-field-${field.id}`}
                               type="radio"
                               value={String(option)}
                               checked={value === option}
+                              disabled={busy}
                               onChange={() => updateValue(field.id, option)}
                               required={field.required}
                               className="h-4 w-4 accent-sage"
@@ -150,12 +151,13 @@ export function ApplicationUseRenderer({
                     <label key={field.id} className="block text-sm text-warm-black">
                       <span className="block text-xs text-gray-muted">{field.label}{field.required ? " *" : ""}</span>
                       <select
-                        id={`${instanceId}-field-${field.id}`}
-                        name={`${instanceId}-field-${field.id}`}
+                        id={`${instanceId}-app-field-${field.id}`}
+                        name={`${instanceId}-app-field-${field.id}`}
                         className="mt-1 block min-h-11 w-full rounded-xl border border-gray-border bg-surface px-3 py-2 text-sm"
                         aria-label={field.label}
                         value={value === undefined ? "" : String(value)}
                         required={field.required}
+                        disabled={busy}
                         onChange={event => updateValue(field.id, event.target.value)}
                       >
                         <option value="">Choose an option</option>
@@ -167,21 +169,22 @@ export function ApplicationUseRenderer({
                 return (
                   <TextInput
                     key={field.id}
-                    id={`${instanceId}-field-${field.id}`}
+                    id={`${instanceId}-app-field-${field.id}`}
                     label={`${field.label}${field.required ? " *" : ""}`}
                     aria-label={field.label}
                     type={fieldInputType(field.type)}
                     inputMode={field.type === "number" ? "decimal" : undefined}
                     value={value === undefined ? "" : String(value)}
                     required={field.required}
+                    disabled={busy}
                     onChange={event => updateValue(field.id, field.type === "number" ? (event.target.value === "" ? undefined : Number(event.target.value)) : event.target.value)}
                   />
                 );
               })}
             </div>
-            {submitError ? <p id="application-submit-error" role="alert" className="rounded-lg border border-terra/30 bg-terra/5 px-3 py-2 text-sm text-terra">{submitError}</p> : null}
+            {submitError ? <p id={`${instanceId}-application-submit-error`} role="alert" className="rounded-lg border border-terra/30 bg-terra/5 px-3 py-2 text-sm text-terra">{submitError}</p> : null}
             <div className="flex flex-wrap items-center gap-3">
-              <Button type="submit" loading={busy} disabled={busy} aria-describedby={submitError ? "application-submit-error" : undefined}>{draft.editingRecordId ? "Save correction" : "Submit record"}</Button>
+              <Button type="submit" loading={busy} disabled={busy} aria-describedby={submitError ? `${instanceId}-application-submit-error` : undefined}>{draft.editingRecordId ? "Save correction" : "Submit record"}</Button>
               {draft.editingRecordId ? <Button type="button" variant="secondary" disabled={busy} onClick={cancelEdit}>Cancel correction</Button> : null}
               {onReload && submitError ? <Button type="button" variant="secondary" disabled={busy} onClick={onReload}>Reload application</Button> : null}
             </div>
@@ -190,9 +193,9 @@ export function ApplicationUseRenderer({
       ) : null}
 
       {recordViews.length > 0 && snapshot.access.recordRead !== "none" ? (
-        <section aria-labelledby={`${instanceId}-records-heading`} className="space-y-4">
+        <section aria-labelledby={`${instanceId}-application-records-heading`} className="space-y-4">
           <div className="space-y-2">
-            <h2 id={`${instanceId}-records-heading`} className="font-display text-2xl font-medium text-warm-black">{recordsHeading}</h2>
+            <h2 id={`${instanceId}-application-records-heading`} className="font-display text-2xl font-medium text-warm-black">{recordsHeading}</h2>
           </div>
           {snapshot.records.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-gray-border bg-surface-inset px-5 py-8 text-sm text-gray-muted">There are no records to show yet.</p>

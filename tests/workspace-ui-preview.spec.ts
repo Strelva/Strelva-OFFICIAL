@@ -272,39 +272,48 @@ test("direct customer can inspect an offering setup and its local allowance", as
   await expect(page.getByRole("heading", { name: "Staff requests", exact: true })).toBeVisible();
   await expect(page.getByText("No version is live yet.", { exact: false })).toBeVisible();
 
+  await page.getByRole("tab", { name: "Edit app", exact: true }).click();
   await page.getByRole("button", { name: "Check proposed change", exact: true }).click();
   await expect(page.getByText("Passed: Definition is valid", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(page.getByText(/Version 1 is live/)).toBeVisible();
+  await page.getByRole("tab", { name: "Use app", exact: true }).click();
 
   await page.getByLabel("What do you need?", { exact: true }).fill("Replace the reception printer");
   await page.getByRole("button", { name: "Save record", exact: true }).click();
   await expect(page.getByText("Replace the reception printer", { exact: true }).first()).toBeVisible();
 
+  await page.getByRole("tab", { name: "Sharing", exact: true }).click();
   await page.getByLabel("Recipient email", { exact: true }).fill("staff@harbordental.example");
   await page.getByRole("button", { name: "Issue access link", exact: true }).click();
   await expect(page.getByText("Link for staff@harbordental.example", { exact: true })).toBeVisible();
   await expect(page.locator('a[href="/apps/88888888-8888-4888-8888-888888888888"]')).toBeVisible();
 
+  await page.getByRole("tab", { name: "Edit app", exact: true }).click();
   await page.getByText("Edit proposed app", { exact: true }).click();
   await page.getByLabel("Label for What do you need?", { exact: true }).fill("Request details");
   await page.getByRole("button", { name: "Save new draft", exact: true }).click();
   await expect(page.getByText(/label changes from "What do you need\?" to "Request details"/)).toBeVisible();
   await expect(page.getByLabel("What do you need?", { exact: true })).toHaveCount(1);
+  await page.getByRole("tab", { name: "Edit app", exact: true }).click();
   await page.getByRole("button", { name: "Check proposed change", exact: true }).click();
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(page.getByText(/Version 2 is live/)).toBeVisible();
+  await page.getByRole("tab", { name: "Use app", exact: true }).click();
   await expect(page.getByLabel("Request details", { exact: true })).toHaveCount(1);
   await expect(page.getByText("Replace the reception printer", { exact: true }).first()).toBeVisible();
 
+  await page.getByRole("tab", { name: "Edit app", exact: true }).click();
   const recovery = page.locator("details").filter({ hasText: "Restore an earlier live version" });
   await recovery.getByText("Restore an earlier live version", { exact: true }).click();
   await recovery.getByRole("combobox").selectOption("1");
   await recovery.getByRole("button", { name: "Restore released version", exact: true }).click();
   await expect(page.getByText(/Version 1 is live/)).toBeVisible();
+  await page.getByRole("tab", { name: "Use app", exact: true }).click();
   await expect(page.getByLabel("What do you need?", { exact: true })).toHaveCount(1);
   await expect(page.getByText("Replace the reception printer", { exact: true }).first()).toBeVisible();
 
+  await page.getByRole("tab", { name: "Sharing", exact: true }).click();
   await page.getByRole("button", { name: "Revoke link", exact: true }).click();
   await expect(page.getByText("Access revoked for staff@harbordental.example", { exact: true })).toBeVisible();
 
@@ -318,7 +327,7 @@ test("direct customer can inspect an offering setup and its local allowance", as
   await page.setViewportSize({ width: 1280, height: 900 });
   const navigation = page.getByRole("complementary", { name: "Strelva navigation", exact: true });
   await navigation.getByRole("link", { name: "Home", exact: true }).click();
-  const recent = page.getByRole("region", { name: "Recent work", exact: true });
+  const recent = page.getByRole("region", { name: "Your apps and work", exact: true });
   await expect(recent.getByRole("button", { name: /Staff requests/ })).toBeVisible();
   await recent.getByRole("button", { name: /Staff requests/ }).click();
   await expect(page.getByRole("heading", { name: "Staff requests", exact: true })).toBeVisible();

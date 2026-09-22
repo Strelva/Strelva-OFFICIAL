@@ -320,7 +320,7 @@ export function AppFrame({
                 {collapsed ? <PanelLeftOpen size={17} strokeWidth={1.5} /> : <PanelLeftClose size={17} strokeWidth={1.5} />}
               </button>
             )}
-            <div className={styles.headerContent}>{header}</div>
+            <div className={styles.headerContent} inert={mobileRailModal || undefined}>{header}</div>
           </div>
         )}
         {notice}

@@ -1,10 +1,12 @@
 "use client";
 
+import { ApplicationDraftPreview } from "@/experience/applications/ApplicationDraftPreview";
+import { useWorkspaceIntent } from "@/experience/workspace/WorkspaceIntent";
+
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import type { z } from "zod";
-import { useWorkspaceIntent } from "@/experience/workspace/WorkspaceIntent";
-import { ApplicationDraftPreview } from "@/experience/applications/ApplicationDraftPreview";
 import { Button } from "@/components/ui/Button";
+import { Tabs, TabsPanel } from "@/components/ui/Tabs";
 import { TextInput } from "@/components/ui/TextInput";
 import { ApplicationAccessControls } from "@/experience/applications/ApplicationAccessControls";
 import { ScheduleCalendarControls } from "@/experience/scheduling/ScheduleCalendarControls";
@@ -79,8 +81,9 @@ function localDateTime(value: string) {
 }
 
 export function BoundedWorkExperience(props: Props) {
-  const { request } = useWorkspaceIntent();
-  return <Session key={`${props.workspaceId}:${props.workId ?? "new"}:${props.productId}`} {...props} initialRequest={props.initialRequest || request} />;
+  const intent = useWorkspaceIntent();
+  if (!props.workId && !props.initialRequest && !intent.ready) return <p role="status">Opening your request…</p>;
+  return <Session key={`${props.workspaceId}:${props.workId ?? "new"}:${props.productId}`} {...props} initialRequest={props.initialRequest || (!props.workId && intent.route === props.productId ? intent.request : undefined)} />;
 }
 function Session({ initialRequest, workspaceId, workId, productId, readOnly = false, draftEditOnly = false, workspaceStopped = false, calendarRecoveryAllowed = false, sources, onSaved }: Props) {
   const request = useWorkspaceRequest();
@@ -321,6 +324,7 @@ function ApplicationReview({ value, command, disabled, canPublish = true }: { va
 }
 
 function ApplicationResult({ value, workId, canManage, draftEditOnly = false, command, disabled }: { value: Application; workId: string; canManage: boolean; draftEditOnly?: boolean; command: Command; disabled: boolean }) {
+  const [section, setSection] = useState(draftEditOnly ? "edit" : "use");
   const [values, setValues] = useState<Record<string, string | number | boolean>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [priorVersion, setPriorVersion] = useState("");
@@ -347,7 +351,16 @@ function ApplicationResult({ value, workId, canManage, draftEditOnly = false, co
       : "No version is live yet. Check the draft before publishing it.";
   return <>
     <p className="text-sm text-gray-muted">{availability} This is a private app, with no public deployment.</p>
-    {!draftEditOnly ? <ApplicationAccessControls workId={workId} status={value.status} hasRelease={Boolean(value.release)} canManage={canManage} disabled={disabled} /> : null}
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <Tabs aria-label="Application workspace" value={section} onChange={setSection} items={[
+        { value: "use", label: liveRelease ? "Use app" : "Preview", id: `${id}-use-tab`, panelId: `${id}-use-panel` },
+        ...(canManage ? [{ value: "edit", label: "Edit app", id: `${id}-edit-tab`, panelId: `${id}-edit-panel` }] : []),
+        ...(!draftEditOnly ? [{ value: "sharing", label: "Sharing", id: `${id}-sharing-tab`, panelId: `${id}-sharing-panel` }] : []),
+      ]} />
+      {canManage && !liveRelease && section === "use" ? <Button variant="secondary" onClick={() => setSection("edit")}>Review and publish</Button> : null}
+    </div>
+    <TabsPanel id={`${id}-use-panel`} tabId={`${id}-use-tab`} active={section === "use"}>
+
     {liveRelease || value.status === "retired" ? <section className={`${group} space-y-8`} aria-labelledby={`${id}-live-app-heading`}>
       <h2 id={`${id}-live-app-heading`} className="font-display text-2xl">{liveRelease ? "Live app" : "Proposed app"}</h2>
       {liveRelease ? <p className="text-sm text-gray-muted">Version {liveRelease.version} is the version people use now.</p> : null}
@@ -358,11 +371,17 @@ function ApplicationResult({ value, workId, canManage, draftEditOnly = false, co
         return <section key={index} id={`${id}-record-${index}`} tabIndex={-1} className={group} aria-live="polite"><h2 className="font-display text-xl">{component.kind === "document" ? "Record document" : "Selected record"}</h2>{selected ? <dl className="space-y-4">{fields.map(field => <div key={field.id}><dt className="text-sm text-gray-muted">{field.label}</dt><dd className="whitespace-pre-wrap break-words">{selected.values[field.id] === undefined ? "Not recorded" : String(selected.values[field.id])}</dd></div>)}</dl> : <p className="text-sm text-gray-muted">Save or select a record to inspect it.</p>}</section>;
       })}</div>
     </section> : <ApplicationDraftPreview spec={value.candidate?.spec || value.spec} />}
+    </TabsPanel>
+    <TabsPanel id={`${id}-edit-panel`} tabId={`${id}-edit-tab`} active={section === "edit" && canManage}>
     <ApplicationReview value={value} command={command} disabled={disabled} canPublish={!draftEditOnly} />
     {!draftEditOnly && value.installation ? <SourceUpdate key={value.installation.sourceVersion} value={value} command={command} disabled={disabled} /> : null}
     <EditApplicationSpec key={value.specVersion} value={value} command={command} disabled={disabled} />
     {!draftEditOnly && (value.releases?.length ?? 0) > 1 && liveRelease ? <details className={group}><summary className="cursor-pointer text-sm">Restore an earlier live version</summary><p className="text-sm text-gray-muted">This changes the version people use now. Existing records and their attribution remain in place.</p><label className="text-sm">Released version<select className={control} value={priorRelease} disabled={disabled} onChange={event => setPriorRelease(event.target.value)}><option value="">Choose a released version</option>{value.releases?.filter(release => release.version !== liveRelease.version).map(release => <option key={release.version} value={release.version}>Version {release.version}: {release.spec.title}</option>)}</select></label><Button variant="secondary" disabled={disabled || !priorRelease} onClick={() => void command({ kind: "rollback_release", expectedDesignRevision: value.candidate?.designRevision ?? value.designRevision ?? 0, expectedReleaseVersion: liveRelease.version, version: Number(priorRelease) })}>Restore released version</Button></details> : null}
     {!draftEditOnly && value.versions.length > 1 ? <details className={group}><summary className="cursor-pointer text-sm">Use an earlier version as a proposed change</summary><p className="text-sm text-gray-muted">This prepares an earlier version for review. It does not change the live app until you check and publish it. Existing records remain.</p><label className="text-sm">Earlier version<select className={control} value={priorVersion} disabled={disabled} onChange={event => setPriorVersion(event.target.value)}><option value="">Choose a version</option>{value.versions.filter(version => version.version !== value.specVersion).map(version => <option key={version.version} value={version.version}>Version {version.version}: {version.spec.title}</option>)}</select></label><Button variant="secondary" disabled={disabled || !priorVersion} onClick={() => void command({ kind: "rollback", version: Number(priorVersion) })}>Use version as proposed change</Button></details> : null}
+    </TabsPanel>
+    {!draftEditOnly ? <TabsPanel id={`${id}-sharing-panel`} tabId={`${id}-sharing-tab`} active={section === "sharing"}>
+      <ApplicationAccessControls workId={workId} status={value.status} hasRelease={Boolean(value.release)} canManage={canManage} disabled={disabled} />
+    </TabsPanel> : null}
   </>;
 }
 function scheduleProviderLabel(provider?: Schedule["reservations"][number]["provider"]): string {

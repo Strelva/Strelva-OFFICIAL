@@ -40,3 +40,7 @@
 @media(prefers-reduced-motion:reduce) { .template { transition:none; } }
 .saveActions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
 .openApp { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:12px 16px; border:1px solid var(--gray-border); border-radius:12px; color:var(--warm-black); background:var(--surface); font-size:14px; font-weight:500; text-decoration:none; }
+
+.editor { min-width:0; }
+.mobileViews { display:none; }
+@media(max-width:1100px) { .mobileViews { display:flex; gap:8px; margin-bottom:24px; } .editorGrid[data-mobile-view="edit"] .preview,.editorGrid[data-mobile-view="preview"] .editor { display:none; } }

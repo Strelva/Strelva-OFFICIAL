@@ -15,6 +15,9 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// HTTP is mocked below. Resolve its public test hosts without a real DNS lookup.
+vi.mock("node:dns", () => ({ promises: { lookup: vi.fn(async () => ({ address: "93.184.216.34", family: 4 })) } }));
+
 const mockRedisGet = vi.fn((_key: string) => Promise.resolve(null as unknown));
 
 vi.mock("@/lib/redis", () => ({
@@ -104,6 +107,7 @@ const regularHours = {
 describe("GBP pending-approval soft-fail", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFetch.mockReset();
     mockGetConnection.mockResolvedValue(connectedWithScope());
     setupGbpMeta();
   });

@@ -229,7 +229,7 @@ test("an edit-only recipient keeps a date correction after a stale response", as
   await page.getByLabel("Visit date *", { exact: true }).fill("2024-02-29");
   await page.getByLabel("Problem *", { exact: true }).fill("Broken gate");
   await page.getByRole("button", { name: "Save correction", exact: true }).click();
-  await expect(page.locator("#application-submit-error")).toContainText("Your correction is still here");
+  await expect(page.locator('[id$="application-submit-error"]')).toContainText("Your correction is still here");
   await expect(page.getByLabel("Visit date *", { exact: true })).toHaveValue("2024-02-29");
   await expect(page.getByLabel("Problem *", { exact: true })).toHaveValue("Broken gate");
   await page.getByRole("button", { name: "Save correction", exact: true }).click();

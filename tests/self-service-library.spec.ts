@@ -10,6 +10,7 @@ for (const width of [1440, 390]) test(`template customization and native app cre
   await page.getByRole("button", { name: "Preview Staff requests", exact: true }).click();
   await page.getByLabel("App name", { exact: true }).fill("Studio requests");
   await page.getByLabel("Field 2 name", { exact: true }).fill("What do you need?");
+  if (width < 1100) await page.getByRole("button", { name: "Try preview", exact: true }).click();
   const preview = page.getByRole("region", { name: "Interactive app preview", exact: true });
   await expect(preview.getByRole("heading", { name: "Studio requests", exact: true })).toBeVisible();
   await preview.getByLabel("Name *", { exact: true }).fill("Test person");
@@ -24,11 +25,13 @@ for (const width of [1440, 390]) test(`template customization and native app cre
   await page.getByRole("button", { name: "Open app", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Studio requests", exact: true }).first()).toBeVisible();
   await expect(page.getByText("Preview-only equipment request", { exact: true })).toHaveCount(0);
-  await page.getByText("Review changes", { exact: true }).click();
+  await page.getByRole("tab", { name: "Edit app", exact: true }).click();
+  await expect(page.getByText("Review changes", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Publish", exact: true })).toBeDisabled();
   await page.getByRole("button", { name: "Check proposed change", exact: true }).click();
   await expect(page.getByRole("button", { name: "Publish", exact: true })).toBeEnabled();
   await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await page.getByRole("tab", { name: "Use app", exact: true }).click();
   await expect(page.getByRole("button", { name: "Save record", exact: true })).toBeVisible();
   await page.screenshot({ path: info.outputPath(`native-app-${width}.png`), fullPage: true });
 });

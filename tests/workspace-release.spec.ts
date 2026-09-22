@@ -177,8 +177,9 @@ test("keeps one navigation around saved work on desktop and mobile", async ({ pa
   await page.getByRole("button", { name: "Open navigation" }).click();
   await mobileNavigation.getByRole("button", { name: "Search", exact: true }).click();
   await expect(mobileNavigation).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "My work", exact: true })).toBeVisible();
-  const search = page.getByRole("searchbox", { name: "Search saved work" });
+  const searchDialog = page.getByRole("dialog", { name: "My work", exact: true });
+  await expect(searchDialog).toBeVisible();
+  const search = searchDialog.getByRole("combobox", { name: "Search My work" });
   await search.fill("missing");
   await expect(page.getByText("No matching work")).toBeVisible();
   await page.screenshot({ path: "test-results/workspace-home-mobile.png", fullPage: true });
@@ -207,7 +208,7 @@ async function pendingWorkspaceSwitchSurvives(page: Page, section: "work" | "set
   await expect.poll(() => releaseTarget.length).toBeGreaterThan(0);
 
   await page.getByRole("complementary", { name: "Strelva navigation", exact: true })
-    .getByRole("button", { name: section === "products" ? "Explore offerings" : section === "settings" ? "Settings" : "Work", exact: true })
+    .getByRole("link", { name: section === "products" ? "Apps & templates" : section === "settings" ? "Settings" : "Work", exact: true })
     .click();
 
   targetReady = true;
@@ -267,6 +268,7 @@ test("creates a private assessment and restores it after reload", async ({ page 
 
   await page.goto("/workspace");
   await page.getByRole("link", { name: "Apps & templates", exact: true }).click();
+  await page.getByText("More tools and managed services", { exact: true }).click();
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await expect(page.getByRole("heading", { name: "AI Visibility", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Check a business" }).click();
@@ -517,12 +519,13 @@ test("keeps My work and Shared with me context-local and read-only", async ({ pa
   await page.goto("/workspace");
   await page.getByLabel("Current workspace").selectOption(CUSTOMER_ID);
   await expect(page.getByRole("heading", { name: "Your shared work.", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Recent work", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your apps and work", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open Customer-owned assessment" })).toBeVisible();
-  await page.getByRole("button", { name: /^Explore offerings/ }).click();
+  await page.getByRole("link", { name: /^Apps & templates/ }).click();
+  await page.getByText("More tools and managed services", { exact: true }).click();
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await expect(page.getByRole("button", { name: "Check a business", exact: true })).toBeDisabled();
-  await expect(page.getByText("Switch to a workspace you own to create an assessment.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "New", exact: true })).toBeDisabled();
 
   // Returning to owned work changes context before rendering its collection.
   await page.getByLabel("Current workspace").selectOption(PERSONAL_ID);
@@ -857,6 +860,7 @@ test("does not add a completed assessment to a workspace selected while it was r
 
   await page.goto("/workspace");
   await page.getByRole("link", { name: "Apps & templates", exact: true }).click();
+  await page.getByText("More tools and managed services", { exact: true }).click();
   await page.getByRole("button", { name: "Start", exact: true }).click();
   await expect(page.getByRole("heading", { name: "AI Visibility", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Check a business", exact: true }).click();

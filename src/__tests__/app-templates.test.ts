@@ -34,6 +34,11 @@ describe("native app templates", () => {
   });
 });
 describe("onboarding request continuity", () => {
+  it("carries an explicit sentence into editable requirements without breaking compound names", () => {
+    expect(onboardingRequestPrefill("Organize supplier onboarding. We need an insurance certificate and a signed agreement.")).toEqual({ subjectType: "supplier", requirementsText: "an insurance certificate\na signed agreement" });
+    expect(onboardingRequestPrefill("Organize employee onboarding. We need a health and safety policy.").requirementsText).toBe("a health and safety policy");
+    expect(onboardingRequestPrefill("We need no additional documents.").requirementsText).toBe("");
+  });
   it("retains explicit supplier context and literal checklist lines", () => {
     expect(onboardingRequestPrefill("Organize supplier onboarding.\n- Insurance certificate\n- Signed agreement")).toEqual({ subjectType: "supplier", requirementsText: "Insurance certificate\nSigned agreement" });
   });

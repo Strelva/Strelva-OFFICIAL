@@ -25,7 +25,7 @@ import { DocumentExperience } from "./DocumentExperience";
 import { LocalDocumentPreview } from "./preview/LocalDocumentPreview";
 import { WorkPlanExperience } from "./WorkPlanExperience";
 import { WorkBudgetPanel } from "./WorkBudgetPanel";
-import { OnboardingWorkspaceExperience as OnboardingExperience } from "./OnboardingWorkspaceExperience";
+import { OnboardingWorkspaceExperience } from "./OnboardingWorkspaceExperience";
 import { WebsiteExperience } from "@/experience/websites/WebsiteExperience";
 import { CustomApplicationManageExperience } from "@/experience/custom-applications/CustomApplicationManageExperience";
 import { BoundedWorkExperience } from "@/experience/operations/BoundedWorkExperience";
@@ -362,6 +362,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
   }
 
   function clearEmbeddedRouteParams(url: URL) {
+    url.searchParams.delete("template");
     url.searchParams.delete("standingId");
     url.searchParams.delete("assignmentId");
     url.searchParams.delete("tenantId");
@@ -802,7 +803,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
             />
               : view === "websites" ? <WebsiteExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} readOnly={workspaceReadOnly} initialRequest={horizontalRequest} onSaved={horizontalSaved} />
               : view === "custom-applications" ? selectedWork?.productId === view ? <CustomApplicationManageExperience key={selectedWork.id} workId={selectedWork.id} readOnly={Boolean(workspaceReadOnly || currentWorkspace?.role === "member")} /> : <p role="status">Select a saved custom application to review its delivery.</p>
-              : view === "onboarding" ? <OnboardingExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} initialCaseId={selectedWork?.productId === view ? selectedWork.id : undefined} initialRequest={horizontalRequest} readOnly={workspaceReadOnly} onSaved={horizontalSaved} />
+              : view === "onboarding" ? <OnboardingWorkspaceExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} initialCaseId={selectedWork?.productId === view ? selectedWork.id : undefined} initialRequest={horizontalRequest} readOnly={workspaceReadOnly} onSaved={horizontalSaved} />
               : view === "product-learning" ? <LearningExperience workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} sources={snapshot.work} readOnly={workspaceReadOnly} onSaved={horizontalSaved} />
               : <BoundedWorkExperience key={`${snapshot.workspaceId}:${view}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} productId={view} sources={snapshot.work} readOnly={workspaceReadOnly} workspaceStopped={workspaceStopped} calendarRecoveryAllowed={calendarRecoveryAllowed} initialRequest={horizontalRequest} onSaved={horizontalSaved} />}
             {selectedWork && view !== "product-learning" && view !== "websites" && !snapshot.actor.localPreview ? <WorkAuthorityPanel key={selectedWork.id} workId={selectedWork.id} canManage={!workspaceReadOnly && (currentWorkspace?.role === "owner" || currentWorkspace?.role === "admin")} sources={snapshot.work} /> : null}

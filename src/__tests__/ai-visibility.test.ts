@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// HTTP is mocked below. Resolve its public test hosts without a real DNS lookup.
+vi.mock("node:dns", () => ({ promises: { lookup: vi.fn(async () => ({ address: "93.184.216.34", family: 4 })) } }));
+
 /**
  * AI Visibility Score tests.
  *

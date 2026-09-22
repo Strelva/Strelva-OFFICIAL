@@ -88,6 +88,7 @@ function TemplateSession({ workspaceId, actorEmail, businessName, canCreate, onC
   const [state, setState] = useState<"editing" | "unconfirmed" | "created">("editing");
   const [workId, setWorkId] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const [mobileView, setMobileView] = useState<"edit" | "preview">("edit");
   const [checkedSavedWork, setCheckedSavedWork] = useState(false);
   const [error, setError] = useState("");
   const mutation = useRef(false);
@@ -99,7 +100,7 @@ function TemplateSession({ workspaceId, actorEmail, businessName, canCreate, onC
     const frame = window.requestAnimationFrame(() => {
       try {
         const raw = window.sessionStorage.getItem(storageKey);
-        const saved = raw && raw.length < 40_000 ? storedSchema.safeParse(JSON.parse(raw)) : null;
+        const saved = raw && raw.length < 100_000 ? storedSchema.safeParse(JSON.parse(raw)) : null;
         if (saved?.success) {
           const { maintenanceOwner: _owner, ...spec } = saved.data.spec;
           setDraft(spec); setState(saved.data.state); setWorkId(saved.data.workId);
@@ -124,7 +125,8 @@ function TemplateSession({ workspaceId, actorEmail, businessName, canCreate, onC
     if (onCreated) onCreated(id);
   }
   function startAnother() {
-    if (busy || mutation.current) return;
+    if (!canCreate || busy || mutation.current) return;
+    setMobileView("edit");
     const fresh = templateDraft(template);
     setDraft(fresh);
     setState("editing");
@@ -157,10 +159,11 @@ function TemplateSession({ workspaceId, actorEmail, businessName, canCreate, onC
   }
   if (!ready) return <p role="status">Opening your template…</p>;
   return <>
-    <div className={styles.editorGrid}><ApplicationDraftEditor value={draft} onChange={edit} disabled={busy || state !== "editing" || !canCreate} /><div className={styles.preview}>{invalid ? <p role="status" className={styles.notice}>Complete the field names and choices to try this app.</p> : <ApplicationDraftPreview spec={draft} />}</div></div>
+    <div className={styles.mobileViews} role="group" aria-label="Template view"><Button type="button" variant={mobileView === "edit" ? "secondary" : "ghost"} aria-pressed={mobileView === "edit"} onClick={() => setMobileView("edit")}>Edit fields</Button><Button type="button" variant={mobileView === "preview" ? "secondary" : "ghost"} aria-pressed={mobileView === "preview"} onClick={() => setMobileView("preview")}>Try preview</Button></div>
+    <div className={styles.editorGrid} data-mobile-view={mobileView}><div className={styles.editor}><ApplicationDraftEditor value={draft} onChange={edit} disabled={busy || state !== "editing" || !canCreate} /></div><div className={styles.preview}>{invalid ? <p role="status" className={styles.notice}>Complete the field names and choices to try this app.</p> : <ApplicationDraftPreview spec={draft} />}</div></div>
     <div className={styles.savebar}>
       <div><strong>{state === "created" ? "Your private app is ready." : `Save to ${businessName}`}</strong><p>{state === "created" ? "Open it to check, publish, and choose who can use it." : "Starts with no records. Nothing is published or shared."}</p></div>
-      {state === "created" && workId ? <div className={styles.saveActions}>{onCreated ? <Button onClick={() => openCreated(workId)}>Open app<ArrowRight size={16} /></Button> : <Link className={styles.openApp} href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=applications&work=${encodeURIComponent(workId)}`}>Open app<ArrowRight size={16} /></Link>}<Button type="button" variant="secondary" onClick={startAnother}>Start another app</Button></div> : <Button onClick={() => void create()} loading={busy} disabled={!canCreate || Boolean(invalid) || state !== "editing"}>Create private app</Button>}
+      {state === "created" && workId ? <div className={styles.saveActions}>{onCreated ? <Button onClick={() => openCreated(workId)}>Open app<ArrowRight size={16} /></Button> : <Link className={styles.openApp} href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&view=applications&work=${encodeURIComponent(workId)}`}>Open app<ArrowRight size={16} /></Link>}<Button type="button" variant="secondary" disabled={!canCreate} onClick={startAnother}>Start another app</Button></div> : <Button onClick={() => void create()} loading={busy} disabled={!canCreate || Boolean(invalid) || state !== "editing"}>Create private app</Button>}
     </div>
     {!canCreate ? <p role="status" className={styles.notice}>Choose an editable workspace with applications enabled to create this app. The preview is still available.</p> : null}
     {invalid && state === "editing" ? <p role="status" className={styles.notice}>Check the proposed fields: {invalid}</p> : null}

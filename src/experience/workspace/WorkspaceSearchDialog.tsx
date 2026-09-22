@@ -16,7 +16,7 @@ export function WorkspaceSearchDialog({ open, items, scopeName, storageKey, onCl
     if (!storageKey) return;
     const frame = window.requestAnimationFrame(() => {
       try { setQuery((window.sessionStorage.getItem(storageKey) || "").slice(0, 3000)); }
-      catch { /* Search still works when storage is unavailable. */ }
+      catch { /* Search stays usable without browser storage. */ }
     });
     return () => window.cancelAnimationFrame(frame);
   }, [storageKey]);
@@ -47,12 +47,12 @@ export function WorkspaceSearchDialog({ open, items, scopeName, storageKey, onCl
     else window.location.assign(item.href);
   }
 
-  return <dialog ref={dialog} className={styles.dialog} aria-labelledby={`${id}-title`} onCancel={onClose} onClose={onClose} onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
+  return <dialog ref={dialog} className={styles.dialog} aria-labelledby={`${id}-title`} onCancel={event => { event.preventDefault(); onClose(); }} onClose={onClose} onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
     <div className={styles.content}>
       <header className={styles.header}>
         <Search size={20} aria-hidden="true" />
         <label className={styles.srOnly} htmlFor={`${id}-query`}>Search {scopeName}</label>
-        <input ref={input} id={`${id}-query`} placeholder="Search your work…" value={query} onChange={event => { setQuery(event.target.value); setSelected(0); if (storageKey) { try { window.sessionStorage.setItem(storageKey, event.target.value.slice(0, 3000)); } catch { /* Keep the query in this dialog. */ } } }} role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={`${id}-results`} aria-activedescendant={results.length ? `${id}-result-${activeIndex}` : undefined} onKeyDown={event => {
+        <input ref={input} id={`${id}-query`} placeholder="Search your work…" maxLength={3000} value={query} onChange={event => { setQuery(event.target.value); setSelected(0); if (storageKey) { try { window.sessionStorage.setItem(storageKey, event.target.value); } catch { /* Keep the query in this dialog. */ } } }} role="combobox" aria-autocomplete="list" aria-expanded={open} aria-controls={`${id}-results`} aria-activedescendant={results.length ? `${id}-result-${activeIndex}` : undefined} onKeyDown={event => {
           if (event.nativeEvent.isComposing) return;
           if (event.key === "ArrowDown" || event.key === "ArrowUp") {
             event.preventDefault();
