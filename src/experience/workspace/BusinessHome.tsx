@@ -62,6 +62,8 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   const deliveryUnavailable = deliveries.state.status === "error";
   const workHref = (id: string) => `${appBase}/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&work=${encodeURIComponent(id)}`;
   const searchItems: WorkspaceSearchItem[] = [
+    { id: "action-new", title: "Start with an outcome", detail: "Tell Strelva what you want to make happen", href: `${appBase}/workspace?view=start&workspaceId=${encodeURIComponent(snapshot.workspaceId)}`, onOpen: onStart },
+    { id: "action-explore", title: "Browse examples", detail: "Apps and templates you can adapt", href: `${appBase}/workspace?view=products&workspaceId=${encodeURIComponent(snapshot.workspaceId)}`, onOpen: onExplore },
     ...snapshot.work.map(work => ({ id: work.id, title: work.title, detail: workspaceWorkLabel(work), href: workHref(work.id), onOpen: () => onOpen(work.id) })),
     ...sites.map(site => ({ id: `site-${site.id}`, title: site.title, detail: "Managed website", href: site.href })),
     ...deliveryItems.map(item => ({ id: `delivery-${item.id}`, title: item.title, detail: item.detail, href: item.href })),
