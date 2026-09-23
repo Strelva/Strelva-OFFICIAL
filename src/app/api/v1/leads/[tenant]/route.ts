@@ -15,6 +15,7 @@ import { readOptionalJsonObject } from "@/lib/request-body";
 import { isTenantId } from "@/lib/scaffold-contracts";
 import { captureLead, recordLead } from "@/lib/leads";
 import { scoreLeadSpam } from "@/lib/lead-spam";
+import { recordSpam } from "@/lib/spam-pit";
 import {
   getInquiryRepository,
   inquiryReleaseEnabled,
@@ -117,6 +118,25 @@ export async function POST(
         score: spam.score,
         signals: spam.signals,
       });
+      // File it in the tenant's spam pit (no notification) so a false positive
+      // is recoverable. Only for a real tenant, so bots can't mint pit keys, and
+      // never allowed to turn the fake success into an error.
+      try {
+        const pitTenant = await getTenantConfig(tenant);
+        if (pitTenant && pitTenant.active !== false) {
+          await recordSpam(tenant, {
+            reason: honeypot ? "honeypot" : spam.signals.join(",") || "content-score",
+            source: source ?? "v1-leads",
+            name,
+            email: emailRaw,
+            message,
+            ip: (req.headers.get("x-forwarded-for") ?? "").split(",")[0]?.trim(),
+            userAgent: req.headers.get("user-agent") ?? undefined,
+          });
+        }
+      } catch (err) {
+        console.error("[v1 leads] spam pit write failed", tenant, err);
+      }
       return corsJson({ ok: true }, 200);
     }
 
