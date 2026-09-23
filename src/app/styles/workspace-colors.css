@@ -132,3 +132,60 @@
   --navigation-selected-shadow: 0 6px 18px rgb(0 0 0 / 12%);
   --navigation-overlay-shadow: 24px 0 80px rgb(0 0 0 / 45%);
 }
+
+/*
+ * September 23 component material. Roles shared by the shell and Home so both
+ * palettes can be judged on identical components. Neutral is the September 20
+ * default; ink is the September 17 reference, enabled with data-palette="ink".
+ */
+[data-dashboard] {
+  --sv-display: #fafafa;
+  --sv-gloss: #ffffff0f;
+  --sv-orbit: #ffffff24;
+  --sv-orbit-faint: #ffffff12;
+  --sv-signal: #a8c2a8;
+  --sv-object: #161616;
+  --sv-object-hover: #1c1c1c;
+  --sv-haze-a: #ffffff00;
+  --sv-haze-b: #ffffff00;
+  --sv-grain-opacity: .035;
+}
+
+:root[data-palette="ink"] [data-dashboard] {
+  color-scheme: dark;
+  --surface-base: #0b110f;
+  --surface-inset: #0d1412;
+  --surface: #111a17;
+  --surface-raised: #16211d;
+  --warm-black: #ece6d8;
+  --warm-white: #ece6d8;
+  --gray-fg: #d3cdbf;
+  --gray-muted: #9da398;
+  --gray-subtle: #8a9187;
+  --gray-faint: #8a9187;
+  --gray-border: #ece6d817;
+  --gray-bg: #ece6d80b;
+  --gray-bg-hover: #ece6d812;
+  --gray-bg-alt: #ece6d808;
+  --accent: #a9c49a;
+  --accent-dim: #a9c49a1f;
+  --accent-text: #bfd5b1;
+  --on-accent: #142018;
+  --navigation-bg: #0d1412;
+  --navigation-border: #1b2622;
+  --navigation-text: #ece6d8;
+  --navigation-nav-text: #a3aa9f;
+  --navigation-hover-bg: #ece6d80d;
+  --navigation-selected-bg: #ece6d812;
+  --navigation-active-text: #f3ede0;
+  --sv-display: #efe8d8;
+  --sv-gloss: #ece6d812;
+  --sv-orbit: #ece6d82b;
+  --sv-orbit-faint: #ece6d814;
+  --sv-signal: #a9c49a;
+  --sv-object: #111a17;
+  --sv-object-hover: #15201c;
+  --sv-haze-a: #5a806652;
+  --sv-haze-b: #2e4f6250;
+  --sv-grain-opacity: .06;
+}

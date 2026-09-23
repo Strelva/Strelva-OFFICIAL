@@ -21,8 +21,22 @@
 
 /* Masthead */
 .masthead {
+  position: relative;
+  isolation: isolate;
   padding-top: clamp(32px, 6vh, 96px);
   animation: rise 480ms cubic-bezier(.2, .8, .2, 1) both;
+}
+
+/* Bounded atmosphere behind the business name; never behind controls. */
+.masthead::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: -96px -25vw -48px -12vw;
+  background:
+    radial-gradient(42% 60% at 18% 30%, var(--sv-haze-a), transparent 70%),
+    radial-gradient(38% 55% at 72% 10%, var(--sv-haze-b), transparent 70%);
+  pointer-events: none;
 }
 
 .eyebrow {
@@ -35,8 +49,9 @@
 
 .name {
   margin: 8px 0 0;
+  color: var(--sv-display);
   font-size: clamp(40px, 7vw, 80px);
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.04;
   letter-spacing: -.045em;
   text-wrap: balance;
@@ -97,27 +112,32 @@
 .suggestions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  align-items: baseline;
+  gap: 4px 20px;
   margin-top: 16px;
+  padding-inline: 8px;
+}
+
+.suggestions > span {
+  color: var(--gray-subtle);
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .suggestions button {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 40px;
-  padding: 8px 16px;
-  border: 1px solid var(--gray-border);
-  border-radius: 9999px;
+  min-height: 32px;
   color: var(--gray-muted);
   font-size: 14px;
-  line-height: 24px;
-  transition: color 120ms, border-color 120ms;
+  line-height: 20px;
+  text-decoration: underline;
+  text-decoration-color: var(--gray-border);
+  text-underline-offset: 6px;
+  transition: color 120ms, text-decoration-color 120ms;
 }
 
 .suggestions button:hover:not(:disabled) {
-  border-color: var(--gray-muted);
   color: var(--warm-black);
+  text-decoration-color: var(--gray-muted);
 }
 
 /* Sections */
@@ -218,25 +238,45 @@
   grid-template-columns: auto minmax(0, 1fr);
   gap: 40px;
   margin-top: 80px;
+  align-items: center;
   padding: 48px;
   border: 1px solid var(--gray-border);
   border-radius: 24px;
-  background: var(--surface);
+  background: var(--sv-object);
+  box-shadow: inset 0 1px 0 var(--sv-gloss);
   animation: rise 480ms 160ms cubic-bezier(.2, .8, .2, 1) both;
 }
 
-.grade {
+.insight,
+.tile {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+/* Fine mineral grain: material, not decoration. */
+.insight::after,
+.tile::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: var(--sv-grain-opacity);
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+.orbitEmpty {
   display: grid;
-  width: 128px;
-  height: 128px;
+  width: 176px;
+  height: 176px;
   place-items: center;
-  border-radius: 24px;
-  background: var(--accent-dim);
-  color: var(--accent-text);
-  font-size: 80px;
-  font-weight: 500;
-  line-height: 1;
-  letter-spacing: -.04em;
+  border: 1px dashed var(--sv-orbit);
+  border-radius: 9999px;
+  color: var(--sv-display);
+  font-size: 64px;
+  font-weight: 300;
 }
 
 .insightBody {
@@ -245,8 +285,9 @@
 
 .insightTitle {
   margin: 8px 0 0;
+  color: var(--sv-display);
   font-size: 32px;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 40px;
   letter-spacing: -.025em;
   text-wrap: balance;
@@ -319,18 +360,30 @@
   padding: 24px;
   border: 1px solid var(--gray-border);
   border-radius: 24px;
-  background: var(--surface);
+  background: var(--sv-object);
+  box-shadow: inset 0 1px 0 var(--sv-gloss);
   color: var(--gray-muted);
   text-align: left;
-  transition: border-color 120ms, transform 200ms cubic-bezier(.2, .8, .2, 1);
+  transition: background-color 120ms, border-color 120ms, transform 200ms cubic-bezier(.2, .8, .2, 1);
 }
 
 .tile:hover {
-  border-color: var(--gray-muted);
+  border-color: var(--sv-orbit);
+  background: var(--sv-object-hover);
   transform: translateY(-2px);
 }
 
-.tile > span {
+.glyph {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid var(--sv-orbit);
+  border-radius: 9999px;
+  color: var(--sv-display);
+}
+
+.tile > span:not(.glyph) {
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -338,10 +391,11 @@
 }
 
 .tile strong {
-  color: var(--warm-black);
-  font-size: 16px;
-  font-weight: 500;
-  line-height: 24px;
+  color: var(--sv-display);
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 28px;
+  letter-spacing: -.01em;
   overflow-wrap: anywhere;
 }
 
@@ -353,6 +407,15 @@
 .addTile {
   border-style: dashed;
   background: transparent;
+  box-shadow: none;
+}
+
+.addTile::after {
+  display: none;
+}
+
+.addTile .glyph {
+  border-style: dashed;
 }
 
 /* Supporting lists (deliveries, account websites) */
@@ -528,11 +591,10 @@
     padding: 24px;
   }
 
-  .grade {
-    width: 80px;
-    height: 80px;
-    border-radius: 16px;
-    font-size: 48px;
+  .insight figure,
+  .orbitEmpty {
+    width: 120px !important;
+    height: 120px !important;
   }
 
   .insightTitle {

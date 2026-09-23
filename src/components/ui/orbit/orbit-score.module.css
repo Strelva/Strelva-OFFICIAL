@@ -1,0 +1,79 @@
+.orbit {
+  position: relative;
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  margin: 0;
+}
+
+.orbit svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.guide {
+  fill: none;
+  stroke: var(--sv-orbit);
+  stroke-width: .5;
+  stroke-dasharray: .8 2.2;
+}
+
+.track {
+  fill: none;
+  stroke: var(--sv-orbit);
+  stroke-width: .8;
+}
+
+.tick {
+  stroke: var(--sv-display);
+  stroke-opacity: .5;
+  stroke-width: .7;
+}
+
+.arc {
+  fill: none;
+  stroke: var(--sv-signal);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  animation: draw 1200ms cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.body {
+  fill: var(--sv-display);
+  animation: appear 400ms 900ms both;
+}
+
+.grade {
+  position: relative;
+  color: var(--sv-display);
+  font-size: 44cqi;
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -.04em;
+}
+
+.orbit {
+  container-type: inline-size;
+}
+
+@keyframes draw {
+  from {
+    stroke-dasharray: 0 var(--orbit-length, 277);
+  }
+}
+
+@keyframes appear {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arc,
+  .body {
+    animation: none;
+  }
+}
