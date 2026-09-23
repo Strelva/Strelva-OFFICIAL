@@ -10,16 +10,25 @@ permissions:
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Archive tracked source for offline inspection
-        run: git archive --format=tar.gz --output=strelva-source.tar.gz HEAD
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install locked dependencies for offline verification
+        run: pnpm install --frozen-lockfile
+      - name: Archive dependency tree
+        run: tar -czf strelva-dependencies.tar.gz node_modules
       - uses: actions/upload-artifact@v4
         with:
-          name: strelva-cleanup-source
-          path: strelva-source.tar.gz
+          name: strelva-cleanup-dependencies
+          path: strelva-dependencies.tar.gz
           retention-days: 1
           if-no-files-found: error
