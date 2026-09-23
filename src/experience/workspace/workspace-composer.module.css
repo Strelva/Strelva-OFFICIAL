@@ -3,33 +3,26 @@
   min-width: 0;
 }
 
+/* One flat surface. Focus is carried by the border, not by lift or glow. */
 .composer {
   position: relative;
-  padding: 20px 20px 14px;
+  padding: 16px 16px 12px;
   border: 1px solid var(--gray-border);
-  border-radius: 28px;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--surface) 96%, white 4%), var(--surface));
-  box-shadow:
-    0 1px 0 rgb(255 255 255 / .025) inset,
-    0 10px 40px rgb(0 0 0 / .16);
-  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+  border-radius: 24px;
+  background: var(--surface);
+  transition: border-color 120ms cubic-bezier(.2, .8, .2, 1);
 }
 
 .composer:focus-within {
-  border-color: color-mix(in srgb, var(--gray-fg) 42%, var(--gray-border));
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--gray-fg) 10%, transparent),
-    0 14px 48px rgb(0 0 0 / .22);
-  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--gray-fg) 40%, var(--gray-border));
 }
 
 .composer textarea {
   display: block;
   width: 100%;
-  min-height: 96px;
+  min-height: 72px;
   max-height: 288px;
-  padding: 2px 4px 0;
+  padding: 4px 8px 0;
   resize: none;
   border: 0;
   background: transparent;
@@ -37,12 +30,29 @@
   font: inherit;
   font-size: 18px;
   line-height: 28px;
-  letter-spacing: -.012em;
+  letter-spacing: -.01em;
+  outline: none;
+}
+
+.composer textarea:focus-visible {
   outline: none;
 }
 
 .composer textarea::placeholder {
-  color: color-mix(in srgb, var(--gray-muted) 88%, transparent);
+  color: var(--gray-muted);
+}
+
+/* After a request is answered the composer stays editable but steps back. */
+.compact .composer {
+  padding: 12px 12px 8px;
+  border-radius: 16px;
+}
+
+.compact .composer textarea {
+  min-height: 24px;
+  font-size: 16px;
+  line-height: 24px;
+  letter-spacing: 0;
 }
 
 .tools,
@@ -54,12 +64,12 @@
 
 .tools {
   justify-content: space-between;
-  padding-top: 12px;
+  padding-top: 8px;
 }
 
 .tools > button:first-child {
   color: var(--gray-muted);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 400;
 }
 
@@ -68,10 +78,11 @@
 }
 
 .clear {
-  min-height: 36px;
-  padding: 6px 8px;
+  min-height: 32px;
+  padding: 4px 8px;
+  border-radius: 8px;
   color: var(--gray-muted);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 16px;
 }
 
@@ -82,24 +93,19 @@
 .clear:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 8px;
 }
 
 .hint {
-  display: flex;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 9px 8px 0;
+  margin: 8px 8px 0;
   color: var(--gray-muted);
-  font-size: 11px;
-  line-height: 18px;
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .error {
-  margin: 10px 4px 0;
+  margin: 8px 8px 0;
   color: var(--critical);
-  font-size: 13px;
+  font-size: 14px;
   line-height: 20px;
 }
 
@@ -116,33 +122,19 @@
 }
 
 @media (max-width: 640px) {
-  .composer {
-    padding: 16px 16px 12px;
-    border-radius: 24px;
-  }
-
   .composer textarea {
-    min-height: 88px;
-    font-size: 17px;
-    line-height: 26px;
+    min-height: 72px;
+    font-size: 16px;
+    line-height: 24px;
   }
 
-  .hint span,
   .clear {
     display: none;
-  }
-
-  .tools {
-    gap: 8px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .composer {
     transition: none;
-  }
-
-  .composer:focus-within {
-    transform: none;
   }
 }

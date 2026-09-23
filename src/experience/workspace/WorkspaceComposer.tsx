@@ -12,6 +12,8 @@ export interface WorkspaceComposerProps {
   disabled?: boolean;
   placeholder?: string;
   autoFocus?: boolean;
+  /** Quieter editor shown above an answer; the request stays editable. */
+  compact?: boolean;
   onSubmit: (request: string) => void | Promise<void>;
   onTemplates?: () => void;
   onChange?: (request: string) => void;
@@ -23,7 +25,7 @@ export function WorkspaceComposer(props: WorkspaceComposerProps) {
 }
 
 /** One request editor. Routing, permission and execution remain with its caller. */
-function ComposerSession({ initialRequest = "", draftKey, disabled = false, placeholder = "What do you want Strelva to make happen?", autoFocus = false, onSubmit, onTemplates, onChange, onEdited }: WorkspaceComposerProps) {
+function ComposerSession({ initialRequest = "", draftKey, disabled = false, placeholder = "What do you want Strelva to make happen?", autoFocus = false, compact = false, onSubmit, onTemplates, onChange, onEdited }: WorkspaceComposerProps) {
   const id = useId();
   const textarea = useRef<HTMLTextAreaElement>(null);
   const submitting = useRef(false);
@@ -47,7 +49,7 @@ function ComposerSession({ initialRequest = "", draftKey, disabled = false, plac
     input.style.height = "auto";
     const minHeight = Number.parseFloat(window.getComputedStyle(input).minHeight) || 0;
     input.style.height = `${Math.min(288, Math.max(minHeight, input.scrollHeight))}px`;
-  }, [request]);
+  }, [request, compact]);
 
   useEffect(() => {
     if (autoFocus) textarea.current?.focus({ preventScroll: true });
@@ -75,10 +77,10 @@ function ComposerSession({ initialRequest = "", draftKey, disabled = false, plac
     finally { submitting.current = false; setPending(false); }
   }
 
-  return <div className={styles.wrap}>
+  return <div className={compact ? `${styles.wrap} ${styles.compact}` : styles.wrap}>
     <form className={styles.composer} onSubmit={event => void submit(event)} aria-label="Start new work" aria-busy={pending || undefined}>
       <label className={styles.srOnly} htmlFor={id}>What do you want to accomplish?</label>
-      <textarea ref={textarea} id={id} value={request} onChange={event => change(event.target.value)} disabled={disabled || pending} placeholder={placeholder} maxLength={3000} rows={3} aria-describedby={`${id}-hint${error ? ` ${id}-error` : ""}`} onKeyDown={event => {
+      <textarea ref={textarea} id={id} value={request} onChange={event => change(event.target.value)} disabled={disabled || pending} placeholder={placeholder} maxLength={3000} rows={compact ? 1 : 3} aria-describedby={`${id}-hint${error ? ` ${id}-error` : ""}`} onKeyDown={event => {
         if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
           event.preventDefault();
           event.currentTarget.form?.requestSubmit();
@@ -87,12 +89,12 @@ function ComposerSession({ initialRequest = "", draftKey, disabled = false, plac
       <div className={styles.tools}>
         {onTemplates ? <Button type="button" variant="ghost" size="sm" onClick={onTemplates} disabled={pending}><LayoutGrid size={16} aria-hidden="true" />Browse examples</Button> : <span />}
         <div className={styles.send}>
-          {request ? <button type="button" className={styles.clear} onClick={() => change("")} disabled={pending}>Clear draft</button> : null}
+          {request ? <button type="button" className={styles.clear} onClick={() => change("")} disabled={pending}>Clear</button> : null}
           <Button type="submit" variant="contrast" size="sm" loading={pending} disabled={disabled || !request.trim()} aria-label="Continue with this request"><ArrowUp size={18} aria-hidden="true" /><span className={styles.srOnly}>Continue</span></Button>
         </div>
       </div>
     </form>
-    <p id={`${id}-hint`} className={styles.hint}>{storageUnavailable ? "Browser storage is unavailable. Keep this page open to retain your draft." : "You’ll review what Strelva understood before anything consequential happens."}<span>Enter to continue. Shift + Enter for a new line.</span></p>
+    <p id={`${id}-hint`} className={storageUnavailable ? styles.hint : styles.srOnly}>{storageUnavailable ? "Keep this page open. Your browser can't save this draft." : "Press Enter to continue, or Shift and Enter for a new line. Nothing happens until you review it."}</p>
     {error ? <p id={`${id}-error`} role="alert" className={styles.error}>{error}</p> : null}
   </div>;
 }
