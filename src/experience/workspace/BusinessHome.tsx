@@ -57,7 +57,8 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   const deliveryItems = deliveries.state.status === "ready" ? deliveries.state.items : [];
   const deliveryAttention = deliveryItems.filter(item => item.attention);
   const attentionCount = home.attention.length + deliveryAttention.length;
-  const availableWorkCount = home.results.length + sites.length;
+  const savedResultCount = home.results.length;
+  const availableWorkCount = savedResultCount + sites.length;
   const deliveryPending = deliveries.state.status === "loading";
   const deliveryUnavailable = deliveries.state.status === "error";
   const workHref = (id: string) => `${appBase}/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&work=${encodeURIComponent(id)}`;
@@ -97,7 +98,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
           <WorkspaceComposer key={`${snapshot.actor.email}:${snapshot.workspaceId}`} draftKey={requestDraftKey({ actorEmail: snapshot.actor.email, workspaceId: snapshot.workspaceId })} disabled={busy} onSubmit={request} onEdited={onDraftChange} onTemplates={onExplore} placeholder="What do you want Strelva to make happen?" />
           <div className={styles.contextLine} aria-label="Current Strelva context">
             <span>Working in <strong>{name}</strong></span>
-            {availableWorkCount ? <span>{availableWorkCount} saved {availableWorkCount === 1 ? "result" : "results"}</span> : null}
+            {savedResultCount ? <span>{savedResultCount} saved {savedResultCount === 1 ? "result" : "results"}</span> : null}
             {sites.length ? <span>{sites.length} connected {sites.length === 1 ? "website" : "websites"}</span> : null}
           </div>
           <div className={styles.starters} aria-label="Try asking Strelva">
