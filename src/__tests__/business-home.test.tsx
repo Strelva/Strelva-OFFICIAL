@@ -66,13 +66,13 @@ function renderHome(items: WorkspaceWork[] = [
 }
 
 describe("business home", () => {
-  it("puts the saved work and its next action in front of category counts", () => {
+  it("keeps intent primary while putting saved work and next actions in front of category counts", () => {
     const html = renderHome();
 
     expect(html).toContain("Needs you");
     expect(html).toContain("Review urgency field");
     expect(html).toContain("Opening checklist");
-    expect(html).toContain("Your apps and work");
+    expect(html).toContain("Continue");
     expect(html).not.toMatch(/>Applications<|>Documents</);
   });
 
