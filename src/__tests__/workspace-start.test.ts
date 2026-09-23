@@ -119,7 +119,7 @@ describe("workspace start planner", () => {
   it("reports unavailable products without claiming a flow started", () => {
     const plan = planWorkspaceStart("Turn this spreadsheet into a tracker.", context({ products: [{ id: "tracker", name: "Spreadsheet tracker", availability: "release_gated" }] }));
     expect(plan).toMatchObject({ route: "tracker", status: "blocked", canContinue: false });
-    expect(plan.reason).toContain("not available");
+    expect(plan.reason).toContain("isn’t available in this workspace yet");
   });
 
   it("keeps inquiry and website scope failures explicit", () => {

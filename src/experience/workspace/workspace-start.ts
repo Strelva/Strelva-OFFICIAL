@@ -242,7 +242,7 @@ function hasAvailableProduct(context: WorkspaceStartContext, route: Exclude<Work
 }
 
 function partsFor(route: Exclude<WorkspaceStartRoute, "help">, request: string): WorkspaceStartPart[] {
-  if (["websites", "onboarding", "applications", "scheduling", "investigations", "operations"].includes(route)) return [{ id: "scope", label: ROUTE_COPY[route].title, detail: ROUTE_COPY[route].summary, outcome: ROUTE_COPY[route].outcome }, { id: "control", label: "Your workspace and permissions", detail: "Keep the result private. Review changes and preserve their evidence.", outcome: "Responsibility" }];
+  if (["websites", "onboarding", "applications", "scheduling", "investigations", "operations"].includes(route)) return [{ id: "scope", label: ROUTE_COPY[route].title, detail: ROUTE_COPY[route].summary, outcome: ROUTE_COPY[route].outcome }, { id: "control", label: "Private to this workspace", detail: "Only people you add can see it. You review every change.", outcome: "Responsibility" }];
   if (route === "assessment") {
     return [
       { id: "business-scope", label: "business in scope", detail: "Use the business details you provide for this assessment.", outcome: "Answer" },
@@ -368,7 +368,8 @@ function blockedReason(context: WorkspaceStartContext, route: Exclude<WorkspaceS
   if (!supportedFlowMounted(context, route)) return "This flow is not available in the current workspace. Nothing has been started.";
   if (!hasAvailableProduct(context, route)) {
     if (route === "website") return "Website work is available here only for a connected managed website.";
-    return `This ${ROUTE_COPY[route].title.toLowerCase()} is not available in this workspace yet.`;
+    const subject = ROUTE_COPY[route].title.replace(/^(?:a|an|the|your)\s+/i, "");
+    return `${subject.charAt(0).toUpperCase()}${subject.slice(1)} isn’t available in this workspace yet.`;
   }
   if (route === "inquiries" && !context.inquiryBusinesses?.length) return "No business scope is available for inquiry work in this workspace.";
   if (route === "website" && context.managedWorkUnavailable) return "Website access is temporarily unavailable. Nothing has been opened or changed.";
