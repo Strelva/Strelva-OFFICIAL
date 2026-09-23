@@ -129,6 +129,28 @@ afterEach(async () => {
 });
 
 describe("offering editor conflict recovery", () => {
+  it.each(["installation", "website"] as const)("ignores a late %s conflict after switching businesses", async (kind) => {
+    renderEditor(businessId);
+    await resolvePending(0, collection(installation(1, "Business A")));
+    act(() => {
+      if (kind === "installation") {
+        void controllers[0]!.command({ action: "update_configuration", businessId, installationId,
+          expectedRevision: 1, configuration: { displayName: "Old draft" } });
+      } else {
+        void controllers[0]!.websiteCommand({ action: "bind_managed_website", businessId,
+          tenantId: "example", idempotencyKey: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" });
+      }
+    });
+    renderEditor(secondBusinessId);
+    await resolvePending(2, collection(installation(1, "Business B", secondBusinessId)));
+    await resolvePending(1, { error: "The old business changed." }, 409);
+    // An old conflict must not start an old-business refresh under the new epoch.
+    expect(pending).toHaveLength(3);
+    expect(controllers[0]!.state).toMatchObject({ status: "ready", saving: false,
+      collection: { businessId: secondBusinessId } });
+    expect(container.textContent).not.toContain("The old business changed.");
+  });
+
   it("refreshes editor B to revision 2, keeps its draft beside the saved value, and only retries after an explicit save", async () => {
     await renderEditors();
     expect(pending).toHaveLength(2);

@@ -3,7 +3,7 @@
 import { useRef, useEffect } from "react";
 import Image from "next/image";
 import gsap from "gsap";
-import { ScrollTrigger as _ScrollTrigger } from "@/lib/lenis";
+import "@/lib/lenis";
 import { TrackedLink } from "./TrackedLink";
 import type { ProvidersContent, ProviderItem } from "@/lib/types";
 

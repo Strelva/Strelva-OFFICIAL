@@ -41,6 +41,3 @@ export interface AuditContext {
   /** /llms.txt body, or null if missing (the 2026 AI-visibility signal). */
   llmsTxt: string | null;
 }
-
-/** Signature every ported audit module implements: pure, context in, category out. */
-export type AuditModule = (ctx: AuditContext) => import("./types").CategoryResult;

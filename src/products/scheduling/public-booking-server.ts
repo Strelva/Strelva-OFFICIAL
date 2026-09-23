@@ -20,15 +20,7 @@ import {
   readWorkspaceSchedule,
 } from "./server";
 import { scheduleSchema } from "./contracts";
-import {
-  createPublicBookingService,
-  PublicBookingError,
-  publicBookingVisitorSchema,
-  type PublicBookingBinding,
-  type PublicBookingCalendar,
-  type PublicBookingInquiryCapture,
-  type PublicBookingRange,
-} from "./public-booking";
+import { createPublicBookingService, PublicBookingError, type PublicBookingBinding, type PublicBookingCalendar, type PublicBookingInquiryCapture, type PublicBookingRange } from "./public-booking";
 import { postgresPublicBookingTokenStore } from "./public-booking-store";
 
 type DbRow = Record<string, unknown>;
@@ -299,8 +291,4 @@ export function createPublicWebsiteBookingService() {
     tokens: postgresPublicBookingTokenStore,
     createRequestId: () => `public-${randomUUID()}`,
   });
-}
-
-export function validatePublicBookingVisitor(value: unknown) {
-  return publicBookingVisitorSchema.safeParse(value);
 }

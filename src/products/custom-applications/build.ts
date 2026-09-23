@@ -5,30 +5,22 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { z } from "zod";
+import { customApplicationFilesSchema, type CustomApplicationArtifact } from "./contracts";
+export type { CustomApplicationArtifact } from "./contracts";
 
 const exec = promisify(execFile);
-const MAX_SOURCE_BYTES = 512_000;
 const MAX_ARTIFACT_BYTES = 512_000;
 const MARKER = "STRELVA_BUILD_OUTPUT:";
 /** Pinned installed image. This adapter never pulls an image or installs dependencies. */
 export const CUSTOM_BUILD_IMAGE = "node@sha256:934240a162082fd8b8a2f90cd5114446443f1eba1c5378f6687167ca405e6584";
-const filePath = z.string().max(160).regex(/^[a-zA-Z0-9][a-zA-Z0-9_./-]*$/).refine(path => path.split("/").every(part => part !== "." && part !== ".." && part !== ""));
 const buildSchema = z.object({
   workspaceId: z.string().uuid(), resourceId: z.string().uuid(), applicationVersion: z.number().int().positive(),
-  files: z.record(filePath, z.string()).refine(files => Object.keys(files).length > 0 && Object.keys(files).length <= 30)
-    .refine(files => typeof files["build.mjs"] === "string", "A build.mjs entry is required")
-    .refine(files => Object.values(files).reduce((sum, content) => sum + Buffer.byteLength(content), 0) <= MAX_SOURCE_BYTES, "Source exceeds the build limit"),
+  files: customApplicationFilesSchema,
 }).strict();
 export type CustomBuildInput = z.infer<typeof buildSchema>;
 export function validateCustomBuild(input: unknown): CustomBuildInput { return buildSchema.parse(input); }
 export function customArtifactDigest(value: { workspaceId: string; resourceId: string; applicationVersion: number; html: string }): string {
   return createHash("sha256").update(JSON.stringify([value.workspaceId, value.resourceId, value.applicationVersion, value.html])).digest("hex");
-}
-export interface CustomApplicationArtifact {
-  version: 1; workspaceId: string; resourceId: string; applicationVersion: number;
-  sourceDigest: string; artifactDigest: string; image: string; html: string;
-  builtAt: string; durationMs: number; state: "built";
-  limits: { network: "none"; memoryMb: 256; cpuCount: 1; timeoutSeconds: 30 };
 }
 
 /**

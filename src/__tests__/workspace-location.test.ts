@@ -90,3 +90,11 @@ describe("workspace return destination", () => {
     expect(workspaceReturnTarget(value)).toBeNull();
   });
 });
+
+
+it("preserves an exact custom application destination through sign-in", () => {
+  const target = `/workspace?workspaceId=${workspaceId}&view=custom-applications&work=private-app`;
+  expect(workspaceReturnTarget(target)).toBe(target);
+  expect(accountReturnTarget(`/account?next=${encodeURIComponent(target)}`)).toBe(`/account?next=${encodeURIComponent(target)}`);
+  expect(workspaceReturnTarget(target + "&next=https%3A%2F%2Fevil.example")).toBeNull();
+});

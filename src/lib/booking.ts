@@ -154,20 +154,6 @@ export function generateSlots(
   });
 }
 
-export function isDateBookable(
-  config: BookingConfig,
-  date: string,
-  overrides: DateOverride[]
-): boolean {
-  const dayOfWeek = dayOfWeekForDate(date);
-
-  const override = overrides.find((o) => o.date === date);
-  if (override) return override.available;
-
-  const schedule = config.weeklySchedule.find((s) => s.day === dayOfWeek);
-  return !!schedule?.enabled;
-}
-
 export function generateBookingId(): string {
   return `bk_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }

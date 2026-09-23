@@ -1,18 +1,5 @@
 import { createHash } from "node:crypto";
-import {
-  calendarAvailabilityQuerySchema,
-  calendarEventLookupSchema,
-  calendarIdempotencyLookupSchema,
-  calendarEventInputSchema,
-  calendarEventSchema,
-  calendarBusyIntervalSchema,
-  calendarProviderSchema,
-  type CalendarBusyInterval,
-  type CalendarConnection,
-  type CalendarEvent,
-  type CalendarEventInput,
-  type CalendarProvider,
-} from "./contracts";
+import { calendarAvailabilityQuerySchema, calendarEventLookupSchema, calendarIdempotencyLookupSchema, calendarEventInputSchema, calendarEventSchema, calendarBusyIntervalSchema, calendarProviderSchema, type CalendarBusyInterval, type CalendarEvent, type CalendarEventInput, type CalendarProvider } from "./contracts";
 
 type JsonRecord = Record<string, unknown>;
 type CalendarFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -605,9 +592,4 @@ export function createGoogleCalendarAdapter(options: { fetch?: CalendarFetch; no
 export function createCalendarAdapter(provider: CalendarProvider, options: { fetch?: CalendarFetch; now?: () => number } = {}): CalendarAdapter {
   const parsed = calendarProviderSchema.parse(provider);
   return parsed === "outlook" ? createOutlookCalendarAdapter(options) : createGoogleCalendarAdapter(options);
-}
-
-export function providerConnectionCredentials(connection: CalendarConnection & { accessToken?: string; refreshToken?: string }): CalendarCredentials {
-  if (!connection.accessToken) throw new CalendarProviderError({ provider: connection.provider, message: "The calendar connection has no usable authorization.", code: "unauthorized" });
-  return { accessToken: connection.accessToken, refreshToken: connection.refreshToken };
 }

@@ -122,8 +122,9 @@ production `content` rows — those images will 403 for any user. Rewrite first,
 > auth tests are rewritten — the "sign-in paused / not using Clerk" skips are gone;
 > `customer-frontend.spec.ts` now tests the live Supabase sign-in flow. Still open:
 
-- `svix` (1.92.2) is still in `package.json` with no remaining import in `src/` —
-  safe to remove with dep-review sign-off.
+- Direct `svix` 1.92.2 removed in the September 22 source cleanup after the
+  repository-wide caller check. Resend still owns its transitive Svix 1.86.0
+  dependency; that dependency is retained. No webhook verification path changed.
 - `dashboard-route-redirects.test.ts:67` still has an `it.skip` referencing the
   deleted `SignInClient.tsx` — it throws if un-skipped; safe to delete the whole test.
 - Re-evaluate `@babel/plugin-transform-modules-systemjs` override (still in lockfile;

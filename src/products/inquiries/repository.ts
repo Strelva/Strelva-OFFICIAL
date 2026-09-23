@@ -11,16 +11,7 @@ import { createHash, createHmac, randomUUID } from "node:crypto";
 import type { Json } from "@/lib/db/database.types";
 import { getSupabase, type Db, type Row } from "@/lib/db/client";
 import { decodeOnboarding } from "./onboarding";
-import {
-  INQUIRY_ENGINE_VERSION,
-  type ActionReceipt,
-  type InquiryEngineState,
-  type InquiryTimelineEvent,
-  type LivePublishResult,
-  type ReceiptActor,
-  type ResponsibilityActionReceipt,
-  type InquiryRecordStatus,
-} from "./contracts";
+import { INQUIRY_ENGINE_VERSION, type ActionReceipt, type InquiryEngineState, type InquiryTimelineEvent, type ReceiptActor, type ResponsibilityActionReceipt, type InquiryRecordStatus } from "./contracts";
 
 export const INQUIRY_SCHEMA_VERSION = INQUIRY_ENGINE_VERSION;
 export const INQUIRY_PUBLISH_EVENT_KIND = "inquiry_capability_publish" as const;
@@ -119,11 +110,6 @@ export interface LinkPublicationEventInput {
   claimId: string;
   claimToken: string;
   governanceEventId: string;
-}
-
-export interface ActionReceiptInput {
-  tenantId: string;
-  receipt: ActionReceipt;
 }
 
 /** Non-PII status/assignment metadata for Redis-authoritative lead records. */
@@ -900,16 +886,6 @@ export function getInquiryRepository(): InquiryRepository {
     return localRepository;
   }
   throw new InquiryPersistenceError("The inquiry workspace durable store is unavailable.");
-}
-
-/** Keep provider outcomes available without making an accepted write retryable. */
-export function acceptedMarkerFromPublishResult(result: LivePublishResult):
-  | { accepted: true; acceptanceId: string; providerReceipt: JsonRecord | null }
-  | { accepted: false; reason: string; retryable: boolean } {
-  if (result.status === "accepted") {
-    return { accepted: true, acceptanceId: result.acceptanceId, providerReceipt: result.providerReceipt ?? null };
-  }
-  return { accepted: false, reason: result.error, retryable: result.retryable };
 }
 
 export const __private = { redactText, stable, digest, tokenHash, validateState, safeReceipt, durableState };

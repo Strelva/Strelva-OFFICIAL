@@ -113,5 +113,3 @@ export function createPublicWebsiteSourceAdapter(dependencies: PublicWebsiteSour
     },
   };
 }
-
-export type PublicWebsiteSourceAdapter = ReturnType<typeof createPublicWebsiteSourceAdapter>;

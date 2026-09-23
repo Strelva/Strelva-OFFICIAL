@@ -9,7 +9,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { getRedis } from "./redis";
-import type { ChatMessage, Thread } from "./conversation-types";
+import type { Thread } from "./conversation-types";
 
 export type { ChatMessage, Thread } from "./conversation-types";
 
@@ -49,19 +49,6 @@ async function writeDevThreads(
   threads: Record<string, Thread>
 ): Promise<void> {
   await fs.writeFile(DEV_THREADS_PATH(tenant), JSON.stringify(threads, null, 2));
-}
-
-/**
- * Generate a title from the first user message.
- * Truncates to 50 chars, or returns "New chat" if no user message.
- */
-export function generateThreadTitle(messages: ChatMessage[]): string {
-  const firstUserMessage = messages.find((m) => m.role === "user");
-  if (!firstUserMessage) return "New chat";
-
-  const content = firstUserMessage.content.trim();
-  if (content.length <= 50) return content;
-  return content.slice(0, 47) + "...";
 }
 
 // --- CRUD Operations ---

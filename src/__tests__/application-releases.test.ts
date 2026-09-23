@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { BoundedStore } from "@/platform/bounded-work/repository";
 import { WorkspaceAccessError, WorkspaceConflictError, type SavedWork, type WorkspaceActor } from "@/platform/workspaces/types";
 import { createApplicationService } from "@/products/applications/server";
@@ -202,5 +202,98 @@ describe("native application release and record clocks", () => {
     await expect(service.publish(owner, created.id, { expectedCandidateRevision: 3, expectedReleaseVersion: 1 })).rejects.toThrow(/rehearsal/i);
     expect((await service.readRuntime(member, created.id)).release.version).toBe(1);
     expect((await service.readRuntime(member, created.id)).records).toEqual([{ id: "r1", values: { priority: "standard", problem: "Loose hinge" } }]);
+  });
+});
+
+
+describe("application repository serialization", () => {
+  async function live(store: BoundedStore) {
+    const service = createApplicationService(store);
+    const created = await service.create(owner, "workspace-a", specV1);
+    await service.rehearse(owner, created.id, { expectedDesignRevision: created.payload.designRevision });
+    const published = await service.publish(owner, created.id, {
+      expectedCandidateRevision: created.payload.designRevision,
+      expectedReleaseVersion: null,
+    });
+    return { service, published };
+  }
+
+  it("serializes submissions across service instances sharing a store", async () => {
+    const store = applicationStore();
+    const { service, published } = await live(store);
+    const other = createApplicationService(store);
+    const results = await Promise.allSettled([service, other].map((writer, i) => writer.submit(member, published.id, {
+      expectedReleaseVersion: 1,
+      expectedRecordsRevision: 0,
+      record: { id: `request-${i}`, values: { problem: "Help" } },
+    })));
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const failed = results.find((result) => result.status === "rejected");
+    expect(failed?.status === "rejected" && failed.reason).toBeInstanceOf(WorkspaceConflictError);
+    const runtime = await other.readRuntime(member, published.id);
+    expect(runtime.records).toHaveLength(1);
+    expect(runtime.recordsRevision).toBe(1);
+  });
+
+  it("does not advance in-memory state after a persistence failure and releases the lane", async () => {
+    const store = applicationStore();
+    const { service, published } = await live(store);
+    const before = await service.read(owner, published.id);
+    const update = vi.spyOn(store, "update").mockRejectedValueOnce(new Error("Storage unavailable"));
+    try {
+      const input = {
+        expectedReleaseVersion: 1, expectedRecordsRevision: 0,
+        record: { id: "request-1", values: { problem: "Help" } },
+      };
+      await expect(service.submit(member, published.id, input)).rejects.toThrow("Storage unavailable");
+      expect(await service.read(owner, published.id)).toEqual(before);
+      const saved = await service.submit(member, published.id, input);
+      expect(saved.recordsRevision).toBe(1);
+      expect(saved.records).toHaveLength(1);
+    } finally {
+      update.mockRestore();
+    }
+  });
+
+  it("rejects publication when a queued submission no longer fits the rehearsed candidate", async () => {
+    const store = applicationStore();
+    const { service, published } = await live(store);
+    const revised = await service.revise(owner, published.id, {
+      expectedDesignRevision: published.payload.designRevision, spec: incompatibleSpec,
+    });
+    await service.rehearse(owner, published.id, { expectedDesignRevision: revised.payload.designRevision });
+    const started = Promise.withResolvers<void>();
+    const proceed = Promise.withResolvers<void>();
+    const submission = service.submit(member, published.id, {
+      expectedReleaseVersion: 1, expectedRecordsRevision: 0,
+      record: { id: "request-1", values: { problem: "Accepted by v1" } },
+    }, async () => {
+      started.resolve();
+      await proceed.promise;
+    });
+    await started.promise;
+    const publication = createApplicationService(store).publish(owner, published.id, {
+      expectedCandidateRevision: revised.payload.designRevision, expectedReleaseVersion: 1,
+    });
+    const rejected = expect(publication).rejects.toThrow("wrong type");
+    proceed.resolve();
+    await submission;
+    await rejected;
+    const runtime = await service.readRuntime(member, published.id);
+    expect(runtime.release.version).toBe(1);
+    expect(runtime.records).toEqual([{ id: "request-1", values: { problem: "Accepted by v1" } }]);
+  });
+
+  it("denies scoped authorization without changing records or blocking the next command", async () => {
+    const { service, published } = await live(applicationStore());
+    const input = {
+      expectedReleaseVersion: 1, expectedRecordsRevision: 0,
+      record: { id: "request-1", values: { problem: "Help" } },
+    };
+    await expect(service.submit(member, published.id, input, () => {
+      throw new WorkspaceAccessError();
+    })).rejects.toBeInstanceOf(WorkspaceAccessError);
+    expect((await service.readRuntime(member, published.id)).recordsRevision).toBe(0);
+    expect((await service.submit(member, published.id, input)).recordsRevision).toBe(1);
   });
 });

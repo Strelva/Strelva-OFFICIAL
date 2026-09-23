@@ -4,7 +4,7 @@ import type {
   BudgetExecutionEvidenceContext,
   BudgetExecutionEvidenceResolver,
   BudgetExecutionReconciliation,
-} from "./runtime";
+} from "./execution-contracts";
 
 /**
  * A provider receipt is deliberately stricter than model usage. Token counts,

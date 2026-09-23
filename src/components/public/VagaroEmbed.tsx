@@ -75,32 +75,3 @@ export function VagaroEmbed({ embedId, fallbackUrl }: VagaroEmbedProps) {
     </section>
   );
 }
-
-/**
- * Lightweight Vagaro popup button — opens Vagaro in a modal overlay.
- * Use this for inline CTAs instead of the full embedded widget.
- * Requires the popup widget script from Vagaro's dashboard.
- */
-export function VagaroPopupButton({
-  embedId,
-  label = "Book a Session",
-  className,
-}: {
-  embedId: string;
-  label?: string;
-  className?: string;
-}) {
-  const bookingUrl = `https://www.vagaro.com/${embedId}`;
-
-  return (
-    <a
-      href={bookingUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={className || "btn-primary"}
-      style={!className ? { background: "var(--sage)", color: "var(--pure-white)" } : undefined}
-    >
-      {label}
-    </a>
-  );
-}

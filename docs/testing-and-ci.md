@@ -29,6 +29,27 @@ both `.test.ts` and `.test.tsx` files under `src/__tests__`.
 
 `noUncheckedIndexedAccess` is ON in `tsconfig.json` (enabled 2026-07-30). Every array index and record key access is typed `T | undefined` — guard or provide a default. All 637 existing sites were fixed when the flag landed; keep it green. A new `arr[i]` or `record[key]` without a guard will fail typecheck.
 
+### Source ownership
+
+`pnpm check:boundaries` checks static imports, re-exports, literal dynamic imports,
+`require` calls, and type imports across current source and scripts, including
+untracked files. Product and platform direction rules remain in force.
+
+The domain check follows the complete local import graph from each product's
+`contracts.ts`, `domain.ts`, `engine.ts`, and `inquiry-engine.ts`, plus the named
+execution, budget, delivery-commitment, governance and risk cores in
+`scripts/domain-boundaries.ts`. A dependency hidden behind an intermediate helper
+or type re-export is still checked. Unresolved local modules and nonliteral module
+loads fail rather than disappearing from the graph. Domain roots allow Zod and
+the existing Node identity primitive, not provider SDKs, storage or presentation.
+Native application rules retain their narrower explicit dependency allowlist.
+This is import-boundary enforcement, not a proof that arbitrary code is pure.
+
+ESLint treats unused variables and imports as errors. Explicit underscore-prefixed
+parameters remain allowed for interface implementations. Unreferenced routes,
+public product entry points, fixtures, migration history, and deployed client
+contracts are not disposable just because an import search finds no callers.
+
 ## Playwright (`tests/*.spec.ts`) — two modes
 
 `pnpm smoke` runs `playwright test`. The webServer is `next dev` (see

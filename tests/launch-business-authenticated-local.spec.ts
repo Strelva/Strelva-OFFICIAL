@@ -67,6 +67,8 @@ for (const width of [1440, 390]) {
     let item=(await requested.json()).request;
     expect(item.businessId).toBe(businessId);expect(item.deliveryCommitment).toBeNull();
     const requestId=item.id;
+    const deliveryCard=page.getByRole("region",{name:"Strelva delivery",exact:true})
+      .locator(`a[href="/workspace/delivery/${requestId}"]`);
 
     // Synthetic local operator identity only. No production grants or bypass.
     expect((await admin.from("super_admins").insert({user_id:operator.userId,email:operator.email})).error).toBeNull();
@@ -83,7 +85,7 @@ for (const width of [1440, 390]) {
     await expect(operatorPage.getByText("Scope and terms need your acceptance",{exact:true})).toBeVisible();
     await page.goto(`/workspace?workspaceId=${businessId}`);
     await expect(page.getByRole("heading",{name:"Strelva delivery",exact:true})).toBeVisible();
-    await expect(page.locator(`a[href="/workspace/delivery/${requestId}"]`).first()).toBeVisible();
+    await expect(deliveryCard).toBeVisible();
     await page.goto(`/workspace/delivery/${requestId}`);
     await expect(page.getByRole("button",{name:"Propose 24-hour delivery",exact:true})).toHaveCount(0);
     const agreedResponse=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/service-requests/delivery"&&r.request().method()==="POST");
@@ -130,7 +132,7 @@ for (const width of [1440, 390]) {
     await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await page.screenshot({path:testInfo.outputPath(`delivery-${width}.png`),fullPage:true});
     await page.goto(`/workspace?workspaceId=${businessId}`);
-    await expect(page.getByText("Customer accepted this delivery",{exact:true})).toBeVisible();
+    await expect(deliveryCard.getByText("Customer accepted this delivery",{exact:true})).toBeVisible();
     await page.goto(`/workspace?workspaceId=${businessId}&work=${app.id}`);
     await expect(page.getByRole("heading",{name:"Team requests",exact:true,level:1})).toBeVisible();
     await expect(page.getByText(/Version 1 is live/)).toBeVisible();

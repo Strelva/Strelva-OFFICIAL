@@ -65,4 +65,47 @@ describe("product import boundaries", () => {
       import { route } from "@/lib/../app/page";
     `)).toHaveLength(1);
   });
+
+  it("keeps the native application domain independent of runtime adapters", () => {
+    expect(checkProductBoundaries("src/products/applications/domain.ts", `
+      import { getSupabase } from "@/lib/db/client";
+      export { service } from "./server";
+      const storage = import("./repository");
+      const crypto = require("node:crypto");
+      import type { Store } from "@/platform/bounded-work/repository";
+    `)).toHaveLength(5);
+    expect(checkProductBoundaries("src/products/applications/domain.ts", `
+      import type { z } from "zod";
+      import { applicationSchema } from "./contracts";
+      import { isApplicationDateOnly } from "./date-only";
+      import { WorkspaceConflictError } from "@/platform/workspaces/types";
+    `)).toEqual([]);
+  });
+
+  it("prevents runtime dependencies from entering through shared domain contracts", () => {
+    for (const file of [
+      "src/products/applications/contracts.ts",
+      "src/products/applications/date-only.ts",
+      "src/platform/bounded-work/contracts.ts",
+      "src/platform/workspaces/types.ts",
+    ]) {
+      expect(checkProductBoundaries(file, `
+        export { client } from "@/lib/db/client";
+      `)).toHaveLength(1);
+    }
+    expect(checkProductBoundaries("src/products/applications/contracts.ts", `
+      import { z } from "zod";
+      import { baseSchema } from "@/platform/bounded-work/contracts";
+    `)).toEqual([]);
+  });
+
+  it("normalizes Windows file paths before applying boundaries", () => {
+    expect(checkProductBoundaries("src\\products\\applications\\domain.ts", `
+      import { storage } from "./repository";
+    `)).toHaveLength(1);
+    expect(checkProductBoundaries("./src/products/applications/domain.ts", `
+      import { route } from "../../app/page";
+    `)).toHaveLength(1);
+  });
+
 });

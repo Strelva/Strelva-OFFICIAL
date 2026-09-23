@@ -23,14 +23,6 @@ import { getRedis } from "@/lib/redis";
 
 export type AccountStatus = "active" | "paused" | "churned";
 
-export interface AccountContact {
-  id: string;
-  name: string;
-  email?: string;
-  phone?: string;
-  role?: string;
-}
-
 /** A line item on the account's bundled subscription, mapped to one site. */
 export interface AccountSubscriptionItem {
   tenantId: string;

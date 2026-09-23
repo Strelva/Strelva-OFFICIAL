@@ -73,7 +73,6 @@ export const FEATURE_SETS: Record<string, FeatureSetDef> = {
     scope: "Store evidence: catalog visibility, orders, revenue, and best sellers.",
   },
 };
-export type FeatureSetId = keyof typeof FEATURE_SETS;
 /** Compatibility export for existing callers. New domain language should use
  * FEATURE_SETS so a bundle is not confused with an individual capability. */
 export const SETS = FEATURE_SETS;

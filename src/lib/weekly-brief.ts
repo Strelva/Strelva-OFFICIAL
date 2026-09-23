@@ -391,16 +391,6 @@ function isOwnerLegibleActivity(a: { text: string; actor?: string; type?: string
   return typeof a.text === "string" && a.text.trim().length > 0 && !SYSTEM_ACTIVITY_PATTERN.test(a.text);
 }
 
-/**
- * Read-time guard for a stored brief line (a highlight string). Briefs generated
- * before the highlight filter shipped can still carry an infra line like "Cache
- * invalidation: hero change triggered revalidation" — filtering on display keeps
- * that jargon off existing clients' dashboards immediately, not just on regen.
- */
-export function isOwnerLegibleHighlight(text: string): boolean {
-  return typeof text === "string" && text.trim().length > 0 && !SYSTEM_ACTIVITY_PATTERN.test(text);
-}
-
 export function buildHighlights(
   stats: WeeklyBriefStats,
   events: Array<{ type: string; title: string }>,

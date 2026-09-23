@@ -267,11 +267,9 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
   it("normalizes invite emails before access assignment", () => {
     const invite = readFileSync(path.join(process.cwd(), "src/app/api/admin/invites/route.ts"), "utf8");
     const assign = readFileSync(path.join(process.cwd(), "src/app/api/admin/tenants/assign/route.ts"), "utf8");
-    // Owner invites are sent from the client detail page's TenantEditor access
-    // card (resendOwnerInvite → /api/admin/invites). The shared InviteButton
-    // component is still used on other admin surfaces.
+    // Verify the active client access card, not retired modal implementations.
     const tenantEditor = readFileSync(path.join(process.cwd(), "src/app/admin/clients/[id]/TenantEditor.tsx"), "utf8");
-    const inviteButton = readFileSync(path.join(process.cwd(), "src/app/admin/InviteButton.tsx"), "utf8");
+    const operatorConsole = readFileSync(path.join(process.cwd(), "src/app/admin/OperatorConsole.tsx"), "utf8");
 
     for (const source of [invite, assign]) {
       expect(source).toContain("normalizeEmail");
@@ -311,18 +309,11 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(tenantEditor).toContain("resendOwnerInvite");
     expect(tenantEditor).toContain('fetch("/api/admin/invites"');
     expect(tenantEditor).toContain('role: "owner"');
-    expect(inviteButton).toContain('fetch("/api/admin/invites"');
-    expect(inviteButton).toContain("Access is assigned to this exact email on signup");
-    expect(inviteButton).toContain("signUpUrl?: string");
-    expect(inviteButton).toContain("data.signUpUrl");
-    expect(inviteButton).toContain("Open manual signup link");
-    expect(inviteButton).toContain("Share this link only with");
-    expect(inviteButton).toContain("navigator.clipboard.writeText");
-    expect(inviteButton).toContain("Copy failed. Select the manual signup link above.");
-    expect(inviteButton).toContain("Copy signup link");
-    expect(inviteButton).toContain('role="dialog"');
-    expect(inviteButton).toContain('htmlFor="invite-email"');
-    expect(inviteButton).toContain('role="status"');
+    expect(tenantEditor).toContain("form.ownerEmail.trim()");
+    expect(tenantEditor).toContain("data.emailSent === false");
+    expect(tenantEditor).toContain("data.signUpUrl");
+    expect(tenantEditor).toContain('if (!res.ok) throw new Error(data.error');
+    expect(operatorConsole).toContain('send_invite: { endpoint: "/api/admin/invites", method: "POST" }');
   });
 
   it("normalizes admin tenant setup request bodies", () => {

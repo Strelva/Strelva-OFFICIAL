@@ -1,5 +1,4 @@
-/** Browser-local draft continuity. A draft is never authority to execute work. */
-export const REQUEST_DRAFT_EVENT = "strelva:request-draft";
+
 const PREFIX = "strelva:request-draft:v1:";
 const MAX_REQUEST_LENGTH = 3_000;
 

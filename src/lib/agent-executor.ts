@@ -61,20 +61,6 @@ const PROMPT_CACHE_TTL_SECONDS = 60;
 // route, which builds its own prompt) skips the N section reads on a Redis hit.
 const promptCacheKey = (tenant: string) => `reb:prompt-cache:${tenant}`;
 
-/** Test/manual hook to drop cached prompts. */
-export async function clearAgentPromptCache(tenant?: string): Promise<void> {
-  if (tenant) promptCache.delete(tenant);
-  else promptCache.clear();
-  const redis = getRedis();
-  if (!redis) return;
-  try {
-    if (tenant) await redis.del(promptCacheKey(tenant));
-    // No wildcard delete: per-tenant keys expire on their own 60s TTL.
-  } catch {
-    // best-effort cache clear
-  }
-}
-
 async function buildSystemPrompt(
   tenant: string,
   capFragment: string

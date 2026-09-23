@@ -457,5 +457,3 @@ export function createWorkspaceStartContinuation(
     ...(selections.trackerTemplateId ? { trackerTemplateId: selections.trackerTemplateId } : {}),
   };
 }
-
-export const createWorkspaceStartPlan = planWorkspaceStart;
