@@ -216,22 +216,20 @@ Text elements with `[data-reb-field]` inside `[data-reb-section]` become `conten
 
 ### AI access from the editor
 
-There is no standalone "AI tab" in `PropertiesEditor`. The right panel has `"properties"` and `"chat"` tabs (state in `DashboardContext` → `rightTab`). AI actions in `PropertiesEditor` are shortcut buttons that open the chat tab (`setRightTab("chat")`) with a pre-filled prompt for the selected section (e.g., "Update my comparison table"). The chat experience itself is `ChatPanel` — the same panel used from the Ask Strelva nav surface. `AgentTrace` streams tool call steps while the AI is working. `AgentPreview` shows proposed diffs for approve/reject.
+There is no standalone "AI tab" in `PropertiesEditor`. The right panel has `"properties"` and `"chat"` tabs (state in `DashboardContext` → `rightTab`). AI actions in `PropertiesEditor` are shortcut buttons that open the chat tab (`setRightTab("chat")`) with a pre-filled prompt for the selected section (e.g., "Update my comparison table"). The chat experience itself is `ChatPanel` — the same panel used from the Ask Strelva nav surface. `ChatPanel` owns conversation streaming and renders tool results through `ToolOutput`; pending approvals use `QueuePage` and the existing governed event path. The unused standalone trace and dismiss-only preview components have been removed. Closing a preview is not publication authority.
 
 ## Known Limitations
 
-1. **`AgentPreview` approve does not persist changes.** Approving an AI preview in `AgentPreview` clears the preview UI but does not call the content API — changes are not saved. Marked TODO in the code.
+1. **No undo/redo.** Content edits (inline or via properties panel) are immediately sent to the API. There is no client-side undo stack. The governed `undo_last_change` agent tool restores the previous section version through the approval queue, but that is an AI tool, not a client-side undo.
 
-2. **No undo/redo.** Content edits (inline or via properties panel) are immediately sent to the API. There is no client-side undo stack. The governed `undo_last_change` agent tool restores the previous section version through the approval queue, but that is an AI tool, not a client-side undo.
+2. **No drag-and-drop section reordering.** `SectionsRail` has up/down reorder controls; no drag-and-drop.
 
-3. **No drag-and-drop section reordering.** `SectionsRail` has up/down reorder controls; no drag-and-drop.
+3. **iframe origin fallback.** `EditModeOverlay` uses a first-message handshake to establish the trusted parent origin (the first `reb-edit-mode` message origin is captured as `trustedOriginRef`). If the referrer is unavailable before the first message, the origin is `"*"` as fallback on outgoing replies. (This is a code-comment note in `EditModeOverlay.tsx`.)
 
-4. **iframe origin fallback.** `EditModeOverlay` uses a first-message handshake to establish the trusted parent origin (the first `reb-edit-mode` message origin is captured as `trustedOriginRef`). If the referrer is unavailable before the first message, the origin is `"*"` as fallback on outgoing replies. (This is a code-comment note in `EditModeOverlay.tsx`.)
+4. **iframe does not validate incoming message origins before handshake.** Before the first `reb-edit-mode` message is received, `EditModeOverlay` trusts messages from any origin. After handshake, it validates against `trustedOriginRef`. The pre-handshake window is small.
 
-5. **iframe does not validate incoming message origins before handshake.** Before the first `reb-edit-mode` message is received, `EditModeOverlay` trusts messages from any origin. After handshake, it validates against `trustedOriginRef`. The pre-handshake window is small.
+5. **Context menu UI not implemented.** `reb-context-menu` is sent from the iframe; no floating menu is rendered in the dashboard.
 
-6. **Context menu UI not implemented.** `reb-context-menu` is sent from the iframe; no floating menu is rendered in the dashboard.
+6. **Page paths list is code-defined.** `SitePreview.tsx` exports a `PAGE_PATHS` constant (`home`, `services`, `about`, `contact`, `events`, `faq`, `providers`, `shop`). It is not derived from the live site's actual routing — pages outside this list require a manual URL entry.
 
-7. **Page paths list is code-defined.** `SitePreview.tsx` exports a `PAGE_PATHS` constant (`home`, `services`, `about`, `contact`, `events`, `faq`, `providers`, `shop`). It is not derived from the live site's actual routing — pages outside this list require a manual URL entry.
-
-8. **Rect measurements and iframe scale.** `SitePreview` supports zoom via breakpoint width controls (Mobile/Tablet/Desktop/Fluid). Overlay measurements from the iframe use the iframe's coordinate space; when the iframe is scaled by CSS the overlay positions may drift.
+7. **Rect measurements and iframe scale.** `SitePreview` supports zoom via breakpoint width controls (Mobile/Tablet/Desktop/Fluid). Overlay measurements from the iframe use the iframe's coordinate space; when the iframe is scaled by CSS the overlay positions may drift.

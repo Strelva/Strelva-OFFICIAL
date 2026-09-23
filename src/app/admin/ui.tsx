@@ -1,10 +1,6 @@
 "use client";
 
-/**
- * Shared admin form primitives. Before this, onboard/pay-links/TenantEditor (and
- * the off-token CreateTenantForm/InviteButton) each reimplemented their own
- * label+input. These are the canonical, token-clean building blocks.
- */
+/** Shared, token-based admin form primitives for onboarding, pay links, and client access. */
 
 import { useId, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";

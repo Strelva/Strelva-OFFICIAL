@@ -10,6 +10,24 @@ export interface BoundaryViolation {
 
 const PRODUCT_ENTRIES = new Set(["index", "contracts", "server", "client"]);
 
+// This migrated domain and its transitive local dependencies stay independent
+// of storage and UI. Checking the contracts too prevents a server re-export
+// from becoming an indirect dependency of otherwise clean domain code.
+const APPLICATION_DOMAIN_MODULES = new Set([
+  "src/products/applications/domain",
+  "src/products/applications/contracts",
+  "src/products/applications/date-only",
+  "src/platform/bounded-work/contracts",
+  "src/platform/workspaces/types",
+]);
+
+function applicationDomainReason(file: string, target: string | null, specifier: string): string | null {
+  const modulePath = file.replace(/\.(?:[cm]?[jt]sx?)$/, "");
+  if (!APPLICATION_DOMAIN_MODULES.has(modulePath)) return null;
+  if (specifier === "zod" || (target && APPLICATION_DOMAIN_MODULES.has(target))) return null;
+  return "Native application rules and their contracts cannot depend on runtime adapters. Keep storage, providers, and presentation outside the domain.";
+}
+
 function localTarget(file: string, specifier: string): string | null {
   const target = specifier.startsWith("@/")
     ? `src/${specifier.slice(2)}`
@@ -42,6 +60,7 @@ function boundaryReason(file: string, target: string): string | null {
 
 /** Check static imports, re-exports, literal dynamic imports, and require calls. */
 export function checkProductBoundaries(file: string, source: string): BoundaryViolation[] {
+  file = path.posix.normalize(file.replaceAll("\\", "/"));
   const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
   const violations: BoundaryViolation[] = [];
   function inspect(node: ts.Node): void {
@@ -60,7 +79,7 @@ export function checkProductBoundaries(file: string, source: string): BoundaryVi
     }
     if (literal && ts.isStringLiteralLike(literal)) {
       const target = localTarget(file, literal.text);
-      const reason = target && boundaryReason(file, target);
+      const reason = applicationDomainReason(file, target, literal.text) ?? (target && boundaryReason(file, target));
       if (reason) {
         violations.push({
           file,

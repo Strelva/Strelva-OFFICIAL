@@ -94,3 +94,32 @@ The partner experiment stays specified in
 
 These checks establish this extraction's local compatibility, not general-user
 adoption or a working account-owned public conversation.
+
+
+## September 22 native application cleanup
+
+The public `src/products/applications/server.ts` entry and existing wire contracts
+are unchanged. Native applications now have three implementation owners:
+
+| Owner | Responsibility |
+| --- | --- |
+| `domain.ts` | Candidate and release state, record validation, rehearsal checks, and deterministic revise/publish/rollback transitions. Publication time and actor are inputs, not ambient authority. |
+| `repository.ts` | Canonical Postgres reads/RPC error translation, compatibility payload projection, and explicitly injected memory storage with per-store/per-application serialization. Missing production storage still fails closed. |
+| `server.ts` | Authorized use cases, scoped assignment entry, native RPC dispatch, and the retained legacy command adapter. Membership and accepted grants remain distinct from domain validity. |
+
+The import checker guards the domain's local dependency closure, including its
+shared contracts. Pure transitions return a new state; failed transitions do not
+mutate the caller's state. Publication still revalidates records under the same
+memory lane as submissions. Live Postgres transitions retain their existing
+transactional RPC authority. No schema, key, route, release flag, or customer
+agreement changed.
+
+Six UI files had no application callers: `CommandTrigger`, `CreateTenantForm`,
+`InviteButton`, `AgentPreview`, `AgentTrace`, and `LayoutPanel`. They were removed,
+not replaced. The active client access card, operator invite endpoint, onboarding
+route, conversation panel, and governed approval path remain. The invite source
+regression now targets those active callers; historical evidence is retained.
+
+This cleanup does not migrate the remaining legacy application command rules,
+all other product services, or the managed website control plane to pure domain
+models. Those boundaries require their own behavior-preserving extraction.

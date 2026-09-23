@@ -22,8 +22,7 @@ interface ProvisionResult {
   clientEnv: Record<string, string>;
 }
 
-// Full 20-vertical list — kept in sync with scripts/provision-tenant.ts VALID_INDUSTRIES
-// and src/app/admin/CreateTenantForm.tsx INDUSTRIES.
+// Full 20-vertical list — kept in sync with scripts/provision-tenant.ts VALID_INDUSTRIES.
 const INDUSTRIES = [
   "wellness", "food-brand", "restaurant", "trades", "professional", "fashion-stylist",
   "medical", "ecommerce", "retail", "home-services", "automotive", "beauty",
