@@ -31,14 +31,14 @@ export interface WorkspaceStartProps {
 }
 
 const EXAMPLES = [
-  { label: "Create a staff request app", request: "Create a staff request app for our team.", icon: Table2 },
-  { label: "Organize onboarding", request: "Organize supplier onboarding requirements.", icon: FileText },
-  { label: "Have Strelva build my website", request: "Have Strelva build a website for my business.", icon: Globe2 },
-  { label: "Handle customer inquiries", request: "We need a better way to handle customer inquiries and follow up when nobody replies.", icon: MessageSquareText },
-  { label: "Turn a file into a tracker", request: "Turn my spreadsheet into a tracker I can filter and keep up to date.", icon: Table2 },
-  { label: "Check a business", request: "Help me see what AI can understand about my business.", icon: FileSearch },
-  { label: "Improve my website", request: "I want to improve a page on my website and review the change before it goes live.", icon: Globe2 },
-  { label: "Draft a private document", request: "Draft a private procedure my team can use and keep a history of changes.", icon: FileText },
+  { label: "Give staff one place to make requests", request: "Give my team a better way to submit and track requests.", icon: Table2 },
+  { label: "Make supplier onboarding consistent", request: "Make supplier onboarding consistent and easy to keep up to date.", icon: FileText },
+  { label: "Get a new website live", request: "Have Strelva build a website for my business.", icon: Globe2 },
+  { label: "Stop customer inquiries being missed", request: "Make sure customer inquiries are captured and followed up when nobody replies.", icon: MessageSquareText },
+  { label: "Make this spreadsheet operational", request: "Turn my spreadsheet into something my team can use and keep up to date.", icon: Table2 },
+  { label: "See what AI understands about us", request: "Help me see what AI can understand about my business.", icon: FileSearch },
+  { label: "Make our website work better", request: "Improve our website based on what customers need, and let me review the change before it goes live.", icon: Globe2 },
+  { label: "Give the team a procedure that stays current", request: "Create a private procedure my team can use and keep current as the process changes.", icon: FileText },
 ] as const;
 
 function renderPlanIcon(route: WorkspaceStartPlan["route"]): ReactNode {
@@ -172,14 +172,14 @@ export function WorkspaceStart({ context, initialRequest = "", draftKey, onTempl
   return <div className={styles.startPage} data-workspace-start>
     <header className={styles.startHeader}>
       <p className={styles.eyebrow}>New work</p>
-      <h1>What does your business need?</h1>
-      <p>Describe the result in your own words. You can review what Strelva proposes before any work starts.</p>
+      <h1>What should happen next?</h1>
+      <p>Describe the outcome in your own words. Strelva will shape the right interface, workflow, or work from there.</p>
     </header>
 
-    <div className="mt-6"><WorkspaceComposer key={composerSeed} initialRequest={composerSeed} draftKey={draftKey} disabled={context.readOnly} autoFocus={!plan} onTemplates={onTemplates} onSubmit={submit} onChange={request => { setPlan(null); setError(""); onDraftChange?.(request); }} placeholder="Describe an app, a change, or something you need done…" /></div>
+    <div className="mt-6"><WorkspaceComposer key={composerSeed} initialRequest={composerSeed} draftKey={draftKey} disabled={context.readOnly} autoFocus={!plan} onTemplates={onTemplates} onSubmit={submit} onChange={request => { setPlan(null); setError(""); onDraftChange?.(request); }} placeholder="What do you want Strelva to make happen?" /></div>
 
     <section className={styles.startExamples} aria-labelledby={`${formId}-examples`}>
-      <div className={styles.startSectionHeading}><h2 id={`${formId}-examples`}>Try an example</h2><span>Optional</span></div>
+      <div className={styles.startSectionHeading}><h2 id={`${formId}-examples`}>Example outcomes</h2><span>Optional</span></div>
       <div className={styles.startExampleList}>{EXAMPLES.map(({ label, request: exampleRequest, icon: ExampleIcon }) => <Button key={label} type="button" variant="ghost" className={styles.startExample} onClick={() => chooseExample(exampleRequest)}><ExampleIcon size={16} aria-hidden="true" /><span>{label}</span><ArrowRight size={14} aria-hidden="true" /></Button>)}</div>
     </section>
 

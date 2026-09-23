@@ -61,7 +61,7 @@ test("a visible request edit replaces the previously submitted request across to
   await page.getByRole("button", { name: "Continue with this request", exact: true }).click();
   const edited = "Organize supplier onboarding.\n- Insurance certificate\n- Signed agreement";
   await page.getByLabel("What do you want to accomplish?", { exact: true }).fill(edited);
-  await page.getByRole("button", { name: "Apps & templates", exact: true }).click();
+  await page.getByRole("button", { name: "Browse examples", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.getByRole("button", { name: "Onboarding: Start", exact: true }).click();
   await page.getByRole("button", { name: "Get started", exact: true }).click();

@@ -126,9 +126,10 @@ describe("workspace start planner", () => {
     const noBusiness = planWorkspaceStart("Handle our customer inquiries.", context({ inquiryBusinesses: [] }));
     expect(noBusiness.reason).toContain("No business scope");
 
-    const unavailableSite = planWorkspaceStart("Improve my website.", context({ managedWorkUnavailable: true, managedSites: [] }));
+    const unavailableSite = planWorkspaceStart("Make our website work better.", context({ managedWorkUnavailable: true, managedSites: [] }));
     expect(unavailableSite).toMatchObject({ route: "website", status: "blocked" });
     expect(unavailableSite.reason).toContain("temporarily unavailable");
+    expect(planWorkspaceStart("Create my website.", context()).route).toBe("websites");
   });
 
   it("routes unknown intent to scoped help", () => {
@@ -184,15 +185,15 @@ describe("workspace start planner", () => {
       onHelp: () => undefined,
     }));
     expect(html).toContain("data-workspace-start");
-    expect(html).toContain("What does your business need?");
-    expect(html).toContain("Create a staff request app");
-    expect(html).toContain("Organize onboarding");
-    expect(html).toContain("Have Strelva build my website");
+    expect(html).toContain("What should happen next?");
+    expect(html).toContain("Give staff one place to make requests");
+    expect(html).toContain("Make supplier onboarding consistent");
+    expect(html).toContain("Get a new website live");
     expect(html).toContain("Continue with this request");
-    expect(html).toContain("Handle customer inquiries");
-    expect(html).toContain("Turn a file into a tracker");
-    expect(html).toContain("Check a business");
-    expect(html).toContain("Improve my website");
+    expect(html).toContain("Stop customer inquiries being missed");
+    expect(html).toContain("Make this spreadsheet operational");
+    expect(html).toContain("See what AI understands about us");
+    expect(html).toContain("Make our website work better");
     expect(html).not.toContain("general AI task");
   });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ArrowRight, Bell, FileText, Globe2, LayoutGrid, Plus, Workflow } from "lucide-react";
+import { ArrowRight, Bell, FileText, Globe2, LayoutGrid, Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { StrelvaShell, type StrelvaSection } from "@/experience/app-frame/StrelvaShell";
 import type { OfferingWebsiteBinding, OfferingWebsiteBindingCommand } from "@/platform/offerings";
@@ -57,10 +57,14 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   const deliveryItems = deliveries.state.status === "ready" ? deliveries.state.items : [];
   const deliveryAttention = deliveryItems.filter(item => item.attention);
   const attentionCount = home.attention.length + deliveryAttention.length;
+  const savedResultCount = home.results.length;
+  const availableWorkCount = savedResultCount + sites.length;
   const deliveryPending = deliveries.state.status === "loading";
   const deliveryUnavailable = deliveries.state.status === "error";
   const workHref = (id: string) => `${appBase}/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&work=${encodeURIComponent(id)}`;
   const searchItems: WorkspaceSearchItem[] = [
+    { id: "action-new", title: "Start with an outcome", detail: "Tell Strelva what you want to make happen", href: `${appBase}/workspace?view=start&workspaceId=${encodeURIComponent(snapshot.workspaceId)}`, onOpen: onStart },
+    { id: "action-explore", title: "Browse examples", detail: "Apps and templates you can adapt", href: `${appBase}/workspace?view=products&workspaceId=${encodeURIComponent(snapshot.workspaceId)}`, onOpen: onExplore },
     ...snapshot.work.map(work => ({ id: work.id, title: work.title, detail: workspaceWorkLabel(work), href: workHref(work.id), onOpen: () => onOpen(work.id) })),
     ...sites.map(site => ({ id: `site-${site.id}`, title: site.title, detail: "Managed website", href: site.href })),
     ...deliveryItems.map(item => ({ id: `delivery-${item.id}`, title: item.title, detail: item.detail, href: item.href })),
@@ -85,14 +89,22 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
     businessContext={<label><span className={styles.srOnly}>Current workspace</span><select aria-label="Current workspace" value={snapshot.workspaceId} disabled={busy} onChange={event => onWorkspace(event.target.value)}>{snapshot.workspaces.map(workspace => <option key={workspace.id} value={workspace.id}>{workspace.name}{workspace.access === "delegated_read" ? " · Read-only" : ""}</option>)}</select></label>}>
     <div className={styles.home} aria-busy={busy || undefined}>
       <section className={styles.start} aria-labelledby="business-start-title">
-        <header className={styles.greeting}><p>{readOnly ? "Shared with you" : name}</p><h1 id="business-start-title" className="font-display">{readOnly ? "Your shared work." : "What would you like to do?"}</h1>{readOnly ? <p>Review work shared by {name}. Only its owners can make changes.</p> : null}</header>
+        <header className={styles.greeting}>
+          <p>{readOnly ? "Shared workspace" : name}</p>
+          <h1 id="business-start-title" className="font-display">{readOnly ? "Review what was shared." : "What should happen next?"}</h1>
+          <p>{readOnly ? `Only ${name} owners can make changes.` : "Start with the outcome. You do not need to pick a feature first."}</p>
+        </header>
         {!readOnly ? <>
-          <WorkspaceComposer key={`${snapshot.actor.email}:${snapshot.workspaceId}`} draftKey={requestDraftKey({ actorEmail: snapshot.actor.email, workspaceId: snapshot.workspaceId })} disabled={busy} onSubmit={request} onEdited={onDraftChange} onTemplates={onExplore} placeholder="Describe an app, a change, or something you need done…" />
-          <div className={styles.starters} aria-label="Start with an example">
-            <Button variant="ghost" size="sm" disabled={busy} onClick={onExplore}><LayoutGrid size={16} aria-hidden="true" />Create an app</Button>
-            <Button variant="ghost" size="sm" disabled={busy} onClick={() => request("Organize supplier onboarding requirements.")}><FileText size={16} aria-hidden="true" />Organize onboarding</Button>
-            <Button variant="ghost" size="sm" disabled={busy} onClick={() => request("Have Strelva build our website.")}><Globe2 size={16} aria-hidden="true" />Have Strelva build a website</Button>
-            <Button variant="ghost" size="sm" disabled={busy} onClick={() => request("Set up an ongoing responsibility for our business.")}><Workflow size={16} aria-hidden="true" />Set up ongoing work</Button>
+          <WorkspaceComposer key={`${snapshot.actor.email}:${snapshot.workspaceId}`} draftKey={requestDraftKey({ actorEmail: snapshot.actor.email, workspaceId: snapshot.workspaceId })} disabled={busy} onSubmit={request} onEdited={onDraftChange} onTemplates={onExplore} placeholder="What do you want Strelva to make happen?" />
+          <div className={styles.contextLine} aria-label="Current Strelva context">
+            <span>Working in <strong>{name}</strong></span>
+            {savedResultCount ? <span>{savedResultCount} saved {savedResultCount === 1 ? "result" : "results"}</span> : null}
+            {sites.length ? <span>{sites.length} connected {sites.length === 1 ? "website" : "websites"}</span> : null}
+          </div>
+          <div className={styles.starters} aria-label="Try asking Strelva">
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => request("Give my team a better way to submit and track requests.")}>Give my team a better way to request things</Button>
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => request("Make sure customer follow-up does not fall through.")}>Fix customer follow-up</Button>
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => request("Improve our website based on what customers need.")}>Improve our website</Button>
           </div>
         </> : null}
       </section>
@@ -100,7 +112,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
       {managedWorkUnavailable ? <p role="status" className={styles.notice}>Some websites could not be loaded. <a href={accountHref}>Check website access</a></p> : null}
 
       <section className={styles.section} aria-labelledby="home-attention">
-        <header className={styles.sectionHeader}><h2 id="home-attention"><Bell size={18} aria-hidden="true" />Needs your attention</h2>{!busy && !deliveryPending && attentionCount > 0 ? <span className={styles.count}>{attentionCount}</span> : null}</header>
+        <header className={styles.sectionHeader}><h2 id="home-attention"><Bell size={18} aria-hidden="true" />Needs you</h2>{!busy && !deliveryPending && attentionCount > 0 ? <span className={styles.count}>{attentionCount}</span> : null}</header>
         {busy || deliveryPending ? <p role="status" className={styles.muted}>Checking your work…</p> : attentionCount ? <ul className={styles.list}>
           {deliveryAttention.map(item => <li key={`delivery-${item.id}`}><a className={styles.row} href={item.href}><span><strong>{item.title}</strong><small>{item.detail}</small></span><ArrowRight size={16} aria-hidden="true" /></a></li>)}
           {home.attention.map(({ work, reason }) => <li key={work.id}><button type="button" aria-label={`Open ${work.title}`} className={styles.row} onClick={() => onOpen(work.id)}><span><strong>{work.title}</strong><small>{reason}</small></span><ArrowRight size={16} aria-hidden="true" /></button></li>)}
@@ -109,15 +121,15 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
       </section>
 
       <section className={styles.section} aria-labelledby="home-work">
-        <header className={styles.sectionHeader}><h2 id="home-work">Your apps and work</h2><Button variant="ghost" size="sm" onClick={onWork}>View all{home.results.length + sites.length ? ` (${home.results.length + sites.length})` : ""}<ArrowRight size={16} aria-hidden="true" /></Button></header>
+        <header className={styles.sectionHeader}><h2 id="home-work">Continue</h2><Button variant="ghost" size="sm" onClick={onWork}>View all{availableWorkCount ? ` (${availableWorkCount})` : ""}<ArrowRight size={16} aria-hidden="true" /></Button></header>
         {busy ? <p role="status" className={styles.muted}>Loading saved work…</p> : sites.length || home.results.length ? <ul className={styles.list}>
           {sites.map(site => <li key={`site-${site.id}`}><a href={site.href} className={styles.row}><Globe2 size={18} aria-hidden="true" /><span><strong>{site.title}</strong><small>Managed website</small></span><ArrowRight size={16} aria-hidden="true" /></a></li>)}
           {home.results.slice(0, 6).map(work => <li key={work.id}><button type="button" aria-label={`Open ${work.title}`} className={styles.row} onClick={() => onOpen(work.id)}>{work.productId === "applications" ? <LayoutGrid size={18} aria-hidden="true" /> : <FileText size={18} aria-hidden="true" />}<span><strong>{work.title}</strong><small>{workspaceWorkLabel(work)}</small></span><ArrowRight size={16} aria-hidden="true" /></button></li>)}
-        </ul> : <div className={styles.empty}><LayoutGrid size={24} aria-hidden="true" /><div><h3>{readOnly ? "No saved work has been shared here yet." : "Start with something you can use."}</h3><p>{readOnly ? "Shared apps, documents, and results will appear here." : "Choose an app template or describe what your business needs. No website purchase is required."}</p></div>{!readOnly ? <Button variant="secondary" onClick={onExplore}><Plus size={16} aria-hidden="true" />Browse apps &amp; templates</Button> : null}</div>}
+        </ul> : <div className={styles.empty}><LayoutGrid size={24} aria-hidden="true" /><div><h3>{readOnly ? "Nothing has been shared here yet." : "No saved result yet."}</h3><p>{readOnly ? "Shared work will appear here." : "Describe the outcome above. Strelva will show you what it can create or handle."}</p></div>{!readOnly ? <Button variant="secondary" onClick={onExplore}><Plus size={16} aria-hidden="true" />Browse examples</Button> : null}</div>}
         {!readOnly && onCreateWebsite ? <button type="button" className={styles.textAction} disabled={busy} onClick={onCreateWebsite}>Prefer to build a website yourself? Start a private draft.<ArrowRight size={16} aria-hidden="true" /></button> : null}
       </section>
 
-      {deliveryScope && deliveryItems.length ? <section className={styles.section} aria-labelledby="home-deliveries"><header className={styles.sectionHeader}><h2 id="home-deliveries">Strelva delivery</h2><a className={styles.textAction} href={`/workspace/delivery?businessId=${encodeURIComponent(deliveryScope)}`}>View all<ArrowRight size={16} /></a></header><ul className={styles.list}>{deliveryItems.slice(0, 5).map(item => <li key={item.id}><a className={styles.row} href={item.href}><span><strong>{item.title}</strong><small>{item.detail}</small></span><ArrowRight size={16} aria-hidden="true" /></a></li>)}</ul></section> : null}
+      {deliveryScope && deliveryItems.length ? <section className={styles.section} aria-labelledby="home-deliveries"><header className={styles.sectionHeader}><h2 id="home-deliveries">Strelva is handling</h2><a className={styles.textAction} href={`/workspace/delivery?businessId=${encodeURIComponent(deliveryScope)}`}>View all<ArrowRight size={16} /></a></header><ul className={styles.list}>{deliveryItems.slice(0, 5).map(item => <li key={item.id}><a className={styles.row} href={item.href}><span><strong>{item.title}</strong><small>{item.detail}</small></span><ArrowRight size={16} aria-hidden="true" /></a></li>)}</ul></section> : null}
 
       {unassignedSites.length ? <details className={styles.details} aria-label="Websites available to your account"><summary>Websites available to your account <span>{unassignedSites.length}</span></summary><p className={styles.muted}>{current?.kind !== "customer" ? "These websites are available through your account. Assign them from the appropriate customer business." : siteAssignmentsKnown ? "These websites are not yet assigned to this business." : "Business assignments could not be confirmed."}</p>{current?.kind !== "customer" ? <ul className={styles.list}>{unassignedSites.map(site => <li key={site.id}><a className={styles.row} href={site.href}><span><strong>{site.title}</strong><small>Account-authorized website</small></span><ArrowRight size={16} /></a></li>)}</ul> : <WebsiteAssignmentHandoff businessName={name} state={managedWorkUnavailable ? { status: "unavailable", reason: "Linked website access is unavailable right now." } : offerings} sites={unassignedSites} onRetry={onRetryWebsiteAssignments} onCommand={onWebsiteCommand} />}</details> : null}
 

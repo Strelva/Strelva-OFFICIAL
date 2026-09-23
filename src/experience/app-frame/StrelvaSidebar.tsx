@@ -78,7 +78,7 @@ export function StrelvaSidebar({ active, appBase = "", workspaceId, accountName,
       <div className={styles.utilities} aria-label="Workspace utilities">
         {onStart ? <button type="button" className={styles.newAction} disabled={startDisabled} onClick={() => { onCloseMobile?.(); onStart(); }}><Plus size={18} aria-hidden="true" /><span>New</span></button> : <Link className={styles.newAction} href={newHref} aria-disabled={startDisabled || undefined} tabIndex={startDisabled ? -1 : undefined} onClick={event => { if (startDisabled) event.preventDefault(); onCloseMobile?.(); }}><Plus size={18} aria-hidden="true" /><span>New</span></Link>}
         {onSearch ? <button type="button" className={styles.navItem} onClick={() => { onCloseMobile?.(); onSearch(); }} title="Search (Ctrl or Command + K)"><Search size={18} aria-hidden="true" /><span>Search</span></button> : <Link className={styles.navItem} href={searchHref} onClick={onCloseMobile}><Search size={18} aria-hidden="true" /><span>Search</span></Link>}
-        {item({ id: "products", label: "Apps & templates", icon: LayoutGrid })}
+        {item({ id: "products", label: "Examples", icon: LayoutGrid })}
       </div>
       <nav className={styles.primary} aria-label="Main">{PRIMARY_ITEMS.map(item)}</nav>
       {recentWork.length ? <section className={styles.recent} aria-label="Recent work"><h2>Recent</h2>{recentWork.slice(0, 8).map(work => <Link key={work.id} href={work.href} title={work.title} onClick={event => navigateInPlace(event, work.onOpen ? () => { onCloseMobile?.(); work.onOpen?.(); } : undefined)}><span>{work.title}</span></Link>)}</section> : null}
