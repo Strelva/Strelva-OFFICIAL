@@ -66,13 +66,16 @@ function renderHome(items: WorkspaceWork[] = [
 }
 
 describe("business home", () => {
-  it("keeps intent primary while putting saved work and next actions in front of category counts", () => {
+  it("leads with the business, its real facts and the work inside it", () => {
     const html = renderHome();
 
     expect(html).toContain("Needs you");
     expect(html).toContain("Review urgency field");
     expect(html).toContain("Opening checklist");
-    expect(html).toContain("Continue");
+    expect(html).toMatch(/<h1[^>]*>Alder Workshop<\/h1>/);
+    expect(html).toContain("Inside Alder Workshop");
+    expect(html).toContain("What should Alder Workshop do next?");
+    expect(html).toMatch(/\d+ (?:thing needs|things need) you/);
     expect(html).not.toMatch(/>Applications<|>Documents</);
   });
 
