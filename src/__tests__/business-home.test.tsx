@@ -69,7 +69,7 @@ describe("business home", () => {
   it("puts the saved work and its next action in front of category counts", () => {
     const html = renderHome();
 
-    expect(html).toContain("Needs your attention");
+    expect(html).toContain("Needs you");
     expect(html).toContain("Review urgency field");
     expect(html).toContain("Opening checklist");
     expect(html).toContain("Your apps and work");
