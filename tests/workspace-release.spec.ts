@@ -522,10 +522,10 @@ test("keeps My work and Shared with me context-local and read-only", async ({ pa
 
   await page.goto("/workspace");
   await page.getByLabel("Current workspace").selectOption(CUSTOMER_ID);
-  await expect(page.getByRole("heading", { name: "Your shared work.", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Your apps and work", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Review what was shared.", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Continue", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open Customer-owned assessment" })).toBeVisible();
-  await page.getByRole("link", { name: /^Apps & templates/ }).click();
+  await page.getByRole("link", { name: /^Examples/ }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.getByRole("button", { name: "AI Visibility: Start", exact: true }).click();
   await expect(page.getByRole("button", { name: "Check a business", exact: true })).toBeDisabled();

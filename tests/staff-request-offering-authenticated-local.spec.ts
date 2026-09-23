@@ -115,7 +115,7 @@ test("an owner publishes, shares, updates, and resumes the staff request offerin
     await staffPage.screenshot({ path: testInfo.outputPath("staff-request-offering-mobile.png"), fullPage: true });
 
     await navigation.getByRole("link", { name: "Home", exact: true }).click();
-    const recent = page.getByRole("region", { name: "Your apps and work", exact: true });
+    const recent = page.getByRole("region", { name: "Continue", exact: true });
     await expect(recent.getByRole("button", { name: /Staff requests/ })).toBeVisible();
     await recent.getByRole("button", { name: /Staff requests/ }).click();
     await expect(page.getByRole("heading", { name: "Staff requests", exact: true, level: 1 })).toBeVisible();

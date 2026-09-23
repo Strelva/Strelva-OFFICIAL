@@ -67,7 +67,7 @@ for (const width of [1440, 390]) {
     let item=(await requested.json()).request;
     expect(item.businessId).toBe(businessId);expect(item.deliveryCommitment).toBeNull();
     const requestId=item.id;
-    const deliveryCard=page.getByRole("region",{name:"Strelva delivery",exact:true})
+    const deliveryCard=page.getByRole("region",{name:"Strelva is handling",exact:true})
       .locator(`a[href="/workspace/delivery/${requestId}"]`);
 
     // Synthetic local operator identity only. No production grants or bypass.
@@ -84,7 +84,7 @@ for (const width of [1440, 390]) {
     await operatorPage.getByRole("button",{name:"Propose 24-hour delivery",exact:true}).click();
     await expect(operatorPage.getByText("Scope and terms need your acceptance",{exact:true})).toBeVisible();
     await page.goto(`/workspace?workspaceId=${businessId}`);
-    await expect(page.getByRole("heading",{name:"Strelva delivery",exact:true})).toBeVisible();
+    await expect(page.getByRole("heading",{name:"Strelva is handling",exact:true})).toBeVisible();
     await expect(deliveryCard).toBeVisible();
     await page.goto(`/workspace/delivery/${requestId}`);
     await expect(page.getByRole("button",{name:"Propose 24-hour delivery",exact:true})).toHaveCount(0);

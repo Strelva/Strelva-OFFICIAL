@@ -178,6 +178,8 @@ const SIGNALS: readonly Signal[] = [
   { route: "tracker", pattern: /\bcsv\b|spreadsheet|excel|\brows?\b|\bcolumns?\b|\btracker\b|import|\btable\b|\bdata\b|\bkeep track(?: of)?\b|\btrack(?:ing)?\b/i, weight: 3 },
   { route: "assessment", pattern: /ai visibility|visibility|discoverab|assessment|what .* understand|find .* business|search result|mention(?:ed)?/i, weight: 3 },
   { route: "website", pattern: /website|web site|homepage|landing page|\bsite\b|\bseo\b|accessib|page speed|web content|domain/i, weight: 3 },
+  // Improving an existing site ("make our website work better") must outrank the new-website signal.
+  { route: "website", pattern: /\b(?:our|my|the)\s+(?:website|web site|site)\b[\s\S]{0,40}\b(?:work|better|faster|improve|fix|update)\b/i, weight: 5 },
 ];
 
 const ROUTE_ORDER = ["onboarding", "websites", "applications", "scheduling", "investigations", "operations", "document", "inquiries", "tracker", "assessment", "website"] as const;
