@@ -1,0 +1,25 @@
+name: Cleanup inspection
+
+on:
+  push:
+    branches: [refactor/domain-cleanup-20260922]
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Archive tracked source for offline inspection
+        run: git archive --format=tar.gz --output=strelva-source.tar.gz HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: strelva-cleanup-source
+          path: strelva-source.tar.gz
+          retention-days: 1
+          if-no-files-found: error
