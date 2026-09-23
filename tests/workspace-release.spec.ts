@@ -130,7 +130,7 @@ async function mockWorkspace(page: Page, handler: (route: Route) => Promise<void
 }
 
 async function expectBusinessHome(page: Page) {
-  await expect(page.getByRole("heading", { name: "What would you like to do?", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What should happen next?", exact: true })).toBeVisible();
 }
 
 async function openWorkspaceHelp(page: Page) {
@@ -208,7 +208,7 @@ async function pendingWorkspaceSwitchSurvives(page: Page, section: "work" | "set
   await expect.poll(() => releaseTarget.length).toBeGreaterThan(0);
 
   await page.getByRole("complementary", { name: "Strelva navigation", exact: true })
-    .getByRole("link", { name: section === "products" ? "Apps & templates" : section === "settings" ? "Settings" : "Work", exact: true })
+    .getByRole("link", { name: section === "products" ? "Examples" : section === "settings" ? "Settings" : "Work", exact: true })
     .click();
 
   targetReady = true;
@@ -267,7 +267,7 @@ test("creates a private assessment and restores it after reload", async ({ page 
   });
 
   await page.goto("/workspace");
-  await page.getByRole("link", { name: "Apps & templates", exact: true }).click();
+  await page.getByRole("link", { name: "Examples", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.getByRole("button", { name: "AI Visibility: Start", exact: true }).click();
   await expect(page.getByRole("heading", { name: "AI Visibility", exact: true })).toBeVisible();
@@ -863,7 +863,7 @@ test("does not add a completed assessment to a workspace selected while it was r
   });
 
   await page.goto("/workspace");
-  await page.getByRole("link", { name: "Apps & templates", exact: true }).click();
+  await page.getByRole("link", { name: "Examples", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.getByRole("button", { name: "AI Visibility: Start", exact: true }).click();
   await expect(page.getByRole("heading", { name: "AI Visibility", exact: true })).toBeVisible();
@@ -1024,7 +1024,7 @@ test("recovers the same assessment after a lost response and reload", async ({ p
     return fulfill(route,{work:work()});
   });
   await page.goto("/workspace");
-  await page.getByRole("link",{name:"Apps & templates", exact:true}).click();
+  await page.getByRole("link",{name:"Examples", exact:true}).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.getByRole("button",{name:"AI Visibility: Start", exact:true}).click();
   await expect(page.getByRole("heading",{name:"AI Visibility", exact:true})).toBeVisible();
