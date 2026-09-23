@@ -45,7 +45,8 @@ function ComposerSession({ initialRequest = "", draftKey, disabled = false, plac
     const input = textarea.current;
     if (!input) return;
     input.style.height = "auto";
-    input.style.height = `${Math.min(288, Math.max(112, input.scrollHeight))}px`;
+    const minHeight = Number.parseFloat(window.getComputedStyle(input).minHeight) || 0;
+    input.style.height = `${Math.min(288, Math.max(minHeight, input.scrollHeight))}px`;
   }, [request]);
 
   useEffect(() => {
