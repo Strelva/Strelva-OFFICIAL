@@ -135,16 +135,6 @@ export function assertAgentToolCatalog(toolNames: string[], surface: AgentSurfac
   }
 }
 
-export async function getActivatedCapabilities(_tenantId: string): Promise<{
-  capabilities: Capability[];
-  activeTools: Set<AgentToolId>;
-}> {
-  return {
-    capabilities: getAllCapabilities(),
-    activeTools: getAllTools(),
-  };
-}
-
 // --- System prompt fragment for capabilities ---
 
 export function capabilityPromptFragment(): string {

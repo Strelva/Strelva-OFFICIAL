@@ -18,7 +18,7 @@ import { AccessHandoffOverlay, AccessPanel } from "./WorkspaceAccess";
 import { WorkspaceLayout } from "./WorkspaceLayout";
 import { normalizeWorkspaceHandoffPreview, normalizeWorkspaceSnapshot, normalizeWorkspaceWork } from "./result";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
-import { WorkspaceRequestContext, useWorkspaceRequest } from "./WorkspaceRequest";
+import { WorkspaceRequestContext, useWorkspaceRequest, WorkspaceRequestError, readResponse, usePostAction } from "./WorkspaceRequest";
 import { TrackerExperience } from "./TrackerExperience";
 import { LocalTrackerPreview } from "./preview/LocalTrackerPreview";
 import { DocumentExperience } from "./DocumentExperience";
@@ -37,18 +37,15 @@ import { parseView as parseInquiryView } from "@/experience/inquiries/context";
 import { TRACKER_TEMPLATES, type TrackerTemplateId } from "@/products/tracker/client";
 import type { InquirySurfaceAdapter, InquirySurfaceSnapshot } from "@/experience/inquiries/contracts";
 import type {
-  WorkspaceAction,
   WorkspaceHandoffPreview,
   WorkspaceSnapshot,
   WorkspaceWork,
 } from "./contracts";
 import type { WorkspaceInquiryTarget } from "./WorkspaceLayout";
 import type { WorkspaceStartContinuation } from "./workspace-start";
+import { selectWorkspaceLocation, isHorizontalView, type HorizontalView, type WorkspaceView as View } from "./workspace-selection";
 import { workspaceExitBlocksChanges, workspaceExitIsStopped } from "./workspace-exit-ui";
 
-type HorizontalView = "websites" | "custom-applications" | "onboarding" | "applications" | "scheduling" | "investigations" | "operations" | "product-learning";
-const isHorizontalView = (value: string | null | undefined): value is HorizontalView => Boolean(value && ["websites", "custom-applications", "onboarding", "applications", "scheduling", "investigations", "operations", "product-learning"].includes(value));
-type View = "work" | "agency" | "inquiries" | "tracker" | "document" | "plan" | HorizontalView;
 type Notice = { kind: "success" | "error"; message: string } | null;
 
 export interface WorkspaceInquiryConfig {
@@ -56,32 +53,6 @@ export interface WorkspaceInquiryConfig {
   label?: string;
   adapter?: InquirySurfaceAdapter;
   initialSnapshot?: InquirySurfaceSnapshot;
-}
-
-interface ErrorBody {
-  error?: string;
-}
-
-class WorkspaceRequestError extends Error {
-  constructor(message: string, readonly status: number) {
-    super(message);
-  }
-}
-
-async function readResponse<T>(response: Response, fallback: string): Promise<T> {
-  const body = (await response.json().catch(() => null)) as (T & ErrorBody) | null;
-  if (!response.ok) throw new WorkspaceRequestError(body?.error || fallback, response.status);
-  if (!body) throw new Error(fallback);
-  return body;
-}
-
-async function postAction<T>(action: WorkspaceAction, fallback: string, request: typeof fetch): Promise<T> {
-  const response = await request("/api/workspace", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(action),
-  });
-  return readResponse<T>(response, fallback);
 }
 
 function trackerTemplateId(value: string | undefined): TrackerTemplateId | undefined {
@@ -96,11 +67,6 @@ function formatDate(value: string): string {
 
 export function WorkspaceApp({ request = fetch, appBase = "", signOut, inquiry }: { request?: typeof fetch; appBase?: string; signOut?: React.ReactNode; inquiry?: WorkspaceInquiryConfig } = {}) {
   return <WorkspaceRequestContext.Provider value={request}><WorkspaceContent appBase={appBase} signOut={signOut} inquiry={inquiry} /></WorkspaceRequestContext.Provider>;
-}
-
-function usePostAction() {
-  const request = useWorkspaceRequest();
-  return useCallback(<T,>(action: WorkspaceAction, fallback: string) => postAction<T>(action, fallback, request), [request]);
 }
 
 function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBase: string; signOut?: React.ReactNode; inquiry?: WorkspaceInquiryConfig }) {
@@ -165,39 +131,21 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
       requestedWorkspaceRef.current = data.workspaceId;
       setSnapshot(data);
       const params = new URLSearchParams(window.location.search);
-      const requestedWork = params.get("work");
-      const requestedView = params.get("view");
-      const requestedStanding = params.get("standingId");
-      const requestedAssignment = params.get("assignmentId");
-      const accessRoute = requestedView === "access";
-      const inquiryAvailable = Boolean(inquiryConfig) || data.products.some((product) => product.id === "inquiries" && product.availability === "available");
-      const inquiryRoute = requestedView === "inquiries" && inquiryAvailable;
-      const inquiryId = params.get("tenantId") || inquiryConfig?.tenantId || data.managedWork?.[0]?.id || null;
-      const match = data.work.find(item => item.id === requestedWork);
-      const trackerAvailable = data.products.some((product) => product.id === "tracker" && product.availability === "available");
-      const trackerRoute = requestedView === "tracker" && (trackerAvailable || match?.productId === "tracker");
-      const savedTrackerRoute = Boolean(match?.productId === "tracker" && !inquiryRoute);
-      const documentAvailable = data.products.some((product) => product.id === "documents" && product.availability === "available");
-      const documentRoute = requestedView === "document" && documentAvailable;
-      const savedDocumentRoute = Boolean(match?.productId === "documents" && !inquiryRoute && !trackerRoute);
-      const planRoute = requestedView === "plan";
-      const savedPlanRoute = Boolean(match?.productId === "work_plans" && !inquiryRoute && !trackerRoute && !documentRoute);
-      const horizontalView = requestedStanding || requestedAssignment || requestedView === "ongoing" ? "operations" : isHorizontalView(requestedView) ? requestedView : isHorizontalView(match?.productId) ? match.productId : null;
-      const validView: View = accessRoute ? "agency" : horizontalView || (inquiryRoute ? "inquiries" : trackerRoute || savedTrackerRoute ? "tracker" : documentRoute || savedDocumentRoute ? "document" : planRoute || savedPlanRoute ? "plan" : "work");
-      setMissingWork(Boolean(requestedWork && !match && !requestedStanding));
-      setSelectedWorkId(match?.id ?? (requestedWork || horizontalView ? null : data.work[0]?.id) ?? null);
-      setSelectedStandingId(requestedStanding && horizontalView === "operations" ? requestedStanding : null);
-      setSelectedAssignmentId(requestedAssignment && horizontalView === "operations" ? requestedAssignment : null);
+      const selection = selectWorkspaceLocation(params, data, inquiryConfig);
+      setMissingWork(selection.missingWork);
+      setSelectedWorkId(selection.selectedWorkId);
+      setSelectedStandingId(selection.selectedStandingId);
+      setSelectedAssignmentId(selection.selectedAssignmentId);
+      setInquiryTenantId(selection.inquiryTenantId);
       setStandingCreating(false);
-      setInquiryTenantId(inquiryRoute ? inquiryId : null);
       setAssessmentStartContext(null);
       setInquiryStartContext(null);
       setTrackerStartContext(null);
       setDocumentStartContext(null);
       setPlanStartRequest(null);
-      if (!preserveNotice) { setHome(!requestedWork && !accessRoute && !inquiryRoute && !trackerRoute && !documentRoute && !savedDocumentRoute && !planRoute && !savedPlanRoute && !horizontalView); setView(validView); }
-      setShowAssessment(!requestedWork && !accessRoute && data.work.length === 0 && !inquiryRoute && !trackerRoute && !documentRoute && !savedDocumentRoute && !planRoute && !savedPlanRoute && !horizontalView && !workspaceExitIsStopped(data.workspaceExitState, data.workspaceExitReadStatus));
-      replaceWorkspaceLocation(data.workspaceId, requestedStanding ? undefined : requestedWork || undefined);
+      if (!preserveNotice) { setHome(selection.home); setView(selection.view); }
+      setShowAssessment(selection.showAssessment);
+      replaceWorkspaceLocation(data.workspaceId, params.get("standingId") ? undefined : params.get("work") || undefined);
     } catch (cause) {
       if (requestId !== requestRef.current) return;
       setSnapshot(null);

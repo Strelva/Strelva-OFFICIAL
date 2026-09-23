@@ -123,3 +123,81 @@ regression now targets those active callers; historical evidence is retained.
 This cleanup does not migrate the remaining legacy application command rules,
 all other product services, or the managed website control plane to pure domain
 models. Those boundaries require their own behavior-preserving extraction.
+
+## September 22 product-wide cleanup
+
+This follow-through extends the first native application extraction across the
+control plane. The reference inventory covered source, scripts, tests, benchmarks,
+the client starter and configuration, rather than only `src/products`. All 18
+product directories were included in the dependency and caller review. This is a
+source cleanup and regression review, not a manual correctness proof of every
+line or a claim about deployed customer behavior.
+
+### Ownership after cleanup
+
+| Area | Result |
+| --- | --- |
+| Native applications | Candidate/release rules and legacy commands live in `applications/domain.ts`. Authorized orchestration stays in `server.ts`; canonical storage and explicit test compatibility stay in `repository.ts`. Legacy revise still rejects incompatible records immediately, unlike the explicit candidate/rehearse path. |
+| Operations | `native-execution.ts` owns native capability dispatch and its admission checks; `assignments.ts` owns delegated operations; `responsibilities.ts` owns finite/standing coordination and reconciliation. `server.ts` retains the public entry. No second executor or scheduling authority was introduced. |
+| Work plans | `domain.ts` validates supported operations, dependencies, reviewable drafts and required decisions. `generation.ts` owns model interaction, `native-output.ts` maps supported outputs, `execution.ts` owns replay/freshness/atomic output, and `service.ts` coordinates creation and presentation. Public exports stay stable. |
+| Budget execution | `execution-contracts.ts` and `execution-engine.ts` no longer import storage or allowance services. `runtime.ts` assembles the real stores. Budget inspection and provider evidence import the contracts, not the runtime. Accepted or ambiguous effects remain non-replayable. |
+| Custom applications | Build and intake share one source-file validator. Source limits count UTF-8 bytes without the browser depending on Node's `Buffer`. Artifact contracts no longer import the container-build adapter. |
+| Inquiries | Portfolio types moved inward to `portfolio-contracts.ts`. `delivery-approval-service.ts` is explicitly the effectful owner, not a purported pure engine. Removed the uncalled registration globals and alternate approval wrappers; routes still use the same durable approval service and receipts. |
+| Workspace | HTTP handling belongs to `WorkspaceRequest.tsx`; URL selection is testable in `workspace-selection.ts`. Offering transport, configuration, directory and installation views have separate owners behind the existing entry. A late conflict from the previous business is ignored before any refresh. |
+| Shared motion | Removed an unused scroll context. Disposal now removes its exact animation ticker and cancels pending refresh frames. Existing reduced-motion and resize behavior remain. Imports needed only for plugin registration are explicit side-effect imports. |
+| Website generation | Removed an uncalled configured-model wrapper and its private prompt/model helpers. The active injected structured-generation provider, compiler, reviewed export and deployment seam remain. |
+
+### Full product disposition
+
+| Product directories | Review outcome |
+| --- | --- |
+| `applications`, `operations`, `work-plans`, `custom-applications`, `inquiries`, `websites` | Responsibility and dependency changes described above; domain, service and existing route regressions exercise them. |
+| `onboarding`, `scheduling`, `investigations`, `tracker` | Removed uncalled convenience exports or types. Existing rule engines, native receipts, calendars, attachment provenance and record history remain. Their domain contracts are included in the transitive check. |
+| `documents`, `product-learning` | Retained existing engines and their caller-owned authorization/storage paths. Checked the rule dependency graph and existing behavior tests rather than creating another implementation. |
+| `ai-visibility`, `assessment`, `website-audit` | Retained the canonical assessment, audit and recovery paths. Similar names do not make these separate responsibilities duplicates. |
+| `home-finder`, `domain-monitor`, `managed-presence` | Retained active product adapters and public entries. A thin adapter does not need an invented domain hierarchy. |
+
+Auth, tenant/customer identity, billing, email, provider secrets, governed website
+writes, crons, the scanner and `/api/v1` retain their existing owners. No customer
+compatibility name, live plan, grandfathered agreement, release flag, database
+schema or persistence authority changes here. Marketing and individual customer
+repositories are not part of this refactor. The large synthetic
+`DeliveryExperience.tsx` remains a development preview, not a live delivery owner.
+
+### Deletion evidence and retained exceptions
+
+Removed uncalled helpers/types from account contact display, agent prompt-cache
+reset/risk context, audit module aliases, bookings, capability discovery, custom
+repository summaries, editor types, feature identifiers, production fallback
+wrappers, reward storage, site-content checks, suggestion sweeps, thread titles,
+weekly-brief predicates, inquiry adapters, calendar conveniences and native
+capability aliases. Removed unused skeleton variants and the Vagaro popup button;
+active skeleton lines/circles and the embedded booking widget remain.
+
+The deletion review combined module reachability with symbol references in source,
+tests, scripts and documentation. Direct Svix 1.92.2 had no caller and was removed
+from the manifest and lockfile. Resend's transitive Svix remains. This is not a
+dependency upgrade or replacement webhook implementation.
+
+Public product entries, the tenant projection migration bridge, scoped fixtures,
+frozen pricing compatibility constants, generated database types, schema history,
+retained browser evidence and the tested website deployment seam remain. These
+are intentional contracts or evidence, not dead code merely because normal app
+imports do not reach them. Release and migration gates in the earlier tables still
+apply; cleanup is not authority to delete production records.
+
+### Regression evidence
+
+The earlier `c3dba07` cleanup completed all four hosted workflows before this
+follow-through. Its unit baseline was 3,585 passing tests and one intentional
+skip. The expanded local coverage run passed 3,635 tests in 486 files with the
+same skip and unchanged coverage floors. A subsequent custom-application return
+link regression failed against the old URL allowlist and passed after correction.
+The late installation and website-binding conflict regressions also failed before
+fixing the epoch check and passed afterward.
+
+New tests cover transitive/type/dynamic import boundaries, unsupported module
+loads, browser-safe UTF-8 build limits, immutable legacy application commands,
+workspace route precedence/recovery and scroll callback disposal. The PR records
+final source-revision checks, including the last return-link test. No local result
+establishes production deployment, provider operation or human visual acceptance.

@@ -21,12 +21,6 @@ export function getKv() {
   return getRedis();
 }
 
-export function requireKv() {
-  const kv = getRedis();
-  if (!kv) throw new KvNotConfiguredError();
-  return kv;
-}
-
 // Key scheme — tenant-scoped, reb: prefix to avoid collisions with any
 // legacy gldf: keys if the same Redis ever gets shared.
 export const keys = {

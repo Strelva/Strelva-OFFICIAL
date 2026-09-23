@@ -16,13 +16,7 @@
 
 import { createHash } from "node:crypto";
 
-import type {
-  InquiryRecord,
-  InquiryTimelineEventType,
-  ResponsibilityAction,
-  ResponsibilityEvaluation,
-  ResponsibilityPolicy,
-} from "@/products/inquiries/contracts";
+import type { InquiryTimelineEventType, ResponsibilityAction, ResponsibilityEvaluation, ResponsibilityPolicy } from "@/products/inquiries/contracts";
 import type { LeadRecord } from "@/lib/leads";
 import { getTenantConfig } from "@/lib/tenants";
 import { addTenantActivity } from "@/lib/tenant-crm";
@@ -228,26 +222,6 @@ export function inquirySubmissionFromLead(tenantId: string, lead: LeadRecord): I
     capabilityVersion: lead.capabilityVersion || null,
     inquiryVersion: lead.id,
     receivedAt: lead.createdAt,
-  };
-}
-
-export function inquirySubmissionFromRecord(
-  tenantId: string,
-  record: InquiryRecord,
-): InquiryDeliverySubmission {
-  const fields = record.fields;
-  return {
-    id: record.id,
-    tenantId,
-    name: fields.name || fields.full_name || "there",
-    email: fields.email || "",
-    message: fields.message || fields.notes || null,
-    source: fields.source || null,
-    fields,
-    capabilityId: record.capabilityId,
-    capabilityVersion: record.capabilityVersion,
-    inquiryVersion: record.createdReceiptId,
-    receivedAt: record.receivedAt,
   };
 }
 

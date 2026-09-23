@@ -76,7 +76,6 @@ export const standingResponsibilitySchema = z.object({
 
 export type StandingScope = z.infer<typeof standingScopeSchema>;
 export type StandingTrigger = z.infer<typeof standingTriggerSchema>;
-export type StandingLimits = z.infer<typeof standingLimitsSchema>;
 export type StandingResponsibility = z.infer<typeof standingResponsibilitySchema>;
 
 export const standingResponsibilityCommandSchema = z.discriminatedUnion("kind", [

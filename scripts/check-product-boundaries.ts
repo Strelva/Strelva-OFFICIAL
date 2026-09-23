@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { checkProductBoundaries } from "./product-boundaries";
+import { checkDomainDependencies } from "./domain-boundaries";
 
 function sources(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -10,9 +11,11 @@ function sources(directory: string): string[] {
   });
 }
 
-const violations = ["src", "scripts"].flatMap(sources).flatMap((file) =>
-  checkProductBoundaries(file, readFileSync(file, "utf8")),
-);
+const files = new Map(["src", "scripts"].flatMap(sources).map((file) => [file, readFileSync(file, "utf8")]));
+const violations = [
+  ...[...files].flatMap(([file, source]) => checkProductBoundaries(file, source)),
+  ...checkDomainDependencies(files),
+];
 for (const violation of violations) {
   console.error(`${violation.file}:${violation.line} ${violation.reason} (${violation.importPath})`);
 }

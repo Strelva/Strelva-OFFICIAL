@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import gsap from "gsap";
-import { ScrollTrigger as _ScrollTrigger } from "@/lib/lenis";
+import "@/lib/lenis";
 import type { FaqContent } from "@/lib/types";
 
 export function Faq({ faq }: { faq: FaqContent }) {

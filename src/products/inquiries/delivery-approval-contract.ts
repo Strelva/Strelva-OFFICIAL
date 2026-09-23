@@ -49,12 +49,6 @@ export interface InquiryMessageReviewOutcome {
   retryable: boolean;
 }
 
-/** Stable service port for the authenticated API route and the delivery owner. */
-export interface InquiryMessageReviewService {
-  prepare(input: InquiryMessageReviewPrepareInput): Promise<InquiryMessageReviewPreview>;
-  approve(input: InquiryMessageReviewApproveInput): Promise<InquiryMessageReviewOutcome>;
-}
-
 export interface InquiryMessageReviewExecution {
   accepted: boolean;
   safeToResolve: boolean;

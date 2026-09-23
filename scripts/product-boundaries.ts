@@ -28,7 +28,7 @@ function applicationDomainReason(file: string, target: string | null, specifier:
   return "Native application rules and their contracts cannot depend on runtime adapters. Keep storage, providers, and presentation outside the domain.";
 }
 
-function localTarget(file: string, specifier: string): string | null {
+export function localTarget(file: string, specifier: string): string | null {
   const target = specifier.startsWith("@/")
     ? `src/${specifier.slice(2)}`
     : specifier.startsWith(".")
@@ -58,13 +58,18 @@ function boundaryReason(file: string, target: string): string | null {
   return null;
 }
 
-/** Check static imports, re-exports, literal dynamic imports, and require calls. */
-export function checkProductBoundaries(file: string, source: string): BoundaryViolation[] {
-  file = path.posix.normalize(file.replaceAll("\\", "/"));
+export interface SourceImport {
+  specifier: string | null;
+  line: number;
+}
+
+/** Includes type imports, re-exports and dynamic loads; comments are not imports. */
+export function sourceImports(file: string, source: string): SourceImport[] {
   const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
-  const violations: BoundaryViolation[] = [];
+  const imports: SourceImport[] = [];
   function inspect(node: ts.Node): void {
     let literal: ts.Node | undefined;
+    let moduleLoad = false;
     if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
       literal = node.moduleSpecifier;
     } else if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference)) {
@@ -76,21 +81,26 @@ export function checkProductBoundaries(file: string, source: string): BoundaryVi
       (ts.isIdentifier(node.expression) && node.expression.text === "require")
     )) {
       literal = node.arguments[0];
+      moduleLoad = true;
     }
-    if (literal && ts.isStringLiteralLike(literal)) {
-      const target = localTarget(file, literal.text);
-      const reason = applicationDomainReason(file, target, literal.text) ?? (target && boundaryReason(file, target));
-      if (reason) {
-        violations.push({
-          file,
-          line: ast.getLineAndCharacterOfPosition(literal.getStart(ast)).line + 1,
-          importPath: literal.text,
-          reason,
-        });
-      }
+    if (literal || moduleLoad) {
+      imports.push({
+        specifier: literal && ts.isStringLiteralLike(literal) ? literal.text : null,
+        line: ast.getLineAndCharacterOfPosition((literal ?? node).getStart(ast)).line + 1,
+      });
     }
     ts.forEachChild(node, inspect);
   }
   inspect(ast);
-  return violations;
+  return imports;
+}
+
+export function checkProductBoundaries(file: string, source: string): BoundaryViolation[] {
+  file = path.posix.normalize(file.replaceAll("\\", "/"));
+  return sourceImports(file, source).flatMap(({ specifier, line }) => {
+    if (specifier === null) return [];
+    const target = localTarget(file, specifier);
+    const reason = applicationDomainReason(file, target, specifier) ?? (target && boundaryReason(file, target));
+    return reason ? [{ file, line, importPath: specifier, reason }] : [];
+  });
 }

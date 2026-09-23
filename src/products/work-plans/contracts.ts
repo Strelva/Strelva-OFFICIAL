@@ -1,5 +1,5 @@
-import type { SavedWork, WorkspaceActor } from "@/platform/workspaces";
-import type { OperationEffect } from "@/platform/products";
+import type { SavedWork, WorkspaceActor } from "@/platform/workspaces/types";
+import type { OperationEffect } from "@/platform/products/contracts";
 import { z } from "zod";
 import { applicationSpecSchema } from "@/products/applications/contracts";
 

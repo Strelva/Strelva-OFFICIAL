@@ -6,6 +6,7 @@ import {
 } from "@/products/applications/contracts";
 import {
   currentRelease,
+  applyLegacyApplicationCommand,
   publishCandidate,
   rehearseCandidate,
   reviseCandidate,
@@ -155,5 +156,41 @@ describe("native application domain", () => {
       ],
     });
     expect(() => validateRecord(fields, { id: "record-1", values })).toThrow(message);
+  });
+});
+
+
+describe("legacy application command rules", () => {
+  it("rejects a data-breaking legacy edit immediately without changing the live app", () => {
+    const original = released();
+    original.records = [{ id: "existing", values: { subject: "Existing request" } }];
+    const before = structuredClone(original);
+    const incompatible = { ...spec, fields: [{ ...spec.fields[0]!, type: "number" as const }] };
+    expect(() => applyLegacyApplicationCommand(original, { kind: "revise", expectedRevision: 0, spec: incompatible }, "owner", publication.at)).toThrow("wrong type");
+    expect(original).toEqual(before);
+  });
+
+  it("keeps the explicit draft path distinct from legacy immediate validation", () => {
+    const original = released();
+    original.records = [{ id: "existing", values: { subject: "Existing request" } }];
+    const incompatible = { ...spec, fields: [{ ...spec.fields[0]!, type: "number" as const }] };
+    const proposed = reviseCandidate(original, { expectedDesignRevision: 1, spec: incompatible });
+    expect(currentRelease(proposed)).toEqual(currentRelease(original));
+    expect(rehearseCandidate(proposed, { expectedDesignRevision: 2 }).candidate.rehearsal?.checks.some(check => !check.passed)).toBe(true);
+  });
+
+  it("requires the legacy revision and preserves state after rejection", () => {
+    const original = draft();
+    expect(() => applyLegacyApplicationCommand(original, { kind: "retire", expectedRevision: 7 }, "owner", publication.at)).toThrow("work changed");
+    expect(original.status).toBe("draft");
+  });
+
+  it("uses the provided publication identity and time without mutating rehearsal state", () => {
+    const original = rehearseCandidate(draft(), { expectedDesignRevision: 1 });
+    const before = structuredClone(original);
+    const installed = applyLegacyApplicationCommand(original, { kind: "install", expectedRevision: 0 }, "owner", publication.at);
+    expect(currentRelease(installed)).toMatchObject({ publishedBy: "owner", publishedAt: publication.at });
+    expect(original).toEqual(before);
+    expect(installed.status).toBe("installed");
   });
 });

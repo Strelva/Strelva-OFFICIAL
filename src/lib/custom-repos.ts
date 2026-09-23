@@ -133,13 +133,6 @@ export function getTriageDueAt(requestedAt = new Date()): string {
   return due.toISOString();
 }
 
-export function summarizeCustomRepo(repo: CustomRepoMetadata | undefined): string {
-  if (!repo) return "No repo metadata";
-  return [repo.repoName, repo.productionUrl, repo.contractVersion]
-    .filter(Boolean)
-    .join(" · ") || "Repo metadata pending";
-}
-
 export function isCustomChangeRequestMetadata(
   metadata: Record<string, unknown> | undefined
 ): metadata is Record<string, unknown> & CustomChangeRequestMetadata {

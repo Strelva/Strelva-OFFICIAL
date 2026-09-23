@@ -6,7 +6,7 @@ if (typeof window !== "undefined") {
   gsap.registerPlugin(ScrollTrigger);
 }
 
-export function initLenis(): Lenis {
+export function initLenis(): { lenis: Lenis; dispose: () => void } {
   const lenis = new Lenis({
     duration: 1.2,
     easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
@@ -19,19 +19,29 @@ export function initLenis(): Lenis {
 
   lenis.on("scroll", ScrollTrigger.update);
 
-  gsap.ticker.add((time) => {
-    lenis.raf(time * 1000);
-  });
+  const tick = (time: number) => lenis.raf(time * 1000);
+  gsap.ticker.add(tick);
 
   gsap.ticker.lagSmoothing(0);
 
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      ScrollTrigger.refresh(true);
+  let disposed = false;
+  let refreshFrame = requestAnimationFrame(() => {
+    if (disposed) return;
+    refreshFrame = requestAnimationFrame(() => {
+      if (!disposed) ScrollTrigger.refresh(true);
     });
   });
 
-  return lenis;
+  return {
+    lenis,
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      cancelAnimationFrame(refreshFrame);
+      gsap.ticker.remove(tick);
+      lenis.destroy();
+    },
+  };
 }
 
 export { ScrollTrigger };

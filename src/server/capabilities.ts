@@ -478,28 +478,14 @@ export const EXECUTABLE_CAPABILITY_QUALIFICATIONS = Object.freeze([
   qualifyCapability(learningCollect, [evidence("learning-collect", "learning.collect", "Internal collection keeps evidence within its registered source set.", "src/__tests__/product-learning-service.test.ts")], "2026-09-14T00:00:00.000Z", "Local internal R&D collection proof."),
 ] as const);
 
-export type NativeExecutableCapability = (typeof EXECUTABLE_CAPABILITY_DEFINITIONS)[number];
-
 /** Server composition of product-owned schemas with the generic capability registry. */
 export const executableCapabilityRegistry = createCapabilityRegistry({
   definitions: EXECUTABLE_CAPABILITY_DEFINITIONS,
   qualifications: EXECUTABLE_CAPABILITY_QUALIFICATIONS,
 });
 
-export function getExecutableCapability(id: string, version?: number) {
-  return executableCapabilityRegistry.get(id, version);
-}
-
-export function requireExecutableCapability(id: string, version?: number, entrance?: CapabilityEntrance) {
-  return executableCapabilityRegistry.require(id, version, entrance);
-}
-
 export function requireExactExecutableCapability(id: string, version: number, entrance?: CapabilityEntrance) {
   return executableCapabilityRegistry.requireExact(id, version, entrance);
-}
-
-export function listExecutableCapabilities(entrance?: CapabilityEntrance) {
-  return executableCapabilityRegistry.list(entrance);
 }
 
 export function listExecutableCapabilityDescriptors(entrance?: CapabilityEntrance) {

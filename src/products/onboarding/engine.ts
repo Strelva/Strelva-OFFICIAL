@@ -188,7 +188,3 @@ export function acceptRequirement(
     draft.status = draft.requirements.every((item) => item.id === requirementId ? true : item.status === "accepted") ? "complete" : "in_progress";
   }, null, at);
 }
-
-export function assertCase(value: unknown): OnboardingCase {
-  return onboardingCaseSchema.parse(value);
-}
