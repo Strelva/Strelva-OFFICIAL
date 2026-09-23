@@ -1,0 +1,35 @@
+name: Full product cleanup transfer
+
+on:
+  push:
+    branches: [refactor/full-product-transfer-20260922]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: strelva-full-product-transfer
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: github.repository == 'Strelva/Strelva-OFFICIAL'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Apply checked source delta and remove transfer files
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .cleanup-transfer/apply.py
+          git rm -r -- .cleanup-transfer .github/workflows/full-product-transfer.yml
+          git diff --cached --check
+          test "$(git write-tree)" = 'dc4221a028a4c13f8c755faf0cab870b26eeb253'
+          git diff --cached --stat
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'refactor: assemble verified full-product cleanup'
+          git push origin HEAD:refs/heads/refactor/full-product-transfer-20260922
