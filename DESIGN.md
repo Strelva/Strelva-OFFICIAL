@@ -516,3 +516,24 @@ The first change applies to Home → New → Plan and sets the rule for the rest
 
 This is local implementation direction. It is not a deployment or an
 acceptance of the remaining surfaces, which still need the same pass.
+
+### September 23 business Home
+
+Jacob asked that bringing a business to Strelva should feel impressive, with
+the experience itself doing the work. Home now leads with the business:
+
+- The business name is the headline, with a short line of real facts beneath
+  it (websites, apps, saved results, and what needs the owner). Personal
+  workspaces say "Your workspace" rather than claiming to be a business.
+- The newest measured AI Visibility result is the featured insight: grade,
+  verdict and the single top fix, with "Have Strelva do this" turning the fix
+  into a change request. Unmeasured or unavailable scorecards are never shown.
+  A new business sees a "See how AI describes …" first step instead.
+- Work inside the business is shown as objects to open, with a dashed tile
+  for adding more. Suggestions follow what the business already has and do
+  not repeat the insight card.
+- "Needs you" appears only when something does. Entrance motion is short and
+  staggered, and is removed under reduced motion.
+
+The illustrated-business Home from September 14–15 remains history; this
+decision replaces it for the workspace Home.
