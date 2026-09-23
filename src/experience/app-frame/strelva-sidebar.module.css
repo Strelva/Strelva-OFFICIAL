@@ -1,3 +1,7 @@
+/*
+ * Shared navigation. Quiet chrome on the 8px grid: 14px labels, 40px rows,
+ * one selected state carried by material (fill and gloss), not by stripes.
+ */
 .sidebar {
   box-sizing: border-box;
   display: flex;
@@ -6,28 +10,27 @@
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  padding: 10px 8px;
-  padding-bottom: max(10px, env(safe-area-inset-bottom));
-  border-right: 1px solid var(--gray-border);
-  background: var(--surface-inset);
+  padding: 16px 12px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  border-right: 1px solid var(--navigation-border, var(--gray-border));
+  background: var(--navigation-bg, var(--surface-inset));
   color: var(--warm-black);
 }
 
 .brandRow {
   display: flex;
-  min-height: 42px;
+  min-height: 40px;
   flex-shrink: 0;
   align-items: center;
   justify-content: space-between;
-  padding: 0 8px 6px;
+  padding: 0 8px;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 9px;
-  color: var(--warm-black);
-  font-family: var(--font-display), sans-serif;
+  gap: 8px;
+  color: var(--sv-display, var(--warm-black));
   font-size: 16px;
   font-weight: 500;
   letter-spacing: -.02em;
@@ -38,13 +41,14 @@
 .brandMark {
   width: 20px;
   height: 23px;
-  color: var(--warm-black);
+  color: var(--sv-display, var(--warm-black));
   --m-accent: var(--accent);
 }
 
+/* The current business is a place, so it gets an object, not a bare select. */
 .businessContext {
   flex-shrink: 0;
-  padding: 4px 4px 10px;
+  padding: 16px 0 8px;
 }
 
 .businessContext label {
@@ -55,21 +59,22 @@
 .businessContext select {
   width: 100%;
   min-width: 0;
-  min-height: 36px;
-  padding: 6px 9px;
-  border: 1px solid transparent;
-  border-radius: 9px;
-  background: transparent;
-  color: var(--gray-fg);
+  min-height: 48px;
+  padding: 12px 16px;
+  border: 1px solid var(--gray-border);
+  border-radius: 12px;
+  background: var(--sv-object, var(--surface));
+  box-shadow: inset 0 1px 0 var(--sv-gloss, transparent);
+  color: var(--sv-display, var(--warm-black));
   font: inherit;
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 500;
   line-height: 20px;
+  cursor: pointer;
 }
 
-.businessContext select:hover,
-.businessContext select:focus-visible {
-  border-color: var(--gray-border);
-  background: var(--gray-bg-alt);
+.businessContext select:hover {
+  border-color: var(--sv-orbit, var(--gray-muted));
 }
 
 .body {
@@ -87,40 +92,41 @@
 }
 
 .utilities {
-  padding-bottom: 8px;
-}
-
-.primary {
-  padding-top: 8px;
-  border-top: 1px solid var(--gray-border);
+  padding-bottom: 16px;
 }
 
 .navItem,
 .newAction {
   display: flex;
   width: 100%;
-  min-height: 36px;
+  min-height: 40px;
   align-items: center;
-  gap: 9px;
-  padding: 7px 9px;
-  border-radius: 8px;
-  color: var(--gray-muted);
-  font-size: 12px;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  color: var(--navigation-nav-text, var(--gray-muted));
+  font-size: 14px;
   font-weight: 400;
-  line-height: 20px;
+  line-height: 24px;
   text-align: left;
   text-decoration: none;
-  transition: background-color 120ms ease, color 120ms ease;
+  transition: background-color 120ms, color 120ms;
 }
 
-.navItem:hover,
-.navItem[aria-current="page"] {
-  background: var(--gray-bg-hover);
-  color: var(--gray-fg);
+.navItem:hover {
+  background: var(--navigation-hover-bg, var(--gray-bg-hover));
+  color: var(--navigation-active-text, var(--warm-black));
 }
 
 .navItem[aria-current="page"] {
+  background: var(--navigation-selected-bg, var(--gray-bg-hover));
+  box-shadow: inset 0 1px 0 var(--sv-gloss, transparent);
+  color: var(--navigation-active-text, var(--warm-black));
   font-weight: 500;
+}
+
+.navItem[aria-current="page"] svg {
+  color: var(--sv-signal, var(--accent));
 }
 
 .navItem svg,
@@ -136,14 +142,21 @@
 }
 
 .newAction {
-  border: 0;
-  background: var(--gray-bg-alt);
-  color: var(--gray-fg);
+  margin-bottom: 4px;
+  border: 1px solid var(--gray-border);
+  background: var(--sv-object, var(--gray-bg-alt));
+  box-shadow: inset 0 1px 0 var(--sv-gloss, transparent);
+  color: var(--sv-display, var(--warm-black));
   font-weight: 500;
 }
 
+.newAction svg {
+  color: var(--sv-signal, var(--accent));
+}
+
 .newAction:hover:not(:disabled):not([aria-disabled="true"]) {
-  background: var(--gray-bg-hover);
+  border-color: var(--sv-orbit, var(--gray-muted));
+  background: var(--sv-object-hover, var(--gray-bg-hover));
 }
 
 .newAction:disabled,
@@ -153,17 +166,16 @@
 }
 
 .recent {
-  margin-top: 18px;
+  margin-top: 24px;
 }
 
 .recent h2,
 .contextual h2 {
   margin: 0;
-  padding: 0 9px 5px;
-  color: var(--gray-muted);
-  font-size: 10px;
+  padding: 0 12px 8px;
+  color: var(--gray-subtle);
+  font-size: 12px;
   font-weight: 500;
-  letter-spacing: .02em;
   line-height: 16px;
 }
 
@@ -172,13 +184,13 @@
 .contextual button {
   display: flex;
   width: 100%;
-  min-height: 34px;
+  min-height: 36px;
   align-items: center;
   gap: 8px;
-  padding: 6px 9px;
-  border-radius: 8px;
-  color: var(--gray-muted);
-  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  color: var(--navigation-nav-text, var(--gray-muted));
+  font-size: 14px;
   line-height: 20px;
   text-align: left;
   text-decoration: none;
@@ -188,8 +200,8 @@
 .contextual a:hover,
 .contextual button:hover,
 .contextual [aria-current="page"] {
-  background: var(--gray-bg-hover);
-  color: var(--gray-fg);
+  background: var(--navigation-hover-bg, var(--gray-bg-hover));
+  color: var(--navigation-active-text, var(--warm-black));
 }
 
 .recent span,
@@ -200,59 +212,58 @@
 }
 
 .contextual {
-  margin-top: 12px;
-  padding-top: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
   border-top: 1px solid var(--gray-border);
 }
 
 .contextual p {
-  padding: 6px 9px;
+  padding: 8px 12px;
   color: var(--gray-muted);
-  font-size: 11px;
-  line-height: 18px;
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .footer {
   flex-shrink: 0;
-  margin-top: 12px;
-  padding-top: 6px;
+  margin-top: 16px;
+  padding-top: 8px;
   border-top: 1px solid var(--gray-border);
 }
 
 .footer .navItem {
-  min-height: 34px;
+  min-height: 36px;
   padding-block: 6px;
-  font-size: 11px;
 }
 
 .account {
   display: flex;
-  min-height: 54px;
+  min-height: 56px;
   align-items: center;
-  gap: 9px;
-  margin-top: 4px;
-  padding: 8px 6px;
-  border-radius: 9px;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 12px;
   color: inherit;
   text-decoration: none;
 }
 
 .account:hover,
 .account[aria-current="page"] {
-  background: var(--gray-bg-hover);
+  background: var(--navigation-hover-bg, var(--gray-bg-hover));
 }
 
 .avatar {
   display: grid;
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
   place-items: center;
-  border: 1px solid var(--gray-border);
-  border-radius: 50%;
-  background: var(--surface);
-  color: var(--gray-fg);
-  font-size: 11px;
+  border: 1px solid var(--sv-orbit, var(--gray-border));
+  border-radius: 9999px;
+  color: var(--sv-display, var(--gray-fg));
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .account > span:nth-child(2) {
@@ -269,38 +280,37 @@
 }
 
 .account strong {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
-  line-height: 18px;
+  line-height: 20px;
 }
 
 .account small {
-  margin-top: 1px;
   color: var(--gray-muted);
-  font-size: 10px;
+  font-size: 12px;
   line-height: 16px;
 }
 
 .signOut {
   display: flex;
   width: 100%;
-  min-height: 34px;
+  min-height: 36px;
   align-items: center;
-  padding: 6px 9px;
+  padding: 8px 12px;
   color: var(--gray-muted);
-  font-size: 11px;
-  line-height: 20px;
+  font-size: 12px;
+  line-height: 16px;
 }
 
 .signIn {
   display: flex;
-  min-height: 38px;
+  min-height: 40px;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--gray-border);
-  border-radius: 9px;
+  border-radius: 12px;
   color: var(--gray-fg);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 .mobileClose {
@@ -308,7 +318,7 @@
   width: 40px;
   height: 40px;
   place-items: center;
-  border-radius: 10px;
+  border-radius: 12px;
   color: var(--gray-muted);
 }
 
@@ -353,7 +363,7 @@
 @media (pointer: coarse) {
   .footer .navItem,
   .signOut {
-    min-height: 42px;
+    min-height: 44px;
   }
 }
 
