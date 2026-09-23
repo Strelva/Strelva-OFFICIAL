@@ -10,39 +10,14 @@ import {
 } from "./repository";
 
 type InquiryWorkState = InquiryWork["state"];
+import type { InquiryAttentionSummary, InquiryPatternSummary, InquiryPortfolio } from "./portfolio-contracts";
+export type { InquiryAttentionSummary, InquiryPatternSummary, InquiryPortfolio } from "./portfolio-contracts";
 
 const ATTENTION_STATES = new Set<InquiryWorkState>([
   "planned",
   "ready_to_publish",
   "failed",
 ]);
-
-export interface InquiryAttentionSummary {
-  tenantId: string;
-  businessId: string;
-  businessName: string;
-  workId: string;
-  title: string;
-  state: Extract<InquiryWorkState, "planned" | "ready_to_publish" | "failed">;
-  requiredDecision: string;
-  updatedAt: string;
-}
-
-export interface InquiryPatternSummary {
-  id: string;
-  sourceTenantId: string;
-  sourceBusinessId: string;
-  sourceBusinessName: string;
-  name: string;
-  version: number;
-  cleanReceiptCount: number;
-}
-
-export interface InquiryPortfolio {
-  attention: InquiryAttentionSummary[];
-  patterns: InquiryPatternSummary[];
-  unavailableTenantIds: string[];
-}
 
 export interface ResolvedInquiryPattern {
   sourceBusinessName: string;

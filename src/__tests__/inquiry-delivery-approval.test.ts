@@ -10,7 +10,7 @@ import {
   prepareInquiryMessageReviewWithDependencies,
   reconcileInquiryMessageReview,
   type InquiryMessageReviewDependencies,
-} from "@/products/inquiries/delivery-approval-engine";
+} from "@/products/inquiries/delivery-approval-service";
 import { createMemoryInquiryDeliveryStore } from "@/products/inquiries/delivery-store";
 import type { InquiryOutboundTransport } from "@/products/inquiries/delivery-types";
 import { createInMemoryInquiryRepository, type InquiryRepository } from "@/products/inquiries/repository";

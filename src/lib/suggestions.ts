@@ -8,7 +8,7 @@ import { addEvent, getEvents, resolveEvent, updateEvent } from "./events";
 import { getSectionTimestamps, getClickCounts, getContent, getSearchData, getDailyMetrics } from "./storage";
 import { getProducts } from "./products";
 import { getSiteCapabilityManifest } from "./site-capabilities";
-import { getAllTenants, getTenantConfig } from "./tenants";
+import { getTenantConfig } from "./tenants";
 import type { ContentSection } from "./types";
 import { dataSourceIsPostgres } from "./db/source-flags";
 import { getSupabase, type Row, type Insert } from "./db/client";
@@ -653,12 +653,5 @@ No markdown. No extra text.`,
     };
   } catch {
     return null;
-  }
-}
-
-export async function generateSuggestionsForAll(): Promise<void> {
-  const tenants = await getAllTenants();
-  for (const tenant of tenants.filter((t) => t.active)) {
-    await generateSuggestionsForTenant(tenant.id);
   }
 }

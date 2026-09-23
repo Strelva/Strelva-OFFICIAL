@@ -32,12 +32,18 @@ both `.test.ts` and `.test.tsx` files under `src/__tests__`.
 ### Source ownership
 
 `pnpm check:boundaries` checks static imports, re-exports, literal dynamic imports,
-`require` calls, and type imports across current source and scripts. Native
-application rules and their shared contract dependencies may import only the
-explicit domain modules and Zod. The check rejects a database or service import
-hidden behind a contract re-export. Other product and platform boundaries remain
-in force; this is an incremental migration, not a claim that every product has a
-pure domain layer.
+`require` calls, and type imports across current source and scripts, including
+untracked files. Product and platform direction rules remain in force.
+
+The domain check follows the complete local import graph from each product's
+`contracts.ts`, `domain.ts`, `engine.ts`, and `inquiry-engine.ts`, plus the named
+execution, budget, delivery-commitment, governance and risk cores in
+`scripts/domain-boundaries.ts`. A dependency hidden behind an intermediate helper
+or type re-export is still checked. Unresolved local modules and nonliteral module
+loads fail rather than disappearing from the graph. Domain roots allow Zod and
+the existing Node identity primitive, not provider SDKs, storage or presentation.
+Native application rules retain their narrower explicit dependency allowlist.
+This is import-boundary enforcement, not a proof that arbitrary code is pure.
 
 ESLint treats unused variables and imports as errors. Explicit underscore-prefixed
 parameters remain allowed for interface implementations. Unreferenced routes,

@@ -49,13 +49,6 @@ export interface RiskAssessment {
   autoApply: boolean;
 }
 
-export interface NodeContext {
-  selectedSection: ContentSection;
-  selectedField?: string;
-  currentValue?: string;
-  sectionData?: Record<string, unknown>;
-}
-
 export interface AgentOperation {
   type: "rewrite" | "add" | "update" | "delete" | "reorder" | "visibility" | "structural";
   section: ContentSection;

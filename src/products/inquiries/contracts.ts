@@ -791,4 +791,4 @@ export type { InquiryConnectionView } from "./connections";
 
 export type { InquiryAudience, InquirySurfaceAction, InquirySurfaceAdapter, InquirySurfaceResult, InquirySurfaceSnapshot } from "./surface-contracts";
 
-export type { InquiryAttentionSummary, InquiryPatternSummary, InquiryPortfolio } from "./portfolio";
+export type { InquiryAttentionSummary, InquiryPatternSummary, InquiryPortfolio } from "./portfolio-contracts";

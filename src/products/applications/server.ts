@@ -6,32 +6,8 @@ import {
   type WorkspaceActor,
 } from "@/platform/workspaces/types";
 import { boundedStore, initial, type BoundedStore } from "@/platform/bounded-work/repository";
-import {
-  applicationCommandSchema,
-  applicationPublishInputSchema,
-  applicationRehearseInputSchema,
-  applicationReleaseSchema,
-  applicationReviseInputSchema,
-  applicationRollbackInputSchema,
-  applicationSchema,
-  applicationSpecSchema,
-  applicationSubmitInputSchema,
-  APPLICATION_RECORD_LIMIT,
-  type ApplicationRelease,
-} from "./contracts";
-import {
-  appendVersion,
-  cloneState,
-  compatibilityChecks,
-  currentRelease,
-  normalizeReleaseVersion,
-  releaseSpec,
-  reviseCandidate,
-  rehearseCandidate,
-  publishCandidate,
-  rollbackRelease,
-  validateRecord,
-} from "./domain";
+import { applicationCommandSchema, applicationPublishInputSchema, applicationRehearseInputSchema, applicationReviseInputSchema, applicationRollbackInputSchema, applicationSchema, applicationSpecSchema, applicationSubmitInputSchema, APPLICATION_RECORD_LIMIT, type ApplicationRelease } from "./contracts";
+import { applyLegacyApplicationCommand, assertLegacyApplicationRevision, cloneState, currentRelease, normalizeReleaseVersion, releaseSpec, reviseCandidate, rehearseCandidate, publishCandidate, rollbackRelease, validateRecord } from "./domain";
 import {
   assertApplicationStorage,
   durableDb,
@@ -341,13 +317,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     if (durableDb(store)) {
       const loaded = await load(store, actor, id);
       if (command.kind !== "submit" && command.kind !== "revise" && command.kind !== "rehearse") await ensureManager(store, actor, loaded.work);
-      const aggregateRevision = "expectedRevision" in command ? command.expectedRevision : undefined;
-      const designRevision = "expectedDesignRevision" in command ? command.expectedDesignRevision : undefined;
-      if (aggregateRevision !== undefined) {
-        if (loaded.state.legacyRevision !== aggregateRevision) throw new WorkspaceConflictError("This work changed. Reload before trying again.");
-      } else if (designRevision !== undefined && loaded.state.candidate.designRevision !== designRevision) {
-        throw new WorkspaceConflictError("This application candidate changed. Reload before trying again.");
-      }
+      assertLegacyApplicationRevision(loaded.state, command);
       if (command.kind === "revise") return revise(actor, id, { expectedDesignRevision: loaded.state.candidate.designRevision, spec: command.spec });
       if (command.kind === "rehearse") return rehearse(actor, id, { expectedDesignRevision: loaded.state.candidate.designRevision });
       if (command.kind === "install") return publish(actor, id, { expectedCandidateRevision: loaded.state.candidate.designRevision, expectedReleaseVersion: loaded.state.currentReleaseVersion });
@@ -390,97 +360,17 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     return withMemoryLane(store, id, async () => {
       const loaded = await load(store, actor, id);
       if (command.kind !== "submit") await ensureManager(store, actor, loaded.work);
-      const state = cloneState(loaded.state);
-      const aggregateRevision = "expectedRevision" in command ? command.expectedRevision : undefined;
-      const designRevision = "expectedDesignRevision" in command ? command.expectedDesignRevision : undefined;
-      if (aggregateRevision !== undefined) {
-        if (state.legacyRevision !== aggregateRevision) throw new WorkspaceConflictError("This work changed. Reload before trying again.");
-      } else if (designRevision !== undefined && state.candidate.designRevision !== designRevision) {
-        throw new WorkspaceConflictError("This application candidate changed. Reload before trying again.");
-      }
-
+      assertLegacyApplicationRevision(loaded.state, command);
+      let source;
       if (command.kind === "adopt_update") {
-        if (!state.installation) throw new WorkspaceConflictError("This application has no reusable source.");
-        const source = await load(store, actor, state.installation.sourceWorkId);
-        await ensureActorMember(store, actor, source.work);
-        const sourceRelease = source.state.releases.find((release) => release.version === command.sourceVersion);
-        if (!sourceRelease || source.state.currentReleaseVersion !== command.sourceVersion || source.state.status === "retired") {
-          throw new WorkspaceConflictError("The selected source version is not currently available for installation.");
-        }
-        if (state.installation.sourceVersion === command.sourceVersion) throw new WorkspaceConflictError("This source version is already installed.");
-        const base = state.installation.baseSpec;
-        const remote = applicationSpecSchema.parse({ ...sourceRelease.spec, maintenanceOwner: state.candidate.spec.maintenanceOwner });
-        function merge<T>(previous: T, local: T, incoming: T): T {
-          const changed = JSON.stringify(local) !== JSON.stringify(previous);
-          if (changed && JSON.stringify(incoming) !== JSON.stringify(previous) && JSON.stringify(local) !== JSON.stringify(incoming)) {
-            throw new WorkspaceConflictError("This source update conflicts with local changes. Keep the current version until those changes are reconciled.");
-          }
-          return changed ? local : incoming;
-        }
-        const spec = applicationSpecSchema.parse({
-          title: merge(base.title, state.candidate.spec.title, remote.title),
-          maintenanceOwner: state.candidate.spec.maintenanceOwner,
-          fields: merge(base.fields, state.candidate.spec.fields, remote.fields),
-          components: merge(base.components, state.candidate.spec.components, remote.components),
-        });
-        for (const record of state.records) validateRecord(spec, record);
-        state.candidate = { designRevision: state.candidate.designRevision + 1, specVersion: state.candidate.specVersion + 1, spec, rehearsal: null };
-        state.versions = appendVersion(state.versions, { version: state.candidate.specVersion, spec }, "This application has reached its candidate history limit.");
-        state.installation = { ...state.installation, sourceVersion: command.sourceVersion, baseSpec: remote };
-        state.status = "draft";
-        return saveMemory(store, actor, loaded, state, "adopt_update");
+        if (!loaded.state.installation) throw new WorkspaceConflictError("This application has no reusable source.");
+        const loadedSource = await load(store, actor, loaded.state.installation.sourceWorkId);
+        await ensureActorMember(store, actor, loadedSource.work);
+        source = loadedSource.state;
       }
-      if (command.kind === "revise") {
-        // The compatibility command preserves the old dashboard contract and
-        // rejects data-breaking edits immediately. The explicit revise method
-        // allows a candidate to be rehearsed and rejected at publication.
-        for (const record of state.records) validateRecord(command.spec, record);
-        if (command.spec.maintenanceOwner !== state.candidate.spec.maintenanceOwner) throw new WorkspaceConflictError("Changing maintenance responsibility requires an accepted handoff.");
-        state.candidate = { designRevision: state.candidate.designRevision + 1, specVersion: state.candidate.specVersion + 1, spec: command.spec, rehearsal: null };
-        state.versions = appendVersion(state.versions, { version: state.candidate.specVersion, spec: command.spec }, "This application has reached its candidate history limit.");
-        state.status = "draft";
-        return saveMemory(store, actor, loaded, state, "revise");
-      }
-      if (command.kind === "rehearse") {
-        state.candidate.rehearsal = { specVersion: state.candidate.specVersion, checks: compatibilityChecks(state) };
-        return saveMemory(store, actor, loaded, state, "rehearse");
-      }
-      if (command.kind === "install") {
-        if (!state.candidate.rehearsal || state.candidate.rehearsal.specVersion !== state.candidate.specVersion || state.candidate.rehearsal.checks.some((check) => !check.passed)) throw new WorkspaceConflictError("Run a passing rehearsal for this version first.");
-        for (const record of state.records) validateRecord(state.candidate.spec, record);
-        const nextVersion = Math.max(0, ...state.releases.map((release) => release.version)) + 1;
-        const release = applicationReleaseSchema.parse({ version: nextVersion, spec: state.candidate.spec, publishedAt: new Date().toISOString(), publishedBy: actor.userId, provenance: "published" });
-        state.releases = appendVersion(state.releases, release, "This application has reached its release history limit.");
-        state.currentReleaseVersion = release.version;
-        state.status = "installed";
-        return saveMemory(store, actor, loaded, state, "install");
-      }
-      if (command.kind === "retire") {
-        state.status = "retired";
-        return saveMemory(store, actor, loaded, state, "retire");
-      }
-      if (command.kind === "rollback") {
-        const spec = state.versions.find((value) => value.version === command.version)?.spec;
-        if (!spec) throw new WorkspaceConflictError("That application version is unavailable.");
-        if (spec.maintenanceOwner !== state.candidate.spec.maintenanceOwner) throw new WorkspaceConflictError("Changing maintenance responsibility requires an accepted handoff.");
-        for (const record of state.records) validateRecord(spec, record);
-        state.candidate = { designRevision: state.candidate.designRevision + 1, specVersion: state.candidate.specVersion + 1, spec, rehearsal: null };
-        state.versions = appendVersion(state.versions, { version: state.candidate.specVersion, spec }, "This application has reached its candidate history limit.");
-        state.status = "draft";
-        return saveMemory(store, actor, loaded, state, "rollback");
-      }
-      if (command.kind === "submit") {
-        const spec = releaseSpec(state);
-        if (!spec || state.status === "retired") throw new WorkspaceConflictError("This application is not accepting records.");
-        if (state.records.some((record) => record.id === command.record.id)) throw new WorkspaceConflictError("That record already exists.");
-        if (state.records.length >= APPLICATION_RECORD_LIMIT) throw new WorkspaceConflictError("This application has reached its record limit.");
-        validateRecord(spec, command.record);
-        state.records = [...state.records, command.record];
-        state.recordsRevision += 1;
-        const saved = await saveMemory(store, actor, loaded, state, "submit");
-        return output(saved, state);
-      }
-      throw new WorkspaceConflictError("This application command is unavailable.");
+      const state = applyLegacyApplicationCommand(loaded.state, command, actor.userId, new Date().toISOString(), source);
+      const saved = await saveMemory(store, actor, loaded, state, command.kind);
+      return command.kind === "submit" ? output(saved, state) : saved;
     });
   }
 

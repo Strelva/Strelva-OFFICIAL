@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { CustomApplicationArtifact } from "./build";
 
 export const CUSTOM_APPLICATION_PRODUCT = "custom-applications" as const;
 export const CUSTOM_APPLICATION_RESOURCE_KIND = "custom-application" as const;
@@ -17,7 +16,7 @@ const filePath = z.string()
 export const customApplicationFilesSchema = z.record(filePath, z.string())
   .refine(files => Object.keys(files).length > 0 && Object.keys(files).length <= CUSTOM_APPLICATION_FILE_LIMIT, "Add between one and thirty source files")
   .refine(files => typeof files["build.mjs"] === "string", "A build.mjs entry is required")
-  .refine(files => Object.values(files).reduce((sum, value) => sum + Buffer.byteLength(value), 0) <= CUSTOM_APPLICATION_SOURCE_BYTES, "Source exceeds the build limit");
+  .refine(files => Object.values(files).reduce((sum, value) => sum + new TextEncoder().encode(value).byteLength, 0) <= CUSTOM_APPLICATION_SOURCE_BYTES, "Source exceeds the build limit");
 
 export const customApplicationBudgetSchema = z.object({
   maxAuthorizedCents: z.number().int().min(0).max(1_000_000),
@@ -184,5 +183,12 @@ export const customApplicationPreviewSchema = z.object({
   html: z.string().min(1),
 }).strict();
 export type CustomApplicationPreview = z.infer<typeof customApplicationPreviewSchema>;
+
+export interface CustomApplicationArtifact {
+  version: 1; workspaceId: string; resourceId: string; applicationVersion: number;
+  sourceDigest: string; artifactDigest: string; image: string; html: string;
+  builtAt: string; durationMs: number; state: "built";
+  limits: { network: "none"; memoryMb: 256; cpuCount: 1; timeoutSeconds: 30 };
+}
 
 export type CustomBuildArtifact = CustomApplicationArtifact;

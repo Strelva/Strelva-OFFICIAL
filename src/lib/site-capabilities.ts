@@ -3,12 +3,7 @@ import { CUSTOM_REPO_CONTRACT_VERSION, getCustomRepoMetadata } from "@/lib/custo
 import { getTenantConfig } from "@/lib/tenants";
 import { siteCapabilityManifestSchema } from "@/lib/schemas";
 import { isSafeFetchUrl } from "@/lib/safe-fetch";
-import type {
-  ContentSection,
-  SectionCapability,
-  SiteCapabilityManifest,
-  TenantConfig,
-} from "@/lib/types";
+import type { SectionCapability, SiteCapabilityManifest, TenantConfig } from "@/lib/types";
 import { isContentSection } from "@/lib/types";
 
 const DEFAULT_DESIGN_TOKENS = [
@@ -132,13 +127,6 @@ export function manifestSupportsSection(
   section: string
 ): boolean {
   return isContentSection(section) && !!manifest.sections[section];
-}
-
-export function manifestSupportsContentSection(
-  manifest: SiteCapabilityManifest,
-  section: ContentSection
-): boolean {
-  return manifestSupportsSection(manifest, section);
 }
 
 export function manifestAllowsAction(

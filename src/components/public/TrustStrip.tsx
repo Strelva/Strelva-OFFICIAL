@@ -2,7 +2,7 @@
 
 import { useRef, useEffect } from "react";
 import gsap from "gsap";
-import { ScrollTrigger as _ScrollTrigger } from "@/lib/lenis";
+import "@/lib/lenis";
 import type { SiteSettings, ContactContent } from "@/lib/types";
 
 export function TrustStrip({ settings, contact }: { settings: SiteSettings; contact: ContactContent }) {

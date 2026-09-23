@@ -220,9 +220,4 @@ export function assertWebsiteArtifactBundle(bundle: WebsiteArtifactBundle): void
   }
 }
 
-export function websiteCandidateFromBundle(bundle: WebsiteArtifactBundle): WebsiteArtifact {
-  assertWebsiteArtifactBundle(bundle);
-  return websiteArtifactSchema.parse(bundle.candidate);
-}
-
 export { websiteSpecContentHash };

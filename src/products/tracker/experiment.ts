@@ -41,7 +41,6 @@ export type TrackerExperiment = z.infer<typeof trackerExperimentSchema>;
 export const trackerExperimentInputSchema = trackerExperimentSchema.extend({
   expectedRevision: z.number().int().nonnegative(),
 });
-export type TrackerExperimentInput = z.infer<typeof trackerExperimentInputSchema>;
 
 /** Reported effort is evidence for an experiment, not proven customer savings. */
 export function summarizeTrackerExperiment(input: TrackerExperiment) {

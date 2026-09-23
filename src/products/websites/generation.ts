@@ -1,7 +1,5 @@
 import { createHash } from "node:crypto";
-import { generateText, Output, type LanguageModel } from "ai";
 import { defaults } from "@/lib/defaults";
-import { getFallbackModel, getPrimaryModel, isTransientModelError, type ModelConfig } from "@/lib/ai-models";
 import type { ContentMap, PageConfig, SitePageConfig, ThemeContent } from "@/lib/types";
 import {
   WEBSITE_VERSION,
@@ -64,70 +62,6 @@ export interface WebsiteModelGenerationOptions {
 /** Build a provider around an already-admitted structured model call. */
 export function createStructuredWebsiteGenerationProvider(options: WebsiteModelGenerationOptions): WebsiteGenerationProvider {
   return async ({ brief, baseline }) => options.run({ brief, baseline, modelLabel: "structured-website-provider" });
-}
-
-function fallbackModelConfigured(): boolean {
-  if (!process.env.AI_FALLBACK_PROVIDER || !process.env.AI_FALLBACK_MODEL) return false;
-  if (process.env.AI_FALLBACK_PROVIDER === "anthropic") return Boolean(process.env.ANTHROPIC_API_KEY?.trim());
-  if (process.env.AI_FALLBACK_PROVIDER === "openai") return Boolean(process.env.OPENAI_API_KEY?.trim());
-  return false;
-}
-
-function configuredWebsiteModels(): ModelConfig[] {
-  const models: ModelConfig[] = [];
-  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim()) models.push(getPrimaryModel());
-  if (fallbackModelConfigured()) {
-    const fallback = getFallbackModel();
-    if (fallback) models.push(fallback);
-  }
-  return models;
-}
-
-function websiteModelPrompt(brief: WebsiteBrief, baseline: WebsiteDraft): string {
-  return [
-    "Create a website from the supplied brief.",
-    "Return only a WebsiteSpec object. Keep version 1, provide a siteName, and preserve a home page plus any useful about/contact pages.",
-    "Use only facts in the brief. Do not invent testimonials, addresses, phone numbers, pricing, certifications, client names, or provider claims.",
-    "The baseline is a shape and renderer example, not business evidence. Replace its generic or empty content with the brief where the brief supplies it.",
-    "Brief:", JSON.stringify(brief),
-    "Baseline WebsiteSpec:", JSON.stringify(baseline.spec),
-  ].join("\n\n");
-}
-
-/**
- * Opt-in adapter for the repository's configured AI models. It is disabled
- * unless website model generation is explicitly enabled and a model key is
- * present. Callers that need paid usage should invoke this provider inside the
- * existing budget admission path; token usage alone is never treated as cost.
- */
-export function createConfiguredWebsiteGenerationProvider(): WebsiteGenerationProvider | null {
-  if (process.env.STRELVA_WEBSITE_GENERATION_ENABLED !== "1") return null;
-  const models = configuredWebsiteModels();
-  if (!models.length) return null;
-  return async ({ brief, baseline }) => {
-    const abortSignal = AbortSignal.timeout(20_000);
-    const options = (model: LanguageModel) => ({
-      model,
-      system: "You produce a reviewable structured website draft. Never execute code or external actions.",
-      prompt: websiteModelPrompt(brief, baseline),
-      output: Output.object({ schema: websiteSpecSchema }),
-      maxOutputTokens: 4_000,
-      maxRetries: 0,
-      abortSignal,
-    });
-    try {
-      const result = await generateText(options(models[0]!.model));
-      return result.output;
-    } catch (error) {
-      if (!models[1] || !isTransientModelError(error)) throw new WebsiteGenerationProviderError("The configured website model did not return a structured draft.");
-      try {
-        const result = await generateText(options(models[1].model));
-        return result.output;
-      } catch {
-        throw new WebsiteGenerationProviderError("The configured website model did not return a structured draft.");
-      }
-    }
-  };
 }
 
 export interface WebsiteGenerationInput {

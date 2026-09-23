@@ -171,7 +171,7 @@ export interface JobEconomicsInspection {
   job: JobEconomicsRecord;
   usage: JobEconomicsUsage[];
   reservations: JobEconomicsReservation[];
-  executions?: import("./runtime").BudgetExecution[];
+  executions?: import("./execution-contracts").BudgetExecution[];
   policy: typeof JOB_ECONOMICS_POLICY;
 }
 
