@@ -102,7 +102,7 @@ test("Home keeps decisions, allowance, business switching and site assignment re
 
 test("the same navigation remains across primary surfaces and utilities", async ({ page }, info) => {
   await page.goto("/preview/strelva?scenario=free");
-  for (const label of ["Home", "Work", "Ongoing", "Settings", "People & access", "Apps & templates", "Help"]) {
+  for (const label of ["Home", "Work", "Ongoing", "Settings", "People & access", "Examples", "Help"]) {
     await navigation(page).getByRole("link", { name: label, exact: true }).click();
     await expect(navigation(page).getByRole("link", { name: label, exact: true })).toHaveAttribute("aria-current", "page");
     for (const name of ["Home", "Work", "Ongoing", "People & access", "Settings"]) await expect(navigation(page).getByRole("link", { name, exact: true })).toBeVisible();
@@ -130,7 +130,7 @@ test("mobile navigation traps focus and opens search without background interact
   await expect(page.getByRole("combobox", { name: /Search/ })).toBeFocused();
   await page.keyboard.press("Escape");
   await trigger.click();
-  await navigation(page).getByRole("link", { name: "Apps & templates", exact: true }).click();
+  await navigation(page).getByRole("link", { name: "Examples", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Make it yours.", exact: true })).toBeVisible();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.getByRole("button", { name: "Assign to this business", exact: true }).click();
