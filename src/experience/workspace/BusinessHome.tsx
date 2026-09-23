@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ArrowRight, Bell, FileText, Globe2, LayoutGrid, Plus, Workflow } from "lucide-react";
+import { ArrowRight, Bell, FileText, Globe2, LayoutGrid, Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { StrelvaShell, type StrelvaSection } from "@/experience/app-frame/StrelvaShell";
 import type { OfferingWebsiteBinding, OfferingWebsiteBindingCommand } from "@/platform/offerings";
