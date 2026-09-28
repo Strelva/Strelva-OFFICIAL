@@ -516,3 +516,41 @@ The first change applies to Home → New → Plan and sets the rule for the rest
 
 This is local implementation direction. It is not a deployment or an
 acceptance of the remaining surfaces, which still need the same pass.
+
+### September 23 business Home
+
+Jacob asked that bringing a business to Strelva should feel impressive, with
+the experience itself doing the work. Home now leads with the business:
+
+- The business name is the headline, with a short line of real facts beneath
+  it (websites, apps, saved results, and what needs the owner). Personal
+  workspaces say "Your workspace" rather than claiming to be a business.
+- The newest measured AI Visibility result is the featured insight: grade,
+  verdict and the single top fix, with "Have Strelva do this" turning the fix
+  into a change request. Unmeasured or unavailable scorecards are never shown.
+  A new business sees a "See how AI describes …" first step instead.
+- Work inside the business is shown as objects to open, with a dashed tile
+  for adding more. Suggestions follow what the business already has and do
+  not repeat the insight card.
+- "Needs you" appears only when something does. Entrance motion is short and
+  staggered, and is removed under reduced motion.
+
+The illustrated-business Home from September 14–15 remains history; this
+decision replaces it for the workspace Home.
+
+### September 23 component material and palette comparison
+
+Jacob judged the components generic: bordered rounded boxes, pills, stock
+white buttons and zinc grays that read as any dark SaaS dashboard. The shell
+and Home now share one small material vocabulary (`--sv-*` roles in
+`src/app/styles/workspace-colors.css`): objects carry a top gloss edge and fine
+grain, the selected navigation item is carried by material instead of a gray
+pill, the current business is shown as an object, and measured scores use the
+new `OrbitScore` mark derived from the reference's orbital lines. Navigation
+text moves from 12px to the 14px scale.
+
+The September 17 ink/ivory reference and the September 20 neutral direction
+conflict. Both are implemented on the same components; neutral remains the
+default, and the local preview's Palette control (or `?palette=ink`) switches
+to ink for comparison. This is pending Jacob's selection, not an adopted
+palette change.

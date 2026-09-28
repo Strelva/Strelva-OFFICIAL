@@ -7,3 +7,4 @@
 .controls select { min-height: 40px; max-width: 176px; padding: 4px 12px; border: 1px solid var(--gray-border); border-radius: 8px; color: var(--warm-black); background: var(--surface-base); font-size: 14px; }
 .controls select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .controls p { margin: 0; flex-basis: 100%; }
+@media (max-width: 639px) { .paletteControl { display: none !important; } }

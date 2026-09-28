@@ -130,7 +130,7 @@ async function mockWorkspace(page: Page, handler: (route: Route) => Promise<void
 }
 
 async function expectBusinessHome(page: Page) {
-  await expect(page.getByRole("heading", { name: "What should happen next?", exact: true })).toBeVisible();
+  await expect(page.getByRole("list", { name: "At a glance", exact: true })).toBeVisible();
 }
 
 async function openWorkspaceHelp(page: Page) {
@@ -522,8 +522,8 @@ test("keeps My work and Shared with me context-local and read-only", async ({ pa
 
   await page.goto("/workspace");
   await page.getByLabel("Current workspace").selectOption(CUSTOMER_ID);
-  await expect(page.getByRole("heading", { name: "Review what was shared.", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Continue", exact: true })).toBeVisible();
+  await expect(page.getByText("Shared with you", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Shared work", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open Customer-owned assessment" })).toBeVisible();
   await page.getByRole("link", { name: /^Examples/ }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
