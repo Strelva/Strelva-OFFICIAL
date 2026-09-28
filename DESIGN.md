@@ -537,3 +537,20 @@ the experience itself doing the work. Home now leads with the business:
 
 The illustrated-business Home from September 14–15 remains history; this
 decision replaces it for the workspace Home.
+
+### September 23 component material and palette comparison
+
+Jacob judged the components generic: bordered rounded boxes, pills, stock
+white buttons and zinc grays that read as any dark SaaS dashboard. The shell
+and Home now share one small material vocabulary (`--sv-*` roles in
+`src/app/styles/workspace-colors.css`): objects carry a top gloss edge and fine
+grain, the selected navigation item is carried by material instead of a gray
+pill, the current business is shown as an object, and measured scores use the
+new `OrbitScore` mark derived from the reference's orbital lines. Navigation
+text moves from 12px to the 14px scale.
+
+The September 17 ink/ivory reference and the September 20 neutral direction
+conflict. Both are implemented on the same components; neutral remains the
+default, and the local preview's Palette control (or `?palette=ink`) switches
+to ink for comparison. This is pending Jacob's selection, not an adopted
+palette change.

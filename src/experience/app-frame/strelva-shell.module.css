@@ -5,7 +5,7 @@
 }
 
 .shell {
-  --app-navigation-width: 232px;
+  --app-navigation-width: 256px;
   position: relative;
   background: var(--surface-base);
 }
@@ -14,17 +14,17 @@
   display: flex;
   width: 100%;
   min-width: 0;
-  min-height: 52px;
+  min-height: 56px;
   align-items: center;
   gap: 12px;
-  padding: 6px 18px 6px 6px;
+  padding: 8px 24px 8px 8px;
 }
 
 .title {
   overflow: hidden;
-  color: var(--gray-fg);
-  font-size: 12px;
-  font-weight: 500;
+  color: var(--gray-muted);
+  font-size: 14px;
+  font-weight: 400;
   line-height: 20px;
   text-overflow: ellipsis;
   white-space: nowrap;
