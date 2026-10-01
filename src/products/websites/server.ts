@@ -12,8 +12,9 @@ import {
   approveWebsiteInputSchema,
   connectWebsiteCapabilitiesInputSchema,
   createWebsiteInputSchema,
-  prepareWebsiteLaunchInputSchema,
+  publishWebsiteInputSchema,
   reviseWebsiteInputSchema,
+  takeWebsiteOfflineInputSchema,
   WEBSITE_PRODUCT_ID,
   WEBSITE_RESOURCE_KIND,
   websiteArtifactSchema,
@@ -22,8 +23,9 @@ import {
   type ApproveWebsiteInput,
   type ConnectWebsiteCapabilitiesInput,
   type CreateWebsiteInput,
-  type PrepareWebsiteLaunchInput,
+  type PublishWebsiteInput,
   type ReviseWebsiteInput,
+  type TakeWebsiteOfflineInput,
   type Website,
   type WebsiteArtifact,
   type WebsiteBrief,
@@ -32,7 +34,10 @@ import {
   type WebsitePublishedCapabilities,
   type WebsiteRecord,
 } from "./contracts";
-import { buildWebsiteArtifact } from "./artifact";
+import { buildWebsiteArtifact, type WebsiteArtifactBundle } from "./artifact";
+import { hostedPagesFromBundle, websiteAddressCandidates } from "./hosting";
+import { WebsiteAddressTakenError, websitePublicationStore, type WebsitePublicationRow, type WebsitePublicationStore } from "./publications";
+import { hostedSitesDomain, hostedSiteUrl } from "@/lib/hosted-site-host";
 import { draftFromWebsiteSpec, generateWebsiteDraft, websiteSpecContentHash } from "./generation";
 import { listPublishedWebsiteCapabilityOptions, resolvePublishedWebsiteCapabilities } from "./published-capabilities";
 
@@ -45,8 +50,9 @@ export {
 export {
   approveWebsiteInputSchema,
   createWebsiteInputSchema,
-  prepareWebsiteLaunchInputSchema,
+  publishWebsiteInputSchema,
   reviseWebsiteInputSchema,
+  takeWebsiteOfflineInputSchema,
   WEBSITE_PRODUCT_ID,
   WEBSITE_RESOURCE_KIND,
   websiteArtifactSchema,
@@ -84,7 +90,8 @@ export interface WebsiteArtifactGenerationInput {
   publishedCapabilities?: WebsitePublishedCapabilities;
 }
 
-export interface WebsiteLaunchPreparationInput {
+export interface WebsitePublishInput {
+  actor: WorkspaceActor;
   workspaceId: string;
   workId: string;
   candidate: WebsiteArtifact;
@@ -93,13 +100,14 @@ export interface WebsiteLaunchPreparationInput {
 
 /**
  * The website product owns the durable brief and lifecycle. A provider owns
- * artifact construction and any real launch handoff. The default provider
- * creates a deterministic local candidate; launch remains unavailable until
- * an authorized external artifact adapter is configured.
+ * artifact construction and the public handoff. The default provider creates a
+ * deterministic candidate and publishes the exact approved pages to Strelva
+ * hosting at <address>.<STRELVA_SITES_DOMAIN>.
  */
 export interface WebsiteArtifactProvider {
   generate(input: WebsiteArtifactGenerationInput): Promise<WebsiteArtifact>;
-  prepareLaunch(input: WebsiteLaunchPreparationInput): Promise<WebsiteLaunchReceipt>;
+  publish(input: WebsitePublishInput): Promise<WebsiteLaunchReceipt>;
+  takeOffline(input: { actor: WorkspaceActor; workspaceId: string; workId: string }): Promise<void>;
 }
 
 interface WebsiteStore extends BoundedStore {
@@ -121,80 +129,127 @@ interface LoadedWebsite {
   website: Website;
 }
 
-export const defaultWebsiteArtifactProvider: WebsiteArtifactProvider = {
-  async generate(input) {
-    const draft = await generateWebsiteDraft({
-      workspaceId: input.workspaceId,
-      workId: input.workId,
-      revision: input.revision,
-      brief: input.brief,
-      publishedCapabilities: input.publishedCapabilities,
-      now: new Date().toISOString(),
-      previewHref: `/workspace?view=websites&work=${encodeURIComponent(input.workId)}&revision=${input.revision}`,
-    });
-    const bundle = buildWebsiteArtifact({
-      workspaceId: input.workspaceId,
-      workId: input.workId,
-      revision: input.revision,
-      draft,
-      generatedAt: new Date().toISOString(),
-      previewHref: `/workspace?view=websites&work=${encodeURIComponent(input.workId)}&revision=${input.revision}`,
-    });
-    return websiteArtifactSchema.parse({
-      ...bundle.candidate,
-      preview: {
-        ...bundle.candidate.preview,
-        href: `/api/websites/${encodeURIComponent(input.workId)}/preview?revision=${input.revision}&contentHash=${bundle.candidate.contentHash}`,
-      },
-    });
-  },
-  async prepareLaunch(input) {
-    // Local preparation is deliberately limited to rebuilding the exact
-    // immutable export. It does not call a model, GitHub, Vercel, or any other
-    // external provider, and therefore returns a pending local receipt rather
-    // than claiming publication.
-    if (websiteSpecContentHash(input.candidate.spec) !== input.candidate.contentHash) {
-      throw new WebsiteProviderUnavailableError("The approved website candidate no longer matches its content hash.");
-    }
-    const settings = input.candidate.spec.content.settings;
-    const siteSettings = settings && typeof settings === "object" && !Array.isArray(settings)
-      ? settings as Record<string, unknown>
-      : {};
-    const description = typeof siteSettings.siteTagline === "string" && siteSettings.siteTagline.trim()
-      ? siteSettings.siteTagline
-      : input.candidate.spec.siteName;
-    const draft = draftFromWebsiteSpec(input.candidate.spec, {
-      businessName: input.candidate.spec.siteName,
-      description,
-      primaryCallToAction: "Contact us",
-    });
-    const bundle = buildWebsiteArtifact({
-      workspaceId: input.workspaceId,
-      workId: input.workId,
-      revision: input.candidate.revision,
-      draft,
-      generatedAt: input.candidate.generatedAt,
-      previewHref: input.candidate.preview.href,
-    });
-    if (bundle.contentHash !== input.candidate.contentHash || bundle.revision !== input.candidate.revision || bundle.artifactDigest !== input.candidate.artifactDigest) {
-      throw new WebsiteProviderUnavailableError("The approved website export does not match its candidate revision.");
-    }
-    if (bundle.rendererDigest !== input.candidate.rendererDigest) {
-      throw new WebsiteProviderUnavailableError("The website renderer changed after approval. Generate a new preview before preparing export.");
-    }
-    const receiptId = `website-local-export-${createHash("sha256").update(`${input.idempotencyKey}:${input.candidate.contentHash}`, "utf8").digest("hex").slice(0, 32)}`;
-    return websiteLaunchReceiptSchema.parse({
-      status: "pending",
-      receiptId,
-      provider: "local_export",
-      providerUrl: `/api/websites/${encodeURIComponent(input.workId)}/export?revision=${input.candidate.revision}&contentHash=${input.candidate.contentHash}`,
-      evidence: `The exact approved website export is ready for private download (artifact ${bundle.artifactDigest}). No external deployment was attempted.`,
-      artifactHash: input.candidate.contentHash,
-      candidateRevision: input.candidate.revision,
-      preparedAt: new Date().toISOString(),
-    });
-  },
-};
+function previewHref(workId: string, revision: number): string {
+  return `/workspace?view=websites&work=${encodeURIComponent(workId)}&revision=${revision}`;
+}
+
+/** Rebuild the exact approved export from the persisted candidate and refuse any drift. */
+function approvedBundle(input: Pick<WebsitePublishInput, "workspaceId" | "workId" | "candidate">): WebsiteArtifactBundle {
+  if (websiteSpecContentHash(input.candidate.spec) !== input.candidate.contentHash) {
+    throw new WebsiteProviderUnavailableError("The approved website candidate no longer matches its content hash.");
+  }
+  const settings = input.candidate.spec.content.settings;
+  const siteSettings = settings && typeof settings === "object" && !Array.isArray(settings)
+    ? settings as Record<string, unknown>
+    : {};
+  const description = typeof siteSettings.siteTagline === "string" && siteSettings.siteTagline.trim()
+    ? siteSettings.siteTagline
+    : input.candidate.spec.siteName;
+  const draft = draftFromWebsiteSpec(input.candidate.spec, {
+    businessName: input.candidate.spec.siteName,
+    description,
+    primaryCallToAction: "Contact us",
+  });
+  const bundle = buildWebsiteArtifact({
+    workspaceId: input.workspaceId,
+    workId: input.workId,
+    revision: input.candidate.revision,
+    draft,
+    generatedAt: input.candidate.generatedAt,
+    previewHref: input.candidate.preview.href,
+  });
+  if (bundle.contentHash !== input.candidate.contentHash || bundle.revision !== input.candidate.revision || bundle.artifactDigest !== input.candidate.artifactDigest) {
+    throw new WebsiteProviderUnavailableError("The approved website export does not match its candidate revision.");
+  }
+  if (bundle.rendererDigest !== input.candidate.rendererDigest) {
+    throw new WebsiteProviderUnavailableError("The website renderer changed after approval. Generate a new preview before publishing.");
+  }
+  return bundle;
+}
+
+export interface HostedWebsiteProviderOptions {
+  store?: WebsitePublicationStore;
+  domain?: () => string | null;
+}
+
+export function createHostedWebsiteProvider(options: HostedWebsiteProviderOptions = {}): WebsiteArtifactProvider {
+  const store = options.store ?? websitePublicationStore;
+  const domain = options.domain ?? (() => hostedSitesDomain());
+  return {
+    async generate(input) {
+      const draft = await generateWebsiteDraft({
+        workspaceId: input.workspaceId,
+        workId: input.workId,
+        revision: input.revision,
+        brief: input.brief,
+        publishedCapabilities: input.publishedCapabilities,
+        now: new Date().toISOString(),
+        previewHref: previewHref(input.workId, input.revision),
+      });
+      const bundle = buildWebsiteArtifact({
+        workspaceId: input.workspaceId,
+        workId: input.workId,
+        revision: input.revision,
+        draft,
+        generatedAt: new Date().toISOString(),
+        previewHref: previewHref(input.workId, input.revision),
+      });
+      return websiteArtifactSchema.parse({
+        ...bundle.candidate,
+        preview: {
+          ...bundle.candidate.preview,
+          href: `/api/websites/${encodeURIComponent(input.workId)}/preview?revision=${input.revision}&contentHash=${bundle.candidate.contentHash}`,
+        },
+      });
+    },
+    async publish(input) {
+      const sitesDomain = domain();
+      if (!sitesDomain) throw new WebsiteProviderUnavailableError("Website publishing is not configured in this environment. Your approved preview is saved and can be downloaded.");
+      const bundle = approvedBundle(input);
+      const pages = hostedPagesFromBundle(bundle);
+      const capabilities = input.candidate.spec.publishedCapabilities;
+      const connectOrigin = capabilities ? new URL(capabilities.baseUrl).origin : null;
+      let row: WebsitePublicationRow | null = null;
+      // A republished website keeps its first address; the database ignores
+      // the proposed address when the work item already has one.
+      for (const address of websiteAddressCandidates(input.candidate.spec.siteName, input.workId)) {
+        try {
+          row = await store.publish(input.actor, {
+            workspaceId: input.workspaceId,
+            workId: input.workId,
+            address,
+            candidateRevision: input.candidate.revision,
+            contentHash: input.candidate.contentHash,
+            artifactDigest: input.candidate.artifactDigest,
+            connectOrigin,
+            pages,
+          });
+          break;
+        } catch (error) {
+          if (error instanceof WebsiteAddressTakenError) continue;
+          throw error;
+        }
+      }
+      if (!row) throw new WebsiteProviderUnavailableError("No website address was available. Try publishing again.");
+      const url = hostedSiteUrl(row.address, sitesDomain);
+      return websiteLaunchReceiptSchema.parse({
+        status: "published",
+        receiptId: `website-hosted-${createHash("sha256").update(`${input.idempotencyKey}:${input.candidate.contentHash}`, "utf8").digest("hex").slice(0, 32)}`,
+        provider: "strelva_hosted",
+        providerUrl: url,
+        evidence: `Preview version ${input.candidate.revision} is live at ${url} (artifact ${bundle.artifactDigest}).`,
+        artifactHash: input.candidate.contentHash,
+        candidateRevision: input.candidate.revision,
+        publishedAt: row.publishedAt,
+      });
+    },
+    async takeOffline(input) {
+      await store.takeOffline(input.actor, { workspaceId: input.workspaceId, workId: input.workId });
+    },
+  };
+}
+
+export const defaultWebsiteArtifactProvider = createHostedWebsiteProvider();
 
 function inputRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -257,7 +312,7 @@ function providerFailure(error: unknown, stage: "artifact" | "launch"): string {
   if (error instanceof WebsiteUnavailableError) return error.message;
   return stage === "artifact"
     ? "The website preview could not be generated. Retry this brief or try again later."
-    : "The website launch provider could not confirm this request. Retry from the saved approval.";
+    : "Publishing could not be confirmed. Your approved preview is saved; try publishing again.";
 }
 
 function privatePreviewHref(workId: string, candidate: Pick<WebsiteArtifact, "revision" | "contentHash">): string {
@@ -323,7 +378,8 @@ export interface WebsiteService {
   list(actor: WorkspaceActor, workspaceId: string): Promise<WebsiteRecord[]>;
   revise(actor: WorkspaceActor, workId: string, raw: unknown): Promise<WebsiteRecord>;
   approve(actor: WorkspaceActor, workId: string, raw: unknown): Promise<WebsiteRecord>;
-  prepareLaunch(actor: WorkspaceActor, workId: string, raw: unknown): Promise<WebsiteRecord>;
+  publish(actor: WorkspaceActor, workId: string, raw: unknown): Promise<WebsiteRecord>;
+  takeOffline(actor: WorkspaceActor, workId: string, raw: unknown): Promise<WebsiteRecord>;
   capabilityOptions(actor: WorkspaceActor, workId: string): Promise<WebsiteCapabilityOptions>;
   connectCapabilities(actor: WorkspaceActor, workId: string, raw: unknown): Promise<WebsiteRecord>;
 }
@@ -471,8 +527,8 @@ export function createWebsiteService(inputStore: BoundedStore = boundedStore, de
     const input: ReviseWebsiteInput = reviseWebsiteInputSchema.parse(raw);
     const loaded = await load(actor, workId);
     if (loaded.website.revision !== input.expectedRevision) throw new WebsiteConflictError();
-    if (loaded.website.status === "launch_pending" && loaded.website.launch.receipt?.provider !== "local_export") {
-      throw new WebsiteConflictError("Launch preparation is already in progress. Wait for its receipt or retry it.");
+    if (loaded.website.status === "launch_pending") {
+      throw new WebsiteConflictError("Publishing is still in progress. Finish publishing before changing this website.");
     }
     return generate(actor, loaded, input.brief);
   }
@@ -491,18 +547,17 @@ export function createWebsiteService(inputStore: BoundedStore = boundedStore, de
     return update(actor, loaded, input.expectedRevision, next);
   }
 
-  async function prepareLaunch(actor: WorkspaceActor, workId: string, raw: unknown): Promise<WebsiteRecord> {
-    const input: PrepareWebsiteLaunchInput = prepareWebsiteLaunchInputSchema.parse(raw);
+  async function publish(actor: WorkspaceActor, workId: string, raw: unknown): Promise<WebsiteRecord> {
+    const input: PublishWebsiteInput = publishWebsiteInputSchema.parse(raw);
     const loaded = await load(actor, workId);
     if (loaded.website.revision !== input.expectedRevision) throw new WebsiteConflictError();
     if (!loaded.website.candidate || loaded.website.candidate.revision !== input.candidateRevision || loaded.website.candidate.contentHash !== input.candidateContentHash) throw new WebsiteConflictError("The requested website preview is no longer current.");
     if (loaded.website.status === "published" && loaded.website.launch.candidateRevision === input.candidateRevision) return present(loaded);
-    if (loaded.website.status === "launch_pending" && loaded.website.launch.receipt?.candidateRevision === input.candidateRevision) return present(loaded);
     const canRetry = loaded.website.status === "failed" && loaded.website.lastError?.stage === "launch" && loaded.website.approvedCandidateRevision === input.candidateRevision;
     const canRecover = loaded.website.status === "launch_pending"
       && loaded.website.launch.candidateRevision === input.candidateRevision
       && loaded.website.launch.receipt === null;
-    if (loaded.website.status !== "approved" && !canRetry && !canRecover) throw new WebsiteConflictError("Approve the current website preview before preparing launch.");
+    if (loaded.website.status !== "approved" && !canRetry && !canRecover) throw new WebsiteConflictError("Approve the current website preview before publishing it.");
 
     const started = transition(loaded.website, actor, "launch_started", now, {
       status: "launch_pending",
@@ -513,14 +568,19 @@ export function createWebsiteService(inputStore: BoundedStore = boundedStore, de
     const idempotencyKey = `website:${reserved.work.id}:candidate:${input.candidateRevision}`;
     let receipt: WebsiteLaunchReceipt;
     try {
-      receipt = websiteLaunchReceiptSchema.parse(await provider.prepareLaunch({
+      receipt = websiteLaunchReceiptSchema.parse(await provider.publish({
+        actor,
         workspaceId: reserved.work.workspaceId,
         workId: reserved.work.id,
         candidate: reserved.website.candidate!,
         idempotencyKey,
       }));
-      if (receipt.candidateRevision !== input.candidateRevision || receipt.artifactHash !== reserved.website.candidate!.contentHash) throw new WebsiteProviderUnavailableError("The website launch provider returned a receipt for another artifact.");
+      if (receipt.candidateRevision !== input.candidateRevision || receipt.artifactHash !== reserved.website.candidate!.contentHash) throw new WebsiteProviderUnavailableError("Publishing returned a receipt for another website version.");
     } catch (error) {
+      // Authority and lifecycle refusals are not provider failures. The row
+      // stays launch_pending without a receipt, which the owner can recover by
+      // publishing the same approved revision again.
+      if (error instanceof WorkspaceAccessError || (error instanceof WorkspaceConflictError && !(error instanceof WebsiteConflictError))) throw error;
       const message = providerFailure(error, "launch");
       const failed = transition(reserved.website, actor, "launch_failed", now, {
         status: "failed",
@@ -530,19 +590,36 @@ export function createWebsiteService(inputStore: BoundedStore = boundedStore, de
       return update(actor, reserved, reserved.website.revision, failed);
     }
 
-    // Receipt persistence is outside the provider-failure catch. If an
-    // external adapter accepted the idempotency key but this update fails, the
-    // row remains launch_pending and the next call can reconcile with the same
-    // key instead of recording a misleading retryable provider failure.
-    const confirmed = transition(reserved.website, actor, receipt.status === "published" ? "launch_confirmed" : "launch_prepared", now, {
-      status: receipt.status === "published" ? "published" : "launch_pending",
-      launch: { status: receipt.status, candidateRevision: input.candidateRevision, receipt, failure: null },
+    // Receipt persistence is outside the provider-failure catch. Publishing is
+    // an idempotent upsert, so if this update fails the row remains
+    // launch_pending and publishing the same revision again reconciles it.
+    const confirmed = transition(reserved.website, actor, "launch_confirmed", now, {
+      status: "published",
+      launch: { status: "published", candidateRevision: input.candidateRevision, receipt, failure: null },
+      publication: { status: "live", url: receipt.providerUrl, candidateRevision: input.candidateRevision, publishedAt: receipt.publishedAt, changedAt: nowIso(now) },
       lastError: null,
-    }, input.candidateRevision);
+    }, input.candidateRevision, receipt.providerUrl);
     return update(actor, reserved, reserved.website.revision, confirmed);
   }
 
-  return { create, read, list, revise, approve, prepareLaunch, capabilityOptions, connectCapabilities };
+  async function takeOffline(actor: WorkspaceActor, workId: string, raw: unknown): Promise<WebsiteRecord> {
+    const input: TakeWebsiteOfflineInput = takeWebsiteOfflineInputSchema.parse(raw);
+    const loaded = await load(actor, workId);
+    if (loaded.website.revision !== input.expectedRevision) throw new WebsiteConflictError();
+    const publication = loaded.website.publication;
+    if (!publication || publication.status !== "live") throw new WebsiteConflictError("This website is not live.");
+    if (loaded.website.status === "launch_pending") throw new WebsiteConflictError("Publishing is still in progress. Finish publishing before taking the website offline.");
+    // The public site goes offline first. If the record update then fails,
+    // taking it offline again is idempotent and reconciles the saved state.
+    await provider.takeOffline({ actor, workspaceId: loaded.work.workspaceId, workId: loaded.work.id });
+    const next = transition(loaded.website, actor, "taken_offline", now, {
+      publication: { ...publication, status: "offline", changedAt: nowIso(now) },
+      ...(loaded.website.status === "published" ? { status: "approved" as const, launch: emptyLaunch() } : {}),
+    }, publication.candidateRevision, publication.url);
+    return update(actor, loaded, input.expectedRevision, next);
+  }
+
+  return { create, read, list, revise, approve, publish, takeOffline, capabilityOptions, connectCapabilities };
 }
 
 export const websiteService = createWebsiteService(boundedStore, {
@@ -553,6 +630,7 @@ export const readWebsite = (actor: WorkspaceActor, workId: string) => websiteSer
 export const listWebsites = (actor: WorkspaceActor, workspaceId: string) => websiteService.list(actor, workspaceId);
 export const reviseWebsite = (actor: WorkspaceActor, workId: string, input: unknown) => websiteService.revise(actor, workId, input);
 export const approveWebsite = (actor: WorkspaceActor, workId: string, input: unknown) => websiteService.approve(actor, workId, input);
-export const prepareWebsiteLaunch = (actor: WorkspaceActor, workId: string, input: unknown) => websiteService.prepareLaunch(actor, workId, input);
+export const publishWebsite = (actor: WorkspaceActor, workId: string, input: unknown) => websiteService.publish(actor, workId, input);
+export const takeWebsiteOffline = (actor: WorkspaceActor, workId: string, input: unknown) => websiteService.takeOffline(actor, workId, input);
 export const listWebsiteCapabilityOptions = (actor: WorkspaceActor, workId: string) => websiteService.capabilityOptions(actor, workId);
 export const connectWebsiteCapabilities = (actor: WorkspaceActor, workId: string, input: unknown) => websiteService.connectCapabilities(actor, workId, input);

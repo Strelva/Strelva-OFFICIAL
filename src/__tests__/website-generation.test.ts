@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import { createStructuredWebsiteGenerationProvider, generateWebsiteArtifact, generateWebsiteDraft, websiteDraftRenderData } from "@/products/websites/generation";
-import { createWebsiteLaunchAdapter, prepareWebsiteLaunch, WebsiteLaunchPreparationError } from "@/products/websites/deployment";
+import { hostedPagesFromBundle } from "@/products/websites/hosting";
 import { assertWebsiteArtifactBundle } from "@/products/websites/artifact";
 import { renderGeneratedSite, safeHref } from "../../custom-repo-starter/website-generation/renderer";
 
@@ -127,16 +127,14 @@ describe("website generation and immutable artifacts", () => {
     }
   });
 
-  it("keeps the same digest across preview, export, and launch preparation", async () => {
+  it("keeps the same digest across preview, export, and published pages", async () => {
     const first = await generateWebsiteArtifact({ ...ids, revision: 1, brief, now: "2026-09-20T12:00:00.000Z" });
     const second = await generateWebsiteArtifact({ ...ids, revision: 1, brief, now: "2026-09-21T12:00:00.000Z" });
     expect(second.artifactDigest).toBe(first.artifactDigest);
     expect(second.contentHash).toBe(first.contentHash);
 
-    const prepared = prepareWebsiteLaunch(first, { kind: "local_export", outputDirectory: "/tmp/northstar-site" });
-    expect(prepared.status).toBe("prepared");
-    expect(prepared.artifactDigest).toBe(first.artifactDigest);
-    expect(prepared.files).toHaveLength(first.files.length);
+    const pages = hostedPagesFromBundle(first);
+    expect(pages["/"]).toBe(first.previewHtml);
   });
 
   it("changes the artifact when the brief revision changes", async () => {
@@ -199,37 +197,6 @@ describe("website generation and immutable artifacts", () => {
     expect(safeHref("/contact")).toBe("/contact");
   });
 
-  it("blocks provider launch preparation when no provider identity is accepted", async () => {
-    const artifact = await generateWebsiteArtifact({ ...ids, revision: 1, brief, now: "2026-09-20T12:00:00.000Z" });
-    const blocked = prepareWebsiteLaunch(artifact, { kind: "github_vercel", projectId: "", repositoryUrl: "" });
-    expect(blocked.status).toBe("blocked");
-    expect(blocked.reason).toBe("provider_unavailable");
-    expect(blocked.artifactDigest).toBe(artifact.artifactDigest);
-  });
-
-  it("requires exact approval and replays one provider receipt by idempotency key", async () => {
-    const artifact = await generateWebsiteArtifact({ ...ids, revision: 1, brief, now: "2026-09-20T12:00:00.000Z" });
-    const adapter = createWebsiteLaunchAdapter({
-      target: { kind: "github_vercel", repositoryUrl: "https://github.com/example/northstar", projectId: "northstar-site" },
-      approval: { candidateRevision: artifact.revision, contentHash: artifact.contentHash },
-      now: () => "2026-09-20T12:30:00.000Z",
-    });
-    const input = { workspaceId: ids.workspaceId, workId: ids.workId, idempotencyKey: "website:launch:1" };
-    const first = await adapter.prepare(artifact.candidate, input);
-    const replay = await adapter.prepare(artifact.candidate, input);
-    expect(first).toEqual(replay);
-    expect(first).toMatchObject({ status: "pending", artifactHash: artifact.contentHash, candidateRevision: 1 });
-
-    const edited = await generateWebsiteArtifact({ ...ids, revision: 2, brief: { ...brief, description: "Next-day repair estimates" } });
-    await expect(adapter.prepare(edited.candidate, input)).rejects.toThrow(/idempotency key/i);
-  });
-
-  it("does not turn an unconfigured provider target into a fake receipt", async () => {
-    const artifact = await generateWebsiteArtifact({ ...ids, revision: 1, brief });
-    const adapter = createWebsiteLaunchAdapter({ target: { kind: "github_vercel", repositoryUrl: "", projectId: "" } });
-    await expect(adapter.prepare(artifact.candidate, { ...ids, idempotencyKey: "website:launch:missing" })).rejects.toMatchObject({ reason: "provider_unavailable" } satisfies Partial<WebsiteLaunchPreparationError>);
-  });
-
   it("rejects an artifact whose file bytes no longer match the recorded digest", async () => {
     const artifact = await generateWebsiteArtifact({ ...ids, revision: 1, brief, now: "2026-09-20T12:00:00.000Z" });
     const changed = { ...artifact, files: artifact.files.map((file) => file.path === "site/index.html" ? { ...file, content: `${file.content}changed` } : file) };
@@ -255,7 +222,7 @@ describe("website generation and immutable artifacts", () => {
       candidate: { ...artifact.candidate, rendererDigest: "0".repeat(64) },
     };
     expect(() => assertWebsiteArtifactBundle(changed)).toThrow(/renderer|digest/i);
-    expect(prepareWebsiteLaunch(changed, { kind: "local_export", outputDirectory: "/tmp/northstar-site" })).toMatchObject({ status: "blocked", reason: "artifact_mismatch" });
+    expect(() => hostedPagesFromBundle(changed)).toThrow(/renderer|digest/i);
   });
 
   it("blocks a candidate when its complete exported artifact digest is stale", async () => {

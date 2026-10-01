@@ -1,8 +1,9 @@
 import {
   type ApproveWebsiteInput,
   type CreateWebsiteInput,
-  type PrepareWebsiteLaunchInput,
+  type PublishWebsiteInput,
   type ReviseWebsiteInput,
+  type TakeWebsiteOfflineInput,
   type Website,
   type WebsiteRecord,
 } from "@/products/websites/contracts";
@@ -21,7 +22,8 @@ export interface WebsiteExperienceTransport {
   create(input: CreateWebsiteInput & { workspaceId: string }): Promise<WebsiteRecord>;
   revise(input: ReviseWebsiteInput & { workspaceId: string; workId: string }): Promise<WebsiteRecord>;
   approve(input: ApproveWebsiteInput & { workspaceId: string; workId: string }): Promise<WebsiteRecord>;
-  prepareLaunch(input: PrepareWebsiteLaunchInput & { workspaceId: string; workId: string }): Promise<WebsiteRecord>;
+  publish(input: PublishWebsiteInput & { workspaceId: string; workId: string }): Promise<WebsiteRecord>;
+  takeOffline(input: TakeWebsiteOfflineInput & { workspaceId: string; workId: string }): Promise<WebsiteRecord>;
 }
 
 export class WebsiteExperienceError extends Error {
@@ -84,36 +86,42 @@ async function record(response: Response, fallback: string, workspaceId: string)
 
 const jsonHeaders = { "Content-Type": "application/json", Accept: "application/json" };
 
-function post(path: string, body: unknown, fallback: string, workspaceId: string): Promise<WebsiteRecord> {
-  return fetch(path, {
+/** The website product's HTTP transport over the workspace request function. */
+export function createWebsiteTransport(request: typeof fetch = fetch): WebsiteExperienceTransport {
+  const post = (path: string, body: unknown, fallback: string, workspaceId: string): Promise<WebsiteRecord> => request(path, {
     method: "POST",
     credentials: "same-origin",
     headers: jsonHeaders,
     body: JSON.stringify(body),
   }).then(response => record(response, fallback, workspaceId));
+  return {
+    async read({ workspaceId, workId }, signal) {
+      const params = new URLSearchParams({ workspaceId });
+      return record(await request(`${websiteWorkPath(workId)}?${params}`, { signal, cache: "no-store", credentials: "same-origin" }), "The saved website could not be loaded.", workspaceId);
+    },
+    create(input) {
+      return post(WEBSITE_API_PATH, { action: "create", ...input }, "The website preview could not be created.", input.workspaceId);
+    },
+    revise(input) {
+      const { workspaceId, workId, ...body } = input;
+      return post(websiteWorkPath(workId), { action: "revise", ...body }, "The website preview could not be generated.", workspaceId);
+    },
+    approve(input) {
+      const { workspaceId, workId, ...body } = input;
+      return post(websiteWorkPath(workId), { action: "approve", ...body }, "This website preview could not be approved.", workspaceId);
+    },
+    publish(input) {
+      const { workspaceId, workId, ...body } = input;
+      return post(websiteWorkPath(workId), { action: "publish", ...body }, "The website could not be published.", workspaceId);
+    },
+    takeOffline(input) {
+      const { workspaceId, workId, ...body } = input;
+      return post(websiteWorkPath(workId), { action: "takeOffline", ...body }, "The website could not be taken offline.", workspaceId);
+    },
+  };
 }
 
-/** The customer surface's sole HTTP transport for the website product. */
-export const serverWebsiteTransport: WebsiteExperienceTransport = {
-  async read({ workspaceId, workId }, signal) {
-    const params = new URLSearchParams({ workspaceId });
-    return record(await fetch(`${websiteWorkPath(workId)}?${params}`, { signal, cache: "no-store", credentials: "same-origin" }), "The saved website could not be loaded.", workspaceId);
-  },
-  create(input) {
-    return post(WEBSITE_API_PATH, { action: "create", ...input }, "The website preview could not be created.", input.workspaceId);
-  },
-  revise(input) {
-    const { workspaceId, workId, ...body } = input;
-    return post(websiteWorkPath(workId), { action: "revise", ...body }, "The website preview could not be generated.", workspaceId);
-  },
-  approve(input) {
-    const { workspaceId, workId, ...body } = input;
-    return post(websiteWorkPath(workId), { action: "approve", ...body }, "This website preview could not be approved.", workspaceId);
-  },
-  prepareLaunch(input) {
-    const { workspaceId, workId, ...body } = input;
-    return post(websiteWorkPath(workId), { action: "prepareLaunch", ...body }, "Launch could not be prepared.", workspaceId);
-  },
-};
+/** The customer surface's default HTTP transport for the website product. */
+export const serverWebsiteTransport: WebsiteExperienceTransport = createWebsiteTransport((input, init) => fetch(input, init));
 
 export { createWebsiteRequestId };

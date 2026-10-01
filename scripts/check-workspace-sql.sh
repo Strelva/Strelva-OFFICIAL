@@ -291,6 +291,7 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920120000_web
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920121000_agency_managed_website_draft_authority.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920122000_public_website_bookings.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260920123000_public_website_booking_fingerprints.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260928120000_website_publications.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-exit-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-workspace-exit-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-export-v2-schema.sql"
@@ -303,6 +304,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/agency-application-authoring-sch
 psql "${psql_args[@]}" --file="$repo_root/tests/websites-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-managed-website-draft-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/public-website-bookings-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-publications-schema.sql"
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

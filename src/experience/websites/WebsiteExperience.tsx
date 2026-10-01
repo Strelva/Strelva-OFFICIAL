@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
-import { ArrowRight, Check, CircleAlert, ExternalLink, History, Loader2, RefreshCw, Rocket, ShieldCheck } from "lucide-react";
+import { ArrowRight, Check, CircleAlert, CloudOff, ExternalLink, Globe, History, Loader2, RefreshCw, Rocket, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { TextArea, TextInput } from "@/components/ui/TextInput";
 import type { Website, WebsiteBrief, WebsiteRecord } from "@/products/websites/contracts";
@@ -76,30 +76,24 @@ function formatDate(value: string): string {
     : new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(date);
 }
 
-function isLocalExportReady(website: Website): boolean {
-  return website.status === "launch_pending" && website.launch.receipt?.provider === "local_export";
-}
-
 function statusLabel(website: Website): string {
   const status = website.status;
-  if (isLocalExportReady(website)) return "Launch files ready";
   if (status === "draft") return "Draft saved";
   if (status === "preview_ready") return "Private preview ready";
   if (status === "approved") return "Approved revision";
-  if (status === "launch_pending") return "Launch preparation pending";
+  if (status === "launch_pending") return "Publishing not finished";
   if (status === "published") return "Published";
   return "Needs attention";
 }
 
 function statusMessage(website: Website): string {
-  if (isLocalExportReady(website)) return "Your approved website is ready to download. It has not been published.";
   if (website.status === "draft") return "Your website draft is saved while the next preview is being prepared.";
   if (website.status === "preview_ready") return `Preview version ${website.candidate?.revision ?? "current"} is ready for your review.`;
-  if (website.status === "approved") return `Preview version ${website.approvedCandidateRevision ?? "current"} is approved. Prepare launch when you are ready.`;
-  if (website.status === "launch_pending") return "Launch preparation is still pending. Check the saved status before trying again.";
-  if (website.status === "published") return `Your website is published from preview version ${website.launch.candidateRevision ?? website.approvedCandidateRevision ?? "current"}.`;
+  if (website.status === "approved") return `Preview version ${website.approvedCandidateRevision ?? "current"} is approved. Publish it when you are ready.`;
+  if (website.status === "launch_pending") return "Publishing did not finish. Publish again to complete it; nothing else has changed.";
+  if (website.status === "published") return `Visitors see preview version ${website.launch.candidateRevision ?? website.approvedCandidateRevision ?? "current"}. New previews stay private until you publish them.`;
   if (website.lastError?.stage === "artifact") return "We could not generate the preview. Your website draft is saved; try again.";
-  if (website.lastError?.stage === "launch") return "We could not prepare launch. Your approved preview is saved; try launch preparation again.";
+  if (website.lastError?.stage === "launch") return `${website.lastError.message}`;
   return "The saved website needs attention before its next step can continue.";
 }
 
@@ -110,10 +104,10 @@ function historyLabel(kind: Website["history"][number]["kind"]): string {
     candidate_generated: "Preview generated",
     candidate_failed: "Preview generation failed",
     approved: "Approved",
-    launch_started: "Launch preparation started",
-    launch_prepared: "Launch prepared",
+    launch_started: "Publishing started",
     launch_confirmed: "Published",
-    launch_failed: "Launch preparation failed",
+    launch_failed: "Publishing failed",
+    taken_offline: "Taken offline",
   };
   return labels[kind];
 }
@@ -150,6 +144,24 @@ function ArtifactPreview({ artifact }: { artifact: NonNullable<Website["candidat
         Preview version {artifact.revision} · {pageCount} {pageCount === 1 ? "page" : "pages"}
       </p>
     </article>
+  );
+}
+
+function PublicationStatus({ publication }: { publication: NonNullable<Website["publication"]> }) {
+  const live = publication.status === "live";
+  return (
+    <div className={styles.status} aria-label="Public website">
+      {live ? <Globe size={16} aria-hidden="true" /> : <CloudOff size={16} aria-hidden="true" />}
+      <span>
+        <strong>{live ? "Live" : "Offline"}</strong>
+        {" · "}
+        {live ? "Anyone can visit " : "Not publicly visible. It was at "}
+        <a href={publication.url} target="_blank" rel="noopener noreferrer" className={styles.previewLink}>
+          {publication.url.replace(/^https?:\/\//, "")}{live ? <ExternalLink size={14} aria-hidden="true" /> : null}
+        </a>
+        {live ? ` · preview version ${publication.candidateRevision}` : null}
+      </span>
+    </div>
   );
 }
 
@@ -270,47 +282,38 @@ function WebsiteSession({
       expectedRevision: record.website.revision,
       candidateRevision: candidate.revision,
       candidateContentHash: candidate.contentHash,
-    }), next => `Preview version ${next.website.approvedCandidateRevision ?? candidate.revision} is approved. Prepare launch when you are ready.`);
+    }), next => `Preview version ${next.website.approvedCandidateRevision ?? candidate.revision} is approved. Publish it when you are ready.`);
   }
 
-  async function prepareLaunch() {
+  async function publish() {
     if (!record?.website.candidate || record.website.approvedCandidateRevision == null) return;
     const candidate = record.website.candidate;
     if (candidate.revision !== record.website.approvedCandidateRevision) return;
-    await run("Launch preparation", () => transport.prepareLaunch({
+    await run("Publishing", () => transport.publish({
       workspaceId,
       workId: record.workId,
       expectedRevision: record.website.revision,
       candidateRevision: candidate.revision,
       candidateContentHash: candidate.contentHash,
-    }), next => isLocalExportReady(next.website)
-      ? "Your approved website files are ready to download."
-      : next.website.status === "published"
-      ? "The approved website is published."
-      : "Launch preparation is pending. Check the saved status before trying again.");
+    }), next => next.website.status === "published" && next.website.publication
+      ? `Your website is live at ${next.website.publication.url}.`
+      : "Publishing did not finish. Your approved preview is saved; try publishing again.");
   }
 
-  async function reload() {
-    if (!record || busy) return;
-    setBusy(true);
-    setError("");
-    try {
-      const next = await transport.read({ workspaceId, workId: record.workId }, new AbortController().signal);
-      if (!mountedRef.current) return;
-      setRecord(next);
-      setFields(fieldsFromBrief(next.website.brief));
-      setNotice("Saved status refreshed.");
-    } catch (cause) {
-      if (!mountedRef.current) return;
-      setError(cause instanceof Error ? cause.message : "The saved website could not be refreshed.");
-    } finally {
-      if (mountedRef.current) setBusy(false);
-    }
+  async function takeOffline() {
+    if (!record?.website.publication) return;
+    await run("Taking the website offline", () => transport.takeOffline({
+      workspaceId,
+      workId: record.workId,
+      expectedRevision: record.website.revision,
+    }), () => "Your website is offline. Publish it again whenever you are ready.");
   }
 
   const website = record?.website;
   const canApprove = Boolean(website?.status === "preview_ready" && website.candidate && !dirty);
-  const canPrepare = Boolean(website?.status === "approved" && website.candidate && website.approvedCandidateRevision === website.candidate.revision);
+  const canPublish = Boolean(website?.status === "approved" && website.candidate && website.approvedCandidateRevision === website.candidate.revision);
+  const canFinishPublishing = Boolean(website?.status === "launch_pending" && website.launch.receipt === null && website.candidate && website.approvedCandidateRevision === website.candidate.revision);
+  const canTakeOffline = Boolean(website?.publication?.status === "live" && website.status !== "launch_pending");
   const canRetryPreview = Boolean(website?.status === "failed" && website.lastError?.stage === "artifact");
   const canRetryLaunch = Boolean(website?.status === "failed" && website.lastError?.stage === "launch" && website.candidate && website.approvedCandidateRevision === website.candidate.revision);
 
@@ -343,14 +346,16 @@ function WebsiteSession({
             <StatusIcon website={website!} />
             <span><strong>{statusLabel(website!)}</strong> · {statusMessage(website!)}</span>
           </div>
+          {website!.publication ? <PublicationStatus publication={website!.publication} /> : null}
 
           <div className={styles.requestCard}>
             <BriefForm fields={fields} setFields={setFields} onSubmit={() => void createOrRevise()} busy={busy} readOnly={readOnly} submitLabel={canRetryPreview ? "Try generating again" : "Generate a new preview"} canSubmit={canSubmitBrief} compact />
             <div className={styles.actions}>
               {!readOnly && canApprove ? <Button type="button" loading={busy} disabled={busy} onClick={() => void approve()} icon={<Check size={16} />}>Approve this preview</Button> : null}
-              {!readOnly && canPrepare ? <Button type="button" loading={busy} disabled={busy} onClick={() => void prepareLaunch()} icon={<Rocket size={16} />}>Prepare launch</Button> : null}
-              {!readOnly && canRetryLaunch ? <Button type="button" loading={busy} disabled={busy} onClick={() => void prepareLaunch()} icon={<RefreshCw size={16} />}>Retry launch preparation</Button> : null}
-              {website!.status === "launch_pending" && !isLocalExportReady(website!) ? <Button type="button" variant="secondary" loading={busy} disabled={busy} onClick={() => void reload()} icon={<RefreshCw size={16} />}>Check saved status</Button> : null}
+              {!readOnly && canPublish ? <Button type="button" loading={busy} disabled={busy} onClick={() => void publish()} icon={<Rocket size={16} />}>{website!.publication?.status === "live" ? "Publish this version" : "Publish website"}</Button> : null}
+              {!readOnly && canRetryLaunch ? <Button type="button" loading={busy} disabled={busy} onClick={() => void publish()} icon={<RefreshCw size={16} />}>Try publishing again</Button> : null}
+              {!readOnly && canFinishPublishing ? <Button type="button" loading={busy} disabled={busy} onClick={() => void publish()} icon={<RefreshCw size={16} />}>Finish publishing</Button> : null}
+              {!readOnly && canTakeOffline ? <Button type="button" variant="secondary" loading={busy} disabled={busy} onClick={() => void takeOffline()} icon={<CloudOff size={16} />}>Take website offline</Button> : null}
             </div>
             {dirty && !readOnly ? <p className={styles.notice}>Save this wording as a new preview before approving it. The current saved revision stays unchanged.</p> : null}
           </div>

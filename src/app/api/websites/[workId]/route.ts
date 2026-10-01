@@ -2,8 +2,8 @@ import { z } from "zod";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { readWorkspaceBody, workspaceHttpActor, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError } from "@/platform/workspaces/types";
-import { approveWebsite, prepareWebsiteLaunch, readWebsite, reviseWebsite, WebsiteConflictError, WebsiteUnavailableError } from "@/products/websites/server";
-import { approveWebsiteInputSchema, prepareWebsiteLaunchInputSchema, reviseWebsiteInputSchema } from "@/products/websites/contracts";
+import { approveWebsite, publishWebsite, readWebsite, reviseWebsite, takeWebsiteOffline, WebsiteConflictError, WebsiteUnavailableError } from "@/products/websites/server";
+import { approveWebsiteInputSchema, publishWebsiteInputSchema, reviseWebsiteInputSchema, takeWebsiteOfflineInputSchema } from "@/products/websites/contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +45,8 @@ export async function POST(request: Request, context: { params: Promise<{ workId
     const body = z.discriminatedUnion("action", [
       z.object({ action: z.literal("revise"), expectedRevision: z.number().int().nonnegative(), brief: z.unknown() }).strict(),
       z.object({ action: z.literal("approve"), expectedRevision: z.number().int().nonnegative(), candidateRevision: z.number().int().positive(), candidateContentHash: z.string() }).strict(),
-      z.object({ action: z.literal("prepareLaunch"), expectedRevision: z.number().int().nonnegative(), candidateRevision: z.number().int().positive(), candidateContentHash: z.string() }).strict(),
+      z.object({ action: z.literal("publish"), expectedRevision: z.number().int().nonnegative(), candidateRevision: z.number().int().positive(), candidateContentHash: z.string() }).strict(),
+      z.object({ action: z.literal("takeOffline"), expectedRevision: z.number().int().nonnegative() }).strict(),
     ]).parse(await readWorkspaceBody(request));
     if (body.action === "revise") {
       const { action: _action, ...input } = body;
@@ -55,8 +56,12 @@ export async function POST(request: Request, context: { params: Promise<{ workId
       const { action: _action, ...input } = body;
       return workspaceJson(await approveWebsite(current, workId, approveWebsiteInputSchema.parse(input)));
     }
+    if (body.action === "takeOffline") {
+      const { action: _action, ...input } = body;
+      return workspaceJson(await takeWebsiteOffline(current, workId, takeWebsiteOfflineInputSchema.parse(input)));
+    }
     const { action: _action, ...input } = body;
-    return workspaceJson(await prepareWebsiteLaunch(current, workId, prepareWebsiteLaunchInputSchema.parse(input)));
+    return workspaceJson(await publishWebsite(current, workId, publishWebsiteInputSchema.parse(input)));
   } catch (error) {
     return failure(error);
   }
