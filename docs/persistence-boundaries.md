@@ -1,13 +1,14 @@
 # Persistence boundaries
 
-Updated 2026-09-20. This is the current authority map. A Postgres table or mirror write does
+Updated 2026-09-28. This is the current authority map. A Postgres table or mirror write does
 not make Postgres authoritative; authority changes only when the production read path changes.
 
 | Domain | Authority | Cache or mirror | Failure rule |
 |---|---|---|---|
 | Private workspace results and assessment recovery | Postgres `saved_product_work`, `workspace_operations` after the release migrations | Anonymous audit reports remain 60-day Redis bearer records, copied only on explicit save | Fail closed. Actor and direct membership are checked on every operation transition. A checkpoint survives failed completion; one operation commits one saved result. A pre-checkpoint interruption can repeat provider reads. No automatic background worker is implied. Local implementation only until migration and release acceptance. |
 | Private documents, plans and accepted plan outputs | Postgres `saved_product_work` and `work_plan_output_executions` after the local release migrations | None | Documents use revision-checked edits and append-only receipts. Plans retain bounded source references. A private output and its execution receipt commit together; retries reopen that output. These are local capabilities, not a general background executor or permission to publish. |
-| Private website drafts and approval | Postgres `saved_product_work` with `product_id=websites` after `20260920120000_websites.sql` | Generated projects are reconstructed from the saved candidate and verified against its content, renderer and artifact digests | Direct workspace membership, revision checks and stopped-work guards apply. A changed candidate clears approval. Local launch preparation records an export receipt; it does not establish a deployment. |
+| Private website drafts and approval | Postgres `saved_product_work` with `product_id=websites` after `20260920120000_websites.sql` | Generated projects are reconstructed from the saved candidate and verified against its content, renderer and artifact digests | Direct workspace membership, revision checks and stopped-work guards apply. A changed candidate clears approval. The approved export remains a private download. Publishing is recorded in `website_publications` (next row). |
+| Hosted website publication | Postgres `website_publications` after `20260928120000_website_publications.sql`, through `publish_website`, `take_website_offline` and `read_live_website` | The work payload's `publication` projects the last confirmed state for the owner; it does not decide what is served | Rows hold an immutable copy of the rendered pages of the exact approved candidate. Publishing requires direct membership, the approved revision, content hash and artifact digest, and a workspace that has not exited. An address is kept across republication and is unique. Offline stays possible after exit; exited or offline sites are not served. Served only on `<address>.<STRELVA_SITES_DOMAIN>`, never on the control-plane origin. Local only until the migration, the sites domain and DNS are separately authorized. |
 | Agency managed website draft authority | Postgres `agency_managed_website_draft_grants`, `agency_managed_website_draft_preparations` and `agency_managed_website_draft_revisions` after `20260920121000_agency_managed_website_draft_authority.sql` | Native draft content remains in the existing managed website store | Permission requires the named active assignment, accepted delivery, native sponsor authority and explicit unexpired customer grant. Agency preparation does not grant publication. Revocation blocks further preparation. |
 | Public website booking grants and visitor receipts | Postgres `public_website_booking_grants` and `public_website_bookings` after migrations `20260920122000` and `20260920123000` | Native schedule and calendar receipts retain provider operation authority | The durable visitor receipt is claimed before the calendar write. Request fingerprints and original slots are immutable. Management tokens are hashed for lookup and stored through the secret encryption boundary. Existing receipt readback reconciles native evidence without creating work. Export omits management secrets. These migrations and paths remain local until release acceptance. |
 | Private onboarding cases and supplied files | Postgres `saved_product_work`; onboarding cases use `product_id=onboarding` and uploaded files use private `documents` work with the `20260920020000_onboarding_work.sql` CAS function and `20260920020100_onboarding_attachment_immutability.sql` trigger | None | Requirement payloads retain missing/supplied/correction/accepted state, assignee, append-only history, and an immutable document work id plus exact document revision. Upload provenance and file bytes up to 2 MB remain inside the workspace-authorized saved-work boundary. Local text/CSV/JSON parsing is proposed information for human review; unsupported extraction is explicitly unavailable. Replacing a supplied file creates a new immutable attachment reference and requires review; generic editing of the original attachment is blocked. Local implementation only until release and human review. |
@@ -63,7 +64,7 @@ been exercised only in the isolated SQL harness, not applied to production.
 
 | Concern | Local source of truth | Rules |
 | --- | --- | --- |
-| Offering installations | Postgres through `src/platform/offerings` | Existing customer workspace identity; installation/configuration/retirement require current owner or admin authority. Native records retain their own lifecycle and authorization. A requested provider is not an accepted service. |
+| Offering installations | Postgres through `src/platform/offerings` | Existing customer workspace identity; installation/configuration/retirement require current owner or admin authority. Install and activation also require a code-owned qualification record for the exact definition version and a valid ADR 0010 declaration. Native records retain their own lifecycle and authorization. A requested provider is not an accepted service. Native resource kinds are constrained by `20260928140000_home_finder_offering.sql`; a `home_finder_installation` is a reference to the external Home Finder runtime's installation id, which remains that runtime's authority, and the install command does not admit it. |
 | Business website attachments | Postgres `offering_website_bindings` | Binding requires current workspace owner/admin and tenant owner authority. Store stable tenant identity; no membership or domain authority transfers. Revocation retains history. Existing tenant deletion clears the physical reference and preserves an unavailable binding record. |
 | Operational assignments | Postgres through `src/platform/work-participation/assignments.ts` and the assignment repository | Owner offers, verified assignee accepts, expiry and revocation stop subsequent work. Approved zero-cost finite work uses direct membership or an exact accepted agency delivery/assignment grant. Agency draft editing additionally requires `agency_application_draft_grants`; the customer retains publication authority. Assignment scope does not narrow broader permissions the assignee already holds. Acting identity remains distinct from sponsor. |
 | Configured period allowances and subscription included usage | Postgres `work_allowances`, `work_allowance_ledger`, `work_allowance_reservations`, and the optional `work_allowance_subscription_entitlements` projection | Operator awards or an explicitly configured Stripe subscription event creates the same payer-accepted operational cap and named-unit ledger. Subscription terms come only from server configuration keyed by event metadata; a Stripe price, invoice amount, one-off payment, or grandfathered agreement never supplies units or a customer price. Replays and older events do not create duplicate allowances, and a cancellation can close an unaccepted period while retaining its record. Strelva retries consume no customer allowance. Unknown effects/costs retain holds; contribution credits remain separate from subscription included usage. |
@@ -110,6 +111,31 @@ store or migration of customer values is introduced.
 Application date fields use calendar strings in `YYYY-MM-DD` form. The owner,
 editor, recipient boundary, SQL validator, publication and rollback paths all
 reject rollover dates and preserve the value without a timezone conversion.
+
+## September 28 human minutes per business
+
+ADR 0009's factory measure, human minutes per business per month, uses Postgres
+`business_effort_entries` and `business_effort_voids` after
+`20260928130000_business_effort_minutes.sql`, through `src/platform/business-effort`.
+Postgres is the only authority; there is no Redis mirror or cache.
+
+The business key is the customer workspace (`workspaces.kind='customer'`), the
+same identity used by service requests and business entry. A managed website
+tenant is measured through its active `offering_website_bindings` row; the
+tenant slug is never a second key. An unbound managed tenant is reported as not
+attached rather than guessed.
+
+Only a verified, active super admin can record, void or read entries; the SQL
+functions recheck `super_admins` under lock and the tables have RLS enabled with
+no direct role privileges. Entries are append-only (1–1440 minutes, a fixed
+category, a UTC calendar date from 2020 to today, an optional 280-character
+note, the acting operator). A server-issued entry id makes a lost-response retry
+return the original entry. A mistake is corrected by one void record naming the
+operator and reason; the entry stays in history and stops counting. Direct
+updates and deletes are refused. Deleting the customer workspace cascades its
+effort history. No time-based purge is configured. Missing storage reports
+unavailable rather than zero. This is local implementation behind the workspace
+release gate; the migration has run only in the isolated ordered upgrade.
 
 ## Tenant rename registry completeness
 
