@@ -27,6 +27,7 @@ import { WorkPlanExperience } from "./WorkPlanExperience";
 import { WorkBudgetPanel } from "./WorkBudgetPanel";
 import { OnboardingWorkspaceExperience } from "./OnboardingWorkspaceExperience";
 import { WebsiteExperience } from "@/experience/websites/WebsiteExperience";
+import { createWebsiteTransport } from "@/experience/websites/contracts";
 import { CustomApplicationManageExperience } from "@/experience/custom-applications/CustomApplicationManageExperience";
 import { BoundedWorkExperience } from "@/experience/operations/BoundedWorkExperience";
 import { LearningExperience } from "@/experience/operations/LearningExperience";
@@ -72,6 +73,7 @@ export function WorkspaceApp({ request = fetch, appBase = "", signOut, inquiry }
 function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBase: string; signOut?: React.ReactNode; inquiry?: WorkspaceInquiryConfig }) {
   const request = useWorkspaceRequest();
   const postAction = usePostAction();
+  const websiteTransport = useMemo(() => createWebsiteTransport(request), [request]);
   const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(null);
   const [missingWork, setMissingWork] = useState(false);
   const [returnTarget, setReturnTarget] = useState("/workspace");
@@ -749,7 +751,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
               onOpenWork={openWorkFromPlan}
               onSaved={horizontalSaved}
             />
-              : view === "websites" ? <WebsiteExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} readOnly={workspaceReadOnly} initialRequest={horizontalRequest} onSaved={horizontalSaved} />
+              : view === "websites" ? <WebsiteExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} transport={websiteTransport} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} readOnly={workspaceReadOnly} initialRequest={horizontalRequest} onSaved={horizontalSaved} />
               : view === "custom-applications" ? selectedWork?.productId === view ? <CustomApplicationManageExperience key={selectedWork.id} workId={selectedWork.id} readOnly={Boolean(workspaceReadOnly || currentWorkspace?.role === "member")} /> : <p role="status">Select a saved custom application to review its delivery.</p>
               : view === "onboarding" ? <OnboardingWorkspaceExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} initialCaseId={selectedWork?.productId === view ? selectedWork.id : undefined} initialRequest={horizontalRequest} readOnly={workspaceReadOnly} onSaved={horizontalSaved} />
               : view === "product-learning" ? <LearningExperience workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} sources={snapshot.work} readOnly={workspaceReadOnly} onSaved={horizontalSaved} />

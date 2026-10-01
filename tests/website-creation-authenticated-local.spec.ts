@@ -48,22 +48,34 @@ for (const width of [1440, 390]) {
       await page.reload();
       await expect(page.getByText("Approved revision", { exact: true })).toBeVisible();
       await expect(preview.getByText(/sourdough bread/).first()).toBeVisible();
-      const preparationResponse = page.waitForResponse(response => new URL(response.url()).pathname === `/api/websites/${workId}` && response.request().method() === "POST");
-      await page.getByRole("button", { name: "Prepare launch", exact: true }).click();
-      const preparedResponse = await preparationResponse;
-      expect(preparedResponse.status(), await preparedResponse.text()).toBe(200);
-      const prepared = await preparedResponse.json();
-      expect(prepared.website.launch.receipt.provider).toBe("local_export");
-      expect(prepared.website.launch.receipt.artifactHash).toBe(record.website.candidate.contentHash);
-      expect(prepared.website.status).not.toBe("published");
-      await expect(page.getByText("Launch files ready", { exact: true })).toBeVisible();
-      await page.reload();
-      await expect(page.getByText("Launch files ready", { exact: true })).toBeVisible();
-      const exported = await owner.context.request.get(prepared.website.launch.receipt.providerUrl);
+      const exported = await owner.context.request.get(record.website.candidate.preview.href.replace("/preview", "/export"));
       expect(exported.status(), await exported.text()).toBe(200);
       expect(exported.headers()["content-type"]).toBe("application/x-tar");
       expect((await exported.body()).toString("utf8")).toContain("scripts/build-site.mjs");
-      expect((await stranger.context.request.get(prepared.website.launch.receipt.providerUrl)).status()).toBe(403);
+
+      // Requires STRELVA_SITES_DOMAIN=sites.localhost:<port> on the app under test.
+      const publishResponse = page.waitForResponse(response => new URL(response.url()).pathname === `/api/websites/${workId}` && response.request().method() === "POST");
+      await page.getByRole("button", { name: "Publish website", exact: true }).click();
+      const publishedResponse = await publishResponse;
+      expect(publishedResponse.status(), await publishedResponse.text()).toBe(200);
+      const published = await publishedResponse.json();
+      expect(published.website.status).toBe("published");
+      expect(published.website.launch.receipt).toMatchObject({ provider: "strelva_hosted", artifactHash: record.website.candidate.contentHash });
+      const siteUrl = published.website.publication.url;
+      expect(siteUrl).toMatch(/^http:\/\/juniper-bread(-[a-z0-9]+)?\.sites\.localhost:\d+$/);
+      await expect(page.getByText("Live", { exact: true }).first()).toBeVisible();
+      await page.reload();
+      await expect(page.getByRole("button", { name: "Take website offline", exact: true })).toBeVisible();
+
+      // Anyone can visit the live site, without a session, on its own host.
+      const visitor = await browser.newContext();
+      const site = await visitor.newPage();
+      const visit = await site.goto(siteUrl);
+      expect(visit?.status()).toBe(200);
+      expect(visit?.headers()["set-cookie"]).toBeUndefined();
+      await expect(site.getByRole("heading", { name: /Juniper Bread/ }).first()).toBeVisible();
+      await expect(site.getByText(/sourdough bread/).first()).toBeVisible();
+
       await page.getByLabel("What does the business do?", { exact: true }).fill("We bake sourdough bread and deliver catering boxes for local offices.");
       await page.getByRole("button", { name: "Generate a new preview", exact: true }).click();
       await expect(page.getByText("Private preview ready", { exact: true })).toBeVisible();
@@ -73,6 +85,15 @@ for (const width of [1440, 390]) {
       const revised = await current.json();
       expect(revised.website.approvedCandidateRevision).toBeNull();
       expect(revised.website.launch.receipt).toBeNull();
+      expect(revised.website.publication).toMatchObject({ status: "live", url: siteUrl });
+      await site.reload();
+      await expect(site.getByText(/sourdough bread for neighborhood pickup/).first()).toBeVisible();
+      expect(await site.content()).not.toContain("catering boxes");
+
+      const offline = await owner.context.request.post(`/api/websites/${workId}`, { headers: { origin: env.app }, data: { action: "takeOffline", expectedRevision: revised.website.revision } });
+      expect(offline.status(), await offline.text()).toBe(200);
+      expect((await site.goto(siteUrl))?.status()).toBe(404);
+      await visitor.close();
       expect(revised.website.candidate.contentHash).not.toBe(record.website.candidate.contentHash);
       const staleApproval = await owner.context.request.post(`/api/websites/${workId}`, {
         headers: { origin: env.app },

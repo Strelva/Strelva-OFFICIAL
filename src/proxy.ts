@@ -10,6 +10,7 @@ import type { NextRequest } from "next/server";
 import { getDevAccessTenant, isDevAccessBypassEnabled } from "./lib/dev-access";
 import { MARKETING_HOSTS, isMarketingHost } from "./lib/marketing-hosts";
 import { parseTenantHost } from "./lib/tenant-host";
+import { hostedSiteAddressFromHost, hostedSiteRewritePath } from "./lib/hosted-site-host";
 import { CONTROL_PLANE_URL } from "./lib/brand";
 import { strelvaHostedPreviewEnabled } from "./experience/workspace/preview/enabled";
 
@@ -479,6 +480,17 @@ export default async function proxy(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
   const devAccessBypass = isDevAccessBypassEnabled();
   const devPreviewRequest = devAccessBypass && req.nextUrl.searchParams.get("preview") === "true";
+
+  // Strelva-hosted customer websites (<address>.<STRELVA_SITES_DOMAIN>) are
+  // public static pages on their own domain: no session refresh, no tenant
+  // resolution and no app cookies. The route sets its own security headers.
+  const hostedSiteAddress = hostedSiteAddressFromHost(host);
+  if (hostedSiteAddress) {
+    const url = req.nextUrl.clone();
+    url.pathname = hostedSiteRewritePath(hostedSiteAddress, pathname);
+    url.search = "";
+    return NextResponse.rewrite(url);
+  }
 
   // Hosted review enters synthetic UI only. Real APIs, dashboards and their
   // authentication gates remain unchanged; this never creates a session.

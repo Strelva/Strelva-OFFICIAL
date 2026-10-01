@@ -5,8 +5,9 @@ export {
   approveWebsiteInputSchema,
   connectWebsiteCapabilitiesInputSchema,
   createWebsiteInputSchema,
-  prepareWebsiteLaunchInputSchema,
+  publishWebsiteInputSchema,
   reviseWebsiteInputSchema,
+  takeWebsiteOfflineInputSchema,
   websiteArtifactSchema,
   websiteCapabilityOptionsSchema,
   websiteCapabilitySelectionSchema,
@@ -21,8 +22,9 @@ export type {
   ApproveWebsiteInput,
   ConnectWebsiteCapabilitiesInput,
   CreateWebsiteInput,
-  PrepareWebsiteLaunchInput,
+  PublishWebsiteInput,
   ReviseWebsiteInput,
+  TakeWebsiteOfflineInput,
   Website,
   WebsiteArtifact,
   WebsiteCapabilityOptions,
@@ -30,6 +32,7 @@ export type {
   WebsiteBrief,
   WebsiteLaunch,
   WebsiteLaunchReceipt,
+  WebsitePublication,
   WebsiteLifecycle,
   WebsitePreview,
   WebsitePublishedCapabilities,
@@ -49,7 +52,8 @@ export type WebsiteCreateRequest = {
 export type WebsiteMutationRequest =
   | ({ action: "revise"; } & import("./contracts").ReviseWebsiteInput)
   | ({ action: "approve"; } & import("./contracts").ApproveWebsiteInput)
-  | ({ action: "prepareLaunch"; } & import("./contracts").PrepareWebsiteLaunchInput);
+  | ({ action: "publish"; } & import("./contracts").PublishWebsiteInput)
+  | ({ action: "takeOffline"; } & import("./contracts").TakeWebsiteOfflineInput);
 
 export function websiteWorkPath(workId: string): string {
   return `${WEBSITE_API_PATH}/${encodeURIComponent(workId)}`;

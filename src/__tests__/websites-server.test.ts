@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type SavedWork } from "@/platform/workspaces/types";
-import { createWebsiteService, type WebsiteArtifactProvider } from "@/products/websites/server";
-import type { WebsiteArtifact, WebsiteBrief, WebsiteLaunchReceipt, WebsitePublishedCapabilities } from "@/products/websites/contracts";
+import { createHostedWebsiteProvider, createWebsiteService, type WebsiteArtifactProvider } from "@/products/websites/server";
+import { WebsiteAddressTakenError, type PublishWebsiteRecordInput, type WebsitePublicationStore } from "@/products/websites/publications";
+import type { WebsiteArtifact, WebsiteBrief, WebsiteLaunchReceipt, WebsitePublishedCapabilities, WebsiteRecord } from "@/products/websites/contracts";
 import { memoryBoundedStore, owner } from "./fixtures/bounded-store";
 
 const brief: WebsiteBrief = {
@@ -34,23 +35,65 @@ function artifact(revision: number, suffix = "a"): WebsiteArtifact {
   };
 }
 
-function providerFixture(options: { failGenerate?: boolean; launch?: WebsiteLaunchReceipt } = {}): WebsiteArtifactProvider & { generate: ReturnType<typeof vi.fn>; prepareLaunch: ReturnType<typeof vi.fn> } {
+function providerFixture(options: { failGenerate?: boolean; launch?: WebsiteLaunchReceipt } = {}): WebsiteArtifactProvider & { generate: ReturnType<typeof vi.fn>; publish: ReturnType<typeof vi.fn>; takeOffline: ReturnType<typeof vi.fn> } {
   return {
     generate: vi.fn(async ({ revision }: { revision: number }) => {
       if (options.failGenerate) throw new Error("provider unavailable");
       return artifact(revision, revision % 2 ? "a" : "b");
     }),
-    prepareLaunch: vi.fn(async ({ candidate }: { candidate: WebsiteArtifact }): Promise<WebsiteLaunchReceipt> => options.launch ?? {
-      status: "pending",
+    publish: vi.fn(async ({ candidate }: { candidate: WebsiteArtifact }): Promise<WebsiteLaunchReceipt> => options.launch ?? {
+      status: "published",
       receiptId: `receipt-${candidate.revision}`,
-      provider: "local-artifact-provider",
-      providerUrl: `https://provider.example/receipts/${candidate.revision}`,
-      evidence: "Local provider prepared this exact artifact.",
+      provider: "strelva_hosted",
+      providerUrl: "https://alder-pine.sites.example",
+      evidence: "Preview version is live.",
       artifactHash: candidate.contentHash,
       candidateRevision: candidate.revision,
-      preparedAt: "2026-09-20T12:01:00.000Z",
+      publishedAt: "2026-09-20T12:01:00.000Z",
     }),
+    takeOffline: vi.fn(async () => undefined),
   };
+}
+
+/** In-memory stand-in for the Postgres publication authority. */
+function memoryPublications(): WebsitePublicationStore & { rows: Map<string, PublishWebsiteRecordInput & { status: "live" | "offline"; publishedAt: string }> } {
+  const rows = new Map<string, PublishWebsiteRecordInput & { status: "live" | "offline"; publishedAt: string }>();
+  const present = (row: PublishWebsiteRecordInput & { status: "live" | "offline"; publishedAt: string }) => ({ address: row.address, status: row.status, candidateRevision: row.candidateRevision, contentHash: row.contentHash, publishedAt: row.publishedAt, updatedAt: row.publishedAt });
+  return {
+    rows,
+    async publish(actor, input) {
+      if (actor.userId !== owner.userId) throw new WorkspaceAccessError();
+      const existing = rows.get(input.workId);
+      const address = existing?.address ?? input.address;
+      if (!existing && [...rows.values()].some((row) => row.address === address)) throw new WebsiteAddressTakenError();
+      const row = { ...input, address, status: "live" as const, publishedAt: "2026-09-28T12:00:00.000Z" };
+      rows.set(input.workId, row);
+      return present(row);
+    },
+    async takeOffline(_actor, input) {
+      const row = rows.get(input.workId);
+      if (!row) throw new WorkspaceConflictError("This website is not published.");
+      row.status = "offline";
+      return present(row);
+    },
+    async readLive(address) {
+      const row = [...rows.values()].find((candidate) => candidate.address === address && candidate.status === "live");
+      return row ? { address: row.address, contentHash: row.contentHash, connectOrigin: row.connectOrigin, pages: row.pages } : null;
+    },
+  };
+}
+
+async function approvedWebsite(service: ReturnType<typeof createWebsiteService>, requestId: string, input: WebsiteBrief = brief) {
+  const created = await service.create(owner, "workspace-a", { requestId, brief: input });
+  return service.approve(owner, created.workId, {
+    expectedRevision: created.website.revision,
+    candidateRevision: created.website.candidate!.revision,
+    candidateContentHash: created.website.candidate!.contentHash,
+  });
+}
+
+function publishInput(record: WebsiteRecord) {
+  return { expectedRevision: record.website.revision, candidateRevision: record.website.candidate!.revision, candidateContentHash: record.website.candidate!.contentHash };
 }
 
 describe("self-service website work", () => {
@@ -241,66 +284,101 @@ describe("self-service website work", () => {
       .rejects.toThrow(/access/i);
   });
 
-  it("requires the exact approved candidate and records only a real launch receipt", async () => {
+  it("publishes only the exact approved candidate and records the live address", async () => {
     const provider = providerFixture();
     const service = createWebsiteService(memoryBoundedStore(), { provider });
     const created = await service.create(owner, "workspace-a", { requestId: "website-request-004", brief });
-    await expect(service.prepareLaunch(owner, created.workId, { expectedRevision: 1, candidateRevision: 1, candidateContentHash: created.website.candidate!.contentHash })).rejects.toThrow(/approve/i);
-    const approved = await service.approve(owner, created.workId, { expectedRevision: 1, candidateRevision: 1, candidateContentHash: created.website.candidate!.contentHash });
-    const pending = await service.prepareLaunch(owner, created.workId, { expectedRevision: approved.website.revision, candidateRevision: 1, candidateContentHash: created.website.candidate!.contentHash });
-    expect(pending.website).toMatchObject({ status: "launch_pending", launch: { receipt: { receiptId: "receipt-1", candidateRevision: 1, provider: "local-artifact-provider", artifactHash: created.website.candidate!.contentHash }, candidateRevision: 1 } });
-    expect(pending.website.status).not.toBe("published");
-    expect(provider.prepareLaunch).toHaveBeenCalledWith(expect.objectContaining({ workId: created.workId, candidate: expect.objectContaining({ revision: 1 }), idempotencyKey: expect.stringContaining(created.workId) }));
+    await expect(service.publish(owner, created.workId, publishInput(created))).rejects.toThrow(/approve/i);
+    const approved = await service.approve(owner, created.workId, publishInput(created));
+    const published = await service.publish(owner, created.workId, publishInput(approved));
+    expect(published.website).toMatchObject({
+      status: "published",
+      launch: { status: "published", candidateRevision: 1, receipt: { receiptId: "receipt-1", provider: "strelva_hosted", artifactHash: created.website.candidate!.contentHash } },
+      publication: { status: "live", url: "https://alder-pine.sites.example", candidateRevision: 1 },
+    });
+    expect(provider.publish).toHaveBeenCalledWith(expect.objectContaining({ actor: owner, workId: created.workId, candidate: expect.objectContaining({ revision: 1 }), idempotencyKey: expect.stringContaining(created.workId) }));
+
+    // Replaying the same publish is a no-op rather than a second write.
+    const replay = await service.publish(owner, created.workId, { ...publishInput(approved), expectedRevision: published.website.revision });
+    expect(replay.website.revision).toBe(published.website.revision);
+    expect(provider.publish).toHaveBeenCalledTimes(1);
   });
 
-  it("prepares the exact approved candidate as a private local export without claiming publication", async () => {
-    const service = createWebsiteService(memoryBoundedStore());
-    const created = await service.create(owner, "workspace-a", { requestId: "website-request-local-export", brief });
-    const approved = await service.approve(owner, created.workId, {
-      expectedRevision: created.website.revision,
-      candidateRevision: created.website.candidate!.revision,
-      candidateContentHash: created.website.candidate!.contentHash,
-    });
-    const prepared = await service.prepareLaunch(owner, created.workId, {
-      expectedRevision: approved.website.revision,
-      candidateRevision: approved.website.approvedCandidateRevision!,
-      candidateContentHash: created.website.candidate!.contentHash,
-    });
-    expect(prepared.website).toMatchObject({
-      status: "launch_pending",
-      approvedCandidateRevision: 1,
-      launch: {
-        status: "pending",
-        candidateRevision: 1,
-        receipt: {
-          status: "pending",
-          provider: "local_export",
-          providerUrl: `/api/websites/${created.workId}/export?revision=1&contentHash=${created.website.candidate!.contentHash}`,
-          artifactHash: created.website.candidate!.contentHash,
-          candidateRevision: 1,
-        },
-      },
-    });
-    expect(prepared.website.status).not.toBe("published");
-    expect(prepared.website.launch.receipt?.evidence).toMatch(/private download|No external deployment/i);
+  it("keeps the live site through a new preview and republishes the next approval at the same address", async () => {
+    const publications = memoryPublications();
+    const service = createWebsiteService(memoryBoundedStore(), { provider: createHostedWebsiteProvider({ store: publications, domain: () => "sites.localhost:3000" }) });
+    const approved = await approvedWebsite(service, "website-request-hosted");
+    const published = await service.publish(owner, approved.workId, publishInput(approved));
+    expect(published.website.publication).toMatchObject({ status: "live", url: "http://alder-and-pine.sites.localhost:3000", candidateRevision: 1 });
+    const live = await publications.readLive("alder-and-pine");
+    expect(Object.keys(live!.pages)).toContain("/");
+    expect(live!.pages["/"]).toContain("Alder &amp; Pine");
+    expect(Object.keys(live!.pages).every((path) => path === "/" || /^\/[a-zA-Z0-9_-]+$/.test(path))).toBe(true);
 
-    const edited = await service.revise(owner, created.workId, {
-      expectedRevision: prepared.website.revision,
-      brief: { ...brief, description: "A revised local export brief." },
-    });
-    expect(edited.website).toMatchObject({ status: "preview_ready", revision: 5, approvedCandidateRevision: null, launch: { status: "not_requested", receipt: null }, candidate: { revision: 5 } });
+    const revised = await service.revise(owner, approved.workId, { expectedRevision: published.website.revision, brief: { ...brief, description: "Seasonal flowers and weekly subscriptions." } });
+    expect(revised.website).toMatchObject({ status: "preview_ready", publication: { status: "live", candidateRevision: 1 } });
+    expect((await publications.readLive("alder-and-pine"))!.contentHash).toBe(approved.website.candidate!.contentHash);
+
+    const reapproved = await service.approve(owner, approved.workId, publishInput(revised));
+    const republished = await service.publish(owner, approved.workId, publishInput(reapproved));
+    expect(republished.website.publication).toMatchObject({ status: "live", url: "http://alder-and-pine.sites.localhost:3000", candidateRevision: revised.website.candidate!.revision });
+    expect((await publications.readLive("alder-and-pine"))!.contentHash).toBe(revised.website.candidate!.contentHash);
   });
 
-  it("leaves receipt persistence recoverable after a provider preparation succeeds", async () => {
+  it("chooses the next free address when another website already uses the business name", async () => {
+    const publications = memoryPublications();
+    const service = createWebsiteService(memoryBoundedStore(), { provider: createHostedWebsiteProvider({ store: publications, domain: () => "sites.example" }) });
+    const first = await approvedWebsite(service, "website-request-address-1");
+    await service.publish(owner, first.workId, publishInput(first));
+    const second = await approvedWebsite(service, "website-request-address-2", { ...brief, description: "A second florist with the same name." });
+    const published = await service.publish(owner, second.workId, publishInput(second));
+    expect(published.website.publication?.url).toBe("https://alder-and-pine-2.sites.example");
+  });
+
+  it("does not publish when hosting is not configured and keeps the approval retryable", async () => {
+    const publications = memoryPublications();
+    const service = createWebsiteService(memoryBoundedStore(), { provider: createHostedWebsiteProvider({ store: publications, domain: () => null }) });
+    const approved = await approvedWebsite(service, "website-request-unconfigured");
+    const failed = await service.publish(owner, approved.workId, publishInput(approved));
+    expect(failed.website).toMatchObject({ status: "failed", lastError: { stage: "launch", message: expect.stringMatching(/not configured/i) }, launch: { receipt: null } });
+    expect(failed.website.publication).toBeUndefined();
+    expect(publications.rows.size).toBe(0);
+  });
+
+  it("propagates a refused publication without recording a provider failure", async () => {
+    const provider = providerFixture();
+    provider.publish.mockRejectedValueOnce(new WorkspaceConflictError("Only the current approved website preview can be published."));
+    const service = createWebsiteService(memoryBoundedStore(), { provider });
+    const approved = await approvedWebsite(service, "website-request-refused");
+    await expect(service.publish(owner, approved.workId, publishInput(approved))).rejects.toThrow(/approved website preview/i);
+    const pending = await service.read(owner, approved.workId);
+    expect(pending.website).toMatchObject({ status: "launch_pending", launch: { receipt: null } });
+    await expect(service.revise(owner, approved.workId, { expectedRevision: pending.website.revision, brief })).rejects.toThrow(/in progress/i);
+    const finished = await service.publish(owner, approved.workId, publishInput(pending));
+    expect(finished.website.status).toBe("published");
+  });
+
+  it("takes a live website offline and allows publishing it again", async () => {
+    const publications = memoryPublications();
+    const service = createWebsiteService(memoryBoundedStore(), { provider: createHostedWebsiteProvider({ store: publications, domain: () => "sites.example" }) });
+    const approved = await approvedWebsite(service, "website-request-offline");
+    await expect(service.takeOffline(owner, approved.workId, { expectedRevision: approved.website.revision })).rejects.toThrow(/not live/i);
+    const published = await service.publish(owner, approved.workId, publishInput(approved));
+    const offline = await service.takeOffline(owner, approved.workId, { expectedRevision: published.website.revision });
+    expect(offline.website).toMatchObject({ status: "approved", launch: { status: "not_requested" }, publication: { status: "offline", url: "https://alder-and-pine.sites.example" } });
+    expect(offline.website.history.at(-1)?.kind).toBe("taken_offline");
+    expect(await publications.readLive("alder-and-pine")).toBeNull();
+    await expect(service.takeOffline({ userId: "outsider", verifiedEmail: "outsider@example.com" }, approved.workId, { expectedRevision: offline.website.revision })).rejects.toThrow(/denied/i);
+
+    const again = await service.publish(owner, approved.workId, publishInput(offline));
+    expect(again.website.publication).toMatchObject({ status: "live", url: "https://alder-and-pine.sites.example" });
+  });
+
+  it("leaves receipt persistence recoverable after publishing succeeds", async () => {
     const provider = providerFixture();
     const store = memoryBoundedStore();
     const service = createWebsiteService(store, { provider });
-    const created = await service.create(owner, "workspace-a", { requestId: "website-request-reconcile", brief });
-    const approved = await service.approve(owner, created.workId, {
-      expectedRevision: created.website.revision,
-      candidateRevision: created.website.candidate!.revision,
-      candidateContentHash: created.website.candidate!.contentHash,
-    });
+    const approved = await approvedWebsite(service, "website-request-reconcile");
     const originalUpdate = store.update.bind(store);
     let updateCount = 0;
     store.update = async (...args) => {
@@ -308,22 +386,14 @@ describe("self-service website work", () => {
       if (updateCount === 2) throw new WorkspaceStoreError("Receipt persistence is unavailable.");
       return originalUpdate(...args);
     };
-    const input = {
-      expectedRevision: approved.website.revision,
-      candidateRevision: approved.website.approvedCandidateRevision!,
-      candidateContentHash: created.website.candidate!.contentHash,
-    };
-    await expect(service.prepareLaunch(owner, created.workId, input)).rejects.toThrow(/receipt persistence/i);
-    const pending = await service.read(owner, created.workId);
+    await expect(service.publish(owner, approved.workId, publishInput(approved))).rejects.toThrow(/receipt persistence/i);
+    const pending = await service.read(owner, approved.workId);
     expect(pending.website).toMatchObject({ status: "launch_pending", launch: { status: "pending", candidateRevision: 1, receipt: null } });
 
     store.update = originalUpdate;
-    const resumed = await service.prepareLaunch(owner, created.workId, {
-      ...input,
-      expectedRevision: pending.website.revision,
-    });
-    expect(resumed.website).toMatchObject({ status: "launch_pending", launch: { receipt: { receiptId: "receipt-1", candidateRevision: 1 } } });
-    expect(provider.prepareLaunch).toHaveBeenCalledTimes(2);
+    const resumed = await service.publish(owner, approved.workId, publishInput(pending));
+    expect(resumed.website).toMatchObject({ status: "published", launch: { receipt: { receiptId: "receipt-1", candidateRevision: 1 } } });
+    expect(provider.publish).toHaveBeenCalledTimes(2);
   });
 
   it("keeps reads tenant-bound and propagates a stopped workspace write as a conflict", async () => {
@@ -343,16 +413,15 @@ describe("self-service website work", () => {
     expect((await service.read(owner, created.workId)).website.revision).toBe(1);
   });
 
-  it("does not claim publication when a provider reports a failure, and allows a receipt-backed retry", async () => {
+  it("does not claim publication when publishing fails, and allows a retry", async () => {
     const provider = providerFixture();
-    provider.prepareLaunch.mockRejectedValueOnce(new Error("provider unavailable"));
+    provider.publish.mockRejectedValueOnce(new Error("provider unavailable"));
     const service = createWebsiteService(memoryBoundedStore(), { provider });
-    const created = await service.create(owner, "workspace-a", { requestId: "website-request-006", brief });
-    const approved = await service.approve(owner, created.workId, { expectedRevision: 1, candidateRevision: 1, candidateContentHash: created.website.candidate!.contentHash });
-    const failed = await service.prepareLaunch(owner, created.workId, { expectedRevision: approved.website.revision, candidateRevision: 1, candidateContentHash: created.website.candidate!.contentHash });
+    const approved = await approvedWebsite(service, "website-request-006");
+    const failed = await service.publish(owner, approved.workId, publishInput(approved));
     expect(failed.website).toMatchObject({ status: "failed", launch: { receipt: null }, lastError: { stage: "launch" } });
-    provider.prepareLaunch.mockResolvedValueOnce({ status: "published", receiptId: "published-1", provider: "local-artifact-provider", providerUrl: "https://provider.example/receipts/published-1", evidence: "Local provider confirmed the published artifact.", artifactHash: created.website.candidate!.contentHash, candidateRevision: 1, publishedAt: "2026-09-20T12:03:00.000Z" });
-    const published = await service.prepareLaunch(owner, failed.workId, { expectedRevision: failed.website.revision, candidateRevision: 1, candidateContentHash: created.website.candidate!.contentHash });
-    expect(published.website).toMatchObject({ status: "published", launch: { receipt: { receiptId: "published-1", candidateRevision: 1, artifactHash: created.website.candidate!.contentHash }, candidateRevision: 1 } });
+    expect(failed.website.publication).toBeUndefined();
+    const published = await service.publish(owner, failed.workId, publishInput(failed));
+    expect(published.website).toMatchObject({ status: "published", launch: { receipt: { receiptId: "receipt-1", candidateRevision: 1, artifactHash: approved.website.candidate!.contentHash }, candidateRevision: 1 } });
   });
 });

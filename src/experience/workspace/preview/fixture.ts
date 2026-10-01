@@ -4,6 +4,7 @@ import { listOfferingDefinitions } from "@/platform/offerings/definitions";
 import { applicationSchema, applicationSpecSchema } from "@/products/applications/contracts";
 import type { ServiceRequest } from "@/platform/service-requests";
 import type { z } from "zod";
+import type { Website, WebsiteBrief, WebsiteRecord } from "@/products/websites/contracts";
 
 export const PREVIEW_SCENARIOS = ["free", "paid", "managed", "business", "agency", "enterprise", "empty", "read-only", "unavailable", "signed-out", "website-audit", "recovery"] as const;
 export type PreviewScenario = typeof PREVIEW_SCENARIOS[number];
@@ -191,6 +192,61 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
   };
   const accessGrants: Array<{ id: string; recipientEmail: string; views: Array<"form" | "list" | "detail" | "document">; recordRead: "none" | "own" | "all"; recordSubmit: boolean; purpose: string; expiresAt: string; status: "active" | "revoked" }> = [];
   const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  // Synthetic website lifecycle for visual review of preview, approval,
+  // publishing and offline states. Real persistence and hosting are tested separately.
+  let previewWebsite: WebsiteRecord | null = null;
+  const websiteWorkId = "44444444-4444-4444-8444-444444444444";
+  const websiteAt = "2026-09-28T12:00:00.000Z";
+  const websiteCandidate = (revision: number, brief: WebsiteBrief) => {
+    const contentHash = (revision % 2 ? "a" : "b").repeat(64);
+    return {
+      kind: "website_candidate" as const, revision, contentHash, rendererDigest: "c".repeat(64), artifactDigest: "d".repeat(64), generatedAt: websiteAt,
+      spec: { version: 1 as const, siteName: brief.businessName, content: { hero: { headline: brief.businessName } }, pages: { home: {}, services: {}, contact: {} }, theme: {} },
+      preview: { href: `/api/websites/${websiteWorkId}/preview?revision=${revision}&contentHash=${contentHash}`, revision, contentHash },
+    };
+  };
+  const websiteStep = (current: Website, kind: Website["history"][number]["kind"], change: Partial<Website>, candidateRevision: number | null): Website => ({
+    ...current, ...change, revision: current.revision + 1,
+    history: [...current.history, { revision: current.revision + 1, kind, actorId: PREVIEW_ACTOR, at: websiteAt, candidateRevision, note: null }],
+  });
+  const websiteFixture = (url: URL, init?: RequestInit): Response => {
+    const method = init?.method || "GET";
+    const body = typeof init?.body === "string" ? JSON.parse(init.body) as Record<string, unknown> : {};
+    if (url.pathname === "/api/websites" && method === "POST" && body.action === "create") {
+      const brief = body.brief as WebsiteBrief;
+      const website: Website = { version: 1, revision: 1, title: brief.businessName, brief, status: "preview_ready", candidate: websiteCandidate(1, brief), approvedCandidateRevision: null, launch: { status: "not_requested", candidateRevision: null, receipt: null, failure: null }, lastError: null, createdBy: PREVIEW_ACTOR, createdAt: websiteAt, history: [{ revision: 1, kind: "candidate_generated", actorId: PREVIEW_ACTOR, at: websiteAt, candidateRevision: 1, note: null }] };
+      previewWebsite = { workId: websiteWorkId, workspaceId: CUSTOMER, website, createdAt: websiteAt, updatedAt: websiteAt };
+      saved.set(CUSTOMER, [{ id: websiteWorkId, workspaceId: CUSTOMER, title: brief.businessName, productId: "websites", resourceKind: "website", payload: null, input: {}, createdAt: websiteAt }, ...(saved.get(CUSTOMER) || []).filter((work) => work.id !== websiteWorkId)]);
+      return response(previewWebsite, 201);
+    }
+    if (url.pathname !== `/api/websites/${websiteWorkId}` || !previewWebsite) return response({ error: "This website is unavailable in the local preview." }, 404);
+    if (method === "GET") return response(previewWebsite);
+    const current = previewWebsite.website;
+    if (body.expectedRevision !== current.revision) return response({ error: "This website changed. Reload it before continuing." }, 409);
+    let next: Website;
+    if (body.action === "revise") {
+      const brief = body.brief as WebsiteBrief;
+      const candidate = websiteCandidate(current.revision + 1, brief);
+      next = websiteStep(current, "candidate_generated", { title: brief.businessName, brief, status: "preview_ready", candidate, approvedCandidateRevision: null, launch: { status: "not_requested", candidateRevision: null, receipt: null, failure: null } }, candidate.revision);
+    } else if (body.action === "approve" && current.candidate) {
+      next = websiteStep(current, "approved", { status: "approved", approvedCandidateRevision: current.candidate.revision }, current.candidate.revision);
+    } else if (body.action === "publish" && current.candidate && current.approvedCandidateRevision === current.candidate.revision) {
+      const siteUrl = "https://harbor-dental.strelva.site";
+      const revision = current.candidate.revision;
+      next = websiteStep(current, "launch_confirmed", {
+        status: "published",
+        launch: { status: "published", candidateRevision: revision, failure: null, receipt: { status: "published", receiptId: `preview-${revision}`, provider: "strelva_hosted", providerUrl: siteUrl, evidence: `Preview version ${revision} is live at ${siteUrl}.`, artifactHash: current.candidate.contentHash, candidateRevision: revision, publishedAt: websiteAt } },
+        publication: { status: "live", url: siteUrl, candidateRevision: revision, publishedAt: websiteAt, changedAt: websiteAt },
+      }, revision);
+    } else if (body.action === "takeOffline" && current.publication?.status === "live") {
+      next = websiteStep(current, "taken_offline", {
+        publication: { ...current.publication, status: "offline", changedAt: websiteAt },
+        ...(current.status === "published" ? { status: "approved" as const, launch: { status: "not_requested" as const, candidateRevision: null, receipt: null, failure: null } } : {}),
+      }, current.publication.candidateRevision);
+    } else return response({ error: "This website action is unavailable in the local preview." }, 409);
+    previewWebsite = { ...previewWebsite, website: next, updatedAt: websiteAt };
+    return response(previewWebsite);
+  };
   const providerDelivery = () => ({
     id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", businessId: CUSTOMER, installationId: staffRequestInstallation.id,
     assignmentId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", status: providerDeliveryStatus, customerDecision: providerCustomerDecision,
@@ -404,6 +460,7 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
         createdBy: "local-preview", createdAt: "2026-09-15T12:00:00.000Z", updatedBy: "local-preview", updatedAt: "2026-09-15T12:00:00.000Z",
       } });
     }
+    if (scenario === "business" && url.pathname.startsWith("/api/websites")) return websiteFixture(url, init);
     if (scenario === "business" && url.pathname === "/api/work-allowances" && (init?.method || "GET") === "GET") return response({
       allowances: [{
         id: "55555555-5555-4555-8555-555555555555", workspaceId: CUSTOMER, businessName: "Harbor Dental", payerId: "66666666-6666-4666-8666-666666666666",

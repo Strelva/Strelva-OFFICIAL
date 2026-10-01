@@ -8,7 +8,8 @@ const state = vi.hoisted(() => ({
   readWebsite: vi.fn(),
   reviseWebsite: vi.fn(),
   approveWebsite: vi.fn(),
-  prepareWebsiteLaunch: vi.fn(),
+  publishWebsite: vi.fn(),
+  takeWebsiteOffline: vi.fn(),
 }));
 
 vi.mock("@/lib/db/server-client", () => ({ getSessionUser: () => state.user }));
@@ -19,7 +20,8 @@ vi.mock("@/products/websites/server", () => ({
   readWebsite: state.readWebsite,
   reviseWebsite: state.reviseWebsite,
   approveWebsite: state.approveWebsite,
-  prepareWebsiteLaunch: state.prepareWebsiteLaunch,
+  publishWebsite: state.publishWebsite,
+  takeWebsiteOffline: state.takeWebsiteOffline,
   WebsiteConflictError: class WebsiteConflictError extends Error {},
   WebsiteUnavailableError: class WebsiteUnavailableError extends Error {},
 }));
@@ -56,13 +58,15 @@ beforeEach(() => {
   state.readWebsite.mockReset();
   state.reviseWebsite.mockReset();
   state.approveWebsite.mockReset();
-  state.prepareWebsiteLaunch.mockReset();
+  state.publishWebsite.mockReset();
+  state.takeWebsiteOffline.mockReset();
   state.readWebsite.mockResolvedValue(record);
   state.listWebsites.mockResolvedValue([record]);
   state.createWebsite.mockResolvedValue(record);
   state.reviseWebsite.mockResolvedValue(record);
   state.approveWebsite.mockResolvedValue(record);
-  state.prepareWebsiteLaunch.mockResolvedValue(record);
+  state.publishWebsite.mockResolvedValue(record);
+  state.takeWebsiteOffline.mockResolvedValue(record);
 });
 
 describe("website API boundary", () => {
@@ -90,6 +94,19 @@ describe("website API boundary", () => {
     const response = await POST(new Request("http://localhost/api/websites", { method: "POST", headers: { origin: "http://localhost", "sec-fetch-site": "same-origin", "content-type": "application/json" }, body: JSON.stringify({ action: "revise", workId, expectedRevision: 1, brief: { businessName: "Alder & Pine", description: "A florist", primaryCallToAction: "Request flowers" } }) }));
     expect(response.status).toBe(200);
     expect(state.reviseWebsite).toHaveBeenCalledWith(expect.objectContaining({ userId: actor.id }), workId, { expectedRevision: 1, brief: expect.objectContaining({ primaryCallToAction: "Request flowers" }) });
+  });
+
+  it("publishes and takes offline through the work route with strict service input", async () => {
+    state.user = actor;
+    const { POST } = await import("@/app/api/websites/[workId]/route");
+    const post = (body: unknown) => POST(new Request(`http://localhost/api/websites/${workId}`, { method: "POST", headers: { origin: "http://localhost", "sec-fetch-site": "same-origin", "content-type": "application/json" }, body: JSON.stringify(body) }), { params: Promise.resolve({ workId }) });
+    const contentHash = "a".repeat(64);
+    expect((await post({ action: "publish", expectedRevision: 3, candidateRevision: 2, candidateContentHash: contentHash })).status).toBe(200);
+    expect(state.publishWebsite).toHaveBeenCalledWith(expect.objectContaining({ userId: actor.id }), workId, { expectedRevision: 3, candidateRevision: 2, candidateContentHash: contentHash });
+    expect((await post({ action: "takeOffline", expectedRevision: 4 })).status).toBe(200);
+    expect(state.takeWebsiteOffline).toHaveBeenCalledWith(expect.objectContaining({ userId: actor.id }), workId, { expectedRevision: 4 });
+    expect((await post({ action: "prepareLaunch", expectedRevision: 3, candidateRevision: 2, candidateContentHash: contentHash })).status).toBe(400);
+    expect((await post({ action: "takeOffline", expectedRevision: 4, address: "other" })).status).toBe(400);
   });
 
 });

@@ -144,30 +144,17 @@ export const websiteArtifactSchema = z.object({
 });
 export type WebsiteArtifact = z.infer<typeof websiteArtifactSchema>;
 
-export const websiteLaunchReceiptSchema = z.discriminatedUnion("status", [
-  z.object({
-    status: z.literal("pending"),
-    receiptId: shortText(256),
-    provider: shortText(120),
-    // External adapters return HTTPS URLs. The local adapter returns the
-    // private, server-owned export path for this exact candidate.
-    providerUrl: z.string().trim().max(2_048).refine(value => (/^\/(?!\/)/.test(value)) || /^https:\/\//i.test(value), "Expected a server-owned path or HTTPS provider URL"),
-    evidence: shortText(1_000),
-    artifactHash: contentHash,
-    candidateRevision: z.number().int().positive(),
-    preparedAt: z.string().datetime({ offset: true }),
-  }).strict(),
-  z.object({
-    status: z.literal("published"),
-    receiptId: shortText(256),
-    provider: shortText(120),
-    providerUrl: z.string().trim().url().max(2_048),
-    evidence: shortText(1_000),
-    artifactHash: contentHash,
-    candidateRevision: z.number().int().positive(),
-    publishedAt: z.string().datetime({ offset: true }),
-  }).strict(),
-]);
+/** Proof that the exact approved candidate is publicly live on Strelva hosting. */
+export const websiteLaunchReceiptSchema = z.object({
+  status: z.literal("published"),
+  receiptId: shortText(256),
+  provider: z.literal("strelva_hosted"),
+  providerUrl: z.string().trim().url().max(2_048).refine(value => /^https?:\/\//i.test(value), "Expected an HTTP(S) site URL"),
+  evidence: shortText(1_000),
+  artifactHash: contentHash,
+  candidateRevision: z.number().int().positive(),
+  publishedAt: z.string().datetime({ offset: true }),
+}).strict();
 export type WebsiteLaunchReceipt = z.infer<typeof websiteLaunchReceiptSchema>;
 
 export const websiteLaunchSchema = z.object({
@@ -178,9 +165,22 @@ export const websiteLaunchSchema = z.object({
 }).strict();
 export type WebsiteLaunch = z.infer<typeof websiteLaunchSchema>;
 
+/**
+ * The public address outlives candidate revisions: a new preview does not
+ * change what is live until the owner publishes it or takes the site offline.
+ */
+export const websitePublicationSchema = z.object({
+  status: z.enum(["live", "offline"]),
+  url: z.string().trim().url().max(2_048),
+  candidateRevision: z.number().int().positive(),
+  publishedAt: z.string().datetime({ offset: true }),
+  changedAt: z.string().datetime({ offset: true }),
+}).strict();
+export type WebsitePublication = z.infer<typeof websitePublicationSchema>;
+
 export const websiteHistoryEntrySchema = z.object({
   revision: z.number().int().positive(),
-  kind: z.enum(["created", "revised", "candidate_generated", "candidate_failed", "approved", "launch_started", "launch_prepared", "launch_confirmed", "launch_failed"]),
+  kind: z.enum(["created", "revised", "candidate_generated", "candidate_failed", "approved", "launch_started", "launch_confirmed", "launch_failed", "taken_offline"]),
   actorId: z.string().min(1),
   at: z.string().datetime({ offset: true }),
   candidateRevision: z.number().int().positive().nullable(),
@@ -205,6 +205,7 @@ export const websiteSchema = z.object({
   candidate: websiteArtifactSchema.nullable(),
   approvedCandidateRevision: z.number().int().positive().nullable(),
   launch: websiteLaunchSchema,
+  publication: websitePublicationSchema.optional(),
   lastError: websiteErrorSchema.nullable(),
   createdBy: z.string().min(1),
   createdAt: z.string().datetime({ offset: true }),
@@ -233,12 +234,17 @@ export const approveWebsiteInputSchema = z.object({
 }).strict();
 export type ApproveWebsiteInput = z.infer<typeof approveWebsiteInputSchema>;
 
-export const prepareWebsiteLaunchInputSchema = z.object({
+export const publishWebsiteInputSchema = z.object({
   expectedRevision: z.number().int().nonnegative(),
   candidateRevision: z.number().int().positive(),
   candidateContentHash: contentHash,
 }).strict();
-export type PrepareWebsiteLaunchInput = z.infer<typeof prepareWebsiteLaunchInputSchema>;
+export type PublishWebsiteInput = z.infer<typeof publishWebsiteInputSchema>;
+
+export const takeWebsiteOfflineInputSchema = z.object({
+  expectedRevision: z.number().int().nonnegative(),
+}).strict();
+export type TakeWebsiteOfflineInput = z.infer<typeof takeWebsiteOfflineInputSchema>;
 
 export const connectWebsiteCapabilitiesInputSchema = z.object({
   expectedRevision: z.number().int().nonnegative(),

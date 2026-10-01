@@ -33,7 +33,8 @@ function transport(): WebsiteExperienceTransport {
     })),
     revise: vi.fn(),
     approve: vi.fn(),
-    prepareLaunch: vi.fn(),
+    publish: vi.fn(),
+    takeOffline: vi.fn(),
   };
 }
 

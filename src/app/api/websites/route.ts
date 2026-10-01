@@ -3,8 +3,8 @@ import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { readWorkspaceBody, workspaceHttpActor, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError } from "@/platform/workspaces/types";
 import { createWebsite, listWebsites, WebsiteConflictError, WebsiteUnavailableError } from "@/products/websites/server";
-import { approveWebsiteInputSchema, createWebsiteInputSchema, prepareWebsiteLaunchInputSchema, reviseWebsiteInputSchema } from "@/products/websites/contracts";
-import { approveWebsite, prepareWebsiteLaunch, readWebsite, reviseWebsite } from "@/products/websites/server";
+import { approveWebsiteInputSchema, createWebsiteInputSchema, publishWebsiteInputSchema, reviseWebsiteInputSchema, takeWebsiteOfflineInputSchema } from "@/products/websites/contracts";
+import { approveWebsite, publishWebsite, readWebsite, reviseWebsite, takeWebsiteOffline } from "@/products/websites/server";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +46,8 @@ export async function POST(request: Request) {
       z.object({ action: z.literal("create"), workspaceId: z.string().uuid(), requestId: z.string(), brief: z.unknown() }).strict(),
       z.object({ action: z.literal("revise"), workId: z.string().uuid(), expectedRevision: z.number().int().nonnegative(), brief: z.unknown() }).strict(),
       z.object({ action: z.literal("approve"), workId: z.string().uuid(), expectedRevision: z.number().int().nonnegative(), candidateRevision: z.number().int().positive(), candidateContentHash: z.string() }).strict(),
-      z.object({ action: z.enum(["prepareLaunch", "prepare_launch"]), workId: z.string().uuid(), expectedRevision: z.number().int().nonnegative(), candidateRevision: z.number().int().positive(), candidateContentHash: z.string() }).strict(),
+      z.object({ action: z.literal("publish"), workId: z.string().uuid(), expectedRevision: z.number().int().nonnegative(), candidateRevision: z.number().int().positive(), candidateContentHash: z.string() }).strict(),
+      z.object({ action: z.literal("takeOffline"), workId: z.string().uuid(), expectedRevision: z.number().int().nonnegative() }).strict(),
     ]).parse(await readWorkspaceBody(request));
     if (body.action === "create") return workspaceJson(await createWebsite(current, body.workspaceId, createWebsiteInputSchema.parse({ requestId: body.requestId, brief: body.brief })), 201);
     if (body.action === "revise") {
@@ -57,8 +58,12 @@ export async function POST(request: Request) {
       const { action: _action, workId: _workId, ...input } = body;
       return workspaceJson(await approveWebsite(current, body.workId, approveWebsiteInputSchema.parse(input)));
     }
+    if (body.action === "takeOffline") {
+      const { action: _action, workId: _workId, ...input } = body;
+      return workspaceJson(await takeWebsiteOffline(current, body.workId, takeWebsiteOfflineInputSchema.parse(input)));
+    }
     const { action: _action, workId: _workId, ...input } = body;
-    return workspaceJson(await prepareWebsiteLaunch(current, body.workId, prepareWebsiteLaunchInputSchema.parse(input)));
+    return workspaceJson(await publishWebsite(current, body.workId, publishWebsiteInputSchema.parse(input)));
   } catch (error) {
     return failure(error);
   }
