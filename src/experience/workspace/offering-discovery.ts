@@ -35,6 +35,8 @@ const FAMILY_BY_ID: Readonly<Record<string, string>> = {
   customer_inquiry_intake: "inquiries",
   applications: "applications",
   private_staff_requests: "applications",
+  homefinder: "homefinder",
+  home_finder: "homefinder",
 };
 
 export function discoveryFamilyFor(id: string): string {

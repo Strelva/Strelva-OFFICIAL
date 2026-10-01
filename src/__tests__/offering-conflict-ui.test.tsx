@@ -3,6 +3,7 @@ import { act, createElement, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OfferingCollection, OfferingInstallation } from "@/platform/offerings";
+import { getOfferingDefinition } from "@/platform/offerings/definitions";
 import { WorkspaceRequestContext } from "@/experience/workspace/WorkspaceRequest";
 import { WorkspaceOfferingDirectory, useWorkspaceOfferings } from "@/experience/workspace/WorkspaceOfferings";
 
@@ -23,6 +24,8 @@ const definition = {
   scopes: [{ id: "submit_requests", label: "Submit requests", description: "Add request records.", required: true }],
   surfaces: [{ id: "staff_app", label: "Staff application", description: "The staff form.", href: null, required: true }],
   configurationFields: [{ id: "displayName", label: "Display name", kind: "short_text" as const, required: false, maximumLength: 80 }],
+  declaration: getOfferingDefinition("private_staff_requests", "1.0.0")!.declaration,
+  qualified: true,
 };
 
 const work = {

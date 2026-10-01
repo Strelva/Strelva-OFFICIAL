@@ -1,10 +1,22 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { HOME_FINDER_MANAGEMENT_OPERATIONS } from "@/platform/customers/home-finder-port";
+import { getProductDefinition } from "@/platform/products/catalog";
 import {
+  HOME_FINDER_OFFERING_SCOPES,
+  OFFERING_DEFINITIONS,
+  OFFERING_QUALIFICATIONS,
   OfferingAccessError,
   OfferingConflictError,
   OfferingNotFoundError,
+  OfferingNotQualifiedError,
   OfferingService,
+  createOfferingCatalog,
+  getOfferingDefinition,
+  listOfferingDefinitions,
+  qualifyOffering,
+  type OfferingDefinition,
+  type OfferingQualificationEvidence,
   type OfferingAccess,
   type OfferingActor,
   type OfferingInstallWrite,
@@ -433,5 +445,157 @@ describe("offering installation interface", () => {
       ...installCommand(),
       nativeResources: [{ kind: "managed_website", id: "https://example.com/admin" }],
     })).rejects.toThrow(/invalid/i);
+  });
+});
+
+const staffDefinition = getOfferingDefinition("private_staff_requests", "1.0.0")!;
+
+function evidenceFor(definition: Pick<OfferingDefinition, "id" | "version">): OfferingQualificationEvidence {
+  return {
+    id: "staff-requests-focused",
+    offeringId: definition.id,
+    offeringVersion: definition.version,
+    kind: "focused_test",
+    environment: "local",
+    status: "passed",
+    reference: "src/__tests__/offering-installations.test.ts",
+    checkedAt: "2026-09-28T00:00:00.000Z",
+    summary: "Focused offering installation proof.",
+  };
+}
+
+function homeFinderCommand(overrides: Record<string, unknown> = {}) {
+  return installCommand({
+    definitionId: "home_finder",
+    idempotencyKey: "home-finder:first",
+    configuration: {},
+    nativeResources: [{ kind: "home_finder_installation", id: "installation-fixture-1" }],
+    responsibility: { kind: "provider_requested", providerKind: "named_third_party", providerName: "John Leone, Agency Partner" },
+    acceptedScope: [...HOME_FINDER_OFFERING_SCOPES],
+    surfaceIds: ["home_finder_management"],
+    ...overrides,
+  });
+}
+
+describe("offering declarations (ADR 0010)", () => {
+  it("requires every built-in definition to declare data, permissions, outside systems and its creator", () => {
+    expect(OFFERING_DEFINITIONS.map((definition) => definition.id)).toEqual([
+      "private_staff_requests", "customer_inquiry_intake", "managed_website_changes", "home_finder",
+    ]);
+    for (const definition of listOfferingDefinitions()) {
+      expect(definition.declaration.data.length).toBeGreaterThan(0);
+      expect(definition.declaration.permissions.map((permission) => permission.scope).sort())
+        .toEqual(definition.scopes.map((scope) => scope.id).sort());
+      expect(definition.declaration.madeBy.name).toBeTruthy();
+    }
+  });
+
+  it.each([
+    ["a missing declaration", { declaration: undefined }, /missing or invalid declaration/],
+    ["no data classes", { declaration: { ...staffDefinition.declaration, data: [] } }, /missing or invalid declaration/],
+    ["no permissions", { declaration: { ...staffDefinition.declaration, permissions: [] } }, /missing or invalid declaration/],
+    ["no creator", { declaration: { ...staffDefinition.declaration, madeBy: undefined } }, /missing or invalid declaration/],
+    ["an unknown data class", { declaration: { ...staffDefinition.declaration, data: [{ class: "everything", access: "read", heldBy: "strelva", description: "All data." }] } }, /missing or invalid declaration/],
+    ["an undeclared scope permission", { declaration: { ...staffDefinition.declaration, permissions: staffDefinition.declaration.permissions.slice(0, 1) } }, /every scope exactly once/],
+    ["data held by an undeclared system", { declaration: { ...staffDefinition.declaration, data: [{ class: "application_records", access: "read", heldBy: "mystery_vendor", description: "Records." }] } }, /undeclared outside system/],
+  ])("rejects a definition with %s", (_label, override, message) => {
+    const definition = { ...staffDefinition, ...override } as unknown as OfferingDefinition;
+    expect(() => createOfferingCatalog({ definitions: [definition], qualifications: [] })).toThrow(message);
+  });
+});
+
+describe("offering qualification gate", () => {
+  it("keeps the three existing offerings qualified at their exact versions and installable", async () => {
+    expect(OFFERING_QUALIFICATIONS.map((record) => `${record.offeringId}@${record.offeringVersion}`)).toEqual([
+      "private_staff_requests@1.0.0", "customer_inquiry_intake@1.0.0", "managed_website_changes@1.0.0",
+    ]);
+    const qualified = listOfferingDefinitions().filter((definition) => definition.qualified);
+    expect(qualified.map((definition) => [definition.id, definition.installability])).toEqual([
+      ["private_staff_requests", "available"], ["customer_inquiry_intake", "available"], ["managed_website_changes", "available"],
+    ]);
+    const service = new OfferingService(new MemoryOfferingStore());
+    await expect(service.execute(owner, installCommand())).resolves.toMatchObject({ status: "active" });
+  });
+
+  it("refuses an unqualified definition before the store and accepts it once qualified", async () => {
+    const unqualified = createOfferingCatalog({ definitions: [staffDefinition], qualifications: [] });
+    expect(unqualified.list()[0]).toMatchObject({ qualified: false, installability: "not_enabled" });
+    const store = new MemoryOfferingStore();
+    const refused = new OfferingService(store, unqualified).execute(owner, installCommand());
+    await expect(refused).rejects.toBeInstanceOf(OfferingNotQualifiedError);
+    await expect(refused).rejects.toThrow(/not qualified to be turned on/);
+    expect((await new OfferingService(store, unqualified).list(owner, BUSINESS_A)).installations).toEqual([]);
+
+    const qualified = createOfferingCatalog({
+      definitions: [staffDefinition],
+      qualifications: [qualifyOffering(staffDefinition, [evidenceFor(staffDefinition)], "2026-09-28T00:00:00.000Z", "Test witness.")],
+    });
+    await expect(new OfferingService(store, qualified).execute(owner, installCommand())).resolves.toMatchObject({ status: "active" });
+  });
+
+  it("requires a new definition version to be qualified again", async () => {
+    const nextVersion: OfferingDefinition = { ...staffDefinition, version: "1.1.0" };
+    expect(() => qualifyOffering(nextVersion, [evidenceFor(staffDefinition)], "2026-09-28T00:00:00.000Z", "Stale witness.")).toThrow(/not bound/);
+    expect(() => qualifyOffering(staffDefinition, [{ ...evidenceFor(staffDefinition), status: "failed" }], "2026-09-28T00:00:00.000Z", "Failed witness.")).toThrow(/failed/);
+    expect(() => createOfferingCatalog({
+      definitions: [nextVersion],
+      qualifications: [qualifyOffering(staffDefinition, [evidenceFor(staffDefinition)], "2026-09-28T00:00:00.000Z", "Old witness.")],
+    })).toThrow(/does not match a declared definition/);
+
+    const catalog = createOfferingCatalog({
+      definitions: [staffDefinition, nextVersion],
+      qualifications: [qualifyOffering(staffDefinition, [evidenceFor(staffDefinition)], "2026-09-28T00:00:00.000Z", "Only 1.0.0.")],
+    });
+    const service = new OfferingService(new MemoryOfferingStore(), catalog);
+    await expect(service.execute(owner, installCommand({ definitionVersion: "1.1.0", idempotencyKey: "staff:next" })))
+      .rejects.toBeInstanceOf(OfferingNotQualifiedError);
+    await expect(service.execute(owner, installCommand())).resolves.toMatchObject({ definitionVersion: "1.0.0" });
+  });
+
+  it("refuses activation when the installed version is no longer qualified, while retirement still works", async () => {
+    const store = new MemoryOfferingStore();
+    const draft = await new OfferingService(store).execute(owner, installCommand({ nativeResources: undefined, idempotencyKey: "staff:draft" }));
+    store.releasedApplications.add(draft.nativeResources[0]!.id);
+    const withdrawn = new OfferingService(store, createOfferingCatalog({ definitions: [staffDefinition], qualifications: [] }));
+    await expect(withdrawn.execute(owner, { action: "activate", businessId: BUSINESS_A, installationId: draft.id, expectedRevision: 1 }))
+      .rejects.toBeInstanceOf(OfferingNotQualifiedError);
+    const active = await new OfferingService(store).execute(owner, { action: "activate", businessId: BUSINESS_A, installationId: draft.id, expectedRevision: 1 });
+    expect(active.status).toBe("active");
+    await expect(withdrawn.execute(owner, { action: "retire", businessId: BUSINESS_A, installationId: draft.id, expectedRevision: 2, reason: "Qualification withdrawn" }))
+      .resolves.toMatchObject({ status: "retired" });
+  });
+});
+
+describe("IDX Home Finder offering", () => {
+  it("is declared with its creator, data, outside systems and the four read-only management scopes", () => {
+    const definition = listOfferingDefinitions().find((item) => item.id === "home_finder")!;
+    expect(definition).toMatchObject({ qualified: false, installability: "not_enabled", availability: "external_pilot" });
+    expect(definition.declaration.madeBy).toEqual({ kind: "agency", name: "John Leone, Agency Partner" });
+    expect(definition.requiredResources).toEqual([expect.objectContaining({ kind: "home_finder_installation", minimum: 1, maximum: 1 })]);
+    expect(definition.scopes.map((scope) => scope.id)).toEqual(HOME_FINDER_OFFERING_SCOPES);
+    expect(HOME_FINDER_OFFERING_SCOPES).toHaveLength(HOME_FINDER_MANAGEMENT_OPERATIONS.length);
+    expect(definition.declaration.permissions.every((permission) => permission.effect === "read")).toBe(true);
+    expect(definition.declaration.data.map((item) => item.class).sort()).toEqual(
+      ["buyer_inquiry_content", "delivery_receipts", "installation_readiness", "listing_data"],
+    );
+    expect(definition.declaration.data.every((item) => item.heldBy !== "strelva")).toBe(true);
+    expect(definition.declaration.outsideSystems.map((system) => system.id)).toEqual(["trestle", "resend", "home_finder_host"]);
+  });
+
+  it("refuses installation with the catalog's outstanding external gates as the reason", async () => {
+    const outstanding = getProductDefinition("homefinder").release.gates.filter((gate) => gate.state !== "met");
+    expect(outstanding.map((gate) => gate.id)).toEqual(["authorized_brokerage", "live_inventory_rights", "inquiry_delivery", "platform_handoff"]);
+    const store = new MemoryOfferingStore();
+    const refusal = new OfferingService(store).execute(owner, homeFinderCommand());
+    await expect(refusal).rejects.toBeInstanceOf(OfferingNotQualifiedError);
+    const error = await refusal.then(() => new Error("accepted"), (caught: Error) => caught);
+    for (const gate of outstanding) expect(error.message).toContain(gate.label.toLowerCase());
+    expect((await new OfferingService(store).list(owner, BUSINESS_A)).installations).toEqual([]);
+  });
+
+  it("accepts only a bounded external installation id as its native resource", async () => {
+    const service = new OfferingService(new MemoryOfferingStore());
+    await expect(service.execute(owner, homeFinderCommand({ nativeResources: [{ kind: "home_finder_installation", id: "https://evil.example/admin" }] })))
+      .rejects.toThrow(/invalid/i);
   });
 });

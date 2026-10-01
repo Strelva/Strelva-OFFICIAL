@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { WorkspaceOfferingDirectory } from "@/experience/workspace/WorkspaceOfferings";
 import type { OfferingCollection } from "@/platform/offerings";
+import { getOfferingDefinition } from "@/platform/offerings/definitions";
 
 describe("provider delivery offering UI", () => {
   it("places the provider lifecycle in the installed offering without claiming acceptance", () => {
@@ -13,6 +14,7 @@ describe("provider delivery offering UI", () => {
       definitions: [{
         id: "private_staff_requests", version: "1.0.0", name: "Staff requests", description: "One operating workflow.",
         availability: "local", installability: "available", installationNote: "", requiredResources: [], scopes: [], surfaces: [], configurationFields: [],
+        declaration: getOfferingDefinition("private_staff_requests", "1.0.0")!.declaration, qualified: true,
       }],
       installations: [{
         id: installationId, businessId, definitionId: "private_staff_requests", definitionVersion: "1.0.0", status: "active", revision: 2,
