@@ -606,8 +606,8 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     // The pinned pnpm 10 toolchain reads overrides from package.json. Check
     // that the lockfile also resolves the selected override.
     expect(packageData.packageManager).toMatch(/^pnpm@10\./);
-    expect(packageData.pnpm?.overrides?.["fast-uri"]).toBe("3.1.6");
-    expect(lockfile).toContain("  fast-uri: 3.1.6");
+    expect(packageData.pnpm?.overrides?.["fast-uri"]).toBe("3.1.8");
+    expect(lockfile).toContain("  fast-uri: 3.1.8");
     expect(releaseGate).toBe("pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && pnpm check:prod && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke");
     expect(launchGate).toBe("pnpm lint && pnpm typecheck && pnpm test && pnpm audit && pnpm build && PLAYWRIGHT_BUILT_APP=1 REB_DEV_UNGATED_ACCESS=0 pnpm smoke");
     expect(packageJson).toContain("PLAYWRIGHT_BUILT_APP=1");

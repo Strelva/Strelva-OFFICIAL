@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { checkHeartbeats } from "@/lib/heartbeat";
+import { checkHeartbeats, recordHeartbeat } from "@/lib/heartbeat";
 import { alertOnce } from "@/lib/monitoring";
 import { requireCronRequest } from "@/lib/cron-auth";
 
@@ -27,6 +27,9 @@ export async function GET(request: Request) {
       6 * 3600 // re-page at most every 6h per cron
     );
   }
+  // The watchdog is itself a registered cron. Record its own run, otherwise it
+  // has no heartbeat and reports itself stale on every pass.
+  await recordHeartbeat("heartbeat", { ok: true, processed: statuses.length });
   return NextResponse.json({
     checkedAt: new Date().toISOString(),
     total: statuses.length,
