@@ -212,5 +212,6 @@ psql "${psql_args[@]}" --set=tenant_import="$(cat "$repo_root/tests/fixtures/bus
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 psql "${psql_args[@]}" -Atc "select count(*) from pg_trigger where tgname = 'tenant_workspace_links_attach_leads'" | grep -qx 1 \
   || { printf 'Conversion trigger for client leads is missing after out-of-order apply.\n' >&2; exit 1; }
+psql "${psql_args[@]}" --file="$repo_root/tests/business-effort-minutes-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
