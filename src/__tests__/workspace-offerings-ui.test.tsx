@@ -5,6 +5,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it } from "vitest";
 import type { OfferingCollection } from "@/platform/offerings";
+import { getOfferingDefinition } from "@/platform/offerings/definitions";
 import {
   BusinessOfferingSummary,
   WorkspaceOfferingDirectory,
@@ -31,6 +32,8 @@ const definition = {
   scopes: [{ id: "submit_requests", label: "Submit requests", description: "Add request records.", required: true }],
   surfaces: [{ id: "staff_app", label: "Staff application", description: "The staff form.", href: null, required: true }],
   configurationFields: [{ id: "displayName", label: "Display name", kind: "short_text" as const, required: false, maximumLength: 80 }],
+  declaration: getOfferingDefinition("private_staff_requests", "1.0.0")!.declaration,
+  qualified: true,
 };
 
 const collection: OfferingCollection = {

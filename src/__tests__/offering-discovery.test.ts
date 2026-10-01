@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { OfferingDefinitionView, OfferingInstallation } from "@/platform/offerings";
+import { getOfferingDefinition } from "@/platform/offerings/definitions";
 import type { WorkspaceProduct } from "@/experience/workspace/contracts";
 import { composeOfferingDiscovery, discoveryActionForOffering, discoveryActionForProduct } from "@/experience/workspace/offering-discovery";
 
@@ -15,6 +16,8 @@ const offering: OfferingDefinitionView = {
   scopes: [],
   surfaces: [],
   configurationFields: [],
+  declaration: getOfferingDefinition("managed_website_changes", "1.0.0")!.declaration,
+  qualified: true,
 };
 
 const product: WorkspaceProduct = {

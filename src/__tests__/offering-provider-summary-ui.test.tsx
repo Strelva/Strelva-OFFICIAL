@@ -3,6 +3,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { OfferingCollection, OfferingInstallation } from "@/platform/offerings";
+import { getOfferingDefinition } from "@/platform/offerings/definitions";
 import { WorkspaceRequestContext } from "@/experience/workspace/WorkspaceRequest";
 import { BusinessOfferingSummary } from "@/experience/workspace/WorkspaceOfferings";
 import { createPreviewRequest } from "@/experience/workspace/preview/fixture";
@@ -25,6 +26,8 @@ const definition = {
   scopes: [],
   surfaces: [],
   configurationFields: [],
+  declaration: getOfferingDefinition("private_staff_requests", "1.0.0")!.declaration,
+  qualified: true,
 };
 
 function installation(id: string, businessId: string): OfferingInstallation {

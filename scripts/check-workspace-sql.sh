@@ -304,6 +304,10 @@ psql "${psql_args[@]}" --file="$repo_root/tests/websites-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-managed-website-draft-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/public-website-bookings-schema.sql"
 
+# September 28: IDX Home Finder is a declared, unqualified offering.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260928140000_home_finder_offering.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/home-finder-offering-schema.sql"
+
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 

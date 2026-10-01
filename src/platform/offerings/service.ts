@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { getOfferingDefinition, listOfferingDefinitions, resolveOfferingSurfaces } from "./definitions";
+import { offeringCatalog, type OfferingCatalog } from "./definitions";
 import type { OfferingStore } from "./store";
 import {
   OfferingAccessError,
@@ -47,6 +47,8 @@ const nativeResource = z.discriminatedUnion("kind", [
   // The resource id is the verified binding UUID, never a tenant slug, domain,
   // browser URL, or direct claim of tenant authority.
   z.object({ kind: z.literal("managed_website"), id: UUID }).strict(),
+  // The Home Finder runtime's own installation id (the adapter's scope id).
+  z.object({ kind: z.literal("home_finder_installation"), id: z.string().trim().min(1).max(160).regex(/^[A-Za-z0-9][A-Za-z0-9_.:-]*$/) }).strict(),
 ]);
 const installCommand = z.object({
   action: z.literal("install"),
@@ -100,7 +102,7 @@ function unique(values: readonly string[]): boolean {
   return new Set(values).size === values.length;
 }
 
-function validateConfiguration(definition: OfferingDefinitionView, value: Record<string, unknown>): Record<string, unknown> {
+function validateConfiguration(definition: Pick<OfferingDefinitionView, "configurationFields">, value: Record<string, unknown>): Record<string, unknown> {
   const allowed = new Map(definition.configurationFields.map((field) => [field.id, field]));
   for (const [key, candidate] of Object.entries(value)) {
     const field = allowed.get(key);
@@ -119,9 +121,12 @@ function validateConfiguration(definition: OfferingDefinitionView, value: Record
   return value;
 }
 
-function validateInstall(command: z.infer<typeof installCommand>): z.infer<typeof installCommand> {
-  const definition = getOfferingDefinition(command.definitionId, command.definitionVersion);
-  if (!definition) throw new OfferingValidationError("This offering definition version is unavailable.");
+function validateInstall(catalog: OfferingCatalog, command: z.infer<typeof installCommand>): z.infer<typeof installCommand> {
+  if (!catalog.get(command.definitionId, command.definitionVersion)) {
+    throw new OfferingValidationError("This offering definition version is unavailable.");
+  }
+  // ADR 0010: nothing is turned on unless this exact declared version is qualified.
+  const definition = catalog.requireQualified(command.definitionId, command.definitionVersion);
   if (definition.installability !== "available") {
     throw new OfferingConflictError(definition.installationNote);
   }
@@ -177,9 +182,9 @@ function presentWebsiteBinding(record: OfferingWebsiteBindingRecord): OfferingWe
   } };
 }
 
-function present(record: OfferingInstallationRecord, bindings: readonly OfferingWebsiteBindingRecord[] = []): OfferingInstallation {
+function present(catalog: OfferingCatalog, record: OfferingInstallationRecord, bindings: readonly OfferingWebsiteBindingRecord[] = []): OfferingInstallation {
   const { surfaceIds, ...installation } = record;
-  const surfaces = resolveOfferingSurfaces(record.definitionId, record.definitionVersion, record.nativeResources, surfaceIds, record.businessId, record.status);
+  const surfaces = catalog.resolveSurfaces(record.definitionId, record.definitionVersion, record.nativeResources, surfaceIds, record.businessId, record.status);
   const websiteBindingId = record.nativeResources.find((resource) => resource.kind === "managed_website")?.id;
   const websiteBinding = websiteBindingId ? bindings.find((binding) => binding.id === websiteBindingId) : undefined;
   return {
@@ -189,7 +194,10 @@ function present(record: OfferingInstallationRecord, bindings: readonly Offering
 }
 
 export class OfferingService {
-  constructor(private readonly store: OfferingStore) {}
+  constructor(
+    private readonly store: OfferingStore,
+    private readonly catalog: OfferingCatalog = offeringCatalog,
+  ) {}
 
   async list(actor: OfferingActor, businessId: string, installationId?: string): Promise<OfferingCollection> {
     const current = actorValue(actor);
@@ -202,8 +210,8 @@ export class OfferingService {
     return {
       businessId: parsedBusinessId.data,
       permissions: { canRead: true, canManage: inspection.access.canManage, role: inspection.access.role },
-      definitions: listOfferingDefinitions(),
-      installations: records.map((record) => present(record, inspection.websiteBindings)),
+      definitions: this.catalog.list(),
+      installations: records.map((record) => present(this.catalog, record, inspection.websiteBindings)),
       websiteBindings: inspection.websiteBindings.map(presentWebsiteBinding),
     };
   }
@@ -224,8 +232,8 @@ export class OfferingService {
     if (!inspection.access.canManage) throw new OfferingAccessError("Owner or admin access is required to manage an offering.");
 
     if (command.action === "install") {
-      const validated = validateInstall(command);
-      return present(await this.store.install(current, {
+      const validated = validateInstall(this.catalog, command);
+      return present(this.catalog, await this.store.install(current, {
         ...validated,
         commandDigest: digestInstall(validated),
         responsibility: validated.responsibility as OfferingResponsibility,
@@ -234,18 +242,20 @@ export class OfferingService {
 
     const existing = inspection.installations[0];
     if (!existing) throw new OfferingNotFoundError();
-    const definition = getOfferingDefinition(existing.definitionId, existing.definitionVersion);
+    const definition = this.catalog.get(existing.definitionId, existing.definitionVersion);
     if (!definition) throw new OfferingConflictError("The installed offering definition version is unavailable.");
     if (command.action === "activate") {
-      return present(await this.store.activate(current, command), inspection.websiteBindings);
+      // Activation turns the offering on, so it rechecks qualification of the installed version.
+      this.catalog.requireQualified(existing.definitionId, existing.definitionVersion);
+      return present(this.catalog, await this.store.activate(current, command), inspection.websiteBindings);
     }
     if (command.action === "update_configuration") {
-      return present(await this.store.updateConfiguration(current, {
+      return present(this.catalog, await this.store.updateConfiguration(current, {
         ...command,
         configuration: validateConfiguration(definition, command.configuration),
       }), inspection.websiteBindings);
     }
-    return present(await this.store.retire(current, command), inspection.websiteBindings);
+    return present(this.catalog, await this.store.retire(current, command), inspection.websiteBindings);
   }
 
   async executeWebsiteBinding(actor: OfferingActor, rawCommand: unknown): Promise<OfferingWebsiteBinding> {
