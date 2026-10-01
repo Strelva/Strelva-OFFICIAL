@@ -1847,3 +1847,115 @@ All 24 public capability/content API reads across the 12 active tenants returned
 200 JSON responses without an error envelope. These are baseline read checks,
 not proof of authenticated writes or candidate production behavior. GitHub CI
 was still running at this checkpoint; the secrets check had passed.
+
+## September 28 hosted website publishing (local only)
+
+Workspace [ADR 0009's September 28 refinement](../../docs/adr/0009-make-strelva-how-businesses-get-found-and-served-in-the-ai-economy.md)
+makes taking a self-serve website all the way to live the first factory gap.
+Approval previously ended in a private download.
+
+- **Implemented locally:** after approving a preview, the owner can publish the
+  exact approved candidate to `<address>.<STRELVA_SITES_DOMAIN>`, served by the
+  control plane from `website_publications`. The address comes from the business
+  name and is kept across republication. New previews stay private until
+  published. The owner can take the site offline and publish again. The unused
+  GitHub/Vercel preparation adapter (`src/products/websites/deployment.ts`) is
+  removed. The website view now uses the workspace request seam, so the local
+  preview fixture exercises it.
+- **Boundary:** hosted pages are served only on their sites host with their own
+  CSP (own scripts, inline styles, and network access only to the declared
+  capability origin) and no session handling. They are never served on the
+  control-plane origin.
+- **Verified locally:** `websites-server` (19), `website-hosting` (14), website
+  routes/experience/generation tests, `pnpm typecheck`, `pnpm lint`,
+  `pnpm check:workspace-sql` including `tests/website-publications-schema.sql`,
+  and `pnpm check:workspace-upgrade`. The local preview was inspected at 1280px
+  and 390px (publish, live, offline, publish again; no horizontal overflow).
+  The generated pages were rendered under the hosted CSP with no violations.
+- **Not proven:** `tests/website-creation-authenticated-local.spec.ts` is updated
+  for publishing but was not run, because it needs the isolated Supabase CI
+  stack. There is no production migration, sites domain, DNS or wildcard
+  certificate, and no customer use. Choosing and configuring the sites domain is
+  a separate domain/DNS action that requires explicit authority.
+
+## September 28 human minutes per business (local only)
+
+ADR 0009 makes human minutes per business per month the primary operating
+measure. This local slice records it end to end; see the
+[authority](./persistence-boundaries.md#september-28-human-minutes-per-business)
+and the [operator surface](./operator-command-center.md#host--routing).
+
+Proven locally:
+
+- `20260928130000_business_effort_minutes.sql` applied in the full isolated
+  ordered upgrade (`pnpm check:workspace-upgrade`, PostgreSQL 18 on a Unix
+  socket; `LC_ALL` had to be set for the server to start). The added
+  `tests/business-effort-minutes-schema.sql` passed: service-role-only RPCs and
+  RLS, idempotent retry and changed-retry conflict, non-admin/revoked/unverified
+  and mismatched-email denial, invalid minutes/category/date/note, personal and
+  unknown workspace rejection, refused update/delete, one void with reason,
+  managed-site lookup through the active binding, first-effort date ignoring
+  voids, and cascade on business deletion.
+- Vitest: 56/56 across `business-effort-measure`, `business-effort-service`,
+  `business-effort-actions` and `business-effort-ui` (empty, single-month,
+  voided, zero-month, year-boundary and portfolio-median cases; storage and
+  authority failures; retry keeps the entry id; empty, unavailable, disabled,
+  denied, unattached-site states). `pnpm typecheck`, `pnpm lint` and
+  `pnpm check:ontology` passed.
+- A local dev server with the workspace release on and no Supabase session
+  rendered the `/admin/work` denied state at 1440px and 390px without
+  horizontal overflow.
+
+Not proven: the ready state in a browser against a real database, the
+`/admin/clients/[id]` panel in a browser (no local tenant data), any hosted
+migration, and whether operators record minutes consistently. Existing
+production managed clients have no customer business workspace yet, so they
+cannot be measured until one exists and the site is bound to it. No deployment,
+hosted migration or production data change was made.
+
+## September 28 declared and qualified offerings; IDX Home Finder
+
+[ADR 0010](../../docs/adr/0010-make-agencies-creators-and-channel-under-a-partner-charter.md)
+requires every shelf item to declare the data, permissions and outside systems
+it touches, with a "made by" credit, before it is turned on. Offering
+definitions in [`src/platform/offerings/definitions.ts`](../src/platform/offerings/definitions.ts)
+now carry a required declaration: data classes and their holder, one permission
+(effect and authority) per scope, outside systems, and the creator. The catalog
+rejects a missing or empty declaration, an uncovered scope, or data held by an
+undeclared system.
+
+Install and activation now also require a qualification record for the exact
+definition version. [`qualification.ts`](../src/platform/offerings/qualification.ts)
+reuses the executable-capability evidence and record contract with an offering
+id and semantic version as its subject. A new version is refused until it is
+qualified again. Update and retirement of an existing installation are not
+gated. The three existing offerings are qualified with their existing local
+test evidence; that witness is local only.
+
+IDX Home Finder, John Leone's item as Agency Partner, is the fourth definition.
+It declares listing data (Trestle/MLS), buyer inquiry content, content-free
+delivery receipts and readiness evidence, all held outside Strelva. It declares
+Resend and the Home Finder host as outside systems and exposes four read-only
+scopes matching the signed management adapter reads. It references the Home
+Finder runtime's installation id, the same identity Customers maps as a
+`home_finder_installation` reference; no second record is created. It has no
+qualification record. Install is refused with the product catalog's outstanding
+gates as the reason: authorized brokerage pilot, verified inventory rights,
+verified inquiry delivery and customer-owned agency handoff. The additive
+[`20260928140000_home_finder_offering.sql`](../supabase/migrations/20260928140000_home_finder_offering.sql)
+constrains native resource kinds, including the bounded Home Finder reference.
+The database install command still refuses `home_finder`.
+
+Local proof: `src/__tests__/offering-installations.test.ts` passed 26 tests covering declaration
+rejection, qualification refusal and acceptance, version re-qualification,
+activation refusal, Home Finder refusal and existing offering installation. The
+offering and workspace UI suites passed. `pnpm typecheck` and `pnpm lint`
+passed. `pnpm check:workspace-sql`, including `tests/home-finder-offering-schema.sql`,
+and `pnpm check:workspace-upgrade` passed on isolated local PostgreSQL. The full
+Vitest run had 4 failures in `agency-managed-website-draft.test.tsx`, whose
+imports do not include the changed files.
+
+Not proven or authorized: any brokerage agreement, MLS/Trestle display
+authority, verified inquiry delivery, Home Finder deployment, customer-owned
+agency handoff, royalty or creator agreement, hosted migration, or production
+activation. The declaration is not yet rendered in the offering interface.

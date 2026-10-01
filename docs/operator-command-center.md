@@ -42,6 +42,18 @@ reviewed revision; it does not start delivery or agree commercial terms. See the
 This surface remains behind the workspace release gate and requires the local
 service-request migration; no production activation is recorded.
 
+The September 28 local addition records ADR 0009's factory measure, **human minutes
+per business per month**, in `/admin/work` (`src/app/admin/work/BusinessEffort.tsx`).
+The panel shows the median minutes per business with effort for the last complete
+UTC month and its direction against the month before, total minutes, businesses with
+effort, month-to-date minutes, a per-business table, a log form and recent entries.
+`/admin/clients/[id]` shows the same measure and log form for the customer business
+the site is attached to, or states that the site is not attached. Server actions in
+`effort-actions.ts` re-verify super-admin and pass the verified session identity to
+SQL, which rechecks it. Corrections are void records with a reason. Disabled release,
+unverified session and unavailable storage each render their own state. See the
+[authority and retention](./persistence-boundaries.md#september-28-human-minutes-per-business).
+
 **Mobile row rule.** Dense list rows (`ClientsCrm.tsx`, `SiteAuditsBoard.tsx`) are a flex
 row on phones and a fixed multi-column grid **only at `md+`** (`flex ... md:grid
 md:grid-cols-[…]`). Never ship a fixed `grid-cols-[…px…]` at the base breakpoint: the reserved
