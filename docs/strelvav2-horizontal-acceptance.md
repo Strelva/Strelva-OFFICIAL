@@ -1847,3 +1847,77 @@ All 24 public capability/content API reads across the 12 active tenants returned
 200 JSON responses without an error envelope. These are baseline read checks,
 not proof of authenticated writes or candidate production behavior. GitHub CI
 was still running at this checkpoint; the secrets check had passed.
+
+## September 30 workspace production release
+
+Jacob asked to get Strelva into production for use without cutting off any
+client. Observed and executed 2026-09-30 EDT (2026-10-01 UTC).
+
+### What production already had
+
+- Read-only `supabase migration list --linked`: production history matched all
+  84 repository migrations through `20260921220000_customer_business_entry`.
+  The September 21 records of 62–63 pending migrations were stale; the schema
+  was applied after that record. 113 public tables; 0 workspaces.
+- Live app was `dpl_Ap36dev6CuuMu2sSBtrgWfAcUzSW` at `466c5d2` (PR #196).
+  `STRELVA_WORKSPACE_RELEASE` was absent from production, so `/workspace`
+  showed "Workspaces are not open yet."
+- 14 tenants (12 active), 0 tenant memberships, 0 open invites, 16 auth users
+  (4 email-confirmed, 1 sign-in in 30 days). No client owner signs in today;
+  clients are served through their sites, `/api/v1/*` and crons.
+
+### Changes made
+
+1. **Security grant fix (production DB).** Read-only `has_function_privilege`
+   showed `anon` could execute five security-definer functions
+   (`create_owned_workspace` and four `custom_application_*` helpers).
+   Migration `20260930120000_revoke_public_execute_internal_functions` was
+   applied with `supabase db push --linked` after a dry run listed only that
+   file. Re-check: only the three row-security helpers and five trigger
+   functions remain executable by public roles. The upgrade rehearsal now
+   applies Supabase's default function grants; without the migration the
+   existing "workspace creation stays behind the service role" assertion fails.
+2. **Dependency security.** `pnpm audit` failed CI with 24 advisories published
+   after the last green `main`, including critical GHSA-vcvr-r3jv-pc5j (RCE in
+   `next/og` ImageResponse; the app uses `next/og`). Next 16.3.4 → 16.3.6 and
+   patched overrides for brace-expansion, dompurify, fast-uri and undici.
+   Audit now reports no known vulnerabilities.
+3. **Release candidate** `f41e9a6f` (PR #208): also pins the agency draft test
+   clock (expired fixture date) and records the watchdog cron's own heartbeat.
+4. **Production flag.** `STRELVA_WORKSPACE_RELEASE` added for the production
+   target only. Inquiries, background work, planning, product learning and
+   customers flags remain unset.
+5. **Deployment.** `vercel deploy --prod --skip-domain` created
+   `dpl_7MEL5Bi7Jqxh7BB5ov5oXN8aHc58`, verified on its protected URL, then
+   promoted. Rollback target: `dpl_Ap36dev6CuuMu2sSBtrgWfAcUzSW`.
+
+### Verification
+
+- Local on the candidate: lint, typecheck, 3,637 tests (1 skipped), ontology,
+  boundaries, version parity, `check:workspace-sql`, `check:workspace-upgrade`,
+  build. GitHub CI on `f41e9a6f`: build, authenticated journeys, persisted
+  delivery, self-service review and secrets all passed.
+- Diff from live source touched no `/api/v1`, `proxy.ts`, migrations, tenants,
+  auth, leads, scan, email, billing, cron or `vercel.json` files.
+- Candidate before promotion: 60 of 60 storefront responses (12 active tenants ×
+  site-capabilities, page-config, content settings/hero/navigation) were
+  byte-identical to live. `/workspace` rendered "Your work | Strelva";
+  `/api/workspace` returned 401 signed out.
+- After promotion: `app.strelva.com`, `admin.strelva.com`,
+  `admin.greatlakesdriedfruit.com` and `admin.rohlaxwellness.com` resolve to
+  the new deployment. 55 of 55 baseline URLs (client sites, app pages, 36
+  storefront reads) match their pre-release status and final URL. No
+  production error or 5xx logs in the first 15 minutes.
+
+### Not established
+
+- No authenticated production journey has run: no real sign-in, business
+  creation or website attachment. Google sign-in avoids Strelva mail; magic-link
+  delivery depends on Supabase Auth SMTP, which was not verified.
+- Client owners cannot attach their sites until each has an owner membership
+  (an invite, which emails the client).
+- `www.rohlaxwellness.com` now points at the Rohlax project (`dpl_EEsPa5…`); the
+  September 21 DNS defect is no longer observed on this host.
+- Separate client issue found during the release: GLDF's own Supabase project
+  is paused; its reviews endpoint returns 500 and contact/chat, rewards and
+  review writes fail. Not caused by this release.
