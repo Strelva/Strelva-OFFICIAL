@@ -58,6 +58,10 @@ psql "${psql_args[@]}" <<'SQL'
 create role service_role nologin bypassrls;
 create role authenticated nologin;
 create role anon nologin;
+-- Match Supabase: new public functions are executable by anon and
+-- authenticated unless a migration revokes it. Without this the rehearsal
+-- hides grants that production actually has.
+alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
 create schema auth;
 create table auth.users (
   id uuid primary key,
@@ -194,5 +198,6 @@ printf 'Expected migration rerun rejection preserved the applied schema.\n'
 psql "${psql_args[@]}" --file="$schema_test"
 psql "${psql_args[@]}" --file="$repo_root/tests/service-delivery-commitments-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/customer-business-entry-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/function-exposure-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
