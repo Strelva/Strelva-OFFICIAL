@@ -1,151 +1,177 @@
-# Strelva control plane
+# Strelva app
 
-This repository owns the Managed Websites control plane and the current local
-implementation of Strelva's common customer interface. It includes the owner
-dashboard, workspace, operator console, governed website agent, audit engine,
-billing integrations and versioned API consumed by client sites. Local interface
-capability does not establish a production release or a new commercial offering.
+This repo is the Strelva product: the customer workspace, managed websites,
+the website agent, the audit engine, billing, the operator console, and the
+`/api/v1` API that every client site calls. Real clients depend on it today.
 
-Public `strelva.com` presentation belongs in the sibling `strelva-marketing`
-repository. Each paid client site has its own repository and Vercel project.
-Keep public presentation and client-specific frontend behavior with their owners.
-Company and cross-product decisions remain in the workspace context; this
-repository does not define Strelva's unresolved Custom Software offering.
+Other things live elsewhere:
 
-## September 21 implementation scope
+- `strelva.com` marketing → `../strelva-marketing`
+- Each paid client site → its own repo and Vercel project
+- Company direction → `../CONTEXT.md` and `../docs/adr/`
 
-Keep agency website delivery and independent native tools in the same customer
-business. A service request must not become a self-service generation assignment.
-Native apps and onboarding do not require a website purchase. Reuse the existing
-client-repository, workspace, native-product and authority paths. A 24-hour service
-requires an explicitly accepted scope and deadline; a request is not acceptance.
-This implementation direction does not authorize deployment, billing, provider
-calls, hosted migrations or changes to existing customer agreements.
+## Where we're going
 
-## Start with the existing records
+Strelva lets businesses and agencies create, run, and keep reshaping the
+systems a business needs. A small business should be able to act on ideas that
+used to need its own software team.
 
-Read [CONTEXT.md](./CONTEXT.md) for current scope, evidence and release attention.
-For interface work, also read `~/.codex/DESIGN.md`, [DESIGN.md](./DESIGN.md) and
-the [foundation inventory](./docs/component-system.md). Follow its links to the
-relevant color, motion or material contract and inspect the named implementation.
-The [component handoff](./docs/design/current-component-context.md) records local
-adoption and verification, not a second set of component rules.
+- **Working capabilities to start:** a website, bookings, customer inquiries,
+  publishing, internal apps. They share the business's information, people,
+  permissions, and connected tools.
+- **Creative tools to go further:** change how a capability works, connect it
+  to others, add your own interfaces and rules, and turn the pieces into a
+  service we never designed. Agents help build and run it.
+- **Ongoing operation to make it dependable:** governance, approvals,
+  receipts, monitoring, and recovery, so it keeps working as it changes.
 
-Reuse the existing Markdown owners. Put operating instructions here, design
-decisions in DESIGN.md or its focused contracts, component APIs and migration
-status in component-system.md, and dated proof in the existing verification
-record. Link to an owner rather than copying its rules into another handoff.
+Agencies do this across clients and package their expertise as reusable
+offerings ([ADR 0010](../docs/adr/0010-make-agencies-creators-and-channel-under-a-partner-charter.md)).
+Businesses can use it directly.
 
-## Build from tokens and atoms
+The workspace product (`src/platform`, `src/products`, `src/experience`) is
+where Strelva is going. Today the live business is managed websites for nine
+clients on the older tenant model (`src/lib`); those clients keep their service
+and move into business workspaces, with the managed website becoming one
+capability inside a workspace. Build new capability on the workspace model, not
+as tenant-only features. [CONTEXT.md](./CONTEXT.md) has the evidence.
 
-- Start with the surface's semantic roles and owned atoms, then compose the
-  content and interaction. Inspect source and rendered states before reuse.
-- Extend or repair the owning primitive when its contract is missing. Do not
-  rebuild its appearance, focus, sizing or motion in page CSS. Layout remains
-  free to be spacious, asymmetric or otherwise suited to the work.
-- Existing code is implementation evidence, not automatic design approval.
-  The foundation inventory names legacy fields/tabs and other migration gaps;
-  do not propagate those gaps as the new standard.
-- Preserve accessibility and working behavior during adoption. Verify relevant
-  keyboard, focus, loading, error, empty and permission states as well as geometry.
-- Keep marketing and product component APIs explicit. There is no shared package;
-  do not import sibling source or claim parity from matching colors and blur.
-- Generated images and reference studies may explore composition. They do not
-  select tokens, replace real component inspection or resolve open design choices.
-- Update the owning contract and adoption evidence with a component change.
-  Distinguish recorded direction, source implementation, verified use, human
-  acceptance and deployment. Never mark the system migrated from a gallery alone.
+Customers who hire Strelva never have to build their own site. A native tool
+never requires buying a website. A request for work is not an accepted job
+until scope and deadline are agreed.
 
-## Product and compatibility boundaries
+## Before you start
 
-- The product, package, Vercel team, and control-plane project use the Strelva name. Do not call the product Scaffold Web.
-- Deployed compatibility names are intentionally frozen: `reb:` Redis keys, `x-reb-*` HMAC headers, and existing `REB_*` and `SCAFFOLD_*` environment or contract symbols. Rename them only through a coordinated, versioned migration across every consumer.
-- `package.json` in this repository and in `strelva-marketing` hold one shared product version. `VERSIONING.md` defines the release contract; `pnpm version:check` detects drift.
-- `/api/v1/*` is the deployed storefront contract. Changes are additive within v1. A breaking wire change requires a new versioned route family and a coordinated client rollout.
-- Reusable client-site behavior lands in `custom-repo-starter/` before it is propagated to client repositories. Client-specific booking, commerce, content, or presentation stays in that client's repository.
-- Promote client-site behavior into the control plane only after at least two client repositories demonstrate the same need.
-- Do not add `Co-Authored-By` trailers to commits in this repository.
+- Read [CONTEXT.md](./CONTEXT.md).
+- For UI work, read `~/.codex/DESIGN.md`, [DESIGN.md](./DESIGN.md), and
+  [docs/component-system.md](./docs/component-system.md).
+- Run `git status`. Changes you didn't make belong to someone else.
 
-## Architecture and sources of truth
+## Building UI
 
-The implementation and focused tests are the closest sources of truth. Use these maps when a change crosses a durable boundary:
+- Compose from tokens and the existing components. If a component can't do what
+  you need, fix the component. Don't restyle it in page CSS.
+- Existing code isn't automatically approved design. The component inventory
+  lists the legacy pieces not to copy.
+- Check keyboard, focus, loading, error, empty, and permission states, on
+  desktop and mobile.
+- Use the `font-display` utility for display type. The arbitrary Tailwind font
+  value breaks cold Turbopack dev builds.
+- Marketing and app components are separate. Don't import across repos.
+- When you change a component, update its entry in `docs/component-system.md`.
 
-| Concern | Source of truth |
-| --- | --- |
-| Production data authority and retention | `docs/persistence-boundaries.md` |
-| CI layers, local data modes, and smoke-test gates | `docs/testing-and-ci.md` |
-| Client dashboard surfaces and states | `docs/client-dashboard-ia.md` |
-| Operator console routes and responsibilities | `docs/operator-command-center.md` |
-| Storefront compatibility | `src/app/api/v1/`, `src/lib/scaffold-contracts.ts`, `release-manifest.json`, and `custom-repo-starter/` |
-| Product versioning | both repositories' `package.json`, then `VERSIONING.md` |
-| Visual direction and component ownership | [DESIGN.md](./DESIGN.md), [component system](./docs/component-system.md), and the source owners linked there |
+## Rules that protect live clients
 
-The live system has these non-negotiable boundaries:
+**Frozen names.** `reb:` Redis keys, `x-reb-*` HMAC headers, and `REB_*` /
+`SCAFFOLD_*` env and contract names are deployed. Renaming them needs a
+versioned migration across every consumer. The product is called Strelva, never
+Scaffold Web.
 
-- Next.js request routing and request-level access gating live in `src/proxy.ts`.
-- Supabase Auth is the only authentication path. Clerk is removed.
-- Supabase Postgres owns identity, tenant configuration, domains, content, collections, drafts, audit, and activity. Upstash Redis caches Postgres-backed data and remains authoritative only for the operational domains explicitly listed in `docs/persistence-boundaries.md`. The presence of a table or mirror does not transfer authority.
-- Sanity is not a data source or rollback path. The remaining Sanity code resolves legacy CDN image references until those stored URLs are rewritten.
-- Tenant isolation is enforced in the application. Derive the tenant from authenticated membership or trusted routing/configuration and use `requireTenantAccess`, `requireTenantPermission`, or `requireTenantPermissions`. The service-role Postgres client bypasses RLS, so RLS is defense in depth rather than the live authorization boundary.
-- `src/lib/tenants.ts` owns tenant row mapping. Preserve `site_name` and `created_at` on partial updates, treat `stable_id` as immutable identity, and let the database trigger populate `tenant_stable_id` mirrors.
-- Tenant slug renames must update every Redis-authoritative slug-keyed domain through the registry in `src/lib/tenant-rename.ts`. Caches may regenerate; authoritative operational state may not be stranded under the old slug.
-- All crons are declared in `vercel.json`, authenticate through `requireCronRequest`, and are registered in `CRON_MAX_AGE_SECONDS` in `src/lib/heartbeat.ts`.
-- `src/lib/scan.ts` and `src/lib/scan-store.ts` are the single audit and site-health write path. Do not create a parallel scanner, history store, or scoring engine.
-- The streaming tenant agent and background executor share tool definitions and gates through `src/lib/agent-shared.ts`. Extend the shared factories rather than creating a second implementation.
-- Use the `font-display` utility for display type. The equivalent arbitrary Tailwind family value breaks cold Turbopack development compilation even though production builds may pass.
+**The v1 API.** `/api/v1/*` changes are additive only. A breaking change gets a
+new route family and a coordinated client rollout. Shared client-site behavior
+goes into `custom-repo-starter/` first. Move it into this app only after two
+client repos need it.
 
-## Consequential actions and trust boundaries
+**Data.** Supabase Postgres owns identity, tenants, domains, content, drafts,
+audit, and activity. Redis is a cache, except for the domains listed in
+[docs/persistence-boundaries.md](./docs/persistence-boundaries.md). Sanity is
+dead except for resolving old image URLs.
 
-- Existing client sites must remain available throughout release preparation and rollout. Treat shared control-plane aliases, storefront APIs, databases and Redis authorities as client dependencies. Do not proceed with a production rollout until old/new compatibility, bounded migration locking, client acceptance checks and recovery are established in the [release checklist](./docs/horizontal-release-checklist-2026-09-11.md#september-21-production-preparation).
-- Content and external-surface changes pass through `src/lib/ai-governance.ts` and the existing event/approval path. Google Business writes and review replies must not gain a direct publish path. The only standing exception is a tenant's explicit review-reply `auto` mode, including its existing delay and re-check before posting.
-- For non-idempotent external writes, an accepted provider write resolves the approval. A failed read-back creates separate verification-failure evidence; it must not leave the approval retryable and risk a duplicate write.
-- All application email goes through `src/lib/email/send.ts`, with an explicit audience and the switches in `src/lib/email-enabled.ts`. Provider errors throw; intentional suppression or a missing key returns `false`.
-- `updates.strelva.com` is for Strelva mail and `mail.strelva.com` is for shared client-branded transactional mail. Do not verify the root `strelva.com` sending domain, create per-client sending domains, or route cold outbound through this system.
-- Provider secrets use the encryption boundary in `src/lib/crypto/secrets.ts`. Do not write encrypted tenant columns or connection blobs through an alternate path, and never place real credentials in documentation, fixtures, logs, or command output.
-- Stripe billing is live. A one-off pay link does not imply a subscription, and pricing tiers are packaging and build scope rather than code feature flags.
-- `gldf` and `rohlax` are grandfathered from subscription enforcement. `/pay/rohlax` is a one-off historical agreement, including its no-monthly-fee commitment, and is not a template for new clients.
-- A production deploy, environment change, database migration, live email, Stripe mutation, Google write, domain/DNS action, or production data repair requires explicit authority. Prepare and verify the exact action before requesting it. Do not use a redeploy to apply Vercel environment changes; a new production deployment is required after authorization.
+**Auth and tenants.** Supabase Auth is the only login. Request gating lives in
+`src/proxy.ts`. Get the tenant from membership or trusted routing, then check it
+with `requireTenantAccess` / `requireTenantPermission(s)`. The service-role
+client skips RLS, so the app check is the real boundary.
+
+**Tenant records.** `src/lib/tenants.ts` owns tenant rows. Keep `site_name`
+and `created_at` on partial updates. `stable_id` never changes. Slug renames go
+through `src/lib/tenant-rename.ts` so no Redis state is left under the old slug.
+
+**One of each.** One scanner (`src/lib/scan.ts`, `scan-store.ts`). One set of
+agent tools (`src/lib/agent-shared.ts`). One email path (`src/lib/email/send.ts`,
+gated by `email-enabled.ts`). One secrets path (`src/lib/crypto/secrets.ts`).
+Extend these; don't build a second.
+
+**Crons.** Declare in `vercel.json`, authenticate with `requireCronRequest`,
+and register in `CRON_MAX_AGE_SECONDS` in `src/lib/heartbeat.ts`.
+
+**Outside writes.** Content and Google changes go through
+`src/lib/ai-governance.ts` and approval. The only exception is a tenant's
+review-reply `auto` mode. Once a provider accepts a write, the approval is done.
+If the read-back fails, record that separately. Never leave it retryable.
+
+**Email domains.** `updates.strelva.com` for Strelva mail, `mail.strelva.com`
+for client-branded mail. No root-domain sending, no per-client domains, no cold
+outbound.
+
+**Money.** Stripe is live. A pay link is not a subscription. Plan tiers are
+packaging, not feature flags. `gldf` and `rohlax` are grandfathered, and
+`/pay/rohlax` is a one-off deal, not a template.
+
+**Secrets.** Real credentials never go in docs, fixtures, logs, or command output.
+
+## Needs Jacob's yes
+
+Production deploys, env var changes, database migrations, live email, Stripe
+changes, Google writes, DNS or domain changes, and production data fixes.
+Prepare and verify the exact action first, then ask. Env changes need a new
+production deploy, not a redeploy. A production rollout also has to pass the
+[release checklist](./docs/horizontal-release-checklist-2026-09-11.md#september-21-production-preparation)
+so existing client sites stay up.
+
+No `Co-Authored-By` trailers on commits here.
 
 ## Commands
 
 ```bash
-pnpm dev                 # Local Next.js server on localhost:3000
-pnpm lint                # ESLint
-pnpm typecheck           # TypeScript without emit
-pnpm test                # Vitest suite
-pnpm build               # Production build
-pnpm check               # Lint, typecheck, tests, and build
-pnpm check:ci            # CI-faithful local gate
-pnpm smoke               # Public Playwright smoke tests, access bypass off
-pnpm smoke:surfaces      # Owner and operator surface smoke tests with local fixtures
-pnpm check:prod          # Production-readiness checks
-pnpm check:custom-repos  # Executable custom-repository compatibility checks
-pnpm check:ontology      # Persistence and lifecycle invariants
-pnpm check:workspace-sql # Isolated PostgreSQL workspace and recovery migration checks
-pnpm check:workspace-upgrade # Ordered pre-workspace to current isolated migration rehearsal
-pnpm version:check       # App and marketing product-version parity
+pnpm dev                     # localhost:3000; gldf.localhost:3000 is the gldf tenant
+pnpm typecheck
+pnpm test                    # Vitest
+pnpm lint
+pnpm build
+pnpm check                   # lint + typecheck + test + build
+pnpm check:ci                # what CI runs
+pnpm smoke                   # public Playwright smoke
+pnpm smoke:surfaces          # owner + operator surfaces with local fixtures
+pnpm check:custom-repos      # client-repo compatibility
+pnpm check:ontology          # persistence invariants
+pnpm check:prod              # production readiness
+pnpm version:check           # version matches strelva-marketing
 ```
 
-`gldf.localhost:3000` resolves the `gldf` tenant. Use `CUSTOM_DOMAIN_MAP` for local custom-domain routing. Follow `docs/testing-and-ci.md` when Redis, Postgres, bypass mode, or representative tenant data can change what a green result means.
+The SQL checks need real Postgres binaries. They run in a throwaway local
+cluster and never touch production:
 
-## Proof requirements
+```bash
+PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-sql
+PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-upgrade
+```
 
-- Documentation-only instruction changes require valid links, no active retired-harness references, `git diff --check`, and inspection of the complete diff.
-- Code changes require the narrow test that exercises the changed behavior plus `pnpm typecheck`; run broader gates when the affected boundary warrants them.
-- Storefront-contract changes require contract tests and `pnpm check:custom-repos` against representative consumers.
-- Persistence, tenant identity, auth, cron, billing, email, governance, or external-write changes require focused failure-path tests as well as the normal success path.
-- User-facing changes require rendered inspection of realistic content, relevant empty/loading/error/permission states, and the affected desktop and mobile journey. A build or screenshot alone is not proof of behavior.
-- Never claim a production result from local evidence. State separately what was proven locally, in preview, and in production.
+`CUSTOM_DOMAIN_MAP` routes custom domains locally.
+[docs/testing-and-ci.md](./docs/testing-and-ci.md) explains when Redis,
+Postgres, or bypass mode changes what a green run means.
 
-The workspace SQL check requires PostgreSQL server binaries (`postgres`, `initdb`,
-`pg_ctl`, `psql`) on PATH; `libpq` alone is insufficient. On this workstation use
-`PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH npm run check:workspace-sql`.
-The script creates an isolated Unix-socket cluster, applies only the workspace
-and recovery migrations, tests permissions and failure paths, and stops the cluster.
-It does not connect to or migrate production.
+## Done means proven
 
-Use the same PostgreSQL PATH for `pnpm check:workspace-upgrade`. That script
-applies the retained ordered repository history through the documented
-pre-workspace baseline, seeds representative legacy rows, then applies and checks
-the full workspace/recovery tail in a separate isolated cluster. It also does not
-connect to or migrate production.
+- Code: the test that covers the change, plus `pnpm typecheck`.
+- API contract: contract tests plus `pnpm check:custom-repos`.
+- Auth, tenants, persistence, crons, billing, email, governance, or outside
+  writes: failure-path tests too.
+- UI: look at the rendered page with realistic content, on desktop and mobile,
+  in its empty, loading, error, and permission states.
+- Docs only: links work, `git diff --check` is clean, and you've read the diff.
+- Say where it was proven: local, preview, or production. Local proof is never
+  a production claim.
+
+## Where the details live
+
+| Topic | Owner |
+| --- | --- |
+| Data authority and retention | [docs/persistence-boundaries.md](./docs/persistence-boundaries.md) |
+| CI and test modes | [docs/testing-and-ci.md](./docs/testing-and-ci.md) |
+| Client dashboard | [docs/client-dashboard-ia.md](./docs/client-dashboard-ia.md) |
+| Operator console | [docs/operator-command-center.md](./docs/operator-command-center.md) |
+| Storefront contract | `src/app/api/v1/`, `src/lib/scaffold-contracts.ts`, `release-manifest.json`, `custom-repo-starter/` |
+| Versioning | [VERSIONING.md](./VERSIONING.md) |
+| Design | [DESIGN.md](./DESIGN.md), [docs/component-system.md](./docs/component-system.md) |
+
+Put new rules in the owner above, not here. This file stays short.

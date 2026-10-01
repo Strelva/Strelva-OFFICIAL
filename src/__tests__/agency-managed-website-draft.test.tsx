@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgencyManagedWebsiteDraftExperience } from "@/experience/agency-website/AgencyManagedWebsiteDraftExperience";
 import { AgencyWebsiteCustomerControls } from "@/experience/agency-website/AgencyWebsiteCustomerControls";
 
@@ -70,7 +70,15 @@ function changeInput(field: HTMLInputElement, value: string) {
   });
 }
 
+// The fixture grant expires on a fixed date. Pin the clock inside its validity
+// window so "active" and "expired" cases don't depend on when the suite runs.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-09-21T12:00:00.000Z"));
+});
+
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   document.body.innerHTML = "";
 });
