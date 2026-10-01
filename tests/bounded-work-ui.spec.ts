@@ -140,7 +140,7 @@ test("document drafting stays with the document and preserves writing after prov
   await page.getByRole("button", { name: "Propose planning budget", exact: true }).click();
   await expect(page.getByText("$1.25", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Accept planning budget", exact: true }).click();
-  await expect(page.getByText("The maximum is accepted. A model call will reserve it before the request starts.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Limit accepted.", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Prepare document draft", exact: true }).click();
   await expect(page.getByRole("main").getByRole("alert")).toContainText("temporarily unavailable");
   await expect(page.getByLabel("The result you want", { exact: true })).toHaveValue("Draft a handover procedure for our team.");

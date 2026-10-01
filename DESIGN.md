@@ -496,3 +496,23 @@ The customer web application uses the persistent StrelvaShell/AppFrame across Ho
 WorkspaceComposer owns the shared request editor. Actor/business-scoped session drafts retain words, not permission. Editing a request invalidates its previous proposal. Native products receive explicit continuation properties from experience adapters; they must not import experience state. Search displays every matching authorized item supplied to the shell and preserves its scoped query. This is not a new server-wide search index.
 
 The template library contains curated native application schemas. Preview uses the actual recipient renderer with local-only test data. A private app is created through the existing native API; publication, access, stored records and version compatibility remain native responsibilities. Previewing does not publish, grant access, invoke a model or save test records. An unconfirmed create is never automatically retried. Desktop packaging remains future work; this change does not add a native desktop runtime.
+
+## September 23 request flow: ask once
+
+Jacob called the customer interface slop on September 23 and asked for a
+teardown led by strong references (ChatGPT, Claude, Perplexity, Linear, v0).
+The first change applies to Home → New → Plan and sets the rule for the rest:
+
+- A request is asked for once. After a request is submitted, the page stops
+  prompting: the heading and examples leave, the request stays editable in a
+  compact composer at the top, and Strelva's proposal becomes the main object
+  directly beneath it. Editing the request still removes a stale proposal.
+- Interface copy says what happens next in one short sentence. Safety rules
+  stay enforced in code; they are not repeated as on-screen disclaimers.
+- Surfaces are flat. Focus is shown by the border, not by lift, glow or a
+  second inner outline. Type uses the global scale (12/16, 14/20, 16/24,
+  32/40, 40/48) instead of one-off pixel sizes.
+- Stored identifiers (business IDs, scope keys) are never shown to people.
+
+This is local implementation direction. It is not a deployment or an
+acceptance of the remaining surfaces, which still need the same pass.

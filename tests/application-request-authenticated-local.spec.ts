@@ -53,7 +53,7 @@ test("an owner starts with a request and delivers an application through the UI,
     await page.getByRole("button", { name: "Propose planning budget", exact: true }).click();
     await expect(page.getByText("$1.25", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Accept planning budget", exact: true }).click();
-    await expect(page.getByText("The maximum is accepted. A model call will reserve it before the request starts.", { exact: true })).toBeVisible();
+    await expect(page.getByText("Limit accepted.", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Prepare a plan", exact: true }).click();
     await expect(page.getByRole("region", { name: "Work plan", exact: true }).getByRole("alert")).toContainText("Try again");
     await expect(page.getByLabel("The result you want", { exact: true })).toHaveValue(goal);

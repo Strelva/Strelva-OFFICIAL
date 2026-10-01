@@ -76,7 +76,7 @@ for (const start of ["home", "new"]) test(`${start} carries the full multi-part 
   await expect(page.getByRole("heading", { name: "A plan that keeps the whole request", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Prepare a plan", exact: true }).click();
   await expect(page.getByLabel("The result you want", { exact: true })).toHaveValue(request);
-  await expect(page.getByText("AI planning is available in a configured, signed-in workspace. This preview does not call a model or save a plan.", { exact: true })).toBeVisible();
+  await expect(page.getByText("Preview only. Planning runs in a signed-in workspace.", { exact: true })).toBeVisible();
 });
 
 test("Home keeps decisions, allowance, business switching and site assignment reachable", async ({ page }) => {

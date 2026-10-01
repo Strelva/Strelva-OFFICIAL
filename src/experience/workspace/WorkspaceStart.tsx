@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Check, CircleHelp, Clipboard, FileSearch, FileText, Globe2, MessageSquareText, Table2 } from "lucide-react";
+import { ArrowRight, Check, Clipboard, FileSearch, FileText, Globe2, MessageSquareText, Table2 } from "lucide-react";
 import { useId, useRef, useState, type ReactNode } from "react";
 import { WorkspaceComposer } from "./WorkspaceComposer";
 import { Button } from "@/components/ui/Button";
@@ -87,8 +87,8 @@ function WebsiteRequestHandoff({ handoff, onBack }: { handoff: WorkspaceStartWeb
   }
 
   return <section className={styles.startProposal} aria-labelledby="website-request-handoff-title">
-    <div className={styles.startProposalHeader}><div className={styles.startProposalIcon}><Globe2 size={19} aria-hidden="true" /></div><div><p className={styles.eyebrow}>Website work</p><h2 id="website-request-handoff-title">Open {handoff.site.title} with your request ready.</h2></div></div>
-    <p className={styles.startProposalSummary}>The website opens in a separate step, so this request cannot travel there automatically. Copy it first, then open the website. Nothing has been sent.</p>
+    <header className={styles.startProposalHeader}><span className={styles.startProposalIcon}><Globe2 size={19} aria-hidden="true" /></span><p className={styles.eyebrow}>Website work</p></header><h2 id="website-request-handoff-title" className={styles.startProposalTitle}>Open {handoff.site.title} with your request ready</h2>
+    <p className={styles.startProposalSummary}>Copy your request, then paste it into the website conversation. Nothing has been sent.</p>
     <label className={styles.startRequestField} htmlFor={requestId}><span>Request to carry with you</span><textarea ref={requestRef} id={requestId} value={handoff.request} readOnly rows={5} /></label>
     {copyError ? <p className={styles.startError} role="alert">{copyError}</p> : null}
     <div className={styles.startProposalActions}><button type="button" className={styles.primaryAction} onClick={() => void copyRequest()}>{copied ? <Check size={16} /> : <Clipboard size={16} />}{copied ? "Copied" : "Copy request"}</button><a className={styles.secondaryAction} href={handoff.site.href} target="_blank" rel="noreferrer">Open website<ArrowRight size={16} /></a>{onBack ? <button type="button" className={styles.secondaryAction} onClick={onBack}>Back to request</button> : null}</div>
@@ -169,34 +169,31 @@ export function WorkspaceStart({ context, initialRequest = "", draftKey, onTempl
   const selectedBusiness = plan?.route === "inquiries" ? context.inquiryBusinesses || [] : [];
   const selectedSites = plan?.route === "website" ? context.managedSites || [] : [];
   const templates = plan?.route === "tracker" ? context.trackerTemplates || [] : [];
-  return <div className={styles.startPage} data-workspace-start>
-    <header className={styles.startHeader}>
-      <p className={styles.eyebrow}>New work</p>
+  const answering = Boolean(plan || websiteHandoff);
+  return <div className={styles.startPage} data-workspace-start data-state={answering ? "answer" : "ask"}>
+    {!answering ? <header className={styles.startHeader}>
       <h1>What should happen next?</h1>
-      <p>Describe the outcome in your own words. Strelva will shape the right interface, workflow, or work from there.</p>
-    </header>
+      <p>Describe the outcome. Strelva works out the right app, workflow or change.</p>
+    </header> : null}
 
-    <div className="mt-6"><WorkspaceComposer key={composerSeed} initialRequest={composerSeed} draftKey={draftKey} disabled={context.readOnly} autoFocus={!plan} onTemplates={onTemplates} onSubmit={submit} onChange={request => { setPlan(null); setError(""); onDraftChange?.(request); }} placeholder="What do you want Strelva to make happen?" /></div>
-
-    <section className={styles.startExamples} aria-labelledby={`${formId}-examples`}>
-      <div className={styles.startSectionHeading}><h2 id={`${formId}-examples`}>Example outcomes</h2><span>Optional</span></div>
-      <div className={styles.startExampleList}>{EXAMPLES.map(({ label, request: exampleRequest, icon: ExampleIcon }) => <Button key={label} type="button" variant="ghost" className={styles.startExample} onClick={() => chooseExample(exampleRequest)}><ExampleIcon size={16} aria-hidden="true" /><span>{label}</span><ArrowRight size={14} aria-hidden="true" /></Button>)}</div>
-    </section>
+    <div><WorkspaceComposer key={composerSeed} initialRequest={composerSeed} draftKey={draftKey} disabled={context.readOnly} autoFocus={!plan} compact={answering} onTemplates={answering ? undefined : onTemplates} onSubmit={submit} onChange={request => { setPlan(null); setError(""); onDraftChange?.(request); }} placeholder="What do you want Strelva to make happen?" /></div>
 
     {websiteHandoff ? <WebsiteRequestHandoff handoff={websiteHandoff} onBack={onWebsiteHandoffBack} /> : plan ? <section className={styles.startProposal} aria-labelledby={`${formId}-proposal`} aria-live="polite">
-      <div className={styles.startProposalHeader}><div className={styles.startProposalIcon}>{renderPlanIcon(plan.route)}</div><div><p className={styles.eyebrow}>{plan.kind === "help" ? (plan.matchedRoutes?.length ? "Multiple outcomes" : "Request to review") : "Proposed next step"}</p><h2 id={`${formId}-proposal`}>{plan.title}</h2></div></div>
-      <p className={styles.startProposalSummary}>{plan.summary}</p>
-      {plan.kind === "help" ? <p className={styles.startRequestEcho}><strong>Your request stays intact:</strong> <span>{plan.request}</span></p> : null}
-      <p className={styles.startNextAction}><strong>Next:</strong> {plan.nextAction}</p>
-        {plan.kind === "help" ? <><div className={styles.startHelp}><CircleHelp size={17} aria-hidden="true" /><p><strong>Choose a supported next step.</strong> Strelva can assess a business, turn a CSV into a tracker, handle inquiries for an authorized business, open work on a connected managed website, start a private document, organize onboarding requirements, build an application, set up scheduling, compare saved sources, or carry a bounded responsibility. No work has started from this request. {context.readOnly ? "Switch to a workspace you own before preparing a plan." : "You can ask about the closest path when none of these fits."}</p></div>{plan.reason ? <div className={styles.startBlocked} role="status"><CircleHelp size={17} aria-hidden="true" /><p>{plan.reason}</p></div> : null}</> : <>
+      <header className={styles.startProposalHeader}><span className={styles.startProposalIcon}>{renderPlanIcon(plan.route)}</span><p className={styles.eyebrow}>{plan.kind === "help" ? (plan.matchedRoutes?.length ? "Several outcomes" : "Needs a closer look") : "Strelva suggests"}</p></header>
+      <h2 id={`${formId}-proposal`} className={styles.startProposalTitle}>{plan.title}</h2>
+      {plan.parts[0]?.detail !== plan.summary ? <p className={styles.startProposalSummary}>{plan.summary}</p> : null}
+        {plan.kind === "help" ? <>{plan.reason ? <p className={styles.startBlocked} role="status">{plan.reason}</p> : <p className={styles.startNextAction}>{context.readOnly ? "Switch to a workspace you own to plan this." : "Strelva can draft a plan for the whole request, or you can ask which path fits."}</p>}</> : <>
         <div className={styles.startParts} aria-label="Proposed result">{plan.parts.map((part) => renderPart(part, selectedPartIds.includes(part.id), () => togglePart(part.id), `${formId}-${part.id}`))}</div>
         {selection ? <label className={styles.startSelect} htmlFor={`${formId}-selection`}><span>{selection}</span><select id={`${formId}-selection`} value={plan.needsSelection === "business" ? businessId : siteId} onChange={(event) => plan.needsSelection === "business" ? setBusinessId(event.target.value) : setSiteId(event.target.value)} required><option value="">Choose one</option>{(plan.needsSelection === "business" ? selectedBusiness : selectedSites).map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select></label> : null}
         {templates.length ? <label className={styles.startSelect} htmlFor={`${formId}-template`}><span>Starting template <small>Optional</small></span><select id={`${formId}-template`} value={trackerTemplateId} onChange={(event) => setTrackerTemplateId(event.target.value)}><option value="">Start from a blank tracker</option>{templates.map((template) => <option key={template.id} value={template.id}>{template.label}</option>)}</select></label> : null}
-        {plan.status === "blocked" ? <div className={styles.startBlocked} role="status"><CircleHelp size={17} aria-hidden="true" /><p>{plan.reason}</p></div> : null}
+        {plan.status === "blocked" ? <p className={styles.startBlocked} role="status">{plan.reason}</p> : null}
       </>}
       {error ? <p className={styles.startError} role="alert">{error}</p> : null}
-      <div className={styles.startProposalActions}>{plan.kind === "help" ? <><button type="button" className={styles.primaryAction} disabled={!canContinue} onClick={continueToSupportedFlow}>{plan.deliveryMode === "service" ? "Review website request" : "Prepare a plan"}<ArrowRight size={16} /></button><button type="button" className={styles.secondaryAction} onClick={() => onHelp(plan.helpRequest || plan.request)}>Ask about available paths<ArrowRight size={16} /></button></> : plan.status === "blocked" ? <>{canPreparePlan ? <button type="button" className={styles.primaryAction} onClick={preparePlan}>Prepare a plan<ArrowRight size={16} /></button> : null}<button type="button" className={styles.secondaryAction} onClick={continueToSupportedFlow}>Ask about this path<ArrowRight size={16} /></button></> : <><button type="button" className={styles.primaryAction} disabled={!canContinue} onClick={continueToSupportedFlow}>{workspaceStartContinueLabel(plan)}<ArrowRight size={16} /></button>{canPreparePlan ? <button type="button" className={styles.secondaryAction} onClick={preparePlan}>Prepare a plan<ArrowRight size={16} /></button> : null}</>}</div>
-      {plan.status === "blocked" && context.readOnly ? <p className={styles.startFootnote}>Use the workspace selector above to switch to a workspace you own. No work has been created.</p> : null}
-    </section> : null}
+      <div className={styles.startProposalActions}>{plan.kind === "help" ? <><button type="button" className={styles.primaryAction} disabled={!canContinue} onClick={continueToSupportedFlow}>{plan.deliveryMode === "service" ? "Review website request" : "Prepare a plan"}<ArrowRight size={16} /></button><button type="button" className={styles.quietAction} onClick={() => onHelp(plan.helpRequest || plan.request)}>Ask about available paths</button></> : plan.status === "blocked" ? <>{canPreparePlan ? <button type="button" className={styles.primaryAction} onClick={preparePlan}>Prepare a plan<ArrowRight size={16} /></button> : null}<button type="button" className={styles.quietAction} onClick={continueToSupportedFlow}>Ask about this path</button></> : <><button type="button" className={styles.primaryAction} disabled={!canContinue} onClick={continueToSupportedFlow}>{workspaceStartContinueLabel(plan)}<ArrowRight size={16} /></button>{canPreparePlan ? <button type="button" className={styles.quietAction} onClick={preparePlan}>Prepare a plan</button> : null}</>}</div>
+      {plan.kind !== "help" ? <p className={styles.startFootnote}>{plan.nextAction}</p> : null}
+    </section> : <section className={styles.startExamples} aria-labelledby={`${formId}-examples`}>
+      <h2 id={`${formId}-examples`} className={styles.startExamplesTitle}>Or start from an example</h2>
+      <div className={styles.startExampleList}>{EXAMPLES.map(({ label, request: exampleRequest, icon: ExampleIcon }) => <Button key={label} type="button" variant="ghost" className={styles.startExample} onClick={() => chooseExample(exampleRequest)}><ExampleIcon size={16} aria-hidden="true" /><span>{label}</span></Button>)}</div>
+    </section>}
   </div>;
 }

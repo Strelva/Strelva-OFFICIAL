@@ -299,31 +299,38 @@ function PlanSession({ presentation, workspaceId, workId, initialRequest = "", p
   const canPrepare = !budgetLoading && !budgetError && accepted && !executionBlocksNewCall;
   const plan = result?.plan;
   const Heading = presentation === "document" ? "h2" : "h1";
-  return <section className="mx-auto max-w-3xl space-y-6 p-4 sm:p-8" aria-label="Work plan" aria-busy={busy}>
-    <header><p className="text-sm text-gray-muted">{presentation === "document" ? "Draft with Strelva" : "Proposed work"}</p><Heading className="font-display text-2xl">{plan ? "Review what Strelva prepared" : presentation === "document" ? "What should this document cover?" : "What would you like to accomplish?"}</Heading><p className="mt-2 text-sm text-gray-muted">Describe the result you want. Strelva prepares a proposal using the work you choose to share.</p></header>
-    {localPreview ? <p role="status" className="text-sm">AI planning is available in a configured, signed-in workspace. This preview does not call a model or save a plan.</p> : null}
-    {!localPreview ? <PlanningBudgetPanel workspaceId={workspaceId} budget={budget} loading={budgetLoading} error={budgetError} busy={budgetBusy} retry={budgetRetry} execution={latestExecution} canPropose={!workId || refining} readOnly={Boolean(readOnly)} onCommand={command} onRetry={() => void loadPlanningBudget()} /> : null}
-    {error ? <p role="alert" className="text-sm text-critical">{error}</p> : null}
-    {result?.planningEconomics ? <p role="status" className="text-sm text-gray-muted">Planning admission recorded. The provider cost is unverified, so up to the accepted maximum remains held until reconciliation.</p> : null}
-    {workId && !plan && !error && !localPreview ? <p role="status">Loading your plan…</p> : null}
-    {(!workId || refining) && !readOnly ? <form className="space-y-4" onSubmit={event => { event.preventDefault(); void prepare(); }}>
-      <TextArea label="The result you want" rows={5} value={request} maxLength={3000} required disabled={busy} onChange={event => setRequest(event.target.value)} placeholder="Help my team handle new customer requests without anything slipping through." />
-      {availableSources.length ? <details><summary className="cursor-pointer py-2 text-sm">Include saved work{sourceIds.length ? ` (${sourceIds.length} selected)` : " (optional)"}</summary><fieldset className="space-y-2"><legend className="mb-2 text-sm font-medium">Include saved work, optional</legend><p className="mb-3 text-sm text-gray-muted">Choose up to six documents, trackers, or assessments. Strelva reads a limited excerpt of each selected item when preparing this plan.</p>{availableSources.map(source => <label key={source.id} className="flex items-center gap-3 py-2 text-sm"><input type="checkbox" checked={sourceIds.includes(source.id)} disabled={busy || (!sourceIds.includes(source.id) && sourceIds.length >= 6)} onChange={event => setSourceIds(current => event.target.checked ? [...current, source.id] : current.filter(id => id !== source.id))} />{source.title}</label>)}</fieldset></details> : null}
-      <p className="text-sm text-gray-muted">Preparing a plan uses the configured AI provider after the accepted maximum is recorded. It does not publish, send messages, or start the proposed work.</p>
-      {!budgetLoading && !budgetError && !accepted ? <p className="text-sm text-gray-muted" role="status">Set and accept a planning budget above before the model can be called.</p> : null}
-      {executionBlocksNewCall ? <p className="text-sm text-gray-muted" role="status">The previous planning receipt remains authoritative. Its maximum stays held until the cost is reconciled, so this request cannot be replayed.</p> : null}
-      <Button type="submit" disabled={busy || localPreview || !request.trim() || !canPrepare}>{busy ? "Preparing your plan…" : refining ? "Prepare a revised plan" : presentation === "document" ? "Prepare document draft" : "Prepare a plan"}</Button>
-      {refining ? <Button type="button" variant="secondary" disabled={busy} onClick={() => setRefining(false)}>Keep this plan</Button> : null}
+  const budgetPanel = !localPreview ? <PlanningBudgetPanel workspaceId={workspaceId} budget={budget} loading={budgetLoading} error={budgetError} busy={budgetBusy} retry={budgetRetry} execution={latestExecution} canPropose={!workId || refining} readOnly={Boolean(readOnly)} onCommand={command} onRetry={() => void loadPlanningBudget()} /> : null;
+  const composing = (!workId || refining) && !readOnly;
+  return <section className="mx-auto w-full max-w-[720px] px-4 pb-24 pt-8 sm:px-6 sm:pt-12" aria-label="Work plan" aria-busy={busy}>
+    <header>
+      {plan ? <p className="mb-3 text-xs font-medium text-accent-text">Plan ready</p> : null}
+      <Heading className="text-balance text-[32px] font-medium leading-10 tracking-[-0.025em] text-warm-black">{plan ? "Review the plan" : presentation === "document" ? "What should this document cover?" : "Plan this with Strelva"}</Heading>
+      {!plan ? <p className="mt-3 text-base text-gray-muted">Strelva drafts what to build, the steps, and what it needs from you. Nothing is sent or published.</p> : null}
+    </header>
+    {localPreview ? <p role="status" className="mt-6 text-sm text-gray-muted">Preview only. Planning runs in a signed-in workspace.</p> : null}
+    {error ? <p role="alert" className="mt-6 text-sm text-critical">{error}</p> : null}
+    {result?.planningEconomics ? <p role="status" className="mt-6 text-sm text-gray-muted">Planning is recorded. Up to your limit stays held until the final cost is confirmed.</p> : null}
+    {workId && !plan && !error && !localPreview ? <p role="status" className="mt-6 text-sm text-gray-muted">Loading your plan…</p> : null}
+    {budgetPanel ? <div className="mt-8">{budgetPanel}</div> : null}
+    {composing ? <form className="mt-6 space-y-6" onSubmit={event => { event.preventDefault(); void prepare(); }}>
+      <TextArea label="The result you want" rows={4} value={request} maxLength={3000} required disabled={busy} onChange={event => setRequest(event.target.value)} placeholder="Help my team handle new customer requests without anything slipping through." />
+      {availableSources.length ? <details className="text-sm"><summary className="cursor-pointer py-2 text-gray-muted">Use saved work{sourceIds.length ? ` (${sourceIds.length} selected)` : ""}</summary><fieldset className="space-y-1 pt-2"><legend className="sr-only">Saved work Strelva may read</legend><p className="mb-2 text-gray-muted">Pick up to six. Strelva reads a short excerpt of each.</p>{availableSources.map(source => <label key={source.id} className="flex min-h-10 items-center gap-3 text-warm-black"><input type="checkbox" checked={sourceIds.includes(source.id)} disabled={busy || (!sourceIds.includes(source.id) && sourceIds.length >= 6)} onChange={event => setSourceIds(current => event.target.checked ? [...current, source.id] : current.filter(id => id !== source.id))} />{source.title}</label>)}</fieldset></details> : null}
+      {executionBlocksNewCall ? <p className="text-sm text-gray-muted" role="status">This plan was already run. Its cost is still being confirmed, so it can’t be run again yet.</p> : null}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="submit" disabled={busy || localPreview || !request.trim() || !canPrepare}>{busy ? "Preparing your plan…" : refining ? "Prepare a revised plan" : presentation === "document" ? "Prepare document draft" : "Prepare a plan"}</Button>
+        {refining ? <Button type="button" variant="ghost" disabled={busy} onClick={() => setRefining(false)}>Keep this plan</Button> : null}
+      </div>
     </form> : null}
-    {plan ? <>
-      <details className="text-sm"><summary className="cursor-pointer py-2">Original request</summary><p className="whitespace-pre-wrap">{plan.userGoal}</p></details>
-      {plan.context?.sources.length ? <details className="text-sm"><summary className="cursor-pointer">What Strelva looked at</summary><ul className="mt-3 space-y-3">{plan.context.sources.map(source => <li key={source.workId}><a className="underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&work=${encodeURIComponent(source.workId)}`}>{source.title}</a><p className="text-gray-muted">{source.revision === null ? "Saved version" : `Revision ${source.revision}`} · Last changed {new Date(source.updatedAt).toLocaleString()}</p></li>)}</ul><p className="mt-3 text-gray-muted">These are the versions used to prepare this proposal. Later source edits do not update the saved plan.</p></details> : null}
-      <section className="space-y-3 border-t border-gray-border pt-4"><h2 className="font-display text-xl">Ready to review</h2><p className="text-sm">{plan.summary}</p><ul className="space-y-6">{plan.proposedOutputs.map(output => <li key={`${result?.work.id}:${output.id}`}><h3 className="font-medium">{output.title}</h3><p className="text-sm text-gray-muted">{output.description}</p>{result ? <WorkPlanOutputPreview onOpenWork={onOpenWork} workspaceId={workspaceId} planWorkId={result.work.id} plan={plan} output={output} disabled={readOnly || localPreview} completed={result.executions?.find(execution => execution.outputId === output.id)} /> : null}</li>)}</ul></section>
-      {plan.steps.length ? <details className="space-y-3 border-t border-gray-border pt-4"><summary className="cursor-pointer text-sm">How this will be done</summary><ol className="list-decimal space-y-3 pl-5">{plan.steps.map(step => <li key={step.id}><h3 className="font-medium">{step.title}</h3><p className="text-sm text-gray-muted">{step.description}</p></li>)}</ol></details> : null}
-      {plan.neededInputs.length || plan.requiredDecisions.length ? <section className="space-y-3 border-t border-gray-border pt-4"><h2 className="font-display text-xl">Needs you</h2><ul className="space-y-3">{plan.neededInputs.map(input => <li key={`input-${input.id}`}><p className="font-medium">{input.label}{input.required ? "" : " (optional)"}</p><p className="text-sm text-gray-muted">{input.reason}</p></li>)}{plan.requiredDecisions.map(decision => <li key={`decision-${decision.id}`}><p className="font-medium">{decision.question}</p><p className="text-sm text-gray-muted">{decision.reason}</p></li>)}</ul></section> : null}
-      <p className="text-sm text-gray-muted">Cost has not been estimated. Each output needs its own explicit action. Creating private work does not start an ongoing job.</p>
-      {!readOnly && !refining ? <Button variant="secondary" onClick={() => setRefining(true)}>Add details and revise</Button> : null}
-    </> : null}
+    {plan ? <div className="mt-8">
+      <p className="whitespace-pre-wrap border-l-2 border-gray-border pl-4 text-base text-gray-muted">{plan.userGoal}</p>
+      <p className="mt-8 text-lg leading-7 text-warm-black">{plan.summary}</p>
+      <ul className="mt-8 divide-y divide-gray-border border-y border-gray-border">{plan.proposedOutputs.map(output => <li key={`${result?.work.id}:${output.id}`} className="py-6"><h2 className="text-base font-medium text-warm-black">{output.title}</h2><p className="mt-1 text-sm text-gray-muted">{output.description}</p>{result ? <WorkPlanOutputPreview onOpenWork={onOpenWork} workspaceId={workspaceId} planWorkId={result.work.id} plan={plan} output={output} disabled={readOnly || localPreview} completed={result.executions?.find(execution => execution.outputId === output.id)} /> : null}</li>)}</ul>
+      {plan.neededInputs.length || plan.requiredDecisions.length ? <section className="mt-12"><h2 className="text-base font-medium text-warm-black">Needs you</h2><ul className="mt-4 space-y-4">{plan.neededInputs.map(input => <li key={`input-${input.id}`}><p className="text-sm font-medium text-warm-black">{input.label}{input.required ? "" : " (optional)"}</p><p className="text-sm text-gray-muted">{input.reason}</p></li>)}{plan.requiredDecisions.map(decision => <li key={`decision-${decision.id}`}><p className="text-sm font-medium text-warm-black">{decision.question}</p><p className="text-sm text-gray-muted">{decision.reason}</p></li>)}</ul></section> : null}
+      {plan.steps.length ? <details className="mt-12 text-sm"><summary className="cursor-pointer py-2 text-gray-muted">How this will be done</summary><ol className="mt-2 list-decimal space-y-3 pl-5">{plan.steps.map(step => <li key={step.id}><h3 className="font-medium text-warm-black">{step.title}</h3><p className="text-gray-muted">{step.description}</p></li>)}</ol></details> : null}
+      {plan.context?.sources.length ? <details className="text-sm"><summary className="cursor-pointer py-2 text-gray-muted">What Strelva read</summary><ul className="mt-2 space-y-3">{plan.context.sources.map(source => <li key={source.workId}><a className="underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&work=${encodeURIComponent(source.workId)}`}>{source.title}</a><p className="text-gray-muted">{source.revision === null ? "Saved version" : `Revision ${source.revision}`} · Changed {new Date(source.updatedAt).toLocaleString()}</p></li>)}</ul></details> : null}
+      <p className="mt-8 text-xs text-gray-muted">Each result above is created only when you choose it.</p>
+      {!readOnly && !refining ? <Button className="mt-4" variant="secondary" onClick={() => setRefining(true)}>Add details and revise</Button> : null}
+    </div> : null}
   </section>;
 }
 
@@ -359,17 +366,17 @@ function PlanningBudgetPanel({
   const executionHeld = executionIsHeld(execution);
   const executionCompleted = Boolean(execution && execution.status === "finished" && execution.effect === "accepted");
 
-  return <section className="space-y-4 rounded-xl border border-gray-border p-4" aria-labelledby="planning-budget-heading">
+  return <section className="space-y-4 rounded-2xl border border-gray-border p-4" aria-labelledby="planning-budget-heading">
     <div>
-      <h2 id="planning-budget-heading" className="font-medium">Planning budget</h2>
-      <p className="mt-1 text-sm text-gray-muted">Set a maximum before Strelva asks the configured model. No price is assumed here, and this local record does not charge your card or enforce a provider limit.</p>
+      <h2 id="planning-budget-heading" className="text-sm font-medium text-warm-black">Spending limit</h2>
+      <p className="mt-1 text-sm text-gray-muted">Strelva won’t spend more than this on the plan.</p>
     </div>
-    {loading ? <p role="status" className="text-sm">Checking the planning budget…</p> : null}
-    {error ? <div className="space-y-2"><p role="alert" className="text-sm text-critical">{error}</p><Button type="button" variant="secondary" onClick={onRetry}>Check planning budget again</Button></div> : null}
-    {retry && !readOnly ? <div className="space-y-2"><p className="text-sm">The previous budget change was not confirmed. Retry sends the exact same command.</p><Button type="button" variant="secondary" disabled={busy} onClick={() => void onCommand(retry)}>Retry budget change</Button></div> : null}
+    {loading ? <p role="status" className="text-sm">Checking your limit…</p> : null}
+    {error ? <div className="space-y-2"><p role="alert" className="text-sm text-critical">{error}</p><Button type="button" variant="secondary" onClick={onRetry}>Try again</Button></div> : null}
+    {retry && !readOnly ? <div className="space-y-2"><p className="text-sm">That change wasn’t confirmed. Retry sends it again unchanged.</p><Button type="button" variant="secondary" disabled={busy} onClick={() => void onCommand(retry)}>Retry budget change</Button></div> : null}
     {!loading && !error && !job && canCreate ? <PlanningBudgetProposal workspaceId={workspaceId} payerId={budget?.currentActorId} busy={busy} onCommand={onCommand} /> : null}
     {!loading && !error && terminal && canCreate ? <PlanningBudgetProposal workspaceId={workspaceId} payerId={budget?.currentActorId} busy={busy} onCommand={onCommand} /> : null}
-    {!loading && !error && !job && !canCreate ? <p className="text-sm" role="status">No planning budget is available for this workspace member. Ask the named payer to propose one.</p> : null}
+    {!loading && !error && !job && !canCreate ? <p className="text-sm" role="status">Ask the workspace payer to set a limit.</p> : null}
     {job ? <>
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
         <div><dt className="text-gray-muted">Status</dt><dd className="capitalize">{job.status}</dd></div>
@@ -377,11 +384,11 @@ function PlanningBudgetPanel({
         <div><dt className="text-gray-muted">Used or held</dt><dd>{money(job.reservedCents)}</dd></div>
         <div><dt className="text-gray-muted">Recorded cost</dt><dd>{job.actualKnown ? money(job.actualCents) : executionHeld ? "Awaiting cost verification" : "Not recorded"}</dd></div>
       </dl>
-      {job.status === "draft" ? canAccept ? <div className="space-y-2"><Button type="button" disabled={busy} onClick={() => void onCommand({ action: "accept", jobId: job.id })}>Accept planning budget</Button><p className="text-sm text-gray-muted">Acceptance is explicit. The model will not run until you accept this maximum.</p></div> : <p className="text-sm text-gray-muted">This budget is waiting for its named payer to accept it.</p> : null}
-      {job.status === "accepted" || job.status === "reserved" ? <p className="text-sm text-gray-muted">The maximum is accepted. A model call will reserve it before the request starts.</p> : null}
-      {executionHeld ? <p className="text-sm text-gray-muted" role="status">Up to {money(execution?.maximumCents ?? job.maxAuthorizedCents)} remains held while the planning result or cost is reconciled. The call will not be replayed.</p> : null}
-      {executionCompleted && !executionHeld ? <p className="text-sm text-gray-muted" role="status">A durable planning receipt exists. Its result is authoritative; another model call needs a new accepted budget.</p> : null}
-      {terminal && !canCreate ? <p className="text-sm text-gray-muted" role="status">This planning budget is {job.status}. A new maximum must be proposed by the payer before another model call.</p> : null}
+      {job.status === "draft" ? canAccept ? <div className="space-y-2"><Button type="button" disabled={busy} onClick={() => void onCommand({ action: "accept", jobId: job.id })}>Accept planning budget</Button><p className="text-sm text-gray-muted">Nothing runs until you accept.</p></div> : <p className="text-sm text-gray-muted">Waiting for the payer to accept.</p> : null}
+      {job.status === "accepted" || job.status === "reserved" ? <p className="text-sm text-gray-muted">Limit accepted.</p> : null}
+      {executionHeld ? <p className="text-sm text-gray-muted" role="status">Up to {money(execution?.maximumCents ?? job.maxAuthorizedCents)} is held until the cost is confirmed.</p> : null}
+      {executionCompleted && !executionHeld ? <p className="text-sm text-gray-muted" role="status">This limit has been used. Set a new one to plan again.</p> : null}
+      {terminal && !canCreate ? <p className="text-sm text-gray-muted" role="status">This limit is {job.status}. The payer needs to set a new one.</p> : null}
     </> : null}
   </section>;
 }
@@ -414,8 +421,8 @@ function PlanningBudgetProposal({ workspaceId, payerId, busy, onCommand }: { wor
   }
 
   return <form className="space-y-3" onSubmit={submit}>
-    <p className="text-sm">You choose the maximum and become the payer. Proposing it does not accept it.</p>
+    <p className="text-sm text-gray-muted">You’ll be the payer. You accept it in the next step.</p>
     <TextInput label="Maximum planning budget, USD" name="planningMaximum" type="number" min={0} max={10000} step="0.01" required onChange={event => event.currentTarget.setCustomValidity("")} />
-    <Button type="submit" disabled={busy}>{busy ? "Saving budget…" : "Propose planning budget"}</Button>
+    <Button type="submit" disabled={busy}>{busy ? "Saving…" : "Propose planning budget"}</Button>
   </form>;
 }
