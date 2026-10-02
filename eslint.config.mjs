@@ -12,6 +12,8 @@ const eslintConfig = [
       ".next-self-service/**",
       ".next-self-service-build/**",
       ".playwright-mcp/**",
+      // Local research and screenshot output, not product source.
+      "output/**",
       "test-results/**",
       ".validation-artifacts/**",
       "src/sanity/**",

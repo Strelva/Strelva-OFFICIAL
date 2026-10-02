@@ -34,7 +34,7 @@ Date: 2026-06-09. Source: 26-agent workflow (7 subsystem analyses + adversarial 
 2. Hand-create Stripe prices: $199/mo (+$499 start) and $99/mo care. Keep `STRIPE_SCAFFOLD_PRICE_ID` unset for now (billing-on is a cliff: tenants without status get 402'd — needs migration before flipping).
 3. Restrict self-serve cancellation in Stripe portal config (or accept paper-only minimum knowingly).
 4. Add `stripeSubscriptionId`, `subscriptionStartedAt`, `commitmentEndsAt` to TenantConfig + persist in webhook (prerequisite for month-12 mechanics).
-5. Domain procedure in `docs/domain-setup.md`: registered in CLIENT's registrar/Cloudflare account day one; Strelva gets DNS-edit member access only.
+5. Domain procedure in `docs/operations/domain-setup.md`: registered in CLIENT's registrar/Cloudflare account day one; Strelva gets DNS-edit member access only.
 6. Repo-transfer runbook (doc): repo transfer + bake final content into `content-defaults.ts` for frozen-handoff viability; flag third-party deps (GLDF's paused Supabase) as transfer risks.
 7. Un-suppress offboarding requests (`/api/offboarding/request` currently a dead letter — no event, no Slack).
 8. OwnershipSection copy update after terms settle (own-after-12, keep-everything).

@@ -12,11 +12,16 @@ import {
 } from "./contracts";
 import styles from "./website-experience.module.css";
 import { WebsiteConnections } from "./WebsiteConnections";
+import { RebuildExperience } from "./RebuildExperience";
 
 export type { Website, WebsiteBrief, WebsiteRecord, WebsiteExperienceTransport } from "./contracts";
 
 export interface WebsiteExperienceProps {
   workspaceId: string;
+  rebuildVersion?: 2;
+  rebuildEnabled?: boolean;
+  managed?: boolean;
+  agency?: boolean;
   workId?: string;
   readOnly?: boolean;
   initialRequest?: string;
@@ -175,6 +180,7 @@ function StatusIcon({ website }: { website: Website }) {
 }
 
 export function WebsiteExperience(props: WebsiteExperienceProps) {
+  if (!props.transport && ((!props.workId && props.rebuildEnabled) || props.rebuildVersion === 2)) return <RebuildExperience workspaceId={props.workspaceId} workId={props.workId} readOnly={props.readOnly} managed={props.managed} agency={props.agency} initialRequest={props.initialRequest} onSaved={props.onSaved} />;
   return <WebsiteSession key={`${props.workspaceId}:${props.workId ?? "new"}`} {...props} />;
 }
 

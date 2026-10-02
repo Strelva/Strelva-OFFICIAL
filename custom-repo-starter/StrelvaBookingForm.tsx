@@ -26,6 +26,7 @@ type ConnectedProps = {
   tenant: string;
   capabilityId: string;
   range: PublicBookingRange;
+  expectedVersion?: number;
 };
 
 /** Client-site entry point for a published native calendar capability. */
@@ -33,7 +34,7 @@ export function StrelvaConnectedBookingForm(props: ConnectedProps) {
   return <BookingLoader key={`${props.baseUrl}:${props.tenant}:${props.capabilityId}:${props.range.from}:${props.range.to}`} {...props} />;
 }
 
-function BookingLoader({ baseUrl, tenant, capabilityId, range }: ConnectedProps) {
+function BookingLoader({ baseUrl, tenant, capabilityId, range, expectedVersion }: ConnectedProps) {
   const [result, setResult] = useState<PublicBookingSchedule | Error | null>(null);
   const [receipt, setReceipt] = useState<PublicBookingReceipt | null>(null);
   const requestStorageKey = bookingRequestStorageKey(baseUrl, tenant, capabilityId);
@@ -50,6 +51,7 @@ function BookingLoader({ baseUrl, tenant, capabilityId, range }: ConnectedProps)
   }, [baseUrl, tenant, capabilityId, rangeFrom, rangeTo]);
   if (result === null) return <p role="status">Loading booking times…</p>;
   if (result instanceof Error) return <p role="alert">{result.message}</p>;
+  if (expectedVersion !== undefined && result.version !== expectedVersion) return <p role="alert">This booking schedule changed. Please contact the business directly.</p>;
 
   return (
     <StrelvaBookingForm

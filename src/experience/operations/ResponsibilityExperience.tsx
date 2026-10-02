@@ -369,22 +369,22 @@ export function StandingResponsibilityPicker({ workspaceId, sources, selectedId,
 
   return <section className="rounded-xl border border-gray-border p-4" aria-labelledby="ongoing-work-entry-heading">
     <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><p className="text-sm text-gray-muted">Ongoing work</p><h2 id="ongoing-work-entry-heading" className="mt-1 font-medium">Saved checks that can run again</h2><p className="mt-1 max-w-2xl text-sm text-gray-muted">Each check has its own run and result. The approved scope stays visible for review.</p></div>
-      {!readOnly && !newWorkBlocked ? <Button variant="secondary" disabled={busy} onClick={() => { const next = !creating; setCreating(next); onCreatingChange?.(next); setError(""); }}>{creating ? "Close" : "New ongoing work"}</Button> : null}
+      <div><h2 id="ongoing-work-entry-heading" className="font-medium">Saved checks that can run again</h2><p className="mt-1 max-w-2xl text-sm text-gray-muted">Each check has its own run and result. The approved scope stays visible for review.</p></div>
+      {!readOnly && !newWorkBlocked ? <Button variant="secondary" disabled={busy} onClick={() => { const next = !creating; setCreating(next); onCreatingChange?.(next); setError(""); }}>{creating ? "Close" : "Keep something running"}</Button> : null}
     </div>
     {newWorkBlocked && !readOnly ? <p className="mt-3 text-sm text-gray-muted">{NEW_WORK_PAUSED_COPY}</p> : null}
     {error ? <p className="mt-3 text-sm" role="alert">{error}</p> : null}
-    {loading ? <p className="mt-3 text-sm" role="status">Loading ongoing work…</p> : items.length ? <ul className="mt-4 space-y-2" role="list">{items.map(item => <li key={item.id}><button type="button" className={`w-full rounded-lg border p-3 text-left ${selectedId === item.id ? "border-accent" : "border-gray-border"}`} aria-current={selectedId === item.id ? "page" : undefined} onClick={() => onOpen(item.id)}><span className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium">{item.policy.title}</span><span className="text-sm text-gray-muted">{standingActionLabel(item.policy.status)}</span></span><span className="mt-1 block text-sm text-gray-muted">Version {item.policy.version} · {item.policy.scope.steps.length} saved check{item.policy.scope.steps.length === 1 ? "" : "s"}</span></button></li>)}</ul> : <p className="mt-4 text-sm text-gray-muted">No ongoing work has been created.</p>}
+    {loading ? <p className="mt-3 text-sm" role="status">Loading what Strelva keeps running…</p> : items.length ? <ul className="mt-4 space-y-2" role="list">{items.map(item => <li key={item.id}><button type="button" className={`w-full rounded-lg border p-3 text-left ${selectedId === item.id ? "border-accent" : "border-gray-border"}`} aria-current={selectedId === item.id ? "page" : undefined} onClick={() => onOpen(item.id)}><span className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium">{item.policy.title}</span><span className="text-sm text-gray-muted">{standingActionLabel(item.policy.status)}</span></span><span className="mt-1 block text-sm text-gray-muted">Version {item.policy.version} · {item.policy.scope.steps.length} saved check{item.policy.scope.steps.length === 1 ? "" : "s"}</span></button></li>)}</ul> : <p className="mt-4 text-sm text-gray-muted">No ongoing work has been created.</p>}
     {creating && !readOnly && !newWorkBlocked ? <form className="mt-5 space-y-4 border-t border-gray-border pt-4" onSubmit={create}>
-      <h3 className="font-medium">New ongoing work</h3>
+      <h3 className="font-medium">Keep something running</h3>
       <TextInput label="Name" value={title} onChange={event => setTitle(event.target.value)} maxLength={160} required />
       <TextInput label="Result" value={intent} onChange={event => setIntent(event.target.value)} maxLength={4000} required />
       <div className="block text-sm"><label htmlFor="standing-source">Saved check</label><select id="standing-source" className="mt-2 min-h-11 w-full rounded-lg border border-gray-border bg-white p-3" value={sourceId} onChange={event => setSourceId(event.target.value)} required><option value="">Choose a saved investigation</option>{investigations.map(source => <option key={source.id} value={source.id}>{source.title}</option>)}</select></div>
       <div className="block text-sm"><label htmlFor="standing-trigger">When should this check run?</label><select id="standing-trigger" className="mt-2 min-h-11 w-full rounded-lg border border-gray-border bg-white p-3" value={triggerKind} onChange={event => setTriggerKind(event.target.value as "manual" | "interval")}><option value="manual">When I ask</option><option value="interval">On a schedule</option></select></div>
       {triggerKind === "interval" ? <TextInput label="Interval in minutes" type="number" min={1} max={525600} value={everyMinutes} onChange={event => setEveryMinutes(event.target.value)} required /> : null}
-      {!investigations.length ? <p className="text-sm text-gray-muted">Create a saved investigation first. Ongoing work currently supports saved checks.</p> : null}
+      {!investigations.length ? <p className="text-sm text-gray-muted">Create a saved investigation first. Running currently supports saved checks.</p> : null}
       <p className="text-sm text-gray-muted">No external message or provider call is made by creating this proposal. Approval is required before a check can run. This setup allows up to 10 checks.</p>
-      <Button type="submit" disabled={busy || !investigations.length || !sourceId}>Create ongoing work</Button>
+      <Button type="submit" disabled={busy || !investigations.length || !sourceId}>Start running it</Button>
     </form> : null}
   </section>;
 }
@@ -477,7 +477,7 @@ function StandingResponsibilityExperience({ workspaceId, standingId, sources, re
   const sourceTitle = (workId: string) => sources.find(source => source.id === workId)?.title || "Saved check";
   return <section className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6" aria-busy={busy}>
     <header className="space-y-2">
-      <p className="text-sm text-gray-muted">Ongoing work</p>
+      <p className="text-sm text-gray-muted">Running</p>
       <div className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="font-display text-3xl">{policy?.title || "Ongoing work"}</h1><p className="mt-2 max-w-2xl text-sm text-gray-muted">{policy?.intent || "Opening the approved scope and its runs."}</p></div>{policy ? <span className="rounded-full border border-gray-border px-3 py-1 text-sm">{standingActionLabel(policy.status)}</span> : null}</div>
     </header>
     {error ? <div role="alert" className="space-y-2 text-sm"><p>{error}</p><Button variant="secondary" onClick={() => { setError(""); setRetryLoad(value => value + 1); }}>Reload current state</Button></div> : null}

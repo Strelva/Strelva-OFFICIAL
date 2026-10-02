@@ -7,7 +7,7 @@
  * catch-up: the slug is ALSO embedded in Redis keys, and some of those stores are
  * Redis-AUTHORITATIVE (no Postgres to regenerate from) — a missed prefix there is
  * silent data loss, so the registry below is derived directly from
- * docs/persistence-boundaries.md and is the completeness-critical surface.
+ * docs/architecture/persistence-boundaries.md and is the completeness-critical surface.
  *
  * Ordering: DB first (identity source of truth), then Redis best-effort catch-up.
  * A partial Redis failure leaves the DB renamed + some stale Redis keys — recover
@@ -22,7 +22,7 @@ import type { UnifiedEvent } from "./types";
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,40})$/;
 
 /**
- * Redis-AUTHORITATIVE stores keyed on the tenant slug (docs/persistence-boundaries.md).
+ * Redis-AUTHORITATIVE stores keyed on the tenant slug (docs/architecture/persistence-boundaries.md).
  * Each is a SCAN match pattern; `{t}` is the slug. `events` is handled separately
  * (zset index + id-keyed blobs). CACHES (content/page-config/analytics/google-meta/
  * briefs/domain-map) are intentionally omitted — they regenerate from Postgres.

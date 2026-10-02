@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { headers } from "next/headers";
 import { DashboardProvider } from "@/components/dashboard/DashboardContext";
 import { BillingBanner } from "@/components/dashboard/BillingBanner";
@@ -212,9 +213,9 @@ export default async function DashboardLayout({
         {isDemo && !devAccessBypass && (
           <div className="flex items-center justify-center gap-2 border-b border-accent/30 bg-accent-dim px-4 py-2 text-center text-[12px] text-warm-black">
             <span className="font-medium">You&apos;re viewing a read-only live demo &mdash; editing is off.</span>
-            <a href="/access-request" className="font-semibold text-accent underline-offset-2 hover:underline">
+            <Link href="/access-request" className="font-semibold text-accent underline-offset-2 hover:underline">
               Get your own site &rarr;
-            </a>
+            </Link>
           </div>
         )}
         {!isDemo && <SessionKeeper />}

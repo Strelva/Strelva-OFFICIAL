@@ -52,7 +52,7 @@ while vertical referral payoff historically lags the runway of a $0-MRR solo fou
 
 - **Do not build the Jobber product inside the multi-tenant control plane.** It's a different tenant model (Jobber OAuth account, not a Strelva website tenant), different lifecycle, different deploy cadence.
 - **Extract the chassis as packages**: events/weekly-brief/report rendering and the governance layer become libraries consumable by both the control plane and a thin new Jobber app. This is the "clean for restructure" work — it preserves horizontal optionality without building a horizontal product.
-- **The strelva-marketing/strelva-app split and rebrand cutover are a separate, already-in-flight motion** (see `docs/strelva-migration-plan.md`); the new input is that the topology should anticipate a third deployable (the Jobber app) sharing packages, which argues for a workspace/monorepo shape or a deliberately thin shared-package story rather than ad-hoc duplication.
+- **The strelva-marketing/strelva-app split and rebrand cutover are a separate, already-in-flight motion** (see `docs/archive/strelva-migration-plan.md`); the new input is that the topology should anticipate a third deployable (the Jobber app) sharing packages, which argues for a workspace/monorepo shape or a deliberately thin shared-package story rather than ad-hoc duplication.
 
 ## Open questions (close before committing build time)
 

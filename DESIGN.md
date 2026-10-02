@@ -1,6 +1,6 @@
 # Strelva product design
 
-Start with [foundations, tokens and atoms](./docs/component-system.md#start-with-tokens-and-atoms).
+Start with [foundations, tokens and atoms](./docs/design/component-system.md#start-with-tokens-and-atoms).
 Latest implementation handoff: [current component context](./docs/design/current-component-context.md).
 
 ## Visual direction and extension map
@@ -12,15 +12,15 @@ extracted token value cannot override it.
 
 | Concern | Current direction and scope | Owner and route to implementation |
 | --- | --- | --- |
-| Identity | Original cairn and custom Strelva lettering. The lettering is logo artwork, not a text font. | [Identity APIs and adoption](./docs/component-system.md#cairn-and-display-lettering); [existing mark](./src/components/Logo.tsx), [lockup](./src/components/brand/StrelvaLockup.tsx). |
-| Typography | Geist Sans for interface and display text. Weight specimens remain reviewable; Inter/Fraunces describe legacy source and historical comparisons. | [Type roles and legibility](./docs/component-system.md#geist-weight-and-legibility-contract). |
-| Color and themes | Semantic roles with independently finished light and dark treatments. Workspace, card and client scopes remain explicit. | [Color contract](./docs/color-system.md), which links the actual CSS owners. |
-| Geometry and composition | Shared measurement roles; composition follows the task. Atmosphere, containment and expressive type do not prescribe one page template. | [Foundation geometry](./docs/component-system.md#geometry-and-interaction-detail) and the global design standard. |
-| Material | Prominent gloss, selective bounded atmosphere and sharp content. Exact pigment, grain, reflection and light-card recipes remain reviewable. | [Atmospheric contract](./docs/design/atmospheric-component-contract.md), [material acceptance](./docs/component-system.md#material-contract). |
+| Identity | Original cairn and custom Strelva lettering. The lettering is logo artwork, not a text font. | [Identity APIs and adoption](./docs/design/component-system.md#cairn-and-display-lettering); [existing mark](./src/components/Logo.tsx), [lockup](./src/components/brand/StrelvaLockup.tsx). |
+| Typography | Geist Sans for interface and display text. Weight specimens remain reviewable; Inter/Fraunces describe legacy source and historical comparisons. | [Type roles and legibility](./docs/design/component-system.md#geist-weight-and-legibility-contract). |
+| Color and themes | Semantic roles with independently finished light and dark treatments. Workspace, card and client scopes remain explicit. | [Color contract](./docs/design/color-system.md), which links the actual CSS owners. |
+| Geometry and composition | Shared measurement roles; composition follows the task. Atmosphere, containment and expressive type do not prescribe one page template. | [Foundation geometry](./docs/design/component-system.md#geometry-and-interaction-detail) and the global design standard. |
+| Material | Prominent gloss, selective bounded atmosphere and sharp content. Exact pigment, grain, reflection and light-card recipes remain reviewable. | [Atmospheric contract](./docs/design/atmospheric-component-contract.md), [material acceptance](./docs/design/component-system.md#material-contract). |
 | Imagery and illustration | People, businesses, materials and evidence of work; unusual phenomena used sparingly. The world board leads, the earlier board supports atmosphere. | [Visual record and reference collection](./docs/design/strelva-visual-direction.md). |
 | Motion | Named presets, interruptible disclosure and optional identity motion, with immediate reduced-motion states. | [Motion contract](./docs/design/motion.md). |
-| Components and states | Real owned primitives, both themes, realistic content, semantics and recovery. | [Component inventory](./docs/component-system.md#atoms-to-inspect-before-composing-a-page) and [family acceptance](./docs/component-system.md#component-families-and-behavioral-acceptance). |
-| Evidence and adoption | Source implementation, rendered proof, Jacob's visual acceptance and deployment are separate facts. | [Adoption record](./docs/component-system.md#adoption-work-and-completion-evidence), [dated verification](./docs/design/atmospheric-components-verification.md). |
+| Components and states | Real owned primitives, both themes, realistic content, semantics and recovery. | [Component inventory](./docs/design/component-system.md#atoms-to-inspect-before-composing-a-page) and [family acceptance](./docs/design/component-system.md#component-families-and-behavioral-acceptance). |
+| Evidence and adoption | Source implementation, rendered proof, Jacob's visual acceptance and deployment are separate facts. | [Adoption record](./docs/design/component-system.md#adoption-work-and-completion-evidence), [dated verification](./docs/design/atmospheric-components-verification.md). |
 
 Public composition is owned by [marketing DESIGN.md](../strelva-marketing/DESIGN.md).
 Client brands remain owned by their repositories. Shared direction does not
@@ -42,13 +42,68 @@ the owning token or component, then adds a specimen and relevant verification.
 Track actual consumers in the adoption record. A successful study alone does
 not replace the selected treatment or migrate a page.
 
-The [extension record](./docs/component-system.md#extending-the-foundation)
+The [extension record](./docs/design/component-system.md#extending-the-foundation)
 defines what to retain with a change. The [visual review criteria](./docs/design/strelva-visual-direction.md#visual-review-and-extension)
 cover identity, imagery, composition and material together. Tooling indexes such
 as `.21st/design.json` route to these owners; extracted values are not a second
 design specification.
 
 ## Latest foundation decisions
+
+### October 2 navigation: plain places, Strelva as the actor
+
+Jacob chose this on October 2, 2026. It replaces the October 1 places below.
+Branded nouns (Lines, Watches, Keys and the like) were tried and rejected as
+tacky. Objects keep plain names, and **Strelva** is the only name that acts:
+"Strelva updated your hours", "Strelva needs your call".
+
+- **Places** in the sidebar: **Home**, **Customers**, **Requests**, **Running**.
+  - **Home** lists, in order: **Needs you**, **Strelva handled**,
+    **In progress**, **Recent**.
+    - Personal workspaces have no business requests, so they show only Needs
+      you and Recent.
+  - **Requests** are things asked for that have an end. Stages: Asked, Needs
+    you, In progress, Ready for your review, Done, Closed. A request is agreed
+    work only once its scope and deadline are accepted.
+  - **Running** is what Strelva keeps doing. Each item is named by the sentence
+    it keeps true.
+- **Website and apps** are pinned by their own names, with an **All apps and
+  files** link to the full list. The `apps`, `work` and `products` views stay
+  addressable.
+- The **business menu** holds **Business details**, **People & access** and
+  **Help**.
+- **Ask Strelva** is the one way in.
+- **Words to avoid:** never say AI, agent, automation, workflow or task.
+
+`view=delivery` resolves to Requests. `view=operations` resolves to Running.
+A finite job opened from Requests shows as a request, not as Running.
+
+**Not built yet:**
+
+- Undo from Home.
+- Business details as the one place hours, services and prices are edited.
+- A single customer record per person.
+- The agency surface (Clients, Queue, Library, Team).
+
+### October 1 navigation: three places (superseded October 2)
+
+Jacob selected three places on October 1, 2026, replacing the September 7
+navigation (Home, Work, Ongoing, People & access, Settings):
+
+- **Places** in the sidebar: **Today**, **Customers**, **Apps**. A managed
+  website is the first **Pinned** app, shown by its name or domain.
+- **Things** appear as cards wherever they're relevant, never as sections:
+  request, booking, review, change, receipt, routine.
+- **Verbs** everywhere: Ask, Approve, Undo, Pin. The utility action is
+  **Ask Strelva**.
+- The **business menu** holds Business profile, Access, Help, billing and
+  export.
+
+Work, Ongoing, Examples, Offering and Workspace leave the interface. Old
+`view=work`, `view=ongoing` and `view=products` links keep working inside
+Apps. Ongoing is called **Routines**. The look keeps the dark Field direction
+with one composer and little chrome; receipts use monospace. The options
+record is `../.scratch/brand-nouns/structure-2026-10-01.html`.
 
 ### September 20 horizontal workspace direction
 
@@ -75,7 +130,7 @@ component adoption and rendered acceptance remain pending.
 Jacob selected Geist Sans for interface text, the custom Strelva lettering for
 the logo, prominent gloss, selective atmospheric material, and equally finished
 light and dark components. Current work is foundations and components only, with
-no page design. See the [completion specification](./docs/component-system.md#foundation-completion-specification).
+no page design. See the [completion specification](./docs/design/component-system.md#foundation-completion-specification).
 
 These decisions supersede earlier Inter/Fraunces font recommendations for future
 Strelva UI. Existing source and historical studies have not been migrated by this
@@ -118,7 +173,7 @@ the laboratory study has shipped or received final visual approval.
 
 ## Component and motion foundations
 
-Read the [component system](./docs/component-system.md) for reusable APIs and implementation status, the [motion contract](./docs/design/motion.md) for gooey disclosure and exit behavior, and the [color system](./docs/color-system.md) for palette ownership. These are the current implementation guides. The three card materials remain options until Jacob selects one; their close/restore demonstration is not yet a product card API.
+Read the [component system](./docs/design/component-system.md) for reusable APIs and implementation status, the [motion contract](./docs/design/motion.md) for gooey disclosure and exit behavior, and the [color system](./docs/design/color-system.md) for palette ownership. These are the current implementation guides. The three card materials remain options until Jacob selects one; their close/restore demonstration is not yet a product card API.
 
 ## Current visual direction: September 16, 2026
 
@@ -177,8 +232,9 @@ means an accessible entrance, familiar persistent navigation, and easy return
 to work. It does not require a chat composer or conversation as the main object.
 An assessment, website, or another supported result occupies the working area.
 
-The shared navigation is Home, Work, Ongoing, People & access, and Settings.
-New, Search, Explore offerings, and Help are utilities; personal Account stays
+Superseded October 1, 2026 by the three-place navigation above. The earlier
+shared navigation was Home, Work, Ongoing, People & access, and Settings, with
+New, Search, Explore offerings, and Help as utilities; personal Account stays
 at the bottom. Settings concerns the selected business, not the person's
 identity. Explore describes supported products and their actual availability.
 Relationship labels do not unlock capabilities by themselves.
@@ -406,7 +462,7 @@ Tenant storefronts are brand-led and visual. The client's real place, products, 
 - Dashboard tokens live in the `[data-dashboard]` contract in `src/app/globals.css`.
 - Dashboard and operator primitives live in `src/components/ui/` and `src/app/admin/console.tsx`.
 - Status colors map through `src/lib/status-colors.ts`; use the existing positive, warning, critical, and neutral semantics.
-- [Color system](./docs/color-system.md) maps palette ownership, paired foregrounds, and local verification. Current Home and navigation colors live in `src/app/styles/workspace-colors.css`.
+- [Color system](./docs/design/color-system.md) maps palette ownership, paired foregrounds, and local verification. Current Home and navigation colors live in `src/app/styles/workspace-colors.css`.
 - Marketing tokens use the `--m-*` family and shared marketing button classes in `src/app/globals.css`.
 - Tenant storefront theme variables and the public section components are the shared storefront foundation. A client repository may establish a narrower brand system for its own surfaces.
 

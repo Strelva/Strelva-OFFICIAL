@@ -503,7 +503,7 @@ These recommendations are based on the root DESIGN.md decisions and the research
 ### Strelva
 
 - [BRIEF.md](./BRIEF.md), read September 11, 2026.
-- [DESIGN.md](../../DESIGN.md), read September 11, 2026.
+- [DESIGN.md](../../../DESIGN.md), read September 11, 2026.
 
 ### Linear
 

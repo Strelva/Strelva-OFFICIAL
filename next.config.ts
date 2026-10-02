@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
     "/*": [
       "./custom-repo-starter/website-generation/renderer.mjs",
       "./custom-repo-starter/website-generation/capability-runtime.mjs",
+      "./src/products/websites/site-lead-runtime.mjs",
     ],
   },
   // The dev-tools badge defaults to bottom-left, where it sits on top of the

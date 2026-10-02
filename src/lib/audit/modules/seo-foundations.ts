@@ -69,7 +69,7 @@ function findBlockingRules(robotsTxt: string): {
   return { blocked, patterns };
 }
 
-export function checkSeoFoundations(ctx: AuditContext): CategoryResult {
+export function checkSeoFoundations(ctx: AuditContext, options: { htmlOnly?: boolean } = {}): CategoryResult {
   const { $, robotsTxt, sitemapXml } = ctx;
   const checks: CheckResult[] = [];
 
@@ -284,11 +284,12 @@ export function checkSeoFoundations(ctx: AuditContext): CategoryResult {
     [WEIGHTS.h1Single, checks[8]!.score],
     [WEIGHTS.serverRendered, checks[9]!.score],
   ];
-  const totalWeight = weighted.reduce((sum, [w]) => sum + w, 0);
+  const measured = options.htmlOnly ? weighted.slice(4) : weighted;
+  const totalWeight = measured.reduce((sum, [w]) => sum + w, 0);
   const score =
     totalWeight > 0
       ? Math.round(
-          weighted.reduce((sum, [w, s]) => sum + w * s, 0) / totalWeight
+          measured.reduce((sum, [w, s]) => sum + w * s, 0) / totalWeight
         )
       : averageCheckScores(checks.map((c) => c.score));
 
@@ -297,6 +298,6 @@ export function checkSeoFoundations(ctx: AuditContext): CategoryResult {
     slug: "seo",
     weight: 0, // runner overrides
     score,
-    checks,
+    checks: options.htmlOnly ? checks.slice(4) : checks,
   };
 }

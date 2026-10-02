@@ -14,7 +14,7 @@ marketing site in lockstep. Their `package.json` versions must always match.
 - Add configured subscription allowances, exact provider-cost receipts and customer exit with retained records and bounded export.
 - Verify exact client repository revisions before release compatibility checks.
 
-This is a draft release candidate. The [acceptance ledger](./docs/strelvav2-horizontal-acceptance.md)
+This is a draft release candidate. The [acceptance ledger](./docs/operations/strelvav2-horizontal-acceptance.md)
 records completed local proof and remaining integration work. Hosted migration,
 provider verification and production deployment remain separate release gates.
 

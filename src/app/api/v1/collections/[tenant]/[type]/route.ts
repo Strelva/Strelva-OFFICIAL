@@ -2,7 +2,7 @@
  * Strelva v1 public collections API — list.
  *
  * Stable contract consumed by custom-repo client sites (Collections CMS, see
- * docs/strelva-cms-scope.md). Returns PUBLISHED entries of a collection type for
+ * docs/capabilities/publishing/collections-cms.md). Returns PUBLISHED entries of a collection type for
  * a tenant. Change the shape only by versioning (add a v2 sibling).
  */
 import { NextResponse } from "next/server";

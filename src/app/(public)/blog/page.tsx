@@ -1,3 +1,4 @@
+import { hostedPageMetadata, renderHostedPage } from "@/products/websites/index";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getBlogPostsForSite } from "@/lib/cms/blog-public";
@@ -8,6 +9,8 @@ import { PageViewTracker } from "@/components/public/PageViewTracker";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
+  const hosted = await hostedPageMetadata("/blog");
+  if (hosted) return hosted;
   const tenant = await getTenantFromHeaders();
   const settings = await getContent("settings", tenant);
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
@@ -25,6 +28,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function BlogPage() {
+  const hosted = await renderHostedPage("/blog");
+  if (hosted) return hosted;
   const tenant = await getTenantFromHeaders();
   const preview = await isPreviewMode();
   // In preview mode, show all posts including drafts; in production, only published

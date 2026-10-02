@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { ArrowRight, FileText, Globe2, X } from "lucide-react";
 import { AtmosphericCard } from "@/components/ui/atmosphere/AtmosphericCard";
 import { AtmosphericCardHeader, AtmosphericCardDetail, AtmosphericCardFooter } from "@/components/ui/atmosphere/AtmosphericCardParts";
@@ -42,9 +43,9 @@ export function ComponentReference({ initialTheme }: { initialTheme: "light" | "
   return <main className={styles.page} data-dashboard={theme === "dark" ? "" : undefined} data-theme={theme}>
     <a href="#component-examples" className={styles.skip}>Skip to components</a>
     <header className={styles.header}>
-      <a href="/preview/strelva?scenario=free" className={styles.brand}><LogoMark className={styles.mark} /><span className="font-display">Strelva</span></a>
+      <Link href="/preview/strelva?scenario=free" className={styles.brand}><LogoMark className={styles.mark} /><span className="font-display">Strelva</span></Link>
       <span className={styles.previewLabel}>Local component study</span>
-      <a href="/preview/strelva/colors">Color reference <ArrowRight size={16} /></a>
+      <Link href="/preview/strelva/colors">Color reference <ArrowRight size={16} /></Link>
     </header>
     <div className={styles.intro}>
       <p className={styles.eyebrow}>Material, light, and useful detail</p>

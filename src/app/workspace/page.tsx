@@ -23,5 +23,5 @@ export default function WorkspacePage() {
   );
   // Public shell contains no private data. Each API request validates the session.
   // Keeping the shell accessible lets it preserve recipient-bound fragments across sign-in.
-  return <WorkspaceApp />;
+  return <WorkspaceApp rebuildEnabled={process.env.STRELVA_WEBSITE_REBUILD_RELEASE === "1"} />;
 }

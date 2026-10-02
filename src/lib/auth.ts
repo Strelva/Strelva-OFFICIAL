@@ -19,7 +19,7 @@ import {
 // Request-context auth runs against Supabase + the memberships/super_admins/
 // invites tables. Invariants enforced: the verified-email gate (an unconfirmed
 // email never grants a role or super-admin) + the last-owner guard.
-// See docs/auth-tenancy-architecture.md + docs/supabase-migration-plan.md.
+// See docs/architecture/auth-tenancy.md + docs/archive/supabase-migration-plan.md.
 // ---------------------------------------------------------------------------
 
 /** Supabase Auth user shape we rely on (subset of @supabase/supabase-js User). */

@@ -363,3 +363,21 @@
     transition: none;
   }
 }
+
+.pinned svg {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.allApps {
+  color: var(--gray-muted);
+}
+
+.allApps svg {
+  flex-shrink: 0;
+}
+
+.recent .allApps[aria-current="page"] {
+  background: var(--gray-bg-hover);
+  color: var(--gray-fg);
+}

@@ -1,3 +1,4 @@
+import { runWebsiteMonthlyReports } from "@/products/websites/index";
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/heartbeat";
 import { mapPool } from "@/lib/concurrency";
@@ -55,12 +56,14 @@ export async function GET(request: Request) {
   const monthKey = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
   const monthName = prev.toLocaleDateString("en-US", { month: "long" });
 
+  const hostedReports = await runWebsiteMonthlyReports(monthKey).catch(() => ({ tenants: [] as string[], sent: 0, suppressed: 0, errors: ["Native website monthly reporting is unavailable"] }));
+  const hostedTenants = new Set(hostedReports.tenants);
   const tenants = (await getAllTenants().catch(() => [])).filter(
-    (t) => t.active !== false && t.subscriptionStatus !== "cancelled" && !!t.ownerEmail,
+    (t) => !hostedTenants.has(t.id) && t.active !== false && t.subscriptionStatus !== "cancelled" && !!t.ownerEmail,
   );
 
   const sent: string[] = [];
-  const errors: string[] = [];
+  const errors: string[] = [...hostedReports.errors];
   const skipped: { tenantId: string; reason: string }[] = [];
   const redis = getRedis();
 
@@ -147,5 +150,5 @@ export async function GET(request: Request) {
     }).catch(() => {});
   }
 
-  return NextResponse.json({ status: "complete", month: monthKey, sent: sent.length, skipped: skipped.length, errors });
+  return NextResponse.json({ status: "complete", month: monthKey, sent: sent.length + hostedReports.sent, hostedSuppressed: hostedReports.suppressed, skipped: skipped.length, errors });
 }

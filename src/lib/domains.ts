@@ -205,12 +205,29 @@ export async function clearTenantDomainClaims(
   }
 }
 
-async function addDomainToVercel(domain: string): Promise<Partial<DomainClaim>> {
+async function addDomainToVercel(domain: string, reconcileBeforeWrite = false, beforeWrite?: () => Promise<void>): Promise<Partial<DomainClaim>> {
   const projectId = getVercelProjectId();
   if (!hasVercelDomainApi() || !projectId) {
     return { status: "pending", dnsStatus: "unknown", sslStatus: "unknown" };
   }
 
+  if (reconcileBeforeWrite) {
+    // An accepted registration can outlive a failed local claim write. Resolve
+    // the provider's current project binding before issuing another POST.
+    const existing = await fetch(`https://api.vercel.com/v9/projects/${encodeURIComponent(projectId)}/domains/${encodeURIComponent(domain)}${getVercelTeamQuery()}`, {
+      headers: { Authorization: `Bearer ${process.env.VERCEL_API_TOKEN}` },
+      cache: "no-store", redirect: "error", signal: AbortSignal.timeout(10000),
+    });
+    if (existing.ok) {
+      const data = await existing.json() as VercelDomainResponse;
+      if (data.name !== domain || typeof data.verified !== "boolean") throw new Error("The hosting provider's domain binding could not be confirmed.");
+      return { registrationAttempt:"confirmed", vercelProjectId: projectId, status: data.verified ? "verified" : "pending", dnsStatus: data.verified ? "configured" : "unknown", sslStatus: data.verified ? "issued" : "pending", verification: data.verification?.map(item => [item.type,item.domain,item.value || item.reason].filter(Boolean).join(" ")) };
+    }
+    // Unavailability is not proof that the previous registration was rejected.
+    if (existing.status !== 404) throw new Error("The hosting provider's domain binding could not be checked. Reopen its status before retrying.");
+  }
+
+  await beforeWrite?.();
   const response = await fetch(
     `https://api.vercel.com/v10/projects/${encodeURIComponent(projectId)}/domains${getVercelTeamQuery()}`,
     {
@@ -220,6 +237,7 @@ async function addDomainToVercel(domain: string): Promise<Partial<DomainClaim>> 
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ name: domain }),
+      ...(reconcileBeforeWrite ? { redirect: "error" as const, signal: AbortSignal.timeout(10000) } : {}),
     }
   );
   const data = (await response.json().catch(() => ({}))) as VercelDomainResponse;
@@ -229,11 +247,13 @@ async function addDomainToVercel(domain: string): Promise<Partial<DomainClaim>> 
       status: "error",
       dnsStatus: "unknown",
       sslStatus: "error",
+      ...(reconcileBeforeWrite ? { registrationAttempt: response.status >= 400 && response.status < 500 && ![408,429].includes(response.status) ? "rejected" as const : "unknown" as const } : {}),
       error: data.error?.message || "Vercel domain registration failed",
     };
   }
 
   return {
+    ...(reconcileBeforeWrite ? { registrationAttempt: response.status === 409 ? "unknown" as const : "confirmed" as const } : {}),
     vercelProjectId: projectId,
     status: data.verified ? "verified" : "pending",
     dnsStatus: data.verified ? "configured" : "unknown",
@@ -340,7 +360,8 @@ export async function listTenantDomainClaims(tenantId: string): Promise<DomainCl
 export async function addCustomDomain(
   tenantId: string,
   domain: string,
-  role: DomainClaimRole = "additional"
+  role: DomainClaimRole = "additional",
+  options: { reconcileProviderBeforeWrite?: boolean; authorizeWrite?: () => Promise<void> } = {}
 ): Promise<DomainResult> {
   const normalized = normalizeCustomDomain(domain);
   if (!normalized || !isValidDomain(normalized)) {
@@ -354,7 +375,9 @@ export async function addCustomDomain(
   if (!tenant) return { ok: false, status: 404, error: "Tenant not found" };
 
   const current = tenant.customDomains ?? [];
-  if (current.some((item) => claimKey(normalizeCustomDomain(item) ?? item) === claimKey(normalized))) {
+  const prior = tenant.domainClaims?.find(claim => claimKey(claim.domain) === claimKey(normalized));
+  const retryable = options.reconcileProviderBeforeWrite === true && (prior?.registrationAttempt === "not_submitted" || prior?.registrationAttempt === "rejected");
+  if (!retryable && current.some((item) => claimKey(normalizeCustomDomain(item) ?? item) === claimKey(normalized))) {
     return { ok: false, status: 409, error: "Domain already connected" };
   }
 
@@ -364,7 +387,22 @@ export async function addCustomDomain(
   }
 
   const createdAt = nowIso();
-  const vercelState = await addDomainToVercel(normalized);
+  const nextDomains = [...new Set([...current, normalized])];
+  const vercelState = await addDomainToVercel(normalized,options.reconcileProviderBeforeWrite === true,options.reconcileProviderBeforeWrite ? async () => {
+    // A saved intent is retryable until the submission boundary is durably
+    // unknown. Once unknown, a lost response or revoked owner cannot cause a
+    // second POST; only provider confirmation or a definite rejection resolves it.
+    const pending: DomainClaim = { domain:normalized,tenantId,role,status:"pending",dnsStatus:"unknown",sslStatus:"pending",createdAt,updatedAt:createdAt,registrationAttempt:"not_submitted" };
+    await options.authorizeWrite?.();
+    const saved = await updateTenant(tenantId,{ customDomains:nextDomains,domainClaims:mergeClaims(tenant.domainClaims,pending) });
+    if (!saved) throw new Error("The domain registration intent could not be saved.");
+    await options.authorizeWrite?.();
+    const unknown = { ...pending, registrationAttempt:"unknown" as const };
+    const bounded = await updateTenant(tenantId,{ domainClaims:mergeClaims(saved.domainClaims,unknown) });
+    if (!bounded) throw new Error("The domain submission boundary could not be saved.");
+    await saveRedisClaim(unknown); invalidateDomainMapCache();
+    await options.authorizeWrite?.();
+  } : undefined);
   const claim: DomainClaim = {
     domain: normalized,
     tenantId,
@@ -376,10 +414,11 @@ export async function addCustomDomain(
     updatedAt: createdAt,
     verification: vercelState.verification,
     vercelProjectId: vercelState.vercelProjectId,
+    ...(vercelState.registrationAttempt ? { registrationAttempt:vercelState.registrationAttempt } : {}),
     error: vercelState.error,
   };
 
-  const nextDomains = [...current, normalized];
+  await options.authorizeWrite?.();
   const updated = await updateTenant(tenantId, {
     customDomains: nextDomains,
     domainClaims: mergeClaims(tenant.domainClaims, claim),
@@ -391,7 +430,7 @@ export async function addCustomDomain(
   return { ok: true, tenant: updated, claim };
 }
 
-export async function refreshDomainClaim(tenantId: string, domain: string): Promise<DomainResult> {
+export async function refreshDomainClaim(tenantId: string, domain: string, options: { authorizeWrite?: () => Promise<void> } = {}): Promise<DomainResult> {
   const normalized = normalizeCustomDomain(domain);
   if (!normalized) return { ok: false, status: 400, error: "Invalid domain format" };
 
@@ -410,9 +449,11 @@ export async function refreshDomainClaim(tenantId: string, domain: string): Prom
   const claim: DomainClaim = {
     ...existing,
     ...inspection,
+    ...(existing.registrationAttempt && inspection.status && !["error","conflict"].includes(inspection.status) ? { registrationAttempt:"confirmed" as const } : {}),
     updatedAt: nowIso(),
   };
 
+  await options.authorizeWrite?.();
   const updated = await updateTenant(tenantId, { domainClaims: mergeClaims(tenant.domainClaims, claim) });
   if (!updated) return { ok: false, status: 404, error: "Tenant not found" };
 

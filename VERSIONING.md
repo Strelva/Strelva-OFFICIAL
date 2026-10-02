@@ -36,6 +36,14 @@ Strelva as one product.
 
 Do not use the retired `reb-vYYYY.MM.DD.N` tag format for new releases.
 
+Strelva has two channels. **Stable** is what customers use, simply called
+Strelva, and gets `strelva-v<version>` tags. **Preview** is Strelva Preview,
+for Jacob and selected testers. It is built every night from the next
+release's branch, and green builds get a SemVer prerelease tag such as
+`strelva-v1.0.0-preview.20261003`. The
+[Strelva Preview](./.github/workflows/preview-nightly.yml) workflow creates
+them. Preview tags are not releases and never deploy to Stable.
+
 ## Separate version domains
 
 The product version does not replace the public storefront API contract version.

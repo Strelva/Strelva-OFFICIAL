@@ -1,0 +1,554 @@
+{
+  "scope": "html",
+  "before": {
+    "categories": [
+      {
+        "name": "AI Readability",
+        "slug": "ai-readability",
+        "score": 39,
+        "checks": [
+          {
+            "name": "Structured data present",
+            "status": "pass",
+            "score": 100,
+            "message": "Found 2 schema type(s) AI tools can read."
+          },
+          {
+            "name": "Business schema valid",
+            "status": "warn",
+            "score": 50,
+            "message": "Found LegalService schema, but it has no specific rich-result requirements to check."
+          },
+          {
+            "name": "AI-answer content (FAQ/HowTo)",
+            "status": "fail",
+            "score": 0,
+            "message": "No FAQ or how-to content. AI assistants answer common questions about your business with competitor info instead of yours."
+          },
+          {
+            "name": "Entity authority (sameAs)",
+            "status": "fail",
+            "score": 0,
+            "message": "No verified social or authority profiles linked. AI tools have nothing to cross-check, so they trust you less."
+          },
+          {
+            "name": "Plain-text readable by AI",
+            "status": "pass",
+            "score": 100,
+            "message": "Your content is in plain HTML (254 words) that AI tools can read directly."
+          },
+          {
+            "name": "Single clear business name",
+            "status": "pass",
+            "score": 100,
+            "message": "Your business name is used consistently, so AI tools can identify you clearly."
+          }
+        ]
+      },
+      {
+        "name": "SEO Foundations",
+        "slug": "seo",
+        "score": 100,
+        "checks": [
+          {
+            "name": "Canonical tag",
+            "status": "pass",
+            "score": 100,
+            "message": "A canonical tag is set."
+          },
+          {
+            "name": "Title tag",
+            "status": "pass",
+            "score": 100,
+            "message": "The page title is present and a good length (47 characters)."
+          },
+          {
+            "name": "Meta description",
+            "status": "pass",
+            "score": 100,
+            "message": "A meta description is present."
+          },
+          {
+            "name": "H1 heading",
+            "status": "pass",
+            "score": 100,
+            "message": "The page has an H1 heading."
+          },
+          {
+            "name": "Single H1",
+            "status": "pass",
+            "score": 100,
+            "message": "The page uses a single H1 heading."
+          },
+          {
+            "name": "Server-rendered content",
+            "status": "pass",
+            "score": 100,
+            "message": "Your content is readable right in the page, the way search engines prefer."
+          }
+        ]
+      },
+      {
+        "name": "Accessibility",
+        "slug": "a11y",
+        "score": 100,
+        "checks": [
+          {
+            "name": "Document Language",
+            "status": "pass",
+            "score": 100,
+            "message": "The page declares its language (en)."
+          },
+          {
+            "name": "Page Title",
+            "status": "pass",
+            "score": 100,
+            "message": "The page has a descriptive title."
+          },
+          {
+            "name": "Image Alt Text",
+            "status": "pass",
+            "score": 100,
+            "message": "All 3 image(s) have meaningful alt text."
+          },
+          {
+            "name": "Link Text",
+            "status": "pass",
+            "score": 100,
+            "message": "Links use descriptive text."
+          },
+          {
+            "name": "Form Labels",
+            "status": "pass",
+            "score": 100,
+            "message": "No form fields found on the page."
+          },
+          {
+            "name": "Heading Structure",
+            "status": "pass",
+            "score": 100,
+            "message": "Headings follow a single, sequential structure."
+          },
+          {
+            "name": "Landmark Regions",
+            "status": "pass",
+            "score": 100,
+            "message": "The page uses a main landmark for navigation."
+          },
+          {
+            "name": "Skip Navigation Link",
+            "status": "pass",
+            "score": 100,
+            "message": "The page has a skip-to-content link."
+          },
+          {
+            "name": "Button and Control Names",
+            "status": "pass",
+            "score": 100,
+            "message": "Buttons and icon controls have accessible names."
+          },
+          {
+            "name": "Iframe Titles",
+            "status": "pass",
+            "score": 100,
+            "message": "No iframes found on the page."
+          },
+          {
+            "name": "ARIA Roles",
+            "status": "pass",
+            "score": 100,
+            "message": "ARIA roles are valid."
+          },
+          {
+            "name": "Table Headers",
+            "status": "pass",
+            "score": 100,
+            "message": "No data tables found on the page."
+          }
+        ]
+      },
+      {
+        "name": "Trust Signals",
+        "slug": "trust",
+        "score": 44,
+        "checks": [
+          {
+            "name": "Secure connection (HTTPS)",
+            "status": "pass",
+            "score": 100,
+            "message": "Your site loads over HTTPS, which visitors and search engines trust."
+          },
+          {
+            "name": "Contact info visible",
+            "status": "pass",
+            "score": 100,
+            "message": "Visitors can clearly see how and where to reach you."
+          },
+          {
+            "name": "Click-to-call",
+            "status": "pass",
+            "score": 100,
+            "message": "Your phone number is a tap-to-call link, which is easy for mobile visitors."
+          },
+          {
+            "name": "Trust badges & credentials",
+            "status": "fail",
+            "score": 0,
+            "message": "Your site shows little proof of credibility (licensing, insurance, certifications, awards, or guarantees)."
+          },
+          {
+            "name": "Customer testimonials",
+            "status": "fail",
+            "score": 0,
+            "message": "No customer testimonials or reviews are shown. Social proof is one of the strongest trust signals."
+          },
+          {
+            "name": "Privacy & terms pages",
+            "status": "pass",
+            "score": 100,
+            "message": "Your site links to its legal pages, which signals a legitimate business."
+          },
+          {
+            "name": "Team transparency",
+            "status": "pass",
+            "score": 100,
+            "message": "Your site links to a team or about page, which puts a face to the business."
+          }
+        ]
+      },
+      {
+        "name": "Content Quality",
+        "slug": "content",
+        "score": 61,
+        "checks": [
+          {
+            "name": "Enough content",
+            "status": "fail",
+            "score": 40,
+            "message": "Thin content (160 words). Aim for at least 300 words."
+          },
+          {
+            "name": "Heading structure",
+            "status": "pass",
+            "score": 100,
+            "message": "Clear heading structure with one main heading and supporting sub-headings."
+          },
+          {
+            "name": "Key pages linked",
+            "status": "warn",
+            "score": 50,
+            "message": "Missing links to: Services, Blog."
+          },
+          {
+            "name": "Readability",
+            "status": "warn",
+            "score": 50,
+            "message": "Reading level is fairly advanced (grade 12). Simpler wording is easier for more visitors to follow."
+          },
+          {
+            "name": "Internal links",
+            "status": "pass",
+            "score": 100,
+            "message": "Strong internal linking (22 links)."
+          },
+          {
+            "name": "Image alt coverage",
+            "status": "fail",
+            "score": 30,
+            "message": "2 of 3 image(s) missing alt text."
+          },
+          {
+            "name": "Organized with lists",
+            "status": "warn",
+            "score": 60,
+            "message": "One list found. Lists help break up dense content and make it easy to scan."
+          },
+          {
+            "name": "Clear calls to action",
+            "status": "pass",
+            "score": 100,
+            "message": "Clear calls to action present (2 found)."
+          }
+        ]
+      }
+    ]
+  },
+  "after": {
+    "categories": [
+      {
+        "name": "AI Readability",
+        "slug": "ai-readability",
+        "score": 58,
+        "checks": [
+          {
+            "name": "Structured data present",
+            "status": "pass",
+            "score": 100,
+            "message": "Found 2 schema type(s) AI tools can read."
+          },
+          {
+            "name": "Business schema valid",
+            "status": "warn",
+            "score": 50,
+            "message": "Found LegalService schema, but it has no specific rich-result requirements to check."
+          },
+          {
+            "name": "AI-answer content (FAQ/HowTo)",
+            "status": "pass",
+            "score": 80,
+            "message": "You publish content AI assistants quote directly: FAQ (2 Q&As)."
+          },
+          {
+            "name": "Entity authority (sameAs)",
+            "status": "fail",
+            "score": 0,
+            "message": "No verified social or authority profiles linked. AI tools have nothing to cross-check, so they trust you less."
+          },
+          {
+            "name": "Plain-text readable by AI",
+            "status": "pass",
+            "score": 100,
+            "message": "Your content is in plain HTML (243 words) that AI tools can read directly."
+          },
+          {
+            "name": "Single clear business name",
+            "status": "pass",
+            "score": 100,
+            "message": "Your business name is used consistently, so AI tools can identify you clearly."
+          }
+        ]
+      },
+      {
+        "name": "SEO Foundations",
+        "slug": "seo",
+        "score": 100,
+        "checks": [
+          {
+            "name": "Canonical tag",
+            "status": "pass",
+            "score": 100,
+            "message": "A canonical tag is set."
+          },
+          {
+            "name": "Title tag",
+            "status": "pass",
+            "score": 100,
+            "message": "The page title is present and a good length (47 characters)."
+          },
+          {
+            "name": "Meta description",
+            "status": "pass",
+            "score": 100,
+            "message": "A meta description is present."
+          },
+          {
+            "name": "H1 heading",
+            "status": "pass",
+            "score": 100,
+            "message": "The page has an H1 heading."
+          },
+          {
+            "name": "Single H1",
+            "status": "pass",
+            "score": 100,
+            "message": "The page uses a single H1 heading."
+          },
+          {
+            "name": "Server-rendered content",
+            "status": "pass",
+            "score": 100,
+            "message": "Your content is readable right in the page, the way search engines prefer."
+          }
+        ]
+      },
+      {
+        "name": "Accessibility",
+        "slug": "a11y",
+        "score": 100,
+        "checks": [
+          {
+            "name": "Document Language",
+            "status": "pass",
+            "score": 100,
+            "message": "The page declares its language (en)."
+          },
+          {
+            "name": "Page Title",
+            "status": "pass",
+            "score": 100,
+            "message": "The page has a descriptive title."
+          },
+          {
+            "name": "Image Alt Text",
+            "status": "pass",
+            "score": 100,
+            "message": "No images found on the page."
+          },
+          {
+            "name": "Link Text",
+            "status": "pass",
+            "score": 100,
+            "message": "Links use descriptive text."
+          },
+          {
+            "name": "Form Labels",
+            "status": "pass",
+            "score": 100,
+            "message": "No form fields found on the page."
+          },
+          {
+            "name": "Heading Structure",
+            "status": "pass",
+            "score": 100,
+            "message": "Headings follow a single, sequential structure."
+          },
+          {
+            "name": "Landmark Regions",
+            "status": "pass",
+            "score": 100,
+            "message": "The page uses a main landmark for navigation."
+          },
+          {
+            "name": "Skip Navigation Link",
+            "status": "pass",
+            "score": 100,
+            "message": "The page has a skip-to-content link."
+          },
+          {
+            "name": "Button and Control Names",
+            "status": "pass",
+            "score": 100,
+            "message": "Buttons and icon controls have accessible names."
+          },
+          {
+            "name": "Iframe Titles",
+            "status": "pass",
+            "score": 100,
+            "message": "No iframes found on the page."
+          },
+          {
+            "name": "ARIA Roles",
+            "status": "pass",
+            "score": 100,
+            "message": "ARIA roles are valid."
+          },
+          {
+            "name": "Table Headers",
+            "status": "pass",
+            "score": 100,
+            "message": "No data tables found on the page."
+          }
+        ]
+      },
+      {
+        "name": "Trust Signals",
+        "slug": "trust",
+        "score": 44,
+        "checks": [
+          {
+            "name": "Secure connection (HTTPS)",
+            "status": "pass",
+            "score": 100,
+            "message": "Your site loads over HTTPS, which visitors and search engines trust."
+          },
+          {
+            "name": "Contact info visible",
+            "status": "pass",
+            "score": 100,
+            "message": "Visitors can clearly see how and where to reach you."
+          },
+          {
+            "name": "Click-to-call",
+            "status": "pass",
+            "score": 100,
+            "message": "Your phone number is a tap-to-call link, which is easy for mobile visitors."
+          },
+          {
+            "name": "Trust badges & credentials",
+            "status": "fail",
+            "score": 0,
+            "message": "Your site shows little proof of credibility (licensing, insurance, certifications, awards, or guarantees)."
+          },
+          {
+            "name": "Customer testimonials",
+            "status": "fail",
+            "score": 0,
+            "message": "No customer testimonials or reviews are shown. Social proof is one of the strongest trust signals."
+          },
+          {
+            "name": "Privacy & terms pages",
+            "status": "pass",
+            "score": 100,
+            "message": "Your site links to its legal pages, which signals a legitimate business."
+          },
+          {
+            "name": "Team transparency",
+            "status": "pass",
+            "score": 100,
+            "message": "Your site links to a team or about page, which puts a face to the business."
+          }
+        ]
+      },
+      {
+        "name": "Content Quality",
+        "slug": "content",
+        "score": 63,
+        "checks": [
+          {
+            "name": "Enough content",
+            "status": "fail",
+            "score": 40,
+            "message": "Thin content (232 words). Aim for at least 300 words."
+          },
+          {
+            "name": "Heading structure",
+            "status": "pass",
+            "score": 100,
+            "message": "Clear heading structure with one main heading and supporting sub-headings."
+          },
+          {
+            "name": "Key pages linked",
+            "status": "warn",
+            "score": 50,
+            "message": "Missing links to: Services, Blog."
+          },
+          {
+            "name": "Readability",
+            "status": "warn",
+            "score": 50,
+            "message": "Reading level is fairly advanced (grade 11). Simpler wording is easier for more visitors to follow."
+          },
+          {
+            "name": "Internal links",
+            "status": "pass",
+            "score": 100,
+            "message": "Strong internal linking (18 links)."
+          },
+          {
+            "name": "Image alt coverage",
+            "status": "warn",
+            "score": 50,
+            "message": "No images found on the page."
+          },
+          {
+            "name": "Organized with lists",
+            "status": "warn",
+            "score": 60,
+            "message": "One list found. Lists help break up dense content and make it easy to scan."
+          },
+          {
+            "name": "Clear calls to action",
+            "status": "pass",
+            "score": 100,
+            "message": "Clear calls to action present (2 found)."
+          }
+        ]
+      }
+    ]
+  },
+  "checkedAt": "2026-10-01T20:43:49.819Z",
+  "unavailable": [
+    "Performance, real traffic and AI assistant mentions were not measured.",
+    "HTML-only runtime checks do not fetch or verify robots.txt, sitemaps, DNS or security response headers."
+  ]
+}

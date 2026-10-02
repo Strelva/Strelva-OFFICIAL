@@ -1,9 +1,9 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { ArrowRight, Bell, FileText, Globe2, LayoutGrid, Plus } from "lucide-react";
+import { ArrowRight, Bell, CheckCircle2, FileText, LayoutGrid, ListChecks, Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { StrelvaShell, type StrelvaSection } from "@/experience/app-frame/StrelvaShell";
+import { StrelvaShell, pinnedApps, pinnedWebsites, type StrelvaSection } from "@/experience/app-frame/StrelvaShell";
 import type { OfferingWebsiteBinding, OfferingWebsiteBindingCommand } from "@/platform/offerings";
 import type { WorkspaceSnapshot } from "./contracts";
 import type { ManagedWorkSummary } from "./workspace-discovery";
@@ -14,13 +14,13 @@ import { WorkspaceComposer } from "./WorkspaceComposer";
 import { requestDraftKey } from "./request-draft";
 import { useBusinessDeliveries } from "./useBusinessDeliveries";
 import { workspaceHome } from "./workspace-home";
+import { businessRequestRows, deliveryProviderName, type BusinessRequestRow } from "./WorkspaceRequests";
 import { workspaceWorkLabel } from "./work-label";
 import styles from "./business-home.module.css";
 
 interface Props {
   appBase?: string;
   accountHref: string;
-  onExplore: () => void;
   onOfferings: (id?: string) => void;
   managedWorkUnavailable?: boolean;
   snapshot: WorkspaceSnapshot;
@@ -35,19 +35,16 @@ interface Props {
   onCreateWebsite?: () => void;
   onRequest?: (request: string) => void;
   onDraftChange?: (request: string) => void;
-  onWork: () => void;
-  onOngoing: () => void;
-  onAccess: () => void;
-  onSettings: () => void;
+  /** Opens any workspace place or business-menu section. */
+  onNavigate: (section: StrelvaSection) => void;
   onWorkspace: (id: string) => void;
-  onHelp: () => void;
   signOut?: ReactNode;
   onWebsiteCommand?: (command: OfferingWebsiteBindingCommand) => Promise<OfferingWebsiteBinding | null>;
   onRetryWebsiteAssignments?: () => void;
 }
 
 /** The start and return surface, using the same frame as every saved result. */
-export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignmentsKnown, offerings, busy, notice, onOpen, onStart, onCreateWebsite, onRequest, onDraftChange, onWork, onOngoing, onAccess, onSettings, onWorkspace, onHelp, onExplore, onOfferings, appBase = "", accountHref, signOut, managedWorkUnavailable, onWebsiteCommand, onRetryWebsiteAssignments }: Props) {
+export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignmentsKnown, offerings, busy, notice, onOpen, onStart, onCreateWebsite, onRequest, onDraftChange, onNavigate, onWorkspace, onOfferings, appBase = "", accountHref, signOut, managedWorkUnavailable, onWebsiteCommand, onRetryWebsiteAssignments }: Props) {
   const current = snapshot.workspaces.find(space => space.id === snapshot.workspaceId);
   const readOnly = current?.access === "delegated_read";
   const name = current?.name || "Your business";
@@ -58,34 +55,35 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   const deliveryAttention = deliveryItems.filter(item => item.attention);
   const attentionCount = home.attention.length + deliveryAttention.length;
   const savedResultCount = home.results.length;
-  const availableWorkCount = savedResultCount + sites.length;
+  const agencyNames = new Map(snapshot.workspaces.filter(space => space.kind === "agency").map(space => [space.id, space.name]));
+  const requestRows = businessRequestRows(deliveryItems, snapshot.work, item => deliveryProviderName(item, agencyNames));
+  const handled = requestRows.filter(row => row.stage === "done").slice(0, 5);
+  const inProgress = requestRows.filter(row => row.stage === "in_progress" || row.stage === "asked");
+  /** Requests belong to a business. Personal workspaces only see these lists when something is in them. */
+  const showRequests = current?.kind === "customer" || requestRows.length > 0;
   const deliveryPending = deliveries.state.status === "loading";
   const deliveryUnavailable = deliveries.state.status === "error";
   const workHref = (id: string) => `${appBase}/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&work=${encodeURIComponent(id)}`;
   const searchItems: WorkspaceSearchItem[] = [
     { id: "action-new", title: "Start with an outcome", detail: "Tell Strelva what you want to make happen", href: `${appBase}/workspace?view=start&workspaceId=${encodeURIComponent(snapshot.workspaceId)}`, onOpen: onStart },
-    { id: "action-explore", title: "Browse examples", detail: "Apps and templates you can adapt", href: `${appBase}/workspace?view=products&workspaceId=${encodeURIComponent(snapshot.workspaceId)}`, onOpen: onExplore },
+    { id: "action-explore", title: "Get or build an app", detail: "Apps and templates you can adapt", href: `${appBase}/workspace?view=products&workspaceId=${encodeURIComponent(snapshot.workspaceId)}`, onOpen: () => onNavigate("products") },
     ...snapshot.work.map(work => ({ id: work.id, title: work.title, detail: workspaceWorkLabel(work), href: workHref(work.id), onOpen: () => onOpen(work.id) })),
     ...sites.map(site => ({ id: `site-${site.id}`, title: site.title, detail: "Managed website", href: site.href })),
     ...deliveryItems.map(item => ({ id: `delivery-${item.id}`, title: item.title, detail: item.detail, href: item.href })),
   ];
   const recentWork = home.results.map(work => ({ id: work.id, title: work.title, detail: workspaceWorkLabel(work), href: workHref(work.id), onOpen: () => onOpen(work.id) }));
 
+  function requestRow(row: BusinessRequestRow) {
+    const body = <><span><strong>{row.title}</strong><small>{row.detail}</small></span><ArrowRight size={16} aria-hidden="true" /></>;
+    return <li key={row.id}>{row.href ? <a className={styles.row} href={row.href}>{body}</a> : <button type="button" aria-label={`Open ${row.title}`} className={styles.row} onClick={() => row.workId && onOpen(row.workId)}>{body}</button>}</li>;
+  }
+
   function request(value: string) {
     if (readOnly || busy) return;
     if (onRequest) onRequest(value);
     else onStart();
   }
-  function navigate(section: StrelvaSection) {
-    if (section === "work") onWork();
-    if (section === "ongoing") onOngoing();
-    if (section === "access") onAccess();
-    if (section === "settings") onSettings();
-    if (section === "products") onExplore();
-    if (section === "help") onHelp();
-  }
-
-  return <StrelvaShell active="home" title={name} appBase={appBase} workspaceId={snapshot.workspaceId} accountName={snapshot.actor.email.split("@")[0] || "Your account"} accountDetail={snapshot.actor.email} signOut={signOut} onNavigate={navigate} onAccess={onAccess} onStart={onStart} startDisabled={readOnly || busy} searchItems={searchItems} searchScopeName={name} recentWork={recentWork} notice={notice} contentId="business-home-main"
+  return <StrelvaShell active="home" title={name} appBase={appBase} workspaceId={snapshot.workspaceId} accountName={snapshot.actor.email.split("@")[0] || "Your account"} accountDetail={snapshot.actor.email} signOut={signOut} onNavigate={onNavigate} onStart={onStart} startDisabled={readOnly || busy} searchItems={searchItems} searchScopeName={name} recentWork={recentWork} pinned={[...pinnedWebsites(sites), ...pinnedApps(snapshot.work, workHref, onOpen)]} notice={notice} contentId="business-home-main"
     businessContext={<label><span className={styles.srOnly}>Current workspace</span><select aria-label="Current workspace" value={snapshot.workspaceId} disabled={busy} onChange={event => onWorkspace(event.target.value)}>{snapshot.workspaces.map(workspace => <option key={workspace.id} value={workspace.id}>{workspace.name}{workspace.access === "delegated_read" ? " · Read-only" : ""}</option>)}</select></label>}>
     <div className={styles.home} aria-busy={busy || undefined}>
       <section className={styles.start} aria-labelledby="business-start-title">
@@ -95,7 +93,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
           <p>{readOnly ? `Only ${name} owners can make changes.` : "Start with the outcome. You do not need to pick a feature first."}</p>
         </header>
         {!readOnly ? <>
-          <WorkspaceComposer key={`${snapshot.actor.email}:${snapshot.workspaceId}`} draftKey={requestDraftKey({ actorEmail: snapshot.actor.email, workspaceId: snapshot.workspaceId })} disabled={busy} onSubmit={request} onEdited={onDraftChange} onTemplates={onExplore} placeholder="What do you want Strelva to make happen?" />
+          <WorkspaceComposer key={`${snapshot.actor.email}:${snapshot.workspaceId}`} draftKey={requestDraftKey({ actorEmail: snapshot.actor.email, workspaceId: snapshot.workspaceId })} disabled={busy} onSubmit={request} onEdited={onDraftChange} onTemplates={() => onNavigate("products")} placeholder="What do you want Strelva to make happen?" />
           <div className={styles.contextLine} aria-label="Current Strelva context">
             <span>Working in <strong>{name}</strong></span>
             {savedResultCount ? <span>{savedResultCount} saved {savedResultCount === 1 ? "result" : "results"}</span> : null}
@@ -120,20 +118,27 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
         {deliveryUnavailable ? <p role="status" className={styles.notice}>Delivery decisions could not be checked. <button type="button" onClick={deliveries.refresh}>Check again</button></p> : null}
       </section>
 
-      <section className={styles.section} aria-labelledby="home-work">
-        <header className={styles.sectionHeader}><h2 id="home-work">Continue</h2><Button variant="ghost" size="sm" onClick={onWork}>View all{availableWorkCount ? ` (${availableWorkCount})` : ""}<ArrowRight size={16} aria-hidden="true" /></Button></header>
-        {busy ? <p role="status" className={styles.muted}>Loading saved work…</p> : sites.length || home.results.length ? <ul className={styles.list}>
-          {sites.map(site => <li key={`site-${site.id}`}><a href={site.href} className={styles.row}><Globe2 size={18} aria-hidden="true" /><span><strong>{site.title}</strong><small>Managed website</small></span><ArrowRight size={16} aria-hidden="true" /></a></li>)}
+      {showRequests ? <><section className={styles.section} aria-labelledby="home-handled">
+        <header className={styles.sectionHeader}><h2 id="home-handled"><CheckCircle2 size={18} aria-hidden="true" />Strelva handled</h2></header>
+        {busy || deliveryPending ? <p role="status" className={styles.muted}>Checking what finished…</p> : handled.length ? <ul className={styles.list}>{handled.map(row => requestRow(row))}</ul> : <p className={styles.muted}>Nothing finished yet. When Strelva or your agency finishes something, it appears here with what changed.</p>}
+      </section>
+
+      <section className={styles.section} aria-labelledby="home-progress">
+        <header className={styles.sectionHeader}><h2 id="home-progress"><ListChecks size={18} aria-hidden="true" />In progress</h2><Button variant="ghost" size="sm" onClick={() => onNavigate("requests")}>All requests<ArrowRight size={16} aria-hidden="true" /></Button></header>
+        {busy || deliveryPending ? <p role="status" className={styles.muted}>Checking your requests…</p> : inProgress.length ? <ul className={styles.list}>{inProgress.slice(0, 5).map(row => requestRow(row))}</ul> : <p className={styles.muted}>{readOnly ? "No shared requests are in progress." : "Nothing is in progress. Ask Strelva above for something with an end, like a new page or an intake form."}</p>}
+      </section></> : null}
+
+      <section className={styles.section} aria-labelledby="home-recent">
+        <header className={styles.sectionHeader}><h2 id="home-recent">Recent</h2><Button variant="ghost" size="sm" onClick={() => onNavigate("apps")}>All apps and files{savedResultCount ? ` (${savedResultCount})` : ""}<ArrowRight size={16} aria-hidden="true" /></Button></header>
+        {busy ? <p role="status" className={styles.muted}>Loading saved work…</p> : home.results.length ? <ul className={styles.list}>
           {home.results.slice(0, 6).map(work => <li key={work.id}><button type="button" aria-label={`Open ${work.title}`} className={styles.row} onClick={() => onOpen(work.id)}>{work.productId === "applications" ? <LayoutGrid size={18} aria-hidden="true" /> : <FileText size={18} aria-hidden="true" />}<span><strong>{work.title}</strong><small>{workspaceWorkLabel(work)}</small></span><ArrowRight size={16} aria-hidden="true" /></button></li>)}
-        </ul> : <div className={styles.empty}><LayoutGrid size={24} aria-hidden="true" /><div><h3>{readOnly ? "Nothing has been shared here yet." : "No saved result yet."}</h3><p>{readOnly ? "Shared work will appear here." : "Describe the outcome above. Strelva will show you what it can create or handle."}</p></div>{!readOnly ? <Button variant="secondary" onClick={onExplore}><Plus size={16} aria-hidden="true" />Browse examples</Button> : null}</div>}
+        </ul> : <div className={styles.empty}><LayoutGrid size={24} aria-hidden="true" /><div><h3>{readOnly ? "Nothing has been shared here yet." : "No saved result yet."}</h3><p>{readOnly ? "Shared work will appear here." : "Describe the outcome above. Strelva will show you what it can create or handle."}</p></div>{!readOnly ? <Button variant="secondary" onClick={() => onNavigate("products")}><Plus size={16} aria-hidden="true" />Get or build an app</Button> : null}</div>}
         {!readOnly && onCreateWebsite ? <button type="button" className={styles.textAction} disabled={busy} onClick={onCreateWebsite}>Prefer to build a website yourself? Start a private draft.<ArrowRight size={16} aria-hidden="true" /></button> : null}
       </section>
 
-      {deliveryScope && deliveryItems.length ? <section className={styles.section} aria-labelledby="home-deliveries"><header className={styles.sectionHeader}><h2 id="home-deliveries">Strelva is handling</h2><a className={styles.textAction} href={`/workspace/delivery?businessId=${encodeURIComponent(deliveryScope)}`}>View all<ArrowRight size={16} /></a></header><ul className={styles.list}>{deliveryItems.slice(0, 5).map(item => <li key={item.id}><a className={styles.row} href={item.href}><span><strong>{item.title}</strong><small>{item.detail}</small></span><ArrowRight size={16} aria-hidden="true" /></a></li>)}</ul></section> : null}
-
       {unassignedSites.length ? <details className={styles.details} aria-label="Websites available to your account"><summary>Websites available to your account <span>{unassignedSites.length}</span></summary><p className={styles.muted}>{current?.kind !== "customer" ? "These websites are available through your account. Assign them from the appropriate customer business." : siteAssignmentsKnown ? "These websites are not yet assigned to this business." : "Business assignments could not be confirmed."}</p>{current?.kind !== "customer" ? <ul className={styles.list}>{unassignedSites.map(site => <li key={site.id}><a className={styles.row} href={site.href}><span><strong>{site.title}</strong><small>Account-authorized website</small></span><ArrowRight size={16} /></a></li>)}</ul> : <WebsiteAssignmentHandoff businessName={name} state={managedWorkUnavailable ? { status: "unavailable", reason: "Linked website access is unavailable right now." } : offerings} sites={unassignedSites} onRetry={onRetryWebsiteAssignments} onCommand={onWebsiteCommand} />}</details> : null}
 
-      <details className={styles.details} aria-label="Usage and connected services"><summary>Usage and connected services</summary><div className={styles.connections}>{current?.kind === "customer" && !readOnly ? <WorkspaceAllowanceSummary businessId={snapshot.workspaceId} enabled compact onOpenSettings={onSettings} /> : null}<BusinessOfferingSummary state={offerings} work={snapshot.work} onOpen={onOfferings} /></div></details>
+      <details className={styles.details} aria-label="Usage and connected services"><summary>Usage and connected services</summary><div className={styles.connections}>{current?.kind === "customer" && !readOnly ? <WorkspaceAllowanceSummary businessId={snapshot.workspaceId} enabled compact onOpenSettings={() => onNavigate("settings")} /> : null}<BusinessOfferingSummary state={offerings} work={snapshot.work} onOpen={onOfferings} /></div></details>
     </div>
   </StrelvaShell>;
 }

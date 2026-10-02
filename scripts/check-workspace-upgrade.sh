@@ -158,6 +158,12 @@ for migration in $(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -na
     wait "$holder_pid"
     printf 'Client writer remained available during a bounded index lock wait.\n'
   fi
+  if [[ "$migration_name" == "20261001130000_domain_registration_attempt.sql" ]]; then
+    psql "${psql_args[@]}" <<'SQL'
+insert into public.domain_claims(tenant_id,domain,role,status,dns_status,ssl_status,created_at,updated_at)
+ values('upgrade-site','domain-registration-legacy.example.test','production','verified','configured','issued','2026-09-01T00:00:00Z','2026-09-01T00:00:00Z');
+SQL
+  fi
   psql "${psql_args[@]}" --file="$migration" >/dev/null
   if [[ "$migration_name" == "20260920060100_content_version_request_index.sql" ]]; then
     psql "${psql_args[@]}" --file="$migration" > "$cluster_root/index-retry.log" 2>&1
@@ -199,5 +205,8 @@ psql "${psql_args[@]}" --file="$schema_test"
 psql "${psql_args[@]}" --file="$repo_root/tests/service-delivery-commitments-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/customer-business-entry-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/function-exposure-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-documents-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/domain-registration-attempt-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-website-document-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

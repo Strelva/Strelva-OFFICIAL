@@ -464,7 +464,7 @@ export function createWebsiteService(inputStore: BoundedStore = boundedStore, de
 
   async function list(actor: WorkspaceActor, workspaceId: string): Promise<WebsiteRecord[]> {
     const works = await defaultList(store, actor, workspaceId, dependencies);
-    return works.filter(work => work.productId === WEBSITE_PRODUCT_ID && work.resourceKind === WEBSITE_RESOURCE_KIND).map(mapWebsite).map(present);
+    return works.filter(work => work.productId === WEBSITE_PRODUCT_ID && work.resourceKind === WEBSITE_RESOURCE_KIND && !(work.payload && typeof work.payload === "object" && (work.payload as { version?: unknown }).version === 2)).map(mapWebsite).map(present);
   }
 
   async function revise(actor: WorkspaceActor, workId: string, raw: unknown): Promise<WebsiteRecord> {

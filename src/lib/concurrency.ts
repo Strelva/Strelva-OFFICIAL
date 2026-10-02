@@ -7,7 +7,7 @@
  * Promise.all would open ~6N Redis/HTTP connections at once. mapPool keeps a
  * fixed number of tasks in flight: ~Nx faster than serial without the
  * connection storm. Queue-later (QStash) is the eventual model past ~20 paying
- * clients (see docs/operations.md); this raises the ceiling without new infra.
+ * clients (see docs/operations/where-things-live.md); this raises the ceiling without new infra.
  */
 
 const DEFAULT_CONCURRENCY = 8;

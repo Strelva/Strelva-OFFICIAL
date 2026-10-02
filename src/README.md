@@ -64,11 +64,11 @@ Each operation retains its server-side permission and entitlement checks.
 
 The current migration map, acceptance evidence, confidence grades, and open
 release gates are in
-[`product-work-migration-2026-09-06.md`](../docs/product-work-migration-2026-09-06.md).
+[`product-work-migration-2026-09-06.md`](../docs/archive/product-work-migration-2026-09-06.md).
 The release-one implementation/readiness record remains in
-[`release-one-readiness-2026-09-05.md`](../docs/release-one-readiness-2026-09-05.md),
+[`release-one-readiness-2026-09-05.md`](../docs/archive/release-one-readiness-2026-09-05.md),
 and the canonical nouns and data ownership are in
-[`product-ontology.md`](../docs/product-ontology.md). These documents separate
+[`product-ontology.md`](../docs/architecture/product-ontology.md). These documents separate
 implemented source, focused local evidence, deployed behavior, and demand proof.
 
 Move one working capability and update its callers and tests together. Delete an

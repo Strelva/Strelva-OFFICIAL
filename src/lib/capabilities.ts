@@ -22,6 +22,8 @@ export type CapabilityId = "website" | "analytics" | "email" | "blog" | "reviews
 export type AgentSurface = "chat" | "background";
 
 export const AGENT_TOOL_CATALOG = {
+  read_site: ["chat"],
+  patch_site: ["chat"],
   read_section: ["chat", "background"],
   update_section: ["chat", "background"],
   undo_last_change: ["chat", "background"],
@@ -71,7 +73,7 @@ const CAPABILITY_DEFS: Record<CapabilityId, { name: string; description: string;
     name: "Website Management",
     description:
       "Read, update, and manage all sections of your website, including undoing the last change (revert to an earlier version), which is drafted for your approval before it goes live",
-    tools: ["read_section", "update_section", "undo_last_change", "request_custom_change", "upload_image", "toggle_section_visibility", "reorder_sections", "show_content", "show_photos", "preview_site"],
+    tools: ["read_site", "patch_site", "read_section", "update_section", "undo_last_change", "request_custom_change", "upload_image", "toggle_section_visibility", "reorder_sections", "show_content", "show_photos", "preview_site"],
   },
   analytics: {
     name: "Analytics",

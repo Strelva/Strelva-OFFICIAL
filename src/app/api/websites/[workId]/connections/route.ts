@@ -1,3 +1,4 @@
+import { isWebsiteRebuildWork,listWebsiteRebuildCapabilityOptions,connectWebsiteRebuildCapabilitySelection } from "@/products/websites/index";
 import { z } from "zod";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { readWorkspaceBody, workspaceHttpActor, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
@@ -29,7 +30,9 @@ export async function GET(_request: Request, context: { params: Promise<{ workId
   const current = await workspaceHttpActor();
   if (!current) return workspaceJson({ error: "Sign in to open website connections." }, 401);
   try {
-    return workspaceJson(await listWebsiteCapabilityOptions(current, workIdFrom(await context.params)));
+    const workId=workIdFrom(await context.params);
+    if(await isWebsiteRebuildWork(current,workId))return workspaceJson(await listWebsiteRebuildCapabilityOptions(current,workId));
+    return workspaceJson(await listWebsiteCapabilityOptions(current, workId));
   } catch (error) {
     return failure(error);
   }
@@ -44,6 +47,7 @@ export async function POST(request: Request, context: { params: Promise<{ workId
   try {
     const workId = workIdFrom(await context.params);
     const input = connectWebsiteCapabilitiesInputSchema.parse(await readWorkspaceBody(request));
+    if(await isWebsiteRebuildWork(current,workId))return workspaceJson(await connectWebsiteRebuildCapabilitySelection(current,workId,input));
     return workspaceJson(await connectWebsiteCapabilities(current, workId, input));
   } catch (error) {
     return failure(error);

@@ -702,6 +702,8 @@ export interface DomainClaim {
   updatedAt: string;
   verification?: string[];
   vercelProjectId?: string;
+  /** Durable submission boundary used by hosted rebuild domain recovery. */
+  registrationAttempt?: "not_submitted" | "unknown" | "rejected" | "confirmed";
   error?: string;
 }
 

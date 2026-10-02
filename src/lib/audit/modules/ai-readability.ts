@@ -499,7 +499,7 @@ function statusFor(score: number): CheckResult["status"] {
 // Module entry
 // ---------------------------------------------------------------------------
 
-export function checkAiReadability(ctx: AuditContext): CategoryResult {
+export function checkAiReadability(ctx: AuditContext, options: { htmlOnly?: boolean } = {}): CategoryResult {
   const { $ } = ctx;
   const checks: CheckResult[] = [];
 
@@ -714,7 +714,7 @@ export function checkAiReadability(ctx: AuditContext): CategoryResult {
   }
 
   // --- 7. llms.txt for AI agents (NEW — not in OWSH) ---------------------
-  {
+  if (!options.htmlOnly) {
     const llms = ctx.llmsTxt?.trim();
     if (llms) {
       checks.push({

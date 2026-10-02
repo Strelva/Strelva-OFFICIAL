@@ -85,7 +85,7 @@ function ComposerSession({ initialRequest = "", draftKey, disabled = false, plac
         }
       }} />
       <div className={styles.tools}>
-        {onTemplates ? <Button type="button" variant="ghost" size="sm" onClick={onTemplates} disabled={pending}><LayoutGrid size={16} aria-hidden="true" />Browse examples</Button> : <span />}
+        {onTemplates ? <Button type="button" variant="ghost" size="sm" onClick={onTemplates} disabled={pending}><LayoutGrid size={16} aria-hidden="true" />Get or build an app</Button> : <span />}
         <div className={styles.send}>
           {request ? <button type="button" className={styles.clear} onClick={() => change("")} disabled={pending}>Clear draft</button> : null}
           <Button type="submit" variant="contrast" size="sm" loading={pending} disabled={disabled || !request.trim()} aria-label="Continue with this request"><ArrowUp size={18} aria-hidden="true" /><span className={styles.srOnly}>Continue</span></Button>

@@ -1,0 +1,13 @@
+import {describe,it,expect,vi} from "vitest";
+import {domainVerificationDue,verifyHostedDomains} from "@/products/websites/domain-verification";
+import type {DomainClaim} from "@/lib/types";
+import type {WebsiteDocumentRevision} from "@/products/websites/document-store";
+const now=Date.parse("2026-10-01T12:00:00Z");
+function claim(createdHours:number,updatedMinutes:number,status:DomainClaim["status"]="pending"):DomainClaim{return{tenantId:"mooney",domain:"attymooney.com",role:"production",status,dnsStatus:"unknown",sslStatus:"pending",createdAt:new Date(now-createdHours*3600000).toISOString(),updatedAt:new Date(now-updatedMinutes*60000).toISOString()};}
+const sites=[{tenantId:"mooney"}] as WebsiteDocumentRevision[];
+describe("hosted domain polling",()=>{
+ it("polls once a minute initially then daily after 48 hours",()=>{expect(domainVerificationDue(claim(24,1),now)).toBe(true);expect(domainVerificationDue(claim(24,.5),now)).toBe(false);expect(domainVerificationDue(claim(48,10),now)).toBe(false);expect(domainVerificationDue(claim(49,24*60),now)).toBe(true);expect(domainVerificationDue(claim(24,2,"verified"),now)).toBe(false);expect(domainVerificationDue({...claim(24,2),role:"admin"},now)).toBe(false);});
+ it("backs off nondue claims and reloads after accepted verification before escalation",async()=>{const pending=claim(8*24,24*60+1);const claims=vi.fn().mockResolvedValueOnce([pending]).mockResolvedValueOnce([{...pending,status:"verified"}]);const refresh=vi.fn().mockResolvedValue({ok:true});const alert=vi.fn();const result=await verifyHostedDomains({list:async()=>sites,claims,refresh,alert,now:()=>now});expect(result.refreshed).toBe(1);expect(refresh).toHaveBeenCalledWith("mooney","attymooney.com");expect(alert).not.toHaveBeenCalled();});
+ it("alerts after seven days and represents provider failure explicitly",async()=>{const pending=claim(8*24,24*60+1);const alert=vi.fn();const result=await verifyHostedDomains({list:async()=>sites,claims:async()=>[pending],refresh:async()=>({ok:false}),alert,now:()=>now});expect(result).toMatchObject({failed:1,alerted:1,processed:1});expect(alert).toHaveBeenCalledWith(expect.objectContaining({tenantId:"mooney",hostname:"attymooney.com"}));});
+ it("bounds refresh work and leaves overflow due for later runs",async()=>{const claims=Array.from({length:15},(_,index)=>({...claim(24,10),domain:`site${index}.example.com`}));const refresh=vi.fn().mockResolvedValue({ok:true});const result=await verifyHostedDomains({list:async()=>sites,claims:async()=>claims,refresh,now:()=>now});expect(result.processed).toBe(10);expect(result.deferred).toBe(5);expect(refresh).toHaveBeenCalledTimes(10);});
+});

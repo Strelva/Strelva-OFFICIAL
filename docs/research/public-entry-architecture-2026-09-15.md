@@ -13,7 +13,7 @@ The visible experience should have few concepts: choose something useful, try it
 
 ## Evidence and constraints
 
-- The [September 15 product brief](../horizontal-product-brief-2026-09-11.md) calls for useful entry before organization setup, people who need help discovering what to do, and fluid self-service, agency and Strelva involvement. It does not select a chat-first entrance or the first released offerings.
+- The [September 15 product brief](../product/horizontal-product-brief-2026-09-11.md) calls for useful entry before organization setup, people who need help discovering what to do, and fluid self-service, agency and Strelva involvement. It does not select a chat-first entrance or the first released offerings.
 - The [local marketing source](../../../strelva-marketing/src/app/page.tsx) leads with account creation and contains an editable intake preview, public diagnostics and a separate agency path.
 - [BuildPreview](../../../strelva-marketing/src/components/product/BuildPreview.tsx) has Build, Improve and Manage modes. Build changes a welcome message in local component state, then routes the text to an implementation inquiry. It does not save a usable application. This is source inspection, not a fresh local browser test.
 - The [marketing design record](../../../strelva-marketing/DESIGN.md) selects the continuous Buffalo dusk setting, Fraunces display type, DM Sans interface type, soft surfaces and restrained responsive motion. Those visual choices can support the proposed architecture.

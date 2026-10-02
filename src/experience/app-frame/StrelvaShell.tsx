@@ -5,10 +5,11 @@ import { Menu } from "lucide-react";
 import { WorkspaceSearchDialog } from "@/experience/workspace/WorkspaceSearchDialog";
 import type { WorkspaceSearchItem } from "@/experience/workspace/workspace-search";
 import { AppFrame, useHydrationReady } from "./AppFrame";
-import { StrelvaSidebar, type StrelvaSection } from "./StrelvaSidebar";
+import { StrelvaSidebar } from "./StrelvaSidebar";
+import type { StrelvaPinnedItem, StrelvaSection } from "./workspace-places";
 import styles from "./strelva-shell.module.css";
 
-export { workspaceSectionHref, type StrelvaSection } from "./StrelvaSidebar";
+export { pinnedApps, pinnedWebsites, placeForSection, sectionFromView, sectionTitle, workspaceSectionHref, type StrelvaPinnedItem, type StrelvaSection } from "./workspace-places";
 
 interface Props {
   children: ReactNode;
@@ -19,6 +20,7 @@ interface Props {
   workspaceId?: string;
   navigation?: ReactNode;
   recentWork?: readonly WorkspaceSearchItem[];
+  pinned?: readonly StrelvaPinnedItem[];
   searchItems?: readonly WorkspaceSearchItem[];
   searchScopeName?: string;
   actions?: ReactNode;
@@ -43,7 +45,7 @@ interface Props {
 }
 
 /** Shared presentation only. Each resource retains its server authorization. */
-export function StrelvaShell({ children, active, title = "Strelva", context, businessContext, workspaceId, navigation, recentWork, searchItems, searchScopeName = "Your work", actions, notice, accountName = "Your account", accountDetail, signedIn = true, signInHref, signOut, appBase = "", onNavigate, onAccess, onSearch, onStart, startDisabled = false, contentId = "strelva-main", rightRail, rightRailOpen, onCloseRightRail, rightRailTriggerRef }: Props) {
+export function StrelvaShell({ children, active, title = "Strelva", context, businessContext, workspaceId, navigation, recentWork, pinned, searchItems, searchScopeName = "Your work", actions, notice, accountName = "Your account", accountDetail, signedIn = true, signInHref, signOut, appBase = "", onNavigate, onAccess, onSearch, onStart, startDisabled = false, contentId = "strelva-main", rightRail, rightRailOpen, onCloseRightRail, rightRailTriggerRef }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const menuRef = useRef<HTMLButtonElement>(null);
@@ -74,7 +76,7 @@ export function StrelvaShell({ children, active, title = "Strelva", context, bus
   return <div data-dashboard className={styles.root}>
     <a className={styles.skip} href={`#${contentId}`}>Skip to work</a>
     <AppFrame className={styles.shell} navigationLabel="Strelva workspace navigation" navigationStorageKey="strelva:app-frame-navigation-collapsed" navigationOpen={mobileOpen} onCloseNavigation={() => setMobileOpen(false)} navigationTriggerRef={menuRef} contentId={contentId}
-      navigation={<StrelvaSidebar active={active} appBase={appBase} workspaceId={workspaceId} accountName={accountName} accountDetail={accountDetail} businessContext={businessContext} contextualNavigation={navigation} recentWork={recentWork} mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} onNavigate={onNavigate ? section => section === "access" && onAccess ? onAccess() : onNavigate(section) : undefined} onSearch={canSearch ? openSearch : undefined} onStart={onStart} startDisabled={startDisabled} signedIn={signedIn} signInHref={signInHref} signOut={signOut} />}
+      navigation={<StrelvaSidebar active={active} appBase={appBase} workspaceId={workspaceId} accountName={accountName} accountDetail={accountDetail} businessContext={businessContext} contextualNavigation={navigation} recentWork={recentWork} pinned={pinned} mobileOpen={mobileOpen} onCloseMobile={() => setMobileOpen(false)} onNavigate={onNavigate ? section => section === "access" && onAccess ? onAccess() : onNavigate(section) : undefined} onSearch={canSearch ? openSearch : undefined} onStart={onStart} startDisabled={startDisabled} signedIn={signedIn} signInHref={signInHref} signOut={signOut} />}
       header={<div className={styles.header}><button ref={menuRef} className={styles.mobileMenu} disabled={!ready} onClick={() => setMobileOpen(true)} type="button" aria-label="Open navigation" aria-expanded={mobileOpen}><Menu size={20} /></button><span className={styles.title}>{title}</span>{context ? <div className={styles.context}>{context}</div> : null}{actions ? <div className={styles.actions}>{actions}</div> : null}</div>}
       notice={notice} rightRail={rightRail} rightRailId="managed-discussion" rightRailTitle="Ask Strelva" rightRailOpen={rightRailOpen} onCloseRightRail={onCloseRightRail} rightRailTriggerRef={rightRailTriggerRef}
     >{children}</AppFrame>

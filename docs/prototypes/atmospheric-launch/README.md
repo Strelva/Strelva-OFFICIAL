@@ -75,6 +75,6 @@ Layout correction: each card now uses a full-width header, one heading/descripti
 
 ## Component-system handoff
 
-See [component system](../../component-system.md) and [motion foundation](../../design/motion.md). `light-options.html?variant=all` compares three unselected material options on a pure-white page. Each supports gooey collapse/expand, rounded close, restore and reduced motion. It is a standalone prototype, not the React AtmosphericCard API. The product gallery now exercises a reusable GooeyDisclosure. No choice among the three materials has been recorded.
+See [component system](../../design/component-system.md) and [motion foundation](../../design/motion.md). `light-options.html?variant=all` compares three unselected material options on a pure-white page. Each supports gooey collapse/expand, rounded close, restore and reduced motion. It is a standalone prototype, not the React AtmosphericCard API. The product gallery now exercises a reusable GooeyDisclosure. No choice among the three materials has been recorded.
 
 Current typography comparison: `typography-options.html`, with identical smoked material and three type treatments. See [proposal and Mobbin sources](../../design/frosted-typography-options.md). Older `typography.html` retains superseded layout and placeholder context and is historical. No type selection is recorded.

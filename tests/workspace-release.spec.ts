@@ -208,13 +208,13 @@ async function pendingWorkspaceSwitchSurvives(page: Page, section: "work" | "set
   await expect.poll(() => releaseTarget.length).toBeGreaterThan(0);
 
   await page.getByRole("complementary", { name: "Strelva navigation", exact: true })
-    .getByRole("link", { name: section === "products" ? "Examples" : section === "settings" ? "Settings" : "Work", exact: true })
+    .getByRole("link", { name: section === "settings" ? "Business details" : "All apps and files", exact: true })
     .click();
 
   targetReady = true;
   for (const resolve of releaseTarget.splice(0)) resolve();
   await expect(workspace).toHaveValue(CUSTOMER_ID);
-  await expect(page).toHaveURL(new RegExp(`workspaceId=${CUSTOMER_ID}.*view=${section}`));
+  await expect(page).toHaveURL(new RegExp(`workspaceId=${CUSTOMER_ID}.*view=${section === "settings" ? "settings" : "apps"}`));
 }
 
 for (const section of ["work", "settings", "products"] as const) {
@@ -267,7 +267,7 @@ test("creates a private assessment and restores it after reload", async ({ page 
   });
 
   await page.goto("/workspace");
-  await page.getByRole("link", { name: "Examples", exact: true }).click();
+  await page.getByRole("link", { name: "All apps and files", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.getByRole("button", { name: "AI Visibility: Start", exact: true }).click();
   await expect(page.getByRole("heading", { name: "AI Visibility", exact: true })).toBeVisible();
@@ -523,13 +523,13 @@ test("keeps My work and Shared with me context-local and read-only", async ({ pa
   await page.goto("/workspace");
   await page.getByLabel("Current workspace").selectOption(CUSTOMER_ID);
   await expect(page.getByRole("heading", { name: "Review what was shared.", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Continue", exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Open Customer-owned assessment" })).toBeVisible();
-  await page.getByRole("link", { name: /^Examples/ }).click();
+  await expect(page.getByRole("heading", { name: "Strelva handled", exact: true })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("region", { name: "Recent work", exact: true }).getByRole("link", { name: "Customer-owned assessment" })).toBeVisible();
+  await page.getByRole("link", { name: "All apps and files", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.getByRole("button", { name: "AI Visibility: Start", exact: true }).click();
   await expect(page.getByRole("button", { name: "Check a business", exact: true })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "New", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Ask Strelva", exact: true })).toBeDisabled();
 
   // Returning to owned work changes context before rendering its collection.
   await page.getByLabel("Current workspace").selectOption(PERSONAL_ID);
@@ -863,7 +863,7 @@ test("does not add a completed assessment to a workspace selected while it was r
   });
 
   await page.goto("/workspace");
-  await page.getByRole("link", { name: "Examples", exact: true }).click();
+  await page.getByRole("link", { name: "All apps and files", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.getByRole("button", { name: "AI Visibility: Start", exact: true }).click();
   await expect(page.getByRole("heading", { name: "AI Visibility", exact: true })).toBeVisible();
@@ -965,7 +965,7 @@ test("never substitutes another result for an unavailable deep link", async ({ p
   await page.goto(`/workspace?workspaceId=${PERSONAL_ID}&work=missing`);
   await expect(page.getByRole("heading", { name: "This saved result is unavailable." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Harbor Dental", exact: true })).not.toBeVisible();
-  await page.getByRole("button", { name: "Back to work", exact: true }).click();
+  await page.getByRole("button", { name: "Back to Apps", exact: true }).click();
   await page.getByRole("button", { name: "Open Harbor Dental", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Harbor Dental", exact: true })).toBeVisible();
 });
@@ -1024,7 +1024,7 @@ test("recovers the same assessment after a lost response and reload", async ({ p
     return fulfill(route,{work:work()});
   });
   await page.goto("/workspace");
-  await page.getByRole("link",{name:"Examples", exact:true}).click();
+  await page.getByRole("link", { name: "All apps and files", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.getByRole("button",{name:"AI Visibility: Start", exact:true}).click();
   await expect(page.getByRole("heading",{name:"AI Visibility", exact:true})).toBeVisible();
@@ -1126,7 +1126,7 @@ test("switching businesses clears the previous payer while the next history load
   await expect(page.getByText("harbor-payer@example.test", { exact: false })).toBeVisible();
   await page.getByLabel("Current workspace").selectOption(nextId);
   await expect(page).toHaveURL(new RegExp(nextId));
-  await page.getByRole("link", { name: "Settings", exact: true }).click();
+  await page.getByRole("link", { name: "Business details", exact: true }).click();
   await expect.poll(() => Boolean(pending)).toBe(true);
   await expect(page.getByText("harbor-payer@example.test", { exact: false })).toHaveCount(0);
   await fulfill(pending!, { currentActorId: "owner", transitions: [], pending: null, current: null });

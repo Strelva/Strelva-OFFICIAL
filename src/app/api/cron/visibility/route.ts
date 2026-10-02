@@ -55,7 +55,7 @@ export async function GET(request: Request) {
   // Budget guard: visibility cost scales per-tenant (serper.dev + Gemini per
   // query). Cap how many tenants a single weekly run will probe so an
   // unexpected tenant spike can't run up an unbounded external bill. Past this
-  // ceiling, move to a queue (QStash) — see docs/operations.md.
+  // ceiling, move to a queue (QStash) — see docs/operations/where-things-live.md.
   //
   // The cap ROTATES by week so a tenant past the cap isn't starved forever —
   // every tenant is covered over ceil(n/cap) weeks — and a deferred run pages

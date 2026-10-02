@@ -104,7 +104,7 @@ describe("ontology contracts", () => {
 
   it("publishes the canonical glossary required by the domain model", () => {
     const ontology = readFileSync(
-      path.join(process.cwd(), "docs/product-ontology.md"),
+      path.join(process.cwd(), "docs/architecture/product-ontology.md"),
       "utf8",
     );
     for (const term of [

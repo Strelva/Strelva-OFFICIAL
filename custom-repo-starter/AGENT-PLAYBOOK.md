@@ -4,7 +4,7 @@
 
 **Canonical components live at** `~/strelva-platform/custom-repo-starter/` on this machine. Copy the ones named below into this repo's `src/components/` (or `src/lib/` for the helpers) and adjust import paths — don't reinvent them. Never invent business facts (phone, address, social URLs, credentials); if you don't have a real value, leave it out and list it as a gap for the human, rather than fabricating.
 
-The operator-side journey (provisioning, domain, billing) is Noah's, documented in [`docs/client-onboarding.md`](../docs/client-onboarding.md). This playbook is **only the repo work** — Phases 2–3 of that flow.
+The operator-side journey (provisioning, domain, billing) is Noah's, documented in [`docs/operations/client-onboarding.md`](../docs/operations/client-onboarding.md). This playbook is **only the repo work** — Phases 2–3 of that flow.
 
 ---
 

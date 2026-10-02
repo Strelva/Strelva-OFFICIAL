@@ -300,3 +300,43 @@ export function buildUndoTool(hooks: UndoToolHooks) {
     },
   });
 }
+
+/** v2 website document tools share the same scoped service used by workspace
+ * routes. Tenant permission at the chat route is necessary but not sufficient:
+ * each execution also requires a verified actor with access to the saved work. */
+export function buildSiteDocumentTools(input: {
+  tenantId: string;
+  actor: import("@/platform/workspaces/types").WorkspaceActor | null;
+  onResult?: (status: "queued" | "failed", message: string) => void;
+}) {
+  const selection = async () => {
+    const { websiteRebuildReleaseEnabled } = await import("@/products/websites/index");
+    if (!websiteRebuildReleaseEnabled()) throw new Error("Website rebuilds are unavailable.");
+    if (!input.actor) throw new Error("A verified signed-in account is required.");
+    const { websiteDocumentStore } = await import("@/products/websites/index");
+    const published = await websiteDocumentStore.published(input.tenantId);
+    if (!published) throw new Error("This tenant does not have a v2 website document.");
+    const { readWebsiteRebuild } = await import("@/products/websites/index");
+    const record = await readWebsiteRebuild(input.actor,published.workId);
+    if (record.workspaceId !== published.workspaceId || record.rebuild.tenantId !== input.tenantId) throw new Error("Website scope changed. Reload before continuing.");
+    return record;
+  };
+  return {
+    read_site: tool({
+      description: "Read v2 website pages, metadata, root IDs and stable node IDs. allPages lists the full site even when path selects one page. Use read_section for legacy websites.",
+      inputSchema: z.object({ path: z.string().startsWith("/").max(512).optional() }).strict(),
+      execute: async ({ path }) => {
+        try { const record = await selection(); const { readSiteNodes } = await import("@/products/websites/index"); if (!record.rebuild.candidate) return { error:"No website candidate is available." }; return { workId:record.workId,expectedRevision:record.rebuild.revision,candidateRevision:record.rebuild.candidate.revision,candidateContentHash:record.rebuild.candidate.contentHash,...readSiteNodes(record.rebuild.candidate.document,path) }; }
+        catch { return { error:"This website document is unavailable to your account." }; }
+      },
+    }),
+    patch_site: tool({
+      description: "Draft RFC6902 /nodes and /pages entry patches on a v2 site. To add a page, add its catalog nodes and a /pages/- entry with path/title/description/root together. Read the site first and include its exact revision/hash. Page copy and navigation require owner review. Facts, assets, capabilities, theme and provenance are immutable.",
+      inputSchema: z.object({ expectedRevision:z.number().int().nonnegative(),candidateRevision:z.number().int().positive(),candidateContentHash:z.string().regex(/^[a-f0-9]{64}$/),ops:z.array(z.object({op:z.enum(["add","remove","replace","test","move","copy"]),path:z.string().max(500).regex(/^\/(?:nodes\/[^/]+|pages\/(?:0|[1-9]\d*|-))(?:\/.*)?$/),from:z.string().max(500).regex(/^\/(?:nodes\/[^/]+|pages\/(?:0|[1-9]\d*|-))(?:\/.*)?$/).optional(),value:z.unknown().optional()}).strict()).min(1).max(100) }).strict(),
+      execute: async (patch) => {
+        try { const record = await selection(); const { patchWebsiteRebuild } = await import("@/products/websites/index"); await patchWebsiteRebuild(input.actor!,record.workId,{...patch,forceReview:true}); const message="Website changes are saved as a new revision for owner review."; input.onResult?.("queued",message); return { success:true,agentResultStatus:"queued" as const,message,workId:record.workId }; }
+        catch { const message="The website patch could not be confirmed. Read the current site before retrying."; input.onResult?.("failed",message); return { success:false,agentResultStatus:"failed" as const,error:message }; }
+      },
+    }),
+  };
+}

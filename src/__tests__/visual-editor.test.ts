@@ -233,7 +233,7 @@ describe("origin validation pattern (mirrors DesignMode/DesignCanvas)", () => {
 // There are no centralized constants for message types in the codebase; they
 // are string literals scattered across EditModeOverlay.tsx, DesignMode.tsx,
 // DesignCanvas.tsx, and preview-html.ts. This test documents the full
-// protocol as described in docs/visual-editor.md and verifies that the types
+// protocol as described in docs/capabilities/website/visual-editor.md and verifies that the types
 // are consistent between the documentation and the source files.
 // ---------------------------------------------------------------------------
 

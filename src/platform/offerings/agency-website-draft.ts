@@ -177,7 +177,7 @@ async function websiteTenant(actor: WorkspaceActor, bindingId: string): Promise<
  * disabled, grandfathered, comped, and past-due grace behavior. The result is
  * passed only to a service_role-only SQL wrapper, never accepted from a client.
  */
-async function assertWebsiteSubscription(tenantId: string): Promise<boolean> {
+export async function assertAgencyWebsiteDraftSubscription(tenantId: string): Promise<boolean> {
   const status = await getEffectiveSubscriptionStatus(tenantId);
   if (status === "active" || status === "trialing") return true;
   if (status === "past_due" && await isWithinPastDueGrace(tenantId)) return true;
@@ -213,7 +213,7 @@ export const postgresAgencyManagedWebsiteDraftAccess: AgencyManagedWebsiteDraftA
   },
   async grant(actor, deliveryId, bindingId) {
     const tenantId = await websiteTenant(actor, bindingId);
-    const subscriptionExemption = await assertWebsiteSubscription(tenantId);
+    const subscriptionExemption = await assertAgencyWebsiteDraftSubscription(tenantId);
     return parseGrant(row(await rpc("grant_agency_managed_website_draft_edit_server", {
       ...identity(actor), p_delivery_id: uuid.parse(deliveryId), p_binding_id: uuid.parse(bindingId),
       p_subscription_exemption: subscriptionExemption,
@@ -236,7 +236,7 @@ export const postgresAgencyManagedWebsiteDraftAccess: AgencyManagedWebsiteDraftA
     if (!grant || grant.status !== "active" || grant.assignmentId !== uuid.parse(assignmentId)) throw new WorkspaceAccessError("This managed website draft is unavailable to your account.");
     if (!Number.isInteger(expectedRevision) || expectedRevision < 0) throw new WorkspaceConflictError("Reload the website draft before preparing it.");
     const name = await validateSection(grant.tenantId, sectionName, data);
-    const subscriptionExemption = await assertWebsiteSubscription(grant.tenantId);
+    const subscriptionExemption = await assertAgencyWebsiteDraftSubscription(grant.tenantId);
     return parsePreparation(row(await rpc("prepare_agency_managed_website_draft_server", {
       ...identity(actor), p_assignment_id: uuid.parse(assignmentId), p_binding_id: uuid.parse(bindingId), p_section: name,
       p_data: data, p_expected_revision: expectedRevision, p_expected_hash: hash.parse(expectedHash),
@@ -246,7 +246,7 @@ export const postgresAgencyManagedWebsiteDraftAccess: AgencyManagedWebsiteDraftA
   async pending(actor, responsibilityId, bindingId, sectionName) {
     const name = section.parse(sectionName);
     const tenantId = await websiteTenant(actor, bindingId);
-    const subscriptionExemption = await assertWebsiteSubscription(tenantId);
+    const subscriptionExemption = await assertAgencyWebsiteDraftSubscription(tenantId);
     return parsePreparation(row(await rpc("read_agency_managed_website_draft_preparation_server", {
       ...identity(actor), p_work_id: uuid.parse(responsibilityId), p_binding_id: uuid.parse(bindingId), p_section: name,
       p_subscription_exemption: subscriptionExemption,
@@ -255,7 +255,7 @@ export const postgresAgencyManagedWebsiteDraftAccess: AgencyManagedWebsiteDraftA
   async execute(actor, responsibilityId, bindingId, sectionName) {
     const name = section.parse(sectionName);
     const tenantId = await websiteTenant(actor, bindingId);
-    const subscriptionExemption = await assertWebsiteSubscription(tenantId);
+    const subscriptionExemption = await assertAgencyWebsiteDraftSubscription(tenantId);
     return parseRevision(row(await rpc("execute_agency_managed_website_draft_server", {
       ...identity(actor), p_work_id: uuid.parse(responsibilityId), p_binding_id: uuid.parse(bindingId), p_section: name,
       p_subscription_exemption: subscriptionExemption,

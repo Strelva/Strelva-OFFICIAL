@@ -67,7 +67,7 @@ for (const width of [1440, 390]) {
     let item=(await requested.json()).request;
     expect(item.businessId).toBe(businessId);expect(item.deliveryCommitment).toBeNull();
     const requestId=item.id;
-    const deliveryCard=page.getByRole("region",{name:"Strelva is handling",exact:true})
+    const deliveryCard=page.getByRole("region",{name:"Needs you",exact:true})
       .locator(`a[href="/workspace/delivery/${requestId}"]`);
 
     // Synthetic local operator identity only. No production grants or bypass.
@@ -84,7 +84,7 @@ for (const width of [1440, 390]) {
     await operatorPage.getByRole("button",{name:"Propose 24-hour delivery",exact:true}).click();
     await expect(operatorPage.getByText("Scope and terms need your acceptance",{exact:true})).toBeVisible();
     await page.goto(`/workspace?workspaceId=${businessId}`);
-    await expect(page.getByRole("heading",{name:"Strelva is handling",exact:true})).toBeVisible();
+    await expect(page.getByRole("heading",{name:"Needs you",exact:true})).toBeVisible();
     await expect(deliveryCard).toBeVisible();
     await page.goto(`/workspace/delivery/${requestId}`);
     await expect(page.getByRole("button",{name:"Propose 24-hour delivery",exact:true})).toHaveCount(0);
@@ -132,7 +132,11 @@ for (const width of [1440, 390]) {
     await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await page.screenshot({path:testInfo.outputPath(`delivery-${width}.png`),fullPage:true});
     await page.goto(`/workspace?workspaceId=${businessId}`);
-    await expect(deliveryCard.getByText("Customer accepted this delivery",{exact:true})).toBeVisible();
+    // Accepted work leaves "Needs you" and is listed as done under "Strelva handled".
+    const handledCard=page.getByRole("region",{name:"Strelva handled",exact:true})
+      .locator(`a[href="/workspace/delivery/${requestId}"]`);
+    await expect(handledCard.getByText(/^Done/)).toBeVisible();
+    await expect(deliveryCard).toHaveCount(0);
     await page.goto(`/workspace?workspaceId=${businessId}&work=${app.id}`);
     await expect(page.getByRole("heading",{name:"Team requests",exact:true,level:1})).toBeVisible();
     await expect(page.getByText(/Version 1 is live/)).toBeVisible();

@@ -206,13 +206,13 @@ function checkFileContains(path: string, name: string, requiredTerms: string[]) 
   log({ name, status: "ok", message: `${path} covers required launch guidance` });
 }
 
-checkFileContains("docs/design-kit.md", "Design kit", [
+checkFileContains("docs/design/design-kit.md", "Design kit", [
   "WCAG 2.2 AA",
   "Core Web Vitals",
   "AI Surfaces",
   "Template Expansion Rules",
 ]);
-checkFileContains("docs/domain-setup.md", "Domain setup doc", [
+checkFileContains("docs/operations/domain-setup.md", "Domain setup doc", [
   "strelva-admin",
   "app.strelva.com",
   "admin.strelva.com",
@@ -220,7 +220,7 @@ checkFileContains("docs/domain-setup.md", "Domain setup doc", [
   "MARKETING_DOMAINS=scaffoldweb.com,www.scaffoldweb.com",
   "pnpm check:prod",
 ]);
-checkFileContains("docs/production-readiness.md", "Production readiness doc", [
+checkFileContains("docs/operations/production-readiness.md", "Production readiness doc", [
   "Tenant Deployment Checklist",
   "Incident And Rollback Runbook",
   "Content Schema Rollback Plan",
@@ -303,7 +303,7 @@ function checkReleaseManifestEnv(manifestPath: string, checklistPath: string, re
   }
 }
 
-checkReleaseManifestEnv("release-manifest.json", "scripts/production-checklist.ts", "docs/production-readiness.md");
+checkReleaseManifestEnv("release-manifest.json", "scripts/production-checklist.ts", "docs/operations/production-readiness.md");
 
 function checkLaunchBlockers(path: string) {
   if (!existsSync(path)) {
@@ -325,7 +325,7 @@ function checkLaunchBlockers(path: string) {
   log({ name: "Launch blockers", status: "ok", message: `${path} has no unresolved blockers` });
 }
 
-checkLaunchBlockers("docs/launch-blockers.md");
+checkLaunchBlockers("docs/operations/launch-blockers.md");
 
 function checkLaunchBlockerActionability(path: string) {
   if (!existsSync(path)) {
@@ -388,7 +388,7 @@ function checkLaunchBlockerActionability(path: string) {
   log({ name: "Launch blocker actionability", status: "ok", message: `${path} has owner-ready blocker actions` });
 }
 
-checkLaunchBlockerActionability("docs/launch-blockers.md");
+checkLaunchBlockerActionability("docs/operations/launch-blockers.md");
 
 // Note: the self-referential `checkCompletionAudit` (a 62KB markdown file
 // that the checker parsed for stringly-typed evidence of its own assertions)
@@ -1535,8 +1535,8 @@ function printReleaseActions() {
   const failedEnvs = [...failedEnvVars].sort();
   const warnedEnvs = [...warnedEnvVars].sort();
   if (!failedEnvs.length && !warnedEnvs.length && !results.some((result) => result.status === "fail")) return;
-  const launchBlockers = existsSync("docs/launch-blockers.md")
-    ? readFileSync("docs/launch-blockers.md", "utf8")
+  const launchBlockers = existsSync("docs/operations/launch-blockers.md")
+    ? readFileSync("docs/operations/launch-blockers.md", "utf8")
     : "";
 
   console.log("═══════════════════════════════════════════════════════════════");
@@ -1629,7 +1629,7 @@ function printReleaseActions() {
       console.log("    curl -i https://app.strelva.com/api/cron/maintenance");
       console.log('    curl -i -H "Authorization: Bearer $CRON_SECRET" https://app.strelva.com/api/cron/maintenance');
     }
-    console.log("- Launch blockers: clear docs/launch-blockers.md Current Blockers or move each approved waiver to Waived Blockers with Status, Owner, Release note/Ticket/Reference, Follow-up, and Reason.");
+    console.log("- Launch blockers: clear docs/operations/launch-blockers.md Current Blockers or move each approved waiver to Waived Blockers with Status, Owner, Release note/Ticket/Reference, Follow-up, and Reason.");
   }
   const tenantDnsFailures = results.filter((result) => result.status === "fail" && /^Tenant .+ DNS /.test(result.name));
   const tenantConfigurationFailures = results.filter(

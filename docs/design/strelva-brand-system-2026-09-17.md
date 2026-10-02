@@ -258,7 +258,7 @@ boundaries, and continuous movement between states. Controls remain firmer at
 rows, tables, or every nested group into rounded capsules.
 
 The earlier 6–8px-radius product rule remains historical evidence in
-`docs/design-kit.md`; it should not silently constrain this forward direction.
+`docs/design/design-kit.md`; it should not silently constrain this forward direction.
 Migration needs rendered comparison and component-level review.
 
 ### Surfaces, glass, and borders

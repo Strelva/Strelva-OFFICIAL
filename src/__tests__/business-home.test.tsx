@@ -1,6 +1,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined }), usePathname: () => "/workspace", useSearchParams: () => new URLSearchParams() }));
 import { BusinessHome } from "@/experience/workspace/BusinessHome";
 import type { WorkspaceSnapshot, WorkspaceWork } from "@/experience/workspace/contracts";
 import type { WorkspaceOfferingState } from "@/experience/workspace/WorkspaceOfferings";
@@ -52,13 +54,8 @@ function renderHome(items: WorkspaceWork[] = [
     onOpen: noop,
     onStart: noop,
     onRequest: noop,
-    onWork: noop,
-    onOngoing: noop,
-    onAccess: noop,
-    onSettings: noop,
+    onNavigate: noop,
     onWorkspace: noop,
-    onHelp: noop,
-    onExplore: noop,
     onOfferings: noop,
     accountHref: "/workspace/account",
     signOut: createElement("button", { type: "button" }, "Sign out"),
@@ -71,8 +68,12 @@ describe("business home", () => {
 
     expect(html).toContain("Needs you");
     expect(html).toContain("Review urgency field");
+    expect(html).toContain("Strelva handled");
+    expect(html).toContain("In progress");
+    expect(html).toContain("All requests");
+    expect(html).toContain("Recent");
     expect(html).toContain("Opening checklist");
-    expect(html).toContain("Continue");
+    for (const retired of ["Waiting on you", "id=\"home-work\"", "Strelva is handling"]) expect(html).not.toContain(retired);
     expect(html).not.toMatch(/>Applications<|>Documents</);
   });
 
@@ -82,8 +83,20 @@ describe("business home", () => {
     expect(html).toContain("Current workspace");
     expect(html).toContain("Alder Workshop");
     expect(html).toContain("Work allowance");
-    expect(html).toContain("Review allowance and payer details in Settings.");
-    expect(html).toContain("Open Settings");
+    expect(html).toContain("Review allowance and payer details in Business details.");
+    expect(html).toContain("Open Business details");
     expect(html).not.toContain("$0");
+  });
+
+  it("keeps a personal workspace to what it can use: no business request lists, saved work still one click away", () => {
+    const html = renderToStaticMarkup(createElement(BusinessHome, {
+      snapshot: { ...snapshot([work("Opening checklist")]), workspaces: [{ id: "business-1", kind: "personal", name: "Alex’s work" }] },
+      sites: [], unassignedSites: [], siteAssignmentsKnown: true, offerings: offeringState, busy: false,
+      onOpen: noop, onStart: noop, onRequest: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account",
+    }));
+    expect(html).toContain("Needs you");
+    expect(html).toContain("Open Opening checklist");
+    expect(html).not.toContain("Strelva handled");
+    expect(html).not.toContain("All requests");
   });
 });

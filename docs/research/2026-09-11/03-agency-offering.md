@@ -33,7 +33,7 @@ The first distinction matters for Strelva. Vendasta and HighLevel sell a reselle
 
 **Portfolio first.** Agencies expect an account-level view with a list of clients and a second scope for each client's work. Vendasta calls this Partner Center and client accounts. HighLevel uses agency and sub-account views. Duda has Client Management and per-site permissions. Webflow has client seats scoped to an individual site. Wix has a central Studio workspace and site-specific collaborators. Framer has workspace members and project members. Lovable has external collaborators limited to shared projects. Replit separates builders from viewers.
 
-The pattern is not “give every client access to the agency workspace.” It is “give this person access to this customer's named resource.” Webflow, Wix, Framer, and Lovable all support some form of this scope. The [current Strelva interface specification](../../docs/enterprise-customer-interface-spec.md) reaches the same conclusion: agency membership must not silently expose every customer.
+The pattern is not “give every client access to the agency workspace.” It is “give this person access to this customer's named resource.” Webflow, Wix, Framer, and Lovable all support some form of this scope. The [current Strelva interface specification](../../archive/enterprise-customer-interface-spec.md) reaches the same conclusion: agency membership must not silently expose every customer.
 
 **Review is becoming a product object.** Duda's Site Comments support internal comments, client-visible comments, replies, email notifications, and a resolved-comments record. The product explicitly positions this as a way to replace email, messaging, and phone feedback. Webflow offers Reviewer, Content Editor, and Marketer roles, plus comment-only links. Wix uses on-canvas comments and “Content Mode” so a client can change copy and media without changing design. Framer makes Viewer, Content Editor, Design, Content, and Deploy permissions distinct. These are review and control boundaries, not just invitations.
 
@@ -263,6 +263,6 @@ Pilot with no more than three agencies. Measure active Customers, Requests commi
 
 ### Strelva sources consulted
 
-- [Strelva enterprise and customer interface specification](../../docs/enterprise-customer-interface-spec.md), proposed September 8, 2026.
-- [Strelva release-one readiness](../../docs/release-one-readiness-2026-09-05.md), local implementation scope, September 2026.
+- [Strelva enterprise and customer interface specification](../../archive/enterprise-customer-interface-spec.md), proposed September 8, 2026.
+- [Strelva release-one readiness](../../archive/release-one-readiness-2026-09-05.md), local implementation scope, September 2026.
 - [Strelva pricing exploration memo](../../.scratch/product-release/pricing-2026-09-08.md), recommendation only, September 8, 2026.

@@ -193,7 +193,7 @@ test("an owner can discover, create, and reopen ongoing work in the workspace", 
     const page = await owner.context.newPage();
     await page.goto(`/workspace?workspaceId=${workspaceId}&view=operations`);
     await expect(page.getByRole("heading", { name: "Saved checks that can run again", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "New ongoing work", exact: true }).click();
+    await page.getByRole("button", { name: "Keep something running", exact: true }).click();
     await page.getByLabel("Name", { exact: true }).fill("UI supplier check");
     await page.getByLabel("Result", { exact: true }).fill("Compare the supplier records whenever a check is needed.");
     await page.getByLabel("Saved check", { exact: true }).selectOption({ label: "Saved supplier check" });

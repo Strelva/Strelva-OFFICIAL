@@ -1,0 +1,141 @@
+name: Strelva Preview (nightly build)
+
+# Builds Strelva Preview every night from the Strelva Reborn (1.0.0)
+# integration branch, runs the full local gate, reports progress against
+# docs/product/strelva-reborn.md, and tags a green build as
+# strelva-v1.0.0-preview.YYYYMMDD. Customers use Strelva (Stable);
+# Strelva Preview is for Jacob and selected testers. It never deploys,
+# never reads production and never touches a client site.
+
+on:
+  schedule:
+    - cron: "0 7 * * *" # 03:00 Eastern (EDT)
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch to build"
+        required: true
+        default: reborn
+
+concurrency:
+  group: strelva-preview
+  cancel-in-progress: false
+
+env:
+  REBORN_REF: ${{ inputs.ref || 'reborn' }}
+  REBORN_VERSION: 1.0.0
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.REBORN_REF }}
+          fetch-depth: 0
+          persist-credentials: false
+      - id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.34.5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Progress report
+        # Runs first so the report exists even when a later gate fails.
+        run: |
+          previous="$(git tag -l "strelva-v${REBORN_VERSION}-preview.*" --sort=-creatordate | head -1)"
+          if [ -n "$previous" ]; then
+            git tag -l --format='%(contents)' "$previous" > previous-progress.json
+            echo "Compared with $previous" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          node scripts/reborn-progress.mjs --markdown --previous previous-progress.json >> "$GITHUB_STEP_SUMMARY"
+          node scripts/reborn-progress.mjs --json > reborn-progress.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reborn-progress
+          path: reborn-progress.json
+          retention-days: 30
+
+      - name: Lint
+        run: pnpm lint
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Product boundaries
+        run: pnpm check:boundaries
+      - name: Ontology invariants
+        run: pnpm check:ontology
+      - name: Workspace SQL and full ordered upgrade
+        run: |
+          export PATH="$(pg_config --bindir):$PATH"
+          pnpm check:workspace-sql
+          pnpm check:workspace-upgrade
+      - name: Test (with coverage gate)
+        run: pnpm test:coverage
+      - name: Audit dependencies
+        run: pnpm audit --audit-level high
+      - name: Build
+        run: pnpm build
+      - name: Install browser
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Public smoke
+        run: pnpm smoke
+        env:
+          CI: true
+      - name: Workspace browser acceptance
+        run: pnpm smoke:workspace
+        env:
+          CI: true
+          REB_DEV_UNGATED_ACCESS: "0"
+          SCAFFOLD_DEV_UNGATED_ACCESS: "0"
+      - name: Retain browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-browser-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  tag:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: reborn-progress
+      - name: Tag the green Preview build
+        # The tag message carries the progress JSON so the next night can
+        # report what changed. Unchanged source is not re-tagged.
+        run: |
+          if git tag --points-at HEAD | grep -q "^strelva-v${REBORN_VERSION}-preview\."; then
+            echo "This commit already has a Preview tag." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          tag="strelva-v${REBORN_VERSION}-preview.$(date -u +%Y%m%d)"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "$tag already exists; keeping the earlier build for today." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -F reborn-progress.json
+          git push origin "$tag"
+          echo "Tagged $tag at $(git rev-parse --short HEAD)." >> "$GITHUB_STEP_SUMMARY"

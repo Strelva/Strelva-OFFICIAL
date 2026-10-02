@@ -6,7 +6,7 @@ Strelva remains the control plane; the custom repo is the public website runtime
 > **Onboarding an existing client site?** Point that repo's coding agent at
 > [`AGENT-PLAYBOOK.md`](./AGENT-PLAYBOOK.md) — the step-by-step to wire a client
 > repo to Strelva and get it to audit grade A. The operator-side journey
-> (provision → domain → billing) is in [`../docs/client-onboarding.md`](../docs/client-onboarding.md).
+> (provision → domain → billing) is in [`../docs/client-onboarding.md`](../docs/operations/client-onboarding.md).
 
 ## Files
 
@@ -310,7 +310,7 @@ The tracker fails silent, is non-blocking (`sendBeacon` / `keepalive` fetch),
 skips in development, and respects `prefers-reduced-data`. It never throws, so a
 network error or missing env var can never break the client site.
 
-See `docs/tracking-rollout.md` in the Scaffold Web repo for the exact steps to
+See `docs/operations/tracking-rollout.md` in the Scaffold Web repo for the exact steps to
 roll this into the live GLDF and Rohlax repos plus how to verify the report
 picks it up.
 

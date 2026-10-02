@@ -58,7 +58,7 @@ jobs:
           fi
 
           if [ "$LAUNCH_GATE" = "owner-waived-blockers" ] && ! echo "$RELEASE_NOTE_REF" | grep -Eiq '(waiv|launch-blockers|blocker|pr|#[0-9]+|https?://|[A-Z]+-[0-9]+)'; then
-            echo "Owner-waived releases must reference waiver metadata in docs/launch-blockers.md, a release note, PR, URL, or ticket."
+            echo "Owner-waived releases must reference waiver metadata in docs/operations/launch-blockers.md, a release note, PR, URL, or ticket."
             exit 1
           fi
       - name: Create tag

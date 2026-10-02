@@ -1,103 +1,82 @@
-# Documentation status and authority
+# Docs
 
-Updated: 2026-09-11
+Updated: 2026-10-02
 
-Strelva has accumulated implementation notes, migration plans, strategy research,
-and live runbooks. They are not equal sources of truth. When two documents
-conflict, use this order:
+| Folder | Holds | Start with |
+| --- | --- | --- |
+| [capabilities/](./capabilities/README.md) | Every customer capability: what it does, status, code, specs, tests | [capabilities/README](./capabilities/README.md) |
+| [architecture/](./architecture/README.md) | Data, auth, tenancy, contracts, platform layers | [persistence-boundaries](./architecture/persistence-boundaries.md) |
+| [operations/](#operations) | Runbooks: release, rollback, secrets, domains, onboarding, testing | [production-readiness](./operations/production-readiness.md) |
+| [product/](#product) | Direction, briefs, evidence, roadmap | [product-reality](./product/product-reality.md) |
+| [design/](./design/) | Tokens, components, color, motion, brand | [component-system](./design/component-system.md) |
+| [research/](./research/), [strategy/](./strategy/00-INDEX.md) | Research memos and strategy explorations. Inputs, not decisions | — |
+| [archive/](./archive/README.md) | Finished migrations, superseded plans, old releases | Don't build from these |
+| [prototypes/](./prototypes/) | Design prototypes (`scripts/design/` writes here) | — |
 
-1. `AGENTS.md` for repository invariants and current operating constraints.
-2. `product-ontology.md` for domain names and product boundaries.
-3. `persistence-boundaries.md` for authority, cache, mirror, and retention.
-4. Current code and contract tests for executable behavior.
-5. Current operational runbooks listed below.
-6. Historical plans only as decision context.
+## When docs disagree
 
-## Current and normative
+1. [`AGENTS.md`](../AGENTS.md): repo rules and live-client constraints.
+2. [product-ontology](./architecture/product-ontology.md): names and boundaries.
+3. [persistence-boundaries](./architecture/persistence-boundaries.md): store authority.
+4. Current code and contract tests.
+5. Runbooks in `operations/`.
+6. Everything in `archive/`, `research/`, and `strategy/` is context only.
 
-| Document | Authority |
-|---|---|
-| [strelvav2](./strelvav2.md) | Internal release name, scope, verification, and production hold |
-| `horizontal-product-brief-2026-09-11.md` | Latest confirmed horizontal product direction; no claim of implementation or release |
-| `horizontal-audit-and-plan-2026-09-11.md` | Bounded source audit and proposed stages; architecture and release scope remain under review |
-| `horizontal-first-scope-2026-09-11.md` | Accepted local implementation scope and evidence requirements |
-| `horizontal-local-verification-2026-09-11.md` | Local implementation evidence, authenticated inquiry/tracker proof, and remaining release gates |
-| `horizontal-release-checklist-2026-09-11.md` | Local, authenticated staging, and separately authorized rollout checks |
-| `horizontal-capability-experiments-2026-09-11.md` | Sourced technical possibilities and experimental feature candidates, not committed capabilities |
-| `../VERSIONING.md` | Lockstep app/marketing SemVer and release-tag policy |
-| `inquiry-first-product-spec-2026-09-11.md` | Selected inquiry-first migration behavior, records, authority, and surface contract |
-| `inquiry-first-acceptance-2026-09-11.md` | Evidence requirements and initial inquiry audit; later results are in horizontal local verification |
-| `inquiry-first-architecture-security-review-2026-09-11.md` | Independent local review of inquiry trust boundaries, serious findings, and release blockers |
-| `product-ontology.md` | Product/domain ontology, taxonomy, maturity vocabulary |
-| `persistence-boundaries.md` | Store authority and migration boundaries |
-| `auth-tenancy-architecture.md` | Supabase Auth, membership, and application-layer tenancy |
-| `custom-repo-delivery-model.md` | Delivery topology and versioned storefront contract |
-| `operator-command-center.md` | Current operator information architecture |
-| `testing-and-ci.md` | Test layers and CI-faithful local verification |
-| `production-readiness.md` | Current release and production verification runbook |
-| `roadmap.md` | Current delivery state, market experiments, and execution priorities |
-| `rollback.md` | Current code, content, schema, Redis, and provider recovery policy |
-| `client-onboarding.md` | Current managed-client delivery workflow |
-| `strategy/current-product-focus.md` | Active product-strategy experiment |
-| `gtm/README.md` | Canonical GTM thesis, approach selection, release engine, experiments, and decisions |
+Don't fix a historical plan by making code match it. Promote the decision into
+a current doc and a contract test.
 
-Commercial plan truth is `src/lib/billing-plans.ts` plus the selected plan and
-monthly amount persisted on each tenant. Plan, capability, vertical, presence
-profile, and delivery model are independent axes. One-off pay links never imply
-a subscription.
+## Operations
 
-The canonical public origins are:
+| Doc | Use it for |
+| --- | --- |
+| [production-readiness](./operations/production-readiness.md) | Release and production verification (read by `pnpm check:prod`) |
+| [launch-blockers](./operations/launch-blockers.md) | The release gate (read by tests and `pnpm check:prod`) |
+| [horizontal-release-checklist](./operations/horizontal-release-checklist-2026-09-11.md) | Production rollout that keeps client sites up |
+| [strelvav2-horizontal-acceptance](./operations/strelvav2-horizontal-acceptance.md) | Acceptance and release evidence ledger, incl. the Sept 30 release |
+| [testing-and-ci](./operations/testing-and-ci.md) | Test layers and what a green run means |
+| [rollback](./operations/rollback.md) | Code, content, schema, Redis, provider recovery |
+| [secret-rotation](./operations/secret-rotation.md), [first-time-production-secrets](./operations/first-time-production-secrets.md) | Secrets |
+| [domain-setup](./operations/domain-setup.md) | Client domains and DNS |
+| [client-onboarding](./operations/client-onboarding.md), [`PROVISIONING.md`](../PROVISIONING.md) | Signed lead to live client |
+| [activation-runbook](./operations/activation-runbook.md), [tracking-rollout](./operations/tracking-rollout.md) | Analytics on client sites |
+| [tenant-redesign](./operations/tenant-redesign.md), [repo-transfer-runbook](./operations/repo-transfer-runbook.md) | Client repo redesign and handoff |
+| [where-things-live](./operations/where-things-live.md) | Which system owns what, and drift rules |
+| [`VERSIONING.md`](../VERSIONING.md) | Lockstep app/marketing versions |
 
-- `https://strelva.com` — separate marketing property.
-- `https://app.strelva.com` — client control plane and `/api` origin.
-- `https://admin.strelva.com` — operator console.
-- Customer custom domains — delivered Site Properties.
+## Product
 
-Legacy `REB_*`, `x-reb-*`, `reb:`, `scaffold-web`, and old capability aliases
-remain only where deployed wire, persistent data, or repository compatibility
-requires them.
+| Doc | Use it for |
+| --- | --- |
+| [offerings-and-differentiation](./product/offerings-and-differentiation-2026-10-02.md) | Every offering against the market, what to lead with, how we build differently (Oct 2) |
+| [product-reality](./product/product-reality.md) | Evidence register and the current decision (Oct 1) |
+| [horizontal-product-brief](./product/horizontal-product-brief-2026-09-11.md) | Confirmed product direction, clarified through Oct 1 |
+| [horizontal-audit-and-plan](./product/horizontal-audit-and-plan-2026-09-11.md) | Source audit and build order |
+| [Strelva Reborn](./product/strelva-reborn.md) | The `1.0.0` release: every client in a business workspace. Exit criteria and order (Oct 2) |
+| [strelvav2](./product/strelvav2.md), [definition of done](./product/strelvav2-definition-of-done.md), [module map](./product/strelvav2-module-map-2026-09-19.md) | The Sept 30 workspace release (history) |
+| [roadmap](./product/roadmap.md) | Delivery state as of Aug 1 (older than product-reality) |
+| [strelva-labs](./product/strelva-labs.md), [assets](./product/assets.md) | Labs direction; client and asset snapshot (Jul 30) |
+| [`todo.md`](../todo.md) | Sept 19–20 completion plan and backlog |
 
-## Current with scoped historical material
+Company direction and ADRs live outside this repo in `../CONTEXT.md` and
+`../docs/adr/`.
 
-- [September 11 product-direction synthesis](./product-direction-2026-09-11.md):
-  research context for the common interface. Its generic Request topology is
-  superseded by the selected inquiry-first specification where they conflict.
-- [Major-release specifications](./major-release/README.md): Astra's proposed
-  release package covering simple interfaces, deep modules, Enterprise agencies,
-  customers, Home Finder, implementation, and acceptance. Its proposed surface
-  topology and implementation order are superseded where they conflict with the
-  selected inquiry-first specification. Its authority and release evidence
-  constraints still apply and it does not establish deployed behavior.
-- [IDE for business research memo](./research/ide-for-business-2026-09-11.md):
-  September 11 product research on Strelva as an environment and runtime for a
-  business. Proposes primitives, an object model, an interface architecture,
-  a first wedge, and a moat analysis. Research direction for review; it does
-  not select scope, prices, or release behavior.
+## Fixed facts
 
-- `launch-blockers.md`: only Current/Waived Blockers and the current verification
-  section are normative; the evidence log is historical.
-- `domain-setup.md`: client-domain ownership and DNS instructions are current;
-  old control-plane apex cutover examples are historical.
-- `clerk-sanity-teardown-checklist.md`: historical execution record plus the
-  remaining ops-only Sanity image URL cleanup.
+- Commercial plan truth is `src/lib/billing-plans.ts` plus each tenant's
+  persisted plan and amount. A pay link never implies a subscription.
+- Origins: `strelva.com` (marketing, separate repo), `app.strelva.com` (app and
+  `/api`), `admin.strelva.com` (operator console), customer custom domains.
+- Legacy `REB_*`, `x-reb-*`, `reb:`, and `scaffold-web` names stay only where
+  deployed wire, stored data, or client repos need them.
 
-## Historical or superseded
+## Known gaps
 
-These files explain past decisions but must not drive new implementation:
-
-- `supabase-migration-plan.md` and `post-cutover-runbook.md`
-- `strelva-migration-plan.md` and `url-cutover-runbook.md`
-- `first-time-production-secrets.md`
-- `operating-model.md` — superseded 2026-07-14; the top-banner and section headers
-  are updated to reflect that Clerk (removed 2026-07-11) and Sanity (removed
-  2026-07-10) teardowns are complete. Punch-list items referencing them are closed.
-  Use `product-ontology.md`, `persistence-boundaries.md`, and `operations.md` for
-  current decisions.
-- `platform-hardening.md` and `mission-control-test-checklist.md`
-- `docs/goals/**` state, runbooks, and completed goal notes
-- `strategy/research/**` and dated strategy alternatives unless explicitly
-  promoted by `strategy/current-product-focus.md` or `gtm/DECISIONS.md`
-- `clerk-sanity-teardown-checklist.md` — execution record; both teardowns complete.
-
-Do not repair a historical plan by making current code match it. Promote an
-intentional decision into a normative document and an executable contract test.
+- `gtm/` is referenced by [strategy/00-INDEX](./strategy/00-INDEX.md),
+  [current-product-focus](./strategy/current-product-focus.md), and the roadmap,
+  but doesn't exist in this repo.
+- [client-dashboard-ia](./architecture/client-dashboard-ia.md) calls itself a
+  historical compatibility map, but `AGENTS.md` still names it the owner.
+- [design-kit](./design/design-kit.md) predates the Sept 18 Geist decision in
+  `DESIGN.md`; tests still read it.
+- Two applied migrations mention old doc paths in
+  comments. Migrations are left unedited on purpose.

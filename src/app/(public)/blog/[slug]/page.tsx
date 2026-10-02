@@ -1,3 +1,4 @@
+import { hostedPageMetadata, renderHostedPage } from "@/products/websites/index";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -16,6 +17,8 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
+  const hosted = await hostedPageMetadata(`/blog/${slug}`);
+  if (hosted) return hosted;
   const tenant = await getTenantFromHeaders();
   const post = await getBlogPostForSite(tenant, slug).catch(() => null);
   const settings = await getContent("settings", tenant).catch(() => defaults.settings);
@@ -46,6 +49,8 @@ export default async function BlogPostPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const hosted = await renderHostedPage(`/blog/${slug}`);
+  if (hosted) return hosted;
   const tenant = await getTenantFromHeaders();
   const preview = await isPreviewMode();
   // In preview mode, allow viewing draft posts. A transient backend error must

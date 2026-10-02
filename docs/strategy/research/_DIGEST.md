@@ -384,12 +384,12 @@ governance engine are confirmed in source code. The "AI Visibility" audit catego
 known direct local-business competitor as of June 2026 research.
 
 **Confirmed code references:**
-- Audit engine: `src/lib/audit/checks.ts`, `/api/audit/scan`, docs at `docs/audit-page.md`
+- Audit engine: `src/lib/audit/checks.ts`, `/api/audit/scan`, docs at `docs/capabilities/audit/audit-engine.md`
 - Governance engine: `src/lib/ai-governance.ts` (auto / review / block tiers)
 - Integration registry: `src/lib/integration-registry.ts` (Google Search Console +
   Business, Yelp, Instagram, Calendly, Reviews, site activity)
 - Versioned contract + signed revalidation: `src/lib/scaffold-contracts.ts`; delivery
-  pipeline in `docs/future-codebase-integration.md`
+  pipeline in `docs/architecture/client-repo-build-standard.md`
 - Weekly brief (per-tenant receipt, no cross-tenant layer yet): `src/lib/weekly-brief.ts`
 - Agent executor + tools: `src/lib/agent-executor.ts`
 - Site capability manifest: `src/lib/site-capabilities.ts`

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ServiceRequest } from "@/platform/service-requests/types";
-import { businessDeliveryItems } from "@/experience/workspace/business-delivery-summary";
+import { businessDeliveryItems, requestStage } from "@/experience/workspace/business-delivery-summary";
 function request(status: string | null, acceptance = "accepted", state = "requested"): ServiceRequest {
   return { id: "test", outcome: "A working website", status: state, providerAcceptance: { status: acceptance }, deliveryCommitment: status ? { status, blocker: null, dueAt: null } : null } as unknown as ServiceRequest;
 }
@@ -12,4 +12,17 @@ describe("business home describes actual delivery state", () => {
   it.each(["accepted","cancelled"])("keeps %s history without fabricating a next action", status => expect(businessDeliveryItems([request(status)])[0]).toMatchObject({attention:false,handling:false}));
   it("does not surface draft requests as deliveries",()=>expect(businessDeliveryItems([request(null,"pending","draft")])).toEqual([]));
   it("does not revive withdrawn or declined work",()=>{expect(businessDeliveryItems([request("running","declined"),request("proposed","accepted","withdrawn")]).every(item=>!item.attention&&!item.handling)).toBe(true);});
+  it.each([
+    [null, "pending", "requested", "asked"],
+    [null, "accepted", "requested", "asked"],
+    ["proposed", "accepted", "requested", "needs_you"],
+    ["running", "accepted", "requested", "in_progress"],
+    ["changes_requested", "accepted", "requested", "in_progress"],
+    ["submitted", "accepted", "requested", "ready_for_review"],
+    ["accepted", "accepted", "requested", "done"],
+    ["cancelled", "accepted", "requested", "closed"],
+    ["running", "declined", "requested", "closed"],
+    ["running", "accepted", "withdrawn", "closed"],
+  ])("puts commitment %s / provider %s / request %s in the %s stage", (status, acceptance, state, stage) => expect(requestStage(request(status, acceptance, state))).toBe(stage));
+  it("only calls a request agreed work once scope and deadline are accepted", () => expect(businessDeliveryItems([request(null)])[0]).toMatchObject({ stage: "asked", handling: false }));
 });
