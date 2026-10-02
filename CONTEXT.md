@@ -6,7 +6,9 @@ Component checkpoint reviewed on this date; earlier product evidence retains its
 own dates.
 Kind: product
 
-Internal release: **strelvav2**. See the [release entry point](./docs/strelvav2.md).
+Next release: **Strelva Reborn** (`1.0.0`), every client in a business
+workspace. See the [release entry point](./docs/product/strelva-reborn.md). The earlier
+[strelvav2](./docs/product/strelvav2.md) release shipped the workspace on Sept 30.
 This branch is for internal work and is not approved for production.
 
 ## Role
@@ -19,7 +21,7 @@ in the [workspace context](../CONTEXT.md); interaction decisions live in
 
 ## Current component work
 
-Start with the [foundation inventory](./docs/component-system.md): tokens,
+Start with the [foundation inventory](./docs/design/component-system.md): tokens,
 atoms, contracts and remaining adoption work. The
 [September 17 component checkpoint](./docs/design/current-component-context.md)
 records local implementations, rejected treatments, alternatives and proof.
@@ -27,7 +29,7 @@ The system is partially adopted, not fully migrated. No material winner, final
 visual acceptance or production release is implied.
 
 The September 18 [visual direction map](./DESIGN.md#visual-direction-and-extension-map)
-and [foundation extension contract](./docs/component-system.md#extending-the-foundation)
+and [foundation extension contract](./docs/design/component-system.md#extending-the-foundation)
 connect selected direction, source owners, specimens and verification. They
 resolve older font-selection guidance in favor of the recorded Geist/custom-logo
 decision. This is structural documentation work; component implementation and
@@ -35,8 +37,19 @@ adoption gaps remain in the foundation inventory.
 
 ## Current product work
 
+Jacob's October 1 direction makes managed delivery the default for managed
+clients, while retaining creation tools for agencies and people who deliberately
+choose to build. Clients provide business information, judgment and approvals;
+Strelva handles setup, testing, delivery and agreed maintenance. The website
+remains clear and directly accessible: its name and domain, live-site link,
+verified status, change requests and previews awaiting review. Clients should
+not have to manage Strelva's software or agents. The
+[managed-client direction](./docs/product/horizontal-product-brief-2026-09-11.md#october-1-managed-client-default-and-website-clarity)
+owns the acceptance requirements. This selects behavior, not implemented
+completion, proven delivery economics or new commercial terms.
+
 Use **The Mooney Firm, attymooney.com**, as the default product example and
-walkthrough from now on. The [website release focus](./docs/horizontal-product-brief-2026-09-11.md#september-20-website-release-focus)
+walkthrough from now on. The [website release focus](./docs/product/horizontal-product-brief-2026-09-11.md#september-20-website-release-focus)
 records this choice and links its existing customer acceptance requirements.
 
 Jacob's September 21 direction keeps Strelva's agency website delivery and
@@ -46,10 +59,10 @@ must not need a website purchase. The agency intends a 24-hour website offer;
 its accepted scope, clock start and delivery definition still require explicit
 commercial selection before publication. No price, refund or unlimited-work
 policy is implied. The September 20
-[website release focus](./docs/horizontal-product-brief-2026-09-11.md#september-20-website-release-focus)
-is historical where it makes self-service websites the primary release gate. Read the [website release review](./docs/strelvav2-horizontal-acceptance.md#website-release-review)
+[website release focus](./docs/product/horizontal-product-brief-2026-09-11.md#september-20-website-release-focus)
+is historical where it makes self-service websites the primary release gate. Read the [website release review](./docs/operations/strelvav2-horizontal-acceptance.md#website-release-review)
 for the distinction between existing managed sites, new customer creation and
-outside-site connection. The subsequent [self-service implementation record](./docs/strelvav2-horizontal-acceptance.md#self-service-website-implementation-follow-through)
+outside-site connection. The subsequent [self-service implementation record](./docs/operations/strelvav2-horizontal-acceptance.md#self-service-website-implementation-follow-through)
 records the working local creation, private preview, approval and downloadable
 website flow. Launch preparation currently prepares files; it does not deploy
 the website or connect a domain. Supporting workspace capabilities remain available
@@ -57,22 +70,22 @@ according to their own evidence; the new focus does not certify a self-service
 website builder or change existing customer obligations.
 
 The September 20 completion work prepares shared version `0.2.0` as an
-Unreleased candidate. The [current execution record](./docs/strelvav2-horizontal-acceptance.md#september-20-completion-execution)
+Unreleased candidate. The [current execution record](./docs/operations/strelvav2-horizontal-acceptance.md#september-20-completion-execution)
 owns the latest implementation and verification state; [the completion plan](./todo.md#september-19-completion-plan)
 separates local work from operating and production requirements.
 
-The September 16 [transition and hypotheses](./docs/horizontal-product-brief-2026-09-11.md#september-16-transition-and-hypotheses)
+The September 16 [transition and hypotheses](./docs/product/horizontal-product-brief-2026-09-11.md#september-16-transition-and-hypotheses)
 explain the move from hiring Strelva for defined delivery toward using a product
 to improve and operate business work. Improving existing work and enabling
 previously unaffordable work are equally part of the direction. The
-[evidence register](./docs/product-reality.md#september-16-transition-hypotheses)
+[evidence register](./docs/product/product-reality.md#september-16-transition-hypotheses)
 keeps this selected direction separate from unproven adoption and economics.
 
 Jacob's September 15 direction authorizes local implementation of the full
 business and offering topology in the
-[product brief](./docs/horizontal-product-brief-2026-09-11.md). The earlier staff
+[product brief](./docs/product/horizontal-product-brief-2026-09-11.md). The earlier staff
 application journey remains a required regression, not a restriction on broader
-work. The [acceptance ledger](./docs/strelvav2-horizontal-acceptance.md) separates
+work. The [acceptance ledger](./docs/operations/strelvav2-horizontal-acceptance.md) separates
 proof from unfinished behavior. Existing customer agreements, native product
 authority and production restrictions remain unchanged.
 
@@ -81,9 +94,44 @@ authority and production restrictions remain unchanged.
 **Business:** The customer organization whose work and records must remain
 separate from other businesses. A business is not a website tenant, payer or
 agency merely because the same person can access them.
+_Avoid_: tenant (legacy storage name only), account, client (for the record)
 
-**Offering:** A specific promise combining usable software, completed work or
-ongoing help. Its limits and provider commitments are explicit.
+**Business record:** The one shared set of facts, contacts, requests, bookings
+and content that belongs to a business and that every capability reads.
+_Avoid_: CRM, knowledge graph, tenant config
+
+**Capability:** Something Strelva's software can do on a business record, such
+as answering requests, taking bookings or publishing a website. Businesses
+don't buy capabilities directly.
+_Avoid_: module, product, executable, feature, app (for first-party capabilities)
+
+**Offering:** An outcome a business turns on, named the way the business would
+say it ("Never miss a new client"), delivered by one or more capabilities
+under stated limits. Human help is the exception path inside it, not the
+offering itself.
+_Avoid_: item, shelf item, package, product, service
+
+**Responsibility:** A condition an offering keeps true over time under stated
+limits, such as every inquiry answered within five minutes. It is the unit
+Strelva prices and is accountable for.
+_Avoid_: retainer, maintenance, service level
+
+**Receipt:** The record that an outside change was made and then read back from
+the outside system, with what changed and how to undo it.
+_Avoid_: proof, log, evidence (for a single change)
+
+**Provider:** Whoever serves a business beyond the software: nobody
+(self-serve), an agency, or Strelva's own agency.
+_Avoid_: operator (that's Strelva staff in the console), vendor
+
+**Method:** An agency's reusable way of setting up and running offerings for
+its clients. A method carries no customer data, secrets or grants.
+_Avoid_: playbook, snapshot, template, recipe
+
+**Customer agent:** An AI acting for a member of the public, such as Google
+calling to book or ChatGPT making a reservation. It is not Strelva's agent and
+holds no business authority.
+_Avoid_: bot, AI customer
 
 **Installation:** An offering configured for one business, with its selected
 version and connected resources. Installation does not grant new authority or
@@ -105,7 +153,7 @@ or permission to access client information.
 ## Evidence state
 
 Jacob authorized the full horizontal local implementation on September 12. The
-[acceptance ledger](./docs/strelvav2-horizontal-acceptance.md) is the completion
+[acceptance ledger](./docs/operations/strelvav2-horizontal-acceptance.md) is the completion
 record. The current work adds durable owner-approved execution, private bounded
 apps, local scheduling, repeated saved-source investigations, scoped contributions,
 source context, runtime cost admission, and the internal learning loop. Results
@@ -120,18 +168,18 @@ real research samples, customer value, or Jacob's human acceptance. Production,
 paid calls, live messages, grants and deployments remain unapproved.
 
 - **Latest confirmed product direction:** the
-  [horizontal product brief](./docs/horizontal-product-brief-2026-09-11.md)
+  [horizontal product brief](./docs/product/horizontal-product-brief-2026-09-11.md)
   records Jacob's subsequent decisions: users across organization sizes, fluid
   self-service and managed collaboration, outside agencies and agents, and
   vertical R&D measuring time and financial value. The inquiry migration below
   is one narrow implementation slice, not the whole product or its launch
-  sequence. See the [audit and staged plan](./docs/horizontal-audit-and-plan-2026-09-11.md).
+  sequence. See the [audit and staged plan](./docs/product/horizontal-audit-and-plan-2026-09-11.md).
   These planning decisions do not change live scope, billing or runtime authority.
 
 - **Existing inquiry implementation contract:** the
-  [inquiry-first product specification](./docs/inquiry-first-product-spec-2026-09-11.md)
+  [inquiry-first product specification](./docs/capabilities/inquiries/inquiry-first-product-spec-2026-09-11.md)
   governs the September 11 local migration. The
-  [acceptance matrix](./docs/inquiry-first-acceptance-2026-09-11.md) keeps
+  [acceptance matrix](./docs/capabilities/inquiries/inquiry-first-acceptance-2026-09-11.md) keeps
   implementation and evidence status separate from the selected behavior.
   Work present in the local tree is under review and does not establish release,
   deployment, provider access, live delivery, or customer adoption.
@@ -158,8 +206,8 @@ paid calls, live messages, grants and deployments remain unapproved.
 
 The inquiry engine, business entry, fixed public form, version-bound intake,
 rehearsal UI, publication transaction, receipts, consent controls, and undo now
-have local implementation and tests. Production activation remains pending. The [initial implementation checkpoint](./docs/inquiry-first-implementation-status-2026-09-11.md)
-is historical. The [horizontal verification record](./docs/horizontal-local-verification-2026-09-11.md)
+have local implementation and tests. Production activation remains pending. The [initial implementation checkpoint](./docs/archive/inquiry-first-implementation-status-2026-09-11.md)
+is historical. The [horizontal verification record](./docs/archive/horizontal-local-verification-2026-09-11.md)
 records the later implementation and authenticated local evidence. Keep
 `STRELVA_INQUIRIES_RELEASE` off until that checklist is complete and a separate
 production action is authorized.
@@ -213,11 +261,13 @@ to the application. No migration or activation was performed. On September
 ## Current attention
 
 The [internal product research](./docs/research/strelva-horizontal-product-research.md)
-and [evidence register](./docs/product-reality.md) examine horizontal capabilities
+and [evidence register](./docs/product/product-reality.md) examine horizontal capabilities
 and product structure. Jacob clarified the high-growth technology-product aim,
 with clients becoming product users under subscription/usage pricing. Exploration
 keeps app creation, recurring work, interactive shared outputs, and reusable
-products open. A work-centered or agency-delivery default is not accepted. R&D
+products open. A general work-centered or agency-delivery default was not
+accepted by that research. The October 1 direction above subsequently selects
+managed delivery for managed clients while retaining deliberate creation. R&D
 is strictly internal. These research options authorize no implementation or
 production change.
 
@@ -227,14 +277,14 @@ product alternatives, and ten proposed demonstrations. Its recommendations are
 research, not a newly selected strategy or evidence of general autonomous
 operation. Existing authority and release boundaries remain in force.
 
-The [definition of done](./docs/strelvav2-definition-of-done.md) proposes separate
+The [definition of done](./docs/product/strelvav2-definition-of-done.md) proposes separate
 acceptance gates for the horizontal interface, working local product and internal
 research/learning system, and operated customer offerings. Inquiry screen counts
 do not measure horizontal completion. Internal research retains sourced claims,
 observations, inferences, unknowns, and contradictory evidence; synthetic users
 do not establish demand. These definitions add no production or spending authority.
 
-The [full horizontal acceptance ledger](./docs/strelvav2-horizontal-acceptance.md)
+The [full horizontal acceptance ledger](./docs/operations/strelvav2-horizontal-acceptance.md)
 now defines the requested expansion beyond the first slice. Current local work
 adds outcome entry, private documents, grouped tracker edits and Undo, task and
 project starts, model-backed planning with selected sources, reusable inquiry
@@ -244,14 +294,14 @@ Jacob will conduct the end-to-end behavior review. Use focused behavior tests,
 critical failure checks, and type checking during implementation. Production
 remains off, and no audited full-product completion percentage is established.
 
-The [first horizontal scope](./docs/horizontal-first-scope-2026-09-11.md) is selected:
+The [first horizontal scope](./docs/archive/horizontal-first-scope-2026-09-11.md) is selected:
 shared inquiry work, CSV trackers, and internal experiment evidence. Its local
 implementation passes unit, browser, build, compatibility and isolated storage
 checks, including authenticated local journeys. See the
-[verification record](./docs/horizontal-local-verification-2026-09-11.md) for the
+[verification record](./docs/archive/horizontal-local-verification-2026-09-11.md) for the
 exact evidence and limits. Provider testing, representative client installation
 and production activation remain release gates. Use
-the [rollout checklist](./docs/horizontal-release-checklist-2026-09-11.md) to keep
+the [rollout checklist](./docs/operations/horizontal-release-checklist-2026-09-11.md) to keep
 local, authenticated staging, and production evidence separate. Preserve the
 inquiry acceptance requirements for any
 inquiry release without weakening the existing
@@ -276,9 +326,9 @@ presence of these routes.
 - [Interface contract](./DESIGN.md), [shared frame](./src/experience/app-frame/StrelvaShell.tsx),
   [workspace experience](./src/experience/workspace/WorkspaceApp.tsx), and
   [managed website frame](./src/components/dashboard/ConversationShell.tsx).
-- [Testing and CI](./docs/testing-and-ci.md) and
-  [persistence boundaries](./docs/persistence-boundaries.md).
-- [Inquiry-first product specification](./docs/inquiry-first-product-spec-2026-09-11.md)
-  and [acceptance matrix](./docs/inquiry-first-acceptance-2026-09-11.md).
-- [Client dashboard surfaces](./docs/client-dashboard-ia.md) and
-  [operator responsibilities](./docs/operator-command-center.md).
+- [Testing and CI](./docs/operations/testing-and-ci.md) and
+  [persistence boundaries](./docs/architecture/persistence-boundaries.md).
+- [Inquiry-first product specification](./docs/capabilities/inquiries/inquiry-first-product-spec-2026-09-11.md)
+  and [acceptance matrix](./docs/capabilities/inquiries/inquiry-first-acceptance-2026-09-11.md).
+- [Client dashboard surfaces](./docs/architecture/client-dashboard-ia.md) and
+  [operator responsibilities](./docs/architecture/operator-command-center.md).

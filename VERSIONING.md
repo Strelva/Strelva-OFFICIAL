@@ -36,6 +36,11 @@ Strelva as one product.
 
 Do not use the retired `reb-vYYYY.MM.DD.N` tag format for new releases.
 
+Nightly builds of an upcoming release use a SemVer prerelease tag, for example
+`strelva-v1.0.0-nightly.20261003`. The
+[Reborn nightly](./.github/workflows/reborn-nightly.yml) workflow creates them
+from green builds. They are not releases and never deploy.
+
 ## Separate version domains
 
 The product version does not replace the public storefront API contract version.

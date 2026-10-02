@@ -36,6 +36,7 @@
     "audit:full": "npx tsx --env-file-if-exists=.env.local scripts/full-audit.ts",
     "check:prod": "tsx scripts/production-checklist.ts",
     "typecheck": "next typegen && tsc --noEmit",
+    "reborn:progress": "node scripts/reborn-progress.mjs",
     "version:check": "node scripts/check-version-sync.mjs"
   },
   "dependencies": {

@@ -1,5 +1,8 @@
 # strelvav2
 
+History. The workspace this release built went to production on Sept 30.
+The next release is [Strelva Reborn](./strelva-reborn.md) (`1.0.0`).
+
 `strelvav2` is the internal migration name. The customer product is Strelva.
 The current source version is `0.2.0` in the app and marketing repositories.
 This does not establish a deployed release or change compatibility names.
@@ -48,15 +51,15 @@ parallel website builder, generic task database or case-management product.
 
 ## Verification that belongs to this release
 
-The [original CI workflow](../.github/workflows/ci.yml) covers full-project lint,
+The [original CI workflow](../../.github/workflows/ci.yml) covers full-project lint,
 types, boundaries, invariants, tests, coverage, dependency audit and build.
 Its public, workspace and owner/operator browser gates require a non-draft PR.
 A successful draft run does not include those gates.
 
-[Launch verification](../.github/workflows/launch-verification.yml) additionally
+[Launch verification](../../.github/workflows/launch-verification.yml) additionally
 runs the full ordered isolated database upgrade, focused delivery and business
 regressions, workspace browser checks and six real local Auth/Postgres journeys.
-[The retained-results checker](../scripts/check-launch-browser-results.mjs)
+[The retained-results checker](../../scripts/check-launch-browser-results.mjs)
 requires the named journeys to execute and pass without skips or retries.
 The marketing profile independently requires six public-entry journeys; it
 cannot substitute for the core native and delivery journeys.
@@ -83,14 +86,14 @@ a GitHub workflow result.
 
 The earlier connector returned 403. On September 21 the existing Vercel CLI
 login successfully read the Strelva team, production deployments and project
-configuration. The [dated preparation evidence](./strelvav2-horizontal-acceptance.md#september-21-production-preparation-evidence)
+configuration. The [dated preparation evidence](../operations/strelvav2-horizontal-acceptance.md#september-21-production-preparation-evidence)
 records the actual deployment IDs, configured Supabase origin and their limits.
 Read-only Supabase catalog access subsequently identified the actual migration
 gap and unrecognized history. Their reconciliation and deployed-runtime mapping
 remain gates; current project settings alone do not prove an older deployment's
 effective environment.
 
-The [prepared rollout checklist](./horizontal-release-checklist-2026-09-11.md#september-21-production-preparation)
+The [prepared rollout checklist](../operations/horizontal-release-checklist-2026-09-11.md#september-21-production-preparation)
 implements Jacob's requirement that no client site go down. Preparation does not
 authorize production changes. Existing client aliases on the control-plane
 project make compatibility a prerequisite to any app rollout.
@@ -98,8 +101,8 @@ project make compatibility a prerequisite to any app rollout.
 The hosted operation needs the exact application and marketing artifacts,
 environment and provider scopes, actual database history and schema delta,
 backup/recovery target, existing-client compatibility, and ordinary-account
-acceptance. The [offline target checker](../scripts/check-workspace-target.mjs)
-and [read-only catalog query](../scripts/workspace-target-snapshot.sql) assist
+acceptance. The [offline target checker](../../scripts/check-workspace-target.mjs)
+and [read-only catalog query](../../scripts/workspace-target-snapshot.sql) assist
 that comparison. They do not grant release approval or apply migrations.
 
 Publish the marketing destinations only after the intended app and database
@@ -119,14 +122,14 @@ customer agreements and keep unqualified actions unavailable server-side.
 
 ## Retained evidence and ownership
 
-- [Operating instructions](../AGENTS.md) and [current product context](../CONTEXT.md).
+- [Operating instructions](../../AGENTS.md) and [current product context](../../CONTEXT.md).
 - [Product brief and dated decisions](./horizontal-product-brief-2026-09-11.md).
-- [Native persistence and operational authority](./persistence-boundaries.md).
-- [Dated implementation and acceptance ledger](./strelvav2-horizontal-acceptance.md).
-- [Current component, material and motion context](./design/current-component-context.md).
+- [Native persistence and operational authority](../architecture/persistence-boundaries.md).
+- [Dated implementation and acceptance ledger](../operations/strelvav2-horizontal-acceptance.md).
+- [Current component, material and motion context](../design/current-component-context.md).
 - [Definition of done and internal learning](./strelvav2-definition-of-done.md).
-- [Provider and customer release checklist](./horizontal-release-checklist-2026-09-11.md).
-- [Versioning policy](../VERSIONING.md).
+- [Provider and customer release checklist](../operations/horizontal-release-checklist-2026-09-11.md).
+- [Versioning policy](../../VERSIONING.md).
 
 September 11 and September 19 records describe earlier checkpoints. PR #190,
 its `0330f75` head, the earlier `0.1.1` version and local preview ports are not the
