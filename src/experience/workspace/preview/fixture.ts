@@ -97,7 +97,7 @@ function sampleWork(workspaceId: string, title = "Harbor Dental", id = "44444444
   };
 }
 
-export function createPreviewRequest(scenario: PreviewScenario, options: { installedStaffRequest?: boolean } = {}): typeof fetch {
+export function createPreviewRequest(scenario: PreviewScenario, options: { installedStaffRequest?: boolean; seededRequests?: boolean } = {}): typeof fetch {
   const workspaceId = scenario === "agency" ? AGENCY : scenario === "read-only" || scenario === "business" ? CUSTOMER : PERSONAL;
   const base: WorkspaceSnapshot = {
     actor: { email: "alex@example.com", localPreview: true },
@@ -154,6 +154,14 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
   if (scenario === "business" && options.installedStaffRequest) {
     saved.set(CUSTOMER, [staffRequestWork(), ...(saved.get(CUSTOMER) || [])]);
   }
+  if (scenario === "business" && options.seededRequests) {
+    saved.set(CUSTOMER, [
+      { ...staffRequestWork(), title: "Staff requests" },
+      { ...sampleWork(CUSTOMER), id: "dddddddd-dddd-4ddd-8ddd-000000000001", title: "Send recall reminders to overdue patients", productId: "operations", resourceKind: "responsibility", payload: null, assessment: undefined, createdAt: "2026-10-01T15:00:00.000Z", operation: { status: "needs_attention", reason: "Approve the reminder text before it goes to 38 patients." } },
+      { ...sampleWork(CUSTOMER), id: "dddddddd-dddd-4ddd-8ddd-000000000002", title: "Fix broken links on the services pages", productId: "operations", resourceKind: "responsibility", payload: null, assessment: undefined, createdAt: "2026-09-29T15:00:00.000Z", operation: { status: "completed" } },
+      ...(saved.get(CUSTOMER) || []),
+    ]);
+  }
   let sequence = 0;
   let serviceRequestSequence = 0;
   let allowanceAccepted = false;
@@ -165,6 +173,7 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
   let providerDeliveryRevision = 1;
   const serviceRequests: ServiceRequest[] = [];
   const serviceRequestKeys = new Map<string, { digest: string; requestId: string }>();
+  if (scenario === "business" && options.seededRequests) serviceRequests.push(...seededServiceRequests());
   if (scenario === "agency") serviceRequests.push({
     id: PREVIEW_AGENCY_REQUEST,
     businessId: CUSTOMER,
@@ -457,4 +466,28 @@ export function createPreviewRequest(scenario: PreviewScenario, options: { insta
     }
     return response({ error: "This action is not performed in the local preview. No invitation, email, or account change has been created." }, 409);
   };
+}
+
+/** Requests at every stage for reviewing the Requests and Home surfaces. Fictional. */
+function seededServiceRequests(): ServiceRequest[] {
+  const operatorId = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+  const base = (index: number, outcome: string, provider: ServiceRequest["provider"], updatedAt: string): ServiceRequest => ({
+    id: `ffffffff-ffff-4fff-8fff-${String(index).padStart(12, "0")}`, businessId: CUSTOMER, status: "requested", request: outcome, outcome,
+    context: { workspaceName: "Harbor Dental", source: "workspace_help" }, scope: ["website_change"], provider,
+    providerAcceptance: { status: "accepted", actorId: operatorId, acceptedAt: "2026-09-28T14:00:00.000Z", note: null },
+    installationId: null, deliveryId: null, revision: 2, createdBy: PREVIEW_ACTOR_ID, createdAt: "2026-09-27T14:00:00.000Z", updatedAt,
+  });
+  const commitment = (status: NonNullable<ServiceRequest["deliveryCommitment"]>["status"], dueAt: string | null) => ({
+    version: 1 as const, status, operatorId, termsReference: "Harbor Dental website care", deliveryDefinition: "Live on harbordental.example and checked on desktop and mobile.",
+    scope: ["website_change"], proposedAt: "2026-09-28T14:00:00.000Z", startedAt: status === "proposed" ? null : "2026-09-29T14:00:00.000Z", dueAt,
+    customerAcceptedBy: status === "proposed" ? null : PREVIEW_ACTOR_ID, customerAcceptedAt: status === "proposed" ? null : "2026-09-29T13:00:00.000Z",
+    blocker: null, result: null, decision: status === "accepted" ? { kind: "accepted" as const, note: "Looks right.", actorId: PREVIEW_ACTOR_ID, at: "2026-10-01T16:00:00.000Z" } : null,
+  });
+  return [
+    { ...base(1, "A page for implant consultations, with booking", { kind: "strelva" }, "2026-10-02T13:00:00.000Z"), deliveryCommitment: commitment("running", "2026-10-09T21:00:00.000Z") },
+    { ...base(2, "Online new-patient intake form", { kind: "agency", agencyWorkspaceId: AGENCY }, "2026-10-02T11:00:00.000Z"), deliveryCommitment: commitment("running", "2026-10-06T21:00:00.000Z") },
+    { ...base(3, "Whitening packages and prices on the website", { kind: "strelva" }, "2026-10-02T09:00:00.000Z"), deliveryCommitment: commitment("proposed", "2026-10-10T21:00:00.000Z") },
+    { ...base(4, "Holiday hours on the website and Google", { kind: "strelva" }, "2026-10-01T16:00:00.000Z"), deliveryCommitment: commitment("accepted", "2026-10-01T21:00:00.000Z") },
+    { ...base(5, "Spanish versions of the service pages", { kind: "strelva" }, "2026-10-02T08:00:00.000Z"), providerAcceptance: { status: "pending", actorId: null, acceptedAt: null, note: null } },
+  ];
 }

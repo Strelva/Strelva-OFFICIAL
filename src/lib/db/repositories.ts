@@ -219,7 +219,7 @@ export async function getMailLogPg(tenantId: string, limit = 50): Promise<Row<"m
 // These repositories use
 // the SERVICE_ROLE client deliberately — authorization computations (owner guard,
 // super-admin check) must see across tenants, and they run server-side only.
-// See docs/auth-tenancy-architecture.md (Plane 2).
+// See docs/architecture/auth-tenancy.md (Plane 2).
 // ---------------------------------------------------------------------------
 
 // users -----------------------------------------------------------------------
@@ -482,7 +482,7 @@ export async function upsertContentData(
 
 // ---------------------------------------------------------------------------
 // collection_entries (Collections CMS — typed repeating entries)
-// See src/lib/cms/collection-types.ts + docs/strelva-cms-scope.md.
+// See src/lib/cms/collection-types.ts + docs/capabilities/publishing/collections-cms.md.
 // ---------------------------------------------------------------------------
 
 export async function listEntries(

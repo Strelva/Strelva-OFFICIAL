@@ -208,5 +208,5 @@ For each comparison, state which property is being explored and which direction
 is held constant. Preserve materially different options when taste is unresolved.
 Record Jacob's selection with its scope in the owning contract; keep rejected
 or superseded studies clearly labeled so they cannot return as defaults.
-Promotion into code follows the [foundation extension contract](../component-system.md#extending-the-foundation),
+Promotion into code follows the [foundation extension contract](component-system.md#extending-the-foundation),
 with actual consumer adoption and dated evidence recorded separately.

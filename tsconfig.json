@@ -53,7 +53,9 @@
     ".next-components-restart/types/**/*.ts",
     ".next-components-restart/dev/types/**/*.ts",
     ".next-visible-review/types/**/*.ts",
-    ".next-visible-review/dev/types/**/*.ts"
+    ".next-visible-review/dev/types/**/*.ts",
+    ".next-navcheck/types/**/*.ts",
+    ".next-navcheck/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

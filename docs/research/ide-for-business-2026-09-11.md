@@ -145,7 +145,7 @@ rehearsal scenarios, and history. Everything a business already runs elsewhere
 authoritative there. Strelva mirrors with provenance and writes only through the
 governed action path, exactly as the current Google Business and review-reply
 gates already work. A mirror never transfers authority, which is the same rule
-`docs/persistence-boundaries.md` already applies to Redis.
+`docs/architecture/persistence-boundaries.md` already applies to Redis.
 
 The graph is not a triple store. It is typed Postgres records with explicit link
 types, an append-only event ledger, and snapshots. That is what Palantir's

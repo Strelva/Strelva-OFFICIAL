@@ -63,7 +63,7 @@ flowchart TD
   Resolve --> DomainStates["P · Wrong account / unverified / unavailable"]
 ```
 
-The graph covers the requested entrance/navigation scope; it is not an inventory of every editor, API or administrative detail screen. Website controls retain their existing [client dashboard map](../client-dashboard-ia.md). Public diagnostic routes `/audit` and `/ai-visibility` remain direct product entrances and need the same save/return behavior. No branded workspace address or native AI-host connector is established by this proposal.
+The graph covers the requested entrance/navigation scope; it is not an inventory of every editor, API or administrative detail screen. Website controls retain their existing [client dashboard map](../architecture/client-dashboard-ia.md). Public diagnostic routes `/audit` and `/ai-visibility` remain direct product entrances and need the same save/return behavior. No branded workspace address or native AI-host connector is established by this proposal.
 
 ## First destination
 

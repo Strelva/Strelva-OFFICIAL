@@ -382,8 +382,8 @@ The first useful release does not require a new database migration. It requires 
 
 - `CONTEXT.md`
 - `DESIGN.md`
-- `docs/client-dashboard-ia.md`
-- `docs/operator-command-center.md`
+- `docs/architecture/client-dashboard-ia.md`
+- `docs/architecture/operator-command-center.md`
 - `src/experience/app-frame/StrelvaShell.tsx`
 - `src/experience/workspace/WorkspaceLayout.tsx`
 - `src/experience/workspace/WorkspaceRequest.tsx`

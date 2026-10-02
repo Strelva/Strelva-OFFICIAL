@@ -237,7 +237,7 @@ The next discussion should make each product more imaginable rather than demand 
 
 The growth questions follow those experiences: whether useful sharing introduces new creators, whether team use expands naturally, whether recurring operation earns continued usage, and whether adaptation becomes easier with each accepted installation. None is yet established. High-growth ambition changes the search space; it does not substitute for those observations.
 
-Keep customer readiness, internal R&D maturity, and evidence from operated offerings separate in the [definition of done](../strelvav2-definition-of-done.md). The [horizontal acceptance ledger](../strelvav2-horizontal-acceptance.md) remains the implementation reference. A concept selected for a release must become an explicit acceptance amendment before it adds to the denominator. No concept was selected during this research discussion.
+Keep customer readiness, internal R&D maturity, and evidence from operated offerings separate in the [definition of done](../product/strelvav2-definition-of-done.md). The [horizontal acceptance ledger](../operations/strelvav2-horizontal-acceptance.md) remains the implementation reference. A concept selected for a release must become an explicit acceptance amendment before it adds to the denominator. No concept was selected during this research discussion.
 
 ## Sources
 

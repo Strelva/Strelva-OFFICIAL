@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { getHostedSite } from "@/products/websites/index";
+import { safeJsonLd, siteDocumentJsonLd, siteDocumentMetadata } from "@/products/websites/index";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import SmoothScrollProvider from "@/components/providers/SmoothScrollProvider";
@@ -19,6 +21,8 @@ async function isAdminDomain(): Promise<boolean> {
 }
 
 export async function generateMetadata(): Promise<Metadata> {
+  const hosted = await getHostedSite();
+  if (hosted) return siteDocumentMetadata(hosted.document, "/", hosted.origin, hosted.preview);
   const tenant = await getTenantFromHeaders();
   const [settings, hero] = await Promise.all([
     getContent("settings", tenant).catch(() => defaults.settings),
@@ -216,6 +220,13 @@ export default async function TenantPublicLayout({
   if (isAdmin && !isPreview) {
     redirect("/dashboard");
   }
+
+  const hosted = await getHostedSite();
+  if (hosted) return <>
+    <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-[200]">Skip to content</a>
+    {!hosted.preview && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: safeJsonLd(siteDocumentJsonLd(hosted.document, hosted.origin, hosted.config?.industry)) }} />}
+    <main id="main-content">{children}</main>
+  </>;
 
   const template = await getTemplateForTenant(tenant);
 

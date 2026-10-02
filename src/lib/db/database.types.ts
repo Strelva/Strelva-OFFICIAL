@@ -772,6 +772,7 @@ export type Database = {
           dns_status: string | null
           domain: string
           error: string | null
+          registration_attempt: string | null
           role: string
           ssl_status: string | null
           status: string
@@ -786,6 +787,7 @@ export type Database = {
           dns_status?: string | null
           domain: string
           error?: string | null
+          registration_attempt?: string | null
           role: string
           ssl_status?: string | null
           status: string
@@ -800,6 +802,7 @@ export type Database = {
           dns_status?: string | null
           domain?: string
           error?: string | null
+          registration_attempt?: string | null
           role?: string
           ssl_status?: string | null
           status?: string

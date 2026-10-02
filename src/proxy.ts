@@ -4,13 +4,15 @@ import {
 } from "@/lib/db/middleware-client";
 import { isSupabaseAuthConfigured } from "@/lib/db/server-client";
 import { validateCronRequest } from "@/lib/cron-auth";
-import { WEBSITE_PREVIEW_CSP, isWebsiteCandidatePreviewPath } from "@/lib/website-preview-policy";
+import { WEBSITE_PREVIEW_CSP, isWebsiteCandidatePreviewRequest } from "@/lib/website-preview-policy";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getDevAccessTenant, isDevAccessBypassEnabled } from "./lib/dev-access";
 import { MARKETING_HOSTS, isMarketingHost } from "./lib/marketing-hosts";
 import { parseTenantHost } from "./lib/tenant-host";
 import { CONTROL_PLANE_URL } from "./lib/brand";
+import { websiteRebuildReleaseEnabled } from "./products/websites/index";
+import { hostedRedirectTarget } from "./products/websites/index";
 import { strelvaHostedPreviewEnabled } from "./experience/workspace/preview/enabled";
 
 export { isMarketingHost } from "./lib/marketing-hosts";
@@ -325,7 +327,7 @@ export function buildContentSecurityPolicy(params: {
 function applySecurityHeaders(response: NextResponse, req: NextRequest): NextResponse {
   applyMiddlewareSupabaseResponse(req, response);
   const livePreviewRequest = isLivePreviewRequest(req);
-  const websiteCandidate = isWebsiteCandidatePreviewPath(req.nextUrl.pathname);
+  const websiteCandidate = isWebsiteCandidatePreviewRequest(req.nextUrl.pathname, req.nextUrl.searchParams, websiteRebuildReleaseEnabled());
   response.headers.set(
     "Content-Security-Policy",
     buildContentSecurityPolicy({
@@ -477,6 +479,9 @@ export async function requestIsSuperAdmin(req: NextRequest): Promise<boolean> {
 export default async function proxy(req: NextRequest) {
   const host = req.headers.get("host") || "";
   const pathname = req.nextUrl.pathname;
+  // HTML assets skipped the proxy before the v2 redirect matcher was added.
+  // Keep the original passthrough bytes while the rebuild release is disabled.
+  if (/\.html?$/i.test(pathname) && !websiteRebuildReleaseEnabled()) return NextResponse.next();
   const devAccessBypass = isDevAccessBypassEnabled();
   const devPreviewRequest = devAccessBypass && req.nextUrl.searchParams.get("preview") === "true";
 
@@ -709,6 +714,19 @@ export default async function proxy(req: NextRequest) {
       }), req);
     }
 
+    // Rebuilt old paths redirect only on the trusted public tenant host. This
+    // does not participate in client fallback, impersonation or preview routing.
+    if (websiteRebuildReleaseEnabled() && !isAdminSubdomain && !tenantFromClientPath && !tenantFromQueryParam && !isPreviewMode && /^\/(?:[a-zA-Z0-9_.-]+\/?)*$/.test(pathname) && !pathname.split("/").some(segment => segment === "." || segment === "..") && !/^\/(?:api|admin|dashboard|workspace|sign-in|sign-up|auth|preview)(?:\/|$)/.test(pathname)) {
+      const { getPublishedSiteDocument } = await import("./products/websites/index");
+      const published = await getPublishedSiteDocument(tenantId);
+      const target = published ? hostedRedirectTarget(published, pathname) : null;
+      if (target) {
+        const url = req.nextUrl.clone();
+        url.pathname = target;
+        return applySecurityHeaders(NextResponse.redirect(url, 301), req);
+      }
+    }
+
     const response = NextResponse.next({
       request: { headers },
     });
@@ -739,5 +757,6 @@ export const config = {
   matcher: [
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     "/(api|trpc)(.*)",
+    "/((?!_next).*\\.(?:html?|php|aspx))",
   ],
 };

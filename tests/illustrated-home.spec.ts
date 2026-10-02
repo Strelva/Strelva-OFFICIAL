@@ -21,14 +21,14 @@ test("request-first Home opens saved work on desktop and mobile", async ({ page 
 
 test("empty and read-only Home retain their permitted actions", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=empty");
-  await expect(page.getByRole("region", { name: "Continue", exact: true }).getByRole("button", { name: "Browse examples", exact: true })).toBeVisible();
-  await navigation(page).getByRole("button", { name: "New", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Recent", exact: true }).getByRole("button", { name: "Get or build an app", exact: true })).toBeVisible();
+  await navigation(page).getByRole("button", { name: "Ask Strelva", exact: true }).click();
   await expect(page.getByLabel("What do you want to accomplish?")).toBeVisible();
   await page.goto("/preview/strelva?scenario=read-only");
   await expect(page.getByRole("heading", { name: "Review what was shared." })).toBeVisible();
-  await expect(navigation(page).getByRole("button", { name: "New", exact: true })).toBeDisabled();
+  await expect(navigation(page).getByRole("button", { name: "Ask Strelva", exact: true })).toBeDisabled();
   await expect(page.getByLabel("What do you want to accomplish?", { exact: true })).toHaveCount(0);
-  await navigation(page).getByRole("link", { name: "Settings", exact: true }).click();
+  await navigation(page).getByRole("link", { name: "Business details", exact: true }).click();
   await expect(page.getByRole("status")).toHaveText("Linked website access is unavailable right now. No business setting was changed.");
   await expect(page.getByText("No managed website is linked", { exact: false })).toHaveCount(0);
   for (const name of ["Business information", "People and access", "Work"]) await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
@@ -96,18 +96,18 @@ test("Home keeps decisions, allowance, business switching and site assignment re
   await expect(page.getByRole("heading", { name: "Harbor Dental", exact: true })).toBeVisible();
   await navigation(page).getByRole("link", { name: "Home", exact: true }).click();
   await page.getByText("Usage and connected services", { exact: true }).click();
-  await page.getByRole("button", { name: "Open Settings", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Open Business details", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Business details", exact: true })).toBeVisible();
 });
 
 test("the same navigation remains across primary surfaces and utilities", async ({ page }, info) => {
   await page.goto("/preview/strelva?scenario=free");
-  for (const label of ["Home", "Work", "Ongoing", "Settings", "People & access", "Examples", "Help"]) {
+  for (const label of ["Home", "Customers", "Requests", "Running", "All apps and files", "Business details", "People & access", "Help"]) {
     await navigation(page).getByRole("link", { name: label, exact: true }).click();
     await expect(navigation(page).getByRole("link", { name: label, exact: true })).toHaveAttribute("aria-current", "page");
-    for (const name of ["Home", "Work", "Ongoing", "People & access", "Settings"]) await expect(navigation(page).getByRole("link", { name, exact: true })).toBeVisible();
+    for (const name of ["Home", "Customers", "Requests", "Running", "Business details", "People & access"]) await expect(navigation(page).getByRole("link", { name, exact: true })).toBeVisible();
   }
-  await navigation(page).getByRole("link", { name: "Settings", exact: true }).click();
+  await navigation(page).getByRole("link", { name: "Business details", exact: true }).click();
   await page.screenshot({ path: info.outputPath("desktop-settings.png"), fullPage: true });
 });
 
@@ -130,14 +130,14 @@ test("mobile navigation traps focus and opens search without background interact
   await expect(page.getByRole("combobox", { name: /Search/ })).toBeFocused();
   await page.keyboard.press("Escape");
   await trigger.click();
-  await navigation(page).getByRole("link", { name: "Examples", exact: true }).click();
+  await navigation(page).getByRole("link", { name: "All apps and files", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Make it yours.", exact: true })).toBeVisible();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.getByRole("button", { name: "Assign to this business", exact: true }).click();
   await expect(page.getByText("Assigned to this business · You can open it", { exact: true })).toBeVisible();
   await trigger.click();
-  await navigation(page).getByRole("link", { name: "Settings", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
+  await navigation(page).getByRole("link", { name: "Business details", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Business details", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: /Subscription/ })).toHaveAttribute("href", "/preview/strelva/website/dashboard/settings#plan");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath("mobile-settings.png"), fullPage: true });

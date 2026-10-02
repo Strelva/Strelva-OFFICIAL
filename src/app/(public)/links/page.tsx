@@ -1,3 +1,4 @@
+import { hostedPageMetadata, renderHostedPage } from "@/products/websites/index";
 import { getContent } from "@/lib/storage";
 import { defaults } from "@/lib/defaults";
 import { getTenantFromHeaders, isPreviewMode } from "@/lib/tenant";
@@ -7,6 +8,8 @@ import { PageViewTracker } from "@/components/public/PageViewTracker";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
+  const hosted = await hostedPageMetadata("/links");
+  if (hosted) return hosted;
   const tenant = await getTenantFromHeaders();
   const settings = await getContent("settings", tenant).catch(() => defaults.settings);
   return {
@@ -16,6 +19,8 @@ export async function generateMetadata() {
 }
 
 export default async function LinksPage() {
+  const hosted = await renderHostedPage("/links");
+  if (hosted) return hosted;
   const tenant = await getTenantFromHeaders();
   const preview = await isPreviewMode();
   const fetchOptions = preview ? { preview: true } : undefined;

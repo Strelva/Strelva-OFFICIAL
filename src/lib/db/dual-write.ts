@@ -26,7 +26,7 @@ export function dualWritePgEnabled(): boolean {
  * outcomes) shadow-write — NOT the same knob as DUAL_WRITE_PG. Defaults OFF and only
  * turns on for an explicit "1"/"true", the inverse of dualWritePgEnabled(): those
  * tables' migration (#7) is intentionally UNAPPLIED, so this must stay off by default
- * until it is applied. See docs/ontology-phase2-governed-work.md.
+ * until it is applied. See docs/architecture/ontology-phase2-governed-work.md.
  */
 export function governedWorkDualWriteEnabled(): boolean {
   const flag = process.env.GOVERNED_WORK_DUAL_WRITE;

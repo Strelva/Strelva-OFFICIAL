@@ -2,32 +2,27 @@
 
 import Link from "next/link";
 import type { MouseEvent, ReactNode } from "react";
-import { BriefcaseBusiness, CircleHelp, Home, LayoutGrid, Plus, Search, Settings, Users, Workflow, X, type LucideIcon } from "lucide-react";
+import { AppWindow, Building2, CircleHelp, Globe2, Home, KeyRound, ListChecks, MessageSquareText, Repeat, Search, Users, X, type LucideIcon } from "lucide-react";
 import { LogoMark } from "@/components/Logo";
 import { WorkspaceSignOutButton } from "@/experience/workspace/WorkspaceSignOutButton";
 import type { WorkspaceSearchItem } from "@/experience/workspace/workspace-search";
 import styles from "./strelva-sidebar.module.css";
+import { placeForSection, sectionTitle, workspaceSectionHref, type StrelvaPinnedItem, type StrelvaSection } from "./workspace-places";
 
-export type StrelvaSection = "home" | "work" | "ongoing" | "access" | "settings" | "products" | "help" | "account";
+export { placeForSection, workspaceSectionHref, type StrelvaPinnedItem, type StrelvaSection } from "./workspace-places";
+
 type NavigableSection = Exclude<StrelvaSection, "account">;
 
-export function workspaceSectionHref(section: StrelvaSection, base = "", workspaceId?: string) {
-  const path = section === "account" ? `${base}/workspace/account` : `${base}/workspace`;
-  const params = new URLSearchParams();
-  if (section !== "home" && section !== "account") params.set("view", section);
-  if (workspaceId && section !== "account") params.set("workspaceId", workspaceId);
-  return `${path}${params.size ? `?${params}` : ""}`;
-}
-
-const PRIMARY_ITEMS: readonly { id: NavigableSection; label: string; icon: LucideIcon }[] = [
-  { id: "home", label: "Home", icon: Home },
-  { id: "work", label: "Work", icon: BriefcaseBusiness },
-  { id: "ongoing", label: "Ongoing", icon: Workflow },
+const PRIMARY_ITEMS: readonly { id: NavigableSection; icon: LucideIcon }[] = [
+  { id: "home", icon: Home },
+  { id: "customers", icon: Users },
+  { id: "requests", icon: ListChecks },
+  { id: "ongoing", icon: Repeat },
 ];
-const SETTINGS_ITEMS: readonly { id: NavigableSection; label: string; icon: LucideIcon }[] = [
-  { id: "access", label: "People & access", icon: Users },
-  { id: "settings", label: "Settings", icon: Settings },
-  { id: "help", label: "Help", icon: CircleHelp },
+const BUSINESS_ITEMS: readonly { id: NavigableSection; icon: LucideIcon }[] = [
+  { id: "settings", icon: Building2 },
+  { id: "access", icon: KeyRound },
+  { id: "help", icon: CircleHelp },
 ];
 
 interface Props {
@@ -39,6 +34,8 @@ interface Props {
   businessContext?: ReactNode;
   contextualNavigation?: ReactNode;
   recentWork?: readonly WorkspaceSearchItem[];
+  /** Pinned apps. A managed website appears first, by its name or domain. */
+  pinned?: readonly StrelvaPinnedItem[];
   mobileOpen?: boolean;
   onCloseMobile?: () => void;
   onNavigate?: (section: NavigableSection) => void;
@@ -58,12 +55,14 @@ function navigateInPlace(event: MouseEvent<HTMLAnchorElement>, action: (() => vo
 }
 
 /** One navigation contract for owners, agencies, account and managed work. */
-export function StrelvaSidebar({ active, appBase = "", workspaceId, accountName, accountDetail, businessContext, contextualNavigation, recentWork = [], mobileOpen = false, onCloseMobile, onNavigate, onSearch, onStart, startDisabled = false, signedIn = true, signInHref, signOut, standalone = false }: Props) {
+export function StrelvaSidebar({ active, appBase = "", workspaceId, accountName, accountDetail, businessContext, contextualNavigation, recentWork = [], pinned = [], mobileOpen = false, onCloseMobile, onNavigate, onSearch, onStart, startDisabled = false, signedIn = true, signInHref, signOut, standalone = false }: Props) {
   const href = (section: StrelvaSection) => workspaceSectionHref(section, appBase, workspaceId);
   const newHref = `${appBase}/workspace?view=start${workspaceId ? `&workspaceId=${encodeURIComponent(workspaceId)}` : ""}`;
   const searchHref = `${href("work")}&search=1`;
-  function item({ id, label, icon: Icon }: (typeof PRIMARY_ITEMS)[number]) {
-    return <Link key={id} className={styles.navItem} href={href(id)} aria-current={active === id ? "page" : undefined} onClick={event => {
+  const place = placeForSection(active);
+  function item({ id, icon: Icon }: (typeof PRIMARY_ITEMS)[number]) {
+    const label = sectionTitle(id);
+    return <Link key={id} className={styles.navItem} href={href(id)} aria-current={place === id ? "page" : undefined} onClick={event => {
       navigateInPlace(event, onNavigate ? () => { onCloseMobile?.(); onNavigate(id); } : undefined);
       if (!onNavigate) onCloseMobile?.();
     }}><Icon size={18} strokeWidth={1.6} aria-hidden="true" /><span>{label}</span></Link>;
@@ -76,16 +75,25 @@ export function StrelvaSidebar({ active, appBase = "", workspaceId, accountName,
     {businessContext ? <div className={styles.businessContext}>{businessContext}</div> : null}
     <div className={styles.body}>
       <div className={styles.utilities} aria-label="Workspace utilities">
-        {onStart ? <button type="button" className={styles.newAction} disabled={startDisabled} onClick={() => { onCloseMobile?.(); onStart(); }}><Plus size={18} aria-hidden="true" /><span>New</span></button> : <Link className={styles.newAction} href={newHref} aria-disabled={startDisabled || undefined} tabIndex={startDisabled ? -1 : undefined} onClick={event => { if (startDisabled) event.preventDefault(); onCloseMobile?.(); }}><Plus size={18} aria-hidden="true" /><span>New</span></Link>}
+        {onStart ? <button type="button" className={styles.newAction} disabled={startDisabled} onClick={() => { onCloseMobile?.(); onStart(); }}><MessageSquareText size={18} aria-hidden="true" /><span>Ask Strelva</span></button> : <Link className={styles.newAction} href={newHref} aria-disabled={startDisabled || undefined} tabIndex={startDisabled ? -1 : undefined} onClick={event => { if (startDisabled) event.preventDefault(); onCloseMobile?.(); }}><MessageSquareText size={18} aria-hidden="true" /><span>Ask Strelva</span></Link>}
         {onSearch ? <button type="button" className={styles.navItem} onClick={() => { onCloseMobile?.(); onSearch(); }} title="Search (Ctrl or Command + K)"><Search size={18} aria-hidden="true" /><span>Search</span></button> : <Link className={styles.navItem} href={searchHref} onClick={onCloseMobile}><Search size={18} aria-hidden="true" /><span>Search</span></Link>}
-        {item({ id: "products", label: "Examples", icon: LayoutGrid })}
       </div>
       <nav className={styles.primary} aria-label="Main">{PRIMARY_ITEMS.map(item)}</nav>
+      {pinned.length ? <section className={styles.recent} aria-label="Website and apps"><h2>Website and apps</h2>{pinned.map(entry => {
+        const Icon = entry.kind === "app" ? AppWindow : Globe2;
+        return <Link key={entry.id} className={styles.pinned} href={entry.href} title={entry.title} onClick={event => navigateInPlace(event, entry.onOpen ? () => { onCloseMobile?.(); entry.onOpen?.(); } : undefined)}><Icon size={15} strokeWidth={1.6} aria-hidden="true" /><span>{entry.title}</span></Link>;
+      })}<Link className={styles.allApps} href={href("apps")} aria-current={place === "apps" ? "page" : undefined} onClick={event => {
+        navigateInPlace(event, onNavigate ? () => { onCloseMobile?.(); onNavigate("apps"); } : undefined);
+        if (!onNavigate) onCloseMobile?.();
+      }}><span>All apps and files</span></Link></section> : <nav className={styles.recent} aria-label="All apps"><Link className={styles.allApps} href={href("apps")} aria-current={place === "apps" ? "page" : undefined} onClick={event => {
+        navigateInPlace(event, onNavigate ? () => { onCloseMobile?.(); onNavigate("apps"); } : undefined);
+        if (!onNavigate) onCloseMobile?.();
+      }}><AppWindow size={15} strokeWidth={1.6} aria-hidden="true" /><span>All apps and files</span></Link></nav>}
       {recentWork.length ? <section className={styles.recent} aria-label="Recent work"><h2>Recent</h2>{recentWork.slice(0, 8).map(work => <Link key={work.id} href={work.href} title={work.title} onClick={event => navigateInPlace(event, work.onOpen ? () => { onCloseMobile?.(); work.onOpen?.(); } : undefined)}><span>{work.title}</span></Link>)}</section> : null}
       {contextualNavigation ? <div className={styles.contextual}>{contextualNavigation}</div> : null}
     </div>
     <div className={styles.footer}>
-      <nav aria-label="Business and help">{SETTINGS_ITEMS.map(item)}</nav>
+      <nav aria-label="Business menu">{BUSINESS_ITEMS.map(item)}</nav>
       {signedIn ? <>
         <Link className={styles.account} href={href("account")} aria-current={active === "account" ? "page" : undefined} onClick={onCloseMobile}>
           <span className={styles.avatar} aria-hidden="true">{accountName.slice(0, 1).toUpperCase()}</span>

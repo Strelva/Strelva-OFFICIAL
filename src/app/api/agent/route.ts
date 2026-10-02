@@ -22,7 +22,7 @@ import { assertAgentToolCatalog, capabilityPromptFragment, sanitizePromptValue }
 import { buildAgentSystemPrompt } from "@/lib/agent-prompt-shared";
 import { sniffImageType } from "@/lib/image-signature";
 import { getSiteCapabilityManifest, manifestAllowsAction } from "@/lib/site-capabilities";
-import { resolveGbpWriteAllowed, resolveEditableSections, buildGbpTools, buildUndoTool } from "@/lib/agent-shared";
+import { resolveGbpWriteAllowed, resolveEditableSections, buildGbpTools, buildUndoTool, buildSiteDocumentTools } from "@/lib/agent-shared";
 import { isRateLimitedAsync } from "@/lib/rate-limit";
 import { classifySource, recordAgentToolCall } from "@/lib/proof-signals";
 import { applySectionUpdate } from "@/lib/apply-section-update";
@@ -33,6 +33,7 @@ import {
   buildAgentResultContract,
   type AgentActionResult,
 } from "@/lib/agent-results";
+import { workspaceHttpActor } from "@/platform/workspaces/http";
 import { readJsonObject } from "@/lib/request-body";
 
 type IncomingMessagePart = { type?: string; text?: string };
@@ -269,8 +270,11 @@ Only use tools for manifest-supported sections and actions. If the user requests
   // All tools are always available — single plan includes everything.
   // The `capability` key is legacy bookkeeping kept to minimize diff; see
   // the flatten step below where it is stripped before passing to streamText.
+  const documentTools = buildSiteDocumentTools({ tenantId: tenant, actor: await workspaceHttpActor(), onResult: (status, message) => recordActionResult(status === "queued" ? { status, message } : { status, error: message }) });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const allTools: Record<string, { capability: string; def: any }> = {
+    read_site: { capability: "read_site", def: documentTools.read_site },
+    patch_site: { capability: "patch_site", def: documentTools.patch_site },
     read_section: {
       capability: "read_section",
       def: tool({

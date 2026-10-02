@@ -1,3 +1,6 @@
+import { websiteRebuildReleaseEnabled } from "@/products/websites/index";
+import { websiteRebuildSchema } from "@/products/websites/index";
+import { initializeRebuildHandoff } from "@/products/websites/index";
 import { savePublicWebsiteAudit } from "@/products/website-audit/server";
 import { recoverAssessment } from "@/products/assessment/server";
 import { WorkspaceOperationPendingError } from "@/platform/workspaces";
@@ -155,6 +158,10 @@ function presentHandoffWork(work: SavedWork): WorkspaceWork {
 }
 
 function supportsHandoff(work: SavedWork): boolean {
+  if (work.productId === "websites" && work.resourceKind === "website") {
+    const rebuild = websiteRebuildSchema.safeParse(work.payload);
+    return websiteRebuildReleaseEnabled() && rebuild.success && rebuild.data.status !== "published" && !rebuild.data.tenantId && !rebuild.data.candidate?.document.capabilities;
+  }
   const presented = presentWorkspaceWork(work, { access: "owned" });
   if (presented.assessment?.actions.handoff.allowed) return true;
   return work.productId === "tracker" && work.resourceKind === "tracker" && parseTrackerWorkPayload(work.payload) !== null;
@@ -311,6 +318,7 @@ export async function POST(request: Request) {
         const addressed = await inspectHandoff(current, input.token);
         if (!supportsHandoff(addressed.work)) return json({ error: "This product does not support handoffs in this release." }, 409);
         const accepted = await acceptHandoff(current, input.token, input.destination, input.allowAgencyAccess);
+        if (addressed.work.productId === "websites") await initializeRebuildHandoff(current, accepted);
         return json({ workspaceId: accepted.customerWorkspaceId, workId: accepted.customerWorkId });
       }
       case "revoke_delegation":

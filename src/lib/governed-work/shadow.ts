@@ -6,7 +6,7 @@
  * normalized proposals/decisions/execution_attempts/outcomes tables as a PARALLEL
  * shadow. Redis stays 100% authoritative and every read path is untouched; these
  * writes only populate the new tables so a LATER staged cutover (#8) has parity
- * data. See docs/ontology-phase2-governed-work.md for the field→table mapping.
+ * data. See docs/architecture/ontology-phase2-governed-work.md for the field→table mapping.
  *
  * Two hard invariants, both enforced here so call sites can't get them wrong:
  *  1. FLAG-GATED — every orchestrator no-ops unless GOVERNED_WORK_DUAL_WRITE is

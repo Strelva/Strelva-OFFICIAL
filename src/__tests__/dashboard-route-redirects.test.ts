@@ -40,11 +40,11 @@ describe("dashboard route redirects", () => {
 
   it("documents the canonical dashboard site path in the production runbook", () => {
     const runbook = readFileSync(
-      path.join(process.cwd(), "docs/production-readiness.md"),
+      path.join(process.cwd(), "docs/operations/production-readiness.md"),
       "utf8",
     );
     const launchBlockers = readFileSync(
-      path.join(process.cwd(), "docs/launch-blockers.md"),
+      path.join(process.cwd(), "docs/operations/launch-blockers.md"),
       "utf8",
     );
 

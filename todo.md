@@ -4,8 +4,8 @@
 
 Jacob selected websites as the main current offer, with self-service as the
 primary experience and agencies participating around client-owned work. The
-[product brief](./docs/horizontal-product-brief-2026-09-11.md#september-20-website-release-focus)
-owns the direction; the [website release review](./docs/strelvav2-horizontal-acceptance.md#website-release-review)
+[product brief](./docs/product/horizontal-product-brief-2026-09-11.md#september-20-website-release-focus)
+owns the direction; the [website release review](./docs/operations/strelvav2-horizontal-acceptance.md#website-release-review)
 owns assignments, findings and proof. Read those before the historical backlog
 below. Existing horizontal work and customer compatibility obligations remain.
 
@@ -29,7 +29,7 @@ Reviewed against `484dd2c1`, the current acceptance ledger, the eight experience
 PRDs and the implementation owners linked below. The earlier 20 follow-up tasks
 cover offering modules; they are not the complete release backlog. This section
 is the current completion sequence. Older sections retain their dated evidence.
-The [acceptance ledger](./docs/strelvav2-horizontal-acceptance.md) remains the
+The [acceptance ledger](./docs/operations/strelvav2-horizontal-acceptance.md) remains the
 owner of proof, and the [PRDs](../.scratch/strelvav2-experience/spec.md) remain
 the detailed requirements. No new commercial offer or production authority is
 created by this plan.
@@ -59,7 +59,7 @@ created by this plan.
 
 “Build” means a missing behavior. “Connect/prove” means useful implementation
 already exists but the joined journey or operating evidence is incomplete.
-Existing task IDs refer to the [module queue](./docs/strelvav2-horizontal-acceptance.md#subsequent-task-queue).
+Existing task IDs refer to the [module queue](./docs/operations/strelvav2-horizontal-acceptance.md#subsequent-task-queue).
 
 | Work | What must be finished | Completion evidence and owner |
 | --- | --- | --- |
@@ -85,7 +85,7 @@ Existing task IDs refer to the [module queue](./docs/strelvav2-horizontal-accept
    Verify actual vendor/mailbox receipt, uncertain-outcome recovery, monitoring,
    repeat use and operating effort. Preserve the firm's existing systems;
    do not add a second case-management pipeline. The exact configuration and
-   authorized live rehearsal remain prerequisites. [Owning checklist](./docs/horizontal-release-checklist-2026-09-11.md#first-customer-release-case).
+   authorized live rehearsal remain prerequisites. [Owning checklist](./docs/operations/horizontal-release-checklist-2026-09-11.md#first-customer-release-case).
 2. **Prove the operating model.** Exercise due work, provider interruption,
    unknown cost, failed evidence writes, operator escalation and recovery in the
    intended hosted environment. A missing portfolio read must never mean all
@@ -94,7 +94,7 @@ Existing task IDs refer to the [module queue](./docs/strelvav2-horizontal-accept
    Exercise it with permitted real observations, a measured capability trial,
    contradictory evidence and an explicit keep/change/stop decision. Record
    setup, correction, support and provider cost separately. Do not rebuild ten
-   research services or treat synthetic users as demand. [Definition of done](./docs/strelvav2-definition-of-done.md#the-ten-part-learning-loop).
+   research services or treat synthetic users as demand. [Definition of done](./docs/product/strelvav2-definition-of-done.md#the-ten-part-learning-loop).
 4. **Prepare the release as an exact operation.** Check current hosted migration
    state, rehearse the pending order and recovery, verify pinned client revisions in isolated checkouts, storefront/revalidation
    compatibility and existing agreements, select the shared version, align both
@@ -102,7 +102,7 @@ Existing task IDs refer to the [module queue](./docs/strelvav2-horizontal-accept
    and prepare activation and rollback steps.
    Hosted browser/Auth/provider evidence and human acceptance remain separate
    from green CI. Merging into main, migrations and deployment are distinct
-   actions. [Versioning](./VERSIONING.md) and [release checklist](./docs/horizontal-release-checklist-2026-09-11.md).
+   actions. [Versioning](./VERSIONING.md) and [release checklist](./docs/operations/horizontal-release-checklist-2026-09-11.md).
 5. **Qualify commercial claims.** Observe useful first use, a later change and
    voluntary return; include support and recovery in the economics. Public
    access does not establish willingness to pay or a supported enterprise offer.
@@ -153,13 +153,13 @@ date or completion percentage is supported by the available evidence.
 
 Updated September 18, 2026. Read the overview and next steps first; the numbered
 sections below preserve the full journey checklist. This file is the work index.
-The [product brief](./docs/horizontal-product-brief-2026-09-11.md) owns selected
+The [product brief](./docs/product/horizontal-product-brief-2026-09-11.md) owns selected
 behavior, [DESIGN.md](./DESIGN.md) owns design direction, and the
-[acceptance ledger](./docs/strelvav2-horizontal-acceptance.md) owns implementation proof.
+[acceptance ledger](./docs/operations/strelvav2-horizontal-acceptance.md) owns implementation proof.
 
 ## Practical scalability: reduce Strelva's operating work
 
-The [September 18 friction audit](./docs/horizontal-audit-and-plan-2026-09-11.md#september-18-audit-less-work-and-friction-for-strelva)
+The [September 18 friction audit](./docs/product/horizontal-audit-and-plan-2026-09-11.md#september-18-audit-less-work-and-friction-for-strelva)
 checks setup, supervision, troubleshooting, coordination and maintenance per
 useful result. No measured reduction or scalability percentage is established.
 The following are audit findings and proposed next fixes, not completed work:
@@ -279,11 +279,11 @@ These are not completion percentages. Earlier proof retains its date and limits.
 | Public arrival | Partial | Session-led homepage and a bounded private-brief continuation are implemented. The isolated new-account/Auth/Postgres journey passes explicit destination selection, exact saved-document recovery, wrong-account privacy and revoked access. File contents and arbitrary execution are not imported; export and closure remain open. [Public handoff](../strelva-marketing/docs/design/session-landing.md) |
 | Home, Work and navigation | Local proof | Shared business, agency, website and account frame; supported saved work now uses native reopen labels and route-specific actions. Unit and preview journeys pass; broader human review remains. [Audit](./output/strelvav2-audit-2026-09-18/audit.md) |
 | Start something new | Local proof / partial | Ordinary application, scheduling, tracker and investigation paraphrases reach their native entry or a useful clarification, with destination-specific continuation copy. The public entrance and unsupported work still need product decisions. |
-| Create, use and change an app | Local proof | One deterministic browser journey now connects prepared request, owner and employee use, exact change review, publication, record-preserving rollback and revocation. Model creation remains fixture-backed; Jacob’s acceptance is pending. [Ledger](./docs/strelvav2-horizontal-acceptance.md#current-acceptance-gate) |
+| Create, use and change an app | Local proof | One deterministic browser journey now connects prepared request, owner and employee use, exact change review, publication, record-preserving rollback and revocation. Model creation remains fixture-backed; Jacob’s acceptance is pending. [Ledger](./docs/operations/strelvav2-horizontal-acceptance.md#current-acceptance-gate) |
 | Business setup and offerings | Local proof | Home and Settings expose direct assignment for account-authorized websites; business identity remains coherent without a website. An isolated Auth/Postgres journey passes owner, administrator, member, wrong-business and exact-retry cases. The internal Strelva provider request, explicit acceptance, exact assigned operation, review and revocation also pass locally. External provider arrangements and production remain open. |
 | Agency and personal AI | Local proof / partial | Scoped agency access and exact-work read/propose tokens exist. Agency attention checks at most eight clients; native AI-host connectors and broader execution are not established. |
 | Ongoing work and costs | Local proof / partial | Planning now requires a user-entered maximum and explicit payer acceptance, records an unknown-cost hold, and refuses receipt replay. Connected assignments, standing-work recovery and zero-cost execution pass locally. Trusted native-receipt reconciliation passes independent review; internal provider acceptance and assigned execution also pass with real local Auth/Postgres. Nonmember payer transition, bounded job acceptance and runtime claim pass with real local Auth/Postgres; model-provider billing evidence and live delivery remain open. |
-| Visual system | Selected / partial implementation | REB and marketing now bind one Geist family and their owned field/tab primitives carry semantic relationships and keyboard behavior. Broader consumer adoption, exact weights/material review and Jacob’s visual acceptance remain open. [Foundation](./docs/component-system.md) |
+| Visual system | Selected / partial implementation | REB and marketing now bind one Geist family and their owned field/tab primitives carry semantic relationships and keyboard behavior. Broader consumer adoption, exact weights/material review and Jacob’s visual acceptance remain open. [Foundation](./docs/design/component-system.md) |
 | Website request to business work | Generic connected local proof; Mooney incomplete | Generic website submission helper → durable request → staff assignment → governed reply → retained outcome and Undo pass with isolated Auth/Postgres/Redis. Simulated accepted-send/read-back failure cannot send twice. Mooney uses the separate native handoff described above; its Outlook/ADR receipt and actual firm use remain unproven. |
 | Release and business value | Local upgrade proof / unproven value | The full ordered schema now upgrades successfully from the documented pre-workspace baseline in isolated PostgreSQL, including permissions and atomic duplicate rejection. Hosted continuity, Jacob's acceptance, repeat use and customer economics remain open. Existing Managed Websites agreements are separate. |
 
@@ -432,8 +432,8 @@ options with concrete screen behavior and tradeoffs. Do not turn every small
 control into five variants or quietly select the company's direction.
 
 Record accepted interaction decisions in [DESIGN.md](./DESIGN.md), product
-decisions in the [product brief](./docs/horizontal-product-brief-2026-09-11.md),
-and working evidence in the [acceptance ledger](./docs/strelvav2-horizontal-acceptance.md).
+decisions in the [product brief](./docs/product/horizontal-product-brief-2026-09-11.md),
+and working evidence in the [acceptance ledger](./docs/operations/strelvav2-horizontal-acceptance.md).
 Link those records from completed items here instead of creating competing specifications.
 
 ## 1. Entrances and navigation
@@ -469,7 +469,7 @@ adds the supplied visual direction, motion, and a local business/sample preview.
 Tab-local drafts now survive refresh and Back/Forward, with direct opportunity
 links, dismissal undo, and clear/storage-failure states. Live business discovery,
 provider connections, and signup continuation remain unfinished. The
-[acceptance ledger](./docs/strelvav2-horizontal-acceptance.md#september-17-public-entry-motion-and-continuity)
+[acceptance ledger](./docs/operations/strelvav2-horizontal-acceptance.md#september-17-public-entry-motion-and-continuity)
 records the local proof. This does not complete the journey checkboxes below.
 
 September 17, replacement decision: Jacob explicitly selected the session-led
@@ -596,7 +596,7 @@ Current direct application entrance: `/apps/[workId]`. Public client websites re
 
 ## 9. Managed website controls
 
-Use the existing [client dashboard map](./docs/client-dashboard-ia.md); do not invent a second website-management product.
+Use the existing [client dashboard map](./docs/architecture/client-dashboard-ia.md); do not invent a second website-management product.
 
 - [ ] Map business Work → website → content, assets, leads, reviews, reports, integrations, settings and relevant commerce/booking controls.
 - [ ] Carry a website change request into the governed composer without losing the request or publishing it automatically.
@@ -677,7 +677,7 @@ Private agency offering distribution and royalty workflows remain decisions, not
 
 ## 15. Inside Strelva
 
-Current restricted entrance: `/admin/work`. Refer to the [operator map](./docs/operator-command-center.md).
+Current restricted entrance: `/admin/work`. Refer to the [operator map](./docs/architecture/operator-command-center.md).
 
 - [ ] Design request intake → scope discussion → provider acceptance → staff assignment → delivery → customer confirmation.
 - [ ] Define the staff work queue and exact assignment entrance without giving delivery staff super-admin access.

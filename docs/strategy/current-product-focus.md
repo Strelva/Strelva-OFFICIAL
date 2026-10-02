@@ -63,7 +63,7 @@ Optional private pull
   → managed Tenant + Site Property or bounded private implementation
 ```
 
-The canonical domain model is [`../product-ontology.md`](../product-ontology.md).
+The canonical domain model is [`../product-ontology.md`](../architecture/product-ontology.md).
 Commercial Plan, service scope, Presence Profile, Vertical, Feature Set, Tenant
 Capability, Site Capability, Agent Capability, and delivery topology remain
 independent axes. Strategy must not smuggle one axis into another.

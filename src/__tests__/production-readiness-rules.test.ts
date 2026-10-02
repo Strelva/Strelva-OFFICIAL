@@ -448,9 +448,9 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
       pnpm?: { overrides?: Record<string, string> };
     };
     const ci = readFileSync(path.join(process.cwd(), ".github/workflows/ci.yml"), "utf8");
-    const designKit = readFileSync(path.join(process.cwd(), "docs/design-kit.md"), "utf8");
-    const domainSetup = readFileSync(path.join(process.cwd(), "docs/domain-setup.md"), "utf8");
-    const launchBlockers = readFileSync(path.join(process.cwd(), "docs/launch-blockers.md"), "utf8");
+    const designKit = readFileSync(path.join(process.cwd(), "docs/design/design-kit.md"), "utf8");
+    const domainSetup = readFileSync(path.join(process.cwd(), "docs/operations/domain-setup.md"), "utf8");
+    const launchBlockers = readFileSync(path.join(process.cwd(), "docs/operations/launch-blockers.md"), "utf8");
     const releaseGate = packageData.scripts?.["check:release"] || "";
     const launchGate = packageData.scripts?.["check:launch"] || "";
     // SignInClient.tsx no longer exists — it was folded back into
@@ -484,7 +484,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("checkReleaseManifestEnv");
     expect(source).toContain("checkReleaseWorkflow");
     expect(source).toContain("checkLaunchBlockerActionability");
-    // Rohlax/jacobtest blocker names live in docs/launch-blockers.md and are
+    // Rohlax/jacobtest blocker names live in docs/operations/launch-blockers.md and are
     // covered by the launchBlockers assertions in this test file. The
     // production-checklist source no longer duplicates them (that came from
     // the deleted self-referential checkCompletionAudit).
@@ -688,7 +688,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
   it("prints owner-ready release actions for failed production checks", () => {
     const source = readFileSync(path.join(process.cwd(), "scripts/production-checklist.ts"), "utf8");
     const readinessRules = readFileSync(path.join(process.cwd(), "src/lib/production-readiness-rules.ts"), "utf8");
-    const launchBlockers = readFileSync(path.join(process.cwd(), "docs/launch-blockers.md"), "utf8");
+    const launchBlockers = readFileSync(path.join(process.cwd(), "docs/operations/launch-blockers.md"), "utf8");
     const requiredEnvNames = [...source.matchAll(/checkEnvVar\("([^"]+)", true/g)].map((match) => match[1]);
     const generatedSecretBlock = source.match(/const locallyGeneratedSecrets = new Set\(\[([\s\S]*?)\]\);/)?.[1] || "";
     const sourceHintsBlock = source.match(/const envSourceHints: Record<string, string> = \{([\s\S]*?)\};/)?.[1] || "";
@@ -744,7 +744,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
     expect(source).toContain("invited-owner /dashboard/site access");
     expect(source).toContain("Supabase Auth and Stripe webhook verification are successful");
     expect(source).toContain("cron 401/success behavior works with CRON_SECRET");
-    expect(source).toContain("clear docs/launch-blockers.md Current Blockers");
+    expect(source).toContain("clear docs/operations/launch-blockers.md Current Blockers");
     expect(source).toContain("DNS verification commands:");
     expect(source).toContain("vercel domains inspect app.strelva.com");
     expect(source).toContain("dig +short app.strelva.com CNAME");
@@ -877,8 +877,8 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
   it("keeps required production env checks represented in the launch handoff docs", () => {
     const checklist = readFileSync(path.join(process.cwd(), "scripts/production-checklist.ts"), "utf8");
     const manifest = readFileSync(path.join(process.cwd(), "release-manifest.json"), "utf8");
-    const productionReadiness = readFileSync(path.join(process.cwd(), "docs/production-readiness.md"), "utf8");
-    const launchBlockers = readFileSync(path.join(process.cwd(), "docs/launch-blockers.md"), "utf8");
+    const productionReadiness = readFileSync(path.join(process.cwd(), "docs/operations/production-readiness.md"), "utf8");
+    const launchBlockers = readFileSync(path.join(process.cwd(), "docs/operations/launch-blockers.md"), "utf8");
     const requiredEnvNames = [...checklist.matchAll(/checkEnvVar\("([^"]+)", true/g)].map((match) => match[1]);
 
     for (const name of requiredEnvNames) {
@@ -967,7 +967,7 @@ STRIPE_SCAFFOLD_PRICE_ID is wrong.
   it("makes optional OAuth dependencies explicit in production checks", () => {
     const checklist = readFileSync(path.join(process.cwd(), "scripts/production-checklist.ts"), "utf8");
     const template = readFileSync(path.join(process.cwd(), ".env.production.example"), "utf8");
-    const productionReadiness = readFileSync(path.join(process.cwd(), "docs/production-readiness.md"), "utf8");
+    const productionReadiness = readFileSync(path.join(process.cwd(), "docs/operations/production-readiness.md"), "utf8");
 
     expect(checklist).toContain("checkOptionalPair");
     expect(checklist).toContain("NEXT_PUBLIC_APP_URL");

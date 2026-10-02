@@ -93,23 +93,23 @@ export function WorkspaceAllowanceSummary({ businessId, enabled, compact = false
     const pending = state.status === "ready" ? state.value.allowances.find((allowance) => allowance.status === "pending_cap_acceptance") : undefined;
     const pendingForActor = Boolean(pending && state.status === "ready" && pending.payerId === state.value.currentActorId);
     const message = state.status === "loading"
-      ? "Review allowance and payer details in Settings."
+      ? "Review allowance and payer details in Business details."
       : state.status === "error"
-        ? "Allowance status is unavailable. Review it in Settings."
+        ? "Allowance status is unavailable. Review it in Business details."
         : pendingForActor
           ? "Cap needs your acceptance."
           : pending
             ? "Work allowance is pending acceptance."
-            : "Review allowance and payer details in Settings.";
+            : "Review allowance and payer details in Business details.";
     const detail = pending
-      ? "Review the cap and payer details in Settings before starting work."
+      ? "Review the cap and payer details in Business details before starting work."
       : state.status === "error"
         ? state.message
         : undefined;
     return <section className={`${styles.panel} ${styles.compactPanel}`} aria-labelledby="home-allowance">
       <header><Gauge size={17} aria-hidden="true" /><h2 id="home-allowance">Work allowance</h2></header>
       <p className={styles.compactNotice} role={pending ? "alert" : state.status === "loading" || state.status === "error" ? "status" : undefined}><strong>{message}</strong>{detail ? <span>{detail}</span> : null}<span className={styles.compactPolicy}>{state.status === "ready" ? subscriptionSummary(state.value) : "Billing details are unavailable until allowances load."}</span></p>
-      {onOpenSettings ? <button type="button" onClick={onOpenSettings}>Open Settings</button> : null}
+      {onOpenSettings ? <button type="button" onClick={onOpenSettings}>Open Business details</button> : null}
     </section>;
   }
 

@@ -1,7 +1,7 @@
 # Strelva UI and UX system handoff
 
 For token roles, atom contracts, recorded decisions and unresolved gaps, start
-with the [foundation inventory](../component-system.md#start-with-tokens-and-atoms).
+with the [foundation inventory](component-system.md#start-with-tokens-and-atoms).
 This handoff records component implementation; it is not a substitute for that
 foundation or evidence of final visual acceptance.
 
@@ -14,7 +14,7 @@ Updated September 17, 2026. This is the implementation and evidence checkpoint f
 Jacob subsequently selected Geist Sans, custom logo lettering, prominent gloss,
 selective atmosphere and both light/dark treatments. Current work is component
 foundations only, with no page design. The
-[completion specification](../component-system.md#foundation-completion-specification)
+[completion specification](component-system.md#foundation-completion-specification)
 records proposed implementation and acceptance criteria. The source and tests
 summarized below predate that migration; their Inter/Fraunces references describe
 implementation history, not the newly selected typography.
@@ -69,7 +69,7 @@ Use semantic variables rather than copied palette values. The default light foun
 | Home and navigation palette | [workspace-colors.css](../../src/app/styles/workspace-colors.css) |
 | Positive, warning, critical, informational and neutral meanings | [status-colors.ts](../../src/lib/status-colors.ts) |
 | Atmospheric fill, text, border and focus roles | [atmospheric-card.module.css](../../src/components/ui/atmosphere/atmospheric-card.module.css) |
-| Usage and foreground pairings | [Color system](../color-system.md) |
+| Usage and foreground pairings | [Color system](color-system.md) |
 
 Use paired roles such as `accent` / `on-accent` and `action-danger` / `on-action-danger`. `critical` is not automatically a destructive button fill. Category colors do not indicate permission or success. Atmospheric content consumes its own `--atmosphere-*` roles.
 
@@ -77,7 +77,7 @@ The renderer must retain pause, offscreen/hidden suspension, reduced motion and 
 
 ## Components and geometry
 
-The [component system](../component-system.md) owns the atom inventory, APIs,
+The [component system](component-system.md) owns the atom inventory, APIs,
 geometry, examples and outstanding migration work. Inspect those contracts and
 the actual source before composing a surface. This checkpoint does not duplicate
 their measurements or certify that every existing primitive conforms.
@@ -172,7 +172,7 @@ Physical-device GPU/battery behavior, screen-reader output, complete browser-eng
 ## Supporting evidence
 
 The September 18 [visual direction map](../../DESIGN.md#visual-direction-and-extension-map)
-and [extension contract](../component-system.md#extending-the-foundation) connect
+and [extension contract](component-system.md#extending-the-foundation) connect
 these studies to their owners and future adoption. They reconcile historical
 font guidance without claiming the Geist or full component migration has run.
 

@@ -1,3 +1,4 @@
+import { hostedPageMetadata, renderHostedPage } from "@/products/websites/index";
 import { getContent } from "@/lib/storage";
 import { getTenantFromHeaders, isPreviewMode } from "@/lib/tenant";
 import { SectionRenderer } from "@/components/public/SectionRenderer";
@@ -6,6 +7,8 @@ import { PageViewTracker } from "@/components/public/PageViewTracker";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
+  const hosted = await hostedPageMetadata("/");
+  if (hosted) return hosted;
   const tenant = await getTenantFromHeaders();
   const settings = await getContent("settings", tenant);
   return {
@@ -19,6 +22,8 @@ export default async function Home({
 }: {
   searchParams: Promise<{ edit?: string }>;
 }) {
+  const hosted = await renderHostedPage("/");
+  if (hosted) return hosted;
   const params = await searchParams;
   const tenant = await getTenantFromHeaders();
   const preview = await isPreviewMode();

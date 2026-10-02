@@ -304,6 +304,67 @@ psql "${psql_args[@]}" --file="$repo_root/tests/websites-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-managed-website-draft-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/public-website-bookings-schema.sql"
 
+# The focused workspace cluster supplies the tenant columns referenced by the
+# hosted provisioning RPC. The full upgrade gate verifies their real history.
+psql "${psql_args[@]}" <<'SQL'
+alter table public.tenants add column owner_name text;
+alter table public.tenants add column owner_email text;
+alter table public.tenants add column industry text;
+alter table public.tenants add column template text;
+alter table public.tenants add column delivery_model text not null default 'custom_repo';
+alter table public.tenants add column auto_publish boolean not null default false;
+alter table public.tenants add column site_url text;
+SQL
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261001120000_website_documents.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-documents-schema.sql"
+# The focused cluster mirrors the historical domain claim columns; the full
+# upgrade gate applies the original schema and proves legacy-row preservation.
+psql "${psql_args[@]}" <<'SQL'
+create table public.domain_claims (
+ tenant_id text not null references public.tenants(id) on delete cascade,
+ domain text not null, role text not null, status text not null,
+ dns_status text, ssl_status text, verification text[], vercel_project_id text,
+ error text, created_at timestamptz not null default now(), updated_at timestamptz not null default now(),
+ primary key(tenant_id,domain)
+);
+alter table public.domain_claims enable row level security;
+revoke all on public.domain_claims from public,anon,authenticated;
+grant all on public.domain_claims to service_role;
+insert into public.domain_claims(tenant_id,domain,role,status,dns_status,ssl_status,created_at,updated_at)
+ values('v2-fictional','domain-registration-legacy.example.test','production','verified','configured','issued','2026-09-01T00:00:00Z','2026-09-01T00:00:00Z');
+SQL
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261001130000_domain_registration_attempt.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/domain-registration-attempt-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261001140000_agency_website_document_drafts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-website-document-schema.sql"
+# Two actual concurrent service-role transactions claim the same source domain
+# with different idempotency keys. Exactly one may start; the loser must leave
+# no durable work behind. This uses only the fictional local fixture above.
+psql "${psql_args[@]}" --set=request_id=v2-race-first --file="$repo_root/tests/website-document-rebuild-race.sql" >"$cluster_root/website-race-first.log" 2>&1 &
+website_race_first=$!
+psql "${psql_args[@]}" --set=request_id=v2-race-second --file="$repo_root/tests/website-document-rebuild-race.sql" >"$cluster_root/website-race-second.log" 2>&1 &
+website_race_second=$!
+website_race_first_status=0
+website_race_second_status=0
+wait "$website_race_first" || website_race_first_status=$?
+wait "$website_race_second" || website_race_second_status=$?
+if [[ "$website_race_first_status" -eq 0 && "$website_race_second_status" -ne 0 ]]; then
+  rg -q website_rebuild_in_progress "$cluster_root/website-race-second.log"
+elif [[ "$website_race_second_status" -eq 0 && "$website_race_first_status" -ne 0 ]]; then
+  rg -q website_rebuild_in_progress "$cluster_root/website-race-first.log"
+else
+  printf 'Website domain claim race did not produce exactly one winner.\n' >&2
+  exit 1
+fi
+psql "${psql_args[@]}" <<'SQL'
+do $$ begin
+  if (select count(*) from public.saved_product_work where input->>'domainKey'='race.example.test') <> 1 then
+    raise exception 'website domain claim race committed duplicate work';
+  end if;
+end $$;
+SQL
+
+
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 

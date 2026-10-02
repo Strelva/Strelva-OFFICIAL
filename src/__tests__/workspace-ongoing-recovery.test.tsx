@@ -218,7 +218,7 @@ describe("stopped ongoing work recovery", () => {
     await vi.waitFor(() => expect(container.textContent).toContain("Check supplier records"));
 
     expect(container.textContent).toContain("New work is paused for this workspace.");
-    expect(container.querySelector("button")?.textContent).not.toBe("New ongoing work");
+    expect(container.querySelector("button")?.textContent).not.toBe("Keep something running");
     expect(container.textContent).not.toContain("Create ongoing work");
   });
 });

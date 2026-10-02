@@ -35,7 +35,7 @@ Scope: documentation and design-tooling source indexes only. The
 [direction map](../../DESIGN.md#visual-direction-and-extension-map) now links
 identity, typography, themes, geometry, material, imagery, motion, component
 states and adoption to their existing owners. The
-[extension contract](../component-system.md#extending-the-foundation) records
+[extension contract](component-system.md#extending-the-foundation) records
 how a proposal reaches a specimen, implementation, review and named consumers.
 The [visual review criteria](./strelva-visual-direction.md#visual-review-and-extension)
 connect the imagery references with actual typography, material and composition.

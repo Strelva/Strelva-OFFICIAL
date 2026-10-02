@@ -4,6 +4,12 @@ import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { workspaceHttpActor, workspaceJson } from "@/platform/workspaces/http";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import { readWebsite, renderWebsiteCandidate, exportWebsiteCandidate, WebsiteCandidateMismatchError } from "@/products/websites/server";
+import { getWork } from "@/platform/workspaces/repository";
+import { websiteRebuildReleaseEnabled } from "@/products/websites/index";
+import { readWebsiteRebuild } from "@/products/websites/index";
+import { renderRebuildPreview, exportRebuildCandidate } from "@/products/websites/index";
+import { safeSitePathSchema } from "@/products/websites/index";
+import { websiteDocumentStore } from "@/products/websites/index";
 
 export async function websiteCandidateResponse(request: Request, params: Promise<{ workId: string }>, kind: "preview" | "export") {
   if (!workspaceReleaseEnabled()) return workspaceJson({ error: "Workspaces are not enabled." }, 503);
@@ -12,6 +18,20 @@ export async function websiteCandidateResponse(request: Request, params: Promise
   try {
     const workId = z.string().uuid().parse((await params).workId);
     const query = new URL(request.url).searchParams;
+    const savedWork = websiteRebuildReleaseEnabled() ? await getWork(actor,workId) : null;
+    if (savedWork?.productId === "websites" && savedWork.payload && typeof savedWork.payload === "object" && (savedWork.payload as {version?:unknown}).version === 2) {
+      if (!websiteRebuildReleaseEnabled()) return workspaceJson({ error: "Website rebuilds are not enabled." },503);
+      const selection = z.object({ revision: z.coerce.number().int().positive(), contentHash: z.string().regex(/^[a-f0-9]{64}$/), page: z.union([safeSitePathSchema,z.string().max(160).regex(/^[a-zA-Z0-9_-]+$/)]).optional() }).parse({ revision: query.get("revision"), contentHash: query.get("contentHash"), page: query.get("page") ?? undefined });
+      const record = await readWebsiteRebuild(actor,workId);
+      const headers: Record<string,string> = { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer", "X-Robots-Tag": "noindex, nofollow", "X-Website-Content-Hash": selection.contentHash };
+      if (kind === "export") {
+        headers["Content-Type"] = "application/x-tar"; headers["Content-Disposition"] = `attachment; filename="website-${workId}-r${selection.revision}.tar"`;
+        const receipts = await websiteDocumentStore.receipts(actor,{ workspaceId:record.workspaceId,workId });
+        return new Response(Buffer.from(await exportRebuildCandidate(record,selection,receipts)),{ headers });
+      }
+      headers["Content-Type"] = "text/html; charset=utf-8"; headers["Content-Security-Policy"] = WEBSITE_PREVIEW_CSP;
+      return new Response(renderRebuildPreview(record,selection),{ headers });
+    }
     const selection = z.object({
       revision: z.coerce.number().int().positive(),
       contentHash: z.string().regex(/^[a-f0-9]{64}$/),

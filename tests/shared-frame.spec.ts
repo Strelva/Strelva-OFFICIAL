@@ -99,7 +99,7 @@ test("keeps the existing navigation reachable when the shared frame collapses it
   await expect(expand).toBeVisible();
   await expand.click();
   await expect(page.getByRole("link", { name: "Strelva home", exact: true })).toHaveAttribute("href", managedBase ? "/preview/strelva/workspace" : "/workspace");
-  await expect(page.getByRole("link", { name: "Today", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Home", exact: true })).toBeVisible();
   await page.screenshot({ path: "test-results/shared-frame-collapsed-desktop.png", fullPage: true });
 });
 

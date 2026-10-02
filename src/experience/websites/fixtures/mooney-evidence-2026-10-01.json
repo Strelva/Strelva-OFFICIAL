@@ -1,0 +1,1258 @@
+{
+  "measuredAt": "2026-10-01T20:43:49.822Z",
+  "sourceUrl": "https://attymooney.com",
+  "finalSourceUrl": "https://www.attymooney.com/",
+  "elapsedMs": 1215,
+  "crawlerElapsedMs": 1148,
+  "htmlBytesRead": 341838,
+  "checkpointBytes": 447151,
+  "pages": 10,
+  "facts": 239,
+  "supported": 239,
+  "needsReview": 40,
+  "highRisk": 40,
+  "factSupportMethod": "Exact fact quote + source HTML/text integrity; this is source support, not truth or independent semantic model verification.",
+  "supportedWithoutOwnerAction": 199,
+  "carriedOver": [
+    {
+      "sourceUrl": "https://www.attymooney.com/",
+      "targetPath": "/",
+      "carriedOver": true
+    },
+    {
+      "sourceUrl": "https://www.attymooney.com/attorneys",
+      "targetPath": "/attorneys",
+      "carriedOver": true
+    },
+    {
+      "sourceUrl": "https://www.attymooney.com/workplace-mediation",
+      "targetPath": "/workplace-mediation",
+      "carriedOver": true
+    },
+    {
+      "sourceUrl": "https://www.attymooney.com/about",
+      "targetPath": "/about",
+      "carriedOver": true
+    },
+    {
+      "sourceUrl": "https://www.attymooney.com/fees",
+      "targetPath": "/fees",
+      "carriedOver": true
+    },
+    {
+      "sourceUrl": "https://www.attymooney.com/contact",
+      "targetPath": "/contact",
+      "carriedOver": true
+    },
+    {
+      "sourceUrl": "https://www.attymooney.com/privacy",
+      "targetPath": "/pages/privacy",
+      "carriedOver": true
+    },
+    {
+      "sourceUrl": "https://www.attymooney.com/terms",
+      "targetPath": "/pages/terms",
+      "carriedOver": true
+    },
+    {
+      "sourceUrl": "https://www.attymooney.com/accessibility",
+      "targetPath": "/accessibility",
+      "carriedOver": true
+    },
+    {
+      "sourceUrl": "https://www.attymooney.com/attorney-advertising",
+      "targetPath": "/attorney-advertising",
+      "carriedOver": true
+    }
+  ],
+  "skipped": [],
+  "composer": "rules",
+  "writer": "source",
+  "modelCalls": 0,
+  "modelCostUsd": 0,
+  "jevComparison": "Not measured: no provider or paid-call authorization. Rules compose the catalog site.",
+  "images": "Source assets collected but omitted until authorized tenant-media rehosting; no hotlinking or writes.",
+  "production": "Not published. This is local source and static-render proof only.",
+  "documentHash": "c0ca900d53c72bb8817b027bf78fd7bf1666494ced1b0ea1ae3e508a43d8be19",
+  "audits": {
+    "scope": "Five canonical HTML audit modules against real source HTML and local static export. Generated well-known files are local export artifacts. No PageSpeed, Lighthouse, real traffic, live hosted fetch, AI assistant visibility, or security headers measured.",
+    "before": [
+      {
+        "name": "AI Readability",
+        "slug": "ai-readability",
+        "weight": 0,
+        "score": 40,
+        "checks": [
+          {
+            "name": "Structured data present",
+            "status": "pass",
+            "score": 100,
+            "message": "Found 2 schema type(s) AI tools can read.",
+            "details": "WebSite, LegalService"
+          },
+          {
+            "name": "Business schema valid",
+            "status": "warn",
+            "score": 50,
+            "message": "Found LegalService schema, but it has no specific rich-result requirements to check."
+          },
+          {
+            "name": "AI-answer content (FAQ/HowTo)",
+            "status": "fail",
+            "score": 0,
+            "message": "No FAQ or how-to content. AI assistants answer common questions about your business with competitor info instead of yours.",
+            "details": "Add an FAQ section answering the questions customers actually ask (hours, pricing, services, location) so AI can quote it."
+          },
+          {
+            "name": "Entity authority (sameAs)",
+            "status": "fail",
+            "score": 0,
+            "message": "No verified social or authority profiles linked. AI tools have nothing to cross-check, so they trust you less.",
+            "details": "Link your official profiles (Google, LinkedIn, Facebook, and ideally Wikipedia) from the site so AI can confirm you are a real business."
+          },
+          {
+            "name": "Plain-text readable by AI",
+            "status": "pass",
+            "score": 100,
+            "message": "Your content is in plain HTML (254 words) that AI tools can read directly."
+          },
+          {
+            "name": "Single clear business name",
+            "status": "pass",
+            "score": 100,
+            "message": "Your business name is used consistently, so AI tools can identify you clearly."
+          },
+          {
+            "name": "llms.txt for AI agents",
+            "status": "warn",
+            "score": 70,
+            "message": "No llms.txt file found. llms.txt is an emerging, optional plain-text guide at your site root that tells AI assistants (ChatGPT, Claude, Perplexity) what your site is and where the important pages are.",
+            "details": "Optional but forward-looking: ask Strelva to add an llms.txt that summarizes your business and points AI assistants at your key pages."
+          }
+        ]
+      },
+      {
+        "name": "SEO Foundations",
+        "slug": "seo",
+        "weight": 0,
+        "score": 100,
+        "checks": [
+          {
+            "name": "robots.txt",
+            "status": "pass",
+            "score": 100,
+            "message": "A robots.txt file is present."
+          },
+          {
+            "name": "Crawlers allowed",
+            "status": "pass",
+            "score": 100,
+            "message": "Search engines are allowed to read the site."
+          },
+          {
+            "name": "XML sitemap",
+            "status": "pass",
+            "score": 100,
+            "message": "An XML sitemap is present."
+          },
+          {
+            "name": "Sitemap is valid",
+            "status": "pass",
+            "score": 100,
+            "message": "The sitemap is valid XML with listed pages."
+          },
+          {
+            "name": "Canonical tag",
+            "status": "pass",
+            "score": 100,
+            "message": "A canonical tag is set.",
+            "details": "https://www.attymooney.com"
+          },
+          {
+            "name": "Title tag",
+            "status": "pass",
+            "score": 100,
+            "message": "The page title is present and a good length (47 characters).",
+            "details": "The Mooney Firm | Legal and Workplace Mediation"
+          },
+          {
+            "name": "Meta description",
+            "status": "pass",
+            "score": 100,
+            "message": "A meta description is present."
+          },
+          {
+            "name": "H1 heading",
+            "status": "pass",
+            "score": 100,
+            "message": "The page has an H1 heading.",
+            "details": "Legal and workplace mediation."
+          },
+          {
+            "name": "Single H1",
+            "status": "pass",
+            "score": 100,
+            "message": "The page uses a single H1 heading."
+          },
+          {
+            "name": "Server-rendered content",
+            "status": "pass",
+            "score": 100,
+            "message": "Your content is readable right in the page, the way search engines prefer."
+          }
+        ]
+      },
+      {
+        "name": "Accessibility",
+        "slug": "a11y",
+        "weight": 0,
+        "score": 100,
+        "checks": [
+          {
+            "name": "Document Language",
+            "status": "pass",
+            "score": 100,
+            "message": "The page declares its language (en)."
+          },
+          {
+            "name": "Page Title",
+            "status": "pass",
+            "score": 100,
+            "message": "The page has a descriptive title."
+          },
+          {
+            "name": "Image Alt Text",
+            "status": "pass",
+            "score": 100,
+            "message": "All 3 image(s) have meaningful alt text."
+          },
+          {
+            "name": "Link Text",
+            "status": "pass",
+            "score": 100,
+            "message": "Links use descriptive text."
+          },
+          {
+            "name": "Form Labels",
+            "status": "pass",
+            "score": 100,
+            "message": "No form fields found on the page."
+          },
+          {
+            "name": "Heading Structure",
+            "status": "pass",
+            "score": 100,
+            "message": "Headings follow a single, sequential structure."
+          },
+          {
+            "name": "Landmark Regions",
+            "status": "pass",
+            "score": 100,
+            "message": "The page uses a main landmark for navigation."
+          },
+          {
+            "name": "Skip Navigation Link",
+            "status": "pass",
+            "score": 100,
+            "message": "The page has a skip-to-content link."
+          },
+          {
+            "name": "Button and Control Names",
+            "status": "pass",
+            "score": 100,
+            "message": "Buttons and icon controls have accessible names."
+          },
+          {
+            "name": "Iframe Titles",
+            "status": "pass",
+            "score": 100,
+            "message": "No iframes found on the page."
+          },
+          {
+            "name": "ARIA Roles",
+            "status": "pass",
+            "score": 100,
+            "message": "ARIA roles are valid."
+          },
+          {
+            "name": "Table Headers",
+            "status": "pass",
+            "score": 100,
+            "message": "No data tables found on the page."
+          }
+        ]
+      },
+      {
+        "name": "Trust Signals",
+        "slug": "trust",
+        "weight": 0,
+        "score": 44,
+        "checks": [
+          {
+            "name": "Secure connection (HTTPS)",
+            "status": "pass",
+            "score": 100,
+            "message": "Your site loads over HTTPS, which visitors and search engines trust."
+          },
+          {
+            "name": "Contact info visible",
+            "status": "pass",
+            "score": 100,
+            "message": "Visitors can clearly see how and where to reach you.",
+            "details": "Shows: phone number, email, physical address, contact form."
+          },
+          {
+            "name": "Click-to-call",
+            "status": "pass",
+            "score": 100,
+            "message": "Your phone number is a tap-to-call link, which is easy for mobile visitors."
+          },
+          {
+            "name": "Trust badges & credentials",
+            "status": "fail",
+            "score": 0,
+            "message": "Your site shows little proof of credibility (licensing, insurance, certifications, awards, or guarantees).",
+            "details": "No trust badges or credentials detected."
+          },
+          {
+            "name": "Customer testimonials",
+            "status": "fail",
+            "score": 0,
+            "message": "No customer testimonials or reviews are shown. Social proof is one of the strongest trust signals."
+          },
+          {
+            "name": "Privacy & terms pages",
+            "status": "pass",
+            "score": 100,
+            "message": "Your site links to its legal pages, which signals a legitimate business.",
+            "details": "Linked: Privacy Policy, Terms of Service."
+          },
+          {
+            "name": "Team transparency",
+            "status": "pass",
+            "score": 100,
+            "message": "Your site links to a team or about page, which puts a face to the business."
+          }
+        ]
+      },
+      {
+        "name": "Content Quality",
+        "slug": "content",
+        "weight": 0,
+        "score": 61,
+        "checks": [
+          {
+            "name": "Enough content",
+            "status": "fail",
+            "score": 40,
+            "message": "Thin content (160 words). Aim for at least 300 words.",
+            "details": "160 words"
+          },
+          {
+            "name": "Heading structure",
+            "status": "pass",
+            "score": 100,
+            "message": "Clear heading structure with one main heading and supporting sub-headings.",
+            "details": "H1: 1, H2: 4, H3: 3"
+          },
+          {
+            "name": "Key pages linked",
+            "status": "warn",
+            "score": 50,
+            "message": "Missing links to: Services, Blog.",
+            "details": "About: yes, Services: no, Contact: yes, Blog: no"
+          },
+          {
+            "name": "Readability",
+            "status": "warn",
+            "score": 50,
+            "message": "Reading level is fairly advanced (grade 12). Simpler wording is easier for more visitors to follow.",
+            "details": "Grade 12"
+          },
+          {
+            "name": "Internal links",
+            "status": "pass",
+            "score": 100,
+            "message": "Strong internal linking (22 links).",
+            "details": "22 internal, 0 external"
+          },
+          {
+            "name": "Image alt coverage",
+            "status": "fail",
+            "score": 30,
+            "message": "2 of 3 image(s) missing alt text.",
+            "details": "1 with alt, 2 without"
+          },
+          {
+            "name": "Organized with lists",
+            "status": "warn",
+            "score": 60,
+            "message": "One list found. Lists help break up dense content and make it easy to scan.",
+            "details": "1 list(s)"
+          },
+          {
+            "name": "Clear calls to action",
+            "status": "pass",
+            "score": 100,
+            "message": "Clear calls to action present (2 found).",
+            "details": "2 call-to-action(s)"
+          }
+        ]
+      }
+    ],
+    "after": [
+      {
+        "name": "AI Readability",
+        "slug": "ai-readability",
+        "weight": 0,
+        "score": 57,
+        "checks": [
+          {
+            "name": "Structured data present",
+            "status": "pass",
+            "score": 100,
+            "message": "Found 2 schema type(s) AI tools can read.",
+            "details": "LegalService, FAQPage"
+          },
+          {
+            "name": "Business schema valid",
+            "status": "warn",
+            "score": 50,
+            "message": "Found LegalService schema, but it has no specific rich-result requirements to check."
+          },
+          {
+            "name": "AI-answer content (FAQ/HowTo)",
+            "status": "pass",
+            "score": 80,
+            "message": "You publish content AI assistants quote directly: FAQ (2 Q&As)."
+          },
+          {
+            "name": "Entity authority (sameAs)",
+            "status": "fail",
+            "score": 0,
+            "message": "No verified social or authority profiles linked. AI tools have nothing to cross-check, so they trust you less.",
+            "details": "Link your official profiles (Google, LinkedIn, Facebook, and ideally Wikipedia) from the site so AI can confirm you are a real business."
+          },
+          {
+            "name": "Plain-text readable by AI",
+            "status": "pass",
+            "score": 100,
+            "message": "Your content is in plain HTML (243 words) that AI tools can read directly."
+          },
+          {
+            "name": "Single clear business name",
+            "status": "pass",
+            "score": 100,
+            "message": "Your business name is used consistently, so AI tools can identify you clearly."
+          },
+          {
+            "name": "llms.txt for AI agents",
+            "status": "warn",
+            "score": 70,
+            "message": "No llms.txt file found. llms.txt is an emerging, optional plain-text guide at your site root that tells AI assistants (ChatGPT, Claude, Perplexity) what your site is and where the important pages are.",
+            "details": "Optional but forward-looking: ask Strelva to add an llms.txt that summarizes your business and points AI assistants at your key pages."
+          }
+        ]
+      },
+      {
+        "name": "SEO Foundations",
+        "slug": "seo",
+        "weight": 0,
+        "score": 100,
+        "checks": [
+          {
+            "name": "robots.txt",
+            "status": "pass",
+            "score": 100,
+            "message": "A robots.txt file is present."
+          },
+          {
+            "name": "Crawlers allowed",
+            "status": "pass",
+            "score": 100,
+            "message": "Search engines are allowed to read the site."
+          },
+          {
+            "name": "XML sitemap",
+            "status": "pass",
+            "score": 100,
+            "message": "An XML sitemap is present."
+          },
+          {
+            "name": "Sitemap is valid",
+            "status": "pass",
+            "score": 100,
+            "message": "The sitemap is valid XML with listed pages."
+          },
+          {
+            "name": "Canonical tag",
+            "status": "pass",
+            "score": 100,
+            "message": "A canonical tag is set.",
+            "details": "https://mooney.strelva.com/"
+          },
+          {
+            "name": "Title tag",
+            "status": "pass",
+            "score": 100,
+            "message": "The page title is present and a good length (47 characters).",
+            "details": "The Mooney Firm | Legal and Workplace Mediation"
+          },
+          {
+            "name": "Meta description",
+            "status": "pass",
+            "score": 100,
+            "message": "A meta description is present."
+          },
+          {
+            "name": "H1 heading",
+            "status": "pass",
+            "score": 100,
+            "message": "The page has an H1 heading.",
+            "details": "The Mooney Firm"
+          },
+          {
+            "name": "Single H1",
+            "status": "pass",
+            "score": 100,
+            "message": "The page uses a single H1 heading."
+          },
+          {
+            "name": "Server-rendered content",
+            "status": "pass",
+            "score": 100,
+            "message": "Your content is readable right in the page, the way search engines prefer."
+          }
+        ]
+      },
+      {
+        "name": "Accessibility",
+        "slug": "a11y",
+        "weight": 0,
+        "score": 100,
+        "checks": [
+          {
+            "name": "Document Language",
+            "status": "pass",
+            "score": 100,
+            "message": "The page declares its language (en)."
+          },
+          {
+            "name": "Page Title",
+            "status": "pass",
+            "score": 100,
+            "message": "The page has a descriptive title."
+          },
+          {
+            "name": "Image Alt Text",
+            "status": "pass",
+            "score": 100,
+            "message": "No images found on the page."
+          },
+          {
+            "name": "Link Text",
+            "status": "pass",
+            "score": 100,
+            "message": "Links use descriptive text."
+          },
+          {
+            "name": "Form Labels",
+            "status": "pass",
+            "score": 100,
+            "message": "No form fields found on the page."
+          },
+          {
+            "name": "Heading Structure",
+            "status": "pass",
+            "score": 100,
+            "message": "Headings follow a single, sequential structure."
+          },
+          {
+            "name": "Landmark Regions",
+            "status": "pass",
+            "score": 100,
+            "message": "The page uses a main landmark for navigation."
+          },
+          {
+            "name": "Skip Navigation Link",
+            "status": "pass",
+            "score": 100,
+            "message": "The page has a skip-to-content link."
+          },
+          {
+            "name": "Button and Control Names",
+            "status": "pass",
+            "score": 100,
+            "message": "Buttons and icon controls have accessible names."
+          },
+          {
+            "name": "Iframe Titles",
+            "status": "pass",
+            "score": 100,
+            "message": "No iframes found on the page."
+          },
+          {
+            "name": "ARIA Roles",
+            "status": "pass",
+            "score": 100,
+            "message": "ARIA roles are valid."
+          },
+          {
+            "name": "Table Headers",
+            "status": "pass",
+            "score": 100,
+            "message": "No data tables found on the page."
+          }
+        ]
+      },
+      {
+        "name": "Trust Signals",
+        "slug": "trust",
+        "weight": 0,
+        "score": 44,
+        "checks": [
+          {
+            "name": "Secure connection (HTTPS)",
+            "status": "pass",
+            "score": 100,
+            "message": "Your site loads over HTTPS, which visitors and search engines trust."
+          },
+          {
+            "name": "Contact info visible",
+            "status": "pass",
+            "score": 100,
+            "message": "Visitors can clearly see how and where to reach you.",
+            "details": "Shows: phone number, email, physical address, contact form."
+          },
+          {
+            "name": "Click-to-call",
+            "status": "pass",
+            "score": 100,
+            "message": "Your phone number is a tap-to-call link, which is easy for mobile visitors."
+          },
+          {
+            "name": "Trust badges & credentials",
+            "status": "fail",
+            "score": 0,
+            "message": "Your site shows little proof of credibility (licensing, insurance, certifications, awards, or guarantees).",
+            "details": "No trust badges or credentials detected."
+          },
+          {
+            "name": "Customer testimonials",
+            "status": "fail",
+            "score": 0,
+            "message": "No customer testimonials or reviews are shown. Social proof is one of the strongest trust signals."
+          },
+          {
+            "name": "Privacy & terms pages",
+            "status": "pass",
+            "score": 100,
+            "message": "Your site links to its legal pages, which signals a legitimate business.",
+            "details": "Linked: Privacy Policy, Terms of Service."
+          },
+          {
+            "name": "Team transparency",
+            "status": "pass",
+            "score": 100,
+            "message": "Your site links to a team or about page, which puts a face to the business."
+          }
+        ]
+      },
+      {
+        "name": "Content Quality",
+        "slug": "content",
+        "weight": 0,
+        "score": 63,
+        "checks": [
+          {
+            "name": "Enough content",
+            "status": "fail",
+            "score": 40,
+            "message": "Thin content (232 words). Aim for at least 300 words.",
+            "details": "232 words"
+          },
+          {
+            "name": "Heading structure",
+            "status": "pass",
+            "score": 100,
+            "message": "Clear heading structure with one main heading and supporting sub-headings.",
+            "details": "H1: 1, H2: 4, H3: 3"
+          },
+          {
+            "name": "Key pages linked",
+            "status": "warn",
+            "score": 50,
+            "message": "Missing links to: Services, Blog.",
+            "details": "About: yes, Services: no, Contact: yes, Blog: no"
+          },
+          {
+            "name": "Readability",
+            "status": "warn",
+            "score": 50,
+            "message": "Reading level is fairly advanced (grade 11). Simpler wording is easier for more visitors to follow.",
+            "details": "Grade 11"
+          },
+          {
+            "name": "Internal links",
+            "status": "pass",
+            "score": 100,
+            "message": "Strong internal linking (18 links).",
+            "details": "18 internal, 0 external"
+          },
+          {
+            "name": "Image alt coverage",
+            "status": "warn",
+            "score": 50,
+            "message": "No images found on the page.",
+            "details": "0 with alt, 0 without"
+          },
+          {
+            "name": "Organized with lists",
+            "status": "warn",
+            "score": 60,
+            "message": "One list found. Lists help break up dense content and make it easy to scan.",
+            "details": "1 list(s)"
+          },
+          {
+            "name": "Clear calls to action",
+            "status": "pass",
+            "score": 100,
+            "message": "Clear calls to action present (2 found).",
+            "details": "2 call-to-action(s)"
+          }
+        ]
+      }
+    ],
+    "deltas": [
+      {
+        "category": "AI Readability",
+        "before": 40,
+        "after": 57,
+        "delta": 17
+      },
+      {
+        "category": "SEO Foundations",
+        "before": 100,
+        "after": 100,
+        "delta": 0
+      },
+      {
+        "category": "Accessibility",
+        "before": 100,
+        "after": 100,
+        "delta": 0
+      },
+      {
+        "category": "Trust Signals",
+        "before": 44,
+        "after": 44,
+        "delta": 0
+      },
+      {
+        "category": "Content Quality",
+        "before": 61,
+        "after": 63,
+        "delta": 2
+      }
+    ]
+  },
+  "unresolved": [
+    {
+      "factId": "fact_574f575c4842d94043e7",
+      "text": "3Terms and schedulingOnce the conflict check clears, we confirm availability, fees, and the next step.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/#sha256=cd59087fb363a22562ff6b99d997a18bcbc26ca4750d9a8773055ac55f2e2980",
+          "quote": "3Terms and schedulingOnce the conflict check clears, we confirm availability, fees, and the next step."
+        }
+      ]
+    },
+    {
+      "factId": "fact_4959836283e3146bbad6",
+      "text": "that as well. Do not include party or counsel names, dispute facts, pleadings, medical records, settlement communications, or other documents. We respond quickly to every inquiry, and if the matter moves forward, we will explain how to provide the names needed for a conflict check.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/attorneys#sha256=c6147778c99d254e4fe85e0e9ca5f01412264840ef35a6529c0f22da4118a44e",
+          "quote": "that as well. Do not include party or counsel names, dispute facts, pleadings, medical records, settlement communications, or other documents. We respond quickly to every inquiry, and if the matter moves forward, we will explain how to provide the names needed for a conflict check."
+        }
+      ]
+    },
+    {
+      "factId": "fact_3d4e330c9eeede217624",
+      "text": "Emailing us does not establish that we can serve as mediator or create an attorney-client relationship.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/attorneys#sha256=c6147778c99d254e4fe85e0e9ca5f01412264840ef35a6529c0f22da4118a44e",
+          "quote": "Emailing us does not establish that we can serve as mediator or create an attorney-client relationship."
+        }
+      ]
+    },
+    {
+      "factId": "fact_ffef8cdf67fb204363b8",
+      "text": "After a conflict check and brief review, we confirm availability and the applicable fee structure. We provide cancellation, travel, virtual-session, and other terms before a date is finalized.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/attorneys#sha256=c6147778c99d254e4fe85e0e9ca5f01412264840ef35a6529c0f22da4118a44e",
+          "quote": "After a conflict check and brief review, we confirm availability and the applicable fee structure. We provide cancellation, travel, virtual-session, and other terms before a date is finalized."
+        }
+      ]
+    },
+    {
+      "factId": "fact_ea6e9d56e1ae256c7fe0",
+      "text": "To begin, call 716.932.8566 or email smooney@attymooney.com.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/attorneys#sha256=c6147778c99d254e4fe85e0e9ca5f01412264840ef35a6529c0f22da4118a44e",
+          "quote": "To begin, call 716.932.8566 or email smooney@attymooney.com."
+        }
+      ]
+    },
+    {
+      "factId": "fact_f87bc6916afa80abe1e3",
+      "text": "No. The mediator remains neutral, does not represent any participant, and does not give legal advice. The outcome belongs to the participants.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/workplace-mediation#sha256=0c29b3adac84c1a078ebb6fa16bf40f59c0c5d5a5d6255c6db4ee25a0209ff93",
+          "quote": "No. The mediator remains neutral, does not represent any participant, and does not give legal advice. The outcome belongs to the participants."
+        }
+      ]
+    },
+    {
+      "factId": "fact_eeade94c32baa7209be0",
+      "text": "Confirm independence. The mediator should have no stake in the outcome and no ongoing role with the organization that could compromise neutrality.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/workplace-mediation#sha256=0c29b3adac84c1a078ebb6fa16bf40f59c0c5d5a5d6255c6db4ee25a0209ff93",
+          "quote": "Confirm independence. The mediator should have no stake in the outcome and no ongoing role with the organization that could compromise neutrality."
+        }
+      ]
+    },
+    {
+      "factId": "fact_d6ce837f092de71b3185",
+      "text": "We bring decades in litigation, executive leadership, and coaching to that work. Litigation experience grounds the discussion in realism. Executive experience brings a working understanding of how organizations actually function. Coaching, including active listening, gives participants",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/workplace-mediation#sha256=0c29b3adac84c1a078ebb6fa16bf40f59c0c5d5a5d6255c6db4ee25a0209ff93",
+          "quote": "We bring decades in litigation, executive leadership, and coaching to that work. Litigation experience grounds the discussion in realism. Executive experience brings a working understanding of how organizations actually function. Coaching, including active listening, gives participants"
+        }
+      ]
+    },
+    {
+      "factId": "fact_b416e84ee8cb51fbb707",
+      "text": "Throughout, every participant is treated with respect, professionalism, and understanding, whatever the outcome. Resolution comes first. Fairness and efficiency are how we get there.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/workplace-mediation#sha256=0c29b3adac84c1a078ebb6fa16bf40f59c0c5d5a5d6255c6db4ee25a0209ff93",
+          "quote": "Throughout, every participant is treated with respect, professionalism, and understanding, whatever the outcome. Resolution comes first. Fairness and efficiency are how we get there."
+        }
+      ]
+    },
+    {
+      "factId": "fact_dc9032be59dca457785f",
+      "text": "Reaching an outcome. Participants decide what they can agree on. That may be a specific agreement, a changed way of working together, or a clearer understanding between the people involved. Not every mediation ends in a formal agreement, and participants are never pressured into one.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/workplace-mediation#sha256=0c29b3adac84c1a078ebb6fa16bf40f59c0c5d5a5d6255c6db4ee25a0209ff93",
+          "quote": "Reaching an outcome. Participants decide what they can agree on. That may be a specific agreement, a changed way of working together, or a clearer understanding between the people involved. Not every mediation ends in a formal agreement, and participants are never pressured into one."
+        }
+      ]
+    },
+    {
+      "factId": "fact_3dec9b1e168e73a8f3f4",
+      "text": "Sheri L. Mooney, Attorney and Mediator | The Mooney Firm",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/about#sha256=e0785559a9e6e2f8bcd0c912b185e96dfc4520a9703b66da1ce7d661385f455a",
+          "quote": "Sheri L. Mooney, Attorney and Mediator | The Mooney Firm"
+        }
+      ]
+    },
+    {
+      "factId": "fact_0a438139794adcd0fed9",
+      "text": "My path from litigation into executive leadership and coaching shapes how I help parties reach resolution. Nearly two decades trying and arguing cases at the trial and appellate level, in both state and federal court, gave me a realistic sense of how a case actually resolves, so I can help",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/about#sha256=e0785559a9e6e2f8bcd0c912b185e96dfc4520a9703b66da1ce7d661385f455a",
+          "quote": "My path from litigation into executive leadership and coaching shapes how I help parties reach resolution. Nearly two decades trying and arguing cases at the trial and appellate level, in both state and federal court, gave me a realistic sense of how a case actually resolves, so I can help"
+        }
+      ]
+    },
+    {
+      "factId": "fact_9c7777856f67f8079bf5",
+      "text": "parties weigh their options with that same realism rather than in the abstract. The years since, leading teams and responding directly to personnel issues, gave me a practical understanding of how organizations make decisions and where conflict tends to get stuck, informing a process built",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/about#sha256=e0785559a9e6e2f8bcd0c912b185e96dfc4520a9703b66da1ce7d661385f455a",
+          "quote": "parties weigh their options with that same realism rather than in the abstract. The years since, leading teams and responding directly to personnel issues, gave me a practical understanding of how organizations make decisions and where conflict tends to get stuck, informing a process built"
+        }
+      ]
+    },
+    {
+      "factId": "fact_1fcb7952bb7024fc140a",
+      "text": "for efficiency as well as resolution. My training as a Certified Leadership Coach, including active listening, gives participants the tools to communicate clearly, manage difficult conversations, and identify what they actually need, in service of a fair outcome for everyone at the table.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/about#sha256=e0785559a9e6e2f8bcd0c912b185e96dfc4520a9703b66da1ce7d661385f455a",
+          "quote": "for efficiency as well as resolution. My training as a Certified Leadership Coach, including active listening, gives participants the tools to communicate clearly, manage difficult conversations, and identify what they actually need, in service of a fair outcome for everyone at the table."
+        }
+      ]
+    },
+    {
+      "factId": "fact_65e25e6d7e916071d006",
+      "text": "As a mediator, I do not represent either side or decide the outcome. I organize the process, explain its boundaries, and guide participants toward a resolution they help shape themselves.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/about#sha256=e0785559a9e6e2f8bcd0c912b185e96dfc4520a9703b66da1ce7d661385f455a",
+          "quote": "As a mediator, I do not represent either side or decide the outcome. I organize the process, explain its boundaries, and guide participants toward a resolution they help shape themselves."
+        }
+      ]
+    },
+    {
+      "factId": "fact_be8742443f7f42b558a8",
+      "text": "Across nearly three decades of practice, I have worked across a broad range of industries, including:",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/about#sha256=e0785559a9e6e2f8bcd0c912b185e96dfc4520a9703b66da1ce7d661385f455a",
+          "quote": "Across nearly three decades of practice, I have worked across a broad range of industries, including:"
+        }
+      ]
+    },
+    {
+      "factId": "fact_ca83554b12d16dce032b",
+      "text": "Whatever the outcome, participants leave having been heard, treated fairly, and treated with professionalism and understanding throughout.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/about#sha256=e0785559a9e6e2f8bcd0c912b185e96dfc4520a9703b66da1ce7d661385f455a",
+          "quote": "Whatever the outcome, participants leave having been heard, treated fairly, and treated with professionalism and understanding throughout."
+        }
+      ]
+    },
+    {
+      "factId": "fact_2f0ca75007df5de31095",
+      "text": "Mediation Fees and Availability | The Mooney Firm",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/fees#sha256=51090d5485a5243222ae30da3dfd7a08409b5a9929719d78c7e35068224624e5",
+          "quote": "Mediation Fees and Availability | The Mooney Firm"
+        }
+      ]
+    },
+    {
+      "factId": "fact_4732f550edc5a2c2fc37",
+      "text": "We begin with a brief conversation to understand the situation. If the matter moves forward, we clarify the proposed scope, participants, format, preparation, follow-up, and fee terms before the engagement begins.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/fees#sha256=51090d5485a5243222ae30da3dfd7a08409b5a9929719d78c7e35068224624e5",
+          "quote": "We begin with a brief conversation to understand the situation. If the matter moves forward, we clarify the proposed scope, participants, format, preparation, follow-up, and fee terms before the engagement begins."
+        }
+      ]
+    },
+    {
+      "factId": "fact_d7f6312eb556dc228ae1",
+      "text": "Submitting the form or contacting the firm through the website does not create an attorney-client relationship. An attorney-client relationship is formed only through a written agreement signed by both you and the firm.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/privacy#sha256=528856d76d24a081fa89d5bd288603c7bf3670d3f402264765cd446d30d0a8f7",
+          "quote": "Submitting the form or contacting the firm through the website does not create an attorney-client relationship. An attorney-client relationship is formed only through a written agreement signed by both you and the firm."
+        }
+      ]
+    },
+    {
+      "factId": "fact_bc20c4d016ab3c2098ce",
+      "text": "The firm and its service providers take reasonable measures to protect information submitted through the website. No website or electronic transmission is completely secure, and the firm cannot guarantee absolute security. This is a further reason not to submit confidential or sensitive",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/privacy#sha256=528856d76d24a081fa89d5bd288603c7bf3670d3f402264765cd446d30d0a8f7",
+          "quote": "The firm and its service providers take reasonable measures to protect information submitted through the website. No website or electronic transmission is completely secure, and the firm cannot guarantee absolute security. This is a further reason not to submit confidential or sensitive"
+        }
+      ]
+    },
+    {
+      "factId": "fact_d2c8cd30b2c9b17757f4",
+      "text": "Questions about this website notice may be directed to smooney@attymooney.com or 716.932.8566.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/privacy#sha256=528856d76d24a081fa89d5bd288603c7bf3670d3f402264765cd446d30d0a8f7",
+          "quote": "Questions about this website notice may be directed to smooney@attymooney.com or 716.932.8566."
+        }
+      ]
+    },
+    {
+      "factId": "fact_5bcebbbdace70d5345e9",
+      "text": "should any action be taken based on the information contained on these web pages or any of their associated links. Laws, rules, and procedures vary by jurisdiction and by the nature of a particular dispute. Contact an attorney or other qualified professional licensed in the relevant",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/terms#sha256=ddf41348ae724ec4e972c6cb239d262a9ea3820d59ba26d35d6ebaf9812b5965",
+          "quote": "should any action be taken based on the information contained on these web pages or any of their associated links. Laws, rules, and procedures vary by jurisdiction and by the nature of a particular dispute. Contact an attorney or other qualified professional licensed in the relevant"
+        }
+      ]
+    },
+    {
+      "factId": "fact_5058893e5dcedfcd62fb",
+      "text": "1. No attorney-client relationship; no legal advice",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/terms#sha256=ddf41348ae724ec4e972c6cb239d262a9ea3820d59ba26d35d6ebaf9812b5965",
+          "quote": "1. No attorney-client relationship; no legal advice"
+        }
+      ]
+    },
+    {
+      "factId": "fact_d209f0d2d69060f33f37",
+      "text": "Neither viewing this website nor transmitting information through it creates an attorney-client relationship, a mediator-party relationship, or any other professional relationship, and nothing on this website constitutes legal advice to any person viewing it. The firm serves in a neutral",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/terms#sha256=ddf41348ae724ec4e972c6cb239d262a9ea3820d59ba26d35d6ebaf9812b5965",
+          "quote": "Neither viewing this website nor transmitting information through it creates an attorney-client relationship, a mediator-party relationship, or any other professional relationship, and nothing on this website constitutes legal advice to any person viewing it. The firm serves in a neutral"
+        }
+      ]
+    },
+    {
+      "factId": "fact_55f0b97d57fa796c6707",
+      "text": "for consultation with an attorney who represents your individual interests.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/terms#sha256=ddf41348ae724ec4e972c6cb239d262a9ea3820d59ba26d35d6ebaf9812b5965",
+          "quote": "for consultation with an attorney who represents your individual interests."
+        }
+      ]
+    },
+    {
+      "factId": "fact_360b5028c7070019abd7",
+      "text": "The attorney associated with this firm is licensed to practice law in New York State. In some other jurisdictions, this website may be considered advertising. The hiring of an attorney or the retention of a mediator is an important decision that should not be based solely on advertisement.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/terms#sha256=ddf41348ae724ec4e972c6cb239d262a9ea3820d59ba26d35d6ebaf9812b5965",
+          "quote": "The attorney associated with this firm is licensed to practice law in New York State. In some other jurisdictions, this website may be considered advertising. The hiring of an attorney or the retention of a mediator is an important decision that should not be based solely on advertisement."
+        }
+      ]
+    },
+    {
+      "factId": "fact_e8e16df7ddff8ae897e2",
+      "text": "Before deciding to retain the firm, you may obtain free information about the firm by visiting this website or by calling 716.932.8566. The firm cannot represent or serve anyone seeking representation or mediation services based solely on viewing this website, in any jurisdiction where",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/terms#sha256=ddf41348ae724ec4e972c6cb239d262a9ea3820d59ba26d35d6ebaf9812b5965",
+          "quote": "Before deciding to retain the firm, you may obtain free information about the firm by visiting this website or by calling 716.932.8566. The firm cannot represent or serve anyone seeking representation or mediation services based solely on viewing this website, in any jurisdiction where"
+        }
+      ]
+    },
+    {
+      "factId": "fact_2ceda03df20c486beb24",
+      "text": "By submitting the general inquiry form or contacting the firm by other means, you understand and agree to the following: your inquiry may or may not be reviewed by an attorney; you may or may not be contacted by a representative of the firm about the matter; and the submission of your",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/terms#sha256=ddf41348ae724ec4e972c6cb239d262a9ea3820d59ba26d35d6ebaf9812b5965",
+          "quote": "By submitting the general inquiry form or contacting the firm by other means, you understand and agree to the following: your inquiry may or may not be reviewed by an attorney; you may or may not be contacted by a representative of the firm about the matter; and the submission of your"
+        }
+      ]
+    },
+    {
+      "factId": "fact_ece57c931da32e64cdea",
+      "text": "information does not, by itself, create an attorney-client relationship, a mediator-party relationship, or any obligation on the part of the firm to act on your behalf.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/terms#sha256=ddf41348ae724ec4e972c6cb239d262a9ea3820d59ba26d35d6ebaf9812b5965",
+          "quote": "information does not, by itself, create an attorney-client relationship, a mediator-party relationship, or any obligation on the part of the firm to act on your behalf."
+        }
+      ]
+    },
+    {
+      "factId": "fact_25adf3357d7451553ab9",
+      "text": "5. No warranty; no guarantee of outcome",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/terms#sha256=ddf41348ae724ec4e972c6cb239d262a9ea3820d59ba26d35d6ebaf9812b5965",
+          "quote": "5. No warranty; no guarantee of outcome"
+        }
+      ]
+    },
+    {
+      "factId": "fact_dad0627eca73b75b05f3",
+      "text": "While reasonable steps have been taken to help ensure the accuracy of the information on this website, the firm does not make any express or implied representation or warranty about the accuracy or completeness of the information on this website or any associated links. Prior outcomes in",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/terms#sha256=ddf41348ae724ec4e972c6cb239d262a9ea3820d59ba26d35d6ebaf9812b5965",
+          "quote": "While reasonable steps have been taken to help ensure the accuracy of the information on this website, the firm does not make any express or implied representation or warranty about the accuracy or completeness of the information on this website or any associated links. Prior outcomes in"
+        }
+      ]
+    },
+    {
+      "factId": "fact_4d0c4dce076774b11908",
+      "text": "mediation or other matters depend on the facts and circumstances of each case and do not guarantee a similar outcome in any other matter.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/terms#sha256=ddf41348ae724ec4e972c6cb239d262a9ea3820d59ba26d35d6ebaf9812b5965",
+          "quote": "mediation or other matters depend on the facts and circumstances of each case and do not guarantee a similar outcome in any other matter."
+        }
+      ]
+    },
+    {
+      "factId": "fact_1a1be64424ffb88b14ca",
+      "text": "The content of this website is not guaranteed to be available at all times. Routine maintenance or other circumstances may make the website unavailable to users for a period of time.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/terms#sha256=ddf41348ae724ec4e972c6cb239d262a9ea3820d59ba26d35d6ebaf9812b5965",
+          "quote": "The content of this website is not guaranteed to be available at all times. Routine maintenance or other circumstances may make the website unavailable to users for a period of time."
+        }
+      ]
+    },
+    {
+      "factId": "fact_16a145a26d61384c4ce2",
+      "text": "Questions about this notice may be directed to smooney@attymooney.com or 716.932.8566.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/terms#sha256=ddf41348ae724ec4e972c6cb239d262a9ea3820d59ba26d35d6ebaf9812b5965",
+          "quote": "Questions about this notice may be directed to smooney@attymooney.com or 716.932.8566."
+        }
+      ]
+    },
+    {
+      "factId": "fact_5ecbe14402d72116f0be",
+      "text": "If you encounter a barrier or need information in another format, contact Sheri at 716.932.8566 or smooney@attymooney.com. If possible, identify the page and the assistance you need.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/accessibility#sha256=cd8e0e3e2fcc62daf452d967bce4c162c42cadf3fd0dcbe34b4d449804fb0351",
+          "quote": "If you encounter a barrier or need information in another format, contact Sheri at 716.932.8566 or smooney@attymooney.com. If possible, identify the page and the assistance you need."
+        }
+      ]
+    },
+    {
+      "factId": "fact_946e7c9804e3434c4b02",
+      "text": "Attorney Advertising Notice | The Mooney Firm",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/attorney-advertising#sha256=36fbe80bf29dae3c7fa2449c3992adedd11c8706706f0ef936c603283705c40a",
+          "quote": "Attorney Advertising Notice | The Mooney Firm"
+        }
+      ]
+    },
+    {
+      "factId": "fact_3fc58a42fecd5a57d1aa",
+      "text": "Telephone716.932.8566",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/attorney-advertising#sha256=36fbe80bf29dae3c7fa2449c3992adedd11c8706706f0ef936c603283705c40a",
+          "quote": "Telephone716.932.8566"
+        }
+      ]
+    },
+    {
+      "factId": "fact_861578784334c8aa95d3",
+      "text": "This website does not guarantee any result. Past outcomes, if ever discussed elsewhere, do not guarantee a similar outcome. The firm does not claim certification as a specialist.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/attorney-advertising#sha256=36fbe80bf29dae3c7fa2449c3992adedd11c8706706f0ef936c603283705c40a",
+          "quote": "This website does not guarantee any result. Past outcomes, if ever discussed elsewhere, do not guarantee a similar outcome. The firm does not claim certification as a specialist."
+        }
+      ]
+    },
+    {
+      "factId": "fact_6980e61c65f0b9282f4f",
+      "text": "Nothing on this website creates an attorney-client relationship or establishes that Sheri can serve as mediator in a particular matter.",
+      "highRisk": true,
+      "supported": true,
+      "sources": [
+        {
+          "sourceId": "https://www.attymooney.com/attorney-advertising#sha256=36fbe80bf29dae3c7fa2449c3992adedd11c8706706f0ef936c603283705c40a",
+          "quote": "Nothing on this website creates an attorney-client relationship or establishes that Sheri can serve as mediator in a particular matter."
+        }
+      ]
+    }
+  ],
+  "runtimeAuditProvenance": {
+    "checkedAt": "2026-10-01T20:43:49.819Z",
+    "source": {
+      "artifact": "raw-source.html",
+      "url": "https://www.attymooney.com/",
+      "bytes": 32447,
+      "sha256": "cd59087fb363a22562ff6b99d997a18bcbc26ca4750d9a8773055ac55f2e2980"
+    },
+    "planned": {
+      "artifact": "planned.html",
+      "url": "https://mooney.strelva.com",
+      "bytes": 12730,
+      "sha256": "04a681cafa28421308aab4cd8a73d3851271773a110f50d83ec2c12bda57c12c"
+    },
+    "documentHash": "c0ca900d53c72bb8817b027bf78fd7bf1666494ced1b0ea1ae3e508a43d8be19",
+    "note": "The source artifact preserves actual response HTML, including inert JSON-LD. The planned artifact is the non-preview static render with its proposed canonical. Neither preview catalog.html nor sanitized original.html was used for runtime scoring. The planned URL is not published."
+  }
+}

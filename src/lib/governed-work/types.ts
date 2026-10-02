@@ -11,7 +11,7 @@
  * These model the same lifecycle that today lives in Redis as a `UnifiedEvent`
  * (src/lib/events.ts) driven through src/lib/event-actions.ts. Nothing on the live
  * path reads or writes them yet; authority stays in Redis until #8. See
- * docs/ontology-phase2-governed-work.md.
+ * docs/architecture/ontology-phase2-governed-work.md.
  */
 
 /** Who authored the proposed change. Mirrors the UnifiedEvent `source` collapsed

@@ -473,6 +473,18 @@ export function invalidateDomainMapCache(): void {
   }
 }
 
+/**
+ * Hosted v2 tenant creation uses one owner-checked Postgres transaction for the
+ * tenant row, stable identity, owner membership and workspace binding. The
+ * website document repository supplies that RPC boundary; this module owns
+ * invalidation of the tenant configuration readers after creation/replay.
+ */
+export async function provisionHostedWebsiteTenant(provision: () => Promise<string>): Promise<string> {
+  const tenantId = await provision();
+  invalidateCache();
+  return tenantId;
+}
+
 export async function createTenant(
   config: Omit<TenantConfig, "id" | "createdAt" | "active" | "subscriptionStatus">
 ): Promise<TenantConfig> {

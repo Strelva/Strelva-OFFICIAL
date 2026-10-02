@@ -3,14 +3,14 @@
 import { useEffect, useId, useState, type FormEvent } from "react";
 import { isPublicInquiryForm, loadInquiryForm, submitInquiryForm, type PublicInquiryForm } from "./inquiry-client";
 
-type ConnectedProps = { baseUrl: string; tenant: string; capabilityId: string };
+type ConnectedProps = { baseUrl: string; tenant: string; capabilityId: string; expectedVersion?: number };
 
 /** Client-site entry. Changing business or capability discards the old form. */
 export function StrelvaConnectedInquiryForm(props: ConnectedProps) {
   return <InquiryFormLoader key={`${props.baseUrl}:${props.tenant}:${props.capabilityId}`} {...props} />;
 }
 
-function InquiryFormLoader({ baseUrl, tenant, capabilityId }: ConnectedProps) {
+function InquiryFormLoader({ baseUrl, tenant, capabilityId, expectedVersion }: ConnectedProps) {
   const [result, setResult] = useState<PublicInquiryForm | Error | null>(null);
   useEffect(() => {
     const controller = new AbortController();
@@ -22,6 +22,7 @@ function InquiryFormLoader({ baseUrl, tenant, capabilityId }: ConnectedProps) {
   }, [baseUrl, tenant, capabilityId]);
   if (result === null) return <p role="status">Loading inquiry form…</p>;
   if (result instanceof Error) return <p role="alert">{result.message}</p>;
+  if (expectedVersion !== undefined && result.version !== expectedVersion) return <p role="alert">This form changed. Please contact the business directly.</p>;
   return <StrelvaInquiryForm definition={result} onSubmit={(fields) => submitInquiryForm(baseUrl, tenant, result, fields)} />;
 }
 

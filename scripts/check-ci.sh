@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # CI-faithful local gate. Runs the checks enforced by the GitHub Actions `build`
 # job, including the browser gates that run for a ready-for-review PR. See
-# docs/testing-and-ci.md for the local/hosted evidence boundary.
+# docs/operations/testing-and-ci.md for the local/hosted evidence boundary.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"

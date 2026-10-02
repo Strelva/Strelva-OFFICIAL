@@ -65,11 +65,11 @@ function formatDate(value: string): string {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(date);
 }
 
-export function WorkspaceApp({ request = fetch, appBase = "", signOut, inquiry }: { request?: typeof fetch; appBase?: string; signOut?: React.ReactNode; inquiry?: WorkspaceInquiryConfig } = {}) {
-  return <WorkspaceRequestContext.Provider value={request}><WorkspaceContent appBase={appBase} signOut={signOut} inquiry={inquiry} /></WorkspaceRequestContext.Provider>;
+export function WorkspaceApp({ request = fetch, appBase = "", signOut, inquiry, rebuildEnabled = false }: { rebuildEnabled?: boolean; request?: typeof fetch; appBase?: string; signOut?: React.ReactNode; inquiry?: WorkspaceInquiryConfig } = {}) {
+  return <WorkspaceRequestContext.Provider value={request}><WorkspaceContent appBase={appBase} signOut={signOut} inquiry={inquiry} rebuildEnabled={rebuildEnabled} /></WorkspaceRequestContext.Provider>;
 }
 
-function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBase: string; signOut?: React.ReactNode; inquiry?: WorkspaceInquiryConfig }) {
+function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEnabled }: { rebuildEnabled: boolean; appBase: string; signOut?: React.ReactNode; inquiry?: WorkspaceInquiryConfig }) {
   const request = useWorkspaceRequest();
   const postAction = usePostAction();
   const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(null);
@@ -644,12 +644,14 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
     );
   }
 
+  const finiteJobOpen = view === "operations" && !selectedStandingId && !selectedAssignmentId && selectedWork?.productId === "operations" && selectedWork.resourceKind === "responsibility";
   return (
     <WorkspaceFrame>
       <div inert={Boolean(handoffLoading || (handoffToken && handoffPreview) || publicSaveResultId) || undefined}>
       <WorkspaceLayout appBase={appBase} signOut={signOut} key={snapshot.workspaceId} snapshot={snapshot} home={home} agency={view === "agency"} busy={loading} selectedWork={showAssessment ? null : selectedWork}
-        workingTitle={view === "websites" ? "Website" : view === "operations" ? "Ongoing work" : view === "applications" ? "Applications" : view === "scheduling" ? "Reservations" : view === "investigations" ? "Saved checks" : view === "product-learning" ? "Learning" : undefined}
-        workingSection={view === "operations" ? "ongoing" : "work"}
+        workingTitle={view === "websites" ? "Website" : view === "operations" ? finiteJobOpen ? "Request" : "Running" : view === "applications" ? "Applications" : view === "scheduling" ? "Reservations" : view === "investigations" ? "Saved checks" : view === "product-learning" ? "Learning" : undefined}
+        workingSection={view === "operations" ? finiteJobOpen ? "requests" : "ongoing" : "work"}
+        atSectionRoot={view === "operations" && !selectedWork && !selectedStandingId && !selectedAssignmentId}
         managedWork={snapshot.managedWork}
         managedWorkUnavailable={snapshot.managedWorkUnavailable}
         onHome={goHome}
@@ -746,10 +748,9 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig }: { appBas
               initialRequest={horizontalRequest}
               onCreatingStandingChange={setStandingCreating}
               onOpenStanding={openStanding}
-              onOpenWork={openWorkFromPlan}
               onSaved={horizontalSaved}
             />
-              : view === "websites" ? <WebsiteExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} readOnly={workspaceReadOnly} initialRequest={horizontalRequest} onSaved={horizontalSaved} />
+              : view === "websites" ? <WebsiteExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} rebuildEnabled={rebuildEnabled} rebuildVersion={websiteDocumentVersion(selectedWork?.payload)} managed={Boolean(snapshot.managedWork?.length)} agency={currentWorkspace?.kind === "agency"} readOnly={workspaceReadOnly} initialRequest={horizontalRequest} onSaved={horizontalSaved} />
               : view === "custom-applications" ? selectedWork?.productId === view ? <CustomApplicationManageExperience key={selectedWork.id} workId={selectedWork.id} readOnly={Boolean(workspaceReadOnly || currentWorkspace?.role === "member")} /> : <p role="status">Select a saved custom application to review its delivery.</p>
               : view === "onboarding" ? <OnboardingWorkspaceExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} initialCaseId={selectedWork?.productId === view ? selectedWork.id : undefined} initialRequest={horizontalRequest} readOnly={workspaceReadOnly} onSaved={horizontalSaved} />
               : view === "product-learning" ? <LearningExperience workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} sources={snapshot.work} readOnly={workspaceReadOnly} onSaved={horizontalSaved} />
@@ -894,4 +895,10 @@ function PublicResultSaveOverlay({ workspaceName, saving, error, onSave, onClose
       </div>
     </div>
   );
+}
+
+function websiteDocumentVersion(value: unknown): 2 | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const item = value as { version?: unknown; rebuild?: { version?: unknown } };
+  return item.version === 2 || item.rebuild?.version === 2 ? 2 : undefined;
 }

@@ -1,6 +1,6 @@
 /**
  * Collections CMS — the code-side content-type registry (see
- * docs/strelva-cms-scope.md). Each collection type = a field schema (Zod) + the
+ * docs/capabilities/publishing/collections-cms.md). Each collection type = a field schema (Zod) + the
  * capability flag that gates it + which field is the display title. Entries are
  * stored in the `collection_entries` Postgres table; `data` holds the type's
  * fields, validated here on write.

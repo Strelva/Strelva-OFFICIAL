@@ -28,8 +28,8 @@ before preparing a release. See [`VERSIONING.md`](./VERSIONING.md).
 - [`AGENTS.md`](./AGENTS.md) defines repository invariants and verification commands.
 - [`docs/README.md`](./docs/README.md) defines documentation authority and separates
   current runbooks from historical plans.
-- [`docs/product-ontology.md`](./docs/product-ontology.md) defines product language;
-  [`docs/persistence-boundaries.md`](./docs/persistence-boundaries.md) defines store
+- [`docs/architecture/product-ontology.md`](./docs/architecture/product-ontology.md) defines product language;
+  [`docs/architecture/persistence-boundaries.md`](./docs/architecture/persistence-boundaries.md) defines store
   authority and failure behavior.
 
 ## Architecture
@@ -55,7 +55,7 @@ before preparing a release. See [`VERSIONING.md`](./VERSIONING.md).
   content, collections, drafts, audit, and activity. Upstash Redis is the cache for
   Postgres-backed domains and the authority for explicitly documented operational stores.
   Sanity code teardown is complete; only read-only legacy image URL compatibility remains.
-  See [`docs/persistence-boundaries.md`](./docs/persistence-boundaries.md) for the
+  See [`docs/architecture/persistence-boundaries.md`](./docs/architecture/persistence-boundaries.md) for the
   per-domain authority map.
 - **Sync contract (`/api/v1/*`):** client repos pull content (ISR) and receive
   HMAC-signed revalidation pushes. The contract is versioned (`v1`) and changed only
@@ -99,7 +99,7 @@ target an arbitrary endpoint or mutate state on its own.
   console: triage at `/admin`, one client list at `/admin/clients`, one client detail at
   `/admin/clients/[id]`, plus leads, analytics, approvals, maintenance, ops, and audit.
   Navigation is a grouped desktop rail and matching mobile drawer. The authoritative map
-  is [`docs/operator-command-center.md`](./docs/operator-command-center.md).
+  is [`docs/architecture/operator-command-center.md`](./docs/architecture/operator-command-center.md).
 - **Email audiences** — `src/lib/email-enabled.ts` defines four independent policies:
   client lifecycle mail defaults OFF (`EMAIL_SENDING_ENABLED`), operator notifications
   default ON (`OPERATOR_EMAILS_ENABLED`), prospect audit reports default ON

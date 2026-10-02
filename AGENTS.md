@@ -1,5 +1,7 @@
 # Strelva app
 
+For all output please read `OUTPUT.md` in this folder first EVERY TIME.
+
 This repo is the Strelva product: the customer workspace, managed websites,
 the website agent, the audit engine, billing, the operator console, and the
 `/api/v1` API that every client site calls. Real clients depend on it today.
@@ -44,7 +46,7 @@ until scope and deadline are agreed.
 
 - Read [CONTEXT.md](./CONTEXT.md).
 - For UI work, read `~/.codex/DESIGN.md`, [DESIGN.md](./DESIGN.md), and
-  [docs/component-system.md](./docs/component-system.md).
+  [docs/design/component-system.md](./docs/design/component-system.md).
 - Run `git status`. Changes you didn't make belong to someone else.
 
 ## Building UI
@@ -58,7 +60,7 @@ until scope and deadline are agreed.
 - Use the `font-display` utility for display type. The arbitrary Tailwind font
   value breaks cold Turbopack dev builds.
 - Marketing and app components are separate. Don't import across repos.
-- When you change a component, update its entry in `docs/component-system.md`.
+- When you change a component, update its entry in `docs/design/component-system.md`.
 
 ## Rules that protect live clients
 
@@ -74,7 +76,7 @@ client repos need it.
 
 **Data.** Supabase Postgres owns identity, tenants, domains, content, drafts,
 audit, and activity. Redis is a cache, except for the domains listed in
-[docs/persistence-boundaries.md](./docs/persistence-boundaries.md). Sanity is
+[docs/architecture/persistence-boundaries.md](./docs/architecture/persistence-boundaries.md). Sanity is
 dead except for resolving old image URLs.
 
 **Auth and tenants.** Supabase Auth is the only login. Request gating lives in
@@ -115,7 +117,7 @@ Production deploys, env var changes, database migrations, live email, Stripe
 changes, Google writes, DNS or domain changes, and production data fixes.
 Prepare and verify the exact action first, then ask. Env changes need a new
 production deploy, not a redeploy. A production rollout also has to pass the
-[release checklist](./docs/horizontal-release-checklist-2026-09-11.md#september-21-production-preparation)
+[release checklist](./docs/operations/horizontal-release-checklist-2026-09-11.md#september-21-production-preparation)
 so existing client sites stay up.
 
 No `Co-Authored-By` trailers on commits here.
@@ -147,7 +149,7 @@ PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-upgrade
 ```
 
 `CUSTOM_DOMAIN_MAP` routes custom domains locally.
-[docs/testing-and-ci.md](./docs/testing-and-ci.md) explains when Redis,
+[docs/operations/testing-and-ci.md](./docs/operations/testing-and-ci.md) explains when Redis,
 Postgres, or bypass mode changes what a green run means.
 
 ## Done means proven
@@ -166,12 +168,14 @@ Postgres, or bypass mode changes what a green run means.
 
 | Topic | Owner |
 | --- | --- |
-| Data authority and retention | [docs/persistence-boundaries.md](./docs/persistence-boundaries.md) |
-| CI and test modes | [docs/testing-and-ci.md](./docs/testing-and-ci.md) |
-| Client dashboard | [docs/client-dashboard-ia.md](./docs/client-dashboard-ia.md) |
-| Operator console | [docs/operator-command-center.md](./docs/operator-command-center.md) |
+| Capabilities: status, code, specs, flags | [docs/capabilities/README.md](./docs/capabilities/README.md) |
+| Code layers and platform | [docs/architecture/README.md](./docs/architecture/README.md) |
+| Data authority and retention | [docs/architecture/persistence-boundaries.md](./docs/architecture/persistence-boundaries.md) |
+| CI and test modes | [docs/operations/testing-and-ci.md](./docs/operations/testing-and-ci.md) |
+| Client dashboard | [docs/architecture/client-dashboard-ia.md](./docs/architecture/client-dashboard-ia.md) |
+| Operator console | [docs/architecture/operator-command-center.md](./docs/architecture/operator-command-center.md) |
 | Storefront contract | `src/app/api/v1/`, `src/lib/scaffold-contracts.ts`, `release-manifest.json`, `custom-repo-starter/` |
 | Versioning | [VERSIONING.md](./VERSIONING.md) |
-| Design | [DESIGN.md](./DESIGN.md), [docs/component-system.md](./docs/component-system.md) |
+| Design | [DESIGN.md](./DESIGN.md), [docs/design/component-system.md](./docs/design/component-system.md) |
 
 Put new rules in the owner above, not here. This file stays short.

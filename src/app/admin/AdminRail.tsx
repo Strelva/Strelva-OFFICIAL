@@ -26,6 +26,7 @@ export const NAV: Group[] = [
     label: "Delivery",
     items: [
       { href: "/admin/actions", label: "Managed-site work", icon: Zap, badgeKey: "actions", hot: true },
+      { href: "/admin/websites", label: "Website rebuilds", icon: Globe },
       { href: "/admin/drafts", label: "Drafts", icon: FileText },
       { href: "/admin/digests", label: "Maintenance", icon: Wrench },
     ],

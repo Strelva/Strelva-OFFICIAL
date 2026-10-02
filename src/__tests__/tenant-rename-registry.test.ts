@@ -4,7 +4,7 @@ import { authoritativePatterns, rekeySegments } from "@/lib/tenant-rename";
 /**
  * Completeness guard for the tenant-rename authoritative-store registry
  * (Deep Audit #2, #25). `authoritativePatterns` is derived from
- * docs/persistence-boundaries.md: every Redis-AUTHORITATIVE, slug-keyed store
+ * docs/architecture/persistence-boundaries.md: every Redis-AUTHORITATIVE, slug-keyed store
  * must be here, or its data silently stays under the old slug on a rename
  * (audit #16 stranded goal / analytics:cfg / report-* / scan:baseline this way).
  * This is a static assertion — no Redis needed.

@@ -99,6 +99,14 @@
     {
       "path": "/api/cron/workspace-work",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/website-health",
+      "schedule": "30 5 * * *"
+    },
+    {
+      "path": "/api/cron/website-domain-verification",
+      "schedule": "* * * * *"
     }
   ]
 }

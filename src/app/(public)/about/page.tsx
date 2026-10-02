@@ -1,3 +1,4 @@
+import { hostedPageMetadata, renderHostedPage } from "@/products/websites/index";
 import { getContent } from "@/lib/storage";
 import { getTenantFromHeaders, isPreviewMode } from "@/lib/tenant";
 import { SectionRenderer } from "@/components/public/SectionRenderer";
@@ -7,6 +8,8 @@ import { MARKETING_URL } from "@/lib/brand";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata() {
+  const hosted = await hostedPageMetadata("/about");
+  if (hosted) return hosted;
   const tenant = await getTenantFromHeaders();
   const settings = await getContent("settings", tenant);
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || MARKETING_URL;
@@ -29,6 +32,8 @@ export default async function AboutPage({
 }: {
   searchParams: Promise<{ edit?: string }>;
 }) {
+  const hosted = await renderHostedPage("/about");
+  if (hosted) return hosted;
   const params = await searchParams;
   const tenant = await getTenantFromHeaders();
   const preview = await isPreviewMode();

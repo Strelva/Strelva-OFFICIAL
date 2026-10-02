@@ -80,6 +80,7 @@ export default async function InternalWorkPage() {
 
         <Panel title="Managed-site delivery" bodyClassName="">
           <SurfaceLinks links={[
+            { href: "/admin/websites", label: "Rebuild a website", detail: "Read an existing site, prepare a private preview and send its decisions to the owner." },
             { href: "/admin/actions", label: "Managed-site work", detail: "Review ready opportunities and pending governed actions for existing managed clients." },
             { href: "/admin/drafts", label: "Drafts", detail: "Inspect drafts that have not been published." },
             { href: "/admin/digests", label: "Maintenance", detail: "Review pending maintenance digests." },
