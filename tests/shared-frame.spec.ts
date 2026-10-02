@@ -28,7 +28,8 @@ test("preserves managed navigation and keeps chat as the single conversation rou
   await expect(dashboardNav).toBeVisible();
   await expect(dashboardNav.getByRole("navigation", { name: / website$/ })).toBeVisible();
   await expect(dashboardNav.getByRole("link", { name: "Today", exact: true })).toHaveAttribute("href", managedPath("/dashboard"));
-  await expect(dashboardNav.getByRole("link", { name: "Ask Strelva", exact: true })).toHaveAttribute("href", managedPath("/dashboard/chat"));
+  // "Ask Strelva" also names the workspace start action; the managed site's own chat lives under Manage.
+  await expect(dashboardNav.getByLabel("Manage").getByRole("link", { name: "Ask Strelva", exact: true })).toHaveAttribute("href", managedPath("/dashboard/chat"));
   await expect(dashboardNav.getByRole("link", { name: "Website", exact: true })).toHaveAttribute("href", managedPath("/dashboard/site"));
   await expect(dashboardNav.getByRole("link", { name: "Analytics", exact: true })).toHaveAttribute("href", managedPath("/dashboard/analytics"));
   await expect(dashboardNav.getByRole("link", { name: "Reports", exact: true })).toHaveAttribute("href", managedPath("/dashboard/reports"));
