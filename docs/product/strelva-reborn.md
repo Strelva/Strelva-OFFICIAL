@@ -72,9 +72,9 @@ storefront comparison like Sept 30 (60/60).
 ### 3. Every client converted
 
 - [ ] `scripts/convert-tenant-to-workspace.ts`: creates the workspace, links
-      the tenant (`tenants.workspace_id`), backfills facts, contacts, leads
-      and bookings into the record. Idempotent, with a dry-run mode and a
-      rollback.
+      the tenant through a link table (the `tenants` row is not altered), and
+      backfills facts, contacts, leads and bookings into the record.
+      Idempotent, with a dry-run mode and a rollback.
 - [ ] Dry run against a restored local copy for every active tenant.
 - [ ] Production run for gldf, then the rest.
 - [ ] Hosted websites created by the workspace stay linked to their workspace
@@ -150,31 +150,37 @@ Each step unblocks the next. Steps 1, 2 and 7 are local work and start now.
 5. **Operate:** one queue, receipts, monitoring.
 6. **Entry:** owners in, dashboard retired page by page.
 
-## Nightly and daily
+## Preview and Stable
+
+Strelva has two channels. Customers use **Strelva**, the Stable channel,
+which is what `main` and production run. Jacob and selected testers use
+**Strelva Preview**, built from Reborn work before it ships. Nightly is when
+Preview gets built, not a separate channel.
 
 All Reborn work lands on the `reborn` branch through pull requests. `main`
-stays what production runs until the `1.0.0` cut merges `reborn` into it.
+stays Stable until the `1.0.0` cut merges `reborn` into it.
 
-- **Nightly.** [`reborn-nightly.yml`](../../.github/workflows/reborn-nightly.yml)
+- **Nightly build.** [`preview-nightly.yml`](../../.github/workflows/preview-nightly.yml)
   builds `reborn` at 03:00 Eastern: lint, types, boundaries, ontology,
   workspace SQL and full upgrade, tests with coverage, audit, build, public
   smoke and workspace browser acceptance. A green build is tagged
-  `strelva-v1.0.0-nightly.YYYYMMDD`. Unchanged source isn't re-tagged.
-- **Daily report.** The run summary shows the progress table: now, last
-  nightly, Oct 2 baseline and target. The tag message stores that night's
-  numbers so the next night can compare. Run it by hand from the Actions tab
-  with any branch.
-- **Not yet:** a nightly preview you can click through. Vercel git deploys
-  are off and preview builds would read production Supabase. That needs a
-  staging Supabase project and a CI deploy token first, which is an env
-  change.
+  `strelva-v1.0.0-preview.YYYYMMDD`. Unchanged source isn't re-tagged.
+- **Progress.** The run summary shows the progress table: now, last Preview,
+  Oct 2 baseline and target. The tag message stores that build's numbers so
+  the next one can compare. Run it by hand from the Actions tab with any
+  branch.
+- **Not yet: a Preview you can sign in to.** Today Preview is a tested,
+  tagged build, not a running app. Running it needs its own deployment
+  (for example `preview.strelva.com`) on a staging Supabase project, because
+  Vercel preview builds would read production data. That is a new
+  environment and env change, so it needs Jacob's yes.
 
-
+## Needs Jacob's yes
 
 Each of these gets an exact action prepared and verified before asking.
 
-- Each production migration (business record, inquiry and booking stores,
-  `tenants.workspace_id`).
+- Each production migration (business record, tenant-to-workspace links,
+  inquiry and booking stores).
 - Each production conversion run, starting with gldf.
 - Owner invites. They send client email.
 - Turning on `STRELVA_INQUIRIES_RELEASE` and `STRELVA_WEBSITE_REBUILD_RELEASE`.

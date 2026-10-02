@@ -349,9 +349,9 @@ website_race_second_status=0
 wait "$website_race_first" || website_race_first_status=$?
 wait "$website_race_second" || website_race_second_status=$?
 if [[ "$website_race_first_status" -eq 0 && "$website_race_second_status" -ne 0 ]]; then
-  rg -q website_rebuild_in_progress "$cluster_root/website-race-second.log"
+  grep -q website_rebuild_in_progress "$cluster_root/website-race-second.log"
 elif [[ "$website_race_second_status" -eq 0 && "$website_race_first_status" -ne 0 ]]; then
-  rg -q website_rebuild_in_progress "$cluster_root/website-race-first.log"
+  grep -q website_rebuild_in_progress "$cluster_root/website-race-first.log"
 else
   printf 'Website domain claim race did not produce exactly one winner.\n' >&2
   exit 1

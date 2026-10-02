@@ -1,8 +1,10 @@
-name: Reborn nightly
+name: Strelva Preview (nightly build)
 
-# Builds the Strelva Reborn (1.0.0) integration branch every night, runs the
-# full local gate, reports progress against docs/product/strelva-reborn.md, and
-# tags a green build as strelva-v1.0.0-nightly.YYYYMMDD. It never deploys,
+# Builds Strelva Preview every night from the Strelva Reborn (1.0.0)
+# integration branch, runs the full local gate, reports progress against
+# docs/product/strelva-reborn.md, and tags a green build as
+# strelva-v1.0.0-preview.YYYYMMDD. Customers use Strelva (Stable);
+# Strelva Preview is for Jacob and selected testers. It never deploys,
 # never reads production and never touches a client site.
 
 on:
@@ -16,7 +18,7 @@ on:
         default: reborn
 
 concurrency:
-  group: reborn-nightly
+  group: strelva-preview
   cancel-in-progress: false
 
 env:
@@ -51,7 +53,7 @@ jobs:
       - name: Progress report
         # Runs first so the report exists even when a later gate fails.
         run: |
-          previous="$(git tag -l "strelva-v${REBORN_VERSION}-nightly.*" --sort=-creatordate | head -1)"
+          previous="$(git tag -l "strelva-v${REBORN_VERSION}-preview.*" --sort=-creatordate | head -1)"
           if [ -n "$previous" ]; then
             git tag -l --format='%(contents)' "$previous" > previous-progress.json
             echo "Compared with $previous" >> "$GITHUB_STEP_SUMMARY"
@@ -99,7 +101,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: reborn-nightly-browser-${{ github.run_id }}
+          name: preview-browser-${{ github.run_id }}
           path: |
             playwright-report/
             test-results/
@@ -119,15 +121,15 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: reborn-progress
-      - name: Tag the green nightly
+      - name: Tag the green Preview build
         # The tag message carries the progress JSON so the next night can
         # report what changed. Unchanged source is not re-tagged.
         run: |
-          if git tag --points-at HEAD | grep -q "^strelva-v${REBORN_VERSION}-nightly\."; then
-            echo "This commit already has a nightly tag." >> "$GITHUB_STEP_SUMMARY"
+          if git tag --points-at HEAD | grep -q "^strelva-v${REBORN_VERSION}-preview\."; then
+            echo "This commit already has a Preview tag." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          tag="strelva-v${REBORN_VERSION}-nightly.$(date -u +%Y%m%d)"
+          tag="strelva-v${REBORN_VERSION}-preview.$(date -u +%Y%m%d)"
           if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
             echo "$tag already exists; keeping the earlier build for today." >> "$GITHUB_STEP_SUMMARY"
             exit 0

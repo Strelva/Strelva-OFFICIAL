@@ -85,7 +85,7 @@ const arg = name => {
 if (process.argv.includes("--json")) {
   console.log(JSON.stringify({ checks: checks.map(c => ({ ...c, met: met(c) })), details }, null, 2));
 } else if (process.argv.includes("--markdown")) {
-  // --previous <file>: an earlier --json run (the last nightly) for night-over-night change.
+  // --previous <file>: an earlier --json run (the last Preview build) for night-over-night change.
   let previous = new Map();
   const previousPath = arg("--previous");
   if (previousPath) {
@@ -96,7 +96,7 @@ if (process.argv.includes("--json")) {
   const done = checks.filter(c => met(c) === true).length;
   const goals = checks.filter(c => met(c) !== null).length;
   console.log(`### Strelva Reborn progress: ${done} of ${goals} code targets met\n`);
-  console.log("| | Check | Now | Last nightly | Baseline (Oct 2) | Target |");
+  console.log("| | Check | Now | Last Preview | Baseline (Oct 2) | Target |");
   console.log("| --- | --- | --- | --- | --- | --- |");
   for (const c of checks) {
     const state = met(c) === null ? "·" : met(c) ? "✅" : "⬜";
