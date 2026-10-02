@@ -132,7 +132,11 @@ for (const width of [1440, 390]) {
     await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await page.screenshot({path:testInfo.outputPath(`delivery-${width}.png`),fullPage:true});
     await page.goto(`/workspace?workspaceId=${businessId}`);
-    await expect(deliveryCard.getByText("Customer accepted this delivery",{exact:true})).toBeVisible();
+    // Accepted work leaves "Needs you" and is listed as done under "Strelva handled".
+    const handledCard=page.getByRole("region",{name:"Strelva handled",exact:true})
+      .locator(`a[href="/workspace/delivery/${requestId}"]`);
+    await expect(handledCard.getByText(/^Done/)).toBeVisible();
+    await expect(deliveryCard).toHaveCount(0);
     await page.goto(`/workspace?workspaceId=${businessId}&work=${app.id}`);
     await expect(page.getByRole("heading",{name:"Team requests",exact:true,level:1})).toBeVisible();
     await expect(page.getByText(/Version 1 is live/)).toBeVisible();

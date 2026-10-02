@@ -130,7 +130,7 @@ empty, loading, error and permission states, using The Mooney Firm and gldf.
 - [ ] One capability registry replaces the seven declaration files listed in
       [capabilities](../capabilities/README.md#where-capabilities-are-declared).
 - [ ] One model-call helper. Every `generateText`, `streamText` and
-      `generateObject` call goes through it (10 files today).
+      `generateObject` call goes through it (12 files in `src` today).
 - [ ] `src/lib/newsletter.ts` sends through `email/send.ts`;
       `src/lib/public-continuation.ts` encrypts through `crypto/secrets.ts`.
 

@@ -43,7 +43,7 @@ const libOnWorkspace = lib.filter(f => {
   return ["@/platform", "@/products", "@/experience", "@/server"].some(p => importsFrom(s, p));
 });
 const tenantGate = src.filter(f => /requireTenant(Access|Permissions?)\(/.test(read(f)));
-const modelCallSites = src.filter(f => /from\s+["']ai["']/.test(read(f)) &&
+const modelCallSites = src.filter(f => /(from\s+|import\(\s*)["']ai["']/.test(read(f)) &&
   /\b(generateText|streamText|generateObject|streamObject)\b/.test(read(f)));
 const resendOutsideSend = src.filter(f => f !== "src/lib/email/send.ts" && /new Resend\(/.test(read(f)));
 const routeKind = f => {
@@ -63,7 +63,7 @@ const checks = [
   { id: "workspace_keyed_inquiries", label: "Inquiry table references workspaces(id)", value: workspaceLeads, target: true, baseline: false },
   { id: "workspace_imports_lib", label: "Workspace files importing @/lib", value: workspaceOnLib.length, target: 0, baseline: 98 },
   { id: "lib_imports_workspace", label: "src/lib files importing workspace layers", value: libOnWorkspace.length, target: 0, baseline: 2 },
-  { id: "model_call_sites", label: "Files calling the model directly", value: modelCallSites.length, target: 1, baseline: 10 },
+  { id: "model_call_sites", label: "Files calling the model directly", value: modelCallSites.length, target: 1, baseline: 12 },
   { id: "resend_outside_send", label: "Resend clients outside email/send.ts (webhook verify allowed)", value: resendOutsideSend.length, target: 1, baseline: 2 },
   { id: "tenant_gate_files", label: "Files using requireTenantAccess/Permission", value: tenantGate.length, target: null, baseline: 79 },
   { id: "routes_tenant_only", label: "API routes on tenant model only", value: routeCounts.tenant ?? 0, target: null, baseline: 153 },
