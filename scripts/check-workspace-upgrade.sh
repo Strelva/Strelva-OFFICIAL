@@ -208,5 +208,8 @@ psql "${psql_args[@]}" --file="$repo_root/tests/function-exposure-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/website-documents-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/domain-registration-attempt-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-website-document-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-record-schema.sql"
+psql "${psql_args[@]}" --set=tenant_import="$(cat "$repo_root/tests/fixtures/business-record-tenant-import.json")" \
+  --file="$repo_root/tests/business-record-conversion-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
