@@ -14,29 +14,41 @@ Other things live elsewhere:
 
 ## Where we're going
 
-Strelva lets businesses and agencies create, run, and keep reshaping the
-systems a business needs. A small business should be able to act on ideas that
-used to need its own software team.
+Strelva is where a business makes, runs and keeps reshaping its own systems.
+A small business should be able to act on ideas that used to need its own
+software team. Four nouns carry the product
+([ADR 0011, proposed](../docs/adr/0011-organize-strelva-around-systems-connections-possibilities-versions.md)):
 
-- **Working capabilities to start:** a website, bookings, customer inquiries,
-  publishing, internal apps. They share the business's information, people,
-  permissions, and connected tools.
-- **Creative tools to go further:** change how a capability works, connect it
-  to others, add your own interfaces and rules, and turn the pieces into a
-  service we never designed. Agents help build and run it.
-- **Ongoing operation to make it dependable:** governance, approvals,
-  receipts, monitoring, and recovery, so it keeps working as it changes.
+- **System:** something the business made in Strelva that works: a website,
+  a proposal, a booking page, an intake flow, an internal app. Its identity
+  survives changes to its content, data, logic and screens. Draft, Live or
+  Paused, with health tracked separately.
+- **Connection:** what a System works with: business facts, another System,
+  a person, a Google account, a domain. Each one is typed (reads, acts,
+  appears in, shares with, depends on, is triggered by).
+- **Possibility:** a working alternative you can open and compare, across one
+  or several Systems. **Make real** turns it on, and reports honestly when
+  only part of it landed.
+- **Version:** the same System adapted for another market, segment or agency
+  client, with lineage back to its source. Not a release.
 
-Agencies do this across clients and package their expertise as reusable
-offerings ([ADR 0010](../docs/adr/0010-make-agencies-creators-and-channel-under-a-partner-charter.md)).
-Businesses can use it directly.
+Example: a consultant's **proposal** System grows package selection, then
+onboarding. It stays the same System the whole way, and a proposal the client
+already accepted keeps its original terms.
 
-The workspace product (`src/platform`, `src/products`, `src/experience`) is
-where Strelva is going. Today the live business is managed websites for nine
-clients on the older tenant model (`src/lib`); those clients keep their service
-and move into business workspaces, with the managed website becoming one
-capability inside a workspace. Build new capability on the workspace model, not
-as tenant-only features. [CONTEXT.md](./CONTEXT.md) has the evidence.
+Records, grants, operations, approvals and receipts stay underneath. A
+customer hires Strelva to make and run their Systems and never has to build;
+an agency makes and adapts them for clients
+([ADR 0010](../docs/adr/0010-make-agencies-creators-and-channel-under-a-partner-charter.md));
+a business can also change its own. The rules (identity, connection contracts,
+isolation, pause and health) are in [CONTEXT.md](./CONTEXT.md#product-model).
+
+Today the live business is managed websites for nine clients on the older
+tenant model (`src/lib`). Those clients keep their service and move into
+business workspaces, where each website becomes their first System. Build new
+capability as Systems on the workspace model (`src/platform`, `src/products`,
+`src/experience`), not as tenant-only features. The model is selected
+direction, not a shipped runtime; [CONTEXT.md](./CONTEXT.md) has the evidence.
 
 Customers who hire Strelva never have to build their own site. A native tool
 never requires buying a website. A request for work is not an accepted job
@@ -168,6 +180,7 @@ Postgres, or bypass mode changes what a green run means.
 
 | Topic | Owner |
 | --- | --- |
+| Product model: Systems, Connections, Possibilities, Versions | [CONTEXT.md](./CONTEXT.md#product-model); the full ledger is `PRODUCT_MODEL.md` (untracked, main checkout only) |
 | Capabilities: status, code, specs, flags | [docs/capabilities/README.md](./docs/capabilities/README.md) |
 | Code layers and platform | [docs/architecture/README.md](./docs/architecture/README.md) |
 | Data authority and retention | [docs/architecture/persistence-boundaries.md](./docs/architecture/persistence-boundaries.md) |

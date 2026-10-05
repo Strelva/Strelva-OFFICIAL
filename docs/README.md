@@ -1,6 +1,6 @@
 # Docs
 
-Updated: 2026-10-02
+Updated: 2026-10-04
 
 | Folder | Holds | Start with |
 | --- | --- | --- |
@@ -16,7 +16,9 @@ Updated: 2026-10-02
 ## When docs disagree
 
 1. [`AGENTS.md`](../AGENTS.md): repo rules and live-client constraints.
-2. [product-ontology](./architecture/product-ontology.md): names and boundaries.
+2. [CONTEXT.md](../CONTEXT.md#product-model): the customer model and its
+   names. [product-ontology](./architecture/product-ontology.md): deployed
+   compatibility names and boundaries.
 3. [persistence-boundaries](./architecture/persistence-boundaries.md): store authority.
 4. Current code and contract tests.
 5. Runbooks in `operations/`.
@@ -47,7 +49,8 @@ a current doc and a contract test.
 
 | Doc | Use it for |
 | --- | --- |
-| [offerings-and-differentiation](./product/offerings-and-differentiation-2026-10-02.md) | Every offering against the market, what to lead with, how we build differently (Oct 2) |
+| [Product model](../CONTEXT.md#product-model) | Systems, Connections, Possibilities, Versions: the customer model and its rules (Oct 4) |
+| [offerings-and-differentiation](./product/offerings-and-differentiation-2026-10-02.md) | Every offering against the market, what to lead with, how we build differently (Oct 2; customer noun now System) |
 | [product-reality](./product/product-reality.md) | Evidence register and the current decision (Oct 1) |
 | [horizontal-product-brief](./product/horizontal-product-brief-2026-09-11.md) | Confirmed product direction, clarified through Oct 1 |
 | [horizontal-audit-and-plan](./product/horizontal-audit-and-plan-2026-09-11.md) | Source audit and build order |
