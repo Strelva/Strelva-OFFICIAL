@@ -9,6 +9,18 @@ export function useWorkspaceIntent() { return useContext(IntentContext); }
 type Props = { request: string; current?: boolean; route?: string; draftKey: string; children: ReactNode };
 const ROUTES = new Set(["start", "plan", "help", "assessment", "document", "tracker", "inquiries", "website", "websites", "applications", "onboarding", "scheduling", "investigations", "operations"]);
 
+/**
+ * The product view that opens new work from a route. Choosing Applications
+ * with a request opens a work plan, so the plan reads that route too.
+ */
+const ROUTE_CONSUMER: Readonly<Record<string, string>> = { applications: "plan" };
+export function routeConsumer(route: string): string { return ROUTE_CONSUMER[route] ?? route; }
+
+/** The routed request a product view should open with, if it was aimed there. */
+export function intentRequestFor(intent: { request: string; route: string }, consumer: string): string | undefined {
+  return intent.request && routeConsumer(intent.route) === consumer ? intent.request : undefined;
+}
+
 /** Request data only. Never authorization to execute, share, or publish work. */
 export function retainRequestIntent(storage: Pick<Storage, "setItem">, draftKey: string, request: string, route: string): void {
   if (!ROUTES.has(route)) return;

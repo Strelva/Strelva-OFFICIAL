@@ -1,7 +1,7 @@
 "use client";
 
 import { ApplicationDraftPreview } from "@/experience/applications/ApplicationDraftPreview";
-import { useWorkspaceIntent } from "@/experience/workspace/WorkspaceIntent";
+import { intentRequestFor, useWorkspaceIntent } from "@/experience/workspace/WorkspaceIntent";
 
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import type { z } from "zod";
@@ -83,7 +83,7 @@ function localDateTime(value: string) {
 export function BoundedWorkExperience(props: Props) {
   const intent = useWorkspaceIntent();
   if (!props.workId && !props.initialRequest && !intent.ready) return <p role="status">Opening your request…</p>;
-  return <Session key={`${props.workspaceId}:${props.workId ?? "new"}:${props.productId}`} {...props} initialRequest={props.initialRequest || (!props.workId && intent.route === props.productId ? intent.request : undefined)} />;
+  return <Session key={`${props.workspaceId}:${props.workId ?? "new"}:${props.productId}`} {...props} initialRequest={props.initialRequest || (!props.workId ? intentRequestFor(intent, props.productId) : undefined)} />;
 }
 function Session({ initialRequest, workspaceId, workId, productId, readOnly = false, draftEditOnly = false, workspaceStopped = false, calendarRecoveryAllowed = false, sources, onSaved }: Props) {
   const request = useWorkspaceRequest();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useWorkspaceIntent } from "./WorkspaceIntent";
+import { intentRequestFor, useWorkspaceIntent } from "./WorkspaceIntent";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
@@ -97,7 +97,7 @@ export type WorkPlanExperienceProps = {
 export function WorkPlanExperience(props: WorkPlanExperienceProps) {
   const intent = useWorkspaceIntent();
   if (!props.workId && !props.initialRequest && !intent.ready) return <p role="status">Opening your request…</p>;
-  return <PlanSession key={`${props.workspaceId}:${props.workId ?? "new"}`} {...props} initialRequest={props.initialRequest || (!props.workId && intent.route === "plan" ? intent.request : undefined)} />;
+  return <PlanSession key={`${props.workspaceId}:${props.workId ?? "new"}`} {...props} initialRequest={props.initialRequest || (!props.workId ? intentRequestFor(intent, "plan") : undefined)} />;
 }
 
 function PlanSession({ presentation, workspaceId, workId, initialRequest = "", planningEconomics: providedPlanningEconomics, sources, readOnly, localPreview, onSaved, onOpenWork }: WorkPlanExperienceProps) {
