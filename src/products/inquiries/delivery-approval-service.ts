@@ -38,6 +38,8 @@ import type {
 } from "./delivery";
 import { inquiryEmailReadiness } from "./email-consent";
 import { stateForReceive } from "./receive";
+import { classifyInquiryMessage } from "./message-outcome";
+import { currentResponsibility, inquiryCurrentness } from "./currentness";
 import type {
   InquiryMessageReviewAction,
   InquiryMessageReviewExecution,
@@ -216,25 +218,24 @@ function responsibilityFor(
   capabilityId: string,
   expectedId?: string,
 ): ResponsibilityPolicy {
-  const candidates = state.responsibilities
-    .filter((item) => item.capabilityId === capabilityId && (!expectedId || item.id === expectedId))
-    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
-  const responsibility = candidates[0];
+  const responsibility = currentResponsibility(state.responsibilities, capabilityId, expectedId);
   if (!responsibility) throwCode("current_policy_unavailable", "The current inquiry responsibility is unavailable.");
   return responsibility;
 }
 
-function assertCapability(
+function assertCurrentInquiry(
   snapshot: import("./repository").InquiryWorkspaceSnapshot,
   lead: LeadRecord,
+  status: InquiryRecordStatus,
 ): { capability: InquiryCapabilityState; definition: InquiryCapabilityDefinition } {
-  const capabilityId = typeof lead.capabilityId === "string" ? lead.capabilityId.trim() : "";
-  const version = lead.capabilityVersion;
-  const capability = snapshot.state.capabilities.find((item) => item.id === capabilityId);
-  if (!capability?.live || capability.status !== "live" || !Number.isSafeInteger(version) || capability.live.version !== version) {
-    throwCode("inquiry_changed", "This inquiry was created from an older capability version. Refresh before preparing a message.");
-  }
-  return { capability, definition: capability.live };
+  const currentness = inquiryCurrentness(snapshot.state, snapshot.businessId, {
+    capabilityId: lead.capabilityId,
+    capabilityVersion: lead.capabilityVersion,
+    status,
+  });
+  if (currentness.current) return { capability: currentness.capability, definition: currentness.definition };
+  if (currentness.reason === "inquiry_closed") assertOpenInquiry(status);
+  throwCode("inquiry_changed", "This inquiry was created from an older capability version. Refresh before preparing a message.");
 }
 
 function assertEventBinding(
@@ -275,10 +276,9 @@ async function buildContext(input: {
   const snapshot = await snapshotFor(input.tenantId, input.businessId, input.deps);
   const lead = await dependency(input.deps.getLead, getLeadById)(input.tenantId, input.inquiryId);
   if (!lead) throwCode("inquiry_not_found", "Inquiry record unavailable.");
-  const { capability, definition } = assertCapability(snapshot, lead);
-  await readyForEmail(input.tenantId, definition, input.deps);
   const status = await overlayStatus(input.tenantId, input.businessId, input.inquiryId, snapshot.state, input.deps);
-  assertOpenInquiry(status);
+  const { capability, definition } = assertCurrentInquiry(snapshot, lead, status);
+  await readyForEmail(input.tenantId, definition, input.deps);
   const responsibility = responsibilityFor(snapshot.state, capability.id, input.responsibilityId);
   if (responsibility.businessId !== input.businessId) throwCode("permission_denied", "This responsibility belongs to another business.");
   assertResponsibilitySponsor(responsibility, input.actorId);
@@ -501,15 +501,7 @@ export async function prepareInquiryMessageReviewWithDependencies(
 }
 
 function checkpointAccepted(checkpoint: InquiryDeliveryCheckpoint | null): boolean {
-  if (!checkpoint) return false;
-  return Boolean(
-    checkpoint.acceptedAt || checkpoint.providerMessageId ||
-    checkpoint.status === "accepted" || checkpoint.status === "accepted_unverified" ||
-    checkpoint.status === "verified" || checkpoint.status === "delivered" ||
-    checkpoint.status === "bounced" || checkpoint.status === "deferred" ||
-    checkpoint.status === "suppressed" ||
-    (checkpoint.status === "failed" && checkpoint.providerOutcome),
-  );
+  return Boolean(checkpoint) && classifyInquiryMessage(checkpoint!).accepted;
 }
 
 function outcomeFromCheckpoint(
@@ -530,6 +522,11 @@ function outcomeFromCheckpoint(
                 status === "accepted" || status === "accepted_unverified" ? "accepted_unverified" :
                   status === "sending" || status === "unknown" ? "reconciliation_required" :
                     fallback?.status === "failed" ? "failed" : "unavailable";
+  // An unsettled attempt stays "possibly accepted" even when the checkpoint
+  // alone would read as a rejection.
+  const classification = outputStatus === "reconciliation_required" && !checkpointAccepted(checkpoint)
+    ? classifyInquiryMessage({ status: outputStatus })
+    : classifyInquiryMessage(checkpoint ?? { status: outputStatus });
   return {
     inquiryId,
     action,
@@ -538,7 +535,9 @@ function outcomeFromCheckpoint(
     ...(checkpoint?.acceptedAt ? { acceptedAt: checkpoint.acceptedAt } : {}),
     ...(checkpoint?.providerMessageId ? { providerMessageId: checkpoint.providerMessageId } : {}),
     ...(checkpoint?.verificationEvidence ? { verificationEvidence: checkpoint.verificationEvidence } : {}),
-    retryable: outputStatus === "failed" ? Boolean(checkpoint?.retryable) : false,
+    retryable: outputStatus === "failed" && classification.retryAllowed ? Boolean(checkpoint?.retryable) : false,
+    delivery: classification.delivery,
+    retryAllowed: classification.retryAllowed,
   };
 }
 

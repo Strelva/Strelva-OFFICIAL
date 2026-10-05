@@ -330,6 +330,38 @@ describe("inquiry message review approval", () => {
     expect(mail.send).not.toHaveBeenCalled();
   });
 
+  it("binds the review to the newest created responsibility, not the one updated last", async () => {
+    const { base, repository } = await fixture();
+    await updateState(repository, (state) => {
+      // An older responsibility for the same intake, sponsored by someone else,
+      // was touched after the current one (a receipt or a pause moves updatedAt).
+      state.responsibilities.push({
+        ...responsibility(),
+        id: "responsibility-older",
+        sponsorId: "former-sponsor",
+        createdAt: "2026-09-01T00:00:00.000Z",
+        updatedAt: "2026-09-11T12:30:00.000Z",
+      });
+    });
+    const review = await prepare("reply", base);
+    expect(review.recipient).toBe("ada@example.test");
+  });
+
+  // The same table runs against the follow-up sweep and the receive seam.
+  it.each([
+    ["draft", false],
+    ["live_unverified", true],
+    ["live", true],
+    ["paused", false],
+    ["failed", false],
+  ] as const)("prepares a message review for a %s inquiry intake only with live intent (%s)", async (status, current) => {
+    const { base, repository } = await fixture();
+    await updateState(repository, (state) => { state.capabilities[0]!.status = status; });
+    const prepared = prepare("reply", base);
+    if (current) await expect(prepared).resolves.toMatchObject({ recipient: "ada@example.test" });
+    else await expect(prepared).rejects.toMatchObject({ code: "inquiry_changed" });
+  });
+
   it("closes an accepted but unverified provider write without earning a clean receipt", async () => {
     const { base, events, repository } = await fixture();
     await prepare("reply", base);

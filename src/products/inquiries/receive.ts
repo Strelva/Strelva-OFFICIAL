@@ -24,6 +24,7 @@ import type {
 } from "./repository";
 import { getInquiryRepository } from "./repository";
 import { enqueueInquiryCaptureRepair, type InquiryCaptureRepairStore } from "./reconciliation";
+import { currentResponsibility, inquiryCurrentness } from "./currentness";
 
 export interface RecordInquiryEvidenceInput {
   tenantId: string;
@@ -54,7 +55,7 @@ export function evaluateInquiryResponsibility(
 ): ResponsibilityEvaluation | null {
   try {
     const state = stateForReceive(snapshot);
-    const policy = state.responsibilities.find((item) => item.capabilityId === capabilityId);
+    const policy = currentResponsibility(state.responsibilities, capabilityId);
     if (!policy) return null;
     const engine = new InquiryEngine({ businessId: snapshot.businessId, state, now: () => at });
     return engine.evaluateResponsibilityAction(policy.id, action, { at, messageBody });
@@ -253,16 +254,21 @@ async function recordInquiryEvidenceInternal(
     const already = existingEvidence(snapshot, input.inquiryId);
     if (already) return already;
 
-    const capability = snapshot.state.capabilities.find((item) => item.id === input.capabilityId);
-    const definition = capability?.live;
-    let receiveDefinition = definition;
+    const currentness = inquiryCurrentness(snapshot.state, snapshot.businessId, {
+      capabilityId: input.capabilityId,
+      capabilityVersion: input.expectedCapabilityVersion,
+    });
+    let receiveDefinition: InquiryCapabilityDefinition | null = currentness.current ? currentness.definition : null;
     let usesHistoricalDefinition = false;
-    if (!capability || !definition || !["live", "live_unverified"].includes(capability.status)) {
-      if (!historicalRepair) return { status: "stale", reason: "inquiry_capability_unavailable" };
-      receiveDefinition = historicalDefinitionForCapture(snapshot, input.capabilityId, input.expectedCapabilityVersion);
-      usesHistoricalDefinition = true;
-    } else if (definition.version !== input.expectedCapabilityVersion) {
-      if (!historicalRepair) return { status: "stale", reason: "inquiry_capability_changed" };
+    if (!currentness.current) {
+      const reason = currentness.reason === "revision_changed" ? "inquiry_capability_changed" : "inquiry_capability_unavailable";
+      if (!historicalRepair) {
+        // The lead is already captured. Queue the receipt repair so it is
+        // recorded against the captured revision instead of waiting for the
+        // bounded discovery sweep to find it.
+        await queueCaptureRepair(input, reason);
+        return { status: "stale", reason };
+      }
       receiveDefinition = historicalDefinitionForCapture(snapshot, input.capabilityId, input.expectedCapabilityVersion);
       usesHistoricalDefinition = true;
     }
