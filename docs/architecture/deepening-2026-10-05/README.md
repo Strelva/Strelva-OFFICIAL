@@ -42,53 +42,37 @@ glossary disagree, the glossary wins.
 | workspace capabilities | Workspace permission | capability, standing, authority, allowance are taken |
 | product, executable, horizontal | System kind (proposed) | product means Offering; overlaps the ontology's Capability until ADR 0011 is accepted |
 
-## Defects found
+## Defects found and fixed
 
-Verified by re-reading the code:
+Each fix landed with a test that failed before it. Proven locally on branch
+`fix/deepening-2026-10-05`; nothing is deployed.
 
-- The operational inbox loads the first 500 rows of five tables across all
-  workspaces with no filter or ordering, then filters in memory. Past 500
-  rows, real assignments drop out (`src/products/operations/inbox.ts:90-94`,
-  `:312-318`).
-- After a deferred, bounced or suppressed send, the review screen tells the
-  owner to prepare a new review, which can never send
-  (`src/experience/inquiries/InquiryMessageReview.tsx:26-33`, `:156`).
-- Owner approval requires a form status of `live`; intake and the follow-up
-  cron accept `live_unverified` too (`delivery-approval-service.ts:233` vs
-  `follow-up-cron.ts:113`).
-- The Layout and the App map a work item to different views
-  (`WorkspaceLayout.tsx:221` vs `WorkspaceApp.tsx:281`).
-- A shared business home says only owners can make changes; admins and members
-  can (`BusinessHome.tsx:95`).
+| Defect | Fix |
+| --- | --- |
+| Operational inbox read the first 500 rows of five tables across every workspace | Queries only the actor's assignments, then related rows by id |
+| Review screen invited a new review after deferred, bounced or suppressed sends | One shared classifier; accepted messages never offer another review |
+| Approval required `live`; intake and the cron accepted `live_unverified` | One currentness rule (`currentness.ts`) used by all three |
+| Layout and App mapped a work item to different views | One `viewForWork` |
+| "Only owners can make changes" and "a workspace you own" copy | Copy names the real read-only reason |
+| A second review could record a receipt for a message never sent | Checkpoints store the sent message digest; mismatches are refused |
+| Provider id lost when the acceptance write failed | Bounded retries plus a second copy on the approval event for repair |
+| A delivered report after the approval resolved wrote no receipt | The webhook writes the owed receipt once |
+| Product-learning create showed a store error after workspace exit | Maps to the stopped-workspace message |
+| Applications start route lost its request on reload | One alias table for routed requests |
+| Old routed requests prefilled later blank work | Requests are spent when a product saves work |
+| Back from an offering's work lost the offering | Leaving an entry never rewrites it |
+| Runner recheck accepted applications revisions the domain rejects | Recheck calls the domain's own check |
+| Stale intake never queued a receipt repair | Queues the repair |
+| Approval, cron and intake chose different responsibilities | One selector: newest created |
+| Unbounded JSON bodies and late upload size checks | Bounded reads; oversized bodies return 413 |
+| Session lookup outside error handling crashed with 500 | Returns 503 |
+| Missing Referrer-Policy on 11 routes | Header set |
+| Server labelled a member's new assessment as owned | Same work-access rule as reads |
+| Six service-role writes checked only in TypeScript | Eight SQL-checked RPCs with locked membership reads; **migrations not applied** |
 
-Traced by the review agents, not re-verified line by line:
-
-- A second review for the same inquiry and purpose resolves as already sent and
-  records a receipt for a message that was never sent (note 3).
-- If the provider accepts but the acceptance write fails, the provider id is
-  lost and the approval stays pending forever (`delivery.ts:857-864`).
-- A delivered report that arrives after the approval resolved never writes a
-  receipt (`delivery-approval-service.ts:881-886`).
-- Product-learning create shows a generic store error after workspace exit
-  instead of "stopped" (note 2).
-- Choosing the applications start route loses the request on reload
-  (`WorkspaceLayout.tsx:312` → `WorkspaceApp.tsx:421` →
-  `WorkPlanExperience.tsx:99`).
-- An old routed request can prefill a later blank document in the same tab
-  (note 5).
-- Back from an offering's work loses the offering (note 1).
-- The work-plan runner accepts an applications revision the applications domain
-  rejects, so a step can pass recheck and fail at perform
-  (`native-execution.ts:156-162` vs `applications/domain.ts:176-183`).
-- A stale intake never queues a receipt repair (`receive.ts:261,265`).
-- Two workspace routes read JSON with no size cap; onboarding upload reads the
-  whole form before its size check (note 7).
-- Six service-role writes are checked only in TypeScript: calendar connection,
-  calendar receipts, revoke delegation, revoke handoff, create handoff, save
-  work. All six checks are correct today (note 9).
-
-No double-send path was found beyond a narrow window the provider idempotency
-key very likely absorbs (note 3).
+Not fixed: inquiries captured on an older capability version still can't
+receive messages (question 2 below); `listOperationalExceptions` (operator only)
+still reads unfiltered rows; tracker requests are not spent on save.
 
 ## Corrections to the architecture review
 
@@ -100,7 +84,7 @@ key very likely absorbs (note 3).
   server-side and one inside a JSON response.
 - Several counts drifted by one or two; each note lists its corrections.
 
-## Order
+## Order (for the larger refactors)
 
 1. Fixes that need no migration, each its own change: review-screen status
    lists and copy, the two permission copy lines, scoped inbox queries,
