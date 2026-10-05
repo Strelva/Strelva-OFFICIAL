@@ -21,6 +21,7 @@ import {
   time,
 } from "./inquiry-engine-operations";
 import { formatDuration, planFor } from "./inquiry-engine-support";
+import { collectChangedPaths } from "@/platform/system-versions/compare";
 
 /**
  * The pattern projection is deliberately smaller than a capability
@@ -405,25 +406,17 @@ function shapeValue(shape: InquiryPatternShape, path: string): JsonValue | null 
 function objectLike(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
+// Version is carried separately as the source pin. A version bump is the
+// reason to build a proposal, not a field to merge into the definition.
+const PATTERN_IGNORED_PATHS: ReadonlySet<string> = new Set(["version"]);
+
+/**
+ * Field and option lists are merged as one reusable shape value; the shared
+ * System Version comparator treats arrays as whole values, so a list both
+ * sides changed becomes one explicit conflict.
+ */
 function changedPaths(before: unknown, after: unknown, path: string, output: string[]): void {
-  if (equal(before, after)) return;
-  // Field and option lists are merged as one reusable shape value. Treating
-  // an array index as a writable object path would either reject an added
-  // field or leave a removed field behind, so the whole list becomes an
-  // explicit conflict when both sides changed it.
-  if (Array.isArray(before) || Array.isArray(after)) {
-    output.push(path);
-    return;
-  }
-  // Version is carried separately as the source pin. A version bump is the
-  // reason to build a proposal, not a field to merge into the definition.
-  if (path === "version") return;
-  if (objectLike(before) && objectLike(after)) {
-    const keys = [...new Set([...Object.keys(before), ...Object.keys(after)])].sort();
-    for (const key of keys) changedPaths(before[key], after[key], path ? `${path}.${key}` : key, output);
-    return;
-  }
-  output.push(path);
+  collectChangedPaths(before, after, path, output, PATTERN_IGNORED_PATHS);
 }
 
 function applyShapeToDefinition(
