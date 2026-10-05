@@ -67,6 +67,10 @@ export const existingSavedWorkSchema = z.object({
   /** True when this work row created its own hosted tenant (native first).
    * False or absent: the tenant existed first and keeps the identity. */
   hostedTenantReserved: z.boolean().nullable().optional().transform((value) => value ?? false),
+  /** The schedule's own `pause` field. A stored booking System and its
+   * schedule share one pause (SQL keeps them in one transaction); the
+   * projection reads the same field so it cannot disagree either. */
+  schedulePaused: z.boolean().nullable().optional().transform((value) => value ?? false),
 });
 
 export const existingManagedWebsiteSchema = z.object({
@@ -151,6 +155,7 @@ function savedWorkLifecycle(work: SavedWork, snapshot: Snapshot): { lifecycle: S
         : { lifecycle: "draft", basis: "Not released yet." };
     case "scheduling/schedule": {
       const grants = snapshot.bookingGrants.filter((grant) => grant.workId === work.id);
+      if (work.schedulePaused && grants.length > 0) return { lifecycle: "paused", basis: "Bookings are paused on the schedule." };
       if (grants.some((grant) => grant.status === "published")) return { lifecycle: "live", basis: "Booking is published on a website." };
       if (grants.length > 0) return { lifecycle: "paused", basis: "Public booking was revoked." };
       return { lifecycle: "draft", basis: "Not published for booking yet." };

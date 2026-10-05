@@ -527,9 +527,15 @@ create function public.transition_system_lifecycle(
   p_workspace_id uuid, p_user_id uuid, p_verified_email text, p_system_id uuid, p_expected_change bigint, p_to text
 ) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
-declare s public.systems;
+declare s public.systems; v_at text;
 begin
   perform public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, true);
+  -- A booking System adopted from a schedule shares its pause with that
+  -- schedule. Lock the schedule row before the System row, the same order the
+  -- schedule-side trigger takes, so the two writers cannot deadlock.
+  perform 1 from public.saved_product_work w join public.systems x
+      on x.id = p_system_id and x.business_workspace_id = p_workspace_id and x.origin_kind = 'saved_work' and x.origin_ref = w.id::text
+    where w.workspace_id = p_workspace_id and w.product_id = 'scheduling' and w.resource_kind = 'schedule' for update of w;
   s := public.system_load(p_workspace_id, p_system_id, true);
   if s.change_number <> p_expected_change then raise exception 'system_change_conflict'; end if;
   if p_to is null or p_to not in ('draft','live','paused') then raise exception 'system_input_invalid'; end if;
@@ -541,9 +547,49 @@ begin
   update public.systems set lifecycle = p_to, change_number = change_number + 1,
     updated_by = p_user_id, updated_at = clock_timestamp()
   where id = s.id returning * into s;
+  -- Same transaction: the schedule's `pause` field (what /api/v1/bookings and
+  -- the scheduling service read) changes with the System, as a new schedule
+  -- revision, so neither store can disagree with the other.
+  if s.origin_kind = 'saved_work' then
+    v_at := to_char(clock_timestamp() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
+    update public.saved_product_work w set updated_at = clock_timestamp(), payload = case when p_to = 'paused'
+        then w.payload || jsonb_build_object('pause', jsonb_build_object('pausedAt', v_at, 'pausedBy', p_user_id::text, 'reason', 'Paused from the System.'))
+        else w.payload - 'pause' end
+      || jsonb_build_object('revision', (w.payload->>'revision')::int + 1,
+        'history', coalesce(w.payload->'history', '[]'::jsonb) || jsonb_build_array(jsonb_build_object(
+          'revision', (w.payload->>'revision')::int + 1, 'kind', case when p_to = 'paused' then 'pause' else 'resume' end,
+          'actorId', p_user_id::text, 'at', v_at)))
+    where w.workspace_id = p_workspace_id and w.id::text = s.origin_ref and w.product_id = 'scheduling' and w.resource_kind = 'schedule'
+      and (w.payload ? 'pause') is distinct from (p_to = 'paused');
+    if found and (select jsonb_array_length(payload->'history') from public.saved_product_work where id::text = s.origin_ref) > 500 then
+      raise exception 'system_input_invalid';
+    end if;
+  end if;
   return public.system_json(s);
 end;
 $$;
+
+-- The schedule side of the same rule: a schedule pause or resume written by
+-- the scheduling service (update_bounded_product_work) moves the booking
+-- System adopted from it in the same transaction. Draft Systems stay draft.
+create function public.system_follow_schedule_pause() returns trigger
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare v_to text; v_actor text;
+begin
+  v_to := case when new.payload ? 'pause' then 'paused' else 'live' end;
+  v_actor := coalesce(new.payload->'pause'->>'pausedBy', new.payload->'history'->-1->>'actorId');
+  update public.systems x set lifecycle = v_to, change_number = x.change_number + 1, updated_at = clock_timestamp(),
+      updated_by = coalesce((select u.id from public.users u where v_actor ~ '^[0-9a-f-]{36}$' and u.id = v_actor::uuid), x.updated_by)
+    where x.business_workspace_id = new.workspace_id and x.origin_kind = 'saved_work' and x.origin_ref = new.id::text
+      and x.lifecycle in ('live','paused') and x.lifecycle <> v_to
+      and (v_to = 'paused' or x.current_revision_id is not null);
+  return null;
+end;
+$$;
+create trigger saved_product_work_schedule_pause_follows after update of payload on public.saved_product_work
+  for each row when (new.product_id = 'scheduling' and new.resource_kind = 'schedule'
+    and (old.payload ? 'pause') is distinct from (new.payload ? 'pause'))
+  execute function public.system_follow_schedule_pause();
 
 create function public.issue_system_output(
   p_workspace_id uuid, p_user_id uuid, p_verified_email text, p_system_id uuid,
@@ -748,7 +794,9 @@ begin
         'hostedTenantStableId', coalesce(hr.tenant_stable_id, pt.stable_id), 'hostedTenantId', coalesce(hr.tenant_id, p.tenant_id),
         -- True when this work row created its own hosted tenant (native first).
         -- Otherwise the tenant came first and the System keeps its identity.
-        'hostedTenantReserved', hr.website_work_id is not null)
+        'hostedTenantReserved', hr.website_work_id is not null,
+        -- The schedule's own pause; a booking System adopted from it is Paused.
+        'schedulePaused', case when w.product_id = 'scheduling' then w.payload ? 'pause' end)
         order by w.created_at, w.id)
       from public.saved_product_work w
       left join public.application_states a on a.work_id = w.id and a.workspace_id = w.workspace_id
@@ -811,6 +859,7 @@ revoke all on function public.update_business_system(uuid, uuid, text, uuid, big
 revoke all on function public.record_system_revision(uuid, uuid, text, uuid, bigint, jsonb, uuid, text, boolean) from public, anon, authenticated;
 revoke all on function public.set_system_current_revision(uuid, uuid, text, uuid, uuid, uuid) from public, anon, authenticated;
 revoke all on function public.transition_system_lifecycle(uuid, uuid, text, uuid, bigint, text) from public, anon, authenticated;
+revoke all on function public.system_follow_schedule_pause() from public, anon, authenticated, service_role;
 revoke all on function public.issue_system_output(uuid, uuid, text, uuid, jsonb, uuid, text) from public, anon, authenticated;
 revoke all on function public.accept_system_output(uuid, uuid, text, uuid, uuid) from public, anon, authenticated;
 revoke all on function public.connect_system(uuid, uuid, text, jsonb, uuid, text) from public, anon, authenticated;

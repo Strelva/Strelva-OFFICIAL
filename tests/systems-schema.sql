@@ -333,6 +333,52 @@ delete from public.workspace_memberships where workspace_id = '5e000000-0000-400
 select pg_temp.sy_assert(public.set_system_connection_state('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000001', 'sy-owner@example.test',
   (select id from sy_share), 'disconnected')->>'state' = 'disconnected', 'the source revokes without the target');
 
+-- Pause is stored once and kept in step in one transaction: a booking System
+-- adopted from a schedule and that schedule's `pause` field never diverge,
+-- whichever side is written.
+insert into public.saved_product_work(id, workspace_id, product_id, resource_kind, title, payload, created_by) values
+  ('5e000000-0000-4000-8000-0000000000f1', '5e000000-0000-4000-8000-000000000010', 'scheduling', 'schedule', 'Fittings',
+   '{"version":1,"revision":0,"title":"Fittings","createdBy":"5e000000-0000-4000-8000-000000000001","createdAt":"2026-10-01T12:00:00Z","history":[],"availability":[],"reservations":[]}',
+   '5e000000-0000-4000-8000-000000000001');
+insert into sy_ids select 'booking', (public.create_business_system('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000001',
+  'sy-owner@example.test', '{"name":"Fittings","kind":"booking","origin":{"kind":"saved_work","ref":"5e000000-0000-4000-8000-0000000000f1"}}',
+  '5e000000-0000-4000-8000-0000000000f2', repeat('7', 64))->>'id')::uuid;
+select public.record_system_revision('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000001', 'sy-owner@example.test',
+  (select id from sy_ids where name = 'booking'), 1, '{"implementation":{"kind":"schedule","ref":"work:5e000000-0000-4000-8000-0000000000f1"}}',
+  '5e000000-0000-4000-8000-0000000000f3', repeat('7', 64), true);
+select public.transition_system_lifecycle('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000001', 'sy-owner@example.test',
+  (select id from sy_ids where name = 'booking'), 2, 'live');
+-- The schedule side pauses (what the scheduling service writes): the System follows.
+update public.saved_product_work set payload = payload || jsonb_build_object('revision', 1,
+    'pause', jsonb_build_object('pausedAt', '2026-10-02T12:00:00Z', 'pausedBy', '5e000000-0000-4000-8000-000000000001', 'reason', 'Owner away'),
+    'history', jsonb_build_array(jsonb_build_object('revision', 1, 'kind', 'pause', 'actorId', '5e000000-0000-4000-8000-000000000001', 'at', '2026-10-02T12:00:00Z')))
+  where id = '5e000000-0000-4000-8000-0000000000f1';
+select pg_temp.sy_assert((select lifecycle from public.systems where id = (select id from sy_ids where name = 'booking')) = 'paused',
+  'pausing the schedule pauses its booking System in the same transaction');
+select pg_temp.sy_assert((select s->>'schedulePaused' from jsonb_array_elements(public.read_existing_business_systems('5e000000-0000-4000-8000-000000000010',
+  '5e000000-0000-4000-8000-000000000001', 'sy-owner@example.test')->'savedWork') s where s->>'id' = '5e000000-0000-4000-8000-0000000000f1') = 'true',
+  'the existing-things reader reports the schedule pause');
+-- The System side resumes: the schedule's pause is removed in the same transaction, as a new revision.
+select public.transition_system_lifecycle('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000001', 'sy-owner@example.test',
+  (select id from sy_ids where name = 'booking'), (select change_number from public.systems where id = (select id from sy_ids where name = 'booking')), 'live');
+select pg_temp.sy_assert((select not (payload ? 'pause') and (payload->>'revision')::int = 2 and payload->'history'->-1->>'kind' = 'resume'
+    and payload->'history'->-1->>'actorId' = '5e000000-0000-4000-8000-000000000001'
+  from public.saved_product_work where id = '5e000000-0000-4000-8000-0000000000f1'), 'resuming the System resumes the schedule as revision 2');
+select pg_temp.sy_assert((select lifecycle from public.systems where id = (select id from sy_ids where name = 'booking')) = 'live', 'System is live again');
+-- The System side pauses: the schedule records the pause.
+select public.transition_system_lifecycle('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000001', 'sy-owner@example.test',
+  (select id from sy_ids where name = 'booking'), (select change_number from public.systems where id = (select id from sy_ids where name = 'booking')), 'paused');
+select pg_temp.sy_assert((select payload->'pause'->>'pausedBy' = '5e000000-0000-4000-8000-000000000001' and (payload->>'revision')::int = 3
+  from public.saved_product_work where id = '5e000000-0000-4000-8000-0000000000f1'), 'pausing the System pauses the schedule');
+-- The schedule side resumes: the System follows.
+update public.saved_product_work set payload = (payload - 'pause') || jsonb_build_object('revision', 4)
+  where id = '5e000000-0000-4000-8000-0000000000f1';
+select pg_temp.sy_assert((select lifecycle from public.systems where id = (select id from sy_ids where name = 'booking')) = 'live',
+  'resuming the schedule resumes its booking System');
+select pg_temp.sy_assert(not exists (
+  select 1 from public.systems s join public.saved_product_work w on s.origin_kind = 'saved_work' and s.origin_ref = w.id::text
+  where w.product_id = 'scheduling' and s.lifecycle in ('live','paused') and (s.lifecycle = 'paused') <> (w.payload ? 'pause')), 'no booking System disagrees with its schedule');
+
 -- After exit, writes stop and reads continue.
 select public.create_business_system('5e000000-0000-4000-8000-000000000013', '5e000000-0000-4000-8000-000000000001', 'sy-owner@example.test',
   '{"name":"Before exit","kind":"report"}', '5e000000-0000-4000-8000-0000000000c8', repeat('1', 64));

@@ -54,6 +54,13 @@ describe("systems from existing things", () => {
     expect(systems.every(({ provenance }) => provenance === "existing")).toBe(true);
   });
 
+  it("lists a paused schedule's booking System as paused even while it is published on a website", () => {
+    const paused = { ...snapshot, savedWork: snapshot.savedWork.map((w) => (w.id.endsWith("a3") ? { ...w, schedulePaused: true } : w)) };
+    const booking = systemsFromExisting(paused).systems.find(({ system }) => system.kind === "booking")!;
+    expect(booking.system.lifecycle).toBe("paused");
+    expect(booking.basis).toMatch(/paused/i);
+  });
+
   it("treats a native website and the tenant it publishes to as one System", () => {
     const { systems } = systemsFromExisting(snapshot);
     const websites = systems.filter(({ system }) => system.kind === "website");
