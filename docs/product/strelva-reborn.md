@@ -30,7 +30,8 @@ client conversion and conversion doesn't wait for every capability.
 
 Numbers after `0.3.0` can shift as evidence comes in; the order holds.
 
-**`1.0.0` is not a Reborn target.** It means Strelva is something we'd stand
+**`1.0.0` is the launch, after these steps.** [Strelva 1.0.0](./strelva-1.0.0.md)
+lists every feature it contains. It means Strelva is something we'd stand
 behind for any new customer: every client running in a workspace in
 production, owners using it, no client data held only in Redis, every client
 repo checked, and the customer model (Systems, Connections, Possibilities,

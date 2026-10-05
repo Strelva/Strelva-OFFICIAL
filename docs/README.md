@@ -52,6 +52,7 @@ a current doc and a contract test.
 | [horizontal-product-brief](./product/horizontal-product-brief-2026-09-11.md) | Confirmed product direction, clarified through Oct 1 |
 | [horizontal-audit-and-plan](./product/horizontal-audit-and-plan-2026-09-11.md) | Source audit and build order |
 | [Strelva Reborn](./product/strelva-reborn.md) | The `0.x` release series that moves every client into a business workspace. Exit criteria and order (Oct 2) |
+| [Strelva 1.0.0](./product/strelva-1.0.0.md) | Every feature planned for the 1.0.0 launch, with today's state and open decisions (Oct 5) |
 | [strelvav2](./product/strelvav2.md), [definition of done](./product/strelvav2-definition-of-done.md), [module map](./product/strelvav2-module-map-2026-09-19.md) | The Sept 30 workspace release (history) |
 | [roadmap](./product/roadmap.md) | Delivery state as of Aug 1 (older than product-reality) |
 | [strelva-labs](./product/strelva-labs.md), [assets](./product/assets.md) | Labs direction; client and asset snapshot (Jul 30) |
