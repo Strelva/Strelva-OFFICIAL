@@ -134,11 +134,24 @@ export interface ThreeWayInput {
   upstream: JsonObject;
   local: JsonObject;
   ignorePaths?: ReadonlySet<string>;
+  /**
+   * The paths the customer actually edited (for example override paths).
+   * When given, each one is a single unit of local change: an override that
+   * replaced `form` as a whole conflicts with any upstream change inside
+   * `form`, instead of being reduced to the leaves that happen to differ.
+   * Adoption rebuilds local state from these paths, so detection must use
+   * them too or preview and adoption disagree.
+   */
+  localEditPaths?: readonly string[];
 }
 
 export function threeWayCompare(input: ThreeWayInput): ThreeWayResult {
   const upstreamPaths = changedPaths(input.base, input.upstream, input.ignorePaths);
-  const localPaths = changedPaths(input.base, input.local, input.ignorePaths);
+  const localPaths = input.localEditPaths
+    ? [...new Set(input.localEditPaths)]
+      .filter((path) => !jsonEqual(readPath(input.base, path), readPath(input.local, path)))
+      .sort()
+    : changedPaths(input.base, input.local, input.ignorePaths);
   const merged = cloneJson(input.local);
   const changes: ThreeWayChange[] = [];
   const conflicts = new Map<string, ThreeWayConflict>();

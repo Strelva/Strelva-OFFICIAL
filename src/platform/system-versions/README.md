@@ -29,11 +29,14 @@ its own release history. A Version is not a point in time.
 2. `listAvailableImprovements` shows it to each descendant with a three-way
    compare (base = baseline, upstream = N+1, local = working).
 3. Status is `auto_applicable`, or `blocked` with explicit `conflicts`
-   (`overlapping_edit`, `incompatible_override`) or `missingBindings`.
+   (`overlapping_edit`, `incompatible_override`) or `missingBindings`. Each
+   override is one unit of local change: an override at `form` conflicts with
+   an upstream change at `form.title`, and the reverse. Lists are one value.
 4. The descendant decides: `adoptImprovement` (with `keep_local` or
    `take_upstream` for every conflict) or `declineImprovement`. Missing accounts
    must be bound locally first. Adoption changes the working definition only;
-   it does not release.
+   it does not release. The adopted result must equal the preview plus the
+   chosen `take_upstream` values, or adoption fails and nothing changes.
 
 The compare rule is the inquiry pattern update rule, lifted out.
 `src/products/inquiries/inquiry-pattern-updates.ts` now calls

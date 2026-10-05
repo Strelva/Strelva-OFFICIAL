@@ -122,7 +122,15 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
         upstreamPaths: [],
       };
     }
-    const result = threeWayCompare({ base: lineage.baseline.definition, upstream: revision.definition, local });
+    // Overrides are the unit of local change. Adoption keeps or drops whole
+    // overrides, so an upstream change anywhere inside (or above) one must be
+    // a conflict, or adoption would silently discard part of the local edit.
+    const result = threeWayCompare({
+      base: lineage.baseline.definition,
+      upstream: revision.definition,
+      local,
+      localEditPaths: lineage.overrides.map((override) => override.path),
+    });
     const bound = new Set(lineage.bindings.map((binding) => binding.kind));
     const missingBindings = revision.requires.bindingKinds.filter((kind) => !bound.has(kind));
     return {
@@ -364,8 +372,20 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
         overrides,
         decisions: [...lineage.decisions, { sourceRevision: revision.source.number, choice: "adopted", resolutions, by: actor.userId, at }],
       };
-      // Every override path is still writable on the new baseline.
-      working(next);
+      // Every override path is still writable on the new baseline, and the
+      // adopted result is exactly the preview with the chosen upstream values.
+      const expectedResult = cloneJson(comparison.preview);
+      for (const resolution of resolutions) {
+        if (resolution.choice !== "take_upstream") continue;
+        try {
+          writePath(expectedResult, resolution.path, readPath(revision.definition, resolution.path));
+        } catch {
+          throw new VersionValidationError("Adopting this revision would change local edits beyond the preview. Nothing was changed.");
+        }
+      }
+      if (!jsonEqual(working(next), expectedResult)) {
+        throw new VersionValidationError("Adopting this revision would change local edits beyond the preview. Nothing was changed.");
+      }
       return save(next, input.expectedRowRevision);
     },
 
