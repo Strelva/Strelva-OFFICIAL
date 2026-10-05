@@ -90,7 +90,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
         <header className={styles.greeting}>
           <p>{readOnly ? "Shared workspace" : name}</p>
           <h1 id="business-start-title" className="font-display">{readOnly ? "Review what was shared." : "What should happen next?"}</h1>
-          <p>{readOnly ? `Only ${name} owners can make changes.` : "Start with the outcome. You do not need to pick a feature first."}</p>
+          <p>{readOnly ? `${name} shared this with your agency to review.` : "Start with the outcome. You do not need to pick a feature first."}</p>
         </header>
         {!readOnly ? <>
           <WorkspaceComposer key={`${snapshot.actor.email}:${snapshot.workspaceId}`} draftKey={requestDraftKey({ actorEmail: snapshot.actor.email, workspaceId: snapshot.workspaceId })} disabled={busy} onSubmit={request} onEdited={onDraftChange} onTemplates={() => onNavigate("products")} placeholder="What do you want Strelva to make happen?" />

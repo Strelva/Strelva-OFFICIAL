@@ -43,8 +43,9 @@ import type {
 } from "./contracts";
 import type { WorkspaceInquiryTarget } from "./WorkspaceLayout";
 import type { WorkspaceStartContinuation } from "./workspace-start";
-import { selectWorkspaceLocation, isHorizontalView, type HorizontalView, type WorkspaceView as View } from "./workspace-selection";
+import { selectWorkspaceLocation, isHorizontalView, viewForWork, type HorizontalView, type WorkspaceView as View } from "./workspace-selection";
 import { workspaceExitBlocksChanges, workspaceExitIsStopped } from "./workspace-exit-ui";
+import { NO_OPEN_WORK, leaveWork, startContinuation, startRequest, type OpenWorkContext } from "./open-work";
 
 type Notice = { kind: "success" | "error"; message: string } | null;
 
@@ -73,26 +74,23 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   const request = useWorkspaceRequest();
   const postAction = usePostAction();
   const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(null);
-  const [missingWork, setMissingWork] = useState(false);
   const [returnTarget, setReturnTarget] = useState("/workspace");
   const [selectedWorkId, setSelectedWorkId] = useState<string | null>(null);
-  const [selectedStandingId, setSelectedStandingId] = useState<string | null>(null);
-  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string | null>(null);
-  const [standingCreating, setStandingCreating] = useState(false);
   const [view, setView] = useState<View>("work");
-  const [inquiryTenantId, setInquiryTenantId] = useState<string | null>(null);
-  const [assessmentStartContext, setAssessmentStartContext] = useState<WorkspaceStartContinuation | null>(null);
-  const [inquiryStartContext, setInquiryStartContext] = useState<WorkspaceStartContinuation | null>(null);
-  const [trackerStartContext, setTrackerStartContext] = useState<WorkspaceStartContinuation | null>(null);
-  const [documentStartContext, setDocumentStartContext] = useState<WorkspaceStartContinuation | null>(null);
-  const [planStartRequest, setPlanStartRequest] = useState<string | null>(null);
+  // Everything that belongs to the open work. Transitions replace it whole via leaveWork().
+  const [open, setOpen] = useState<OpenWorkContext>(NO_OPEN_WORK);
+  const { missingWork, standingId: selectedStandingId, assignmentId: selectedAssignmentId, standingCreating, inquiryTenantId, showAssessment } = open;
+  const assessmentStartContext = startContinuation(open, "work", "assessment");
+  const inquiryStartContext = startContinuation(open, "inquiries", "inquiries");
+  const trackerStartContext = startContinuation(open, "tracker", "tracker");
+  const documentStartContext = startContinuation(open, "document", "document");
+  const planStartRequest = startRequest(open, "plan");
+  const horizontalRequest = startRequest(open, view);
   const [home, setHome] = useState(true);
-  const [horizontalRequest, setHorizontalRequest] = useState<string | undefined>();
   const [pendingRequest, setPendingRequest] = useState<string | null>(null);
   const [recovering, setRecovering] = useState(false);
   const attemptRef = useRef<{ signature: string; id: string } | null>(null);
   const [retryWork, setRetryWork] = useState<WorkspaceWork | null>(null);
-  const [showAssessment, setShowAssessment] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<Notice>(null);
   const [handoffPreview, setHandoffPreview] = useState<WorkspaceHandoffPreview | null>(null);
@@ -132,19 +130,9 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
       setSnapshot(data);
       const params = new URLSearchParams(window.location.search);
       const selection = selectWorkspaceLocation(params, data, inquiryConfig);
-      setMissingWork(selection.missingWork);
       setSelectedWorkId(selection.selectedWorkId);
-      setSelectedStandingId(selection.selectedStandingId);
-      setSelectedAssignmentId(selection.selectedAssignmentId);
-      setInquiryTenantId(selection.inquiryTenantId);
-      setStandingCreating(false);
-      setAssessmentStartContext(null);
-      setInquiryStartContext(null);
-      setTrackerStartContext(null);
-      setDocumentStartContext(null);
-      setPlanStartRequest(null);
+      setOpen(leaveWork({ missingWork: selection.missingWork, standingId: selection.selectedStandingId, assignmentId: selection.selectedAssignmentId, inquiryTenantId: selection.inquiryTenantId, showAssessment: selection.showAssessment }));
       if (!preserveNotice) { setHome(selection.home); setView(selection.view); }
-      setShowAssessment(selection.showAssessment);
       replaceWorkspaceLocation(data.workspaceId, params.get("standingId") ? undefined : params.get("work") || undefined);
     } catch (cause) {
       if (requestId !== requestRef.current) return;
@@ -265,25 +253,12 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
 
   function chooseWork(id: string) {
     const chosen = snapshot?.work.find((work) => work.id === id);
-    setMissingWork(false);
+    leaveCurrentWork();
     setHome(false);
     setSelectedWorkId(id);
-    setSelectedStandingId(null);
-    setSelectedAssignmentId(null);
-    setStandingCreating(false);
-    setShowAssessment(false);
-    setInquiryTenantId(null);
-    setAssessmentStartContext(null);
-    setInquiryStartContext(null);
-    setTrackerStartContext(null);
-    setDocumentStartContext(null);
-    setPlanStartRequest(null);
-    setView(isHorizontalView(chosen?.productId) ? chosen.productId : chosen?.productId === "tracker" ? "tracker" : chosen?.productId === "documents" ? "document" : chosen?.productId === "work_plans" ? "plan" : "work");
+    setView(viewForWork(chosen?.productId));
     setNotice(null);
-    const url = new URL(window.location.href);
-    url.searchParams.delete("standingId");
-    url.searchParams.delete("offering");
-    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    // Callers push the new entry. Never rewrite the entry being left, or Back loses its offering or standing.
   }
 
   function workspaceIdForNavigation(fallback: string): string {
@@ -292,6 +267,11 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
 
   function acceptsWorkspaceCallback(workspaceId: string): boolean {
     return activeWorkspaceRef.current === workspaceId && requestedWorkspaceRef.current === workspaceId;
+  }
+
+  /** Every transition that leaves the current work resets all of its context, then sets only what the next view needs. */
+  function leaveCurrentWork(next?: Partial<OpenWorkContext>) {
+    setOpen(leaveWork(next));
   }
 
   function openWorkFromPlan(id: string, receiptProductId?: string) {
@@ -304,7 +284,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     url.searchParams.set("workspaceId", workspaceId);
     url.searchParams.set("work", id);
     clearEmbeddedRouteParams(url);
-    url.searchParams.set("view", isHorizontalView(productId) ? productId : productId === "tracker" ? "tracker" : productId === "documents" ? "document" : productId === "work_plans" ? "plan" : "work");
+    url.searchParams.set("view", viewForWork(productId));
     window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
     void loadWorkspace(workspaceId);
   }
@@ -323,40 +303,20 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   }
 
   function chooseInquiry(tenantId: string, context?: WorkspaceStartContinuation) {
-    setMissingWork(false);
+    leaveCurrentWork({ inquiryTenantId: tenantId, start: context?.route === "inquiries" ? { view: "inquiries", continuation: context } : null });
     setSelectedWorkId(null);
-    setSelectedStandingId(null);
-    setSelectedAssignmentId(null);
-    setStandingCreating(false);
-    setInquiryTenantId(tenantId);
-    setAssessmentStartContext(null);
-    setInquiryStartContext(context?.route === "inquiries" ? context : null);
-    setTrackerStartContext(null);
-    setDocumentStartContext(null);
-    setPlanStartRequest(null);
     setHome(false);
     setView("inquiries");
-    setShowAssessment(false);
     setNotice(null);
   }
 
   function startTracker(context?: WorkspaceStartContinuation) {
     if (workspaceExitBlocks) return;
     const workspaceId = workspaceIdForNavigation(snapshot!.workspaceId);
-    setMissingWork(false);
+    leaveCurrentWork({ start: context?.route === "tracker" ? { view: "tracker", continuation: context } : null });
     setSelectedWorkId(null);
-    setSelectedStandingId(null);
-    setSelectedAssignmentId(null);
-    setStandingCreating(false);
-    setInquiryTenantId(null);
-    setAssessmentStartContext(null);
-    setInquiryStartContext(null);
-    setTrackerStartContext(context?.route === "tracker" ? context : null);
-    setDocumentStartContext(null);
-    setPlanStartRequest(null);
     setHome(false);
     setView("tracker");
-    setShowAssessment(false);
     setNotice(null);
     const url = new URL(window.location.href);
     url.searchParams.set("workspaceId", workspaceId);
@@ -369,19 +329,10 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   function startDocument(context?: WorkspaceStartContinuation) {
     if (workspaceExitBlocks) return;
     const workspaceId = workspaceIdForNavigation(snapshot!.workspaceId);
-    setMissingWork(false);
+    leaveCurrentWork({ start: context?.route === "document" ? { view: "document", continuation: context } : null });
     setSelectedWorkId(null);
-    setSelectedStandingId(null);
-    setStandingCreating(false);
-    setInquiryTenantId(null);
-    setAssessmentStartContext(null);
-    setInquiryStartContext(null);
-    setTrackerStartContext(null);
-    setDocumentStartContext(context?.route === "document" ? context : null);
-    setPlanStartRequest(null);
     setHome(false);
     setView("document");
-    setShowAssessment(false);
     setNotice(null);
     const url = new URL(window.location.href);
     url.searchParams.set("workspaceId", workspaceId);
@@ -394,19 +345,10 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   function startPlan(requestText: string) {
     if (workspaceExitBlocks) return;
     const workspaceId = workspaceIdForNavigation(snapshot!.workspaceId);
-    setMissingWork(false);
+    leaveCurrentWork({ start: { view: "plan", request: requestText } });
     setSelectedWorkId(null);
-    setSelectedStandingId(null);
-    setStandingCreating(false);
-    setInquiryTenantId(null);
-    setAssessmentStartContext(null);
-    setInquiryStartContext(null);
-    setTrackerStartContext(null);
-    setDocumentStartContext(null);
-    setPlanStartRequest(requestText);
     setHome(false);
     setView("plan");
-    setShowAssessment(false);
     setNotice(null);
     const url = new URL(window.location.href);
     url.searchParams.set("workspaceId", workspaceId);
@@ -419,14 +361,16 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   function startHorizontal(productId: HorizontalView, context?: WorkspaceStartContinuation) {
     if (workspaceExitBlocks) return;
     if (productId === "applications" && context?.request) { startPlan(context.request); return; }
-    setSelectedWorkId(null); setSelectedStandingId(null); setStandingCreating(false); setMissingWork(false); setInquiryTenantId(null); setShowAssessment(false); setHome(false); setView(productId); setNotice(null); setHorizontalRequest(context?.request);
+    leaveCurrentWork({ start: context?.request ? { view: productId, request: context.request } : null });
+    setSelectedWorkId(null); setHome(false); setView(productId); setNotice(null);
     const workspaceId = workspaceIdForNavigation(snapshot!.workspaceId);
     const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.set("workspaceId", workspaceId); url.searchParams.set("view", productId); url.searchParams.delete("work");
     window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   }
   function openOngoing() {
     if (!snapshot) return;
-    setSelectedWorkId(null); setSelectedStandingId(null); setSelectedAssignmentId(null); setStandingCreating(false); setMissingWork(false); setInquiryTenantId(null); setShowAssessment(false); setHome(false); setView("operations"); setNotice(null); setHorizontalRequest(undefined);
+    leaveCurrentWork();
+    setSelectedWorkId(null); setHome(false); setView("operations"); setNotice(null);
   }
   function openClientWork(workspaceId: string, workId: string) {
     requestedWorkspaceRef.current = workspaceId;
@@ -444,21 +388,10 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   }
   function openStanding(standingId: string) {
     if (!snapshot) return;
-    setMissingWork(false);
+    leaveCurrentWork({ standingId });
     setSelectedWorkId(null);
-    setSelectedStandingId(standingId);
-    setSelectedAssignmentId(null);
-    setStandingCreating(false);
-    setInquiryTenantId(null);
-    setAssessmentStartContext(null);
-    setInquiryStartContext(null);
-    setTrackerStartContext(null);
-    setDocumentStartContext(null);
-    setPlanStartRequest(null);
-    setHorizontalRequest(undefined);
     setHome(false);
     setView("operations");
-    setShowAssessment(false);
     setNotice(null);
     const workspaceId = workspaceIdForNavigation(snapshot.workspaceId);
     const url = new URL(window.location.href);
@@ -472,41 +405,23 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   function horizontalSaved(workId: string) {
     if (!snapshot || !acceptsWorkspaceCallback(snapshot.workspaceId)) return;
     const workspaceId = snapshot.workspaceId;
-    setSelectedWorkId(workId); setSelectedStandingId(null); setSelectedAssignmentId(null); setStandingCreating(false); const url = new URL(window.location.href); url.searchParams.set("workspaceId", workspaceId); url.searchParams.set("work", workId); url.searchParams.set("view", view); url.searchParams.delete("standingId"); url.searchParams.delete("assignmentId");
+    leaveCurrentWork(); setSelectedWorkId(workId); const url = new URL(window.location.href); url.searchParams.set("workspaceId", workspaceId); url.searchParams.set("work", workId); url.searchParams.set("view", view); url.searchParams.delete("standingId"); url.searchParams.delete("assignmentId");
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`); void loadWorkspace(workspaceId, true);
   }
   function goHome() {
-    setMissingWork(false);
+    leaveCurrentWork();
     setHome(true);
     setView("work");
-    setInquiryTenantId(null);
-    setAssessmentStartContext(null);
-    setInquiryStartContext(null);
-    setTrackerStartContext(null);
-    setDocumentStartContext(null);
-    setPlanStartRequest(null);
-    setSelectedStandingId(null);
-    setSelectedAssignmentId(null);
-    setStandingCreating(false);
-    setShowAssessment(false);
     if (snapshot) void loadWorkspace(undefined, true);
   }
 
   function handleTrackerSaved(workId: string) {
     if (!snapshot || !acceptsWorkspaceCallback(snapshot.workspaceId)) return;
     const workspaceId = snapshot.workspaceId;
-    setMissingWork(false);
+    leaveCurrentWork();
     setSelectedWorkId(workId);
-    setSelectedStandingId(null);
-    setInquiryTenantId(null);
-    setAssessmentStartContext(null);
-    setInquiryStartContext(null);
-    setTrackerStartContext(null);
-    setDocumentStartContext(null);
-    setPlanStartRequest(null);
     setHome(false);
     setView("tracker");
-    setShowAssessment(false);
     const url = new URL(window.location.href);
     url.searchParams.set("workspaceId", workspaceId);
     url.searchParams.set("view", "tracker");
@@ -519,18 +434,10 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   function handleDocumentSaved(workId: string) {
     if (!snapshot || !acceptsWorkspaceCallback(snapshot.workspaceId)) return;
     const workspaceId = snapshot.workspaceId;
-    setMissingWork(false);
+    leaveCurrentWork();
     setSelectedWorkId(workId);
-    setSelectedStandingId(null);
-    setInquiryTenantId(null);
-    setAssessmentStartContext(null);
-    setInquiryStartContext(null);
-    setTrackerStartContext(null);
-    setDocumentStartContext(null);
-    setPlanStartRequest(null);
     setHome(false);
     setView("document");
-    setShowAssessment(false);
     const url = new URL(window.location.href);
     url.searchParams.set("workspaceId", workspaceId);
     url.searchParams.set("view", "document");
@@ -543,18 +450,10 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   function handlePlanSaved(workId: string) {
     if (!snapshot || !acceptsWorkspaceCallback(snapshot.workspaceId)) return;
     const workspaceId = snapshot.workspaceId;
-    setMissingWork(false);
+    leaveCurrentWork();
     setSelectedWorkId(workId);
-    setSelectedStandingId(null);
-    setInquiryTenantId(null);
-    setAssessmentStartContext(null);
-    setInquiryStartContext(null);
-    setTrackerStartContext(null);
-    setDocumentStartContext(null);
-    setPlanStartRequest(null);
     setHome(false);
     setView("plan");
-    setShowAssessment(false);
     const url = new URL(window.location.href);
     url.searchParams.set("workspaceId", workspaceId);
     url.searchParams.set("view", "plan");
@@ -606,12 +505,11 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
           : [normalizedWork, ...current.work];
         return { ...current, work };
       });
+      leaveCurrentWork();
       setSelectedWorkId(normalizedWork.id);
-      setMissingWork(false);
       replaceWorkspaceLocation(normalizedWork.workspaceId, normalizedWork.id);
       setHome(false);
       setView("work");
-      setShowAssessment(false);
       setPublicSaveResultId(null);
       clearPublicSaveQuery();
       setNotice({
@@ -657,7 +555,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
         onHome={goHome}
         onChoose={chooseWork}
         onCreatedApp={id => openWorkFromPlan(id, "applications")}
-        onNew={(context) => { if (workspaceExitBlocks) return; setMissingWork(false); setSelectedStandingId(null); setStandingCreating(false); setRetryWork(null); setAssessmentStartContext(context?.route === "assessment" ? context : null); setInquiryStartContext(null); setTrackerStartContext(null); setDocumentStartContext(null); setPlanStartRequest(null); const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.set("workspaceId", workspaceIdForNavigation(snapshot.workspaceId)); url.searchParams.set("view", "work"); url.searchParams.delete("work"); window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`); setHome(false); setView("work"); setShowAssessment(true); setNotice(null); }}
+        onNew={(context) => { if (workspaceExitBlocks) return; leaveCurrentWork({ showAssessment: true, start: context?.route === "assessment" ? { view: "work", continuation: context } : null }); setRetryWork(null); const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.set("workspaceId", workspaceIdForNavigation(snapshot.workspaceId)); url.searchParams.set("view", "work"); url.searchParams.delete("work"); window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`); setHome(false); setView("work"); setNotice(null); }}
         onPlan={startPlan}
         onOngoing={openOngoing}
         onHorizontal={startHorizontal}
@@ -681,7 +579,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
         tracker={trackerContent}
         plan={planContent}
         document={documentContent}
-        onWorkspace={(id) => { requestedWorkspaceRef.current = id; replaceWorkspaceLocation(id); const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.delete("work"); url.searchParams.delete("view"); window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`); setSelectedStandingId(null); setStandingCreating(false); setHome(true); setView("work"); setInquiryTenantId(null); setInquiryStartContext(null); setTrackerStartContext(null); setDocumentStartContext(null); setPlanStartRequest(null); void loadWorkspace(id); }}
+        onWorkspace={(id) => { requestedWorkspaceRef.current = id; replaceWorkspaceLocation(id); const url = new URL(window.location.href); clearEmbeddedRouteParams(url); url.searchParams.delete("work"); url.searchParams.delete("view"); window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`); leaveCurrentWork(); setHome(true); setView("work"); void loadWorkspace(id); }}
         onOpenClientWork={openClientWork}
         notice={<>
         {pendingRequest ? <div role="status" className="mx-4 mt-4 flex flex-wrap items-center gap-4 rounded-xl border border-gray-border p-4 text-sm"><span>An assessment may still need to finish saving.</span>
@@ -722,16 +620,15 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
                 const body = await postAction<{ work: WorkspaceWork }>({ action: "assess", workspaceId: snapshot.workspaceId, requestId, ...input }, "The assessment couldn’t be completed. Use Recover assessment before starting again.");
         return normalizeWorkspaceWork(body.work, { access: "owned" });
               }}
-              onCancel={snapshot.work.length ? () => { setAssessmentStartContext(null); setShowAssessment(false); } : undefined}
+              onCancel={snapshot.work.length ? () => setOpen(current => ({ ...current, showAssessment: false, start: null })) : undefined}
               onCreated={(work) => {
                 if (activeWorkspaceRef.current !== work.workspaceId) return;
                 setSnapshot((current) => current?.workspaceId === work.workspaceId ? { ...current, work: [work, ...current.work] } : current);
                 rememberAttempt(null);
                 attemptRef.current = null;
-                setAssessmentStartContext(null);
+                setOpen(current => ({ ...current, showAssessment: false, start: null }));
                 setSelectedWorkId(work.id);
                 replaceWorkspaceLocation(work.workspaceId, work.id);
-                setShowAssessment(false);
                 setNotice({ kind: "success", message: "Assessment saved privately to this workspace." });
               }}
             />
@@ -746,7 +643,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
               readOnly={Boolean(delegatedRead || currentWorkspace?.role === "member")}
               newWorkBlocked={workspaceExitBlocks}
               initialRequest={horizontalRequest}
-              onCreatingStandingChange={setStandingCreating}
+              onCreatingStandingChange={(creating) => setOpen(current => ({ ...current, standingCreating: creating }))}
               onOpenStanding={openStanding}
               onSaved={horizontalSaved}
             />
@@ -760,7 +657,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
             <WebsiteAuditPage key={selectedWork.id} initialResult={selectedWork.assessment.payload} saved />
           ) : selectedWork?.assessment?.kind === "ai_visibility" ? (
             <>
-            <AiVisibilityAssessmentResult work={selectedWork} onRetry={workspaceReadOnly ? undefined : () => { setAssessmentStartContext(null); setRetryWork(selectedWork); setShowAssessment(true); }} accessLabel={delegatedRead ? "Read-only access granted by the customer" : workspaceExitBlocks ? "Changes are paused for this workspace" : "Access controlled by this workspace"} />
+            <AiVisibilityAssessmentResult work={selectedWork} onRetry={workspaceReadOnly ? undefined : () => { setRetryWork(selectedWork); setOpen(current => ({ ...current, showAssessment: true, start: null })); }} accessLabel={delegatedRead ? "Read-only access granted by the customer" : workspaceExitBlocks ? "Changes are paused for this workspace" : "Access controlled by this workspace"} />
               {canShowWorkBudget ? <WorkBudgetPanel workspaceId={snapshot.workspaceId} workId={selectedWork.id} productId="ai_visibility" resourceKind={selectedWork.resourceKind} /> : null}
             </>
           ) : selectedWork?.productId === "research" && selectedWork.resourceKind === "experiment" ? (

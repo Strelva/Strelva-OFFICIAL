@@ -315,7 +315,7 @@ function emptyPlan(): WorkspaceStartPlan {
 }
 
 function helpPlan(request: string, context: WorkspaceStartContext, routes: readonly Exclude<WorkspaceStartRoute, "help">[] = []): WorkspaceStartPlan {
-  const reason = context.readOnly ? "This workspace is read-only. Switch to a workspace you own before preparing a plan." : undefined;
+  const reason = context.readOnly ? "This workspace is read-only. Switch to a workspace where you can start work before preparing a plan." : undefined;
   const multiOutcome = routes.length > 1;
   return {
     kind: "help",
@@ -364,7 +364,7 @@ function websiteServicePlan(request: string, context: WorkspaceStartContext): Wo
 }
 
 function blockedReason(context: WorkspaceStartContext, route: Exclude<WorkspaceStartRoute, "help">): string | undefined {
-  if (context.readOnly) return "This workspace is read-only. Switch to a workspace you own before starting new work.";
+  if (context.readOnly) return "This workspace is read-only. Switch to a workspace where you can start work before starting new work.";
   if (!supportedFlowMounted(context, route)) return "This flow is not available in the current workspace. Nothing has been started.";
   if (!hasAvailableProduct(context, route)) {
     if (route === "website") return "Website work is available here only for a connected managed website.";
