@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
 
 const json = (value: unknown, status = 200) => NextResponse.json(value, {
   status,
-  headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" },
+  headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer" },
 });
 
 async function actor() {

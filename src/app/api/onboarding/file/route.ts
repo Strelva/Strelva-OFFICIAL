@@ -13,6 +13,7 @@ function json(value: unknown, status = 200) {
     headers: {
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "no-referrer",
     },
   });
 }
@@ -63,6 +64,7 @@ export async function GET(request: Request) {
         "Content-Length": String(file.bytes.length),
         "Content-Disposition": `attachment; filename="${filename.fallback}"; filename*=UTF-8''${filename.encoded}`,
         "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer",
       },
     });
   } catch (error) {
