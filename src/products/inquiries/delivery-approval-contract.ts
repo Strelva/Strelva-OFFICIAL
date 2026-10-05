@@ -65,7 +65,19 @@ export interface InquiryMessageReviewExecution {
   reason?: string;
   acceptedAt?: string;
   providerMessageId?: string;
+  /** The delivery send attempt the provider accepted, for reconciliation. */
+  deliveryAttemptId?: string;
   verificationEvidence?: string[];
+}
+
+/**
+ * A second copy of an accepted send, kept on the governed event. Reconciliation
+ * uses it when the delivery checkpoint could not record the acceptance.
+ */
+export interface InquiryMessageAcceptanceEvidence {
+  providerMessageId?: string;
+  acceptedAt?: string;
+  deliveryAttemptId?: string;
 }
 
 export interface InquiryMessageReviewReconciliation {

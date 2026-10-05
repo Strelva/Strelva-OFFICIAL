@@ -39,6 +39,7 @@ import type {
 import { inquiryEmailReadiness } from "./email-consent";
 import { stateForReceive } from "./receive";
 import type {
+  InquiryMessageAcceptanceEvidence,
   InquiryMessageReviewAction,
   InquiryMessageReviewExecution,
   InquiryMessageReviewReconciliation,
@@ -934,6 +935,7 @@ export async function executeInquiryMessageReview(
     reason: digestUnknown ? MESSAGE_DIGEST_UNKNOWN : result.reason,
     acceptedAt: result.acceptedAt || checkpoint?.acceptedAt,
     providerMessageId: result.providerMessageId || checkpoint?.providerMessageId,
+    ...(result.attemptId || checkpoint?.attemptId ? { deliveryAttemptId: result.attemptId || checkpoint?.attemptId } : {}),
     verificationEvidence: result.verificationEvidence || checkpoint?.verificationEvidence,
   };
 }
@@ -966,6 +968,20 @@ export async function authorizeInquiryMessageReviewActor(input: {
   }
 }
 
+function acceptanceEvidenceFromEvent(event: UnifiedEvent): InquiryMessageAcceptanceEvidence | null {
+  const raw = (event.metadata?.execution as { acceptance?: unknown } | undefined)?.acceptance;
+  if (!raw || typeof raw !== "object") return null;
+  const row = raw as Record<string, unknown>;
+  const value = (field: unknown, max: number) => (typeof field === "string" && field.trim() ? field.trim().slice(0, max) : undefined);
+  const acceptedAt = value(row.acceptedAt, 80);
+  if (acceptedAt && !Number.isFinite(Date.parse(acceptedAt))) return null;
+  return {
+    providerMessageId: value(row.providerMessageId, 240),
+    acceptedAt,
+    deliveryAttemptId: value(row.deliveryAttemptId, 240),
+  };
+}
+
 export async function reconcileInquiryMessageReview(input: {
   tenantId: string;
   event: UnifiedEvent;
@@ -976,7 +992,28 @@ export async function reconcileInquiryMessageReview(input: {
   const metadata = metadataFromEvent(input.event);
   if (!metadata || input.event.tenantId !== input.tenantId) return { accepted: false, safeToResolve: false, receiptPersisted: false, verified: false, status: "unavailable", reason: "wrong_tenant" };
   const store = dependency(deps.store, createRedisInquiryDeliveryStore());
-  const checkpoint = await checkpointFor(store, input.tenantId, metadata.inquiryId, metadata.action);
+  let checkpoint = await checkpointFor(store, input.tenantId, metadata.inquiryId, metadata.action);
+  if (checkpoint?.status === "sending") {
+    // The provider may have accepted this attempt while the acceptance write
+    // failed. If the governed event kept a copy of that acceptance for this
+    // exact attempt, record it now. Reconciliation never sends.
+    const evidence = acceptanceEvidenceFromEvent(input.event);
+    if (evidence?.acceptedAt && evidence.deliveryAttemptId === checkpoint.attemptId) {
+      try {
+        checkpoint = await store.markAccepted({
+          tenantId: input.tenantId,
+          inquiryId: metadata.inquiryId,
+          action: metadata.action,
+          attemptId: checkpoint.attemptId,
+          acceptedAt: evidence.acceptedAt,
+          ...(evidence.providerMessageId ? { providerMessageId: evidence.providerMessageId } : {}),
+          ...(metadata.replyTo ? { replyTo: metadata.replyTo } : {}),
+        });
+      } catch {
+        return { accepted: true, safeToResolve: false, receiptPersisted: false, verified: false, status: "reconciliation_required", reason: "provider_acceptance_repair_unavailable" };
+      }
+    }
+  }
   const binding = sentMessageBinding(checkpoint, metadata.messageDigest);
   if (checkpointAccepted(checkpoint) && binding === "different") {
     return { accepted: false, safeToResolve: false, receiptPersisted: false, verified: false, status: "different_message_sent", reason: DIFFERENT_MESSAGE_SENT };
