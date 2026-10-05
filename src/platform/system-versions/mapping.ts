@@ -6,7 +6,7 @@
  * object without renaming anything that is already deployed.
  */
 import type { JsonObject } from "./compare";
-import type { SystemRef, SystemRevisionRef } from "./refs";
+import { projectedRevisionRef, type SystemRef, type SystemRevisionRef } from "./refs";
 import type { VersionContext } from "./types";
 import type { OfferingDefinitionView, OfferingInstallationRecord } from "@/platform/offerings/types";
 import type { AgencyManagedWebsiteDraftGrant } from "@/platform/offerings/agency-website-draft-contracts";
@@ -38,11 +38,10 @@ export interface SourceRevisionProjection {
 /** An offering definition is a Strelva-authored source System revision. */
 export function offeringDefinitionAsSource(definition: OfferingDefinitionView): SourceRevisionProjection {
   return {
-    source: {
-      businessId: STRELVA_AUTHOR_BUSINESS_ID,
-      systemId: `offering:${definition.id}`,
-      revision: revisionFromSemver(definition.version),
-    },
+    source: projectedRevisionRef(
+      { businessId: STRELVA_AUTHOR_BUSINESS_ID, systemId: `offering:${definition.id}` },
+      revisionFromSemver(definition.version),
+    ),
     label: definition.version,
     // The shareable part only: copy, scopes, surfaces and configuration shape.
     definition: JSON.parse(JSON.stringify({
@@ -82,11 +81,10 @@ export interface VersionProjection {
 export function offeringInstallationAsVersion(installation: OfferingInstallationRecord): VersionProjection {
   return {
     version: { businessId: installation.businessId, systemId: `offering-installation:${installation.id}` },
-    source: {
-      businessId: STRELVA_AUTHOR_BUSINESS_ID,
-      systemId: `offering:${installation.definitionId}`,
-      revision: revisionFromSemver(installation.definitionVersion),
-    },
+    source: projectedRevisionRef(
+      { businessId: STRELVA_AUTHOR_BUSINESS_ID, systemId: `offering:${installation.definitionId}` },
+      revisionFromSemver(installation.definitionVersion),
+    ),
     context: null,
     overridePaths: Object.keys(installation.configuration).sort().map((key) => `configuration.${key}`),
     bindings: installation.nativeResources.map((resource) => ({
@@ -126,11 +124,10 @@ export function patternInstallationAsVersion(installation: PatternInstallationLi
 } {
   return {
     version: { businessId: installation.businessId, systemId: `inquiry:${installation.capabilityId}` },
-    source: {
-      businessId: installation.sourceBusinessId,
-      systemId: `inquiry:${installation.sourceCapabilityId}`,
-      revision: installation.sourceVersion,
-    },
+    source: projectedRevisionRef(
+      { businessId: installation.sourceBusinessId, systemId: `inquiry:${installation.sourceCapabilityId}` },
+      installation.sourceVersion,
+    ),
     context: installation.sourceBusinessId === installation.businessId
       ? null
       : { kind: "agency_client", label: `Installed from ${installation.sourceBusinessId}` },

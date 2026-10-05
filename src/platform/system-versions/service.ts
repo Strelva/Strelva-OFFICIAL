@@ -108,11 +108,11 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
 
   function compareWith(lineage: VersionLineage, revision: SourceRevision): ImprovementComparison & { upstreamPaths: string[] } {
     const local = working(lineage);
-    if (revision.source.revision <= lineage.baseline.revision) {
+    if (revision.source.number <= lineage.baseline.revision) {
       return {
         versionId: lineage.id,
         baselineRevision: lineage.baseline.revision,
-        sourceRevision: revision.source.revision,
+        sourceRevision: revision.source.number,
         summary: revision.summary,
         status: "up_to_date",
         changes: [],
@@ -128,7 +128,7 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
     return {
       versionId: lineage.id,
       baselineRevision: lineage.baseline.revision,
-      sourceRevision: revision.source.revision,
+      sourceRevision: revision.source.number,
       summary: revision.summary,
       status: result.conflicts.length > 0 || missingBindings.length > 0 ? "blocked" : "auto_applicable",
       changes: result.changes,
@@ -157,7 +157,12 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       if (!store.getSource(input.source)) store.putSource({ source: input.source, sharedWith: [], createdAt: now() });
       const previous = store.listRevisions(input.source).at(-1);
       const revision: SourceRevision = {
-        source: { ...input.source, revision: (previous?.source.revision ?? 0) + 1 },
+        source: {
+          businessId: input.source.businessId,
+          systemId: input.source.systemId,
+          revisionId: id("source_revision"),
+          number: (previous?.source.number ?? 0) + 1,
+        },
         ...(input.label ? { label: input.label } : {}),
         summary: text(input.summary, "summary", 500),
         definition: cloneJson(input.definition),
@@ -196,8 +201,10 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       if (sameSystem(input.source, input.version)) throw new VersionValidationError("A Version needs its own System identity.");
       if (!VERSION_CONTEXT_KINDS.includes(input.context.kind)) throw new VersionValidationError("Choose a supported Version context.");
       if (!sourceVisibleTo(input.source, input.version.businessId)) throw new VersionAccessError("That source is not shared with this business.");
-      const revision = store.getRevision(input.source, input.source.revision);
-      if (!revision) throw new VersionValidationError("That source revision does not exist.");
+      const revision = store.getRevision(input.source, input.source.number);
+      if (!revision || revision.source.revisionId !== input.source.revisionId) {
+        throw new VersionValidationError("That source revision does not exist.");
+      }
       if (store.findLineageByVersion(input.version)) throw new VersionValidationError("That System is already a Version of a source.");
       const at = now();
       const lineage: VersionLineage = {
@@ -205,7 +212,7 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
         version: { businessId: input.version.businessId, systemId: input.version.systemId },
         source: { businessId: input.source.businessId, systemId: input.source.systemId },
         context: { kind: input.context.kind, label: text(input.context.label, "context label") },
-        baseline: { revision: revision.source.revision, definition: cloneJson(revision.definition) },
+        baseline: { revision: revision.source.number, definition: cloneJson(revision.definition) },
         overrides: [],
         bindings: [],
         localData: {},
@@ -296,7 +303,7 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       if (!sourceVisibleTo(lineage.source, lineage.version.businessId)) return [];
       return store
         .listRevisions(lineage.source)
-        .filter((revision) => revision.source.revision > lineage.baseline.revision)
+        .filter((revision) => revision.source.number > lineage.baseline.revision)
         .map((revision) => {
           const { upstreamPaths: _paths, ...comparison } = compareWith(lineage, revision);
           return comparison;
@@ -353,9 +360,9 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       }
       const next: VersionLineage = {
         ...lineage,
-        baseline: { revision: revision.source.revision, definition: cloneJson(revision.definition) },
+        baseline: { revision: revision.source.number, definition: cloneJson(revision.definition) },
         overrides,
-        decisions: [...lineage.decisions, { sourceRevision: revision.source.revision, choice: "adopted", resolutions, by: actor.userId, at }],
+        decisions: [...lineage.decisions, { sourceRevision: revision.source.number, choice: "adopted", resolutions, by: actor.userId, at }],
       };
       // Every override path is still writable on the new baseline.
       working(next);

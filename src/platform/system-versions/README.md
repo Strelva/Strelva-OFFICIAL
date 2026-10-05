@@ -8,7 +8,8 @@ its own release history. A Version is not a point in time.
 ## The model
 
 - **Source revision.** The source business publishes an immutable shareable
-  definition (shape and rules). Records, bindings, grants and secrets are
+  definition (shape and rules), identified by the spine's `SystemRevisionRef`
+  (`revisionId` plus an ordering `number`). Records, bindings, grants and secrets are
   rejected at publish (`assertShareableDefinition`).
 - **Version.** `createVersion` gives the descendant its own `SystemRef`, owned
   by the descendant business. Only the definition is copied. Bindings, data and
@@ -62,7 +63,7 @@ data). Bindings are never shown outside the owning business.
 | Today | Reads as |
 | --- | --- |
 | Inquiry `PatternInstallation` (`installed` / `update_available` / `conflicted`) | The closest existing lineage. `sourceVersion` = baseline, `targetVersion` = Version release. This module builds on its compare rule |
-| Offering definition `id@version` | Strelva-authored source System, revision from semver |
+| Offering definition `id@version` | Strelva-authored source System, revision number from semver. Projections with no stored revision get the deterministic `revisionId` `<systemId>@<number>` (`projectedRevisionRef`) |
 | Offering installation | Version owned by `businessId`; `configuration` = overrides, `nativeResources` = bindings, `active` = release 1 |
 | Multi-site account (Twin Trees) | One website System, one location Version per tenant |
 | Agency website draft grant | A **Possibility** on the client's own System, prepared by the agency. Not a Version. An upstream improvement offered to a client also arrives as a Possibility there |
@@ -88,6 +89,7 @@ added beside them; nothing is renamed:
 
 - Postgres storage. `store.ts` is the port plus the in-memory reference. The
   migration waits on lane B's systems tables (slot `20261004122000`).
-- Real membership, connection ownership and `SystemRef` come from
-  `src/platform/workspaces`, the connections owner and `src/platform/systems`.
+- `SystemRef` and `SystemRevisionRef` are the spine's (`src/platform/systems`).
+  Source revisions are not yet stored as `SystemRevision` rows; real
+  membership and connection ownership still come through local ports.
 - Collection/franchise Versions across several Systems.

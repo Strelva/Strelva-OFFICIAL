@@ -37,11 +37,11 @@ export function createInMemoryVersionStore(): VersionStore {
     getSource: (source) => cloneJson(sources.get(systemKey(source)) ?? null),
     putSource: (record) => void sources.set(systemKey(record.source), cloneJson(record)),
     getRevision: (source, revision) =>
-      cloneJson((revisions.get(systemKey(source)) ?? []).find((item) => item.source.revision === revision) ?? null),
+      cloneJson((revisions.get(systemKey(source)) ?? []).find((item) => item.source.number === revision) ?? null),
     listRevisions: (source) => cloneJson(revisions.get(systemKey(source)) ?? []),
     insertRevision(revision) {
       const list = revisions.get(systemKey(revision.source)) ?? [];
-      if (list.some((item) => item.source.revision === revision.source.revision)) {
+      if (list.some((item) => item.source.number === revision.source.number)) {
         throw new VersionStaleError("That source revision was already published.");
       }
       list.push(cloneJson(revision));

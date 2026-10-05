@@ -52,7 +52,7 @@ describe("existing objects as source Systems and Versions", () => {
     for (const definition of listOfferingDefinitions()) {
       const source = offeringDefinitionAsSource(definition);
       expect(source.source.businessId).toBe(STRELVA_AUTHOR_BUSINESS_ID);
-      expect(semverFromRevision(source.source.revision)).toBe(definition.version);
+      expect(semverFromRevision(source.source.number)).toBe(definition.version);
       expect(() => assertShareableDefinition(source.definition)).not.toThrow();
       expect(source.requires.bindingKinds.length).toBeGreaterThan(0);
     }
@@ -97,7 +97,7 @@ describe("existing objects as source Systems and Versions", () => {
       targetVersion: 7,
       status: "conflicted",
     });
-    expect(version.source).toEqual({ businessId: "biz_northside", systemId: "inquiry:cap_source", revision: 3 });
+    expect(version.source).toEqual({ businessId: "biz_northside", systemId: "inquiry:cap_source", revisionId: "inquiry:cap_source@3", number: 3 });
     expect(version.version.businessId).toBe("biz_lakeside");
     expect(version.context?.kind).toBe("agency_client");
     expect(version.currentRelease).toBe(7);

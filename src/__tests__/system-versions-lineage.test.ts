@@ -246,10 +246,16 @@ describe("System Versions: one agency source, two client Versions", () => {
 
     const stranger: VersionActor = { userId: "u_other", memberships: [{ businessId: "biz_other", role: "owner" }] };
     expect(() => versions.createVersion(stranger, {
-      source: { ...SOURCE, revision: 1 },
+      source: { ...SOURCE, revisionId: "source_revision_0001", number: 1 },
       version: { businessId: "biz_other", systemId: "sys_other" },
       context: { kind: "location", label: "Rochester" },
     })).toThrow(VersionAccessError);
+    // The revision number alone is not enough: the ref must name that exact revision.
+    expect(() => versions.createVersion(mooneyOwner, {
+      source: { ...SOURCE, revisionId: "not_that_revision", number: 1 },
+      version: { businessId: MOONEY, systemId: "sys_mooney_second" },
+      context: { kind: "location", label: "Amherst" },
+    })).toThrow(VersionValidationError);
 
     versions.unshareSource(agencyOwner, SOURCE, LAKESIDE);
     versions.publishSourceRevision(agencyOwner, { source: SOURCE, definition: withPath(intakeV1, (copy) => { copy.extra = true; }), requires: { bindingKinds: ["email_sender"] }, summary: "Extra" });
