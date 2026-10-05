@@ -1,5 +1,6 @@
 import type { InquiryDeliveryResult } from "./delivery-types";
 import type { InquiryDeliveryAction, InquiryDeliveryStatus } from "./delivery-types";
+import type { InquiryMessageDelivery } from "./message-outcome";
 
 /** The only outbound actions exposed by the per-message review boundary. */
 export type InquiryMessageReviewAction = Extract<
@@ -47,6 +48,10 @@ export interface InquiryMessageReviewOutcome {
   verificationEvidence?: string[];
   /** False for an accepted or ambiguous provider write. */
   retryable: boolean;
+  /** What happened to the message after the provider took it (see message-outcome.ts). */
+  delivery?: InquiryMessageDelivery;
+  /** The owner may prepare a new review. Only a rejected message allows one. */
+  retryAllowed?: boolean;
 }
 
 export interface InquiryMessageReviewExecution {

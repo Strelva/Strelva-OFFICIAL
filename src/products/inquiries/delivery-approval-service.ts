@@ -38,6 +38,7 @@ import type {
 } from "./delivery";
 import { inquiryEmailReadiness } from "./email-consent";
 import { stateForReceive } from "./receive";
+import { classifyInquiryMessage } from "./message-outcome";
 import type {
   InquiryMessageReviewAction,
   InquiryMessageReviewExecution,
@@ -501,15 +502,7 @@ export async function prepareInquiryMessageReviewWithDependencies(
 }
 
 function checkpointAccepted(checkpoint: InquiryDeliveryCheckpoint | null): boolean {
-  if (!checkpoint) return false;
-  return Boolean(
-    checkpoint.acceptedAt || checkpoint.providerMessageId ||
-    checkpoint.status === "accepted" || checkpoint.status === "accepted_unverified" ||
-    checkpoint.status === "verified" || checkpoint.status === "delivered" ||
-    checkpoint.status === "bounced" || checkpoint.status === "deferred" ||
-    checkpoint.status === "suppressed" ||
-    (checkpoint.status === "failed" && checkpoint.providerOutcome),
-  );
+  return Boolean(checkpoint) && classifyInquiryMessage(checkpoint!).accepted;
 }
 
 function outcomeFromCheckpoint(
@@ -530,6 +523,11 @@ function outcomeFromCheckpoint(
                 status === "accepted" || status === "accepted_unverified" ? "accepted_unverified" :
                   status === "sending" || status === "unknown" ? "reconciliation_required" :
                     fallback?.status === "failed" ? "failed" : "unavailable";
+  // An unsettled attempt stays "possibly accepted" even when the checkpoint
+  // alone would read as a rejection.
+  const classification = outputStatus === "reconciliation_required" && !checkpointAccepted(checkpoint)
+    ? classifyInquiryMessage({ status: outputStatus })
+    : classifyInquiryMessage(checkpoint ?? { status: outputStatus });
   return {
     inquiryId,
     action,
@@ -538,7 +536,9 @@ function outcomeFromCheckpoint(
     ...(checkpoint?.acceptedAt ? { acceptedAt: checkpoint.acceptedAt } : {}),
     ...(checkpoint?.providerMessageId ? { providerMessageId: checkpoint.providerMessageId } : {}),
     ...(checkpoint?.verificationEvidence ? { verificationEvidence: checkpoint.verificationEvidence } : {}),
-    retryable: outputStatus === "failed" ? Boolean(checkpoint?.retryable) : false,
+    retryable: outputStatus === "failed" && classification.retryAllowed ? Boolean(checkpoint?.retryable) : false,
+    delivery: classification.delivery,
+    retryAllowed: classification.retryAllowed,
   };
 }
 
