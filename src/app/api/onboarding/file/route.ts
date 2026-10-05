@@ -49,9 +49,9 @@ export async function GET(request: Request) {
   if ((origin && origin !== new URL(request.url).origin) || request.headers.get("sec-fetch-site") === "cross-site") {
     return json({ error: "Open Strelva directly to download a private file." }, 403);
   }
-  const current = await actor();
-  if (!current) return json({ error: "Sign in to download a private onboarding file." }, 401);
   try {
+    const current = await actor();
+    if (!current) return json({ error: "Sign in to download a private onboarding file." }, 401);
     const workId = new URL(request.url).searchParams.get("workId") ?? "";
     const file = await readOnboardingOriginalFile(current, workId);
     const filename = safeFilename(file.provenance.originalName);

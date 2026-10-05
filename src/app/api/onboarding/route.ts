@@ -48,9 +48,9 @@ function sameOrigin(request: Request): boolean {
 
 export async function GET(request: Request) {
   if (!workspaceReleaseEnabled()) return json({ error: "Workspaces are not enabled." }, 503);
-  const current = await actor();
-  if (!current) return json({ error: "Sign in to open onboarding." }, 401);
   try {
+    const current = await actor();
+    if (!current) return json({ error: "Sign in to open onboarding." }, 401);
     const params = new URL(request.url).searchParams;
     const documentWorkId = params.get("documentWorkId");
     if (documentWorkId) return json(await readOnboardingUpload(current, documentWorkId));
@@ -72,9 +72,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!workspaceReleaseEnabled()) return json({ error: "Workspaces are not enabled." }, 503);
   if (!sameOrigin(request)) return json({ error: "Open Strelva directly to change onboarding." }, 403);
-  const current = await actor();
-  if (!current) return json({ error: "Sign in to change onboarding." }, 401);
   try {
+    const current = await actor();
+    if (!current) return json({ error: "Sign in to change onboarding." }, 401);
     if (!request.headers.get("content-type")?.startsWith("application/json")) return json({ error: "Send a JSON onboarding request." }, 415);
     const body = z.discriminatedUnion("action", [
       z.object({ action: z.literal("create"), input: z.unknown() }).strict(),

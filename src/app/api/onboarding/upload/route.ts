@@ -33,9 +33,9 @@ export async function POST(request: Request) {
   if (!workspaceReleaseEnabled()) return json({ error: "Workspaces are not enabled." }, 503);
   const origin = request.headers.get("origin");
   if (origin !== new URL(request.url).origin || request.headers.get("sec-fetch-site") === "cross-site") return json({ error: "Open Strelva directly to upload a private onboarding file." }, 403);
-  const current = await actor();
-  if (!current) return json({ error: "Sign in to upload a private onboarding file." }, 401);
   try {
+    const current = await actor();
+    if (!current) return json({ error: "Sign in to upload a private onboarding file." }, 401);
     const contentType = request.headers.get("content-type") ?? "";
     if (!contentType.startsWith("multipart/form-data")) return json({ error: "Send a multipart file upload." }, 415);
     // Bound the bytes before multipart parsing: reject a declared oversize

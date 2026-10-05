@@ -6,9 +6,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   if (!workspaceReleaseEnabled()) return workspaceJson({ error: "Workspace exit is not available." }, 503);
-  const actor = await workspaceHttpActor();
-  if (!actor) return workspaceJson({ error: "Sign in with a confirmed email to review workspace exit." }, 401);
   try {
+    const actor = await workspaceHttpActor();
+    if (!actor) return workspaceJson({ error: "Sign in with a confirmed email to review workspace exit." }, 401);
     const workspaceId = new URL(request.url).searchParams.get("workspaceId") || "";
     return workspaceJson(await readWorkspaceExit(actor, workspaceId));
   } catch (error) {
@@ -20,9 +20,9 @@ export async function POST(request: Request) {
   if (!workspaceReleaseEnabled()) return workspaceJson({ error: "Workspace exit is not available." }, 503);
   const guard = workspaceWriteGuard(request);
   if (guard) return guard;
-  const actor = await workspaceHttpActor();
-  if (!actor) return workspaceJson({ error: "Sign in with a confirmed email to stop future workspace work." }, 401);
   try {
+    const actor = await workspaceHttpActor();
+    if (!actor) return workspaceJson({ error: "Sign in with a confirmed email to stop future workspace work." }, 401);
     const body = await readWorkspaceBody(request, 20_000);
     return workspaceJson(await completeWorkspaceExit(actor, body));
   } catch (error) {
