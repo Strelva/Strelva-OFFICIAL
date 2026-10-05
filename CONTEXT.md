@@ -11,6 +11,54 @@ workspace. See the [release entry point](./docs/product/strelva-reborn.md). The 
 [strelvav2](./docs/product/strelvav2.md) release shipped the workspace on Sept 30.
 This branch is for internal work and is not approved for production.
 
+## Product model
+
+Selected by Jacob on October 4, 2026
+([ADR 0011, proposed](../docs/adr/0011-organize-strelva-around-systems-connections-possibilities-versions.md)).
+Customers see **Systems**, **Connections**, **Possibilities** and
+**Versions**. The verbs are Make, Connect, Explore, Make real and Version.
+This is direction. No System runtime, table or screen is shipped yet, and
+nothing here proves demand, delivery cost or pricing.
+
+Walk it with The Mooney Firm. Its website is a **System**: it stays the same
+System through a rebuild, a new domain or a new booking section. It has
+**Connections**: it reads hours and services from the business record, appears
+on attymooney.com, and could act on the firm's Google Business profile once
+that access is granted. A **Possibility** could be a consult-booking flow
+Strelva builds beside the current contact path, which the owner can open, try
+and compare. **Make real** turns it on. If the website change lands and the
+calendar grant fails, the owner sees exactly that, and the part that landed
+stays. If the firm opened a second office, a **Version** would be the same
+site adapted for it, with its own hours, people and accounts.
+
+Five rules hold underneath. They are proposed records in the product ledger
+(`PRODUCT_MODEL.md`, untracked in the main checkout) and must be proven before
+any of them is called shipped:
+
+1. **Identity outlives the build** (`RULE_SYSTEM_OUTPUT_IDENTITY`). A System
+   keeps its ID while it changes. Things it already issued, like an accepted
+   proposal, keep their own terms and never rewrite.
+2. **Connections are contracts** (`RULE_SYSTEM_CONNECTION_CONTRACT`). Each
+   declares direction, authority, source of truth, freshness and what happens
+   on failure. Knowing about Stripe is not permission to charge.
+3. **Possibilities are isolated** (`RULE_POSSIBILITY_ISOLATION`). They pin
+   the baselines they change, use isolated data and effects, and go stale
+   when the System under them changes. Make real goes through the same
+   approvals, governance and stop points as any other change.
+4. **Versions are context, not time** (`RULE_CONTEXT_VERSION_IDENTITY`). A
+   Version has its own releases. Across businesses, each Version is that
+   business's own System with its own data, credentials and grants; nothing is
+   shared implicitly.
+5. **Lifecycle is not health** (`RULE_SYSTEM_PAUSE_HEALTH`). Draft, Live and
+   Paused say what the business intends. Health and needed decisions are
+   tracked separately. Pausing keeps records and commitments already made.
+
+Capabilities, offerings, methods and installations below are the machinery
+and packaging under Systems, not what a customer navigates. Open questions:
+where a System ends and a new one begins, how Versions map onto today's
+release fields, what Make real guarantees after a partial failure, and whether
+any of this makes customer work easier at a cost we can carry.
+
 ## Role
 
 REB owns the Managed Websites control plane and the current local implementation
@@ -91,6 +139,26 @@ authority and production restrictions remain unchanged.
 
 ## Language
 
+**System:** Something a business made in Strelva that works, such as a
+website, proposal, booking page, intake flow or internal app. Its identity
+survives changes to how it is built. Draft, Live or Paused; health is separate.
+_Avoid_: app, product, module, project (as the customer noun)
+
+**Connection:** What a System reads, acts on, appears in, shares with, depends
+on or is triggered by: another System, business facts, a person, an outside
+account, a domain. An account binding is one kind; a Connection never grants
+authority by itself.
+_Avoid_: integration (for the customer noun)
+
+**Possibility:** A working alternative to one or several Systems that a person
+can open, use and compare. A suggestion alone is not a Possibility. **Make
+real** turns it on.
+_Avoid_: idea, recommendation, experiment (for the customer noun)
+
+**Version:** A System adapted to a different context (market, segment, agency
+client, location) with lineage to its source. Not an edit or a deploy.
+_Avoid_: release, revision, copy, fork
+
 **Business:** The customer organization whose work and records must remain
 separate from other businesses. A business is not a website tenant, payer or
 agency merely because the same person can access them.
@@ -102,13 +170,14 @@ _Avoid_: CRM, knowledge graph, tenant config
 
 **Capability:** Something Strelva's software can do on a business record, such
 as answering requests, taking bookings or publishing a website. Businesses
-don't buy capabilities directly.
+don't buy capabilities directly; Systems are built from them.
 _Avoid_: module, product, executable, feature, app (for first-party capabilities)
 
 **Offering:** An outcome a business turns on, named the way the business would
 say it ("Never miss a new client"), delivered by one or more capabilities
 under stated limits. Human help is the exception path inside it, not the
-offering itself.
+offering itself. Since October 4, packaging for a System, not the primary
+customer noun.
 _Avoid_: item, shelf item, package, product, service
 
 **Responsibility:** A condition an offering keeps true over time under stated
@@ -134,7 +203,8 @@ holds no business authority.
 _Avoid_: bot, AI customer
 
 **Installation:** An offering configured for one business, with its selected
-version and connected resources. Installation does not grant new authority or
+version and connected resources. Internal binding under a System or Version;
+not a customer noun. Installation does not grant new authority or
 prove that a human provider accepted service.
 
 **Assignment:** A person's or agent's explicit permission to operate specified

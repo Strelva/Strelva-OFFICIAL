@@ -3,6 +3,10 @@
 Status: **normative**
 Updated: 2026-09-11
 
+> **October 4, 2026:** customer names now follow Systems, Connections,
+> Possibilities and Versions ([CONTEXT.md](../../CONTEXT.md#language)). This
+> page stays normative for deployed compatibility vocabulary and boundaries.
+
 The [inquiry-first product specification](../capabilities/inquiries/inquiry-first-product-spec-2026-09-11.md)
 is authoritative for the selected local migration. It supersedes the generic
 conversational experience and surface examples below where they conflict.

@@ -5,6 +5,13 @@ Kind: research input, not a decision. Proposes the primitive set for Strelva
 Reborn and beyond. Decisions land in [product-ontology](../architecture/product-ontology.md)
 and an ADR once Jacob picks.
 
+> **Superseded for customer nouns, October 4, 2026.** Jacob picked Systems,
+> Connections, Possibilities and Versions
+> ([CONTEXT.md](../../CONTEXT.md#product-model), proposed
+> [ADR 0011](../../../docs/adr/0011-organize-strelva-around-systems-connections-possibilities-versions.md)).
+> The record, ledger, grant and receipt machinery here still describes the
+> layer underneath.
+
 ## What Strelva is reaching for
 
 Strelva is the software department for a small business. One record of the
