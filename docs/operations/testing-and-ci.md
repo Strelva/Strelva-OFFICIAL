@@ -101,6 +101,18 @@ record the client revision and result. A production checklist may make external
 writes even when its name says “check”; inspect it before running it against a
 live environment.
 
+## Inquiry delivery Lua check
+
+`pnpm check:inquiry-lua` runs the inquiry delivery store contract
+(`src/__tests__/inquiry-delivery-store-contract.test.ts`) against the real Lua
+scripts in `src/products/inquiries/delivery-store.ts`. It starts a throwaway
+`redis-server` on a private unix socket with no TCP port and no persistence,
+and removes it on exit. It never connects to a shared or production Redis.
+`pnpm test` runs the same contract against the memory store only, because CI has
+no Redis. It needs `redis-server` on `PATH` (`brew install redis`). Run it when
+a delivery-store script or the stored checkpoint shape changes. A green run is
+local proof only.
+
 ## Workspace schema checks
 
 `pnpm check:workspace-sql` builds the current workspace and recovery schema in

@@ -29,6 +29,7 @@
     "check:boundaries": "tsx scripts/check-product-boundaries.ts",
     "check:workspace-sql": "bash scripts/check-workspace-sql.sh",
     "check:workspace-upgrade": "bash scripts/check-workspace-upgrade.sh",
+    "check:inquiry-lua": "bash scripts/check-inquiry-lua.sh",
     "check:workspace-target": "node scripts/check-workspace-target.mjs",
     "test:workspace-target": "node --test scripts/tests/workspace-target.node-test.mjs",
     "check:release-one": "bash scripts/check-release-one.sh",
