@@ -1,6 +1,10 @@
 import { z } from "zod";
-import { scheduleSchema, scheduleCommandSchema, reservationSchema, createScheduleSchema } from "./contracts";
-export { scheduleSchema, scheduleCommandSchema } from "./contracts";
+import { scheduleSchema, scheduleCommandSchema, scheduleLifecycleCommandSchema, reservationSchema, createScheduleSchema } from "./contracts";
+import { assertWorkspaceCalendarManager } from "./calendar/repository";
+import { SCHEDULE_PAUSED_MESSAGE } from "./lifecycle";
+export { scheduleSchema, scheduleCommandSchema, scheduleLifecycleCommandSchema } from "./contracts";
+export type { ScheduleLifecycle } from "./contracts";
+export { SCHEDULE_PAUSED_MESSAGE, scheduleLifecycle, scheduleObligations, type ScheduleHold, type ScheduleObligations } from "./lifecycle";
 import { WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { advance, boundedStore, initial, readBounded, type BoundedStore } from "@/platform/bounded-work/repository";
 import { createCalendarSchedulingService } from "./calendar/service";
@@ -18,9 +22,15 @@ export interface SchedulingProvider {
 }
 export interface SchedulingServiceDeps {
   workspaceExitCompleted?: (workspaceId: string) => Promise<boolean>;
+  /** Pause and resume change what the business accepts, so only a workspace
+   * owner or administrator may do it. Defaults to the calendar manager rule. */
+  assertManager?: (actor: WorkspaceActor, workspaceId: string) => Promise<void>;
+  now?: () => Date;
 }
 export function createSchedulingService(store: BoundedStore = boundedStore, dependencies: SchedulingServiceDeps = {}) {
   const workspaceExitCompleted = dependencies.workspaceExitCompleted ?? readWorkspaceExitCompleted;
+  const assertManager = dependencies.assertManager ?? assertWorkspaceCalendarManager;
+  const now = dependencies.now ?? (() => new Date());
   const read = (actor: WorkspaceActor, id: string) => readBounded(store, actor, id, "scheduling", scheduleSchema);
   async function save(actor: WorkspaceActor, work: Awaited<ReturnType<typeof read>>, payload: z.infer<typeof scheduleSchema>) {
     const saved = await store.update(actor, work, work.payload.revision, scheduleSchema.parse(payload));
@@ -35,7 +45,21 @@ export function createSchedulingService(store: BoundedStore = boundedStore, depe
       return { ...saved, payload: scheduleSchema.parse(saved.payload) };
     },
     async command(actor: WorkspaceActor, id: string, raw: unknown) {
-      const work = await read(actor, id); await store.member(actor, work.workspaceId); const command = scheduleCommandSchema.parse(raw);
+      const work = await read(actor, id); await store.member(actor, work.workspaceId);
+      const lifecycle = scheduleLifecycleCommandSchema.safeParse(raw);
+      if (lifecycle.success) {
+        // Lifecycle only: no reservation is created, removed, or ended here.
+        await assertManager(actor, work.workspaceId);
+        if (lifecycle.data.kind === "pause") {
+          if (work.payload.pause) return work; // a second pause keeps the first time and reason
+          const next = advance(work.payload, lifecycle.data.expectedRevision, "pause", actor);
+          return save(actor, work, { ...next, pause: { pausedAt: now().toISOString(), pausedBy: actor.userId, reason: lifecycle.data.reason } });
+        }
+        if (!work.payload.pause) return work;
+        const { pause: _pause, ...next } = advance(work.payload, lifecycle.data.expectedRevision, "resume", actor);
+        return save(actor, work, next);
+      }
+      const command = scheduleCommandSchema.parse(raw);
       const prior = work.payload.reservations.find(value => value.requestId === command.requestId);
       if (command.kind === "reserve" && prior) {
         if (prior.start !== command.start || prior.end !== command.end || prior.title !== command.title) throw new WorkspaceConflictError("This request identifier belongs to a different reservation.");
@@ -47,6 +71,11 @@ export function createSchedulingService(store: BoundedStore = boundedStore, depe
       }
       if ((command.kind === "reserve" || command.kind === "reschedule") && await workspaceExitCompleted(work.workspaceId)) {
         throw new WorkspaceConflictError("New scheduling work is stopped for this workspace. Existing reservations remain available for review.");
+      }
+      // Paused: no new reservation and no new time. Cancellation stays open,
+      // and exact replays of an accepted reserve were answered above.
+      if ((command.kind === "reserve" || command.kind === "reschedule") && work.payload.pause) {
+        throw new WorkspaceConflictError(SCHEDULE_PAUSED_MESSAGE);
       }
       if (command.kind === "reschedule") {
         if (!prior) throw new WorkspaceConflictError("Reservation not found.");
