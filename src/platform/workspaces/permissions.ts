@@ -45,7 +45,7 @@ const OWNER: readonly WorkspacePermission[] = [
   "manage_members",
 ];
 
-/** No Strelva-staff entry exists, by design (ADR 0001). */
+/** No Strelva-staff entry exists, by design (docs/architecture/auth-tenancy.md). */
 export const WORKSPACE_ROLE_PERMISSIONS: Readonly<Record<WorkspaceRole, readonly WorkspacePermission[]>> = {
   owner: OWNER,
   admin: MANAGER,

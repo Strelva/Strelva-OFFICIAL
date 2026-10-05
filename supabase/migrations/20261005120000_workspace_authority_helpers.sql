@@ -11,7 +11,7 @@
 --
 -- Owner-only and the older owner/admin rules keep their own checks inside
 -- their existing RPCs and triggers; the names are listed here so the table is
--- complete. There is no Strelva-staff bypass (ADR 0001): only a direct
+-- complete. There is no Strelva-staff bypass (docs/architecture/auth-tenancy.md): only a direct
 -- workspace membership satisfies a permission. An unknown permission name is
 -- an error, never a silent deny or allow.
 --
