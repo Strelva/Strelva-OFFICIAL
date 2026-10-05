@@ -59,6 +59,10 @@ where a System ends and a new one begins, how Versions map onto today's
 release fields, what Make real guarantees after a partial failure, and whether
 any of this makes customer work easier at a cost we can carry.
 
+[docs/product/systems-transition.md](./docs/product/systems-transition.md)
+maps today's code onto Systems, Connections, Possibilities and Versions:
+where each existing module lands and what the inventory found.
+
 ## Role
 
 REB owns the Managed Websites control plane and the current local implementation
