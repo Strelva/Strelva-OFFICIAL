@@ -5,7 +5,9 @@ import { applicationSchema, applicationSpecSchema } from "@/products/application
 import type { ServiceRequest } from "@/platform/service-requests";
 import type { z } from "zod";
 
-export const PREVIEW_SCENARIOS = ["free", "paid", "managed", "business", "agency", "enterprise", "empty", "read-only", "unavailable", "signed-out", "website-audit", "recovery"] as const;
+import { SYSTEMS_PREVIEW_SCENARIOS, createSystemsPreviewRequest, isSystemsPreviewScenario } from "./systems-fixture";
+
+export const PREVIEW_SCENARIOS = ["free", "paid", "managed", "business", "agency", "enterprise", "empty", "read-only", "unavailable", "signed-out", "website-audit", "recovery", ...SYSTEMS_PREVIEW_SCENARIOS] as const;
 export type PreviewScenario = typeof PREVIEW_SCENARIOS[number];
 export function previewScenario(value: string | undefined): PreviewScenario {
   return PREVIEW_SCENARIOS.includes(value as PreviewScenario) ? value as PreviewScenario : "free";
@@ -98,6 +100,7 @@ function sampleWork(workspaceId: string, title = "Harbor Dental", id = "44444444
 }
 
 export function createPreviewRequest(scenario: PreviewScenario, options: { installedStaffRequest?: boolean; seededRequests?: boolean } = {}): typeof fetch {
+  if (isSystemsPreviewScenario(scenario)) return createSystemsPreviewRequest(scenario);
   const workspaceId = scenario === "agency" ? AGENCY : scenario === "read-only" || scenario === "business" ? CUSTOMER : PERSONAL;
   const base: WorkspaceSnapshot = {
     actor: { email: "alex@example.com", localPreview: true },

@@ -24,6 +24,7 @@ import {
   savePublicAiVisibilityResult,
 } from "@/products/ai-visibility/server";
 import { listManagedPresenceWork } from "@/products/managed-presence/server";
+import { publicHostname } from "@/products/managed-presence/hostname";
 import { resolveHomeFinderPreviewHref } from "@/products/home-finder/server";
 import { inquiryReleaseEnabled } from "@/products/inquiries";
 import { parseTrackerWorkPayload, presentTrackerHandoffPreview } from "@/products/tracker";
@@ -131,7 +132,8 @@ function presentManagedWorkListing(value: unknown): { managedWork: ManagedWork[]
       const relationship = item.relationship === "enterprise" || item.relationship === "client"
         ? item.relationship : null;
       if (!id || !title || !href || item.productId !== "managed_presence" || !relationship) return [];
-      return [{ id, title, href, productId: "managed_presence", relationship }];
+      const domain = publicHostname(item.domain);
+      return [{ id, title, href, productId: "managed_presence", relationship, ...(domain ? { domain } : {}) }];
     })
     : [];
   return { managedWork, unavailable: source.unavailable === true || !Array.isArray(source.managedWork) };

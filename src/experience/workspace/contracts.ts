@@ -85,6 +85,10 @@ export interface ManagedWork {
   href: string;
   productId: "managed_presence";
   relationship: "client" | "enterprise";
+  /** Public hostname of the live site, when the tenant records one. Additive. */
+  domain?: string;
+  /** Same-origin rendering of the site (local fixtures only today). */
+  previewHref?: string;
 }
 
 export interface WorkspaceHandoff {

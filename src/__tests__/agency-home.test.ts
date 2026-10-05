@@ -186,7 +186,7 @@ describe("agency home projection", () => {
     expect(html).toContain("Private agency work");
     expect(html).toContain("Intake method");
     expect(html).toContain("Checking shared client work");
-    expect(html).toContain("does not currently hold a private offering catalog");
+    expect(html).toContain("does not hold a private catalog yet");
     expect(html.toLowerCase()).not.toContain("earnings");
     expect(html.toLowerCase()).not.toContain("royalt");
   });

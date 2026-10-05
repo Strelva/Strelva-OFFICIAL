@@ -678,6 +678,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
         trackerTemplates={TRACKER_TEMPLATES.map((template) => ({ id: template.id, label: template.name, description: template.description }))}
         inquiryBusinesses={inquiryBusinesses}
         inquiry={inquiryTarget}
+        inquirySource={inquiryConfig?.tenantId ? { tenantId: inquiryConfig.tenantId, adapter: inquiryConfig.adapter } : undefined}
         tracker={trackerContent}
         plan={planContent}
         document={documentContent}

@@ -63,6 +63,34 @@ function renderHome(items: WorkspaceWork[] = [
 }
 
 describe("business home", () => {
+  it("presents the business's actual Systems and Needs you, and keeps Systems out of the files list", () => {
+    const items = [work("Mediation intake", { productId: "applications" }), work("AI check", { productId: "ai_visibility" })];
+    const html = renderToStaticMarkup(createElement(BusinessHome, {
+      snapshot: snapshot(items), sites: [], unassignedSites: [], siteAssignmentsKnown: true, offerings: offeringState, busy: false,
+      onOpen: noop, onStart: noop, onRequest: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account",
+      systems: [{ id: "work:Mediation intake", kind: "app", name: "Mediation intake", detail: "Used by your team", lifecycle: "live", health: { state: "unchecked", summary: "No recent check." }, surface: { kind: "work", workId: "Mediation intake", productId: "applications" }, connections: [], possibilities: [], versions: [] }],
+      files: [items[1]!],
+    }));
+    expect(html).toContain("<h1 class=\"font-display\">Alder Workshop</h1>");
+    expect(html).toContain("1 live");
+    expect(html.indexOf("Needs you")).toBeLessThan(html.indexOf("id=\"home-systems\""));
+    expect(html).toContain("Open Mediation intake, Internal tool, Live, Not checked here yet");
+    expect(html).toContain("What should happen next?");
+    expect(html).toContain("All systems and files");
+    expect(html).not.toContain("Open Mediation intake\"");
+    expect(html).toContain("Open AI check");
+  });
+
+  it("tells an empty business that Strelva builds its systems, without a build-it-yourself prompt", () => {
+    const html = renderToStaticMarkup(createElement(BusinessHome, {
+      snapshot: snapshot([]), sites: [], unassignedSites: [], siteAssignmentsKnown: true, offerings: offeringState, busy: false,
+      onOpen: noop, onStart: noop, onRequest: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account", systems: [], files: [],
+    }));
+    expect(html).toContain("Nothing is running yet.");
+    expect(html).toContain("once Strelva builds them");
+    expect(html).not.toContain("Get or build");
+  });
+
   it("keeps intent primary while putting saved work and next actions in front of category counts", () => {
     const html = renderHome();
 
@@ -71,7 +99,7 @@ describe("business home", () => {
     expect(html).toContain("Strelva handled");
     expect(html).toContain("In progress");
     expect(html).toContain("All requests");
-    expect(html).toContain("Recent");
+    expect(html).toContain("Files and results");
     expect(html).toContain("Opening checklist");
     for (const retired of ["Waiting on you", "id=\"home-work\"", "Strelva is handling"]) expect(html).not.toContain(retired);
     expect(html).not.toMatch(/>Applications<|>Documents</);

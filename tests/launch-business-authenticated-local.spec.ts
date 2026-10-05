@@ -44,7 +44,7 @@ for (const width of [1440, 390]) {
     await page.getByRole("form", { name: "Application setup" }).getByLabel("App name",{exact:true}).fill("Team requests");
     await page.getByLabel("Field 1",{exact:true}).fill("Request");
     const appCreation=page.waitForResponse(r=>new URL(r.url()).pathname==="/api/bounded-work"&&r.request().method()==="POST");
-    await page.getByRole("button",{name:"Create private app",exact:true}).click();
+    await page.getByRole("button",{name:"Create private tool",exact:true}).click();
     const appResponse=await appCreation;
     expect(appResponse.status(),await appResponse.text()).toBe(201);
     const app=await appResponse.json();

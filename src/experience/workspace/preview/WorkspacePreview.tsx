@@ -6,6 +6,7 @@ import Link from "next/link";
 import { WorkspaceApp } from "../WorkspaceApp";
 import { createPreviewInquiryAdapter } from "@/experience/inquiries/preview-fixture";
 import { createPreviewRequest, PREVIEW_SCENARIOS, type PreviewScenario } from "./fixture";
+import { MOONEY_INQUIRY_PROFILE, MOONEY_TENANT } from "./systems-fixture";
 import styles from "./preview.module.css";
 
 export function WorkspacePreview({ scenario }: { scenario: PreviewScenario }) {
@@ -32,7 +33,9 @@ export function WorkspacePreview({ scenario }: { scenario: PreviewScenario }) {
     url.searchParams.delete("previewSetup");
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   }, [installedStaffRequest]);
-  const inquiry = useMemo(() => ({ tenantId: "buffalo-realty", label: "Buffalo Realty", adapter: createPreviewInquiryAdapter("business", scenario) }), [scenario]);
+  const inquiry = useMemo(() => scenario.startsWith("mooney")
+    ? { tenantId: MOONEY_TENANT, label: "The Mooney Firm", adapter: createPreviewInquiryAdapter("business", scenario === "mooney-shared" ? "read-only" : scenario, MOONEY_INQUIRY_PROFILE) }
+    : { tenantId: "buffalo-realty", label: "Buffalo Realty", adapter: createPreviewInquiryAdapter("business", scenario) }, [scenario]);
   return <div ref={previewRef} data-dashboard className={styles.preview}>
     <aside ref={controlsRef} className={styles.controls} aria-label="Local preview controls">
       <div><strong>Local interface preview</strong><span>Fictional data · changes reset on reload · no live actions</span></div>
