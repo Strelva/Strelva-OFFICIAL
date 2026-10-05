@@ -157,6 +157,23 @@ function presentHandoffWork(work: SavedWork): WorkspaceWork {
   return { ...presented, payload: null, input: {}, tracker, unavailableReason: undefined };
 }
 
+type ListedWorkspace = Awaited<ReturnType<typeof listWorkspaces>>[number];
+
+/** The one rule for how saved work in a workspace is presented to this actor. */
+function workAccess(workspace: Pick<ListedWorkspace, "access" | "kind">): "delegated_read" | "owned" | "member" {
+  return workspace.access === "delegated_read" ? "delegated_read" : workspace.kind === "personal" ? "owned" : "member";
+}
+
+/**
+ * Present work a POST just saved with the same access the listing would give
+ * it. A business-workspace member must not receive owner actions here and lose
+ * them on the next reload.
+ */
+async function presentSavedWork(current: WorkspaceActor, work: SavedWork): Promise<WorkspaceWork> {
+  const workspace = (await listWorkspaces(current)).find((item) => item.id === work.workspaceId);
+  return presentWorkspaceWork(work, { access: workspace ? workAccess(workspace) : "member" });
+}
+
 function supportsHandoff(work: SavedWork): boolean {
   if (work.productId === "websites" && work.resourceKind === "website") {
     const rebuild = websiteRebuildSchema.safeParse(work.payload);
@@ -253,9 +270,7 @@ export async function GET(request: Request) {
       workspaces: workspaces.map(({ id, kind, name, access, role }) => ({ id, kind, name, access, role })), workspaceId: selected.id,
       workspaceExitState,
       workspaceExitReadStatus,
-      work: work.map((item) => presentWorkspaceWork(item, {
-        access: selected.access === "delegated_read" ? "delegated_read" : selected.kind === "personal" ? "owned" : "member",
-      })),
+      work: work.map((item) => presentWorkspaceWork(item, { access: workAccess(selected) })),
       pendingAssessments: selected.access === "member" ? await listPendingAssessments(current, selected.id) : [],
       managedWork: managedPresence.managedWork,
       ...(managedPresence.unavailable ? { managedWorkUnavailable: true } : {}),
@@ -293,19 +308,19 @@ export async function POST(request: Request) {
       case "assess": {
         const scoreInput = { business: input.business, url: input.url || undefined, category: input.category || undefined, location: input.location || undefined };
         const work = await runPrivateAiVisibilityAssessment({ actor: current, workspaceId: input.workspaceId, input: scoreInput, ...(input.requestId ? { requestId: input.requestId } : {}) });
-        return json({ work: presentWorkspaceWork(work) }, 201);
+        return json({ work: await presentSavedWork(current, work) }, 201);
       }
       case "recover_assessment": {
         const work = await recoverAssessment({ actor: current, workspaceId: input.workspaceId, operationId: input.requestId });
-        return json({ work: presentWorkspaceWork(work) });
+        return json({ work: await presentSavedWork(current, work) });
       }
       case "save_website_audit": {
         const work = await savePublicWebsiteAudit({ actor: current, workspaceId: input.workspaceId, resultId: input.resultId });
-        return json({ work: presentWorkspaceWork(work) });
+        return json({ work: await presentSavedWork(current, work) });
       }
       case "save_public_result": {
         const saved = await savePublicAiVisibilityResult({ actor: current, workspaceId: input.workspaceId, resultId: input.resultId });
-        return json({ work: presentWorkspaceWork(saved.work), alreadySaved: !saved.created }, saved.created ? 201 : 200);
+        return json({ work: await presentSavedWork(current, saved.work), alreadySaved: !saved.created }, saved.created ? 201 : 200);
       }
       case "handoff": {
         const work = await getWork(current, input.workId);
