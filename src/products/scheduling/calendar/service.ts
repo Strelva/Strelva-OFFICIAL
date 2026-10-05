@@ -1,3 +1,4 @@
+import { SCHEDULE_PAUSED_MESSAGE } from "../lifecycle";
 import { z } from "zod";
 import { getSupabase } from "@/lib/db/client";
 import { advance, boundedStore, readBounded, type BoundedStore } from "@/platform/bounded-work/repository";
@@ -394,6 +395,8 @@ export function createCalendarSchedulingService(store: BoundedStore = boundedSto
     const current = reservation(work, requestId);
     const provider = parseProvider(input.provider);
     assertReservationProvider(current, provider);
+    // A paused schedule takes no new times; the appointment itself stays.
+    if (work.payload.pause) throw new WorkspaceConflictError(SCHEDULE_PAUSED_MESSAGE);
     if (current.status === "reserved") {
       const command = scheduleCommandSchema.parse({ kind: "reschedule", expectedRevision: input.expectedRevision, requestId, start: input.start, end: input.end });
       await assertProviderWriteAllowed(work.workspaceId);
