@@ -125,6 +125,8 @@ The workspace inventory is **manifest-driven** — `release-manifest.json` → `
 ```
 That's it — a starter-based repo inherits the whole baseline. Only add `packageScripts` / `requiredFiles` / `requiredEnv` to the entry if the repo has extras BEYOND the baseline (the legacy gldf/rohlax repos do; new starter repos shouldn't).
 
+A repo that doesn't read REB content (a site that only sends beacons, or a static HTML site) sets `"profile"` to a name in `customRepoWorkspace.profiles` (`next-beacon-site`, `static-site`), which replaces the baseline for that repo only. Every entry also lists `v1Endpoints` and, per endpoint, a `v1CallSites` entry: the file that makes the call, the body fields it sends, and for POST endpoints a fixture body. `pnpm check:custom-repos` reads that file at `compatibleCommit` and checks the path and fields against `scripts/custom-repo-v1-contracts.ts`; `src/__tests__/custom-repo-v1-contracts.test.ts` runs the real route handlers on the fixtures. If a slug can't be confirmed against live tenant data, set `"tenantConfirmed": false` and start `tenantEvidence` with `UNCONFIRMED`.
+
 **Verify:** `pnpm check:custom-repos` (green when siblings aren't checked out — repos SKIP; run with the repos checked out next to `strelva-platform`, or set `CUSTOM_REPO_WORKSPACE_ROOT`, to run the structural checks). Merge logic is covered by `src/__tests__/custom-repo-workspace-inventory.test.ts`.
 
 ## Current verification note
