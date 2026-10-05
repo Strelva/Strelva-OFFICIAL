@@ -9,7 +9,7 @@ import type { InquirySurfaceAdapter, InquirySurfaceSnapshot, InquiryView } from 
 import type { WorkspaceSnapshot, WorkspaceWork } from "./contracts";
 import { discoveryProducts, sameAppHref, type ManagedWorkSummary } from "./workspace-discovery";
 import { WorkspaceTemplateLibrary } from "./WorkspaceTemplateLibrary";
-import { WorkspaceIntent, retainRequestIntent } from "./WorkspaceIntent";
+import { WorkspaceIntent, retainRequestIntent, routeConsumer } from "./WorkspaceIntent";
 import { readRequestDraft, requestDraftKey, writeRequestDraft } from "./request-draft";
 import { WorkspaceHelp } from "./WorkspaceHelp";
 import { WorkspaceStart } from "./WorkspaceStart";
@@ -262,6 +262,14 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     try { writeRequestDraft(window.sessionStorage, draftKey, request); } catch { /* In-memory request remains usable. */ }
   }
 
+  /** A product saved work from the routed request: drop the in-memory copy so it never pre-fills again. */
+  function spendRequest(consumer: string) {
+    if (routeConsumer(requestRoute) !== consumer) return;
+    setRequestText("");
+    setRequestRoute("start");
+    setRequestCurrent(true);
+  }
+
   function openRequest(request: string) {
     if (workspaceMutationReadOnly) return;
     rememberRequest(request);
@@ -426,7 +434,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     return <><h2>Try the search before you connect it.</h2><p>Home Finder is a brokerage-branded home search. This preview uses synthetic listings and never sends or stores buyer inquiries.</p>{product.previewHref ? <a className={styles.primaryAction} href={product.previewHref} target="_blank" rel="noreferrer">Try Home Finder<ArrowRight size={17} /></a> : <p>Its synthetic preview is not available from this environment yet.</p>}<p>A live installation needs brokerage approval, permitted listing data, and verified inquiry delivery.</p><button type="button" className={styles.secondaryAction} onClick={() => navigate("help", "I’d like early access to Home Finder. Please tell me what enabling a live brokerage installation would require.")}>Ask about early access<ArrowRight size={17} /></button></>;
   }
 
-  if (home && !startOpen && section === "home" && current?.kind !== "agency" && !workspaceExitBlocks) return <WorkspaceIntent request={requestText} current={requestCurrent} route={requestRoute} draftKey={draftKey}><BusinessHome
+  if (home && !startOpen && section === "home" && current?.kind !== "agency" && !workspaceExitBlocks) return <WorkspaceIntent request={requestText} current={requestCurrent} route={requestRoute} draftKey={draftKey} onSpent={spendRequest}><BusinessHome
     snapshot={snapshot} sites={assignedSites} unassignedSites={unassignedSites} siteAssignmentsKnown={siteAssignmentsKnown} offerings={offerings.state} busy={busy} notice={notice} managedWorkUnavailable={managedWorkUnavailable}
     appBase={appBase} accountHref={`${appBase || ""}/workspace/account`} signOut={signOut}
     onNavigate={navigate}
@@ -447,7 +455,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     ...snapshot.work.map(work => ({ id: work.id, title: work.title, detail: workspaceWorkLabel(work), href: `${appBase || ""}/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&work=${encodeURIComponent(work.id)}`, onOpen: () => openWork(work.id) })),
     ...assignedSites.map(site => ({ id: `site-${site.id}`, title: site.title, detail: "Managed website", href: site.href })),
   ];
-  return <WorkspaceIntent request={requestText} current={requestCurrent} route={requestRoute} draftKey={draftKey}><StrelvaShell appBase={appBase} signOut={signOut}
+  return <WorkspaceIntent request={requestText} current={requestCurrent} route={requestRoute} draftKey={draftKey} onSpent={spendRequest}><StrelvaShell appBase={appBase} signOut={signOut}
     workspaceId={snapshot.workspaceId} searchItems={searchItems} searchScopeName={current?.name || "Your work"} recentWork={searchItems.filter(item => !item.id.startsWith("site-"))} pinned={pinnedSites}
     active={agency ? "access" : home ? startOpen ? undefined : section : workingSection}
     title={!home ? inquiry ? "Inquiry work" : tracker !== undefined ? "Tracker" : plan !== undefined ? "Work plan" : document !== undefined ? "Document" : agency ? sectionTitle("access") : workingTitle || (selectedWork ? "Your work" : "New assessment") : startOpen ? "New" : sectionTitle(section)}

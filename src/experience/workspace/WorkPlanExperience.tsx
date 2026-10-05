@@ -97,7 +97,8 @@ export type WorkPlanExperienceProps = {
 export function WorkPlanExperience(props: WorkPlanExperienceProps) {
   const intent = useWorkspaceIntent();
   if (!props.workId && !props.initialRequest && !intent.ready) return <p role="status">Opening your request…</p>;
-  return <PlanSession key={`${props.workspaceId}:${props.workId ?? "new"}`} {...props} initialRequest={props.initialRequest || (!props.workId ? intentRequestFor(intent, "plan") : undefined)} />;
+  const onSaved = props.onSaved && !props.workId ? (id: string) => { intent.spend("plan"); props.onSaved?.(id); } : props.onSaved;
+  return <PlanSession key={`${props.workspaceId}:${props.workId ?? "new"}`} {...props} onSaved={onSaved} initialRequest={props.initialRequest || (!props.workId ? intentRequestFor(intent, "plan") : undefined)} />;
 }
 
 function PlanSession({ presentation, workspaceId, workId, initialRequest = "", planningEconomics: providedPlanningEconomics, sources, readOnly, localPreview, onSaved, onOpenWork }: WorkPlanExperienceProps) {

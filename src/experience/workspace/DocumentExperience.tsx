@@ -35,7 +35,8 @@ type Props = { workspaceId: string; workId?: string; readOnly?: boolean; onSaved
 export function DocumentExperience(props: Props) {
   const intent = useWorkspaceIntent();
   if (!props.workId && !props.initialRequestText && !intent.ready) return <p role="status">Opening your request…</p>;
-  return <DocumentSession key={`${props.workspaceId}:${props.workId ?? "new"}`} {...props} initialRequestText={props.initialRequestText || (!props.workId ? intentRequestFor(intent, "document") : undefined)} />;
+  const onSaved = props.onSaved && !props.workId ? (id: string) => { intent.spend("document"); props.onSaved?.(id); } : props.onSaved;
+  return <DocumentSession key={`${props.workspaceId}:${props.workId ?? "new"}`} {...props} onSaved={onSaved} initialRequestText={props.initialRequestText || (!props.workId ? intentRequestFor(intent, "document") : undefined)} />;
 }
 
 function DocumentSession({ workspaceId, workId, readOnly, onSaved, transport = serverTransport, initialRequestText, sources = [] }: Props) {

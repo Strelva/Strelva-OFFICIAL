@@ -2,8 +2,19 @@
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { intentRequestFor, retainRequestIntent, useWorkspaceIntent, WorkspaceIntent } from "@/experience/workspace/WorkspaceIntent";
-import { requestDraftKey } from "@/experience/workspace/request-draft";
+import { useState } from "react";
+import { intentRequestFor, retainRequestIntent, spendRequestIntent, useWorkspaceIntent, WorkspaceIntent } from "@/experience/workspace/WorkspaceIntent";
+import { readRequestDraft, requestDraftKey, writeRequestDraft } from "@/experience/workspace/request-draft";
+
+class MemoryStorage implements Storage {
+  private items = new Map<string, string>();
+  get length() { return this.items.size; }
+  key(index: number) { return [...this.items.keys()][index] ?? null; }
+  getItem(name: string) { return this.items.get(name) ?? null; }
+  setItem(name: string, value: string) { this.items.set(name, String(value)); }
+  removeItem(name: string) { this.items.delete(name); }
+  clear() { this.items.clear(); }
+}
 
 const roots: ReturnType<typeof createRoot>[] = [];
 beforeEach(() => {
@@ -40,5 +51,52 @@ describe("routed request after reload", () => {
     expect(intentRequestFor(intent, "document")).toBeUndefined();
     expect(intentRequestFor({ ...intent, route: "plan" }, "plan")).toBe("Organize supplier onboarding");
     expect(intentRequestFor({ ...intent, route: "applications" }, "applications")).toBeUndefined();
+  });
+});
+
+describe("spent request", () => {
+  let memory: MemoryStorage;
+  const original = Object.getOwnPropertyDescriptor(window, "sessionStorage");
+  beforeEach(() => { memory = new MemoryStorage(); Object.defineProperty(window, "sessionStorage", { value: memory, configurable: true }); });
+  afterEach(() => { if (original) Object.defineProperty(window, "sessionStorage", original); });
+
+  it("removes the routed request and its matching draft once the product saved work from it", () => {
+    retainRequestIntent(memory, key, "Write our opening checklist.", "document");
+    writeRequestDraft(memory, key, "Write our opening checklist.");
+    spendRequestIntent(memory, key, "plan");
+    expect(memory.getItem(`${key}:continuation`)).not.toBeNull();
+    spendRequestIntent(memory, key, "document");
+    expect(memory.getItem(`${key}:continuation`)).toBeNull();
+    expect(readRequestDraft(memory, key)).toBe("");
+  });
+
+  it("keeps a draft the person edited after routing it", () => {
+    retainRequestIntent(memory, key, "Build a booking app.", "applications");
+    writeRequestDraft(memory, key, "Something new I am still typing");
+    spendRequestIntent(memory, key, "plan");
+    expect(memory.getItem(`${key}:continuation`)).toBeNull();
+    expect(readRequestDraft(memory, key)).toBe("Something new I am still typing");
+  });
+
+  it("does not pre-fill a later blank document in the same tab", async () => {
+    retainRequestIntent(memory, key, "Write our opening checklist.", "document");
+    function Document() {
+      const intent = useWorkspaceIntent();
+      return <><output>{intentRequestFor(intent, "document") ?? "blank"}</output><button type="button" onClick={() => intent.spend("document")}>Save document</button></>;
+    }
+    // Layout keeps the routed request in memory too; spending must clear that copy.
+    function Host() {
+      const [request, setRequest] = useState("Write our opening checklist.");
+      const [current, setCurrent] = useState(true);
+      return <WorkspaceIntent draftKey={key} request={request} current={current} route="document" onSpent={() => { setRequest(""); setCurrent(true); }}><Document /></WorkspaceIntent>;
+    }
+    const first = await render(<Host />);
+    expect(first.node.querySelector("output")?.textContent).toBe("Write our opening checklist.");
+    await act(async () => first.node.querySelector("button")!.click());
+    expect(first.node.querySelector("output")?.textContent).toBe("blank");
+    await act(async () => first.root.unmount());
+
+    const later = await render(<WorkspaceIntent draftKey={key} request=""><Document /></WorkspaceIntent>);
+    expect(later.node.querySelector("output")?.textContent).toBe("blank");
   });
 });

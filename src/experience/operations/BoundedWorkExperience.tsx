@@ -83,7 +83,8 @@ function localDateTime(value: string) {
 export function BoundedWorkExperience(props: Props) {
   const intent = useWorkspaceIntent();
   if (!props.workId && !props.initialRequest && !intent.ready) return <p role="status">Opening your request…</p>;
-  return <Session key={`${props.workspaceId}:${props.workId ?? "new"}:${props.productId}`} {...props} initialRequest={props.initialRequest || (!props.workId ? intentRequestFor(intent, props.productId) : undefined)} />;
+  const onSaved = props.workId ? props.onSaved : (id: string) => { intent.spend(props.productId); props.onSaved(id); };
+  return <Session key={`${props.workspaceId}:${props.workId ?? "new"}:${props.productId}`} {...props} onSaved={onSaved} initialRequest={props.initialRequest || (!props.workId ? intentRequestFor(intent, props.productId) : undefined)} />;
 }
 function Session({ initialRequest, workspaceId, workId, productId, readOnly = false, draftEditOnly = false, workspaceStopped = false, calendarRecoveryAllowed = false, sources, onSaved }: Props) {
   const request = useWorkspaceRequest();

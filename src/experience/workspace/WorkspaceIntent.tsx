@@ -1,12 +1,17 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { readRequestDraft } from "./request-draft";
 
-interface RequestIntent { request: string; route: string; ready: boolean }
-const IntentContext = createContext<RequestIntent>({ request: "", route: "", ready: true });
+interface RetainedIntent { request: string; route: string; ready: boolean }
+interface RequestIntent extends RetainedIntent {
+  /** Call once a product saved work from the routed request; it never pre-fills again. */
+  spend: (consumer: string) => void;
+}
+const IntentContext = createContext<RequestIntent>({ request: "", route: "", ready: true, spend: () => undefined });
 export function useWorkspaceIntent() { return useContext(IntentContext); }
 
-type Props = { request: string; current?: boolean; route?: string; draftKey: string; children: ReactNode };
+type Props = { request: string; current?: boolean; route?: string; draftKey: string; onSpent?: (consumer: string) => void; children: ReactNode };
 const ROUTES = new Set(["start", "plan", "help", "assessment", "document", "tracker", "inquiries", "website", "websites", "applications", "onboarding", "scheduling", "investigations", "operations"]);
 
 /**
@@ -28,22 +33,45 @@ export function retainRequestIntent(storage: Pick<Storage, "setItem">, draftKey:
   catch { /* The current in-memory request remains available. */ }
 }
 
+function readRetainedIntent(storage: Pick<Storage, "getItem">, draftKey: string): RetainedIntent | null {
+  const raw = storage.getItem(`${draftKey}:continuation`);
+  const value: unknown = raw && raw.length < 20000 ? JSON.parse(raw) : null;
+  if (value && typeof value === "object" && "version" in value && value.version === 1 && "request" in value && typeof value.request === "string" && "route" in value && typeof value.route === "string" && ROUTES.has(value.route)) {
+    return { request: value.request.slice(0, 3000), route: value.route, ready: true };
+  }
+  return null;
+}
+
+/**
+ * A routed request is spent once its product saved work from it: the Work now
+ * carries the words. Remove the routed record, and the draft too when it still
+ * holds the same words (an edited draft is newer and stays).
+ */
+export function spendRequestIntent(storage: Pick<Storage, "getItem" | "removeItem">, draftKey: string, consumer: string): void {
+  try {
+    const retained = readRetainedIntent(storage, draftKey);
+    if (!retained || routeConsumer(retained.route) !== consumer) return;
+    storage.removeItem(`${draftKey}:continuation`);
+    if (readRequestDraft(storage, draftKey) === retained.request) storage.removeItem(draftKey);
+  } catch { /* Browser storage is optional. */ }
+}
+
 export function WorkspaceIntent(props: Props) { return <IntentSession key={props.draftKey} {...props} />; }
-function IntentSession({ request, current = false, route = "start", draftKey, children }: Props) {
-  const [retained, setRetained] = useState<RequestIntent>({ request: "", route: "", ready: false });
+function IntentSession({ request, current = false, route = "start", draftKey, onSpent, children }: Props) {
+  const [retained, setRetained] = useState<RetainedIntent>({ request: "", route: "", ready: false });
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
-      let restored: RequestIntent = { request: "", route: "", ready: true };
-      try {
-        const raw = window.sessionStorage.getItem(`${draftKey}:continuation`);
-        const value: unknown = raw && raw.length < 20000 ? JSON.parse(raw) : null;
-        if (value && typeof value === "object" && "version" in value && value.version === 1 && "request" in value && typeof value.request === "string" && "route" in value && typeof value.route === "string" && ROUTES.has(value.route)) {
-          restored = { request: value.request.slice(0, 3000), route: value.route, ready: true };
-        }
-      } catch { /* Browser storage is optional. */ }
+      let restored: RetainedIntent = { request: "", route: "", ready: true };
+      try { restored = readRetainedIntent(window.sessionStorage, draftKey) ?? restored; } catch { /* Browser storage is optional. */ }
       setRetained(restored);
     });
     return () => window.cancelAnimationFrame(frame);
   }, [draftKey]);
-  return <IntentContext.Provider value={current || request ? { request, route, ready: true } : retained}>{children}</IntentContext.Provider>;
+  const spend = useCallback((consumer: string) => {
+    try { spendRequestIntent(window.sessionStorage, draftKey, consumer); } catch { /* Browser storage is optional. */ }
+    setRetained(value => routeConsumer(value.route) === consumer ? { request: "", route: "", ready: true } : value);
+    onSpent?.(consumer);
+  }, [draftKey, onSpent]);
+  const value = useMemo<RequestIntent>(() => ({ ...(current || request ? { request, route, ready: true } : retained), spend }), [current, request, route, retained, spend]);
+  return <IntentContext.Provider value={value}>{children}</IntentContext.Provider>;
 }
