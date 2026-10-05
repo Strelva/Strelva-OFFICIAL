@@ -24,11 +24,12 @@ import {
   savePublicAiVisibilityResult,
 } from "@/products/ai-visibility/server";
 import { listManagedPresenceWork } from "@/products/managed-presence/server";
-import { publicHostname } from "@/products/managed-presence/hostname";
+import { publicHostname } from "@/products/managed-presence";
 import { resolveHomeFinderPreviewHref } from "@/products/home-finder/server";
 import { inquiryReleaseEnabled } from "@/products/inquiries";
 import { parseTrackerWorkPayload, presentTrackerHandoffPreview } from "@/products/tracker";
 import { presentWorkspaceWork } from "@/experience/workspace/result";
+import { readWorkspaceSystems } from "@/experience/systems/server";
 import type { ManagedWork, WorkspaceDelegation, WorkspaceProduct, WorkspaceSnapshot, WorkspaceWork } from "@/experience/workspace/contracts";
 
 export const dynamic = "force-dynamic";
@@ -235,6 +236,12 @@ export async function GET(request: Request) {
       ? await listAgencyDelegations(current, selected.id) : [];
     const customerDelegations = selected.access === "member" && (selected.role === "owner" || selected.role === "admin")
       ? (await Promise.all(work.map((item) => listWorkDelegations(current, item.id)))).flat() : [];
+    // Systems are business-level: the spine projection, its health and any
+    // Possibility a saved rebuild offers. A failed read is reported as such.
+    const systems = selected.kind === "customer" ? await readWorkspaceSystems({
+      actor: current, businessId: selected.id, savedWork: work,
+      siteDomains: new Map(managedPresence.managedWork.flatMap((site) => site.domain ? [[site.id, site.domain] as const] : [])),
+    }) : undefined;
     const homeFinderPreview = resolveHomeFinderPreviewHref();
     const products: WorkspaceProduct[] = listWorkspaceDiscoveryProducts().map((product): WorkspaceProduct => ({ id: product.id, name: product.name, description: product.promise,
       availability: workspaceAvailability(product),
@@ -264,6 +271,7 @@ export async function GET(request: Request) {
       handoffs: handoffs.map(({ id, sourceWorkId, recipientEmail, status, expiresAt, createdAt }) => ({ id, sourceWorkId, recipientEmail, status, expiresAt, createdAt })),
       delegations: [...agencyDelegations.map((value) => presentDelegation(value, false)), ...customerDelegations.map((value) => presentDelegation(value, true))],
       products,
+      ...(systems ? { systems } : {}),
     };
     return json(snapshot);
   } catch (error) { return failed(error); }

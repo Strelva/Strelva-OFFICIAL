@@ -68,13 +68,13 @@ describe("business home", () => {
     const html = renderToStaticMarkup(createElement(BusinessHome, {
       snapshot: snapshot(items), sites: [], unassignedSites: [], siteAssignmentsKnown: true, offerings: offeringState, busy: false,
       onOpen: noop, onStart: noop, onRequest: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account",
-      systems: [{ id: "work:Mediation intake", kind: "app", name: "Mediation intake", detail: "Used by your team", lifecycle: "live", health: { state: "unchecked", summary: "No recent check." }, surface: { kind: "work", workId: "Mediation intake", productId: "applications" }, connections: [], possibilities: [], versions: [] }],
+      systems: [{ id: "work:Mediation intake", kind: "app", name: "Mediation intake", detail: "Used by your team", lifecycle: "live", health: { state: "unknown", summary: "Nothing has checked this yet." }, surface: { kind: "work", workId: "Mediation intake", productId: "applications" }, connections: [], possibilities: [], versions: [] }],
       files: [items[1]!],
     }));
     expect(html).toContain("<h1 class=\"font-display\">Alder Workshop</h1>");
     expect(html).toContain("1 live");
     expect(html.indexOf("Needs you")).toBeLessThan(html.indexOf("id=\"home-systems\""));
-    expect(html).toContain("Open Mediation intake, Internal tool, Live, Not checked here yet");
+    expect(html).toContain("Open Mediation intake, Internal tool, Live, Unknown");
     expect(html).toContain("What should happen next?");
     expect(html).toContain("All systems and files");
     expect(html).not.toContain("Open Mediation intake\"");

@@ -11,7 +11,7 @@ import type { ServiceRequest } from "@/platform/service-requests";
 import type { InquiryPreviewProfile } from "@/experience/inquiries/preview-fixture";
 import type { WorkspaceSnapshot, WorkspaceWork } from "../contracts";
 
-export const SYSTEMS_PREVIEW_SCENARIOS = ["mooney", "mooney-empty", "mooney-loading", "mooney-shared", "mooney-error", "agency-systems", "twin-trees"] as const;
+export const SYSTEMS_PREVIEW_SCENARIOS = ["mooney", "mooney-empty", "mooney-loading", "mooney-shared", "mooney-member", "mooney-error", "agency-systems", "twin-trees"] as const;
 export type SystemsPreviewScenario = typeof SYSTEMS_PREVIEW_SCENARIOS[number];
 export const isSystemsPreviewScenario = (value: string): value is SystemsPreviewScenario => (SYSTEMS_PREVIEW_SCENARIOS as readonly string[]).includes(value);
 
@@ -104,7 +104,7 @@ export function createSystemsPreviewRequest(scenario: SystemsPreviewScenario): t
   const agency = scenario === "agency-systems";
   const twin = scenario === "twin-trees";
   const current = agency ? AGENCY : twin ? TWIN_TREES : MOONEY;
-  const mooneyAccess = scenario === "mooney-shared" || agency ? { access: "delegated_read" as const } : { role: "owner" as const };
+  const mooneyAccess = scenario === "mooney-shared" || agency ? { access: "delegated_read" as const } : scenario === "mooney-member" ? { access: "member" as const, role: "member" as const } : { role: "owner" as const };
   const workspaces: WorkspaceSnapshot["workspaces"] = [
     ...(agency ? [{ id: AGENCY, kind: "agency" as const, name: "Strelva Agency" }] : []),
     ...(twin ? [{ id: TWIN_TREES, kind: "customer" as const, name: "Twin Trees", role: "owner" as const }] : [{ id: MOONEY, kind: "customer" as const, name: "The Mooney Firm", ...mooneyAccess }]),

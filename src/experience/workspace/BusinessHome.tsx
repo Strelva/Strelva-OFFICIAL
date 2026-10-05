@@ -49,13 +49,15 @@ interface Props {
   files?: readonly WorkspaceWork[];
   systemHref?: (id: string) => string;
   onOpenSystem?: (id: string) => void;
-  /** Website assignments are still loading, so the System list is incomplete. */
+  /** Still loading, so the System list is incomplete. */
   systemsLoading?: boolean;
+  /** The server could not read this business's Systems. */
+  systemsUnavailable?: boolean;
 }
 
 /** The start and return surface, using the same frame as every saved result. */
-export function BusinessHome({ snapshot, unassignedSites, siteAssignmentsKnown, offerings, busy, notice, onOpen, onStart, onCreateWebsite, onRequest, onDraftChange, onNavigate, onWorkspace, onOfferings, appBase = "", accountHref, signOut, managedWorkUnavailable, onWebsiteCommand, onRetryWebsiteAssignments, files, systemHref, onOpenSystem, systemsLoading = false, systems: knownSystems = [] }: Props) {
-  // An incomplete list would misplace a website build as its own System; show none until assignments load.
+export function BusinessHome({ snapshot, unassignedSites, siteAssignmentsKnown, offerings, busy, notice, onOpen, onStart, onCreateWebsite, onRequest, onDraftChange, onNavigate, onWorkspace, onOfferings, appBase = "", accountHref, signOut, managedWorkUnavailable, onWebsiteCommand, onRetryWebsiteAssignments, files, systemHref, onOpenSystem, systemsLoading = false, systemsUnavailable = false, systems: knownSystems = [] }: Props) {
+  // An incomplete list would misplace a System; show none until it loads.
   const systems = systemsLoading ? [] : knownSystems;
   const current = snapshot.workspaces.find(space => space.id === snapshot.workspaceId);
   const readOnly = current?.access === "delegated_read";
@@ -143,7 +145,7 @@ export function BusinessHome({ snapshot, unassignedSites, siteAssignmentsKnown, 
 
       {business || systems.length ? <section className={styles.section} aria-labelledby="home-systems">
         <header className={styles.sectionHeader}><h2 id="home-systems"><LayoutGrid size={18} aria-hidden="true" />{SYSTEMS_LABEL}</h2>{systems.length ? <Button variant="ghost" size="sm" onClick={() => onNavigate("apps")}>{SYSTEMS_LIST_LABEL}<ArrowRight size={16} aria-hidden="true" /></Button> : null}</header>
-        {busy || systemsLoading ? <p role="status" className={styles.muted}>Loading your systems…</p> : systems.length ? <SystemList systems={systems} href={openSystemHref} onOpen={onOpenSystem} label={`${name} ${SYSTEMS_LABEL.toLowerCase()}`} /> : <div className={styles.empty}><LayoutGrid size={24} aria-hidden="true" /><div><h3>{readOnly ? "Nothing has been shared here yet." : "Nothing is running yet."}</h3><p>{readOnly ? "Systems the owner shares will appear here." : "Your website, inquiries, bookings and the tools your team uses will appear here once Strelva builds them. Tell Strelva what you need below."}</p></div></div>}
+        {busy || systemsLoading ? <p role="status" className={styles.muted}>Loading your systems…</p> : systemsUnavailable ? <p role="status" className={styles.notice}>Your systems could not be loaded just now. Nothing about them has changed.</p> : systems.length ? <SystemList systems={systems} href={openSystemHref} onOpen={onOpenSystem} label={`${name} ${SYSTEMS_LABEL.toLowerCase()}`} /> : <div className={styles.empty}><LayoutGrid size={24} aria-hidden="true" /><div><h3>{readOnly ? "Nothing has been shared here yet." : "Nothing is running yet."}</h3><p>{readOnly ? "Systems the owner shares will appear here." : "Your website, inquiries, bookings and the tools your team uses will appear here once Strelva builds them. Tell Strelva what you need below."}</p></div></div>}
       </section> : null}
 
       {business && !readOnly ? <section className={styles.ask} aria-labelledby="business-start-title">

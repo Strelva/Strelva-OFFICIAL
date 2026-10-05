@@ -119,9 +119,9 @@
   content: "";
 }
 
-.health[data-health="working"]::before { border-color: var(--positive); background: var(--positive); }
-.health[data-health="needs_you"]::before { border-color: var(--warning); background: var(--warning); }
-.health[data-health="degraded"]::before { border-color: var(--critical); background: var(--critical); }
+.health[data-health="healthy"]::before { border-color: var(--positive); background: var(--positive); }
+.health[data-health="degraded"]::before { border-color: var(--warning); background: var(--warning); }
+.health[data-health="blocked"]::before { border-color: var(--critical); background: var(--critical); }
 
 .emptySystems {
   display: grid;
@@ -414,6 +414,24 @@
   color: var(--gray-fg);
   font-size: 12px;
   line-height: 16px;
+}
+
+.makeRealNotice h3 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.makeRealNotice ul {
+  margin: 4px 0 8px;
+  padding-left: 16px;
+  list-style: disc;
+}
+
+.makeRealNotice li {
+  padding: 0;
+  border: 0;
 }
 
 .notFound {

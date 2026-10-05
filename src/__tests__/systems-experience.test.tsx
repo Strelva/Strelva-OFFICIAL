@@ -5,87 +5,91 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined }), usePathname: () => "/workspace", useSearchParams: () => new URLSearchParams() }));
 
 import { agencySystemLineage, readBusinessSystems } from "@/experience/systems/from-workspace";
-import { requestMakeReal, systemHref, type SystemView } from "@/experience/systems/model";
+import { makeRealSummary, systemHref, type SystemView } from "@/experience/systems/model";
 import { SystemPage, websiteSandbox } from "@/experience/systems/SystemPage";
 import { pinnedSystems, sectionFromView, placeForSection } from "@/experience/app-frame/workspace-places";
 import { publicHostname } from "@/products/managed-presence/hostname";
-import type { WorkspaceSnapshot, WorkspaceWork } from "@/experience/workspace/contracts";
+import type { WorkspaceMakeRealResult, WorkspaceSnapshot, WorkspaceSystemEntry, WorkspaceSystems, WorkspaceWork } from "@/experience/workspace/contracts";
 
-const BUSINESS = "business-1";
+const BUSINESS = "a0000000-0000-4000-8000-000000000001";
+const SITE = "51000000-0000-4000-8000-000000000001";
+const INBOX = "51000000-0000-4000-8000-000000000002";
+const INTAKE_SYSTEM = "51000000-0000-4000-8000-000000000003";
 const work = (id: string, productId: string, extra: Partial<WorkspaceWork> = {}): WorkspaceWork => ({ id, workspaceId: BUSINESS, title: id, productId, resourceKind: "x", payload: null, input: {}, createdAt: "2026-10-01T00:00:00Z", ...extra });
-const snapshot = (items: WorkspaceWork[], extra: Partial<WorkspaceSnapshot> = {}): Pick<WorkspaceSnapshot, "workspaceId" | "workspaces" | "work" | "delegations"> => ({
-  workspaceId: BUSINESS, workspaces: [{ id: BUSINESS, kind: "customer", name: "The Mooney Firm", role: "owner" }], work: items, delegations: [], ...extra,
+const entry = (systemId: string, kind: string, name: string, extra: Partial<WorkspaceSystemEntry> = {}): WorkspaceSystemEntry => ({
+  ref: { businessId: BUSINESS, systemId }, name, kind, lifecycle: "live", basis: null, savedWorkId: null, tenantId: null,
+  health: { status: "unknown", summary: "Nothing has checked this yet.", lastVerifiedAt: null }, ...extra,
+});
+const projection = (extra: Partial<WorkspaceSystems> = {}): WorkspaceSystems => ({ status: "ready", systems: [], connections: [], possibilities: [], ...extra });
+const snapshot = (items: WorkspaceWork[], systems?: WorkspaceSystems): Pick<WorkspaceSnapshot, "workspaceId" | "workspaces" | "work" | "delegations" | "systems"> => ({
+  workspaceId: BUSINESS, workspaces: [{ id: BUSINESS, kind: "customer", name: "The Mooney Firm", role: "owner" }], work: items, delegations: [], ...(systems ? { systems } : {}),
 });
 const mooneySite = { id: "mooney-firm", title: "The Mooney Firm", href: "/dashboard", productId: "managed_presence" as const, relationship: "client" as const, domain: "www.attymooney.com" };
+const mooney = projection({
+  systems: [
+    entry(SITE, "website", "The Mooney Firm", { tenantId: "mooney-firm", health: { status: "healthy", summary: "The latest checks passed.", lastVerifiedAt: "2026-10-05T14:00:00Z" } }),
+    entry(INBOX, "inquiry", "The Mooney Firm inquiries"),
+    entry(INTAKE_SYSTEM, "internal_app", "Mediation intake", { savedWorkId: "intake" }),
+  ],
+  connections: [{ id: "c1", sourceId: INBOX, kind: "appear", targetSystemId: SITE, targetLabel: "The Mooney Firm", state: "connected", purpose: "Inquiry form on the site" }],
+  possibilities: [{ id: "website-rebuild:rebuild", title: "A rebuilt attymooney.com", summary: "Rebuilt.", status: "ready", affects: [SITE, INBOX], evidence: "12 of 12 public pages carried over.", previewHref: "/api/websites/rebuild/preview", workId: "rebuild" }],
+});
 
-describe("Systems read adapter", () => {
-  it("turns the managed site, its inquiries and saved tools into Systems with separate lifecycle and health", () => {
-    const { systems, files } = readBusinessSystems({
-      snapshot: snapshot([
-        work("intake", "applications", { title: "Mediation intake", operation: { status: "installed" } }),
-        work("sessions", "scheduling", { title: "Mediation sessions", operation: { status: "draft" } }),
-        work("old-tool", "applications", { operation: { status: "retired" } }),
-        work("broken", "tracker", { unavailableReason: "This tracker could not be read." }),
-        work("check", "ai_visibility"),
-      ]),
+describe("Systems read adapter over the spine projection", () => {
+  it("draws the server's Systems by spine id, with lifecycle and health as separate marks", () => {
+    const { systems, files, unavailable } = readBusinessSystems({
+      snapshot: snapshot([work("intake", "applications", { title: "Mediation intake", operation: { status: "installed" } }), work("rebuild", "websites"), work("check", "ai_visibility")], mooney),
       sites: [mooneySite],
-      inquiryBusinesses: [{ id: "mooney-firm", title: "The Mooney Firm" }],
     });
-    expect(systems.map(item => [item.id, item.kind, item.lifecycle, item.health.state])).toEqual([
-      ["site:mooney-firm", "website", "live", "unchecked"],
-      ["inquiries:mooney-firm", "inquiries", "live", "unchecked"],
-      ["work:intake", "app", "live", "unchecked"],
-      ["work:sessions", "bookings", "draft", "unchecked"],
-      ["work:broken", "tracker", "live", "degraded"],
+    expect(unavailable).toBe(false);
+    expect(systems.map(item => [item.id, item.kind, item.name, item.lifecycle, item.health.state])).toEqual([
+      [SITE, "website", "attymooney.com", "live", "healthy"],
+      [INBOX, "inquiries", "The Mooney Firm inquiries", "live", "unknown"],
+      [INTAKE_SYSTEM, "app", "Mediation intake", "live", "unknown"],
     ]);
-    expect(systems[0]!).toMatchObject({ name: "attymooney.com", surface: { kind: "website", liveUrl: "https://www.attymooney.com", previewSrc: "https://www.attymooney.com" } });
-    expect(systems[1]!.connections[0]!).toMatchObject({ kind: "appear", systemId: "site:mooney-firm" });
-    // Retired tools and saved results are files, not Systems.
-    expect(files.map(item => item.id)).toEqual(["old-tool", "check"]);
+    expect(systems[0]!).toMatchObject({ detail: "The Mooney Firm", surface: { kind: "website", liveUrl: "https://www.attymooney.com", previewSrc: "https://www.attymooney.com", manageHref: "/dashboard" }, operatedBy: "Strelva" });
+    // The inquiry inbox opens for the tenant of the site its form appears on.
+    expect(systems[1]!.surface).toEqual({ kind: "inquiries", tenantId: "mooney-firm" });
+    expect(systems[1]!.connections[0]!).toMatchObject({ kind: "appear", systemId: SITE, sentence: "Inquiry form on the site", status: "connected" });
+    expect(systems[0]!.connections[0]!).toMatchObject({ systemId: INBOX, direction: "in", sentence: "The Mooney Firm inquiries: Inquiry form on the site." });
+    expect(systems[2]!.surface).toEqual({ kind: "work", workId: "intake", productId: "applications" });
+    // The rebuild is a Possibility, not a file or a second website.
+    expect(files.map(item => item.id)).toEqual(["check"]);
   });
 
-  it("never claims health it has not seen, and pauses everything when the workspace stopped", () => {
-    const { systems } = readBusinessSystems({ snapshot: snapshot([work("a", "documents")]), sites: [mooneySite], stopped: true, sitesUnavailable: true });
+  it("shows one Possibility from every System it changes, with a same-origin candidate only", () => {
+    const { systems } = readBusinessSystems({ snapshot: snapshot([], mooney), sites: [mooneySite] });
+    expect(systems[0]!.possibilities).toEqual([expect.objectContaining({ id: "website-rebuild:rebuild", status: "ready", affects: [SITE, INBOX], previewSrc: "/api/websites/rebuild/preview" })]);
+    expect(systems[1]!.possibilities.map(item => item.id)).toEqual(["website-rebuild:rebuild"]);
+    const hostile = projection({ ...mooney, possibilities: [{ ...mooney.possibilities[0]!, previewHref: "https://evil.example/x" }] });
+    expect(readBusinessSystems({ snapshot: snapshot([], hostile), sites: [mooneySite] }).systems[0]!.possibilities[0]!.previewSrc).toBeUndefined();
+  });
+
+  it("claims nothing when the spine could not be read, and has no Systems for a workspace without a projection", () => {
+    const down = readBusinessSystems({ snapshot: snapshot([work("intake", "applications")], projection({ status: "unavailable" })), sites: [mooneySite] });
+    expect(down).toEqual({ systems: [], files: [expect.objectContaining({ id: "intake" })], unavailable: true });
+    expect(readBusinessSystems({ snapshot: snapshot([work("intake", "applications")]), sites: [] })).toMatchObject({ systems: [], unavailable: false });
+  });
+
+  it("pauses every System when the workspace stopped, without touching health", () => {
+    const { systems } = readBusinessSystems({ snapshot: snapshot([], mooney), sites: [mooneySite], stopped: true });
     expect(systems.every(item => item.lifecycle === "paused")).toBe(true);
-    expect(systems[0]!.health).toEqual({ state: "degraded", summary: "Website access could not be confirmed just now." });
-    expect(systems[1]!.health.state).toBe("unchecked");
-  });
-
-  it("makes a saved rebuild a Possibility of the live website, shown from every System it changes", () => {
-    const { systems } = readBusinessSystems({
-      snapshot: snapshot([work("rebuild", "websites", { title: "attymooney.com rebuild", operation: { status: "review" }, input: { sourceUrl: "https://attymooney.com/", candidatePreviewHref: "/preview/strelva/rebuild/site?example=mooney" } })]),
-      sites: [mooneySite],
-      inquiryBusinesses: [{ id: "mooney-firm", title: "The Mooney Firm" }],
-    });
-    expect(systems).toHaveLength(2);
-    const site = systems[0]!; const inquiries = systems[1]!;
-    expect(site.possibilities).toEqual([expect.objectContaining({ id: "work:rebuild", status: "ready", affects: ["site:mooney-firm", "inquiries:mooney-firm"], previewSrc: "/preview/strelva/rebuild/site?example=mooney" })]);
-    expect(inquiries.possibilities.map(item => item.id)).toEqual(["work:rebuild"]);
-  });
-
-  it("drops a candidate preview that is not same-origin", () => {
-    const { systems } = readBusinessSystems({ snapshot: snapshot([work("rebuild", "websites", { input: { sourceUrl: "attymooney.com", candidatePreviewHref: "https://evil.example/x" } })]), sites: [mooneySite] });
-    expect(systems[0]!.possibilities[0]!.previewSrc).toBeUndefined();
-    expect(systems[0]!.possibilities[0]!.status).toBe("exploring");
-  });
-
-  it("keeps an unmatched website build as its own draft website", () => {
-    const { systems } = readBusinessSystems({ snapshot: snapshot([work("new-site", "websites", { title: "New site" })]), sites: [] });
-    expect(systems).toEqual([expect.objectContaining({ id: "work:new-site", kind: "website", lifecycle: "draft" })]);
+    expect(systems[0]!.health.state).toBe("healthy");
   });
 
   it("shows two location websites on one account as Versions of each other (Twin Trees)", () => {
-    const { systems } = readBusinessSystems({ snapshot: snapshot([]), sites: [
-      { ...mooneySite, id: "twintrees-camillus", title: "Twin Trees Camillus", domain: undefined },
-      { ...mooneySite, id: "twintrees-fayetteville", title: "Twin Trees Fayetteville", domain: undefined },
+    const twin = projection({ systems: [entry(SITE, "website", "Twin Trees Camillus", { tenantId: "camillus" }), entry(INBOX, "website", "Twin Trees Fayetteville", { tenantId: "fayetteville" })] });
+    const { systems } = readBusinessSystems({ snapshot: snapshot([], twin), sites: [
+      { ...mooneySite, id: "camillus", title: "Twin Trees Camillus", domain: undefined },
+      { ...mooneySite, id: "fayetteville", title: "Twin Trees Fayetteville", domain: undefined },
     ] });
-    expect(systems[0]!.versions).toEqual([expect.objectContaining({ systemId: "site:twintrees-fayetteville", relation: "version" })]);
-    expect(systems[1]!.versions[0]!.systemId).toBe("site:twintrees-camillus");
+    expect(systems[0]!.versions).toEqual([expect.objectContaining({ systemId: INBOX, relation: "version" })]);
     expect(systems[0]!.surface).toMatchObject({ kind: "website", previewSrc: undefined });
   });
 
   it("records lineage only from a source link, never from a matching title", () => {
-    const { systems } = readBusinessSystems({ snapshot: snapshot([work("intake", "applications", { sourceWorkId: "source" }), work("Mediation intake", "applications")]), sites: [] });
+    const apps = projection({ systems: [entry(SITE, "internal_app", "intake", { savedWorkId: "intake" }), entry(INBOX, "internal_app", "Mediation intake", { savedWorkId: "Mediation intake" })] });
+    const { systems } = readBusinessSystems({ snapshot: snapshot([work("intake", "applications", { sourceWorkId: "source" }), work("Mediation intake", "applications")], apps), sites: [] });
     expect(systems[0]!.versions[0]!.lineage).toContain("Adapted from a source system");
     expect(systems[1]!.versions).toEqual([]);
 
@@ -100,35 +104,34 @@ describe("Systems read adapter", () => {
 
 describe("Make real and the System page", () => {
   const site: SystemView = {
-    id: "site:mooney-firm", kind: "website", name: "attymooney.com", detail: "The Mooney Firm", lifecycle: "live",
-    health: { state: "unchecked", summary: "No recent check is recorded for this system." },
+    id: SITE, kind: "website", name: "attymooney.com", detail: "The Mooney Firm", lifecycle: "live",
+    health: { state: "unknown", summary: "Nothing has checked this yet." },
     surface: { kind: "website", domain: "attymooney.com", liveUrl: "https://www.attymooney.com", previewSrc: "https://www.attymooney.com", previewLabel: "attymooney.com, as visitors see it now", manageHref: "/dashboard" },
     operatedBy: "Strelva", connections: [], versions: [],
-    possibilities: [{ id: "work:rebuild", title: "A rebuilt attymooney.com", summary: "Rebuilt.", status: "ready", affects: ["site:mooney-firm"], previewSrc: "/preview/x" }],
+    possibilities: [{ id: "website-rebuild:rebuild", title: "A rebuilt attymooney.com", summary: "Rebuilt.", status: "ready", affects: [SITE], previewSrc: "/preview/x" }],
   };
   const render = (overrides: Partial<Parameters<typeof SystemPage>[0]> = {}) => renderToStaticMarkup(createElement(SystemPage, {
-    system: site, systems: [site], workspaceId: BUSINESS, readOnly: false, sources: [], systemHref: id => systemHref("", BUSINESS, id), onHome: () => undefined, onAsk: () => undefined, ...overrides,
+    system: site, systems: [site], workspaceId: BUSINESS, readOnly: false, canMakeReal: true, sources: [], systemHref: id => systemHref("", BUSINESS, id), onHome: () => undefined, onAsk: () => undefined, ...overrides,
   }));
 
-  it("says activation is not connected and that nothing changed", () => {
-    const result = requestMakeReal({ title: "A rebuilt attymooney.com" });
-    expect(result.status).toBe("not_connected");
-    expect(result.message).toMatch(/^Activation is not connected yet\. Nothing changed/);
+  it("says outside effects are not connected and nothing live changed", () => {
+    const result: WorkspaceMakeRealResult = { isolated: true, status: "in_progress", headline: "In progress: 2 of 5 steps.", done: [], waiting: [], unknown: [], notStarted: [], liveUnchanged: true, notConnected: [] };
+    expect(makeRealSummary(result)).toBe("Outside effects aren\u2019t connected yet, so this ran on an isolated copy. Your live systems are unchanged. Nothing was published, sent, booked or charged.");
   });
 
   it("gives the website most of the page and puts the four nouns beside it", () => {
     const html = render();
     expect(html).toContain("<h1");
-    expect(html).toContain("attymooney.com");
     expect(html).toContain('title="attymooney.com as visitors see it"');
     for (const heading of ["Connections", "Possibilities", "Versions", "Make real", "Compare", "Website controls", "Ask for a change"]) expect(html).toContain(heading);
     expect(html).toContain("Live");
-    expect(html).toContain("Not checked here yet");
+    expect(html).toContain("Unknown. Nothing has checked this yet.");
+    expect(html).not.toContain("Not checked here yet");
   });
 
-  it("disables changes and Make real with a visible reason for read-only access", () => {
-    const html = render({ readOnly: true, readOnlyReason: "Only The Mooney Firm owners can make changes." });
-    expect(html).toContain("Only The Mooney Firm owners can make changes.");
+  it("gives a non-owner a visible permission state on Make real", () => {
+    const html = render({ readOnly: true, canMakeReal: false, readOnlyReason: "Ask an owner or admin to make changes.", makeRealReason: "Only an owner of this business can make a possibility real." });
+    expect(html).toContain("Only an owner of this business can make a possibility real.");
     expect(html.match(/<button[^>]*disabled=""[^>]*>[^]*?Make real/)).not.toBeNull();
   });
 

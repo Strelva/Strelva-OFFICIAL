@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { MouseEvent, ReactNode } from "react";
-import { AppWindow, Building2, CalendarDays, CircleHelp, FileText, Globe2, Home, Inbox, KeyRound, ListChecks, MessageSquareText, Repeat, Search, Sheet, UserPlus, Users, X, type LucideIcon } from "lucide-react";
+import { AppWindow, Building2, CalendarDays, CircleHelp, FileText, Globe2, Home, Inbox, KeyRound, ListChecks, MessageSquareText, Repeat, Search, Sheet, UserPlus, X, type LucideIcon } from "lucide-react";
 import { SYSTEMS_LABEL, SYSTEMS_LIST_LABEL } from "@/experience/systems/model";
 import { LogoMark } from "@/components/Logo";
 import { WorkspaceSignOutButton } from "@/experience/workspace/WorkspaceSignOutButton";
@@ -16,7 +16,6 @@ type NavigableSection = Exclude<StrelvaSection, "account">;
 
 const PRIMARY_ITEMS: readonly { id: NavigableSection; icon: LucideIcon }[] = [
   { id: "home", icon: Home },
-  { id: "customers", icon: Users },
   { id: "requests", icon: ListChecks },
   { id: "ongoing", icon: Repeat },
 ];

@@ -1,50 +1,50 @@
 /**
- * Read adapter: existing workspace data -> Systems view-model.
+ * Read adapter: the server's spine projection -> Systems view-model.
  *
- * // reconcile with src/platform/systems
- * This is a presentation projection of data the workspace already returns
- * (managed sites, saved work, offering installations, delegations). It infers
- * no health it has not seen and no lineage that was not recorded. When the
- * platform Systems module exposes `SystemRef`s, swap this adapter for it.
+ * Systems, lifecycle, Connections, health and Possibilities all come from
+ * `snapshot.systems` (src/experience/systems/server.ts over
+ * src/platform/systems, system-health and possibilities). This adapter only
+ * resolves what opens (the site, the inquiry inbox or the saved work), the
+ * sentences customers read, and Versions recorded on saved work. It infers no
+ * System, health or lineage the server did not send.
  */
 import type { OfferingInstallation } from "@/platform/offerings";
-import type { ManagedWork, WorkspaceSnapshot, WorkspaceWork } from "@/experience/workspace/contracts";
+import type { ManagedWork, WorkspaceSnapshot, WorkspaceSystemEntry, WorkspaceSystems, WorkspaceWork } from "@/experience/workspace/contracts";
 import { sameAppHref } from "@/experience/workspace/workspace-discovery";
-import {
-  inquirySystemId, siteSystemId, workSystemId,
-  type SystemHealth, type SystemKind, type SystemLifecycle, type SystemPossibility, type SystemVersion, type SystemView,
-} from "./model";
+import type { SystemConnection, SystemKind, SystemPossibility, SystemSurface, SystemVersion, SystemView } from "./model";
 
 export interface SystemsInput {
-  snapshot: Pick<WorkspaceSnapshot, "workspaceId" | "workspaces" | "work" | "delegations">;
-  /** Websites assigned to this business. */
+  snapshot: Pick<WorkspaceSnapshot, "workspaceId" | "workspaces" | "work" | "delegations" | "systems">;
+  /** Managed sites this account can open, for the site surface (address, controls). */
   sites: readonly ManagedWork[];
-  /** Businesses whose inquiries this workspace can open. */
-  inquiryBusinesses?: readonly { id: string; title: string }[];
   installations?: readonly OfferingInstallation[];
   definitionNames?: ReadonlyMap<string, string>;
   /** Workspace exit stopped new work: every System is paused, records retained. */
   stopped?: boolean;
-  /** Site discovery partially failed. */
-  sitesUnavailable?: boolean;
 }
 
 export interface BusinessSystems {
   systems: SystemView[];
   /** Saved results that are not Systems: assessments, audits, plans, experiments. */
   files: WorkspaceWork[];
+  /** The spine projection could not be read. Nothing about Systems is claimed. */
+  unavailable: boolean;
 }
 
-const WORK_KINDS: Record<string, SystemKind> = {
-  applications: "app",
-  "custom-applications": "app",
-  scheduling: "bookings",
-  documents: "document",
+/** Spine descriptor -> what the workspace draws. Kind is a descriptor, not identity. */
+const KIND_VIEW: Record<string, SystemKind> = {
+  website: "website",
+  inquiry: "inquiries",
+  booking: "bookings",
+  document: "document",
+  report: "document",
+  proposal: "document",
   tracker: "tracker",
   onboarding: "onboarding",
+  internal_app: "app",
+  portal: "app",
+  pricing: "app",
 };
-
-const UNCHECKED: SystemHealth = { state: "unchecked", summary: "No recent check is recorded for this system." };
 
 function hostname(value: unknown): string | undefined {
   if (typeof value !== "string" || !value.trim()) return undefined;
@@ -58,29 +58,28 @@ function hostname(value: unknown): string | undefined {
 
 const bare = (host: string | undefined) => host?.replace(/^www\./, "");
 
-function workLifecycle(work: WorkspaceWork, stopped: boolean): SystemLifecycle | null {
-  if (stopped) return "paused";
-  const status = work.operation?.status;
-  if (status === "retired") return null;
-  if (status === "draft" || status === "review" || status === "building") return "draft";
-  return "live";
-}
-
-function workHealth(work: WorkspaceWork): SystemHealth {
-  if (work.unavailableReason) return { state: "degraded", summary: work.unavailableReason };
-  if (work.operation?.status === "needs_attention") return { state: "needs_you", summary: work.operation.reason || "A decision is waiting." };
-  return UNCHECKED;
-}
-
 function provider(installation: OfferingInstallation | undefined): string | undefined {
   if (!installation) return undefined;
   return installation.responsibility.kind === "provider_requested" ? installation.responsibility.providerName : undefined;
 }
 
+const CONNECTION_STATUS = { connected: "connected", disconnected: "not_connected", stale: "unknown" } as const;
+
+function detailFor(kind: SystemKind, work: WorkspaceWork | undefined, entry: WorkspaceSystemEntry): string {
+  if (kind === "document" && work?.document) return `Revision ${work.document.revision}`;
+  if (kind === "app") return "Used by your team";
+  if (kind === "bookings") return "Time people can reserve";
+  if (kind === "tracker") return "Working data";
+  if (kind === "onboarding") return "New-client intake";
+  if (kind === "website" && !entry.tenantId) return "Website draft";
+  return "";
+}
+
 export function readBusinessSystems(input: SystemsInput): BusinessSystems {
-  const { snapshot, sites, inquiryBusinesses = [], installations = [], definitionNames = new Map(), stopped = false, sitesUnavailable = false } = input;
-  const systems: SystemView[] = [];
-  const files: WorkspaceWork[] = [];
+  const { snapshot, sites, installations = [], definitionNames = new Map(), stopped = false } = input;
+  const projection: WorkspaceSystems | undefined = snapshot.systems;
+  const ready = projection?.status === "ready" ? projection : null;
+  const entries = ready?.systems ?? [];
   const installationFor = new Map<string, OfferingInstallation>();
   for (const installation of installations) {
     if (installation.status === "retired") continue;
@@ -88,100 +87,77 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
   }
   const agencyNames = new Map(snapshot.workspaces.filter(item => item.kind === "agency").map(item => [item.id, item.name]));
   const delegationAgency = new Map(snapshot.delegations.filter(item => item.status === "active").map(item => [item.workId, item.agencyWorkspaceId]));
+  const businessName = snapshot.workspaces.find(item => item.id === snapshot.workspaceId)?.name || "This business";
+  const workById = new Map(snapshot.work.map(work => [work.id, work]));
+  const siteById = new Map(sites.map(site => [site.id, site]));
+  const claimedWork = new Set<string>([
+    ...entries.flatMap(entry => entry.savedWorkId ? [entry.savedWorkId] : []),
+    ...(ready?.possibilities ?? []).map(item => item.workId),
+  ]);
 
-  // Websites first: for most managed clients this is the system they know.
-  for (const site of sites) {
-    const domain = bare(hostname(site.domain));
-    const liveUrl = site.domain ? `https://${site.domain.replace(/^https?:\/\//, "")}` : undefined;
-    const previewSrc = (site.previewHref && sameAppHref(site.previewHref)) || liveUrl;
-    systems.push({
-      id: siteSystemId(site.id),
-      kind: "website",
-      name: domain || site.title,
-      detail: domain ? site.title : "Public website",
-      lifecycle: stopped ? "paused" : "live",
-      health: sitesUnavailable ? { state: "degraded", summary: "Website access could not be confirmed just now." } : UNCHECKED,
-      surface: { kind: "website", domain, liveUrl, previewSrc, previewLabel: site.previewHref ? `Rendered from the saved copy of ${domain || site.title}` : `${domain || site.title}, as visitors see it now`, manageHref: site.href },
-      operatedBy: site.relationship === "enterprise" ? "Your enterprise team" : "Strelva",
-      connections: [],
-      possibilities: [],
-      versions: [],
-    });
-  }
-
-  for (const business of inquiryBusinesses) {
-    const site = systems.find(item => item.id === siteSystemId(business.id));
-    systems.push({
-      id: inquirySystemId(business.id),
-      kind: "inquiries",
-      name: "Inquiries",
-      detail: site ? `From ${site.name}` : business.title,
-      lifecycle: stopped ? "paused" : "live",
-      health: UNCHECKED,
-      surface: { kind: "inquiries", tenantId: business.id },
-      operatedBy: site?.operatedBy,
-      connections: site ? [{ id: `${business.id}:appear`, kind: "appear", target: site.name, systemId: site.id, sentence: `People ask through the contact form on ${site.name}.`, status: "connected" }] : [],
-      possibilities: [],
-      versions: [],
-    });
-    if (site) site.connections.push({ id: `${business.id}:trigger`, kind: "trigger", target: "Inquiries", systemId: inquirySystemId(business.id), sentence: "Every contact-form message becomes an inquiry.", status: "connected" });
-  }
-
-  const websiteWork: WorkspaceWork[] = [];
-  for (const work of snapshot.work) {
-    if (work.productId === "websites") { websiteWork.push(work); continue; }
-    const kind = WORK_KINDS[work.productId];
-    const lifecycle = kind ? workLifecycle(work, stopped) : null;
-    if (!kind || !lifecycle) { files.push(work); continue; }
-    const installation = installationFor.get(work.id);
+  const systems: SystemView[] = entries.map(entry => {
+    const kind = KIND_VIEW[entry.kind] ?? "app";
+    const work = entry.savedWorkId ? workById.get(entry.savedWorkId) : undefined;
+    const site = entry.tenantId ? siteById.get(entry.tenantId) : undefined;
+    const domain = bare(hostname(site?.domain));
+    const installation = entry.savedWorkId ? installationFor.get(entry.savedWorkId) : undefined;
+    let surface: SystemSurface | null = null;
+    if (kind === "website" && entry.tenantId) {
+      const liveUrl = site?.domain ? `https://${site.domain.replace(/^https?:\/\//, "")}` : undefined;
+      const previewSrc = (site?.previewHref && sameAppHref(site.previewHref)) || liveUrl;
+      surface = { kind: "website", domain, liveUrl, previewSrc, previewLabel: site?.previewHref ? `Rendered from the saved copy of ${domain || entry.name}` : `${domain || entry.name}, as visitors see it now`, manageHref: site?.href && sameAppHref(site.href) ? sameAppHref(site.href) || undefined : undefined };
+    } else if (work) {
+      surface = { kind: "work", workId: work.id, productId: work.productId };
+    }
     const versions: SystemVersion[] = [];
-    if (installation) versions.push({ id: `${work.id}:offering`, relation: "version", context: snapshot.workspaces.find(item => item.id === snapshot.workspaceId)?.name || "This business", title: work.title, lineage: `Adapted from ${definitionNames.get(installation.definitionId) || installation.definitionId}, version ${installation.definitionVersion}.` });
-    if (work.sourceWorkId && kind !== "document") {
+    if (work && installation) versions.push({ id: `${work.id}:offering`, relation: "version", context: businessName, title: work.title, lineage: `Adapted from ${definitionNames.get(installation.definitionId) || installation.definitionId}, version ${installation.definitionVersion}.` });
+    if (work?.sourceWorkId && kind !== "document") {
       const agency = delegationAgency.get(work.id);
-      versions.push({ id: `${work.id}:source`, relation: "version", context: snapshot.workspaces.find(item => item.id === snapshot.workspaceId)?.name || "This business", title: work.title, lineage: `Adapted from a source system${agency && agencyNames.get(agency) ? ` kept by ${agencyNames.get(agency)}` : " your provider keeps"}. Your records and access stay here.` });
+      versions.push({ id: `${work.id}:source`, relation: "version", context: businessName, title: work.title, lineage: `Adapted from a source system${agency && agencyNames.get(agency) ? ` kept by ${agencyNames.get(agency)}` : " your provider keeps"}. Your records and access stay here.` });
     }
-    const possibilities: SystemPossibility[] = [];
-    if (kind === "app" && work.operation?.status === "draft" && installation?.status === "active") {
-      possibilities.push({ id: `${work.id}:candidate`, title: `Unpublished changes to ${work.title}`, summary: "A changed version is saved but not published. People keep using the current one.", status: "exploring", affects: [workSystemId(work.id)] });
+    return {
+      id: entry.ref.systemId,
+      kind,
+      // A managed website reads by its address; the spine keeps the site name.
+      name: kind === "website" && domain ? domain : entry.name,
+      detail: kind === "website" && domain ? entry.name : detailFor(kind, work, entry),
+      ...(entry.basis ? { basis: entry.basis } : {}),
+      lifecycle: stopped ? "paused" : entry.lifecycle,
+      health: { state: entry.health.status, summary: work?.unavailableReason || entry.health.summary, lastVerifiedAt: entry.health.lastVerifiedAt },
+      surface: surface ?? { kind: "work", workId: entry.savedWorkId ?? entry.ref.systemId, productId: "unknown" },
+      operatedBy: kind === "website" && site ? site.relationship === "enterprise" ? "Your enterprise team" : "Strelva" : provider(installation),
+      connections: [], possibilities: [], versions,
+    };
+  });
+  const byId = new Map(systems.map(system => [system.id, system]));
+
+  // The inquiry inbox opens for the tenant of the site its form appears on.
+  for (const connection of ready?.connections ?? []) {
+    const source = byId.get(connection.sourceId);
+    const target = connection.targetSystemId ? byId.get(connection.targetSystemId) : undefined;
+    if (!source) continue;
+    const status = CONNECTION_STATUS[connection.state];
+    const outgoing: SystemConnection = { id: connection.id, kind: connection.kind, target: target?.name ?? connection.targetLabel, systemId: target?.id, sentence: connection.purpose ?? `${source.name} works with ${target?.name ?? connection.targetLabel}.`, status };
+    source.connections.push(outgoing);
+    if (target) target.connections.push({ id: `${connection.id}:in`, kind: connection.kind, target: source.name, systemId: source.id, sentence: `${source.name}: ${connection.purpose ?? "connected here"}.`, status, direction: "in" });
+    const tenantId = target ? entries.find(entry => entry.ref.systemId === target.id)?.tenantId : null;
+    if (source.kind === "inquiries" && connection.kind === "appear" && tenantId && source.surface.kind === "work" && source.surface.productId === "unknown") {
+      source.surface = { kind: "inquiries", tenantId };
+      source.operatedBy = target?.operatedBy;
+      source.detail = `From ${target?.name}`;
     }
-    systems.push({
-      id: workSystemId(work.id), kind, name: work.title,
-      detail: kind === "document" && work.document ? `Revision ${work.document.revision}` : kind === "app" ? "Used by your team" : kind === "bookings" ? "Time people can reserve" : kind === "tracker" ? "Working data" : kind === "onboarding" ? "New-client intake" : "",
-      lifecycle, health: workHealth(work),
-      surface: { kind: "work", workId: work.id, productId: work.productId },
-      operatedBy: provider(installation),
-      connections: [], possibilities, versions,
-    });
   }
 
-  // A saved website build is either a Possibility for an existing site or a draft website of its own.
-  for (const work of websiteWork) {
-    const source = bare(hostname(work.input.sourceUrl));
-    const site = systems.find(item => item.kind === "website" && item.surface.kind === "website" && ((source && item.surface.domain === source) || item.detail === work.title || item.name === work.title));
-    const ready = ["review", "approved", "ready"].includes(work.operation?.status || "");
-    const previewSrc = typeof work.input.candidatePreviewHref === "string" ? sameAppHref(work.input.candidatePreviewHref) || undefined : undefined;
-    if (site) {
-      site.possibilities.push({
-        id: workSystemId(work.id),
-        title: `A rebuilt ${site.name}`,
-        summary: typeof work.input.summary === "string" ? work.input.summary : "The same business, pages and facts, rebuilt on Strelva's website system.",
-        status: ready ? "ready" : "exploring",
-        // The rebuilt site carries the contact form, so the inquiries it feeds change too.
-        affects: [site.id, ...systems.filter(item => item.kind === "inquiries" && item.connections.some(connection => connection.systemId === site.id)).map(item => item.id)],
-        evidence: typeof work.input.evidence === "string" ? work.input.evidence : undefined,
-        previewSrc,
-        openHref: `/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&view=websites&work=${encodeURIComponent(work.id)}`,
-      });
-      continue;
-    }
-    if (work.operation?.status === "retired") { files.push(work); continue; }
-    systems.push({
-      id: workSystemId(work.id), kind: "website", name: work.title, detail: "Website draft",
-      lifecycle: stopped ? "paused" : work.operation?.status === "published" ? "live" : "draft",
-      health: workHealth(work),
-      surface: { kind: "work", workId: work.id, productId: "websites" },
-      connections: [], possibilities: [], versions: [],
-    });
+  // A Possibility is business-level: show it from every System it would change.
+  for (const possibility of ready?.possibilities ?? []) {
+    const view: SystemPossibility = {
+      id: possibility.id, title: possibility.title, summary: possibility.summary, status: possibility.status,
+      affects: possibility.affects.filter(id => byId.has(id)),
+      ...(possibility.evidence ? { evidence: possibility.evidence } : {}),
+      ...(possibility.previewHref && sameAppHref(possibility.previewHref) ? { previewSrc: sameAppHref(possibility.previewHref) || undefined } : {}),
+      openHref: `/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&view=websites&work=${encodeURIComponent(possibility.workId)}`,
+    };
+    for (const id of view.affects) byId.get(id)!.possibilities.push(view);
   }
 
   // Several websites under one business are location Versions of one website (Twin Trees: one account, two locations).
@@ -193,13 +169,8 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
     })));
   }
 
-  // A Possibility is business-level: show it from every System it would change.
-  for (const system of systems) for (const possibility of system.possibilities) for (const id of possibility.affects) {
-    const other = systems.find(item => item.id === id);
-    if (other && !other.possibilities.some(item => item.id === possibility.id)) other.possibilities.push(possibility);
-  }
-
-  return { systems, files };
+  const files = snapshot.work.filter(work => !claimedWork.has(work.id));
+  return { systems, files, unavailable: projection?.status === "unavailable" };
 }
 
 /** A Possibility can touch several Systems; this resolves the names a customer will recognize. */
@@ -209,6 +180,9 @@ export function possibilityScope(possibility: SystemPossibility, systems: readon
     ...(possibility.introduces || []).map(name => `New: ${name}`),
   ];
 }
+
+/** Saved-work products the spine maps to Systems (systems/from-existing SAVED_WORK_KINDS), less websites. */
+const SYSTEM_PRODUCTS: ReadonlySet<string> = new Set(["applications", "custom-applications", "scheduling", "documents", "tracker"]);
 
 export interface AgencyLineage {
   sources: Array<{ source: WorkspaceWork; versions: Array<{ businessId: string; businessName: string; work: WorkspaceWork }> }>;
@@ -221,11 +195,11 @@ export interface AgencyLineage {
  * Only `sourceWorkId` establishes lineage; matching titles never do.
  */
 export function agencySystemLineage(agencyWork: readonly WorkspaceWork[], clients: readonly { workspace: { id: string; name: string }; work: readonly WorkspaceWork[] }[]): AgencyLineage {
-  const sources = agencyWork.filter(work => WORK_KINDS[work.productId] && work.operation?.status !== "retired").map(source => ({ source, versions: [] as AgencyLineage["sources"][number]["versions"] }));
+  const sources = agencyWork.filter(work => SYSTEM_PRODUCTS.has(work.productId) && work.operation?.status !== "retired").map(source => ({ source, versions: [] as AgencyLineage["sources"][number]["versions"] }));
   const byId = new Map(sources.map(entry => [entry.source.id, entry]));
   const unlinked: AgencyLineage["unlinked"] = [];
   for (const client of clients) for (const work of client.work) {
-    if (!WORK_KINDS[work.productId] && work.productId !== "websites") continue;
+    if (!SYSTEM_PRODUCTS.has(work.productId) && work.productId !== "websites") continue;
     const entry = work.sourceWorkId ? byId.get(work.sourceWorkId) : undefined;
     const item = { businessId: client.workspace.id, businessName: client.workspace.name, work };
     if (entry) entry.versions.push(item); else unlinked.push(item);

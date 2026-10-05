@@ -7,9 +7,37 @@ import { WorkspaceApp } from "../WorkspaceApp";
 import { createPreviewInquiryAdapter } from "@/experience/inquiries/preview-fixture";
 import { createPreviewRequest, PREVIEW_SCENARIOS, type PreviewScenario } from "./fixture";
 import { MOONEY_INQUIRY_PROFILE, MOONEY_TENANT } from "./systems-fixture";
+import type { PreviewSystems } from "./systems-projection";
 import styles from "./preview.module.css";
 
-export function WorkspacePreview({ scenario }: { scenario: PreviewScenario }) {
+const previewJson = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+
+/**
+ * Adds the server-computed Systems projection to the fixture's workspace
+ * reads, and answers Make real with the result the isolated sandbox produced
+ * on the server. Non-owners get the same 403 the route returns.
+ */
+function withSystems(base: typeof fetch, systems: PreviewSystems | undefined): typeof fetch {
+  if (!systems) return base;
+  return async (input, init) => {
+    const raw = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    const url = new URL(raw, "http://preview.invalid");
+    const method = init?.method || "GET";
+    if (url.pathname === "/api/workspace/systems/make-real" && method === "POST") {
+      const body = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as { workspaceId?: string; possibilityId?: string };
+      if (!body.workspaceId || !systems.owners.includes(body.workspaceId)) return previewJson({ error: "Only an owner of this business can make a possibility real.", permission: "not_owner" }, 403);
+      const result = systems.makeReal[`${body.workspaceId}:${body.possibilityId}`];
+      return result ? previewJson({ result }) : previewJson({ error: "This possibility is not available. Nothing changed." }, 404);
+    }
+    const response = await base(input, init);
+    if (url.pathname !== "/api/workspace" || method !== "GET" || !response.ok) return response;
+    const snapshot = await response.json() as { workspaceId: string };
+    const projection = systems.systems[snapshot.workspaceId];
+    return previewJson(projection ? { ...snapshot, systems: projection } : snapshot);
+  };
+}
+
+export function WorkspacePreview({ scenario, systems }: { scenario: PreviewScenario; systems?: PreviewSystems }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [installedStaffRequest] = useState(() => searchParams.get("previewSetup") === "staff-request");
@@ -26,7 +54,7 @@ export function WorkspacePreview({ scenario }: { scenario: PreviewScenario }) {
     observer.observe(controls);
     return () => observer.disconnect();
   }, []);
-  const request = useMemo(() => createPreviewRequest(scenario, { installedStaffRequest, seededRequests }), [installedStaffRequest, seededRequests, scenario]);
+  const request = useMemo(() => withSystems(createPreviewRequest(scenario, { installedStaffRequest, seededRequests }), systems), [installedStaffRequest, seededRequests, scenario, systems]);
   useEffect(() => {
     if (!installedStaffRequest) return;
     const url = new URL(window.location.href);

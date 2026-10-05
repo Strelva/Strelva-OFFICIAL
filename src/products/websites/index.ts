@@ -3,6 +3,7 @@
  * The existing v1 ./server entry remains unchanged. */
 export * from "./rebuild-release";
 export * from "./rebuild-contracts";
+export * from "./rebuild-possibility";
 export * from "./rebuild-audit-contracts";
 export * from "./rebuild-audit";
 export * from "./site-document";

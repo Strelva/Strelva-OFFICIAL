@@ -2,13 +2,16 @@
  * Presentation view-model for the Systems, Connections, Possibilities and
  * Versions customer model (PRODUCT_MODEL.md DESIGN_SYSTEMS_PRODUCT_MODEL).
  *
- * // reconcile with src/platform/systems
- * Lane B owns the domain (`SystemRef`, lifecycle and lineage contracts). This
- * file only describes what the workspace renders. Nothing here grants access,
- * activates a Possibility or copies data between Versions. When the platform
- * module lands, replace the read adapter in `from-workspace.ts` and keep these
- * shapes as the UI contract (or map them 1:1).
+ * A thin projection over the spine: `id` is the spine's systemId (the
+ * SystemRef within this business), lifecycle is the spine's SystemLifecycle
+ * and health is src/platform/system-health's status. This file only adds what
+ * the workspace renders: icons, labels, the surface that opens and the
+ * sentences customers read. Nothing here grants access, activates a
+ * Possibility or copies data between Versions.
  */
+import type { SystemLifecycle as SpineLifecycle } from "@/platform/systems/contracts";
+import type { HealthStatus } from "@/platform/system-health/contracts";
+import type { WorkspaceMakeRealResult } from "@/experience/workspace/contracts";
 
 /** Customer-facing name of the whole set. Jacob still owns the brand call; rename here only. */
 export const SYSTEMS_LABEL = "Systems";
@@ -17,14 +20,16 @@ export const SYSTEMS_LIST_LABEL = "All systems and files";
 export type SystemKind = "website" | "inquiries" | "bookings" | "document" | "app" | "tracker" | "onboarding";
 
 /** Intended operation only. Health is a separate signal (RULE_SYSTEM_PAUSE_HEALTH). */
-export type SystemLifecycle = "draft" | "live" | "paused";
+export type SystemLifecycle = SpineLifecycle;
 
-export type SystemHealthState = "working" | "needs_you" | "degraded" | "unchecked";
+/** src/platform/system-health status. `unknown` means no fresh evidence, never "fine". */
+export type SystemHealthState = HealthStatus;
 
 export interface SystemHealth {
   state: SystemHealthState;
-  /** One plain sentence. Never claims a check that did not happen. */
+  /** One plain sentence from the evidence. Never claims a check that did not happen. */
   summary: string;
+  lastVerifiedAt?: string | null;
 }
 
 export type SystemConnectionKind = "read" | "act" | "appear" | "share" | "depend" | "trigger";
@@ -39,6 +44,8 @@ export interface SystemConnection {
   /** The sentence a customer reads, e.g. "Inquiries arrive from the website". */
   sentence: string;
   status: "connected" | "not_connected" | "unknown";
+  /** `in`: another System points at this one (the form that appears on this site). */
+  direction?: "out" | "in";
 }
 
 export type PossibilityStatus = "exploring" | "ready";
@@ -78,11 +85,14 @@ export type SystemSurface =
   | { kind: "work"; workId: string; productId: string };
 
 export interface SystemView {
+  /** The spine's systemId. Together with the workspace id it is the SystemRef. */
   id: string;
   kind: SystemKind;
   name: string;
   /** Short line under the name: domain, source, or what it is for. */
   detail: string;
+  /** Why the lifecycle reads as it does, when the spine records it. */
+  basis?: string;
   lifecycle: SystemLifecycle;
   health: SystemHealth;
   surface: SystemSurface;
@@ -115,10 +125,10 @@ export const SYSTEM_KIND_LABEL: Record<SystemKind, string> = {
 export const LIFECYCLE_LABEL: Record<SystemLifecycle, string> = { draft: "Draft", live: "Live", paused: "Paused" };
 
 export const HEALTH_LABEL: Record<SystemHealthState, string> = {
-  working: "Working",
-  needs_you: "Needs you",
+  healthy: "Working",
   degraded: "Something is off",
-  unchecked: "Not checked here yet",
+  blocked: "Not working",
+  unknown: "Unknown",
 };
 
 export const POSSIBILITY_STATUS_LABEL: Record<PossibilityStatus, string> = { exploring: "Exploring", ready: "Ready" };
@@ -127,24 +137,23 @@ export const CONNECTION_KIND_LABEL: Record<SystemConnectionKind, string> = {
   read: "Reads", act: "Acts on", appear: "Appears on", share: "Shares with", depend: "Depends on", trigger: "Starts work in",
 };
 
-export const siteSystemId = (tenantId: string) => `site:${tenantId}`;
-export const inquirySystemId = (tenantId: string) => `inquiries:${tenantId}`;
-export const workSystemId = (workId: string) => `work:${workId}`;
+/** The same Connection read from its target. */
+export const INCOMING_CONNECTION_LABEL: Record<SystemConnectionKind, string> = {
+  read: "Read by", act: "Acted on by", appear: "Shows", share: "Shared with", depend: "Needed by", trigger: "Started by",
+};
 
 export function systemHref(base: string, workspaceId: string, systemId: string): string {
   const params = new URLSearchParams({ view: "system", system: systemId, workspaceId });
   return `${base}/workspace?${params}`;
 }
 
-/** Make real is a customer action, but activation is not connected yet (COMP_MULTI_SYSTEM_ACTIVATION). */
-export interface MakeRealResult {
-  status: "not_connected";
-  message: string;
-}
+export type MakeRealOutcome =
+  | { kind: "result"; result: WorkspaceMakeRealResult }
+  | { kind: "permission"; message: string }
+  | { kind: "error"; message: string };
 
-export function requestMakeReal(possibility: Pick<SystemPossibility, "title">): MakeRealResult {
-  return {
-    status: "not_connected",
-    message: `Activation is not connected yet. Nothing changed: "${possibility.title}" stays a possibility, and your live systems are untouched. Ask Strelva to make it real and the team will agree scope and a date with you first.`,
-  };
+/** Plain customer copy for an isolated Make real run. Never implies a live change. */
+export function makeRealSummary(result: WorkspaceMakeRealResult): string {
+  const live = result.liveUnchanged ? "Your live systems are unchanged." : "Some systems switched in the isolated copy only; your live systems are unchanged.";
+  return `Outside effects aren\u2019t connected yet, so this ran on an isolated copy. ${live} Nothing was published, sent, booked or charged.`;
 }

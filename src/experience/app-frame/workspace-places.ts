@@ -3,7 +3,6 @@
  *
  * Plain places, with Strelva as the only actor:
  * - Home: what needs you, what Strelva handled, what is in progress.
- * - Customers: the people who reach the business.
  * - Requests: things someone asked for that have an end.
  * - Running: what Strelva keeps doing, named by the sentence it keeps true.
  * The business menu holds Business details, People & access and Help. The
@@ -12,6 +11,9 @@
  * October 4: the website and apps are Systems. Each opens its System page
  * (`view=system&system=<id>`); the full list keeps its old `apps` address.
  * The on-screen word lives in `SYSTEMS_LABEL` so the brand call stays one edit.
+ * October 5: Customers left the navigation. The page only listed where people
+ * reach the business, not customers; `view=customers` still opens it for
+ * existing links.
  * Every caller that needs to know which place a view belongs to, what it is
  * called, or how to link to it asks this module instead of keeping its own
  * mapping.

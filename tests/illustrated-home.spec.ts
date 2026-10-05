@@ -102,11 +102,15 @@ test("Home keeps decisions, allowance, business switching and site assignment re
 
 test("the same navigation remains across primary surfaces and utilities", async ({ page }, info) => {
   await page.goto("/preview/strelva?scenario=free");
-  for (const label of ["Home", "Customers", "Requests", "Running", "All systems and files", "Business details", "People & access", "Help"]) {
+  for (const label of ["Home", "Requests", "Running", "All systems and files", "Business details", "People & access", "Help"]) {
     await navigation(page).getByRole("link", { name: label, exact: true }).click();
     await expect(navigation(page).getByRole("link", { name: label, exact: true })).toHaveAttribute("aria-current", "page");
-    for (const name of ["Home", "Customers", "Requests", "Running", "Business details", "People & access"]) await expect(navigation(page).getByRole("link", { name, exact: true })).toBeVisible();
+    for (const name of ["Home", "Requests", "Running", "Business details", "People & access"]) await expect(navigation(page).getByRole("link", { name, exact: true })).toBeVisible();
+    await expect(navigation(page).getByRole("link", { name: "Customers", exact: true })).toHaveCount(0);
   }
+  // Customers left the navigation; existing links still open the page.
+  await page.goto("/preview/strelva/workspace?scenario=free&view=customers");
+  await expect(page.getByRole("heading", { name: "Customers", level: 1 })).toBeVisible();
   await navigation(page).getByRole("link", { name: "Business details", exact: true }).click();
   await page.screenshot({ path: info.outputPath("desktop-settings.png"), fullPage: true });
 });

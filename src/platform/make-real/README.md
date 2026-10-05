@@ -6,7 +6,15 @@ connect, then run the declared operating checks. Each step records its own
 outcome. Nothing is atomic across providers, and the activation says so.
 
 Today the step log is in memory (`createInMemoryActivationRepository`). Every
-proof runs against isolated fake providers. Nothing here is wired to a route.
+proof runs against isolated fake providers.
+
+The workspace reaches it through one route, `POST /api/workspace/systems/make-real`
+(owners only), which runs `sandbox.ts`: an in-memory copy of the affected
+Systems, isolated adapters only (`assertIsolated` refuses a live one), and a
+stop before the first step that would switch a live System or call a
+provider. The customer sees `describeActivation()` for that run and the
+outside effects that are not connected. Nothing it does reaches a provider,
+the SystemStore or a live site.
 
 ## Rules the runner enforces
 
