@@ -1,7 +1,7 @@
 # Strelva Reborn
 
 Created: 2026-10-02
-Version: `1.0.0`, tagged `strelva-v1.0.0` at release cut.
+Versions: a series of `0.x` releases, starting with `0.2.1`. Not `1.0.0`.
 Status: preparing. Nothing in this release is deployed.
 
 **Strelva Reborn is the release where every Strelva client runs inside a business
@@ -13,6 +13,28 @@ The Sept 30 release (internal name `strelvav2`, version `0.2.0`) put the
 workspace machinery in production: memberships, grants, saved work, approvals,
 exits, exports, allowances. It moved no client. Strelva Reborn is the release
 that moves them. The [strelvav2 page](./strelvav2.md) is now history.
+
+## Versions
+
+Strelva Reborn ships in steps. Each step is a minor or patch release that goes
+to production on its own once it is proven, so the leads fix doesn't wait for
+client conversion and conversion doesn't wait for every capability.
+
+| Version | Ships when | Sections |
+| --- | --- | --- |
+| `0.2.1` | Every client lead is also kept in Postgres; all 9 client repos are checked | 0 |
+| `0.3.0` | One business record, and gldf converted into a workspace in production | 1, first of 3 |
+| `0.4.0` | Leads, inquiries, bookings and approvals are owned by the workspace, not Redis | 2 |
+| `0.5.0` | Every client converted, storefront responses unchanged | 3 |
+| `0.6.0` | Owners can enter; capabilities and one operator place are production-complete | 4, 5, 6 |
+
+Numbers after `0.3.0` can shift as evidence comes in; the order holds.
+
+**`1.0.0` is not a Reborn target.** It means Strelva is something we'd stand
+behind for any new customer: every client running in a workspace in
+production, owners using it, no client data held only in Redis, every client
+repo checked, and the customer model (Systems, Connections, Possibilities,
+Versions) proven with real customers. Jacob decides when that is true.
 
 ## Where we are
 
@@ -259,13 +281,15 @@ which is what `main` and production run. Jacob and selected testers use
 Preview gets built, not a separate channel.
 
 All Reborn work lands on the `reborn` branch through pull requests. `main`
-stays Stable until the `1.0.0` cut merges `reborn` into it.
+stays Stable; each Reborn version merges into `main` when it is cut. A step that
+must not wait for the rest (like `0.2.1`) is built from `main` directly.
 
 - **Nightly build.** [`preview-nightly.yml`](../../.github/workflows/preview-nightly.yml)
   builds `reborn` at 03:00 Eastern: lint, types, boundaries, ontology,
   workspace SQL and full upgrade, tests with coverage, audit, build, public
   smoke and workspace browser acceptance. A green build is tagged
-  `strelva-v1.0.0-preview.YYYYMMDD`. Unchanged source isn't re-tagged.
+  `strelva-v<next version>-preview.YYYYMMDD`, today
+  `strelva-v0.3.0-preview.YYYYMMDD`. Unchanged source isn't re-tagged.
 - **Progress.** The run summary shows the progress table: now, last Preview,
   Oct 2 baseline and target. The tag message stores that build's numbers so
   the next one can compare. Run it by hand from the Actions tab with any
@@ -290,8 +314,8 @@ Each of these gets an exact action prepared and verified before asking.
 - Adding `workspaceId` to Stripe subscription metadata.
 - Changing where client admin hosts land.
 - A Preview deployment and staging Supabase project.
-- The release cut itself: `1.0.0` set in this repo and `strelva-marketing`
-  together, per `VERSIONING.md`, and tagged `strelva-v1.0.0`.
+- Each release cut: the version set in this repo and `strelva-marketing`
+  together, per `VERSIONING.md`, and tagged `strelva-v<version>`.
 
 Every production step also passes the
 [release checklist](../operations/horizontal-release-checklist-2026-09-11.md#september-21-production-preparation).

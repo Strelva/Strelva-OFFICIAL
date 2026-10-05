@@ -3,7 +3,7 @@
 Strelva uses [Semantic Versioning](https://semver.org/) and releases the app and
 marketing site in lockstep. Their `package.json` versions must always match.
 
-## 0.2.0 - Unreleased
+## 0.2.0 - 2026-09-30
 
 - Create private website drafts from business briefs, review exact revisions, and download buildable website projects.
 - Select published inquiry and booking connections for exported websites, with durable booking receipts and readback recovery.
@@ -14,9 +14,9 @@ marketing site in lockstep. Their `package.json` versions must always match.
 - Add configured subscription allowances, exact provider-cost receipts and customer exit with retained records and bounded export.
 - Verify exact client repository revisions before release compatibility checks.
 
-This is a draft release candidate. The [acceptance ledger](./docs/operations/strelvav2-horizontal-acceptance.md)
-records completed local proof and remaining integration work. Hosted migration,
-provider verification and production deployment remain separate release gates.
+Deployed to production on 2026-09-30, built from `f41e9a6f`. The workspace was
+on but held 0 workspaces; no client moved. The [acceptance ledger](./docs/operations/strelvav2-horizontal-acceptance.md#september-30-workspace-production-release)
+records the release.
 
 ## 0.1.1 - 2026-08-03
 
