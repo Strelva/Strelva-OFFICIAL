@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createMemorySystemStore,
   listBusinessSystems,
+  mergeBusinessSystems,
   systemOriginId,
   systemsFromExisting,
   type ExistingSystemsSnapshot,
@@ -19,7 +20,7 @@ const snapshot: ExistingSystemsSnapshot = {
   businessId: BUSINESS,
   savedWork: [
     work("5e000000-0000-4000-8000-0000000000a2", "websites", "website", "Juniper site",
-      { websitePublishedRevision: 3, hostedTenantStableId: NATIVE_TENANT, hostedTenantId: "juniper" }),
+      { websitePublishedRevision: 3, hostedTenantStableId: NATIVE_TENANT, hostedTenantId: "juniper", hostedTenantReserved: true }),
     work("5e000000-0000-4000-8000-0000000000a3", "scheduling", "schedule", "Tastings"),
     work("5e000000-0000-4000-8000-0000000000a4", "applications", "application", "Orders", { applicationStatus: "installed", applicationRelease: 2 }),
     work("5e000000-0000-4000-8000-0000000000a5", "applications", "application", "Old app", { applicationStatus: "retired" }),
@@ -129,5 +130,83 @@ describe("systems from existing things", () => {
     expect(website[0]).toMatchObject({ provenance: "stored", system: { name: "Juniper website" } });
     expect(listed.systems.map(({ system }) => system.name)).toContain("Catering proposal");
     expect(listed.systems).toHaveLength(7);
+  });
+
+  it("keeps one website System under one id as a managed site converts", async () => {
+    const TENANT = "5e000000-0000-4000-8000-0000000000b7";
+    const WORK = "5e000000-0000-4000-8000-0000000000a9";
+    const empty = { businessId: BUSINESS, savedWork: [], managedWebsites: [], inquiryWorkspaces: [], bookingGrants: [], calendarConnections: [] };
+    const site = (link: "tenant_link" | "website_binding") =>
+      ({ link, tenantStableId: TENANT, tenantId: "maple", siteName: "Maple Dental", tenantActive: true, linkedAt: AT });
+    const rebuilt = (extra: Record<string, unknown>) => work(WORK, "websites", "website", "Maple Dental rebuild", extra);
+    const states: Array<[string, ExistingSystemsSnapshot]> = [
+      ["hosted tenant only (binding)", { ...empty, managedWebsites: [site("website_binding")] }],
+      ["tenant linked", { ...empty, managedWebsites: [site("tenant_link")] }],
+      // The draft rebuild is not tied to the tenant until it publishes there.
+      ["linked, native rebuild still a draft", { ...empty, managedWebsites: [site("tenant_link")], savedWork: [rebuilt({})] }],
+      ["linked, native rebuild published to it", { ...empty, managedWebsites: [site("tenant_link")],
+        savedWork: [rebuilt({ websitePublishedRevision: 1, hostedTenantStableId: TENANT, hostedTenantId: "maple" })] }],
+      ["native row only, still hosting the tenant", { ...empty,
+        savedWork: [rebuilt({ websitePublishedRevision: 2, hostedTenantStableId: TENANT, hostedTenantId: "maple" })] }],
+    ];
+    const tenantId = systemOriginId(BUSINESS, { kind: "tenant", ref: TENANT });
+    for (const [label, state] of states) {
+      const websites = systemsFromExisting(state).systems.filter(({ references }) => references.tenantStableId === TENANT);
+      expect(websites.map(({ system }) => system.id), label).toEqual([tenantId]);
+    }
+
+    // A System saved while the site was only managed lists once after the rebuild publishes.
+    const store = createMemorySystemStore({ access: (actor, businessId) => (businessId === BUSINESS && actor.userId === owner.userId ? "owner" : null) });
+    const saved = await store.createSystem(owner, BUSINESS, { name: "Maple website", kind: "website", origin: { kind: "tenant", ref: TENANT } },
+      "5e000000-0000-4000-8000-0000000000f3");
+    const merged = mergeBusinessSystems(await store.readGraph(owner, BUSINESS), systemsFromExisting(states[3]![1]));
+    expect(merged.systems.filter(({ system }) => system.kind === "website").map(({ system, provenance }) => [system.id, provenance]))
+      .toEqual([[saved.id, "stored"]]);
+  });
+
+  it("keeps a native-first website on its work id after it reserves a hosted tenant", () => {
+    const WORK = "5e000000-0000-4000-8000-0000000000aa";
+    const TENANT = "5e000000-0000-4000-8000-0000000000b8";
+    const empty = { businessId: BUSINESS, savedWork: [], managedWebsites: [], inquiryWorkspaces: [], bookingGrants: [], calendarConnections: [] };
+    const draft = systemsFromExisting({ ...empty, savedWork: [work(WORK, "websites", "website", "Oak site")] }).systems;
+    const published = systemsFromExisting({ ...empty,
+      savedWork: [work(WORK, "websites", "website", "Oak site",
+        { websitePublishedRevision: 1, hostedTenantStableId: TENANT, hostedTenantId: "oak", hostedTenantReserved: true })],
+      managedWebsites: [{ link: "website_binding", tenantStableId: TENANT, tenantId: "oak", siteName: "Oak", tenantActive: true, linkedAt: AT }],
+    }).systems;
+    const id = systemOriginId(BUSINESS, { kind: "saved_work", ref: WORK });
+    expect(draft.map(({ system }) => system.id)).toEqual([id]);
+    expect(published.map(({ system }) => system.id)).toEqual([id]);
+  });
+
+  it("merges a System stored under a draft rebuild's work id into the converted site", async () => {
+    const TENANT = "5e000000-0000-4000-8000-0000000000b9";
+    const WORK = "5e000000-0000-4000-8000-0000000000ab";
+    const store = createMemorySystemStore({ access: (actor, businessId) => (businessId === BUSINESS && actor.userId === owner.userId ? "owner" : null) });
+    const saved = await store.createSystem(owner, BUSINESS, { name: "Rebuild", kind: "website", origin: { kind: "saved_work", ref: WORK } },
+      "5e000000-0000-4000-8000-0000000000f4");
+    const merged = mergeBusinessSystems(await store.readGraph(owner, BUSINESS), systemsFromExisting({
+      businessId: BUSINESS, bookingGrants: [], calendarConnections: [],
+      inquiryWorkspaces: [{ id: "5e000000-0000-4000-8000-0000000000c3", tenantStableId: TENANT, businessId: "default", createdAt: AT, updatedAt: AT }],
+      managedWebsites: [{ link: "tenant_link", tenantStableId: TENANT, tenantId: "elm", siteName: "Elm", tenantActive: true, linkedAt: AT }],
+      savedWork: [work(WORK, "websites", "website", "Elm rebuild", { websitePublishedRevision: 1, hostedTenantStableId: TENANT, hostedTenantId: "elm" })],
+    }));
+    expect(merged.systems.filter(({ system }) => system.kind === "website").map(({ system, provenance }) => [system.id, provenance]))
+      .toEqual([[saved.id, "stored"]]);
+    const appear = merged.connections.map(({ connection }) => connection).find((connection) => connection.kind === "appear")!;
+    expect(appear.target).toMatchObject({ type: "system", system: { systemId: saved.id } });
+  });
+
+  it("lists inquiries only from tenants this business holds", () => {
+    const ELSEWHERE = "5e000000-0000-4000-8000-0000000000ba";
+    const { systems } = systemsFromExisting({
+      ...snapshot,
+      inquiryWorkspaces: [
+        ...snapshot.inquiryWorkspaces,
+        { id: "5e000000-0000-4000-8000-0000000000c2", tenantStableId: ELSEWHERE, businessId: "default", createdAt: AT, updatedAt: AT },
+      ],
+    });
+    const inquiries = systems.filter(({ system }) => system.kind === "inquiry");
+    expect(inquiries.map(({ references }) => references.tenantStableId)).toEqual([MANAGED_TENANT]);
   });
 });

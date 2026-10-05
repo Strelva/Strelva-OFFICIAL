@@ -41,6 +41,8 @@ select pg_temp.sy_assert(
 -- Deterministic adoption ids match src/platform/systems/invariants.ts.
 select pg_temp.sy_assert(public.system_origin_id('5e000000-0000-4000-8000-000000000010', 'saved_work', '5e000000-0000-4000-8000-0000000000a1')
   = 'f155e662-163a-42f3-a0ea-e12c754a9a96', 'origin id matches the TypeScript derivation');
+select pg_temp.sy_assert(public.system_origin_id('5e000000-0000-4000-8000-000000000010', 'tenant', '5e000000-0000-4000-8000-0000000000b2')
+  = '60111262-7fba-474e-a004-3f5d2eee18f0', 'tenant origin id matches the TypeScript derivation');
 
 insert into public.users(id, email, verified_at) values
   ('5e000000-0000-4000-8000-000000000001', 'sy-owner@example.test', now()),
@@ -264,6 +266,72 @@ do $$ declare e jsonb; begin
   perform pg_temp.sy_assert((select x->>'link' from jsonb_array_elements(e->'managedWebsites') x where x->>'tenantStableId' = '5e000000-0000-4000-8000-0000000000b3') = 'website_binding', 'unlinked binding is read');
   perform pg_temp.sy_assert(jsonb_array_length(e->'calendarConnections') = 1 and e->'calendarConnections'->0->>'calendarName' = 'Front desk', 'calendar binding');
 end $$;
+
+-- A native-first website reserved its own hosted tenant; a rebuild published
+-- to a managed tenant did not. from-existing.ts keys identity on this.
+insert into public.tenants(id, stable_id, site_name, active) values
+  ('sy-reserved', '5e000000-0000-4000-8000-0000000000b5', 'Juniper reserved', true);
+insert into public.saved_product_work(id, workspace_id, product_id, resource_kind, title, payload, created_by) values
+  ('5e000000-0000-4000-8000-0000000000a6', '5e000000-0000-4000-8000-000000000010', 'websites', 'website', 'Native first', '{}', '5e000000-0000-4000-8000-000000000001');
+insert into public.website_hosted_tenant_reservations(website_work_id, workspace_id, tenant_id, tenant_stable_id, created_by) values
+  ('5e000000-0000-4000-8000-0000000000a6', '5e000000-0000-4000-8000-000000000010', 'sy-reserved', '5e000000-0000-4000-8000-0000000000b5', '5e000000-0000-4000-8000-000000000001');
+do $$ declare e jsonb; begin
+  e := public.read_existing_business_systems('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000002', 'sy-member@example.test');
+  perform pg_temp.sy_assert((select (x->>'hostedTenantReserved')::boolean from jsonb_array_elements(e->'savedWork') x
+    where x->>'id' = '5e000000-0000-4000-8000-0000000000a6') is true, 'native-first website reports its reserved tenant');
+  perform pg_temp.sy_assert((select (x->>'hostedTenantReserved')::boolean from jsonb_array_elements(e->'savedWork') x
+    where x->>'id' = '5e000000-0000-4000-8000-0000000000a2') is false, 'rebuild published to a managed tenant is not a reservation');
+end $$;
+
+-- Inquiries come only from tenants this business holds. A tenant linked to
+-- another business keeps a stale active binding here; its inquiries stay out.
+insert into public.tenants(id, stable_id, site_name, active) values
+  ('sy-elsewhere', '5e000000-0000-4000-8000-0000000000b4', 'Moved site', true);
+insert into public.tenant_workspace_links(tenant_stable_id, tenant_slug_at_link, workspace_id, linked_by, command_id, command_digest, receipt) values
+  ('5e000000-0000-4000-8000-0000000000b4', 'sy-elsewhere', '5e000000-0000-4000-8000-000000000011', '5e000000-0000-4000-8000-000000000004', gen_random_uuid(), repeat('c', 64), '{}');
+insert into public.offering_website_bindings(business_workspace_id, tenant_stable_id, tenant_id_at_binding, site_name_at_binding, idempotency_key, command_digest, created_by, updated_by) values
+  ('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-0000000000b4', 'sy-elsewhere', 'Moved site', 'sy-bind-3', repeat('d', 64), '5e000000-0000-4000-8000-000000000001', '5e000000-0000-4000-8000-000000000001');
+insert into public.inquiry_workspaces(tenant_id, tenant_stable_id, business_id, state) values
+  ('sy-managed', '5e000000-0000-4000-8000-0000000000b2', 'default', '{"inquiries":[]}'),
+  ('sy-elsewhere', '5e000000-0000-4000-8000-0000000000b4', 'default', '{"inquiries":[]}');
+do $$ declare e jsonb; begin
+  e := public.read_existing_business_systems('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000002', 'sy-member@example.test');
+  perform pg_temp.sy_assert((select count(*) from jsonb_array_elements(e->'inquiryWorkspaces') x
+    where x->>'tenantStableId' = '5e000000-0000-4000-8000-0000000000b2') = 1, 'linked tenant inquiries are listed');
+  perform pg_temp.sy_assert(not exists (select 1 from jsonb_array_elements(e->'inquiryWorkspaces') x
+    where x->>'tenantStableId' = '5e000000-0000-4000-8000-0000000000b4'), 'another business''s inquiries are not listed through a stale binding');
+  perform pg_temp.sy_assert(not exists (select 1 from jsonb_array_elements(e->'managedWebsites') x
+    where x->>'tenantStableId' = '5e000000-0000-4000-8000-0000000000b4'), 'a tenant linked elsewhere is not a managed website here');
+  e := public.read_existing_business_systems('5e000000-0000-4000-8000-000000000011', '5e000000-0000-4000-8000-000000000004', 'sy-other-owner@example.test');
+  perform pg_temp.sy_assert((select count(*) from jsonb_array_elements(e->'inquiryWorkspaces') x
+    where x->>'tenantStableId' = '5e000000-0000-4000-8000-0000000000b4') = 1, 'the linked business sees its own inquiries');
+end $$;
+
+-- A share reconnects only while the actor can still write in both businesses.
+-- Revoking it never needs the other side, and the target business may revoke.
+insert into public.workspace_memberships(workspace_id, user_id, role, created_by) values
+  ('5e000000-0000-4000-8000-000000000014', '5e000000-0000-4000-8000-000000000004', 'owner', '5e000000-0000-4000-8000-000000000001');
+create temp table sy_share on commit drop as
+  select id from public.system_connections where kind = 'share' and target_business_workspace_id = '5e000000-0000-4000-8000-000000000014';
+select pg_temp.sy_assert((select count(*) from sy_share) = 1, 'one share into Juniper Catering');
+select public.set_system_connection_state('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000001', 'sy-owner@example.test',
+  (select id from sy_share), 'disconnected');
+delete from public.workspace_memberships where workspace_id = '5e000000-0000-4000-8000-000000000014' and user_id = '5e000000-0000-4000-8000-000000000001';
+select pg_temp.sy_expect($$select public.set_system_connection_state('5e000000-0000-4000-8000-000000000010','5e000000-0000-4000-8000-000000000001','sy-owner@example.test',(select id from sy_share),'connected')$$, 'business_record_access_denied');
+select pg_temp.sy_expect($$select public.set_system_connection_state('5e000000-0000-4000-8000-000000000010','5e000000-0000-4000-8000-000000000001','sy-owner@example.test',(select id from sy_share),'stale')$$, 'business_record_access_denied');
+select pg_temp.sy_assert((select state from public.system_connections where id = (select id from sy_share)) = 'disconnected', 'removed user could not reconnect the share');
+insert into public.workspace_memberships(workspace_id, user_id, role, created_by) values
+  ('5e000000-0000-4000-8000-000000000014', '5e000000-0000-4000-8000-000000000001', 'owner', '5e000000-0000-4000-8000-000000000004');
+select public.set_system_connection_state('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000001', 'sy-owner@example.test',
+  (select id from sy_share), 'connected');
+select pg_temp.sy_expect($$select public.set_system_connection_state('5e000000-0000-4000-8000-000000000014','5e000000-0000-4000-8000-000000000004','sy-other-owner@example.test',(select id from sy_share),'connected')$$, 'system_not_found');
+select pg_temp.sy_assert(public.set_system_connection_state('5e000000-0000-4000-8000-000000000014', '5e000000-0000-4000-8000-000000000004', 'sy-other-owner@example.test',
+  (select id from sy_share), 'disconnected')->>'state' = 'disconnected', 'the target business revokes the share');
+select public.set_system_connection_state('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000001', 'sy-owner@example.test',
+  (select id from sy_share), 'connected');
+delete from public.workspace_memberships where workspace_id = '5e000000-0000-4000-8000-000000000014' and user_id = '5e000000-0000-4000-8000-000000000001';
+select pg_temp.sy_assert(public.set_system_connection_state('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000001', 'sy-owner@example.test',
+  (select id from sy_share), 'disconnected')->>'state' = 'disconnected', 'the source revokes without the target');
 
 -- After exit, writes stop and reads continue.
 select public.create_business_system('5e000000-0000-4000-8000-000000000013', '5e000000-0000-4000-8000-000000000001', 'sy-owner@example.test',

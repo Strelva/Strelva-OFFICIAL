@@ -29,7 +29,8 @@
 --     current revision;
 --   * an output's pinned revision never changes;
 --   * a System target in another business is allowed only for `share`, and
---     only when the actor can write in both businesses;
+--     only when the actor can write in both businesses, rechecked on every
+--     reconnect; either business may revoke it;
 --   * depend and trigger connections never form a loop;
 --   * a revision can be staged without moving the current pointer, and the
 --     pointer moves only by compare-and-set (activate or restore);
@@ -684,12 +685,29 @@ create function public.set_system_connection_state(
   p_workspace_id uuid, p_user_id uuid, p_verified_email text, p_connection_id uuid, p_state text
 ) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
-declare c public.system_connections;
+declare c public.system_connections; v_businesses uuid[]; v_business uuid;
 begin
-  perform public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, true);
+  -- Read access first so a stranger learns nothing; write locks come below.
+  perform public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, false);
   if p_state is null or p_state not in ('connected','disconnected','stale') then raise exception 'system_input_invalid'; end if;
-  select * into c from public.system_connections where id = p_connection_id and business_workspace_id = p_workspace_id for update;
+  -- The source business acts on its connections; the target business of a
+  -- share may only revoke it.
+  select * into c from public.system_connections where id = p_connection_id
+    and (business_workspace_id = p_workspace_id
+      or (kind = 'share' and target_business_workspace_id = p_workspace_id and p_state = 'disconnected'));
   if not found then raise exception 'system_not_found'; end if;
+  -- Turning a connection off needs write access where the actor stands.
+  -- Anything else needs current write access on the source and, across
+  -- businesses, the target too, so a user removed from either side cannot
+  -- reconnect. Locks are taken in id order, as in connect_system.
+  v_businesses := array[p_workspace_id];
+  if p_state <> 'disconnected' then
+    v_businesses := array[c.business_workspace_id] || coalesce(array[c.target_business_workspace_id], '{}');
+  end if;
+  for v_business in select d.b from (select distinct b from unnest(v_businesses) b where b is not null) d order by d.b::text loop
+    perform public.business_record_assert_actor(v_business, p_user_id, p_verified_email, true);
+  end loop;
+  select * into c from public.system_connections where id = c.id for update;
   update public.system_connections set state = p_state, updated_by = p_user_id, updated_at = clock_timestamp()
     where id = c.id returning * into c;
   return public.system_connection_json(c);
@@ -706,9 +724,14 @@ language plpgsql security definer set search_path = public, pg_temp as $$
 declare linked_tenants uuid[];
 begin
   perform public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, false);
+  -- The tenants this business holds now, by the same rule as managedWebsites:
+  -- its tenant_workspace_links, plus an active binding only for a tenant with
+  -- no link anywhere. A stale binding to a tenant linked to another business
+  -- never shows that business's inquiries here.
   select coalesce(array_agg(distinct stable_id), '{}') into linked_tenants from (
-    select tenant_stable_id as stable_id from public.offering_website_bindings
-      where business_workspace_id = p_workspace_id and status = 'active' and tenant_stable_id is not null
+    select b.tenant_stable_id as stable_id from public.offering_website_bindings b
+      where b.business_workspace_id = p_workspace_id and b.status = 'active' and b.tenant_stable_id is not null
+        and not exists (select 1 from public.tenant_workspace_links l2 where l2.tenant_stable_id = b.tenant_stable_id)
     union
     select tenant_stable_id from public.tenant_workspace_links
       where workspace_id = p_workspace_id and tenant_stable_id is not null
@@ -722,7 +745,10 @@ begin
         'customApplicationStatus', ca.lifecycle_status, 'customApplicationRelease', ca.current_release_version,
         'websiteHeadRevision', h.revision, 'websiteApprovedRevision', h.approved_revision,
         'websitePublishedRevision', p.revision, 'websitePublishedHash', p.content_hash,
-        'hostedTenantStableId', coalesce(hr.tenant_stable_id, pt.stable_id), 'hostedTenantId', coalesce(hr.tenant_id, p.tenant_id))
+        'hostedTenantStableId', coalesce(hr.tenant_stable_id, pt.stable_id), 'hostedTenantId', coalesce(hr.tenant_id, p.tenant_id),
+        -- True when this work row created its own hosted tenant (native first).
+        -- Otherwise the tenant came first and the System keeps its identity.
+        'hostedTenantReserved', hr.website_work_id is not null)
         order by w.created_at, w.id)
       from public.saved_product_work w
       left join public.application_states a on a.work_id = w.id and a.workspace_id = w.workspace_id

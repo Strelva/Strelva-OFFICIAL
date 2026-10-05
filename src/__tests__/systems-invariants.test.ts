@@ -77,6 +77,9 @@ describe("System identity", () => {
     // Pinned in tests/systems-schema.sql against public.system_origin_id.
     expect(systemOriginId(BUSINESS, { kind: "saved_work", ref: "5e000000-0000-4000-8000-0000000000a1" }))
       .toBe("f155e662-163a-42f3-a0ea-e12c754a9a96");
+    // A managed website's System keeps this tenant-derived id through conversion.
+    expect(systemOriginId(BUSINESS, { kind: "tenant", ref: "5e000000-0000-4000-8000-0000000000b2" }))
+      .toBe("60111262-7fba-474e-a004-3f5d2eee18f0");
     expect(systemOriginId(OTHER, { kind: "saved_work", ref: "5e000000-0000-4000-8000-0000000000a1" }))
       .not.toBe("f155e662-163a-42f3-a0ea-e12c754a9a96");
   });

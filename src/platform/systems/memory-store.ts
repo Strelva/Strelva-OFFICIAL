@@ -271,9 +271,21 @@ export function createMemorySystemStore(options: MemorySystemStoreOptions): Syst
 
     async setConnectionState(actor, businessId, connectionId, rawState: ConnectionState) {
       const state = connectionStateSchema.parse(rawState);
-      assertAccess(actor, businessId, true);
+      assertAccess(actor, businessId, false);
       const connection = connections.get(connectionId);
-      if (!connection || connection.businessId !== businessId) throw new WorkspaceAccessError();
+      // The source business acts on its connections; the target business of
+      // a share may only revoke it.
+      const targetBusiness = connection?.target.type === "system" ? connection.target.system.businessId : null;
+      if (!connection || (connection.businessId !== businessId
+        && !(connection.kind === "share" && targetBusiness === businessId && state === "disconnected"))) {
+        throw new WorkspaceAccessError();
+      }
+      // Turning a connection off needs write access where the actor stands.
+      // Anything else needs current write access on the source and, across
+      // businesses, the target, so a user removed from either side cannot
+      // reconnect.
+      const required = state === "disconnected" ? [businessId] : [connection.businessId, targetBusiness];
+      for (const id of new Set(required)) if (id) assertAccess(actor, id, true);
       if (state === "connected" && connection.state === "disconnected") {
         // Reconnecting rechecks loop rules against what exists now.
         assertConnectionAllowed(

@@ -23,14 +23,19 @@ import type { SystemStore } from "./store";
  *
  * Identity is never minted in parallel. A System adopted from an existing
  * thing has id = systemOriginId(businessId, origin), where origin points at
- * the existing identity: saved_product_work.id for anything made in the
- * workspace, tenants.stable_id for a managed website with no native work row,
- * and inquiry_workspaces.id for a managed tenant's inquiry handling. Storing
- * the System later (createSystem with the same origin) keeps the same id.
+ * the identity that existed FIRST: saved_product_work.id for anything made in
+ * the workspace, tenants.stable_id for a managed website, and
+ * inquiry_workspaces.id for a managed tenant's inquiry handling. Storing the
+ * System later (createSystem with the same origin) keeps the same id.
  *
- * A native website's work row and the tenant it publishes to are ONE System.
+ * A native website's work row and the tenant it publishes to are ONE System,
+ * and its id never changes as a site converts. A managed site keeps its
+ * tenant-derived id when a native rebuild publishes to it (bound, linked,
+ * linked + rebuild, rebuild only). A native-first site keeps its work-derived
+ * id after it reserves its own hosted tenant (hostedTenantReserved).
  * tenant_workspace_links is the canonical workspace-to-tenant link; an active
  * offering_website_bindings row is read only for a tenant with no link.
+ * Inquiry workspaces are listed only for tenants this business holds.
  *
  * Not mapped, on purpose: plans, investigations, responsibilities, learning
  * items and onboarding cases are work or records inside a System, not
@@ -59,6 +64,9 @@ export const existingSavedWorkSchema = z.object({
   websitePublishedHash: nullableText,
   hostedTenantStableId: nullableText,
   hostedTenantId: nullableText,
+  /** True when this work row created its own hosted tenant (native first).
+   * False or absent: the tenant existed first and keeps the identity. */
+  hostedTenantReserved: z.boolean().nullable().optional().transform((value) => value ?? false),
 });
 
 export const existingManagedWebsiteSchema = z.object({
@@ -207,7 +215,11 @@ export function systemsFromExisting(raw: ExistingSystemsSnapshot): BusinessSyste
     if (!mapping) continue;
     const state = savedWorkLifecycle(work, snapshot);
     if (!state) continue;
-    const system = existingSystem(businessId, { kind: "saved_work", ref: work.id }, {
+    // A rebuild of a managed site stands for that site: the tenant came first.
+    const origin: SystemOrigin = mapping.kind === "website" && work.hostedTenantStableId && !work.hostedTenantReserved
+      ? { kind: "tenant", ref: work.hostedTenantStableId }
+      : { kind: "saved_work", ref: work.id };
+    const system = existingSystem(businessId, origin, {
       name: work.title ?? mapping.fallbackName, kind: mapping.kind, lifecycle: state.lifecycle,
       createdAt: work.createdAt, updatedAt: work.updatedAt,
     });
@@ -238,7 +250,11 @@ export function systemsFromExisting(raw: ExistingSystemsSnapshot): BusinessSyste
     websiteByTenant.set(site.tenantStableId, system);
   }
 
+  // Only tenants this business holds now; a stale binding never leaks another
+  // business's inquiries (the SQL reader applies the same rule).
+  const heldTenants = new Set(snapshot.managedWebsites.map((site) => site.tenantStableId));
   for (const inquiry of snapshot.inquiryWorkspaces) {
+    if (!heldTenants.has(inquiry.tenantStableId)) continue;
     const website = websiteByTenant.get(inquiry.tenantStableId);
     const state = inquiryWorkspaceLifecycle(inquiry.capabilityStatus, website?.lifecycle === "live");
     const system = existingSystem(businessId, { kind: "inquiry_workspace", ref: inquiry.id }, {
@@ -277,12 +293,28 @@ export function systemsFromExisting(raw: ExistingSystemsSnapshot): BusinessSyste
 }
 
 /** Stored Systems win over the projection: same id, real lifecycle and
- * revisions. Existing things not yet stored still appear. */
+ * revisions. A stored System also claims a listing whose native ids its
+ * origin names (a System saved under a rebuild's work id before it published
+ * to its managed tenant), so one thing never lists twice. Existing things not
+ * yet stored still appear. */
 export function mergeBusinessSystems(graph: SystemGraph, existing: BusinessSystems): BusinessSystems {
   const stored = new Map(graph.systems.map((system) => [system.id, system]));
+  const claimed = new Set<string>();
+  const renamed = new Map<string, string>();
+  const claim = (listing: SystemListing): System | undefined => {
+    const exact = stored.get(listing.system.id);
+    if (exact && !claimed.has(exact.id)) return exact;
+    const { savedWorkId, tenantStableId } = listing.references;
+    return graph.systems.find((system) => !claimed.has(system.id) && !existing.systems.some((item) => item.system.id === system.id) && (
+      (system.origin?.kind === "saved_work" && system.origin.ref === savedWorkId)
+      || (system.origin?.kind === "tenant" && listing.system.kind === "website" && system.origin.ref === tenantStableId)));
+  };
   const systems: SystemListing[] = existing.systems.map((listing) => {
-    const match = stored.get(listing.system.id);
-    return match ? { ...listing, system: match, provenance: "stored", basis: null } : listing;
+    const match = claim(listing);
+    if (!match) return listing;
+    claimed.add(match.id);
+    if (match.id !== listing.system.id) renamed.set(listing.system.id, match.id);
+    return { ...listing, system: match, provenance: "stored", basis: null };
   });
   const seen = new Set(systems.map((listing) => listing.system.id));
   for (const system of graph.systems) {
@@ -291,7 +323,12 @@ export function mergeBusinessSystems(graph: SystemGraph, existing: BusinessSyste
   }
   const storedConnections = graph.connections.map((connection) => ({ connection, provenance: "stored" as const }));
   const storedKeys = new Set(graph.connections.map((c) => `${c.source.systemId}:${c.kind}:${JSON.stringify(c.target)}`));
-  const derived = existing.connections.filter(({ connection: c }) => !storedKeys.has(`${c.source.systemId}:${c.kind}:${JSON.stringify(c.target)}`));
+  const rename = (id: string) => renamed.get(id) ?? id;
+  const derived = existing.connections.map(({ connection: c, provenance }) => ({ provenance, connection: {
+    ...c,
+    source: { ...c.source, systemId: rename(c.source.systemId) },
+    target: c.target.type === "system" ? { ...c.target, system: { ...c.target.system, systemId: rename(c.target.system.systemId) } } : c.target,
+  } })).filter(({ connection: c }) => !storedKeys.has(`${c.source.systemId}:${c.kind}:${JSON.stringify(c.target)}`));
   return { businessId: existing.businessId, systems, connections: [...storedConnections, ...derived] };
 }
 

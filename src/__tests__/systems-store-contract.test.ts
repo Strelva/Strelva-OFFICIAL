@@ -170,4 +170,30 @@ describe("SystemStore contract (memory)", () => {
       .rejects.toMatchObject({ code: "system_business_stopped" });
     expect((await store.readGraph(owner, EXITED)).systems).toHaveLength(1);
   });
+
+  it("rechecks both businesses before a share reconnects, and never blocks revoking it", async () => {
+    const roles: Record<string, Record<string, SystemAccess>> = structuredClone(ROLES);
+    roles[CATERING]![otherOwner.userId] = "owner";
+    const store = createMemorySystemStore({ access: (actor, businessId) => roles[businessId]?.[actor.userId] ?? null });
+    const pricing = { businessId: JUNIPER, systemId: (await store.createSystem(owner, JUNIPER, { name: "Pricing", kind: "pricing" }, command())).id };
+    const menu = { businessId: CATERING, systemId: (await store.createSystem(owner, CATERING, { name: "Menu", kind: "pricing" }, command())).id };
+    const share = await store.connect(owner, { source: pricing, kind: "share", target: { type: "system", system: menu } }, command());
+    await store.setConnectionState(owner, JUNIPER, share.id, "disconnected");
+
+    // The owner is removed from the target business; the share stays off.
+    delete roles[CATERING]![owner.userId];
+    await expect(store.setConnectionState(owner, JUNIPER, share.id, "connected")).rejects.toBeInstanceOf(WorkspaceAccessError);
+    await expect(store.setConnectionState(owner, JUNIPER, share.id, "stale")).rejects.toBeInstanceOf(WorkspaceAccessError);
+    expect((await store.readGraph(owner, JUNIPER)).connections.find((item) => item.id === share.id)?.state).toBe("disconnected");
+
+    // Restored access reconnects; the target business can revoke it; a source-only writer can still turn it off.
+    roles[CATERING]![owner.userId] = "owner";
+    await store.setConnectionState(owner, JUNIPER, share.id, "connected");
+    await expect(store.setConnectionState(otherOwner, CATERING, share.id, "connected")).rejects.toBeInstanceOf(WorkspaceAccessError);
+    expect(await store.setConnectionState(otherOwner, CATERING, share.id, "disconnected")).toMatchObject({ state: "disconnected" });
+    roles[CATERING]![owner.userId] = "owner";
+    await store.setConnectionState(owner, JUNIPER, share.id, "connected");
+    delete roles[CATERING]![owner.userId];
+    expect(await store.setConnectionState(owner, JUNIPER, share.id, "disconnected")).toMatchObject({ state: "disconnected" });
+  });
 });

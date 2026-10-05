@@ -54,5 +54,8 @@ export interface SystemStore {
   issueOutput(actor: WorkspaceActor, ref: SystemRef, input: IssueOutputInput, commandId: string): Promise<SystemOutput>;
   acceptOutput(actor: WorkspaceActor, ref: SystemRef, outputId: string): Promise<SystemOutput>;
   connect(actor: WorkspaceActor, input: ConnectInput, commandId: string): Promise<SystemConnection>;
+  /** The source business may set any state; the target business of a share
+   * may only disconnect it. Any state but disconnected rechecks write access
+   * on the source and, for a share, the target. */
   setConnectionState(actor: WorkspaceActor, businessId: string, connectionId: string, state: ConnectionState): Promise<SystemConnection>;
 }
