@@ -23,7 +23,7 @@ beforeEach(() => {
   vi.setSystemTime(clock);
 });
 
-import { captureLead, recordLead, getLeads, getLeadSummary } from "@/lib/leads";
+import { captureLead, recordLead, getLeads, getLeadSummary, leadSubmissionHash } from "@/lib/leads";
 
 describe("leads store", () => {
   it("captures a submission with name + message", async () => {
@@ -80,6 +80,8 @@ describe("leads store", () => {
     expect(mockSendNewLeadEmail).toHaveBeenCalledTimes(1);
     const arg = mockSendNewLeadEmail.mock.calls[0]![0];
     expect(arg.email).toBe("owner@example.com");
+    // The tenant lets the per-client email override arm this notice.
+    expect(arg.tenantId).toBe("t1");
     expect(arg.lead.name).toBe("Sarah Chen");
     expect(arg.lead.email).toBe("s@x.com");
     expect(arg.lead.message).toBe("Saturday?");
@@ -111,5 +113,13 @@ describe("leads store", () => {
     const retry = await recordLead("t1", { name: "Sarah", email: "s@x.com", message: "hi" });
     expect(retry).not.toBeNull(); // dedup lock was released, retry captured it
     expect(await getLeads("t1")).toHaveLength(1);
+  });
+
+  it("leadSubmissionHash reproduces the capture-time hash from a stored lead", async () => {
+    const input = { name: "Ada", email: "a@x.com", message: "Hi", fields: { timeline: "Soon" }, capabilityId: "cap", capabilityVersion: 2 };
+    const first = await captureLead("t1", input, { notifyOwner: false });
+    if (first.status !== "captured") throw new Error("expected capture");
+    const marker = [...mockRedis.store.keys()].find((key) => key.startsWith("lead-dedup:t1:"))!;
+    expect(marker.slice("lead-dedup:t1:".length)).toBe(leadSubmissionHash(first.lead));
   });
 });

@@ -8,12 +8,16 @@
  * name is honest — not fabricated from click data.
  *
  * Redis-backed 90-day window (recent activity, not a CRM); idempotent on a
- * submission hash so a double-submit doesn't double-count.
+ * submission hash so a double-submit doesn't double-count. Every captured lead
+ * is also copied to Postgres `tenant_leads` (src/lib/lead-mirror.ts), bounded
+ * and never failing the capture, so leads outlive the Redis window. Reads stay
+ * on Redis until cutover.
  */
 import { getRedis } from "./redis";
 import { getTenantConfig } from "./tenants";
 import { getTenantDashboardUrl } from "./tenant-urls";
 import { sendNewLeadEmail } from "./delivery-email";
+import { mirrorLead } from "./lead-mirror";
 
 const LEAD_TTL_SECONDS = 90 * 24 * 60 * 60;
 const LEAD_KEEP = 500;
@@ -92,6 +96,22 @@ function dedupHash(input: RecordLeadInput, fields?: Record<string, string>): str
   return (h >>> 0).toString(36);
 }
 
+/** The double-submit hash of a stored lead, as computed when it was captured. */
+export function leadSubmissionHash(lead: LeadRecord): string {
+  const fields = normalizeFields(lead.fields);
+  return dedupHash(
+    {
+      name: lead.name,
+      email: lead.email,
+      message: lead.message,
+      capabilityId: lead.capabilityId,
+      capabilityVersion: lead.capabilityVersion,
+      fields,
+    },
+    fields,
+  );
+}
+
 /** Capture a form submission. Idempotent over a short window; returns null on dedup/no-redis. */
 export async function recordLead(
   tenant: string,
@@ -112,7 +132,6 @@ export async function captureLead(
   options: RecordLeadOptions = {},
 ): Promise<RecordLeadResult> {
   const redis = getRedis();
-  if (!redis) return { status: "unavailable" };
   const fields = normalizeFields(input.fields);
 
   const lead: LeadRecord = {
@@ -129,10 +148,24 @@ export async function captureLead(
     createdAt: new Date().toISOString(),
   };
 
-  // Best-effort double-submit guard (a refresh/double-click), 5-minute window.
   const hash = dedupHash(input, fields);
+  // Without Redis the lead still reaches Postgres; callers see "unavailable"
+  // exactly as before.
+  if (!redis) {
+    await mirrorLead(tenant, lead, hash);
+    return { status: "unavailable" };
+  }
+
+  // Best-effort double-submit guard (a refresh/double-click), 5-minute window.
   const dedupKey = `lead-dedup:${tenant}:${hash}`;
-  const fresh = await redis.set(dedupKey, lead.id, { nx: true, ex: 300 });
+  let fresh: unknown;
+  try {
+    fresh = await redis.set(dedupKey, lead.id, { nx: true, ex: 300 });
+  } catch (err) {
+    // Redis is down: keep the submission in Postgres, then fail as before.
+    await mirrorLead(tenant, lead, hash);
+    throw err;
+  }
   if (!fresh) {
     // The marker contains the accepted lead id, so a retry can repair a
     // missing canonical receipt without creating a second Redis record.
@@ -140,6 +173,9 @@ export async function captureLead(
     const duplicate = duplicateId && duplicateId !== "1"
       ? await redis.get<LeadRecord>(leadKey(tenant, duplicateId)).catch(() => null)
       : null;
+    // A retry also repairs a Postgres copy the first attempt couldn't write;
+    // the store treats the same lead id as a no-op.
+    if (duplicate) await mirrorLead(tenant, duplicate, hash);
     return duplicate ? { status: "duplicate", lead: duplicate } : { status: "duplicate" };
   }
 
@@ -153,13 +189,19 @@ export async function captureLead(
     await redis.zremrangebyrank(leadsKey(tenant), 0, -(LEAD_KEEP + 1));
   } catch (err) {
     await redis.del(dedupKey).catch(() => {});
+    // Keep the submission in Postgres even though Redis failed; the visitor's
+    // retry is recognized there as the same submission.
+    await mirrorLead(tenant, lead, hash);
     throw err;
   }
 
-  // Notify the owner a customer reached out — best-effort, only for genuinely
-  // new leads (the dedup guard above already returned on a re-submission). A
-  // failed email must never fail the capture, so it's isolated and logged.
-  if (options.notifyOwner !== false) await notifyOwnerOfLead(tenant, lead);
+  // Copy to Postgres and notify the owner side by side. Both are bounded and
+  // never throw; the email goes only for genuinely new leads (the dedup guard
+  // above already returned on a re-submission).
+  await Promise.all([
+    mirrorLead(tenant, lead, hash),
+    options.notifyOwner !== false ? notifyOwnerOfLead(tenant, lead) : Promise.resolve(),
+  ]);
   return { status: "captured", lead };
 }
 
@@ -174,6 +216,7 @@ async function notifyOwnerOfLead(tenant: string, lead: LeadRecord): Promise<void
     const config = await getTenantConfig(tenant);
     if (!config?.ownerEmail) return;
     await sendNewLeadEmail({
+      tenantId: tenant,
       email: config.ownerEmail,
       siteName: config.siteName,
       lead: { name: lead.name, email: lead.email, message: lead.message },
