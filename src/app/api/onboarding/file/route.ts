@@ -13,6 +13,7 @@ function json(value: unknown, status = 200) {
     headers: {
       "Cache-Control": "private, no-store",
       "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "no-referrer",
     },
   });
 }
@@ -49,9 +50,9 @@ export async function GET(request: Request) {
   if ((origin && origin !== new URL(request.url).origin) || request.headers.get("sec-fetch-site") === "cross-site") {
     return json({ error: "Open Strelva directly to download a private file." }, 403);
   }
-  const current = await actor();
-  if (!current) return json({ error: "Sign in to download a private onboarding file." }, 401);
   try {
+    const current = await actor();
+    if (!current) return json({ error: "Sign in to download a private onboarding file." }, 401);
     const workId = new URL(request.url).searchParams.get("workId") ?? "";
     const file = await readOnboardingOriginalFile(current, workId);
     const filename = safeFilename(file.provenance.originalName);
@@ -63,6 +64,7 @@ export async function GET(request: Request) {
         "Content-Length": String(file.bytes.length),
         "Content-Disposition": `attachment; filename="${filename.fallback}"; filename*=UTF-8''${filename.encoded}`,
         "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "no-referrer",
       },
     });
   } catch (error) {

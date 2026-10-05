@@ -413,6 +413,45 @@ export const rollbackApplication = rollbackWorkspaceApplication;
 export const submitApplicationRecord = submitWorkspaceApplicationRecord;
 
 /**
+ * The revision and transition checks `command` (and the assignment rehearsal
+ * path) apply, run against a read payload with no effects. A runner rechecks
+ * with this so a step cannot pass recheck and then fail at perform.
+ */
+export function assertApplicationCommandCurrent(
+  payload: unknown,
+  raw: unknown,
+  options: { actorId: string; delegated?: boolean },
+): void {
+  const command = applicationCommandSchema.parse(raw);
+  const state = parseStateFromPayload(payload);
+  // A read payload states "no current release" as an explicit null.
+  if ((payload as { release?: unknown } | null)?.release === null) state.currentReleaseVersion = null;
+  if (options.delegated && command.kind === "rehearse") {
+    const expectedDesignRevision = command.expectedDesignRevision ?? command.expectedRevision;
+    if (expectedDesignRevision === undefined) throw new WorkspaceConflictError("A candidate revision is required.");
+    rehearseCandidate(state, { expectedDesignRevision });
+    return;
+  }
+  if (command.kind === "publish") {
+    publishCandidate(state, { expectedCandidateRevision: command.expectedCandidateRevision, expectedReleaseVersion: command.expectedReleaseVersion },
+      { at: new Date().toISOString(), by: options.actorId });
+    return;
+  }
+  if (command.kind === "rollback_release") {
+    rollbackRelease(state, { expectedDesignRevision: command.expectedDesignRevision, expectedReleaseVersion: command.expectedReleaseVersion, version: command.version });
+    return;
+  }
+  if (command.kind === "submit" && command.expectedReleaseVersion !== undefined && command.expectedRecordsRevision !== undefined) {
+    const release = currentRelease(state);
+    if (!release || state.status === "retired") throw new WorkspaceConflictError("This application has no usable released version.");
+    if (release.version !== command.expectedReleaseVersion) throw new WorkspaceConflictError("This application release changed. Reload before submitting.");
+    if (state.recordsRevision !== command.expectedRecordsRevision) throw new WorkspaceConflictError("These records changed. Reload before submitting.");
+    return;
+  }
+  assertLegacyApplicationRevision(state, command);
+}
+
+/**
  * Rehearse the exact application named by an accepted operational assignment.
  * The database RPC rechecks the accepted delivery and native resource before
  * writing the rehearsal receipt; this entry point intentionally skips the
