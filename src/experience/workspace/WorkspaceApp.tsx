@@ -258,10 +258,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     setSelectedWorkId(id);
     setView(viewForWork(chosen?.productId));
     setNotice(null);
-    const url = new URL(window.location.href);
-    url.searchParams.delete("standingId");
-    url.searchParams.delete("offering");
-    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    // Callers push the new entry. Never rewrite the entry being left, or Back loses its offering or standing.
   }
 
   function workspaceIdForNavigation(fallback: string): string {
