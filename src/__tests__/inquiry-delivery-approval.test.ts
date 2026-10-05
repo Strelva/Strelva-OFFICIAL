@@ -5,6 +5,7 @@ import type { UnifiedEvent } from "@/lib/types";
 import type { InquiryCapabilityDefinition, InquiryEngineState, ResponsibilityPolicy } from "@/products/inquiries/contracts";
 import { InquiryEngine } from "@/products/inquiries/inquiry-engine";
 import {
+  approveInquiryMessageReviewWithDependencies,
   executeInquiryMessageReview,
   getInquiryMessageReviewMetadata,
   prepareInquiryMessageReviewWithDependencies,
@@ -379,6 +380,78 @@ describe("inquiry message review approval", () => {
     expect(result).toMatchObject({ accepted: true, safeToResolve: true, receiptPersisted: true, verified: true });
     expect((await repository.getSnapshot(TENANT, BUSINESS))?.state.responsibilityReceipts).toHaveLength(1);
     expect(mail.send).toHaveBeenCalledTimes(1);
+  });
+
+  it("never records a second review's message as sent when a different message already went out", async () => {
+    const { base, events, repository } = await fixture();
+    let current = lead();
+    const deps: InquiryMessageReviewDependencies = { ...base, getLead: async () => current };
+    await prepare("reply", deps);
+    const first = events[0]!;
+    const firstDigest = getInquiryMessageReviewMetadata(first)!.messageDigest;
+    const mail = transport();
+    const sent = await executeInquiryMessageReview({ tenantId: TENANT, eventId: first.id, event: first, actorId: ACTOR, deps: { ...deps, transport: mail } });
+    expect(sent).toMatchObject({ accepted: true, verified: true, receiptPersisted: true });
+    const checkpoint = await deps.store!.getCheckpoint({ tenantId: TENANT, inquiryId: INQUIRY, action: "reply" });
+    expect(checkpoint?.messageDigest).toBe(firstDigest);
+
+    // The inquiry changes, so a fresh review renders a different body for the
+    // same inquiry and purpose. The provider already has the first message.
+    current = { ...lead(), message: "Actually, can you call me instead?", fields: { ...lead().fields, message: "Actually, can you call me instead?" } };
+    await prepare("reply", deps);
+    const second = events[0]!;
+    const secondMetadata = getInquiryMessageReviewMetadata(second)!;
+    expect(secondMetadata.messageDigest).not.toBe(firstDigest);
+
+    const result = await executeInquiryMessageReview({ tenantId: TENANT, eventId: second.id, event: second, actorId: ACTOR, deps: { ...deps, transport: mail } });
+    expect(result).toMatchObject({ accepted: false, safeToResolve: false, receiptPersisted: false, status: "different_message_sent", reason: "different_message_already_sent" });
+    expect(mail.send).toHaveBeenCalledTimes(1);
+    const receipts = (await repository.getSnapshot(TENANT, BUSINESS))!.state.responsibilityReceipts;
+    expect(receipts).toHaveLength(1);
+    expect(receipts.some((receipt) => receipt.idempotencyKey?.includes(secondMetadata.messageDigest))).toBe(false);
+
+    const reconciled = await reconcileInquiryMessageReview({ tenantId: TENANT, event: second, actorId: ACTOR, deps });
+    expect(reconciled).toMatchObject({ safeToResolve: false, receiptPersisted: false, status: "different_message_sent" });
+    expect((await repository.getSnapshot(TENANT, BUSINESS))!.state.responsibilityReceipts).toHaveLength(1);
+
+    const outcome = await approveInquiryMessageReviewWithDependencies({
+      tenantId: TENANT,
+      businessId: BUSINESS,
+      inquiryId: INQUIRY,
+      action: "reply",
+      actorId: ACTOR,
+      reviewToken: (await prepare("reply", deps)).reviewToken,
+      messageDigest: secondMetadata.messageDigest,
+    }, { ...deps, resolveAction: async () => ({ changed: false, reason: "different_message_already_sent" }) });
+    expect(outcome).toMatchObject({ status: "blocked", reason: "different_message_already_sent", retryable: false });
+  });
+
+  it("refuses a receipt for a checkpoint written before message digests were recorded", async () => {
+    const { base, events, repository } = await fixture();
+    await prepare("reply", base);
+    const store = base.store!;
+    // A legacy checkpoint: accepted and verified, but with no message digest.
+    const claim = await store.beginAttempt({
+      tenantId: TENANT,
+      inquiryId: INQUIRY,
+      action: "reply",
+      maxAttempts: 1,
+      now: AT,
+      budget: { limit: 10, timezone: "UTC", policyVersion: "legacy", now: AT },
+    });
+    await store.markAccepted({ tenantId: TENANT, inquiryId: INQUIRY, action: "reply", attemptId: claim.attemptId!, acceptedAt: AT, providerMessageId: "provider-legacy" });
+    await store.markVerified({ tenantId: TENANT, inquiryId: INQUIRY, action: "reply", attemptId: claim.attemptId!, evidence: ["legacy read-back"] });
+    expect((await store.getCheckpoint({ tenantId: TENANT, inquiryId: INQUIRY, action: "reply" }))?.messageDigest).toBeUndefined();
+
+    const mail = transport();
+    const result = await executeInquiryMessageReview({ tenantId: TENANT, eventId: events[0]!.id, event: events[0]!, actorId: ACTOR, deps: { ...base, transport: mail } });
+    expect(mail.send).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ accepted: true, safeToResolve: false, receiptPersisted: false, providerMessageId: "provider-legacy", reason: "message_digest_unknown" });
+    expect((await repository.getSnapshot(TENANT, BUSINESS))!.state.responsibilityReceipts).toHaveLength(0);
+
+    const reconciled = await reconcileInquiryMessageReview({ tenantId: TENANT, event: events[0]!, actorId: ACTOR, deps: base });
+    expect(reconciled).toMatchObject({ accepted: true, safeToResolve: false, receiptPersisted: false, reason: "message_digest_unknown" });
+    expect((await repository.getSnapshot(TENANT, BUSINESS))!.state.responsibilityReceipts).toHaveLength(0);
   });
 
   it("leaves the event blocked when the receipt save is unavailable, then reconciles it", async () => {

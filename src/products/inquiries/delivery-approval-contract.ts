@@ -49,12 +49,19 @@ export interface InquiryMessageReviewOutcome {
   retryable: boolean;
 }
 
+/**
+ * `different_message_sent`: the provider already accepted a different message
+ * for this inquiry and purpose. The reviewed message was not sent, never will
+ * be under this purpose, and earns no message receipt.
+ */
+export type InquiryMessageReviewExecutionStatus = InquiryDeliveryResult["status"] | "different_message_sent";
+
 export interface InquiryMessageReviewExecution {
   accepted: boolean;
   safeToResolve: boolean;
   receiptPersisted: boolean;
   verified: boolean;
-  status: InquiryDeliveryResult["status"];
+  status: InquiryMessageReviewExecutionStatus;
   reason?: string;
   acceptedAt?: string;
   providerMessageId?: string;
@@ -66,6 +73,6 @@ export interface InquiryMessageReviewReconciliation {
   safeToResolve: boolean;
   receiptPersisted: boolean;
   verified: boolean;
-  status: InquiryDeliveryResult["status"];
+  status: InquiryMessageReviewExecutionStatus;
   reason?: string;
 }

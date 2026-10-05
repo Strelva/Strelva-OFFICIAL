@@ -787,6 +787,7 @@ export async function deliverInquiryAction(
       maxAttempts: actionPolicy.maxAttempts,
       now: now.toISOString(),
       budget: { ...budget, now: now.toISOString() },
+      messageDigest,
     });
   } catch {
     return { ...evaluated, status: "unavailable", reason: "durable_delivery_state_unavailable", retryable: false };
