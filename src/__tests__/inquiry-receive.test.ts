@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { InquiryEngine } from "@/products/inquiries/inquiry-engine";
 import { recordInquiryEvidence, stateForReceive } from "@/products/inquiries/receive";
 import { createInMemoryInquiryRepository } from "@/products/inquiries/repository";
+import { createMemoryInquiryCaptureRepairStore } from "@/products/inquiries/reconciliation";
 
 const TENANT = "acme";
 const BUSINESS = "acme-business";
@@ -108,6 +109,32 @@ describe("canonical inquiry receive seam", () => {
       repository,
     });
     expect(second).toMatchObject({ status: "already_recorded", receiptId: first.receiptId });
+  });
+
+  // The same table runs against message review approval and the follow-up sweep.
+  it.each([
+    ["draft", false],
+    ["live_unverified", true],
+    ["live", true],
+    ["paused", false],
+    ["failed", false],
+  ] as const)("records an inquiry for a %s inquiry intake only with live intent (%s)", async (status, current) => {
+    const repository = createInMemoryInquiryRepository();
+    const state = snapshot().state;
+    state.capabilities[0]!.status = status;
+    await repository.compareAndSwap({ tenantId: TENANT, businessId: BUSINESS, expectedRevision: null, state });
+    const result = await recordInquiryEvidence({
+      tenantId: TENANT,
+      businessId: BUSINESS,
+      inquiryId: `lead_${status}`,
+      capabilityId: CAPABILITY,
+      expectedCapabilityVersion: 2,
+      fields,
+      receivedAt: RECEIVED_AT,
+      repository,
+      repairQueue: createMemoryInquiryCaptureRepairStore(),
+    });
+    expect(result.status).toBe(current ? "recorded" : "stale");
   });
 
   it("rejects a changed select option before writing a receipt", async () => {

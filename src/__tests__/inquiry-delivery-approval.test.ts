@@ -330,6 +330,21 @@ describe("inquiry message review approval", () => {
     expect(mail.send).not.toHaveBeenCalled();
   });
 
+  // The same table runs against the follow-up sweep and the receive seam.
+  it.each([
+    ["draft", false],
+    ["live_unverified", true],
+    ["live", true],
+    ["paused", false],
+    ["failed", false],
+  ] as const)("prepares a message review for a %s inquiry intake only with live intent (%s)", async (status, current) => {
+    const { base, repository } = await fixture();
+    await updateState(repository, (state) => { state.capabilities[0]!.status = status; });
+    const prepared = prepare("reply", base);
+    if (current) await expect(prepared).resolves.toMatchObject({ recipient: "ada@example.test" });
+    else await expect(prepared).rejects.toMatchObject({ code: "inquiry_changed" });
+  });
+
   it("closes an accepted but unverified provider write without earning a clean receipt", async () => {
     const { base, events, repository } = await fixture();
     await prepare("reply", base);
