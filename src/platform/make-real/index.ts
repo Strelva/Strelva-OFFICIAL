@@ -7,3 +7,4 @@ export * from "./repository";
 export * from "./view";
 export * from "./isolated-adapters";
 export * from "./in-memory-live";
+export * from "./systems-adapter";

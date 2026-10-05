@@ -4,7 +4,7 @@ import type { SystemRef } from "./refs";
 /** Read-only view of live Systems. Exploring code receives only this port, so
  * it has no method that could write live state. */
 export interface LiveSystemsReader {
-  current(ref: SystemRef): Promise<{ revisionId: string; content: Record<string, unknown> } | null>;
+  current(ref: SystemRef): Promise<{ revisionId: string; number: number; content: Record<string, unknown> } | null>;
 }
 
 /** An adapter that can rehearse an effect without touching a real provider.

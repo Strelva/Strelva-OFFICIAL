@@ -422,7 +422,7 @@ export function createMakeReal(deps: MakeRealDeps) {
           if (key) {
             const row = a.introduced.find((i) => i.key === key)!;
             await deps.live.restore({ businessId, systemId: row.systemId! }, null, row.revisionId!);
-            step.status = "restored"; step.reason = "Returned to draft; its record is kept.";
+            step.status = "restored"; step.reason = "Paused; its record and revisions are kept.";
           } else {
             const pin = a.pinned.find((x) => x.systemId === step.target)!;
             await deps.live.restore({ businessId, systemId: pin.systemId }, pin.baselineRevisionId, pin.stagedRevisionId!);

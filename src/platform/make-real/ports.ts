@@ -1,7 +1,7 @@
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { AuthorityScope, DeclaredEffect, EffectKind, ProposedConnection, Reversibility, SystemIntroduction } from "@/platform/possibilities/contracts";
 import type { IsolatedEffectRehearsal, LiveSystemsReader } from "@/platform/possibilities/ports";
-import type { SystemRef } from "@/platform/possibilities/refs";
+import type { SystemRef } from "@/platform/systems/contracts";
 import type { Activation } from "./contracts";
 
 export type EffectPerformResult =
@@ -35,8 +35,9 @@ export class BaselineMovedError extends Error {
 }
 
 /**
- * Live System state. Reconcile with src/platform/systems (lane B): this is the
- * minimum Make real needs. Every write is idempotent by `key`.
+ * Live System state: the minimum Make real needs. The production
+ * implementation is `createSystemStoreLiveSystems` over the spine's
+ * SystemStore (systems-adapter.ts). Every write is idempotent by `key`.
  * `activate` is compare-and-set on the current revision pointer and must
  * throw BaselineMovedError if it moved. Issued outputs are never touched.
  */

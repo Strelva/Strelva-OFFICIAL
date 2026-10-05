@@ -1,25 +1,13 @@
-import { z } from "zod";
+import { systemRefSchema, systemRevisionRefSchema } from "@/platform/systems/contracts";
 
-// Reconcile with src/platform/systems: lane B owns the canonical SystemRef and
-// SystemRevisionRef. These minimal local shapes match its announced contract
-// ({ businessId, systemId } plus a revision id) so this module can be rebased
-// onto the real export by replacing this file with a re-export.
+/**
+ * System identity comes from the spine (src/platform/systems). A Possibility
+ * pins each baseline as a canonical SystemRevisionRef, so a pinned baseline
+ * is exactly what SystemStore.setCurrentRevision compares against.
+ */
+export { systemRefSchema, systemRevisionRefSchema } from "@/platform/systems/contracts";
+export type { SystemRef, SystemRevisionRef } from "@/platform/systems/contracts";
+export { sameSystem } from "@/platform/systems/invariants";
 
-export const SYSTEM_ID = z.string().trim().min(1).max(120);
-export const REVISION_ID = z.string().trim().min(1).max(160);
-
-export const systemRefSchema = z.object({
-  businessId: z.string().trim().min(1).max(120),
-  systemId: SYSTEM_ID,
-}).strict();
-
-export const systemRevisionRefSchema = systemRefSchema.extend({
-  revisionId: REVISION_ID,
-}).strict();
-
-export type SystemRef = z.infer<typeof systemRefSchema>;
-export type SystemRevisionRef = z.infer<typeof systemRevisionRefSchema>;
-
-export function sameSystem(a: SystemRef, b: SystemRef): boolean {
-  return a.businessId === b.businessId && a.systemId === b.systemId;
-}
+export const SYSTEM_ID = systemRefSchema.shape.systemId;
+export const REVISION_ID = systemRevisionRefSchema.shape.revisionId;

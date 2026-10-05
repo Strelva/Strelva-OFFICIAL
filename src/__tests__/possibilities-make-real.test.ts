@@ -15,15 +15,20 @@ import {
 import {
   createInMemoryActivationRepository,
   createInMemoryLiveSystems,
+  createInMemoryRevisionContent,
   createIsolatedAdapter,
   createMakeReal,
+  createSystemStoreLiveSystems,
   describeActivation,
   RUNNING_STEP_GRACE_MS,
   type Activation,
   type ActivationRepository,
   type AuthorityPort,
+  type LiveSystemsPort,
   type OperatingChecksPort,
 } from "@/platform/make-real";
+import { canonicalJson, sha256, uuidFromSeed } from "@/platform/business-record/tenant-import";
+import { createMemorySystemStore, systemOriginId, type ConnectionKind, type SystemRef } from "@/platform/systems";
 
 /*
  * Proof scenario (all effects are ISOLATED FAKES; no provider is called):
@@ -31,32 +36,107 @@ import {
  * The "self-service package purchase" Possibility changes both, extracts a
  * shared Package Pricing System, books a kickoff type, creates a checkout
  * link, notifies the team and publishes a packages section.
+ *
+ * Live System state runs on two backends: the small Make real fake, and the
+ * spine's in-memory SystemStore through createSystemStoreLiveSystems. The
+ * main scenario runs on both.
  */
 
-const BIZ = "biz-acme";
+const BIZ = uuidFromSeed("business:acme-studio");
+const OTHER_BIZ = uuidFromSeed("business:other");
 const owner: WorkspaceActor = { userId: "owner-1", verifiedEmail: "owner@acme.test" };
-const PROPOSAL = { businessId: BIZ, systemId: "commercial-proposal" };
-const PRICING = { businessId: BIZ, systemId: "pricing" };
+const PROPOSAL = { businessId: BIZ, systemId: systemOriginId(BIZ, { kind: "saved_work", ref: "commercial-proposal" }) };
+const PRICING = { businessId: BIZ, systemId: systemOriginId(BIZ, { kind: "saved_work", ref: "pricing" }) };
 
-function world() {
+interface IssuedTerms { outputId: string; systemId: string; revisionId: string; terms: Record<string, unknown>; issuedAt: string; audience: string }
+
+/** What the scenario reads and seeds, whichever backend holds live state. */
+interface LiveFixture {
+  port: LiveSystemsPort;
+  writes?: Record<string, number>;
+  seed(ref: SystemRef, name: string, content: Record<string, unknown>): Promise<string> | string;
+  seedConnection(businessId: string, from: string, to: string, kind: ConnectionKind, purpose: string): Promise<unknown> | unknown;
+  edit(ref: SystemRef, content: Record<string, unknown>): Promise<string> | string;
+  issueOutput(ref: SystemRef, audience: string, at: string): Promise<IssuedTerms> | IssuedTerms;
+  outputs(): Promise<IssuedTerms[]> | IssuedTerms[];
+  system(ref: SystemRef): Promise<{ lifecycle: string; current: string | null; revisions: string[] } | null> | { lifecycle: string; current: string | null; revisions: string[] } | null;
+  connections(businessId: string): Promise<Array<{ from: string; kind: string; to: string; active: boolean }>> | Array<{ from: string; kind: string; to: string; active: boolean }>;
+}
+
+/** The spine's SystemStore, seen through the Make real adapter. */
+function storeFixture(): LiveFixture {
+  const store = createMemorySystemStore({ access: (actor, businessId) => (actor.userId === owner.userId && businessId === BIZ ? "owner" : null) });
+  const content = createInMemoryRevisionContent();
+  const port = createSystemStoreLiveSystems({ store, content, actor: owner });
+  let n = 0;
+  const cmd = () => uuidFromSeed(`fixture-command:${++n}`);
+  const termsOf = async (ref: SystemRef, revisionId: string) => {
+    const { revisions } = await store.readSystem(owner, ref);
+    return (await content.get(ref.businessId, revisions.find((r) => r.id === revisionId)!.implementation))!;
+  };
+  const issued: Array<{ ref: SystemRef; outputId: string; audience: string }> = [];
+  const asTerms = async (ref: SystemRef, outputId: string, audience: string): Promise<IssuedTerms> => {
+    const output = (await store.readSystem(owner, ref)).outputs.find((o) => o.id === outputId)!;
+    return { outputId, systemId: ref.systemId, revisionId: output.revision.revisionId, terms: await termsOf(ref, output.revision.revisionId), issuedAt: output.issuedAt, audience };
+  };
+  return {
+    port,
+    async seed(ref, name, body) {
+      const origin = { kind: "saved_work" as const, ref: name === "Pricing" ? "pricing" : "commercial-proposal" };
+      const system = await store.createSystem(owner, ref.businessId, { name, kind: "other", origin }, cmd());
+      expect(system.id).toBe(ref.systemId);
+      const implementation = await content.put(ref.businessId, body);
+      const { system: withRevision, revision } = await store.recordRevision(owner, ref, system.changeNumber, { implementation, summary: "Initial" }, cmd());
+      await store.transitionLifecycle(owner, ref, withRevision.changeNumber, "live");
+      return revision.id;
+    },
+    async seedConnection(businessId, from, to, kind, purpose) {
+      return store.connect(owner, { source: { businessId, systemId: from }, kind, target: { type: "system", system: { businessId, systemId: to } }, purpose }, cmd());
+    },
+    async edit(ref, body) {
+      const { system } = await store.readSystem(owner, ref);
+      const implementation = await content.put(ref.businessId, body);
+      return (await store.recordRevision(owner, ref, system.changeNumber, { implementation, summary: "Direct edit" }, cmd())).revision.id;
+    },
+    async issueOutput(ref, audience) {
+      const current = (await port.current(ref))!;
+      const output = await store.issueOutput(owner, ref, { kind: "proposal", title: `Proposal for ${audience}`, snapshotHash: sha256(canonicalJson(current.content)) }, cmd());
+      issued.push({ ref, outputId: output.id, audience });
+      return asTerms(ref, output.id, audience);
+    },
+    async outputs() {
+      return Promise.all(issued.map((o) => asTerms(o.ref, o.outputId, o.audience)));
+    },
+    async system(ref) {
+      const { system, revisions } = await store.readSystem(owner, ref);
+      return { lifecycle: system.lifecycle, current: system.currentRevision?.revisionId ?? null, revisions: revisions.map((r) => r.id) };
+    },
+    async connections(businessId) {
+      const graph = await store.readGraph(owner, businessId);
+      return graph.connections.map((c) => ({ from: c.source.systemId, kind: c.kind, to: c.target.type === "system" ? c.target.system.systemId : c.target.type, active: c.state === "connected" }));
+    },
+  };
+}
+
+async function world(backend: "fake" | "store" = "fake") {
   let t = Date.parse("2026-10-04T12:00:00.000Z");
   const clock = () => new Date(t).toISOString();
   const advance = (ms: number) => { t += ms; };
   let n = 0;
   const ids = () => `id-${++n}`;
 
-  const live = createInMemoryLiveSystems();
-  const proposalR1 = live.seed(PROPOSAL, "Commercial Proposal", {
+  const live: LiveFixture = backend === "fake" ? createInMemoryLiveSystems() : storeFixture();
+  const proposalR1 = await live.seed(PROPOSAL, "Commercial Proposal", {
     title: "Brand refresh proposal",
     packages: { starter: { name: "Starter", priceCents: 120000 } },
     checkout: "none",
   });
-  const pricingR1 = live.seed(PRICING, "Pricing", {
+  const pricingR1 = await live.seed(PRICING, "Pricing", {
     hourlyRateCents: 15000,
     packages: { starter: { hours: 10, priceCents: 150000 } },
   });
-  live.seedConnection(BIZ, PROPOSAL.systemId, PRICING.systemId, "read", "Proposal quotes the hourly rate");
-  const issued = live.issueOutput(PROPOSAL, "Mooney Firm", clock());
+  await live.seedConnection(BIZ, PROPOSAL.systemId, PRICING.systemId, "read", "Proposal quotes the hourly rate");
+  const issued = await live.issueOutput(PROPOSAL, "Mooney Firm", clock());
 
   const revoked = new Set<AuthorityScope>();
   const authority: AuthorityPort = {
@@ -108,8 +188,8 @@ function world() {
     title: "Self-service package purchase",
     intent: "Let a client pick a package from the proposal, pay, and book a kickoff call without a back-and-forth.",
     changes: [
-      { baseline: { ...PROPOSAL, revisionId: proposalR1 }, candidate: { summary: "Package selection, checkout and onboarding", content: { title: "Brand refresh proposal", packagesFrom: "package-pricing", checkout: "self-service", onboarding: "kickoff-call" } } },
-      { baseline: { ...PRICING, revisionId: pricingR1 }, candidate: { summary: "Packages move to Package Pricing", content: { hourlyRateCents: 15000, packagesFrom: "package-pricing" } } },
+      { baseline: { ...PROPOSAL, revisionId: proposalR1, number: 1 }, candidate: { summary: "Package selection, checkout and onboarding", content: { title: "Brand refresh proposal", packagesFrom: "package-pricing", checkout: "self-service", onboarding: "kickoff-call" } } },
+      { baseline: { ...PRICING, revisionId: pricingR1, number: 1 }, candidate: { summary: "Packages move to Package Pricing", content: { hourlyRateCents: 15000, packagesFrom: "package-pricing" } } },
     ],
     introduces: [{
       key: "package-pricing", name: "Package Pricing", purpose: "One source of package prices for proposals, checkout and the website.",
@@ -150,20 +230,20 @@ const approvals = [{ effectId: "packages-page", approvalId: "approval-owner-1" }
 
 describe("Possibility: exploring is isolated", () => {
   it("rehearses with isolated adapters only and never writes live state or calls a provider", async () => {
-    const w = world();
+    const w = await world();
     const p = createPossibility(w.input, { id: "poss-1", businessId: BIZ, actorId: owner.userId, at: w.clock() });
     expect(p.status).toBe("exploring");
     const rehearsal = await rehearsePossibility(p, w.live.port, w.adapters, w.clock());
     expect(rehearsal.ok).toBe(true);
     expect(rehearsal.effects.every((e) => e.mode === "isolated")).toBe(true);
-    expect(Object.values(w.live.writes).every((n) => n === 0)).toBe(true);
+    expect(Object.values(w.live.writes!).every((n) => n === 0)).toBe(true);
     expect(w.adapters.every((a) => a.ledger.length === 0 && a.calls.perform === 0)).toBe(true);
     const liveAdapter = { ...createIsolatedAdapter("payment"), mode: "live" as const };
     await expect(rehearsePossibility(p, w.live.port, [liveAdapter], w.clock())).rejects.toThrow(/live payment adapter/);
   });
 
   it("will not be ready until the owner chooses the authoritative extracted price and rehearses that candidate", async () => {
-    const w = world();
+    const w = await world();
     let p = createPossibility(w.input, { id: "poss-1", businessId: BIZ, actorId: owner.userId, at: w.clock() });
     p = recordRehearsal(p, await rehearsePossibility(p, w.live.port, w.adapters, w.clock()), p.revision, owner.userId, w.clock());
     await expect(markReady(p, w.live.port, p.revision, owner.userId, w.clock())).rejects.toThrow(/authoritative value for package-pricing.packages.starter.priceCents/);
@@ -177,7 +257,7 @@ describe("Possibility: exploring is isolated", () => {
   });
 
   it("compares against the current baseline per System", async () => {
-    const w = world();
+    const w = await world();
     const p = await w.readyPossibility();
     const cmp = await comparePossibility(p, w.live.port);
     const proposal = cmp.changes.find((c) => c.systemId === PROPOSAL.systemId)!;
@@ -188,29 +268,29 @@ describe("Possibility: exploring is isolated", () => {
   });
 
   it("refuses Make real while exploring, and sends a ready possibility back to Exploring when a baseline moved", async () => {
-    const w = world();
+    const w = await world();
     const exploring = createPossibility(w.input, { id: "poss-x", businessId: BIZ, actorId: owner.userId, at: w.clock() });
     await w.possibilities.create(exploring);
     await expect(w.makeReal.start(owner, BIZ, "poss-x")).rejects.toThrow(/Only a ready possibility/);
 
     await w.readyPossibility();
-    w.live.edit(PRICING, { hourlyRateCents: 17500, packages: { starter: { hours: 10, priceCents: 175000 } } });
+    await w.live.edit(PRICING, { hourlyRateCents: 17500, packages: { starter: { hours: 10, priceCents: 175000 } } });
     await expect(w.makeReal.start(owner, BIZ, "poss-1", { approvals })).rejects.toThrow(/changed since this was rehearsed/);
     expect((await w.possibilities.get(BIZ, "poss-1"))!.status).toBe("exploring");
     expect(w.calendar.calls.perform).toBe(0);
   });
 
   it("is invisible to another business", async () => {
-    const w = world();
+    const w = await world();
     await w.readyPossibility();
-    expect(await w.possibilities.get("biz-other", "poss-1")).toBeNull();
-    await expect(w.makeReal.start(owner, "biz-other", "poss-1")).rejects.toBeInstanceOf(WorkspaceAccessError);
+    expect(await w.possibilities.get(OTHER_BIZ, "poss-1")).toBeNull();
+    await expect(w.makeReal.start(owner, OTHER_BIZ, "poss-1")).rejects.toBeInstanceOf(WorkspaceAccessError);
   });
 });
 
-describe("Make real: the interrupted self-service package purchase", () => {
+describe.each(["fake", "store"] as const)("Make real on the %s live backend: the interrupted self-service package purchase", (backend) => {
   it("resumes after an interruption and a revoked grant without duplicating the accepted calendar effect", async () => {
-    const w = world();
+    const w = await world(backend);
     await w.readyPossibility();
 
     // Preflight: publish touches prices, so governance requires an explicit approval.
@@ -246,14 +326,14 @@ describe("Make real: the interrupted self-service package purchase", () => {
     const view = describeActivation(partial);
     expect(view.liveUnchanged).toBe(true);
     expect(view.headline).toMatch(/Partly done.*Your live Systems are unchanged/);
-    expect(view.done.map((d) => d.step)).toEqual(expect.arrayContaining(["stage:commercial-proposal", "stage:pricing", "introduce:package-pricing", "effect:kickoff-calendar"]));
+    expect(view.done.map((d) => d.step)).toEqual(expect.arrayContaining([`stage:${PROPOSAL.systemId}`, `stage:${PRICING.systemId}`, "introduce:package-pricing", "effect:kickoff-calendar"]));
     expect(view.done.find((d) => d.step === "effect:kickoff-calendar")).toMatchObject({ mode: "isolated", readBack: "confirmed" });
     expect(view.waiting).toEqual([{ step: "effect:team-notice", label: "Tell the Acme team that self-service packages are live", reason: expect.stringMatching(/message.send was revoked/) }]);
-    expect(view.notStarted).toEqual(expect.arrayContaining(["effect:packages-page", "activate:commercial-proposal", "verify"]));
+    expect(view.notStarted).toEqual(expect.arrayContaining(["effect:packages-page", `activate:${PROPOSAL.systemId}`, "verify"]));
     expect((await w.live.port.current(PROPOSAL))!.revisionId).toBe(w.proposalR1);
     expect((await w.live.port.current(PRICING))!.revisionId).toBe(w.pricingR1);
     const pkgId = partial.introduced[0]!.systemId!;
-    expect(w.live.system({ businessId: BIZ, systemId: pkgId })!.lifecycle).toBe("draft");
+    expect((await w.live.system({ businessId: BIZ, systemId: pkgId }))!.lifecycle).toBe("draft");
     expect((await w.possibilities.get(BIZ, "poss-1"))!.status).toBe("ready");
 
     // Still revoked: resume re-checks and stays blocked rather than sending.
@@ -275,27 +355,28 @@ describe("Make real: the interrupted self-service package purchase", () => {
     expect((await w.possibilities.get(BIZ, "poss-1"))!.status).toBe("made_real");
 
     // Same System identity, new revision; the extracted System is live and connected.
-    expect((await w.live.port.current(PROPOSAL))!.revisionId).toBe("commercial-proposal@r2");
-    expect(w.live.system(PROPOSAL)!.revisions).toEqual([w.proposalR1, "commercial-proposal@r2"]);
-    expect(w.live.system({ businessId: BIZ, systemId: pkgId })!.lifecycle).toBe("live");
-    expect(w.live.connections(BIZ).filter((c) => c.active).map((c) => `${c.from}-${c.kind}->${c.to}`)).toEqual([
-      "commercial-proposal-read->pricing",
-      `commercial-proposal-read->${pkgId}`,
-      `${pkgId}-depend->pricing`,
+    const proposalR2 = (await w.live.system(PROPOSAL))!.revisions[1]!;
+    expect(await w.live.port.current(PROPOSAL)).toMatchObject({ revisionId: proposalR2, number: 2 });
+    expect((await w.live.system(PROPOSAL))!.revisions).toEqual([w.proposalR1, proposalR2]);
+    expect((await w.live.system({ businessId: BIZ, systemId: pkgId }))!.lifecycle).toBe("live");
+    expect((await w.live.connections(BIZ)).filter((c) => c.active).map((c) => `${c.from}-${c.kind}->${c.to}`)).toEqual([
+      `${PROPOSAL.systemId}-read->${PRICING.systemId}`,
+      `${PROPOSAL.systemId}-read->${pkgId}`,
+      `${pkgId}-depend->${PRICING.systemId}`,
     ]);
 
     // The proposal issued to Mooney Firm keeps its original terms.
-    const outputs = w.live.outputs();
+    const outputs = await w.live.outputs();
     expect(outputs[0]).toEqual(w.issued);
     expect((outputs[0]!.terms.packages as { starter: { priceCents: number } }).starter.priceCents).toBe(120000);
-    const fresh = w.live.issueOutput(PROPOSAL, "New client", w.clock());
+    const fresh = await w.live.issueOutput(PROPOSAL, "New client", w.clock());
     expect(fresh.terms.packagesFrom).toBe("package-pricing");
   });
 });
 
-describe("Make real: bounded recovery and honest outcomes", () => {
+describe.each(["fake", "store"] as const)("Make real on the %s live backend: bounded recovery and honest outcomes", (backend) => {
   it("rolls back a stalled activation: compensates what it can and never sends the revoked message", async () => {
-    const w = world();
+    const w = await world(backend);
     await w.readyPossibility();
     const a = await w.makeReal.start(owner, BIZ, "poss-1", { approvals });
     w.revoked.add("message.send");
@@ -314,7 +395,7 @@ describe("Make real: bounded recovery and honest outcomes", () => {
   });
 
   it("never marks made real when an operating check fails, and rollback names the message it cannot unsend", async () => {
-    const w = world();
+    const w = await world(backend);
     await w.readyPossibility();
     w.failingChecks.add("checkout-active");
     const a = await w.makeReal.start(owner, BIZ, "poss-1", { approvals });
@@ -327,8 +408,9 @@ describe("Make real: bounded recovery and honest outcomes", () => {
     const rolled = await w.makeReal.rollback(owner, BIZ, a.id);
     expect((await w.live.port.current(PROPOSAL))!.revisionId).toBe(w.proposalR1);
     expect((await w.live.port.current(PRICING))!.revisionId).toBe(w.pricingR1);
-    expect(w.live.system({ businessId: BIZ, systemId: rolled.introduced[0]!.systemId! })!.lifecycle).toBe("draft");
-    expect(w.live.connections(BIZ).filter((c) => c.active)).toHaveLength(1);
+    // A live System never returns to draft: undoing the introduction pauses it.
+    expect((await w.live.system({ businessId: BIZ, systemId: rolled.introduced[0]!.systemId! }))!.lifecycle).toBe("paused");
+    expect((await w.live.connections(BIZ)).filter((c) => c.active)).toHaveLength(1);
     const view = describeActivation(rolled);
     expect(view.cannotUndo).toEqual(["Tell the Acme team that self-service packages are live"]);
     expect(rolled.steps.find((s) => s.id === "effect:team-notice")).toMatchObject({ status: "completed", effect: "accepted", reason: "Already happened and cannot be undone." });
@@ -336,7 +418,7 @@ describe("Make real: bounded recovery and honest outcomes", () => {
   });
 
   it("leaves an unconfirmed payment unknown, never replays it, and continues only after evidence", async () => {
-    const w = world();
+    const w = await world(backend);
     const payment = createIsolatedAdapter("payment", { supportsLookup: false, idempotentByKey: false });
     const adapters = [w.calendar, w.message, payment, w.publish];
     const makeReal = createMakeReal({ possibilities: w.possibilities, activations: w.activations, live: w.live.port, authority: { check: async () => ({ allowed: true, grantId: "g" }) }, adapters, checks: { run: async () => ({ passed: true, detail: "ok" }) }, clock: w.clock });
@@ -356,7 +438,7 @@ describe("Make real: bounded recovery and honest outcomes", () => {
   });
 
   it("records a failed read-back beside the accepted write and does not retry it", async () => {
-    const w = world();
+    const w = await world(backend);
     await w.readyPossibility();
     w.calendar.faults.failReadBack = true;
     const a = await w.makeReal.start(owner, BIZ, "poss-1", { approvals });
@@ -368,17 +450,17 @@ describe("Make real: bounded recovery and honest outcomes", () => {
   });
 
   it("stops a System switch whose baseline moved mid-activation and surfaces the partial switch", async () => {
-    const w = world();
+    const w = await world(backend);
     await w.readyPossibility();
     const a = await w.makeReal.start(owner, BIZ, "poss-1", { approvals });
     for (let i = 0; i < 20; i++) {
       const r = await w.makeReal.runNext(owner, BIZ, a.id);
-      if (r.ran === "activate:commercial-proposal") break;
+      if (r.ran === `activate:${PROPOSAL.systemId}`) break;
     }
-    const edited = w.live.edit(PRICING, { hourlyRateCents: 17500 });
+    const edited = await w.live.edit(PRICING, { hourlyRateCents: 17500 });
     const result = await w.makeReal.run(owner, BIZ, a.id);
-    expect(result.steps.find((s) => s.id === "activate:pricing")).toMatchObject({ status: "blocked", reason: expect.stringMatching(/pricing changed after Make real started/) });
-    expect((await w.live.port.current(PROPOSAL))!.revisionId).toBe("commercial-proposal@r2");
+    expect(result.steps.find((s) => s.id === `activate:${PRICING.systemId}`)).toMatchObject({ status: "blocked", reason: expect.stringContaining(`${PRICING.systemId} changed after Make real started`) });
+    expect((await w.live.port.current(PROPOSAL))!.revisionId).toBe((await w.live.system(PROPOSAL))!.revisions[1]);
     expect((await w.live.port.current(PRICING))!.revisionId).toBe(edited);
     const view = describeActivation(result);
     expect(view.liveUnchanged).toBe(false);

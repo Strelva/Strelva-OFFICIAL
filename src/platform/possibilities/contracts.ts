@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { connectionKindSchema } from "@/platform/systems/contracts";
 import { REVISION_ID, SYSTEM_ID, systemRefSchema, systemRevisionRefSchema } from "./refs";
 
 /**
@@ -83,7 +84,6 @@ export const systemIntroductionSchema = z.object({
 }).strict();
 export type SystemIntroduction = z.infer<typeof systemIntroductionSchema>;
 
-export const connectionKindSchema = z.enum(["read", "act", "appear", "share", "depend", "trigger"]);
 export const proposedConnectionSchema = z.object({
   id: KEY,
   from: systemTargetSchema,
