@@ -88,7 +88,8 @@ added beside them; nothing is renamed:
 ## Not built yet
 
 - Postgres storage. `store.ts` is the port plus the in-memory reference. The
-  migration waits on lane B's systems tables (slot `20261004122000`).
+  migration can now build on the spine's systems tables
+  (`20261004120000_systems.sql`); slot `20261004122000` is reserved for it.
 - `SystemRef` and `SystemRevisionRef` are the spine's (`src/platform/systems`).
   Source revisions are not yet stored as `SystemRevision` rows; real
   membership and connection ownership still come through local ports.
