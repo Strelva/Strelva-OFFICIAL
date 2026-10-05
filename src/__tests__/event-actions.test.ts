@@ -519,4 +519,32 @@ describe("resolveEventAction", () => {
     expect(mockResolveEvent).toHaveBeenCalledWith(event.id, "approved", { actor: "original-sponsor" });
     expect(mockExecuteInquiryMessageReview).not.toHaveBeenCalled();
   });
+
+  it("records the provider id on the event when the delivery marker could not be written", async () => {
+    const event = { ...acceptedInquiryReviewEvent(), metadata: { kind: "inquiry_delivery_approval" } };
+    mockIsInquiryMessageReviewEvent.mockReturnValue(true);
+    mockGetEvent.mockResolvedValue(event);
+    mockAuthorizeInquiryMessageReviewActor.mockResolvedValue({ allowed: true });
+    mockExecuteInquiryMessageReview.mockResolvedValue({
+      accepted: true,
+      safeToResolve: false,
+      receiptPersisted: false,
+      verified: false,
+      status: "reconciliation_required",
+      reason: "provider_accepted_marker_unavailable",
+      acceptedAt: "2026-09-11T12:00:01.000Z",
+      providerMessageId: "provider-lost",
+      deliveryAttemptId: "delivery-attempt-1",
+    });
+
+    const result = await resolveEventAction("tenant-a", event.id, "approved", "original-sponsor");
+
+    expect(result).toEqual({ changed: false, reason: "provider_accepted_marker_unavailable" });
+    expect(mockMarkExecutionExternalAccepted).toHaveBeenCalledWith(event.id, {
+      providerMessageId: "provider-lost",
+      acceptedAt: "2026-09-11T12:00:01.000Z",
+      deliveryAttemptId: "delivery-attempt-1",
+    });
+    expect(mockResolveEvent).not.toHaveBeenCalled();
+  });
 });

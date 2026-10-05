@@ -157,6 +157,12 @@ export interface InquiryDeliveryCheckpoint {
   attemptId: string;
   attempts: number;
   startedAt: string;
+  /**
+   * Digest of the exact message this attempt handed to the provider, written
+   * when the attempt is claimed. Checkpoints written before digests were
+   * recorded have none, so a missing value means "unknown", never "matches".
+   */
+  messageDigest?: string;
   acceptedAt?: string;
   providerMessageId?: string;
   /** The exact reply-to address used by the accepted provider message. */
@@ -240,6 +246,8 @@ export interface InquiryDeliveryStore {
     maxAttempts: number;
     now: string;
     budget: InquiryDeliveryBudgetReservation;
+    /** Digest of the exact message this attempt will hand to the provider. */
+    messageDigest?: string;
   }): Promise<InquiryDeliveryClaim>;
   markAccepted(input: {
     tenantId: string;

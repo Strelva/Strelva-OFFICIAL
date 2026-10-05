@@ -41,6 +41,7 @@ import { stateForReceive } from "./receive";
 import { classifyInquiryMessage } from "./message-outcome";
 import { currentResponsibility, inquiryCurrentness } from "./currentness";
 import type {
+  InquiryMessageAcceptanceEvidence,
   InquiryMessageReviewAction,
   InquiryMessageReviewExecution,
   InquiryMessageReviewReconciliation,
@@ -504,12 +505,35 @@ function checkpointAccepted(checkpoint: InquiryDeliveryCheckpoint | null): boole
   return Boolean(checkpoint) && classifyInquiryMessage(checkpoint!).accepted;
 }
 
+/**
+ * Whether the message the provider accepted for this inquiry and purpose is
+ * the reviewed message. A checkpoint written before digests were recorded is
+ * "unknown": it may hold this message or another one, so it never earns a
+ * message receipt for the review.
+ */
+type SentMessageBinding = "same" | "different" | "unknown";
+
+function sentMessageBinding(checkpoint: InquiryDeliveryCheckpoint | null, reviewDigest: string): SentMessageBinding {
+  if (!checkpoint?.messageDigest) return "unknown";
+  return checkpoint.messageDigest.toLowerCase() === reviewDigest.toLowerCase() ? "same" : "different";
+}
+
+const DIFFERENT_MESSAGE_SENT = "different_message_already_sent";
+const MESSAGE_DIGEST_UNKNOWN = "message_digest_unknown";
+
 function outcomeFromCheckpoint(
   checkpoint: InquiryDeliveryCheckpoint | null,
   inquiryId: string,
   action: InquiryMessageReviewAction,
   fallback?: { status?: InquiryDeliveryResult["status"]; reason?: string },
+  reviewDigest?: string,
 ): InquiryMessageReviewOutcome {
+  if (reviewDigest && checkpointAccepted(checkpoint) && sentMessageBinding(checkpoint, reviewDigest) === "different") {
+    // Another message already went out for this purpose. This review was
+    // never sent and cannot be: report it as blocked, with no provider ids
+    // that belong to the other message.
+    return { inquiryId, action, status: "blocked", reason: DIFFERENT_MESSAGE_SENT, retryable: false };
+  }
   const status = checkpoint?.status;
   const outputStatus: InquiryMessageReviewOutcome["status"] =
     fallback?.status === "reconciliation_required" ? "reconciliation_required" :
@@ -595,7 +619,7 @@ export async function approveInquiryMessageReviewWithDependencies(
   if (candidate.status === "approved") {
     const store = dependency(deps.store, createRedisInquiryDeliveryStore());
     const checkpoint = await store.getCheckpoint({ tenantId, inquiryId, action });
-    return outcomeFromCheckpoint(checkpoint, inquiryId, action, { status: "unavailable", reason: "approval_already_resolved" });
+    return outcomeFromCheckpoint(checkpoint, inquiryId, action, { status: "unavailable", reason: "approval_already_resolved" }, suppliedDigest);
   }
   if (candidate.status !== "pending") throwCode("review_revoked", "This message review was revoked. Prepare a fresh review.");
   const resolveAction = deps.resolveAction ?? (async (id, eventId, eventAction, actor) => {
@@ -613,6 +637,7 @@ export async function approveInquiryMessageReviewWithDependencies(
       result.changed
         ? { status: "unavailable", reason: result.reason }
         : { status: "reconciliation_required", reason: result.reason },
+      suppliedDigest,
     );
   }
   if (!result.changed) throw outcomeError(result);
@@ -654,29 +679,61 @@ async function checkpointFor(
   }
 }
 
+/** The workspace facts a message receipt needs. A full review context has them. */
+type ReceiptContext = Pick<ReviewContext, "snapshot" | "lead" | "capability" | "status" | "responsibilityAction">;
+
+/**
+ * "refused" is permanent (the sponsor or responsibility changed, or the
+ * receipt would not be accepted); "unavailable" is a persistence failure that
+ * a later attempt can repair.
+ */
+type MessageReceiptWrite = "persisted" | "refused" | "unavailable";
+
 async function persistVerifiedReceipt(input: {
-  context: ReviewContext;
+  context: ReceiptContext;
   metadata: InquiryMessageReviewEventMetadata;
   providerResult: InquiryDeliveryResult;
+  /** The digest the checkpoint recorded for the accepted attempt. */
+  sentMessageDigest: string | undefined;
   deps: InquiryMessageReviewDependencies;
 }): Promise<boolean> {
-  const repository = await repositoryFor(input.deps);
+  return (await writeMessageReceipt(input)) === "persisted";
+}
+
+async function writeMessageReceipt(input: {
+  context: ReceiptContext;
+  metadata: InquiryMessageReviewEventMetadata;
+  providerResult: InquiryDeliveryResult;
+  sentMessageDigest: string | undefined;
+  deps: InquiryMessageReviewDependencies;
+}): Promise<MessageReceiptWrite> {
+  // A message receipt says this exact message was sent. Never write one for a
+  // review unless the accepted attempt recorded the same digest.
+  if (!input.sentMessageDigest || input.sentMessageDigest.toLowerCase() !== input.metadata.messageDigest.toLowerCase()) return "refused";
+  let repository: import("./repository").InquiryRepository;
+  try {
+    repository = await repositoryFor(input.deps);
+  } catch {
+    return "unavailable";
+  }
+  // The key is the same whenever the receipt is written (at approval, by
+  // reconciliation, or after a later delivered report), so it is written once.
   const idempotencyKey = `inquiry-delivery:${input.metadata.inquiryId}:${input.metadata.action}:${input.metadata.messageDigest}`;
   let snapshot = input.context.snapshot;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     if (attempt > 0) {
       try {
         const current = await repository.getSnapshot(snapshot.tenantId, snapshot.businessId);
-        if (!current) return false;
+        if (!current) return "unavailable";
         snapshot = current;
       } catch {
-        return false;
+        return "unavailable";
       }
     }
     const existing = snapshot.state.responsibilityReceipts.find((receipt) => receipt.responsibilityId === input.metadata.responsibilityId && receipt.idempotencyKey === idempotencyKey);
-    if (existing) return existing.status === "accepted";
+    if (existing) return existing.status === "accepted" ? "persisted" : "refused";
     const currentResponsibility = snapshot.state.responsibilities.find((item) => item.id === input.metadata.responsibilityId);
-    if (!currentResponsibility || currentResponsibility.sponsorId !== input.metadata.requestedBy) return false;
+    if (!currentResponsibility || currentResponsibility.sponsorId !== input.metadata.requestedBy) return "refused";
     const record = recordFromLead(snapshot.state, input.context.capability, input.context.lead, input.context.status);
     const state = stateForReceive(snapshot);
     state.inquiries = [...state.inquiries.filter((item) => item.id !== record.id), record];
@@ -710,9 +767,9 @@ async function persistVerifiedReceipt(input: {
       });
       updatedState = engine.snapshot();
     } catch {
-      return false;
+      return "refused";
     }
-    if (receipt.status !== "accepted" || !updatedState) return false;
+    if (receipt.status !== "accepted" || !updatedState) return "refused";
     try {
       const saved = await repository.compareAndSwap({
         tenantId: snapshot.tenantId,
@@ -721,12 +778,98 @@ async function persistVerifiedReceipt(input: {
         state: updatedState,
         actorId: input.metadata.requestedBy,
       });
-      if (saved.changed) return true;
+      if (saved.changed) return "persisted";
     } catch {
-      return false;
+      return "unavailable";
     }
   }
-  return false;
+  return "unavailable";
+}
+
+async function receiptContextFor(
+  tenantId: string,
+  metadata: InquiryMessageReviewEventMetadata,
+  deps: InquiryMessageReviewDependencies,
+): Promise<ReceiptContext> {
+  // The message already went out, so this reads only what the receipt
+  // records. It does not re-run the send gates (open inquiry, live capability
+  // version, email readiness) that applied before the provider call.
+  const snapshot = await snapshotFor(tenantId, metadata.businessId, deps);
+  const lead = await dependency(deps.getLead, getLeadById)(tenantId, metadata.inquiryId);
+  if (!lead) throwCode("inquiry_not_found", "Inquiry record unavailable.");
+  const capability = snapshot.state.capabilities.find((item) => item.id === metadata.capabilityId);
+  if (!capability) throwCode("inquiry_changed", "The inquiry capability is unavailable.");
+  const status = await overlayStatus(tenantId, metadata.businessId, metadata.inquiryId, snapshot.state, deps);
+  return { snapshot, lead, capability, status, responsibilityAction: responsibilityActionFor(metadata.action) };
+}
+
+export type InquiryMessageReceiptOutcome = "persisted" | "not_owed" | "refused" | "unavailable";
+
+/**
+ * Write the message receipt an approved review is owed once a provider report
+ * shows its message was delivered. The approval may have resolved earlier,
+ * while the message was unconfirmed or deferred, with no receipt.
+ *
+ * Idempotent: the receipt key is the same one the approval path uses, so the
+ * receipt is written at most once however many reports arrive. It is written
+ * only for an approved review whose digest matches the accepted attempt's
+ * digest; a checkpoint without a digest never earns one.
+ */
+export async function persistDeliveredInquiryMessageReceipt(input: {
+  tenantId: string;
+  checkpoint: InquiryDeliveryCheckpoint;
+  deps?: InquiryMessageReviewDependencies;
+}): Promise<InquiryMessageReceiptOutcome> {
+  const deps = input.deps ?? {};
+  const { checkpoint } = input;
+  if (checkpoint.tenantId !== input.tenantId) return "not_owed";
+  if (checkpoint.status !== "delivered" && checkpoint.status !== "verified") return "not_owed";
+  if (!checkpoint.messageDigest) return "not_owed";
+  let events: UnifiedEvent[];
+  try {
+    events = await eventsFor(input.tenantId, deps);
+  } catch {
+    return "unavailable";
+  }
+  let metadata: InquiryMessageReviewEventMetadata | null = null;
+  for (const event of events) {
+    const candidate = metadataFromEvent(event);
+    if (
+      !candidate || event.tenantId !== input.tenantId ||
+      candidate.inquiryId !== checkpoint.inquiryId || candidate.action !== checkpoint.action ||
+      candidate.messageDigest.toLowerCase() !== checkpoint.messageDigest.toLowerCase()
+    ) continue;
+    // Only a review the sponsor actually approved is owed a receipt. A pending
+    // review with the same digest (for example, a standing-approval send of an
+    // identical body) is not an approval.
+    if (event.status === "approved" || event.metadata?.execution?.state === "external_accepted") {
+      metadata = candidate;
+      break;
+    }
+  }
+  if (!metadata) return "not_owed";
+  let context: ReceiptContext;
+  try {
+    context = await receiptContextFor(input.tenantId, metadata, deps);
+  } catch (error) {
+    return errorCode(error) === "persistence_unavailable" ? "unavailable" : "refused";
+  }
+  return writeMessageReceipt({
+    context,
+    metadata,
+    providerResult: {
+      inquiryId: checkpoint.inquiryId,
+      tenantId: input.tenantId,
+      action: checkpoint.action,
+      status: checkpoint.status,
+      acceptedAt: checkpoint.acceptedAt,
+      providerMessageId: checkpoint.providerMessageId,
+      verificationEvidence: checkpoint.verificationEvidence,
+      retryable: false,
+    },
+    sentMessageDigest: checkpoint.messageDigest,
+    deps,
+  });
 }
 
 export async function executeInquiryMessageReview(
@@ -861,6 +1004,13 @@ export async function executeInquiryMessageReview(
     return { accepted: false, safeToResolve: false, receiptPersisted: false, verified: false, status: "unavailable", reason: errorCode(error) };
   }
   const checkpoint = await checkpointFor(store, input.tenantId, metadata.inquiryId, metadata.action);
+  const binding = sentMessageBinding(checkpoint, metadata.messageDigest);
+  if (checkpointAccepted(checkpoint) && binding === "different") {
+    // The provider accepted a different message for this inquiry and purpose
+    // (an earlier review or a standing-approval send). This review was not
+    // sent, can never be sent under this purpose, and earns no receipt.
+    return { accepted: false, safeToResolve: false, receiptPersisted: false, verified: false, status: "different_message_sent", reason: DIFFERENT_MESSAGE_SENT };
+  }
   const providerAccepted = checkpointAccepted(checkpoint) || Boolean(result.acceptedAt || result.providerMessageId);
   if (!providerAccepted) {
     return {
@@ -878,8 +1028,14 @@ export async function executeInquiryMessageReview(
   const markerDurable = Boolean(checkpoint) && checkpointAccepted(checkpoint);
   const verified = result.status === "verified" || result.status === "delivered" || checkpoint?.status === "verified" || checkpoint?.status === "delivered";
   let receiptPersisted = true;
+  const digestUnknown = verified && Boolean(checkpoint) && binding === "unknown";
   if (verified) {
-    receiptPersisted = await persistVerifiedReceipt({ context: latestContext ?? context, metadata, providerResult: result, deps });
+    // A checkpoint without a digest predates digest tracking. It may hold this
+    // review's message or another one, so refuse the receipt and leave the
+    // approval for a person to reconcile. It never becomes retryable.
+    receiptPersisted = digestUnknown
+      ? false
+      : await persistVerifiedReceipt({ context: latestContext ?? context, metadata, providerResult: result, sentMessageDigest: checkpoint?.messageDigest, deps });
   }
   const safeToResolve = markerDurable && (!verified || receiptPersisted);
   return {
@@ -888,9 +1044,10 @@ export async function executeInquiryMessageReview(
     receiptPersisted,
     verified,
     status: result.status,
-    reason: result.reason,
+    reason: digestUnknown ? MESSAGE_DIGEST_UNKNOWN : result.reason,
     acceptedAt: result.acceptedAt || checkpoint?.acceptedAt,
     providerMessageId: result.providerMessageId || checkpoint?.providerMessageId,
+    ...(result.attemptId || checkpoint?.attemptId ? { deliveryAttemptId: result.attemptId || checkpoint?.attemptId } : {}),
     verificationEvidence: result.verificationEvidence || checkpoint?.verificationEvidence,
   };
 }
@@ -923,6 +1080,20 @@ export async function authorizeInquiryMessageReviewActor(input: {
   }
 }
 
+function acceptanceEvidenceFromEvent(event: UnifiedEvent): InquiryMessageAcceptanceEvidence | null {
+  const raw = (event.metadata?.execution as { acceptance?: unknown } | undefined)?.acceptance;
+  if (!raw || typeof raw !== "object") return null;
+  const row = raw as Record<string, unknown>;
+  const value = (field: unknown, max: number) => (typeof field === "string" && field.trim() ? field.trim().slice(0, max) : undefined);
+  const acceptedAt = value(row.acceptedAt, 80);
+  if (acceptedAt && !Number.isFinite(Date.parse(acceptedAt))) return null;
+  return {
+    providerMessageId: value(row.providerMessageId, 240),
+    acceptedAt,
+    deliveryAttemptId: value(row.deliveryAttemptId, 240),
+  };
+}
+
 export async function reconcileInquiryMessageReview(input: {
   tenantId: string;
   event: UnifiedEvent;
@@ -933,7 +1104,32 @@ export async function reconcileInquiryMessageReview(input: {
   const metadata = metadataFromEvent(input.event);
   if (!metadata || input.event.tenantId !== input.tenantId) return { accepted: false, safeToResolve: false, receiptPersisted: false, verified: false, status: "unavailable", reason: "wrong_tenant" };
   const store = dependency(deps.store, createRedisInquiryDeliveryStore());
-  const checkpoint = await checkpointFor(store, input.tenantId, metadata.inquiryId, metadata.action);
+  let checkpoint = await checkpointFor(store, input.tenantId, metadata.inquiryId, metadata.action);
+  if (checkpoint?.status === "sending") {
+    // The provider may have accepted this attempt while the acceptance write
+    // failed. If the governed event kept a copy of that acceptance for this
+    // exact attempt, record it now. Reconciliation never sends.
+    const evidence = acceptanceEvidenceFromEvent(input.event);
+    if (evidence?.acceptedAt && evidence.deliveryAttemptId === checkpoint.attemptId) {
+      try {
+        checkpoint = await store.markAccepted({
+          tenantId: input.tenantId,
+          inquiryId: metadata.inquiryId,
+          action: metadata.action,
+          attemptId: checkpoint.attemptId,
+          acceptedAt: evidence.acceptedAt,
+          ...(evidence.providerMessageId ? { providerMessageId: evidence.providerMessageId } : {}),
+          ...(metadata.replyTo ? { replyTo: metadata.replyTo } : {}),
+        });
+      } catch {
+        return { accepted: true, safeToResolve: false, receiptPersisted: false, verified: false, status: "reconciliation_required", reason: "provider_acceptance_repair_unavailable" };
+      }
+    }
+  }
+  const binding = sentMessageBinding(checkpoint, metadata.messageDigest);
+  if (checkpointAccepted(checkpoint) && binding === "different") {
+    return { accepted: false, safeToResolve: false, receiptPersisted: false, verified: false, status: "different_message_sent", reason: DIFFERENT_MESSAGE_SENT };
+  }
   if (!checkpointAccepted(checkpoint)) {
     return { accepted: false, safeToResolve: false, receiptPersisted: false, verified: false, status: checkpoint?.status === "unknown" || checkpoint?.status === "sending" ? "reconciliation_required" : "unavailable", reason: "delivery_acceptance_unavailable" };
   }
@@ -946,6 +1142,9 @@ export async function reconcileInquiryMessageReview(input: {
             checkpoint?.status === "failed" ? "failed" :
               "accepted_unverified";
     return { accepted: true, safeToResolve: true, receiptPersisted: true, verified: false, status, reason: checkpoint?.verificationReason || checkpoint?.failureReason };
+  }
+  if (binding === "unknown") {
+    return { accepted: true, safeToResolve: false, receiptPersisted: false, verified: true, status: "reconciliation_required", reason: MESSAGE_DIGEST_UNKNOWN };
   }
   let context: ReviewContext;
   try {
@@ -976,6 +1175,7 @@ export async function reconcileInquiryMessageReview(input: {
       verificationEvidence: checkpoint?.verificationEvidence,
       retryable: false,
     },
+    sentMessageDigest: checkpoint?.messageDigest,
     deps,
   });
   return {

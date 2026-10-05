@@ -5,14 +5,17 @@ import type { UnifiedEvent } from "@/lib/types";
 import type { InquiryCapabilityDefinition, InquiryEngineState, ResponsibilityPolicy } from "@/products/inquiries/contracts";
 import { InquiryEngine } from "@/products/inquiries/inquiry-engine";
 import {
+  approveInquiryMessageReviewWithDependencies,
   executeInquiryMessageReview,
   getInquiryMessageReviewMetadata,
+  persistDeliveredInquiryMessageReceipt,
   prepareInquiryMessageReviewWithDependencies,
   reconcileInquiryMessageReview,
   type InquiryMessageReviewDependencies,
 } from "@/products/inquiries/delivery-approval-service";
 import { createMemoryInquiryDeliveryStore } from "@/products/inquiries/delivery-store";
-import type { InquiryOutboundTransport } from "@/products/inquiries/delivery-types";
+import { reconcileInquiryProviderEvent } from "@/products/inquiries/reconciliation";
+import type { InquiryDeliveryStore, InquiryOutboundTransport } from "@/products/inquiries/delivery-types";
 import { createInMemoryInquiryRepository, type InquiryRepository } from "@/products/inquiries/repository";
 
 vi.mock("@/lib/tenant-crm", () => ({ addTenantActivity: vi.fn(async () => undefined) }));
@@ -411,6 +414,239 @@ describe("inquiry message review approval", () => {
     expect(result).toMatchObject({ accepted: true, safeToResolve: true, receiptPersisted: true, verified: true });
     expect((await repository.getSnapshot(TENANT, BUSINESS))?.state.responsibilityReceipts).toHaveLength(1);
     expect(mail.send).toHaveBeenCalledTimes(1);
+  });
+
+  it("never records a second review's message as sent when a different message already went out", async () => {
+    const { base, events, repository } = await fixture();
+    let current = lead();
+    const deps: InquiryMessageReviewDependencies = { ...base, getLead: async () => current };
+    await prepare("reply", deps);
+    const first = events[0]!;
+    const firstDigest = getInquiryMessageReviewMetadata(first)!.messageDigest;
+    const mail = transport();
+    const sent = await executeInquiryMessageReview({ tenantId: TENANT, eventId: first.id, event: first, actorId: ACTOR, deps: { ...deps, transport: mail } });
+    expect(sent).toMatchObject({ accepted: true, verified: true, receiptPersisted: true });
+    const checkpoint = await deps.store!.getCheckpoint({ tenantId: TENANT, inquiryId: INQUIRY, action: "reply" });
+    expect(checkpoint?.messageDigest).toBe(firstDigest);
+
+    // The inquiry changes, so a fresh review renders a different body for the
+    // same inquiry and purpose. The provider already has the first message.
+    current = { ...lead(), message: "Actually, can you call me instead?", fields: { ...lead().fields, message: "Actually, can you call me instead?" } };
+    await prepare("reply", deps);
+    const second = events[0]!;
+    const secondMetadata = getInquiryMessageReviewMetadata(second)!;
+    expect(secondMetadata.messageDigest).not.toBe(firstDigest);
+
+    const result = await executeInquiryMessageReview({ tenantId: TENANT, eventId: second.id, event: second, actorId: ACTOR, deps: { ...deps, transport: mail } });
+    expect(result).toMatchObject({ accepted: false, safeToResolve: false, receiptPersisted: false, status: "different_message_sent", reason: "different_message_already_sent" });
+    expect(mail.send).toHaveBeenCalledTimes(1);
+    const receipts = (await repository.getSnapshot(TENANT, BUSINESS))!.state.responsibilityReceipts;
+    expect(receipts).toHaveLength(1);
+    expect(receipts.some((receipt) => receipt.idempotencyKey?.includes(secondMetadata.messageDigest))).toBe(false);
+
+    const reconciled = await reconcileInquiryMessageReview({ tenantId: TENANT, event: second, actorId: ACTOR, deps });
+    expect(reconciled).toMatchObject({ safeToResolve: false, receiptPersisted: false, status: "different_message_sent" });
+    expect((await repository.getSnapshot(TENANT, BUSINESS))!.state.responsibilityReceipts).toHaveLength(1);
+
+    const outcome = await approveInquiryMessageReviewWithDependencies({
+      tenantId: TENANT,
+      businessId: BUSINESS,
+      inquiryId: INQUIRY,
+      action: "reply",
+      actorId: ACTOR,
+      reviewToken: (await prepare("reply", deps)).reviewToken,
+      messageDigest: secondMetadata.messageDigest,
+    }, { ...deps, resolveAction: async () => ({ changed: false, reason: "different_message_already_sent" }) });
+    expect(outcome).toMatchObject({ status: "blocked", reason: "different_message_already_sent", retryable: false });
+  });
+
+  it("refuses a receipt for a checkpoint written before message digests were recorded", async () => {
+    const { base, events, repository } = await fixture();
+    await prepare("reply", base);
+    const store = base.store!;
+    // A legacy checkpoint: accepted and verified, but with no message digest.
+    const claim = await store.beginAttempt({
+      tenantId: TENANT,
+      inquiryId: INQUIRY,
+      action: "reply",
+      maxAttempts: 1,
+      now: AT,
+      budget: { limit: 10, timezone: "UTC", policyVersion: "legacy", now: AT },
+    });
+    await store.markAccepted({ tenantId: TENANT, inquiryId: INQUIRY, action: "reply", attemptId: claim.attemptId!, acceptedAt: AT, providerMessageId: "provider-legacy" });
+    await store.markVerified({ tenantId: TENANT, inquiryId: INQUIRY, action: "reply", attemptId: claim.attemptId!, evidence: ["legacy read-back"] });
+    expect((await store.getCheckpoint({ tenantId: TENANT, inquiryId: INQUIRY, action: "reply" }))?.messageDigest).toBeUndefined();
+
+    const mail = transport();
+    const result = await executeInquiryMessageReview({ tenantId: TENANT, eventId: events[0]!.id, event: events[0]!, actorId: ACTOR, deps: { ...base, transport: mail } });
+    expect(mail.send).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ accepted: true, safeToResolve: false, receiptPersisted: false, providerMessageId: "provider-legacy", reason: "message_digest_unknown" });
+    expect((await repository.getSnapshot(TENANT, BUSINESS))!.state.responsibilityReceipts).toHaveLength(0);
+
+    const reconciled = await reconcileInquiryMessageReview({ tenantId: TENANT, event: events[0]!, actorId: ACTOR, deps: base });
+    expect(reconciled).toMatchObject({ accepted: true, safeToResolve: false, receiptPersisted: false, reason: "message_digest_unknown" });
+    expect((await repository.getSnapshot(TENANT, BUSINESS))!.state.responsibilityReceipts).toHaveLength(0);
+  });
+
+  it("retries a failed acceptance write so a transient store error does not lose the sent message", async () => {
+    const { base, events, repository } = await fixture();
+    await prepare("reply", base);
+    const store = base.store!;
+    let failures = 1;
+    const flakyStore: InquiryDeliveryStore = {
+      ...store,
+      markAccepted: async (input) => {
+        if (failures > 0) {
+          failures -= 1;
+          throw new Error("redis blip");
+        }
+        return store.markAccepted(input);
+      },
+    };
+    const mail = transport();
+    const result = await executeInquiryMessageReview({ tenantId: TENANT, eventId: events[0]!.id, event: events[0]!, actorId: ACTOR, deps: { ...base, store: flakyStore, transport: mail } });
+    expect(result).toMatchObject({ accepted: true, safeToResolve: true, receiptPersisted: true, verified: true, providerMessageId: "provider-approval" });
+    expect(mail.send).toHaveBeenCalledTimes(1);
+    expect(await store.findByProviderMessageId({ tenantId: TENANT, providerMessageId: "provider-approval" })).toEqual({ inquiryId: INQUIRY, action: "reply" });
+    expect((await repository.getSnapshot(TENANT, BUSINESS))!.state.responsibilityReceipts).toHaveLength(1);
+  });
+
+  it("keeps the provider id when the acceptance write keeps failing, and reconciliation repairs it without sending", async () => {
+    const { base, events, repository } = await fixture();
+    await prepare("reply", base);
+    const store = base.store!;
+    const brokenStore: InquiryDeliveryStore = {
+      ...store,
+      markAccepted: async () => {
+        throw new Error("redis unavailable");
+      },
+    };
+    const mail = transport();
+    const event = events[0]!;
+    const result = await executeInquiryMessageReview({ tenantId: TENANT, eventId: event.id, event, actorId: ACTOR, deps: { ...base, store: brokenStore, transport: mail } });
+    expect(mail.send).toHaveBeenCalledTimes(1);
+    // The send counts as accepted: the event must close its duplicate barrier
+    // and carry the provider id as a second copy.
+    expect(result).toMatchObject({ accepted: true, safeToResolve: false, status: "reconciliation_required", providerMessageId: "provider-approval", acceptedAt: AT });
+    expect(result.deliveryAttemptId).toEqual(expect.any(String));
+    const stuck = await store.getCheckpoint({ tenantId: TENANT, inquiryId: INQUIRY, action: "reply" });
+    expect(stuck).toMatchObject({ status: "sending", attemptId: result.deliveryAttemptId });
+    expect(await store.findByProviderMessageId({ tenantId: TENANT, providerMessageId: "provider-approval" })).toBeNull();
+
+    // event-actions records the acceptance evidence on the governed event.
+    const recorded = {
+      ...event,
+      metadata: {
+        ...event.metadata,
+        execution: {
+          state: "external_accepted" as const,
+          action: "approved" as const,
+          actor: ACTOR,
+          attemptId: "event-attempt",
+          startedAt: AT,
+          acceptance: { providerMessageId: result.providerMessageId, acceptedAt: result.acceptedAt, deliveryAttemptId: result.deliveryAttemptId },
+        },
+      },
+    } as UnifiedEvent;
+    const repaired = await reconcileInquiryMessageReview({ tenantId: TENANT, event: recorded, actorId: ACTOR, deps: { ...base, transport: mail } });
+    expect(repaired).toMatchObject({ accepted: true, safeToResolve: true });
+    expect(mail.send).toHaveBeenCalledTimes(1);
+    expect(await store.getCheckpoint({ tenantId: TENANT, inquiryId: INQUIRY, action: "reply" })).toMatchObject({ status: "accepted", providerMessageId: "provider-approval", acceptedAt: AT });
+    // Provider reports can now match the accepted message.
+    expect(await store.findByProviderMessageId({ tenantId: TENANT, providerMessageId: "provider-approval" })).toEqual({ inquiryId: INQUIRY, action: "reply" });
+    expect((await repository.getSnapshot(TENANT, BUSINESS))!.state.responsibilityReceipts).toHaveLength(0);
+  });
+
+  it("never repairs acceptance from evidence that belongs to another attempt", async () => {
+    const { base, events } = await fixture();
+    await prepare("reply", base);
+    const store = base.store!;
+    const mail = transport();
+    const event = events[0]!;
+    await executeInquiryMessageReview({ tenantId: TENANT, eventId: event.id, event, actorId: ACTOR, deps: { ...base, store: { ...store, markAccepted: async () => { throw new Error("down"); } }, transport: mail } });
+    const recorded = {
+      ...event,
+      metadata: {
+        ...event.metadata,
+        execution: { state: "external_accepted" as const, action: "approved" as const, actor: ACTOR, attemptId: "x", startedAt: AT, acceptance: { providerMessageId: "provider-other", acceptedAt: AT, deliveryAttemptId: "another-attempt" } },
+      },
+    } as UnifiedEvent;
+    const result = await reconcileInquiryMessageReview({ tenantId: TENANT, event: recorded, actorId: ACTOR, deps: base });
+    expect(result).toMatchObject({ accepted: false, safeToResolve: false, status: "reconciliation_required" });
+    expect(await store.getCheckpoint({ tenantId: TENANT, inquiryId: INQUIRY, action: "reply" })).toMatchObject({ status: "sending" });
+    expect(mail.send).toHaveBeenCalledTimes(1);
+  });
+
+  it("writes the owed message receipt exactly once when delivery is reported after the approval resolved", async () => {
+    const { base, events, repository } = await fixture();
+    await prepare("reply", base);
+    const event = events[0]!;
+    const mail: InquiryOutboundTransport = {
+      send: vi.fn(async () => ({ status: "accepted" as const, providerMessageId: "provider-approval", acceptedAt: AT })),
+      verify: vi.fn(async () => ({ status: "deferred" as const, reason: "Recipient server is greylisting.", retryable: false })),
+    };
+    const result = await executeInquiryMessageReview({ tenantId: TENANT, eventId: event.id, event, actorId: ACTOR, deps: { ...base, transport: mail } });
+    // Deferred is accepted and still open: the approval resolves with no receipt yet.
+    expect(result).toMatchObject({ accepted: true, safeToResolve: true, receiptPersisted: true, verified: false, status: "deferred" });
+    event.status = "approved";
+    expect((await repository.getSnapshot(TENANT, BUSINESS))!.state.responsibilityReceipts).toHaveLength(0);
+
+    const delivered = (eventId: string, at: string) => ({
+      event: {
+        type: "email.delivered",
+        created_at: at,
+        data: { email_id: "provider-approval", tags: { strelva_tenant_id: TENANT, strelva_inquiry_id: INQUIRY, strelva_action: "reply" } },
+      },
+      eventId,
+      store: base.store!,
+      persistMessageReceipt: (input: Parameters<typeof persistDeliveredInquiryMessageReceipt>[0]) => persistDeliveredInquiryMessageReceipt({ ...input, deps: base }),
+    });
+
+    // The first delivered report arrives while the workspace save is down:
+    // the webhook stays retryable instead of dropping the owed receipt.
+    let saveAvailable = false;
+    const realCompareAndSwap = repository.compareAndSwap.bind(repository);
+    repository.compareAndSwap = async (input) => (saveAvailable
+      ? realCompareAndSwap(input)
+      : { changed: false, reason: "conflict", current: await repository.getSnapshot(TENANT, BUSINESS) });
+    const blocked = await reconcileInquiryProviderEvent(delivered("evt_delivered", "2026-09-11T12:03:00.000Z"));
+    expect(blocked).toMatchObject({ status: "unavailable", reason: "message_receipt_unavailable" });
+    expect((await repository.getSnapshot(TENANT, BUSINESS))!.state.responsibilityReceipts).toHaveLength(0);
+
+    saveAvailable = true;
+    const retried = await reconcileInquiryProviderEvent(delivered("evt_delivered", "2026-09-11T12:03:00.000Z"));
+    expect(retried.status).toBe("duplicate");
+    const receipts = (await repository.getSnapshot(TENANT, BUSINESS))!.state.responsibilityReceipts;
+    expect(receipts).toHaveLength(1);
+    expect(receipts[0]).toMatchObject({ action: "reply", status: "accepted" });
+    expect(receipts[0]!.idempotencyKey).toContain(getInquiryMessageReviewMetadata(event)!.messageDigest);
+    expect(receipts[0]!.outcomeEvidence).toEqual(expect.arrayContaining(["provider status delivered", "provider message provider-approval"]));
+
+    // Repeated and later reports never write a second receipt.
+    expect((await reconcileInquiryProviderEvent(delivered("evt_delivered", "2026-09-11T12:03:00.000Z"))).status).toBe("duplicate");
+    expect((await reconcileInquiryProviderEvent(delivered("evt_delivered_again", "2026-09-11T12:04:00.000Z"))).status).toBe("recorded");
+    expect((await repository.getSnapshot(TENANT, BUSINESS))!.state.responsibilityReceipts).toHaveLength(1);
+    expect(mail.send).toHaveBeenCalledTimes(1);
+  });
+
+  it("writes no receipt on delivery when no approved review matches the sent message", async () => {
+    const { base, events, repository } = await fixture();
+    await prepare("reply", base);
+    const event = events[0]!;
+    const mail: InquiryOutboundTransport = {
+      send: vi.fn(async () => ({ status: "accepted" as const, providerMessageId: "provider-approval", acceptedAt: AT })),
+      verify: vi.fn(async () => ({ status: "unverified" as const, reason: "Read-back unavailable.", retryable: false })),
+    };
+    await executeInquiryMessageReview({ tenantId: TENANT, eventId: event.id, event, actorId: ACTOR, deps: { ...base, transport: mail } });
+    // The review was never approved (still pending with no accepted marker).
+    const result = await reconcileInquiryProviderEvent({
+      event: { type: "email.delivered", created_at: "2026-09-11T12:03:00.000Z", data: { email_id: "provider-approval", tags: { strelva_tenant_id: TENANT, strelva_inquiry_id: INQUIRY, strelva_action: "reply" } } },
+      eventId: "evt_delivered",
+      store: base.store!,
+      persistMessageReceipt: (input) => persistDeliveredInquiryMessageReceipt({ ...input, deps: base }),
+    });
+    expect(result.status).toBe("recorded");
+    expect((await repository.getSnapshot(TENANT, BUSINESS))!.state.responsibilityReceipts).toHaveLength(0);
   });
 
   it("leaves the event blocked when the receipt save is unavailable, then reconciles it", async () => {

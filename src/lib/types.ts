@@ -749,6 +749,13 @@ export interface UnifiedEvent {
       startedAt: string;
       finishedAt?: string;
       reason?: string;
+      // What the provider accepted, kept on the event as a second copy for
+      // reconciliation when the delivery's own marker could not be written.
+      acceptance?: {
+        providerMessageId?: string;
+        acceptedAt?: string;
+        deliveryAttemptId?: string;
+      };
     };
   };
   createdAt: string;
