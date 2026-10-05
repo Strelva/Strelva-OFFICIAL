@@ -439,7 +439,7 @@ test("shared read-only work cannot start an assessment", async ({ page }) => {
   await expect(page.getByText("This work-share does not include business-wide offering access.", { exact: false })).toBeVisible();
   await page.locator('[class*="discoveryRow"]').filter({ hasText: "AI Visibility" }).getByRole("button", { name: "AI Visibility: Start", exact: true }).click();
   await expect(page.getByRole("button", { name: "Check a business", exact: true })).toBeDisabled();
-  await expect(page.getByText("Switch to a workspace you own to create an assessment.")).toBeVisible();
+  await expect(page.getByText("Harbor Dental shared this with your agency to review. Switch to a workspace you’re a member of to create an assessment.")).toBeVisible();
 });
 
 test("preview account navigation remains local and exposes no real sign-out", async ({ page }) => {
