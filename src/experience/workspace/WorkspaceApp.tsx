@@ -43,7 +43,7 @@ import type {
 } from "./contracts";
 import type { WorkspaceInquiryTarget } from "./WorkspaceLayout";
 import type { WorkspaceStartContinuation } from "./workspace-start";
-import { selectWorkspaceLocation, isHorizontalView, type HorizontalView, type WorkspaceView as View } from "./workspace-selection";
+import { selectWorkspaceLocation, isHorizontalView, viewForWork, type HorizontalView, type WorkspaceView as View } from "./workspace-selection";
 import { workspaceExitBlocksChanges, workspaceExitIsStopped } from "./workspace-exit-ui";
 
 type Notice = { kind: "success" | "error"; message: string } | null;
@@ -278,7 +278,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     setTrackerStartContext(null);
     setDocumentStartContext(null);
     setPlanStartRequest(null);
-    setView(isHorizontalView(chosen?.productId) ? chosen.productId : chosen?.productId === "tracker" ? "tracker" : chosen?.productId === "documents" ? "document" : chosen?.productId === "work_plans" ? "plan" : "work");
+    setView(viewForWork(chosen?.productId));
     setNotice(null);
     const url = new URL(window.location.href);
     url.searchParams.delete("standingId");
@@ -304,7 +304,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
     url.searchParams.set("workspaceId", workspaceId);
     url.searchParams.set("work", id);
     clearEmbeddedRouteParams(url);
-    url.searchParams.set("view", isHorizontalView(productId) ? productId : productId === "tracker" ? "tracker" : productId === "documents" ? "document" : productId === "work_plans" ? "plan" : "work");
+    url.searchParams.set("view", viewForWork(productId));
     window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
     void loadWorkspace(workspaceId);
   }

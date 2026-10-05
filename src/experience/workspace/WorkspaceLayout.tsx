@@ -26,6 +26,7 @@ import {
   useWorkspaceOfferings,
 } from "./WorkspaceOfferings";
 import type { WorkspaceStartContext, WorkspaceStartContinuation, WorkspaceStartTemplate, WorkspaceStartWebsiteHandoff } from "./workspace-start";
+import { viewForWork } from "./workspace-selection";
 import styles from "./workspace-surface.module.css";
 
 export interface WorkspaceInquiryTarget {
@@ -219,7 +220,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     const selected = snapshot.work.find((work) => work.id === id);
     const url = new URL(window.location.href); url.searchParams.set("work", id); url.searchParams.set("workspaceId", workspaceIdForNavigation());
     clearEmbeddedParams(url);
-    url.searchParams.set("view", selected?.productId === "operations" ? "ongoing" : selected?.productId === "tracker" ? "tracker" : selected?.productId === "documents" ? "document" : selected?.productId === "work_plans" ? "plan" : "work");
+    url.searchParams.set("view", viewForWork(selected?.productId));
     window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   }
 

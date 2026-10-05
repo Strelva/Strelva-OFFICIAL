@@ -5,6 +5,18 @@ export type HorizontalView = "websites" | "custom-applications" | "onboarding" |
 export const isHorizontalView = (value: string | null | undefined): value is HorizontalView => Boolean(value && ["websites", "custom-applications", "onboarding", "applications", "scheduling", "investigations", "operations", "product-learning"].includes(value));
 export type WorkspaceView = "work" | "agency" | "inquiries" | "tracker" | "document" | "plan" | HorizontalView;
 
+/**
+ * The one view a saved piece of work opens in. Used for both the in-page view
+ * and the `view` written to the URL, so a reload lands where the click did.
+ */
+export function viewForWork(productId: string | null | undefined): WorkspaceView {
+  if (isHorizontalView(productId)) return productId;
+  if (productId === "tracker") return "tracker";
+  if (productId === "documents") return "document";
+  if (productId === "work_plans") return "plan";
+  return "work";
+}
+
 /** Resolve navigation only. Data and action authority still belong to the server. */
 export function selectWorkspaceLocation(
   params: URLSearchParams,
