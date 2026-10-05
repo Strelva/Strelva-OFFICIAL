@@ -152,6 +152,7 @@ function readOutcome(value: unknown): InquiryMessageReviewOutcome | null {
     providerMessageId: typeof row.providerMessageId === "string" ? row.providerMessageId : null,
     delivery: row.delivery,
     retryAllowed: row.retryAllowed,
+    reason: typeof row.reason === "string" ? row.reason : null,
   });
   return {
     inquiryId,
@@ -241,6 +242,13 @@ export function messageReviewCompletionCopy(outcome: InquiryMessageReviewOutcome
       title: "The provider reported delivery.",
       detail: "The delivery receipt is attached to this inquiry.",
       tone: "success",
+    };
+  }
+  if (outcome.status === "blocked" && outcome.reason === "different_message_already_sent") {
+    return {
+      title: `A different ${actionLabel(outcome.action)} was already sent for this inquiry.`,
+      detail: "This one was not sent and can't be. Check the inquiry's history to see what went out.",
+      tone: "warning",
     };
   }
   if (outcome.status === "blocked") {

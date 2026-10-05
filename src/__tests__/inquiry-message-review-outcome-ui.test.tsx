@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InquiryMessageReview } from "@/experience/inquiries/InquiryMessageReview";
 import type { InquiryMessageReviewPreview } from "@/experience/inquiries/message-review-contract";
+import { classifyInquiryMessageOutcome } from "@/products/inquiries/message-outcome";
 
 const review: InquiryMessageReviewPreview = {
   reviewToken: "review-token",
@@ -82,6 +83,17 @@ describe("message review outcome after the provider accepted the message", () =>
   it("uses the server's delivery classification when the outcome carries one", async () => {
     const node = await approveWithOutcome({ ...base, status: "failed", retryable: false, delivery: "undeliverable", retryAllowed: false });
     expect(node.textContent).toContain("accepted but not delivered");
+    expect(node.textContent).not.toContain("Prepare a new review");
+  });
+
+  it("explains a different message already went out and offers no new review", async () => {
+    // The route classifies the server outcome before the screen sees it.
+    const server = { ...base, status: "blocked", reason: "different_message_already_sent", retryable: false };
+    const routed = { ...server, ...classifyInquiryMessageOutcome(server) };
+    expect(routed.retryAllowed).toBe(false);
+    const node = await approveWithOutcome(routed);
+    expect(node.textContent).toContain("A different reply was already sent for this inquiry.");
+    expect(node.textContent).not.toContain("different_message_already_sent");
     expect(node.textContent).not.toContain("Prepare a new review");
   });
 

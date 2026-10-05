@@ -52,7 +52,16 @@ export interface InquiryMessageClassificationInput {
   acceptedAt?: string | null;
   providerMessageId?: string | null;
   providerOutcome?: InquiryDeliveryProviderOutcome | null;
+  /** Why the send stopped, when the server said. */
+  reason?: string | null;
 }
+
+/**
+ * Reasons that end the purpose for this inquiry even though nothing was sent:
+ * a different message already went out, so the checkpoint and the provider
+ * idempotency key refuse any new review for the same inquiry and purpose.
+ */
+export const FINAL_UNSENT_REASONS: ReadonlySet<string> = new Set(["different_message_already_sent"]);
 
 const ACCEPTED_STATUSES = new Set([
   "accepted",
@@ -85,7 +94,7 @@ export function classifyInquiryMessage(input: InquiryMessageClassificationInput)
   );
   if (accepted) return { accepted: true, delivery: acceptedDelivery(input), retryAllowed: false };
   if (UNKNOWN_STATUSES.has(input.status)) return { accepted: false, delivery: "unknown", retryAllowed: false };
-  return { accepted: false, delivery: "none", retryAllowed: true };
+  return { accepted: false, delivery: "none", retryAllowed: !FINAL_UNSENT_REASONS.has(input.reason ?? "") };
 }
 
 export function isInquiryMessageDelivery(value: unknown): value is InquiryMessageDelivery {
@@ -102,10 +111,12 @@ export function classifyInquiryMessageOutcome(outcome: {
   providerMessageId?: string | null;
   delivery?: unknown;
   retryAllowed?: unknown;
+  reason?: string | null;
 }): InquiryMessageClassification {
   if (isInquiryMessageDelivery(outcome.delivery) && typeof outcome.retryAllowed === "boolean") {
     const accepted = outcome.delivery !== "none" && outcome.delivery !== "unknown";
-    return { accepted, delivery: outcome.delivery, retryAllowed: !accepted && outcome.retryAllowed };
+    const final = FINAL_UNSENT_REASONS.has(outcome.reason ?? "");
+    return { accepted, delivery: outcome.delivery, retryAllowed: !accepted && !final && outcome.retryAllowed };
   }
   return classifyInquiryMessage(outcome);
 }
