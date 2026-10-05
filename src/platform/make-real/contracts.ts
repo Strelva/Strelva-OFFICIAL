@@ -85,7 +85,12 @@ export const activationSchema = z.object({
   pinned: z.array(z.object({ systemId: z.string(), baselineRevisionId: z.string(), stagedRevisionId: z.string().optional() }).strict()),
   introduced: z.array(z.object({ key: z.string(), systemId: z.string().optional(), revisionId: z.string().optional() }).strict()),
   connections: z.array(z.object({ id: z.string(), connectionId: z.string().optional() }).strict()),
+  /** Verified against the approval store at start/approve and again right
+   * before the effect runs. `approvedBy` is the record's decider, never the caller. */
   approvals: z.array(z.object({ effectId: z.string(), approvalId: z.string().min(1).max(120), approvedBy: z.string(), at: DATE, consumedAt: DATE.optional() }).strict()),
+  /** Set when rollback begins. Forward progress stops for good; rollback only
+   * finishes once no step's outside outcome is unknown. */
+  rollbackStartedAt: DATE.optional(),
   checks: z.array(z.object({ id: z.string(), description: z.string(), status: z.enum(["pending", "passed", "failed"]), detail: z.string().max(1000).optional(), at: DATE.optional() }).strict()),
   steps: z.array(activationStepSchema).min(1).max(120),
   createdAt: DATE,

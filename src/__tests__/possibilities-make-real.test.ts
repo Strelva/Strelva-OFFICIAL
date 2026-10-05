@@ -14,6 +14,8 @@ import {
 } from "@/platform/possibilities";
 import {
   createInMemoryActivationRepository,
+  createInMemoryApprovalRecords,
+  effectApprovalSubject,
   createInMemoryLiveSystems,
   createInMemoryRevisionContent,
   createIsolatedAdapter,
@@ -182,7 +184,8 @@ async function world(backend: "fake" | "store" = "fake") {
       return activationStore.save(value, expected);
     },
   };
-  const makeReal = createMakeReal({ possibilities, activations, live: live.port, authority, adapters, checks, clock, ids });
+  const approvalRecords = createInMemoryApprovalRecords();
+  const makeReal = createMakeReal({ possibilities, activations, live: live.port, authority, adapters, checks, approvals: approvalRecords, clock, ids });
 
   const input: PossibilityInput = {
     title: "Self-service package purchase",
@@ -220,13 +223,15 @@ async function world(backend: "fake" | "store" = "fake") {
     p = recordRehearsal(p, await rehearsePossibility(p, live.port, adapters, clock()), p.revision, owner.userId, clock());
     p = await markReady(p, live.port, p.revision, owner.userId, clock());
     await possibilities.create(p);
+    // Recorded owner approvals for exactly these effects of this candidate.
+    for (const effect of p.effects) approvalRecords.record({ id: `approval-${effect.id}`, businessId: BIZ, subject: effectApprovalSubject(p, effect), status: "approved", decidedBy: owner.userId, decidedAt: clock() });
     return p;
   }
 
-  return { clock, advance, live, proposalR1, pricingR1, issued, revoked, adapters, calendar, message, payment, publish, failingChecks, possibilities, activations, makeReal, input, readyPossibility, setSaveFault: (f: (a: Activation) => boolean) => { saveFault = f; } };
+  return { approvalRecords, clock, advance, live, proposalR1, pricingR1, issued, revoked, adapters, calendar, message, payment, publish, failingChecks, possibilities, activations, makeReal, input, readyPossibility, setSaveFault: (f: (a: Activation) => boolean) => { saveFault = f; } };
 }
 
-const approvals = [{ effectId: "packages-page", approvalId: "approval-owner-1" }];
+const approvals = ["kickoff-calendar", "team-notice", "checkout-link", "packages-page"].map((effectId) => ({ effectId, approvalId: `approval-${effectId}` }));
 
 describe("Possibility: exploring is isolated", () => {
   it("rehearses with isolated adapters only and never writes live state or calls a provider", async () => {
@@ -351,7 +356,7 @@ describe.each(["fake", "store"] as const)("Make real on the %s live backend: the
     expect(w.payment.ledger).toHaveLength(1);
     expect(w.publish.ledger).toHaveLength(1);
     expect(done.approvals[0]!.consumedAt).toBeDefined();
-    expect(done.steps.find((s) => s.id === "effect:packages-page")!.receipt).toMatchObject({ approvalId: "approval-owner-1", grantId: "grant-site.publish" });
+    expect(done.steps.find((s) => s.id === "effect:packages-page")!.receipt).toMatchObject({ approvalId: "approval-packages-page", grantId: "grant-site.publish" });
     expect((await w.possibilities.get(BIZ, "poss-1"))!.status).toBe("made_real");
 
     // Same System identity, new revision; the extracted System is live and connected.
@@ -421,7 +426,7 @@ describe.each(["fake", "store"] as const)("Make real on the %s live backend: bou
     const w = await world(backend);
     const payment = createIsolatedAdapter("payment", { supportsLookup: false, idempotentByKey: false });
     const adapters = [w.calendar, w.message, payment, w.publish];
-    const makeReal = createMakeReal({ possibilities: w.possibilities, activations: w.activations, live: w.live.port, authority: { check: async () => ({ allowed: true, grantId: "g" }) }, adapters, checks: { run: async () => ({ passed: true, detail: "ok" }) }, clock: w.clock });
+    const makeReal = createMakeReal({ possibilities: w.possibilities, activations: w.activations, live: w.live.port, authority: { check: async () => ({ allowed: true, grantId: "g" }) }, adapters, checks: { run: async () => ({ passed: true, detail: "ok" }) }, approvals: w.approvalRecords, clock: w.clock });
     await w.readyPossibility();
     const a = await makeReal.start(owner, BIZ, "poss-1", { approvals });
     payment.faults.acceptThenThrow = true;

@@ -12,6 +12,9 @@ export interface ActivationView {
   notStarted: string[];
   /** True while every pinned System still serves its pre-activation revision. */
   liveUnchanged: boolean;
+  /** True while any step's outside outcome is unknown. Nothing may be
+   * reported as undone or absent until these are reconciled. */
+  needsReconciliation: boolean;
   /** Accepted effects that rollback cannot remove. */
   cannotUndo: string[];
   checks: Activation["checks"];
@@ -30,8 +33,11 @@ export function describeActivation(a: Activation): ActivationView {
   const waiting = a.steps.filter((s) => s.status === "blocked" || s.status === "failed").map((s) => ({ step: s.id, label: s.label, reason: s.reason ?? "" }));
   const unknown = a.steps.filter((s) => s.status === "unknown").map((s) => ({ step: s.id, label: s.label }));
   const accepted = a.steps.filter((s) => s.kind === "effect" && s.effect === "accepted" && s.status !== "compensated");
+  const rollbackWaiting = Boolean(a.rollbackStartedAt) && a.status !== "rolled_back";
   const headline =
     a.status === "made_real" ? "Made real. Every operating check passed."
+      : rollbackWaiting && unknown.length ? `Rollback is not finished. ${unknown.length} outside effect(s) have an unknown outcome and need reconciliation with evidence before anything can be called undone.`
+      : rollbackWaiting ? "Rollback is not finished. Run it again to complete it."
       : a.status === "rolled_back" ? `Rolled back. ${accepted.length ? `${accepted.length} outside effect(s) already happened and are listed.` : "No outside effect remains."}`
         : a.status === "needs_attention" ? `Partly done: ${done.length} of ${a.steps.length} steps. ${switched ? "Some live Systems already switched." : "Your live Systems are unchanged."}`
           : `In progress: ${done.length} of ${a.steps.length} steps.`;
@@ -43,6 +49,7 @@ export function describeActivation(a: Activation): ActivationView {
     unknown,
     notStarted: a.steps.filter((s) => s.status === "pending").map((s) => s.id),
     liveUnchanged: !switched,
+    needsReconciliation: unknown.length > 0,
     cannotUndo: accepted.filter((s) => s.reversibility === "irreversible").map((s) => s.label),
     checks: a.checks,
   };

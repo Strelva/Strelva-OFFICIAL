@@ -147,6 +147,13 @@ export const possibilitySchema = possibilityInputSchema.extend({
   propagation: z.literal("new_outputs_only"),
   rehearsal: rehearsalSchema.optional(),
   activationId: z.string().optional(),
+  /** Make real memory across activations. A step's idempotency key is derived
+   * from (business, possibility, candidate pin, step, epoch); the epoch only
+   * moves when a rollback definitively undid that step, so a restart reuses
+   * the key of anything whose outcome was never settled. */
+  keyEpochs: z.record(z.string().max(120), z.number().int().positive()).optional(),
+  /** Approval records already consumed by an accepted effect. Never reusable. */
+  consumedApprovalIds: z.array(z.string().max(120)).max(200).optional(),
   createdBy: z.string().min(1),
   createdAt: DATE,
   updatedAt: DATE,

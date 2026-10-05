@@ -203,10 +203,16 @@ export function attachActivation(raw: Possibility, activationId: string, actorId
   return record(p, "make_real_started", actorId, at, activationId);
 }
 
-export function detachActivation(raw: Possibility, activationId: string, actorId: string, at: string): Possibility {
+export function detachActivation(raw: Possibility, activationId: string, actorId: string, at: string, settled: { undoneStepIds?: string[]; consumedApprovalIds?: string[] } = {}): Possibility {
   const p = copy(raw);
   if (p.activationId !== activationId) conflict("That activation does not belong to this possibility.");
   p.activationId = undefined;
+  if (settled.undoneStepIds?.length) {
+    const epochs = { ...(p.keyEpochs ?? {}) };
+    for (const id of settled.undoneStepIds) epochs[id] = (epochs[id] ?? 0) + 1;
+    p.keyEpochs = epochs;
+  }
+  if (settled.consumedApprovalIds?.length) p.consumedApprovalIds = [...new Set([...(p.consumedApprovalIds ?? []), ...settled.consumedApprovalIds])];
   return record(p, "make_real_rolled_back", actorId, at, activationId);
 }
 

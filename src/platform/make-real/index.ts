@@ -2,6 +2,7 @@ export * from "./contracts";
 export * from "./ports";
 export * from "./plan";
 export * from "./governance";
+export * from "./approvals";
 export * from "./runner";
 export * from "./repository";
 export * from "./view";

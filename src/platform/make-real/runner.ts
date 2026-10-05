@@ -4,6 +4,7 @@ import { EFFECT_SCOPE, type DeclaredEffect, type Possibility, type SystemTarget 
 import { attachActivation, detachActivation, markMadeReal, returnToExploring, staleBaselines } from "@/platform/possibilities/engine";
 import type { PossibilityRepository } from "@/platform/possibilities/repository";
 import { activationSchema, type Activation, type ActivationStep } from "./contracts";
+import { approvalProblem, type ApprovalRecordsPort } from "./approvals";
 import { gatePublish } from "./governance";
 import { initialChecks, planActivation } from "./plan";
 import { BaselineMovedError, type AuthorityPort, type EffectAdapter, type LiveSystemsPort, type OperatingChecksPort } from "./ports";
@@ -24,6 +25,8 @@ export interface MakeRealDeps {
   authority: AuthorityPort;
   adapters: readonly EffectAdapter[];
   checks: OperatingChecksPort;
+  /** The approval store. Approval ids are only trusted once resolved here. */
+  approvals: ApprovalRecordsPort;
   clock?: () => string;
   ids?: () => string;
 }
@@ -43,6 +46,8 @@ function record(previous: Activation, kind: string, actorId: string, at: string,
 
 function deriveStatus(a: Activation): Activation["status"] {
   if (a.status === "rolled_back") return "rolled_back";
+  // Once rollback starts, forward progress is over until it finishes.
+  if (a.rollbackStartedAt) return "needs_attention";
   if (a.status === "made_real") return "made_real";
   if (a.steps.every((s) => s.status === "completed") && a.checks.every((c) => c.status === "passed")) return "made_real";
   if (a.steps.some((s) => ["blocked", "failed", "unknown"].includes(s.status))) return "needs_attention";
@@ -220,7 +225,13 @@ export function createMakeReal(deps: MakeRealDeps) {
       const effect = p.effects.find((e) => e.id === step.target)!;
       const publish = gatePublish(effect);
       if (publish.kind === "blocked") return { denied: publish.reason, refused: true };
-      if (publish.kind === "needs_approval" && !a.approvals.some((x) => x.effectId === effect.id && !x.consumedAt)) return { denied: `Needs approval: ${publish.reason}` };
+      if (publish.kind === "needs_approval") {
+        const entry = a.approvals.find((x) => x.effectId === effect.id && !x.consumedAt);
+        if (!entry) return { denied: `Needs approval: ${publish.reason}` };
+        // Re-read the record now: a dismissal after start must stop the write.
+        const problem = approvalProblem(await deps.approvals.get(a.businessId, entry.approvalId), a.businessId, p, effect);
+        if (problem) return { denied: `Needs approval: ${problem}.` };
+      }
     }
     return { grantId };
   }
@@ -232,6 +243,7 @@ export function createMakeReal(deps: MakeRealDeps) {
     const step = runnable(a);
     if (!step) return { activation: a, ran: null };
     const p = await loadPossibility(businessId, a.possibilityId);
+    if (p.activationId !== a.id) conflict("This activation no longer belongs to its possibility.");
 
     const gated = await gate(actor, a, p, step);
     if (gated.denied) {
@@ -289,27 +301,38 @@ export function createMakeReal(deps: MakeRealDeps) {
       }
 
       const problems: string[] = [];
+      const at = now();
+      const verified: Activation["approvals"] = [];
+      for (const given of opts.approvals ?? []) {
+        if (!p.effects.some((e) => e.id === given.effectId)) problems.push(`${given.effectId}: not an effect of this possibility`);
+      }
       for (const effect of p.effects) {
         if (!deps.adapters.some((x) => x.kind === effect.kind)) problems.push(`${effect.id}: no ${effect.kind} connection`);
         const decision = await deps.authority.check(actor, { businessId, scope: EFFECT_SCOPE[effect.kind] });
         if (!decision.allowed) problems.push(`${effect.id}: ${decision.reason}`);
         const publish = gatePublish(effect);
         if (publish.kind === "blocked") problems.push(`${effect.id}: ${publish.reason}`);
-        if (publish.kind === "needs_approval" && !opts.approvals?.some((x) => x.effectId === effect.id)) problems.push(`${effect.id}: needs approval (${publish.reason})`);
+        if (publish.kind !== "needs_approval") continue;
+        const given = opts.approvals?.find((x) => x.effectId === effect.id);
+        if (!given) { problems.push(`${effect.id}: needs approval (${publish.reason})`); continue; }
+        if (p.consumedApprovalIds?.includes(given.approvalId)) { problems.push(`${effect.id}: approval ${given.approvalId} was already used by an accepted write`); continue; }
+        const recordRow = await deps.approvals.get(businessId, given.approvalId);
+        const problem = approvalProblem(recordRow, businessId, p, effect);
+        if (problem) { problems.push(`${effect.id}: approval refused (${problem})`); continue; }
+        verified.push({ effectId: effect.id, approvalId: given.approvalId, approvedBy: recordRow!.decidedBy ?? `approval:${given.approvalId}`, at });
       }
       if (problems.length) conflict(`Make real cannot start yet. ${problems.join("; ")}`);
 
       const id = newId();
-      const at = now();
       const activation = activationSchema.parse({
         version: 1, id, businessId, possibilityId, candidateRevision: p.candidateRevision, actorId: actor.userId,
         status: "in_progress", revision: 0,
         pinned: p.changes.map((c) => ({ systemId: c.baseline.systemId, baselineRevisionId: c.baseline.revisionId })),
         introduced: p.introduces.map((i) => ({ key: i.key })),
         connections: p.connections.map((c) => ({ id: c.id })),
-        approvals: (opts.approvals ?? []).map((x) => ({ ...x, approvedBy: actor.userId, at })),
+        approvals: verified,
         checks: initialChecks(p),
-        steps: planActivation(p, id, deps.adapters),
+        steps: planActivation(p, deps.adapters),
         createdAt: at, updatedAt: at, history: [],
       });
       await deps.activations.create(activation);
@@ -327,6 +350,7 @@ export function createMakeReal(deps: MakeRealDeps) {
     async resume(actor: WorkspaceActor, businessId: string, id: string): Promise<Activation> {
       const a = await load(businessId, id);
       if (a.status === "made_real" || a.status === "rolled_back") conflict("This activation is closed.");
+      if (a.rollbackStartedAt) conflict("Rollback has started. Reconcile any unknown step and finish the rollback instead.");
       const notes: string[] = [];
       for (const step of a.steps) {
         if (step.status === "running") {
@@ -368,11 +392,17 @@ export function createMakeReal(deps: MakeRealDeps) {
 
     async approve(actor: WorkspaceActor, businessId: string, id: string, effectId: string, approvalId: string): Promise<Activation> {
       const a = await load(businessId, id);
-      if (a.status === "made_real" || a.status === "rolled_back") conflict("This activation is closed.");
-      const decision = await deps.authority.check(actor, { businessId, scope: "site.publish" });
+      if (a.status === "made_real" || a.status === "rolled_back" || a.rollbackStartedAt) conflict("This activation is closed.");
+      const p = await loadPossibility(businessId, a.possibilityId);
+      const effect = p.effects.find((e) => e.id === effectId);
+      if (!effect || !a.steps.some((s) => s.kind === "effect" && s.target === effectId)) conflict("That effect is not part of this activation.");
+      const decision = await deps.authority.check(actor, { businessId, scope: EFFECT_SCOPE[effect.kind] });
       if (!decision.allowed) throw new WorkspaceAccessError(decision.reason);
-      if (!a.steps.some((s) => s.kind === "effect" && s.target === effectId)) conflict("That effect is not part of this activation.");
-      a.approvals.push({ effectId, approvalId, approvedBy: actor.userId, at: now() });
+      if (p.consumedApprovalIds?.includes(approvalId) || a.approvals.some((x) => x.approvalId === approvalId && x.consumedAt)) conflict("That approval was already used by an accepted write.");
+      const recordRow = await deps.approvals.get(businessId, approvalId);
+      const problem = approvalProblem(recordRow, businessId, p, effect);
+      if (problem) conflict(`That approval cannot be used: ${problem}.`);
+      a.approvals.push({ effectId, approvalId, approvedBy: recordRow!.decidedBy ?? `approval:${approvalId}`, at: now() });
       const next = record(a, "approve", actor.userId, now(), effectId);
       await deps.activations.save(next, a.revision);
       return next;
@@ -383,6 +413,9 @@ export function createMakeReal(deps: MakeRealDeps) {
     async reconcile(actor: WorkspaceActor, businessId: string, id: string, input: { stepId: string; resolution: "completed" | "not_applied"; evidence: string; providerRef?: string }): Promise<Activation> {
       const a = await load(businessId, id);
       const step = a.steps.find((s) => s.id === input.stepId);
+      // Declaring what happened outside is an authority act, rechecked now.
+      const decision = await deps.authority.check(actor, { businessId, scope: step?.scope ?? "system.activate" });
+      if (!decision.allowed) throw new WorkspaceAccessError(decision.reason);
       if (!step || step.status !== "unknown" || !input.evidence.trim()) conflict("Reconciliation needs an unknown step and evidence of its outcome.");
       if (input.resolution === "not_applied" && step.effect === "accepted") conflict("An accepted write cannot be declared safe to replay.");
       if (input.resolution === "completed") {
@@ -402,17 +435,35 @@ export function createMakeReal(deps: MakeRealDeps) {
 
     /** Bounded recovery: restore live references, compensate what can be
      * compensated, and name what cannot be undone. Accepted irreversible
-     * effects stay recorded as done. */
+     * effects stay recorded as done. A step whose outside outcome is unknown
+     * cannot be undone or declared absent, so rollback stops short of
+     * `rolled_back` until it is reconciled with evidence; calling rollback
+     * again then finishes it. Each undone step is checkpointed on its own so
+     * an interrupted rollback resumes instead of repeating live writes. */
     async rollback(actor: WorkspaceActor, businessId: string, id: string): Promise<Activation> {
-      const a = await load(businessId, id);
+      let a = await load(businessId, id);
       if (a.status === "made_real") conflict("This is already real. Change it with a new possibility instead of rolling back.");
       if (a.status === "rolled_back") return a;
       if (a.steps.some((s) => s.status === "running")) conflict("A step is still running. Resume to reconcile it before rolling back.");
       const decision = await deps.authority.check(actor, { businessId, scope: "system.activate" });
       if (!decision.allowed) throw new WorkspaceAccessError(decision.reason);
       const p = await loadPossibility(businessId, a.possibilityId);
-      for (const step of [...a.steps].reverse()) {
+
+      const checkpoint = async (kind: string, detail?: string) => {
+        a.status = deriveStatus(a);
+        const next = record(a, kind, actor.userId, now(), detail);
+        await deps.activations.save(next, a.revision);
+        a = next;
+      };
+      if (!a.rollbackStartedAt) {
+        a.rollbackStartedAt = now();
+        await checkpoint("rollback_started");
+      }
+
+      for (const stepId of [...a.steps].reverse().map((s) => s.id)) {
+        const step = a.steps.find((s) => s.id === stepId)!;
         if (step.status !== "completed") continue;
+        const before = `${step.status}|${step.reason ?? ""}`;
         if (step.kind === "connect") {
           const row = a.connections.find((c) => c.id === step.target);
           if (row?.connectionId) await deps.live.disconnect(businessId, row.connectionId);
@@ -425,7 +476,9 @@ export function createMakeReal(deps: MakeRealDeps) {
             step.status = "restored"; step.reason = "Paused; its record and revisions are kept.";
           } else {
             const pin = a.pinned.find((x) => x.systemId === step.target)!;
-            await deps.live.restore({ businessId, systemId: pin.systemId }, pin.baselineRevisionId, pin.stagedRevisionId!);
+            const ref = { businessId, systemId: pin.systemId };
+            // An interrupted rollback may already have restored this pointer.
+            if ((await deps.live.current(ref))?.revisionId !== pin.baselineRevisionId) await deps.live.restore(ref, pin.baselineRevisionId, pin.stagedRevisionId!);
             step.status = "restored"; step.reason = `Live reference restored to ${pin.baselineRevisionId}.`;
           }
         } else if (step.kind === "effect" && step.effect === "accepted") {
@@ -440,13 +493,24 @@ export function createMakeReal(deps: MakeRealDeps) {
         } else if (step.kind === "stage" || step.kind === "introduce") {
           step.status = "restored"; step.reason = "Prepared revision kept as history; never live.";
         }
+        if (`${step.status}|${step.reason ?? ""}` !== before) await checkpoint("rollback_step", `${step.id}: ${step.status}`);
+      }
+
+      const unknown = a.steps.filter((s) => s.status === "unknown");
+      if (unknown.length) {
+        // Nothing may claim this is over while an outside outcome is unknown.
+        await checkpoint("rollback_waiting", `Needs reconciliation: ${unknown.map((s) => s.id).join(", ")}`);
+        return a;
       }
       a.status = "rolled_back";
-      const next = record(a, "rollback", actor.userId, now());
-      await deps.activations.save(next, a.revision);
-      const detached = detachActivation(p, a.id, actor.userId, now());
+      const done = record(a, "rollback", actor.userId, now());
+      await deps.activations.save(done, a.revision);
+      const detached = detachActivation(p, a.id, actor.userId, now(), {
+        undoneStepIds: done.steps.filter((s) => s.status === "restored" || s.status === "compensated").map((s) => s.id),
+        consumedApprovalIds: done.approvals.filter((x) => x.consumedAt).map((x) => x.approvalId),
+      });
       await deps.possibilities.save(detached, p.revision);
-      return next;
+      return done;
     },
 
     get: load,
