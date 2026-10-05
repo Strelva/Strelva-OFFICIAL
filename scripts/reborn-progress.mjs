@@ -54,11 +54,19 @@ const routeKind = f => {
 };
 const routeCounts = routes.reduce((acc, f) => ({ ...acc, [routeKind(f)]: (acc[routeKind(f)] ?? 0) + 1 }), {});
 const businessRecord = /create table[^;]*business_record/i.test(migrationText);
+// Section 0: every captured lead also lands in Postgres, and the release
+// manifest covers every client repo.
+const leadStore = /create table public\.tenant_leads\b/.test(migrationText) &&
+  /\bmirrorLead\(/.test(read("src/lib/leads.ts"));
+let manifestRepos = 0;
+try { manifestRepos = JSON.parse(read("release-manifest.json")).customRepoWorkspace?.repos?.length ?? 0; } catch { manifestRepos = 0; }
 const workspaceLeads = /create table[^;]*\binquir\w*[^;]*workspace_id uuid[^;]*references public\.workspaces/is
   .test(migrationText);
 
 // target: what Strelva Reborn requires. baseline: measured 2026-10-02 on nav-three-places.
 const checks = [
+  { id: "lead_store", label: "Captured leads also written to Postgres", value: leadStore, target: true, baseline: false },
+  { id: "client_repos_in_manifest", label: "release-manifest.json lists all 9 client repos", value: manifestRepos >= 9, target: true, baseline: false },
   { id: "business_record", label: "Business record table exists", value: businessRecord, target: true, baseline: false },
   { id: "workspace_keyed_inquiries", label: "Inquiry table references workspaces(id)", value: workspaceLeads, target: true, baseline: false },
   { id: "workspace_imports_lib", label: "Workspace files importing @/lib", value: workspaceOnLib.length, target: 0, baseline: 98 },
