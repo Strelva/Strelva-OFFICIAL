@@ -11,9 +11,15 @@ export interface RedisMock {
   get: (k: string) => Promise<unknown>;
   del: (k: string) => Promise<number>;
   mget: (...keys: string[]) => Promise<unknown[]>;
-  zadd: (k: string, e: { score: number; member: string }) => Promise<number>;
-  zrange: (k: string, start: number, stop: number, opts?: { rev?: boolean }) => Promise<string[]>;
+  zadd: (
+    k: string,
+    a: { score: number; member: string } | { nx?: boolean },
+    b?: { score: number; member: string },
+  ) => Promise<number>;
+  zrange: (k: string, start: number, stop: number, opts?: { rev?: boolean; withScores?: boolean }) => Promise<(string | number)[]>;
   zremrangebyrank: (k: string, start: number, stop: number) => Promise<number>;
+  zrem: (k: string, ...members: string[]) => Promise<number>;
+  zcard: (k: string) => Promise<number>;
 }
 
 export function makeRedisMock(): RedisMock {
@@ -30,18 +36,32 @@ export function makeRedisMock(): RedisMock {
     get: async (k) => store.get(k) ?? null,
     del: async (k) => (store.delete(k) ? 1 : 0),
     mget: async (...keys) => keys.map((k) => store.get(k) ?? null),
-    zadd: async (k, { score, member }) => {
+    zadd: async (k, a, b) => {
+      // Supports both zadd(key, entry) and zadd(key, { nx }, entry).
+      const entry = b ?? (a as { score: number; member: string });
+      const nx = b ? Boolean((a as { nx?: boolean }).nx) : false;
       const z = zsets.get(k) ?? new Map<string, number>();
-      z.set(member, score);
+      if (nx && z.has(entry.member)) return 0;
+      z.set(entry.member, entry.score);
       zsets.set(k, z);
       return 1;
     },
     zrange: async (k, start, stop, opts) => {
       const z = zsets.get(k) ?? new Map<string, number>();
-      let arr = [...z.entries()].sort((a, b) => a[1] - b[1]).map(([m]) => m);
-      if (opts?.rev) arr = arr.reverse();
-      return arr.slice(start, stop + 1);
+      let entries = [...z.entries()].sort((a, b) => a[1] - b[1]);
+      if (opts?.rev) entries = entries.reverse();
+      const end = stop < 0 ? entries.length + stop + 1 : stop + 1;
+      const page = entries.slice(start, end);
+      return opts?.withScores ? page.flatMap(([m, score]) => [m, score]) : page.map(([m]) => m);
     },
+    zrem: async (k, ...members) => {
+      const z = zsets.get(k);
+      if (!z) return 0;
+      let removed = 0;
+      for (const m of members) if (z.delete(m)) removed++;
+      return removed;
+    },
+    zcard: async (k) => zsets.get(k)?.size ?? 0,
     zremrangebyrank: async (k, start, stop) => {
       const z = zsets.get(k);
       if (!z) return 0;

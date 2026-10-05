@@ -1112,3 +1112,16 @@ grant execute on function public.read_business_contacts(uuid, uuid, text, intege
 grant execute on function public.read_business_record_history(uuid, uuid, text, integer) to service_role;
 grant execute on function public.read_tenant_workspace_link(text, text) to service_role;
 grant execute on function public.convert_tenant_to_business(text, text, jsonb, uuid, text) to service_role;
+
+-- Client leads (20261005090000_tenant_leads.sql) may be applied to production
+-- before this migration. When it was, converting a tenant must still attach the
+-- tenant's earlier leads to the business, so create the same trigger here.
+do $$
+begin
+  if to_regprocedure('public.tenant_leads_attach_workspace()') is not null
+    and not exists (select 1 from pg_trigger where tgname = 'tenant_workspace_links_attach_leads'
+      and tgrelid = 'public.tenant_workspace_links'::regclass) then
+    create trigger tenant_workspace_links_attach_leads after insert on public.tenant_workspace_links
+      for each row execute function public.tenant_leads_attach_workspace();
+  end if;
+end $$;
