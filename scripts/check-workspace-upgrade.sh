@@ -199,5 +199,6 @@ psql "${psql_args[@]}" --file="$schema_test"
 psql "${psql_args[@]}" --file="$repo_root/tests/service-delivery-commitments-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/customer-business-entry-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/function-exposure-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

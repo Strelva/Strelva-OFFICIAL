@@ -54,6 +54,7 @@ const _CRON_SCHEDULE = {
   "inquiry-follow-ups": 3 * 3600, // hourly
   "workspace-work": 30 * 60, // every 5 min, independently release-gated
   "governed-work-reconcile": 7 * 3600, // every 6h — durability sweep for the PG mirror
+  "lead-mirror-reconcile": 3 * 3600, // hourly — retries client leads not yet in Postgres
   "domain-monitor": 70 * 60, // every 30 min (schedule) + 40 min grace
   heartbeat: 70 * 60, // every 30 min (schedule) + 40 min grace
 } as const satisfies Record<string, number>;

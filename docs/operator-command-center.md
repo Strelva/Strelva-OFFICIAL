@@ -21,7 +21,7 @@ rewrites the bare admin host root onto the `/admin` path:
 
 Nav is a **left rail** (`src/app/admin/AdminRail.tsx`) grouped by responsibility:
 **Overview** and **Internal work**, then **Delivery** (managed-site work / Drafts /
-Maintenance), **Support** (Clients / Accounts / Leads / Onboard / Pay links / Analytics),
+Maintenance), **Support** (Clients / Client leads / Accounts / Leads / Onboard / Pay links / Analytics),
 and **System administration** (Ops / Uptime / Audit). Every tool is one click and always
 visible; there is no "More" dropdown (the old `NavLinks.tsx` is gone). On a phone the rail
 is hidden and `AdminMobileNav.tsx` gives a top-bar + slide-in drawer with the same nav. All
@@ -184,6 +184,17 @@ lead record and keyed by its stable `statusToken` (Redis `lead-workflow:{token}`
 same read-modify-write blob pattern as the CRM; degrades to `new` without Redis).
 The "unworked leads" count on the Overview reads this (`deliveryStatus === "received"`
 and workflow status still `new`).
+
+### Client leads — `/admin/client-leads`
+`src/app/admin/client-leads/page.tsx` + `ClientLeadList.tsx`, backed by
+`src/lib/client-leads.ts` (also `GET /api/admin/client-leads`). What visitors sent
+through **client** websites (`/api/v1/leads/[tenant]`), not Strelva's own prospects
+above. Reads Postgres `tenant_leads` first and merges the Redis window, so each lead
+says whether it is kept in Postgres or only in Redis (with the date Redis drops it).
+A red chip shows leads whose Postgres copy failed; the hourly
+`lead-mirror-reconcile` cron retries them. Filter by client with `?tenant=`. The
+client page (`/admin/clients/[id]`) shows the latest five under "Who reached out".
+The page and API both re-check `isSuperAdmin`.
 
 ### Search + Analytics — `/admin/analytics`
 `src/app/admin/analytics/page.tsx` + `AnalyticsView.tsx`, backed by

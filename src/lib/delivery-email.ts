@@ -279,11 +279,15 @@ export async function sendNewLeadEmail(params: {
   siteName: string;
   lead: { name: string; email?: string; message?: string };
   dashboardUrl: string;
+  /** The tenant the lead belongs to. Lets the per-client email override arm
+   * this notice and logs a real send to the tenant's CRM timeline. */
+  tenantId?: string;
   logPrefix?: string;
 }): Promise<boolean> {
   try {
     const sent = await sendEmail({
       audience: "client",
+      tenantId: params.tenantId,
       to: params.email,
       subject: "Someone reached out through your website",
       html: buildNewLeadEmailHtml({
@@ -299,7 +303,9 @@ export async function sendNewLeadEmail(params: {
         dashboardUrl: params.dashboardUrl,
       }),
     });
-    return sent;
+    if (!sent) return false;
+    await logSentEmailToCrm(params.tenantId, "Sent: new-lead email");
+    return true;
   } catch (err) {
     console.error(`${params.logPrefix || "[delivery-email]"} New-lead email failed:`, err);
     return false;
