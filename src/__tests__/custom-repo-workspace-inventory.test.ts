@@ -58,4 +58,35 @@ describe("resolveRepoChecks — the workspace inventory is manifest-driven (#1)"
     expect(workspaceContractVersion(manifest)).toBe("v1");
     expect(workspaceContractVersion({ contractVersion: "v2", customRepoWorkspace: { repos: [] } })).toBe("v2");
   });
+
+  it("a repo with no profile gets the baseline; a named profile replaces it (baseline checks unchanged)", () => {
+    const withProfiles = {
+      ...manifest,
+      customRepoWorkspace: {
+        ...manifest.customRepoWorkspace,
+        profiles: { "static-site": { packageScripts: [], requiredFiles: ["index.html"], requiredEnv: [] } },
+        repos: [
+          ...manifest.customRepoWorkspace.repos,
+          { tenant: "static", localPath: "../static", compatibleCommit: "abc", profile: "static-site", requiredFiles: ["api/contact.js"] },
+        ],
+      },
+    };
+    const resolved = resolveRepoChecks(withProfiles, "/work", "/work/strelva-platform");
+    expect(resolved.find((c) => c.tenant === "gldf")).toMatchObject({
+      profile: "baseline",
+      requiredFiles: ["README.md", "release-manifest.json", "CLAUDE.md"],
+    });
+    expect(resolved.find((c) => c.tenant === "static")).toMatchObject({
+      profile: "static-site",
+      packageScripts: [],
+      requiredFiles: ["index.html", "api/contact.js"],
+      releaseRequiredEnv: [],
+    });
+  });
+
+  it("throws on a repo naming a profile that does not exist", () => {
+    expect(() =>
+      resolveRepoChecks({ customRepoWorkspace: { repos: [{ tenant: "x", localPath: "../x", profile: "nope" }] } }, "/w", "/w/p"),
+    ).toThrow(/unknown profile "nope"/);
+  });
 });
