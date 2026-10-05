@@ -337,6 +337,80 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261001130000_dom
 psql "${psql_args[@]}" --file="$repo_root/tests/domain-registration-attempt-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261001140000_agency_website_document_drafts.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-website-document-schema.sql"
+
+# Workspace authority: one SQL role x permission table and the six writes
+# that used to be gated only in TypeScript. The schema file proves the role
+# matrix; the loop below proves the membership lock against real concurrent
+# sessions, one write at a time.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261005120000_workspace_authority_helpers.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261005120100_workspace_authority_write_rpcs.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-authority-schema.sql"
+
+authority_leaver='c9000000-0000-4000-8000-000000000005'
+authority_session_ready() {
+  local app_name="$1" attempt
+  for attempt in $(seq 1 200); do
+    if [[ "$(psql "${psql_args[@]}" -Atc "select exists(select 1 from pg_stat_activity where application_name='$app_name' and wait_event='PgSleep');")" == t ]]; then
+      return 0
+    fi
+    sleep 0.02
+  done
+  printf 'Authority race session %s never reached its hold point.\n' "$app_name" >&2
+  return 1
+}
+for authority_call in $(psql "${psql_args[@]}" -Atc "select name from public.authority_parity_calls order by name"); do
+  authority_stmt="$(psql "${psql_args[@]}" -Atc "select replace(stmt, ':actor', quote_literal('$authority_leaver') || '::uuid') from public.authority_parity_calls where name='$authority_call'")"
+  authority_tier="$(psql "${psql_args[@]}" -Atc "select tier from public.authority_parity_calls where name='$authority_call'")"
+  case "$authority_call" in
+    *handoff*) authority_workspace='c9000000-0000-4000-8000-000000000011' ;;
+    *) authority_workspace='c9000000-0000-4000-8000-000000000010' ;;
+  esac
+  authority_membership="workspace_id='$authority_workspace' and user_id='$authority_leaver'"
+
+  # 1. Removed mid-transaction: a write that queues behind an uncommitted
+  # removal must re-read the committed row and be denied, not land once more.
+  PGAPPNAME=authority-remover psql "${psql_args[@]}" \
+    -c "begin; delete from public.workspace_memberships where $authority_membership; select pg_sleep(0.6); commit;" >/dev/null &
+  authority_remover=$!
+  authority_session_ready authority-remover
+  if psql "${psql_args[@]}" -c "$authority_stmt" >"$cluster_root/authority-removed-$authority_call.log" 2>&1; then
+    printf 'Authority race: %s landed after the actor was removed.\n' "$authority_call" >&2
+    exit 1
+  fi
+  grep -q workspace_membership_required "$cluster_root/authority-removed-$authority_call.log"
+  wait "$authority_remover"
+  psql "${psql_args[@]}" -c "insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values ('$authority_workspace','$authority_leaver','admin','c9000000-0000-4000-8000-000000000001');" >/dev/null
+
+  # 2. Removal waits for an in-flight write: the write holds the membership
+  # row FOR SHARE, so a concurrent delete cannot get its row lock.
+  PGAPPNAME=authority-writer psql "${psql_args[@]}" \
+    -c "begin; $authority_stmt; select pg_sleep(0.6); rollback;" >"$cluster_root/authority-writer-$authority_call.log" 2>&1 &
+  authority_writer=$!
+  authority_session_ready authority-writer
+  if psql "${psql_args[@]}" -c "set lock_timeout='150ms'; delete from public.workspace_memberships where $authority_membership;" >"$cluster_root/authority-blocked-$authority_call.log" 2>&1; then
+    printf 'Authority race: removal did not wait for in-flight %s.\n' "$authority_call" >&2
+    exit 1
+  fi
+  grep -q 'lock timeout' "$cluster_root/authority-blocked-$authority_call.log"
+  wait "$authority_writer"
+
+  # 3. Downgraded mid-transaction: an owner/admin write queued behind an
+  # uncommitted admin -> member change is denied.
+  if [[ "$authority_tier" == manager ]]; then
+    PGAPPNAME=authority-demoter psql "${psql_args[@]}" \
+      -c "begin; update public.workspace_memberships set role='member' where $authority_membership; select pg_sleep(0.6); commit;" >/dev/null &
+    authority_demoter=$!
+    authority_session_ready authority-demoter
+    if psql "${psql_args[@]}" -c "$authority_stmt" >"$cluster_root/authority-demoted-$authority_call.log" 2>&1; then
+      printf 'Authority race: %s landed after the actor was downgraded.\n' "$authority_call" >&2
+      exit 1
+    fi
+    grep -q workspace_permission_denied "$cluster_root/authority-demoted-$authority_call.log"
+    wait "$authority_demoter"
+    psql "${psql_args[@]}" -c "update public.workspace_memberships set role='admin' where $authority_membership;" >/dev/null
+  fi
+  printf 'Workspace authority race passed: %s\n' "$authority_call"
+done
 # Two actual concurrent service-role transactions claim the same source domain
 # with different idempotency keys. Exactly one may start; the loser must leave
 # no durable work behind. This uses only the fictional local fixture above.

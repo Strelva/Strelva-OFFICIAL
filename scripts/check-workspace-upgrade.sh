@@ -208,5 +208,6 @@ psql "${psql_args[@]}" --file="$repo_root/tests/function-exposure-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/website-documents-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/domain-registration-attempt-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-website-document-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-authority-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
