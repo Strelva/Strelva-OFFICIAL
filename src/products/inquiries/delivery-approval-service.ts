@@ -39,7 +39,7 @@ import type {
 import { inquiryEmailReadiness } from "./email-consent";
 import { stateForReceive } from "./receive";
 import { classifyInquiryMessage } from "./message-outcome";
-import { inquiryCurrentness } from "./currentness";
+import { currentResponsibility, inquiryCurrentness } from "./currentness";
 import type {
   InquiryMessageReviewAction,
   InquiryMessageReviewExecution,
@@ -218,10 +218,7 @@ function responsibilityFor(
   capabilityId: string,
   expectedId?: string,
 ): ResponsibilityPolicy {
-  const candidates = state.responsibilities
-    .filter((item) => item.capabilityId === capabilityId && (!expectedId || item.id === expectedId))
-    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt));
-  const responsibility = candidates[0];
+  const responsibility = currentResponsibility(state.responsibilities, capabilityId, expectedId);
   if (!responsibility) throwCode("current_policy_unavailable", "The current inquiry responsibility is unavailable.");
   return responsibility;
 }

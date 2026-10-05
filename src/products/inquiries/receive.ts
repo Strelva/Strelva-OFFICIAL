@@ -24,7 +24,7 @@ import type {
 } from "./repository";
 import { getInquiryRepository } from "./repository";
 import { enqueueInquiryCaptureRepair, type InquiryCaptureRepairStore } from "./reconciliation";
-import { inquiryCurrentness } from "./currentness";
+import { currentResponsibility, inquiryCurrentness } from "./currentness";
 
 export interface RecordInquiryEvidenceInput {
   tenantId: string;
@@ -55,7 +55,7 @@ export function evaluateInquiryResponsibility(
 ): ResponsibilityEvaluation | null {
   try {
     const state = stateForReceive(snapshot);
-    const policy = state.responsibilities.find((item) => item.capabilityId === capabilityId);
+    const policy = currentResponsibility(state.responsibilities, capabilityId);
     if (!policy) return null;
     const engine = new InquiryEngine({ businessId: snapshot.businessId, state, now: () => at });
     return engine.evaluateResponsibilityAction(policy.id, action, { at, messageBody });

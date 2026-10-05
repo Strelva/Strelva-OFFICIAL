@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { InquiryCapabilityState, InquiryCapabilityStatus, InquiryRecordStatus } from "@/products/inquiries/contracts";
-import { hasLiveIntent, inquiryCurrentness } from "@/products/inquiries/currentness";
+import type { InquiryCapabilityState, InquiryCapabilityStatus, InquiryRecordStatus, ResponsibilityPolicy } from "@/products/inquiries/contracts";
+import { currentResponsibility, hasLiveIntent, inquiryCurrentness } from "@/products/inquiries/currentness";
 
 const BUSINESS = "acme-business";
 const CAPABILITY = "cap_inquiry";
@@ -68,5 +68,25 @@ describe("current inquiry rule", () => {
     const result = check([capability("live_unverified")], { capabilityId: CAPABILITY, capabilityVersion: 2 });
     expect(result.current && result.definition.version).toBe(2);
     expect(result.current && result.capability.id).toBe(CAPABILITY);
+  });
+});
+
+describe("current responsibility selection", () => {
+  function policy(id: string, createdAt: string, updatedAt: string, capabilityId = CAPABILITY): ResponsibilityPolicy {
+    return { id, capabilityId, createdAt, updatedAt } as ResponsibilityPolicy;
+  }
+  // Older policy, touched most recently by a receipt or a pause.
+  const older = policy("older", "2026-09-01T00:00:00.000Z", "2026-09-11T00:00:00.000Z");
+  const newer = policy("newer", "2026-09-05T00:00:00.000Z", "2026-09-05T00:00:00.000Z");
+
+  it("takes the newest created responsibility for the intake, whatever the order or last update", () => {
+    expect(currentResponsibility([newer, older], CAPABILITY)?.id).toBe("newer");
+    expect(currentResponsibility([older, newer], CAPABILITY)?.id).toBe("newer");
+  });
+
+  it("honours an expected id and ignores other intakes", () => {
+    expect(currentResponsibility([newer, older], CAPABILITY, "older")?.id).toBe("older");
+    expect(currentResponsibility([policy("elsewhere", "2026-09-20T00:00:00.000Z", "2026-09-20T00:00:00.000Z", "other"), older], CAPABILITY)?.id).toBe("older");
+    expect(currentResponsibility([newer], "other")).toBeNull();
   });
 });

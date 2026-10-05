@@ -16,6 +16,7 @@ import type {
   InquiryCapabilityStatus,
   InquiryEngineState,
   InquiryRecordStatus,
+  ResponsibilityPolicy,
 } from "./contracts";
 
 export function hasLiveIntent(status: InquiryCapabilityStatus): boolean {
@@ -65,4 +66,23 @@ export function inquiryCurrentness(
     return { current: false, reason: "inquiry_closed", capturedRevision, liveRevision };
   }
   return { current: true, capability, definition: capability.live };
+}
+
+/**
+ * The inquiry intake's current responsibility. Newest created wins: the engine
+ * puts each new responsibility at the front, while updatedAt moves on every
+ * receipt, pause and promotion, so ordering by it would switch policies after
+ * routine activity. Ties keep state order.
+ */
+export function currentResponsibility(
+  responsibilities: readonly ResponsibilityPolicy[],
+  capabilityId: string | null | undefined,
+  expectedId?: string,
+): ResponsibilityPolicy | null {
+  let selected: ResponsibilityPolicy | null = null;
+  for (const item of responsibilities) {
+    if (!capabilityId || item.capabilityId !== capabilityId || (expectedId && item.id !== expectedId)) continue;
+    if (!selected || Date.parse(item.createdAt) > Date.parse(selected.createdAt)) selected = item;
+  }
+  return selected;
 }

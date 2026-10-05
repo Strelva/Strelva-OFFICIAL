@@ -330,6 +330,23 @@ describe("inquiry message review approval", () => {
     expect(mail.send).not.toHaveBeenCalled();
   });
 
+  it("binds the review to the newest created responsibility, not the one updated last", async () => {
+    const { base, repository } = await fixture();
+    await updateState(repository, (state) => {
+      // An older responsibility for the same intake, sponsored by someone else,
+      // was touched after the current one (a receipt or a pause moves updatedAt).
+      state.responsibilities.push({
+        ...responsibility(),
+        id: "responsibility-older",
+        sponsorId: "former-sponsor",
+        createdAt: "2026-09-01T00:00:00.000Z",
+        updatedAt: "2026-09-11T12:30:00.000Z",
+      });
+    });
+    const review = await prepare("reply", base);
+    expect(review.recipient).toBe("ada@example.test");
+  });
+
   // The same table runs against the follow-up sweep and the receive seam.
   it.each([
     ["draft", false],

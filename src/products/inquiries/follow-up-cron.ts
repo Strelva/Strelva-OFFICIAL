@@ -38,7 +38,7 @@ import {
   recordedInquiryStatus,
 } from "./server";
 import type { InquiryCapabilityDefinition, InquiryRecordStatus } from "./contracts";
-import { inquiryCurrentness } from "./currentness";
+import { currentResponsibility, inquiryCurrentness } from "./currentness";
 import type { InquiryRepository, InquiryWorkspaceSnapshot } from "./repository";
 import {
   reconcileInquiryCaptureRepairs,
@@ -307,7 +307,7 @@ export async function runDueInquiryFollowUps(
               reason: "recipient_route_changed",
             } satisfies ResponsibilityDeliveryGate;
           }
-          const responsibility = current?.state.responsibilities.find((item) => item.capabilityId === currentInquiry.capabilityId);
+          const responsibility = current ? currentResponsibility(current.state.responsibilities, currentInquiry.capabilityId) : null;
           if (!responsibility) return null;
           // Evaluate the same disclosure shown by the email renderer. Owner
           // notices put the Strelva disclosure in the footer, so checking
@@ -455,7 +455,7 @@ export async function runDueInquiryFollowUps(
       let initialReplySent = false;
       const retryInitialReply = !replyCheckpoint || (replyCheckpoint.status === "failed" && replyCheckpoint.retryable === true);
       if (retryInitialReply && snapshot) {
-        const responsibility = snapshot.state.responsibilities.find((item) => item.capabilityId === inquiry.capabilityId);
+        const responsibility = currentResponsibility(snapshot.state.responsibilities, inquiry.capabilityId);
         const evaluation = responsibility
           ? evaluateInquiryResponsibility(snapshot, inquiry.capabilityId || lead.capabilityId!, "reply", "This acknowledgement is from Strelva.", now.toISOString())
           : null;

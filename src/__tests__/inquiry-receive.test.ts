@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { InquiryEngine } from "@/products/inquiries/inquiry-engine";
-import { recordInquiryEvidence, stateForReceive } from "@/products/inquiries/receive";
+import { evaluateInquiryResponsibility, recordInquiryEvidence, stateForReceive } from "@/products/inquiries/receive";
 import { createInMemoryInquiryRepository } from "@/products/inquiries/repository";
 import { createMemoryInquiryCaptureRepairStore } from "@/products/inquiries/reconciliation";
 
@@ -166,6 +166,29 @@ describe("canonical inquiry receive seam", () => {
       capabilityVersion: 2,
       lastError: reason,
     }]);
+  });
+
+  it("evaluates the newest created responsibility even when an older one sorts first", () => {
+    const workspace = snapshot();
+    const engine = new InquiryEngine({ businessId: BUSINESS, state: workspace.state, now: () => RECEIVED_AT });
+    const base = {
+      capabilityId: CAPABILITY,
+      actorId: "owner-1",
+      title: "Handle inquiries",
+      scope: "Reply to inquiries.",
+      allowedActions: ["reply" as const],
+      escalation: { primary: "owner@acme.test", secondary: null },
+      hours: { timezone: "UTC", days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "23:59" },
+    };
+    const older = engine.createResponsibility({ ...base, now: "2026-09-01T00:00:00.000Z" });
+    engine.createResponsibility({ ...base, now: "2026-09-05T00:00:00.000Z" });
+    // Pausing touches the older policy last, and it now sorts first.
+    engine.pauseResponsibility(older.id, "owner-1", "2026-09-10T00:00:00.000Z");
+    const state = engine.snapshot();
+    state.responsibilities.reverse();
+    const evaluation = evaluateInquiryResponsibility({ ...workspace, state: { ...state, inquiries: [] } }, CAPABILITY, "reply", "This reply is from Strelva.", RECEIVED_AT);
+    expect(evaluation?.reason).not.toBe("This responsibility is paused.");
+    expect(evaluation?.decision).toBe("approval_required");
   });
 
   it("rejects a changed select option before writing a receipt", async () => {
