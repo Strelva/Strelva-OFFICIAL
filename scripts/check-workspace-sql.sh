@@ -371,6 +371,12 @@ psql "${psql_args[@]}" --file="$repo_root/tests/business-record-schema.sql"
 psql "${psql_args[@]}" --set=tenant_import="$(cat "$repo_root/tests/fixtures/business-record-tenant-import.json")" \
   --file="$repo_root/tests/business-record-conversion-schema.sql"
 
+# Systems and Connections (the Systems model spine), on the same fictional
+# cluster so the access rule, exit guard and existing-thing projection run
+# against the real workspace, website, tenant-link and calendar tables.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261004120000_systems.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/systems-schema.sql"
+
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
