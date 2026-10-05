@@ -42,7 +42,9 @@ export async function POST(request: Request) {
     return workspaceJson({ error: "Open Strelva directly to save this brief." }, 403);
   }
   if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) return workspaceJson({ error: "Send a JSON request." }, 415);
-  const user = await getSessionUser();
+  let user: Awaited<ReturnType<typeof getSessionUser>>;
+  try { user = await getSessionUser(); }
+  catch { return workspaceJson({ error: "Account saving is temporarily unavailable. Nothing was saved." }, 503); }
   const email = user?.email?.trim().toLowerCase() || "";
   if (!user?.email_confirmed_at || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return workspaceJson({ error: "Sign in with a confirmed email to continue." }, 401);

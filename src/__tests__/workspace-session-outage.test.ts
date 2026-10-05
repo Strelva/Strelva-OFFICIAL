@@ -50,6 +50,13 @@ describe("workspace routes when the session lookup fails", () => {
     })));
   });
 
+  it("public continuation import answers 503", async () => {
+    const { POST } = await import("@/app/api/public-continuation/import/route");
+    await expectUnavailable(await POST(new Request("http://localhost/api/public-continuation/import", {
+      method: "POST", headers: { "content-type": "application/json", ...sameOrigin }, body: JSON.stringify({ workspaceId }),
+    })));
+  });
+
   it("still answers 401 when there is simply no session", async () => {
     session.getSessionUser.mockResolvedValue(null);
     const { GET } = await import("@/app/api/workspace-exit/route");
