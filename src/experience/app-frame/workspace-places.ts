@@ -9,14 +9,19 @@
  * The business menu holds Business details, People & access and Help. The
  * website and apps are pinned by their own names; "apps", "work" and
  * "products" stay addressable as the full list so existing links keep working.
+ * October 4: the website and apps are Systems. Each opens its System page
+ * (`view=system&system=<id>`); the full list keeps its old `apps` address.
+ * The on-screen word lives in `SYSTEMS_LABEL` so the brand call stays one edit.
  * Every caller that needs to know which place a view belongs to, what it is
  * called, or how to link to it asks this module instead of keeping its own
  * mapping.
  */
-export type StrelvaSection = "home" | "customers" | "requests" | "ongoing" | "apps" | "work" | "access" | "settings" | "products" | "help" | "account";
+import { SYSTEMS_LABEL } from "@/experience/systems/model";
+
+export type StrelvaSection = "home" | "customers" | "requests" | "ongoing" | "apps" | "work" | "access" | "settings" | "products" | "help" | "account" | "system";
 
 const APP_VIEWS: ReadonlySet<StrelvaSection> = new Set(["apps", "work", "products"]);
-const DIRECT_VIEWS: ReadonlySet<string> = new Set(["customers", "requests", "apps", "work", "ongoing", "products", "access", "settings", "help"]);
+const DIRECT_VIEWS: ReadonlySet<string> = new Set(["customers", "requests", "apps", "work", "ongoing", "products", "access", "settings", "help", "system"]);
 const WORK_DETAIL_VIEWS: ReadonlySet<string> = new Set(["tracker", "inquiries", "document", "plan"]);
 
 const TITLES: Record<StrelvaSection, string> = {
@@ -24,13 +29,14 @@ const TITLES: Record<StrelvaSection, string> = {
   customers: "Customers",
   requests: "Requests",
   ongoing: "Running",
-  apps: "Apps",
-  work: "Apps",
-  products: "Apps",
+  apps: SYSTEMS_LABEL,
+  work: SYSTEMS_LABEL,
+  products: SYSTEMS_LABEL,
   settings: "Business details",
   access: "People & access",
   help: "Help",
   account: "Account",
+  system: "System",
 };
 
 /** The sidebar place that owns a section. Every view of the app list counts as Apps. */
@@ -63,8 +69,15 @@ export interface StrelvaPinnedItem {
   id: string;
   title: string;
   href: string;
-  kind?: "website" | "app";
+  kind?: "website" | "app" | "inquiries" | "bookings" | "document" | "tracker" | "onboarding";
   onOpen?: () => void;
+  /** The System currently open. */
+  current?: boolean;
+}
+
+/** Systems pinned by name, websites first, then everything else the business runs. */
+export function pinnedSystems(systems: readonly { id: string; name: string; kind: NonNullable<StrelvaPinnedItem["kind"]> }[], href: (id: string) => string, open?: (id: string) => void, currentId?: string | null, limit = 8): StrelvaPinnedItem[] {
+  return systems.slice(0, limit).map(system => ({ id: `system-${system.id}`, title: system.name, href: href(system.id), kind: system.kind, onOpen: open ? () => open(system.id) : undefined, current: system.id === currentId }));
 }
 
 /** Websites assigned to the business are pinned first, in their given order. */

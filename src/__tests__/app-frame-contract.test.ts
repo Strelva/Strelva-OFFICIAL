@@ -59,7 +59,7 @@ describe("shared app frame accessibility contract", () => {
     expect(html).toContain('aria-label="Strelva navigation"');
     expect(html).toContain('aria-label="Main"');
     expect(html).toContain('aria-label="Workspace utilities"');
-    for (const label of [">Home<", ">Customers<", ">Requests<", ">Running<", ">Business details<", "People &amp; access", "Ask Strelva", "Search", "Help", "All apps and files"]) {
+    for (const label of [">Home<", ">Customers<", ">Requests<", ">Running<", ">Business details<", "People &amp; access", "Ask Strelva", "Search", "Help", "All systems and files"]) {
       expect(html).toContain(label);
     }
     for (const retired of [">Today<", ">Routines<", ">Business profile<", ">Work<", ">Ongoing<"]) expect(html).not.toContain(retired);

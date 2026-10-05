@@ -70,7 +70,7 @@ function renderDirectory(state: WorkspaceOfferingState, selectedId: string | nul
 describe("workspace offering experience", () => {
   it("keeps scoped work sharing from implying business-wide offering access", () => {
     const html = renderDirectory({ status: "unavailable", reason: "This work-share does not include business-wide offering access." }, null);
-    expect(html).toContain("Offerings belong to a business.");
+    expect(html).toContain("Ready-made systems are set up for a business.");
     expect(html).toContain("does not include business-wide offering access");
   });
 
@@ -287,7 +287,7 @@ describe("workspace offering experience", () => {
     const state: WorkspaceOfferingState = { status: "ready", collection: installed, saving: false };
     expect([...boundManagedWebsiteIds(state)]).toEqual(["bound-site"]);
     const html = renderToStaticMarkup(createElement(BusinessOfferingSummary, { state, work: [], onOpen: () => undefined }));
-    expect(html).toContain("Business offerings");
+    expect(html).toContain("Ready-made systems");
     expect(html).toContain("managed website");
   });
 

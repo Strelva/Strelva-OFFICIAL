@@ -189,7 +189,7 @@ test("a named agency operator revises one assigned application and returns it fo
     agencyPage.setDefaultTimeout(20_000);
     await agencyPage.setViewportSize({ width: 390, height: 844 });
     await agencyPage.goto(`/workspace?workspaceId=${agencyId}`, { waitUntil: "domcontentloaded" });
-    await expect(agencyPage.getByRole("heading", { name: "Assigned application drafts", exact: true })).toBeVisible();
+    await expect(agencyPage.getByRole("heading", { name: "Internal-tool drafts for clients", exact: true })).toBeVisible();
     await agencyPage.getByRole("link", { name: "Open draft", exact: true }).click();
     await expect(agencyPage.getByText("The customer has not granted draft editing", { exact: false })).toBeVisible();
     await expect(agencyPage.getByRole("button", { name: "Save new draft", exact: true })).toHaveCount(0);

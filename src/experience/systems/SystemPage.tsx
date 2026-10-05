@@ -1,0 +1,188 @@
+"use client";
+
+import Link from "next/link";
+import { useState, type ReactNode } from "react";
+import { ArrowLeft, ArrowUpRight, MessageSquareText } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { InquiryServerWorkspaceExperience } from "@/experience/inquiries/InquiryServerExperience";
+import type { InquirySurfaceAdapter } from "@/experience/inquiries/contracts";
+import { BoundedWorkExperience } from "@/experience/operations/BoundedWorkExperience";
+import { CustomApplicationManageExperience } from "@/experience/custom-applications/CustomApplicationManageExperience";
+import { WebsiteExperience } from "@/experience/websites/WebsiteExperience";
+import { DocumentExperience } from "@/experience/workspace/DocumentExperience";
+import { OnboardingWorkspaceExperience } from "@/experience/workspace/OnboardingWorkspaceExperience";
+import { TrackerExperience } from "@/experience/workspace/TrackerExperience";
+import type { WorkspaceWork } from "@/experience/workspace/contracts";
+import { possibilityScope } from "./from-workspace";
+import { HealthSignal, LifecyclePill, SYSTEM_ICONS } from "./SystemList";
+import {
+  CONNECTION_KIND_LABEL, POSSIBILITY_STATUS_LABEL, SYSTEM_KIND_LABEL, requestMakeReal,
+  type SystemPossibility, type SystemView,
+} from "./model";
+import styles from "./systems.module.css";
+
+export interface SystemPageProps {
+  system: SystemView | undefined;
+  systems: readonly SystemView[];
+  workspaceId: string;
+  appBase?: string;
+  /** No changes or Make real for this account (shared read-only, member, or stopped workspace). */
+  readOnly: boolean;
+  readOnlyReason?: string;
+  loading?: boolean;
+  sources: readonly WorkspaceWork[];
+  localPreview?: boolean;
+  workspaceStopped?: boolean;
+  calendarRecoveryAllowed?: boolean;
+  inquiryAdapter?: { tenantId: string; adapter?: InquirySurfaceAdapter };
+  systemHref: (id: string) => string;
+  onHome: () => void;
+  onOpenSystem?: (id: string) => void;
+  onAsk: (request: string) => void;
+}
+
+/** Opening a System gives most of the space to the actual thing; the four nouns sit beside it. */
+export function SystemPage(props: SystemPageProps) {
+  const { system, systems, readOnly, readOnlyReason, loading, onHome, onAsk } = props;
+  const [compareId, setCompareId] = useState<string | null>(null);
+  const [mode, setMode] = useState<"current" | "possibility" | "both">("current");
+  const back = <button type="button" className={styles.back} onClick={onHome}><ArrowLeft size={16} aria-hidden="true" />Home</button>;
+  if (loading && !system) return <div className={styles.page}>{back}<p role="status" className="mt-6 text-sm text-gray-muted">Opening this system…</p></div>;
+  if (!system) return <div className={styles.page}>{back}<div className={styles.notFound}><h1 className="font-display">This system isn’t available here.</h1><p>It may belong to another business, or your access may have changed. Nothing about it was changed.</p></div></div>;
+
+  const Icon = SYSTEM_ICONS[system.kind];
+  const titled = system.surface.kind !== "work";
+  const comparing = system.possibilities.find(item => item.id === compareId && item.previewSrc);
+  function compare(possibility: SystemPossibility) {
+    setCompareId(possibility.id);
+    setMode("both");
+  }
+
+  return <div className={styles.page} aria-busy={loading || undefined}>
+    <header className={styles.header}>
+      <div>
+        {back}
+        {titled ? <h1 className="font-display">{system.name}</h1> : null}
+        <p className={styles.meta}>
+          <span><Icon size={16} aria-hidden="true" className="mr-2 inline align-[-3px]" />{SYSTEM_KIND_LABEL[system.kind]}{titled && system.detail ? ` · ${system.detail}` : ""}</span>
+          <LifecyclePill lifecycle={system.lifecycle} />
+          <HealthSignal health={system.health} detailed />
+          {system.operatedBy ? <span>Run by {system.operatedBy}</span> : null}
+        </p>
+      </div>
+      <div className={styles.actions}>
+        {system.surface.kind === "website" && system.surface.liveUrl ? <a className={styles.linkAction} href={system.surface.liveUrl} target="_blank" rel="noreferrer">Visit site<ArrowUpRight size={16} aria-hidden="true" /></a> : null}
+        {system.surface.kind === "website" && system.surface.manageHref ? <a className={styles.linkAction} data-variant="secondary" href={system.surface.manageHref}>Website controls</a> : null}
+        {readOnly && readOnlyReason ? <span className="self-center text-xs text-gray-muted">{readOnlyReason}</span> : null}
+        <Button size="sm" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} icon={<MessageSquareText size={16} />} onClick={() => onAsk(`About ${system.name}: `)}>Ask for a change</Button>
+      </div>
+    </header>
+
+    <div className={styles.body}>
+      <section className={styles.surface} data-kind={system.surface.kind} aria-label={`${system.name}, the actual ${SYSTEM_KIND_LABEL[system.kind].toLowerCase()}`}>
+        {system.surface.kind === "website" ? <>
+          <div className={styles.surfaceBar}>
+            <span>{comparing && mode !== "current" ? `Comparing with: ${comparing.title}` : system.surface.previewSrc ? system.surface.previewLabel : "No public address is recorded"}</span>
+            {comparing ? <span className={styles.segmented} role="group" aria-label="What to show">
+              {(["current", "possibility", "both"] as const).map(value => <button key={value} type="button" aria-pressed={mode === value} onClick={() => setMode(value)}>{value === "current" ? "Current" : value === "possibility" ? "Possibility" : "Side by side"}</button>)}
+            </span> : null}
+          </div>
+          <div className={styles.frames}>
+            {mode !== "possibility" || !comparing ? <figure>{comparing && mode === "both" ? <figcaption>Current · {system.surface.domain || system.name}</figcaption> : null}{system.surface.previewSrc ? <iframe title={`${system.name} as visitors see it`} src={system.surface.previewSrc} sandbox={websiteSandbox(system.surface.previewSrc)} loading="lazy" referrerPolicy="no-referrer" /> : <p className="p-4 text-sm text-gray-muted">No address is recorded for this website yet, so there is nothing to show. Website controls still open it.</p>}</figure> : null}
+            {comparing && mode !== "current" ? <figure>{mode === "both" ? <figcaption>{POSSIBILITY_STATUS_LABEL[comparing.status]} · {comparing.title}</figcaption> : null}<iframe title={`${comparing.title}, not live`} src={comparing.previewSrc} sandbox="" loading="lazy" referrerPolicy="no-referrer" /></figure> : null}
+          </div>
+        </> : <div className={styles.workSurface}><SystemSurface {...props} system={system} /></div>}
+      </section>
+
+      <aside className={styles.aside} aria-label={`About ${system.name}`}>
+        <ConnectionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} />
+        <PossibilitiesPanel system={system} systems={systems} readOnly={readOnly} readOnlyReason={readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} />
+        <VersionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} />
+      </aside>
+    </div>
+  </div>;
+}
+
+/**
+ * A customer's live site runs on its own origin, so it keeps its scripts. Anything
+ * served from Strelva's origin (saved copies, candidates) gets no privileges.
+ */
+export function websiteSandbox(src: string): string {
+  try {
+    const url = new URL(src);
+    const own = url.hostname === "app.strelva.com" || url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    return (url.protocol === "https:" || url.protocol === "http:") && !own ? "allow-scripts allow-same-origin allow-popups" : "";
+  } catch {
+    return "";
+  }
+}
+
+function SystemSurface({ system, workspaceId, readOnly, sources, localPreview, workspaceStopped, calendarRecoveryAllowed, inquiryAdapter }: SystemPageProps & { system: SystemView }) {
+  const noop = () => undefined;
+  if (system.surface.kind === "inquiries") {
+    const adapter = inquiryAdapter?.tenantId === system.surface.tenantId ? inquiryAdapter.adapter : undefined;
+    return <InquiryServerWorkspaceExperience tenantId={system.surface.tenantId} adapter={adapter} initialView="home" basePath="/workspace" routePrefix="inquiry" />;
+  }
+  if (system.surface.kind !== "work") return null;
+  const { workId, productId } = system.surface;
+  if (productId === "applications" || productId === "scheduling") return <BoundedWorkExperience key={workId} workspaceId={workspaceId} workId={workId} productId={productId} sources={[...sources]} readOnly={readOnly} workspaceStopped={workspaceStopped} calendarRecoveryAllowed={calendarRecoveryAllowed} onSaved={noop} />;
+  if (productId === "custom-applications") return <CustomApplicationManageExperience key={workId} workId={workId} readOnly={readOnly} />;
+  if (productId === "documents" && !localPreview) return <DocumentExperience key={workId} workspaceId={workspaceId} workId={workId} readOnly={readOnly} onSaved={noop} sources={[...sources]} />;
+  if (productId === "tracker" && !localPreview) return <TrackerExperience key={workId} workspaceId={workspaceId} workId={workId} readOnly={readOnly} onSaved={noop} />;
+  if (productId === "onboarding") return <OnboardingWorkspaceExperience key={workId} workspaceId={workspaceId} initialCaseId={workId} readOnly={readOnly} onSaved={noop} />;
+  if (productId === "websites") return <WebsiteExperience key={workId} workspaceId={workspaceId} workId={workId} readOnly={readOnly} onSaved={noop} />;
+  return <p className="p-6 text-sm text-gray-muted">This system opens in its own view. <Link className="underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&work=${encodeURIComponent(workId)}`}>Open it</Link></p>;
+}
+
+function Panel({ id, title, count, intro, children }: { id: string; title: string; count: number; intro: string; children: ReactNode }) {
+  return <section className={styles.panel} aria-labelledby={id}>
+    <h2 id={id}>{title}{count ? <span>{count}</span> : null}</h2>
+    <p>{intro}</p>
+    {children}
+  </section>;
+}
+
+function SystemLink({ id, label, systemHref, onOpenSystem }: { id?: string; label: string; systemHref: (id: string) => string; onOpenSystem?: (id: string) => void }) {
+  if (!id) return <>{label}</>;
+  return <Link href={systemHref(id)} onClick={event => { if (!onOpenSystem || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return; event.preventDefault(); onOpenSystem(id); }}>{label}</Link>;
+}
+
+function ConnectionsPanel({ system, systemHref, onOpenSystem }: { system: SystemView; systemHref: (id: string) => string; onOpenSystem?: (id: string) => void }) {
+  return <Panel id={`${system.id}-connections`} title="Connections" count={system.connections.length} intro="What it works with.">
+    {system.connections.length ? <ul className={styles.panelList}>{system.connections.map(connection => <li key={connection.id}>
+      <span>{connection.sentence}</span>
+      <small>{CONNECTION_KIND_LABEL[connection.kind]} <SystemLink id={connection.systemId} label={connection.target} systemHref={systemHref} onOpenSystem={onOpenSystem} />{connection.status === "connected" ? "" : connection.status === "not_connected" ? " · Not connected" : " · Not confirmed"}</small>
+    </li>)}</ul> : <p className="mt-3">Nothing else is connected to it yet.</p>}
+  </Panel>;
+}
+
+function PossibilitiesPanel({ system, systems, readOnly, readOnlyReason, appBase, comparingId, onCompare, onAsk }: { system: SystemView; systems: readonly SystemView[]; readOnly: boolean; readOnlyReason?: string; appBase: string; comparingId: string | null; onCompare?: (possibility: SystemPossibility) => void; onAsk: (request: string) => void }) {
+  const [notice, setNotice] = useState<{ id: string; message: string } | null>(null);
+  return <Panel id={`${system.id}-possibilities`} title="Possibilities" count={system.possibilities.length} intro="Alternatives you can open and compare before anything changes.">
+    {system.possibilities.length ? <ul className={styles.panelList}>{system.possibilities.map(possibility => {
+      const scope = possibilityScope(possibility, systems);
+      return <li key={possibility.id}>
+        <span className={styles.possibilityHead}><strong>{possibility.title}</strong><span className={styles.lifecycle} data-lifecycle={possibility.status === "ready" ? "live" : "draft"}>{POSSIBILITY_STATUS_LABEL[possibility.status]}</span></span>
+        <small>{possibility.summary}</small>
+        {possibility.evidence ? <small>{possibility.evidence}</small> : null}
+        <small>Changes: {scope.join(", ")}</small>
+        <span className={styles.possibilityActions}>
+          {onCompare && possibility.previewSrc ? <Button size="sm" variant="secondary" aria-pressed={comparingId === possibility.id} onClick={() => onCompare(possibility)}>Compare</Button> : null}
+          {possibility.openHref ? <a className={styles.linkAction} href={`${appBase}${possibility.openHref}`}>Open</a> : null}
+          <Button size="sm" disabled={readOnly || possibility.status !== "ready"} title={readOnly ? readOnlyReason : possibility.status !== "ready" ? "Still being explored. It can be made real once it is ready." : undefined} onClick={() => setNotice({ id: possibility.id, message: requestMakeReal(possibility).message })}>Make real</Button>
+        </span>
+        {notice?.id === possibility.id ? <p role="status" className={styles.makeRealNotice}>{notice.message} <button type="button" className="underline" onClick={() => onAsk(`Make this real: ${possibility.title}. `)}>Ask Strelva</button></p> : null}
+      </li>;
+    })}</ul> : <p className="mt-3">No alternatives are being explored. <button type="button" className="underline" disabled={readOnly} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else it could become</button></p>}
+  </Panel>;
+}
+
+function VersionsPanel({ system, systemHref, onOpenSystem }: { system: SystemView; systemHref: (id: string) => string; onOpenSystem?: (id: string) => void }) {
+  return <Panel id={`${system.id}-versions`} title="Versions" count={system.versions.length} intro="The same system, adapted for another location or client. Records and access never carry over.">
+    {system.versions.length ? <ul className={styles.panelList}>{system.versions.map(version => <li key={version.id}>
+      <span>{version.relation === "source" ? "Source · " : ""}<SystemLink id={version.systemId} label={version.title} systemHref={systemHref} onOpenSystem={onOpenSystem} /></span>
+      <small>{version.context}</small>
+      <small>{version.lineage}</small>
+    </li>)}</ul> : <p className="mt-3">It runs in one context today.</p>}
+  </Panel>;
+}
