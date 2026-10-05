@@ -1,0 +1,37 @@
+%% Selected product semantics; implementation contracts omitted; source revision 5. 'partial' = local, unmerged transition/systems with open defects; Business partial = deployed schema, 0 users.
+%% Generated from PRODUCT_MODEL revision 5; status=all, inactive=False, focus=all, hops=1
+flowchart LR
+  LATENT_VIEW_TITLE["Strelva #124; revision 5 #124; view: selected product semantics; partial locally, not operating"]
+  N_PRIM_BUSINESS(["primitive: Business #91;partial#93;"])
+  class N_PRIM_BUSINESS type_primitive;
+  class N_PRIM_BUSINESS proposed;
+  N_PRIM_SYSTEM(["primitive: System #91;partial#93;"])
+  class N_PRIM_SYSTEM type_primitive;
+  class N_PRIM_SYSTEM confirmed;
+  N_PRIM_SYSTEM_CONNECTION(["primitive: System connection #91;partial#93;"])
+  class N_PRIM_SYSTEM_CONNECTION type_primitive;
+  class N_PRIM_SYSTEM_CONNECTION confirmed;
+  N_PRIM_POSSIBILITY(["primitive: Possibility #91;partial#93;"])
+  class N_PRIM_POSSIBILITY type_primitive;
+  class N_PRIM_POSSIBILITY confirmed;
+  N_PRIM_CONTEXT_VERSION(["primitive: Contextual Version #91;partial#93;"])
+  class N_PRIM_CONTEXT_VERSION type_primitive;
+  class N_PRIM_CONTEXT_VERSION confirmed;
+  N_PRIM_BUSINESS -->|"owns"| N_PRIM_SYSTEM
+  N_PRIM_SYSTEM -->|"has"| N_PRIM_SYSTEM_CONNECTION
+  N_PRIM_SYSTEM_CONNECTION -->|"connects_to"| N_PRIM_SYSTEM
+  N_PRIM_BUSINESS -->|"owns"| N_PRIM_POSSIBILITY
+  N_PRIM_POSSIBILITY -->|"changes_one_or_more"| N_PRIM_SYSTEM
+  N_PRIM_POSSIBILITY -->|"made_real_as_change_to"| N_PRIM_SYSTEM
+  N_PRIM_SYSTEM -->|"adapted_as"| N_PRIM_CONTEXT_VERSION
+  N_PRIM_CONTEXT_VERSION -->|"binds_locally"| N_PRIM_SYSTEM_CONNECTION
+  classDef type_primitive fill:#E8F0FE,stroke:#3659C9,color:#172554;
+  classDef confirmed stroke-width:2px,stroke-dasharray:0;
+  classDef inferred stroke-width:2px,stroke-dasharray:2 3;
+  classDef proposed stroke-width:2px,stroke-dasharray:8 4;
+  LEGEND_CONFIRMED["confirmed: solid"]
+  class LEGEND_CONFIRMED confirmed;
+  LEGEND_INFERRED["inferred: dotted"]
+  class LEGEND_INFERRED inferred;
+  LEGEND_PROPOSED["proposed: dashed"]
+  class LEGEND_PROPOSED proposed;
