@@ -137,6 +137,37 @@ describe("canonical inquiry receive seam", () => {
     expect(result.status).toBe(current ? "recorded" : "stale");
   });
 
+  it.each([
+    ["a republished intake", (state: ReturnType<typeof snapshot>["state"]) => { state.capabilities[0]!.live!.version = 3; }, "inquiry_capability_changed"],
+    ["a paused intake", (state: ReturnType<typeof snapshot>["state"]) => { state.capabilities[0]!.status = "paused"; }, "inquiry_capability_unavailable"],
+  ] as const)("queues a receipt repair when a submission meets %s", async (_label, change, reason) => {
+    const repository = createInMemoryInquiryRepository();
+    const state = snapshot().state;
+    change(state);
+    await repository.compareAndSwap({ tenantId: TENANT, businessId: BUSINESS, expectedRevision: null, state });
+    const queue = createMemoryInquiryCaptureRepairStore();
+    const result = await recordInquiryEvidence({
+      tenantId: TENANT,
+      businessId: BUSINESS,
+      inquiryId: "lead_stale",
+      capabilityId: CAPABILITY,
+      expectedCapabilityVersion: 2,
+      fields,
+      receivedAt: RECEIVED_AT,
+      repository,
+      repairQueue: queue,
+    });
+    expect(result).toEqual({ status: "stale", reason });
+    expect(await queue.listDue({ tenantId: TENANT, now: RECEIVED_AT, limit: 10 })).toMatchObject([{
+      tenantId: TENANT,
+      businessId: BUSINESS,
+      inquiryId: "lead_stale",
+      capabilityId: CAPABILITY,
+      capabilityVersion: 2,
+      lastError: reason,
+    }]);
+  });
+
   it("rejects a changed select option before writing a receipt", async () => {
     const repository = createInMemoryInquiryRepository();
     await repository.compareAndSwap({ tenantId: TENANT, businessId: BUSINESS, expectedRevision: null, state: snapshot().state });

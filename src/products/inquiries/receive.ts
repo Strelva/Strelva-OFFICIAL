@@ -262,7 +262,13 @@ async function recordInquiryEvidenceInternal(
     let usesHistoricalDefinition = false;
     if (!currentness.current) {
       const reason = currentness.reason === "revision_changed" ? "inquiry_capability_changed" : "inquiry_capability_unavailable";
-      if (!historicalRepair) return { status: "stale", reason };
+      if (!historicalRepair) {
+        // The lead is already captured. Queue the receipt repair so it is
+        // recorded against the captured revision instead of waiting for the
+        // bounded discovery sweep to find it.
+        await queueCaptureRepair(input, reason);
+        return { status: "stale", reason };
+      }
       receiveDefinition = historicalDefinitionForCapture(snapshot, input.capabilityId, input.expectedCapabilityVersion);
       usesHistoricalDefinition = true;
     }
