@@ -6,6 +6,7 @@ import { openPublicContinuation, publicContinuationText, PUBLIC_CONTINUATION_COO
 import { importPublicContinuation } from "@/platform/public-continuations/repository";
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
+import { readWorkspaceBody, isWorkspaceBodyTooLarge } from "@/platform/workspaces/http";
 import { createDocument } from "@/products/documents/contracts";
 
 const inputSchema = z.object({ workspaceId: z.string().uuid() }).strict();
@@ -48,8 +49,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Sign in with a confirmed email to continue." }, { status: 401 });
   }
   let input: z.infer<typeof inputSchema>;
-  try { input = inputSchema.parse(await request.json()); }
-  catch { return NextResponse.json({ error: "Choose an available workspace." }, { status: 400 }); }
+  try { input = inputSchema.parse(await readWorkspaceBody(request, 4096)); }
+  catch (error) {
+    if (isWorkspaceBodyTooLarge(error)) return NextResponse.json({ error: "This request is too large." }, { status: 413 });
+    return NextResponse.json({ error: "Choose an available workspace." }, { status: 400 });
+  }
   const cookieStore = await cookies();
   const brief = openPublicContinuation(cookieStore.get(PUBLIC_CONTINUATION_COOKIE)?.value);
   if (!brief) return NextResponse.json({ error: "This continuation is missing or unavailable. Return to the public session or use your downloaded brief." }, { status: 410 });

@@ -251,7 +251,7 @@ describe("horizontal work HTTP authority and execution", () => {
       expect((await handler(post(path, {}, { origin: "https://other.test" }))).status).toBe(403);
       expect((await handler(post(path, {}, { "content-type": "text/plain" }))).status).toBe(415);
       expect((await handler(post(path, { action: "run", workId: workspaceId, actorId: outsider.id }))).status).toBe(400);
-      expect((await handler(post(path, { text: "x".repeat(151000) }))).status).toBe(400);
+      expect((await handler(post(path, { text: "x".repeat(151000) }))).status).toBe(413);
     }
   });
 

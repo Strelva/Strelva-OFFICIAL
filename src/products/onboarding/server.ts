@@ -42,9 +42,10 @@ import {
   supplyRequirement,
 } from "./engine";
 
+import { MAX_ONBOARDING_FILE_BYTES as MAX_FILE_BYTES } from "./limits";
+
 export { OnboardingConflictError, OnboardingUnavailableError } from "./engine";
 
-const MAX_FILE_BYTES = 2_000_000;
 const MAX_EXTRACTED_TEXT = 50_000;
 
 type DbFailure = { message?: string; code?: string } | null;
