@@ -13,7 +13,7 @@ import type {
   SystemOrigin,
   SystemProvenance,
 } from "./contracts";
-import { defaultPropagation, systemOriginId } from "./invariants";
+import { INQUIRY_CAPABILITY_STATUSES, defaultPropagation, inquiryCapabilityLifecycle, systemOriginId } from "./invariants";
 import { callSystems, type SystemsDb } from "./supabase-store";
 import type { SystemStore } from "./store";
 
@@ -76,6 +76,9 @@ export const existingSystemsSnapshotSchema = z.object({
   managedWebsites: z.array(existingManagedWebsiteSchema),
   inquiryWorkspaces: z.array(z.object({
     id: z.string().uuid(), tenantStableId: z.string().uuid(), businessId: z.string(), createdAt: iso, updatedAt: iso,
+    /** The inquiry capability's status, when the reader supplies it. The SQL
+     * snapshot does not yet; without it a serving site means Live. */
+    capabilityStatus: z.enum(INQUIRY_CAPABILITY_STATUSES).nullable().optional().transform((value) => value ?? null),
   })),
   bookingGrants: z.array(z.object({
     id: z.string().uuid(), tenantStableId: z.string().uuid(), workId: z.string().uuid(),
@@ -172,6 +175,21 @@ function existingConnection(
   };
 }
 
+/** Lifecycle is intent only. An unverified or failed publication is still a
+ * Live System; that evidence belongs to System health, not here. */
+function inquiryWorkspaceLifecycle(
+  status: Snapshot["inquiryWorkspaces"][number]["capabilityStatus"], siteServing: boolean,
+): { lifecycle: SystemLifecycle; basis: string } {
+  const intended = status ? inquiryCapabilityLifecycle(status) : "live";
+  if (intended === "draft") return { lifecycle: "draft", basis: "The inquiry form is not published yet." };
+  if (intended === "paused") return { lifecycle: "paused", basis: "Inquiries are paused." };
+  if (!siteServing) return { lifecycle: "paused", basis: "Its site is not serving." };
+  if (status === "live_unverified" || status === "failed") {
+    return { lifecycle: "live", basis: "Published; whether the form works is tracked as health." };
+  }
+  return { lifecycle: "live", basis: "Takes inquiries from a serving site." };
+}
+
 const calendarState = (status: string): ConnectionState =>
   status === "revoked" ? "disconnected" : status === "error" ? "stale" : "connected";
 
@@ -222,14 +240,15 @@ export function systemsFromExisting(raw: ExistingSystemsSnapshot): BusinessSyste
 
   for (const inquiry of snapshot.inquiryWorkspaces) {
     const website = websiteByTenant.get(inquiry.tenantStableId);
+    const state = inquiryWorkspaceLifecycle(inquiry.capabilityStatus, website?.lifecycle === "live");
     const system = existingSystem(businessId, { kind: "inquiry_workspace", ref: inquiry.id }, {
       name: website ? `${website.name} inquiries` : "Inquiries", kind: "inquiry",
-      lifecycle: website?.lifecycle === "live" ? "live" : "paused",
+      lifecycle: state.lifecycle,
       createdAt: inquiry.createdAt, updatedAt: inquiry.updatedAt,
     });
     systems.push({
       system, provenance: "existing",
-      basis: website?.lifecycle === "live" ? "Takes inquiries from a serving site." : "Its site is not serving.",
+      basis: state.basis,
       references: { savedWorkId: null, tenantStableId: inquiry.tenantStableId, tenantId: null },
     });
     if (website) {

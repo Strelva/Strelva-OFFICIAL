@@ -2,7 +2,8 @@ import type { HeartbeatStatus } from "@/lib/heartbeat";
 import type { TenantDomainHealth } from "@/lib/domain-monitor";
 import type { ScanSummary } from "@/lib/scan-store";
 import type { Connection } from "@/lib/types";
-import type { Observation, ResourceNode, SystemConnection, SystemHealth, SystemNode } from "./contracts";
+import type { ConnectionTarget, System, SystemConnection } from "@/platform/systems/contracts";
+import type { Observation, ResourceNode, HealthConnection, SystemHealth, SystemNode, SystemOperation } from "./contracts";
 import { deriveSystemHealth, type HealthGraph } from "./derive";
 import {
   calendarConnectionObservation,
@@ -53,7 +54,7 @@ export interface BusinessEvidence {
 export function businessHealthGraph(evidence: BusinessEvidence, now: number = Date.now()): HealthGraph {
   const systems: SystemNode[] = [];
   const resources: ResourceNode[] = [];
-  const connections: SystemConnection[] = [];
+  const connections: HealthConnection[] = [];
   const observations: Observation[] = [];
   const businessId = evidence.businessId;
 
@@ -98,4 +99,48 @@ export function businessHealthGraph(evidence: BusinessEvidence, now: number = Da
 
 export function deriveBusinessHealth(evidence: BusinessEvidence, now: number = Date.now()): Map<string, SystemHealth> {
   return deriveSystemHealth(businessHealthGraph(evidence, now), now);
+}
+
+/** Kinds that keep their promise with no running worker. */
+const STATIC_SYSTEM_KINDS = new Set(["document", "report", "proposal"]);
+
+function targetId(target: ConnectionTarget): string {
+  switch (target.type) {
+    case "system": return target.system.systemId;
+    case "business_resource": return target.resource;
+    case "audience": return target.audience;
+    case "account_binding": return target.bindingId;
+    case "domain": return target.domain;
+    case "api": return target.api;
+  }
+}
+
+/**
+ * Health over the spine's own Systems and Connections (stored, or projected
+ * by systemsFromExisting). Lifecycle and Connection kinds pass through
+ * unchanged. A disconnected Connection carries nothing, so health does not
+ * walk it. Non-System targets become resources; evidence about them uses the
+ * same id (a calendar binding id, a domain name).
+ */
+export function healthGraphFromSystems(input: {
+  systems: readonly System[];
+  connections: readonly SystemConnection[];
+  observations: readonly Observation[];
+  operation?: (system: System) => SystemOperation;
+}): HealthGraph {
+  const systems: SystemNode[] = input.systems.map((system) => ({
+    id: system.id, businessId: system.businessId, name: system.name, kind: system.kind, lifecycle: system.lifecycle,
+    operation: input.operation?.(system) ?? (STATIC_SYSTEM_KINDS.has(system.kind) ? "static" : "ongoing"),
+  }));
+  const resources = new Map<string, ResourceNode>();
+  const connections: HealthConnection[] = [];
+  for (const connection of input.connections) {
+    if (connection.state === "disconnected") continue;
+    const to = targetId(connection.target);
+    if (connection.target.type !== "system" && !resources.has(to)) {
+      resources.set(to, { id: to, businessId: connection.businessId, name: connection.purpose ?? to, kind: connection.target.type });
+    }
+    connections.push({ id: connection.id, from: connection.source.systemId, to, kind: connection.kind });
+  }
+  return { systems, resources: [...resources.values()], connections, observations: input.observations };
 }

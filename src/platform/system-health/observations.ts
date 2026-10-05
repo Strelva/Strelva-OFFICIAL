@@ -2,6 +2,8 @@ import { CRON_MAX_AGE_SECONDS, type HeartbeatStatus, type KnownCron } from "@/li
 import type { TenantDomainHealth } from "@/lib/domain-monitor";
 import type { ScanSummary } from "@/lib/scan-store";
 import type { Connection } from "@/lib/types";
+import { inquiryCapabilityLifecycle, type InquiryCapabilityStatus } from "@/platform/systems/invariants";
+import type { SystemLifecycle } from "@/platform/systems/contracts";
 import type { Observation } from "./contracts";
 
 /**
@@ -123,15 +125,14 @@ export function integrationConnectionObservation(subjectId: string, connection: 
 
 /** Inquiry capability (structural; see InquiryCapabilityStatus). */
 export interface InquiryCapabilityEvidence {
-  status: "draft" | "live_unverified" | "live" | "paused" | "failed";
+  status: InquiryCapabilityStatus;
   updatedAt: string;
 }
 
-/** InquiryCapabilityStatus mixes lifecycle and verification; split them here. */
-export function inquiryLifecycle(capability: InquiryCapabilityEvidence): "draft" | "live" | "paused" {
-  if (capability.status === "paused") return "paused";
-  if (capability.status === "draft") return "draft";
-  return "live";
+/** InquiryCapabilityStatus mixes lifecycle and verification. The spine owns
+ * the lifecycle half; inquiryCapabilityObservation below is the health half. */
+export function inquiryLifecycle(capability: InquiryCapabilityEvidence): SystemLifecycle {
+  return inquiryCapabilityLifecycle(capability.status);
 }
 
 export function inquiryCapabilityObservation(subjectId: string, capability: InquiryCapabilityEvidence): Observation {

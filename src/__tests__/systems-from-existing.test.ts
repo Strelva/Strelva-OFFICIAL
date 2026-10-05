@@ -98,6 +98,23 @@ describe("systems from existing things", () => {
     expect(systems.find(({ system }) => system.name === "Tastings")?.system.lifecycle).toBe("draft");
   });
 
+  it("reads inquiry lifecycle as intent and leaves verification to health", () => {
+    const inquiryWith = (capabilityStatus: "draft" | "live_unverified" | "live" | "paused" | "failed") =>
+      systemsFromExisting({ ...snapshot, inquiryWorkspaces: [{ ...snapshot.inquiryWorkspaces[0]!, capabilityStatus }] })
+        .systems.find(({ system }) => system.kind === "inquiry")!;
+    expect(inquiryWith("draft").system.lifecycle).toBe("draft");
+    expect(inquiryWith("paused").system.lifecycle).toBe("paused");
+    expect(inquiryWith("live").system.lifecycle).toBe("live");
+    expect(inquiryWith("live_unverified")).toMatchObject({ system: { lifecycle: "live" }, basis: expect.stringMatching(/health/) });
+    expect(inquiryWith("failed").system.lifecycle).toBe("live");
+    const offline = systemsFromExisting({
+      ...snapshot,
+      managedWebsites: [{ ...snapshot.managedWebsites[1]!, tenantActive: false }],
+      inquiryWorkspaces: [{ ...snapshot.inquiryWorkspaces[0]!, capabilityStatus: "live" }],
+    }).systems.find(({ system }) => system.kind === "inquiry")!;
+    expect(offline.system.lifecycle).toBe("paused");
+  });
+
   it("merges stored Systems over the projection under the same id", async () => {
     const store = createMemorySystemStore({ access: (actor, businessId) => (businessId === BUSINESS && actor.userId === owner.userId ? "owner" : null) });
     const adopted = await store.createSystem(owner, BUSINESS, {

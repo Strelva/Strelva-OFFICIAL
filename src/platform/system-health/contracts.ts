@@ -7,25 +7,15 @@
  * Neither field is ever derived from the other.
  */
 
-// reconcile with src/platform/systems — lane B owns System identity and
-// lifecycle types; these are the minimal local shapes health needs.
-export type SystemLifecycle = "draft" | "live" | "paused";
+import type { ConnectionKind, ConnectionState, System, SystemLifecycle } from "@/platform/systems/contracts";
 
 /** Whether a System needs a running worker to keep its promise. A static
  * System (report, proposal) stays readable with no worker at all. */
 export type SystemOperation = "static" | "ongoing";
 
-// reconcile with src/platform/systems (SystemRef)
-export interface SystemRef {
-  id: string;
-  businessId: string;
-  name: string;
-  /** Implementation category; not identity. */
-  kind: string;
-}
-
-export interface SystemNode extends SystemRef {
-  lifecycle: SystemLifecycle;
+/** A System as health sees it: the spine's identity, name, kind and
+ * lifecycle, plus whether it needs a running worker. */
+export interface SystemNode extends Pick<System, "id" | "businessId" | "name" | "kind" | "lifecycle"> {
   operation: SystemOperation;
 }
 
@@ -38,11 +28,10 @@ export interface ResourceNode {
   kind: string;
 }
 
-// reconcile with src/platform/systems (PRIM_SYSTEM_CONNECTION kinds)
-export type ConnectionKind = "read" | "act" | "appear" | "share" | "depend" | "trigger";
-export type ConnectionState = "connected" | "disconnected" | "stale";
-
-export interface SystemConnection {
+/** One edge health walks. A spine SystemConnection projects onto it
+ * (`healthGraphFromSystems`); `to` is a System id or a resource id. Kinds
+ * are the spine's Connection kinds. */
+export interface HealthConnection {
   id: string;
   /** The System doing the knowing, using, depending or appearing. */
   from: string;

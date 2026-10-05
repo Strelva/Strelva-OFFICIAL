@@ -132,6 +132,19 @@ export function applyLifecycleTransition(system: System, to: SystemLifecycle, at
   return { ...system, lifecycle: to, changeNumber: system.changeNumber + 1, updatedAt: at };
 }
 
+/** Inquiry capability status (src/products/inquiries InquiryCapabilityStatus)
+ * mixes what the business intends with what was verified. Only the intent is
+ * lifecycle: `live_unverified` and `failed` are a Live System whose
+ * publication health is not proven. Health reads those separately. */
+export const INQUIRY_CAPABILITY_STATUSES = ["draft", "live_unverified", "live", "paused", "failed"] as const;
+export type InquiryCapabilityStatus = (typeof INQUIRY_CAPABILITY_STATUSES)[number];
+
+export function inquiryCapabilityLifecycle(status: InquiryCapabilityStatus): SystemLifecycle {
+  if (status === "paused") return "paused";
+  if (status === "draft") return "draft";
+  return "live";
+}
+
 // ---- outputs ----
 
 /** The revision an output is issued against: always the current one, and

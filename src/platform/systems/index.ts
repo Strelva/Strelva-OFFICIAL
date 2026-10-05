@@ -1,6 +1,7 @@
 export * from "./contracts";
 export {
   ACYCLIC_CONNECTION_KINDS,
+  INQUIRY_CAPABILITY_STATUSES,
   SYSTEM_LIFECYCLE_TRANSITIONS,
   SYSTEM_RULE_CODES,
   SystemRuleError,
@@ -14,6 +15,7 @@ export {
   connectionStateAfterTargetChange,
   connectionTargetKey,
   defaultPropagation,
+  inquiryCapabilityLifecycle,
   outputRevisionFor,
   revisionRef,
   sameSystem,
@@ -21,7 +23,7 @@ export {
   systemRef,
   wouldCreateCycle,
 } from "./invariants";
-export type { SystemRuleCode } from "./invariants";
+export type { InquiryCapabilityStatus, SystemRuleCode } from "./invariants";
 export type { SystemStore } from "./store";
 export { createMemorySystemStore } from "./memory-store";
 export type { MemorySystemStoreOptions, SystemAccess } from "./memory-store";

@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { HeartbeatStatus } from "@/lib/heartbeat";
-import { deriveBusinessHealth, deriveSystemHealth, type BusinessEvidence } from "@/platform/system-health";
+import {
+  deriveBusinessHealth,
+  deriveSystemHealth,
+  healthGraphFromSystems,
+  inquiryCapabilityObservation,
+  type BusinessEvidence,
+} from "@/platform/system-health";
+import { systemsFromExisting } from "@/platform/systems";
 
 const now = Date.parse("2026-10-04T12:00:00.000Z");
 const minutesAgo = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
@@ -182,5 +189,52 @@ describe("dependency propagation", () => {
   it("calls an ongoing System with no evidence unknown", () => {
     const health = deriveSystemHealth({ systems: [system("lead-ops")], connections: [], observations: [] }, now);
     expect(health.get("lead-ops")).toMatchObject({ status: "unknown", reasons: [{ code: "no_evidence" }] });
+  });
+});
+
+describe("health over the spine's Systems and Connections", () => {
+  const BUSINESS = "5e000000-0000-4000-8000-000000000010";
+  const TENANT = "5e000000-0000-4000-8000-0000000000b2";
+  const INQUIRY = "5e000000-0000-4000-8000-0000000000c1";
+  const CALENDAR = "5e000000-0000-4000-8000-0000000000e1";
+  const AT = minutesAgo(30);
+  const projected = (capabilityStatus: "live" | "failed" | "paused") => systemsFromExisting({
+    businessId: BUSINESS,
+    savedWork: [{ id: "5e000000-0000-4000-8000-0000000000a3", productId: "scheduling", resourceKind: "schedule", title: "Tastings", createdAt: AT, updatedAt: AT }],
+    managedWebsites: [{ link: "tenant_link", tenantStableId: TENANT, tenantId: "juniper-catering", siteName: "Juniper Catering", tenantActive: true, linkedAt: AT }],
+    inquiryWorkspaces: [{ id: INQUIRY, tenantStableId: TENANT, businessId: "default", createdAt: AT, updatedAt: AT, capabilityStatus }],
+    bookingGrants: [],
+    calendarConnections: [{ id: CALENDAR, provider: "google", calendarName: "Front desk", status: "revoked" }],
+  });
+
+  it("keeps a failed inquiry form Live and reports the failure as health, on the site too", () => {
+    const { systems, connections } = projected("failed");
+    const inquiry = systems.find(({ system }) => system.kind === "inquiry")!.system;
+    const site = systems.find(({ system }) => system.kind === "website")!.system;
+    expect(inquiry.lifecycle).toBe("live");
+    const graph = healthGraphFromSystems({
+      systems: systems.map(({ system }) => system),
+      connections: connections.map(({ connection }) => connection),
+      observations: [inquiryCapabilityObservation(inquiry.id, { status: "failed", updatedAt: minutesAgo(5) })],
+    });
+    // The revoked calendar's spine Connection is disconnected, so health does not walk it.
+    expect(graph.connections.map((c) => c.kind)).toEqual(["appear"]);
+    const health = deriveSystemHealth(graph, now);
+    expect(health.get(inquiry.id)).toMatchObject({ lifecycle: "live", status: "blocked", availability: { acceptsNew: true } });
+    expect(health.get(site.id)!.reasons).toContainEqual(expect.objectContaining({ code: "projection_stale", effect: "degraded" }));
+  });
+
+  it("treats a paused inquiry form as intent: a notice on the site, not a failure", () => {
+    const { systems, connections } = projected("paused");
+    const inquiry = systems.find(({ system }) => system.kind === "inquiry")!.system;
+    const site = systems.find(({ system }) => system.kind === "website")!.system;
+    expect(inquiry.lifecycle).toBe("paused");
+    const health = deriveSystemHealth(healthGraphFromSystems({
+      systems: systems.map(({ system }) => system),
+      connections: connections.map(({ connection }) => connection),
+      observations: [inquiryCapabilityObservation(inquiry.id, { status: "paused", updatedAt: minutesAgo(5) })],
+    }), now);
+    expect(health.get(inquiry.id)).toMatchObject({ lifecycle: "paused", status: "healthy", availability: { acceptsNew: false, keepsObligations: true } });
+    expect(health.get(site.id)!.reasons).toContainEqual(expect.objectContaining({ code: "projection_stale", effect: "notice" }));
   });
 });

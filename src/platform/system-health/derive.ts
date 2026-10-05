@@ -5,11 +5,11 @@ import type {
   Observation,
   ResourceNode,
   SystemAvailability,
-  SystemConnection,
+  HealthConnection,
   SystemHealth,
-  SystemLifecycle,
   SystemNode,
 } from "./contracts";
+import type { SystemLifecycle } from "@/platform/systems/contracts";
 
 const RANK: Record<HealthStatus, number> = { healthy: 0, unknown: 1, degraded: 2, blocked: 3 };
 
@@ -76,7 +76,7 @@ function ownEvidence(observations: readonly Observation[], now: number, requireE
 export interface HealthGraph {
   systems: readonly SystemNode[];
   resources?: readonly ResourceNode[];
-  connections: readonly SystemConnection[];
+  connections: readonly HealthConnection[];
   observations: readonly Observation[];
 }
 
