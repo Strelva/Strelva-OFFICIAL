@@ -8,11 +8,13 @@ import {
   approveInquiryMessageReviewWithDependencies,
   executeInquiryMessageReview,
   getInquiryMessageReviewMetadata,
+  persistDeliveredInquiryMessageReceipt,
   prepareInquiryMessageReviewWithDependencies,
   reconcileInquiryMessageReview,
   type InquiryMessageReviewDependencies,
 } from "@/products/inquiries/delivery-approval-service";
 import { createMemoryInquiryDeliveryStore } from "@/products/inquiries/delivery-store";
+import { reconcileInquiryProviderEvent } from "@/products/inquiries/reconciliation";
 import type { InquiryDeliveryStore, InquiryOutboundTransport } from "@/products/inquiries/delivery-types";
 import { createInMemoryInquiryRepository, type InquiryRepository } from "@/products/inquiries/repository";
 
@@ -541,6 +543,78 @@ describe("inquiry message review approval", () => {
     expect(result).toMatchObject({ accepted: false, safeToResolve: false, status: "reconciliation_required" });
     expect(await store.getCheckpoint({ tenantId: TENANT, inquiryId: INQUIRY, action: "reply" })).toMatchObject({ status: "sending" });
     expect(mail.send).toHaveBeenCalledTimes(1);
+  });
+
+  it("writes the owed message receipt exactly once when delivery is reported after the approval resolved", async () => {
+    const { base, events, repository } = await fixture();
+    await prepare("reply", base);
+    const event = events[0]!;
+    const mail: InquiryOutboundTransport = {
+      send: vi.fn(async () => ({ status: "accepted" as const, providerMessageId: "provider-approval", acceptedAt: AT })),
+      verify: vi.fn(async () => ({ status: "deferred" as const, reason: "Recipient server is greylisting.", retryable: false })),
+    };
+    const result = await executeInquiryMessageReview({ tenantId: TENANT, eventId: event.id, event, actorId: ACTOR, deps: { ...base, transport: mail } });
+    // Deferred is accepted and still open: the approval resolves with no receipt yet.
+    expect(result).toMatchObject({ accepted: true, safeToResolve: true, receiptPersisted: true, verified: false, status: "deferred" });
+    event.status = "approved";
+    expect((await repository.getSnapshot(TENANT, BUSINESS))!.state.responsibilityReceipts).toHaveLength(0);
+
+    const delivered = (eventId: string, at: string) => ({
+      event: {
+        type: "email.delivered",
+        created_at: at,
+        data: { email_id: "provider-approval", tags: { strelva_tenant_id: TENANT, strelva_inquiry_id: INQUIRY, strelva_action: "reply" } },
+      },
+      eventId,
+      store: base.store!,
+      persistMessageReceipt: (input: Parameters<typeof persistDeliveredInquiryMessageReceipt>[0]) => persistDeliveredInquiryMessageReceipt({ ...input, deps: base }),
+    });
+
+    // The first delivered report arrives while the workspace save is down:
+    // the webhook stays retryable instead of dropping the owed receipt.
+    let saveAvailable = false;
+    const realCompareAndSwap = repository.compareAndSwap.bind(repository);
+    repository.compareAndSwap = async (input) => (saveAvailable
+      ? realCompareAndSwap(input)
+      : { changed: false, reason: "conflict", current: await repository.getSnapshot(TENANT, BUSINESS) });
+    const blocked = await reconcileInquiryProviderEvent(delivered("evt_delivered", "2026-09-11T12:03:00.000Z"));
+    expect(blocked).toMatchObject({ status: "unavailable", reason: "message_receipt_unavailable" });
+    expect((await repository.getSnapshot(TENANT, BUSINESS))!.state.responsibilityReceipts).toHaveLength(0);
+
+    saveAvailable = true;
+    const retried = await reconcileInquiryProviderEvent(delivered("evt_delivered", "2026-09-11T12:03:00.000Z"));
+    expect(retried.status).toBe("duplicate");
+    const receipts = (await repository.getSnapshot(TENANT, BUSINESS))!.state.responsibilityReceipts;
+    expect(receipts).toHaveLength(1);
+    expect(receipts[0]).toMatchObject({ action: "reply", status: "accepted" });
+    expect(receipts[0]!.idempotencyKey).toContain(getInquiryMessageReviewMetadata(event)!.messageDigest);
+    expect(receipts[0]!.outcomeEvidence).toEqual(expect.arrayContaining(["provider status delivered", "provider message provider-approval"]));
+
+    // Repeated and later reports never write a second receipt.
+    expect((await reconcileInquiryProviderEvent(delivered("evt_delivered", "2026-09-11T12:03:00.000Z"))).status).toBe("duplicate");
+    expect((await reconcileInquiryProviderEvent(delivered("evt_delivered_again", "2026-09-11T12:04:00.000Z"))).status).toBe("recorded");
+    expect((await repository.getSnapshot(TENANT, BUSINESS))!.state.responsibilityReceipts).toHaveLength(1);
+    expect(mail.send).toHaveBeenCalledTimes(1);
+  });
+
+  it("writes no receipt on delivery when no approved review matches the sent message", async () => {
+    const { base, events, repository } = await fixture();
+    await prepare("reply", base);
+    const event = events[0]!;
+    const mail: InquiryOutboundTransport = {
+      send: vi.fn(async () => ({ status: "accepted" as const, providerMessageId: "provider-approval", acceptedAt: AT })),
+      verify: vi.fn(async () => ({ status: "unverified" as const, reason: "Read-back unavailable.", retryable: false })),
+    };
+    await executeInquiryMessageReview({ tenantId: TENANT, eventId: event.id, event, actorId: ACTOR, deps: { ...base, transport: mail } });
+    // The review was never approved (still pending with no accepted marker).
+    const result = await reconcileInquiryProviderEvent({
+      event: { type: "email.delivered", created_at: "2026-09-11T12:03:00.000Z", data: { email_id: "provider-approval", tags: { strelva_tenant_id: TENANT, strelva_inquiry_id: INQUIRY, strelva_action: "reply" } } },
+      eventId: "evt_delivered",
+      store: base.store!,
+      persistMessageReceipt: (input) => persistDeliveredInquiryMessageReceipt({ ...input, deps: base }),
+    });
+    expect(result.status).toBe("recorded");
+    expect((await repository.getSnapshot(TENANT, BUSINESS))!.state.responsibilityReceipts).toHaveLength(0);
   });
 
   it("leaves the event blocked when the receipt save is unavailable, then reconciles it", async () => {
