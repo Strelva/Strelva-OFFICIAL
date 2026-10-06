@@ -19,7 +19,7 @@
  *
  * Design: vault 1-projects/scaffold-web/org-layer-architecture.md.
  */
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import { mirrorClientRecord, mirrorClientRecordRemoval } from "@/platform/client-records/mirror";
 
 export type AccountStatus = "active" | "paused" | "churned";

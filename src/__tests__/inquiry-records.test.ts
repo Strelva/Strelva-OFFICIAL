@@ -3,7 +3,7 @@ import { makeRedisMock } from "./support/redis-mock";
 
 const redis = makeRedisMock();
 const mocks = vi.hoisted(() => ({ tenant: vi.fn(), sendNewLeadEmail: vi.fn(), alertOnce: vi.fn() }));
-vi.mock("@/lib/redis", () => ({ getRedis: () => redis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => redis }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.tenant }));
 vi.mock("@/lib/delivery-email", () => ({ sendNewLeadEmail: mocks.sendNewLeadEmail }));
 vi.mock("@/lib/monitoring", () => ({ alertOnce: mocks.alertOnce }));

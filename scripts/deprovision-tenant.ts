@@ -31,7 +31,7 @@
  */
 
 import * as readline from "node:readline";
-import { getSupabase } from "../src/lib/db/client";
+import { getSupabase } from "../src/platform/infra/db/client";
 import { getTenantConfig } from "../src/lib/tenants";
 import { runDeprovision } from "../src/lib/deprovision";
 

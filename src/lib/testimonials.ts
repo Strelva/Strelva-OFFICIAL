@@ -1,4 +1,4 @@
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import { getContent, setContent, recordSectionUpdate, appendVersion } from "./storage";
 import { diffFields } from "./utils";
 import type { TestimonialItem, TestimonialsContent } from "./types";

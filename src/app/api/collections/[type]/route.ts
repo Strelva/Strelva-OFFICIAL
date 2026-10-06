@@ -8,7 +8,7 @@ import { NextResponse } from "next/server";
 import { isCollectionType, type CollectionType } from "@/lib/cms/collection-types";
 import { listEntriesForType, saveEntry, removeEntry } from "@/lib/cms/collections-service";
 import { requireTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess, requireTenantPermission, getActorContext } from "@/lib/auth";
+import { requireTenantAccess, requireTenantPermission, getActorContext } from "@/platform/infra/auth";
 import { readJsonObject } from "@/lib/request-body";
 
 export async function GET(

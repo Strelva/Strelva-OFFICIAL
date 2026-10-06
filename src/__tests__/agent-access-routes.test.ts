@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const boundary = vi.hoisted(() => ({
   user: vi.fn(), manage: vi.fn(), list: vi.fn(), read: vi.fn(), propose: vi.fn(),
 }));
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: boundary.user }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: boundary.user }));
 vi.mock("@/platform/agent-access", () => ({
   manageAgentAccess: boundary.manage,
   listAgentAccess: boundary.list,

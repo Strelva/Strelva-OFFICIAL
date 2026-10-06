@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
-import type { EmailOptions } from "@/lib/email/layout";
-import { cleanSubjectText } from "@/lib/email/text";
+import type { EmailOptions } from "@/platform/infra/email/layout";
+import { cleanSubjectText } from "@/platform/infra/email/text";
 import type { ReceiptActor } from "@/products/inquiries/contracts";
 
 import type {

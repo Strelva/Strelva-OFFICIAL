@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import type { WorkspaceActor } from "@/platform/workspaces";
 import {
   WORK_ALLOWANCE_UNIT_KINDS,

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getActorContext, getCurrentUserEmail, isSuperAdmin } from "@/lib/auth";
+import { getActorContext, getCurrentUserEmail, isSuperAdmin } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { getConnections } from "@/lib/connections";
 import { getProducts } from "@/lib/products";

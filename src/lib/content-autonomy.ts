@@ -18,7 +18,7 @@
  * hours, address, phone, email) NEVER auto-publish, on any mode. "auto" buys faster
  * routine copy edits, never money/contact details.
  */
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import {
   contentAutonomyFromRoute,
   planContentAutonomy,

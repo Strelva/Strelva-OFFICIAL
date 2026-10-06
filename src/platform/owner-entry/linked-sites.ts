@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { hasDashboardViewAccess, isSuperAdmin } from "@/lib/auth";
+import { hasDashboardViewAccess, isSuperAdmin } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantSiteName } from "@/lib/tenant-display";
 import { callReleaseFlagsRpc, workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";

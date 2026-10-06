@@ -45,8 +45,8 @@ const mockHeadersGet = vi.fn((key: string): string | null => {
 
 // Drive request-context auth as an authorized super-admin so the handlers reach
 // their body-validation/logic under test. Pure helpers stay real via importOriginal.
-vi.mock("@/lib/auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/auth")>();
+vi.mock("@/platform/infra/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/platform/infra/auth")>();
   return {
     ...actual,
     verifyAuth: () => Promise.resolve(true),
@@ -80,7 +80,7 @@ vi.mock("next/headers", () => ({
   ),
 }));
 
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: vi.fn(() => null),
 }));
 
@@ -199,7 +199,7 @@ vi.mock("@/lib/connections", () => ({
   deleteConnection: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/platform/infra/rate-limit", () => ({
   isRateLimitedAsync: vi.fn(() => Promise.resolve(false)),
   isRateLimitedWindowedAsync: vi.fn(() => Promise.resolve(false)),
   rateLimitKey: vi.fn((_request: Request, scope: string) => `${scope}:test`),

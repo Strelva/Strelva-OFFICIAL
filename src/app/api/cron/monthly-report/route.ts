@@ -9,12 +9,12 @@ import { generateMonthlyRecap } from "@/lib/weekly-brief";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { EMAIL_DOMAIN } from "@/lib/brand";
 import { sanitizeEmailSubjectText } from "@/lib/invite-email";
-import { emailSendingPaused } from "@/lib/email-enabled";
-import { renderEmailHtml, renderEmailText } from "@/lib/email/layout";
-import { getRedis } from "@/lib/redis";
+import { emailSendingPaused } from "@/platform/infra/email/enabled";
+import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
+import { getRedis } from "@/platform/infra/redis";
 import { ownerNoticeEmail } from "@/lib/owner-recipient";
 import { requireCronRequest } from "@/lib/cron-auth";
-import { sendEmail } from "@/lib/email/send";
+import { sendEmail } from "@/platform/infra/email/send";
 import type { WeeklyBrief } from "@/lib/types";
 
 // Iterates tenants; matches the platform function ceiling so it can't die

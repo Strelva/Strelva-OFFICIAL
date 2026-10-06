@@ -14,7 +14,7 @@ import type { VisibilityDiff } from "./visibility/snapshots";
 import { sanitizeEmailSubjectText } from "./invite-email";
 import { getSearchConsolePerf, getGa4Perf } from "./analytics";
 import type { SearchPerf, GaPerf } from "./analytics";
-import type { EmailRow } from "./email/layout";
+import type { EmailRow } from "@/platform/infra/email/layout";
 
 export interface ServiceClickData {
   serviceId: string;

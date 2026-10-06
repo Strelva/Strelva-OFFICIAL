@@ -14,7 +14,7 @@ vi.mock("ai", () => ({
   generateObject: (...args: unknown[]) => sdk.generateObject(...args),
   streamText: (...args: unknown[]) => sdk.streamText(...args),
 }));
-vi.mock("@/lib/ai-models", () => ({
+vi.mock("@/platform/infra/ai-models", () => ({
   getPrimaryModel: () => ({ model: { id: "primary" }, label: "google/gemini-2.5-flash" }),
   getFallbackModel: () => models.fallback,
   getGoogleModel: (id: string) => ({ model: { id }, label: `google/${id}` }),

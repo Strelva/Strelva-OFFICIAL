@@ -7,13 +7,13 @@
 
 import type { ContentSection, ContentMap } from "../types";
 import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
-import { dataSourceIsPostgres } from "../db/source-flags";
+import { dataSourceIsPostgres } from "@/platform/infra/db/source-flags";
 import {
   getDraftContentData,
   upsertDraftContentData,
   deleteDraftContentData,
   listDraftSections,
-} from "../db/repositories";
+} from "@/platform/infra/db/repositories";
 
 export async function getDraftContent<K extends ContentSection>(
   section: K,

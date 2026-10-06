@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isDevAccessBypassEnabled } from "./dev-access";
+import { isDevAccessBypassEnabled } from "@/platform/infra/dev-access";
 import { getTenantConfig } from "./tenants";
 import { resolveBillingType } from "./billing-type";
 

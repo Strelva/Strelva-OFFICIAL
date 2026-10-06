@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
+import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { decideHeldInquiry, inquiryRecordsEnabled, InquiryRecordsError } from "@/lib/inquiry-records";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { ownerEntryHomesOpen } from "@/platform/owner-entry/linked-sites";

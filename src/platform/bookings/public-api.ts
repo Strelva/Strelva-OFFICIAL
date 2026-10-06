@@ -10,7 +10,7 @@
  * open times subtract every booking in the store.
  */
 import { alertOnce } from "@/lib/monitoring";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import type { PublicBookingSlot, PublicBookingStatus, PublicBookingStoreHook } from "@/products/scheduling/public-booking";
 import { blocksTime } from "./availability";
 import { bookingReadSource, bookingStoreWriteEnabled } from "./flags";

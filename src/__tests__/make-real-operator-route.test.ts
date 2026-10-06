@@ -11,7 +11,7 @@ const deps = vi.hoisted(() => ({
   rollback: vi.fn(),
   reconcile: vi.fn(),
 }));
-vi.mock("@/lib/auth", () => ({ isSuperAdmin: async () => deps.admin, getCurrentUserEmail: async () => "ops@strelva.test" }));
+vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: async () => deps.admin, getCurrentUserEmail: async () => "ops@strelva.test" }));
 vi.mock("@/platform/make-real/live-server", () => ({
   activationStarter: deps.starter,
   activationRunner: deps.runner,

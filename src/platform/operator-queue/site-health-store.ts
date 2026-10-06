@@ -1,4 +1,4 @@
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import type { SiteHealthSnapshot } from "./site-coverage";
 
 /**

@@ -16,7 +16,7 @@ const mockStoreRecentReply = vi.fn();
 const mockAddEvent = vi.fn();
 const mockGetEvents = vi.fn();
 
-vi.mock("@/lib/auth", () => ({ isSuperAdmin: (...a: unknown[]) => mockIsSuperAdmin(...a) }));
+vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: (...a: unknown[]) => mockIsSuperAdmin(...a) }));
 vi.mock("@/lib/reviews", () => ({ getReviews: (...a: unknown[]) => mockGetReviews(...a) }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: (...a: unknown[]) => mockGetTenantConfig(...a) }));
 vi.mock("@/lib/review-replies", () => ({

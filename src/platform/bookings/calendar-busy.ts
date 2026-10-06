@@ -15,7 +15,7 @@
  *
  * Off unless STRELVA_BOOKING_CALENDAR_BUSY=1, and only on store-served reads.
  */
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import { zonedLocalToUtc } from "./availability";
 import { bookingCalendarBusyEnabled } from "./flags";
 import type { BookingContext } from "./store";
@@ -123,7 +123,7 @@ export function defaultBusyPorts(): CalendarBusyPorts | null {
   if (!bookingCalendarBusyEnabled()) return null;
   return {
     async connection(workspaceId) {
-      const { getSupabase } = await import("@/lib/db/client");
+      const { getSupabase } = await import("@/platform/infra/db/client");
       const db = getSupabase() as unknown as { from(table: string): Query } | null;
       if (!db) return null;
       const { data, error } = await db.from("workspace_calendar_connections").select("provider,status").eq("workspace_id", workspaceId)
@@ -134,7 +134,7 @@ export function defaultBusyPorts(): CalendarBusyPorts | null {
       return { provider: row.provider, status: String(row.status ?? "") };
     },
     async busy(workspaceId, provider, query) {
-      const { getSupabase } = await import("@/lib/db/client");
+      const { getSupabase } = await import("@/platform/infra/db/client");
       const db = getSupabase() as unknown as { from(table: string): Query } | null;
       if (!db) throw new Error("calendar_unconfigured");
       // The owner reads their own calendar: the connection is theirs to grant.

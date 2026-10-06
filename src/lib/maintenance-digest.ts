@@ -1,4 +1,4 @@
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import { getSectionTimestamps } from "./storage";
 import { detectStaleSections } from "./reports";
 import { getScanSummary } from "./scan-store";

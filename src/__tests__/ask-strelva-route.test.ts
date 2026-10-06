@@ -7,8 +7,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("ai", () => ({ tool: (def: unknown) => def, stepCountIs: () => () => true }));
-vi.mock("@/lib/auth", () => ({ isSuperAdmin: async () => false }));
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedAsync: async () => false }));
+vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: async () => false }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: async () => false }));
 vi.mock("@/platform/workspaces", () => ({ listWorkspaces: (...args: unknown[]) => mocks.listWorkspaces(...args) }));
 vi.mock("@/platform/workspaces/http", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/platform/workspaces/http")>();

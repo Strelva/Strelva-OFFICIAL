@@ -24,9 +24,9 @@
  * Kill switch: DUAL_WRITE_PG=0, the same switch as the other Postgres mirrors.
  * Without Supabase env it is a no-op.
  */
-import { getSupabase } from "./db/client";
-import { dualWritePgEnabled } from "./db/dual-write";
-import { getRedis } from "./redis";
+import { getSupabase } from "@/platform/infra/db/client";
+import { dualWritePgEnabled } from "@/platform/infra/db/dual-write";
+import { getRedis } from "@/platform/infra/redis";
 import { alertOnce } from "./monitoring";
 
 export const LEAD_MIRROR_TIMEOUT_MS = 1500;

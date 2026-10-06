@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { getActorContext, isSuperAdmin } from "@/lib/auth";
+import { getActorContext, isSuperAdmin } from "@/platform/infra/auth";
 import { getAllTenants, isActiveTenant, getTenantConfig } from "@/lib/tenants";
 import { sendUpdateLiveEmail } from "@/lib/delivery-email";
 import { SECTION_LABELS } from "@/components/ui/section-labels";

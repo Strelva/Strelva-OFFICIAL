@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const session = vi.hoisted(() => ({ getSessionUser: vi.fn() }));
-vi.mock("@/lib/db/server-client", () => session);
+vi.mock("@/platform/infra/db/server-client", () => session);
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
 
 const sameOrigin = { origin: "http://localhost", "sec-fetch-site": "same-origin" };

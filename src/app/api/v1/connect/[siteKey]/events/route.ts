@@ -8,7 +8,7 @@
  * New in the public /api/v1/* contract (additive); change only additively.
  */
 import type { NextResponse } from "next/server";
-import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { recordBeacon } from "@/products/connected-sites/server";
 import { connectErrorResponse, connectJson, connectPreflight, readConnectBody, resolveConnectSite } from "@/lib/connected-site-http";
 

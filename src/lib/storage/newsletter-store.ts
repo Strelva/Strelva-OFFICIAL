@@ -7,8 +7,8 @@
 
 import path from "path";
 import { DEFAULT_TENANT, readDevFile, writeDevFile } from "./core";
-import { dataSourceIsPostgres } from "../db/source-flags";
-import { getSupabase, type Row, type Insert } from "../db/client";
+import { dataSourceIsPostgres } from "@/platform/infra/db/source-flags";
+import { getSupabase, type Row, type Insert } from "@/platform/infra/db/client";
 
 export interface NewsletterSubscriber {
   email: string;

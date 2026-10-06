@@ -15,7 +15,7 @@
  * switch still decides whether it leaves. The recipient defaults to the
  * business record's owner contact, falling back to tenants.owner_email.
  */
-import { getSupabase } from "../src/lib/db/client";
+import { getSupabase } from "../src/platform/infra/db/client";
 import { readTenantWorkspaceLink } from "../src/platform/business-record";
 import {
   designateStrelvaAgencyWorkspace,

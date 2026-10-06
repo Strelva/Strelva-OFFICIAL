@@ -1,6 +1,6 @@
 import * as Sentry from "@sentry/nextjs";
-import { logger } from "./logger";
-import { getRedis } from "./redis";
+import { logger } from "@/platform/infra/logger";
+import { getRedis } from "@/platform/infra/redis";
 
 type Severity = "low" | "medium" | "high" | "critical";
 

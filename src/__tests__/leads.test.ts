@@ -6,7 +6,7 @@ const mockGetTenantConfig = vi.fn();
 const mockSendNewLeadEmail = vi.fn();
 let clock = Date.UTC(2026, 5, 1);
 
-vi.mock("@/lib/redis", () => ({ getRedis: () => mockRedis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => mockRedis }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: (...a: unknown[]) => mockGetTenantConfig(...a) }));
 vi.mock("@/lib/delivery-email", () => ({ sendNewLeadEmail: (...a: unknown[]) => mockSendNewLeadEmail(...a) }));
 

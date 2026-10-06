@@ -45,7 +45,7 @@ export function computeMrrDollars(
   return tenants.reduce((sum, tenant) => sum + billingMonthlyCents(tenant) / 100, 0);
 }
 import { buildOpsReport, type OpsReport } from "./ops";
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import { getLatestSnapshots } from "./visibility/snapshots";
 import { summarizeVisibility, type VisibilitySummary } from "./visibility/diagnose";
 

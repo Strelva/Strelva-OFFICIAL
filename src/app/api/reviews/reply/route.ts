@@ -24,7 +24,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { readJsonObject } from "@/lib/request-body";
 import { submitOwnerReviewReply } from "@/lib/reviews/owner-reply";

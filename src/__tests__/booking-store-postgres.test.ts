@@ -33,7 +33,7 @@ function builder(): unknown {
   );
 }
 
-vi.mock("@/lib/db/client", async (orig) => ({
+vi.mock("@/platform/infra/db/client", async (orig) => ({
   ...(await orig()),
   getSupabase: () => ({
     from: (t: string) => {
@@ -44,7 +44,7 @@ vi.mock("@/lib/db/client", async (orig) => ({
 }));
 
 // Redis null so the slot-lock layer is inert and never touches a real client.
-vi.mock("@/lib/redis", () => ({ getRedis: () => null }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
 
 import { getBookings, createBooking } from "@/lib/storage/booking-store";
 

@@ -158,9 +158,9 @@ async function main(): Promise<void> {
     SECRETS_ENC_KEY: process.env.SECRETS_ENC_KEY,
   }, options);
   const [{ getSupabase }, { getRedis }, { encryptSecret }, { saveConnection }] = await Promise.all([
-    import("../src/lib/db/client"),
-    import("../src/lib/redis"),
-    import("../src/lib/crypto/secrets"),
+    import("../src/platform/infra/db/client"),
+    import("../src/platform/infra/redis"),
+    import("../src/platform/infra/crypto/secrets"),
     import("../src/lib/connections"),
   ]);
   const db = getSupabase();

@@ -1,4 +1,4 @@
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { awardWorkAllowance } from "@/platform/work-economics/allowances";
 import {

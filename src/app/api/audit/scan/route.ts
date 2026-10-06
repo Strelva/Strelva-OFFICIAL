@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { getRedis } from "@/lib/redis";
-import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
+import { getRedis } from "@/platform/infra/redis";
+import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { runAudit } from "@/lib/audit/checks";
 import { computeOverallScore, scoreToGrade } from "@/lib/audit/scoring";
 import { findingsFromCategories, stripFabricatedEstimates } from "@/lib/lead-audit";

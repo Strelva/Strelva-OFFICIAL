@@ -7,7 +7,7 @@ const state = vi.hoisted(() => ({
   connect: vi.fn(),
 }));
 
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: () => state.user }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: () => state.user }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => state.release }));
 vi.mock("@/products/websites/server", () => ({
   listWebsiteCapabilityOptions: state.options,

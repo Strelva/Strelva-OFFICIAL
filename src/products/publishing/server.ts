@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { BusinessSystems } from "@/platform/systems/from-existing";
 import { publishingSnapshotSchema, type PublishingExtras, type PublishingSnapshot, type SiteAudience, type SiteCollections } from "./projection";

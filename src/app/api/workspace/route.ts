@@ -7,9 +7,9 @@ import { WorkspaceOperationPendingError } from "@/platform/workspaces";
 import { readWorkspaceExit, readWorkspaceExitCompleted } from "@/platform/workspace-exit";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getSessionUser } from "@/lib/db/server-client";
-import { isSuperAdminUser } from "@/lib/db/repositories";
-import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
+import { getSessionUser } from "@/platform/infra/db/server-client";
+import { isSuperAdminUser } from "@/platform/infra/db/repositories";
+import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { listWorkspaceDiscoveryProducts, listWorkspaceExecutableProducts, type ProductDefinition } from "@/platform/products";
 import {

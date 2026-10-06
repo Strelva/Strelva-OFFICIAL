@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
+import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { listWorkspaces } from "@/platform/workspaces";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";

@@ -62,7 +62,7 @@ function defaultRpc(name: string, args: Row): { data: unknown; error: null } {
   return { data: null, error: null };
 }
 
-vi.mock("@/lib/db/client", () => ({
+vi.mock("@/platform/infra/db/client", () => ({
   getSupabase: () => ({
     from: (table: string) => query(table),
     async rpc(name: string, args: Row) {

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { getCurrentUserTenants, requireTenantAccess } from "@/lib/auth";
+import { getCurrentUserTenants, requireTenantAccess } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import type { InquiryCapabilityDefinition, InquiryWork } from "./contracts";
 import { resolveInquiryWorkspace } from "./workspace-exit";

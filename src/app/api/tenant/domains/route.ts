@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantPermission } from "@/lib/auth";
+import { requireTenantPermission } from "@/platform/infra/auth";
 import {
   addCustomDomain,
   listTenantDomainClaims,

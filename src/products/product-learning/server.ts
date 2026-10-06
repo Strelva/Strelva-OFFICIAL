@@ -1,5 +1,5 @@
-import { getSupabase } from "@/lib/db/client";
-import { isSuperAdminUser } from "@/lib/db/repositories";
+import { getSupabase } from "@/platform/infra/db/client";
+import { isSuperAdminUser } from "@/platform/infra/db/repositories";
 import { assertWorkspaceMember, getWork } from "@/platform/workspaces/repository";
 import { WORKSPACE_EXIT_STOPPED_MESSAGE, WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError } from "@/platform/workspaces/types";
 import { createLearningService, type LearningStore } from "./service";

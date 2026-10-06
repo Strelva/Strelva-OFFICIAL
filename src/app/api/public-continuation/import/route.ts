@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { z } from "zod";
-import { getSessionUser } from "@/lib/db/server-client";
+import { getSessionUser } from "@/platform/infra/db/server-client";
 import { openPublicContinuation, publicContinuationText, PUBLIC_CONTINUATION_COOKIE } from "@/lib/public-continuation";
 import { importPublicContinuation } from "@/platform/public-continuations/repository";
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces";

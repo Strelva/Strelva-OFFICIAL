@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { domainClaimToRow, rowToDomainClaim } from "@/lib/db/domain-claims";
+import { domainClaimToRow, rowToDomainClaim } from "@/platform/infra/db/domain-claims";
 import type { DomainClaim } from "@/lib/types";
-import type { Row } from "@/lib/db/client";
+import type { Row } from "@/platform/infra/db/client";
 
 const row: Row<"domain_claims"> = {
   tenant_id: "example", tenant_stable_id: null, domain: "examplebusiness.com", role: "additional",

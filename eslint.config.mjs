@@ -52,7 +52,7 @@ const eslintConfig = [
     // every model call goes through src/platform/infra/model-calls.ts, which
     // owns fallback, the pinned-model rule, and one cost row per provider call.
     files: ["src/**/*.{ts,tsx,js,jsx,mjs,cjs}"],
-    ignores: ["src/platform/infra/model-calls.ts", "src/lib/ai-models.ts", "src/__tests__/**"],
+    ignores: ["src/platform/infra/model-calls.ts", "src/platform/infra/ai-models.ts", "src/__tests__/**"],
     rules: {
       "no-restricted-imports": ["error", {
         paths: [
@@ -61,9 +61,9 @@ const eslintConfig = [
             importNames: ["generateText", "streamText", "generateObject", "streamObject"],
             message: "Call models through src/platform/infra/model-calls.ts so every call is logged and costed.",
           },
-          { name: "@ai-sdk/google", message: "Models come from src/lib/ai-models.ts through the model-call helper." },
-          { name: "@ai-sdk/anthropic", message: "Models come from src/lib/ai-models.ts through the model-call helper." },
-          { name: "@ai-sdk/openai", message: "Models come from src/lib/ai-models.ts through the model-call helper." },
+          { name: "@ai-sdk/google", message: "Models come from src/platform/infra/ai-models.ts through the model-call helper." },
+          { name: "@ai-sdk/anthropic", message: "Models come from src/platform/infra/ai-models.ts through the model-call helper." },
+          { name: "@ai-sdk/openai", message: "Models come from src/platform/infra/ai-models.ts through the model-call helper." },
         ],
       }],
       "no-restricted-syntax": ["error", {

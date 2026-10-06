@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { getEffectiveSubscriptionStatus, isWithinPastDueGrace } from "@/lib/subscription";
 import { getTemplateManifestForTenant } from "@/lib/template-manifests";
 import { sectionSchemas } from "@/lib/schemas";

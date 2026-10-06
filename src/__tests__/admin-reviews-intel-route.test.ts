@@ -5,7 +5,7 @@ const mockIsSuperAdmin = vi.hoisted(() => vi.fn());
 const mockGetTenantConfig = vi.hoisted(() => vi.fn());
 const mockGetReviews = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/auth", () => ({ isSuperAdmin: mockIsSuperAdmin }));
+vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: mockIsSuperAdmin }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mockGetTenantConfig }));
 vi.mock("@/lib/reviews", () => ({ getReviews: mockGetReviews }));
 

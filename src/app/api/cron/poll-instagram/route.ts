@@ -16,7 +16,7 @@ import { getAllTenants } from "@/lib/tenants";
 import { getConnection, saveConnection, updateLastSynced } from "@/lib/connections";
 import { alert } from "@/lib/monitoring";
 import { addEvent } from "@/lib/events";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import type { Connection } from "@/lib/types";
 import { requireCronRequest } from "@/lib/cron-auth";
 

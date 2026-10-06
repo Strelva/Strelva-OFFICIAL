@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const rpc = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => ({ rpc }) }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc }) }));
 
 import { postgresProviderDeliveries } from "@/platform/offerings/provider-delivery-repository";
 

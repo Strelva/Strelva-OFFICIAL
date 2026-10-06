@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { assertJobTargetAccess } from "./adapters";
 import { mapBudgetExecution, readJobEconomics } from "./repository";
 import { JobEconomicsAccessError, JobEconomicsConflictError, JobEconomicsNotFoundError, JobEconomicsPersistenceError, JobEconomicsPayerError, JobEconomicsTargetError, JobEconomicsValidationError } from "./types";

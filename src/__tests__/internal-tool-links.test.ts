@@ -30,7 +30,7 @@ vi.mock("@/products/applications/repository", async (importOriginal) => {
   };
 });
 
-import { sendEmailWithReceipt } from "@/lib/email/send";
+import { sendEmailWithReceipt } from "@/platform/infra/email/send";
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
 import { createApplicationDraft, createApplicationService } from "@/products/applications/server";
 import type { ApplicationSpec } from "@/products/applications/contracts";

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UnifiedEvent } from "@/lib/types";
-import type { SendEmailInput, SendEmailResult } from "@/lib/email/send";
+import type { SendEmailInput, SendEmailResult } from "@/platform/infra/email/send";
 import type { ServiceRequest } from "@/platform/service-requests/types";
 import type { OwnerDecision, ProposedItem } from "@/platform/needs-you/contracts";
 import { serviceRequestAdapter, tenantEventAdapter, type SourceAdapter } from "@/platform/needs-you/adapters";

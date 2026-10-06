@@ -3,7 +3,7 @@
  * `bookings` table or dev store, the Redis config and overrides, the site's
  * services, and the public API receipts in `public_website_bookings`.
  */
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { getLeadById } from "@/lib/leads";
 import { getContent } from "@/lib/storage/content-store";
 import { getLegacyBookingById, getLegacyBookingSettings, legacyGetBookings } from "@/lib/storage/booking-store";

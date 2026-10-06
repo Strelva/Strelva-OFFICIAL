@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { addEvent } from "@/lib/events";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import crypto from "crypto";
 import { recordCalendlyBooking } from "@/platform/bookings/calendly";
 import { bookingStoreWriteEnabled } from "@/platform/bookings/flags";

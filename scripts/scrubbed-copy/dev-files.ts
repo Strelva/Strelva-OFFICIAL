@@ -12,7 +12,7 @@ import path from "node:path";
 import { rowToTenant } from "../../src/lib/tenants";
 import { SECTION_TO_TYPE, transformSanityImages } from "../../src/lib/storage/content-store";
 import { mapPgBookingRow } from "../../src/lib/storage/booking-store";
-import type { Row } from "../../src/lib/db/client";
+import type { Row } from "../../src/platform/infra/db/client";
 import type { ContentSection } from "../../src/lib/types";
 
 const TYPE_TO_SECTION = new Map(Object.entries(SECTION_TO_TYPE).map(([section, type]) => [type, section as ContentSection]));

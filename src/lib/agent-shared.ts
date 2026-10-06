@@ -483,7 +483,7 @@ export async function buildTenantChatTools(ctx: AskToolContext): Promise<Record<
     import("./site-capabilities"),
     import("./apply-section-update"),
     import("./custom-request-client"),
-    import("./logger"),
+    import("@/platform/infra/logger"),
     import("./capabilities"),
   ]);
 
@@ -670,7 +670,7 @@ export async function buildTenantChatTools(ctx: AskToolContext): Promise<Record<
           // either writes, creating two pending events and breaking the
           // one-active-request invariant. Whoever loses the lock returns the
           // same "already has a request" response the reader-path returns.
-          const { getRedis } = await import("@/lib/redis");
+          const { getRedis } = await import("@/platform/infra/redis");
           const redis = getRedis();
           const customRequestLockKey = `reb:custom-request-lock:${tenant}`;
           if (redis) {

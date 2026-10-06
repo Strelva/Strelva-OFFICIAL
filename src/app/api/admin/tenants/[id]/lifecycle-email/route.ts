@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin, getActorContext } from "@/lib/auth";
+import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { logAuditEvent } from "@/lib/storage";
-import { emailSendingPaused } from "@/lib/email-enabled";
+import { emailSendingPaused } from "@/platform/infra/email/enabled";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import {
   sendWelcomeEmail,

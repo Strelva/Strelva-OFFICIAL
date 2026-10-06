@@ -4,7 +4,7 @@ import { recordHeartbeat } from "@/lib/heartbeat";
 import { scanAllTenants } from "@/lib/scan";
 import { getAllTenants } from "@/lib/tenants";
 import { getScanSummaries } from "@/lib/scan-store";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import { sendHealthRegressionEmail } from "@/lib/delivery-email";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { requireCronRequest } from "@/lib/cron-auth";

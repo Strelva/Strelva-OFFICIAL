@@ -4,8 +4,8 @@ const mocks = vi.hoisted(() => ({
   actor: vi.fn(), rpc: vi.fn(), execute: vi.fn(), snapshot: vi.fn(), released: vi.fn(), workspaceRelease: vi.fn(),
 }));
 
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedAsync: async () => false }));
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => ({ rpc: (...args: unknown[]) => mocks.rpc(...args) }) }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: async () => false }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: (...args: unknown[]) => mocks.rpc(...args) }) }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: async (id: string) => ({ id, deliveryModel: "custom_repo" }) }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => mocks.workspaceRelease() }));
 vi.mock("@/platform/systems-release", () => ({ systemsReleaseEnabledForWorkspace: (...args: unknown[]) => mocks.released(...args) }));

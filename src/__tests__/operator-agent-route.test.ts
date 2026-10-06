@@ -5,8 +5,8 @@ const mockIsSuperAdmin = vi.hoisted(() => vi.fn());
 // The operator agent only needs the auth gate exercised; its read/propose tools
 // and model are never reached on the 403/400 paths. Stub the heavy deps so the
 // module imports cleanly in the test environment.
-vi.mock("@/lib/auth", () => ({ isSuperAdmin: mockIsSuperAdmin }));
-vi.mock("@/lib/ai-models", () => ({
+vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: mockIsSuperAdmin }));
+vi.mock("@/platform/infra/ai-models", () => ({
   getPrimaryModel: () => ({ model: {}, label: "test" }),
   getFallbackModel: () => null,
 }));

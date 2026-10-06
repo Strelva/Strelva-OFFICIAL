@@ -41,7 +41,7 @@ vi.mock("@/lib/tenants", () => ({
   getTenantByStripeCustomerId: vi.fn(async () => null),
 }));
 
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => redisHandle,
 }));
 
@@ -50,7 +50,7 @@ vi.mock("@/platform/bookings/calendly", () => ({
   recordCalendlyBooking: (...args: unknown[]) => mockRecordCalendlyBooking(...args),
 }));
 
-vi.mock("@/lib/production-guard", () => ({
+vi.mock("@/platform/infra/production-guard", () => ({
   isProductionEnv: vi.fn(() => false),
 }));
 

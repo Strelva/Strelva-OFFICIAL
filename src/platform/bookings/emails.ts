@@ -8,8 +8,8 @@
  * (src/lib/email/send.ts) and its audience gates; customer mail comes from
  * mail.strelva.com with the business's name.
  */
-import type { EmailOptions } from "@/lib/email/layout";
-import { cleanSubjectText } from "@/lib/email/text";
+import type { EmailOptions } from "@/platform/infra/email/layout";
+import { cleanSubjectText } from "@/platform/infra/email/text";
 import type { StoreBooking } from "./store";
 
 /** "Tue, Nov 3" and "10:00 AM" in the booking's own zone. */

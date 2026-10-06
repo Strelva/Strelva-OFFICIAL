@@ -35,7 +35,7 @@ const mockRedisGet = vi.fn((_key: string) => Promise.resolve(null as unknown));
 const mockRedisSet = vi.fn(() => Promise.resolve("OK"));
 const mockRedisZadd = vi.fn(() => Promise.resolve(1));
 
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => ({
     lrange: (...args: Parameters<typeof mockLrange>) => mockLrange(...args),
     lpush: (...args: Parameters<typeof mockLpush>) => mockLpush(...args),

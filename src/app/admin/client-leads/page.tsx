@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { MessageSquareText } from "lucide-react";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { getAllTenants } from "@/lib/tenants";
 import { getClientLeadsForOperator, type OperatorClientLeads } from "@/lib/client-leads";
 import { isTenantId } from "@/lib/scaffold-contracts";

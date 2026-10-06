@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { getReviews } from "@/lib/reviews";
 import { getAdminReviewIntelligence } from "@/lib/reviews/intelligence";

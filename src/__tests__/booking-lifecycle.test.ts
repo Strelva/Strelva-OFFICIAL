@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SendEmailInput } from "@/lib/email/send";
+import type { SendEmailInput } from "@/platform/infra/email/send";
 import { runBookingLifecycle, type BookingLifecyclePorts } from "@/platform/bookings/lifecycle";
 import { customerReminderEmail, ownerRequestReminderEmail, requestLapsedEmail } from "@/platform/bookings/emails";
 import { bookingRequestAdapter, bookingRequestGoneReason } from "@/platform/bookings/needs-you-adapter";

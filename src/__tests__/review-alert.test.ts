@@ -10,7 +10,7 @@ const mockRedisDel = vi.hoisted(() => vi.fn());
 const mockGetRedis = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/delivery-email", () => ({ sendReviewNeedsReplyEmail: mockSend }));
-vi.mock("@/lib/redis", () => ({ getRedis: mockGetRedis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: mockGetRedis }));
 
 function tenant(over: Record<string, unknown> = {}) {
   return { id: "gldf", siteName: "GLDF", ownerEmail: "owner@gldf.com", ...over } as never;

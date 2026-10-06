@@ -5,7 +5,7 @@ import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 const user = vi.hoisted(() => vi.fn());
 const invite = vi.hoisted(() => vi.fn());
 const redirect = vi.hoisted(() => vi.fn((target: string): never => { throw new Error(`REDIRECT:${target}`); }));
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: user }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: user }));
 vi.mock("@/lib/invites", () => ({ getInvite: invite }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: vi.fn(async () => ({ id: "example", siteName: "Example", active: true })) }));
 vi.mock("next/headers", () => ({ headers: vi.fn(async () => new Headers()) }));

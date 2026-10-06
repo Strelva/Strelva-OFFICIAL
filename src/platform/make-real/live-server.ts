@@ -5,7 +5,7 @@
  * call into the path that already owns it (live-adapters.ts has the table).
  */
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { getTenantConfig } from "@/lib/tenants";
 import { getContent, getVersions, restoreVersion } from "@/lib/storage";
 import type { ContentSection } from "@/lib/types";

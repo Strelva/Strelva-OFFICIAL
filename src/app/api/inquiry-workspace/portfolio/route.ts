@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyAuth } from "@/lib/auth";
+import { verifyAuth } from "@/platform/infra/auth";
 import { currentReleaseViewer } from "@/platform/release-flags/viewer";
 import { inquiryReleaseEnabledForTenant, inquiryReleaseMayBeOn } from "@/products/inquiries";
 import { discoverInquiryPortfolio } from "@/products/inquiries";

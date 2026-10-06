@@ -7,7 +7,7 @@
  * `bulkResolvePortfolioActions` → `resolveEventAction` spine. Returns per-item
  * results so the UI can report honest partial failures.
  */
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { getAllTenants } from "@/lib/tenants";
 import { escalateEventToOwner } from "@/lib/event-actions";
 import {

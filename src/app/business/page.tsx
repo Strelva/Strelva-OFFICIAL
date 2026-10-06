@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { getAuthUserId, getCurrentUserTenants, requireTenantAccess } from "@/lib/auth";
+import { getAuthUserId, getCurrentUserTenants, requireTenantAccess } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { inquiryReleaseMayBeOn, inquiryReleasedForCurrentUser } from "@/products/inquiries/server";
 import { BusinessPicker } from "@/experience/inquiries/BusinessPicker";

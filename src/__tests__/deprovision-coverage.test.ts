@@ -13,7 +13,7 @@ import { describe, it, expect } from "vitest";
  */
 describe("deprovision-tenant table coverage", () => {
   const root = process.cwd();
-  const types = readFileSync(join(root, "src/lib/db/database.types.ts"), "utf8");
+  const types = readFileSync(join(root, "src/platform/infra/db/database.types.ts"), "utf8");
   const deprovisionLib = readFileSync(join(root, "src/lib/deprovision.ts"), "utf8");
 
   // Tenant-scoped tables = every `Tables` entry whose Row block contains tenant_id.

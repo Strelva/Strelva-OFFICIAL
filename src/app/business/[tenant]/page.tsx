@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { requireTenantAccess } from "@/lib/auth";
+import { requireTenantAccess } from "@/platform/infra/auth";
 import { isTenantId } from "@/lib/scaffold-contracts";
 import { getTenantConfig } from "@/lib/tenants";
 import { inquiryReleaseMayBeOn, inquiryReleasedForCurrentUser } from "@/products/inquiries/server";

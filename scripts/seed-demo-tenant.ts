@@ -102,11 +102,11 @@ function hashFloat(s: string): number {
 // ---------------------------------------------------------------------------
 
 async function clearDemoData(tenant: string): Promise<void> {
-  const { dataSourceIsPostgres } = await import("../src/lib/db/source-flags");
+  const { dataSourceIsPostgres } = await import("../src/platform/infra/db/source-flags");
   const cleared: string[] = [];
 
   if (dataSourceIsPostgres()) {
-    const { getSupabase } = await import("../src/lib/db/client");
+    const { getSupabase } = await import("../src/platform/infra/db/client");
     const db = getSupabase();
     if (db) {
       for (const table of [
@@ -126,7 +126,7 @@ async function clearDemoData(tenant: string): Promise<void> {
     }
   }
 
-  const { getRedis } = await import("../src/lib/redis");
+  const { getRedis } = await import("../src/platform/infra/redis");
   const redis = getRedis();
   if (redis) {
     try {
@@ -437,7 +437,7 @@ function buildTraffic(days = 90): DayCounts[] {
 
 async function seedTraffic(tenant: string): Promise<void> {
   const traffic = buildTraffic(90);
-  const { dataSourceIsPostgres } = await import("../src/lib/db/source-flags");
+  const { dataSourceIsPostgres } = await import("../src/platform/infra/db/source-flags");
 
   const pvTotal = traffic.reduce((s, r) => s + r.pageViews, 0);
   const bcTotal = traffic.reduce((s, r) => s + r.bookingClicks, 0);
@@ -447,7 +447,7 @@ async function seedTraffic(tenant: string): Promise<void> {
   const pcWeek = traffic.slice(-7).reduce((s, r) => s + r.phoneClicks, 0);
 
   if (dataSourceIsPostgres()) {
-    const { getSupabase } = await import("../src/lib/db/client");
+    const { getSupabase } = await import("../src/platform/infra/db/client");
     const db = getSupabase();
     if (db) {
       const rows: Array<{ tenant_id: string; metric: string; day: string; count: number }> = [];

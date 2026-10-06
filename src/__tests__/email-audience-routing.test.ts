@@ -7,7 +7,7 @@ vi.mock("resend", () => ({
   },
 }));
 
-import { sendEmail, type EmailAudience } from "@/lib/email/send";
+import { sendEmail, type EmailAudience } from "@/platform/infra/email/send";
 
 const ENV_KEYS = [
   "EMAIL_SENDING_ENABLED",

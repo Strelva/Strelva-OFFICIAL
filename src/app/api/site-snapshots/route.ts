@@ -11,7 +11,7 @@ import {
   getActorContext,
   requireTenantAccess,
   requireTenantPermission,
-} from "@/lib/auth";
+} from "@/platform/infra/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { readJsonObject } from "@/lib/request-body";
 

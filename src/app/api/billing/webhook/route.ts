@@ -6,13 +6,13 @@ import {
   getTenantByStripeSubscriptionId,
   getTenantByStripeCustomerId,
 } from "@/lib/tenants";
-import { getRedis } from "@/lib/redis";
-import { isProductionEnv } from "@/lib/production-guard";
+import { getRedis } from "@/platform/infra/redis";
+import { isProductionEnv } from "@/platform/infra/production-guard";
 import { addEvent } from "@/lib/events";
-import { logger } from "@/lib/logger";
+import { logger } from "@/platform/infra/logger";
 import { alert } from "@/lib/monitoring";
-import { recordBuildPayment as recordBuildPaymentPg } from "@/lib/db/repositories";
-import { dualWritePgEnabled, buildPaymentToInsert } from "@/lib/db/dual-write";
+import { recordBuildPayment as recordBuildPaymentPg } from "@/platform/infra/db/repositories";
+import { dualWritePgEnabled, buildPaymentToInsert } from "@/platform/infra/db/dual-write";
 import { sendNewSignupEmail, sendPaymentFailedEmail, sendPaymentPastDueEmail } from "@/lib/delivery-email";
 import { OPERATOR_URL } from "@/lib/brand";
 import { getAccountForTenant, setAccountSubscription, type AccountSubscriptionItem } from "@/lib/accounts";

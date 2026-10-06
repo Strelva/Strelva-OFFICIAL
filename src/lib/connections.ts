@@ -1,5 +1,5 @@
-import { getRedis } from "./redis";
-import { decryptSecret, encryptSecret } from "./crypto/secrets";
+import { getRedis } from "@/platform/infra/redis";
+import { decryptSecret, encryptSecret } from "@/platform/infra/crypto/secrets";
 import type { IntegrationProvider, Connection } from "./types";
 
 // At-rest envelope encryption for the secret-bearing fields. Redis auto-JSON-

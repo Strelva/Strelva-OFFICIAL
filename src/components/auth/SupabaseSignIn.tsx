@@ -9,7 +9,7 @@
  */
 
 import { useState } from "react";
-import { createBrowserSupabase } from "@/lib/db/browser-client";
+import { createBrowserSupabase } from "@/platform/infra/db/browser-client";
 
 export function SupabaseSignIn({
   next = "/account",

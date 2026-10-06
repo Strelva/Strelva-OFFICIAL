@@ -115,7 +115,7 @@ describe("the booking hours route", () => {
     vi.resetModules();
     const setHours = vi.fn();
     vi.doMock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
-    vi.doMock("@/lib/rate-limit", () => ({ isRateLimitedWindowedAsync: async () => false }));
+    vi.doMock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: async () => false }));
     const actor = vi.fn(async () => ACTOR as typeof ACTOR | null);
     vi.doMock("@/platform/workspaces/http", async () => {
       const actual = await vi.importActual<typeof import("@/platform/workspaces/http")>("@/platform/workspaces/http");
@@ -146,7 +146,7 @@ describe("the booking hours route", () => {
     expect(outside.status).toBe(409);
     expect(await outside.json()).toEqual({ error: "Booking hours have to fit inside the business's opening hours. Nothing changed." });
     vi.doUnmock("@/platform/workspace-release");
-    vi.doUnmock("@/lib/rate-limit");
+    vi.doUnmock("@/platform/infra/rate-limit");
     vi.doUnmock("@/platform/workspaces/http");
     vi.doUnmock("@/products/bookings/server");
   });

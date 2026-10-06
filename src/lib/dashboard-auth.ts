@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getTenantFromHeaders } from "./tenant";
-import { hasDashboardViewAccess } from "./auth";
+import { hasDashboardViewAccess } from "@/platform/infra/auth";
 import { getClientFallbackRoot, withClientFallbackRoot } from "./client-fallback";
 
 /**

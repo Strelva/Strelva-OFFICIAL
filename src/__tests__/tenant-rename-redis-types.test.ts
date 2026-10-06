@@ -4,7 +4,7 @@ import { isolatedRedisAvailable, startIsolatedRedis, type IsolatedRedis } from "
 // Real Redis on a disposable Unix socket: WRONGTYPE errors, Lua, RENAME and
 // TTLs behave exactly as in production.
 const holder = vi.hoisted(() => ({ client: null as unknown }));
-vi.mock("@/lib/redis", () => ({ getRedis: () => holder.client }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => holder.client }));
 import { rekeyTenantRedis } from "@/lib/tenant-rename";
 
 let redis: IsolatedRedis;

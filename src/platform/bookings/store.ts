@@ -3,7 +3,7 @@
  * calls to its service-role functions. Nothing here decides which store a
  * route reads; see flags.ts and src/lib/storage/booking-store.ts.
  */
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 
 export const BOOKING_STORE_TIMEOUT_MS = 2000;
 

@@ -8,7 +8,7 @@
  * brain and the live ops endpoint compute the same numbers from one place.
  */
 
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import { getAllTenants } from "./tenants";
 import { getTenantPrimaryDomain } from "./tenant-urls";
 import { getRecentFailures } from "./revalidate-client";

@@ -13,11 +13,11 @@ const mocks = vi.hoisted(() => ({
   tenant: vi.fn(),
   sendNewLeadEmail: vi.fn(),
 }));
-vi.mock("@/lib/redis", () => ({ getRedis: () => (redisAvailable ? redis : null) }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => (redisAvailable ? redis : null) }));
 vi.mock("@/lib/monitoring", () => ({ alertOnce: mocks.alertOnce }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.tenant, getAllTenants: async () => [] }));
 vi.mock("@/lib/delivery-email", () => ({ sendNewLeadEmail: mocks.sendNewLeadEmail }));
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedAsync: async () => false, rateLimitKey: () => "schema-missing-test" }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: async () => false, rateLimitKey: () => "schema-missing-test" }));
 vi.mock("@/lib/spam-pit", () => ({ recordSpam: vi.fn() }));
 vi.mock("@/products/inquiries/server", () => ({
   INQUIRY_WORKSPACE_EXIT_CODE: "workspace_exit_future_work_blocked",

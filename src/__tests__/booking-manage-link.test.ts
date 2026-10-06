@@ -128,7 +128,7 @@ describe("manage link route", () => {
     const act = vi.fn(async () => ({ done: "cancelled" as const }));
     vi.doMock("@/platform/bookings/manage", () => ({ actOnManageLink: act }));
     vi.doMock("@/platform/bookings/manage-server", () => ({ manageDeps: () => ({}) }));
-    vi.doMock("@/lib/rate-limit", () => ({ isRateLimitedAsync: async () => false, rateLimitKey: () => "k" }));
+    vi.doMock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: async () => false, rateLimitKey: () => "k" }));
     const { POST } = await import("@/app/b/[token]/action/route");
     const request = () => new Request(`https://app.strelva.example/b/${TOKEN}/action`, {
       method: "POST", body: new URLSearchParams({ action: "cancel" }), headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -144,6 +144,6 @@ describe("manage link route", () => {
     vi.unstubAllEnvs();
     vi.doUnmock("@/platform/bookings/manage");
     vi.doUnmock("@/platform/bookings/manage-server");
-    vi.doUnmock("@/lib/rate-limit");
+    vi.doUnmock("@/platform/infra/rate-limit");
   });
 });

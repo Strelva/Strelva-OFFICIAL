@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
-import { isSuperAdminUser } from "@/lib/db/repositories";
+import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
+import { isSuperAdminUser } from "@/platform/infra/db/repositories";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
 import { listWorkspaces } from "@/platform/workspaces";

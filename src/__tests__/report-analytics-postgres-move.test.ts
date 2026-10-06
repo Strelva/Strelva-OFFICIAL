@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGetRedis = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/redis", () => ({ getRedis: mockGetRedis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: mockGetRedis }));
 vi.mock("@/lib/tenants", () => ({
   getTenantConfig: vi.fn(async () => ({ id: "gldf", siteUrl: "https://www.gldf.com" })),
 }));

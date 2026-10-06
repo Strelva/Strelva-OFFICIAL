@@ -1,8 +1,8 @@
 import { randomBytes } from "crypto";
-import { renderEmailHtml, renderEmailText } from "@/lib/email/layout";
-import { getRedis } from "@/lib/redis";
-import { upsertLead } from "@/lib/db/repositories";
-import { dualWritePgEnabled } from "@/lib/db/dual-write";
+import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
+import { getRedis } from "@/platform/infra/redis";
+import { upsertLead } from "@/platform/infra/db/repositories";
+import { dualWritePgEnabled } from "@/platform/infra/db/dual-write";
 
 export type DeliveryStatus =
   | "received"

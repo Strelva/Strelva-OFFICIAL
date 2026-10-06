@@ -18,9 +18,9 @@ import {
   mirrorLead,
   type LeadMirrorHealth,
 } from "./lead-mirror";
-import { dualWritePgEnabled } from "./db/dual-write";
+import { dualWritePgEnabled } from "@/platform/infra/db/dual-write";
 import { checkLeadParity, leadReadMode, type LeadReadMode } from "./lead-reads";
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 
 const REDIS_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 const READ_TIMEOUT_MS = 4000;

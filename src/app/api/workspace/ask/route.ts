@@ -1,6 +1,6 @@
 import { stepCountIs } from "ai";
-import { isSuperAdmin } from "@/lib/auth";
-import { isRateLimitedAsync } from "@/lib/rate-limit";
+import { isSuperAdmin } from "@/platform/infra/auth";
+import { isRateLimitedAsync } from "@/platform/infra/rate-limit";
 import { inquiryReleaseEnabledForWorkspace } from "@/products/inquiries";
 import { releaseViewerFor } from "@/platform/release-flags/viewer";
 import { systemsReleasedFor } from "@/platform/systems-release";

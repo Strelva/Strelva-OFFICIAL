@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getInboxItems, markInboxRead, markAllInboxRead } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess } from "@/lib/auth";
+import { requireTenantAccess } from "@/platform/infra/auth";
 import { readJsonObject } from "@/lib/request-body";
 
 export async function GET(request: Request) {

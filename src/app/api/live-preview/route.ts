@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess, verifyAuth } from "@/lib/auth";
+import { requireTenantAccess, verifyAuth } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantPrimaryDomain, getTenantPublicUrl, getTenantPublicUrlFromDomainMap } from "@/lib/tenant-urls";
 import { normalizePreviewPath, prepareLivePreviewHtml } from "@/lib/preview-html";

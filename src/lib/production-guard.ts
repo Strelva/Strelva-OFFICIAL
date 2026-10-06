@@ -1,13 +1,3 @@
-/**
- * Production runtime guards.
- * These ensure critical dependencies fail loudly in production rather than silently degrading.
- */
-
-const isProduction = process.env.NODE_ENV === "production";
-
-/**
- * Returns true only in production environment.
- */
-export function isProductionEnv(): boolean {
-  return isProduction;
-}
+// Moved to src/platform/infra/production-guard.ts (Strelva Reborn section 7). This re-export keeps old
+// imports working; new code imports @/platform/infra/production-guard directly.
+export * from "@/platform/infra/production-guard";

@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const store = vi.hoisted(() => new Map<string, unknown>());
 const redisState = vi.hoisted(() => ({ throwOnGet: false }));
 
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => ({
     get: async (k: string) => {
       if (redisState.throwOnGet) throw new Error("redis blip");

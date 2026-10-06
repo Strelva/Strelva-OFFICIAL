@@ -3,9 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ actor: vi.fn(), rpc: vi.fn(), systemsFor: vi.fn(async (_actor: { userId: string }, _workspaceId: string) => true) }));
 
 vi.mock("ai", () => ({ tool: (def: unknown) => def, stepCountIs: () => () => true }));
-vi.mock("@/lib/auth", () => ({ isSuperAdmin: async () => false }));
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedAsync: async () => false }));
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => ({ rpc: (...args: unknown[]) => mocks.rpc(...args) }) }));
+vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: async () => false }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: async () => false }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: (...args: unknown[]) => mocks.rpc(...args) }) }));
 vi.mock("@/platform/workspaces/http", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/platform/workspaces/http")>();
   return { ...actual, workspaceHttpActor: () => mocks.actor() };

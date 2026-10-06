@@ -11,7 +11,7 @@
  * Degrades to a safe default (mode "approve", no templates) without Redis.
  */
 
-import { getRedis } from "../redis";
+import { getRedis } from "@/platform/infra/redis";
 import {
   planReplyMode,
   readTenantPolicyRoute,

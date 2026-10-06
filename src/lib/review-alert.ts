@@ -9,7 +9,7 @@
  * real send" discipline the review-nudge cron uses.
  */
 import { ownerNoticeEmail } from "./owner-recipient";
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import { sendReviewNeedsReplyEmail } from "./delivery-email";
 import type { TenantConfig } from "./types";
 

@@ -9,13 +9,13 @@ const mockSendWelcome = vi.hoisted(() => vi.fn());
 const mockSendSiteLive = vi.hoisted(() => vi.fn());
 const mockSendReviewRequest = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   isSuperAdmin: mockIsSuperAdmin,
   getActorContext: mockGetActorContext,
 }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mockGetTenantConfig }));
 vi.mock("@/lib/storage", () => ({ logAuditEvent: mockLogAuditEvent }));
-vi.mock("@/lib/email-enabled", () => ({ emailSendingPaused: mockEmailSendingPaused }));
+vi.mock("@/platform/infra/email/enabled", () => ({ emailSendingPaused: mockEmailSendingPaused }));
 vi.mock("@/lib/tenant-urls", () => ({
   getTenantDashboardUrl: () => "https://admin.demo.com/dashboard",
 }));

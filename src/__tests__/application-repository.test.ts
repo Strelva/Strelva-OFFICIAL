@@ -12,7 +12,7 @@ import { createApplicationDraft } from "@/products/applications/server";
 import { durableDb, durableRpc, load } from "@/products/applications/repository";
 
 const database = vi.hoisted(() => ({ current: vi.fn() }));
-vi.mock("@/lib/db/client", () => ({ getSupabase: database.current }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: database.current }));
 
 const actor = { userId: "owner", verifiedEmail: "owner@example.com" };
 const payload = createApplicationDraft({

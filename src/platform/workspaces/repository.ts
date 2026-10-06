@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import type { WorkspaceDb } from "./schema";
 import {
   WorkspaceAccessError,

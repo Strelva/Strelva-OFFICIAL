@@ -15,7 +15,7 @@
  * STRELVA_BUSINESS_BILLING=1 turns the checkout metadata and webhook mirror
  * on. Off by default. Nothing here changes a price, amount, plan or card.
  */
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { resolveBillingType, type BillingFields } from "@/lib/billing-type";
 
 export const BUSINESS_BILLING_STATES = ["subscription", "custom", "comped", "grandfathered", "none"] as const;

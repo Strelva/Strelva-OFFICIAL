@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { updateBooking, logActivity } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { verifyAuth, requireTenantPermission } from "@/lib/auth";
+import { verifyAuth, requireTenantPermission } from "@/platform/infra/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { readJsonObject } from "@/lib/request-body";
 

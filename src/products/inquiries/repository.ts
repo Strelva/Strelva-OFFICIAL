@@ -8,8 +8,8 @@
  */
 
 import { createHash, createHmac, randomUUID } from "node:crypto";
-import type { Json } from "@/lib/db/database.types";
-import { getSupabase, type Db, type Row } from "@/lib/db/client";
+import type { Json } from "@/platform/infra/db/database.types";
+import { getSupabase, type Db, type Row } from "@/platform/infra/db/client";
 import { decodeOnboarding } from "./onboarding";
 import { INQUIRY_ENGINE_VERSION, type ActionReceipt, type InquiryEngineState, type InquiryTimelineEvent, type ReceiptActor, type ResponsibilityActionReceipt, type InquiryRecordStatus } from "./contracts";
 

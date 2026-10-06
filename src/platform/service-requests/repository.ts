@@ -1,4 +1,4 @@
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import {
   ServiceRequestAccessError, ServiceRequestConflictError, ServiceRequestNotFoundError,
   ServiceRequestStoreError, serviceRequestSchema, type ServiceRequest, type ServiceRequestActor,

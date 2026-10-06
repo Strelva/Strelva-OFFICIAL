@@ -8,7 +8,7 @@ const mockBuildOpsReport = vi.hoisted(() => vi.fn());
 const mockGetAuditLog = vi.hoisted(() => vi.fn());
 const mockGetAllAuditEvents = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/auth", () => ({ isSuperAdmin: mockIsSuperAdmin }));
+vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: mockIsSuperAdmin }));
 vi.mock("@/lib/portfolio", () => ({
   getPortfolioSummary: mockGetPortfolioSummary,
   buildPortfolioSnapshot: mockBuildPortfolioSnapshot,

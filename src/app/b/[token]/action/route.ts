@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { bookingManagePageEnabled } from "@/platform/bookings/flags";
 import { actOnManageLink } from "@/platform/bookings/manage";
 import { manageDeps } from "@/platform/bookings/manage-server";

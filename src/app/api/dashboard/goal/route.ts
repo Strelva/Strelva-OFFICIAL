@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess, requireTenantPermission } from "@/lib/auth";
+import { requireTenantAccess, requireTenantPermission } from "@/platform/infra/auth";
 import { getGoal, setGoal, clearGoal, type GoalMetric } from "@/lib/goals";
 
 /** GET the tenant's weekly goal (or null). */

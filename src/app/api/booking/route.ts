@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createBookingAtomic, getContent, logActivity } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
-import { isRateLimitedAsync, isRateLimitedPerInstance, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedAsync, isRateLimitedPerInstance, rateLimitKey } from "@/platform/infra/rate-limit";
 import { bookingReadSource } from "@/platform/bookings/flags";
 import { readJsonObject } from "@/lib/request-body";
 import { sendBookingConfirmation } from "@/lib/delivery-email";

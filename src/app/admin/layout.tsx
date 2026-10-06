@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { isSuperAdmin, getActorContext } from "@/lib/auth";
+import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { getAllTenants } from "@/lib/tenants";
 import { AdminRail } from "./AdminRail";
 import { AdminMobileNav } from "./AdminMobileNav";

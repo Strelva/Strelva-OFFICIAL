@@ -1,8 +1,8 @@
 import { addEvent, resolveEvent } from "@/lib/events";
 import { getLeads, type LeadRecord } from "@/lib/leads";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import { getConnections } from "@/lib/connections";
-import { getTenantRole, roleHasPermission, type ClientRole, type TenantPermission } from "@/lib/auth";
+import { getTenantRole, roleHasPermission, type ClientRole, type TenantPermission } from "@/platform/infra/auth";
 import type { TenantConfig } from "@/lib/types";
 import {
   INQUIRY_PUBLISH_EVENT_KIND,

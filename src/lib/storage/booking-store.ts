@@ -29,13 +29,13 @@
 
 import type { BookingConfig, DateOverride, Booking } from "../types";
 import { DEFAULT_BOOKING_CONFIG, generateBookingId, generateSlots } from "../booking";
-import { getRedis } from "../redis";
+import { getRedis } from "@/platform/infra/redis";
 import { mirrorClientRecord } from "@/platform/client-records/mirror";
 import { readThroughFlag } from "@/platform/client-records/move";
 import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
 import { getContent } from "./content-store";
-import { dataSourceIsPostgres } from "../db/source-flags";
-import { getSupabase, type Row, type Insert, type Update } from "../db/client";
+import { dataSourceIsPostgres } from "@/platform/infra/db/source-flags";
+import { getSupabase, type Row, type Insert, type Update } from "@/platform/infra/db/client";
 import { bookingReadSource, bookingStoreWriteEnabled } from "@/platform/bookings/flags";
 import {
   claimStoreBooking,

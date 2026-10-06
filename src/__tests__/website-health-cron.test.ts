@@ -4,7 +4,7 @@ const deps=vi.hoisted(()=>({release:vi.fn(),list:vi.fn(),save:vi.fn(),fetch:vi.f
 vi.mock("@/products/websites/rebuild-release",()=>({websiteRebuildReleaseEnabled:deps.release,websiteRebuildReleaseMayBeOn:(...args:unknown[])=>deps.release(...args),websiteRebuildReleaseEnabledForWorkspace:async(...args:unknown[])=>deps.release(...args),websiteRebuildReleaseEnabledForTenant:async(...args:unknown[])=>deps.release(...args),websiteRebuildReleasedFor:async(...args:unknown[])=>deps.release(...args)}));
 vi.mock("@/products/websites/document-store",()=>({websiteDocumentStore:{listPublished:deps.list,recordHealth:deps.save,pruneCrawls:deps.prune}}));
 vi.mock("@/lib/pinned-public-text",()=>({fetchPinnedPublicText:deps.fetch}));
-vi.mock("@/lib/email/send",()=>({sendEmailWithReceipt:deps.send}));
+vi.mock("@/platform/infra/email/send",()=>({sendEmailWithReceipt:deps.send}));
 vi.mock("@/lib/delivery-email",()=>({resolveLeadNotifyRecipients:()=>["operator@example.com"]}));
 vi.mock("@/lib/heartbeat",async(original)=>({...(await original<typeof import("@/lib/heartbeat")>()),recordHeartbeat:deps.heartbeat,checkHeartbeats:deps.heartbeats}));
 vi.mock("@/lib/tenants",()=>({getActiveTenants:deps.tenants}));

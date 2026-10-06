@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => null }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => null }));
 import {
   businessBillingCheckoutMetadata,
   deriveBusinessBillingState,

@@ -1,5 +1,5 @@
 import { isTenantId } from "@/lib/scaffold-contracts";
-import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { publicBookingVisitorSchema } from "@/products/scheduling/server";
 import { bookingError, bookingJson, bookingOptions, bookingService, bodyObject, stringValue } from "../../_shared";
 

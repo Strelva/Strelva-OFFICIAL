@@ -4,7 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess, requireTenantPermission, verifyAuth } from "@/lib/auth";
+import { requireTenantAccess, requireTenantPermission, verifyAuth } from "@/platform/infra/auth";
 import { getConnection, deleteConnection } from "@/lib/connections";
 
 export async function GET() {

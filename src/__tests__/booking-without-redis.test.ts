@@ -23,7 +23,7 @@ const h = vi.hoisted(() => ({
 /** Redis configured but failing every call, like an Upstash outage. */
 const downRedis = new Proxy({}, { get: () => async () => { throw new Error("Upstash: fetch failed"); } });
 
-vi.mock("@/lib/redis", () => ({ getRedis: () => (h.redis === "up" ? redisMock : h.redis === "down" ? downRedis : null) }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => (h.redis === "up" ? redisMock : h.redis === "down" ? downRedis : null) }));
 vi.mock("@/lib/events", () => ({ addEvent: vi.fn() }));
 vi.mock("@/lib/storage/core", () => ({
   DEFAULT_TENANT: "demo",
@@ -37,10 +37,10 @@ vi.mock("@/lib/storage", async () => ({
   logActivity: h.logActivity,
   DEFAULT_TENANT: "demo",
 }));
-vi.mock("@/lib/db/source-flags", () => ({ dataSourceIsPostgres: () => false }));
+vi.mock("@/platform/infra/db/source-flags", () => ({ dataSourceIsPostgres: () => false }));
 vi.mock("@/lib/tenant", () => ({ getTenantFromHeaders: async () => "t1" }));
 // Production behavior: the Redis limit throws when Redis is absent or down (it fails closed).
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/platform/infra/rate-limit", () => ({
   isRateLimitedAsync: async () => {
     h.rateLimitCalls.push("redis");
     if (h.redis !== "up") throw new Error("[PRODUCTION] Redis required for rate limiting but not configured");

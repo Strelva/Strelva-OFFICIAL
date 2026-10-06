@@ -6,7 +6,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SendEmailInput } from "@/lib/email/send";
+import type { SendEmailInput } from "@/platform/infra/email/send";
 import type { OwnerDecision, ProposedItem } from "@/platform/needs-you/contracts";
 import { serviceRequestAdapter } from "@/platform/needs-you/adapters";
 import type { SourceAdapter } from "@/platform/needs-you/adapters";

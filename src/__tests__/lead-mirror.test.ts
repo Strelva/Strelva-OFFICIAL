@@ -4,7 +4,7 @@ import { makeRedisMock } from "./support/redis-mock";
 const redis = makeRedisMock();
 let redisAvailable = true;
 const alertOnce = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/redis", () => ({ getRedis: () => (redisAvailable ? redis : null) }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => (redisAvailable ? redis : null) }));
 vi.mock("@/lib/monitoring", () => ({ alertOnce }));
 
 import {

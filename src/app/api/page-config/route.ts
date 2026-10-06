@@ -9,7 +9,7 @@ import {
   setPageConfig,
 } from "@/lib/storage";
 import { requireTenantFromHeaders } from "@/lib/tenant";
-import { getActorContext, verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
+import { getActorContext, verifyAuth, requireTenantAccess, requireTenantPermission } from "@/platform/infra/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { readJsonObject } from "@/lib/request-body";
 import { parseAndValidatePageConfig } from "@/lib/page-config-validation";

@@ -8,7 +8,7 @@ import type { WebsiteDocumentStore, WebsiteDocumentRevision } from "@/products/w
 import type { BoundedStore } from "@/platform/bounded-work/repository";
 import { WorkspaceAccessError, WorkspaceConflictError, type SavedWork, type WorkspaceActor } from "@/platform/workspaces/types";
 
-vi.mock("@/lib/redis", () => ({ getRedis: () => null }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 const actor: WorkspaceActor = { userId: "71000000-0000-4000-8000-000000000001", verifiedEmail: "owner@example.test" };
 const workspaceId = "71000000-0000-4000-8000-000000000002";

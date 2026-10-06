@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { businessEntryInputSchema, businessEntryResultSchema } from "./business-entry-contract";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "./types";
 

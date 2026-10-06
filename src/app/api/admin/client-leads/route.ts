@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { getClientLeadsForOperator } from "@/lib/client-leads";
 import { isTenantId } from "@/lib/scaffold-contracts";
 

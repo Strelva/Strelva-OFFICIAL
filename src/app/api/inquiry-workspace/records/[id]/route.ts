@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireTenantAccess, verifyAuth } from "@/lib/auth";
+import { requireTenantAccess, verifyAuth } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
 import { getInquiryRepository, inquiryReleaseMayBeOn, inquiryReleasedForCurrentUser, readInquiryRecord } from "@/products/inquiries/server";

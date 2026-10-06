@@ -24,7 +24,7 @@ import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/heartbeat";
 import { mapPool } from "@/lib/concurrency";
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import { getOrders } from "@/lib/orders";
 import { sendReviewRequestEmail } from "@/lib/delivery-email";
 import type { TenantConfig } from "@/lib/types";

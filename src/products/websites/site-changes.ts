@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { siteChangeReceiptSchema, siteChangeRequestSchema, type RecordSiteChange, type SiteChangeReceipt, type SiteChangeRequest } from "./site-change-model";
 

@@ -1,5 +1,5 @@
 import { getLeads, type LeadRecord } from "@/lib/leads";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import { inquiryRecordsEnabled, readWorkspaceInquiryLeads, type WorkspaceInquiryLead } from "@/lib/inquiry-records";
 import { readLinkedSites, type LinkedSite, type LinkedSites } from "@/platform/owner-entry/linked-sites";
 import { WorkspaceAccessError, type WorkspaceActor } from "@/platform/workspaces/types";

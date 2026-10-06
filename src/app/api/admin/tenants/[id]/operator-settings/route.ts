@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin, getActorContext } from "@/lib/auth";
+import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { operatorPolicyWriter } from "@/lib/tenant-policy-writer";
 import { TenantSettingRefusedError } from "@/platform/needs-you/tenant-settings";
@@ -15,7 +15,7 @@ import {
   getClientEmailOverride,
   setClientEmailOverride,
   type ClientEmailOverride,
-} from "@/lib/client-email-override";
+} from "@/platform/infra/email/client-override";
 
 /**
  * Operator controls for the Redis-backed per-client settings that are otherwise

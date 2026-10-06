@@ -4,10 +4,10 @@
  */
 
 import type { UnifiedEvent } from "./types";
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import { DEFAULT_TENANT } from "./storage/core";
-import { insertEvent, setEventStatus } from "./db/repositories";
-import { dualWritePgEnabled, eventToInsert, governedWorkReadPgEnabled } from "./db/dual-write";
+import { insertEvent, setEventStatus } from "@/platform/infra/db/repositories";
+import { dualWritePgEnabled, eventToInsert, governedWorkReadPgEnabled } from "@/platform/infra/db/dual-write";
 import { shadowDecisionFromResolve, shadowProposalFromEvent } from "./governed-work/shadow";
 import { getGovernedEventById, listGovernedEventsForTenant } from "./governed-work/repository";
 import { isGovernedScopeEvent } from "./governed-work/read";

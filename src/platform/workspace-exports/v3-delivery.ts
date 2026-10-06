@@ -5,7 +5,7 @@
  * subject to the same client-email switches as every other client email:
  * while client email is paused, nothing is sent and the operator is told.
  */
-import { sendEmailWithReceipt } from "@/lib/email/send";
+import { sendEmailWithReceipt } from "@/platform/infra/email/send";
 import { alert } from "@/lib/monitoring";
 import type { V3Manifest } from "./v3";
 

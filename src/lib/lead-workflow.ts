@@ -8,7 +8,7 @@
  * internal operator metadata for a handful of leads, read-modify-write, degrades
  * to a default `new` record when Redis is unconfigured.
  */
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import {
   getDeliveryLeadByToken,
   updateDeliveryLeadStatus,

@@ -8,8 +8,8 @@
  * bypass) gets null and the setting stays in Redis alone, as before. The
  * caller has already checked tenant permission; the SQL checks again.
  */
-import { getSessionUser } from "./db/server-client";
-import { getTenantRole } from "./auth";
+import { getSessionUser } from "@/platform/infra/db/server-client";
+import { getTenantRole } from "@/platform/infra/auth";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

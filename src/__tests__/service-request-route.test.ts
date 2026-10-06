@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ session: vi.fn(), release: vi.fn(), list: vi.fn(), read: vi.fn(), save: vi.fn(), respond: vi.fn(), linkDelivery: vi.fn(), withdraw: vi.fn() }));
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: mocks.session }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.session }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mocks.release }));
 vi.mock("@/platform/service-requests", async () => {
   const actual = await vi.importActual<Record<string, unknown>>("@/platform/service-requests");

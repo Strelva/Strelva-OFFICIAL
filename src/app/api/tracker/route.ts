@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/db/server-client";
-import { isSuperAdmin } from "@/lib/auth";
+import { getSessionUser } from "@/platform/infra/db/server-client";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError } from "@/platform/workspaces/types";
 import { previewTracker, readSavedTracker, readTrackerCoordinationOptions, saveNewTracker, editSavedTracker, recordTrackerExperiment } from "@/products/tracker/server";

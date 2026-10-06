@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGetSupabase = vi.fn();
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => mockGetSupabase() }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => mockGetSupabase() }));
 
 import {
   BusinessEffortAccessError, BusinessEffortConflictError, BusinessEffortNotFoundError,

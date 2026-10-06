@@ -6,7 +6,7 @@ import { recordHeartbeat, checkHeartbeats, CRON_MAX_AGE_SECONDS } from "@/lib/he
 import { ROOT_DOMAIN,OPERATOR_URL } from "@/lib/brand";
 import { websiteDocumentStore } from "@/products/websites/index";
 import { scanWebsiteHealth, type WebsiteHealthReceipt } from "@/products/websites/index";
-import { sendEmailWithReceipt } from "@/lib/email/send";
+import { sendEmailWithReceipt } from "@/platform/infra/email/send";
 import { resolveLeadNotifyRecipients } from "@/lib/delivery-email";
 import { getActiveTenants } from "@/lib/tenants";
 import { getDomainHealth } from "@/lib/domain-monitor-store";

@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { requireDashboardView } from "@/lib/dashboard-auth";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { getNeedsYouData } from "@/lib/needs-you";
 import { QueuePage } from "@/components/dashboard/QueuePage";
 import { QueueSkeleton } from "@/components/dashboard/QueueSkeleton";

@@ -23,7 +23,7 @@ const h = vi.hoisted(() => ({
   addEvent: vi.fn(),
 }));
 
-vi.mock("@/lib/redis", () => ({ getRedis: () => redis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => redis }));
 vi.mock("@/lib/events", () => ({ addEvent: h.addEvent }));
 vi.mock("@/lib/storage/core", () => ({
   DEFAULT_TENANT: "demo",
@@ -37,15 +37,15 @@ vi.mock("@/lib/storage", async () => ({
   logActivity: h.logActivity,
   DEFAULT_TENANT: "demo",
 }));
-vi.mock("@/lib/db/source-flags", () => ({ dataSourceIsPostgres: () => false }));
+vi.mock("@/platform/infra/db/source-flags", () => ({ dataSourceIsPostgres: () => false }));
 vi.mock("@/lib/tenant", () => ({ getTenantFromHeaders: async () => h.tenant }));
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedAsync: async () => false, rateLimitKey: () => "booking-test" }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: async () => false, rateLimitKey: () => "booking-test" }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: async (id: string) => ({ id, siteName: "Mooney Firm", ownerEmail: "tenant-owner@example.test", active: true }) }));
 vi.mock("@/lib/owner-recipient", () => ({ ownerNoticeEmail: async () => "owner-recipient@example.test" }));
 vi.mock("@/lib/tenant-urls", () => ({ getTenantDashboardUrl: (_c: unknown, path: string) => `https://app.strelva.test${path}` }));
 vi.mock("@/lib/delivery-email", () => ({ sendBookingConfirmation: h.sendBookingConfirmation, sendNewBookingOwnerEmail: h.sendNewBookingOwnerEmail }));
 vi.mock("@/lib/monitoring", () => ({ alertOnce: h.alertOnce }));
-vi.mock("@/lib/auth", () => ({ verifyAuth: async () => true, requireTenantPermission: async () => null, requireTenantAccess: async () => null }));
+vi.mock("@/platform/infra/auth", () => ({ verifyAuth: async () => true, requireTenantPermission: async () => null, requireTenantAccess: async () => null }));
 vi.mock("@/lib/subscription", () => ({ requireActiveSubscription: async () => null }));
 vi.mock("@/lib/leads", () => ({ getLeadById: async () => null }));
 

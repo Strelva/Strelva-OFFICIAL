@@ -30,7 +30,7 @@ vi.mock("@/lib/connections", () => ({
 }));
 vi.mock("@/lib/events", () => ({ addEvent: mockAddEvent }));
 vi.mock("@/lib/reviews", () => ({ addReview: mockAddReview }));
-vi.mock("@/lib/redis", () => ({ getRedis: mockGetRedis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: mockGetRedis }));
 vi.mock("@/lib/review-replies", () => ({
   draftReviewReply: mockDraftReviewReply,
   storeRecentReply: mockStoreRecentReply,

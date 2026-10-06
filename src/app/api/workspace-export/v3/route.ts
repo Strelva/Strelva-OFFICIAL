@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { exportWorkspace } from "@/platform/workspace-exports/repository";
 import { startWorkspaceExportV3, WorkspaceExportV3Error, type V3Rpc } from "@/platform/workspace-exports/v3";

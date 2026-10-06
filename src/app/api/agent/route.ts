@@ -2,9 +2,9 @@ import { stepCountIs } from "ai";
 import type { ModelMessage } from "ai";
 import { z } from "zod";
 import { streamModelText, type ModelTextStream } from "@/platform/infra/model-calls";
-import { logger } from "@/lib/logger";
+import { logger } from "@/platform/infra/logger";
 import { trackError } from "@/lib/monitoring";
-import { isSuperAdmin, requireTenantPermission, getAuthUserId } from "@/lib/auth";
+import { isSuperAdmin, requireTenantPermission, getAuthUserId } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateManifestForTenant } from "@/lib/template-manifests";
 import { getTenantConfig } from "@/lib/tenants";
@@ -13,7 +13,7 @@ import { capabilityPromptFragment, sanitizePromptValue } from "@/lib/capabilitie
 import { buildAgentSystemPrompt } from "@/lib/agent-prompt-shared";
 import { getSiteCapabilityManifest } from "@/lib/site-capabilities";
 import { resolveGbpWriteAllowed, resolveEditableSections, buildTenantChatTools, chatToolLabel } from "@/lib/agent-shared";
-import { isRateLimitedAsync } from "@/lib/rate-limit";
+import { isRateLimitedAsync } from "@/platform/infra/rate-limit";
 import { classifySource, recordAgentToolCall } from "@/lib/proof-signals";
 import {
   agentResultFromToolOutput,

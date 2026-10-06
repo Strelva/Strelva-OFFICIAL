@@ -1,4 +1,4 @@
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
 import { WorkspaceAccessError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";

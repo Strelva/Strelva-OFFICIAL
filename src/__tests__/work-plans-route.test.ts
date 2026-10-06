@@ -10,9 +10,9 @@ const mocks = vi.hoisted(() => ({
   present: vi.fn(),
 }));
 
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: mocks.user }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.user }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mocks.release }));
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate }));
 vi.mock("@/products/work-plans", async () => {
   const actual = await vi.importActual<Record<string, unknown>>("@/products/work-plans");
   return { ...actual, createWorkPlan: mocks.create, readWorkPlan: mocks.read, listWorkPlanOutputs: mocks.list, presentWorkPlan: mocks.present };

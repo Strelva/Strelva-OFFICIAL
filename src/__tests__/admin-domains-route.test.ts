@@ -9,7 +9,7 @@ const mockListClaims = vi.hoisted(() => vi.fn(() => Promise.resolve([])));
 const mockRefresh = vi.hoisted(() => vi.fn());
 const mockRemove = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   isSuperAdmin: mockIsSuperAdmin,
   getActorContext: mockGetActorContext,
 }));

@@ -15,7 +15,7 @@
  * price, cycle and card are never touched. An object reachable from two
  * businesses is listed as a conflict and never written.
  */
-import { getSupabase } from "../src/lib/db/client";
+import { getSupabase } from "../src/platform/infra/db/client";
 import { getAccountForTenant } from "../src/lib/accounts";
 import { getStripe } from "../src/lib/billing";
 import { workspaceIdForTenant } from "../src/platform/business-billing";

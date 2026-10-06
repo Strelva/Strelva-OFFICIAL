@@ -1,5 +1,5 @@
 import { getActiveTenants } from "@/lib/tenants";
-import { emailSendingPaused } from "@/lib/email-enabled";
+import { emailSendingPaused } from "@/platform/infra/email/enabled";
 import {
   OperatorQueueAccessError, OperatorQueueValidationError, MARK_ACTIONS,
   type MarkAction, type OperatorQueue, type QueueActor, type QueueContext, type QueueItem, type QueueMark,

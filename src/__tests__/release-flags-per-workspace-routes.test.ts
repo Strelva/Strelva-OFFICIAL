@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setReleaseFlagsDb, type ReleaseFlagsDb } from "@/platform/release-flags/store";
 
 const deps = vi.hoisted(() => ({ list: vi.fn(), tenant: vi.fn() }));
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: async () => ({ id: "33333333-3333-4333-8333-333333333333", email: "owner@example.test", email_confirmed_at: "2026-09-01T00:00:00Z" }) }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: async () => ({ id: "33333333-3333-4333-8333-333333333333", email: "owner@example.test", email_confirmed_at: "2026-09-01T00:00:00Z" }) }));
 vi.mock("@/products/websites/rebuild-service", () => ({ listWebsiteRebuilds: deps.list, createWebsiteRebuild: vi.fn(), retryWebsiteRebuild: vi.fn(), readWebsiteRebuild: vi.fn(), approveWebsiteRebuild: vi.fn(), launchWebsiteRebuild: vi.fn(), connectWebsiteRebuildCapabilities: vi.fn() }));
 vi.mock("@/lib/tenants", async (original) => ({ ...await original<typeof import("@/lib/tenants")>(), getTenantConfig: deps.tenant }));
 import { GET as listRebuilds } from "@/app/api/websites/rebuild/route";

@@ -10,9 +10,9 @@ const mockIsSuperAdmin = vi.fn();
 const mockActor = vi.fn();
 const mockRpc = vi.fn();
 const mockRevalidate = vi.fn();
-vi.mock("@/lib/auth", () => ({ isSuperAdmin: () => mockIsSuperAdmin() }));
+vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: () => mockIsSuperAdmin() }));
 vi.mock("@/platform/workspaces/http", () => ({ workspaceHttpActor: () => mockActor() }));
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => ({ rpc: (...args: unknown[]) => mockRpc(...args) }) }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: (...args: unknown[]) => mockRpc(...args) }) }));
 vi.mock("next/cache", () => ({ revalidatePath: (...args: unknown[]) => mockRevalidate(...args) }));
 
 import { recordBusinessEffortAction, voidBusinessEffortAction } from "@/app/admin/work/effort-actions";

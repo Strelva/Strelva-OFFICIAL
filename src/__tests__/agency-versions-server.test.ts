@@ -21,9 +21,9 @@ const deps = vi.hoisted(() => ({
   limited: vi.fn(),
 }));
 
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: async () => deps.user }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: async () => deps.user }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedWindowedAsync: deps.limited }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: deps.limited }));
 vi.mock("@/experience/workspace/agency-server", async (original) => ({
   ...(await original<typeof import("@/experience/workspace/agency-server")>()),
   readAgencyClientsPage: deps.clients,

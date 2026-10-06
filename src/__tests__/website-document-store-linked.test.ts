@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createWebsiteDocumentStore } from "@/products/websites/document-store";
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
 
-vi.mock("@/lib/redis", () => ({ getRedis: () => null }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
 const actor = { userId: "74000000-0000-4000-8000-000000000001", verifiedEmail: "owner@example.test" };
 const key = { workspaceId: "74000000-0000-4000-8000-000000000002", workId: "74000000-0000-4000-8000-000000000003" };
 function db(result: { data: unknown; error: { message: string } | null }) {

@@ -2,8 +2,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 import { isolatedRedisAvailable, startIsolatedRedis, type IsolatedRedis } from "./support/isolated-redis";
 
 const holder = vi.hoisted(() => ({ client: null as unknown }));
-vi.mock("@/lib/redis", () => ({ getRedis: () => holder.client }));
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => null }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => holder.client }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => null }));
 vi.mock("@/lib/vercel", () => ({ isVercelConfigured: () => false, deleteVercelProject: vi.fn() }));
 import { runDeprovision, tenantRedisPatterns } from "@/lib/deprovision";
 

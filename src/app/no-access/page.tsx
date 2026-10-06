@@ -2,9 +2,9 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { UseInvitedEmailButton } from "@/components/auth/UseInvitedEmailButton";
-import { claimPendingInviteForCurrentUser, getAuthUserId } from "@/lib/auth";
+import { claimPendingInviteForCurrentUser, getAuthUserId } from "@/platform/infra/auth";
 import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
-import { isDevAccessBypassEnabled } from "@/lib/dev-access";
+import { isDevAccessBypassEnabled } from "@/platform/infra/dev-access";
 
 export default async function NoAccessPage() {
   const requestHeaders = await headers();

@@ -12,12 +12,12 @@ const mockRedis = {
 };
 let redisClient: typeof mockRedis | null = mockRedis;
 
-vi.mock("../lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => redisClient,
 }));
 
 const loggerMock = vi.hoisted(() => ({ error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() }));
-vi.mock("../lib/logger", () => ({ logger: loggerMock }));
+vi.mock("@/platform/infra/logger", () => ({ logger: loggerMock }));
 
 import { recordHeartbeat, checkHeartbeats, CRON_MAX_AGE_SECONDS } from "../lib/heartbeat";
 import { recordMailSend, getMailLog } from "../lib/storage/mail-log";

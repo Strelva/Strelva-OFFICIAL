@@ -15,7 +15,7 @@
 import { tool, stepCountIs } from "ai";
 import type { ModelMessage } from "ai";
 import { z } from "zod";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { streamModelText, type ModelTextStream } from "@/platform/infra/model-calls";
 import {
   buildPortfolioSnapshot,

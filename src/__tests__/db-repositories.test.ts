@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Postgres-authoritative writes must reject so a caller never reports success
 // for tenant/content/identity data that was not persisted.
 
-import { getSupabase, isSupabaseConfigured } from "../lib/db/client";
-import * as repos from "../lib/db/repositories";
+import { getSupabase, isSupabaseConfigured } from "@/platform/infra/db/client";
+import * as repos from "@/platform/infra/db/repositories";
 
 describe("Supabase data layer — degrades gracefully when unconfigured", () => {
   beforeEach(() => {

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { baseSchema } from "./contracts";
 export { baseSchema } from "./contracts";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { assertWorkspaceMember, getWork, makeSystemsAuthority, saveSystemWork, saveWork, type MakeSystemsAuthority } from "@/platform/workspaces/repository";
 import { WORKSPACE_EXIT_STOPPED_MESSAGE, WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type SavedWork, type SaveWorkInput, type WorkspaceActor } from "@/platform/workspaces/types";
 

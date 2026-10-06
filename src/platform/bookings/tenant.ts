@@ -9,7 +9,7 @@
  * A store refusal for an overlapping slot is not retryable: it is a parity
  * difference, logged and paged, and the compare step must explain it.
  */
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import { alertOnce } from "@/lib/monitoring";
 import type { Booking, BookingConfig, DateOverride } from "@/lib/types";
 import {

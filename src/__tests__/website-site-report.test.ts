@@ -5,7 +5,7 @@ vi.mock("@/products/websites/rebuild-service",()=>({readWebsiteRebuild:deps.read
 vi.mock("@/products/websites/document-store",()=>({websiteDocumentStore:{list:deps.documents,receipts:deps.receipts,published:deps.published,managePublishedTenant:deps.native}}));
 vi.mock("@/products/inquiries/server",()=>({readInquiryWorkspace:deps.inquiries}));
 vi.mock("@/products/scheduling/server",()=>({listPublicWebsiteBookingGrants:deps.grants}));
-vi.mock("@/lib/email/send",()=>({sendEmailWithReceipt:deps.send}));
+vi.mock("@/platform/infra/email/send",()=>({sendEmailWithReceipt:deps.send}));
 vi.mock("@/lib/tenants",()=>({getTenantConfig:deps.tenant}));
 import {readWebsiteMonthlyReport,sendWebsiteMonthlyReport,sendOwnerWebsiteMonthlyReport} from "@/products/websites/site-report";
 const actor={userId:"owner",verifiedEmail:"owner@example.com"};

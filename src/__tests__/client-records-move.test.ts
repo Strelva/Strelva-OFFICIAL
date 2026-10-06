@@ -2,8 +2,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { isolatedRedisAvailable, startIsolatedRedis, type IsolatedRedis } from "./support/isolated-redis";
 
 const holder = vi.hoisted(() => ({ client: null as unknown }));
-vi.mock("@/lib/redis", () => ({ getRedis: () => holder.client }));
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => null }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => holder.client }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => null }));
 
 import {
   CLIENT_RECORD_PENDING_KEY,

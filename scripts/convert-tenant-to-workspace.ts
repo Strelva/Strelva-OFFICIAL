@@ -36,7 +36,7 @@
  * lives there. The preview needs the database (the link lives there) and
  * writes nothing. Same refusal rules as --apply.
  */
-import { getSupabase, type Row } from "../src/lib/db/client";
+import { getSupabase, type Row } from "../src/platform/infra/db/client";
 import { getTenantConfig, rowToTenant } from "../src/lib/tenants";
 import { getStoredContent } from "../src/lib/storage/content-store";
 import { getBookingConfig, getBookings, getDateOverrides } from "../src/lib/storage/booking-store";

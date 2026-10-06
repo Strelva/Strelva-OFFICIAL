@@ -1,4 +1,4 @@
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import type { DomainClaim, DomainClaimRole, TenantConfig } from "./types";
 import type { SiteConfig } from "./tenant/models";
 import { getAllTenants, getTenantConfig, invalidateDomainMapCache, isActiveTenant, updateTenant } from "./tenants";

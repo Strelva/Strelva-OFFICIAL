@@ -21,7 +21,7 @@
  * stay readable.
  */
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { KIND_RULES, ladderRouteSchema, routeRank, stricterOf, type LadderRoute } from "./contracts";
 import { needsYouReleaseEnabled } from "./release";
 

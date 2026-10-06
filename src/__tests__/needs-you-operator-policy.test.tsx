@@ -12,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => undefined }), usePathname: () => "/admin/needs-you" }));
-vi.mock("@/lib/auth", () => ({ isSuperAdmin: mocks.superAdmin }));
+vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: mocks.superAdmin }));
 vi.mock("@/platform/workspaces/http", () => ({ workspaceHttpActor: mocks.actor }));
 vi.mock("@/platform/needs-you/release", () => ({ needsYouReleaseEnabled: mocks.released }));
 vi.mock("@/platform/needs-you/policy", async () => {

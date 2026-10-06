@@ -13,8 +13,8 @@
  * Kill switch: DUAL_WRITE_PG=0 turns Postgres off for both reads and writes
  * here, so the store behaves exactly as the Redis-only code did.
  */
-import { getSupabase } from "../db/client";
-import { dualWritePgEnabled } from "../db/dual-write";
+import { getSupabase } from "@/platform/infra/db/client";
+import { dualWritePgEnabled } from "@/platform/infra/db/dual-write";
 
 export const REDIS_MOVE_TIMEOUT_MS = 1500;
 

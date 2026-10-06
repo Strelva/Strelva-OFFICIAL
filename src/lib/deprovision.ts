@@ -13,8 +13,8 @@
  * server-side (confirmSlug === id in the request body).
  */
 
-import { getSupabase } from "@/lib/db/client";
-import { getRedis } from "@/lib/redis";
+import { getSupabase } from "@/platform/infra/db/client";
+import { getRedis } from "@/platform/infra/redis";
 import type { TenantConfig } from "@/lib/types";
 import { clearTenantDomainClaims } from "@/lib/domains";
 import { deleteVercelProject, isVercelConfigured } from "@/lib/vercel";

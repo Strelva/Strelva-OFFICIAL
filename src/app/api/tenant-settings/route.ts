@@ -5,7 +5,7 @@ import {
   requireTenantAccess,
   requireTenantPermissions,
   type TenantPermission,
-} from "@/lib/auth";
+} from "@/platform/infra/auth";
 import { getTenantConfig, updateTenant, invalidateDomainMapCache } from "@/lib/tenants";
 import { normalizeTenantDomain } from "@/lib/tenant-urls";
 import { validateTenantDomains } from "@/lib/domains";

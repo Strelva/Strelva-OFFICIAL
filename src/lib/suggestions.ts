@@ -9,8 +9,8 @@ import { getProducts } from "./products";
 import { getSiteCapabilityManifest } from "./site-capabilities";
 import { getTenantConfig } from "./tenants";
 import type { ContentSection } from "./types";
-import { dataSourceIsPostgres } from "./db/source-flags";
-import { getSupabase, type Row, type Insert } from "./db/client";
+import { dataSourceIsPostgres } from "@/platform/infra/db/source-flags";
+import { getSupabase, type Row, type Insert } from "@/platform/infra/db/client";
 
 export interface Suggestion {
   id: string;

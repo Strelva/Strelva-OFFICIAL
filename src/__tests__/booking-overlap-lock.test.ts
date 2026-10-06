@@ -28,7 +28,7 @@ const mockRedis = vi.hoisted(() => ({
   }),
 }));
 
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: vi.fn(() => mockRedis),
 }));
 

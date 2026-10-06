@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthUserId, requireTenantAccess, requireTenantPermission, verifyAuth } from "@/lib/auth";
+import { getAuthUserId, requireTenantAccess, requireTenantPermission, verifyAuth } from "@/platform/infra/auth";
 import { readJsonObject } from "@/lib/request-body";
 import { getTenantConfig } from "@/lib/tenants";
 import {

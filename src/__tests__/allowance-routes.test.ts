@@ -8,8 +8,8 @@ const mocks = vi.hoisted(() => ({
   award: vi.fn(),
   accept: vi.fn(),
 }));
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: mocks.session }));
-vi.mock("@/lib/auth", () => ({ isSuperAdmin: mocks.admin }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.session }));
+vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: mocks.admin }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mocks.release }));
 vi.mock("@/platform/work-economics/allowances", async (original) => ({
   ...await original<typeof import("@/platform/work-economics/allowances")>(),

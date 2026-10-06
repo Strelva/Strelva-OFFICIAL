@@ -11,7 +11,7 @@
  * one tenant's compare fails, nothing is recorded for that store, so that day
  * never counts toward the streak: an incomplete check can't flip a read.
  */
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import { clientRecordDb, clientRecordDualWriteEnabled, CLIENT_RECORD_STORES, type ClientRecordDb, type ClientRecordStore } from "./mirror";
 import { checkClientRecordParity, recordClientRecordParity, type ParityReport } from "./move";
 import type { ClientRecordRedis } from "./stores";

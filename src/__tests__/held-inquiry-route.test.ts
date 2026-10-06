@@ -10,7 +10,7 @@ vi.mock("@/platform/workspaces/http", async (importOriginal) => ({
   workspaceHttpActor: actor,
 }));
 vi.mock("@/platform/owner-entry/linked-sites", () => ({ ownerEntryHomesOpen: homesOpen }));
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedWindowedAsync: limited }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: limited }));
 vi.mock("@/lib/inquiry-records", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/inquiry-records")>()),
   decideHeldInquiry: decide,

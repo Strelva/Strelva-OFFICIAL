@@ -8,12 +8,12 @@ import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { generateWeeklyBrief } from "@/lib/weekly-brief";
 import { EMAIL_DOMAIN } from "@/lib/brand";
 import { sanitizeEmailSubjectText } from "@/lib/invite-email";
-import { emailSendingPaused } from "@/lib/email-enabled";
-import { renderEmailHtml, renderEmailText } from "@/lib/email/layout";
-import type { EmailRow } from "@/lib/email/layout";
+import { emailSendingPaused } from "@/platform/infra/email/enabled";
+import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
+import type { EmailRow } from "@/platform/infra/email/layout";
 import { isReportDue, markReportSent } from "@/lib/report-cadence";
 import { requireCronRequest } from "@/lib/cron-auth";
-import { sendEmail } from "@/lib/email/send";
+import { sendEmail } from "@/platform/infra/email/send";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.

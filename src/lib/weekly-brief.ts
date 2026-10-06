@@ -1,6 +1,6 @@
 import { generateModelText } from "@/platform/infra/model-calls";
 import type { WeeklyBrief, WeeklyBriefStats } from "./types";
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import { getClickCounts, getActivity, getClickCountsByPrefix, getContent, getSearchData, getSectionTimestamps } from "./storage";
 import { getEvents } from "./events";
 import { getSuggestions, ownerSuggestions } from "./suggestions";

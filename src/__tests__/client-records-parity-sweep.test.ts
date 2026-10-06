@@ -4,8 +4,8 @@ const holder = vi.hoisted(() => ({
   redisRecords: new Map<string, { recordId: string; payload: Record<string, unknown>; capturedAt: string }[]>(),
   redisDown: false,
 }));
-vi.mock("@/lib/redis", () => ({ getRedis: () => null }));
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => null }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => null }));
 vi.mock("@/platform/client-records/stores", async () => {
   const { CLIENT_RECORD_STORES } = await vi.importActual<typeof import("@/platform/client-records/mirror")>("@/platform/client-records/mirror");
   const definitions = Object.fromEntries(CLIENT_RECORD_STORES.map((store) => [store, {

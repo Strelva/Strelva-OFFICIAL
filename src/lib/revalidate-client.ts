@@ -1,12 +1,12 @@
 import { createRevalidationBody, signRevalidationBody } from "./scaffold-contracts";
 import { getTenantConfig, getActiveTenants } from "./tenants";
 import { getTenantDeliveryModel } from "./custom-repos";
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import { alert } from "./monitoring";
 import { getSectionTimestamps } from "./storage";
-import { logger } from "./logger";
+import { logger } from "@/platform/infra/logger";
 import { addSentryBreadcrumb } from "./sentry-context";
-import { isSafeFetchUrl } from "./safe-fetch";
+import { isSafeFetchUrl } from "@/platform/infra/safe-fetch";
 
 export interface RevalidationFailure {
   tenantId: string;

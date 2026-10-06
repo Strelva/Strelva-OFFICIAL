@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderEmailHtml, renderEmailText, escapeEmailHtml } from "@/lib/email/layout";
+import { renderEmailHtml, renderEmailText, escapeEmailHtml } from "@/platform/infra/email/layout";
 
 describe("email design system layout", () => {
   it("renders a full branded HTML document with the heading and body", () => {

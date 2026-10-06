@@ -7,13 +7,13 @@ vi.mock("@/lib/tenants", () => ({
   getTenantConfig: vi.fn(),
   getActiveTenants: vi.fn(async () => []),
 }));
-vi.mock("@/lib/safe-fetch", () => ({
+vi.mock("@/platform/infra/safe-fetch", () => ({
   isSafeFetchUrl: vi.fn(),
 }));
 
 import { revalidateClientSite } from "@/lib/revalidate-client";
 import { getTenantConfig } from "@/lib/tenants";
-import { isSafeFetchUrl } from "@/lib/safe-fetch";
+import { isSafeFetchUrl } from "@/platform/infra/safe-fetch";
 
 const mockConfig = (overrides: Record<string, unknown>) =>
   ({ id: "acme", deliveryModel: "custom_repo", ...overrides }) as never;

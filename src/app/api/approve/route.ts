@@ -31,7 +31,7 @@ import { needsYouAppOrigin, needsYouReleaseEnabled, needsYouService, needsYouSto
 import { resolveEventAction } from "@/lib/event-actions";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
-import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 
 export const dynamic = "force-dynamic";
 

@@ -14,7 +14,7 @@
  * Redis is a read of production, so it refuses any UPSTASH_REDIS_REST_URL that
  * isn't loopback or `*.localhost` unless `--i-have-jacobs-yes` is passed.
  */
-import { getRedis } from "../src/lib/redis";
+import { getRedis } from "../src/platform/infra/redis";
 import { isLocalDatabaseUrl } from "./tenant-conversion";
 
 export interface CountOptions { json: boolean; jacobsYes: boolean }

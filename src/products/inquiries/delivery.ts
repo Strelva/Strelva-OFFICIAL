@@ -21,11 +21,11 @@ import type { InquiryTimelineEventType, ResponsibilityAction, ResponsibilityEval
 import type { LeadRecord } from "@/lib/leads";
 import { getTenantConfig } from "@/lib/tenants";
 import { addTenantActivity } from "@/lib/tenant-crm";
-import { renderEmailHtml, renderEmailText } from "@/lib/email/layout";
+import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
 import { createEmailInquiryTransport } from "./delivery-email";
 import { createRedisInquiryDeliveryStore } from "./delivery-store";
 import { INQUIRY_WORKSPACE_EXIT_CODE, isInquiryWorkspaceExited } from "./workspace-exit";
-import type { EmailAudience } from "@/lib/email/send";
+import type { EmailAudience } from "@/platform/infra/email/send";
 import {
   actorForAction,
   createInquiryDeliveryMessage,

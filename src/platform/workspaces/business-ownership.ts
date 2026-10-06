@@ -20,10 +20,10 @@
  */
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { OPERATOR_URL } from "@/lib/brand";
-import type { SendEmailInput, SendEmailResult } from "@/lib/email/send";
-import type { EmailOptions } from "@/lib/email/layout";
+import type { SendEmailInput, SendEmailResult } from "@/platform/infra/email/send";
+import type { EmailOptions } from "@/platform/infra/email/layout";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "./types";
 
 export const OWNER_INVITATION_LIFETIME_DAYS = 14;
@@ -175,7 +175,7 @@ export async function inviteBusinessOwner(operator: string, workspaceId: string,
   const primaryTenant = invitation.tenants[0]?.tenantId;
   const recipientName = state.recipient && state.recipient.email === recipient.data ? state.recipient.name : null;
   try {
-    const send = options.send ?? (await import("@/lib/email/send")).sendEmailWithReceipt;
+    const send = options.send ?? (await import("@/platform/infra/email/send")).sendEmailWithReceipt;
     const result = await send({
       audience: "client",
       ...(primaryTenant ? { tenantId: primaryTenant } : {}),

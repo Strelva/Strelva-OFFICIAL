@@ -1,9 +1,9 @@
 import { promises as fs } from "fs";
 import path from "path";
 import type { ReviewItem } from "./types";
-import { dataSourceIsPostgres } from "./db/source-flags";
-import { getSupabase } from "./db/client";
-import type { Row, Insert } from "./db/client";
+import { dataSourceIsPostgres } from "@/platform/infra/db/source-flags";
+import { getSupabase } from "@/platform/infra/db/client";
+import type { Row, Insert } from "@/platform/infra/db/client";
 
 function devReviewsPath(tenant: string): string {
   return path.join(process.cwd(), `dev-reviews-${tenant}.json`);

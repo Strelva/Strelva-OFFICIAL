@@ -74,7 +74,7 @@ export async function probeAiAnswer(
   }
 
   try {
-    const { getGoogleModel } = await import("@/lib/ai-models");
+    const { getGoogleModel } = await import("@/platform/infra/ai-models");
     const { generateModelText } = await import("@/platform/infra/model-calls");
 
     const prompt =

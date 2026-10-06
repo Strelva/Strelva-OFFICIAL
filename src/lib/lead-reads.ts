@@ -16,7 +16,7 @@
  * step: capture writes `tenant_leads` first (src/lib/leads.ts).
  */
 import { leadMirrorDb, LEAD_MIRROR_TIMEOUT_MS, type LeadMirrorDb } from "./lead-mirror";
-import { dualWritePgEnabled } from "./db/dual-write";
+import { dualWritePgEnabled } from "@/platform/infra/db/dual-write";
 import { alertOnce } from "./monitoring";
 
 export type LeadReadMode = "redis" | "compare" | "postgres";

@@ -2,8 +2,8 @@ import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const boundary = vi.hoisted(() => ({ session: vi.fn(), database: null as unknown }));
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: boundary.session }));
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => boundary.database }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: boundary.session }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => boundary.database }));
 
 import { GET as getOperations, POST as postOperations } from "@/app/api/operations/route";
 import { GET as getDocuments, POST as postDocuments } from "@/app/api/documents/route";

@@ -1,7 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import type { TenantConfig } from "@/lib/types";
 const state = vi.hoisted(()=>({ tenant:null as TenantConfig|null, updates:0, failUpdate:0, providerExists:false, unavailable:false, lostResponse:false, postStatus:200, posts:0 }));
-vi.mock("@/lib/redis",()=>({getRedis:()=>null}));
+vi.mock("@/platform/infra/redis",()=>({getRedis:()=>null}));
 vi.mock("@/lib/tenants",()=>({
  getTenantConfig:async()=>state.tenant,getAllTenants:async()=>state.tenant?[state.tenant]:[],isActiveTenant:()=>true,invalidateDomainMapCache:vi.fn(),
  updateTenant:async(_id:string,changes:Partial<TenantConfig>)=>{state.updates++;if(state.updates===state.failUpdate)throw new Error("Local claim storage unavailable");state.tenant={...state.tenant!,...changes};return state.tenant;},

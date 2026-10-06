@@ -13,7 +13,7 @@ vi.mock("resend", () => ({
 }));
 
 import { createEmailInquiryTransport } from "@/products/inquiries/delivery-email";
-import { getReceivedEmailReadback } from "@/lib/email/send";
+import { getReceivedEmailReadback } from "@/platform/infra/email/send";
 
 const message = {
   tenantId: "acme",

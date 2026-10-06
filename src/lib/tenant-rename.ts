@@ -14,8 +14,8 @@
  * by re-running `rekeyTenantRedis(old, new)` (idempotent). Caches are NOT rekeyed
  * (they rebuild from Postgres); only `reb:tenants:all` is busted.
  */
-import { getRedis } from "./redis";
-import { getSupabase } from "./db/client";
+import { getRedis } from "@/platform/infra/redis";
+import { getSupabase } from "@/platform/infra/db/client";
 import { RESERVED_SUBDOMAINS } from "./tenant-host";
 import type { UnifiedEvent } from "./types";
 import { LEAD_MIRROR_PENDING_KEY, LEAD_MIRROR_LAST_FAILURE_KEY } from "./lead-mirror";

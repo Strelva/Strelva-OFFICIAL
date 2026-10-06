@@ -5,12 +5,12 @@ const kv = vi.hoisted(() => new Map<string, unknown>());
 const zset = vi.hoisted(() => [] as Array<{ score: number; member: string }>);
 const redisPresent = vi.hoisted(() => ({ value: true }));
 
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/platform/infra/rate-limit", () => ({
   isRateLimitedWindowedAsync: vi.fn(() => Promise.resolve(false)),
   rateLimitKey: vi.fn(() => "access-request-intake:test"),
 }));
 
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: vi.fn(() =>
     redisPresent.value
       ? {

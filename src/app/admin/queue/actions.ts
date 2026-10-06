@@ -10,7 +10,7 @@
  * quotes stay on the screens each row links to, through their governed paths.
  */
 import { revalidatePath } from "next/cache";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
 import {
   OperatorQueueAccessError, OperatorQueueConflictError, OperatorQueueValidationError,

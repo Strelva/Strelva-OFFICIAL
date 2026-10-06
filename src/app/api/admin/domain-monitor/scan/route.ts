@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin, getActorContext } from "@/lib/auth";
+import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { scanPortfolioDomains } from "@/lib/domain-monitor";
 import { saveDomainHealth } from "@/lib/domain-monitor-store";
 import { logAuditEvent } from "@/lib/storage";

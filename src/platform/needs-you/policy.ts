@@ -4,7 +4,7 @@
  * model (view, plans, words) is policy-model.ts and is re-exported here.
  */
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { changeKindSchema, isConfigurableKind, ladderRouteSchema, policyLayerSchema } from "./contracts";
 import { REFUSAL_WORDS, type PlanRefusal, type PlannedWrite, type PolicyRows } from "./policy-model";

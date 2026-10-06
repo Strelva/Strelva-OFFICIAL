@@ -1,4 +1,4 @@
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
 import { OperatorQueueAccessError, type OperatorQueue } from "@/platform/operator-queue/contracts";
 import { readOperatorQueue } from "@/platform/operator-queue/service";

@@ -20,7 +20,7 @@
  *     the mirror's pending queue, and the visitor still succeeds.
  */
 import { ownerNoticeEmail } from "./owner-recipient";
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import { getTenantConfig } from "./tenants";
 import { getTenantDashboardUrl } from "./tenant-urls";
 import { sendNewLeadEmail } from "./delivery-email";

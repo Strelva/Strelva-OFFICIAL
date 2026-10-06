@@ -1,4 +1,4 @@
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { readWorkspaceExportBuild, type V3Rpc } from "@/platform/workspace-exports/v3";
 
 export const dynamic = "force-dynamic";

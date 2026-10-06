@@ -34,7 +34,7 @@ const fakeRedis = {
   smembers: async (k: string) => Array.from(sets.get(k) ?? []),
 };
 
-vi.mock("@/lib/redis", () => ({ getRedis: () => fakeRedis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => fakeRedis }));
 
 import {
   createAccount,

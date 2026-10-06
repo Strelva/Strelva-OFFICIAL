@@ -10,7 +10,7 @@
  * Same shape as the leads store: one KV record per item with a TTL, plus a
  * score-ordered index trimmed to the newest SPAM_KEEP.
  */
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import { mirrorClientRecord } from "@/platform/client-records/mirror";
 import { readThroughFlag } from "@/platform/client-records/move";
 import { holdSpamForReview } from "./inquiry-records";

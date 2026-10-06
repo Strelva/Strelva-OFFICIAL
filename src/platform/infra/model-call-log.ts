@@ -1,6 +1,6 @@
-import { getSupabase } from "@/lib/db/client";
-import { getRedis } from "@/lib/redis";
-import { logger } from "@/lib/logger";
+import { getSupabase } from "@/platform/infra/db/client";
+import { getRedis } from "@/platform/infra/redis";
+import { logger } from "@/platform/infra/logger";
 import type { ModelCostSource } from "./model-prices";
 
 /**

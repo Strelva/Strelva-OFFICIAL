@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { getAuditReport } from "@/lib/audit-report-store";
-import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
+import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { runWorkspaceOperation, type WorkspaceActor } from "@/platform/workspaces";
 import { parseWebsiteAudit } from "./work";
 

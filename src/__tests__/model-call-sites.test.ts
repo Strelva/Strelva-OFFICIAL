@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const sdk = vi.hoisted(() => ({ generateText: vi.fn() }));
 vi.mock("ai", () => ({ generateText: (...args: unknown[]) => sdk.generateText(...args) }));
 vi.mock("@ai-sdk/google", () => ({ google: (id: string) => ({ modelId: id }) }));
-vi.mock("@/lib/redis", () => ({ getRedis: () => null }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
 vi.mock("@/lib/reviews/reply-voice", () => ({
   getReplyVoice: async () => ({}),
   defaultReplyVoice: () => ({}),
@@ -38,7 +38,7 @@ describe("model call sites", () => {
   it("leaves no direct model call or hard-coded model outside the helper", () => {
     const offenders = sources(path.resolve(__dirname, "..")).filter((file) => {
       const relative = path.relative(path.resolve(__dirname, "../.."), file).split(path.sep).join("/");
-      if (relative === "src/platform/infra/model-calls.ts" || relative === "src/lib/ai-models.ts") return false;
+      if (relative === "src/platform/infra/model-calls.ts" || relative === "src/platform/infra/ai-models.ts") return false;
       const source = readFileSync(file, "utf8");
       return /\b(generateText|streamText|generateObject|streamObject)\s*\(/.test(source) || /google\("gemini/.test(source);
     });

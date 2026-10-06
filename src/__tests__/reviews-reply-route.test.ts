@@ -17,7 +17,7 @@ const mockUpdateEvent = vi.fn();
 const mockResolveEventAction = vi.fn();
 const mockLogActivity = vi.fn();
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   verifyAuth: vi.fn(() => Promise.resolve(true)),
   requireTenantAccess: vi.fn(() => Promise.resolve(null)),
 }));

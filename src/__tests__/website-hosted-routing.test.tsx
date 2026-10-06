@@ -3,9 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { siteDocumentHash, siteDocumentSchema, type SiteDocument } from "@/products/websites/site-document";
 import { bindToCurrentTenant, currentHostedUrl } from "@/products/websites/hosted-routing";
 
-vi.mock("@/lib/redis", () => ({ getRedis: () => null }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
 const published = vi.hoisted(() => ({ row: null as null | Record<string, unknown> }));
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => ({ rpc: async () => ({ data: published.row ? [published.row] : [], error: null }) }) }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: async () => ({ data: published.row ? [published.row] : [], error: null }) }) }));
 vi.mock("@/products/websites/rebuild-release", () => ({ websiteRebuildReleaseEnabled: () => true }));
 
 // Audit 2026-10-05, P2 #8: after a hosted tenant rename, forms, reports and

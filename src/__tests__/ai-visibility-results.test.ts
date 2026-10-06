@@ -9,7 +9,7 @@ const redis = vi.hoisted(() => ({
 }));
 const getRedis = vi.hoisted(() => vi.fn((): typeof redis | null => redis));
 
-vi.mock("@/lib/redis", () => ({ getRedis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis }));
 
 import {
   getAiVisibilityResult,

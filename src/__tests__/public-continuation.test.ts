@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mocks.workspaceReleaseEnabled }));
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: mocks.getSessionUser }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.getSessionUser }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => mocks.cookieValue ? { value: mocks.cookieValue } : undefined }) }));
 vi.mock("@/platform/public-continuations/repository", () => ({ importPublicContinuation: mocks.importPublicContinuation }));
 

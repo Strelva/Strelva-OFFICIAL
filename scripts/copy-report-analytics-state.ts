@@ -17,8 +17,8 @@
  * unless SUPABASE_URL is a loopback host or --i-have-jacobs-yes is passed.
  * Needs 20261007194000_tenant_report_and_analytics_state.sql applied first.
  */
-import { getSupabase } from "../src/lib/db/client";
-import { getRedis } from "../src/lib/redis";
+import { getSupabase } from "../src/platform/infra/db/client";
+import { getRedis } from "../src/platform/infra/redis";
 import { getAllTenants } from "../src/lib/tenants";
 import { callRedisMoveRpc, type RedisMoveResult } from "../src/lib/storage/redis-move";
 import {

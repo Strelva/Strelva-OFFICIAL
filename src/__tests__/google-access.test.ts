@@ -9,7 +9,7 @@ const redis = vi.hoisted(() => ({
   get: vi.fn(), set: vi.fn(), hincrby: vi.fn(), expire: vi.fn(), hgetall: vi.fn(),
 }));
 vi.mock("@/lib/connections", () => ({ getConnection: mockGetConnection, saveConnection: mockSaveConnection }));
-vi.mock("@/lib/redis", () => ({ getRedis: () => redis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => redis }));
 
 import {
   getGoogleGrant,
@@ -20,7 +20,7 @@ import {
   readGoogleBindingFallbacks,
 } from "@/lib/google-access";
 import { connectionHasWriteScope } from "@/lib/gbp-replies";
-import { encryptSecret, decryptSecret } from "@/lib/crypto/secrets";
+import { encryptSecret, decryptSecret } from "@/platform/infra/crypto/secrets";
 import { encryptForBinding, setAccountBindingsDb, upsertGoogleBinding, BindingEncryptionRefused } from "@/platform/account-bindings/store";
 
 const WORKSPACE = "ab000000-0000-4000-8000-000000000010";

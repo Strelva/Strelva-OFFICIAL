@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/db/server-client";
+import { getSessionUser } from "@/platform/infra/db/server-client";
 import { withClientFallbackRoot } from "@/lib/client-fallback";
 import { resolveTenantOwnerEntry, workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";

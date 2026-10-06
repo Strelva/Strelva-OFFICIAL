@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
 import { UseInvitedEmailButton } from "@/components/auth/UseInvitedEmailButton";
-import { claimPendingInviteForCurrentUser, getAuthUserId, getCurrentUserTenants, isSuperAdmin } from "@/lib/auth";
+import { claimPendingInviteForCurrentUser, getAuthUserId, getCurrentUserTenants, isSuperAdmin } from "@/platform/infra/auth";
 import { getTenantConfig, isActiveTenant } from "@/lib/tenants";
 import {
   getTenantDashboardFallbackUrl,
   getTenantDashboardHost,
 } from "@/lib/tenant-urls";
-import { getDevAccessTenant } from "@/lib/dev-access";
+import { getDevAccessTenant } from "@/platform/infra/dev-access";
 import type { TenantConfig } from "@/lib/types";
 import Link from "next/link";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";

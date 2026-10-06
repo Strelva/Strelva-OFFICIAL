@@ -8,7 +8,7 @@
  * Null-safe: no Redis ⇒ heartbeats are no-ops (dev). Key: reb:heartbeat:{cron}.
  */
 
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 
 export interface Heartbeat {
   cron: string;

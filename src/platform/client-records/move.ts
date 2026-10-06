@@ -2,7 +2,7 @@
  * Backfill, parity, repair and the per-store read flag for the client-record
  * move (see mirror.ts for the whole pattern).
  */
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import {
   CLIENT_RECORD_PENDING_KEY,
   CLIENT_RECORD_STORES,

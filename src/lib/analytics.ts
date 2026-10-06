@@ -31,7 +31,7 @@
  * it reads as the client themselves.
  */
 
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import { callRedisMoveRpc, postgresNotInPlay } from "./storage/redis-move";
 import { getTenantConfig } from "./tenants";
 import { getAccessToken, getServiceAccountCredential, queryGscTotals } from "./search-console";

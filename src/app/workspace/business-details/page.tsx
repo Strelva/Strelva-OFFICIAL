@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { readBusinessRecord } from "@/platform/business-record/service";
 import { EDITABLE_DETAILS, type EditableDetail } from "@/platform/business-record/details";
 import type { DetailsSaveOutcome } from "@/platform/business-record/details-save";

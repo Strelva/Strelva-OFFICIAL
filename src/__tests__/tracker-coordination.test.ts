@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 const boundary = vi.hoisted(() => ({ database: null as unknown }));
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => boundary.database }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => boundary.database }));
 import { saveNewTracker, editSavedTracker, readSavedTracker } from "@/products/tracker/server";
 const actor = { userId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", verifiedEmail: "owner@example.com" };
 const assigneeId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";

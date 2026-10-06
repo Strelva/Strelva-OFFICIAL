@@ -24,7 +24,7 @@ import {
   sendInquiryReply,
 } from "./delivery";
 import { isInquiryReplyTrackingAddress } from "./delivery-message";
-import { getReceivedEmailReadback } from "@/lib/email/send";
+import { getReceivedEmailReadback } from "@/platform/infra/email/send";
 import type {
   InquiryDeliveryApproval,
   InquiryDeliveryDependencies,

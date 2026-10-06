@@ -3,9 +3,9 @@ import type { ConnectedSitesStore } from "@/products/connected-sites/store";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 
 const deps = vi.hoisted(() => ({ user: null as null | { id: string; email: string; email_confirmed_at: string }, limited: vi.fn(), systemsOn: true, flag: vi.fn() }));
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: async () => deps.user }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: async () => deps.user }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedWindowedAsync: deps.limited }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: deps.limited }));
 // Per workspace: connected sites follow Systems for the business (release-flag rule).
 vi.mock("@/platform/systems-release", () => ({ systemsReleasedFor: async () => deps.systemsOn }));
 // And the business's own connected_sites row.

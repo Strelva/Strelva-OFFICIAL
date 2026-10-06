@@ -26,7 +26,7 @@
  * agency). Anything else gets no session.
  */
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 
 export const STRELVA_SYSTEM_LABEL = "Strelva (system)" as const;

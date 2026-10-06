@@ -15,7 +15,7 @@
  * recorded, never retried: a provider may have accepted it. Every dependency
  * is a port so the whole run is tested without Postgres or Resend.
  */
-import type { SendEmailInput, SendEmailResult } from "@/lib/email/send";
+import type { SendEmailInput, SendEmailResult } from "@/platform/infra/email/send";
 import { customerReminderEmail, ownerRequestReminderEmail, requestLapsedEmail, type ReminderEmail } from "./emails";
 import type { BookingMessageKind, BookingMessageStatus, ClaimedBookingMessage, StoreBooking } from "./store";
 

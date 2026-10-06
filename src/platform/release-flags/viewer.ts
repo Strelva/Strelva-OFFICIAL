@@ -9,7 +9,7 @@ export async function releaseViewerFor(actor: { userId: string } | null | undefi
   if (!actor) return { operator: false, tester: false };
   let operator = false;
   try {
-    const { isSuperAdminUser } = await import("@/lib/db/repositories");
+    const { isSuperAdminUser } = await import("@/platform/infra/db/repositories");
     operator = await isSuperAdminUser(actor.userId);
   } catch {
     operator = false;
@@ -20,7 +20,7 @@ export async function releaseViewerFor(actor: { userId: string } | null | undefi
 /** The viewer for the request's signed-in user (tenant routes that have no workspace actor). */
 export async function currentReleaseViewer(): Promise<ReleaseViewer> {
   try {
-    const { getAuthUserId } = await import("@/lib/auth");
+    const { getAuthUserId } = await import("@/platform/infra/auth");
     const userId = await getAuthUserId();
     return releaseViewerFor(userId ? { userId } : null);
   } catch {

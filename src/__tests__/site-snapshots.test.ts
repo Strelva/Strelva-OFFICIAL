@@ -33,7 +33,7 @@ vi.mock("@/lib/tenant", () => ({
   getTenantFromHeaders: () => mockGetTenantFromHeaders(),
 }));
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   getActorContext: (...args: unknown[]) => mockGetActorContext(...args),
   requireTenantAccess: (...args: unknown[]) => mockRequireTenantAccess(...args),
   requireTenantPermission: (...args: unknown[]) => mockRequireTenantPermission(...args),

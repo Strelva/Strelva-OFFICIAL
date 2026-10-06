@@ -1,8 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { isSuperAdmin } from "@/lib/auth";
-import { getSessionUser } from "@/lib/db/server-client";
+import { isSuperAdmin } from "@/platform/infra/auth";
+import { getSessionUser } from "@/platform/infra/db/server-client";
 import { patchBusinessRecord, readBusinessRecord } from "@/platform/business-record/service";
 import { saveBusinessDetails } from "@/platform/business-record/details-save";
 import { ownerEntryHomesOpen } from "@/platform/owner-entry/linked-sites";

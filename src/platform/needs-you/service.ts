@@ -3,8 +3,8 @@
  * own resolver, chase them by email, and lapse them. Every dependency is a
  * port so the whole flow runs in tests without Redis, Postgres or Resend.
  */
-import type { SendEmailInput, SendEmailResult } from "@/lib/email/send";
-import type { EmailDecision, EmailOptions } from "@/lib/email/layout";
+import type { SendEmailInput, SendEmailResult } from "@/platform/infra/email/send";
+import type { EmailDecision, EmailOptions } from "@/platform/infra/email/layout";
 import { buildWorkspaceApproveUrl, type WorkspaceApproveLinkClaims } from "@/lib/approve-link";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { nextChaseStep, type Decision, type OwnerDecision } from "./contracts";

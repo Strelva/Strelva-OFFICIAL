@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/cron-auth", () => ({ requireCronRequest: mocks.auth }));
 vi.mock("@/lib/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedWindowedAsync: vi.fn(async () => false) }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: vi.fn(async () => false) }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mocks.workspaceReleased }));
 vi.mock("@/platform/workspaces", () => ({ listWorkspaces: mocks.workspaces }));
 vi.mock("@/platform/needs-you/server", () => ({

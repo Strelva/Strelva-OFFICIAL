@@ -5,9 +5,9 @@ import type {
   ResponsibilityEvaluation,
   ReceiptActor,
 } from "./contracts";
-import type { EmailOptions } from "@/lib/email/layout";
+import type { EmailOptions } from "@/platform/infra/email/layout";
 import type { InquiryDeliveryProviderOutcome } from "./message-outcome";
-import type { EmailAudience } from "@/lib/email/send";
+import type { EmailAudience } from "@/platform/infra/email/send";
 
 export type InquiryDeliveryAction = "reply" | "send_message" | "owner_notification" | "schedule_follow_up";
 export type InquiryDeliveryMode = "off" | "approval" | "supervised" | "auto";

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getVersions, logActivity, logAuditEvent, restoreVersionToDraft } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { getActorContext, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
+import { getActorContext, requireTenantAccess, requireTenantPermission } from "@/platform/infra/auth";
 import { getTemplateManifestForTenant } from "@/lib/template-manifests";
 import type { ContentSection } from "@/lib/types";
 import { requireActiveSubscription } from "@/lib/subscription";

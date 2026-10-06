@@ -53,7 +53,7 @@ export async function liveMakeRealPorts(): Promise<LiveMakeRealPorts> {
     import("@/platform/make-real/live-server"),
     import("@/platform/needs-you/systems-sources"),
     import("@/platform/needs-you/repository"),
-    import("@/lib/email/send"),
+    import("@/platform/infra/email/send"),
   ]);
   return {
     isStored: isStoredPossibilityId,

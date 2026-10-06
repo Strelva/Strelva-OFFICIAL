@@ -3,13 +3,13 @@ import { requireCronRequest } from "@/lib/cron-auth";
 import { recordHeartbeat } from "@/lib/heartbeat";
 import { listTenantDomainClaims,refreshDomainClaim } from "@/lib/domains";
 import { getActiveTenants } from "@/lib/tenants";
-import { sendEmailWithReceipt } from "@/lib/email/send";
+import { sendEmailWithReceipt } from "@/platform/infra/email/send";
 import { resolveLeadNotifyRecipients } from "@/lib/delivery-email";
 import { OPERATOR_URL } from "@/lib/brand";
 import { websiteRebuildReleaseEnabledForTenant, websiteRebuildReleaseMayBeOn } from "@/products/websites/index";
 import { OPERATOR_VIEWER } from "@/platform/release-flags/viewer";
 import { verifyHostedDomains } from "@/products/websites/index";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import { createHash } from "node:crypto";
 export const maxDuration=300;
 /**

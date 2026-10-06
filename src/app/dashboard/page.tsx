@@ -3,7 +3,7 @@ import { ArrowRight, ExternalLink, FileText, Inbox, Mail, MessageCircle, MousePo
 import { StatTile } from "@/components/dashboard/StatTile";
 import { buildVerdict } from "@/lib/weekly-verdict";
 import { requireDashboardView } from "@/lib/dashboard-auth";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { getClickCounts, getActivity, getDailyMetrics } from "@/lib/storage";
 import { getNeedsYouData } from "@/lib/needs-you";
 import { QueuePage } from "@/components/dashboard/QueuePage";

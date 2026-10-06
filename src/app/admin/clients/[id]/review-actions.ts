@@ -11,7 +11,7 @@
  * `event-actions.ts`. Idempotent: skips a review that already has a pending draft.
  */
 
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { getReviews } from "@/lib/reviews";
 import { getTenantConfig } from "@/lib/tenants";
 import { draftReviewReply, storeRecentReply } from "@/lib/review-replies";

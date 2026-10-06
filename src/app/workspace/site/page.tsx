@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/db/server-client";
-import { hasTenantAccess, isSuperAdmin } from "@/lib/auth";
+import { getSessionUser } from "@/platform/infra/db/server-client";
+import { hasTenantAccess, isSuperAdmin } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";

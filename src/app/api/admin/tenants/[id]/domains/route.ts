@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin, getActorContext } from "@/lib/auth";
+import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { logAuditEvent } from "@/lib/storage";
 import { getTenantConfig } from "@/lib/tenants";
 import {

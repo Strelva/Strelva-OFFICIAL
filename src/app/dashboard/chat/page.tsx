@@ -1,8 +1,8 @@
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { redirectIfDashboardPageMoved } from "@/platform/owner-entry/server";
 import { requireDashboardView } from "@/lib/dashboard-auth";
-import { getActorContext } from "@/lib/auth";
-import { isDevAccessBypassEnabled } from "@/lib/dev-access";
+import { getActorContext } from "@/platform/infra/auth";
+import { isDevAccessBypassEnabled } from "@/platform/infra/dev-access";
 import { getNeedsYouData } from "@/lib/needs-you";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { ChatPageClient } from "./ChatPageClient";

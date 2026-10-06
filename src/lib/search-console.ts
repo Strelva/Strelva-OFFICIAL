@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import type { SearchData, TenantConfig } from "./types";
 import type { AutomationPolicy } from "./tenant/models";
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 
 export interface ServiceAccountKey {
   client_email: string;

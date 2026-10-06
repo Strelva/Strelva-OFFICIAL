@@ -10,9 +10,9 @@
  * send timestamp, member = JSON record). Mirrors the briefs:{tenant} pattern.
  */
 
-import { getRedis } from "../redis";
-import { recordMailSendPg } from "../db/repositories";
-import { dualWritePgEnabled, mailToInsert } from "../db/dual-write";
+import { getRedis } from "@/platform/infra/redis";
+import { recordMailSendPg } from "@/platform/infra/db/repositories";
+import { dualWritePgEnabled, mailToInsert } from "@/platform/infra/db/dual-write";
 
 export type MailKind = "weekly_report" | "monthly_report" | "daily_summary" | "invite" | "other";
 

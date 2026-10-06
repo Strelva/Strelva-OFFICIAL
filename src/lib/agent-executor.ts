@@ -1,7 +1,7 @@
 import { tool, stepCountIs } from "ai";
 import { z } from "zod";
 import { getSectionTimestamps } from "@/lib/storage";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import { getTemplateManifestForTenant } from "@/lib/template-manifests";
 import { getTenantConfig } from "@/lib/tenants";
 import { assertAgentToolCatalog, capabilityPromptFragment } from "@/lib/capabilities";

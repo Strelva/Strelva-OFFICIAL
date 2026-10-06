@@ -2,9 +2,9 @@ import {
   buildDeliveryStatusEmailHtml,
   buildDeliveryStatusEmailText,
 } from "@/lib/access-request-delivery";
-import { renderEmailHtml, renderEmailText, type EmailOptions, type EmailRow } from "@/lib/email/layout";
-import { sendEmail } from "@/lib/email/send";
-import { cleanSubjectText } from "@/lib/email/text";
+import { renderEmailHtml, renderEmailText, type EmailOptions, type EmailRow } from "@/platform/infra/email/layout";
+import { sendEmail } from "@/platform/infra/email/send";
+import { cleanSubjectText } from "@/platform/infra/email/text";
 
 /**
  * Log a real client-comms send into the tenant's operator CRM activity timeline

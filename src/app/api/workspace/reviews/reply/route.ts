@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { requireTenantAccess } from "@/lib/auth";
-import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
+import { requireTenantAccess } from "@/platform/infra/auth";
+import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { submitOwnerReviewReply } from "@/lib/reviews/owner-reply";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";

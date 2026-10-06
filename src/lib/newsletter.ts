@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { getSubscribers, getContent } from "./storage";
 import { sanitizeEmailSubjectText } from "./invite-email";
 import { sanitizeEmailHtml, htmlToPlainText } from "./email-html";
-import { CLIENT_MAIL_DOMAIN, sendBatchWithReceipt } from "./email/send";
+import { CLIENT_MAIL_DOMAIN, sendBatchWithReceipt } from "@/platform/infra/email/send";
 import { buildUnsubscribeUrl } from "./newsletter-unsubscribe";
 
 export interface SendNewsletterInput {

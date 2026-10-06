@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import {
   MAX_PERIOD_SPENDING_CAP_CENTS,
   MAX_WORK_ALLOWANCE_UNITS,

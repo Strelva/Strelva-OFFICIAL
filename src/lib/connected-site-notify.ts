@@ -6,8 +6,8 @@
  * path and only while client email is enabled. The inquiry is already stored
  * before this runs; a failure here never loses it.
  */
-import { emailSendingPaused } from "@/lib/email-enabled";
-import { sendEmail } from "@/lib/email/send";
+import { emailSendingPaused } from "@/platform/infra/email/enabled";
+import { sendEmail } from "@/platform/infra/email/send";
 import { resolveOwnerRecipient } from "@/platform/business-record/service";
 import type { ConnectedInquiry, ResolvedConnectedSite } from "@/products/connected-sites/contracts";
 

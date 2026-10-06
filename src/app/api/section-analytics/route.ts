@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireTenantAccess } from "@/lib/auth";
+import { requireTenantAccess } from "@/platform/infra/auth";
 import { requireTenantFromHeaders } from "@/lib/tenant";
 import { getClickCountsByPrefix } from "@/lib/storage";
 

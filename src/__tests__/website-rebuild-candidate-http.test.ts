@@ -4,7 +4,7 @@ import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import { siteDocumentSchema,siteDocumentHash } from "@/products/websites/site-document";
 import { websiteRebuildSchema } from "@/products/websites/rebuild-contracts";
 const deps=vi.hoisted(()=>({read:vi.fn(),receipts:vi.fn(),assets:vi.fn(),work:vi.fn()}));
-vi.mock("@/lib/db/server-client",()=>({getSessionUser:()=>({id:"11111111-1111-4111-8111-111111111111",email:"owner@example.test",email_confirmed_at:"2026-10-01"})}));
+vi.mock("@/platform/infra/db/server-client",()=>({getSessionUser:()=>({id:"11111111-1111-4111-8111-111111111111",email:"owner@example.test",email_confirmed_at:"2026-10-01"})}));
 vi.mock("@/platform/workspace-release",()=>({workspaceReleaseEnabled:()=>true}));
 vi.mock("@/platform/workspaces/repository",()=>({getWork:deps.work}));
 vi.mock("@/products/websites/site-media",()=>({downloadWebsiteExportAssets:deps.assets}));

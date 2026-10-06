@@ -14,7 +14,7 @@
  */
 
 import { generateModelText } from "@/platform/infra/model-calls";
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import type { TenantConfig } from "./types";
 import { analyzeReview, TOPIC_LABELS } from "./reviews/sentiment";
 import { getReplyVoice, defaultReplyVoice, buildVoicePromptSection } from "./reviews/reply-voice";

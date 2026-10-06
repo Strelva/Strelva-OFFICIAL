@@ -18,9 +18,9 @@
  * Redis keys keep their frozen names and stay as the cache.
  */
 import { createHash } from "node:crypto";
-import { getSupabase } from "@/lib/db/client";
-import { dualWritePgEnabled } from "@/lib/db/dual-write";
-import { getRedis } from "@/lib/redis";
+import { getSupabase } from "@/platform/infra/db/client";
+import { dualWritePgEnabled } from "@/platform/infra/db/dual-write";
+import { getRedis } from "@/platform/infra/redis";
 
 export const CLIENT_RECORD_STORES = [
   "spam_held",

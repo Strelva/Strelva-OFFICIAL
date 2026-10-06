@@ -7,7 +7,7 @@
  * live scan. `reb:` persistent-data prefix per AGENTS.md.
  */
 
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import type { TenantDomainHealth } from "./domain-monitor";
 
 const LATEST_KEY = "reb:domain-monitor:latest";

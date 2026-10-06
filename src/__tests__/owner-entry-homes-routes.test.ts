@@ -14,9 +14,9 @@ vi.mock("@/platform/workspaces/http", async (importOriginal) => ({
   workspaceHttpActor: actor,
 }));
 vi.mock("@/platform/owner-entry/linked-sites", () => ({ ownerEntryHomesOpen: homesOpen, readLinkedSite: linkedSite }));
-vi.mock("@/lib/auth", () => ({ requireTenantAccess: tenantAccess }));
+vi.mock("@/platform/infra/auth", () => ({ requireTenantAccess: tenantAccess }));
 vi.mock("@/lib/reviews/owner-reply", () => ({ submitOwnerReviewReply: submit }));
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedWindowedAsync: limited }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: limited }));
 vi.mock("@/platform/owner-entry/site-summary", () => ({ readSiteSummaries: summaries }));
 
 import { POST as reply } from "@/app/api/workspace/reviews/reply/route";

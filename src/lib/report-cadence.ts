@@ -22,7 +22,7 @@
  * Null-safe: no Postgres and no Redis ⇒ default monthly + no last-sent memory.
  */
 
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import { callRedisMoveRpc, postgresNotInPlay } from "./storage/redis-move";
 
 export type ReportCadence = "weekly" | "monthly";

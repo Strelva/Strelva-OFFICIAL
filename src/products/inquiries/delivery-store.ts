@@ -8,7 +8,7 @@
 
 import { createHash, randomUUID } from "node:crypto";
 
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import type { InquiryTimelineEventType } from "@/products/inquiries/contracts";
 
 import type {

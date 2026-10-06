@@ -14,7 +14,7 @@
  * read flag (STRELVA_CLIENT_RECORDS_READ) only takes effect after 7 days in a
  * row. Needs 20261007181000_tenant_client_records.sql applied.
  */
-import { getSupabase } from "../src/lib/db/client";
+import { getSupabase } from "../src/platform/infra/db/client";
 import { getAllTenants } from "../src/lib/tenants";
 import { backfillClientRecords, checkClientRecordParity } from "../src/platform/client-records/move";
 import { parseMoveArgs, runClientRecordMove } from "./client-records-move-plan";

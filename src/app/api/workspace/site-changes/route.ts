@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getTenantConfig } from "@/lib/tenants";
-import { isRateLimitedAsync } from "@/lib/rate-limit";
+import { isRateLimitedAsync } from "@/platform/infra/rate-limit";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
 import { systemOriginId } from "@/platform/systems/invariants";

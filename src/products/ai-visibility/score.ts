@@ -228,7 +228,7 @@ async function citationProbe(input: ScoreInput): Promise<CitationProbe> {
     };
   }
   try {
-    const { getGoogleModel } = await import("@/lib/ai-models");
+    const { getGoogleModel } = await import("@/platform/infra/ai-models");
     const { generateModelText } = await import("@/platform/infra/model-calls");
     const where = input.location ? ` in ${input.location}` : "";
     const what = input.category ?? "businesses";

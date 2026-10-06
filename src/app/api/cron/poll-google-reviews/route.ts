@@ -24,7 +24,7 @@ import {
 import { alert } from "@/lib/monitoring";
 import { addEvent } from "@/lib/events";
 import { addReview } from "@/lib/reviews";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import { draftReviewReply, storeRecentReply } from "@/lib/review-replies";
 import { getReplyVoice, defaultReplyVoice } from "@/lib/reviews/reply-voice";
 import { AUTO_POST_DELAY_MS, autoReplyAllowed } from "@/lib/reviews/auto-reply";

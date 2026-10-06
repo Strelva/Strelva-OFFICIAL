@@ -8,7 +8,7 @@ import { scheduleSchema } from "@/products/scheduling/contracts";
 import { aiVisibilityAssessmentPayloadSchema } from "@/products/ai-visibility/client";
 import { websiteDocumentStore } from "./document-store";
 import { readWebsiteRebuild } from "./rebuild-service";
-import { sendEmailWithReceipt } from "@/lib/email/send";
+import { sendEmailWithReceipt } from "@/platform/infra/email/send";
 import { getTenantConfig } from "@/lib/tenants";
 import { OPERATOR_URL, ROOT_DOMAIN } from "@/lib/brand";
 import { bindToCurrentTenant } from "./hosted-routing";
@@ -109,7 +109,7 @@ async function sendCronWebsiteMonthlyReport(actor:WorkspaceActor,workId:string,m
 export async function runWebsiteMonthlyReports(month:string){
  const { websiteRebuildReleaseMayBeOn, websiteRebuildReleaseEnabledForWorkspace }=await import("./rebuild-release");
  if(!websiteRebuildReleaseMayBeOn())return{tenants:[] as string[],sent:0,suppressed:0,errors:[] as string[]};
- const { getSupabase }=await import("@/lib/db/client");
+ const { getSupabase }=await import("@/platform/infra/db/client");
  const { WorkspaceStoreError }=await import("@/platform/workspaces/types");
  const db=getSupabase();if(!db)throw new WorkspaceStoreError("Website report storage is unavailable.");
  // Owners get the report only where the rebuild is on for their business (per row under `workspace`).

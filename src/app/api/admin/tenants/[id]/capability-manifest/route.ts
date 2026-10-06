@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin, getActorContext } from "@/lib/auth";
+import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { getTenantConfig, updateTenant } from "@/lib/tenants";
-import { isSafeFetchUrl } from "@/lib/safe-fetch";
+import { isSafeFetchUrl } from "@/platform/infra/safe-fetch";
 import { logAuditEvent } from "@/lib/storage";
 
 /**

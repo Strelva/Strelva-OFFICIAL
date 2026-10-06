@@ -10,7 +10,7 @@ const redis = makeRedisMock();
 const originalSet = redis.set;
 let redisAvailable = true;
 const mocks = vi.hoisted(() => ({ tenant: vi.fn(), sendNewLeadEmail: vi.fn(), alertOnce: vi.fn() }));
-vi.mock("@/lib/redis", () => ({ getRedis: () => (redisAvailable ? redis : null) }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => (redisAvailable ? redis : null) }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.tenant, getAllTenants: async () => [{ id: "t1" }, { id: "t2" }] }));
 vi.mock("@/lib/delivery-email", () => ({ sendNewLeadEmail: mocks.sendNewLeadEmail }));
 vi.mock("@/lib/monitoring", () => ({ alertOnce: mocks.alertOnce }));

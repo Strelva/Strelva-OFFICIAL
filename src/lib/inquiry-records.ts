@@ -15,7 +15,7 @@
  * database refuses.
  */
 import { createHash } from "node:crypto";
-import { dualWritePgEnabled } from "./db/dual-write";
+import { dualWritePgEnabled } from "@/platform/infra/db/dual-write";
 import { leadMirrorDb, type LeadMirrorDb } from "./lead-mirror";
 import { WorkspaceAccessError, type WorkspaceActor } from "@/platform/workspaces/types";
 

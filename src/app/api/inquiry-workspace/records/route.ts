@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { requireTenantAccess, verifyAuth } from "@/lib/auth";
+import { requireTenantAccess, verifyAuth } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import { getLeads } from "@/lib/leads";
 import { getInquiryRepository, inquiryReleaseMayBeOn, inquiryReleasedForCurrentUser } from "@/products/inquiries/server";
 import { resolveInquiryWorkspace } from "@/products/inquiries/server";

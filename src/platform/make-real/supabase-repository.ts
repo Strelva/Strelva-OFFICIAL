@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import {
   WORKSPACE_EXIT_STOPPED_MESSAGE,
   WorkspaceAccessError,

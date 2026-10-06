@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAvailableSlots, getContent } from "@/lib/storage";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 
 export async function GET(request: Request) {
   if (await isRateLimitedAsync(rateLimitKey(request, "booking-availability"), 60)) {

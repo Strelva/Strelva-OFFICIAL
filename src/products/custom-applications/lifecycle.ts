@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { boundedStore, type BoundedStore } from "@/platform/bounded-work/repository";
 import { createSystemWork, requireSystemMaker } from "@/platform/bounded-work/make-systems";
 import {

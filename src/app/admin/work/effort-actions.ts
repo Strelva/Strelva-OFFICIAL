@@ -7,7 +7,7 @@
  * rechecks the active super_admins row before writing.
  */
 import { revalidatePath } from "next/cache";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
 import {

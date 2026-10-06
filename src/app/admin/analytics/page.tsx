@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 import {
   getAnalyticsConfig,

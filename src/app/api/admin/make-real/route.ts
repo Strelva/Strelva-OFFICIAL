@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getCurrentUserEmail, isSuperAdmin } from "@/lib/auth";
+import { getCurrentUserEmail, isSuperAdmin } from "@/platform/infra/auth";
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
 import { customerActivationView, describeActivation } from "@/platform/make-real/view";
 

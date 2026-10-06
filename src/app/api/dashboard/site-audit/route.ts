@@ -12,7 +12,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantPrimaryDomain } from "@/lib/tenant-urls";
@@ -20,7 +20,7 @@ import { scanTenant } from "@/lib/scan";
 import { getScanSummary } from "@/lib/scan-store";
 import { topFixes } from "@/lib/audit/impact";
 import type { TenantConfig } from "@/lib/types";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 
 const CACHE_TTL_SECONDS = 60 * 60 * 24; // 24h
 

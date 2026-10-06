@@ -1,13 +1,13 @@
 import {
   applyMiddlewareSupabaseResponse,
   createMiddlewareSupabase,
-} from "@/lib/db/middleware-client";
-import { isSupabaseAuthConfigured } from "@/lib/db/server-client";
+} from "@/platform/infra/db/middleware-client";
+import { isSupabaseAuthConfigured } from "@/platform/infra/db/server-client";
 import { validateCronRequest } from "@/lib/cron-auth";
 import { WEBSITE_PREVIEW_CSP, isWebsiteCandidatePreviewRequest } from "@/lib/website-preview-policy";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { getDevAccessTenant, isDevAccessBypassEnabled } from "./lib/dev-access";
+import { getDevAccessTenant, isDevAccessBypassEnabled } from "@/platform/infra/dev-access";
 import { MARKETING_HOSTS, isMarketingHost } from "./lib/marketing-hosts";
 import { parseTenantHost } from "./lib/tenant-host";
 import { CONTROL_PLANE_URL } from "./lib/brand";

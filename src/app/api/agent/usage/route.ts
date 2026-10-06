@@ -1,5 +1,5 @@
-import { requireTenantAccess } from "@/lib/auth";
-import { getRateLimitStatusAsync } from "@/lib/rate-limit";
+import { requireTenantAccess } from "@/platform/infra/auth";
+import { getRateLimitStatusAsync } from "@/platform/infra/rate-limit";
 import { getTenantFromHeaders } from "@/lib/tenant";
 
 const AGENT_REQUEST_LIMIT_PER_MINUTE = 30;

@@ -10,7 +10,7 @@
  */
 import { NextResponse } from "next/server";
 import { getTenantConfig } from "@/lib/tenants";
-import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { readOptionalJsonObject } from "@/lib/request-body";
 import { isTenantId } from "@/lib/scaffold-contracts";
 import { captureLead } from "@/lib/leads";

@@ -12,10 +12,10 @@ const mockUnsubscribe = vi.hoisted(() => vi.fn());
 vi.mock("resend", () => ({ Resend: class { batch = { send: batchSend }; emails = { send: vi.fn() }; } }));
 vi.mock("@/lib/storage", () => ({ getSubscribers: mockGetSubscribers, getContent: mockGetContent }));
 vi.mock("@/lib/storage/newsletter-store", () => ({ unsubscribeSubscriber: mockUnsubscribe }));
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedAsync: vi.fn(async () => false), rateLimitKey: () => "k" }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: vi.fn(async () => false), rateLimitKey: () => "k" }));
 
 import { sendNewsletter } from "@/lib/newsletter";
-import { sendBatchWithReceipt } from "@/lib/email/send";
+import { sendBatchWithReceipt } from "@/platform/infra/email/send";
 import { signUnsubscribeToken, verifyUnsubscribeToken } from "@/lib/newsletter-unsubscribe";
 import { GET, POST } from "@/app/api/newsletter/unsubscribe/route";
 

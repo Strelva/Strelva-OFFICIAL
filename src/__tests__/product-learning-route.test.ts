@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const session = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: session }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: session }));
 import { GET, POST } from "@/app/api/product-learning/route";
 
 function request(body: unknown, headers: Record<string, string> = {}) { return new Request("http://localhost/api/product-learning", { method: "POST", headers: { "Content-Type": "application/json", origin: "http://localhost", ...headers }, body: JSON.stringify(body) }); }

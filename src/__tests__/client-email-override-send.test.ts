@@ -13,11 +13,11 @@ vi.mock("resend", () => ({
 }));
 
 const mockGetClientEmailOverride = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/client-email-override", () => ({
+vi.mock("@/platform/infra/email/client-override", () => ({
   getClientEmailOverride: mockGetClientEmailOverride,
 }));
 
-import { sendEmail } from "@/lib/email/send";
+import { sendEmail } from "@/platform/infra/email/send";
 
 const ENV_KEYS = [
   "EMAIL_SENDING_ENABLED",

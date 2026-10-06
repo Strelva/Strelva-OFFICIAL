@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
+import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
 import { releaseFlagEnvMode } from "@/platform/release-flags/resolve";
@@ -8,7 +8,7 @@ import { readWorkspaceExit } from "@/platform/workspace-exit";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { listManagedPresenceWork } from "@/products/managed-presence/server";
 import { makeRealForWorkspace } from "@/experience/systems/server";
-import { sendEmailWithReceipt } from "@/lib/email/send";
+import { sendEmailWithReceipt } from "@/platform/infra/email/send";
 import { needsYouAppOrigin, needsYouReleaseEnabled, needsYouStore } from "@/platform/needs-you/server";
 import { makeRealThroughNeedsYou } from "@/platform/needs-you/systems-sources";
 import { liveMakeRealPorts, makeRealPath } from "@/experience/systems/live-make-real";

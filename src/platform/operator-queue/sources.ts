@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { getRedis } from "@/lib/redis";
-import { getSupabase } from "@/lib/db/client";
+import { getRedis } from "@/platform/infra/redis";
+import { getSupabase } from "@/platform/infra/db/client";
 import { getEventsRaw } from "@/lib/events";
 import { listDrafts } from "@/lib/storage";
 import { listPendingDigests } from "@/lib/maintenance-digest";

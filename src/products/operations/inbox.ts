@@ -1,4 +1,4 @@
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { responsibilitySchema, type Responsibility } from "@/platform/work-execution/engine";
 import { WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { activationExceptions } from "./activation-exceptions";

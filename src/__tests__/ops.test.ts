@@ -8,7 +8,7 @@ const mockGetRecentFailures = vi.hoisted(() => vi.fn());
 const mockGetEvents = vi.hoisted(() => vi.fn());
 const mockGetQueueCount = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/redis", () => ({ getRedis: mockGetRedis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: mockGetRedis }));
 vi.mock("@/lib/tenants", () => ({ getAllTenants: mockGetAllTenants, getTenantConfig: mockGetTenantConfig }));
 vi.mock("@/lib/tenant-urls", () => ({ getTenantPrimaryDomain: mockGetTenantPrimaryDomain }));
 vi.mock("@/lib/revalidate-client", () => ({ getRecentFailures: mockGetRecentFailures }));

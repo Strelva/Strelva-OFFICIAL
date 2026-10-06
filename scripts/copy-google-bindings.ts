@@ -13,11 +13,11 @@
  * already exists. It writes nothing anywhere and prints counts, never tokens.
  * Logic and guards: scripts/google-binding-copy.ts.
  */
-import { getSupabase } from "../src/lib/db/client";
+import { getSupabase } from "../src/platform/infra/db/client";
 import { getConnection } from "../src/lib/connections";
-import { getRedis } from "../src/lib/redis";
+import { getRedis } from "../src/platform/infra/redis";
 import { refreshGoogleTokens } from "../src/lib/google-token";
-import { decryptSecret } from "../src/lib/crypto/secrets";
+import { decryptSecret } from "../src/platform/infra/crypto/secrets";
 import {
   bindingEncryptionReady,
   readBindingTarget,

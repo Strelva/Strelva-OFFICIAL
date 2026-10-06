@@ -3,9 +3,9 @@
  * functions, the tenant config and owner-recipient rule for the business, the
  * store-served slot engine for new times, and the one email path.
  */
-import { decryptSecret } from "@/lib/crypto/secrets";
-import { getSupabase } from "@/lib/db/client";
-import { sendEmailWithReceipt } from "@/lib/email/send";
+import { decryptSecret } from "@/platform/infra/crypto/secrets";
+import { getSupabase } from "@/platform/infra/db/client";
+import { sendEmailWithReceipt } from "@/platform/infra/email/send";
 import { ownerNoticeEmail } from "@/lib/owner-recipient";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantPublicUrl } from "@/lib/tenant-urls";

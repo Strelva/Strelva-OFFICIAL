@@ -16,7 +16,7 @@ import type { TenantConfig } from "../lib/types";
 const receipts: Record<string, unknown>[] = [];
 let tenants: TenantConfig[] = [];
 
-vi.mock("../lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: vi.fn(() => ({ get: vi.fn(async () => ({ accountId: "accounts/1", locationId: "locations/2" })), set: vi.fn(), del: vi.fn(), hset: vi.fn(), hdel: vi.fn() })),
 }));
 vi.mock("../lib/connections", () => ({

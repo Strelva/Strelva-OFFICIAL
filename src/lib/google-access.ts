@@ -21,9 +21,9 @@
  */
 
 import { getConnection, saveConnection } from "./connections";
-import { decryptSecret } from "./crypto/secrets";
+import { decryptSecret } from "@/platform/infra/crypto/secrets";
 import { refreshGoogleTokens } from "./google-token";
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import type { Connection } from "./types";
 import {
   googleBindingsEnabled,

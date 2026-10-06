@@ -8,7 +8,7 @@
  */
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { workspaceHttpActor } from "@/platform/workspaces/http";
 import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";

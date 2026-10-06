@@ -33,7 +33,7 @@ describe("email kill-switch (EMAIL_SENDING_ENABLED)", () => {
   });
 
   it("reports paused when the flag is not exactly 'true'", async () => {
-    const { emailSendingEnabled, emailSendingPaused } = await import("@/lib/email-enabled");
+    const { emailSendingEnabled, emailSendingPaused } = await import("@/platform/infra/email/enabled");
     for (const v of [undefined, "", "false", "1", "yes", "TRUE"]) {
       if (v === undefined) delete process.env.EMAIL_SENDING_ENABLED;
       else process.env.EMAIL_SENDING_ENABLED = v;
@@ -91,7 +91,7 @@ describe("operator email switch (OPERATOR_EMAILS_ENABLED)", () => {
   });
 
   it("operatorEmailsEnabled defaults TRUE and only OPERATOR_EMAILS_ENABLED='false' disables it", async () => {
-    const { operatorEmailsEnabled, operatorEmailsPaused } = await import("@/lib/email-enabled");
+    const { operatorEmailsEnabled, operatorEmailsPaused } = await import("@/platform/infra/email/enabled");
     for (const v of [undefined, "", "true", "TRUE", "1", "no"]) {
       if (v === undefined) delete process.env.OPERATOR_EMAILS_ENABLED;
       else process.env.OPERATOR_EMAILS_ENABLED = v;
@@ -209,7 +209,7 @@ describe("prospect email switch (PROSPECT_EMAILS_ENABLED)", () => {
   });
 
   it("prospectEmailsEnabled defaults TRUE and only PROSPECT_EMAILS_ENABLED='false' disables it", async () => {
-    const { prospectEmailsEnabled, prospectEmailsPaused } = await import("@/lib/email-enabled");
+    const { prospectEmailsEnabled, prospectEmailsPaused } = await import("@/platform/infra/email/enabled");
     for (const v of [undefined, "", "true", "TRUE", "1", "no"]) {
       if (v === undefined) delete process.env.PROSPECT_EMAILS_ENABLED;
       else process.env.PROSPECT_EMAILS_ENABLED = v;

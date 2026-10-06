@@ -7,10 +7,10 @@ const deps = vi.hoisted(() => ({
   limited: vi.fn(),
 }));
 
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: async () => deps.user }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: async () => deps.user }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedWindowedAsync: deps.limited }));
-vi.mock("@/lib/db/repositories", () => ({ isSuperAdminUser: async () => false }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: deps.limited }));
+vi.mock("@/platform/infra/db/repositories", () => ({ isSuperAdminUser: async () => false }));
 vi.mock("@/platform/workspaces", () => ({ listWorkspaces: deps.workspaces }));
 vi.mock("@/experience/systems/website-detail-server", () => ({ readWebsiteSystemDetail: deps.detail }));
 

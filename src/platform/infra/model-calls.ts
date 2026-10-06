@@ -19,7 +19,7 @@
  * A failed log write never fails the call (see model-call-log.ts).
  */
 import { generateObject, generateText, streamText } from "ai";
-import { getFallbackModel, getPrimaryModel, isTransientModelError, type ModelConfig } from "@/lib/ai-models";
+import { getFallbackModel, getPrimaryModel, isTransientModelError, type ModelConfig } from "@/platform/infra/ai-models";
 import {
   postgresModelCallSink,
   recordMissingModelCallRows,
@@ -30,7 +30,7 @@ import {
 } from "./model-call-log";
 import { estimateModelCost, UNKNOWN_COST, type ModelCost } from "./model-prices";
 
-export type { ModelConfig } from "@/lib/ai-models";
+export type { ModelConfig } from "@/platform/infra/ai-models";
 export type { ModelCallActorKind, ModelCallPurpose, ModelCallRow, ModelCallSink } from "./model-call-log";
 export { MODEL_CALL_PURPOSES, createMemoryModelCallSink } from "./model-call-log";
 

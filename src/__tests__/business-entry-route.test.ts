@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET, POST } from "@/app/api/workspace/businesses/route";
 const mocks = vi.hoisted(() => ({ enabled: true, actor: vi.fn(), list: vi.fn(), enter: vi.fn(), limit: vi.fn() }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => mocks.enabled }));
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.limit }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.limit }));
 vi.mock("@/platform/workspaces", () => ({ listWorkspaces: mocks.list }));
 vi.mock("@/platform/workspaces/business-entry", () => ({ enterCustomerBusiness: mocks.enter }));
 vi.mock("@/platform/workspaces/http", async original => ({ ...await original<typeof import("@/platform/workspaces/http")>(), workspaceHttpActor: mocks.actor }));

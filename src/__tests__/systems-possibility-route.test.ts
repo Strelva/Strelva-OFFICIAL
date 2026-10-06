@@ -9,7 +9,7 @@ const deps = vi.hoisted(() => ({
   systemsOn: vi.fn(async () => true),
 }));
 
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: async () => deps.user }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: async () => deps.user }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
 vi.mock("@/platform/systems-release", () => ({ systemsReleaseEnabledForWorkspace: deps.systemsOn }));
 vi.mock("@/platform/workspaces", () => ({ listWorkspaces: deps.workspaces }));

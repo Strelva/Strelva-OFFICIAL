@@ -10,9 +10,9 @@ const deps = vi.hoisted(() => ({
   throughNeedsYou: vi.fn(),
 }));
 
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: async () => deps.user }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: async () => deps.user }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedWindowedAsync: deps.limited }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: deps.limited }));
 vi.mock("@/platform/workspaces", () => ({ listWorkspaces: deps.workspaces, listWork: deps.work }));
 vi.mock("@/platform/workspace-exit", () => ({ readWorkspaceExit: deps.exit }));
 vi.mock("@/products/managed-presence/server", () => ({ listManagedPresenceWork: async () => ({ managedWork: [{ id: "mooney-firm", domain: "www.attymooney.com" }] }) }));

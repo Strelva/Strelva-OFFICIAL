@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { getClickCounts, getActivity, listDrafts, getDailyMetrics } from "@/lib/storage";
 import { Sparkline } from "@/components/dashboard/Sparkline";
@@ -23,8 +23,8 @@ import { getTenantPublicUrl, getTenantDashboardFallbackUrl } from "@/lib/tenant-
 import { getReportCadence } from "@/lib/report-cadence";
 import { getReplyVoice } from "@/lib/reviews/reply-voice";
 import { getContentAutonomy } from "@/lib/content-autonomy";
-import { getClientEmailOverride } from "@/lib/client-email-override";
-import { emailSendingPaused } from "@/lib/email-enabled";
+import { getClientEmailOverride } from "@/platform/infra/email/client-override";
+import { emailSendingPaused } from "@/platform/infra/email/enabled";
 import { TenantEditor } from "./TenantEditor";
 import { OperatorControlsPanel } from "./OperatorControlsPanel";
 import { ReleaseFlagsPanel } from "./ReleaseFlagsPanel";

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess, requireTenantPermission } from "@/lib/auth";
+import { requireTenantAccess, requireTenantPermission } from "@/platform/infra/auth";
 import { getContentAutonomy, saveContentAutonomySetting } from "@/lib/content-autonomy";
 import { tenantPolicyWriter } from "@/lib/tenant-policy-writer";
 import { TenantSettingRefusedError } from "@/platform/needs-you/tenant-settings";

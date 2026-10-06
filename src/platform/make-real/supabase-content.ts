@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { canonicalJson, sha256 } from "@/platform/business-record/tenant-import";
 import { mapPossibilityError, type PossibilitiesDb } from "@/platform/possibilities/supabase-repository";
 import { WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";

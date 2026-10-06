@@ -7,7 +7,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const rpc = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => ({ rpc }) }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc }) }));
 
 import { parseServiceSession, recordServiceAction, setServiceActorDb, startServiceSession, type ServiceSession } from "@/platform/needs-you/service-actor";
 import { activationRunner, listDueActivations } from "@/platform/make-real/live-server";

@@ -2,25 +2,25 @@ import { promises as fs } from "fs";
 import path from "path";
 import type { DomainClaim, TenantConfig, TemplateId, TenantFeature, IntegrationProvider, TenantDeliveryModel } from "./types";
 import { ALL_TENANT_FEATURES } from "./types";
-import { getRedis } from "./redis";
-import { decryptSecret, encryptSecret } from "./crypto/secrets";
-import { assignUserToTenant, findUserIdByEmail } from "./auth";
-import { isProductionEnv } from "./production-guard";
+import { getRedis } from "@/platform/infra/redis";
+import { decryptSecret, encryptSecret } from "@/platform/infra/crypto/secrets";
+import { assignUserToTenant, findUserIdByEmail } from "@/platform/infra/auth";
+import { isProductionEnv } from "@/platform/infra/production-guard";
 import { buildTenantDomainMap } from "./tenant-domain-map";
-import { tenantsSourceIsPostgres } from "./db/source-flags";
+import { tenantsSourceIsPostgres } from "@/platform/infra/db/source-flags";
 import {
   listAllTenants,
   getTenant as getTenantRow,
   upsertTenant,
-} from "./db/repositories";
+} from "@/platform/infra/db/repositories";
 import {
   domainClaimToRow,
   listAllDomainClaims,
   listDomainClaims,
   replaceDomainClaims,
   rowToDomainClaim,
-} from "./db/domain-claims";
-import type { Row, Insert } from "./db/client";
+} from "@/platform/infra/db/domain-claims";
+import type { Row, Insert } from "@/platform/infra/db/client";
 
 /**
  * Postgres `tenants` row -> TenantConfig (the spine mapper). The Postgres table

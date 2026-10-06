@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
-import { encryptSecret } from "@/lib/crypto/secrets";
+import { getSupabase } from "@/platform/infra/db/client";
+import { encryptSecret } from "@/platform/infra/crypto/secrets";
 import {
   accountBindingWithSecretsSchema,
   bindingTargetSchema,

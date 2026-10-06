@@ -145,7 +145,7 @@ const mocks = vi.hoisted(() => ({
   workspaces: vi.fn(),
   store: { current: null as PolicySettingsStore | null },
 }));
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedWindowedAsync: vi.fn(async () => false) }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: vi.fn(async () => false) }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mocks.workspaceReleased }));
 vi.mock("@/platform/needs-you/release", () => ({ needsYouReleaseEnabled: mocks.released }));
 vi.mock("@/platform/workspaces", () => ({ listWorkspaces: mocks.workspaces }));

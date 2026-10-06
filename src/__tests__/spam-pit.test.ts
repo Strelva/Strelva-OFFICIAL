@@ -3,10 +3,10 @@ import { makeRedisMock } from "./support/redis-mock";
 
 const mockRedis = makeRedisMock();
 const mocks = vi.hoisted(() => ({ tenant: vi.fn(), capture: vi.fn(), legacy: vi.fn() }));
-vi.mock("@/lib/redis", () => ({ getRedis: () => mockRedis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => mockRedis }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.tenant }));
 vi.mock("@/lib/leads", () => ({ captureLead: mocks.capture, recordLead: mocks.legacy }));
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedAsync: async () => false, rateLimitKey: () => "k" }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: async () => false, rateLimitKey: () => "k" }));
 
 import { getSpam, recordSpam } from "@/lib/spam-pit";
 import { GET, POST } from "@/app/api/v1/spam-pit/[tenant]/route";

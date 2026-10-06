@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const boundary = vi.hoisted(() => ({ database: null as unknown }));
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => boundary.database }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => boundary.database }));
 import { createWorkPlan, executeWorkPlanOutput } from "@/products/work-plans/server";
 import { saveNewTracker } from "@/products/tracker/server";
 import { readWorkspaceApplication, changeWorkspaceApplication } from "@/products/applications/server";

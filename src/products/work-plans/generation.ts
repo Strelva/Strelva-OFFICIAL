@@ -1,6 +1,6 @@
 import { Output } from "ai";
-import type { ModelConfig } from "@/lib/ai-models";
-import { getFallbackModel, getPrimaryModel } from "@/lib/ai-models";
+import type { ModelConfig } from "@/platform/infra/ai-models";
+import { getFallbackModel, getPrimaryModel } from "@/platform/infra/ai-models";
 import { generateModelText } from "@/platform/infra/model-calls";
 import { type BudgetExecutionEvidenceContext } from "@/platform/work-economics/runtime";
 import { geminiReceiptFromAiSdkResult, trustedReceiptFromAiSdkResult, trustedProviderReceiptSchema, type TrustedProviderReceipt } from "@/platform/work-economics/provider-evidence";

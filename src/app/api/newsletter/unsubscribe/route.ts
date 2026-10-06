@@ -11,7 +11,7 @@
 import { NextResponse } from "next/server";
 import { verifyUnsubscribeToken } from "@/lib/newsletter-unsubscribe";
 import { unsubscribeSubscriber } from "@/lib/storage/newsletter-store";
-import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 
 export const dynamic = "force-dynamic";
 

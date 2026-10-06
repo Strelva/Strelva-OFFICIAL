@@ -17,7 +17,7 @@ import {
 } from "@/platform/needs-you/tenant-settings";
 
 const redis = new Map<string, unknown>();
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => ({
     get: async (key: string) => redis.get(key) ?? null,
     set: async (key: string, value: unknown) => { redis.set(key, value); return "OK"; },

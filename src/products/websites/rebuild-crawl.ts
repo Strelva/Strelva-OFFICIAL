@@ -4,7 +4,7 @@ import * as https from "node:https";
 import * as cheerio from "cheerio";
 import { computeVisibleText, validateUrlSafety } from "@/lib/audit/checks";
 import { pinnedRequestOptions } from "@/lib/pinned-lookup";
-import { isSafeFetchUrl } from "@/lib/safe-fetch";
+import { isSafeFetchUrl } from "@/platform/infra/safe-fetch";
 import { registrableRebuildDomain } from "./rebuild-domain-key";
 
 export const REBUILD_USER_AGENT = "StrelvaRebuild/1.0";

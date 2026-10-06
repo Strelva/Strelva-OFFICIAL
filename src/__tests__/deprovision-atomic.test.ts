@@ -18,7 +18,7 @@ const db = vi.hoisted(() => ({
 const redis = vi.hoisted(() => ({ del: vi.fn(async () => 1), exists: vi.fn(async () => 0), scan: vi.fn(async () => ["0", []]), get: vi.fn(async () => null), zrange: vi.fn(async () => []) }));
 const vercel = vi.hoisted(() => ({ deleteVercelProject: vi.fn(async () => ({ ok: true })), isVercelConfigured: vi.fn(() => true) }));
 
-vi.mock("@/lib/db/client", () => ({
+vi.mock("@/platform/infra/db/client", () => ({
   getSupabase: () => ({
     from: (table: string) => ({
       select: () => ({ eq: async () => ({ count: db.counts[table] ?? 0, error: null }) }),
@@ -33,7 +33,7 @@ vi.mock("@/lib/db/client", () => ({
     },
   }),
 }));
-vi.mock("@/lib/redis", () => ({ getRedis: () => redis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => redis }));
 vi.mock("@/lib/domains", () => ({ clearTenantDomainClaims: vi.fn(async () => []) }));
 vi.mock("@/lib/vercel", () => vercel);
 

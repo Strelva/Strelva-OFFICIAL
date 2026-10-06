@@ -9,7 +9,7 @@
  * production write without Jacob's yes.
  */
 import { generateSlots, DEFAULT_BOOKING_CONFIG } from "@/lib/booking";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import type { Booking, BookingConfig, DateOverride } from "@/lib/types";
 import {
   hoursOutsideRecord,
