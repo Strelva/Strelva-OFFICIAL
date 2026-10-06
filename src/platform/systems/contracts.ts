@@ -43,7 +43,7 @@ export type SystemLifecycle = z.infer<typeof systemLifecycleSchema>;
  * we never named; these exist so the UI can label the common ones. */
 export const KNOWN_SYSTEM_KINDS = [
   "website", "booking", "inquiry", "proposal", "pricing", "portal", "onboarding",
-  "internal_app", "document", "report", "tracker", "other",
+  "internal_app", "document", "report", "tracker", "listing", "newsletter", "other",
 ] as const;
 export const systemKindSchema = z.string().regex(/^[a-z][a-z0-9_]{0,39}$/, "A lowercase slug");
 export type SystemKind = string;
@@ -57,6 +57,10 @@ export const SYSTEM_ORIGIN_KINDS = [
   "tenant",
   /** inquiry_workspaces.id: a managed tenant's inquiry handling. */
   "inquiry_workspace",
+  /** `{workspace_account_bindings.id}:{google location id}`: a Google listing. */
+  "google_location",
+  /** tenants.stable_id: the newsletter a managed tenant sends to its subscribers. */
+  "tenant_newsletter",
 ] as const;
 export const systemOriginSchema = z.object({
   kind: z.enum(SYSTEM_ORIGIN_KINDS),
