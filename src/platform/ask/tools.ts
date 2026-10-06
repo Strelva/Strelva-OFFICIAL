@@ -297,11 +297,11 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
       }),
     }),
     open_possibility: tool({
-      description: "Open a Possibility: a working alternative beside a System, for asks bigger than an edit (a new flow such as consult booking, a new page set). Nothing live changes; Make real runs later through approvals. Give a short snake_case key and a name for the new System it introduces.",
+      description: "Open a Possibility: a working alternative beside a System, for asks bigger than an edit (a new flow such as consult booking, a new page set). Nothing live changes; Make real runs later through approvals. Give a short kebab-case key (e.g. consult-booking) and a name for the new System it introduces.",
       inputSchema: z.object({
         title: z.string().min(1).max(160),
         intent: z.string().min(1).max(2_000),
-        newSystemKey: z.string().regex(/^[a-z][a-z0-9_]{1,40}$/),
+        newSystemKey: z.string().regex(/^[a-z][a-z0-9-]{1,40}$/),
         newSystemName: z.string().min(1).max(120),
         purpose: z.string().min(1).max(500),
         summary: z.string().min(1).max(500),

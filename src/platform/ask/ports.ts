@@ -137,7 +137,7 @@ export interface AskPossibilityInput {
   systemId: string | null;
   title: string;
   intent: string;
-  /** Short key for the System the Possibility introduces (e.g. consult_booking). */
+  /** Short key for the System the Possibility introduces (e.g. consult-booking). */
   introduces: { key: string; name: string; purpose: string; summary: string } | null;
   /** A change to an existing System: summary only; the candidate is built later. */
   check: string;
@@ -176,7 +176,7 @@ export function createPossibilityAdapter(repository: PossibilityRepository, opti
           purpose: input.introduces.purpose,
           candidate: { summary: input.introduces.summary, content: {} },
         }],
-        checks: [{ id: "owner_tries_it", description: input.check }],
+        checks: [{ id: "owner-tries-it", description: input.check }],
       }, { id: newId(), businessId: input.workspaceId, actorId: actor.userId, at: now() });
       await repository.create(possibility);
       return { id: possibility.id, status: "exploring", durable: options.durable };
