@@ -24,13 +24,14 @@ const failures: string[] = [];
 // ── Rule 1: file-size ceiling ────────────────────────────────────────────────
 const LINE_LIMIT = 1000;
 // Generated + static-content files aren't hand-maintained logic — exempt them.
-const SIZE_EXEMPT = [/^src\/lib\/db\/database\.types\.ts$/, /^src\/content\//];
+// database.types.ts is written by `pnpm db:types` (scripts/generate-database-types.ts);
+// src/lib/db/database.types.ts is now only a re-export of it and needs no exemption.
+const SIZE_EXEMPT = [/^src\/platform\/infra\/db\/database\.types\.ts$/, /^src\/content\//];
 // Grandfathered existing over-limit files (2026-07-14). Do NOT add to this list
 // to dodge the gate — split the file instead. Trim it as files shrink.
 const SIZE_GRANDFATHER = new Set([
   "scripts/production-checklist.ts",
   "src/app/dashboard/settings/page.tsx",
-  "src/app/api/agent/route.ts",
   "src/__tests__/route-handlers.test.ts",
   "src/__tests__/production-readiness-rules.test.ts",
   "src/components/dashboard/ChatPanel.tsx",
