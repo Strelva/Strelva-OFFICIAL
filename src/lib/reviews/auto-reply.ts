@@ -38,6 +38,16 @@ export const AUTO_POST_DELAY_MS = 12 * 60 * 60 * 1000;
  *  each failure emitting a new pending alert event + Slack ping. */
 export const MAX_AUTO_POST_ATTEMPTS = 3;
 
+/** The lowest rating a reply may auto-post for. A 1 or 2 star review's reply
+ * always goes to the owner, even in `auto` mode (publishing spec, section 3). */
+export const AUTO_REPLY_MIN_RATING = 3;
+
+/** Whether `auto` mode may post this review's reply on its own. Unknown
+ * ratings go to the owner. */
+export function autoReplyAllowed(rating: unknown): boolean {
+  return typeof rating === "number" && Number.isFinite(rating) && rating >= AUTO_REPLY_MIN_RATING;
+}
+
 function hasReply(reply: string | undefined | null): boolean {
   return typeof reply === "string" && reply.trim().length > 0;
 }
@@ -102,7 +112,8 @@ export async function draftReplyBacklog(
             rating: r.rating,
             author: r.author,
             draftedReply: reply,
-            ...(voice.mode === "auto"
+            // 1 and 2 star replies always go to the owner, even in auto mode.
+            ...(voice.mode === "auto" && autoReplyAllowed(r.rating)
               ? { autoPostAt: new Date(nowMs + AUTO_POST_DELAY_MS).toISOString() }
               : {}),
           },
@@ -142,6 +153,8 @@ export async function runDueAutoPosts(nowMs: number): Promise<{ posted: number; 
     for (const e of pending) {
       if (e.metadata?.kind !== "review_reply_draft") continue;
       if (e.metadata?.autoPostFailed === true) continue; // gave up after the cap
+      // A draft stamped before the rating rule still goes to the owner.
+      if (!autoReplyAllowed(e.metadata?.rating)) continue;
       const at = e.metadata?.autoPostAt;
       if (typeof at !== "string") continue; // approve-mode drafts carry no timer
       const due = new Date(at).getTime();

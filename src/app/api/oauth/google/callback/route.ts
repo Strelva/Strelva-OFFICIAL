@@ -11,8 +11,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { saveConnection } from "@/lib/connections";
-import { getRedis } from "@/lib/redis";
+import { googleLocationIdFromName, recordGoogleConnection } from "@/lib/google-access";
 import { consumeOAuthState } from "@/lib/oauth-state";
 import { verifyAuth, requireTenantAccess } from "@/lib/auth";
 
@@ -163,14 +162,16 @@ export async function GET(req: Request) {
     const accounts = await fetchAccounts(tokens.access_token);
     let accountId: string | undefined;
     let locationId: string | undefined;
+    let locationTitle: string | undefined;
 
     if (accounts.length > 0) {
       accountId = accounts[0]!.name; // e.g., "accounts/123"
       const locations = await fetchLocations(tokens.access_token, accountId);
       if (locations.length > 0) {
         // Extract location ID from full name "accounts/123/locations/456"
-        const parts = locations[0]!.name.split("/locations/");
-        locationId = parts[1];
+        // v1 returns "locations/456"; older responses "accounts/123/locations/456".
+        locationId = googleLocationIdFromName(locations[0]!.name);
+        locationTitle = locations[0]!.title;
       }
     }
 
@@ -179,29 +180,20 @@ export async function GET(req: Request) {
       ? tokens.scope.split(" ").filter(Boolean)
       : undefined;
 
-    // Save connection
-    await saveConnection({
-      provider: "google",
+    // Save the connection: Redis exactly as before, then (while
+    // STRELVA_GOOGLE_BINDINGS is on and the tenant is linked to a business)
+    // the business-level binding too, so a reconnect during the move reaches
+    // both stores. The binding write never fails the connect.
+    await recordGoogleConnection({
       tenantId,
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
       expiresAt,
-      status: "connected",
-      lastSyncedAt: new Date().toISOString(),
       scopes,
+      accountId,
+      locationId,
+      locationTitle,
     });
-
-    // Store account/location metadata for review polling
-    if (accountId || locationId) {
-      const redis = getRedis();
-      if (redis) {
-        await redis.set(
-          `google-meta:${tenantId}`,
-          { accountId, locationId },
-          { ex: 60 * 60 * 24 * 365 }
-        );
-      }
-    }
 
     return NextResponse.redirect(`${connectionsUrl}?success=true`);
   } catch (err) {

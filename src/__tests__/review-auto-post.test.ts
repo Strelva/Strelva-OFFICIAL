@@ -55,6 +55,7 @@ function draft(over: Partial<UnifiedEvent> & { autoPostAt?: string | null } = {}
     metadata: {
       kind: "review_reply_draft",
       reviewId: "rev1",
+      rating: 5,
       ...(autoPostAt !== undefined ? { autoPostAt } : {}),
     },
     ...rest,
@@ -105,6 +106,18 @@ describe("runDueAutoPosts", () => {
     const res = await runDueAutoPosts(NOW);
     expect(mockResolveEventAction).not.toHaveBeenCalled();
     expect(res).toEqual({ posted: 0, failed: 0 });
+  });
+
+  it("never auto-posts a 1 or 2 star reply stamped before the rating rule; it stays with the owner", async () => {
+    const due = new Date(NOW - 60_000).toISOString();
+    const low = draft({ id: "low", autoPostAt: due });
+    low.metadata = { ...low.metadata, rating: 2 };
+    const unknown = draft({ id: "unknown", autoPostAt: due });
+    unknown.metadata = { ...unknown.metadata, rating: undefined };
+    mockGetEvents.mockResolvedValue([low, unknown]);
+    const res = await runDueAutoPosts(NOW);
+    expect(res).toEqual({ posted: 0, failed: 0 });
+    expect(mockResolveEventAction).not.toHaveBeenCalled();
   });
 
   it("does NOT post a draft still inside its window", async () => {
@@ -193,6 +206,14 @@ describe("draftReplyBacklog", () => {
     const evt = mockAddEvent.mock.calls[0]?.[0];
     expect(evt?.metadata?.kind).toBe("review_reply_draft");
     expect(evt?.metadata?.autoPostAt).toBeTruthy();
+  });
+
+  it("never stamps autoPostAt for a 1 or 2 star review, even in auto mode", async () => {
+    mockGetReplyVoice.mockResolvedValue({ mode: "auto" });
+    mockGetReviews.mockResolvedValue([review({ id: "r1", externalId: "ext1", rating: 1 }), review({ id: "r2", externalId: "ext2", rating: 2 }), review({ id: "r3", externalId: "ext3", rating: 3 })]);
+    await draftReplyBacklog(NOW);
+    const stamped = mockAddEvent.mock.calls.map(([evt]) => [evt?.metadata?.rating, Boolean(evt?.metadata?.autoPostAt)]);
+    expect(stamped).toEqual([[1, false], [2, false], [3, true]]);
   });
 
   it("does NOT stamp autoPostAt in approve mode", async () => {

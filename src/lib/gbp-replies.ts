@@ -11,41 +11,13 @@
  * that as an error event + Slack ping rather than silently failing.
  */
 
-import { getConnection, saveConnection } from "./connections";
 import { addEvent } from "./events";
 import { sendSlackNotification } from "./slack";
-import { getRedis } from "./redis";
-import { refreshAccessToken } from "./google-token";
+import { getGoogleGrant, getGoogleLocation, getValidGoogleAccessToken } from "./google-access";
 
 // The GBP write scope. New connections via /api/oauth/google already request
 // business.manage; this constant is used for detection only.
 export const GBP_WRITE_SCOPE = "https://www.googleapis.com/auth/business.manage";
-
-// ─── Token helpers ────────────────────────────────────────────────────────────
-
-async function getValidToken(tenantId: string): Promise<string | null> {
-  const connection = await getConnection(tenantId, "google");
-  if (!connection || connection.status !== "connected") return null;
-
-  if (connection.expiresAt) {
-    const buf = 5 * 60 * 1000;
-    if (Date.now() + buf > new Date(connection.expiresAt).getTime()) {
-      if (!connection.refreshToken) return null;
-      const newToken = await refreshAccessToken(connection.refreshToken);
-      if (newToken) {
-        // Persist the refreshed token so subsequent operations within the
-        // same connection's lifetime reuse it instead of re-refreshing.
-        await saveConnection({
-          ...connection,
-          accessToken: newToken,
-          expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
-        }).catch(() => {});
-      }
-      return newToken;
-    }
-  }
-  return connection.accessToken;
-}
 
 // ─── Scope detection ──────────────────────────────────────────────────────────
 
@@ -69,25 +41,14 @@ interface GBPReply {
   updateTime?: string;
 }
 
-async function fetchGBPMeta(
-  tenantId: string
-): Promise<{ accountId: string; locationId: string } | null> {
-  const redis = getRedis();
-  if (!redis) return null;
-  const meta = await redis.get<{ accountId?: string; locationId?: string }>(
-    `google-meta:${tenantId}`
-  );
-  if (!meta?.accountId || !meta?.locationId) return null;
-  return { accountId: meta.accountId, locationId: meta.locationId };
-}
-
 function reviewReplyUrl(
   accountId: string,
   locationId: string,
   reviewId: string
 ): string {
-  // GBP API v4 reviews.updateReply
-  return `https://mybusiness.googleapis.com/v4/${accountId}/locations/${locationId}/reviews/${reviewId}/reply`;
+  // GBP API v4 reviews.updateReply. google-meta stores "accounts/123"; accept a bare id too.
+  const account = accountId.startsWith("accounts/") ? accountId : `accounts/${accountId}`;
+  return `https://mybusiness.googleapis.com/v4/${account}/locations/${locationId}/reviews/${reviewId}/reply`;
 }
 
 async function putReply(
@@ -153,14 +114,14 @@ export async function publishReviewReply(
   const checkedAt = new Date().toISOString();
 
   // ── Scope check ────────────────────────────────────────────────────────────
-  const connection = await getConnection(tenantId, "google");
-  if (!connection || connection.status !== "connected") {
+  const grant = await getGoogleGrant(tenantId);
+  if (!grant || grant.status !== "connected") {
     const evidence = `tenant=${tenantId} reviewId=${reviewId} error=no_connected_google_account`;
     await _emitFailure(tenantId, reviewId, evidence, checkedAt);
     return { published: false, verified: false, evidence };
   }
 
-  if (!connectionHasWriteScope(connection.scopes)) {
+  if (!connectionHasWriteScope(grant.scopes)) {
     const evidence = `tenant=${tenantId} reviewId=${reviewId} error=missing_gbp_write_scope scope=${GBP_WRITE_SCOPE} requires_reconnect=true`;
     await _emitFailure(tenantId, reviewId, evidence, checkedAt);
     sendSlackNotification({
@@ -170,14 +131,14 @@ export async function publishReviewReply(
   }
 
   // ── Fetch tokens + metadata ────────────────────────────────────────────────
-  const accessToken = await getValidToken(tenantId);
+  const accessToken = await getValidGoogleAccessToken(grant);
   if (!accessToken) {
     const evidence = `tenant=${tenantId} reviewId=${reviewId} error=token_refresh_failed`;
     await _emitFailure(tenantId, reviewId, evidence, checkedAt);
     return { published: false, verified: false, evidence };
   }
 
-  const meta = await fetchGBPMeta(tenantId);
+  const meta = await getGoogleLocation(tenantId, grant);
   if (!meta) {
     const evidence = `tenant=${tenantId} reviewId=${reviewId} error=missing_account_location_meta`;
     await _emitFailure(tenantId, reviewId, evidence, checkedAt);
