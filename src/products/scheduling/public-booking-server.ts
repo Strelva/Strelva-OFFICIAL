@@ -133,7 +133,11 @@ export async function resolvePublishedPublicBooking(input: {
   }
   const work = await readWorkspaceSchedule(owner, workId);
   const schedule = scheduleSchema.parse(work.payload);
-  const configuredRange = input.range
+  // A paused schedule offers no open times. The response keeps its shape (an
+  // empty slot list is a valid published schedule), and the provider is not
+  // asked about times nobody can book.
+  const paused = Boolean(schedule.pause);
+  const configuredRange = paused ? null : input.range
     ? { start: input.range.from, end: input.range.to }
     : minMax(schedule.availability);
   const availability = configuredRange
@@ -144,7 +148,7 @@ export async function resolvePublishedPublicBooking(input: {
     })
     : { busy: [] as Array<{ start: string; end: string }>, timeZone: text(grant, "time_zone") || "UTC" };
   const providerBusy = Array.isArray(availability.busy) ? availability.busy : [];
-  const slots = schedule.availability
+  const slots = (paused ? [] : schedule.availability)
     .filter(slot => !input.range || (Date.parse(slot.start) >= Date.parse(input.range.from) && Date.parse(slot.end) <= Date.parse(input.range.to)))
     .filter(slot => !schedule.reservations.some(reservation => reservation.status !== "cancelled" && overlaps(slot, reservation)))
     .filter(slot => !providerBusy.some(busy => overlaps(slot, busy)))
@@ -160,6 +164,7 @@ export async function resolvePublishedPublicBooking(input: {
     grantId: requiredText(grant, "id"),
     status: text(grant, "status") as "published" | "revoked",
     websiteBindingActive,
+    paused,
     capabilityId: input.capabilityId,
     version: numberValue(grant, "capability_version"),
     inquiryCapabilityId: requiredText(grant, "inquiry_capability_id"),

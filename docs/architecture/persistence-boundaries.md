@@ -3,6 +3,12 @@
 Updated 2026-10-05. This is the current authority map. A Postgres table or mirror write does
 not make Postgres authoritative; authority changes only when the production read path changes.
 
+Systems, Connections, Possibilities and Versions (the October 4 customer model,
+[CONTEXT.md](../../CONTEXT.md#product-model)) own no store yet. They name things
+stored below; a website System's identity today is its tenant `stable_id`
+through `tenant_workspace_links`. A store for any of them gets its row here
+before production reads it.
+
 | Domain | Authority | Cache or mirror | Failure rule |
 |---|---|---|---|
 | Private workspace results and assessment recovery | Postgres `saved_product_work`, `workspace_operations` after the release migrations | Anonymous audit reports remain 60-day Redis bearer records, copied only on explicit save | Fail closed. Actor and direct membership are checked on every operation transition. A checkpoint survives failed completion; one operation commits one saved result. A pre-checkpoint interruption can repeat provider reads. No automatic background worker is implied. Local implementation only until migration and release acceptance. |

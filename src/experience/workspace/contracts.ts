@@ -1,3 +1,5 @@
+import type { ConnectionKind, ConnectionState, SystemLifecycle, SystemRef } from "@/platform/systems/contracts";
+import type { HealthStatus } from "@/platform/system-health/contracts";
 import type { AiVisibilityResult } from "@/products/ai-visibility/contracts";
 import type { AssessmentResult } from "@/products/assessment";
 import type { TrackerExperimentComparison } from "@/products/tracker/client";
@@ -85,6 +87,10 @@ export interface ManagedWork {
   href: string;
   productId: "managed_presence";
   relationship: "client" | "enterprise";
+  /** Public hostname of the live site, when the tenant records one. Additive. */
+  domain?: string;
+  /** Same-origin rendering of the site (local fixtures only today). */
+  previewHref?: string;
 }
 
 export interface WorkspaceHandoff {
@@ -133,6 +139,80 @@ export interface WorkspaceSnapshot {
   handoffs: WorkspaceHandoff[];
   delegations: WorkspaceDelegation[];
   products: WorkspaceProduct[];
+  /** The business's Systems from the spine, with health and Possibilities.
+   * Absent for personal and agency workspaces. Additive. */
+  systems?: WorkspaceSystems;
+}
+
+/**
+ * Browser-safe projection of the System spine (src/platform/systems), System
+ * health (src/platform/system-health) and Possibilities
+ * (src/platform/possibilities), built on the server. Identity is the spine's
+ * SystemRef; nothing here is a second model.
+ */
+export interface WorkspaceSystems {
+  /** `unavailable`: the spine read failed. Nothing about any System is claimed. */
+  status: "ready" | "unavailable";
+  systems: WorkspaceSystemEntry[];
+  connections: WorkspaceSystemConnection[];
+  possibilities: WorkspaceSystemPossibility[];
+}
+
+export interface WorkspaceSystemEntry {
+  ref: SystemRef;
+  name: string;
+  /** Spine descriptor slug, e.g. `website`, `inquiry`, `booking`, `internal_app`. */
+  kind: string;
+  /** Intended operation. Never derived from health. */
+  lifecycle: SystemLifecycle;
+  /** Why the lifecycle reads as it does, for an existing thing. */
+  basis: string | null;
+  savedWorkId: string | null;
+  tenantId: string | null;
+  /** What the evidence shows. Never derived from lifecycle. */
+  health: { status: HealthStatus; summary: string; lastVerifiedAt: string | null };
+}
+
+export interface WorkspaceSystemConnection {
+  id: string;
+  sourceId: string;
+  kind: ConnectionKind;
+  /** Set when the target is another System of this business. */
+  targetSystemId: string | null;
+  targetLabel: string;
+  state: ConnectionState;
+  purpose: string | null;
+}
+
+export interface WorkspaceSystemPossibility {
+  id: string;
+  title: string;
+  summary: string;
+  /** Customer lifecycle only: Exploring or Ready. */
+  status: "exploring" | "ready";
+  /** System ids it would change. */
+  affects: string[];
+  evidence: string | null;
+  /** Same-origin rendering of the candidate. */
+  previewHref: string | null;
+  /** The saved work the candidate came from. */
+  workId: string;
+}
+
+/** Result of Make real on an isolated copy (src/platform/make-real/sandbox.ts). */
+export interface WorkspaceMakeRealResult {
+  /** Always true today: no real provider or live System is reachable. */
+  isolated: true;
+  status: "in_progress" | "needs_attention" | "made_real" | "rolled_back";
+  /** describeActivation() headline. */
+  headline: string;
+  done: Array<{ label: string; mode: string | null }>;
+  waiting: Array<{ label: string; reason: string }>;
+  unknown: string[];
+  notStarted: string[];
+  liveUnchanged: boolean;
+  /** Outside effects this change needs that are not connected. */
+  notConnected: string[];
 }
 
 export interface WorkspaceHandoffPreview<TPayload = WorkspaceWorkPayload> {

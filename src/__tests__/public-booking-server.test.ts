@@ -39,6 +39,7 @@ vi.mock("@/products/inquiries/server", () => ({
 }));
 
 import { resolvePublishedPublicBooking } from "@/products/scheduling/public-booking-server";
+import { createPublicBookingService, publicBookingScheduleSchema } from "@/products/scheduling/public-booking";
 
 function fakeClient(options: { bindingStatus?: "active" | "revoked"; grantStatus?: "published" | "revoked" } = {}) {
   const rows: Record<string, Record<string, unknown>> = {
@@ -121,5 +122,59 @@ describe("published public booking resolver", () => {
 
     await expect(resolvePublishedPublicBooking({ tenantId: "northstar", capabilityId: "consultations" }))
       .rejects.toThrow("Public website binding is unavailable.");
+  });
+
+  describe("a paused workspace schedule on the live /api/v1/bookings path", () => {
+    const pausedSchedule = async () => ({ payload: { version: 1, revision: 5, title: "Consultation", createdBy: "owner-1", createdAt: "2026-09-20T00:00:00.000Z", history: [], availability: [
+      { start: "2026-10-01T14:00:00+00:00", end: "2026-10-01T15:00:00+00:00" },
+    ], reservations: [], pause: { pausedAt: "2026-09-30T12:00:00.000Z", pausedBy: "owner-1", reason: "Owner away" } } });
+
+    it("lists no open times, in the same response shape, without asking the provider", async () => {
+      boundary.db = fakeClient();
+      boundary.readWorkspaceProviderAvailability.mockClear();
+      boundary.readWorkspaceSchedule.mockImplementationOnce(pausedSchedule);
+      const binding = await resolvePublishedPublicBooking({ tenantId: "northstar", capabilityId: "consultations" });
+      expect(binding?.slots).toEqual([]);
+      expect(boundary.readWorkspaceProviderAvailability).not.toHaveBeenCalled();
+      const service = createPublicBookingService({ resolve: async () => binding, inquiries: { capture: vi.fn() }, calendar: { reserve: vi.fn(), change: vi.fn(), cancel: vi.fn() }, tokens: { findByRequest: vi.fn(async () => null), findByToken: vi.fn(), save: vi.fn() } });
+      const body = await service.read({ tenantId: "northstar", capabilityId: "consultations" });
+      expect(Object.keys(body).sort()).toEqual(["capabilityId", "name", "provider", "schemaVersion", "slots", "timeZone", "version"]);
+      expect(publicBookingScheduleSchema.parse(body).slots).toEqual([]);
+    });
+
+    it("refuses a booking for a time the visitor saw before the pause, before any inquiry or receipt is recorded", async () => {
+      boundary.db = fakeClient();
+      const live = await resolvePublishedPublicBooking({ tenantId: "northstar", capabilityId: "consultations" });
+      const seen = live!.slots[0]!;
+      boundary.readWorkspaceSchedule.mockImplementationOnce(pausedSchedule);
+      const capture = vi.fn(async () => ({ inquiryId: "lead-1" }));
+      const reserve = vi.fn(async () => { throw new Error("Bookings are paused."); });
+      const save = vi.fn(async (value) => value);
+      const service = createPublicBookingService({
+        resolve: resolvePublishedPublicBooking,
+        inquiries: { capture },
+        calendar: { reserve, change: vi.fn(), cancel: vi.fn() },
+        tokens: { findByRequest: vi.fn(async () => null), findByToken: vi.fn(), save },
+      });
+      const attempt = service.reserve({ tenantId: "northstar", capabilityId: "consultations", capabilityVersion: 2, slotId: seen.id, visitor: { name: "Ada", email: "ada@example.test" }, requestId: "r".repeat(40) });
+      await expect(attempt).rejects.toMatchObject({ code: "conflict", status: 409 });
+      await attempt.catch((error) => expect(error.message).toBe("This business is not taking new bookings right now."));
+      expect(capture).not.toHaveBeenCalled();
+      expect(save).not.toHaveBeenCalled();
+      expect(reserve).not.toHaveBeenCalled();
+    });
+
+    it("refuses a time change while paused but still lets the visitor cancel", async () => {
+      boundary.db = fakeClient();
+      boundary.readWorkspaceSchedule.mockImplementationOnce(pausedSchedule);
+      const binding = await resolvePublishedPublicBooking({ tenantId: "northstar", capabilityId: "consultations", includeRevoked: true });
+      const ref = { tenantId: "northstar", capabilityId: "consultations", version: 2, provider: "outlook" as const, reservationId: "res-12345678", requestId: "r".repeat(40), requestFingerprint: "f", slotId: "slot-12345678", slotStart: "2026-10-01T14:00:00+00:00", slotEnd: "2026-10-01T15:00:00+00:00", workspaceId: "workspace-1", workId: "work-1", inquiryId: "lead-1", managementToken: "token-12345678", expectedRevision: 5, title: "Consultation", start: "2026-10-01T14:00:00+00:00", end: "2026-10-01T15:00:00+00:00", timeZone: "America/New_York", status: "confirmed" as const };
+      const change = vi.fn();
+      const cancel = vi.fn(async () => ({ verification: "verified" as const, start: ref.start, end: ref.end, expectedRevision: 6 }));
+      const service = createPublicBookingService({ resolve: async () => binding, inquiries: { capture: vi.fn() }, calendar: { reserve: vi.fn(), change, cancel }, tokens: { findByRequest: vi.fn(), findByToken: vi.fn(async () => ref), save: vi.fn(async (value) => value) } });
+      await expect(service.change({ tenantId: "northstar", reservationId: ref.reservationId, managementToken: ref.managementToken, capabilityId: "consultations", capabilityVersion: 2, slotId: "slot-12345678" })).rejects.toMatchObject({ code: "conflict" });
+      expect(change).not.toHaveBeenCalled();
+      expect((await service.cancel({ tenantId: "northstar", reservationId: ref.reservationId, managementToken: ref.managementToken })).status).toBe("cancelled");
+    });
   });
 });

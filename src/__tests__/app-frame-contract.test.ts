@@ -59,11 +59,12 @@ describe("shared app frame accessibility contract", () => {
     expect(html).toContain('aria-label="Strelva navigation"');
     expect(html).toContain('aria-label="Main"');
     expect(html).toContain('aria-label="Workspace utilities"');
-    for (const label of [">Home<", ">Customers<", ">Requests<", ">Running<", ">Business details<", "People &amp; access", "Ask Strelva", "Search", "Help", "All apps and files"]) {
+    for (const label of [">Home<", ">Requests<", ">Running<", ">Business details<", "People &amp; access", "Ask Strelva", "Search", "Help", "All systems and files"]) {
       expect(html).toContain(label);
     }
-    for (const retired of [">Today<", ">Routines<", ">Business profile<", ">Work<", ">Ongoing<"]) expect(html).not.toContain(retired);
-    expect(html).toContain('href="/workspace?view=customers"');
+    // Customers left the navigation (October 5): the page listed links, not customers. view=customers still opens.
+    for (const retired of [">Today<", ">Routines<", ">Business profile<", ">Work<", ">Ongoing<", ">Customers<"]) expect(html).not.toContain(retired);
+    expect(html).not.toContain('href="/workspace?view=customers"');
     expect(html).toContain('href="/workspace?view=requests"');
     expect(html).toContain('href="/workspace?view=ongoing"');
     expect(html).toContain('href="/workspace?view=apps"');

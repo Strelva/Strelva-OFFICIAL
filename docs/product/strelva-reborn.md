@@ -37,6 +37,28 @@ production, owners using it, no client data held only in Redis, every client
 repo checked, and the customer model (Systems, Connections, Possibilities,
 Versions) proven with real customers. Jacob decides when that is true.
 
+## Reborn in Systems terms
+
+On October 4 Jacob selected Systems, Connections, Possibilities and Versions
+as the customer model ([CONTEXT.md](../../CONTEXT.md#product-model)). Reborn
+doesn't change scope for it. It lays the ground the model stands on.
+
+| Reborn section | What it becomes in the model | In Reborn scope |
+| --- | --- | --- |
+| 1. One business record | The shared context every System reads. The business is the owner, not a System | Yes |
+| 3. Every client converted | Each live client website becomes that business's first **System**, keyed to the tenant's `stable_id` through the link table. Twin Trees gets two Systems | Yes, as data; a System screen is not promised |
+| 1–2. Facts read from the record | **Connections** of kind *reads*: website, bookings and inquiries read hours and services instead of keeping copies | Yes |
+| 4. Publishing, Google | **Connections** of kind *acts*, on an account the business granted | Yes, per section 4 |
+| 4. Bookings, inquiries, internal apps | Each one a **System** of its own, or part of the website System. Which is an open question | Built as capabilities; the split is decided later |
+| 5. Receipts, site health | System health, kept separate from Draft/Live/Paused | Partly |
+| 6. Owners enter the workspace | Home shows the business's Systems and Needs you | Only if it passes this page's gates |
+
+Not in Reborn (they are [1.0.0](./strelva-1.0.0.md) launch features): Possibilities and **Make real**, contextual **Versions**
+(agencies and multi-location; partner agencies are already out), and any
+customer-facing claim that a System can grow without limit. The live-client
+rules don't move: `/api/v1` stays additive, `reb:` keys and tenant rows stay,
+and clients who never log in keep working.
+
 ## Where we are
 
 Audited 2026-10-02 against code, line by line. Production facts come from the
@@ -369,6 +391,7 @@ Every production step also passes the
 New pricing or plan tiers. Partner agencies (Strelva is the only agency in
 this release). Home Finder. Enterprise customers. Self-serve website building
 for owners. `/api/v2`. No `/api/v1` change except additive.
+Possibilities, Make real across Systems, and contextual Versions.
 
 ## Still unproven
 

@@ -107,6 +107,9 @@ export interface PublicBookingBinding {
   /** The native website binding may be revoked while an existing receipt is
    * still cancellable. This remains server-only state. */
   websiteBindingActive?: boolean;
+  /** The schedule is paused: no new bookings or new times. Server-only;
+   * existing receipts stay readable and cancellable. */
+  paused?: boolean;
   capabilityId: string;
   version: number;
   /** Optional published inquiry capability used for the visitor record. */
@@ -405,6 +408,8 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
     if (!binding) throw new PublicBookingError("not_found", "This booking capability is unavailable.");
     const safe = assertBinding(binding, input.tenantId, input.capabilityId);
     if (input.capabilityVersion !== safe.version) throw new PublicBookingError("conflict", "This booking changed. Reload the available times before reserving.");
+    // Refuse before anything is recorded: no inquiry, no pending receipt.
+    if (safe.paused) throw new PublicBookingError("conflict", "This business is not taking new bookings right now.");
     const slot = slotFor(safe, input.slotId);
     const requestFingerprint = publicBookingRequestFingerprint({
       tenantId: input.tenantId,
@@ -496,7 +501,7 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
     const binding = await resolveBinding(dependencies, { tenantId: input.tenantId, capabilityId: ref.capabilityId, includeRevoked: true });
     if (!binding) throw new PublicBookingError("not_found", "This booking capability is unavailable.");
     const safe = assertBinding(binding, input.tenantId, ref.capabilityId);
-    if (safe.status === "revoked" || safe.websiteBindingActive === false) throw new PublicBookingError("conflict", "This booking is no longer accepting changes. You can still cancel it.");
+    if (safe.status === "revoked" || safe.websiteBindingActive === false || safe.paused) throw new PublicBookingError("conflict", "This booking is no longer accepting changes. You can still cancel it.");
     if (input.capabilityVersion !== safe.version || ref.version !== safe.version) throw new PublicBookingError("conflict", "This booking changed. Reload the available times before changing it.");
     const slot = slotFor(safe, input.slotId);
     let result: Awaited<ReturnType<PublicBookingCalendar["change"]>>;

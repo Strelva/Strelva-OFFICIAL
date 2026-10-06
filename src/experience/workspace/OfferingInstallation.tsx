@@ -118,11 +118,11 @@ export function OfferingInstallationView({
   }
 
   return <div className={styles.detail}>
-    <button type="button" className={styles.back} onClick={onBack}>Back to offerings</button>
+    <button type="button" className={styles.back} onClick={onBack}>Back to ready-made systems</button>
     <header>
       <p className={styles.eyebrow}>{installation.status === "active" ? "Installed" : installation.status === "draft" ? "Draft setup" : "Retired"}</p>
       <h2>{definition?.name ?? installation.definitionId}</h2>
-      <p>{definition?.description ?? "This installed offering uses an older definition that is no longer listed."}</p>
+      <p>{definition?.description ?? "This system was set up from an older design that is no longer listed."}</p>
     </header>
     {conflictMatchesInstallation ? <div className={styles.conflict} role="alert">
       <strong>{mutationConflict.message}</strong>
@@ -171,27 +171,27 @@ export function OfferingInstallationView({
 
     {installation.status === "draft" ? <section className={styles.section} aria-labelledby={`offering-activation-${installation.id}`}>
       <h3 id={`offering-activation-${installation.id}`}>Finish setup</h3>
-      <p>Open the business workspace, rehearse the application, and publish it through the existing application review. Then activate this offering so staff can use its released form.</p>
+      <p>Open the business workspace, rehearse the application, and publish it through the existing application review. Then activate it so staff can use its released form.</p>
       {canManage ? <>
         <label className={styles.activationConfirm}>
           <input type="checkbox" checked={publicationConfirmed} onChange={(event) => setPublicationConfirmed(event.target.checked)} />
           <span>I published the connected application through its review.</span>
         </label>
-        <button className={styles.primary} type="button" disabled={saving || !publicationConfirmed} onClick={() => void activate()}>{saving ? "Checking release…" : "Activate released offering"}</button>
-      </> : <p className={styles.note}>Only a business owner or admin can activate the offering after publication.</p>}
+        <button className={styles.primary} type="button" disabled={saving || !publicationConfirmed} onClick={() => void activate()}>{saving ? "Checking release…" : "Activate released version"}</button>
+      </> : <p className={styles.note}>Only a business owner or admin can activate it after publication.</p>}
     </section> : null}
 
     {definition?.configurationFields.length ? <form className={styles.section} onSubmit={saveConfiguration}>
       <ConfigurationFields fields={definition.configurationFields} values={configuration} disabled={!canManage || saving} onChange={(id, value) => setDraft((current) => ({ values: { ...(current.dirty ? current.values : configuration), [id]: value }, dirty: true }))} />
-      <p className={styles.note}>These fields describe the offering record. They do not change the connected application or its published behavior.</p>
+      <p className={styles.note}>These fields describe this setup. They do not change the connected application or its published behavior.</p>
       {canManage ? <button className={styles.primary} type="submit" disabled={saving || conflictNeedsRefresh}>{saving ? "Saving…" : "Save changes"}</button> : <p className={styles.note}>You can view this configuration, but only a business owner or admin can change it.</p>}
     </form> : null}
 
     {installation.status === "retired" ? <p className={styles.retired}>Retired {installation.retiredAt ? new Date(installation.retiredAt).toLocaleDateString() : ""}. {installation.retirementReason}</p> : canManage ? <section className={styles.section}>
-      {!retireOpen ? <button className={styles.secondary} type="button" disabled={saving} onClick={() => setRetireOpen(true)}>Retire this offering</button> : <form onSubmit={retire} className={styles.retireForm}>
+      {!retireOpen ? <button className={styles.secondary} type="button" disabled={saving} onClick={() => setRetireOpen(true)}>Retire this system</button> : <form onSubmit={retire} className={styles.retireForm}>
         <label><span>Why are you retiring it?</span><textarea required maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} /></label>
-        <p>This stops presenting the installation as active. Its existing work and history stay in the business.</p>
-        <div><button className={styles.secondary} type="button" disabled={saving} onClick={() => { setRetireOpen(false); setReason(""); }}>Cancel</button><button className={styles.danger} type="submit" disabled={saving || !reason.trim()}>{saving ? "Retiring…" : "Retire offering"}</button></div>
+        <p>This stops presenting it as active. Its existing work and history stay in the business.</p>
+        <div><button className={styles.secondary} type="button" disabled={saving} onClick={() => { setRetireOpen(false); setReason(""); }}>Cancel</button><button className={styles.danger} type="submit" disabled={saving || !reason.trim()}>{saving ? "Retiring…" : "Retire system"}</button></div>
       </form>}
     </section> : null}
   </div>;
@@ -362,14 +362,14 @@ export function OfferingInstallView({
   }
 
   return <form className={styles.detail} onSubmit={install}>
-    <button type="button" className={styles.back} onClick={onBack}>Back to offerings</button>
+    <button type="button" className={styles.back} onClick={onBack}>Back to ready-made systems</button>
     <header><p className={styles.eyebrow}>{availabilityLabel(definition)}</p><h2>Install {definition.name}</h2><p>{definition.description}</p></header>
     <p className={styles.note}>{definition.installationNote}</p>
 
     <fieldset className={styles.fields} disabled={!collection.permissions.canManage || saving || attempted}>
       <legend>Connect existing work</legend>
       {canPrepareDefault ? <label className={styles.radioField}><input type="radio" name="resource-mode" checked={resourceMode === "default"} onChange={() => setResourceMode("default")} /><span>Create the standard staff request application</span></label> : null}
-      {resources.length ? <><label className={styles.radioField}><input type="radio" name="resource-mode" checked={resourceMode === "existing"} onChange={() => setResourceMode("existing")} /><span>Use an existing {definition.requiredResources[0]?.kind === "managed_website" ? "website assignment" : "application"}</span></label>{resourceMode === "existing" ? <label><span>{definition.requiredResources[0]?.kind === "managed_website" ? "Website" : "Application"}</span><select required value={resourceId} onChange={(event) => setResourceId(event.target.value)}>{resources.map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select></label> : null}</> : !canPrepareDefault ? <p className={styles.blocked}>{definition.requiredResources[0]?.kind === "managed_website" ? "Assign an account-authorized website to this business before installing this offering." : "Create and release the required application before installing this offering."}</p> : null}
+      {resources.length ? <><label className={styles.radioField}><input type="radio" name="resource-mode" checked={resourceMode === "existing"} onChange={() => setResourceMode("existing")} /><span>Use an existing {definition.requiredResources[0]?.kind === "managed_website" ? "website assignment" : "application"}</span></label>{resourceMode === "existing" ? <label><span>{definition.requiredResources[0]?.kind === "managed_website" ? "Website" : "Application"}</span><select required value={resourceId} onChange={(event) => setResourceId(event.target.value)}>{resources.map((resource) => <option key={resource.id} value={resource.id}>{resource.title}</option>)}</select></label> : null}</> : !canPrepareDefault ? <p className={styles.blocked}>{definition.requiredResources[0]?.kind === "managed_website" ? "Assign an account-authorized website to this business before setting this up." : "Create and release the required application before setting this up."}</p> : null}
       {resourceMode === "default" ? <p className={styles.note}>This creates a private application draft with a request form and review list. Staff cannot use it until you rehearse and publish the application.</p> : null}
     </fieldset>
 
@@ -392,8 +392,8 @@ export function OfferingInstallView({
       <ul>{definition.scopes.map((scope) => <li key={scope.id}><Check size={16} aria-hidden="true" /><span><strong>{scope.label}</strong><small>{scope.description}</small></span></li>)}</ul>
     </section>
 
-    {!collection.permissions.canManage ? <p className={styles.blocked}>You can review this offering, but only a business owner or admin can install it.</p> : definition.installability !== "available" ? <p className={styles.blocked}>{definition.installationNote}</p> : null}
-    {attempted && !saving ? <p className={styles.blocked}>The first request did not return confirmation. The setup is locked so retry sends the exact same command. Reload offerings before changing it.</p> : null}
-    <button className={styles.primary} type="submit" disabled={saving || !canInstall || (resourceMode === "existing" && !resourceId) || !providerName.trim()}>{saving ? "Preparing…" : attempted ? "Retry exact setup" : resourceMode === "default" ? "Prepare offering" : "Install offering"} <ArrowRight size={16} aria-hidden="true" /></button>
+    {!collection.permissions.canManage ? <p className={styles.blocked}>You can review this, but only a business owner or admin can set it up.</p> : definition.installability !== "available" ? <p className={styles.blocked}>{definition.installationNote}</p> : null}
+    {attempted && !saving ? <p className={styles.blocked}>The first request did not return confirmation. The setup is locked so retry sends the exact same command. Reload before changing it.</p> : null}
+    <button className={styles.primary} type="submit" disabled={saving || !canInstall || (resourceMode === "existing" && !resourceId) || !providerName.trim()}>{saving ? "Preparing…" : attempted ? "Retry exact setup" : resourceMode === "default" ? "Prepare setup" : "Set up"} <ArrowRight size={16} aria-hidden="true" /></button>
   </form>;
 }

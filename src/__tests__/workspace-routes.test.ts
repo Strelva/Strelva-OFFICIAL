@@ -4,13 +4,14 @@ const mocks = vi.hoisted(() => ({
   user: vi.fn(), rate: vi.fn(), score: vi.fn(), personal: vi.fn(), list: vi.fn(), work: vi.fn(), getWork: vi.fn(),
   save: vi.fn(), createAgency: vi.fn(), handoff: vi.fn(), inspect: vi.fn(), accept: vi.fn(),
   revoke: vi.fn(), cancel: vi.fn(), handoffs: vi.fn(), agencyDelegations: vi.fn(), workDelegations: vi.fn(),
-  pending: vi.fn(), operation: vi.fn(), saveAudit: vi.fn(), preflight: vi.fn(), runPrivate: vi.fn(), savePublicResult: vi.fn(), managedWork: vi.fn(), exitRead: vi.fn(), exitCompleted: vi.fn(),
+  pending: vi.fn(), operation: vi.fn(), saveAudit: vi.fn(), preflight: vi.fn(), runPrivate: vi.fn(), savePublicResult: vi.fn(), managedWork: vi.fn(), exitRead: vi.fn(), exitCompleted: vi.fn(), systems: vi.fn(),
 }));
 vi.mock("@/lib/db/server-client", () => ({ getSessionUser: mocks.user }));
 vi.mock("@/lib/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate }));
 vi.mock("@/products/ai-visibility/server", () => ({ runPrivateAiVisibilityAssessment: mocks.runPrivate, savePublicAiVisibilityResult: mocks.savePublicResult }));
 vi.mock("@/products/website-audit/server", () => ({ savePublicWebsiteAudit: mocks.saveAudit }));
 vi.mock("@/products/managed-presence/server", () => ({ listManagedPresenceWork: mocks.managedWork }));
+vi.mock("@/experience/systems/server", () => ({ readWorkspaceSystems: mocks.systems }));
 vi.mock("@/platform/workspace-exit", () => ({ readWorkspaceExit: mocks.exitRead, readWorkspaceExitCompleted: mocks.exitCompleted }));
 vi.mock("@/platform/workspaces", async () => {
   const types = await import("@/platform/workspaces/types");
@@ -165,6 +166,22 @@ describe("release-one private workspace routes", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ managedWork: [{ id: "gldf", productId: "managed_presence", relationship: "client" }] });
     expect(mocks.save).not.toHaveBeenCalled();
+  });
+  it("adds the spine Systems projection for a customer business only", async () => {
+    const business = { id: otherId, kind: "customer", name: "The Mooney Firm", access: "member", role: "owner" };
+    const systems = { status: "ready", systems: [], connections: [], possibilities: [] };
+    mocks.list.mockResolvedValue([workspace, business]);
+    mocks.systems.mockResolvedValue(systems);
+    mocks.managedWork.mockResolvedValue({ managedWork: [{ id: "mooney-firm", title: "The Mooney Firm", href: "https://app.strelva.com/client/mooney-firm/dashboard", productId: "managed_presence", relationship: "client", domain: "www.attymooney.com" }], unavailable: false });
+
+    const customer = await (await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${otherId}`))).json();
+    expect(customer.systems).toEqual(systems);
+    expect(mocks.systems).toHaveBeenCalledWith({ actor: { userId: "actor", verifiedEmail: "owner@example.com" }, businessId: otherId, savedWork: [work], siteDomains: new Map([["mooney-firm", "www.attymooney.com"]]) });
+
+    mocks.systems.mockClear();
+    const personal = await (await GET(new Request("https://strelva.com/api/workspace"))).json();
+    expect(personal.systems).toBeUndefined();
+    expect(mocks.systems).not.toHaveBeenCalled();
   });
   it("keeps unrelated private work available when managed discovery is unavailable", async () => {
     mocks.managedWork.mockRejectedValue(new Error("tenant store unavailable"));

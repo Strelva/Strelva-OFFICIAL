@@ -219,7 +219,7 @@ test("customer grants one managed website draft, agency prepares it, and custome
     agencyPage.setDefaultTimeout(25_000);
     await agencyPage.setViewportSize({ width: 390, height: 844 });
     await agencyPage.goto(`/workspace?workspaceId=${agencyId}`, { waitUntil: "domcontentloaded" });
-    await expect(agencyPage.getByRole("heading", { name: "Assigned website drafts", exact: true })).toBeVisible();
+    await expect(agencyPage.getByRole("heading", { name: "Website possibilities for clients", exact: true })).toBeVisible();
     await expect(agencyPage.getByRole("link", { name: "Open website", exact: true })).toBeVisible();
     await agencyPage.getByRole("link", { name: "Open website", exact: true }).click();
     await expect(agencyPage.getByText("The customer needs to enable draft editing", { exact: false })).toBeVisible();

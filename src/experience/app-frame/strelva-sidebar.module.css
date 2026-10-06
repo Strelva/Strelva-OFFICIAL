@@ -377,6 +377,7 @@
   flex-shrink: 0;
 }
 
+.recent .pinned[aria-current="page"],
 .recent .allApps[aria-current="page"] {
   background: var(--gray-bg-hover);
   color: var(--gray-fg);

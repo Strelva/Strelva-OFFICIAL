@@ -6,6 +6,9 @@ Every customer capability in this repo, what it does, how live it is, and where
 its code, specs, and tests live. Start here before building on a capability.
 Specs for a capability sit in its folder under `docs/capabilities/`.
 
+Capabilities are the code inventory. Customers see the Systems built from them
+([CONTEXT.md](../../CONTEXT.md#product-model), October 4).
+
 ## Status words
 
 | Status | Meaning |

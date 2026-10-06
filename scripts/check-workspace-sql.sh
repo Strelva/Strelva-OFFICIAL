@@ -449,6 +449,11 @@ psql "${psql_args[@]}" --set=tenant_import="$(cat "$repo_root/tests/fixtures/bus
 # business record here, so conversion attaches leads to the business.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261005090000_tenant_leads.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
+# Systems and Connections (the Systems model spine), on the same fictional
+# cluster so the access rule, exit guard and existing-thing projection run
+# against the real workspace, website, tenant-link and calendar tables.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261004120000_systems.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/systems-schema.sql"
 
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \

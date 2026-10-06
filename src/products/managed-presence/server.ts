@@ -11,6 +11,7 @@ import { getCurrentUserTenants } from "@/lib/auth";
 import { getTenantDashboardFallbackUrl } from "@/lib/tenant-urls";
 import { isActiveTenant, getTenantConfig } from "@/lib/tenants";
 import { resolveLegacyManagedPresence } from "./legacy";
+import { publicHostname } from "./hostname";
 
 /** Browser-safe shape mirrored by the shared workspace response contract. */
 export interface ManagedPresenceWork {
@@ -19,6 +20,8 @@ export interface ManagedPresenceWork {
   href: string;
   productId: "managed_presence";
   relationship: "client" | "enterprise";
+  /** Public hostname of the live site, when recorded. */
+  domain?: string;
 }
 
 export interface ManagedPresenceWorkListing {
@@ -43,6 +46,7 @@ function managedWorkForTenant(tenant: Awaited<ReturnType<typeof getTenantConfig>
     href: getTenantDashboardFallbackUrl(tenant),
     productId: "managed_presence",
     relationship: relationship === "enterprise" ? "enterprise" : "client",
+    ...(publicHostname(tenant.productionDomain) ? { domain: publicHostname(tenant.productionDomain) } : {}),
   };
 }
 

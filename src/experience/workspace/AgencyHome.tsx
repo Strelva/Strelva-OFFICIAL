@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/Button";
 import { ServiceRequestInbox } from "@/experience/operations/ServiceRequestInbox";
 import type { WorkspaceSnapshot, WorkspaceWork } from "./contracts";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
+import { agencySystemLineage } from "@/experience/systems/from-workspace";
+import { SYSTEMS_LABEL } from "@/experience/systems/model";
+import systemStyles from "@/experience/systems/systems.module.css";
 import {
   MAX_AGENCY_CLIENT_LOADS,
   agencyAttentionQueue,
@@ -23,7 +26,7 @@ type ClientState =
   | { status: "ready"; result: AgencyClientLoadResult };
 
 function workLabel(work: WorkspaceWork): string {
-  if (work.productId === "applications") return "Application";
+  if (work.productId === "applications") return "Internal tool";
   if (work.productId === "documents") return "Document";
   if (work.productId === "operations") return "Ongoing work";
   if (work.productId === "tracker") return "Tracker";
@@ -162,6 +165,7 @@ export function AgencyHome({
   const totalClients = clients.status === "ready" ? clients.result.totalCount : selection.totalCount;
   const omittedCount = clients.status === "ready" ? clients.result.omittedCount : selection.omittedCount;
   const readyApplicationDrafts = applicationDrafts ?? [];
+  const lineage = agencySystemLineage(snapshot.work, loadedClients);
   const readyWebsiteDrafts = websiteDrafts ?? [];
 
   return <div className="mx-auto w-full max-w-5xl px-6 py-10 sm:px-8 lg:px-12" aria-busy={busy || clients.status === "loading" || undefined}>
@@ -171,6 +175,18 @@ export function AgencyHome({
       <p className="mt-3 text-[14px] leading-relaxed text-gray-muted">Only work currently shared with this agency appears here. Customers keep ownership and control access.</p>
     </header>
 
+    <section className="mt-10" aria-labelledby="agency-systems-title">
+      <h2 id="agency-systems-title" className="text-[15px] font-medium text-warm-black">{SYSTEMS_LABEL} you keep, and each client’s version</h2>
+      <p className="mt-1 text-[12px] text-gray-muted">A source stays in {agencyName}. Each client version belongs to that client, with its own records, accounts and access. Only a recorded source link connects them.</p>
+      {clients.status === "loading" ? <p role="status" className="mt-4 text-[13px] text-gray-muted">Checking client versions…</p> : lineage.sources.length || lineage.unlinked.length ? <ul className={systemStyles.lineage}>
+        {lineage.sources.map(({ source, versions }) => <li key={source.id}>
+          <button type="button" onClick={() => onOpenWork(source.id)} aria-label={`Open source ${source.title}`}><strong className="text-[14px] font-medium">{source.title}</strong><small className="block text-[12px] text-gray-muted">Source · {workLabel(source)} · {versions.length ? `${versions.length} client ${versions.length === 1 ? "version" : "versions"}` : "Not adapted for a client yet"}</small></button>
+          {versions.length ? <ul aria-label={`Client versions of ${source.title}`}>{versions.map(version => <li key={`${version.businessId}:${version.work.id}`}><button type="button" onClick={() => onOpenClientWork(version.businessId, version.work.id)} aria-label={`Open ${version.businessName} version, ${version.work.title}`}><span className="text-[13px]">{version.businessName}</span><small className="block text-[12px] text-gray-muted">{version.work.title}{version.work.operation?.status === "draft" ? " · Draft" : ""}</small></button></li>)}</ul> : null}
+        </li>)}
+        {lineage.unlinked.length ? <li><strong className="text-[14px] font-medium">Client systems with no recorded source</strong><ul aria-label="Client systems with no recorded source">{lineage.unlinked.map(item => <li key={`${item.businessId}:${item.work.id}`}><button type="button" onClick={() => onOpenClientWork(item.businessId, item.work.id)}><span className="text-[13px]">{item.businessName}</span><small className="block text-[12px] text-gray-muted">{item.work.title}</small></button></li>)}</ul></li> : null}
+      </ul> : <p className="mt-4 border-y border-gray-border py-5 text-[13px] text-gray-muted">No source systems yet. When you adapt a system for a client, its client version appears under its source.</p>}
+    </section>
+
     {current?.kind === "agency" && current.access !== "delegated_read" ? <section className="mt-10" aria-labelledby="agency-service-requests-title">
       <h2 id="agency-service-requests-title" className="text-[15px] font-medium text-warm-black">Service requests</h2>
       <p className="mt-1 text-[12px] text-gray-muted">Review requests addressed to {agencyName}. A response records review and does not start work.</p>
@@ -178,8 +194,8 @@ export function AgencyHome({
     </section> : null}
 
     {current?.kind === "agency" && current.access !== "delegated_read" ? <section className="mt-10" aria-labelledby="agency-application-drafts-title">
-      <h2 id="agency-application-drafts-title" className="text-[15px] font-medium text-warm-black">Assigned application drafts</h2>
-      <p className="mt-1 text-[12px] text-gray-muted">Open only the installed application named by an active customer delivery. Editing appears after the customer grants it.</p>
+      <h2 id="agency-application-drafts-title" className="text-[15px] font-medium text-warm-black">Internal-tool drafts for clients</h2>
+      <p className="mt-1 text-[12px] text-gray-muted">Open only the client tool named by an active customer delivery. Editing appears after the customer grants it.</p>
       {applicationDrafts === null && !applicationDraftError ? <p role="status" className="mt-4 text-[13px] text-gray-muted">Checking assigned application drafts…</p> : applicationDraftError ? <p role="alert" className="mt-4 text-[13px] text-critical">{applicationDraftError}</p> : readyApplicationDrafts.length ? <ul className="mt-4 divide-y divide-gray-border border-y border-gray-border">{readyApplicationDrafts.map((draft) => {
         const editable = draft.draftGrantStatus === "active" && Boolean(draft.draftGrantExpiresAt) && Date.parse(draft.draftGrantExpiresAt!) > Date.now();
         return <li key={`${draft.assignmentId}:${draft.applicationWorkId}`} className="flex items-center gap-4 px-2 py-4"><FileText className="shrink-0 text-accent-text" size={18} aria-hidden="true" /><span className="min-w-0 flex-1"><strong className="block truncate text-[14px] font-medium text-warm-black">{draft.applicationTitle}</strong><small className="mt-1 block text-[12px] text-gray-muted">{draft.customerWorkspaceName} · {editable ? "Draft editing granted" : "Waiting for customer draft-edit permission"}</small></span><a className="shrink-0 text-[13px] text-warm-black underline" href={`/agency-applications/${encodeURIComponent(draft.applicationWorkId)}`}>Open draft</a></li>;
@@ -187,8 +203,8 @@ export function AgencyHome({
     </section> : null}
 
     {current?.kind === "agency" && current.access !== "delegated_read" ? <section className="mt-10" aria-labelledby="agency-website-drafts-title">
-      <h2 id="agency-website-drafts-title" className="text-[15px] font-medium text-warm-black">Assigned website drafts</h2>
-      <p className="mt-1 text-[12px] text-gray-muted">Open the exact managed website named by an active customer delivery. Preparation appears only after the customer grants it; publishing stays with the customer.</p>
+      <h2 id="agency-website-drafts-title" className="text-[15px] font-medium text-warm-black">Website possibilities for clients</h2>
+      <p className="mt-1 text-[12px] text-gray-muted">Prepare a possibility on the exact client website named by an active delivery. Preparation appears only after the customer grants it; it stays a possibility until the customer makes it real.</p>
       {websiteDrafts === null && !websiteDraftError ? <p role="status" className="mt-4 text-[13px] text-gray-muted">Checking assigned website drafts…</p> : websiteDraftError ? <p role="alert" className="mt-4 text-[13px] text-critical">{websiteDraftError}</p> : readyWebsiteDrafts.length ? <ul className="mt-4 divide-y divide-gray-border border-y border-gray-border">{readyWebsiteDrafts.map((draft) => {
         const permission = draft.draftGrantStatus === "active" ? "Draft preparation granted" : "Waiting for customer draft permission";
         return <li key={`${draft.assignmentId}:${draft.managedWebsiteBindingId}`} className="flex items-center gap-4 px-2 py-4"><Globe2 className="shrink-0 text-accent-text" size={18} aria-hidden="true" /><span className="min-w-0 flex-1"><strong className="block truncate text-[14px] font-medium text-warm-black">{draft.siteName}</strong><small className="mt-1 block text-[12px] text-gray-muted">{draft.customerWorkspaceName} · {permission}</small></span><a className="shrink-0 text-[13px] text-warm-black underline" href={`/agency-websites/${encodeURIComponent(draft.managedWebsiteBindingId)}`}>Open website</a></li>;
@@ -253,7 +269,7 @@ export function AgencyHome({
           <ArrowRight className="shrink-0 text-gray-muted" size={16} aria-hidden="true" />
         </button>
       </li>)}</ul> : <div className="flex items-start gap-3 border-b border-gray-border py-5 text-[13px] leading-relaxed text-gray-muted"><BriefcaseBusiness className="mt-0.5 shrink-0" size={17} aria-hidden="true" /><p>No private agency work has been saved yet.</p></div>}
-      <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">Business offerings are installed and managed from the customer business that owns them. This agency workspace does not currently hold a private offering catalog.</p>
+      <p className="mt-3 text-[12px] leading-relaxed text-gray-muted">Ready-made systems are set up and managed from the customer business that owns them. This agency workspace does not hold a private catalog yet.</p>
     </section>
 
     <section className="mt-12" aria-labelledby="agency-access-title">
