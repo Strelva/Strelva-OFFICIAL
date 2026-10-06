@@ -16,7 +16,9 @@ import { getDomainHealth } from "@/lib/domain-monitor-store";
 import { getScanSummaries } from "@/lib/scan-store";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { BusinessSystems, SystemListing } from "@/platform/systems/from-existing";
-import { listBusinessSystems } from "@/platform/systems/from-existing";
+import { listBusinessSystems, withTenantSurfaces, type BookingView, type TenantSiteFacts } from "@/platform/systems/from-existing";
+import { getTenantConfig } from "@/lib/tenants";
+import { savedCheckObservations } from "@/products/investigations/system-health";
 import { createSupabaseSystemStore } from "@/platform/systems/supabase-store";
 import type { System } from "@/platform/systems/contracts";
 import {
@@ -42,6 +44,8 @@ export interface SystemsProjectionInput {
   observations: readonly Observation[];
   actorId: string;
   now: number;
+  /** Day and week views of a Bookings System (wellness schedule, roster), by System id. */
+  bookingViews?: ReadonlyMap<string, readonly BookingView[]>;
 }
 
 const RANK: Record<HealthStatus, number> = { healthy: 0, unknown: 1, degraded: 2, blocked: 3 };
@@ -97,14 +101,14 @@ export async function prepareRebuildPossibilities(input: Omit<SystemsProjectionI
     const sandbox = await prepareIsolatedPossibility({
       businessId: input.listing.businessId,
       possibilityId: rebuildPossibilityId(candidate.workId),
-      title: `A rebuilt ${domain}`,
-      intent: `Replace ${domain} with ${candidate.title}.`,
+      title: candidate.origin === "agency_draft" ? `A proposed change to ${domain}` : `A rebuilt ${domain}`,
+      intent: candidate.origin === "agency_draft" ? `Apply the agency's proposed change to ${domain}.` : `Replace ${domain} with ${candidate.title}.`,
       systems: [
         { ref: { businessId: site.system.businessId, systemId: site.system.id }, name: site.system.name, content: { website: domain, tenantId: site.references.tenantId } },
         ...inquiries.map((item) => ({ ref: { businessId: item.system.businessId, systemId: item.system.id }, name: item.system.name, content: { form: `Contact form on ${domain}` } })),
       ],
       changes: [
-        { systemId: site.system.id, summary: `the rebuilt ${domain}`, content: { website: domain, rebuildWorkId: candidate.workId, candidateRevision: candidate.candidateRevision, candidateContentHash: candidate.candidateContentHash } },
+        { systemId: site.system.id, summary: candidate.origin === "agency_draft" ? `the agency's change to ${domain}` : `the rebuilt ${domain}`, content: { website: domain, rebuildWorkId: candidate.workId, candidateRevision: candidate.candidateRevision, candidateContentHash: candidate.candidateContentHash } },
         ...inquiries.map((item) => ({ systemId: item.system.id, summary: "inquiries from the rebuilt contact form", content: { form: `Rebuilt contact form on ${domain}`, rebuildWorkId: candidate.workId } })),
       ],
       checks: [
@@ -145,6 +149,7 @@ export async function projectWorkspaceSystems(input: SystemsProjectionInput): Pr
       savedWorkId: item.references.savedWorkId,
       tenantId: item.references.tenantId,
       health: healthSummary(health.get(item.system.id)),
+      ...(input.bookingViews?.get(item.system.id)?.length ? { views: [...input.bookingViews.get(item.system.id)!] } : {}),
     })),
     connections: connections.map(({ connection }) => {
       const targetSystemId = connection.target.type === "system" ? connection.target.system.systemId : null;
@@ -211,16 +216,42 @@ export interface LiveSystemsDeps {
   now?: number;
 }
 
+/**
+ * What each held managed site runs on the tenant side, read from the tenant's
+ * own config. A failed read adds nothing for that site: no Store Connection
+ * and no booking views are claimed without the fact.
+ */
+async function readTenantSiteFacts(listing: BusinessSystems, siteDomains: ReadonlyMap<string, string>): Promise<Map<string, TenantSiteFacts>> {
+  const tenantIds = [...new Set(listing.systems.flatMap((item) => item.system.kind === "website" && item.references.tenantId ? [item.references.tenantId] : []))];
+  const facts = new Map<string, TenantSiteFacts>();
+  await Promise.all(tenantIds.map(async (tenantId) => {
+    const tenant = await getTenantConfig(tenantId).catch(() => undefined);
+    if (!tenant || tenant.id !== tenantId) return;
+    const domain = siteDomains.get(tenantId);
+    facts.set(tenantId, { features: tenant.features ?? [], domain: domain ? bareHostname(domain) : null });
+  }));
+  return facts;
+}
+
+/** Saved checks become health evidence of the Systems they watch. */
+export function savedCheckEvidence(listing: BusinessSystems, siteDomains: ReadonlyMap<string, string>, savedWork: LiveSystemsDeps["savedWork"]): Observation[] {
+  return savedCheckObservations(savedWork, listing.systems.map((item) => ({
+    systemId: item.system.id, savedWorkId: item.references.savedWorkId, domain: item.system.kind === "website" ? siteDomain(item, siteDomains) : null,
+  })));
+}
+
 async function liveProjectionInput(deps: LiveSystemsDeps): Promise<SystemsProjectionInput> {
   const now = deps.now ?? Date.now();
-  const listing = await listBusinessSystems(deps.actor, deps.businessId, { store: createSupabaseSystemStore() });
+  const spine = await listBusinessSystems(deps.actor, deps.businessId, { store: createSupabaseSystemStore() });
+  const { bookingViews, ...listing } = withTenantSurfaces(spine, await readTenantSiteFacts(spine, deps.siteDomains));
   return {
     listing,
     siteDomains: deps.siteDomains,
     candidates: deps.savedWork.flatMap((work) => websiteRebuildCandidate(work) ?? []),
-    observations: await readSystemsEvidence(listing, now),
+    observations: [...await readSystemsEvidence(listing, now), ...savedCheckEvidence(listing, deps.siteDomains, deps.savedWork)],
     actorId: deps.actor.userId,
     now,
+    bookingViews,
   };
 }
 

@@ -33,7 +33,7 @@ export interface PreviewSystems {
 }
 
 const PREVIEW_ACTOR = { userId: "c0000000-0000-4000-8000-000000000001", verifiedEmail: "owner@example.invalid" };
-const SPINE_PRODUCTS = new Set(["websites", "applications", "custom-applications", "scheduling", "documents", "tracker"]);
+const SPINE_PRODUCTS = new Set(["websites", "applications", "custom-applications", "scheduling", "tracker"]);
 const text = (value: unknown) => typeof value === "string" && value.trim() ? value : null;
 
 function existingSnapshot(snapshot: WorkspaceSnapshot, inquiryTenant: string | null): ExistingSystemsSnapshot {
@@ -66,7 +66,7 @@ function candidates(snapshot: WorkspaceSnapshot): WebsiteRebuildCandidate[] {
       workId: work.id, title: work.title, sourceHost: source ? bareHostname(source) : null, tenantId: null,
       ready: ["review", "approved", "ready"].includes(work.operation?.status ?? ""),
       summary: text(work.input.summary) ?? "The same business, pages and facts, rebuilt on Strelva's website system.",
-      evidence: text(work.input.evidence), previewHref: preview, candidateRevision: 1, candidateContentHash: null,
+      evidence: text(work.input.evidence), previewHref: preview, candidateRevision: 1, candidateContentHash: null, origin: "rebuild" as const,
     }];
   });
 }

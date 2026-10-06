@@ -156,6 +156,27 @@ describe("Make real and the System page", () => {
     expect(html).not.toContain("attymooney.com");
   });
 
+  it("lists a website's audits beside it and leaves the panel out when there are none", () => {
+    expect(render()).not.toContain(">Audits<");
+    const html = render({ system: { ...site, audits: [{ workId: "audit-1", title: "Website audit · AI visibility", at: "2026-09-08T12:00:00Z" }] } });
+    expect(html).toContain("Audits");
+    expect(html).toContain("Website audit · AI visibility");
+    expect(html).toContain("work=audit-1");
+  });
+
+  it("opens a Bookings System's schedule and roster on the site, and says when a view cannot open here", () => {
+    const bookings: SystemView = {
+      id: INBOX, kind: "bookings", name: "Rohlax Wellness bookings", detail: "Time people can reserve", lifecycle: "live",
+      health: { state: "unknown", summary: "Nothing has checked this yet." },
+      surface: { kind: "work", workId: INBOX, productId: "unknown" }, connections: [], versions: [], possibilities: [],
+      views: [{ id: "schedule", label: "Day and week schedule", href: "http://localhost:3000/client/rohlax/dashboard/schedule" }, { id: "roster", label: "Roster" }],
+    };
+    const html = render({ system: bookings, systems: [bookings] });
+    expect(html).toContain('href="http://localhost:3000/client/rohlax/dashboard/schedule"');
+    expect(html).toContain("Roster · not available from here");
+    expect(html).not.toContain("There is nothing to open for this system here yet");
+  });
+
   it("keeps privileges off anything served from Strelva's own origin", () => {
     expect(websiteSandbox("https://www.attymooney.com")).toContain("allow-scripts");
     expect(websiteSandbox("/preview/strelva/rebuild/site")).toBe("");

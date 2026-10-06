@@ -101,6 +101,10 @@ export interface SystemView {
   connections: SystemConnection[];
   possibilities: SystemPossibility[];
   versions: SystemVersion[];
+  /** Views of this System kept on the managed site (a Bookings System's schedule and roster). */
+  views?: Array<{ id: string; label: string; href?: string }>;
+  /** Issued audits of this website (website audits and AI visibility assessments). Not Systems. */
+  audits?: Array<{ workId: string; title: string; at: string }>;
 }
 
 export interface NeedsYouItem {
@@ -118,7 +122,8 @@ export const SYSTEM_KIND_LABEL: Record<SystemKind, string> = {
   bookings: "Bookings",
   document: "Document",
   app: "Internal tool",
-  tracker: "Tracker",
+  // Retired as a customer label: a tracker is an internal tool started from a list.
+  tracker: "Internal tool",
   onboarding: "Client onboarding",
 };
 

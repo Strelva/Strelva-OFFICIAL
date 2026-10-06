@@ -42,7 +42,8 @@ const KIND_VIEW: Record<string, SystemKind> = {
   document: "document",
   report: "document",
   proposal: "document",
-  tracker: "tracker",
+  // Stored Systems made before the merge keep their slug; a tracker reads as an internal tool.
+  tracker: "app",
   onboarding: "onboarding",
   internal_app: "app",
   portal: "app",
@@ -70,12 +71,34 @@ const CONNECTION_STATUS = { connected: "connected", disconnected: "not_connected
 
 function detailFor(kind: SystemKind, work: WorkspaceWork | undefined, entry: WorkspaceSystemEntry): string {
   if (kind === "document" && work?.document) return `Revision ${work.document.revision}`;
-  if (kind === "app") return "Used by your team";
+  if (kind === "app") return work?.productId === "tracker" ? "Used by your team · started from a list" : "Used by your team";
   if (kind === "bookings") return "Time people can reserve";
-  if (kind === "tracker") return "Working data";
   if (kind === "onboarding") return "New-client intake";
   if (kind === "website" && !entry.tenantId) return "Website draft";
   return "";
+}
+
+const BOOKING_VIEW_LABEL = { schedule: "Day and week schedule", roster: "Roster" } as const;
+
+/** Wellness schedule and roster are views of the Bookings System on the managed site's dashboard. */
+function bookingViews(views: NonNullable<WorkspaceSystemEntry["views"]>, site: ManagedWork | undefined): NonNullable<SystemView["views"]> {
+  const dashboard = site?.href && /\/dashboard\/?$/.test(site.href) ? site.href.replace(/\/$/, "") : undefined;
+  return views.map(view => ({ id: view, label: BOOKING_VIEW_LABEL[view], ...(dashboard ? { href: `${dashboard}/${view}` } : {}) }));
+}
+
+/**
+ * Assessments and website audits are one thing on a website: issued
+ * outputs about that site. They open from its page, never as a separate
+ * presentation or System. Matched by the address they were run against.
+ */
+function auditsFor(domain: string, work: readonly WorkspaceWork[]): Pick<SystemView, "audits"> {
+  const audits = work.flatMap(item => {
+    const subject = item.assessment?.subject.url;
+    if (!subject || bare(hostname(subject)) !== domain) return [];
+    const method = item.assessment!.method.id === "website_audit" ? "Website audit" : "Website audit · AI visibility";
+    return [{ workId: item.id, title: method, at: item.assessment!.observedAt ?? item.assessment!.recordedAt }];
+  });
+  return audits.length ? { audits } : {};
 }
 
 export function readBusinessSystems(input: SystemsInput): BusinessSystems {
@@ -129,6 +152,8 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
       health: { state: entry.health.status, summary: work?.unavailableReason || entry.health.summary, lastVerifiedAt: entry.health.lastVerifiedAt },
       surface: surface ?? { kind: "work", workId: entry.savedWorkId ?? entry.ref.systemId, productId: "unknown" },
       operatedBy: kind === "website" && site ? site.relationship === "enterprise" ? "Your enterprise team" : "Strelva" : provider(installation),
+      ...(kind === "bookings" && entry.views?.length ? { views: bookingViews(entry.views, entry.tenantId ? siteById.get(entry.tenantId) : undefined) } : {}),
+      ...(kind === "website" && domain ? auditsFor(domain, snapshot.work) : {}),
       connections: [], possibilities: [], versions,
     };
   });
@@ -185,7 +210,7 @@ export function possibilityScope(possibility: SystemPossibility, systems: readon
 }
 
 /** Saved-work products the spine maps to Systems (systems/from-existing SAVED_WORK_KINDS), less websites. */
-const SYSTEM_PRODUCTS: ReadonlySet<string> = new Set(["applications", "custom-applications", "scheduling", "documents", "tracker"]);
+const SYSTEM_PRODUCTS: ReadonlySet<string> = new Set(["applications", "custom-applications", "scheduling", "tracker"]);
 
 export interface AgencyLineage {
   sources: Array<{ source: WorkspaceWork; versions: Array<{ businessId: string; businessName: string; work: WorkspaceWork }> }>;

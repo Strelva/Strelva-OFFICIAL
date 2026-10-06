@@ -109,6 +109,7 @@ export function SystemPage(props: SystemPageProps) {
         <ConnectionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} />
         <PossibilitiesPanel system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} />
         <VersionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} />
+        {system.audits?.length ? <AuditsPanel system={system} workspaceId={props.workspaceId} appBase={props.appBase || ""} /> : null}
       </aside>
     </div>
   </div>;
@@ -142,6 +143,10 @@ function SystemSurface({ system, workspaceId, readOnly, useReadOnly = readOnly, 
   if (productId === "tracker" && !localPreview) return <TrackerExperience key={workId} workspaceId={workspaceId} workId={workId} readOnly={readOnly} onSaved={noop} />;
   if (productId === "onboarding") return <OnboardingWorkspaceExperience key={workId} workspaceId={workspaceId} initialCaseId={workId} readOnly={readOnly} onSaved={noop} />;
   if (productId === "websites") return <WebsiteExperience key={workId} workspaceId={workspaceId} workId={workId} rebuildVersion={websiteDocumentVersion(sources.find(work => work.id === workId)?.payload)} rebuildEnabled={rebuildEnabled} managed={managed} agency={agency} readOnly={readOnly} onSaved={noop} />;
+  if (productId === "unknown" && system.views?.length) return <div className="p-6 text-sm">
+    <p className="text-gray-muted">These bookings are taken on the site and kept in its own booking store. Open a view of them:</p>
+    <ul className="mt-3 space-y-2">{system.views.map(view => <li key={view.id}>{view.href ? <a className="underline" href={view.href}>{view.label}</a> : <span>{view.label} · not available from here</span>}</li>)}</ul>
+  </div>;
   if (productId === "unknown") return <p className="p-6 text-sm text-gray-muted">There is nothing to open for this system here yet. Its record and status are beside it.</p>;
   return <p className="p-6 text-sm text-gray-muted">This system opens in its own view. <Link className="underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&work=${encodeURIComponent(workId)}`}>Open it</Link></p>;
 }
@@ -226,6 +231,17 @@ function PossibilitiesPanel({ system, systems, workspaceId, readOnly, readOnlyRe
         {outcome?.id === possibility.id ? <MakeRealState outcome={outcome.outcome} onAsk={onAsk} title={possibility.title} /> : null}
       </li>;
     })}</ul> : <p className="mt-3">No alternatives are being explored. <button type="button" className="underline" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else it could become</button></p>}
+  </Panel>;
+}
+
+/** Audits are issued results about this website, not Systems. A rebuild they lead to shows under Possibilities. */
+function AuditsPanel({ system, workspaceId, appBase }: { system: SystemView; workspaceId: string; appBase: string }) {
+  const audits = system.audits ?? [];
+  return <Panel id={`${system.id}-audits`} title="Audits" count={audits.length} intro="Checks of this site at a point in time. They change nothing on their own.">
+    <ul className={styles.panelList}>{audits.map(audit => <li key={audit.workId}>
+      <a href={`${appBase}/workspace?workspaceId=${encodeURIComponent(workspaceId)}&work=${encodeURIComponent(audit.workId)}`}>{audit.title}</a>
+      <small><time dateTime={audit.at}>{new Date(audit.at).toLocaleDateString()}</time></small>
+    </li>)}</ul>
   </Panel>;
 }
 

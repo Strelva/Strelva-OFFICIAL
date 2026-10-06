@@ -180,6 +180,8 @@ export interface WorkspaceSystemEntry {
   tenantId: string | null;
   /** What the evidence shows. Never derived from lifecycle. */
   health: { status: HealthStatus; summary: string; lastVerifiedAt: string | null };
+  /** A Bookings System's day and week views on the managed site (wellness schedule, roster). */
+  views?: Array<"schedule" | "roster">;
 }
 
 export interface WorkspaceSystemConnection {

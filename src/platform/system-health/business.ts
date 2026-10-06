@@ -136,6 +136,9 @@ export function healthGraphFromSystems(input: {
   const connections: HealthConnection[] = [];
   for (const connection of input.connections) {
     if (connection.state === "disconnected") continue;
+    // Appearing with something outside Strelva (a client's own checkout) is
+    // a placement Strelva neither runs nor reads; it carries no evidence.
+    if (connection.kind === "appear" && connection.target.type !== "system") continue;
     const to = targetId(connection.target);
     if (connection.target.type !== "system" && !resources.has(to)) {
       resources.set(to, { id: to, businessId: connection.businessId, name: connection.purpose ?? to, kind: connection.target.type });

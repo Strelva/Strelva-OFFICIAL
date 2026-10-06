@@ -24,6 +24,23 @@ export interface WebsiteRebuildCandidate {
   previewHref: string | null;
   candidateRevision: number | null;
   candidateContentHash: string | null;
+  /** `agency_draft`: a change an agency prepared under its website draft
+   * grant for a site that is already published. One change to one client's
+   * System, presented as that website's Possibility. */
+  origin: "rebuild" | "agency_draft";
+}
+
+const PUBLISH_KINDS = new Set(["rebuild_published", "publish_reconciled"]);
+
+/** The latest agency draft came after the latest publish. */
+function agencyDraftPending(rebuild: WebsiteRebuild): boolean {
+  let draft = -1;
+  let published = -1;
+  rebuild.history.forEach((entry, index) => {
+    if (entry.kind === "agency_document_draft") draft = index;
+    if (PUBLISH_KINDS.has(entry.kind)) published = index;
+  });
+  return draft > published && draft >= 0;
 }
 
 export function bareHostname(value: string): string | null {
@@ -61,16 +78,20 @@ export function websiteRebuildCandidate(work: { id: string; productId: string; r
   const rebuild = parsed.data;
   if (rebuild.status === "published" || rebuild.status === "failed") return null;
   const ready = Boolean(rebuild.candidate) && (rebuild.status === "review_ready" || rebuild.status === "approved");
+  const agencyDraft = agencyDraftPending(rebuild);
   return {
     workId: work.id,
     title: work.title?.trim() || rebuild.title,
     sourceHost: "url" in rebuild.input ? bareHostname(rebuild.input.url) : null,
     tenantId: rebuild.tenantId,
     ready,
-    summary: "The same business, pages and facts, rebuilt on Strelva's website system.",
+    summary: agencyDraft
+      ? "A change your agency prepared under its website draft grant. The live site is unchanged until it is approved and published."
+      : "The same business, pages and facts, rebuilt on Strelva's website system.",
     evidence: evidence(rebuild),
     previewHref: rebuild.candidate?.previewHref ?? null,
     candidateRevision: rebuild.candidate?.revision ?? null,
     candidateContentHash: rebuild.candidate?.contentHash ?? null,
+    origin: agencyDraft ? "agency_draft" : "rebuild",
   };
 }
