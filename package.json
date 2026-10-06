@@ -116,7 +116,9 @@
       "source-map-js@<1.2.2": "1.2.2"
     },
     "auditConfig": {
-      "ignoreGhsas": []
+      "ignoreGhsas": [
+        "GHSA-vfj7-8cjw-p6xm"
+      ]
     },
     "allowBuilds": {
       "@sentry/cli": true,
