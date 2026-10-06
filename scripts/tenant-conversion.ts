@@ -1,5 +1,6 @@
 /**
- * Tenant -> business workspace conversion (Strelva Reborn item 3).
+ * Tenant -> business workspace conversion (Strelva Reborn item 3), and its
+ * rollback (a full unlink).
  *
  * Logic only; the CLI is scripts/convert-tenant-to-workspace.ts. Readers and
  * writers are injected so a dry run is provably read-only in tests.
@@ -7,6 +8,7 @@
 import type { TenantConfig } from "../src/lib/types";
 import {
   planTenantImport,
+  planTenantUnlink,
   type ConversionAccount,
   type ConversionBilling,
   type ConversionReceipt,
@@ -14,6 +16,9 @@ import {
   type TenantImportPlan,
   type TenantImportSource,
   type TenantLinkState,
+  type TenantUnlinkCommand,
+  type TenantUnlinkPreview,
+  type TenantUnlinkReceipt,
 } from "../src/platform/business-record";
 
 export interface ConversionSources {
@@ -40,6 +45,8 @@ export interface ConversionDeps {
 export interface ConversionOptions {
   slug: string;
   apply: boolean;
+  /** Reverse the conversion instead of running it. */
+  rollback?: boolean;
   operatorEmail?: string;
   jacobsYes: boolean;
   databaseUrl?: string;
@@ -66,15 +73,26 @@ export function isLocalDatabaseUrl(value: string | undefined): boolean {
   }
 }
 
-export function parseConversionArgs(argv: string[]): ConversionOptions & { json: boolean } {
+export function parseConversionArgs(argv: string[]): ConversionOptions & { json: boolean; rollback: boolean } {
   const slug = argv.find((arg) => !arg.startsWith("--"));
-  if (!slug) throw new Error("Usage: convert-tenant-to-workspace <tenant-slug> [--apply] [--operator-email=<email>] [--json]");
+  if (!slug) throw new Error("Usage: convert-tenant-to-workspace <tenant-slug> [--rollback] [--apply] [--operator-email=<email>] [--json]");
   const operator = argv.find((arg) => arg.startsWith("--operator-email="))?.slice("--operator-email=".length);
-  const unknown = argv.filter((arg) => arg.startsWith("--") && !/^--(?:apply|dry-run|json|i-have-jacobs-yes|operator-email=.+)$/.test(arg));
+  const unknown = argv.filter((arg) => arg.startsWith("--") && !/^--(?:apply|dry-run|rollback|json|i-have-jacobs-yes|operator-email=.+)$/.test(arg));
   if (unknown.length) throw new Error(`Unknown flag(s): ${unknown.join(", ")}`);
   const apply = argv.includes("--apply");
   if (apply && argv.includes("--dry-run")) throw new Error("Choose --dry-run or --apply, not both.");
-  return { slug, apply, operatorEmail: operator, jacobsYes: argv.includes("--i-have-jacobs-yes"), json: argv.includes("--json") };
+  return {
+    slug, apply, rollback: argv.includes("--rollback"), operatorEmail: operator,
+    jacobsYes: argv.includes("--i-have-jacobs-yes"), json: argv.includes("--json"),
+  };
+}
+
+function assertApplyAllowed(options: ConversionOptions): void {
+  if (!options.apply) return;
+  if (!options.operatorEmail) throw new Error("--apply needs --operator-email=<a Strelva super admin>.");
+  if (!isLocalDatabaseUrl(options.databaseUrl) && !options.jacobsYes) {
+    throw new Error("Refusing --apply: the database is not a local loopback host. A production conversion needs Jacob's yes (--i-have-jacobs-yes).");
+  }
 }
 
 function sourceFor(sources: ConversionSources): TenantImportSource {
@@ -113,12 +131,7 @@ function describe(value: unknown): string {
 
 export async function runTenantConversion(options: ConversionOptions, deps: ConversionDeps): Promise<ConversionOutcome> {
   const mode = options.apply ? "apply" : "dry-run";
-  if (options.apply) {
-    if (!options.operatorEmail) throw new Error("--apply needs --operator-email=<a Strelva super admin>.");
-    if (!isLocalDatabaseUrl(options.databaseUrl) && !options.jacobsYes) {
-      throw new Error("Refusing --apply: the database is not a local loopback host. A production conversion needs Jacob's yes (--i-have-jacobs-yes).");
-    }
-  }
+  assertApplyAllowed(options);
   const sources = await deps.read(options.slug);
   if (!sources.tenant) throw new Error(`No tenant "${options.slug}".`);
 
@@ -171,4 +184,61 @@ export async function runTenantConversion(options: ConversionOptions, deps: Conv
     ? `Already converted: business ${receipt.workspaceId} (receipt from ${receipt.convertedAt}). Nothing written.`
     : `Converted: business ${receipt.workspaceId}, revision ${receipt.revision}, ${receipt.counts.facts} facts, ${receipt.counts.services} services, ${receipt.counts.contacts} contacts.`);
   return { mode, plan, link, targetWorkspaceId, receipt };
+}
+
+export interface RollbackDeps {
+  /** Null when no database is configured; reads only. */
+  preview: ((operatorEmail: string, tenantId: string) => Promise<TenantUnlinkPreview>) | null;
+  unlink(operatorEmail: string, command: TenantUnlinkCommand): Promise<TenantUnlinkReceipt>;
+  log(line: string): void;
+}
+
+export interface RollbackOutcome {
+  mode: "dry-run" | "apply";
+  preview: TenantUnlinkPreview;
+  command: TenantUnlinkCommand | null;
+  receipt: TenantUnlinkReceipt | null;
+}
+
+function describeKept(plan: { workspaceKeptBecause: string[]; deleteWorkspace: boolean }): string {
+  return plan.deleteWorkspace ? "delete it (the conversion created it and nothing else lives there)" : `keep it (${plan.workspaceKeptBecause.join(", ")})`;
+}
+
+/** Reverse one conversion. Dry run by default: it previews through a read-only
+ * RPC and writes nothing. --apply runs one atomic unlink under the same
+ * local-database refusal as the forward run. */
+export async function runTenantRollback(options: ConversionOptions, deps: RollbackDeps): Promise<RollbackOutcome> {
+  const mode = options.apply ? "apply" : "dry-run";
+  assertApplyAllowed(options);
+  if (!options.operatorEmail) throw new Error("--rollback needs --operator-email=<a Strelva super admin>; the link lives in the database.");
+  if (!deps.preview) throw new Error("--rollback needs a database; none is configured.");
+  const preview = await deps.preview(options.operatorEmail, options.slug);
+  const log = deps.log;
+  log(`Tenant rollback: ${options.slug} (${mode})`);
+  log(`  database: ${options.databaseUrl ? (isLocalDatabaseUrl(options.databaseUrl) ? "local" : "NOT local") : "not configured"}`);
+  const plan = preview.plan;
+  if (!plan) {
+    const last = preview.lastUnlink;
+    log(`  link: none${last ? `; last unlinked from ${last.workspaceId} at ${last.unlinkedAt}` : "; never converted"}`);
+    log("Nothing to roll back. Nothing was written.");
+    return { mode, preview, command: null, receipt: null };
+  }
+  log(`  link: ${options.slug} -> business ${plan.workspaceId} "${plan.workspaceName}" (linked ${plan.linkedAt}, import revision ${plan.importSequence})`);
+  log(`  would remove ${plan.entities.removed} imported item(s), restore ${plan.entities.restored} merged contact(s), keep ${plan.entities.kept} changed since import`);
+  for (const item of plan.kept) log(`    keep ${item.entity} ${item.id}: ${item.reason}`);
+  log(`  would detach ${plan.leadsDetached} lead(s) from the business (lead rows stay)`);
+  if (plan.systemsAdoptedFromTenant) log(`  ${plan.systemsAdoptedFromTenant} System(s) adopted from this site stay in the business`);
+  log(`  business workspace: would ${describeKept(plan)}`);
+  log("  tenant row, reb: keys, /api/v1, Stripe and email: untouched");
+  const command = planTenantUnlink({ tenantId: preview.tenantId, tenantStableId: preview.tenantStableId, workspaceId: plan.workspaceId, linkedAt: plan.linkedAt });
+  log(`  command ${command.commandId} digest ${command.digest}`);
+  if (!options.apply) {
+    log("Dry run: nothing was written.");
+    return { mode, preview, command, receipt: null };
+  }
+  const receipt = await deps.unlink(options.operatorEmail, command);
+  log(receipt.alreadyUnlinked
+    ? `Already unlinked: business ${receipt.workspaceId} (receipt from ${receipt.unlinkedAt}). Nothing written.`
+    : `Unlinked: business ${receipt.workspaceId} ${receipt.workspaceDeleted ? "deleted" : `kept (${receipt.workspaceKeptBecause.join(", ")})`}, ${receipt.entities.removed} removed, ${receipt.entities.restored} restored, ${receipt.entities.kept} kept, ${receipt.leadsDetached} lead(s) detached.`);
+  return { mode, preview, command, receipt };
 }

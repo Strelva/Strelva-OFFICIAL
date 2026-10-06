@@ -397,6 +397,376 @@ export type Database = {
           },
         ]
       }
+      business_contacts: {
+        Row: {
+          created_at: string
+          email: string | null
+          first_seen_at: string
+          id: string
+          last_seen_at: string
+          name: string | null
+          phone: string | null
+          phone_key: string | null
+          sources: string[]
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          first_seen_at: string
+          id?: string
+          last_seen_at: string
+          name?: string | null
+          phone?: string | null
+          phone_key?: never
+          sources: string[]
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          name?: string | null
+          phone?: string | null
+          phone_key?: never
+          sources?: string[]
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_contacts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "business_records"
+            referencedColumns: ["workspace_id"]
+          },
+        ]
+      }
+      business_people: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          role_title: string | null
+          source: string
+          updated_at: string
+          updated_by: string
+          user_id: string | null
+          verified: boolean
+          workspace_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by: string
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          role_title?: string | null
+          source: string
+          updated_at?: string
+          updated_by: string
+          user_id?: string | null
+          verified?: boolean
+          workspace_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          role_title?: string | null
+          source?: string
+          updated_at?: string
+          updated_by?: string
+          user_id?: string | null
+          verified?: boolean
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_people_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_people_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_people_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_people_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "business_records"
+            referencedColumns: ["workspace_id"]
+          },
+        ]
+      }
+      business_record_facts: {
+        Row: {
+          fact_key: string
+          source: string
+          updated_at: string
+          updated_by: string
+          value: Json
+          verified: boolean
+          workspace_id: string
+        }
+        Insert: {
+          fact_key: string
+          source: string
+          updated_at?: string
+          updated_by: string
+          value: Json
+          verified?: boolean
+          workspace_id: string
+        }
+        Update: {
+          fact_key?: string
+          source?: string
+          updated_at?: string
+          updated_by?: string
+          value?: Json
+          verified?: boolean
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_record_facts_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_record_facts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "business_records"
+            referencedColumns: ["workspace_id"]
+          },
+        ]
+      }
+      business_record_revisions: {
+        Row: {
+          actor_id: string
+          actor_kind: string
+          changes: Json
+          command_digest: string
+          command_id: string
+          created_at: string
+          record_revision: number
+          result: Json
+          sequence: number
+          source: string
+          undo_of_sequence: number | null
+          workspace_id: string
+        }
+        Insert: {
+          actor_id: string
+          actor_kind: string
+          changes: Json
+          command_digest: string
+          command_id: string
+          created_at?: string
+          record_revision: number
+          result: Json
+          sequence: number
+          source: string
+          undo_of_sequence?: number | null
+          workspace_id: string
+        }
+        Update: {
+          actor_id?: string
+          actor_kind?: string
+          changes?: Json
+          command_digest?: string
+          command_id?: string
+          created_at?: string
+          record_revision?: number
+          result?: Json
+          sequence?: number
+          source?: string
+          undo_of_sequence?: number | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_record_revisions_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_record_revisions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "business_records"
+            referencedColumns: ["workspace_id"]
+          },
+          {
+            foreignKeyName: "business_record_revisions_workspace_id_undo_of_sequence_fkey"
+            columns: ["workspace_id", "undo_of_sequence"]
+            isOneToOne: true
+            referencedRelation: "business_record_revisions"
+            referencedColumns: ["workspace_id", "sequence"]
+          },
+        ]
+      }
+      business_records: {
+        Row: {
+          created_at: string
+          created_by: string
+          last_sequence: number
+          revision: number
+          updated_at: string
+          updated_by: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          last_sequence?: number
+          revision?: number
+          updated_at?: string
+          updated_by: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          last_sequence?: number
+          revision?: number
+          updated_at?: string
+          updated_by?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_records_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_records_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_records_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_services: {
+        Row: {
+          active: boolean
+          created_at: string
+          created_by: string
+          description: string | null
+          duration_minutes: number | null
+          external_ref: string | null
+          id: string
+          name: string
+          position: number
+          price_text: string | null
+          source: string
+          updated_at: string
+          updated_by: string
+          verified: boolean
+          workspace_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          created_by: string
+          description?: string | null
+          duration_minutes?: number | null
+          external_ref?: string | null
+          id?: string
+          name: string
+          position?: number
+          price_text?: string | null
+          source: string
+          updated_at?: string
+          updated_by: string
+          verified?: boolean
+          workspace_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          duration_minutes?: number | null
+          external_ref?: string | null
+          id?: string
+          name?: string
+          position?: number
+          price_text?: string | null
+          source?: string
+          updated_at?: string
+          updated_by?: string
+          verified?: boolean
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_services_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_services_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_services_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "business_records"
+            referencedColumns: ["workspace_id"]
+          },
+        ]
+      }
       chat_messages: {
         Row: {
           content: string | null
@@ -2348,6 +2718,507 @@ export type Database = {
           },
         ]
       }
+      system_connections: {
+        Row: {
+          business_workspace_id: string
+          command_digest: string
+          command_id: string
+          contract_version: number
+          created_at: string
+          created_by: string
+          id: string
+          kind: string
+          propagation: string
+          purpose: string | null
+          source_system_id: string
+          state: string
+          target_business_workspace_id: string | null
+          target_key: string
+          target_ref: string | null
+          target_system_id: string | null
+          target_type: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          business_workspace_id: string
+          command_digest: string
+          command_id: string
+          contract_version?: number
+          created_at?: string
+          created_by: string
+          id?: string
+          kind: string
+          propagation: string
+          purpose?: string | null
+          source_system_id: string
+          state?: string
+          target_business_workspace_id?: string | null
+          target_key: string
+          target_ref?: string | null
+          target_system_id?: string | null
+          target_type: string
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          business_workspace_id?: string
+          command_digest?: string
+          command_id?: string
+          contract_version?: number
+          created_at?: string
+          created_by?: string
+          id?: string
+          kind?: string
+          propagation?: string
+          purpose?: string | null
+          source_system_id?: string
+          state?: string
+          target_business_workspace_id?: string | null
+          target_key?: string
+          target_ref?: string | null
+          target_system_id?: string | null
+          target_type?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_connections_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "system_connections_source_system_id_business_workspace_id_fkey"
+            columns: ["source_system_id", "business_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["id", "business_workspace_id"]
+          },
+          {
+            foreignKeyName: "system_connections_target_system_id_target_business_worksp_fkey"
+            columns: ["target_system_id", "target_business_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["id", "business_workspace_id"]
+          },
+          {
+            foreignKeyName: "system_connections_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      system_outputs: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          business_workspace_id: string
+          command_digest: string
+          command_id: string
+          id: string
+          issued_at: string
+          issued_by: string
+          kind: string
+          revision_id: string
+          revision_number: number
+          snapshot_hash: string
+          status: string
+          system_id: string
+          title: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          business_workspace_id: string
+          command_digest: string
+          command_id: string
+          id?: string
+          issued_at?: string
+          issued_by: string
+          kind: string
+          revision_id: string
+          revision_number: number
+          snapshot_hash: string
+          status?: string
+          system_id: string
+          title: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          business_workspace_id?: string
+          command_digest?: string
+          command_id?: string
+          id?: string
+          issued_at?: string
+          issued_by?: string
+          kind?: string
+          revision_id?: string
+          revision_number?: number
+          snapshot_hash?: string
+          status?: string
+          system_id?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_outputs_accepted_by_fkey"
+            columns: ["accepted_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "system_outputs_issued_by_fkey"
+            columns: ["issued_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "system_outputs_revision_id_system_id_revision_number_fkey"
+            columns: ["revision_id", "system_id", "revision_number"]
+            isOneToOne: false
+            referencedRelation: "system_revisions"
+            referencedColumns: ["id", "system_id", "number"]
+          },
+          {
+            foreignKeyName: "system_outputs_system_id_business_workspace_id_fkey"
+            columns: ["system_id", "business_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["id", "business_workspace_id"]
+          },
+        ]
+      }
+      system_revisions: {
+        Row: {
+          business_workspace_id: string
+          command_digest: string
+          command_id: string
+          created_at: string
+          created_by: string
+          id: string
+          implementation: Json
+          number: number
+          summary: string | null
+          system_id: string
+        }
+        Insert: {
+          business_workspace_id: string
+          command_digest: string
+          command_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          implementation: Json
+          number: number
+          summary?: string | null
+          system_id: string
+        }
+        Update: {
+          business_workspace_id?: string
+          command_digest?: string
+          command_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          implementation?: Json
+          number?: number
+          summary?: string | null
+          system_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "system_revisions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "system_revisions_system_id_business_workspace_id_fkey"
+            columns: ["system_id", "business_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "systems"
+            referencedColumns: ["id", "business_workspace_id"]
+          },
+        ]
+      }
+      systems: {
+        Row: {
+          business_workspace_id: string
+          change_number: number
+          command_digest: string
+          command_id: string
+          created_at: string
+          created_by: string
+          current_revision_id: string | null
+          current_revision_number: number | null
+          id: string
+          kind: string
+          lifecycle: string
+          name: string
+          origin_kind: string | null
+          origin_ref: string | null
+          purpose: string | null
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          business_workspace_id: string
+          change_number?: number
+          command_digest: string
+          command_id: string
+          created_at?: string
+          created_by: string
+          current_revision_id?: string | null
+          current_revision_number?: number | null
+          id?: string
+          kind: string
+          lifecycle?: string
+          name: string
+          origin_kind?: string | null
+          origin_ref?: string | null
+          purpose?: string | null
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          business_workspace_id?: string
+          change_number?: number
+          command_digest?: string
+          command_id?: string
+          created_at?: string
+          created_by?: string
+          current_revision_id?: string | null
+          current_revision_number?: number | null
+          id?: string
+          kind?: string
+          lifecycle?: string
+          name?: string
+          origin_kind?: string | null
+          origin_ref?: string | null
+          purpose?: string | null
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "systems_business_workspace_id_fkey"
+            columns: ["business_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "systems_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "systems_current_revision_fk"
+            columns: ["current_revision_id", "id", "current_revision_number"]
+            isOneToOne: false
+            referencedRelation: "system_revisions"
+            referencedColumns: ["id", "system_id", "number"]
+          },
+          {
+            foreignKeyName: "systems_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_leads: {
+        Row: {
+          capability_id: string | null
+          capability_version: number | null
+          captured_at: string
+          email: string | null
+          fields: Json | null
+          id: string
+          lead_id: string
+          message: string | null
+          name: string
+          recorded_at: string
+          recorded_via: string
+          source: string | null
+          submission_hash: string
+          tenant_slug_at_capture: string
+          tenant_stable_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          capability_id?: string | null
+          capability_version?: number | null
+          captured_at: string
+          email?: string | null
+          fields?: Json | null
+          id?: string
+          lead_id: string
+          message?: string | null
+          name: string
+          recorded_at?: string
+          recorded_via: string
+          source?: string | null
+          submission_hash: string
+          tenant_slug_at_capture: string
+          tenant_stable_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          capability_id?: string | null
+          capability_version?: number | null
+          captured_at?: string
+          email?: string | null
+          fields?: Json | null
+          id?: string
+          lead_id?: string
+          message?: string | null
+          name?: string
+          recorded_at?: string
+          recorded_via?: string
+          source?: string | null
+          submission_hash?: string
+          tenant_slug_at_capture?: string
+          tenant_stable_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_leads_tenant_stable_id_fkey"
+            columns: ["tenant_stable_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["stable_id"]
+          },
+          {
+            foreignKeyName: "tenant_leads_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_workspace_links: {
+        Row: {
+          command_digest: string
+          command_id: string
+          id: string
+          linked_at: string
+          linked_by: string
+          receipt: Json
+          tenant_slug_at_link: string
+          tenant_stable_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          command_digest: string
+          command_id: string
+          id?: string
+          linked_at?: string
+          linked_by: string
+          receipt: Json
+          tenant_slug_at_link: string
+          tenant_stable_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          command_digest?: string
+          command_id?: string
+          id?: string
+          linked_at?: string
+          linked_by?: string
+          receipt?: Json
+          tenant_slug_at_link?: string
+          tenant_stable_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_workspace_links_linked_by_fkey"
+            columns: ["linked_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_workspace_links_tenant_stable_id_fkey"
+            columns: ["tenant_stable_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["stable_id"]
+          },
+          {
+            foreignKeyName: "tenant_workspace_links_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenant_workspace_unlinks: {
+        Row: {
+          command_digest: string
+          command_id: string
+          id: string
+          link_command_id: string
+          link_id: string
+          receipt: Json
+          tenant_slug_at_unlink: string
+          tenant_stable_id: string
+          unlinked_at: string
+          unlinked_by: string
+          workspace_id: string
+        }
+        Insert: {
+          command_digest: string
+          command_id: string
+          id?: string
+          link_command_id: string
+          link_id: string
+          receipt: Json
+          tenant_slug_at_unlink: string
+          tenant_stable_id: string
+          unlinked_at?: string
+          unlinked_by: string
+          workspace_id: string
+        }
+        Update: {
+          command_digest?: string
+          command_id?: string
+          id?: string
+          link_command_id?: string
+          link_id?: string
+          receipt?: Json
+          tenant_slug_at_unlink?: string
+          tenant_stable_id?: string
+          unlinked_at?: string
+          unlinked_by?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_workspace_unlinks_unlinked_by_fkey"
+            columns: ["unlinked_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           account_id: string | null
@@ -2599,6 +3470,318 @@ export type Database = {
         }
         Relationships: []
       }
+      website_crawl_pages: {
+        Row: {
+          created_at: string
+          created_by: string
+          expires_at: string
+          html_bytes: number
+          page: Json
+          source_id: string
+          website_work_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          expires_at?: string
+          html_bytes: number
+          page: Json
+          source_id: string
+          website_work_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          html_bytes?: number
+          page?: Json
+          source_id?: string
+          website_work_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "website_crawl_pages_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "website_crawl_pages_website_work_id_workspace_id_fkey"
+            columns: ["website_work_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "saved_product_work"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      website_document_heads: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          approved_hash: string | null
+          approved_revision: number | null
+          revision: number
+          website_work_id: string
+          workspace_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_hash?: string | null
+          approved_revision?: number | null
+          revision: number
+          website_work_id: string
+          workspace_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          approved_hash?: string | null
+          approved_revision?: number | null
+          revision?: number
+          website_work_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "website_document_heads_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "website_document_heads_workspace_id_website_work_id_revisi_fkey"
+            columns: ["workspace_id", "website_work_id", "revision"]
+            isOneToOne: false
+            referencedRelation: "website_documents"
+            referencedColumns: ["workspace_id", "website_work_id", "revision"]
+          },
+        ]
+      }
+      website_document_health: {
+        Row: {
+          checked_at: string
+          content_hash: string
+          observed_hash: string | null
+          revision: number
+          status: string
+          website_work_id: string
+          workspace_id: string
+        }
+        Insert: {
+          checked_at: string
+          content_hash: string
+          observed_hash?: string | null
+          revision: number
+          status: string
+          website_work_id: string
+          workspace_id: string
+        }
+        Update: {
+          checked_at?: string
+          content_hash?: string
+          observed_hash?: string | null
+          revision?: number
+          status?: string
+          website_work_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "website_document_health_workspace_id_website_work_id_revis_fkey"
+            columns: ["workspace_id", "website_work_id", "revision"]
+            isOneToOne: false
+            referencedRelation: "website_documents"
+            referencedColumns: ["workspace_id", "website_work_id", "revision"]
+          },
+        ]
+      }
+      website_document_publications: {
+        Row: {
+          content_hash: string
+          published_at: string
+          receipt: Json
+          revision: number
+          tenant_id: string
+          website_work_id: string
+          workspace_id: string
+        }
+        Insert: {
+          content_hash: string
+          published_at?: string
+          receipt: Json
+          revision: number
+          tenant_id: string
+          website_work_id: string
+          workspace_id: string
+        }
+        Update: {
+          content_hash?: string
+          published_at?: string
+          receipt?: Json
+          revision?: number
+          tenant_id?: string
+          website_work_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "website_document_publications_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "website_document_publications_workspace_id_website_work_id_fkey"
+            columns: ["workspace_id", "website_work_id", "revision"]
+            isOneToOne: false
+            referencedRelation: "website_documents"
+            referencedColumns: ["workspace_id", "website_work_id", "revision"]
+          },
+        ]
+      }
+      website_document_receipts: {
+        Row: {
+          created_at: string
+          id: string
+          receipt: Json
+          revision: number
+          website_work_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          receipt: Json
+          revision: number
+          website_work_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          receipt?: Json
+          revision?: number
+          website_work_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "website_document_receipts_workspace_id_website_work_id_rev_fkey"
+            columns: ["workspace_id", "website_work_id", "revision"]
+            isOneToOne: false
+            referencedRelation: "website_documents"
+            referencedColumns: ["workspace_id", "website_work_id", "revision"]
+          },
+        ]
+      }
+      website_documents: {
+        Row: {
+          content_hash: string
+          created_at: string
+          created_by: string
+          document: Json
+          revision: number
+          website_work_id: string
+          workspace_id: string
+        }
+        Insert: {
+          content_hash: string
+          created_at?: string
+          created_by: string
+          document: Json
+          revision: number
+          website_work_id: string
+          workspace_id: string
+        }
+        Update: {
+          content_hash?: string
+          created_at?: string
+          created_by?: string
+          document?: Json
+          revision?: number
+          website_work_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "website_documents_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "website_documents_website_work_id_workspace_id_fkey"
+            columns: ["website_work_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "saved_product_work"
+            referencedColumns: ["id", "workspace_id"]
+          },
+        ]
+      }
+      website_hosted_tenant_reservations: {
+        Row: {
+          created_at: string
+          created_by: string
+          tenant_id: string
+          tenant_stable_id: string
+          website_work_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          tenant_id: string
+          tenant_stable_id: string
+          website_work_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          tenant_id?: string
+          tenant_stable_id?: string
+          website_work_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "website_hosted_tenant_reserva_website_work_id_workspace_id_fkey"
+            columns: ["website_work_id", "workspace_id"]
+            isOneToOne: false
+            referencedRelation: "saved_product_work"
+            referencedColumns: ["id", "workspace_id"]
+          },
+          {
+            foreignKeyName: "website_hosted_tenant_reservations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "website_hosted_tenant_reservations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "website_hosted_tenant_reservations_tenant_stable_id_fkey"
+            columns: ["tenant_stable_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["stable_id"]
+          },
+        ]
+      }
       weekly_briefs: {
         Row: {
           booking_clicks: Json | null
@@ -2667,12 +3850,430 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_system_output: {
+        Args: {
+          p_output_id: string
+          p_system_id: string
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       app_is_super_admin: { Args: never; Returns: boolean }
       app_tenant_ids: { Args: never; Returns: string[] }
       app_tenant_stable_ids: { Args: never; Returns: string[] }
+      append_website_document: {
+        Args: {
+          p_content_hash: string
+          p_document: Json
+          p_expected_revision: number
+          p_user_id: string
+          p_verified_email: string
+          p_work_id: string
+          p_workspace_id: string
+        }
+        Returns: {
+          content_hash: string
+          created_at: string
+          created_by: string
+          document: Json
+          revision: number
+          website_work_id: string
+          workspace_id: string
+        }[]
+      }
+      approve_website_document: {
+        Args: {
+          p_content_hash: string
+          p_revision: number
+          p_user_id: string
+          p_verified_email: string
+          p_work_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      business_contact_phone_key: {
+        Args: { p_phone: string }
+        Returns: string
+      }
+      business_contact_sources: { Args: never; Returns: string[] }
+      business_record_email_valid: {
+        Args: { p_email: string }
+        Returns: boolean
+      }
+      business_record_fact_valid: {
+        Args: { p_key: string; p_value: Json }
+        Returns: boolean
+      }
+      business_record_sources: { Args: never; Returns: string[] }
+      business_record_text_valid: {
+        Args: { p_max: number; p_min: number; p_value: Json }
+        Returns: boolean
+      }
+      business_record_time_valid: {
+        Args: { p_value: Json }
+        Returns: boolean
+      }
+      claim_website_rebuild: {
+        Args: {
+          p_domain_key: string
+          p_input: Json
+          p_payload: Json
+          p_request_id: string
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string
+          id: string
+          input: Json | null
+          payload: Json
+          product_id: string
+          resource_kind: string
+          source_work_id: string | null
+          title: string | null
+          updated_at: string
+          workspace_id: string
+        }[]
+      }
+      commit_website_document_candidate: {
+        Args: {
+          p_content_hash: string
+          p_document: Json
+          p_expected_document_revision: number
+          p_expected_work_revision: number
+          p_payload: Json
+          p_user_id: string
+          p_verified_email: string
+          p_work_id: string
+          p_workspace_id: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string
+          id: string
+          input: Json | null
+          payload: Json
+          product_id: string
+          resource_kind: string
+          source_work_id: string | null
+          title: string | null
+          updated_at: string
+          workspace_id: string
+        }[]
+      }
+      connect_system: {
+        Args: {
+          p_command_digest: string
+          p_command_id: string
+          p_input: Json
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      convert_tenant_to_business: {
+        Args: {
+          p_command_digest: string
+          p_command_id: string
+          p_import: Json
+          p_operator_email: string
+          p_tenant_id: string
+        }
+        Returns: Json
+      }
+      create_business_system: {
+        Args: {
+          p_command_digest: string
+          p_command_id: string
+          p_input: Json
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      export_workspace_snapshot: {
+        Args: {
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       increment_site_metric: {
         Args: { p_day: string; p_metric: string; p_tenant_id: string }
         Returns: number
+      }
+      issue_system_output: {
+        Args: {
+          p_command_digest: string
+          p_command_id: string
+          p_input: Json
+          p_system_id: string
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      manage_published_website_tenant: {
+        Args: {
+          p_tenant_id: string
+          p_user_id: string
+          p_verified_email: string
+          p_work_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      manage_website_document: {
+        Args: {
+          p_user_id: string
+          p_verified_email: string
+          p_work_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      patch_business_record: {
+        Args: {
+          p_command_digest: string
+          p_command_id: string
+          p_expected_revision: number
+          p_patch: Json
+          p_source: string
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      preview_tenant_unlink: {
+        Args: { p_operator_email: string; p_tenant_id: string }
+        Returns: Json
+      }
+      prune_website_crawl_pages: { Args: never; Returns: number }
+      publish_website_document: {
+        Args: {
+          p_content_hash: string
+          p_receipt: Json
+          p_revision: number
+          p_tenant_id: string
+          p_user_id: string
+          p_verified_email: string
+          p_work_id: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      read_business_contacts: {
+        Args: {
+          p_limit?: number
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      read_business_record: {
+        Args: {
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      read_business_record_history: {
+        Args: {
+          p_limit?: number
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      read_business_system: {
+        Args: {
+          p_system_id: string
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      read_business_systems: {
+        Args: {
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      read_existing_business_systems: {
+        Args: {
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      read_published_website_documents: {
+        Args: { p_tenant_id?: string }
+        Returns: {
+          content_hash: string
+          created_at: string
+          created_by: string
+          document: Json
+          receipt: Json
+          revision: number
+          tenant_id: string
+          website_work_id: string
+          workspace_id: string
+        }[]
+      }
+      read_tenant_leads: {
+        Args: { p_before: string; p_limit: number; p_tenant_id: string }
+        Returns: Json
+      }
+      read_tenant_workspace_link: {
+        Args: { p_operator_email: string; p_tenant_id: string }
+        Returns: Json
+      }
+      read_website_crawl_pages: {
+        Args: {
+          p_user_id: string
+          p_verified_email: string
+          p_work_id: string
+          p_workspace_id: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string
+          expires_at: string
+          html_bytes: number
+          page: Json
+          source_id: string
+          website_work_id: string
+          workspace_id: string
+        }[]
+      }
+      read_website_document_receipts: {
+        Args: {
+          p_user_id: string
+          p_verified_email: string
+          p_work_id: string
+          p_workspace_id: string
+        }
+        Returns: {
+          created_at: string
+          id: string
+          receipt: Json
+          revision: number
+          website_work_id: string
+          workspace_id: string
+        }[]
+      }
+      read_website_documents: {
+        Args: {
+          p_all?: boolean
+          p_revision?: number
+          p_user_id: string
+          p_verified_email: string
+          p_work_id: string
+          p_workspace_id: string
+        }
+        Returns: {
+          content_hash: string
+          created_at: string
+          created_by: string
+          document: Json
+          revision: number
+          website_work_id: string
+          workspace_id: string
+        }[]
+      }
+      record_system_revision: {
+        Args: {
+          p_activate: boolean
+          p_command_digest: string
+          p_command_id: string
+          p_expected_change: number
+          p_input: Json
+          p_system_id: string
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      record_tenant_lead: {
+        Args: { p_lead: Json; p_tenant_id: string; p_via: string }
+        Returns: Json
+      }
+      record_website_document_health: {
+        Args: {
+          p_checked_at: string
+          p_content_hash: string
+          p_observed_hash?: string
+          p_revision: number
+          p_status: string
+          p_work_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      reserve_website_hosted_tenant: {
+        Args: {
+          p_content_hash: string
+          p_revision: number
+          p_tenant_id: string
+          p_user_id: string
+          p_verified_email: string
+          p_work_id: string
+          p_workspace_id: string
+        }
+        Returns: string[]
+      }
+      resolve_business_owner_recipient: {
+        Args: { p_workspace_id: string }
+        Returns: Json
+      }
+      retain_website_crawl_page: {
+        Args: {
+          p_page: Json
+          p_user_id: string
+          p_verified_email: string
+          p_work_id: string
+          p_workspace_id: string
+        }
+        Returns: undefined
+      }
+      set_system_connection_state: {
+        Args: {
+          p_connection_id: string
+          p_state: string
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      set_system_current_revision: {
+        Args: {
+          p_expected_current: string
+          p_revision_id: string
+          p_system_id: string
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
       }
       site_metric_summary: {
         Args: { p_tenant_id: string; p_today: string }
@@ -2683,6 +4284,67 @@ export type Database = {
           today: number
           total: number
         }[]
+      }
+      system_origin_id: {
+        Args: { p_kind: string; p_ref: string; p_workspace_id: string }
+        Returns: string
+      }
+      system_origin_kinds: { Args: never; Returns: string[] }
+      transition_system_lifecycle: {
+        Args: {
+          p_expected_change: number
+          p_system_id: string
+          p_to: string
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      undo_business_record_revision: {
+        Args: {
+          p_command_digest: string
+          p_command_id: string
+          p_sequence: number
+          p_source: string
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      unlink_tenant_from_business: {
+        Args: {
+          p_command_digest: string
+          p_command_id: string
+          p_operator_email: string
+          p_tenant_id: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      update_business_system: {
+        Args: {
+          p_expected_change: number
+          p_patch: Json
+          p_system_id: string
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      upsert_business_contacts: {
+        Args: {
+          p_command_digest: string
+          p_command_id: string
+          p_contacts: Json
+          p_source: string
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
       }
     }
     Enums: {
