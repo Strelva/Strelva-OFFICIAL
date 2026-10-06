@@ -59,7 +59,7 @@ export interface Observation {
   /** Evidence older than this is stale and cannot prove health. */
   maxAgeSeconds: number;
   /** Which existing monitor produced it. */
-  source: "domain-monitor" | "scan" | "heartbeat" | "calendar-connection" | "integration-connection" | "inquiry-capability" | "schedule";
+  source: "domain-monitor" | "scan" | "heartbeat" | "calendar-connection" | "integration-connection" | "inquiry-capability" | "schedule" | "custom-repo" | "hosted-document";
   message: string;
 }
 
