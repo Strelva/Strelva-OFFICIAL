@@ -61,23 +61,28 @@ and clients who never log in keep working.
 
 ## Where we are
 
-Audited 2026-10-02 against code, line by line. Production facts come from the
+Audited 2026-10-02 against code, line by line, and again on 2026-10-05
+against `reborn` plus every unmerged Oct 5 branch together. Production facts
+come from the
 [Sept 30 release record](../operations/strelvav2-horizontal-acceptance.md#september-30-workspace-production-release),
 not a fresh read.
 
-**9 of 48 lines are done (6 proven locally only), 11 are partial and 28
-are not started.** Section 0 was finished locally on Oct 5; nothing in it is
+**8 of 48 lines are done, all proven locally only; 13 are partial and 27 are
+not started.** The Oct 5 re-audit counts a table or function with no product
+caller as partial, which moves undo back to partial and inquiries forward to
+partial. Section 0 was finished locally on Oct 5; nothing in it is
 deployed. Summing the sizes below (S half a day, M two, L five, XL ten)
 gives about 108 agent-days if done one at a time. Sections 0, 1 and 3 are the
 critical path at about 31 of them; the rest can run in parallel streams.
 These are estimates, not measurements. Nothing below is proven in
 production.
 
-- **No business record.** `src/platform/business-record/` is empty. A business
-  is a `workspaces` row with a name. Facts live in `tenants` rows, a Redis
-  booking blob and inside each website document.
+- **The business record exists only as data.** Tables, functions and tests
+  are built locally (`src/platform/business-record/`). The conversion script
+  is its only caller: no route, page or notice reads it yet.
 - **No client in a workspace.** Production: 0 workspaces, 0 tenant
-  memberships, 1 sign-in in 30 days. No conversion script exists.
+  memberships, 1 sign-in in 30 days. A local conversion script exists; its
+  rollback only undoes the import revision.
 - **Leads are being lost today.** In production, leads live only in Redis:
   `lead:{tenant}:{id}` expires after 90 days and `leads:{tenant}` keeps 500.
   Older leads are gone. The fix (section 0) is built locally and waits on a
@@ -95,8 +100,17 @@ production.
   `/api/v1/leads` (Orange Crate only mentions it in a comment); five repos post
   to `/api/v1/track`; Cocard calls `/api/v1/spam-pit`; Vermont Unlimited calls
   nothing.
-- **The layers are tangled.** 98 workspace files import `src/lib`; `lib`
-  imports back into `products` from `agent-shared.ts` and `event-actions.ts`.
+- **The layers are tangled, and Oct 5 made it worse.** 108 workspace files
+  import `src/lib` (98 on Oct 2; Systems, system health, the business-record
+  repository and inquiry receipts added ten). `lib` imports back into
+  `products` from `agent-shared.ts` and `event-actions.ts`.
+- **Systems, Possibilities and Make real sit behind only
+  `STRELVA_WORKSPACE_RELEASE`,** which production turned on Sept 30. They
+  need their own flag before any Reborn step ships, because Possibilities and
+  Make real are not in Reborn.
+- **Lead copies are deleted with their tenant.** `tenant_leads` cascades on
+  tenant delete. Whether a deprovisioned client's leads are kept is Jacob's
+  call.
 
 Run `pnpm reborn:progress` for the code-side numbers at any time.
 
@@ -142,9 +156,10 @@ M one to three days, L three to seven, XL more.
 - [ ] Website facts, booking hours and services, and inquiry contacts read and
       write it. No capability keeps its own copy of a business fact.
       *Not started · L*
-- [x] Every edit has history and an undo, like website documents today.
-      *Proven locally:* each command writes one immutable revision; undo
-      refuses if a later change touched the same item.
+- [ ] Every edit has history and an undo, like website documents today.
+      *Partial:* each command writes one immutable revision and
+      `undo_business_record_revision` refuses if a later change touched the
+      same item, proven locally. Nothing outside tests calls undo yet · S
 - [ ] One owner-recipient rule: the record's owner contact, falling back to
       `tenants.owner_email`. Every owner notice (leads, bookings, reports)
       uses it. *Partial: `owner_recipient` fact and
@@ -161,7 +176,9 @@ Proof: unit and SQL tests in `check:workspace-sql`; `reborn:progress` shows
 
 - [ ] Inquiries are Postgres-authoritative and reference `workspaces(id)`.
       `/api/v1/leads/[tenant]` keeps its contract and writes the new store.
-      *Not started · M (after section 0)*
+      *Partial: `tenant_leads.workspace_id` references `workspaces(id)` and
+      fills in when a tenant is linked, but it is a mirror; Redis still serves
+      reads · M*
 - [ ] One booking store. `/api/booking/*` and `/api/v1/bookings/*` both land
       in it. Weekly hours, slot length, buffer, lead time, advance window,
       date overrides and services come over from `src/lib/booking.ts`.
@@ -193,7 +210,8 @@ storefront comparison like Sept 30 (60/60).
       revision; a full unlink isn't built. Never run against Supabase · S*
 - [x] Links and new rows survive tenant renames and deprovision. *Proven
       locally:* links key on `stable_id`; deleting a tenant clears the link
-      and keeps the business.
+      and keeps the business. Exception: `tenant_leads` rows cascade-delete
+      with their tenant, pending Jacob's decision.
 - [ ] Tooling for a scrubbed local copy of production (Postgres, Auth users,
       Redis leads, bookings, events and connections; outgoing email, Stripe
       and Google disabled). *Not started · M*
@@ -220,7 +238,9 @@ are untouched.
 
 - [ ] **Website.** Live tenant sites show name, domain, live link, verified
       status, change requests and previews awaiting review. Every field
-      exists in tenant data today. *Name done; rest not started · S–M*
+      exists in tenant data today. *Partial: `SystemPage.tsx` shows name,
+      domain, live link, health and a preview (local, `transition/systems`);
+      change requests and previews awaiting review are missing · S*
 - [ ] **Website rebuild merges.** *Partial: committed in PR #209, flag off ·
       M*
 - [ ] **Website edits, history and publishing** for existing sites are

@@ -6,6 +6,7 @@ test.skip(process.env.STRELVA_UI_PREVIEW !== "1", "Systems fixtures require the 
 // comes from the October 1 capture; everything else is fictional fixture data.
 // Systems, health and Possibilities are projected on the server by the same
 // code the workspace route runs (preview/systems-projection.ts).
+test.skip(process.env.STRELVA_UI_PREVIEW !== "1", "Requires the explicit development-only interface preview.");
 
 async function noHorizontalScroll(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
