@@ -49,14 +49,16 @@ export function WorkspaceInquiries({ workspaceId, state }: { workspaceId: string
       errorTitle="Inquiries couldn't load" errorBody="Nothing is lost. New messages still reach your inbox. Reload the page to try again.">
       {data && data.sites.length === 0 && data.denied.length === 0 ? <NoSiteCard body="Inquiries start once Strelva runs a website with a contact form for this business." /> : null}
       {data?.sites.map((site) => (
-        <section key={site.tenantId} className="mt-8" aria-labelledby={`site-${site.tenantId}`}>
-          <SiteHeading id={`site-${site.tenantId}`} name={site.siteName} multiple={data.sites.length > 1} />
+        <section key={site.key} className="mt-8" aria-labelledby={`site-${site.key.replace(/[^a-z0-9-]/gi, "-")}`}>
+          <SiteHeading id={`site-${site.key.replace(/[^a-z0-9-]/gi, "-")}`} name={site.connected ? `${site.siteName} (your site)` : site.siteName} multiple={data.sites.length > 1} />
           {site.unavailable ? (
             <Card padding="lg" role="status"><p className="text-sm leading-6 text-gray-muted">Messages for {site.siteName} couldn&apos;t be read right now. New messages are still captured and emailed to you.</p></Card>
           ) : site.leads.length === 0 ? (
             <Card padding="lg">
               <h3 className="text-base font-medium">No one has reached out yet</h3>
-              <p className="mt-2 text-sm leading-6 text-gray-muted">When someone contacts you through {site.siteName}, they show up here with their name and what they asked.</p>
+              <p className="mt-2 text-sm leading-6 text-gray-muted">{site.connected
+                ? `When someone sends a form on ${site.siteName}, Strelva takes it and it shows up here with their name and what they asked.`
+                : `When someone contacts you through ${site.siteName}, they show up here with their name and what they asked.`}</p>
             </Card>
           ) : (
             <>
