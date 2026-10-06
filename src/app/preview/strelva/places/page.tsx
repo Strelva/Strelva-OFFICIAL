@@ -81,10 +81,10 @@ export default async function PlacesPreviewPage({ searchParams }: { searchParams
 
   const leads = [
     { id: "l3", name: "Priya S.", email: "priya@example.test", message: "Could you do a 3-tier cake for 60 people on Nov 14?", source: "contact-form", fields: [["Event date", "2026-11-14"], ["Guests", "60"]] as Array<[string, string]>, createdAt: "2026-10-05T14:10:00Z" },
-    { id: "l2", name: "Tom R.", email: "tom@example.test", message: "Do you deliver catering trays to offices downtown?", source: "quote", fields: [], createdAt: "2026-10-03T09:30:00Z" },
-    { id: "l1", name: "Someone", email: null, message: "Are you open on Thanksgiving?", source: null, fields: [], createdAt: "2026-08-20T09:30:00Z" },
     // Released from held messages (STRELVA_INQUIRY_RECORDS): can be put back.
     { id: "lead_spam_x", releasedRowId: "5e000000-0000-4000-8000-0000000000d3", name: "Marta K.", email: "marta@example.test", message: "Wholesale bread for our café, 40 loaves a week?", source: "contact-form", fields: [], createdAt: "2026-10-04T07:15:00Z" },
+    { id: "l2", name: "Tom R.", email: "tom@example.test", message: "Do you deliver catering trays to offices downtown?", source: "quote", fields: [], createdAt: "2026-10-03T09:30:00Z" },
+    { id: "l1", name: "Someone", email: null, message: "Are you open on Thanksgiving?", source: null, fields: [], createdAt: "2026-08-20T09:30:00Z" },
   ];
   const site = { tenantId: "juniper", siteName: "Juniper Bakery", leads, lastThirtyDays: 3, unavailable: false };
   // Held spam for review: `held=1` shows two items, `held=error` a list that failed.

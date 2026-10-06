@@ -21,10 +21,35 @@ and the visitor still succeeds. Migration `20261008140000_tenant_lead_reads.sql`
 adds `read_tenant_lead` and `read_tenant_lead_digests`. Scripts and the
 operator merge read Redis on purpose (`getRedisLeads`). Proof:
 `src/__tests__/lead-read-source.test.ts`, `tests/tenant-lead-reads-schema.sql`
-in `check:workspace-sql`, `check:custom-repos` 196/196. Not built: spam
-`held_as_spam`, `inquiry_events`, the workspace-scoped read, contact upsert
-on capture, the Needs you inquiry items. Every production step (migration,
+in `check:workspace-sql`, `check:custom-repos` 196/196. Every production step (migration,
 compare window, each flip) needs Jacob's yes.
+
+**Built locally October 9 (wave 3, branch `w3/inquiries-gaps`, not applied
+or deployed; `STRELVA_INQUIRY_RECORDS` off).** Migration
+`20261009113000_inquiry_records.sql`: `tenant_leads.intake_state`
+(`kept`, `held_as_spam`, `released`, `confirmed_spam`) with `held_reason`
+and `contact_id`; `inquiry_events` (append-only, RLS on, grants revoked);
+`hold_tenant_lead_as_spam`, `after_tenant_lead_capture` (the `captured`
+event and the contact, matched by email then phone, source `inquiry`),
+`record_inquiry_event`, `read_workspace_leads` (direct members, paged with
+`p_before`), `read_workspace_inquiry_events` and
+`decide_held_workspace_lead` (owner or an active Strelva super admin;
+members and admins refused). `read_tenant_leads`, `read_tenant_lead` and
+`read_tenant_lead_digests` are replaced to skip spam, so the 7-day parity
+is unchanged. App: `src/lib/inquiry-records.ts`; the spam pit also holds
+each caught submission in Postgres (Redis pit unchanged); capture runs the
+follow-up after Postgres keeps a lead; delivery, reply and timeline writes
+are copied into `inquiry_events`; the workspace Inquiries page lists held
+messages (Release, It's spam, Move back) through
+`POST /api/workspace/inquiries/held`; a drafted reply that quotes a price,
+date or promise becomes an urgent, owner-only `customer.commitment` Needs
+you item (`src/platform/needs-you/inquiry-policy.ts`). Proof:
+`tests/inquiry-records-schema.sql` in both SQL checks,
+`inquiry-records`, `inquiry-needs-you-and-held` and `held-inquiry-route`
+tests. Not built: Redis readers (`/dashboard/leads`, the inquiry engine)
+don't see a released message until reads flip; held spam from connected
+sites stays in the client-records spam pit; no operator screen for held
+spam (operators can call the same review function).
 
 This page amends the
 [September 11 inquiry spec](./inquiry-first-product-spec-2026-09-11.md). It

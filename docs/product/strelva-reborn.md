@@ -195,8 +195,12 @@ Proof: unit and SQL tests in `check:workspace-sql`; `reborn:progress` shows
       parity recorded by the reconcile cron) and Postgres-first capture
       (`STRELVA_LEADS_AUTHORITY=postgres`, Redis + pending-queue fallback).
       In production nothing changes until Jacob's yes on the migration, 7
-      days of compare and each flip. Spam (`held_as_spam`), `inquiry_events`
-      and the workspace-scoped read are not built.*
+      days of compare and each flip. Spam held for review in `tenant_leads`
+      (`held_as_spam`, `released`, `confirmed_spam`), `inquiry_events`, the
+      workspace-scoped read (`read_workspace_leads`) and the inquiry contact
+      on capture are built and proven locally Oct 9 (branch
+      `w3/inquiries-gaps`, migration `20261009113000` not applied, writes
+      behind `STRELVA_INQUIRY_RECORDS`, off).*
 - [x] One booking store. `/api/booking/*` and `/api/v1/bookings/*` both land
       in it. Weekly hours, slot length, buffer, lead time, advance window,
       date overrides and services come over from `src/lib/booking.ts`.
@@ -306,7 +310,12 @@ are untouched.
       cancellation email are not built · L*
 - [ ] **Inquiries.** `STRELVA_INQUIRIES_RELEASE` on, spam review in the
       workspace, owner notification. Existing leads already project in.
-      *~35% · M*
+      *~45%: spam review on the workspace Inquiries page (owner or Strelva
+      releases, confirms or puts back; members refused) and reply drafts
+      that quote a price, date or promise routed to the owner as urgent
+      `customer.commitment` Needs you items, built locally Oct 9 on
+      `w3/inquiries-gaps` behind `STRELVA_INQUIRY_RECORDS`. Release flag,
+      production email and the migration wait on Jacob · M*
 - [ ] **Publishing.** Reviews and replies, Google Business, and blog and
       collections run from the workspace. Tenant Google tokens move to
       workspace connections through `crypto/secrets.ts` without re-consent.
