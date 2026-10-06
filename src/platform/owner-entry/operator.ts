@@ -6,6 +6,7 @@ import {
   RELEASE_FLAG_LABELS,
   RELEASE_FLAGS,
   effectiveReleaseState,
+  isMakeRealLiveFlag,
   releaseFlagEnvMode,
   workspaceReleaseOn,
   type ReleaseEnvironment,
@@ -111,6 +112,14 @@ export async function applyTenantReleaseCommand(operatorEmail: string, tenantId:
     return;
   }
   let reason = command.reason.trim();
+  if (isMakeRealLiveFlag(command.flag) && (command.state === "on" || command.state === "operators")) {
+    // A live channel only ever runs where Systems itself is shown (spec 6.3).
+    const stored = await readWorkspaceReleaseFlags(workspaceId, { fresh: true });
+    const systems = stored.flags.systems?.state ?? null;
+    if (systems !== "on" && systems !== "operators") {
+      throw new ReleaseFlagValidationError("workspace_release_systems_first", "Turn Systems on for this client (operators or on) before a live Make real channel.");
+    }
+  }
   if (command.state === "on") {
     if (command.jacobApproved !== true) {
       throw new ReleaseFlagValidationError("workspace_release_needs_jacob", "Turning a client on needs Jacob's yes. Confirm it, then try again.");

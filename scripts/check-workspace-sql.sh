@@ -552,6 +552,16 @@ psql "${psql_args[@]}" --file="$repo_root/tests/make-real-activations-schema.sql
 # The real Make real runner, checkpointing through these RPCs (psql-backed port).
 STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run src/__tests__/make-real-activation-repository.test.ts
+# Possibilities in Postgres (stale rule, adoption at conversion, observed
+# revisions, idle withdraw) and Make real live: channel flags and due resume.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008130000_system_possibilities.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/system-possibilities-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008131000_make_real_live.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
+# The release flag rules still hold after the flag names gain channel keys.
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
+STRELVA_POSSIBILITIES_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
+  pnpm --dir "$repo_root" exec vitest run src/__tests__/possibility-repository.test.ts
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 

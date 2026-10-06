@@ -14,16 +14,39 @@
  * Pure. The store reads rows; this decides.
  */
 
-export const RELEASE_FLAGS = ["owner_entry", "inquiries", "website_rebuild", "systems"] as const;
+/**
+ * Make real with real effects has one key per effect channel
+ * (systems-experience spec section 6.2), so Systems Home can ship before any
+ * live effect and each channel turns on alone. They share one env switch.
+ */
+export const MAKE_REAL_LIVE_FLAGS = [
+  "make_real_live:hosted_website",
+  "make_real_live:tenant_content",
+  "make_real_live:inquiry_form",
+  "make_real_live:booking_page",
+  "make_real_live:internal_app",
+] as const;
+export type MakeRealLiveFlag = (typeof MAKE_REAL_LIVE_FLAGS)[number];
+
+export const RELEASE_FLAGS = ["owner_entry", "inquiries", "website_rebuild", "systems", ...MAKE_REAL_LIVE_FLAGS] as const;
 export type ReleaseFlag = (typeof RELEASE_FLAGS)[number];
 export type ReleaseFlagEnvMode = "off" | "workspace" | "on";
 export type ReleaseFlagRowState = "off" | "operators" | "on";
+
+export function isMakeRealLiveFlag(flag: string): flag is MakeRealLiveFlag {
+  return (MAKE_REAL_LIVE_FLAGS as readonly string[]).includes(flag);
+}
 
 export const RELEASE_FLAG_ENV: Record<ReleaseFlag, string> = {
   owner_entry: "STRELVA_OWNER_ENTRY",
   inquiries: "STRELVA_INQUIRIES_RELEASE",
   website_rebuild: "STRELVA_WEBSITE_REBUILD_RELEASE",
   systems: "STRELVA_SYSTEMS_RELEASE",
+  "make_real_live:hosted_website": "STRELVA_MAKE_REAL_LIVE",
+  "make_real_live:tenant_content": "STRELVA_MAKE_REAL_LIVE",
+  "make_real_live:inquiry_form": "STRELVA_MAKE_REAL_LIVE",
+  "make_real_live:booking_page": "STRELVA_MAKE_REAL_LIVE",
+  "make_real_live:internal_app": "STRELVA_MAKE_REAL_LIVE",
 };
 
 export const RELEASE_FLAG_LABELS: Record<ReleaseFlag, string> = {
@@ -31,6 +54,11 @@ export const RELEASE_FLAG_LABELS: Record<ReleaseFlag, string> = {
   inquiries: "Inquiries",
   website_rebuild: "Website rebuild",
   systems: "Systems",
+  "make_real_live:hosted_website": "Make real live: hosted website",
+  "make_real_live:tenant_content": "Make real live: website sections",
+  "make_real_live:inquiry_form": "Make real live: inquiry form",
+  "make_real_live:booking_page": "Make real live: booking page",
+  "make_real_live:internal_app": "Make real live: internal app",
 };
 
 export type ReleaseEnvironment = Partial<Record<string, string | undefined>>;
