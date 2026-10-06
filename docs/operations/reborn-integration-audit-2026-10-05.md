@@ -170,7 +170,6 @@ rehearse a representative conversion and complete the existing production checkl
 before requesting any production action. Keep paid model benchmarking, real email,
 provider writes, migrations, billing and deployments behind their existing authority.
 
-
 ## Integration corrections and final receipt
 
 The audited integration includes the later `51571c15` release re-audit and these
@@ -199,7 +198,6 @@ browser commands were resumed with empty providers on port 3312. Public smoke
 passed 94 tests and skipped 240 opt-in fixture/authenticated tests. Its 62 UX
 capture cases only take screenshots and do not assert visual correctness; their
 inclusion does not make this a complete visual audit.
-
 
 Remaining hosted-equivalent browser phases passed: workspace acceptance 38/38
 (`final-workspace-browser.log`) and synthetic owner/operator surfaces 20/20
