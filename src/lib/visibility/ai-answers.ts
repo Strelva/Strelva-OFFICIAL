@@ -74,8 +74,8 @@ export async function probeAiAnswer(
   }
 
   try {
-    const { google } = await import("@ai-sdk/google");
-    const { generateText } = await import("ai");
+    const { getGoogleModel } = await import("@/lib/ai-models");
+    const { generateModelText } = await import("@/platform/infra/model-calls");
 
     const prompt =
       `You are a consumer assistant helping someone in an emergency. ` +
@@ -84,10 +84,12 @@ export async function probeAiAnswer(
       `Be concrete — name actual businesses. ` +
       `Then on a final line output strict JSON: {"names":["..."]} listing every business you named.`;
 
-    const { text } = await generateText({
-      model: google(MODEL_ID),
-      prompt,
-    });
+    // Measures what MODEL_ID says on purpose: the one pinned-model caller.
+    const { result: { text } } = await generateModelText(
+      { purpose: "visibility_probe", actorKind: "strelva" },
+      { prompt },
+      { pinnedModel: getGoogleModel(MODEL_ID) },
+    );
 
     const tenantMentioned = isMentioned(text, tenantName);
     const competitorResults = competitors.map((c) => ({

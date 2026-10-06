@@ -1,7 +1,7 @@
-import { streamText, tool, stepCountIs } from "ai";
+import { tool, stepCountIs } from "ai";
 import type { ModelMessage } from "ai";
 import { z } from "zod";
-import { getPrimaryModel, getFallbackModel, isTransientModelError } from "@/lib/ai-models";
+import { streamModelText, type ModelTextStream } from "@/platform/infra/model-calls";
 import { logger } from "@/lib/logger";
 import { trackError } from "@/lib/monitoring";
 import { isSuperAdmin, requireTenantPermission, getAuthUserId } from "@/lib/auth";
@@ -182,7 +182,8 @@ export async function POST(req: Request) {
     }
     return undefined;
   })();
-  const signalSource = classifySource(await isSuperAdmin());
+  const askerIsOperator = await isSuperAdmin();
+  const signalSource = classifySource(askerIsOperator);
   const signalSiteName = tenantConfig?.siteName || tenant;
   const capFragment = capabilityPromptFragment();
   let systemPrompt = await buildSystemPrompt(tenant, capFragment);
@@ -1472,22 +1473,6 @@ Only use tools for manifest-supported sections and actions. If the user requests
   }
   assertAgentToolCatalog(Object.keys(tools), "chat");
 
-  // Primary/fallback model resilience: chat survives a Gemini outage by
-  // retrying the whole turn on the configured fallback model — but only when
-  // the primary fails *before* any content reached the client, so we never
-  // duplicate a half-streamed answer. Mirrors src/lib/agent-executor.ts.
-  const primaryModel = getPrimaryModel();
-  const fallbackModel = getFallbackModel();
-
-  const startStream = (model: typeof primaryModel.model) =>
-    streamText({
-      model,
-      system: systemPrompt,
-      messages,
-      tools,
-      stopWhen: stepCountIs(8),
-    });
-
   // Stream text + tool-call status events as SSE-like lines
   const encoder = new TextEncoder();
   const readable = new ReadableStream({
@@ -1496,8 +1481,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
       // the fallback only fires when retrying is still safe (no partial output).
       let emittedToClient = false;
 
-      const runModel = async (model: typeof primaryModel.model): Promise<void> => {
-        const result = startStream(model);
+      const consume = async (result: ModelTextStream): Promise<void> => {
         for await (const part of result.fullStream) {
           if (part.type === "error") {
             // Surface as a thrown error so the catch below can decide on fallback.
@@ -1564,23 +1548,17 @@ Only use tools for manifest-supported sections and actions. If the user requests
       };
 
       try {
-        try {
-          await runModel(primaryModel.model);
-        } catch (primaryErr) {
-          // Retry on the fallback model only when it's safe (nothing streamed
-          // yet) and the failure looks transient (outage / rate limit / 5xx).
-          if (fallbackModel && !emittedToClient && isTransientModelError(primaryErr)) {
-            logger.warn("[agent-chat] Primary model failed, trying fallback", {
-              primary: primaryModel.label,
-              fallback: fallbackModel.label,
-              tenant,
-              error: primaryErr instanceof Error ? primaryErr.message : "unknown",
-            });
-            await runModel(fallbackModel.model);
-          } else {
-            throw primaryErr;
-          }
-        }
+        // Primary/fallback model resilience through the one model-call helper:
+        // chat survives a Gemini outage by retrying the whole turn on the
+        // configured fallback model, but only when the primary fails *before*
+        // any content reached the client, so a half-streamed answer is never
+        // duplicated. One cost row per provider call.
+        await streamModelText(
+          { purpose: "ask", tenantId: tenant, actorKind: askerIsOperator ? "operator" : "member" },
+          { system: systemPrompt, messages, tools, stopWhen: stepCountIs(8) },
+          consume,
+          { emitted: () => emittedToClient },
+        );
       } catch (err) {
         // Both models failed (or the client disconnected). If nothing was
         // streamed, send a plain-English line so the chat doesn't go silent.

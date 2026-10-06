@@ -12,11 +12,11 @@
  * mutation on its own.
  */
 
-import { streamText, tool, stepCountIs } from "ai";
+import { tool, stepCountIs } from "ai";
 import type { ModelMessage } from "ai";
 import { z } from "zod";
 import { isSuperAdmin } from "@/lib/auth";
-import { getPrimaryModel, getFallbackModel, isTransientModelError } from "@/lib/ai-models";
+import { streamModelText, type ModelTextStream } from "@/platform/infra/model-calls";
 import {
   buildPortfolioSnapshot,
   getPortfolioSummary,
@@ -438,8 +438,6 @@ export async function POST(req: Request) {
   };
 
   const encoder = new TextEncoder();
-  const primaryModel = getPrimaryModel();
-  const fallbackModel = getFallbackModel();
 
   const readable = new ReadableStream({
     async start(controller) {
@@ -447,14 +445,7 @@ export async function POST(req: Request) {
       // when retrying is still safe (no partial output sent to the client).
       let emittedToClient = false;
 
-      const runModel = async (model: typeof primaryModel.model): Promise<void> => {
-        const result = streamText({
-          model,
-          system: SYSTEM_PROMPT,
-          messages,
-          tools,
-          stopWhen: stepCountIs(8),
-        });
+      const consume = async (result: ModelTextStream): Promise<void> => {
         for await (const part of result.fullStream) {
           if (part.type === "error") {
             throw part.error;
@@ -507,18 +498,15 @@ export async function POST(req: Request) {
       };
 
       try {
-        try {
-          await runModel(primaryModel.model);
-        } catch (primaryErr) {
-          // Retry on the fallback model only when it's safe (nothing streamed yet)
-          // and the failure looks transient (outage / rate limit / 5xx).
-          if (fallbackModel && !emittedToClient && isTransientModelError(primaryErr)) {
-            console.warn("[operator-agent] Primary model failed, trying fallback:", primaryErr instanceof Error ? primaryErr.message : primaryErr);
-            await runModel(fallbackModel.model);
-          } else {
-            throw primaryErr;
-          }
-        }
+        // Primary then fallback through the one model-call helper: the
+        // fallback runs only when nothing has streamed yet and the failure
+        // looks transient (outage / rate limit / 5xx). One cost row per call.
+        await streamModelText(
+          { purpose: "operator", actorKind: "operator" },
+          { system: SYSTEM_PROMPT, messages, tools, stopWhen: stepCountIs(8) },
+          (result) => consume(result),
+          { emitted: () => emittedToClient },
+        );
       } catch (err) {
         console.error("[operator-agent] turn failed:", err);
         if (!emittedToClient) {
