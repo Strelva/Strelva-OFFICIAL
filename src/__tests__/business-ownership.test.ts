@@ -29,9 +29,10 @@ const created = (args: Record<string, unknown>) => ({
   tenants: state().tenants,
 });
 
-let rpc: ReturnType<typeof vi.fn>;
+type Rpc = (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>;
+let rpc: ReturnType<typeof vi.fn<Rpc>>;
 beforeEach(() => {
-  rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
+  rpc = vi.fn<Rpc>(async (name, args) => {
     if (name === "read_operator_owner_invitation_state") return { data: state(), error: null };
     if (name === "create_operator_owner_invitation") return { data: created(args), error: null };
     return { data: null, error: { message: `unexpected ${name}` } };
