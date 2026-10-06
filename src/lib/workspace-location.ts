@@ -20,6 +20,24 @@ export function workspaceReturnTarget(value: string | null): string | null {
       || !workspaceId || !UUID.test(workspaceId) || target.searchParams.getAll("period").length > 1 || (period !== null && period !== "week" && period !== "month")) return null;
     return `${target.pathname}?${target.searchParams}`;
   }
+  // Workspace homes of old /dashboard pages (owner-entry spec §5). Each takes
+  // its business, and Results also its time window.
+  const place = value?.match(/^\/workspace\/(inquiries|reviews|results|business-details)\?/);
+  if (value && place) {
+    const target = new URL(value, "https://workspace.invalid");
+    const params = target.searchParams;
+    const workspaceId = params.get("workspaceId");
+    const allowed = place[1] === "results" ? ["workspaceId", "range", "from", "to"] : ["workspaceId"];
+    if (target.hash || [...params.keys()].some((key) => !allowed.includes(key) || params.getAll(key).length !== 1)
+      || !workspaceId || !UUID.test(workspaceId)) return null;
+    const range = params.get("range");
+    if (range !== null && !["live", "week", "month", "custom"].includes(range)) return null;
+    for (const key of ["from", "to"]) {
+      const date = params.get(key);
+      if (date !== null && (range !== "custom" || !/^\d{4}-\d{2}-\d{2}$/.test(date))) return null;
+    }
+    return `${target.pathname}?${params}`;
+  }
   if (value?.startsWith("/workspace/business/new?") || value?.startsWith("/workspace/delivery?")) {
     const target = new URL(value, "https://workspace.invalid");
     if (target.hash || target.searchParams.size !== 1) return null;
