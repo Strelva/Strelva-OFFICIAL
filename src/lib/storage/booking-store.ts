@@ -452,7 +452,12 @@ export async function isSlotClaimed(
   return values.some((value) => !!value);
 }
 
-async function legacyInsertBooking(newBooking: Booking, tenant: string, bufferTime: number): Promise<void> {
+async function legacyInsertBooking(
+  newBooking: Booking,
+  tenant: string,
+  bufferTime: number,
+  options: { slotCache?: "required" | "best_effort" } = {}
+): Promise<void> {
   if (dataSourceIsPostgres()) {
     await pgInsertBooking(newBooking, tenant);
   } else {
@@ -463,15 +468,26 @@ async function legacyInsertBooking(newBooking: Booking, tenant: string, bufferTi
     await writeDevContent(store, tenant);
   }
 
-  // Mark the full booked span as confirmed in Redis after successful write
-  await confirmBookingSlot(
-    tenant,
-    newBooking.date,
-    newBooking.startTime,
-    newBooking.endTime,
-    bufferTime
-  );
+  // Mark the full booked span as confirmed in Redis after successful write.
+  // With the one store serving, its exclusion constraint guards the slot and
+  // the Redis cells are only the legacy path's lock: a Redis outage must not
+  // undo a booking the store already holds.
+  try {
+    await confirmBookingSlot(
+      tenant,
+      newBooking.date,
+      newBooking.startTime,
+      newBooking.endTime,
+      bufferTime
+    );
+  } catch (error) {
+    if (options.slotCache !== "best_effort") throw error;
+    console.warn(`[bookings] Redis slot lock not written for ${tenant} (the one store holds the booking):`, error instanceof Error ? error.message : error);
+  }
 }
+
+/** Nothing was stored, and the visitor is told so (never a 500, never a false success). */
+const BOOKING_UNAVAILABLE = "We couldn't save your booking just now, so nothing was booked. Please try again in a minute.";
 
 export async function createBooking(
   booking: Omit<Booking, "id" | "createdAt" | "status">,
@@ -502,7 +518,7 @@ async function siteServices(tenant: string): Promise<SiteService[]> {
 
 export type CreateBookingResult =
   | { success: true; booking: Booking; /** Request mode: held until the owner approves through Needs you. */ requested?: boolean; context?: BookingContext }
-  | { success: false; error: string; code?: "paused" | "taken" | "invalid_service" };
+  | { success: false; error: string; code?: "paused" | "taken" | "invalid_service" | "unavailable" };
 
 /**
  * Atomically claim a slot, verify availability, and create booking.
@@ -529,26 +545,37 @@ export async function createBookingAtomic(
     if (claim && !claim.success) return { success: false, error: claim.error, code: claim.code };
     if (claim?.success) {
       try {
-        await legacyInsertBooking(claim.booking, tenant, claim.context.settings?.bufferMinutes ?? 0);
+        await legacyInsertBooking(claim.booking, tenant, claim.context.settings?.bufferMinutes ?? 0, { slotCache: "best_effort" });
       } catch (error) {
         await releaseStoreBooking(tenant, legacyId);
         throw error;
       }
       return { success: true, booking: claim.booking, requested: claim.requested, context: claim.context };
     }
+    // The store couldn't be reached. The legacy path below guards the slot
+    // only with Redis; without Redis nothing would guard it, so refuse rather
+    // than take an unguarded booking (or confirm a business's request).
+    if (!getRedis()) {
+      console.error(`[bookings] store unreachable and no Redis lock for ${tenant}; refusing rather than booking unguarded.`);
+      return { success: false, error: BOOKING_UNAVAILABLE, code: "unavailable" };
+    }
   }
 
   // Step 1: Atomically claim every grid cell the booking spans. For
   // variable-duration services this prevents two overlapping bookings (whose
   // start times differ) from both succeeding.
-  const { bufferTime } = await legacyGetBookingConfig(tenant);
-  const { claimed, release } = await claimBookingSlot(
-    tenant,
-    booking.date,
-    booking.startTime,
-    booking.endTime,
-    bufferTime
-  );
+  let bufferTime: number;
+  let slot: Awaited<ReturnType<typeof claimBookingSlot>>;
+  try {
+    ({ bufferTime } = await legacyGetBookingConfig(tenant));
+    slot = await claimBookingSlot(tenant, booking.date, booking.startTime, booking.endTime, bufferTime);
+  } catch (error) {
+    // Redis is configured but down: the hours can't be read (they fail
+    // closed) or the slot can't be locked, so nothing is booked.
+    console.error(`[bookings] Redis slot lock failed for ${tenant}:`, error instanceof Error ? error.message : error);
+    return { success: false, error: BOOKING_UNAVAILABLE, code: "unavailable" };
+  }
+  const { claimed, release } = slot;
 
   if (!claimed) {
     return { success: false, error: "This time slot is no longer available. Please choose another time." };

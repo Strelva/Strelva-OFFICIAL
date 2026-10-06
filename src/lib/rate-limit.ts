@@ -55,6 +55,18 @@ function memStatus(key: string, max: number, windowMs: number): RateLimitStatus 
   };
 }
 
+/**
+ * The per-instance limit, on purpose, for a caller that has its own
+ * authoritative guard and must keep working when Redis is absent or down
+ * (today only the visitor's booking with the one booking store serving,
+ * whose exclusion constraint guards every slot). It counts per serverless
+ * instance, so it is weaker than the Redis limit: use it only as that
+ * caller's explicit, logged fallback after isRateLimitedAsync throws.
+ */
+export function isRateLimitedPerInstance(key: string, maxPerMinute: number): boolean {
+  return memCheck(`instance:${key}`, maxPerMinute, 60_000);
+}
+
 // --- Redis-backed check ---
 
 async function redisCheck(key: string, max: number, windowSeconds: number): Promise<boolean> {
