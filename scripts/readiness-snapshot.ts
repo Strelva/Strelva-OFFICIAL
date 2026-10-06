@@ -78,8 +78,13 @@ export const SEPT30_EXTRA_APPLIED = ["20260930120000"];
  * One table per unapplied migration that creates a table, so the snapshot can
  * tell applied from not applied without SQL access. A migration with only
  * functions or columns has no sentinel and needs schema_migrations.
+ *
+ * `20260729180000` (the July org layer) is recorded as applied on 2026-07-30.
+ * Its sentinel confirms that, because batch 4 (`20261007180000`) alters
+ * `accounts`. "missing" there is a stop.
  */
 export const MIGRATION_SENTINELS: Record<string, string> = {
+  "20260729180000": "accounts",
   "20260928130000": "business_effort_entries",
   "20261001120000": "website_documents",
   "20261002120000": "business_records",
@@ -100,6 +105,17 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261007190200": "application_candidate_versions",
   "20261007192100": "internal_tool_notices",
   "20261007194000": "tenant_report_state",
+  "20261008110000": "ask_conversations",
+  "20261008111000": "website_change_receipts",
+  "20261008124000": "decision_policy_tenant_imports",
+  "20261008130000": "system_possibilities",
+  "20261008141000": "business_bookings",
+  "20261008150000": "website_linked_publications",
+  "20261008150100": "website_domain_approvals",
+  "20261008151000": "connected_sites",
+  "20261009100000": "strelva_service_actions",
+  "20261009110000": "business_booking_messages",
+  "20261009113000": "inquiry_events",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */
@@ -121,7 +137,7 @@ export const SECRET_ENV = [
   "ANTHROPIC_API_KEY",
 ] as const;
 
-/** Flag names from src at 9e0bd441 (release packet section 3). Values are printed when short and plain. */
+/** Flag names from src at 30dcba1b (release packet section 2). Values are printed when short and plain. */
 export const FLAG_ENV = [
   "EMAIL_SENDING_ENABLED",
   "CUSTOMER_EMAIL_ENABLED",
@@ -147,6 +163,17 @@ export const FLAG_ENV = [
   "STRELVA_CLIENT_RECORDS_DUAL_WRITE",
   "STRELVA_CLIENT_RECORDS_READ",
   "STRELVA_EXPORT_SCHEMA_3",
+  "STRELVA_LEADS_READ",
+  "STRELVA_LEADS_AUTHORITY",
+  "STRELVA_INQUIRY_RECORDS",
+  "STRELVA_BOOKING_STORE_WRITE",
+  "STRELVA_BOOKING_STORE_READ",
+  "STRELVA_BOOKING_OWNER_NOTICE",
+  "STRELVA_BOOKING_REMINDERS",
+  "STRELVA_BOOKING_MANAGE_PAGE",
+  "STRELVA_BOOKING_CALENDAR_BUSY",
+  "STRELVA_MAKE_REAL_LIVE",
+  "STRELVA_CONNECTED_SITES_RELEASE",
   "REB_DEV_UNGATED_ACCESS",
 ] as const;
 
@@ -167,6 +194,10 @@ export const REDIS_FAMILIES = [
   { name: "lead mirror pending", match: "reb:lead-mirror:pending*", tenantAt: null, cardinality: true },
   { name: "events", match: "events:*", tenantAt: 1, cardinality: true },
   { name: "accounts", match: "account:*", tenantAt: null, cardinality: false },
+  { name: "booking config", match: "reb:booking:config:*", tenantAt: 3, cardinality: false },
+  { name: "booking date overrides", match: "reb:booking:overrides:*", tenantAt: 3, cardinality: false },
+  { name: "booking slot locks", match: "reb:booking:slot:*", tenantAt: 3, cardinality: false },
+  { name: "booking store pending", match: "reb:booking-store:pending*", tenantAt: null, cardinality: true },
 ] as const;
 
 const SCAN_PAGE = 500;
@@ -203,6 +234,8 @@ export interface SnapshotReport {
     unifiedEvents: { total: number | null; last24h: number | null; last7d: number | null; latestAt: string | null };
     tenantLeads: number | null;
     workspaceAccountBindings: number | null;
+    /** Legacy `bookings` rows (the booking-store backfill's size) and public website booking receipts. */
+    bookings: { legacyTotal: number | null; legacyByActiveTenant: Record<string, number | null>; publicWebsiteReceipts: number | null };
   };
   auth: AuthUserSummary | null;
   redis: {
@@ -346,6 +379,7 @@ export async function runReadinessSnapshot(options: { jacobsYes: boolean }, deps
     unifiedEvents: { total: null, last24h: null, last7d: null, latestAt: null },
     tenantLeads: null,
     workspaceAccountBindings: null,
+    bookings: { legacyTotal: null, legacyByActiveTenant: {}, publicWebsiteReceipts: null },
   };
   if (db) {
     pg.tenants.total = countOrNull(await db.count("tenants"));
@@ -379,6 +413,11 @@ export async function runReadinessSnapshot(options: { jacobsYes: boolean }, deps
     pg.workspaceTenantLinks = countOrNull(await db.count("tenant_workspace_links"));
     pg.tenantLeads = countOrNull(await db.count("tenant_leads"));
     pg.workspaceAccountBindings = countOrNull(await db.count("workspace_account_bindings"));
+    pg.bookings.legacyTotal = countOrNull(await db.count("bookings"));
+    for (const tenant of pg.activeTenants) {
+      pg.bookings.legacyByActiveTenant[tenant.id] = countOrNull(await db.count("bookings", [{ column: "tenant_id", op: "eq", value: tenant.id }]));
+    }
+    pg.bookings.publicWebsiteReceipts = countOrNull(await db.count("public_website_bookings"));
 
     pg.governedWork.proposals = countOrNull(await db.count("proposals"));
     const latestProposal = await db.rows<{ created_at: string }>("proposals", "created_at", { orderBy: { column: "created_at", ascending: false }, limit: 1 });
@@ -462,6 +501,8 @@ export function formatReport(report: SnapshotReport): string[] {
   lines.push(`Workspace memberships: ${n(pg.workspaceMemberships)}; tenant memberships: ${n(pg.tenantMemberships)}`);
   lines.push(`Open tenant invites: ${n(pg.openTenantInvites)}; pending workspace invitations: ${n(pg.pendingWorkspaceInvitations)}`);
   lines.push(`Workspace-tenant links: ${n(pg.workspaceTenantLinks)}; tenant_leads rows: ${n(pg.tenantLeads)}; account bindings: ${n(pg.workspaceAccountBindings)}`);
+  const bookingsByTenant = Object.entries(pg.bookings.legacyByActiveTenant).map(([t, c]) => `${t} ${n(c)}`).join(", ");
+  lines.push(`Legacy bookings: ${n(pg.bookings.legacyTotal)}${bookingsByTenant ? ` (active: ${bookingsByTenant})` : ""}; public website booking receipts: ${n(pg.bookings.publicWebsiteReceipts)}`);
   lines.push(`Governed work proposals: ${n(pg.governedWork.proposals)}, latest ${pg.governedWork.latestProposalAt ?? "none"}`);
   lines.push(`unified_events: ${n(pg.unifiedEvents.total)} total, ${n(pg.unifiedEvents.last24h)} in 24h, ${n(pg.unifiedEvents.last7d)} in 7d, latest ${pg.unifiedEvents.latestAt ?? "none"}`);
   if (report.auth) lines.push(`Auth users: ${report.auth.total}, ${report.auth.emailConfirmed} email-confirmed, ${report.auth.signedInLast30Days} signed in within 30 days`);

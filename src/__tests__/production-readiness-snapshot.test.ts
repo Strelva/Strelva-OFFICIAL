@@ -92,6 +92,8 @@ const tables: Record<string, Row[]> = {
     { created_at: "2026-08-01T00:00:00.000Z" },
   ],
   tenant_leads: [{}, {}, {}],
+  bookings: [{ tenant_id: "gldf" }, { tenant_id: "gldf" }, { tenant_id: "old-client" }],
+  public_website_bookings: [{}],
   // 20261005090000 applied; nothing else from the pending set.
 };
 
@@ -108,6 +110,9 @@ const redisKeys = {
   "connections:rohlax:yelp": { type: "string" },
   "analytics:cfg:rohlax": { type: "string" },
   "analytics:cfg:old-client": { type: "string" },
+  "reb:booking:config:gldf": { type: "string" },
+  "reb:booking:slot:gldf:2026-10-09:14:00": { type: "string" },
+  "reb:booking-store:pending": { type: "zset", card: 2 },
 };
 
 function deps(overrides: Partial<SnapshotDeps> = {}) {
@@ -174,6 +179,9 @@ describe("production readiness snapshot", () => {
     expect(report.postgres.pendingWorkspaceInvitations).toBe(1);
     expect(report.postgres.workspaceTenantLinks).toBeNull(); // table not there yet
     expect(report.postgres.tenantLeads).toBe(3);
+    expect(report.postgres.bookings).toEqual({ legacyTotal: 3, legacyByActiveTenant: { gldf: 2, rohlax: 0 }, publicWebsiteReceipts: 1 });
+    expect(report.env.flags.STRELVA_BOOKING_STORE_WRITE).toBe("absent");
+    expect(report.env.flags.STRELVA_MAKE_REAL_LIVE).toBe("absent");
     expect(report.postgres.unifiedEvents).toEqual({ total: 3, last24h: 1, last7d: 2, latestAt: "2026-10-06T06:00:00.000Z" });
     expect(report.postgres.governedWork).toEqual({ proposals: 1, latestProposalAt: "2026-10-01T00:00:00.000Z" });
     expect(report.auth).toEqual({ total: 16, emailConfirmed: 4, signedInLast30Days: 1 });
@@ -185,6 +193,9 @@ describe("production readiness snapshot", () => {
     expect(family("leads")).toMatchObject({ keys: 2, entriesByTenant: { gldf: 40, rohlax: 2 } });
     expect(family("google connections")).toMatchObject({ keys: 1, byTenant: { gldf: 1 } });
     expect(family("lead mirror pending")).toMatchObject({ keys: 1, entriesByTenant: { all: 3 } });
+    expect(family("booking config")).toMatchObject({ keys: 1, byTenant: { gldf: 1 } });
+    expect(family("booking slot locks")).toMatchObject({ keys: 1, byTenant: { gldf: 1 } });
+    expect(family("booking store pending")).toMatchObject({ keys: 1, entriesByTenant: { all: 2 } });
     expect(report.redis!.activeTenantsWithAnalyticsConfig).toEqual(["rohlax"]); // inactive tenant left out
     expect(report.redis!.activeTenantsWithGoogleConnection).toEqual(["gldf"]);
     expect(report.redis!.activeTenantsWithClientEmailOverride).toEqual(["gldf"]);
@@ -260,6 +271,12 @@ describe("production readiness snapshot", () => {
       const file = readdirSync(dir).find((f) => f.startsWith(version));
       expect(file, version).toBeTruthy();
       expect(readFileSync(join(dir, file!), "utf8"), `${version} creates ${table}`).toMatch(new RegExp(`create table (if not exists )?public\\.${table}\\b`, "i"));
+    }
+    // And the reverse: every migration after the Sept 30 record that creates a table has one.
+    const pending = readdirSync(dir).filter((f) => /^\d{14}_.+\.sql$/.test(f) && f.slice(0, 14) > "20260921220000" && f.slice(0, 14) !== "20260930120000");
+    for (const file of pending) {
+      if (!/create table (if not exists )?public\./i.test(readFileSync(join(dir, file), "utf8"))) continue;
+      expect(MIGRATION_SENTINELS[file.slice(0, 14)], `${file} needs a sentinel`).toBeTruthy();
     }
   });
 });
