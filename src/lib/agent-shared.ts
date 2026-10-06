@@ -375,6 +375,8 @@ export interface AskToolContext {
    * chat route passes none: it checks tenant permission once per turn.
    */
   recheck?: (toolName: string) => Promise<AskToolRefusal | null>;
+  /** Route every section edit to review, never auto-publish (Ask Strelva: drafts go to Needs you). */
+  forceReview?: boolean;
 }
 
 /** The tool names the tenant chat surface offers, in catalog order. */
@@ -555,6 +557,8 @@ export async function buildTenantChatTools(ctx: AskToolContext): Promise<Record<
               data: data as Record<string, unknown>,
               tenantConfig: tenantConfig ?? null,
               siteManifest,
+              // Ask Strelva sets this until the Needs you policy decides auto-publish.
+              ...(ctx.forceReview ? { forceReview: true } : {}),
             });
 
             if (result.status === "failed") {
