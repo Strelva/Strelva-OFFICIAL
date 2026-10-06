@@ -9,6 +9,7 @@ import { sameAppHref } from "./workspace-discovery";
 import { WebsiteAssignmentHandoff, type WorkspaceOfferingState } from "./WorkspaceOfferings";
 import { WorkspaceAllowanceSummary } from "./WorkspaceAllowanceSummary";
 import { WorkspacePayerTransition } from "./WorkspacePayerTransition";
+import { DecisionPolicySettings } from "./DecisionPolicySettings";
 
 type ManagedSettingsDestination = "business" | "connections" | "domains" | "subscription";
 export type SiteAssignmentState = "known" | "loading" | "unavailable";
@@ -52,6 +53,7 @@ export function WorkspaceBusinessSettings({
   onRetryWebsiteAssignments,
   managedWorkUnavailable = false,
   accountHref,
+  needsYouReleased = false,
 }: {
   workspace?: WorkspaceSummary;
   sites: readonly ManagedWorkSummary[];
@@ -62,6 +64,8 @@ export function WorkspaceBusinessSettings({
   onRetryWebsiteAssignments?: () => void;
   managedWorkUnavailable?: boolean;
   accountHref: string;
+  /** STRELVA_NEEDS_YOU_RELEASE: off renders this page exactly as before. */
+  needsYouReleased?: boolean;
 }) {
   const readOnly = workspace?.access === "delegated_read";
   const business = workspace?.kind === "customer";
@@ -129,7 +133,9 @@ export function WorkspaceBusinessSettings({
       </div>}
     </section>
 
-    <section id="workspace-usage" className="border-b border-gray-border py-8" aria-labelledby="workspace-usage-heading">
+    {needsYouReleased && business && workspace && !readOnly ? <DecisionPolicySettings workspaceId={workspace.id} /> : null}
+
+    <section id="workspace-usage"className="border-b border-gray-border py-8" aria-labelledby="workspace-usage-heading">
       <h2 id="workspace-usage-heading" className="text-base font-medium text-warm-black">Usage and limits</h2>
       <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-muted">Recorded operational allowances appear here when this business has one. They are separate from website subscription billing.</p>
       <div className="mt-5"><WorkspaceAllowanceSummary businessId={workspace?.id || ""} enabled={Boolean(business && workspace && !readOnly)} /></div>
