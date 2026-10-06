@@ -1,0 +1,174 @@
+import Link from "next/link";
+import { Card } from "@/components/ui/Card";
+import { addDays, type BookingRow, type BookingView, type SiteBookings, type WorkspaceBookings as Bookings } from "@/products/bookings/server";
+import { BookingActions } from "./BookingActions";
+
+/**
+ * The bookings System's day and week views (systems catalog §3.3). The day
+ * view is the wellness roster (/dashboard/roster): today's appointments with
+ * check-in. The week view is the schedule (/dashboard/schedule): seven days
+ * of bookings. Hours and services are set on the business record and by
+ * Strelva, so neither view edits them. Server-rendered; the view, the date and
+ * the week are plain links.
+ */
+
+export type WorkspaceBookingsState =
+  | { kind: "ready"; bookings: Bookings }
+  | { kind: "permission" }
+  | { kind: "error" };
+
+const STATUS: Record<BookingRow["status"], string> = {
+  confirmed: "Booked",
+  completed: "Checked in",
+  cancelled: "Cancelled",
+  requested: "Waiting for the owner",
+};
+
+function dayLabel(date: string, style: "long" | "short" = "long"): string {
+  const d = new Date(`${date}T12:00:00Z`);
+  if (Number.isNaN(d.getTime())) return date;
+  return d.toLocaleDateString("en-US", style === "long"
+    ? { weekday: "long", month: "long", day: "numeric", timeZone: "UTC" }
+    : { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+function timeLabel(time: string): string {
+  const [h, m] = time.split(":").map(Number);
+  if (h === undefined || m === undefined || Number.isNaN(h) || Number.isNaN(m)) return time;
+  return `${(h % 12) || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
+}
+
+function href(workspaceId: string, view: BookingView, date?: string): string {
+  const params = new URLSearchParams({ workspaceId, view });
+  if (date) params.set("date", date);
+  return `/workspace/bookings?${params}`;
+}
+
+function BookingItem({ booking, site, workspaceId, view }: { booking: BookingRow; site: SiteBookings; workspaceId: string; view: BookingView }) {
+  const muted = booking.status === "cancelled";
+  return (
+    <li className="flex flex-col gap-3 border-t border-gray-border py-4 first:border-t-0 sm:flex-row sm:items-start sm:justify-between">
+      <div className={muted ? "text-gray-muted" : undefined}>
+        <p className="text-sm font-medium tabular-nums">{timeLabel(booking.startTime)} – {timeLabel(booking.endTime)}</p>
+        <p className={`mt-1 text-base font-medium ${muted ? "line-through" : ""}`}>{booking.clientName}</p>
+        <p className="mt-0.5 text-sm text-gray-muted">
+          {booking.serviceName}
+          <span aria-hidden="true"> · </span>
+          <span>{STATUS[booking.status]}</span>
+        </p>
+        {booking.notes ? <p className="mt-2 max-w-prose text-sm leading-6 text-gray-muted">{booking.notes}</p> : null}
+        {booking.clientPhone || booking.clientEmail ? (
+          <p className="mt-1 text-sm text-gray-muted">
+            {booking.clientPhone ? <a className="underline-offset-4 hover:underline" href={`tel:${booking.clientPhone}`}>{booking.clientPhone}</a> : null}
+            {booking.clientPhone && booking.clientEmail ? <span aria-hidden="true"> · </span> : null}
+            {booking.clientEmail ? <a className="underline-offset-4 hover:underline" href={`mailto:${booking.clientEmail}`}>{booking.clientEmail}</a> : null}
+          </p>
+        ) : null}
+      </div>
+      <BookingActions workspaceId={workspaceId} tenantId={site.tenantId} bookingId={booking.id} status={booking.status} clientName={booking.clientName} view={view} />
+    </li>
+  );
+}
+
+function DayList({ site, date, workspaceId, view }: { site: SiteBookings; date: string; workspaceId: string; view: BookingView }) {
+  const rows = site.bookings.filter((b) => b.date === date);
+  if (rows.length === 0) return <p className="py-3 text-sm text-gray-muted">{view === "day" ? "No appointments this day." : "No bookings."}</p>;
+  return <ul>{rows.map((booking) => <BookingItem key={booking.id} booking={booking} site={site} workspaceId={workspaceId} view={view} />)}</ul>;
+}
+
+function SiteSection({ site, bookings, workspaceId, many }: { site: SiteBookings; bookings: Bookings; workspaceId: string; many: boolean }) {
+  const days = bookings.view === "day" ? [bookings.from] : Array.from({ length: 7 }, (_, i) => addDays(bookings.from, i));
+  const active = site.bookings.filter((b) => b.status !== "cancelled");
+  const checkedIn = active.filter((b) => b.status === "completed").length;
+  return (
+    <section className="mt-8" aria-labelledby={`site-${site.tenantId}`}>
+      <h2 id={`site-${site.tenantId}`} className={many ? "mb-3 text-lg font-medium" : "sr-only"}>{site.siteName}</h2>
+      {site.unavailable ? (
+        <Card padding="lg" role="status">
+          <p className="text-sm leading-6 text-gray-muted">Bookings for {site.siteName} couldn&apos;t be read right now. Nothing is lost, and visitors can still book. Reload to try again.</p>
+        </Card>
+      ) : (
+        <Card padding="lg">
+          {bookings.view === "day" ? (
+            <p className="text-sm text-gray-muted">
+              {active.length === 0 ? "Nothing booked." : `${active.length} ${active.length === 1 ? "appointment" : "appointments"} · ${checkedIn} checked in`}
+            </p>
+          ) : null}
+          {days.map((date) => (
+            <div key={date} className={bookings.view === "week" ? "border-t border-gray-border pt-4 first:border-t-0 first:pt-0 [&+&]:mt-4" : "mt-2"}>
+              {bookings.view === "week" ? (
+                <h3 className="text-sm font-medium">
+                  {dayLabel(date, "short")}
+                  {date === site.today ? <span className="ml-2 text-xs font-normal text-gray-muted">Today</span> : null}
+                </h3>
+              ) : null}
+              <DayList site={site} date={date} workspaceId={workspaceId} view={bookings.view} />
+            </div>
+          ))}
+        </Card>
+      )}
+    </section>
+  );
+}
+
+export function WorkspaceBookings({ workspaceId, state, view }: { workspaceId: string; state: WorkspaceBookingsState; view: BookingView }) {
+  const homeHref = `/workspace?workspaceId=${encodeURIComponent(workspaceId)}`;
+  const ready = state.kind === "ready" ? state.bookings : null;
+  const step = view === "day" ? 1 : 7;
+  const heading = ready
+    ? view === "day" ? dayLabel(ready.from) : `Week of ${dayLabel(ready.from, "short")}`
+    : view === "day" ? "Today" : "This week";
+  return (
+    <main className="min-h-dvh bg-canvas px-4 py-10 text-warm-black sm:px-6 md:px-8 md:py-12 lg:px-12">
+      <div className="mx-auto max-w-[760px]">
+        <a className="text-sm text-gray-muted underline-offset-4 hover:underline focus-visible:underline" href={homeHref}>Back to Home</a>
+        <p className="mt-10 text-xs font-medium uppercase tracking-[0.14em] text-gray-muted">Bookings</p>
+        <h1 className="mt-3 font-display text-[34px] font-medium leading-tight sm:text-[40px]">{heading}</h1>
+        <p className="mt-3 max-w-2xl text-base leading-7 text-gray-muted">
+          {view === "day" ? "Who's coming in, in order. Check people in as they arrive." : "Every booking this week, from your website and the tools it connects to."}
+        </p>
+
+        {state.kind === "permission" ? (
+          <Card padding="lg" className="mt-8" role="alert">
+            <h2 className="text-lg font-medium">These bookings belong to another business</h2>
+            <p className="mt-2 text-sm leading-6 text-gray-muted">Your account isn&apos;t a member of this business. Ask its owner to invite you, or open your own workspace.</p>
+            <Link className="mt-4 inline-block text-sm font-medium underline-offset-4 hover:underline" href="/workspace">Open your workspace</Link>
+          </Card>
+        ) : state.kind === "error" ? (
+          <Card padding="lg" className="mt-8" role="alert">
+            <h2 className="text-lg font-medium">Bookings couldn&apos;t load</h2>
+            <p className="mt-2 text-sm leading-6 text-gray-muted">Nothing is lost, and visitors can still book. Reload the page to try again.</p>
+          </Card>
+        ) : (
+          <>
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              <nav aria-label="Bookings view" className="inline-flex rounded-lg border border-gray-border p-0.5">
+                {(["day", "week"] as const).map((value) => (
+                  <a key={value} href={href(workspaceId, value, ready!.from)} aria-current={view === value ? "page" : undefined}
+                    className={`rounded-md px-3 py-1.5 text-sm font-medium ${view === value ? "bg-warm-black text-warm-white" : "text-gray-muted hover:text-warm-black"}`}>
+                    {value === "day" ? "Day" : "Week"}
+                  </a>
+                ))}
+              </nav>
+              <nav aria-label={view === "day" ? "Change day" : "Change week"} className="flex items-center gap-1 text-sm">
+                <a className="rounded-md px-2 py-1.5 text-gray-muted hover:bg-gray-bg hover:text-warm-black" href={href(workspaceId, view, addDays(ready!.from, -step))}>
+                  {view === "day" ? "Previous day" : "Previous week"}
+                </a>
+                <a className="rounded-md px-2 py-1.5 text-gray-muted hover:bg-gray-bg hover:text-warm-black" href={href(workspaceId, view)}>Today</a>
+                <a className="rounded-md px-2 py-1.5 text-gray-muted hover:bg-gray-bg hover:text-warm-black" href={href(workspaceId, view, addDays(ready!.from, step))}>
+                  {view === "day" ? "Next day" : "Next week"}
+                </a>
+              </nav>
+            </div>
+            {ready!.sites.length === 0 ? (
+              <Card padding="lg" className="mt-6">
+                <h2 className="text-lg font-medium">No booking site is connected to this business yet</h2>
+                <p className="mt-2 text-sm leading-6 text-gray-muted">Bookings show here once Strelva runs a site that takes them for this business.</p>
+              </Card>
+            ) : ready!.sites.map((site) => <SiteSection key={site.tenantId} site={site} bookings={ready!} workspaceId={workspaceId} many={ready!.sites.length > 1} />)}
+          </>
+        )}
+      </div>
+    </main>
+  );
+}

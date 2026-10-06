@@ -25,7 +25,6 @@ import {
   readTenantBookings,
   recordBooking,
   upsertBookingSettings,
-  type BookingContext,
   type BookingStoreDb,
   type StoreBooking,
   type StoreBookingInput,

@@ -103,10 +103,13 @@ export const DASHBOARD_DISPOSITIONS: readonly DashboardDisposition[] = [
     note: "Inquiries in the workspace are partial and leads are still Redis-authoritative.", target: (c) => workspaceHome(c.workspaceId, { view: "inquiries" }) },
   { route: "/members", home: "Stays on /dashboard (rewards frozen)", state: "frozen", use: "wellness",
     note: "Frozen with rewards at 1.0.0 (systems catalog §3.2, §3.3). Nothing new reads the rewards store.", target: home },
-  { route: "/roster", home: "Bookings System, day roster", state: "stay", use: "wellness",
-    note: "Part of Bookings; waits on the one booking store.", target: (c) => workspaceHome(c.workspaceId, { view: "scheduling" }) },
-  { route: "/schedule", home: "Bookings System", state: "stay", use: "wellness",
-    note: "Part of Bookings; waits on the one booking store.", target: (c) => workspaceHome(c.workspaceId, { view: "scheduling" }) },
+  // The bookings System's day and week views read the tenant's bookings through
+  // getBookings, so they follow the one booking store when its reads flip.
+  { route: "/roster", home: "Bookings System, day view (/workspace/bookings?view=day)", state: "ready", use: "wellness", requires: ["systems"],
+    target: (c) => `/workspace/bookings?${new URLSearchParams({ workspaceId: c.workspaceId, view: "day" })}` },
+  { route: "/schedule", home: "Bookings System, week view (/workspace/bookings?view=week)", state: "ready", use: "wellness", requires: ["systems"],
+    note: "Hours and services are edited on the business record; booking settings by Strelva.",
+    target: (c) => `/workspace/bookings?${new URLSearchParams({ workspaceId: c.workspaceId, view: "week" })}` },
   { route: "/ownership", home: "Business details, ownership", state: "retire", retiresTo: "/settings", use: "always",
     target: (c) => workspaceHome(c.workspaceId, { view: "settings" }) },
   { route: "/reports", home: "Recaps, under Home's Recent (/workspace/recaps)", state: "ready", use: "always",

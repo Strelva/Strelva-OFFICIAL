@@ -593,3 +593,46 @@ describe("public API on the store before the flip", () => {
     expect(error).toBeInstanceOf(PublicBookingError);
   });
 });
+
+describe("the wellness schedule and roster show the same bookings before and after the flip", () => {
+  it("day and week views read identical bookings from the legacy store and the one store", async () => {
+    const { fake } = fakeWorld();
+    const { setReleaseFlagsDb } = await import("@/platform/release-flags/store");
+    const { readWorkspaceBookings } = await import("@/products/bookings/server");
+    const { DEFAULT_BOOKING_CONFIG } = await import("@/lib/booking");
+    setReleaseFlagsDb({ rpc: async () => ({ data: [{ tenantId: "t1", tenantStableId: randomUUID(), linkedAt: "2026-10-01T00:00:00Z" }], error: null }) });
+    try {
+      env("legacy");
+      for (const [time, name] of [["10:00", "Dana Reed"], ["10:45", "Sam Lee"], ["11:30", "Ana Ruiz"]] as const) {
+        expect((await postBooking(bookingRequest(time, name))).status).toBe(200);
+      }
+      const sam = legacyRows().find((b) => b.clientName === "Sam Lee")!;
+      await putBooking(new Request(`https://mooney.example/api/booking/${sam.id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ status: "completed" }) }), { params: Promise.resolve({ id: sam.id }) });
+      const ports: LegacyBookingPorts = {
+        bookings: async () => legacyRows(), booking: async (_t, id) => legacyRows().find((b) => b.id === id) ?? null,
+        settings: async () => ({ config: DEFAULT_BOOKING_CONFIG, overrides: [] }), services: async () => h.services,
+        reservations: async () => [], reservation: async () => null,
+      };
+      await backfillTenantBookings("t1", { apply: true, ports, db: fake.db });
+      const actor = { userId: randomUUID(), verifiedEmail: "owner@example.test" };
+      const workspaceId = randomUUID();
+
+      env("legacy");
+      const dayBefore = await readWorkspaceBookings(actor, workspaceId, { view: "day", date: FRIDAY });
+      const weekBefore = await readWorkspaceBookings(actor, workspaceId, { view: "week", date: FRIDAY });
+      const listBefore = await getBookings("t1");
+      env("postgres");
+      const dayAfter = await readWorkspaceBookings(actor, workspaceId, { view: "day", date: FRIDAY });
+      const weekAfter = await readWorkspaceBookings(actor, workspaceId, { view: "week", date: FRIDAY });
+      const listAfter = await getBookings("t1");
+
+      expect(dayBefore.sites[0]!.bookings.map((b) => [b.clientName, b.startTime, b.status])).toEqual([["Dana Reed", "10:00", "confirmed"], ["Sam Lee", "10:45", "completed"], ["Ana Ruiz", "11:30", "confirmed"]]);
+      expect(dayAfter.sites[0]!.bookings).toEqual(dayBefore.sites[0]!.bookings);
+      expect(weekAfter.sites[0]!.bookings).toEqual(weekBefore.sites[0]!.bookings);
+      const sortKey = (b: Booking) => `${b.date} ${b.startTime}`;
+      expect([...listAfter].sort((a, b) => sortKey(a).localeCompare(sortKey(b)))).toEqual([...listBefore].sort((a, b) => sortKey(a).localeCompare(sortKey(b))));
+    } finally {
+      setReleaseFlagsDb(null);
+    }
+  });
+});

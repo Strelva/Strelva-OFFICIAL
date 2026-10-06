@@ -100,7 +100,9 @@ describe("dashboard disposition map", () => {
     expect(blocking).toContain("/");
     expect(blocking).not.toContain("/store");
     expect(blocking).not.toContain("/schedule");
-    expect(pagesBlockingOwnerEntry(new Set(["always", "wellness"])).map((entry) => entry.route)).toContain("/schedule");
+    // The wellness schedule and roster are ready (the bookings System's week and day views): they no longer block.
+    expect(pagesBlockingOwnerEntry(new Set(["always", "wellness"])).map((entry) => entry.route)).not.toContain("/schedule");
+    expect(pagesBlockingOwnerEntry(new Set(["always", "wellness"])).map((entry) => entry.route)).not.toContain("/roster");
     expect(pagesBlockingOwnerEntry(new Set(["store"])).map((entry) => entry.route)).toEqual([]);
   });
 });
