@@ -613,6 +613,14 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008151000_con
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-client-records-schema.sql"
+# Inquiry records (2026-10-09): spam held in tenant_leads, inquiry_events,
+# contact on capture, the workspace read. Replaces the three lead reads, so
+# their contracts rerun after it.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009113000_inquiry_records.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-records-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-lead-reads-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
 # The real Make real runner, checkpointing through these RPCs (psql-backed port).
 STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run src/__tests__/make-real-activation-repository.test.ts

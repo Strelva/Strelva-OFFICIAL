@@ -227,6 +227,10 @@ psql "${psql_args[@]}" --file="$repo_root/tests/convert-separate-business-schema
 # Release rows: agency workspaces accepted since 20261008161000; business
 # workspaces still accepted, personal ones still refused.
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flags-agency-workspaces-schema.sql"
+# 20261009113000 replaces read_tenant_leads, read_tenant_lead and
+# read_tenant_lead_digests; their contracts and the new records hold.
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-lead-reads-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-records-schema.sql"
 # 20261008150000 replaces reserve_website_hosted_tenant and
 # manage_published_website_tenant; website-documents-schema above proves the
 # original contract against the replacements.
