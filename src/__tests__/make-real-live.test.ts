@@ -61,14 +61,20 @@ function ctx(on: Record<string, boolean> = {}): LiveChannelContext {
 
 function hostedPorts() {
   const state = {
-    status: "approved", approved: 3 as number | null, receipt: null as null | { receiptId: string; candidateRevision: number; providerUrl: string },
-    readBack: null as null | { status: string; message: string }, launches: 0, failAfterWrite: false,
+    revision: 7, status: "review_ready", approved: null as number | null, candidate: { revision: 3, contentHash: HASH } as { revision: number; contentHash: string } | null,
+    receipt: null as null | { receiptId: string; candidateRevision: number; providerUrl: string },
+    readBack: null as null | { status: string; message: string }, launches: 0, approvals: 0, failAfterWrite: false,
   };
   return {
     state,
     ports: {
-      async read() { return { rebuild: { status: state.status, approvedCandidateRevision: state.approved, tenantId: "mooney", launch: { receipt: state.receipt, readBack: state.readBack } } }; },
-      async launch(_a: WorkspaceActor, _w: string, selection: { candidateRevision: number }) {
+      async read() { return { rebuild: { revision: state.revision, status: state.status, approvedCandidateRevision: state.approved, candidate: state.candidate, tenantId: "mooney", launch: { receipt: state.receipt, readBack: state.readBack } } }; },
+      async approve(_a: WorkspaceActor, _w: string, selection: { expectedRevision: number; candidateRevision: number }) {
+        if (selection.expectedRevision !== state.revision) throw new WorkspaceConflictError("stale");
+        state.approvals++; state.status = "approved"; state.approved = selection.candidateRevision; state.revision++;
+      },
+      async launch(_a: WorkspaceActor, _w: string, selection: { candidateRevision: number; expectedRevision: number }) {
+        if (state.status !== "approved" || selection.expectedRevision !== state.revision) throw new WorkspaceConflictError("Approve the exact current preview before launching.");
         state.launches++;
         state.receipt = { receiptId: `hosted-${selection.candidateRevision}`, candidateRevision: selection.candidateRevision, providerUrl: "https://mooney.strelva.com/" };
         state.readBack = { status: "verified", message: "Serves every page." };
@@ -83,7 +89,7 @@ function hostedPorts() {
 function hostedEffect(id = "publish-site", candidateRevision = 3): DeclaredEffect {
   return {
     id, kind: "publish", channel: "hosted_website", system: { systemId: "b1000000-0000-4000-8000-0000000000e1" }, description: "Publish the rebuilt site",
-    request: { workId: WORK, expectedRevision: 7, candidateRevision, candidateContentHash: HASH }, after: [], publish: { section: "hero", data: { headline: "Mooney Firm" } },
+    request: { workId: WORK, candidateRevision, candidateContentHash: HASH }, after: [], publish: { section: "hero", data: { headline: "Mooney Firm" } },
   };
 }
 
@@ -110,9 +116,16 @@ describe("live channel adapters", () => {
     await expect(adapter.readBack({ businessId: BIZ, providerRef: `${WORK}:hosted-3` })).resolves.toEqual({ ok: true, detail: "Serves every page." });
     await expect(adapter.find({ businessId: BIZ, idempotencyKey: "k", effect: hostedEffect() })).resolves.toEqual({ found: true, providerRef: `${WORK}:hosted-3` });
     await expect(adapter.compensate!({ businessId: BIZ, providerRef: `${WORK}:hosted-3`, idempotencyKey: "k:c" })).resolves.toMatchObject({ ok: false, detail: expect.stringMatching(/needs review/) });
-    // A different approved candidate is refused before any write.
-    state.status = "approved"; state.approved = 4;
-    await expect(adapter.perform({ businessId: BIZ, effect: hostedEffect("again", 3), idempotencyKey: "k2" })).resolves.toMatchObject({ status: "rejected" });
+    // The plan approval was recorded on the rebuild as the owner's approval, once.
+    expect(state.approvals).toBe(1);
+    // A changed candidate, or a different approved one, is refused before any write.
+    state.receipt = null; state.status = "approved"; state.approved = 4; state.candidate = { revision: 4, contentHash: HASH };
+    await expect(adapter.perform({ businessId: BIZ, effect: hostedEffect("again", 3), idempotencyKey: "k2" })).resolves.toMatchObject({ status: "rejected", reason: expect.stringMatching(/changed since/) });
+    state.candidate = { revision: 3, contentHash: HASH };
+    await expect(adapter.perform({ businessId: BIZ, effect: hostedEffect("again", 3), idempotencyKey: "k2" })).resolves.toMatchObject({ status: "rejected", reason: expect.stringMatching(/different version/) });
+    state.status = "building";
+    state.approved = null;
+    await expect(adapter.perform({ businessId: BIZ, effect: hostedEffect("again", 3), idempotencyKey: "k2" })).resolves.toMatchObject({ status: "rejected", reason: expect.stringMatching(/not ready/) });
     expect(state.launches).toBe(1);
     await expect(adapter.perform({ businessId: BIZ, effect: { ...hostedEffect(), request: {} }, idempotencyKey: "k3" })).resolves.toMatchObject({ status: "rejected" });
   });

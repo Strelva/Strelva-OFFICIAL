@@ -74,19 +74,21 @@ function message(error: unknown, fallback: string): string {
 
 export const hostedWebsiteRequestSchema = z.object({
   workId: z.string().uuid(),
-  expectedRevision: z.number().int().nonnegative(),
   candidateRevision: z.number().int().positive(),
   candidateContentHash: z.string().regex(/^[0-9a-f]{64}$/),
 }).strict();
 
+type RebuildSelection = { expectedRevision: number; candidateRevision: number; candidateContentHash: string };
+type LaunchView = { receipt: { receiptId: string; candidateRevision: number; providerUrl: string } | null; readBack: { status: string; message: string } | null };
 export interface HostedWebsitePorts {
   read(actor: WorkspaceActor, workId: string): Promise<{ rebuild: {
-    status: string; approvedCandidateRevision: number | null; tenantId: string | null;
-    launch: { receipt: { receiptId: string; candidateRevision: number; providerUrl: string } | null; readBack: { status: string; message: string } | null };
+    revision: number; status: string; approvedCandidateRevision: number | null; tenantId: string | null;
+    candidate: { revision: number; contentHash: string } | null;
+    launch: LaunchView;
   } }>;
-  launch(actor: WorkspaceActor, workId: string, selection: { expectedRevision: number; candidateRevision: number; candidateContentHash: string }): Promise<{ rebuild: {
-    launch: { receipt: { receiptId: string; candidateRevision: number; providerUrl: string } | null; readBack: { status: string; message: string } | null };
-  } }>;
+  /** The owner's approval of this exact preview, recorded on the rebuild (the plan approval is that decision). */
+  approve(actor: WorkspaceActor, workId: string, selection: RebuildSelection): Promise<unknown>;
+  launch(actor: WorkspaceActor, workId: string, selection: RebuildSelection): Promise<{ rebuild: { launch: LaunchView } }>;
 }
 
 export function createHostedWebsiteAdapter(ports: HostedWebsitePorts, ctx: LiveChannelContext): EffectAdapter {
@@ -97,14 +99,23 @@ export function createHostedWebsiteAdapter(ports: HostedWebsitePorts, ctx: LiveC
     async perform({ effect }) {
       const req = parseRequest(hostedWebsiteRequestSchema, effect);
       if (!req) return rejected("This effect does not name an approved website candidate.");
-      const current = await ports.read(ctx.actor, req.workId);
-      if (current.rebuild.status !== "approved" && current.rebuild.launch.receipt?.candidateRevision !== req.candidateRevision) {
-        return rejected("The rebuilt site is not approved for launch yet. Nothing was published.");
+      let current = await ports.read(ctx.actor, req.workId);
+      const candidate = current.rebuild.candidate;
+      const replay = current.rebuild.launch.receipt?.candidateRevision === req.candidateRevision;
+      if (!replay && (!candidate || candidate.revision !== req.candidateRevision || candidate.contentHash !== req.candidateContentHash)) {
+        return rejected("The rebuilt site changed since this was approved. Nothing was published.");
       }
-      if (current.rebuild.approvedCandidateRevision !== null && current.rebuild.approvedCandidateRevision !== req.candidateRevision) {
+      if (!replay && current.rebuild.status === "approved" && current.rebuild.approvedCandidateRevision !== req.candidateRevision) {
         return rejected("A different version of the site was approved. Nothing was published.");
       }
-      const launched = await ports.launch(ctx.actor, req.workId, { expectedRevision: req.expectedRevision, candidateRevision: req.candidateRevision, candidateContentHash: req.candidateContentHash });
+      if (!replay && current.rebuild.status === "review_ready") {
+        // Recording the owner's approval on the rebuild writes nothing outside Strelva.
+        await ports.approve(ctx.actor, req.workId, { expectedRevision: current.rebuild.revision, candidateRevision: req.candidateRevision, candidateContentHash: req.candidateContentHash });
+        current = await ports.read(ctx.actor, req.workId);
+      } else if (!replay && current.rebuild.status !== "approved") {
+        return rejected("The rebuilt site is not ready to publish. Nothing was published.");
+      }
+      const launched = await ports.launch(ctx.actor, req.workId, { expectedRevision: current.rebuild.revision, candidateRevision: req.candidateRevision, candidateContentHash: req.candidateContentHash });
       const receipt = launched.rebuild.launch.receipt;
       if (!receipt || receipt.candidateRevision !== req.candidateRevision) return rejected("The launch returned no receipt for this version.");
       return { status: "accepted", providerRef: ref(req.workId, receipt.receiptId), result: { receiptId: receipt.receiptId, providerUrl: receipt.providerUrl, candidateRevision: receipt.candidateRevision, tenantId: current.rebuild.tenantId } };

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  * identity gap 2), so a Possibility pinned to the old content goes stale. The
  * stale rule itself is proven in tests/system-possibilities-schema.sql.
  */
-const db = vi.hoisted(() => ({ rpc: vi.fn(async () => ({ data: 1, error: null as null | { message: string } })) }));
+const db = vi.hoisted(() => ({ rpc: vi.fn(async (): Promise<{ data: number | null; error: null | { message: string } }> => ({ data: 1, error: null })) }));
 vi.mock("@/lib/db/client", () => ({ getSupabase: () => ({ rpc: db.rpc }) }));
 
 import { observeTenantContentVersion } from "@/lib/storage/version-store";

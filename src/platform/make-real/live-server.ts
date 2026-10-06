@@ -51,6 +51,7 @@ export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string) 
   return [
     createHostedWebsiteAdapter({
       read: async (a, workId) => (await import("@/products/websites/rebuild-service")).readWebsiteRebuild(a, workId),
+      approve: async (a, workId, selection) => (await import("@/products/websites/rebuild-service")).approveWebsiteRebuild(a, workId, selection),
       launch: async (a, workId, selection) => (await import("@/products/websites/rebuild-service")).launchWebsiteRebuild(a, workId, selection),
     }, ctx),
     createTenantContentAdapter({
