@@ -227,8 +227,8 @@ describe("the pages that moved (owner-entry spec §5)", () => {
   const moved: OwnerEntryDecision = { kind: "workspace", workspaceId: WS, tenantStableId: STABLE, operator: false, tester: false };
   const route = (path: string, on: string[] = []) => routeDashboardRequest({ decision: moved, pathWithSearch: path, flagOn: (flag) => on.includes(flag) });
 
-  it("marks today, review, leads, reviews, analytics and settings ready, each saying what it doesn't do yet", () => {
-    for (const path of ["/", "/review", "/leads", "/reviews", "/analytics", "/settings"]) {
+  it("marks today, review, leads, reviews and analytics ready, each saying what it doesn't do yet", () => {
+    for (const path of ["/", "/review", "/leads", "/reviews", "/analytics"]) {
       const entry = DASHBOARD_DISPOSITIONS.find((item) => item.route === path)!;
       expect(entry.state, path).toBe("ready");
       expect(entry.parityGaps?.length, path).toBeGreaterThan(0);
@@ -239,8 +239,13 @@ describe("the pages that moved (owner-entry spec §5)", () => {
     expect(route("/dashboard/leads")).toEqual({ kind: "redirect", location: `/workspace/inquiries?workspaceId=${WS}`, route: "/leads" });
     expect(route("/dashboard/reviews")).toMatchObject({ kind: "redirect", location: `/workspace/reviews?workspaceId=${WS}` });
     expect(route("/dashboard/analytics")).toMatchObject({ kind: "redirect", location: `/workspace/results?workspaceId=${WS}` });
-    expect(route("/dashboard/settings")).toMatchObject({ kind: "redirect", location: `/workspace/business-details?workspaceId=${WS}` });
-    expect(route("/dashboard/ownership")).toMatchObject({ kind: "redirect", location: `/workspace/business-details?workspaceId=${WS}` });
+  });
+
+  it("keeps Settings on /dashboard until owners can edit branding and domains in the workspace", () => {
+    expect(DASHBOARD_DISPOSITIONS.find((item) => item.route === "/settings")!.state).toBe("stay");
+    expect(route("/dashboard/settings").kind).not.toBe("redirect");
+    expect(route("/dashboard/ownership").kind).not.toBe("redirect");
+    expect(pagesBlockingOwnerEntry(new Set(["always", "local"])).map((entry) => entry.route)).toContain("/settings");
   });
 
   it("keeps meaning carried in the query", () => {
@@ -248,7 +253,6 @@ describe("the pages that moved (owner-entry spec §5)", () => {
     expect(route("/dashboard/analytics?range=custom&from=2026-09-01&to=2026-09-30")).toMatchObject({ location: `/workspace/results?workspaceId=${WS}&range=custom&from=2026-09-01&to=2026-09-30` });
     expect(route("/dashboard/analytics?range=bogus")).toMatchObject({ location: `/workspace/results?workspaceId=${WS}` });
     expect(route("/dashboard/health")).toMatchObject({ location: `/workspace/results?workspaceId=${WS}` });
-    expect(route("/dashboard/settings?checkout=success")).toMatchObject({ location: `/workspace?view=settings&workspaceId=${WS}` });
     expect(route("/dashboard?checkout=success", ["needs_you"])).toMatchObject({ location: `/workspace?view=settings&workspaceId=${WS}` });
   });
 
@@ -266,7 +270,7 @@ describe("the pages that moved (owner-entry spec §5)", () => {
 
   it("no longer blocks owner entry for these pages; the site editor still does", () => {
     const blocking = pagesBlockingOwnerEntry(new Set(["always", "local"])).map((entry) => entry.route);
-    for (const path of ["/", "/review", "/leads", "/reviews", "/analytics", "/settings", "/health", "/ownership"]) expect(blocking, path).not.toContain(path);
+    for (const path of ["/", "/review", "/leads", "/reviews", "/analytics", "/health"]) expect(blocking, path).not.toContain(path);
     expect(blocking).toContain("/site");
     expect(effectiveDisposition("/health").route).toBe("/analytics");
   });

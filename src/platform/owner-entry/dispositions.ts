@@ -167,7 +167,8 @@ export const DASHBOARD_DISPOSITIONS: readonly DashboardDisposition[] = [
       "Reads the tenant review store, not the Publishing listing receipts (src/products/google-listing), which stay behind STRELVA_PUBLISHING_RELEASE.",
     ],
     target: (c) => workspacePlace("reviews", c.workspaceId) },
-  { route: "/settings", home: "Business menu: Business details (/workspace/business-details), People and access, account, plan", state: "ready", use: "always",
+  { route: "/settings", home: "Business menu: Business details (/workspace/business-details), People and access, account, plan", state: "stay", use: "always",
+    note: "Kept on /dashboard (Oct 6): moving it now would take branding, site basics and domain editing away from owners. Flip to ready when the workspace home has them.",
     parityGaps: [
       "Edits only business name, phone, public email, description and who gets Strelva's emails, in the business record; the tenant's site profile fields (tagline, main button, footer) don't change from here.",
       "No branding, site basics, navigation, connected services or domains editing; those sections say Strelva handles them on request.",
