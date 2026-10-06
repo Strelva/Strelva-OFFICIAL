@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { SystemPage } from "@/experience/systems/SystemPage";
 import { readBusinessSystems } from "@/experience/systems/from-workspace";
 import { WorkspaceLayout } from "@/experience/workspace/WorkspaceLayout";
-import { WorkspaceRequestContext } from "@/experience/workspace/WorkspaceRequest";
+import { readResponse, WorkspaceRequestContext } from "@/experience/workspace/WorkspaceRequest";
 import type { WorkspaceSnapshot, WorkspaceWork } from "@/experience/workspace/contracts";
 import { fixtureSiteDocument, fixtureRebuild } from "@/experience/websites/rebuild-fixture";
 import { websiteDocumentVersion } from "@/experience/websites/contracts";
@@ -40,15 +40,21 @@ function memberStore(): BoundedStore & { manager: (actor: WorkspaceActor, worksp
   };
 }
 
-function snapshot(work: WorkspaceWork, role: "owner" | "member" = "owner", access?: "delegated_read"): WorkspaceSnapshot {
-  return {
+async function snapshot(work: WorkspaceWork<unknown>, role: "owner" | "member" = "owner", access?: "delegated_read"): Promise<WorkspaceSnapshot> {
+  const response: Omit<WorkspaceSnapshot, "work"> & { work: WorkspaceWork<unknown>[] } = {
     actor: { email: member.verifiedEmail, localPreview: true }, workspaceId: work.workspaceId,
     workspaces: [{ id: work.workspaceId, kind: "customer", name: "Fixture business", role, ...(access ? { access } : {}) }],
     work: [work], products: [], handoffs: [], delegations: [],
     systems: { status: "ready", systems: [{ ref: { businessId: work.workspaceId, systemId: SYSTEM }, name: work.title, kind: work.productId === "websites" ? "website" : work.productId === "applications" ? "internal_app" : "booking", lifecycle: "live", basis: null, savedWorkId: work.id, tenantId: null, health: { status: "unknown", summary: "No verification recorded.", lastVerifiedAt: null } }], connections: [], possibilities: [] },
   };
+  // The workspace JSON boundary accepts each product's own payload. The default
+  // WorkspaceWork alias still describes the release-one AI visibility UI.
+  return readResponse<WorkspaceSnapshot>(new Response(JSON.stringify(response)), "Fixture workspace could not be loaded.");
 }
-function source(row: SavedWork): WorkspaceWork { return { id: row.id, workspaceId: row.workspaceId, productId: row.productId, resourceKind: row.resourceKind, title: row.title, payload: row.payload, input: {}, createdAt: row.createdAt }; }
+function source(row: SavedWork): WorkspaceWork {
+  // App/schedule summaries load their full typed payload from /api/bounded-work.
+  return { id: row.id, workspaceId: row.workspaceId, productId: row.productId, resourceKind: row.resourceKind, title: row.title ?? "Saved work", payload: null, input: {}, createdAt: row.createdAt };
+}
 async function mount(element: ReturnType<typeof createElement>) {
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
   await act(async () => root!.render(element));
@@ -72,8 +78,8 @@ async function mountLayout(state: WorkspaceSnapshot, request: typeof fetch) {
 
 it.each([{ version: 2 }, { rebuild: { version: 2 } }])("opens a standalone v2 website System in rebuild review even when new rebuilds are disabled (%j)", async payload => {
   const record = fixtureRebuild();
-  const work: WorkspaceWork = { id: record.workId, workspaceId: record.workspaceId, title: record.title, productId: "websites", resourceKind: "website", input: {}, payload, createdAt: "2026-10-05T12:00:00Z" };
-  const state = snapshot(work);
+  const work: WorkspaceWork<typeof payload> = { id: record.workId, workspaceId: record.workspaceId, title: record.title, productId: "websites", resourceKind: "website", input: {}, payload, createdAt: "2026-10-05T12:00:00Z" };
+  const state = await snapshot(work);
   const { systems, files } = readBusinessSystems({ snapshot: state, sites: [] });
   expect(systems[0]?.surface).toEqual({ kind: "work", workId: record.workId, productId: "websites" });
   expect(files).toEqual([]);
@@ -86,7 +92,7 @@ it.each([{ version: 2 }, { rebuild: { version: 2 } }])("opens a standalone v2 we
   }) };
   const request = vi.fn(async (url: RequestInfo | URL) => new Response(JSON.stringify(String(url).includes("/history") ? { history: [] } : envelope)));
   vi.stubGlobal("fetch", request);
-  await mount(createElement(SystemPage, { system: systems[0], systems, workspaceId: record.workspaceId, sources: [work], readOnly: false, rebuildEnabled: false, managed: true, systemHref: id => `?system=${id}`, onHome: noop, onAsk: noop }));
+  await mount(createElement(SystemPage, { system: systems[0], systems, workspaceId: record.workspaceId, sources: state.work, readOnly: false, rebuildEnabled: false, managed: true, systemHref: id => `?system=${id}`, onHome: noop, onAsk: noop }));
   expect(request.mock.calls.some(([url]) => String(url).includes(`/api/websites/${record.workId}/rebuild?`))).toBe(true);
   expect(container.textContent).toContain("2 decisions need you");
   expect(container.textContent).not.toContain("version this interface cannot display");
@@ -104,7 +110,7 @@ it("lets a member submit a released app through its System without design or sha
     if (init?.method === "POST") { const body = JSON.parse(String(init.body)); commands.push(body.command); return new Response(JSON.stringify(await service.command(member, created.id, body.command))); }
     return new Response(JSON.stringify(await service.read(member, created.id)));
   };
-  await mountLayout(snapshot(source(released), "member"), request);
+  await mountLayout(await snapshot(source(released), "member"), request);
   expect(button("Ask for a change").disabled).toBe(true);
   expect(container.querySelector('[role="tab"][id$="-edit-tab"]')).toBeNull();
   expect(container.textContent).not.toContain("Save new draft");
@@ -127,7 +133,7 @@ it("lets a member reserve workspace time while retaining native manager-only pau
     if (init?.method === "POST") { const body = JSON.parse(String(init.body)); commands.push(body.command); return new Response(JSON.stringify(await service.command(member, created.id, body.command))); }
     return new Response(JSON.stringify(await service.read(member, created.id)));
   };
-  await mountLayout(snapshot(source(created), "member"), request);
+  await mountLayout(await snapshot(source(created), "member"), request);
   expect(button("Ask for a change").disabled).toBe(true);
   expect(container.querySelector('[aria-label="External calendar sync"]')).toBeNull();
   await fill(input("Reservation name"), "Member session");
@@ -143,8 +149,8 @@ it("keeps shared read-only System use disabled", async () => {
   const service = createSchedulingService(memberStore(), { workspaceExitCompleted: async () => false });
   const created = await service.create(owner, "workspace-a", { title: "Sessions", availability: [{ start: "2030-01-01T09:00:00Z", end: "2030-01-01T17:00:00Z" }] });
   const request = vi.fn(async (url: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify(String(url).startsWith("/api/bounded-work") ? created : { error: "Not simulated." }), { status: String(url).startsWith("/api/bounded-work") ? 200 : 403 }));
-  await mountLayout(snapshot(source(created), "member", "delegated_read"), request as typeof fetch);
+  await mountLayout(await snapshot(source(created), "member", "delegated_read"), request);
   expect(input("Reservation name").disabled).toBe(true);
   expect(button("Reserve in workspace").disabled).toBe(true);
-  expect(request.mock.calls.every(([, init]) => !(init as RequestInit | undefined)?.method)).toBe(true);
+  expect(request.mock.calls.every(([, init]) => !init?.method)).toBe(true);
 });
