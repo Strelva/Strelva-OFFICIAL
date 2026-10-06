@@ -11,6 +11,7 @@ import { checkSecurity } from "./modules/security";
 import { checkAccessibility } from "./modules/accessibility";
 import { checkTrust } from "./modules/trust";
 import { checkContent } from "./modules/content";
+import { fetchPinnedAuditResponse, type PinnedAuditResponse } from "./pinned-fetch";
 
 // ---------------------------------------------------------------------------
 // SSRF protection
@@ -83,12 +84,20 @@ function fetchWithTimeout(url: string, ms: number): Promise<Response> {
  *  miss/error. Rejects an HTML body: SPA catch-alls and soft-404s serve the
  *  homepage with a 200 for /llms.txt etc., which would false-pass the "you
  *  publish an llms.txt / robots.txt" checks on a site that publishes nothing. */
+/** Site reads go through the pinned transport: every redirect hop is validated
+ *  before it is requested, and the socket stays on the validated address. */
+function fetchSitePinned(url: string, ms: number, maxBytes: number): Promise<PinnedAuditResponse> {
+  return fetchPinnedAuditResponse(url, { timeoutMs: ms, maxBytes, headers: AUDIT_FETCH_HEADERS, validate: validateUrlSafety });
+}
+
+const blockedByBoundary = (error: unknown) => error instanceof Error && error.message.startsWith("Blocked:");
+
 async function fetchTextSafe(url: string, ms = 6000): Promise<string | null> {
   try {
-    const res = await fetchWithTimeout(url, ms);
+    const res = await fetchSitePinned(url, ms, 1_000_000);
     if (!res.ok) return null;
     const contentType = (res.headers.get("content-type") || "").toLowerCase();
-    const body = await res.text();
+    const body = res.text;
     if (contentType.includes("text/html")) return null;
     const head = body.trimStart().slice(0, 200).toLowerCase();
     if (head.startsWith("<!doctype html") || head.startsWith("<html")) return null;
@@ -368,23 +377,25 @@ async function buildAuditContext(
   let httpStatus: number | undefined;
 
   try {
-    const res = await fetchWithTimeout(startUrl, 15_000);
-    html = await res.text();
+    const res = await fetchSitePinned(startUrl, 15_000, 5_000_000);
+    html = res.text;
     fetchedUrl = res.url || startUrl;
     headers = res.headers;
     fetchOk = res.ok;
     httpStatus = res.status;
-  } catch {
+  } catch (error) {
+    if (blockedByBoundary(error)) throw error;
     if (startUrl.startsWith("https://")) {
       try {
         const httpUrl = startUrl.replace(/^https:/, "http:");
-        const res = await fetchWithTimeout(httpUrl, 15_000);
-        html = await res.text();
+        const res = await fetchSitePinned(httpUrl, 15_000, 5_000_000);
+        html = res.text;
         fetchedUrl = res.url || httpUrl;
         headers = res.headers;
         fetchOk = res.ok;
         httpStatus = res.status;
-      } catch {
+      } catch (error) {
+        if (blockedByBoundary(error)) throw error;
         // proceed with empty html — modules reflect missing data honestly
       }
     }
@@ -395,14 +406,8 @@ async function buildAuditContext(
     fetchOk = false;
   }
 
-  // DNS-rebinding guard: if a redirect changed host, re-validate the final host.
+  // Every redirect hop was validated and pinned before it was requested.
   const finalUrl = new URL(fetchedUrl);
-  if (finalUrl.hostname !== new URL(startUrl).hostname) {
-    const { address } = await dns.promises.lookup(finalUrl.hostname, { family: 4 });
-    if (isPrivateIP(address)) {
-      throw new Error(`Blocked: redirect target resolved to private IP ${address}`);
-    }
-  }
 
   const origin = finalUrl.origin;
   const [robotsTxt, sitemapXml, llmsTxt] = await Promise.all([
