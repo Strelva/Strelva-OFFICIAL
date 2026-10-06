@@ -535,6 +535,10 @@ psql "${psql_args[@]}" --file="$repo_root/tests/business-outcomes-schema.sql"
 # switch, with the parity ledger shared with the client stores.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008140000_tenant_lead_reads.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-lead-reads-schema.sql"
+# Bookings at 1.0.0 (Reborn §2): one booking store for both route families,
+# hours and services read from the business record, requests and pause.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008141000_booking_store.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-store-schema.sql"
 # Publishing: the business-level Google grant, its locations and a receipt
 # for every Google write. After Systems, because it extends the origin kinds.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007170000_workspace_account_bindings.sql"
