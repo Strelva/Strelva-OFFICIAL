@@ -1,4 +1,3 @@
-import "server-only";
 import { getEventRaw, getEvents } from "@/lib/events";
 import { resolveEventAction } from "@/lib/event-actions";
 import { sendEmailWithReceipt } from "@/lib/email/send";
@@ -21,6 +20,9 @@ import { createNeedsYouService } from "./service";
 export function needsYouReleaseEnabled(environment: { STRELVA_NEEDS_YOU_RELEASE?: string } = { STRELVA_NEEDS_YOU_RELEASE: process.env.STRELVA_NEEDS_YOU_RELEASE }): boolean {
   return environment.STRELVA_NEEDS_YOU_RELEASE === "1";
 }
+
+/** The item store, exposed so the approve route can render its confirm page. */
+export const needsYouStore: NeedsYouStore = PostgresNeedsYouStore;
 
 export function needsYouAppOrigin(): string {
   return process.env.NEXT_PUBLIC_APP_URL || "https://app.strelva.com";
