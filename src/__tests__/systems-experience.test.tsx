@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => undefined, replace: () => undefined, refresh: () => undefined }), usePathname: () => "/workspace", useSearchParams: () => new URLSearchParams() }));
 
-import { agencySystemLineage, readBusinessSystems } from "@/experience/systems/from-workspace";
+import { readBusinessSystems } from "@/experience/systems/from-workspace";
 import { makeRealSummary, systemHref, type SystemView } from "@/experience/systems/model";
 import { SystemPage, websiteSandbox } from "@/experience/systems/SystemPage";
 import { pinnedSystems, sectionFromView, placeForSection } from "@/experience/app-frame/workspace-places";
@@ -102,18 +102,34 @@ describe("Systems read adapter over the spine projection", () => {
     expect(systems[0]!.surface).toMatchObject({ kind: "website", previewSrc: undefined });
   });
 
-  it("records lineage only from a source link, never from a matching title", () => {
+  it("records lineage only from stored Version rows, never from sourceWorkId or a matching title", () => {
     const apps = projection({ systems: [entry(SITE, "internal_app", "intake", { savedWorkId: "intake" }), entry(INBOX, "internal_app", "Mediation intake", { savedWorkId: "Mediation intake" })] });
     const { systems } = readBusinessSystems({ snapshot: snapshot([work("intake", "applications", { sourceWorkId: "source" }), work("Mediation intake", "applications")], apps), sites: [] });
-    expect(systems[0]!.versions[0]!.lineage).toContain("Adapted from a source system");
+    expect(systems[0]!.versions).toEqual([]);
     expect(systems[1]!.versions).toEqual([]);
+  });
 
-    const lineage = agencySystemLineage([work("source", "applications", { title: "Intake for practices" })], [
-      { workspace: { id: "mooney", name: "The Mooney Firm" }, work: [work("m", "applications", { sourceWorkId: "source" })] },
-      { workspace: { id: "harbor", name: "Harbor Dental" }, work: [work("Intake for practices", "applications"), work("audit", "ai_visibility")] },
-    ]);
-    expect(lineage.sources[0]!.versions.map(item => item.businessName)).toEqual(["The Mooney Firm"]);
-    expect(lineage.unlinked.map(item => item.work.id)).toEqual(["Intake for practices"]);
+  it("draws stored Versions: the source, the context, siblings and a waiting improvement (Twin Trees)", () => {
+    const twin = projection({
+      systems: [entry(SITE, "website", "Twin Trees Camillus", { tenantId: "camillus" }), entry(INBOX, "website", "Twin Trees Fayetteville", { tenantId: "fayetteville" })],
+      versions: [
+        { id: "v-c", systemId: SITE, source: { businessId: BUSINESS, systemId: "hidden", name: "Twin Trees website", hidden: true }, context: { kind: "location", label: "Camillus" },
+          baselineRevision: 2, latestRevision: 2, currentRelease: 1, declined: [], siblings: [{ id: "v-f", systemId: INBOX, context: { kind: "location", label: "Fayetteville" } }] },
+        { id: "v-f", systemId: INBOX, source: { businessId: BUSINESS, systemId: "hidden", name: "Twin Trees website", hidden: true }, context: { kind: "location", label: "Fayetteville" },
+          baselineRevision: 1, latestRevision: 2, currentRelease: 1, declined: [], siblings: [{ id: "v-c", systemId: SITE, context: { kind: "location", label: "Camillus" } }] },
+      ],
+    });
+    const { systems } = readBusinessSystems({ snapshot: snapshot([], twin), sites: [
+      { ...mooneySite, id: "camillus", title: "Twin Trees Camillus", domain: undefined },
+      { ...mooneySite, id: "fayetteville", title: "Twin Trees Fayetteville", domain: undefined },
+    ] });
+    const fayetteville = systems.find(item => item.id === INBOX)!;
+    expect(fayetteville.versions[0]).toMatchObject({ relation: "source", context: "Fayetteville" });
+    expect(fayetteville.versions[0]!.lineage).toContain("An improvement is waiting");
+    expect(fayetteville.versions[1]).toMatchObject({ relation: "version", systemId: SITE, context: "Camillus" });
+    // Stored rows replace the synthetic "not linked yet" siblings.
+    expect(JSON.stringify(systems)).not.toContain("not linked between them yet");
+    expect(systems.find(item => item.id === SITE)!.versions[0]!.lineage).not.toContain("waiting");
   });
 });
 

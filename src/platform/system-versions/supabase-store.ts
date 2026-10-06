@@ -256,3 +256,30 @@ export async function resolveStrelvaAgencyWorkspaceId(client?: VersionsDb): Prom
   return call(client ?? versionsDb(), "read_platform_workspace", { p_role: "strelva_agency" }, uuid.nullable(),
     "Strelva's agency workspace could not be read.");
 }
+
+const businessVersionsSchema = z.object({
+  businessId: uuid,
+  hiddenSources: z.array(uuid),
+  versions: z.array(z.object({
+    id: uuid,
+    systemId: uuid,
+    source: z.object({ businessId: uuid, systemId: uuid, name: z.string().nullable(), hidden: z.boolean() }).strict(),
+    context: z.object({ kind: z.string(), label: z.string() }).strict(),
+    baselineRevision: z.number().int().positive(),
+    latestRevision: z.number().int().positive().nullable(),
+    currentRelease: z.number().int().positive().nullable(),
+    declined: z.array(z.number().int().positive()),
+    siblings: z.array(z.object({ id: uuid, systemId: uuid, context: z.object({ kind: z.string(), label: z.string() }).strict() }).strict()),
+  }).strict()),
+}).strict();
+export type BusinessVersions = z.infer<typeof businessVersionsSchema>;
+
+/** Version lineage for one business's Systems view, in the actor's scope. */
+export async function readBusinessVersions(actor: WorkspaceActor, businessId: string, client?: VersionsDb): Promise<BusinessVersions> {
+  const value = await call(client ?? versionsDb(), "read_business_versions", {
+    p_workspace_id: uuid.parse(businessId),
+    p_user_id: uuid.parse(actor.userId), p_verified_email: z.string().email().parse(actor.verifiedEmail.trim().toLowerCase()),
+  }, businessVersionsSchema, "Versions could not be loaded.");
+  if (value.businessId !== businessId) throw new WorkspaceStoreError("Versions could not be loaded. The response was malformed.");
+  return value;
+}

@@ -18,6 +18,7 @@ import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { BusinessSystems, SystemListing } from "@/platform/systems/from-existing";
 import { listBusinessSystems } from "@/platform/systems/from-existing";
 import { createSupabaseSystemStore } from "@/platform/systems/supabase-store";
+import { readBusinessVersions } from "@/platform/system-versions/supabase-store";
 import type { System } from "@/platform/systems/contracts";
 import {
   deriveSystemHealth,
@@ -224,10 +225,29 @@ async function liveProjectionInput(deps: LiveSystemsDeps): Promise<SystemsProjec
   };
 }
 
+/**
+ * Stored Version lineage joined onto the projection. A hidden same-business
+ * source is never listed as a System. If lineage cannot be read, the
+ * Systems still show and no lineage is claimed (`versions` stays absent).
+ */
+export function withVersions(projection: WorkspaceSystems, lineage: { hiddenSources: string[]; versions: NonNullable<WorkspaceSystems["versions"]> } | null): WorkspaceSystems {
+  if (!lineage || projection.status !== "ready") return projection;
+  const hidden = new Set(lineage.hiddenSources);
+  return {
+    ...projection,
+    systems: projection.systems.filter((system) => !hidden.has(system.ref.systemId)),
+    connections: projection.connections.filter((connection) => !hidden.has(connection.sourceId) && !(connection.targetSystemId && hidden.has(connection.targetSystemId))),
+    possibilities: projection.possibilities.map((possibility) => ({ ...possibility, affects: possibility.affects.filter((id) => !hidden.has(id)) })),
+    versions: lineage.versions,
+  };
+}
+
 /** The `systems` field of GET /api/workspace. A failed spine read is reported, not hidden. */
 export async function readWorkspaceSystems(deps: LiveSystemsDeps): Promise<WorkspaceSystems> {
   try {
-    return await projectWorkspaceSystems(await liveProjectionInput(deps));
+    const projection = await projectWorkspaceSystems(await liveProjectionInput(deps));
+    const lineage = await readBusinessVersions(deps.actor, deps.businessId).catch(() => null);
+    return withVersions(projection, lineage);
   } catch {
     return { status: "unavailable", systems: [], connections: [], possibilities: [] };
   }
