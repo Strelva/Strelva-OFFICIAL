@@ -119,6 +119,10 @@
     {
       "path": "/api/cron/website-domain-verification",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/connected-sites-purge",
+      "schedule": "50 5 * * *"
     }
   ]
 }
