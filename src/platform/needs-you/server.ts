@@ -9,6 +9,7 @@ import { handledFromStore, handledFromTenantEvent, mergeHandled } from "./handle
 import { PostgresNeedsYouStore, type NeedsYouStore } from "./repository";
 import { createNeedsYouService } from "./service";
 import { systemsSourceAdapters } from "./systems-sources";
+import { workspaceSourceAdaptersA } from "./sources/server";
 
 export { needsYouReleaseEnabled } from "./release";
 
@@ -38,6 +39,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
         change: (actor, input) => commitments.execute(actor, { action: "delivery_commitment", ...input }),
       }),
       ...systemsSourceAdapters(store),
+      ...workspaceSourceAdaptersA(),
     ],
   });
 }
