@@ -52,6 +52,58 @@ calendar busy times on the tenant routes, editing hours from a booking
 screen. Production steps (migration, backfill, compare, each flip, owner
 email) each need Jacob's yes.
 
+**Built locally October 9 (wave 3, branch `w3/bookings-inquiries-gaps`, not
+applied or deployed; every switch off).** Migration
+`20261009110000_booking_lifecycle.sql` (send log, clocks, sweep, manage
+lookup, schedule copy, narrowing hours; RLS on, grants revoked,
+cross-business refusals in `tests/booking-lifecycle-schema.sql`, in
+`check:workspace-sql`).
+
+- **Reminders and clocks.** The `booking-reminders` cron (every 15 minutes,
+  `vercel.json` and `CRON_MAX_AGE_SECONDS`; off unless
+  `STRELVA_BOOKING_REMINDERS=1` and the store's write switch): customer
+  reminders 24 h and 2 h before (skipped when the booking was made inside
+  that window or is an import), the owner chased once at 24 h, and at 72 h
+  the request is declined ("Expired"), never confirmed, and the customer is
+  told with up to three open times. Needs you then withdraws the item with
+  that reason. Holds not confirmed in 15 minutes are released. Each message
+  is claimed once in `business_booking_messages` and goes through
+  `src/lib/email/send.ts` (customer mail from `mail.strelva.com` with the
+  business name); a failed send is recorded, never resent. API receipts
+  awaiting their calendar read-back are not owner requests and have no
+  clock.
+- **Manage link.** `/b/[token]` (`STRELVA_BOOKING_MANAGE_PAGE=1`) uses the
+  existing public-receipt management token, looked up by hash, and stops
+  working once the booking ends. Change time and cancel run the public
+  booking service's own change and cancel; a paused schedule closes changes
+  and keeps cancel. GET never changes anything. Reminders link to it.
+- **Calendar busy times** on the tenant routes
+  (`STRELVA_BOOKING_CALENDAR_BUSY=1`, store-served reads only): the
+  workspace's calendar connection blocks busy times (60-second Redis
+  cache); a revoked, errored or unreadable calendar offers slots anyway and
+  turns an instant booking into a request.
+- **Schedule reservations without a receipt** copy into the store
+  (`booking-store-move.ts schedules`, dry run by default): on the calendar
+  of the tenant the schedule is published to, else the workspace's own.
+- **Booking-only hours** are edited from `/workspace/bookings` by an owner
+  or admin, bounded by each day's opening hours in the record; the store
+  refuses anything outside them, and a record with no hours is told to add
+  them first.
+- **Calendly**: the signed webhook also reads Calendly's API v2 payload
+  shape; imports and cancels are proven end to end through the route.
+
+Proof: `booking-lifecycle`, `booking-reminders-cron`, `booking-manage-link`,
+`booking-hours-edit`, `booking-schedule-copy`, `booking-store-move-plan`,
+`booking-one-store` (calendar busy and Calendly end to end), and the SQL
+test above. Not built: agent bookings and the MCP server (they need the
+customer confirmation email and the dependency decision), customer
+cancellation and reschedule emails, a manage token for legacy widget
+bookings, the `ReserveAction` markup. Known gaps: a Needs you day-3
+reminder can coincide with the 72-hour lapse; the legacy dashboard's
+config save, while dual-writing, overwrites hours edited on the bookings
+screen. Production steps (migration, each switch, live email) need Jacob's
+yes.
+
 **October 6 update.** This spec now sits inside the 1.0.0 model: bookings is
 a **System** that reads the business record. The new section
 [Bookings in the 1.0.0 model](#bookings-in-the-100-model) says how. Every

@@ -160,8 +160,12 @@ M one to three days, L three to seven, XL more.
       *Partial: once the one booking store's reads flip, booking hours,
       services and phone are read from the record at use and only narrowed
       by booking settings, and each booking upserts a `business_contacts` row
-      (local, branch `w2/bookings-inquiries`). Editing hours from a booking
-      screen, website facts and inquiry contacts are not built · L*
+      (local, branch `w2/bookings-inquiries`). Booking-only hours are edited
+      from the bookings screen, narrowing the record's opening hours only
+      (local, `w3/bookings-inquiries-gaps`, migration `20261009110000` not
+      applied). Inquiry contacts on capture are built locally
+      (`w3/inquiries-gaps`, behind `STRELVA_INQUIRY_RECORDS`). Website facts
+      are not built · M*
 - [ ] Every edit has history and an undo, like website documents today.
       *Partial:* each command writes one immutable revision and
       `undo_business_record_revision` refuses if a later change touched the
@@ -213,8 +217,12 @@ Proof: unit and SQL tests in `check:workspace-sql`; `reborn:progress` shows
       (bookings and 60 days of slots), flipped reads with rollback; hours and
       services read from the business record (narrowing only); pause keeps
       every booking; Calendly writes import bookings. Production backfill,
-      compare and flips each need Jacob's yes. Reminders, manage links and
-      the hold sweep are not built.*
+      compare and flips each need Jacob's yes. Oct 9 (local,
+      `w3/bookings-inquiries-gaps`, migration `20261009110000` not applied):
+      schedule reservations without a public receipt copy into the store
+      (`booking-store-move.ts schedules`), reminders and the hold sweep run
+      in the `booking-reminders` cron, the manage link page exists, and a
+      connected calendar's busy times block tenant-route slots.*
 - [ ] One approval store. Content, Google and workspace approvals use the
       governed-work proposal, decision and outcome tables. Redis event
       lifecycle retires. *Partial: Postgres shadow exists behind
@@ -306,8 +314,15 @@ are untouched.
       notice, request mode through Needs you, and the day roster and week
       schedule as `/workspace/bookings` views (`/dashboard/roster` and
       `/dashboard/schedule` ready behind Systems) built locally on
-      `w2/bookings-inquiries`. Reminders, manage links and customer
-      cancellation email are not built · L*
+      `w2/bookings-inquiries`. Built locally Oct 9 on
+      `w3/bookings-inquiries-gaps`, every switch off: customer reminders 24 h
+      and 2 h before, the owner's 24-hour chase and 72-hour lapse of a
+      request (declined, customer offered new times, Needs you closes it
+      with the reason), the 15-minute hold sweep, the `/b/[token]` manage
+      page (change time, cancel), calendar busy times on the tenant routes,
+      booking-only hours from the bookings screen, and Calendly imports and
+      cancels end to end through the signed webhook. Customer cancellation
+      email, agent bookings and MCP are not built · M*
 - [ ] **Inquiries.** `STRELVA_INQUIRIES_RELEASE` on, spam review in the
       workspace, owner notification. Existing leads already project in.
       *~45%: spam review on the workspace Inquiries page (owner or Strelva
