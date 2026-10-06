@@ -454,6 +454,13 @@ psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 # against the real workspace, website, tenant-link and calendar tables.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261004120000_systems.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/systems-schema.sql"
+# Safety batch (audit 2026-10-05): scoped provider launch on the customer's
+# approval, then atomic tenant teardown that refuses tenants a workspace
+# website still holds. The teardown test reuses the launch fixture's tenants.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007101000_provider_website_launch_authority.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/provider-website-launch-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007100000_atomic_tenant_teardown.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/atomic-tenant-teardown-schema.sql"
 
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \

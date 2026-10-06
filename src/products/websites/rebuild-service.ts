@@ -253,9 +253,10 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
       const projection = await (dependencies.resolveCapabilities ?? resolvePublishedWebsiteCapabilities)(actor,loaded.work.workspaceId,workId,loaded.rebuild.publishedCapabilitySelection);
       if (!projection || JSON.stringify(projection) !== JSON.stringify(candidate.document.capabilities)) throw new WorkspaceConflictError("The visitor form or booking connection changed. Reconnect it and approve the new preview before publishing.");
     }
-    // Recheck owner authority before provisioning. Publish performs this check
-    // again atomically with the durable pointer and receipt.
-    await documents.approve(actor,{ workspaceId: loaded.work.workspaceId, workId, revision: candidate.revision, contentHash: candidate.contentHash });
+    // Never re-approve as the launcher: that would replace the customer's
+    // approval with the operator's (audit 2026-10-05, finding 6). Reserve and
+    // publish each check launch authority and the exact approved revision
+    // atomically; a scoped provider may launch only an owner's approval.
     const tenantId = dependencies.createHostedTenant ? await dependencies.createHostedTenant(actor,present(loaded)) : await documents.reserveHostedTenant(actor,{ workspaceId: loaded.work.workspaceId, workId, revision: candidate.revision, contentHash: candidate.contentHash, tenantId: hostedTenantSlug(present(loaded)) });
     loaded = await update(actor,loaded,"hosted_tenant_bound",{ tenantId });
     const providerUrl = `https://${tenantId}.strelva.com/`;
