@@ -707,6 +707,21 @@ language sql stable security definer set search_path = public, pg_temp as $$
     where p_workspace_id is null or l.workspace_id = p_workspace_id
 $$;
 
+-- The signed-in identity a link decision acts as on a workspace lifecycle:
+-- the verified owner member whose email is the recipient. Null when the
+-- recipient is not (or no longer) an owner member; the caller then refuses
+-- and points the owner to sign in.
+create function public.needs_you_owner_actor(p_workspace_id uuid, p_recipient text) returns jsonb
+language sql stable security definer set search_path = public, pg_temp as $$
+  select jsonb_build_object('userId', u.id, 'verifiedEmail', lower(u.email))
+    from public.workspace_memberships wm
+    join public.workspaces w on w.id = wm.workspace_id and w.kind = 'customer'
+    join public.users u on u.id = wm.user_id and u.verified_at is not null
+    where wm.workspace_id = p_workspace_id and wm.role = 'owner'
+      and lower(u.email) = lower(btrim(p_recipient))
+    limit 1
+$$;
+
 -- Strelva handled ------------------------------------------------------------------
 
 -- One read model over receipt stores that already exist. It writes nothing
@@ -782,6 +797,7 @@ revoke all on function public.list_owner_decisions(uuid, uuid, text, boolean) fr
 revoke all on function public.read_owner_decision(uuid, uuid) from public, anon, authenticated;
 revoke all on function public.list_open_owner_decisions_for_delivery(integer) from public, anon, authenticated;
 revoke all on function public.needs_you_linked_tenants(uuid) from public, anon, authenticated;
+revoke all on function public.needs_you_owner_actor(uuid, text) from public, anon, authenticated;
 revoke all on function public.read_strelva_handled(uuid, uuid, text, timestamptz) from public, anon, authenticated;
 
 grant execute on function public.set_decision_policy(uuid, uuid, text, text, uuid, text, text, text, bigint) to service_role;
@@ -798,4 +814,5 @@ grant execute on function public.list_owner_decisions(uuid, uuid, text, boolean)
 grant execute on function public.read_owner_decision(uuid, uuid) to service_role;
 grant execute on function public.list_open_owner_decisions_for_delivery(integer) to service_role;
 grant execute on function public.needs_you_linked_tenants(uuid) to service_role;
+grant execute on function public.needs_you_owner_actor(uuid, text) to service_role;
 grant execute on function public.read_strelva_handled(uuid, uuid, text, timestamptz) to service_role;

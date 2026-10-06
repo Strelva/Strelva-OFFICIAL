@@ -74,6 +74,12 @@ select pg_temp.ny_assert((public.needs_you_linked_tenants('ae000000-0000-4000-80
 select pg_temp.ny_assert(jsonb_array_length(public.needs_you_linked_tenants('ae000000-0000-4000-8000-000000000011')) = 0,
   'another business lists no tenant');
 
+select pg_temp.ny_assert((public.needs_you_owner_actor('ae000000-0000-4000-8000-000000000010', ' NY-Owner@example.test')->>'userId') = 'ae000000-0000-4000-8000-000000000001',
+  'owner recipient maps to the owner member');
+select pg_temp.ny_assert(public.needs_you_owner_actor('ae000000-0000-4000-8000-000000000010', 'ny-admin@example.test') is null
+  and public.needs_you_owner_actor('ae000000-0000-4000-8000-000000000011', 'ny-owner@example.test') is null,
+  'an admin or another business''s owner is not an owner actor');
+
 -- Policy -------------------------------------------------------------------
 -- Strelva sets a default; it can never go below the floor.
 select pg_temp.ny_expect($$select public.set_decision_policy('ae000000-0000-4000-8000-000000000010','ae000000-0000-4000-8000-000000000005','ny-operator@strelva.example.test','strelva',null,'copy.marketing','handle','strelva_default',0)$$, 'decision_policy_below_floor');

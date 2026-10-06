@@ -149,7 +149,7 @@ export function evaluateRoute(input: EvaluationInput): Evaluation {
   }
 
   let route = base.route;
-  let rule = baseRule;
+  let rule: RuleId = baseRule;
   if (routeRank(rules.floor) > routeRank(route)) {
     route = rules.floor;
     rule = "floor";

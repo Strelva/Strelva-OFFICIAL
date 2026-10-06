@@ -39,6 +39,8 @@ const history: UnifiedEvent[] = [
   ev({ type: "suggestion", status: "pending", title: "Add a FAQ" }),
 ];
 
+const at = (index: number): UnifiedEvent => history[index]!;
+
 const settings = { tenantId: "fixture-firm", contentAutonomy: "approve" as const, replyMode: "approve" as const, autoApproveThreshold: 0 };
 
 describe("parity replay", () => {
@@ -69,13 +71,13 @@ describe("parity replay", () => {
 
   it("blocks when the evaluator would be looser than today without a spec rule", () => {
     // Earned trust at replay time can promote a change that today went to the operator.
-    const report = replayTenantParity({ ...settings, autoApproveThreshold: 3, approvalStreak: 9 }, [history[1]]);
+    const report = replayTenantParity({ ...settings, autoApproveThreshold: 3, approvalStreak: 9 }, [at(1)]);
     expect(report.rows[0]).toMatchObject({ observed: "strelva_reviews", evaluated: "handle", rule: "earned_trust", verdict: "blocking" });
     expect(report.blocked).toBe(true);
   });
 
   it("ignores events from another tenant and duplicates from the Postgres mirror", () => {
-    const report = replayTenantParity(settings, [history[0], { ...history[0] }, { ...history[1], tenantId: "someone-else" }]);
+    const report = replayTenantParity(settings, [at(0), { ...at(0) }, { ...at(1), tenantId: "someone-else" }]);
     expect(report.rows).toHaveLength(1);
     expect(report.counts.skipped).toBe(2);
   });
@@ -90,19 +92,19 @@ describe("parity replay", () => {
 
 describe("tenant event classification", () => {
   it("never treats an incoming review, booking or read-back as a change", () => {
-    expect(classifyTenantEvent(history[13])).toBeNull();
-    expect(classifyTenantEvent(history[14])).toBeNull();
-    expect(classifyTenantEvent(history[15])).toBeNull();
+    expect(classifyTenantEvent(at(13))).toBeNull();
+    expect(classifyTenantEvent(at(14))).toBeNull();
+    expect(classifyTenantEvent(at(15))).toBeNull();
   });
 
   it("observes today's route from what the event records", () => {
-    expect(observedTenantRoute(history[3]).route).toBe("handle");
-    expect(observedTenantRoute(history[12])).toEqual({ route: "strelva_reviews", verifyFailedLeaked: true });
-    expect(observedTenantRoute({ ...history[12], metadata: { reviewAudience: "operator" } }).verifyFailedLeaked).toBe(false);
+    expect(observedTenantRoute(at(3)).route).toBe("handle");
+    expect(observedTenantRoute(at(12))).toEqual({ route: "strelva_reviews", verifyFailedLeaked: true });
+    expect(observedTenantRoute({ ...at(12), metadata: { reviewAudience: "operator" } }).verifyFailedLeaked).toBe(false);
   });
 
   it("binds a revision to what the owner approves, not to execution bookkeeping", () => {
-    const base = history[6];
+    const base = at(6);
     const edited = { ...base, metadata: { ...base.metadata, draftedReply: "Thanks so much!" } };
     const locked = { ...base, metadata: { ...base.metadata, execution: { state: "processing" as const, action: "approved" as const, actor: "x", attemptId: "a", startedAt: "t" } } };
     expect(tenantEventRevision(base)).toMatch(/^[0-9a-f]{64}$/);

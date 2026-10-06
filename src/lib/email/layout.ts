@@ -81,6 +81,17 @@ export interface EmailBullet {
   text?: string;
 }
 
+/** One owner decision with its own links (Needs you emails). `approve` and
+ *  `notYet` are absent when the decision needs a sign-in; `open` always works. */
+export interface EmailDecision {
+  title: string;
+  detail?: string;
+  note?: string;
+  approve?: EmailButton;
+  notYet?: EmailButton;
+  open: EmailButton;
+}
+
 export interface EmailOptions {
   /** Hidden preview text shown in the inbox list before the body. */
   preheader?: string;
@@ -92,6 +103,8 @@ export interface EmailOptions {
   highlight?: EmailHighlight;
   /** Optional dot-marked list (e.g. top issues), shown under the highlight. */
   bullets?: EmailBullet[];
+  /** Optional list of decisions, each with its own Approve / Not yet / Open links. */
+  decisions?: EmailDecision[];
   /** Optional label/value table (lead details, receipts). Values auto-escaped. */
   rows?: EmailRow[];
   /** Optional primary call-to-action button. */
@@ -178,6 +191,21 @@ function bulletsHtml(items: EmailBullet[]): string {
   return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:2px 0 10px;">${rows}</table>`;
 }
 
+function decisionsHtml(items: EmailDecision[]): string {
+  const link = (b: EmailButton, strong: boolean) =>
+    `<a href="${escapeEmailHtml(b.url)}" style="display:inline-block;margin:6px 14px 0 0;font-size:14px;font-weight:600;color:${strong ? TOKENS.buttonText : TOKENS.accent};${strong ? `background:${TOKENS.accent};padding:8px 18px;border-radius:999px;` : "padding:8px 0;"}text-decoration:${strong ? "none" : "underline"};">${escapeEmailHtml(b.label)}</a>`;
+  const rows = items
+    .map((d, i) => {
+      const border = i === 0 ? "" : `border-top:1px solid ${TOKENS.hairline};`;
+      const detail = d.detail ? `<div style="margin-top:4px;font-size:14px;line-height:1.55;color:${TOKENS.muted};">${escapeEmailHtml(d.detail)}</div>` : "";
+      const note = d.note ? `<div style="margin-top:4px;font-size:13px;line-height:1.5;color:${TOKENS.faint};">${escapeEmailHtml(d.note)}</div>` : "";
+      const actions = [d.approve ? link(d.approve, true) : "", d.notYet ? link(d.notYet, false) : "", link(d.open, false)].join("");
+      return `<tr><td style="padding:14px 0;${border}"><div style="font-size:15px;font-weight:600;line-height:1.4;color:${TOKENS.ink};">${escapeEmailHtml(d.title)}</div>${detail}${note}<div>${actions}</div></td></tr>`;
+    })
+    .join("");
+  return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:2px 0 10px;">${rows}</table>`;
+}
+
 function rowsHtml(rows: EmailRow[]): string {
   const body = rows
     .map(
@@ -220,6 +248,7 @@ export function renderEmailHtml(opts: EmailOptions): string {
   const highlight = opts.highlight ? highlightHtml(opts.highlight) : "";
   const bullets = opts.bullets && opts.bullets.length ? bulletsHtml(opts.bullets) : "";
   const rows = opts.rows && opts.rows.length ? rowsHtml(opts.rows) : "";
+  const decisions = opts.decisions && opts.decisions.length ? decisionsHtml(opts.decisions) : "";
   const button = opts.button ? buttonHtml(opts.button) : "";
   const secondaryButton = opts.secondaryButton ? secondaryButtonHtml(opts.secondaryButton) : "";
 
@@ -233,7 +262,7 @@ ${preheader}
       <tr><td style="padding:28px 32px 0;">${logo()}</td></tr>
       <tr><td style="padding:20px 32px 0;">
         <h1 style="margin:0 0 16px;font-size:24px;line-height:1.25;font-weight:700;color:${TOKENS.ink};">${escapeEmailHtml(opts.heading)}</h1>
-        ${paragraphs}${highlight}${bullets}${rows}${button}${secondaryButton}
+        ${paragraphs}${highlight}${bullets}${decisions}${rows}${button}${secondaryButton}
       </td></tr>
       <tr><td style="padding:12px 32px 26px;"><div style="border-top:1px solid ${TOKENS.hairline};">${footerHtml(opts)}</div></td></tr>
     </table>
@@ -253,6 +282,14 @@ export function renderEmailText(opts: EmailOptions): string {
   }
   for (const b of opts.bullets ?? []) parts.push(`- ${b.title}${b.text ? ` — ${b.text}` : ""}`);
   if (opts.bullets && opts.bullets.length) parts.push("");
+  for (const d of opts.decisions ?? []) {
+    parts.push(d.title);
+    if (d.detail) parts.push(d.detail);
+    if (d.note) parts.push(d.note);
+    if (d.approve) parts.push(`${d.approve.label}: ${d.approve.url}`);
+    if (d.notYet) parts.push(`${d.notYet.label}: ${d.notYet.url}`);
+    parts.push(`${d.open.label}: ${d.open.url}`, "");
+  }
   if (opts.rows) for (const r of opts.rows) parts.push(`${r.label}: ${r.value}`);
   if (opts.rows && opts.rows.length) parts.push("");
   if (opts.button) parts.push(`${opts.button.label}: ${opts.button.url}`, "");
