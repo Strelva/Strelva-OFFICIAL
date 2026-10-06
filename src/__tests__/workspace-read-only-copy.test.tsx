@@ -23,14 +23,20 @@ function delegatedSnapshot(): WorkspaceSnapshot {
 
 describe("read-only copy names the real reason", () => {
   it("tells an agency with delegated read who shared the business, not that only owners can change it", () => {
-    const html = renderToStaticMarkup(createElement(BusinessHome, {
+    const render = (systemsReleased: boolean) => renderToStaticMarkup(createElement(BusinessHome, {
       snapshot: delegatedSnapshot(), sites: [], unassignedSites: [], siteAssignmentsKnown: true,
       offerings: { status: "unavailable", reason: "n/a" }, busy: false,
-      onOpen: noop, onStart: noop, onRequest: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account",
+      onOpen: noop, onStart: noop, onRequest: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account", systemsReleased,
     }));
+    // Systems Home (STRELVA_SYSTEMS_RELEASE on) and the pre-Systems Home both name who shared it.
+    const html = render(true);
     expect(html).toContain("Shared with you");
     expect(html).toContain("Alder Workshop shared this with your agency to review.");
     expect(html).not.toContain("owners can make changes");
+    const before = render(false);
+    expect(before).toContain("Shared workspace");
+    expect(before).toContain("Alder Workshop shared this with your agency to review.");
+    expect(before).not.toContain("owners can make changes");
   });
 
   it.each([

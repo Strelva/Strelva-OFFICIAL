@@ -15,7 +15,8 @@ const previewJson = (body: unknown, status = 200) => new Response(JSON.stringify
 /**
  * Adds the server-computed Systems projection to the fixture's workspace
  * reads, and answers Make real with the result the isolated sandbox produced
- * on the server. Non-owners get the same 403 the route returns.
+ * on the server. Non-owners get the same 403 the route returns. With
+ * Systems off, every snapshot says so and Make real answers the route's 503.
  */
 function withSystems(base: typeof fetch, systems: PreviewSystems | undefined): typeof fetch {
   if (!systems) return base;
@@ -24,6 +25,7 @@ function withSystems(base: typeof fetch, systems: PreviewSystems | undefined): t
     const url = new URL(raw, "http://preview.invalid");
     const method = init?.method || "GET";
     if (url.pathname === "/api/workspace/systems/make-real" && method === "POST") {
+      if (!systems.released) return previewJson({ error: "Make real is not enabled. Nothing changed." }, 503);
       const body = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as { workspaceId?: string; possibilityId?: string };
       if (!body.workspaceId || !systems.owners.includes(body.workspaceId)) return previewJson({ error: "Only an owner of this business can make a possibility real.", permission: "not_owner" }, 403);
       const result = systems.makeReal[`${body.workspaceId}:${body.possibilityId}`];
@@ -33,8 +35,15 @@ function withSystems(base: typeof fetch, systems: PreviewSystems | undefined): t
     if (url.pathname !== "/api/workspace" || method !== "GET" || !response.ok) return response;
     const snapshot = await response.json() as { workspaceId: string };
     const projection = systems.systems[snapshot.workspaceId];
-    return previewJson(projection ? { ...snapshot, systems: projection } : snapshot);
+    const releases = { systems: systems.released };
+    return previewJson(projection ? { ...snapshot, systems: projection, releases } : { ...snapshot, releases });
   };
+}
+
+function previewHref(scenario: string, systems: string | null): string {
+  const params = new URLSearchParams({ scenario });
+  if (systems === "on" || systems === "off") params.set("systems", systems);
+  return `/preview/strelva?${params}`;
 }
 
 export function WorkspacePreview({ scenario, systems }: { scenario: PreviewScenario; systems?: PreviewSystems }) {
@@ -42,6 +51,8 @@ export function WorkspacePreview({ scenario, systems }: { scenario: PreviewScena
   const searchParams = useSearchParams();
   const [installedStaffRequest] = useState(() => searchParams.get("previewSetup") === "staff-request");
   const [seededRequests] = useState(() => searchParams.get("previewSetup") === "requests");
+  // Keep an explicit `systems=on|off` choice when switching examples.
+  const releaseParam = searchParams.get("systems");
   const previewRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
@@ -68,9 +79,10 @@ export function WorkspacePreview({ scenario, systems }: { scenario: PreviewScena
     <aside ref={controlsRef} className={styles.controls} aria-label="Local preview controls">
       <div><strong>Local interface preview</strong><span>Fictional data · changes reset on reload · no live actions</span></div>
       <Link href="/preview/strelva/start">All interfaces</Link>
-      <label>Example<select value={scenario} onChange={event => { router.push(`/preview/strelva?scenario=${encodeURIComponent(event.target.value)}`); }}>{PREVIEW_SCENARIOS.map(item => <option key={item} value={item}>{item === "read-only" ? "Shared, read-only" : item.replace(/^./, letter => letter.toUpperCase())}</option>)}</select></label>
+      <label>Example<select value={scenario} onChange={event => { router.push(previewHref(event.target.value, releaseParam)); }}>{PREVIEW_SCENARIOS.map(item => <option key={item} value={item}>{item === "read-only" ? "Shared, read-only" : item.replace(/^./, letter => letter.toUpperCase())}</option>)}</select></label>
+      {systems ? <Link href={previewHref(scenario, systems.released ? "off" : "on")} aria-label={`Systems are ${systems.released ? "on" : "off"}. Turn them ${systems.released ? "off" : "on"}.`}>Systems: {systems.released ? "on" : "off"}</Link> : null}
       {(scenario === "paid" || scenario === "enterprise") && <p>Relationship example only. Pricing and permissions are not simulated.</p>}
     </aside>
-    <WorkspaceApp key={scenario} request={request} appBase="/preview/strelva" signOut={null} inquiry={inquiry} />
+    <WorkspaceApp key={`${scenario}:${systems?.released ? "systems" : "reborn"}`} request={request} appBase="/preview/strelva" signOut={null} inquiry={inquiry} />
   </div>;
 }

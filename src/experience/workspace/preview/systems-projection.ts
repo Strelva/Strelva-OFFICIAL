@@ -6,6 +6,8 @@
  * `systemsFromExisting`, given health by `healthGraphFromSystems`, and saved
  * rebuilds become Possibilities through src/platform/possibilities. Make real
  * results come from the isolated Make real sandbox, run here at render time.
+ * With `systems` off (STRELVA_SYSTEMS_RELEASE, or the page's override) no
+ * projection is built, as on the workspace route.
  *
  * Monitor results below are fictional fixture evidence, dated relative to
  * now. Anything without fixture evidence stays `unknown`.
@@ -26,6 +28,8 @@ export interface PreviewSystems {
   makeReal: Record<string, WorkspaceMakeRealResult>;
   /** Workspaces where the preview actor is an owner and may make things real. */
   owners: string[];
+  /** STRELVA_SYSTEMS_RELEASE for this render. */
+  released: boolean;
 }
 
 const PREVIEW_ACTOR = { userId: "c0000000-0000-4000-8000-000000000001", verifiedEmail: "owner@example.invalid" };
@@ -89,12 +93,14 @@ function fixtureEvidence(scenario: PreviewScenario, input: Pick<SystemsProjectio
   return observations;
 }
 
-export async function previewSystems(scenario: PreviewScenario, options: { installedStaffRequest?: boolean; seededRequests?: boolean } = {}, now: number = Date.now()): Promise<PreviewSystems> {
-  const request = createPreviewRequest(scenario, options);
+export async function previewSystems(scenario: PreviewScenario, options: { installedStaffRequest?: boolean; seededRequests?: boolean; systems: boolean }, now: number = Date.now()): Promise<PreviewSystems> {
+  const { systems: released, ...fixtureOptions } = options;
+  if (!released) return { systems: {}, makeReal: {}, owners: [], released };
+  const request = createPreviewRequest(scenario, fixtureOptions);
   const first = await (await request("/api/workspace")).json() as WorkspaceSnapshot;
-  if (!first?.workspaces) return { systems: {}, makeReal: {}, owners: [] };
+  if (!first?.workspaces) return { systems: {}, makeReal: {}, owners: [], released };
   const inquiryTenant = scenario.startsWith("mooney") ? MOONEY_TENANT : "buffalo-realty";
-  const result: PreviewSystems = { systems: {}, makeReal: {}, owners: [] };
+  const result: PreviewSystems = { systems: {}, makeReal: {}, owners: [], released };
   for (const workspace of first.workspaces) {
     if (workspace.kind !== "customer") continue;
     if (workspace.role === "owner" && workspace.access !== "delegated_read") result.owners.push(workspace.id);

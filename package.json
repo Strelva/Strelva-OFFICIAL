@@ -29,6 +29,8 @@
     "check:boundaries": "tsx scripts/check-product-boundaries.ts",
     "check:workspace-sql": "bash scripts/check-workspace-sql.sh",
     "check:workspace-upgrade": "bash scripts/check-workspace-upgrade.sh",
+    "scrubbed-copy": "tsx scripts/scrubbed-production-copy.ts",
+    "check:scrubbed-copy": "SCRUBBED_COPY_E2E=1 vitest run src/__tests__/scrubbed-copy-e2e.test.ts",
     "check:inquiry-lua": "bash scripts/check-inquiry-lua.sh",
     "check:workspace-target": "node scripts/check-workspace-target.mjs",
     "test:workspace-target": "node --test scripts/tests/workspace-target.node-test.mjs",

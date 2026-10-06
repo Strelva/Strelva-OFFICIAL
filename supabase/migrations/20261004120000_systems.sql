@@ -17,11 +17,18 @@
 --                       System, a business resource, an audience, an external
 --                       account binding, a domain or an API.
 --
--- Access is the business record's rule (business_record_assert_actor): any
--- member of the customer workspace reads; owner, admin or an accepted agency
--- delivery writes; writes take the workspace lock and stop after exit. All
--- tables are RLS-on with every grant revoked; only the service-role RPCs
--- below reach them, and each rechecks the actor.
+-- Access (system_actor_scope). A direct member of the customer workspace
+-- reads every System; owner or admin writes, under the business record's
+-- write rule (business_record_assert_actor: workspace lock, stop after exit).
+-- Anyone else reaches only the Systems tied to the exact saved work an agency
+-- was delegated (read) or assigned with an accepted delivery (read and
+-- write), as listed by business_record_agency_work_ids: a System adopted
+-- from that work, or the website tenant that work hosts. An agency never sees
+-- or writes a System with no origin, another tenant, inquiry handling,
+-- booking grants for other work or the business's calendar connections, and
+-- may create a System only from its own work. With no such work it is
+-- refused like a stranger. All tables are RLS-on with every grant revoked;
+-- only the service-role RPCs below reach them, and each rechecks the actor.
 --
 -- Invariants held here, mirrored by src/platform/systems/invariants.ts:
 --   * identity and owner never change; revisions belong to one System;
@@ -337,9 +344,84 @@ begin
 end;
 $$;
 
--- Loads a System inside the given business, locking it for a write. A System
--- in another business reads as missing.
-create function public.system_load(p_workspace_id uuid, p_system_id uuid, p_lock boolean)
+-- Who may reach this business's Systems, and how far. A direct member gets
+-- its role and work_ids = null, meaning the whole business. Anyone else gets
+-- access 'agency' and exactly the saved work business_record_agency_work_ids
+-- grants (delegated or assigned for a read; assigned only for a write); with
+-- none, business_record_access_denied, as for a stranger. A write first
+-- passes business_record_assert_actor's write rule, which takes the
+-- workspace lock, refuses plain members and stops after exit.
+create function public.system_actor_scope(
+  p_workspace_id uuid, p_user_id uuid, p_verified_email text, p_write boolean,
+  out access text, out work_ids uuid[]
+)
+language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  if p_write then
+    access := public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, true);
+  elsif exists (select 1 from public.workspace_memberships wm
+      join public.workspaces w on w.id = wm.workspace_id and w.kind = 'customer'
+      where wm.workspace_id = p_workspace_id and wm.user_id = p_user_id) then
+    access := public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, false);
+  else
+    access := 'agency';
+  end if;
+  if access <> 'agency' then
+    work_ids := null;
+    return;
+  end if;
+  work_ids := public.business_record_agency_work_ids(p_workspace_id, p_user_id, p_verified_email, p_write);
+  if cardinality(work_ids) = 0 then raise exception 'business_record_access_denied'; end if;
+end;
+$$;
+
+-- The website tenants granted work stands for: the tenant a website work row
+-- reserved or published to, by the same expression read_existing_business_systems
+-- uses for hostedTenantStableId. Null work ids (a direct member) is not asked.
+create function public.system_scope_tenants(p_workspace_id uuid, p_work_ids uuid[]) returns uuid[]
+language sql stable security definer set search_path = public, pg_temp as $$
+  select coalesce(array_agg(distinct t.stable_id), '{}') from (
+    select coalesce(hr.tenant_stable_id, pt.stable_id) as stable_id
+      from public.saved_product_work w
+      left join public.website_document_publications p on p.website_work_id = w.id and p.workspace_id = w.workspace_id
+      left join public.tenants pt on pt.id = p.tenant_id
+      left join public.website_hosted_tenant_reservations hr on hr.website_work_id = w.id and hr.workspace_id = w.workspace_id
+      where w.workspace_id = p_workspace_id and w.id = any(p_work_ids)
+        and w.product_id = 'websites' and w.resource_kind = 'website'
+  ) t where t.stable_id is not null
+$$;
+
+-- Whether a System, by its origin, lies inside the actor's scope. Null work
+-- ids: a direct member, everything. Otherwise a System adopted from granted
+-- work, or from the website tenant that work stands for. Nothing else. Never
+-- null: a System with no origin is outside an agency's scope, not unknown.
+create function public.system_in_scope(p_workspace_id uuid, p_origin_kind text, p_origin_ref text, p_work_ids uuid[])
+returns boolean
+language sql stable security definer set search_path = public, pg_temp as $$
+  select coalesce(p_work_ids is null
+    or (p_origin_kind = 'saved_work' and p_origin_ref = any(p_work_ids::text[]))
+    or (p_origin_kind = 'tenant' and p_origin_ref = any(public.system_scope_tenants(p_workspace_id, p_work_ids)::text[])), false)
+$$;
+
+-- Whether a connection is visible from this business in this scope. A
+-- direct member sees every connection of its business and every share into
+-- it. An agency sees one only when each end inside this business is a System
+-- in its scope; the far end of a cross-business share is named, not opened.
+create function public.system_connection_in_scope(c public.system_connections, p_workspace_id uuid, p_work_ids uuid[])
+returns boolean
+language sql stable security definer set search_path = public, pg_temp as $$
+  select coalesce((c.business_workspace_id = p_workspace_id or c.target_business_workspace_id = p_workspace_id)
+    and (p_work_ids is null or (
+      (c.business_workspace_id <> p_workspace_id or exists (select 1 from public.systems s
+        where s.id = c.source_system_id and public.system_in_scope(p_workspace_id, s.origin_kind, s.origin_ref, p_work_ids)))
+      and (c.target_business_workspace_id is distinct from p_workspace_id or exists (select 1 from public.systems s
+        where s.id = c.target_system_id and public.system_in_scope(p_workspace_id, s.origin_kind, s.origin_ref, p_work_ids))))), false)
+$$;
+
+-- Loads a System inside the given business and the actor's scope, locking it
+-- for a write. A System in another business, or outside the scope, reads as
+-- missing.
+create function public.system_load(p_workspace_id uuid, p_system_id uuid, p_lock boolean, p_work_ids uuid[])
 returns public.systems
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare s public.systems;
@@ -349,7 +431,9 @@ begin
   else
     select * into s from public.systems where id = p_system_id and business_workspace_id = p_workspace_id;
   end if;
-  if not found then raise exception 'system_not_found'; end if;
+  if not found or not public.system_in_scope(p_workspace_id, s.origin_kind, s.origin_ref, p_work_ids) then
+    raise exception 'system_not_found';
+  end if;
   return s;
 end;
 $$;
@@ -359,25 +443,28 @@ $$;
 create function public.read_business_systems(p_workspace_id uuid, p_user_id uuid, p_verified_email text)
 returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
+declare v record;
 begin
-  perform public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, false);
+  v := public.system_actor_scope(p_workspace_id, p_user_id, p_verified_email, false);
   return jsonb_build_object(
     'businessId', p_workspace_id,
     'systems', coalesce((select jsonb_agg(public.system_json(s) order by s.created_at, s.id)
-      from public.systems s where s.business_workspace_id = p_workspace_id), '[]'::jsonb),
+      from public.systems s where s.business_workspace_id = p_workspace_id
+        and public.system_in_scope(p_workspace_id, s.origin_kind, s.origin_ref, v.work_ids)), '[]'::jsonb),
     'connections', coalesce((select jsonb_agg(public.system_connection_json(c) order by c.created_at, c.id)
       from public.system_connections c
-      where c.business_workspace_id = p_workspace_id or c.target_business_workspace_id = p_workspace_id), '[]'::jsonb));
+      where (c.business_workspace_id = p_workspace_id or c.target_business_workspace_id = p_workspace_id)
+        and public.system_connection_in_scope(c, p_workspace_id, v.work_ids)), '[]'::jsonb));
 end;
 $$;
 
 create function public.read_business_system(p_workspace_id uuid, p_user_id uuid, p_verified_email text, p_system_id uuid)
 returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
-declare s public.systems;
+declare s public.systems; v record;
 begin
-  perform public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, false);
-  s := public.system_load(p_workspace_id, p_system_id, false);
+  v := public.system_actor_scope(p_workspace_id, p_user_id, p_verified_email, false);
+  s := public.system_load(p_workspace_id, p_system_id, false, v.work_ids);
   return jsonb_build_object(
     'system', public.system_json(s),
     'revisions', coalesce((select jsonb_agg(public.system_revision_json(r) order by r.number)
@@ -393,13 +480,14 @@ create function public.create_business_system(
   p_workspace_id uuid, p_user_id uuid, p_verified_email text, p_input jsonb, p_command_id uuid, p_command_digest text
 ) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
-declare s public.systems;
+declare s public.systems; v record;
 begin
   perform public.system_command_valid(p_command_id, p_command_digest);
-  perform public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, true);
+  v := public.system_actor_scope(p_workspace_id, p_user_id, p_verified_email, true);
   select * into s from public.systems where business_workspace_id = p_workspace_id and command_id = p_command_id;
   if found then
     if s.command_digest <> p_command_digest or s.created_by <> p_user_id then raise exception 'system_command_conflict'; end if;
+    if not public.system_in_scope(p_workspace_id, s.origin_kind, s.origin_ref, v.work_ids) then raise exception 'system_not_found'; end if;
     return public.system_json(s) || jsonb_build_object('replayed', true);
   end if;
   if p_input is null or jsonb_typeof(p_input) <> 'object'
@@ -407,6 +495,11 @@ begin
     or jsonb_typeof(p_input->'name') is distinct from 'string' or jsonb_typeof(p_input->'kind') is distinct from 'string'
     or (p_input ? 'origin' and jsonb_typeof(p_input->'origin') not in ('object','null')) then
     raise exception 'system_input_invalid';
+  end if;
+  -- An agency creates a System only from its own work, so it can see what it made.
+  if v.work_ids is not null and (jsonb_typeof(p_input->'origin') is distinct from 'object'
+      or not public.system_in_scope(p_workspace_id, p_input->'origin'->>'kind', p_input->'origin'->>'ref', v.work_ids)) then
+    raise exception 'business_record_access_denied';
   end if;
   if jsonb_typeof(p_input->'origin') = 'object' and exists (select 1 from public.systems
       where business_workspace_id = p_workspace_id and origin_kind = p_input->'origin'->>'kind'
@@ -429,10 +522,10 @@ create function public.update_business_system(
   p_workspace_id uuid, p_user_id uuid, p_verified_email text, p_system_id uuid, p_expected_change bigint, p_patch jsonb
 ) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
-declare s public.systems;
+declare s public.systems; v record;
 begin
-  perform public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, true);
-  s := public.system_load(p_workspace_id, p_system_id, true);
+  v := public.system_actor_scope(p_workspace_id, p_user_id, p_verified_email, true);
+  s := public.system_load(p_workspace_id, p_system_id, true, v.work_ids);
   if s.change_number <> p_expected_change then raise exception 'system_change_conflict'; end if;
   if p_patch is null or jsonb_typeof(p_patch) <> 'object' or p_patch = '{}'::jsonb
     or (p_patch - array['name','purpose','kind']::text[]) <> '{}'::jsonb
@@ -458,19 +551,19 @@ create function public.record_system_revision(
   p_input jsonb, p_command_id uuid, p_command_digest text, p_activate boolean
 ) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
-declare s public.systems; r public.system_revisions;
+declare s public.systems; r public.system_revisions; v record;
 begin
   perform public.system_command_valid(p_command_id, p_command_digest);
-  perform public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, true);
+  v := public.system_actor_scope(p_workspace_id, p_user_id, p_verified_email, true);
   select * into r from public.system_revisions where business_workspace_id = p_workspace_id and command_id = p_command_id;
   if found then
     if r.command_digest <> p_command_digest or r.created_by <> p_user_id or r.system_id <> p_system_id then
       raise exception 'system_command_conflict';
     end if;
-    s := public.system_load(p_workspace_id, p_system_id, false);
+    s := public.system_load(p_workspace_id, p_system_id, false, v.work_ids);
     return jsonb_build_object('system', public.system_json(s), 'revision', public.system_revision_json(r), 'replayed', true);
   end if;
-  s := public.system_load(p_workspace_id, p_system_id, true);
+  s := public.system_load(p_workspace_id, p_system_id, true, v.work_ids);
   if p_activate is null or (p_activate and s.change_number is distinct from p_expected_change)
     or (not p_activate and p_expected_change is not null and s.change_number <> p_expected_change) then
     raise exception 'system_change_conflict';
@@ -506,10 +599,10 @@ create function public.set_system_current_revision(
   p_revision_id uuid, p_expected_current uuid
 ) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
-declare s public.systems; r public.system_revisions;
+declare s public.systems; r public.system_revisions; v record;
 begin
-  perform public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, true);
-  s := public.system_load(p_workspace_id, p_system_id, true);
+  v := public.system_actor_scope(p_workspace_id, p_user_id, p_verified_email, true);
+  s := public.system_load(p_workspace_id, p_system_id, true, v.work_ids);
   select * into r from public.system_revisions where id = p_revision_id and system_id = s.id;
   if not found then raise exception 'system_not_found'; end if;
   if s.current_revision_id = r.id then return public.system_json(s); end if;
@@ -527,16 +620,16 @@ create function public.transition_system_lifecycle(
   p_workspace_id uuid, p_user_id uuid, p_verified_email text, p_system_id uuid, p_expected_change bigint, p_to text
 ) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
-declare s public.systems; v_at text;
+declare s public.systems; v_at text; v record;
 begin
-  perform public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, true);
+  v := public.system_actor_scope(p_workspace_id, p_user_id, p_verified_email, true);
   -- A booking System adopted from a schedule shares its pause with that
   -- schedule. Lock the schedule row before the System row, the same order the
   -- schedule-side trigger takes, so the two writers cannot deadlock.
   perform 1 from public.saved_product_work w join public.systems x
       on x.id = p_system_id and x.business_workspace_id = p_workspace_id and x.origin_kind = 'saved_work' and x.origin_ref = w.id::text
     where w.workspace_id = p_workspace_id and w.product_id = 'scheduling' and w.resource_kind = 'schedule' for update of w;
-  s := public.system_load(p_workspace_id, p_system_id, true);
+  s := public.system_load(p_workspace_id, p_system_id, true, v.work_ids);
   if s.change_number <> p_expected_change then raise exception 'system_change_conflict'; end if;
   if p_to is null or p_to not in ('draft','live','paused') then raise exception 'system_input_invalid'; end if;
   if not ((s.lifecycle = 'draft' and p_to = 'live') or (s.lifecycle = 'live' and p_to = 'paused')
@@ -596,18 +689,19 @@ create function public.issue_system_output(
   p_input jsonb, p_command_id uuid, p_command_digest text
 ) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
-declare s public.systems; o public.system_outputs;
+declare s public.systems; o public.system_outputs; v record;
 begin
   perform public.system_command_valid(p_command_id, p_command_digest);
-  perform public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, true);
+  v := public.system_actor_scope(p_workspace_id, p_user_id, p_verified_email, true);
   select * into o from public.system_outputs where business_workspace_id = p_workspace_id and command_id = p_command_id;
   if found then
     if o.command_digest <> p_command_digest or o.issued_by <> p_user_id or o.system_id <> p_system_id then
       raise exception 'system_command_conflict';
     end if;
+    perform public.system_load(p_workspace_id, p_system_id, false, v.work_ids);
     return public.system_output_json(o) || jsonb_build_object('replayed', true);
   end if;
-  s := public.system_load(p_workspace_id, p_system_id, true);
+  s := public.system_load(p_workspace_id, p_system_id, true, v.work_ids);
   if s.current_revision_id is null then raise exception 'system_output_requires_revision'; end if;
   if p_input is null or jsonb_typeof(p_input) <> 'object'
     or (p_input - array['kind','title','snapshotHash']::text[]) <> '{}'::jsonb then
@@ -626,10 +720,10 @@ create function public.accept_system_output(
   p_workspace_id uuid, p_user_id uuid, p_verified_email text, p_system_id uuid, p_output_id uuid
 ) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
-declare o public.system_outputs;
+declare o public.system_outputs; v record;
 begin
-  perform public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, true);
-  perform public.system_load(p_workspace_id, p_system_id, false);
+  v := public.system_actor_scope(p_workspace_id, p_user_id, p_verified_email, true);
+  perform public.system_load(p_workspace_id, p_system_id, false, v.work_ids);
   select * into o from public.system_outputs
     where id = p_output_id and system_id = p_system_id and business_workspace_id = p_workspace_id for update;
   if not found then raise exception 'system_not_found'; end if;
@@ -648,6 +742,7 @@ declare
   c public.system_connections;
   v_source uuid; v_kind text; v_target jsonb; v_type text; v_ref text;
   v_target_system uuid; v_target_business uuid; v_key text; v_policy text;
+  v_scope uuid[]; v_target_scope uuid[];
 begin
   perform public.system_command_valid(p_command_id, p_command_digest);
   if p_input is null or jsonb_typeof(p_input) <> 'object'
@@ -681,26 +776,30 @@ begin
   if v_target_business is not null and v_target_business <> p_workspace_id then
     if v_kind <> 'share' then raise exception 'system_connection_cross_business'; end if;
     if p_workspace_id::text < v_target_business::text then
-      perform public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, true);
-      perform public.business_record_assert_actor(v_target_business, p_user_id, p_verified_email, true);
+      v_scope := (public.system_actor_scope(p_workspace_id, p_user_id, p_verified_email, true)).work_ids;
+      v_target_scope := (public.system_actor_scope(v_target_business, p_user_id, p_verified_email, true)).work_ids;
     else
-      perform public.business_record_assert_actor(v_target_business, p_user_id, p_verified_email, true);
-      perform public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, true);
+      v_target_scope := (public.system_actor_scope(v_target_business, p_user_id, p_verified_email, true)).work_ids;
+      v_scope := (public.system_actor_scope(p_workspace_id, p_user_id, p_verified_email, true)).work_ids;
     end if;
   else
-    perform public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, true);
+    v_scope := (public.system_actor_scope(p_workspace_id, p_user_id, p_verified_email, true)).work_ids;
+    v_target_scope := v_scope;
   end if;
 
   select * into c from public.system_connections where business_workspace_id = p_workspace_id and command_id = p_command_id;
   if found then
     if c.command_digest <> p_command_digest or c.created_by <> p_user_id then raise exception 'system_command_conflict'; end if;
+    if not public.system_connection_in_scope(c, p_workspace_id, v_scope) then raise exception 'system_not_found'; end if;
     return public.system_connection_json(c) || jsonb_build_object('replayed', true);
   end if;
 
-  perform public.system_load(p_workspace_id, v_source, true);
+  perform public.system_load(p_workspace_id, v_source, true, v_scope);
   if v_target_system is not null then
     if v_target_system = v_source then raise exception 'system_connection_self'; end if;
-    if not exists (select 1 from public.systems where id = v_target_system and business_workspace_id = v_target_business) then
+    -- A target outside the actor's scope in its business reads as missing.
+    if not exists (select 1 from public.systems where id = v_target_system and business_workspace_id = v_target_business
+        and public.system_in_scope(v_target_business, origin_kind, origin_ref, v_target_scope)) then
       raise exception 'system_connection_target_missing';
     end if;
   end if;
@@ -731,17 +830,19 @@ create function public.set_system_connection_state(
   p_workspace_id uuid, p_user_id uuid, p_verified_email text, p_connection_id uuid, p_state text
 ) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
-declare c public.system_connections; v_businesses uuid[]; v_business uuid;
+declare c public.system_connections; v_businesses uuid[]; v_business uuid; v record;
 begin
   -- Read access first so a stranger learns nothing; write locks come below.
-  perform public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, false);
+  v := public.system_actor_scope(p_workspace_id, p_user_id, p_verified_email, false);
   if p_state is null or p_state not in ('connected','disconnected','stale') then raise exception 'system_input_invalid'; end if;
   -- The source business acts on its connections; the target business of a
-  -- share may only revoke it.
+  -- share may only revoke it. A connection outside the scope reads as missing.
   select * into c from public.system_connections where id = p_connection_id
     and (business_workspace_id = p_workspace_id
       or (kind = 'share' and target_business_workspace_id = p_workspace_id and p_state = 'disconnected'));
-  if not found then raise exception 'system_not_found'; end if;
+  if not found or not public.system_connection_in_scope(c, p_workspace_id, v.work_ids) then
+    raise exception 'system_not_found';
+  end if;
   -- Turning a connection off needs write access where the actor stands.
   -- Anything else needs current write access on the source and, across
   -- businesses, the target too, so a user removed from either side cannot
@@ -750,8 +851,13 @@ begin
   if p_state <> 'disconnected' then
     v_businesses := array[c.business_workspace_id] || coalesce(array[c.target_business_workspace_id], '{}');
   end if;
+  -- Each business that must allow the change does so in the actor's write
+  -- scope there: an agency writes only through assigned work.
   for v_business in select d.b from (select distinct b from unnest(v_businesses) b where b is not null) d order by d.b::text loop
-    perform public.business_record_assert_actor(v_business, p_user_id, p_verified_email, true);
+    if not public.system_connection_in_scope(c, v_business,
+        (public.system_actor_scope(v_business, p_user_id, p_verified_email, true)).work_ids) then
+      raise exception 'system_not_found';
+    end if;
   end loop;
   select * into c from public.system_connections where id = c.id for update;
   update public.system_connections set state = p_state, updated_by = p_user_id, updated_at = clock_timestamp()
@@ -762,14 +868,20 @@ $$;
 
 -- ---- read-only projection of what a business already has ----
 -- Feeds src/platform/systems/from-existing.ts. Writes nothing; every source
--- is scoped to this business workspace or to tenants linked to it.
+-- is scoped to this business workspace or to tenants linked to it. A direct
+-- member reads all of it (scope 'business'). An agency (scope 'assigned')
+-- reads only its granted saved work, the website tenants that work stands
+-- for and the booking grants of that work; no inquiry handling and no
+-- calendar connections, which belong to the business, not to the work.
 
 create function public.read_existing_business_systems(p_workspace_id uuid, p_user_id uuid, p_verified_email text)
 returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
-declare linked_tenants uuid[];
+declare linked_tenants uuid[]; v record; ids uuid[]; work_tenants uuid[];
 begin
-  perform public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, false);
+  v := public.system_actor_scope(p_workspace_id, p_user_id, p_verified_email, false);
+  ids := v.work_ids;
+  work_tenants := case when ids is null then null else public.system_scope_tenants(p_workspace_id, ids) end;
   -- The tenants this business holds now, by the same rule as managedWebsites:
   -- its tenant_workspace_links, plus an active binding only for a tenant with
   -- no link anywhere. A stale binding to a tenant linked to another business
@@ -784,6 +896,7 @@ begin
   ) t;
   return jsonb_build_object(
     'businessId', p_workspace_id,
+    'scope', case when ids is null then 'business' else 'assigned' end,
     'savedWork', coalesce((select jsonb_agg(jsonb_build_object(
         'id', w.id, 'productId', w.product_id, 'resourceKind', w.resource_kind, 'title', w.title,
         'createdAt', w.created_at, 'updatedAt', w.updated_at,
@@ -805,7 +918,7 @@ begin
       left join public.website_document_publications p on p.website_work_id = w.id and p.workspace_id = w.workspace_id
       left join public.tenants pt on pt.id = p.tenant_id
       left join public.website_hosted_tenant_reservations hr on hr.website_work_id = w.id and hr.workspace_id = w.workspace_id
-      where w.workspace_id = p_workspace_id
+      where w.workspace_id = p_workspace_id and (ids is null or w.id = any(ids))
         and (w.product_id, w.resource_kind) in (('websites','website'),('applications','application'),
           ('custom-applications','custom-application'),('scheduling','schedule'),('inquiry','inquiry_capability'),
           ('onboarding','case'),('documents','document'),('tracker','tracker'))), '[]'::jsonb),
@@ -818,6 +931,7 @@ begin
           'tenantActive', coalesce(t.active, false), 'linkedAt', l.linked_at) as m
         from public.tenant_workspace_links l left join public.tenants t on t.stable_id = l.tenant_stable_id
         where l.workspace_id = p_workspace_id and l.tenant_stable_id is not null
+          and (work_tenants is null or l.tenant_stable_id = any(work_tenants))
         union all
         select jsonb_build_object('link', 'website_binding', 'tenantStableId', b.tenant_stable_id,
           'tenantId', coalesce(t.id, b.tenant_id_at_binding), 'siteName', coalesce(t.site_name, b.site_name_at_binding),
@@ -825,17 +939,19 @@ begin
         from public.offering_website_bindings b left join public.tenants t on t.stable_id = b.tenant_stable_id
         where b.business_workspace_id = p_workspace_id and b.status = 'active' and b.tenant_stable_id is not null
           and not exists (select 1 from public.tenant_workspace_links l2 where l2.tenant_stable_id = b.tenant_stable_id)
+          and (work_tenants is null or b.tenant_stable_id = any(work_tenants))
       ) x), '[]'::jsonb),
     'inquiryWorkspaces', coalesce((select jsonb_agg(jsonb_build_object('id', i.id, 'tenantStableId', i.tenant_stable_id,
         'businessId', i.business_id, 'createdAt', i.created_at, 'updatedAt', i.updated_at) order by i.created_at, i.id)
-      from public.inquiry_workspaces i where i.tenant_stable_id = any(linked_tenants)), '[]'::jsonb),
+      from public.inquiry_workspaces i where ids is null and i.tenant_stable_id = any(linked_tenants)), '[]'::jsonb),
     'bookingGrants', coalesce((select jsonb_agg(jsonb_build_object('id', g.id, 'tenantStableId', g.tenant_stable_id,
         'workId', g.work_id, 'displayName', g.display_name, 'provider', g.provider, 'status', g.status)
         order by g.published_at, g.id)
-      from public.public_website_booking_grants g where g.business_workspace_id = p_workspace_id), '[]'::jsonb),
+      from public.public_website_booking_grants g where g.business_workspace_id = p_workspace_id
+        and (ids is null or g.work_id = any(ids))), '[]'::jsonb),
     'calendarConnections', coalesce((select jsonb_agg(jsonb_build_object('id', c.id, 'provider', c.provider,
         'calendarName', c.calendar_name, 'status', c.status) order by c.created_at, c.id)
-      from public.workspace_calendar_connections c where c.workspace_id = p_workspace_id), '[]'::jsonb));
+      from public.workspace_calendar_connections c where c.workspace_id = p_workspace_id and ids is null), '[]'::jsonb));
 end;
 $$;
 
@@ -850,7 +966,11 @@ revoke all on function public.system_revision_json(public.system_revisions) from
 revoke all on function public.system_output_json(public.system_outputs) from public, anon, authenticated, service_role;
 revoke all on function public.system_connection_json(public.system_connections) from public, anon, authenticated, service_role;
 revoke all on function public.system_command_valid(uuid, text) from public, anon, authenticated, service_role;
-revoke all on function public.system_load(uuid, uuid, boolean) from public, anon, authenticated, service_role;
+revoke all on function public.system_actor_scope(uuid, uuid, text, boolean) from public, anon, authenticated, service_role;
+revoke all on function public.system_scope_tenants(uuid, uuid[]) from public, anon, authenticated, service_role;
+revoke all on function public.system_in_scope(uuid, text, text, uuid[]) from public, anon, authenticated, service_role;
+revoke all on function public.system_connection_in_scope(public.system_connections, uuid, uuid[]) from public, anon, authenticated, service_role;
+revoke all on function public.system_load(uuid, uuid, boolean, uuid[]) from public, anon, authenticated, service_role;
 
 revoke all on function public.read_business_systems(uuid, uuid, text) from public, anon, authenticated;
 revoke all on function public.read_business_system(uuid, uuid, text, uuid) from public, anon, authenticated;

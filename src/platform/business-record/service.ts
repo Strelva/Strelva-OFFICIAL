@@ -14,6 +14,8 @@ import {
   patchVerificationAllowed,
   tenantImportPayloadSchema,
   tenantLinkStateSchema,
+  tenantUnlinkPreviewSchema,
+  tenantUnlinkReceiptSchema,
   type BusinessContact,
   type BusinessRecord,
   type BusinessRecordRevision,
@@ -22,9 +24,11 @@ import {
   type OwnerRecipient,
   type TenantImportPayload,
   type TenantLinkState,
+  type TenantUnlinkPreview,
+  type TenantUnlinkReceipt,
 } from "./contracts";
 import { actorArgs, BusinessRecordValidationError, callBusinessRecord } from "./repository";
-import { canonicalJson, sha256 } from "./tenant-import";
+import { canonicalJson, sha256, type TenantUnlinkCommand } from "./tenant-import";
 
 const workspaceId = z.string().uuid();
 const commandId = z.string().uuid();
@@ -84,12 +88,14 @@ export async function upsertBusinessContacts(
   }, businessRecordWriteResultSchema, "The contacts could not be saved.");
 }
 
+/** Direct members only; an agency is refused (contacts are not its work). */
 export async function readBusinessContacts(actor: WorkspaceActor, workspace: string, limit = 100): Promise<BusinessContact[]> {
   return callBusinessRecord("read_business_contacts", {
     p_workspace_id: workspaceId.parse(workspace), ...actorArgs(actor), p_limit: z.number().int().min(1).max(500).parse(limit),
   }, z.array(businessContactSchema), "The contacts could not be loaded.");
 }
 
+/** An agency sees only revisions that touched no contact; it cannot undo the others. */
 export async function readBusinessRecordHistory(actor: WorkspaceActor, workspace: string, limit = 50): Promise<BusinessRecordRevision[]> {
   return callBusinessRecord("read_business_record_history", {
     p_workspace_id: workspaceId.parse(workspace), ...actorArgs(actor), p_limit: z.number().int().min(1).max(200).parse(limit),
@@ -123,4 +129,22 @@ export async function convertTenantToBusiness(
     p_command_id: commandId.parse(plan.commandId),
     p_command_digest: plan.digest,
   }, conversionReceiptSchema, "The tenant conversion failed.");
+}
+
+/** Operator preview of unlinking a converted tenant. Writes nothing. */
+export async function previewTenantUnlink(operatorEmail: string, tenantId: string): Promise<TenantUnlinkPreview> {
+  return callBusinessRecord("preview_tenant_unlink", {
+    p_operator_email: z.string().email().parse(operatorEmail.trim().toLowerCase()), p_tenant_id: z.string().min(1).parse(tenantId),
+  }, tenantUnlinkPreviewSchema, "The unlink preview could not be read.");
+}
+
+/** Reverse one conversion (see unlink_tenant_from_business for the rule). */
+export async function unlinkTenantFromBusiness(operatorEmail: string, command: TenantUnlinkCommand): Promise<TenantUnlinkReceipt> {
+  return callBusinessRecord("unlink_tenant_from_business", {
+    p_operator_email: z.string().email().parse(operatorEmail.trim().toLowerCase()),
+    p_tenant_id: z.string().min(1).parse(command.tenantId),
+    p_workspace_id: workspaceId.parse(command.workspaceId),
+    p_command_id: commandId.parse(command.commandId),
+    p_command_digest: z.string().regex(/^[0-9a-f]{64}$/).parse(command.digest),
+  }, tenantUnlinkReceiptSchema, "The tenant unlink failed.");
 }

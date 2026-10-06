@@ -16,6 +16,8 @@ export interface WorkspaceComposerProps {
   onTemplates?: () => void;
   onChange?: (request: string) => void;
   onEdited?: (request: string) => void;
+  /** STRELVA_SYSTEMS_RELEASE. Off (the default): the pre-Systems "Get or build an app" label. */
+  systemsReleased?: boolean;
 }
 
 export function WorkspaceComposer(props: WorkspaceComposerProps) {
@@ -23,7 +25,7 @@ export function WorkspaceComposer(props: WorkspaceComposerProps) {
 }
 
 /** One request editor. Routing, permission and execution remain with its caller. */
-function ComposerSession({ initialRequest = "", draftKey, disabled = false, placeholder = "What do you want Strelva to make happen?", autoFocus = false, onSubmit, onTemplates, onChange, onEdited }: WorkspaceComposerProps) {
+function ComposerSession({ initialRequest = "", draftKey, disabled = false, placeholder = "What do you want Strelva to make happen?", autoFocus = false, onSubmit, onTemplates, onChange, onEdited, systemsReleased = false }: WorkspaceComposerProps) {
   const id = useId();
   const textarea = useRef<HTMLTextAreaElement>(null);
   const submitting = useRef(false);
@@ -85,7 +87,7 @@ function ComposerSession({ initialRequest = "", draftKey, disabled = false, plac
         }
       }} />
       <div className={styles.tools}>
-        {onTemplates ? <Button type="button" variant="ghost" size="sm" onClick={onTemplates} disabled={pending}><LayoutGrid size={16} aria-hidden="true" />Browse ready-made systems</Button> : <span />}
+        {onTemplates ? <Button type="button" variant="ghost" size="sm" onClick={onTemplates} disabled={pending}><LayoutGrid size={16} aria-hidden="true" />{systemsReleased ? "Browse ready-made systems" : "Get or build an app"}</Button> : <span />}
         <div className={styles.send}>
           {request ? <button type="button" className={styles.clear} onClick={() => change("")} disabled={pending}>Clear draft</button> : null}
           <Button type="submit" variant="contrast" size="sm" loading={pending} disabled={disabled || !request.trim()} aria-label="Continue with this request"><ArrowUp size={18} aria-hidden="true" /><span className={styles.srOnly}>Continue</span></Button>

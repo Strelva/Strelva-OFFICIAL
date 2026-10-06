@@ -205,7 +205,8 @@ export const businessRecordSchema = z.object({
     id: uuid, name: z.string(), roleTitle: nullableString, email: nullableString, phone: nullableString,
     userId: uuid.nullable(), active: z.boolean(), source: businessRecordSourceSchema, verified: z.boolean(), updatedAt: timestamp,
   })),
-  contactCount: z.number().int().min(0),
+  /** Null for an agency: contacts stay with direct members of the business. */
+  contactCount: z.number().int().min(0).nullable(),
 });
 export type BusinessRecord = z.infer<typeof businessRecordSchema>;
 
@@ -324,3 +325,80 @@ export const tenantLinkStateSchema = z.object({
   link: z.object({ workspaceId: uuid, linkedBy: uuid, linkedAt: timestamp, receipt: z.record(z.string(), z.unknown()) }).nullable(),
 });
 export type TenantLinkState = z.infer<typeof tenantLinkStateSchema>;
+
+/** Why an unlink kept the business workspace instead of deleting it. */
+export const UNLINK_KEEP_REASONS = [
+  "joined_existing_workspace",
+  "workspace_not_created_by_conversion",
+  "other_sites_linked",
+  "other_members",
+  "record_has_other_data",
+  "record_history_after_import",
+] as const;
+/** A reason from UNLINK_KEEP_REASONS, or `workspace_in_use:<table>`. */
+const unlinkKeepReason = z.union([z.enum(UNLINK_KEEP_REASONS), z.string().regex(/^workspace_in_use:[a-z0-9_.]+$/)]);
+
+const unlinkEntityCounts = z.object({
+  removed: z.number().int().min(0),
+  restored: z.number().int().min(0),
+  kept: z.number().int().min(0),
+  alreadyReverted: z.number().int().min(0),
+});
+const unlinkKeptEntity = z.object({
+  entity: z.enum(["fact", "service", "person", "contact"]),
+  id: z.string(),
+  reason: z.enum(["changed_after_import", "deleted_after_import"]),
+});
+
+/** What unlinking would do, computed by public.tenant_unlink_plan. */
+export const tenantUnlinkPlanSchema = z.object({
+  linkId: uuid,
+  tenantStableId: uuid,
+  workspaceId: uuid,
+  workspaceName: z.string(),
+  linkedAt: timestamp,
+  importSequence: z.number().int().positive(),
+  deleteWorkspace: z.boolean(),
+  workspaceKeptBecause: z.array(unlinkKeepReason),
+  entities: unlinkEntityCounts,
+  kept: z.array(unlinkKeptEntity),
+  leadsDetached: z.number().int().min(0),
+  systemsAdoptedFromTenant: z.number().int().min(0),
+});
+export type TenantUnlinkPlan = z.infer<typeof tenantUnlinkPlanSchema>;
+
+export const tenantUnlinkReceiptSchema = z.object({
+  kind: z.literal("tenant_unlink"),
+  version: z.literal(1),
+  tenantId: z.string(),
+  tenantStableId: uuid,
+  workspaceId: uuid,
+  workspaceName: z.string(),
+  linkId: uuid,
+  linkedAt: timestamp,
+  importSequence: z.number().int().positive(),
+  operatorId: uuid,
+  workspaceDeleted: z.boolean(),
+  workspaceKeptBecause: z.array(unlinkKeepReason),
+  entities: unlinkEntityCounts,
+  kept: z.array(unlinkKeptEntity),
+  leadsDetached: z.number().int().min(0),
+  systemsAdoptedFromTenant: z.number().int().min(0),
+  /** History row written in a kept business; null when the business was deleted or nothing changed. */
+  sequence: z.number().int().positive().nullable(),
+  revision: z.number().int().min(0).nullable(),
+  conversionReceipt: z.record(z.string(), z.unknown()),
+  unlinkedAt: timestamp,
+  replayed: z.boolean(),
+  alreadyUnlinked: z.boolean(),
+});
+export type TenantUnlinkReceipt = z.infer<typeof tenantUnlinkReceiptSchema>;
+
+export const tenantUnlinkPreviewSchema = z.object({
+  tenantId: z.string(),
+  tenantStableId: uuid,
+  /** Null when the tenant is not linked to a business. */
+  plan: tenantUnlinkPlanSchema.nullable(),
+  lastUnlink: tenantUnlinkReceiptSchema.nullable(),
+});
+export type TenantUnlinkPreview = z.infer<typeof tenantUnlinkPreviewSchema>;

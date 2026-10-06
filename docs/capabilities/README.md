@@ -1,6 +1,6 @@
 # Capabilities
 
-Updated: 2026-10-02
+Updated: 2026-10-05
 
 Every customer capability in this repo, what it does, how live it is, and where
 its code, specs, and tests live. Start here before building on a capability.
@@ -82,6 +82,7 @@ All are checked with `=== "1"`.
 | --- | --- | --- |
 | `STRELVA_WORKSPACE_RELEASE` | `/workspace` and nearly every workspace API | On since 2026-09-30 |
 | `STRELVA_INQUIRIES_RELEASE` | Workspace inquiries, `/business` | Off |
+| `STRELVA_SYSTEMS_RELEASE` | The Systems customer model: the Systems projection in `GET /api/workspace` (with `releases.systems` telling the browser), Systems on Home, System pages (`view=system`), Possibilities, Make real (`POST /api/workspace/systems/make-real` answers 503 when off), contextual Versions and the agency source/Version list. Off, the workspace renders as it did before transition/systems. A 1.0.0 launch feature, not Reborn ([Reborn in Systems terms](../product/strelva-reborn.md#reborn-in-systems-terms)). Local preview: add `systems=on` or `systems=off` to `/preview/strelva` | Off (code not on `main`) |
 | `STRELVA_PLANNING_ENABLED` | Work-plan generation | Off |
 | `STRELVA_BACKGROUND_WORK_RELEASE` | `/api/cron/workspace-work` | Off |
 | `STRELVA_PRODUCT_LEARNING_RELEASE` | Product learning in production | Off |

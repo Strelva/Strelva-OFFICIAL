@@ -48,6 +48,46 @@ describe("SystemStore contract (memory)", () => {
     await expect(store.readGraph(otherOwner, JUNIPER)).rejects.toBeInstanceOf(WorkspaceAccessError);
   });
 
+  it("limits an agency to the Systems of its exact delegated or assigned work", async () => {
+    const agency = { userId: "5e000000-0000-4000-8000-000000000005", verifiedEmail: "sy-agency@example.test" } as WorkspaceActor;
+    const delegate = { userId: "5e000000-0000-4000-8000-000000000006", verifiedEmail: "sy-delegate@example.test" } as WorkspaceActor;
+    const ASSIGNED_WORK = "5e000000-0000-4000-8000-0000000000a3";
+    const DELEGATED_WORK = "5e000000-0000-4000-8000-0000000000f1";
+    const store = createMemorySystemStore({
+      access: (actor, businessId) => businessId === JUNIPER && (actor.userId === agency.userId || actor.userId === delegate.userId)
+        ? "agency" : ROLES[businessId]?.[actor.userId] ?? null,
+      // Assigned work reads and writes; a delegation is read-only.
+      agencyScope: (actor, _businessId, write) => actor.userId === agency.userId
+        ? { savedWorkIds: [ASSIGNED_WORK] }
+        : { savedWorkIds: write ? [] : [DELEGATED_WORK] },
+    });
+    const { ref: proposal } = await liveProposal(store);
+    const orders = await store.createSystem(owner, JUNIPER, { name: "Orders", kind: "tracker", origin: { kind: "saved_work", ref: ASSIGNED_WORK } }, command());
+    const fittings = await store.createSystem(owner, JUNIPER, { name: "Fittings", kind: "booking", origin: { kind: "saved_work", ref: DELEGATED_WORK } }, command());
+    const ordersRef = { businessId: JUNIPER, systemId: orders.id };
+    await store.connect(owner, { source: ordersRef, kind: "read", target: { type: "system", system: proposal } }, command());
+
+    // A direct member sees everything.
+    expect((await store.readGraph(member, JUNIPER)).systems).toHaveLength(3);
+    // The agency sees and changes only its assigned work's System.
+    const seen = await store.readGraph(agency, JUNIPER);
+    expect(seen.systems.map((system) => system.id)).toEqual([orders.id]);
+    expect(seen.connections).toEqual([]);
+    await expect(store.readSystem(agency, proposal)).rejects.toBeInstanceOf(WorkspaceAccessError);
+    await expect(store.updateSystem(agency, ordersRef, 1, { purpose: "Track orders" })).resolves.toMatchObject({ purpose: "Track orders" });
+    await expect(store.updateSystem(agency, proposal, 4, { name: "Taken" })).rejects.toBeInstanceOf(WorkspaceAccessError);
+    await expect(store.createSystem(agency, JUNIPER, { name: "Loose", kind: "report" }, command())).rejects.toBeInstanceOf(WorkspaceAccessError);
+    await expect(store.connect(agency, { source: ordersRef, kind: "trigger", target: { type: "system", system: proposal } }, command()))
+      .rejects.toMatchObject({ code: "system_connection_target_missing" });
+    // A read-only delegation sees its one System and never writes.
+    expect((await store.readGraph(delegate, JUNIPER)).systems.map((system) => system.id)).toEqual([fittings.id]);
+    await expect(store.updateSystem(delegate, { businessId: JUNIPER, systemId: fittings.id }, 1, { name: "Taken" }))
+      .rejects.toBeInstanceOf(WorkspaceAccessError);
+    // An agency with no granted work is refused, like a stranger.
+    const empty = createMemorySystemStore({ access: () => "agency" });
+    await expect(empty.readGraph(agency, JUNIPER)).rejects.toBeInstanceOf(WorkspaceAccessError);
+  });
+
   it("hides a System from another business even by id", async () => {
     const store = makeStore();
     const { ref } = await liveProposal(store);

@@ -110,7 +110,7 @@ this branch.
 | customers | `src/platform/customers/` (enterprise mapping, Home Finder readiness) | Connection (to an external product) + health | Home Finder is out of Reborn scope. Keep it behind `STRELVA_CUSTOMERS_RELEASE`. | None. | — |
 | workspace-exit | `src/platform/workspace-exit/` (resource kinds `offering/standing/investigation/native_application/custom_application`, `successor_named/stopped`) | supporting (retirement lifecycle) | Exit must list Systems by System ID and each one's Versions and Connections. `RULE_SYSTEM_PAUSE_HEALTH` keeps retirement as a backend concern. | Medium: wrong exit drops data. | B, F |
 | workspace-exports | `src/platform/workspace-exports/` (`schemaVersion: 2`) | supporting | Add a `systems[]` section in schema 3, additively. | Low. | B |
-| workspace-release.ts | `STRELVA_WORKSPACE_RELEASE` | supporting (gate) | New System UI sits behind this and a new flag. | None. | E |
+| workspace-release.ts | `STRELVA_WORKSPACE_RELEASE` | supporting (gate) | The whole System UI also needs `STRELVA_SYSTEMS_RELEASE` (`src/platform/systems-release.ts`, October 5): Systems Home, System pages, Possibilities, Make real and Versions. Off, the workspace renders as it did before. | None. | E |
 
 ## Inventory: `src/products`
 

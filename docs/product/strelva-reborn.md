@@ -206,15 +206,22 @@ storefront comparison like Sept 30 (60/60).
       sites). Idempotent, with a dry-run mode and a rollback. *Partial:
       built and proven locally as one atomic `convert_tenant_to_business`
       call; dry run is the default; `--apply` refuses a non-local database
-      without `--i-have-jacobs-yes`. Rollback only undoes the import
-      revision; a full unlink isn't built. Never run against Supabase · S*
+      without `--i-have-jacobs-yes`. `--rollback` runs the full unlink
+      (`unlink_tenant_from_business`): dry-run preview by default, same
+      refusal, receipt in `tenant_workspace_unlinks`; proven locally for
+      convert → unlink → reconvert, unlink twice, unlink after an owner
+      edit, a joined site, and cross-workspace denial. Never run against
+      Supabase · S*
 - [x] Links and new rows survive tenant renames and deprovision. *Proven
       locally:* links key on `stable_id`; deleting a tenant clears the link
       and keeps the business. Exception: `tenant_leads` rows cascade-delete
       with their tenant, pending Jacob's decision.
 - [ ] Tooling for a scrubbed local copy of production (Postgres, Auth users,
       Redis leads, bookings, events and connections; outgoing email, Stripe
-      and Google disabled). *Not started · M*
+      and Google disabled). *Partial: `pnpm scrubbed-copy` built and proven
+      locally against a fake source (`pnpm check:scrubbed-copy`); never run
+      against production. Runbook:
+      [scrubbed-production-copy.md](../operations/scrubbed-production-copy.md) · M*
 - [ ] Dry run against that copy for every active tenant. *Not started · S*
 - [ ] Production run for gldf, then the rest. *Not started · S each*
 - [ ] Hosted websites created by the workspace stay linked through the same

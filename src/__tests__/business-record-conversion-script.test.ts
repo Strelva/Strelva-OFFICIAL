@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import { isLocalDatabaseUrl, parseConversionArgs, runTenantConversion, type ConversionDeps, type ConversionSources } from "../../scripts/tenant-conversion";
+import {
+  isLocalDatabaseUrl, parseConversionArgs, runTenantConversion, runTenantRollback,
+  type ConversionDeps, type ConversionSources, type RollbackDeps,
+} from "../../scripts/tenant-conversion";
+import { planTenantUnlink, type TenantUnlinkPreview, type TenantUnlinkReceipt } from "@/platform/business-record";
 import type { TenantConfig } from "@/lib/types";
 
 const fixture = JSON.parse(readFileSync(join(process.cwd(), "tests/fixtures/business-record-tenant-source.json"), "utf8"));
@@ -87,5 +91,99 @@ describe("tenant conversion script", () => {
     expect(isLocalDatabaseUrl(undefined)).toBe(false);
     expect(() => parseConversionArgs(["gldf", "--yes"])).toThrow(/Unknown flag/);
     expect(() => parseConversionArgs(["gldf", "--apply", "--dry-run"])).toThrow();
+  });
+});
+
+const linkedPreview: TenantUnlinkPreview = {
+  tenantId: "gldf", tenantStableId: fixture.tenant.stableId,
+  plan: {
+    linkId: "77777777-7777-4777-8777-777777777777", tenantStableId: fixture.tenant.stableId,
+    workspaceId: receipt.workspaceId, workspaceName: "Great Lakes Dried Fruit", linkedAt: "2026-10-02T12:00:00Z", importSequence: 1,
+    deleteWorkspace: false, workspaceKeptBecause: ["other_members", "record_has_other_data"],
+    entities: { removed: 14, restored: 0, kept: 1, alreadyReverted: 0 },
+    kept: [{ entity: "fact", id: "phone", reason: "changed_after_import" }],
+    leadsDetached: 3, systemsAdoptedFromTenant: 0,
+  },
+  lastUnlink: null,
+};
+const unlinkReceipt: TenantUnlinkReceipt = {
+  kind: "tenant_unlink", version: 1, tenantId: "gldf", tenantStableId: fixture.tenant.stableId,
+  workspaceId: receipt.workspaceId, workspaceName: "Great Lakes Dried Fruit", linkId: linkedPreview.plan!.linkId,
+  linkedAt: "2026-10-02T12:00:00Z", importSequence: 1, operatorId: receipt.operatorId,
+  workspaceDeleted: false, workspaceKeptBecause: ["other_members", "record_has_other_data"],
+  entities: { removed: 14, restored: 0, kept: 1, alreadyReverted: 0 }, kept: linkedPreview.plan!.kept,
+  leadsDetached: 3, systemsAdoptedFromTenant: 0, sequence: 3, revision: 3, conversionReceipt: { ...receipt },
+  unlinkedAt: "2026-10-05T12:00:00Z", replayed: false, alreadyUnlinked: false,
+};
+
+function rollbackDeps(overrides: Partial<RollbackDeps> = {}) {
+  const lines: string[] = [];
+  const preview = vi.fn(async () => linkedPreview);
+  const unlink = vi.fn(async () => unlinkReceipt);
+  const base: RollbackDeps = { preview, unlink, log: (line) => lines.push(line), ...overrides };
+  return { deps: base, preview: base.preview as typeof preview, unlink: base.unlink as typeof unlink, lines };
+}
+
+describe("tenant conversion rollback", () => {
+  it("parses --rollback and defaults it to a dry run", () => {
+    const options = parseConversionArgs(["gldf", "--rollback", "--operator-email=operator@strelva.example.test"]);
+    expect(options).toMatchObject({ slug: "gldf", rollback: true, apply: false });
+    expect(parseConversionArgs(["gldf"]).rollback).toBe(false);
+  });
+
+  it("previews without writing and prints what it would remove, keep and detach", async () => {
+    const { deps: d, preview, unlink, lines } = rollbackDeps();
+    const options = parseConversionArgs(["gldf", "--rollback", "--operator-email=operator@strelva.example.test"]);
+    const outcome = await runTenantRollback({ ...options, databaseUrl: "https://abcdefghijklmnopqrst.supabase.co" }, d);
+    expect(outcome.mode).toBe("dry-run");
+    expect(outcome.receipt).toBeNull();
+    expect(preview).toHaveBeenCalledWith("operator@strelva.example.test", "gldf");
+    expect(unlink).not.toHaveBeenCalled();
+    const text = lines.join("\n");
+    expect(text).toContain("would remove 14 imported item(s)");
+    expect(text).toContain("keep fact phone: changed_after_import");
+    expect(text).toContain("would detach 3 lead(s)");
+    expect(text).toContain("keep it (other_members, record_has_other_data)");
+    expect(text).toContain("database: NOT local");
+    expect(lines.at(-1)).toBe("Dry run: nothing was written.");
+  });
+
+  it("refuses --apply against a non-local database and needs an operator and a database", async () => {
+    const { deps: d, preview, unlink } = rollbackDeps();
+    const apply = parseConversionArgs(["gldf", "--rollback", "--apply", "--operator-email=operator@strelva.example.test"]);
+    await expect(runTenantRollback({ ...apply, databaseUrl: "https://abcdefghijklmnopqrst.supabase.co" }, d)).rejects.toThrow(/Jacob's yes/);
+    await expect(runTenantRollback({ ...apply, databaseUrl: undefined }, d)).rejects.toThrow(/Jacob's yes/);
+    await expect(runTenantRollback({ ...parseConversionArgs(["gldf", "--rollback"]), databaseUrl: "http://127.0.0.1:54321" }, d)).rejects.toThrow(/operator-email/);
+    await expect(runTenantRollback({ ...apply, databaseUrl: "http://127.0.0.1:54321" }, { ...d, preview: null })).rejects.toThrow(/needs a database/);
+    expect(preview).not.toHaveBeenCalled();
+    expect(unlink).not.toHaveBeenCalled();
+  });
+
+  it("applies once against a loopback database with the command bound to the previewed link", async () => {
+    const { deps: d, unlink, lines } = rollbackDeps();
+    const options = parseConversionArgs(["gldf", "--rollback", "--apply", "--operator-email=operator@strelva.example.test"]);
+    const outcome = await runTenantRollback({ ...options, databaseUrl: "http://127.0.0.1:54321" }, d);
+    const expected = planTenantUnlink({ tenantId: "gldf", tenantStableId: fixture.tenant.stableId, workspaceId: receipt.workspaceId, linkedAt: "2026-10-02T12:00:00Z" });
+    expect(unlink).toHaveBeenCalledTimes(1);
+    expect(unlink.mock.calls[0]).toEqual(["operator@strelva.example.test", expected]);
+    expect(outcome.receipt?.workspaceDeleted).toBe(false);
+    expect(lines.at(-1)).toContain("Unlinked: business 44444444-4444-4444-8444-444444444444 kept (other_members, record_has_other_data)");
+
+    const again = await runTenantRollback({ ...options, databaseUrl: "http://127.0.0.1:54321" }, d);
+    expect(unlink.mock.calls[1]).toEqual(unlink.mock.calls[0]);
+    expect(again.command).toEqual(outcome.command);
+  });
+
+  it("does nothing for a tenant that is not linked", async () => {
+    const { deps: d, unlink, lines } = rollbackDeps({
+      preview: async () => ({ tenantId: "gldf", tenantStableId: fixture.tenant.stableId, plan: null, lastUnlink: unlinkReceipt }),
+    });
+    const options = parseConversionArgs(["gldf", "--rollback", "--apply", "--operator-email=operator@strelva.example.test"]);
+    const outcome = await runTenantRollback({ ...options, databaseUrl: "http://localhost:54321" }, d);
+    expect(outcome.receipt).toBeNull();
+    expect(outcome.command).toBeNull();
+    expect(unlink).not.toHaveBeenCalled();
+    expect(lines.join("\n")).toContain(`last unlinked from ${receipt.workspaceId}`);
+    expect(lines.at(-1)).toBe("Nothing to roll back. Nothing was written.");
   });
 });
