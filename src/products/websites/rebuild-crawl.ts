@@ -3,6 +3,7 @@ import * as http from "node:http";
 import * as https from "node:https";
 import * as cheerio from "cheerio";
 import { computeVisibleText, validateUrlSafety } from "@/lib/audit/checks";
+import { pinnedRequestOptions } from "@/lib/pinned-lookup";
 import { isSafeFetchUrl } from "@/lib/safe-fetch";
 import { registrableRebuildDomain } from "./rebuild-domain-key";
 
@@ -53,9 +54,8 @@ export const fetchRebuildPage: PageFetcher = async (raw, options) => {
     const response = await new Promise<{ status: number; headers: http.IncomingHttpHeaders; html: string }>((resolve, reject) => {
       const parsed = new URL(url);
       const request = (parsed.protocol === "https:" ? https : http).request(parsed, {
-        family: 4,
+        ...pinnedRequestOptions(address),
         headers: { "User-Agent": `${REBUILD_USER_AGENT} (+https://strelva.com)`, Accept: "text/html,text/plain;q=0.9", "Accept-Encoding": "identity" },
-        lookup: (_hostname, _options, callback) => callback(null, address, 4),
       }, (res) => {
         if ([301, 302, 303, 307, 308].includes(res.statusCode ?? 0)) { res.resume(); resolve({ status: res.statusCode!, headers: res.headers, html: "" }); return; }
         const chunks: Buffer[] = []; let bytes = 0;

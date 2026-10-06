@@ -42,6 +42,14 @@ describe("website asset safety and immutable image export",()=>{
     expect(lookup).toHaveBeenCalledWith(null,"203.0.113.10",4);
     expect(network.dns).toHaveBeenCalledWith("https://source.example/photo.png");
   });
+  it("answers Node's all:true lookup with the pinned IPv4 address list (audit finding 4)",async()=>{
+    responses.push({status:200,body:png});
+    await fetchWebsiteAsset("https://source.example/photo.png");
+    const options = network.request.mock.calls[0]![1] as {family?:number;lookup:(hostname:string,options:unknown,callback:(...args:unknown[])=>void)=>void};
+    const all = vi.fn(); options.lookup("source.example",{all:true},all);
+    expect(all).toHaveBeenCalledWith(null,[{address:"203.0.113.10",family:4}]);
+    expect(options.family).toBe(4);
+  });
   it("checks every redirect before opening another network connection",async()=>{
     responses.push({status:302,location:"https://attacker.example/private.png"});
     await expect(fetchWebsiteAsset(blob,{allowUrl:value=>value.startsWith("https://example.public.blob.vercel-storage.com/media/")})).rejects.toThrow("outside the approved media store");
