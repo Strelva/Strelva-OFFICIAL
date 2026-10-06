@@ -4,7 +4,6 @@ import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
 import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
 import { readJsonObject } from "@/lib/request-body";
-import { requireActiveSubscription } from "@/lib/subscription";
 import { sendBookingConfirmation } from "@/lib/delivery-email";
 
 function isValidDate(value: unknown): value is string {
@@ -50,9 +49,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
     }
 
+    // A visitor booking on a live site is never billing-gated: a lapsed or
+    // past-due payment never drops a client's customer (money-and-data rule 6).
     const tenant = await getTenantFromHeaders();
-    const blocked = await requireActiveSubscription(tenant);
-    if (blocked) return blocked;
 
     // Calculate end time (parse service duration or default 60)
     const services = await getContent("services", tenant);
