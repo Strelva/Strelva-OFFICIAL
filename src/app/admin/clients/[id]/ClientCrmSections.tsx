@@ -407,7 +407,8 @@ export function ClientCrmSections({
               }
             }}
             placeholder="Log a touchpoint… (↵ to save)"
-            className="flex-1 rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50"
+            aria-label="Touchpoint"
+            className="min-w-0 flex-1 rounded-md bg-surface-base border border-glass-border px-3 py-2 text-sm text-warm-white placeholder:text-gray-faint focus:outline-none focus:border-accent/50"
           />
           <button
             onClick={logActivity}
