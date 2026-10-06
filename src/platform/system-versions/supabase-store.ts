@@ -246,3 +246,13 @@ export async function createSourceSystem(
   "The source could not be created.");
   return { source: value.source.source, hidden: value.source.hidden };
 }
+
+/**
+ * Strelva's own agency workspace id, from `platform_workspaces` (set by an
+ * operator with `set_platform_workspace`). Null until one is named: callers
+ * then project no Strelva-authored source rather than guess.
+ */
+export async function resolveStrelvaAgencyWorkspaceId(client?: VersionsDb): Promise<string | null> {
+  return call(client ?? versionsDb(), "read_platform_workspace", { p_role: "strelva_agency" }, uuid.nullable(),
+    "Strelva's agency workspace could not be read.");
+}
