@@ -173,9 +173,11 @@ No fresh production read was made.
    appends a receipt too, so the document is stuck for good.
    `update_document_work` (`20260911210000_document_work.sql`) also requires
    the payload history to grow by exactly one, so the fix needs a migration.
-3. The fix moves full receipts into an append-only revision table and keeps
-   only the latest receipt in the payload. Undo of the latest edit keeps
-   working.
+3. The fix moves full receipts into an append-only revision table
+   (`document_revisions`) and keeps the latest 20 receipts in the payload, so
+   the editor's "Change history" card still shows recent edits. Undo of the
+   latest edit keeps working. (Corrected while building: keeping only one
+   receipt would have emptied that card.)
 4. The same pattern is applied to onboarding (`history ... .max(500)`) and to
    application version and release history (`APPLICATION_VERSION_HISTORY_LIMIT
    = 100`). Those hit the limit later, and their error messages already name
