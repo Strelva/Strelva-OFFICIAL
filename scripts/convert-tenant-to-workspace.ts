@@ -16,6 +16,15 @@
  * passed: a production conversion is Jacob's call. It never changes the tenant
  * row, `reb:` keys, /api/v1, memberships, Stripe, and never invites anyone.
  * Reruns are no-ops; a failed run left nothing behind and can simply rerun.
+ *
+ *   npx tsx scripts/convert-tenant-to-workspace.ts <slug> --rollback --operator-email=<email>          # preview
+ *   npx tsx scripts/convert-tenant-to-workspace.ts <slug> --rollback --apply --operator-email=<email>  # local only
+ *
+ * --rollback reverses a conversion through unlink_tenant_from_business: the
+ * link, every imported item nobody changed since, the leads' business pointer,
+ * and the business itself when the conversion created it and nothing else
+ * lives there. The preview needs the database (the link lives there) and
+ * writes nothing. Same refusal rules as --apply.
  */
 import { getSupabase, type Row } from "../src/lib/db/client";
 import { getTenantConfig, rowToTenant } from "../src/lib/tenants";
@@ -27,8 +36,8 @@ import { getAccountForTenant } from "../src/lib/accounts";
 import { billingMonthlyCents, resolveBillingType } from "../src/lib/billing-type";
 import { isGrandfathered } from "../src/lib/subscription";
 import { PROTECTED_TENANTS } from "../src/lib/deprovision";
-import { convertTenantToBusiness, readTenantWorkspaceLink } from "../src/platform/business-record";
-import { parseConversionArgs, runTenantConversion, type ConversionSources } from "./tenant-conversion";
+import { convertTenantToBusiness, previewTenantUnlink, readTenantWorkspaceLink, unlinkTenantFromBusiness } from "../src/platform/business-record";
+import { parseConversionArgs, runTenantConversion, runTenantRollback, type ConversionSources } from "./tenant-conversion";
 
 async function readTenant(slug: string) {
   const db = getSupabase();
@@ -85,6 +94,15 @@ async function read(slug: string): Promise<ConversionSources> {
 async function main() {
   const options = parseConversionArgs(process.argv.slice(2));
   const hasDb = Boolean(getSupabase());
+  if (options.rollback) {
+    const outcome = await runTenantRollback({ ...options, databaseUrl: process.env.SUPABASE_URL }, {
+      preview: hasDb ? previewTenantUnlink : null,
+      unlink: unlinkTenantFromBusiness,
+      log: options.json ? () => undefined : (line) => console.log(line),
+    });
+    if (options.json) console.log(JSON.stringify(outcome, null, 2));
+    return;
+  }
   const outcome = await runTenantConversion({ ...options, databaseUrl: process.env.SUPABASE_URL }, {
     read,
     readLink: hasDb ? readTenantWorkspaceLink : null,

@@ -16,6 +16,8 @@
 --                             it touched still hold its "after" state.
 --   tenant_workspace_links    one managed tenant <-> one business workspace,
 --                             carrying the conversion receipt.
+--   tenant_workspace_unlinks  immutable receipts of conversions reversed by
+--                             unlink_tenant_from_business.
 --
 -- Revisions. `business_records.revision` counts profile changes (facts,
 -- services, people) and is the optimistic-concurrency token for patches.
@@ -305,6 +307,25 @@ create table public.tenant_workspace_links (
 );
 create index tenant_workspace_links_workspace_idx on public.tenant_workspace_links(workspace_id, linked_at, id);
 
+-- One row per reversed conversion. No foreign keys to the tenant or the
+-- workspace: the unlink may delete the workspace, and the receipt must outlive
+-- a later deprovision or rename. The receipt carries the original conversion
+-- receipt, so the history of a site's conversions reads from here alone.
+create table public.tenant_workspace_unlinks (
+  id uuid primary key default gen_random_uuid(),
+  link_id uuid not null unique,
+  tenant_stable_id uuid not null,
+  tenant_slug_at_unlink text not null check (char_length(tenant_slug_at_unlink) between 1 and 120),
+  workspace_id uuid not null,
+  link_command_id uuid not null,
+  unlinked_by uuid not null references public.users(id) on delete restrict,
+  unlinked_at timestamptz not null default clock_timestamp(),
+  command_id uuid not null unique,
+  command_digest text not null check (command_digest ~ '^[0-9a-f]{64}$'),
+  receipt jsonb not null check (jsonb_typeof(receipt) = 'object' and octet_length(receipt::text) <= 256000)
+);
+create index tenant_workspace_unlinks_tenant_idx on public.tenant_workspace_unlinks(tenant_stable_id, unlinked_at desc, id);
+
 alter table public.business_records enable row level security;
 alter table public.business_record_facts enable row level security;
 alter table public.business_services enable row level security;
@@ -312,9 +333,10 @@ alter table public.business_people enable row level security;
 alter table public.business_contacts enable row level security;
 alter table public.business_record_revisions enable row level security;
 alter table public.tenant_workspace_links enable row level security;
+alter table public.tenant_workspace_unlinks enable row level security;
 revoke all on public.business_records, public.business_record_facts, public.business_services,
   public.business_people, public.business_contacts, public.business_record_revisions,
-  public.tenant_workspace_links from public, anon, authenticated, service_role;
+  public.tenant_workspace_links, public.tenant_workspace_unlinks from public, anon, authenticated, service_role;
 
 -- History rows and conversion receipts never change. Deletion is allowed only
 -- as part of removing the parent record (workspace deletion cascade).
@@ -338,11 +360,24 @@ begin
     and (to_jsonb(new) - 'tenant_stable_id') = (to_jsonb(old) - 'tenant_stable_id') then
     return new;
   end if;
+  -- unlink_tenant_from_business removes exactly the link it names, in the
+  -- same transaction that records the unlink receipt.
+  if tg_op = 'DELETE' and current_setting('strelva.tenant_unlink_link', true) = old.id::text then
+    return old;
+  end if;
   raise exception 'tenant_workspace_link_immutable';
 end;
 $$;
 create trigger tenant_workspace_links_immutable before update or delete on public.tenant_workspace_links
   for each row execute function public.tenant_workspace_link_guard();
+create function public.tenant_workspace_unlink_immutable() returns trigger
+language plpgsql set search_path = public, pg_temp as $$
+begin
+  raise exception 'tenant_workspace_unlink_immutable';
+end;
+$$;
+create trigger tenant_workspace_unlinks_immutable before update or delete on public.tenant_workspace_unlinks
+  for each row execute function public.tenant_workspace_unlink_immutable();
 
 -- Returns the access kind: owner | admin | member | agency.
 create function public.business_record_assert_actor(
@@ -1016,9 +1051,15 @@ begin
     perform pg_advisory_xact_lock(hashtextextended(business_id::text, 7415));
   end if;
 
+  -- Conversion idempotency lives on the link. When this site was converted
+  -- into this same business before and then unlinked, the record's history
+  -- already holds the command id, so the new import revision gets its own.
   applied := public.business_record_apply(business_id, operator_id, 'operator', 'tenant_import', patch,
     case when jsonb_array_length(coalesce(p_import->'contacts', '[]'::jsonb)) = 0 then null else p_import->'contacts' end,
-    null, p_command_id, p_command_digest);
+    null,
+    case when exists (select 1 from public.business_record_revisions where workspace_id = business_id and command_id = p_command_id)
+      then gen_random_uuid() else p_command_id end,
+    p_command_digest);
 
   receipt := jsonb_build_object(
     'kind', 'tenant_conversion',
@@ -1051,6 +1092,322 @@ begin
   insert into public.tenant_workspace_links(tenant_stable_id, tenant_slug_at_link, workspace_id, linked_by,
       command_id, command_digest, receipt)
     values (tenant_row.stable_id, tenant_row.id, business_id, operator_id, p_command_id, p_command_digest, receipt);
+  return receipt;
+end;
+$$;
+
+-- Unlink: the full reverse of one conversion.
+--
+-- The rule. Unlinking removes what the conversion created and nobody has
+-- touched since, and nothing else:
+--   * the tenant_workspace_links row (its receipt moves into
+--     tenant_workspace_unlinks, so reconverting starts clean);
+--   * each fact, service, person and contact the import revision created,
+--     only while it still holds exactly the state the import wrote;
+--   * each contact the import merged into an existing contact is restored to
+--     its pre-conversion state, again only while it still holds the merge;
+--   * the tenant's leads stop pointing at the business (`tenant_leads` rows
+--     are kept; only `workspace_id` is cleared, for this business only);
+--   * the business workspace itself, with the operator's admin membership and
+--     the record's history, only when the conversion created it and nothing
+--     else lives there: no other linked site, no other member, no history
+--     besides the import (and an undo of it), no record entity left after
+--     the removals above, and no row in any other table that references the
+--     workspace.
+-- Anything changed or added after the conversion is kept, and so is the
+-- workspace holding it; the receipt counts every kept entity, names the first
+-- 200, and lists every reason the workspace was kept. Data that existed before the conversion (a joined
+-- business) is never deleted. The `tenants` row is never touched.
+--
+-- tenant_unlink_plan is the read-only half; the unlink executes exactly it
+-- under the tenant and workspace locks.
+create function public.tenant_unlink_plan(p_link_id uuid) returns jsonb
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+declare
+  link public.tenant_workspace_links%rowtype;
+  import_rev public.business_record_revisions%rowtype;
+  ws public.workspaces%rowtype;
+  change jsonb;
+  current_state jsonb;
+  before_state jsonb;
+  after_state jsonb;
+  action text;
+  actions jsonb := '[]'::jsonb;
+  kept jsonb := '[]'::jsonb;
+  removing integer := 0;
+  restoring integer := 0;
+  keeping integer := 0;
+  reverted integer := 0;
+  remaining bigint;
+  reasons text[] := '{}';
+  fk record;
+  in_use boolean;
+  leads bigint := 0;
+  adopted bigint := 0;
+begin
+  select * into link from public.tenant_workspace_links where id = p_link_id;
+  if not found then raise exception 'tenant_unlink_not_linked'; end if;
+  select * into ws from public.workspaces where id = link.workspace_id;
+  select * into import_rev from public.business_record_revisions
+    where workspace_id = link.workspace_id and sequence = (link.receipt->>'sequence')::bigint and source = 'tenant_import';
+  if not found then raise exception 'tenant_unlink_import_missing'; end if;
+
+  -- One revision may touch an entity more than once (a contact created and
+  -- then merged by a later lead), so compare against its net effect: the
+  -- first "before" and the last "after".
+  for change in
+    select jsonb_build_object('entity', x.entity, 'id', x.id,
+        'before', (array_agg(t.value->'before' order by t.n))[1],
+        'after', (array_agg(t.value->'after' order by t.n desc))[1])
+      from jsonb_array_elements(import_rev.changes) with ordinality t(value, n)
+      cross join lateral (select t.value->>'entity' as entity, t.value->>'id' as id) x
+      group by x.entity, x.id
+      order by min(t.n) desc
+  loop
+    current_state := public.business_record_entity_state(link.workspace_id, change->>'entity', change->>'id');
+    before_state := nullif(change->'before', 'null'::jsonb);
+    after_state := nullif(change->'after', 'null'::jsonb);
+    if before_state is not distinct from after_state then continue; end if;
+    action := case
+      when current_state is not distinct from before_state then 'already_reverted'
+      when current_state is not distinct from after_state then case when before_state is null then 'remove' else 'restore' end
+      else 'keep' end;
+    case action
+      when 'remove' then removing := removing + 1;
+      when 'restore' then restoring := restoring + 1;
+      when 'keep' then
+        keeping := keeping + 1;
+        if jsonb_array_length(kept) < 200 then
+          kept := kept || jsonb_build_array(jsonb_build_object('entity', change->>'entity', 'id', change->>'id',
+            'reason', case when current_state is null then 'deleted_after_import' else 'changed_after_import' end));
+        end if;
+      else reverted := reverted + 1;
+    end case;
+    if action in ('remove','restore') then
+      actions := actions || jsonb_build_array(jsonb_build_object('entity', change->>'entity', 'id', change->>'id',
+        'action', action, 'restoreTo', coalesce(before_state, 'null'::jsonb)));
+    end if;
+  end loop;
+
+  if coalesce((link.receipt->>'joinedExistingWorkspace')::boolean, true) then
+    reasons := array_append(reasons, 'joined_existing_workspace');
+  end if;
+  if ws.created_by is distinct from link.linked_by then reasons := array_append(reasons, 'workspace_not_created_by_conversion'); end if;
+  if exists (select 1 from public.tenant_workspace_links where workspace_id = link.workspace_id and id <> link.id) then
+    reasons := array_append(reasons, 'other_sites_linked');
+  end if;
+  if exists (select 1 from public.workspace_memberships where workspace_id = link.workspace_id
+      and not (user_id = link.linked_by and role = 'admin')) then
+    reasons := array_append(reasons, 'other_members');
+  end if;
+  remaining := (select count(*) from public.business_record_facts where workspace_id = link.workspace_id)
+    + (select count(*) from public.business_services where workspace_id = link.workspace_id)
+    + (select count(*) from public.business_people where workspace_id = link.workspace_id)
+    + (select count(*) from public.business_contacts where workspace_id = link.workspace_id)
+    - removing;
+  if remaining > 0 then reasons := array_append(reasons, 'record_has_other_data'); end if;
+  if exists (select 1 from public.business_record_revisions where workspace_id = link.workspace_id
+      and sequence <> import_rev.sequence and undo_of_sequence is distinct from import_rev.sequence) then
+    reasons := array_append(reasons, 'record_history_after_import');
+  end if;
+  -- Every other table that points at the workspace counts as use. New tables
+  -- are covered without changing this function.
+  for fk in
+    select c.conrelid::regclass as rel, a.attname as col
+      from pg_constraint c
+      cross join lateral unnest(c.conkey, c.confkey) as k(local_col, ref_col)
+      join pg_attribute ra on ra.attrelid = c.confrelid and ra.attnum = k.ref_col and ra.attname = 'id'
+      join pg_attribute a on a.attrelid = c.conrelid and a.attnum = k.local_col
+      where c.contype = 'f' and c.confrelid = 'public.workspaces'::regclass
+        and c.conrelid not in ('public.workspace_memberships'::regclass, 'public.business_records'::regclass,
+          'public.tenant_workspace_links'::regclass)
+        and c.conrelid is distinct from to_regclass('public.tenant_leads')
+      order by 1, 2
+  loop
+    execute format('select exists (select 1 from %s where %I = $1)', fk.rel, fk.col) into in_use using link.workspace_id;
+    if in_use then reasons := array_append(reasons, ('workspace_in_use:' || fk.rel::text)); end if;
+  end loop;
+
+  if link.tenant_stable_id is not null and to_regclass('public.tenant_leads') is not null then
+    execute 'select count(*) from public.tenant_leads where tenant_stable_id = $1 and workspace_id = $2'
+      into leads using link.tenant_stable_id, link.workspace_id;
+  end if;
+  if link.tenant_stable_id is not null and to_regclass('public.systems') is not null then
+    execute $q$select count(*) from public.systems where business_workspace_id = $1 and origin_kind = 'tenant' and origin_ref = $2$q$
+      into adopted using link.workspace_id, link.tenant_stable_id::text;
+  end if;
+
+  return jsonb_build_object(
+    'linkId', link.id,
+    'tenantStableId', link.tenant_stable_id,
+    'workspaceId', link.workspace_id,
+    'workspaceName', ws.name,
+    'linkedAt', link.linked_at,
+    'importSequence', import_rev.sequence,
+    'deleteWorkspace', cardinality(reasons) = 0,
+    'workspaceKeptBecause', to_jsonb(reasons),
+    'entities', jsonb_build_object('removed', removing, 'restored', restoring, 'kept', keeping, 'alreadyReverted', reverted),
+    'kept', kept,
+    'leadsDetached', leads,
+    'systemsAdoptedFromTenant', adopted,
+    'actions', actions);
+end;
+$$;
+
+-- Operator preview of an unlink. Writes nothing.
+create function public.preview_tenant_unlink(p_operator_email text, p_tenant_id text) returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare operator_id uuid; tenant_row record; link public.tenant_workspace_links%rowtype; last_unlink jsonb;
+begin
+  operator_id := public.tenant_conversion_assert_operator(p_operator_email);
+  select t.id, t.stable_id into tenant_row from public.tenants t where t.id = p_tenant_id;
+  if not found then raise exception 'tenant_conversion_tenant_not_found'; end if;
+  select u.receipt into last_unlink from public.tenant_workspace_unlinks u
+    where u.tenant_stable_id = tenant_row.stable_id order by u.unlinked_at desc, u.id desc limit 1;
+  select * into link from public.tenant_workspace_links where tenant_stable_id = tenant_row.stable_id;
+  if not found then
+    return jsonb_build_object('tenantId', tenant_row.id, 'tenantStableId', tenant_row.stable_id, 'plan', null, 'lastUnlink', last_unlink);
+  end if;
+  if not exists (select 1 from public.workspace_memberships where workspace_id = link.workspace_id
+      and user_id = operator_id and role in ('owner','admin')) then
+    raise exception 'tenant_unlink_access_denied';
+  end if;
+  return jsonb_build_object('tenantId', tenant_row.id, 'tenantStableId', tenant_row.stable_id,
+    'plan', public.tenant_unlink_plan(link.id) - 'actions', 'lastUnlink', last_unlink);
+end;
+$$;
+
+-- Reverse one conversion by the rule above. p_workspace_id is the business the
+-- operator previewed; a link to any other business is refused. A repeated
+-- command replays its receipt; a tenant that is no longer linked returns its
+-- latest unlink receipt for that business and writes nothing.
+create function public.unlink_tenant_from_business(
+  p_operator_email text, p_tenant_id text, p_workspace_id uuid, p_command_id uuid, p_command_digest text
+) returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  operator_id uuid;
+  tenant_row record;
+  link public.tenant_workspace_links%rowtype;
+  prior public.tenant_workspace_unlinks%rowtype;
+  rec public.business_records%rowtype;
+  plan jsonb;
+  item jsonb;
+  before_state jsonb;
+  after_state jsonb;
+  changes jsonb := '[]'::jsonb;
+  leads bigint := 0;
+  deleted boolean;
+  profile_changed boolean;
+  new_sequence bigint;
+  new_revision bigint;
+  receipt jsonb;
+begin
+  if p_command_id is null or p_command_digest is null or p_command_digest !~ '^[0-9a-f]{64}$' or p_workspace_id is null then
+    raise exception 'tenant_unlink_invalid';
+  end if;
+  operator_id := public.tenant_conversion_assert_operator(p_operator_email);
+  select t.id, t.stable_id into tenant_row from public.tenants t where t.id = p_tenant_id for share;
+  if not found then raise exception 'tenant_conversion_tenant_not_found'; end if;
+  perform pg_advisory_xact_lock(hashtextextended('tenant-conversion:' || tenant_row.stable_id::text, 0));
+
+  select * into prior from public.tenant_workspace_unlinks where command_id = p_command_id;
+  if found then
+    if prior.command_digest <> p_command_digest or prior.tenant_stable_id <> tenant_row.stable_id then
+      raise exception 'tenant_unlink_idempotency_conflict';
+    end if;
+    return prior.receipt || jsonb_build_object('replayed', true, 'alreadyUnlinked', true);
+  end if;
+  select * into link from public.tenant_workspace_links where tenant_stable_id = tenant_row.stable_id;
+  if not found then
+    select * into prior from public.tenant_workspace_unlinks
+      where tenant_stable_id = tenant_row.stable_id and workspace_id = p_workspace_id
+      order by unlinked_at desc, id desc limit 1;
+    if found then return prior.receipt || jsonb_build_object('replayed', true, 'alreadyUnlinked', true); end if;
+    raise exception 'tenant_unlink_not_linked';
+  end if;
+  if link.workspace_id <> p_workspace_id then raise exception 'tenant_unlink_workspace_mismatch'; end if;
+
+  perform pg_advisory_xact_lock(hashtextextended(link.workspace_id::text, 7415));
+  perform 1 from public.workspaces where id = link.workspace_id for update;
+  if not exists (select 1 from public.workspace_memberships where workspace_id = link.workspace_id
+      and user_id = operator_id and role in ('owner','admin')) then
+    raise exception 'tenant_unlink_access_denied';
+  end if;
+  select * into link from public.tenant_workspace_links where id = link.id for update;
+
+  plan := public.tenant_unlink_plan(link.id);
+  deleted := (plan->>'deleteWorkspace')::boolean;
+  begin
+    for item in select value from jsonb_array_elements(plan->'actions') loop
+      before_state := public.business_record_entity_state(link.workspace_id, item->>'entity', item->>'id');
+      after_state := nullif(item->'restoreTo', 'null'::jsonb);
+      perform public.business_record_entity_write(link.workspace_id, item->>'entity', item->>'id', after_state, operator_id);
+      after_state := public.business_record_entity_state(link.workspace_id, item->>'entity', item->>'id');
+      changes := changes || jsonb_build_array(jsonb_build_object('entity', item->>'entity', 'id', item->>'id',
+        'before', coalesce(before_state, 'null'::jsonb), 'after', coalesce(after_state, 'null'::jsonb)));
+    end loop;
+  exception when unique_violation or check_violation or foreign_key_violation then
+    raise exception 'tenant_unlink_conflict';
+  end;
+
+  if link.tenant_stable_id is not null and to_regclass('public.tenant_leads') is not null then
+    execute 'update public.tenant_leads set workspace_id = null where tenant_stable_id = $1 and workspace_id = $2'
+      using link.tenant_stable_id, link.workspace_id;
+    get diagnostics leads = row_count;
+  end if;
+
+  perform set_config('strelva.tenant_unlink_link', link.id::text, true);
+  delete from public.tenant_workspace_links where id = link.id;
+  perform set_config('strelva.tenant_unlink_link', '', true);
+
+  if deleted then
+    delete from public.workspaces where id = link.workspace_id;
+  elsif jsonb_array_length(changes) > 0 then
+    -- The kept business records the unlink as one history row.
+    select * into rec from public.business_records where workspace_id = link.workspace_id for update;
+    profile_changed := exists (select 1 from jsonb_array_elements(changes) c where c->>'entity' in ('fact','service','person'));
+    new_sequence := rec.last_sequence + 1;
+    new_revision := rec.revision + case when profile_changed then 1 else 0 end;
+    insert into public.business_record_revisions(workspace_id, sequence, record_revision, actor_id, actor_kind, source,
+        command_id, command_digest, undo_of_sequence, changes, result)
+      values (link.workspace_id, new_sequence, new_revision, operator_id, 'operator', 'tenant_import',
+        p_command_id, p_command_digest, null, changes,
+        jsonb_build_object('workspaceId', link.workspace_id, 'sequence', new_sequence, 'revision', new_revision,
+          'changeCount', jsonb_array_length(changes), 'undoOf', null,
+          'contacts', jsonb_build_object('created', 0, 'merged', 0, 'unchanged', 0), 'replayed', false,
+          'unlinkOf', jsonb_build_object('linkId', link.id, 'importSequence', (plan->>'importSequence')::bigint)));
+    update public.business_records set revision = new_revision, last_sequence = new_sequence,
+      updated_by = operator_id, updated_at = clock_timestamp() where workspace_id = link.workspace_id;
+  end if;
+
+  receipt := jsonb_build_object(
+    'kind', 'tenant_unlink',
+    'version', 1,
+    'tenantId', tenant_row.id,
+    'tenantStableId', tenant_row.stable_id,
+    'workspaceId', link.workspace_id,
+    'workspaceName', plan->'workspaceName',
+    'linkId', link.id,
+    'linkedAt', link.linked_at,
+    'importSequence', plan->'importSequence',
+    'operatorId', operator_id,
+    'workspaceDeleted', deleted,
+    'workspaceKeptBecause', plan->'workspaceKeptBecause',
+    'entities', plan->'entities',
+    'kept', plan->'kept',
+    'leadsDetached', leads,
+    'systemsAdoptedFromTenant', plan->'systemsAdoptedFromTenant',
+    'sequence', new_sequence,
+    'revision', new_revision,
+    'conversionReceipt', link.receipt,
+    'unlinkedAt', clock_timestamp(),
+    'replayed', false,
+    'alreadyUnlinked', false);
+  insert into public.tenant_workspace_unlinks(link_id, tenant_stable_id, tenant_slug_at_unlink, workspace_id, link_command_id,
+      unlinked_by, command_id, command_digest, receipt)
+    values (link.id, tenant_row.stable_id, tenant_row.id, link.workspace_id, link.command_id,
+      operator_id, p_command_id, p_command_digest, receipt);
   return receipt;
 end;
 $$;
@@ -1093,6 +1450,8 @@ revoke all on function public.business_record_entity_write(uuid, text, text, jso
 revoke all on function public.business_record_apply(uuid, uuid, text, text, jsonb, jsonb, bigint, uuid, text) from public, anon, authenticated, service_role;
 revoke all on function public.business_record_begin_write(uuid, uuid, text, text, uuid, text) from public, anon, authenticated, service_role;
 revoke all on function public.tenant_conversion_assert_operator(text) from public, anon, authenticated, service_role;
+revoke all on function public.tenant_unlink_plan(uuid) from public, anon, authenticated, service_role;
+revoke all on function public.tenant_workspace_unlink_immutable() from public, anon, authenticated;
 
 revoke all on function public.read_business_record(uuid, uuid, text) from public, anon, authenticated;
 revoke all on function public.patch_business_record(uuid, uuid, text, text, bigint, jsonb, uuid, text) from public, anon, authenticated;
@@ -1112,6 +1471,10 @@ grant execute on function public.read_business_contacts(uuid, uuid, text, intege
 grant execute on function public.read_business_record_history(uuid, uuid, text, integer) to service_role;
 grant execute on function public.read_tenant_workspace_link(text, text) to service_role;
 grant execute on function public.convert_tenant_to_business(text, text, jsonb, uuid, text) to service_role;
+revoke all on function public.preview_tenant_unlink(text, text) from public, anon, authenticated;
+revoke all on function public.unlink_tenant_from_business(text, text, uuid, uuid, text) from public, anon, authenticated;
+grant execute on function public.preview_tenant_unlink(text, text) to service_role;
+grant execute on function public.unlink_tenant_from_business(text, text, uuid, uuid, text) to service_role;
 
 -- Client leads (20261005090000_tenant_leads.sql) may be applied to production
 -- before this migration. When it was, converting a tenant must still attach the

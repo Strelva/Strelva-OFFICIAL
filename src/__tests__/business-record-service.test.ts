@@ -4,13 +4,15 @@ import {
   BusinessRecordValidationError,
   convertTenantToBusiness,
   patchBusinessRecord,
+  previewTenantUnlink,
   readBusinessRecord,
   resolveOwnerRecipient,
   setBusinessRecordDb,
   undoBusinessRecordRevision,
+  unlinkTenantFromBusiness,
   upsertBusinessContacts,
 } from "@/platform/business-record";
-import { planTenantImport } from "@/platform/business-record/tenant-import";
+import { planTenantImport, planTenantUnlink } from "@/platform/business-record/tenant-import";
 import { WorkspaceAccessError, WorkspaceStoreError } from "@/platform/workspaces/types";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -95,5 +97,36 @@ describe("business record service", () => {
     await expect(convertTenantToBusiness("operator@example.com", plan.payload, { commandId: plan.commandId, digest: "0".repeat(64) }))
       .rejects.toBeInstanceOf(BusinessRecordValidationError);
     expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("sends one link-bound unlink command and maps unlink refusals", async () => {
+    const link = { tenantId: "gldf", tenantStableId: "c0ffee00-0000-4000-8000-0000000000a1", workspaceId: workspace, linkedAt: "2026-10-02T12:00:00Z" };
+    const unlink = planTenantUnlink(link);
+    expect(planTenantUnlink(link)).toEqual(unlink);
+    expect(planTenantUnlink({ ...link, linkedAt: "2026-10-03T12:00:00Z" }).commandId).not.toBe(unlink.commandId);
+    expect(unlink.digest).toMatch(/^[0-9a-f]{64}$/);
+
+    const rpc = db(null, { message: "tenant_unlink_access_denied" });
+    await expect(unlinkTenantFromBusiness(" Operator@Strelva.example.test ", unlink)).rejects.toBeInstanceOf(WorkspaceAccessError);
+    expect(rpc.mock.calls[0]).toEqual(["unlink_tenant_from_business", {
+      p_operator_email: "operator@strelva.example.test", p_tenant_id: "gldf", p_workspace_id: workspace,
+      p_command_id: unlink.commandId, p_command_digest: unlink.digest,
+    }]);
+    db(null, { message: "tenant_unlink_workspace_mismatch" });
+    await expect(unlinkTenantFromBusiness("operator@strelva.example.test", unlink)).rejects.toBeInstanceOf(BusinessRecordConflictError);
+    db(null, { message: "tenant_unlink_idempotency_conflict" });
+    await expect(unlinkTenantFromBusiness("operator@strelva.example.test", unlink)).rejects.toBeInstanceOf(BusinessRecordConflictError);
+    db(null, { message: "tenant_unlink_invalid" });
+    await expect(unlinkTenantFromBusiness("operator@strelva.example.test", unlink)).rejects.toBeInstanceOf(BusinessRecordValidationError);
+    db({ kind: "tenant_unlink" });
+    await expect(unlinkTenantFromBusiness("operator@strelva.example.test", unlink)).rejects.toBeInstanceOf(WorkspaceStoreError);
+    const none = db(null);
+    await expect(unlinkTenantFromBusiness("operator@strelva.example.test", { ...unlink, workspaceId: "not-a-uuid" })).rejects.toThrow();
+    expect(none).not.toHaveBeenCalled();
+  });
+
+  it("reads an unlink preview for a tenant that is not linked", async () => {
+    db({ tenantId: "gldf", tenantStableId: "c0ffee00-0000-4000-8000-0000000000a1", plan: null, lastUnlink: null });
+    await expect(previewTenantUnlink("operator@strelva.example.test", "gldf")).resolves.toMatchObject({ plan: null, lastUnlink: null });
   });
 });
