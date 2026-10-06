@@ -1,17 +1,16 @@
+import { getTenantFromHeaders } from "@/lib/tenant";
+import { redirectIfDashboardPageMoved } from "@/platform/owner-entry/server";
 import { requireDashboardView } from "@/lib/dashboard-auth";
-import { getConnection } from "@/lib/connections";
-import { getGbpState } from "@/lib/gbp-management";
+import { loadGoogleBusinessData } from "@/lib/website-page-data";
 import { EngagementTracker } from "@/components/dashboard/EngagementTracker";
 import { GoogleBusinessPanel } from "@/components/dashboard/GoogleBusinessPanel";
 
 export default async function GoogleBusinessPage() {
-  const { tenant } = await requireDashboardView();
+  // Moved to the workspace website when owner entry is on: the layout redirects a full load; this covers a soft navigation.
+  await redirectIfDashboardPageMoved(await getTenantFromHeaders(), "/google");
 
-  const connection = await getConnection(tenant, "google").catch(() => null);
-  const connected = connection?.status === "connected";
-  // Live listing state only when connected; the read itself degrades to null on
-  // a transient API error (or before Google grants Business Profile API access).
-  const state = connected ? await getGbpState(tenant).catch(() => null) : null;
+  const { tenant } = await requireDashboardView();
+  const { connected, state } = await loadGoogleBusinessData(tenant);
 
   return (
     <>

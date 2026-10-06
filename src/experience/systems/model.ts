@@ -80,7 +80,8 @@ export interface SystemVersion {
 }
 
 export type SystemSurface =
-  | { kind: "website"; domain?: string; liveUrl?: string; previewSrc?: string; previewLabel: string; manageHref?: string }
+  /** `editing`: Strelva edits the content in the workspace (`native`), or every change is a repo Request (`request`). */
+  | { kind: "website"; domain?: string; liveUrl?: string; previewSrc?: string; previewLabel: string; manageHref?: string; editing?: "native" | "request" }
   | { kind: "inquiries"; tenantId: string }
   | { kind: "work"; workId: string; productId: string }
   /** A Google listing: its health in words and what Strelva did on Google. */

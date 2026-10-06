@@ -1,5 +1,6 @@
 import { systemOriginId } from "@/platform/systems/invariants";
 import type { ReleaseFlag } from "@/platform/release-flags/resolve";
+import { workspaceSiteHref, type SiteTab } from "@/lib/workspace-site-places";
 
 /**
  * Where each `/dashboard` page lands in the workspace (owner-entry spec §5).
@@ -28,6 +29,8 @@ export interface DispositionContext {
   tenantStableId: string | null;
   /** The request's query, for meaning-carrying params like `?checkout=success`. */
   search: URLSearchParams;
+  /** The concrete path under /dashboard (`/dashboard/sources/google`), for ids in the path. */
+  path?: string;
 }
 
 export interface DashboardDisposition {
@@ -41,6 +44,8 @@ export interface DashboardDisposition {
   retiresTo?: string;
   /** Ready only where these flags are on for the workspace. */
   requires?: readonly ReleaseFlag[];
+  /** Ready only while this env-only release is on (Ask Strelva has no per-workspace flag). */
+  requiresEnv?: "ask";
   /** Why a page stays or is frozen, and what would make it ready. */
   note?: string;
   target(context: DispositionContext): string;
@@ -58,6 +63,21 @@ export function websiteSystemHome({ workspaceId, tenantStableId }: DispositionCo
 }
 
 const home = ({ workspaceId }: DispositionContext) => workspaceHome(workspaceId);
+
+/**
+ * A managed website's own page in the workspace (`/workspace/site`), by tab.
+ * Without the tenant's identity there is no website System to open: Home.
+ */
+export function websiteSitePlace(tab: SiteTab, extra: (context: DispositionContext) => { source?: string; request?: string } = () => ({})) {
+  return (context: DispositionContext): string => {
+    if (!context.tenantStableId) return workspaceHome(context.workspaceId);
+    const systemId = systemOriginId(context.workspaceId, { kind: "tenant", ref: context.tenantStableId });
+    return workspaceSiteHref({ workspaceId: context.workspaceId, systemId, tab, ...extra(context) });
+  };
+}
+
+const SOURCE_ID = /^[a-z0-9_-]{1,64}$/i;
+const REQUEST_ID = /^[A-Za-z0-9_.:-]{1,200}$/;
 
 /** `/dashboard/settings#<anchor>` places, for when Settings is ready. The
  * server never sees a fragment; the browser carries it onto the redirect. */
@@ -78,27 +98,29 @@ export const DASHBOARD_DISPOSITIONS: readonly DashboardDisposition[] = [
     note: "Home doesn't read the linked tenant's approvals, leads or activity yet (needs-you spec).",
     // Stripe returns to /dashboard?checkout=success; that belongs to billing.
     target: (c) => c.search.has("checkout") ? workspaceHome(c.workspaceId, { view: "settings" }) : workspaceHome(c.workspaceId) },
-  { route: "/chat", home: "Ask Strelva on Home and on each System", state: "stay", use: "always",
-    note: "Ask Strelva doesn't run in the workspace yet (ask-strelva spec).", target: home },
-  { route: "/site", home: "Website System", state: "stay", use: "always",
-    note: "The System page shows the site but editing still opens /dashboard/site, so redirecting would loop.", target: websiteSystemHome },
+  { route: "/chat", home: "Ask Strelva (view=ask), on Home and on each System", state: "ready", use: "always", requiresEnv: "ask",
+    note: "Ready only while STRELVA_ASK_RELEASE is on; off, the old chat stays. Conversations start fresh in the workspace: tenant chat threads are not copied.",
+    target: (c) => workspaceHome(c.workspaceId, { view: "ask" }) },
+  { route: "/site", home: "Website System: the site's editor, or Ask for a change on a repo-only site", state: "ready", use: "always", requires: ["systems"],
+    target: websiteSitePlace("edit") },
   { route: "/content", home: "Website System", state: "retire", retiresTo: "/site", use: "always", target: websiteSystemHome },
-  { route: "/assets", home: "Website System, photos and files", state: "stay", use: "always",
-    note: "No photo library on the Website System yet.", target: websiteSystemHome },
-  { route: "/brand-kit", home: "Website System, look", state: "stay", use: "always",
-    note: "No brand panel on the Website System yet.", target: websiteSystemHome },
-  { route: "/collections", home: "Publishing System (blog)", state: "stay", use: "always",
-    note: "Publishing doesn't exist in the workspace yet.", target: home },
-  { route: "/google", home: "Publishing System, acts on Google Business", state: "stay", use: "local",
-    note: "Google tokens are tenant-side and Publishing doesn't exist in the workspace yet.", target: home },
+  { route: "/assets", home: "Website System, photos", state: "ready", use: "always", requires: ["systems"], target: websiteSitePlace("photos") },
+  { route: "/brand-kit", home: "Website System, look", state: "ready", use: "always", requires: ["systems"], target: websiteSitePlace("look") },
+  { route: "/collections", home: "Website System, blog and collections (they appear through /api/v1/collections)", state: "ready", use: "always", requires: ["systems"],
+    target: websiteSitePlace("collections") },
+  { route: "/google", home: "Website System Connections: Google Business", state: "ready", use: "local", requires: ["systems"], target: websiteSitePlace("google") },
   { route: "/health", home: "Website System health", state: "retire", retiresTo: "/analytics", use: "always", target: websiteSystemHome },
-  { route: "/history", home: "Website System, History", state: "stay", use: "always",
-    note: "History doesn't read tenant content versions or site snapshots yet.", target: websiteSystemHome },
-  { route: "/integrations", home: "Connections on each System", state: "stay", use: "always",
-    note: "System Connections don't read the tenant's connections yet.", target: websiteSystemHome },
+  { route: "/history", home: "Website System, History", state: "ready", use: "always", requires: ["systems"],
+    target: websiteSitePlace("history", (c) => { const request = c.search.get("request"); return request && REQUEST_ID.test(request) ? { request } : {}; }) },
+  { route: "/integrations", home: "Website System Connections", state: "ready", use: "always", requires: ["systems"], target: websiteSitePlace("connections") },
   { route: "/sources", home: "Connections on each System", state: "retire", retiresTo: "/integrations", use: "always", target: websiteSystemHome },
-  { route: "/sources/[id]", home: "That Connection on its System", state: "stay", use: "always",
-    note: "No Connection detail view yet.", target: websiteSystemHome },
+  { route: "/sources/[id]", home: "That Connection on the Website System", state: "ready", use: "always", requires: ["systems"],
+    target: (c) => {
+      const raw = c.path?.match(/^\/dashboard\/sources\/([^/]+)\/?$/)?.[1];
+      let source: string | null = null;
+      try { source = raw ? decodeURIComponent(raw) : null; } catch { source = null; }
+      return source && SOURCE_ID.test(source) ? websiteSitePlace("source", () => ({ source }))(c) : websiteSitePlace("connections")(c);
+    } },
   { route: "/leads", home: "Inquiries System", state: "stay", use: "always", requires: ["inquiries"],
     note: "Inquiries in the workspace are partial and leads are still Redis-authoritative.", target: (c) => workspaceHome(c.workspaceId, { view: "inquiries" }) },
   { route: "/members", home: "Stays on /dashboard (rewards frozen)", state: "frozen", use: "wellness",

@@ -1,6 +1,7 @@
 import { workspaceReturnTarget } from "@/lib/workspace-location";
 import { releaseFlagEnvMode, resolveReleaseFlag, type ReleaseEnvironment, type ReleaseFlag } from "@/platform/release-flags/resolve";
 import { ownerEntryPossible } from "./env";
+import { askReleaseEnabled } from "@/platform/ask/release";
 import type { OwnerEntryResolution } from "@/platform/release-flags/store";
 import { effectiveDisposition, routeForDashboardPath, workspaceHome, type DispositionState } from "./dispositions";
 
@@ -53,16 +54,19 @@ export function routeDashboardRequest(input: {
   decision: OwnerEntryDecision;
   pathWithSearch: string;
   flagOn?: (flag: ReleaseFlag) => boolean;
+  /** STRELVA_ASK_RELEASE; read from the env when not given. */
+  askReleased?: boolean;
 }): DashboardRouting {
   const { decision } = input;
   if (decision.kind !== "workspace") return { kind: "render" };
   const url = new URL(input.pathWithSearch || "/dashboard", "https://dashboard.invalid");
   const route = routeForDashboardPath(url.pathname);
   const entry = effectiveDisposition(route);
-  const context = { workspaceId: decision.workspaceId, tenantStableId: decision.tenantStableId, search: url.searchParams };
+  const context = { workspaceId: decision.workspaceId, tenantStableId: decision.tenantStableId, search: url.searchParams, path: url.pathname };
   const homeHref = workspaceHome(decision.workspaceId);
   const legacy = decision.operator && url.searchParams.get("legacy") === "1";
-  const flagsReady = (entry.requires ?? []).every((flag) => input.flagOn?.(flag) === true);
+  const flagsReady = (entry.requires ?? []).every((flag) => input.flagOn?.(flag) === true)
+    && (entry.requiresEnv !== "ask" || (input.askReleased ?? askReleaseEnabled()));
   if (entry.state === "ready" && flagsReady && !legacy) {
     // A target that wouldn't survive sign-in is never a redirect.
     const location = workspaceReturnTarget(entry.target(context));

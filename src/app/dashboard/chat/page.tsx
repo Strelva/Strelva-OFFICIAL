@@ -1,3 +1,5 @@
+import { getTenantFromHeaders } from "@/lib/tenant";
+import { redirectIfDashboardPageMoved } from "@/platform/owner-entry/server";
 import { requireDashboardView } from "@/lib/dashboard-auth";
 import { getActorContext } from "@/lib/auth";
 import { isDevAccessBypassEnabled } from "@/lib/dev-access";
@@ -10,6 +12,9 @@ export default async function ChatPage({
 }: {
   searchParams: Promise<{ thread?: string; needs?: string }>;
 }) {
+  // Ask Strelva in the workspace once owner entry and STRELVA_ASK_RELEASE are on:
+  // the layout redirects a full load; this covers a soft navigation.
+  await redirectIfDashboardPageMoved(await getTenantFromHeaders(), "/chat");
   const params = await searchParams;
   const { tenant } = await requireDashboardView();
 

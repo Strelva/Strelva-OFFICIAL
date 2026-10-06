@@ -1,4 +1,5 @@
 import { isBusinessStartProduct } from "./business-start";
+import { workspaceSiteTarget } from "./workspace-site-places";
 
 /** Navigation hints only. APIs still authorize the requested workspace and work. */
 const ID = /^[a-z0-9_-]{1,128}$/i;
@@ -20,6 +21,8 @@ export function workspaceReturnTarget(value: string | null): string | null {
       || !workspaceId || !UUID.test(workspaceId) || target.searchParams.getAll("period").length > 1 || (period !== null && period !== "week" && period !== "month")) return null;
     return `${target.pathname}?${target.searchParams}`;
   }
+  // A managed website's own pages (editor, photos, look, history, connections).
+  if (value?.startsWith("/workspace/site?")) return workspaceSiteTarget(value);
   if (value?.startsWith("/workspace/business/new?") || value?.startsWith("/workspace/delivery?")) {
     const target = new URL(value, "https://workspace.invalid");
     if (target.hash || target.searchParams.size !== 1) return null;

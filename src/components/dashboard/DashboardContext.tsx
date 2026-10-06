@@ -166,6 +166,7 @@ export function DashboardProvider({
   relationship = DEFAULT_RELATIONSHIP,
   impersonation,
   readOnly = false,
+  resolveHref,
 }: {
   children: ReactNode;
   tenantId?: string;
@@ -183,6 +184,13 @@ export function DashboardProvider({
   relationship?: RelationshipSnapshot;
   impersonation?: ImpersonationContext;
   readOnly?: boolean;
+  /**
+   * Replaces the base-path join for `dashboardHref`. The workspace passes one
+   * so the dashboard pages it reuses keep their links inside the workspace
+   * and reach the tenant's APIs through `/client/<tenant>`
+   * (src/lib/workspace-site-places.ts).
+   */
+  resolveHref?: (path: string) => string;
 }) {
   const [activePanel, setActivePanel] = useState<Panel>("content");
   const [chatPrompt, setChatPromptState] = useState("");
@@ -202,8 +210,8 @@ export function DashboardProvider({
   const [hasPageConfigDraft, setHasPageConfigDraft] = useState(false);
   const [editReceipts, setEditReceipts] = useState<EditReceipt[]>([]);
   const dashboardHref = useCallback(
-    (path: string) => `${dashboardBasePath}${path.startsWith("/") ? path : `/${path}`}`,
-    [dashboardBasePath]
+    (path: string) => resolveHref ? resolveHref(path) : `${dashboardBasePath}${path.startsWith("/") ? path : `/${path}`}`,
+    [dashboardBasePath, resolveHref]
   );
 
   const reloadDraftState = useCallback(async () => {

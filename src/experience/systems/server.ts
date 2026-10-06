@@ -18,6 +18,7 @@ import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { BusinessSystems, SystemListing } from "@/platform/systems/from-existing";
 import { listBusinessSystems, withTenantSurfaces, type BookingView, type TenantSiteFacts } from "@/platform/systems/from-existing";
 import { getTenantConfig } from "@/lib/tenants";
+import { siteEditingFor, type SiteEditing } from "@/products/websites/server";
 import { savedCheckObservations } from "@/products/investigations/system-health";
 import { createSupabaseSystemStore } from "@/platform/systems/supabase-store";
 import { readBusinessVersions } from "@/platform/system-versions/supabase-store";
@@ -50,6 +51,8 @@ export interface SystemsProjectionInput {
   now: number;
   /** Day and week views of a Bookings System (wellness schedule, roster), by System id. */
   bookingViews?: ReadonlyMap<string, readonly BookingView[]>;
+  /** How each managed site changes, by tenant id. Absent: not known, nothing is claimed. */
+  siteEditing?: ReadonlyMap<string, SiteEditing>;
   /** Set while STRELVA_PUBLISHING_RELEASE is on. Null: the read failed. */
   publishing?: Omit<PublishingProjection, "listing" | "observations"> | null;
 }
@@ -186,6 +189,7 @@ export async function projectWorkspaceSystems(input: SystemsProjectionInput): Pr
       tenantId: item.references.tenantId,
       health: healthSummary(health.get(item.system.id)),
       ...(input.bookingViews?.get(item.system.id)?.length ? { views: [...input.bookingViews.get(item.system.id)!] } : {}),
+      ...(item.system.kind === "website" && item.references.tenantId && input.siteEditing?.get(item.references.tenantId) ? { editing: input.siteEditing.get(item.references.tenantId)! } : {}),
     })),
     connections: connections.map(({ connection }) => {
       const targetSystemId = connection.target.type === "system" ? connection.target.system.systemId : null;
@@ -258,16 +262,18 @@ export interface LiveSystemsDeps {
  * own config. A failed read adds nothing for that site: no Store Connection
  * and no booking views are claimed without the fact.
  */
-async function readTenantSiteFacts(listing: BusinessSystems, siteDomains: ReadonlyMap<string, string>): Promise<Map<string, TenantSiteFacts>> {
+async function readTenantSiteFacts(listing: BusinessSystems, siteDomains: ReadonlyMap<string, string>): Promise<{ facts: Map<string, TenantSiteFacts>; editing: Map<string, SiteEditing> }> {
   const tenantIds = [...new Set(listing.systems.flatMap((item) => item.system.kind === "website" && item.references.tenantId ? [item.references.tenantId] : []))];
   const facts = new Map<string, TenantSiteFacts>();
+  const editing = new Map<string, SiteEditing>();
   await Promise.all(tenantIds.map(async (tenantId) => {
     const tenant = await getTenantConfig(tenantId).catch(() => undefined);
     if (!tenant || tenant.id !== tenantId) return;
     const domain = siteDomains.get(tenantId);
     facts.set(tenantId, { features: tenant.features ?? [], domain: domain ? bareHostname(domain) : null });
+    editing.set(tenantId, siteEditingFor(tenant));
   }));
-  return facts;
+  return { facts, editing };
 }
 
 /** Saved checks become health evidence of the Systems they watch. */
@@ -280,7 +286,8 @@ export function savedCheckEvidence(listing: BusinessSystems, siteDomains: Readon
 async function liveProjectionInput(deps: LiveSystemsDeps): Promise<SystemsProjectionInput> {
   const now = deps.now ?? Date.now();
   const spine = await listBusinessSystems(deps.actor, deps.businessId, { store: createSupabaseSystemStore() });
-  const { bookingViews, ...surfaced } = withTenantSurfaces(spine, await readTenantSiteFacts(spine, deps.siteDomains));
+  const tenantFacts = await readTenantSiteFacts(spine, deps.siteDomains);
+  const { bookingViews, ...surfaced } = withTenantSurfaces(spine, tenantFacts.facts);
   const published = publishingReleaseEnabled() ? await withPublishing(surfaced, deps.actor, now) : null;
   const listing = published?.listing ?? surfaced;
   return {
@@ -291,6 +298,7 @@ async function liveProjectionInput(deps: LiveSystemsDeps): Promise<SystemsProjec
     actorId: deps.actor.userId,
     now,
     bookingViews,
+    siteEditing: tenantFacts.editing,
     ...(published ? { publishing: published.publishing } : {}),
   };
 }

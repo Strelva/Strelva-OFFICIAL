@@ -77,11 +77,24 @@ describe("dashboard disposition map", () => {
     expect(state("/roster").home).toMatch(/Bookings/);
   });
 
-  it("lands the website pages on the tenant's website System", () => {
-    const target = DASHBOARD_DISPOSITIONS.find((entry) => entry.route === "/site")!.target({ workspaceId: WS, tenantStableId: STABLE, search: new URLSearchParams() });
-    const params = new URL(target, "https://x.invalid").searchParams;
-    expect(params.get("view")).toBe("system");
-    expect(params.get("system")).toBe(systemOriginId(WS, { kind: "tenant", ref: STABLE }));
+  it("lands the website pages on the tenant's website System, each on its own tab", () => {
+    const system = systemOriginId(WS, { kind: "tenant", ref: STABLE });
+    const target = (route: string, path = `/dashboard${route}`, search = "") => DASHBOARD_DISPOSITIONS.find((entry) => entry.route === route)!
+      .target({ workspaceId: WS, tenantStableId: STABLE, search: new URLSearchParams(search), path });
+    expect(target("/site")).toBe(`/workspace/site?workspaceId=${WS}&system=${system}`);
+    expect(target("/assets")).toBe(`/workspace/site?workspaceId=${WS}&system=${system}&tab=photos`);
+    expect(target("/brand-kit")).toBe(`/workspace/site?workspaceId=${WS}&system=${system}&tab=look`);
+    expect(target("/collections")).toBe(`/workspace/site?workspaceId=${WS}&system=${system}&tab=collections`);
+    expect(target("/history", "/dashboard/history", "request=evt_42")).toBe(`/workspace/site?workspaceId=${WS}&system=${system}&tab=history&request=evt_42`);
+    expect(target("/history", "/dashboard/history", "request=<script>")).toBe(`/workspace/site?workspaceId=${WS}&system=${system}&tab=history`);
+    expect(target("/integrations")).toBe(`/workspace/site?workspaceId=${WS}&system=${system}&tab=connections`);
+    expect(target("/google")).toBe(`/workspace/site?workspaceId=${WS}&system=${system}&tab=google`);
+    expect(target("/sources/[id]", "/dashboard/sources/google-business")).toBe(`/workspace/site?workspaceId=${WS}&system=${system}&tab=source&source=google-business`);
+    expect(target("/sources/[id]", "/dashboard/sources/%E0%A4%A")).toBe(`/workspace/site?workspaceId=${WS}&system=${system}&tab=connections`);
+    expect(target("/chat")).toBe(`/workspace?view=ask&workspaceId=${WS}`);
+    for (const route of ["/site", "/assets", "/history", "/sources/[id]"]) {
+      expect(DASHBOARD_DISPOSITIONS.find((entry) => entry.route === route)!.target({ workspaceId: WS, tenantStableId: null, search: new URLSearchParams() }), route).toBe(`/workspace?workspaceId=${WS}`);
+    }
   });
 
   it("matches concrete paths to routes and retire pages to their target's state", () => {
@@ -144,6 +157,23 @@ describe("routing a /dashboard request", () => {
 
   it("redirects a ready page to its workspace home", () => {
     expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/unknown/page" })).toEqual({ kind: "redirect", location: `/workspace?workspaceId=${WS}`, route: "/[...notFound]" });
+  });
+
+  it("moves the website pages only where Systems are on for the workspace", () => {
+    const system = systemOriginId(WS, { kind: "tenant", ref: STABLE });
+    const on = (flag: string) => flag === "systems";
+    expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/site", flagOn: on })).toEqual({ kind: "redirect", location: `/workspace/site?workspaceId=${WS}&system=${system}`, route: "/site" });
+    expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/content", flagOn: on })).toMatchObject({ kind: "redirect", route: "/content", location: `/workspace/site?workspaceId=${WS}&system=${system}` });
+    expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/sources/google", flagOn: on })).toMatchObject({ kind: "redirect", location: `/workspace/site?workspaceId=${WS}&system=${system}&tab=source&source=google` });
+    expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/sources", flagOn: on })).toMatchObject({ kind: "redirect", location: `/workspace/site?workspaceId=${WS}&system=${system}&tab=connections` });
+    for (const path of ["/dashboard/site", "/dashboard/assets", "/dashboard/history", "/dashboard/integrations", "/dashboard/google"]) {
+      expect(routeDashboardRequest({ decision: moved, pathWithSearch: path, flagOn: () => false }).kind, path).toBe("render-with-back");
+    }
+  });
+
+  it("moves /dashboard/chat only while Ask Strelva is released", () => {
+    expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/chat", askReleased: true })).toEqual({ kind: "redirect", location: `/workspace?view=ask&workspaceId=${WS}`, route: "/chat" });
+    expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/chat", askReleased: false }).kind).toBe("render-with-back");
   });
 
   it("renders a page that stays, with a way back to the workspace", () => {

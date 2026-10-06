@@ -238,6 +238,8 @@ export interface WorkspaceSystemEntry {
   health: { status: HealthStatus; summary: string; lastVerifiedAt: string | null };
   /** A Bookings System's day and week views on the managed site (wellness schedule, roster). */
   views?: Array<"schedule" | "roster">;
+  /** A managed website: Strelva edits its content (`native`) or every change is a repo Request (`request`). */
+  editing?: "native" | "request";
 }
 
 export interface WorkspaceSystemConnection {
