@@ -137,6 +137,7 @@ async function runVerification(
           section,
           checkedAt: result.checkedAt,
           evidence: result.evidence,
+          reviewAudience: "operator",
         },
       });
 

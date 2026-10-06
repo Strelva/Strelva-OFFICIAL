@@ -26,7 +26,8 @@
  *    double action.
  */
 import { NextResponse } from "next/server";
-import { verifyApproveToken, type ApproveLinkClaims } from "@/lib/approve-link";
+import { verifyAnyApproveToken, type ApproveLinkClaims, type WorkspaceApproveLinkClaims } from "@/lib/approve-link";
+import { needsYouAppOrigin, needsYouReleaseEnabled, needsYouService, needsYouStore } from "@/platform/needs-you/server";
 import { resolveEventAction } from "@/lib/event-actions";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
@@ -121,6 +122,80 @@ const INVALID = {
   },
 } as const;
 
+// --- Workspace links (Needs you) -----------------------------------------------
+// Same two steps. The token binds workspace, item, action, recipient and
+// revision; the POST rechecks the item revision against its source and that
+// the recipient is still the owner, then resolves through the source's own
+// resolver. Access, money and exit never resolve from a link.
+
+function workspaceOpenUrl(workspaceId: string, href?: string | null): string {
+  return `${needsYouAppOrigin().replace(/\/+$/, "")}${href ?? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}`;
+}
+
+const CHANGED = { heading: "This changed since we emailed you", body: "Nothing was done. Open Strelva to see the latest version and decide there." };
+const HANDLED = { heading: "Already handled", body: "This was already taken care of. Nothing more to do." };
+const EXPIRED = { heading: "This link expired", body: "Nothing was done. Open Strelva to see what's waiting." };
+
+async function workspaceConfirm(token: string, claims: WorkspaceApproveLinkClaims): Promise<NextResponse> {
+  if (!needsYouReleaseEnabled()) return noticePage({ status: 400, ...INVALID.bad });
+  const item = await needsYouStore.read(claims.workspaceId, claims.itemId).catch(() => null);
+  if (!item) return noticePage({ status: 400, ...INVALID.bad });
+  const open = workspaceOpenUrl(claims.workspaceId, item.openHref);
+  if (item.state === "superseded" || item.revisionHash !== claims.revision) return noticePage({ status: 200, ...CHANGED, dashboardUrl: open, buttonLabel: "Open" });
+  if (item.state !== "open") return noticePage({ status: 200, ...HANDLED, dashboardUrl: open, buttonLabel: "Open" });
+  if (Date.parse(item.expiresAt) <= Date.now()) return noticePage({ status: 200, ...EXPIRED, dashboardUrl: open, buttonLabel: "Open" });
+  if (item.signInRequired) return noticePage({ status: 200, heading: "Sign in to decide this", body: "Decisions about access, money or leaving Strelva need you signed in. Nothing was done.", dashboardUrl: open, buttonLabel: "Sign in and open" });
+  const isApprove = claims.action === "approve";
+  return confirmPage({
+    token,
+    heading: isApprove ? `Approve: ${item.title}` : `Not yet: ${item.title}`,
+    body: `${isApprove ? item.approveEffect : item.notYetEffect} Nothing happens until you confirm.`,
+    confirmLabel: isApprove ? "Confirm — approve" : "Confirm — not yet",
+    dashboardUrl: open,
+  });
+}
+
+async function workspaceResolve(claims: WorkspaceApproveLinkClaims): Promise<NextResponse> {
+  if (!needsYouReleaseEnabled()) return noticePage({ status: 400, ...INVALID.bad });
+  const open = workspaceOpenUrl(claims.workspaceId);
+  let result;
+  try {
+    result = await needsYouService().decide({
+      workspaceId: claims.workspaceId,
+      itemId: claims.itemId,
+      revision: claims.revision,
+      decision: claims.action === "approve" ? "approve" : "not_yet",
+      by: { kind: "owner_link", recipient: claims.recipient },
+    });
+  } catch (err) {
+    console.error(`[api/approve] Needs you decision failed for ${claims.workspaceId}/${claims.itemId}:`, err);
+    return noticePage({ status: 200, heading: "We hit a snag", body: "We couldn't complete that just now. Nothing was done. Open Strelva to finish it there.", dashboardUrl: open, buttonLabel: "Open" });
+  }
+  const openItem = workspaceOpenUrl(claims.workspaceId, result.item?.openHref);
+  switch (result.status) {
+    case "done":
+    case "done_unverified":
+      return claims.action === "approve"
+        ? noticePage({ status: 200, heading: "Approved", body: result.status === "done" ? "Done. Strelva has it from here." : "Done. Strelva is confirming it went through.", dashboardUrl: openItem, buttonLabel: "Open" })
+        : noticePage({ status: 200, heading: "Not yet", body: "Nothing was done. It's still in Strelva when you want it.", dashboardUrl: openItem, buttonLabel: "Open" });
+    case "already_handled":
+      return noticePage({ status: 200, ...HANDLED, dashboardUrl: openItem, buttonLabel: "Open" });
+    case "changed":
+      return noticePage({ status: 200, ...CHANGED, dashboardUrl: openItem, buttonLabel: "Open" });
+    case "expired":
+      return noticePage({ status: 200, ...EXPIRED, dashboardUrl: openItem, buttonLabel: "Open" });
+    case "sign_in":
+      return noticePage({ status: 200, heading: "Sign in to decide this", body: "This one needs you signed in. Nothing was done.", dashboardUrl: openItem, buttonLabel: "Sign in and open" });
+    case "not_owner":
+    case "forbidden":
+      return noticePage({ status: 403, heading: "This link isn't for this account", body: "Nothing was done.", dashboardUrl: open, buttonLabel: "Open" });
+    case "not_found":
+      return noticePage({ status: 400, ...INVALID.bad });
+    default:
+      return noticePage({ status: 200, heading: "Strelva couldn't finish this", body: "We're on it. Nothing else is needed from you right now.", dashboardUrl: openItem, buttonLabel: "Open" });
+  }
+}
+
 /** GET only shows the confirm step — it must never mutate (scanners auto-fetch it). */
 export async function GET(request: Request): Promise<NextResponse> {
   if (await isRateLimitedAsync(rateLimitKey(request, "approve"), 20)) {
@@ -130,8 +205,10 @@ export async function GET(request: Request): Promise<NextResponse> {
   const token = new URL(request.url).searchParams.get("token");
   if (!token) return noticePage({ status: 400, ...INVALID.missing });
 
-  const claims = verifyApproveToken(token);
-  if (!claims) return noticePage({ status: 400, ...INVALID.bad });
+  const verified = verifyAnyApproveToken(token);
+  if (!verified) return noticePage({ status: 400, ...INVALID.bad });
+  if (verified.kind === "workspace") return workspaceConfirm(token, verified.claims);
+  const claims = verified.claims;
 
   const tenant = await getTenantConfig(claims.tenantId).catch(() => null);
   const businessName = tenant?.siteName || "your site";
@@ -161,8 +238,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   const token = typeof rawToken === "string" ? rawToken : null;
   if (!token) return noticePage({ status: 400, ...INVALID.missing });
 
-  const claims: ApproveLinkClaims | null = verifyApproveToken(token);
-  if (!claims) return noticePage({ status: 400, ...INVALID.bad });
+  const verified = verifyAnyApproveToken(token);
+  if (!verified) return noticePage({ status: 400, ...INVALID.bad });
+  if (verified.kind === "workspace") return workspaceResolve(verified.claims);
+  const claims: ApproveLinkClaims = verified.claims;
 
   const tenant = await getTenantConfig(claims.tenantId).catch(() => null);
   const businessName = tenant?.siteName || "your site";

@@ -13,6 +13,10 @@ import type { ContentSection, UnifiedEvent } from "./types";
  *  Events with no tag default to visible, so nothing legacy silently disappears. */
 export function isClientVisibleEvent(e: UnifiedEvent): boolean {
   if (e.metadata?.reviewAudience === "operator") return false;
+  // A write the provider accepted but read-back could not confirm is Strelva's
+  // to reconcile, never the owner's decision (needs-you spec section 4). Older
+  // events carry no audience, so the type decides.
+  if (e.type === "change_verify_failed") return false;
   return e.type !== "suggestion" || suggestionAudience(e.title) === "owner";
 }
 

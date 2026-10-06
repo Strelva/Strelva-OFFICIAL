@@ -35,4 +35,10 @@ describe("client queue visibility — operator-approves-first routing", () => {
       isClientVisibleEvent(ev({ type: "suggestion", title: "Write your site description", metadata: {} })),
     ).toBe(false);
   });
+
+  it("never shows a pending verify-failed event to the owner, tagged or not (needs-you spec 4)", () => {
+    expect(isClientVisibleEvent(ev({ type: "change_verify_failed", metadata: {} }))).toBe(false);
+    expect(isClientVisibleEvent(ev({ type: "change_verify_failed", metadata: { reviewAudience: "owner" } }))).toBe(false);
+    expect(isClientVisibleEvent(ev({ type: "change_verify_failed", metadata: undefined }))).toBe(false);
+  });
 });

@@ -163,6 +163,8 @@ export interface WorkspaceSnapshot {
 
 export interface WorkspaceReleases {
   systems: boolean;
+  /** STRELVA_NEEDS_YOU_RELEASE: Home reads Needs you and Strelva handled from the policy model. */
+  needsYou?: boolean;
 }
 
 /**

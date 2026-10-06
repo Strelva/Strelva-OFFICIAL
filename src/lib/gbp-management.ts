@@ -216,7 +216,7 @@ async function emitFailure(
       title: `GBP ${operation} failed`,
       body: evidence,
       status: "pending",
-      metadata: { kind: `gbp_${operation}_failed`, evidence },
+      metadata: { kind: `gbp_${operation}_failed`, evidence, reviewAudience: "operator" },
     });
     sendSlackNotification({
       text: `GBP ${operation} FAILED for *${tenantId}* — ${evidence}`,

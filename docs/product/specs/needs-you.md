@@ -1,6 +1,37 @@
 # Needs you and Strelva handled
 
-Status: draft spec, 2026-10-06. Not built, not approved. For Jacob's review.
+Status: draft spec, 2026-10-06; working default per the product model. Built
+and proven **locally** on branch `build/needs-you` (2026-10-06), behind
+`STRELVA_NEEDS_YOU_RELEASE` (off). Nothing is in production and client email
+stays gated.
+
+- **Built:** the evaluator, change kinds, floors and defaults (TS and SQL,
+  with a parity test between them); `decision_policies`,
+  `decision_policy_history`, `owner_decisions` and
+  `owner_decision_deliveries` (migration `20261007120000_needs_you.sql`);
+  adapters for tenant events (through `resolveEventAction`) and service
+  request commitments (agree scope, accept result, through
+  `change_service_delivery_commitment`); workspace-keyed signed links at
+  `/api/approve`; the urgent and morning emails and day 3/7 reminders and
+  day 14 lapse as the hourly `/api/cron/needs-you`; Home's Needs you and
+  Strelva handled; a route for `undo_business_record_revision`; the parity
+  replay (`scripts/needs-you-parity.ts`); the `change_verify_failed` and
+  `sendUpdateLiveEmail` fixes.
+- **Not built:** adapters for the other lifecycles in section 6 (website
+  documents, provider delivery, standing responsibilities, offers, agency
+  grants, apps, work plans, money, exit); policy settings UI and one-tap
+  policy undo; the operator queue's "owner not told" view (the data is
+  recorded); the monthly report's handled list with signed undo links;
+  migrating `ContentAutonomy`/`ReplyVoice` values into `decision_policies`;
+  retiring the SMS check.
+- **Unproven:** the parity replay against a scrubbed copy of real tenants,
+  the never-signs-in journey with real email, and any production behavior.
+
+**Decided in code (section 6, step 2).** Tenant events open items on the
+route they take today (the event's review audience), not the evaluator's.
+The evaluator's route takes over at step 3, after the parity replay shows no
+blocking mismatch. Until then a 1-2 star review reply in auto mode still
+posts after its window.
 
 Today every change asks its own question. A Google post asks, a review reply
 asks, a site edit asks, a delivery asks, and each asks in its own store with
@@ -84,8 +115,15 @@ nothing that wasn't theirs did.
 4. **Origin counts.** A change the owner asked for, and whose content is
    exactly what they asked for, is handled and reported. "Change Friday hours
    to 9–3" is an example. If Strelva had to interpret the request, the result
-   routes like a change Strelva started. A change Strelva started never
-   inherits the owner's authority.
+   never inherits the owner's authority: it gets no shortcut, and it goes to
+   the owner who asked, as content previews and Google drafts asked for in
+   chat do today (section 6, "As today (parity)"). A change Strelva started
+   never inherits the owner's authority.
+
+   *Corrected while building:* the first draft said an interpreted request
+   "routes like a change Strelva started", which would move chat-requested
+   previews from the owner to the operator and contradicts the section 6
+   parity rows. The parity replay would block on it.
 5. **Owner-stated facts propagate.** When the owner states a fact (hours,
    price, phone, address, booking link) in the business record, every System
    and *acts* Connection that reads it updates under `handle`, with a receipt
@@ -183,7 +221,7 @@ the least strict route allowed. Only Jacob can change a floor, in code.
 | `google.post` / `google.photo` | Google Business post or photo | strelva_reviews | handle_after_notice |
 | `review.reply` | Reply to a 4–5 star review | handle_after_notice (12 h) | handle_after_notice |
 | `review.reply_critical` | Reply to a 1–2 star review | owner_decides | strelva_reviews |
-| `customer.message` | Inquiry reply, follow-up | inquiry policy (below) | strelva_reviews |
+| `customer.message` | Inquiry reply, follow-up | inquiry policy (below); owner_decides when none | strelva_reviews |
 | `customer.commitment` | Quote a price, promise a date, charge | owner_decides | owner_decides |
 | `customer.broadcast` | Newsletter send | owner_decides | owner_decides |
 | `system.go_live` | First launch, Draft→Live, domain change | owner_decides | owner_decides |

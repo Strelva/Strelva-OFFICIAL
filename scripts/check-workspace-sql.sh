@@ -513,6 +513,11 @@ if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
   STRELVA_VERSIONS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
     pnpm --dir "$repo_root" exec vitest run src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
 fi
+# Needs you and Strelva handled: decision policy, owner decisions and the
+# handled read model, on the same fictional cluster (needs the business record,
+# tenant links and Systems above).
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007120000_needs_you.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
 
 
 # Make real activations persisted as operations/activation saved work.

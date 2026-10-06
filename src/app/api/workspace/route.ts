@@ -32,6 +32,7 @@ import { presentWorkspaceWork } from "@/experience/workspace/result";
 import { readWorkspaceSystems } from "@/experience/systems/server";
 import { systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
 import { listProvidedClients } from "@/platform/workspaces/business-ownership";
+import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
 import type { ManagedWork, WorkspaceDelegation, WorkspaceProduct, WorkspaceSnapshot, WorkspaceWork } from "@/experience/workspace/contracts";
 
 export const dynamic = "force-dynamic";
@@ -301,7 +302,7 @@ export async function GET(request: Request) {
       ...(providedClients ? { providedClients } : {}),
       products,
       ...(systems ? { systems } : {}),
-      releases: { systems: systemsReleased },
+      releases: { systems: systemsReleased, needsYou: needsYouReleaseEnabled() },
     };
     return json(snapshot);
   } catch (error) { return failed(error); }

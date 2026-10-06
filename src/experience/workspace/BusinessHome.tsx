@@ -15,6 +15,8 @@ import { WorkspaceAllowanceSummary } from "./WorkspaceAllowanceSummary";
 import { WorkspaceComposer } from "./WorkspaceComposer";
 import { requestDraftKey } from "./request-draft";
 import { useBusinessDeliveries } from "./useBusinessDeliveries";
+import { NeedsYouSection, StrelvaHandledSection } from "./NeedsYouSection";
+import { useNeedsYou } from "./useNeedsYou";
 import { workspaceHome } from "./workspace-home";
 import { businessRequestRows, deliveryProviderName, type BusinessRequestRow } from "./WorkspaceRequests";
 import { workspaceWorkLabel } from "./work-label";
@@ -73,6 +75,11 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   const deliveries = useBusinessDeliveries(deliveryScope);
   const deliveryItems = deliveries.state.status === "ready" ? deliveries.state.items : [];
   const deliveryAttention = deliveryItems.filter(item => item.attention);
+  // STRELVA_NEEDS_YOU_RELEASE: Needs you and Strelva handled come from the
+  // policy model. Request decisions arrive there as items, so the delivery
+  // list no longer adds its own.
+  const needsYouReleased = snapshot.releases?.needsYou === true && current?.kind === "customer" && !readOnly;
+  const needsYou = useNeedsYou(needsYouReleased ? snapshot.workspaceId : undefined);
   const attentionCount = home.attention.length + deliveryAttention.length;
   const fileIds = systemsReleased && files ? new Set(files.map(item => item.id)) : null;
   const results = fileIds ? home.results.filter(work => fileIds.has(work.id)) : home.results;
@@ -150,14 +157,17 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
 
       {managedWorkUnavailable ? <p role="status" className={styles.notice}>Some websites could not be loaded. <a href={accountHref}>Check website access</a></p> : null}
 
-      <section className={styles.section} aria-labelledby="home-attention">
+      {needsYouReleased ? <NeedsYouSection state={needsYou.state} pending={needsYou.pending} notices={needsYou.notices} onDecide={needsYou.decide} onRetry={needsYou.refresh} appBase={appBase}
+        extraCount={home.attention.length}
+        extra={home.attention.length ? home.attention.map(({ work, reason }) => <li key={work.id}><button type="button" aria-label={`Open ${work.title}`} className={styles.row} onClick={() => onOpen(work.id)}><span><strong>{work.title}</strong><small>{reason}</small></span><ArrowRight size={16} aria-hidden="true" /></button></li>) : null} />
+      : <section className={styles.section} aria-labelledby="home-attention">
         <header className={styles.sectionHeader}><h2 id="home-attention"><Bell size={18} aria-hidden="true" />Needs you</h2>{!busy && !deliveryPending && attentionCount > 0 ? <span className={styles.count}>{attentionCount}</span> : null}</header>
         {busy || deliveryPending ? <p role="status" className={styles.muted}>Checking your work…</p> : attentionCount ? <ul className={styles.list}>
           {deliveryAttention.map(item => <li key={`delivery-${item.id}`}><a className={styles.row} href={item.href}><span><strong>{item.title}</strong><small>{item.detail}</small></span><ArrowRight size={16} aria-hidden="true" /></a></li>)}
           {home.attention.map(({ work, reason }) => <li key={work.id}><button type="button" aria-label={`Open ${work.title}`} className={styles.row} onClick={() => onOpen(work.id)}><span><strong>{work.title}</strong><small>{reason}</small></span><ArrowRight size={16} aria-hidden="true" /></button></li>)}
         </ul> : !deliveryUnavailable ? <p className={styles.muted}>Nothing needs a decision right now.</p> : null}
         {deliveryUnavailable ? <p role="status" className={styles.notice}>{systemsReleased ? "Requests waiting on your decision could not be checked." : "Delivery decisions could not be checked."} <button type="button" onClick={deliveries.refresh}>Check again</button></p> : null}
-      </section>
+      </section>}
 
       {business || systems.length ? <section className={styles.section} aria-labelledby="home-systems">
         <header className={styles.sectionHeader}><h2 id="home-systems"><LayoutGrid size={18} aria-hidden="true" />{SYSTEMS_LABEL}</h2>{systems.length ? <Button variant="ghost" size="sm" onClick={() => onNavigate("apps")}>{SYSTEMS_LIST_LABEL}<ArrowRight size={16} aria-hidden="true" /></Button> : null}</header>
@@ -179,11 +189,13 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
           </div>
       </section> : null}
 
-      {showRequests ? <><section className={styles.section} aria-labelledby="home-handled">
+      {needsYouReleased ? <StrelvaHandledSection state={needsYou.state} pending={needsYou.pending} notices={needsYou.receiptNotices} onUndo={needsYou.undo}
+        fallback={handled.length ? <ul className={styles.list}>{handled.map(row => requestRow(row))}</ul> : undefined} /> : null}
+      {showRequests ? <>{needsYouReleased ? null : <section className={styles.section} aria-labelledby="home-handled">
         <header className={styles.sectionHeader}><h2 id="home-handled"><CheckCircle2 size={18} aria-hidden="true" />Strelva handled</h2></header>
         {busy || deliveryPending ? <p role="status" className={styles.muted}>Checking what finished…</p> : handled.length ? <ul className={styles.list}>{handled.map(row => requestRow(row))}</ul> : <p className={styles.muted}>Nothing finished yet. When Strelva or your agency finishes something, it appears here with what changed.</p>}
         {current?.kind === "customer" && sites.length ? <a className={styles.textAction} href={`${appBase}/workspace/recaps?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Weekly and monthly recaps<ArrowRight size={16} aria-hidden="true" /></a> : null}
-      </section>
+      </section>}
 
       <section className={styles.section} aria-labelledby="home-progress">
         <header className={styles.sectionHeader}><h2 id="home-progress"><ListChecks size={18} aria-hidden="true" />In progress</h2><Button variant="ghost" size="sm" onClick={() => onNavigate("requests")}>All requests<ArrowRight size={16} aria-hidden="true" /></Button></header>
