@@ -454,6 +454,10 @@ psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 # against the real workspace, website, tenant-link and calendar tables.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261004120000_systems.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/systems-schema.sql"
+# Systems catalog: report cadence, last-sent markers and analytics config
+# moved from Redis into Postgres (tenant-scoped, service role only).
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007194000_tenant_report_and_analytics_state.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-report-analytics-state-schema.sql"
 
 # Systems catalog: history caps. Documents and onboarding keep every receipt
 # in append-only tables, so edit 201 (and change 501) no longer fail.
