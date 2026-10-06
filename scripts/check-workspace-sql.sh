@@ -459,6 +459,8 @@ psql "${psql_args[@]}" --file="$repo_root/tests/systems-schema.sql"
 # in append-only tables, so edit 201 (and change 501) no longer fail.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007190000_document_revisions.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/document-revisions-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007190100_onboarding_revisions.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/onboarding-revisions-schema.sql"
 
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
