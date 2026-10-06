@@ -6,7 +6,6 @@ import type { OfferingInstallationRecord } from "@/platform/offerings/types";
 import type { AgencyManagedWebsiteDraftGrant } from "@/platform/offerings/agency-website-draft-contracts";
 import {
   RELEASE_AXIS_FIELDS,
-  STRELVA_AUTHOR_BUSINESS_ID,
   agencyWebsiteDraftAsPossibility,
   assertShareableDefinition,
   offeringDefinitionAsSource,
@@ -17,6 +16,9 @@ import {
   semverFromRevision,
   threeWayCompare,
 } from "@/platform/system-versions";
+
+/** Strelva's agency workspace, as read from platform_workspaces (fictional id). */
+const STRELVA = { businessId: "9e000000-0000-4000-8000-000000000020" };
 
 describe("three-way compare", () => {
   const base = { a: { x: 1, y: 2 }, list: [1, 2], keep: "same" };
@@ -50,8 +52,8 @@ describe("three-way compare", () => {
 describe("existing objects as source Systems and Versions", () => {
   it("projects every offering definition as a shareable source revision", () => {
     for (const definition of listOfferingDefinitions()) {
-      const source = offeringDefinitionAsSource(definition);
-      expect(source.source.businessId).toBe(STRELVA_AUTHOR_BUSINESS_ID);
+      const source = offeringDefinitionAsSource(definition, STRELVA);
+      expect(source.source.businessId).toBe(STRELVA.businessId);
       expect(semverFromRevision(source.source.number)).toBe(definition.version);
       expect(() => assertShareableDefinition(source.definition)).not.toThrow();
       expect(source.requires.bindingKinds.length).toBeGreaterThan(0);
@@ -78,9 +80,9 @@ describe("existing objects as source Systems and Versions", () => {
       updatedBy: "u1",
       updatedAt: "2026-10-01T00:00:00.000Z",
     };
-    const version = offeringInstallationAsVersion(installation);
+    const version = offeringInstallationAsVersion(installation, STRELVA);
     expect(version.version).toEqual({ businessId: "biz_mooney", systemId: "offering-installation:inst_1" });
-    expect(version.source).toEqual(offeringDefinitionAsSource(definition).source);
+    expect(version.source).toEqual(offeringDefinitionAsSource(definition, STRELVA).source);
     expect(version.overridePaths).toEqual(["configuration.displayName"]);
     expect(version.bindings).toEqual([{ kind: "application", connectionId: "app_1", ownerBusinessId: "biz_mooney" }]);
     expect(version).toMatchObject({ currentRelease: 1, rowRevision: 4, lifecycle: "released" });

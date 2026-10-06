@@ -11,12 +11,15 @@ export interface VersionContext {
   label: string;
 }
 
-// reconcile with src/platform/workspaces: membership and roles come from the
-// business workspace membership check; this is the minimal shape the
-// lineage rules need.
+// On the server the actor comes from `read_version_actor` (direct workspace
+// memberships, src/platform/system-versions/supabase-store.ts). Postgres
+// rechecks every call, including agency scope, which this shape does not
+// carry: a partner agency with no membership is refused here first.
 export type VersionRole = "owner" | "admin" | "member";
 export interface VersionActor {
   userId: string;
+  /** Required by the Postgres store, which rechecks the actor in the database. */
+  verifiedEmail?: string;
   memberships: ReadonlyArray<{ businessId: string; role: VersionRole }>;
 }
 

@@ -500,8 +500,27 @@ psql "${psql_args[@]}" --file="$repo_root/tests/application-version-history-sche
 # business record, the cross-business link guard, and notice receipts.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007192100_internal_tool_links.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-links-schema.sql"
+# Versions and the agency surface, on the Systems spine: lineage tables,
+# the batched agency client read and Strelva's own agency workspace.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007150000_system_versions.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007150100_agency_client_overview.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007150200_platform_agency_workspace.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/system-versions-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-client-overview-schema.sql"
+if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
+  # The same Version store contract the in-memory store passes, run through
+  # createSupabaseVersionStore against this cluster (psql-backed RPC port).
+  STRELVA_VERSIONS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
+    pnpm --dir "$repo_root" exec vitest run src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
+fi
 
 
+# Make real activations persisted as operations/activation saved work.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007155000_make_real_activations.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/make-real-activations-schema.sql"
+# The real Make real runner, checkpointing through these RPCs (psql-backed port).
+STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
+  pnpm --dir "$repo_root" exec vitest run src/__tests__/make-real-activation-repository.test.ts
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 

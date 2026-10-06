@@ -11,8 +11,17 @@ import type { VersionContext } from "./types";
 import type { OfferingDefinitionView, OfferingInstallationRecord } from "@/platform/offerings/types";
 import type { AgencyManagedWebsiteDraftGrant } from "@/platform/offerings/agency-website-draft-contracts";
 
-/** Platform-authored definitions are owned by Strelva's own business record. */
-export const STRELVA_AUTHOR_BUSINESS_ID = "strelva";
+/**
+ * Platform-authored definitions are owned by Strelva's own agency workspace,
+ * a real workspace id read from `platform_workspaces` (role
+ * `strelva_agency`, set by an operator) through `resolveStrelvaAgencyWorkspaceId`
+ * in ./supabase-store.ts. There is no string stand-in: until an operator
+ * names the workspace, Strelva-authored sources do not project at all.
+ */
+export interface StrelvaAuthor {
+  /** Strelva's agency workspace id. */
+  businessId: string;
+}
 
 /**
  * Offering versions are semver strings; lineage revisions are integers.
@@ -36,10 +45,10 @@ export interface SourceRevisionProjection {
 }
 
 /** An offering definition is a Strelva-authored source System revision. */
-export function offeringDefinitionAsSource(definition: OfferingDefinitionView): SourceRevisionProjection {
+export function offeringDefinitionAsSource(definition: OfferingDefinitionView, author: StrelvaAuthor): SourceRevisionProjection {
   return {
     source: projectedRevisionRef(
-      { businessId: STRELVA_AUTHOR_BUSINESS_ID, systemId: `offering:${definition.id}` },
+      { businessId: author.businessId, systemId: `offering:${definition.id}` },
       revisionFromSemver(definition.version),
     ),
     label: definition.version,
@@ -78,11 +87,11 @@ export interface VersionProjection {
  * installing business. Configuration is the override set; native resources are
  * local bindings. Context is not recorded today, so it is null.
  */
-export function offeringInstallationAsVersion(installation: OfferingInstallationRecord): VersionProjection {
+export function offeringInstallationAsVersion(installation: OfferingInstallationRecord, author: StrelvaAuthor): VersionProjection {
   return {
     version: { businessId: installation.businessId, systemId: `offering-installation:${installation.id}` },
     source: projectedRevisionRef(
-      { businessId: STRELVA_AUTHOR_BUSINESS_ID, systemId: `offering:${installation.definitionId}` },
+      { businessId: author.businessId, systemId: `offering:${installation.definitionId}` },
       revisionFromSemver(installation.definitionVersion),
     ),
     context: null,

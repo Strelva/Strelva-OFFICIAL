@@ -8,6 +8,7 @@ import { createPreviewInquiryAdapter } from "@/experience/inquiries/preview-fixt
 import { createPreviewRequest, PREVIEW_SCENARIOS, type PreviewScenario } from "./fixture";
 import { MOONEY_INQUIRY_PROFILE, MOONEY_TENANT } from "./systems-fixture";
 import type { PreviewSystems } from "./systems-projection";
+import { agencyPreviewState, withAgencyPreview } from "./agency-fixture";
 import styles from "./preview.module.css";
 
 const previewJson = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -65,7 +66,8 @@ export function WorkspacePreview({ scenario, systems }: { scenario: PreviewScena
     observer.observe(controls);
     return () => observer.disconnect();
   }, []);
-  const request = useMemo(() => withSystems(createPreviewRequest(scenario, { installedStaffRequest, seededRequests }), systems), [installedStaffRequest, seededRequests, scenario, systems]);
+  const [agencyState] = useState(() => agencyPreviewState(searchParams.get("agency")));
+  const request = useMemo(() => withAgencyPreview(withSystems(createPreviewRequest(scenario, { installedStaffRequest, seededRequests }), systems), scenario, agencyState), [agencyState, installedStaffRequest, seededRequests, scenario, systems]);
   useEffect(() => {
     if (!installedStaffRequest) return;
     const url = new URL(window.location.href);

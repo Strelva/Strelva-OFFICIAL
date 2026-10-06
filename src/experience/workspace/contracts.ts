@@ -177,6 +177,27 @@ export interface WorkspaceSystems {
   systems: WorkspaceSystemEntry[];
   connections: WorkspaceSystemConnection[];
   possibilities: WorkspaceSystemPossibility[];
+  /**
+   * Stored Version lineage in the actor's scope (read_business_versions).
+   * Absent when it was not read; then no lineage is claimed. Hidden
+   * same-business sources are already left out of `systems`.
+   */
+  versions?: WorkspaceSystemVersion[];
+}
+
+export interface WorkspaceSystemVersion {
+  id: string;
+  /** The Version's own System in this business. */
+  systemId: string;
+  source: { businessId: string; systemId: string; name: string | null; hidden: boolean };
+  context: { kind: string; label: string };
+  baselineRevision: number;
+  latestRevision: number | null;
+  currentRelease: number | null;
+  /** Source revisions this business declined. */
+  declined: number[];
+  /** Other Versions of the same source in this business (another location). */
+  siblings: Array<{ id: string; systemId: string; context: { kind: string; label: string } }>;
 }
 
 export interface WorkspaceSystemEntry {

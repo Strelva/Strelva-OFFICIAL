@@ -66,8 +66,8 @@ export function applyOverrides(baseline: JsonObject, overrides: readonly Version
 export function createSystemVersions(deps: SystemVersionsDeps) {
   const { store, connections } = deps;
   const now = deps.now ?? (() => new Date().toISOString());
-  let counter = 0;
-  const id = deps.id ?? ((prefix: string) => `${prefix}_${(counter += 1).toString().padStart(4, "0")}`);
+  // UUIDs by default so the same ids are valid in the in-memory store and in Postgres.
+  const id = deps.id ?? ((_prefix: string) => globalThis.crypto.randomUUID());
 
   function roleIn(actor: VersionActor, businessId: string) {
     return actor.memberships.find((membership) => membership.businessId === businessId)?.role ?? null;
@@ -82,13 +82,13 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
     if (!roleIn(actor, businessId)) throw new VersionAccessError();
   }
 
-  function sourceVisibleTo(source: SystemRef, businessId: string): boolean {
+  async function sourceVisibleTo(actor: VersionActor, source: SystemRef, businessId: string): Promise<boolean> {
     if (source.businessId === businessId) return true;
-    return store.getSource(source)?.sharedWith.includes(businessId) ?? false;
+    return (await store.getSource(actor, source))?.sharedWith.includes(businessId) ?? false;
   }
 
-  function loadOwned(actor: VersionActor, versionId: string, manage: boolean): VersionLineage {
-    const lineage = store.getLineage(versionId);
+  async function loadOwned(actor: VersionActor, versionId: string, manage: boolean): Promise<VersionLineage> {
+    const lineage = await store.getLineage(actor, versionId);
     // Same error for missing and forbidden so IDs cannot be probed.
     if (!lineage) throw new VersionAccessError();
     if (manage) requireManage(actor, lineage.version.businessId);
@@ -96,10 +96,10 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
     return lineage;
   }
 
-  function save(lineage: VersionLineage, expectedRowRevision: number): VersionLineage {
+  async function save(actor: VersionActor, lineage: VersionLineage, expectedRowRevision: number): Promise<VersionLineage> {
     const next = { ...lineage, updatedAt: now() };
-    store.updateLineage(next, expectedRowRevision);
-    return store.getLineage(lineage.id)!;
+    const saved = await store.updateLineage(actor, next, expectedRowRevision);
+    return saved ?? (await store.getLineage(actor, lineage.id))!;
   }
 
   function working(lineage: VersionLineage): JsonObject {
@@ -147,23 +147,23 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
     };
   }
 
-  function loadImprovement(lineage: VersionLineage, revisionNumber: number): SourceRevision {
-    if (!sourceVisibleTo(lineage.source, lineage.version.businessId)) throw new VersionAccessError("The source of this Version is no longer shared with this business.");
-    const revision = store.getRevision(lineage.source, revisionNumber);
+  async function loadImprovement(actor: VersionActor, lineage: VersionLineage, revisionNumber: number): Promise<SourceRevision> {
+    if (!(await sourceVisibleTo(actor, lineage.source, lineage.version.businessId))) throw new VersionAccessError("The source of this Version is no longer shared with this business.");
+    const revision = await store.getRevision(actor, lineage.source, revisionNumber);
     if (!revision) throw new VersionValidationError("That source revision does not exist.");
     return revision;
   }
 
   return {
     /** Author side: publish an immutable shareable revision of a source System. */
-    publishSourceRevision(
+    async publishSourceRevision(
       actor: VersionActor,
       input: { source: SystemRef; definition: JsonObject; requires?: { bindingKinds: string[] }; summary: string; label?: string },
-    ): SourceRevision {
+    ): Promise<SourceRevision> {
       requireManage(actor, input.source.businessId);
       assertShareableDefinition(input.definition);
-      if (!store.getSource(input.source)) store.putSource({ source: input.source, sharedWith: [], createdAt: now() });
-      const previous = store.listRevisions(input.source).at(-1);
+      if (!(await store.getSource(actor, input.source))) await store.putSource(actor, { source: input.source, sharedWith: [], createdAt: now() });
+      const previous = (await store.listRevisions(actor, input.source)).at(-1);
       const revision: SourceRevision = {
         source: {
           businessId: input.source.businessId,
@@ -178,25 +178,25 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
         publishedBy: actor.userId,
         publishedAt: now(),
       };
-      store.insertRevision(revision);
-      return cloneJson(revision);
+      const stored = await store.insertRevision(actor, revision);
+      return cloneJson(stored ?? revision);
     },
 
     /** Author side: let another business base Versions on this source. */
-    shareSource(actor: VersionActor, source: SystemRef, businessId: string): void {
+    async shareSource(actor: VersionActor, source: SystemRef, businessId: string): Promise<void> {
       requireManage(actor, source.businessId);
-      const record = store.getSource(source);
+      const record = await store.getSource(actor, source);
       if (!record) throw new VersionValidationError("Publish a source revision before sharing it.");
       if (!record.sharedWith.includes(businessId)) record.sharedWith.push(businessId);
-      store.putSource(record);
+      await store.putSource(actor, record);
     },
 
-    unshareSource(actor: VersionActor, source: SystemRef, businessId: string): void {
+    async unshareSource(actor: VersionActor, source: SystemRef, businessId: string): Promise<void> {
       requireManage(actor, source.businessId);
-      const record = store.getSource(source);
+      const record = await store.getSource(actor, source);
       if (!record) return;
       record.sharedWith = record.sharedWith.filter((item) => item !== businessId);
-      store.putSource(record);
+      await store.putSource(actor, record);
     },
 
     /**
@@ -204,16 +204,16 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
      * Only the shareable definition is copied. Bindings, data, grants and
      * people start empty and are chosen locally.
      */
-    createVersion(actor: VersionActor, input: { source: SystemRevisionRef; version: SystemRef; context: VersionContext }): VersionLineage {
+    async createVersion(actor: VersionActor, input: { source: SystemRevisionRef; version: SystemRef; context: VersionContext }): Promise<VersionLineage> {
       requireManage(actor, input.version.businessId);
       if (sameSystem(input.source, input.version)) throw new VersionValidationError("A Version needs its own System identity.");
       if (!VERSION_CONTEXT_KINDS.includes(input.context.kind)) throw new VersionValidationError("Choose a supported Version context.");
-      if (!sourceVisibleTo(input.source, input.version.businessId)) throw new VersionAccessError("That source is not shared with this business.");
-      const revision = store.getRevision(input.source, input.source.number);
+      if (!(await sourceVisibleTo(actor, input.source, input.version.businessId))) throw new VersionAccessError("That source is not shared with this business.");
+      const revision = await store.getRevision(actor, input.source, input.source.number);
       if (!revision || revision.source.revisionId !== input.source.revisionId) {
         throw new VersionValidationError("That source revision does not exist.");
       }
-      if (store.findLineageByVersion(input.version)) throw new VersionValidationError("That System is already a Version of a source.");
+      if (await store.findLineageByVersion(actor, input.version)) throw new VersionValidationError("That System is already a Version of a source.");
       const at = now();
       const lineage: VersionLineage = {
         id: id("version"),
@@ -233,13 +233,13 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
         createdAt: at,
         updatedAt: at,
       };
-      store.insertLineage(lineage);
-      return cloneJson(lineage);
+      const stored = await store.insertLineage(actor, lineage);
+      return cloneJson(stored ?? lineage);
     },
 
     /** Set (or with `undefined`, clear) one business-owned override. */
-    setOverride(actor: VersionActor, versionId: string, input: { path: string; value: JsonValue | undefined; expectedRowRevision: number }): VersionLineage {
-      const lineage = loadOwned(actor, versionId, true);
+    async setOverride(actor: VersionActor, versionId: string, input: { path: string; value: JsonValue | undefined; expectedRowRevision: number }): Promise<VersionLineage> {
+      const lineage = await loadOwned(actor, versionId, true);
       if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
       const path = validPath(input.path);
       const at = now();
@@ -267,7 +267,7 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       } catch (error) {
         throw new VersionValidationError(error instanceof Error ? error.message : "The override is invalid.");
       }
-      return save(next, input.expectedRowRevision);
+      return save(actor, next, input.expectedRowRevision);
     },
 
     /**
@@ -275,15 +275,15 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
      * Version's own business: a source's or sibling's credentials are never
      * reused.
      */
-    bindAccount(actor: VersionActor, versionId: string, input: { kind: string; connectionId: string; expectedRowRevision: number }): VersionLineage {
-      const lineage = loadOwned(actor, versionId, true);
+    async bindAccount(actor: VersionActor, versionId: string, input: { kind: string; connectionId: string; expectedRowRevision: number }): Promise<VersionLineage> {
+      const lineage = await loadOwned(actor, versionId, true);
       if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
-      const owner = connections.ownerOf(input.connectionId);
+      const owner = await connections.ownerOf(actor, input.connectionId);
       if (owner !== lineage.version.businessId) {
         throw new VersionAccessError("Connect an account owned by this business. Accounts from another business are never reused.");
       }
-      const holder = store.findLineageByConnection(input.connectionId);
-      if (holder && holder.id !== lineage.id) {
+      const holder = await store.connectionHolder(actor, input.connectionId);
+      if (holder && holder !== lineage.id) {
         // Two locations of one business still get their own live accounts.
         throw new VersionValidationError("That account is already connected to another Version. Connect a separate account for this one.");
       }
@@ -295,22 +295,21 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
         boundAt: now(),
       };
       const bindings = [...lineage.bindings.filter((item) => item.kind !== binding.kind), binding];
-      return save({ ...lineage, bindings }, input.expectedRowRevision);
+      return save(actor, { ...lineage, bindings }, input.expectedRowRevision);
     },
 
-    putLocalData(actor: VersionActor, versionId: string, input: { key: string; value: JsonValue; expectedRowRevision: number }): VersionLineage {
-      const lineage = loadOwned(actor, versionId, false);
+    async putLocalData(actor: VersionActor, versionId: string, input: { key: string; value: JsonValue; expectedRowRevision: number }): Promise<VersionLineage> {
+      const lineage = await loadOwned(actor, versionId, false);
       if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
       const key = text(input.key, "data key", 120);
-      return save({ ...lineage, localData: { ...lineage.localData, [key]: cloneJson(input.value) } }, input.expectedRowRevision);
+      return save(actor, { ...lineage, localData: { ...lineage.localData, [key]: cloneJson(input.value) } }, input.expectedRowRevision);
     },
 
     /** Descendant side: every newer source revision, each compared against local state. */
-    listAvailableImprovements(actor: VersionActor, versionId: string): ImprovementComparison[] {
-      const lineage = loadOwned(actor, versionId, false);
-      if (!sourceVisibleTo(lineage.source, lineage.version.businessId)) return [];
-      return store
-        .listRevisions(lineage.source)
+    async listAvailableImprovements(actor: VersionActor, versionId: string): Promise<ImprovementComparison[]> {
+      const lineage = await loadOwned(actor, versionId, false);
+      if (!(await sourceVisibleTo(actor, lineage.source, lineage.version.businessId))) return [];
+      return (await store.listRevisions(actor, lineage.source))
         .filter((revision) => revision.source.number > lineage.baseline.revision)
         .map((revision) => {
           const { upstreamPaths: _paths, ...comparison } = compareWith(lineage, revision);
@@ -318,9 +317,9 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
         });
     },
 
-    compareImprovement(actor: VersionActor, versionId: string, revision: number): ImprovementComparison {
-      const lineage = loadOwned(actor, versionId, false);
-      const { upstreamPaths: _paths, ...comparison } = compareWith(lineage, loadImprovement(lineage, revision));
+    async compareImprovement(actor: VersionActor, versionId: string, revision: number): Promise<ImprovementComparison> {
+      const lineage = await loadOwned(actor, versionId, false);
+      const { upstreamPaths: _paths, ...comparison } = compareWith(lineage, await loadImprovement(actor, lineage, revision));
       return comparison;
     },
 
@@ -329,14 +328,14 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
      * upstream changes apply; every conflict needs an explicit choice; missing
      * local accounts block adoption outright. Adoption never releases.
      */
-    adoptImprovement(
+    async adoptImprovement(
       actor: VersionActor,
       versionId: string,
       input: { revision: number; expectedRowRevision: number; resolutions?: VersionConflictResolution[] },
-    ): VersionLineage {
-      const lineage = loadOwned(actor, versionId, true);
+    ): Promise<VersionLineage> {
+      const lineage = await loadOwned(actor, versionId, true);
       if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
-      const revision = loadImprovement(lineage, input.revision);
+      const revision = await loadImprovement(actor, lineage, input.revision);
       const comparison = compareWith(lineage, revision);
       if (comparison.status === "up_to_date") throw new VersionValidationError("This Version already includes that revision.");
       if (comparison.missingBindings.length > 0) throw new VersionIncompatibleError(comparison.missingBindings);
@@ -386,29 +385,29 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       if (!jsonEqual(working(next), expectedResult)) {
         throw new VersionValidationError("Adopting this revision would change local edits beyond the preview. Nothing was changed.");
       }
-      return save(next, input.expectedRowRevision);
+      return save(actor, next, input.expectedRowRevision);
     },
 
     /** Stay on the current baseline. Recorded so the choice is visible. */
-    declineImprovement(actor: VersionActor, versionId: string, input: { revision: number; reason: string; expectedRowRevision: number }): VersionLineage {
-      const lineage = loadOwned(actor, versionId, true);
+    async declineImprovement(actor: VersionActor, versionId: string, input: { revision: number; reason: string; expectedRowRevision: number }): Promise<VersionLineage> {
+      const lineage = await loadOwned(actor, versionId, true);
       if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
-      loadImprovement(lineage, input.revision);
-      return save({
+      await loadImprovement(actor, lineage, input.revision);
+      return save(actor, {
         ...lineage,
         decisions: [...lineage.decisions, { sourceRevision: input.revision, choice: "declined", reason: text(input.reason, "reason", 500), by: actor.userId, at: now() }],
       }, input.expectedRowRevision);
     },
 
     /** Release the working definition. Release numbers belong to this Version alone. */
-    release(actor: VersionActor, versionId: string, input: { expectedRowRevision: number }): VersionLineage {
-      const lineage = loadOwned(actor, versionId, true);
+    async release(actor: VersionActor, versionId: string, input: { expectedRowRevision: number }): Promise<VersionLineage> {
+      const lineage = await loadOwned(actor, versionId, true);
       if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
       const definition = working(lineage);
       const latest = lineage.releases.at(-1);
       if (latest && jsonEqual(latest.definition, definition)) throw new VersionValidationError("Nothing changed since the current release.");
       const number = (latest?.number ?? 0) + 1;
-      return save({
+      return save(actor, {
         ...lineage,
         releases: [...lineage.releases, {
           number,
@@ -422,22 +421,22 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       }, input.expectedRowRevision);
     },
 
-    grantAccess(actor: VersionActor, versionId: string, input: { granteeBusinessId: string; scope: VersionGrantScope; expectedRowRevision: number }): VersionLineage {
-      const lineage = loadOwned(actor, versionId, true);
+    async grantAccess(actor: VersionActor, versionId: string, input: { granteeBusinessId: string; scope: VersionGrantScope; expectedRowRevision: number }): Promise<VersionLineage> {
+      const lineage = await loadOwned(actor, versionId, true);
       if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
       if (input.scope !== "lineage" && input.scope !== "lineage_and_data") throw new VersionValidationError("Choose a supported grant scope.");
       const grants = lineage.grants.map((grant) =>
         grant.granteeBusinessId === input.granteeBusinessId && !grant.revokedAt ? { ...grant, revokedAt: now() } : grant);
       grants.push({ granteeBusinessId: input.granteeBusinessId, scope: input.scope, grantedBy: actor.userId, grantedAt: now() });
-      return save({ ...lineage, grants }, input.expectedRowRevision);
+      return save(actor, { ...lineage, grants }, input.expectedRowRevision);
     },
 
-    revokeAccess(actor: VersionActor, versionId: string, input: { granteeBusinessId: string; expectedRowRevision: number }): VersionLineage {
-      const lineage = loadOwned(actor, versionId, true);
+    async revokeAccess(actor: VersionActor, versionId: string, input: { granteeBusinessId: string; expectedRowRevision: number }): Promise<VersionLineage> {
+      const lineage = await loadOwned(actor, versionId, true);
       if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
       const grants = lineage.grants.map((grant) =>
         grant.granteeBusinessId === input.granteeBusinessId && !grant.revokedAt ? { ...grant, revokedAt: now() } : grant);
-      return save({ ...lineage, grants }, input.expectedRowRevision);
+      return save(actor, { ...lineage, grants }, input.expectedRowRevision);
     },
 
     /**
@@ -445,8 +444,8 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
      * Another business (including the source author) sees nothing without an
      * active grant, and never sees bindings even with one.
      */
-    readVersion(actor: VersionActor, versionId: string): VersionView {
-      const lineage = store.getLineage(versionId);
+    async readVersion(actor: VersionActor, versionId: string): Promise<VersionView> {
+      const lineage = await store.getLineage(actor, versionId);
       if (!lineage) throw new VersionAccessError();
       const base = {
         id: lineage.id,

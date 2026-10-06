@@ -88,12 +88,26 @@ added beside them; nothing is renamed:
 `RELEASE_AXIS_FIELDS` is the full list and is tested. `/api/v1` and
 `release-manifest.json` are untouched.
 
+## Storage
+
+- `store.ts` is the port (async; every call names the actor) and the
+  in-memory reference. `supabase-store.ts` is the Postgres adapter over
+  `supabase/migrations/20261007150000_system_versions.sql`. One contract suite
+  (`src/__tests__/system-versions-store-contract.test.ts`) runs on both; the
+  Postgres run happens inside `pnpm check:workspace-sql` on a throwaway
+  cluster. SQL rules are proven in `tests/system-versions-schema.sql`.
+- A Version release also records a `system_revisions` row on the Version's
+  System and moves its current pointer, so History and the spine agree.
+- `improvement.ts`: Library states, the improvement Possibility, and the
+  release gate (`createVersionReleaseGate`), which releases only with an
+  approval from its `VersionReleaseApprovals` port.
+- Strelva-authored sources live in Strelva's agency workspace, read from
+  `platform_workspaces` (`resolveStrelvaAgencyWorkspaceId`).
+
 ## Not built yet
 
-- Postgres storage. `store.ts` is the port plus the in-memory reference. The
-  migration can now build on the spine's systems tables
-  (`20261004120000_systems.sql`); slot `20261004122000` is reserved for it.
-- `SystemRef` and `SystemRevisionRef` are the spine's (`src/platform/systems`).
-  Source revisions are not yet stored as `SystemRevision` rows; real
-  membership and connection ownership still come through local ports.
+- The release port is not wired to Needs you or the workspace-keyed approve
+  link; nothing calls the gate in a live path.
+- Offering installations and inquiry pattern installations are still read
+  through `mapping.ts`, not stored as Version rows.
 - Collection/franchise Versions across several Systems.

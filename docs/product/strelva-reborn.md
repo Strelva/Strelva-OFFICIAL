@@ -104,8 +104,9 @@ production.
 - **Systems, Possibilities and Make real have their own flag.**
   `STRELVA_SYSTEMS_RELEASE` (PR #214, Oct 5) is off by default, so they no
   longer ride `STRELVA_WORKSPACE_RELEASE`, which production turned on Sept 30.
-  Make real still runs on fake effects with in-memory progress, and Versions
-  are in-memory only.
+  Make real still runs on fake effects. On branch `build/versions-agency`
+  (local only), Make real progress and Versions have Postgres stores
+  proven against a throwaway cluster; neither is applied anywhere.
 - **Lead copies are deleted with their tenant.** `tenant_leads` cascades on
   tenant delete. Whether a deprovisioned client's leads are kept is Jacob's
   call.
@@ -304,9 +305,11 @@ Neither is used by any journey today.
       tenants. *Partial · S*
 - [ ] One domain view per workspace across both domain stores. *Not started ·
       S*
-- [ ] The agency home loads every delegated client, not pages of 8. Needs a
-      batched server read; today each client is its own request.
-      *Not started · M*
+- [x] The agency home loads every delegated client, not pages of 8. One
+      batched read (`agency_client_overview`, `GET /api/workspace/agency-clients`),
+      server cursors, Clients/Queue/Library/Team views. *Built and proven
+      locally Oct 6 (branch `build/versions-agency`); not applied anywhere.
+      Strelva's converted clients list once `workspace_providers` lands.*
 
 ### 6. Owners enter the workspace
 

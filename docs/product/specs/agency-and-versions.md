@@ -1,12 +1,25 @@
 # The agency surface and Versions
 
-Status: draft spec, 2026-10-06. Not approved. For Jacob's review.
+Status: draft spec, 2026-10-06. Not approved. **Built and proven locally
+on branch `build/versions-agency` (Oct 6), applied nowhere:** the Versions
+tables and RPCs (`20261007150000`), `createSupabaseVersionStore` passing the
+same contract suite as the in-memory store against a throwaway cluster, the
+hidden same-business source, improvement compare/adopt/decline with
+keep-local/take-upstream, a release gate that needs the business's approval
+(Make real through Needs you is the port, not yet wired to Needs you),
+lineage read from `system_versions` instead of `sourceWorkId`, Strelva's
+agency workspace as a row (`platform_workspaces`) instead of `"strelva"`,
+`agency_client_overview` with `GET /api/workspace/agency-clients`, the
+Library and Review all (`/api/workspace/agency-library`), and the
+Clients/Queue/Library/Team views. Not built: Build, Package UI, Team
+management, the workspace-keyed approve link, owner email, health and
+bounced-email Queue items, bulk receipts. See section 10 for what the build
+found.
+
 Built and proven locally on `build/business-ownership` (Oct 6): decision 1A's
 `workspace_providers` mark (grants nothing), set by conversion once Strelva's
 agency workspace is designated, and the agency home listing operated clients
-the actor already belongs to (`providedClients`). Still per-client fetches
-under `MAX_AGENCY_CLIENT_LOADS`; the batched read, Versions migration and the
-rest are not built.
+the actor already belongs to (`providedClients`). The batched read on `build/versions-agency` reads the same mark.
 
 Base: branch `reborn-1.0-model` at `db9566a8`. Every path below was read on
 that branch. Nothing here was run against production.
@@ -277,6 +290,13 @@ days (number open), the Possibility stays unreleased and the Queue shows it.
    Timestamp: after the newest migration on the branch
    (`20261005120100_*`). The README's reserved slot `20261004122000` now
    sorts before three later files; using it risks out-of-order apply.
+   Built as `20261007150000_system_versions.sql`. Differences from this
+   list, found in the build: a `hidden` flag on `system_version_sources`
+   (the same-business source); bindings name connections as
+   `calendar:<id>` or `tenant:<stableId>`, the only refs the database can
+   prove ownership of; adoption cannot forge a baseline (the stored
+   definition is always the published revision's); history (releases,
+   decisions, grants) only grows and is checked on every save.
 2. **`createSupabaseVersionStore`** implementing the existing `VersionStore`
    port, passing the same contract tests as `createInMemoryVersionStore`.
    The port becomes async.
@@ -443,6 +463,26 @@ Inferences:
   offering configuration, because those have JSON definitions. Website
   improvements stay operator work until sites move to v2 documents.
 - Twin Trees is the only same-business Version case among current clients.
+
+Found while building (Oct 6, local):
+
+- **One calendar per provider per business.** `workspace_calendar_connections`
+  is unique on `(workspace_id, provider)`. Two locations in one business
+  (Twin Trees as one business) can each bind their own calendar only if one
+  is Google and the other Outlook. Separate calendars per location need that
+  constraint relaxed, or the two-workspace answer. This is a real limit on
+  decision 2, not a Versions limit.
+- **Strelva sees none of its converted clients until `workspace_providers`
+  exists.** The batched read takes candidates from delegations, accepted
+  agency assignments and `workspace_providers` (read only if the table is
+  present; the response says `providersRead`). Admin membership alone is not
+  treated as a client, so the provider stream's migration is what lists them.
+- **A same-business source is a real System row with `hidden`.** The Systems
+  view and the batched read leave it out; it still holds revisions.
+- **The agency (partner) path is enforced in Postgres, not TypeScript.** The
+  TypeScript `VersionActor` carries direct memberships only, so a partner
+  agency with an assignment is refused by the service before Postgres would
+  have allowed it. Partners are out of 1.0.0; widening this is a later change.
 
 Unknown, and how to find out:
 

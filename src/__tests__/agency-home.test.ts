@@ -3,19 +3,34 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { AgencyHome } from "@/experience/workspace/AgencyHome";
 import {
-  MAX_AGENCY_CLIENT_LOADS,
-  agencyAttentionQueue,
-  agencyClientTargets,
+  agencyQueueOrder,
+  loadAgencyClients,
+  type AgencyClientRow,
+  type AgencyClientsPage,
+  type AgencyLibrarySource,
+  type AgencyQueueItem,
+} from "@/experience/workspace/agency-clients";
+import {
   agencyCreditPeriods,
-  loadAgencyClientSnapshots,
+  clientSystemLabel,
+  combineAgencyPages,
+  lastReceiptLabel,
+  libraryStatusLine,
+  missingAccountsLabel,
+  needsYouLabel,
+  reviewAllLines,
+  reviewAllReady,
+  reviewLineLabel,
+  reviewableVersionIds,
 } from "@/experience/workspace/agency-home";
 import type { WorkspaceSnapshot, WorkspaceWork } from "@/experience/workspace/contracts";
 import type { WorkAllowanceInspection } from "@/platform/work-economics/allowances";
 
 const AGENCY = "11111111-1111-4111-8111-111111111111";
-const OTHER_AGENCY = "22222222-2222-4222-8222-222222222222";
 const CLIENT = "33333333-3333-4333-8333-333333333333";
-const OTHER_CLIENT = "44444444-4444-4444-8444-444444444444";
+const NOW = Date.parse("2026-10-06T12:00:00.000Z");
+const daysAgo = (days: number) => new Date(NOW - days * 86_400_000).toISOString();
+const uuid = (prefix: string, index: number) => `${prefix}-0000-4000-8000-${String(index).padStart(12, "0")}`;
 
 function work(id: string, workspaceId: string, extra: Partial<WorkspaceWork> = {}): WorkspaceWork {
   return { id, workspaceId, title: id, productId: "documents", resourceKind: "document", payload: null, input: {}, createdAt: "2026-09-15T12:00:00.000Z", ...extra };
@@ -27,193 +42,159 @@ function snapshot(extra: Partial<WorkspaceSnapshot> = {}): WorkspaceSnapshot {
     workspaceId: AGENCY,
     workspaces: [
       { id: AGENCY, kind: "agency", name: "North Studio", access: "member" },
-      { id: OTHER_AGENCY, kind: "agency", name: "Other Studio", access: "member" },
       { id: CLIENT, kind: "customer", name: "Harbor Dental", access: "delegated_read" },
-      { id: OTHER_CLIENT, kind: "customer", name: "Direct customer", role: "member", access: "member" },
     ],
-    work: [],
-    handoffs: [],
-    delegations: [
-      { id: "a", workId: "work-a", customerWorkspaceId: CLIENT, agencyWorkspaceId: AGENCY, status: "active", canRevoke: false },
-      { id: "b", workId: "work-b", customerWorkspaceId: OTHER_CLIENT, agencyWorkspaceId: OTHER_AGENCY, status: "active", canRevoke: false },
-    ],
-    products: [],
+    work: [], handoffs: [], delegations: [], products: [],
     ...extra,
   };
 }
 
-describe("agency home projection", () => {
-  it("derives clients only from active delegations for the selected agency", () => {
-    const value = agencyClientTargets(snapshot({ delegations: [
-      ...snapshot().delegations,
-      { id: "revoked", workId: "old", customerWorkspaceId: OTHER_CLIENT, agencyWorkspaceId: AGENCY, status: "revoked", canRevoke: false },
-      { id: "legacy", workId: "missing-scope", agencyWorkspaceId: AGENCY, status: "active", canRevoke: false },
-    ] }));
-    expect(value).toEqual({ targets: [{ id: CLIENT, name: "Harbor Dental", workIds: ["work-a"] }], totalCount: 1, omittedCount: 0 });
+function row(index: number, extra: Partial<AgencyClientRow> = {}): AgencyClientRow {
+  return {
+    workspaceId: uuid("c0000000", index), name: `Client ${index}`, reach: "member", role: "admin", provider: true, status: "ready",
+    systems: [{ id: uuid("51000000", index), name: `client${index}.example`, kind: "website", lifecycle: "live", versionContext: null }],
+    needsYou: { count: 0, oldestAt: null }, openRequests: 0, improvementsWaiting: 0, lastReceiptAt: null,
+    ...extra,
+  };
+}
+
+function page(clients: AgencyClientRow[], extra: Partial<AgencyClientsPage> = {}): AgencyClientsPage {
+  return { agencyWorkspaceId: AGENCY, clients, queue: [], team: [], total: clients.length, nextCursor: null, providersRead: true, ...extra };
+}
+
+function queueItem(id: string, since: string, extra: Partial<AgencyQueueItem> = {}): AgencyQueueItem {
+  return { id, kind: "request", workspaceId: CLIENT, clientName: "Harbor Dental", title: id, systemId: null, workId: null, since, ...extra };
+}
+
+function source(): AgencyLibrarySource {
+  const version = (id: string, clientName: string, state: AgencyLibrarySource["versions"][number]["state"], extra: Partial<AgencyLibrarySource["versions"][number]> = {}) => ({
+    versionId: id, workspaceId: uuid("c0000000", id.length), clientName, systemId: uuid("52000000", id.length), systemName: "Inquiry intake",
+    context: { kind: "agency_client" as const, label: clientName }, baselineRevision: 3, currentRelease: 1,
+    state, conflicts: [], missingBindings: [], declinedReason: null, ...extra,
+  });
+  return {
+    systemId: uuid("53000000", 1), workspaceId: AGENCY, name: "Inquiry intake", hidden: false,
+    revisions: [
+      { number: 3, label: null, summary: "Routing", publishedAt: daysAgo(30) },
+      { number: 4, label: "Follow-up", summary: "Follow up after one business day.", publishedAt: daysAgo(2) },
+    ],
+    versions: [
+      version("ready-1", "Lake Bakery", "ready"),
+      version("ready-2", "Harbor Dental", "ready"),
+      version("ready-3", "Cobblestone Books", "ready"),
+      version("ready-4", "Grant Street Auto", "ready"),
+      version("ready-5", "Hertel Hardware", "ready"),
+      version("conflict", "The Mooney Firm", "conflicts", { conflicts: [{ path: "followUp.message", local: "We'll call you within one business day", upstream: "Someone will reply by the end of the next business day." }] }),
+      version("missing", "Elmwood Physical Therapy", "missing_accounts", { missingBindings: ["google_calendar"] }),
+    ],
+  };
+}
+
+describe("agency batched read", () => {
+  it("asks for one page of every client in one request, and the next page by cursor", async () => {
+    const fifty = Array.from({ length: 50 }, (_, index) => row(index + 1));
+    const request = vi.fn<typeof fetch>(async () => Response.json(page(fifty)));
+    const first = await loadAgencyClients(request, AGENCY);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(String(request.mock.calls[0]![0])).toBe(`/api/workspace/agency-clients?workspaceId=${AGENCY}`);
+    expect(first.clients).toHaveLength(50);
+
+    await loadAgencyClients(request, AGENCY, { cursor: "100" });
+    expect(String(request.mock.calls[1]![0])).toContain("cursor=100");
   });
 
-  it("bounds full client loads and reports omitted coverage", () => {
-    const clientWorkspaces = Array.from({ length: MAX_AGENCY_CLIENT_LOADS + 2 }, (_, index) => ({
-      id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
-      kind: "customer" as const,
-      name: `Client ${index}`,
-      access: "delegated_read" as const,
-    }));
-    const value = agencyClientTargets(snapshot({
-      workspaces: [{ id: AGENCY, kind: "agency", name: "North Studio", access: "member" }, ...clientWorkspaces],
-      delegations: clientWorkspaces.map((client, index) => ({ id: `d-${index}`, workId: `w-${index}`, customerWorkspaceId: client.id, agencyWorkspaceId: AGENCY, status: "active" as const, canRevoke: false })),
-    }));
-    expect(value.targets).toHaveLength(MAX_AGENCY_CLIENT_LOADS);
-    expect(value.totalCount).toBe(MAX_AGENCY_CLIENT_LOADS + 2);
-    expect(value.omittedCount).toBe(2);
+  it("refuses a malformed response or rows for another agency instead of half-rendering them", async () => {
+    const malformed = vi.fn<typeof fetch>(async () => Response.json({ ...page([row(1)]), clients: [{ name: "No id" }] }));
+    await expect(loadAgencyClients(malformed, AGENCY)).rejects.toThrow("unexpected shape");
+    const otherAgency = vi.fn<typeof fetch>(async () => Response.json({ ...page([row(1)]), agencyWorkspaceId: CLIENT }));
+    await expect(loadAgencyClients(otherAgency, AGENCY)).rejects.toThrow("unexpected shape");
+    const failed = vi.fn<typeof fetch>(async () => Response.json({ error: "Clients could not be loaded." }, { status: 503 }));
+    await expect(loadAgencyClients(failed, AGENCY)).rejects.toThrow("Clients could not be loaded.");
   });
 
-  it("loads later client pages without repeating earlier clients or broadening shared work", async () => {
-    const customers = Array.from({ length: 10 }, (_, index) => ({
-      id: `client-${index}`, kind: "customer" as const, name: `Client ${index}`, access: "delegated_read" as const,
-    }));
-    const agency = snapshot({
-      workspaces: [{ id: AGENCY, kind: "agency", name: "North Studio", access: "member" }, ...customers],
-      delegations: customers.map((client, index) => ({ id: `d-${index}`, workId: `w-${index}`, customerWorkspaceId: client.id, agencyWorkspaceId: AGENCY, status: "active" as const, canRevoke: false })),
+  it("joins pages once per client, queue item and person", () => {
+    const one = page([row(1), row(2, { status: "unavailable", systems: [] })], {
+      total: 3, nextCursor: "2",
+      queue: [queueItem("a", daysAgo(1))],
+      team: [{ userId: uuid("70000000", 1), email: "ops@example.com", role: "admin", clients: [{ workspaceId: row(1).workspaceId, name: "Client 1" }] }],
     });
-    const requested: string[] = [];
-    const request = vi.fn<typeof fetch>(async (input) => {
-      const id = new URL(String(input), "https://strelva.test").searchParams.get("workspaceId")!;
-      requested.push(id);
-      return Response.json({ ...agency, workspaceId: id, work: [work(`w-${id.slice(7)}`, id), work("unshared", id)] });
+    const two = page([row(2), row(3)], {
+      total: 3,
+      queue: [queueItem("a", daysAgo(1)), queueItem("b", daysAgo(4))],
+      team: [{ userId: uuid("70000000", 1), email: "ops@example.com", role: "admin", clients: [{ workspaceId: row(3).workspaceId, name: "Client 3" }] }],
     });
-    const result = await loadAgencyClientSnapshots(request, agency, undefined, 8);
-    expect(requested).toEqual(["client-8", "client-9"]);
-    expect(result.clients.flatMap((client) => client.work.map((item) => item.id))).toEqual(["w-8", "w-9"]);
-    expect(result.totalCount).toBe(10);
-    expect(result.omittedCount).toBe(8);
+    const view = combineAgencyPages([{ cursor: null, page: one }, { cursor: "2", page: two }]);
+    expect(view.clients.map((client) => [client.name, client.status, client.pageIndex])).toEqual([["Client 1", "ready", 0], ["Client 2", "ready", 1], ["Client 3", "ready", 1]]);
+    expect(view.queue.map((item) => item.id)).toEqual(["a", "b"]);
+    expect(view.team).toHaveLength(1);
+    expect(view.team[0]!.clients.map((client) => client.name)).toEqual(["Client 1", "Client 3"]);
+    expect(view.nextCursor).toBeNull();
   });
 
-  it("rechecks each client through the existing workspace route and rejects mixed workspace data", async () => {
-    const requested: string[] = [];
-    const agency = snapshot({
-      workspaces: [
-        { id: AGENCY, kind: "agency", name: "North Studio", access: "member" },
-        { id: CLIENT, kind: "customer", name: "Harbor Dental", access: "delegated_read" },
-        { id: OTHER_CLIENT, kind: "customer", name: "Lake Bakery", access: "delegated_read" },
-      ],
-      delegations: [
-        { id: "a", workId: "work-a", customerWorkspaceId: CLIENT, agencyWorkspaceId: AGENCY, status: "active", canRevoke: false },
-        { id: "b", workId: "work-b", customerWorkspaceId: OTHER_CLIENT, agencyWorkspaceId: AGENCY, status: "active", canRevoke: false },
-      ],
-    });
-    const request = vi.fn<typeof fetch>(async (input) => {
-      const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, "https://strelva.test");
-      const id = url.searchParams.get("workspaceId")!;
-      requested.push(id);
+  it("orders the queue oldest first", () => {
+    const ordered = agencyQueueOrder([queueItem("new", daysAgo(0)), queueItem("oldest", daysAgo(9)), queueItem("middle", daysAgo(3))]);
+    expect(ordered.map((item) => item.id)).toEqual(["oldest", "middle", "new"]);
+  });
+
+  it("says each row in plain words", () => {
+    expect(clientSystemLabel({ id: uuid("51000000", 1), name: "attymooney.com", kind: "website", lifecycle: "live", versionContext: null })).toBe("attymooney.com · Live");
+    expect(clientSystemLabel({ id: uuid("51000000", 2), name: "Twin Trees website", kind: "website", lifecycle: "live", versionContext: "Camillus" })).toBe("Twin Trees website · Live · Camillus Version");
+    expect(needsYouLabel({ needsYou: { count: 2, oldestAt: daysAgo(6) } }, NOW)).toBe("2 waiting · oldest 6 days");
+    expect(needsYouLabel({ needsYou: { count: 0, oldestAt: null } }, NOW)).toBe("Nothing waiting");
+    expect(lastReceiptLabel(daysAgo(3), NOW)).toBe("Last receipt 3 days ago");
+    expect(lastReceiptLabel(null, NOW)).toBe("No receipts yet");
+  });
+});
+
+describe("agency library", () => {
+  it("counts each source's Versions in the spec's words", () => {
+    expect(libraryStatusLine(source())).toBe("5 ready · 1 has conflicts · 1 missing accounts");
+    expect(missingAccountsLabel(["google_calendar"])).toBe("Needs Google Calendar connected first");
+  });
+
+  it("Review all sends only the ready Versions for the latest revision and never forces the rest", async () => {
+    const value = source();
+    expect(reviewableVersionIds(value)).toEqual(["ready-1", "ready-2", "ready-3", "ready-4", "ready-5"]);
+    const request = vi.fn<typeof fetch>(async (_input, init) => {
+      const body = JSON.parse(String(init?.body)) as { versionIds: string[]; revision: number };
       return Response.json({
-        ...agency,
-        workspaceId: id,
-        workspaces: agency.workspaces,
-        work: [work(`work-${id}`, id === OTHER_CLIENT ? CLIENT : id)],
+        sourceSystemId: value.systemId, revision: body.revision,
+        results: body.versionIds.map((versionId) => {
+          const version = value.versions.find((item) => item.versionId === versionId)!;
+          return { versionId, workspaceId: version.workspaceId, clientName: version.clientName, outcome: versionId === "ready-4" ? "failed" : "prepared", detail: versionId === "ready-4" ? "Approval settings could not be read" : "" };
+        }),
       });
     });
-
-    const result = await loadAgencyClientSnapshots(request, agency);
-    expect(requested).toEqual([CLIENT, OTHER_CLIENT]);
-    expect(result.clients.map((client) => client.workspace.id)).toEqual([CLIENT]);
-    expect(result.failed).toEqual([{ id: OTHER_CLIENT, name: "Lake Bakery", workIds: ["work-b"] }]);
-  });
-
-  it("keeps a direct member's agency queue limited to work delegated to the selected agency", async () => {
-    const selectedWork = work("work-a", CLIENT, { operation: { status: "proposed" } });
-    const otherAgencyWork = work("work-from-other-agency", CLIENT, { operation: { status: "needs_attention" } });
-    const directBusinessWork = work("direct-business-work", CLIENT, { operation: { status: "needs_attention" } });
-    const agency = snapshot({
-      workspaces: [
-        { id: AGENCY, kind: "agency", name: "North Studio", access: "member" },
-        { id: CLIENT, kind: "customer", name: "Harbor Dental", access: "member", role: "member" },
-      ],
-      delegations: [{ id: "a", workId: selectedWork.id, customerWorkspaceId: CLIENT, agencyWorkspaceId: AGENCY, status: "active", canRevoke: false }],
+    const result = await reviewAllReady(request, AGENCY, value);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(request.mock.calls[0]![1]!.body))).toEqual({
+      action: "review_all", workspaceId: AGENCY, sourceSystemId: value.systemId, revision: 4,
+      versionIds: ["ready-1", "ready-2", "ready-3", "ready-4", "ready-5"],
     });
-    const request = vi.fn<typeof fetch>(async () => Response.json({
-      ...agency,
-      workspaceId: CLIENT,
-      work: [selectedWork, otherAgencyWork, directBusinessWork],
-    }));
 
-    const result = await loadAgencyClientSnapshots(request, agency);
-    expect(result.failed).toEqual([]);
-    expect(result.clients[0]?.work.map((item) => item.id)).toEqual([selectedWork.id]);
-    expect(agencyAttentionQueue(result.clients).map((item) => item.work.id)).toEqual([selectedWork.id]);
-  });
-
-  it("lists businesses the agency operates only where the actor is already a member", () => {
-    const CONVERTED = "55555555-5555-4555-8555-555555555555";
-    const NOT_MINE = "66666666-6666-4666-8666-666666666666";
-    const value = agencyClientTargets(snapshot({
-      workspaces: [
-        ...snapshot().workspaces,
-        { id: CONVERTED, kind: "customer", name: "Great Lakes Dried Fruit", role: "admin", access: "member" },
-      ],
-      providedClients: [
-        { customerWorkspaceId: CONVERTED, name: "Great Lakes Dried Fruit", startedAt: "2026-10-06T12:00:00.000Z" },
-        // A mark the snapshot gives no access to is never a client target.
-        { customerWorkspaceId: NOT_MINE, name: "Someone else", startedAt: "2026-10-06T12:00:00.000Z" },
-        // A mark on a delegated-read business does not widen it to the whole business.
-        { customerWorkspaceId: CLIENT, name: "Harbor Dental", startedAt: "2026-10-06T12:00:00.000Z" },
-      ],
-    }));
-    expect(value.targets).toEqual([
-      { id: CLIENT, name: "Harbor Dental", workIds: ["work-a"] },
-      { id: CONVERTED, name: "Great Lakes Dried Fruit", workIds: [], operated: true },
+    const lines = reviewAllLines(value, result);
+    expect(lines.map((line) => [line.clientName, line.outcome])).toEqual([
+      ["Lake Bakery", "prepared"], ["Harbor Dental", "prepared"], ["Cobblestone Books", "prepared"], ["Grant Street Auto", "failed"], ["Hertel Hardware", "prepared"],
+      ["The Mooney Firm", "skipped_conflicts"], ["Elmwood Physical Therapy", "skipped_missing_accounts"],
     ]);
+    expect(lines.map(reviewLineLabel)).toContain("Could not prepare: Approval settings could not be read.");
+    expect(lines.map(reviewLineLabel)).toContain("Skipped. Needs Google Calendar connected first.");
+    expect(lines.map(reviewLineLabel)).toContain("Skipped. Needs a choice on 1 change.");
   });
 
-  it("loads an operated client's whole business, not a delegated slice", async () => {
-    const CONVERTED = "55555555-5555-4555-8555-555555555555";
-    const agency = snapshot({
-      workspaces: [
-        { id: AGENCY, kind: "agency", name: "Strelva", access: "member", role: "owner" },
-        { id: CONVERTED, kind: "customer", name: "Great Lakes Dried Fruit", role: "admin", access: "member" },
-      ],
-      delegations: [],
-      providedClients: [{ customerWorkspaceId: CONVERTED, name: "Great Lakes Dried Fruit", startedAt: "2026-10-06T12:00:00.000Z" }],
-    });
-    const request = vi.fn<typeof fetch>(async () => Response.json({
-      ...agency, workspaceId: CONVERTED,
-      work: [work("site", CONVERTED, { operation: { status: "needs_attention" } }), work("form", CONVERTED)],
-    }));
-    const result = await loadAgencyClientSnapshots(request, agency);
-    expect(request).toHaveBeenCalledWith(`/api/workspace?workspaceId=${CONVERTED}`, expect.anything());
-    expect(result.clients[0]?.work.map((item) => item.id)).toEqual(["site", "form"]);
-    expect(result.totalCount).toBe(1);
+  it("sends nothing when no Version is ready", async () => {
+    const request = vi.fn<typeof fetch>();
+    const value = { ...source(), versions: source().versions.filter((version) => version.state !== "ready") };
+    await expect(reviewAllReady(request, AGENCY, value)).resolves.toBeNull();
+    expect(request).not.toHaveBeenCalled();
   });
+});
 
-  it("renders an operated client on the agency home", () => {
-    const CONVERTED = "55555555-5555-4555-8555-555555555555";
-    const html = renderToStaticMarkup(createElement(AgencyHome, {
-      snapshot: snapshot({
-        workspaces: [
-          { id: AGENCY, kind: "agency", name: "Strelva", access: "member", role: "owner" },
-          { id: CONVERTED, kind: "customer", name: "Great Lakes Dried Fruit", role: "admin", access: "member" },
-        ],
-        delegations: [],
-        providedClients: [{ customerWorkspaceId: CONVERTED, name: "Great Lakes Dried Fruit", startedAt: "2026-10-06T12:00:00.000Z" }],
-      }),
-      busy: false, onWorkspace: () => undefined, onOpenClientWork: () => undefined, onOpenWork: () => undefined, onStart: () => undefined,
-    }));
-    expect(html).toContain("Strelva");
-    expect(html).not.toContain("No clients");
-  });
-
-  it("orders only recorded client attention and keeps quiet work out of the queue", () => {
-    const queue = agencyAttentionQueue([
-      { workspace: { id: CLIENT, kind: "customer", name: "Harbor Dental", access: "delegated_read" }, work: [
-        work("quiet", CLIENT),
-        work("proposal", CLIENT, { createdAt: "2026-09-15T13:00:00.000Z", operation: { status: "proposed" } }),
-      ] },
-      { workspace: { id: OTHER_CLIENT, kind: "customer", name: "Lake Bakery", access: "delegated_read" }, work: [
-        work("exception", OTHER_CLIENT, { createdAt: "2026-09-15T14:00:00.000Z", operation: { status: "needs_attention" } }),
-      ] },
-    ]);
-    expect(queue.map((item) => item.work.id)).toEqual(["exception", "proposal"]);
-  });
+describe("agency home", () => {
+  const render = (extra: Partial<WorkspaceSnapshot>) => renderToStaticMarkup(createElement(AgencyHome, {
+    snapshot: snapshot(extra), busy: false,
+    onWorkspace: () => undefined, onOpenClientWork: () => undefined, onOpenWork: () => undefined, onStart: () => undefined,
+  }));
 
   it("shows only explicit credited units, not grants or a payout claim", () => {
     const inspection = {
@@ -233,39 +214,37 @@ describe("agency home projection", () => {
     expect(agencyCreditPeriods(inspection)).toMatchObject([{ units: [{ unitKind: "completed_application_change", creditedUnits: 3 }] }]);
   });
 
-  it("renders private agency work and explains unsupported offering ownership without invented revenue", () => {
-    const html = renderToStaticMarkup(createElement(AgencyHome, {
-      snapshot: snapshot({ work: [work("method", AGENCY, { title: "Intake method" })] }),
-      busy: false,
-      onWorkspace: () => undefined,
-      onOpenClientWork: () => undefined,
-      onOpenWork: () => undefined,
-      onStart: () => undefined,
-    }));
+  it("renders private agency work and keeps unsupported offering ownership plain, with no invented revenue", () => {
+    const html = render({ work: [work("method", AGENCY, { title: "Intake method" })] });
     expect(html).toContain("Private agency work");
     expect(html).toContain("Intake method");
-    expect(html).toContain("Checking shared client work");
-    // Pre-Systems words until STRELVA_SYSTEMS_RELEASE is on (covered below).
+    expect(html).toContain("Loading clients");
     expect(html).toContain("does not currently hold a private offering catalog");
+    expect(html).not.toContain("Previous clients");
     expect(html.toLowerCase()).not.toContain("earnings");
     expect(html.toLowerCase()).not.toContain("royalt");
   });
 
-  it("shows source Systems and client Versions only when STRELVA_SYSTEMS_RELEASE is on", () => {
-    const render = (extra: Partial<WorkspaceSnapshot>) => renderToStaticMarkup(createElement(AgencyHome, {
-      snapshot: snapshot(extra), busy: false,
-      onWorkspace: () => undefined, onOpenClientWork: () => undefined, onOpenWork: () => undefined, onStart: () => undefined,
-    }));
+  it("shows Clients, Queue, Library and Team only when STRELVA_SYSTEMS_RELEASE is on", () => {
     for (const off of [render({}), render({ releases: { systems: false } })]) {
-      expect(off).not.toContain("each client’s version");
-      expect(off).not.toContain("Checking client versions");
+      expect(off).not.toContain('role="tablist"');
+      expect(off).not.toMatch(/>Library<|>Team</);
       expect(off).not.toMatch(/possibilit|make[s]? it real/i);
       expect(off).toContain("Assigned website drafts");
       expect(off).toContain("publishing stays with the customer");
     }
     const on = render({ releases: { systems: true } });
-    expect(on).toContain("Systems you keep, and each client’s version");
+    expect(on).toContain('role="tablist"');
+    for (const label of ["Clients", "Queue", "Library", "Team"]) expect(on).toContain(`>${label}</button>`);
     expect(on).toContain("Website possibilities for clients");
-    expect(on).toContain("does not hold a private catalog yet");
+    expect(on).not.toMatch(/\b(AI|agent|automation|workflow)\b/);
+  });
+
+  it("gives a delegated reader of the agency no agency tools", () => {
+    const html = render({ releases: { systems: true }, workspaces: [{ id: AGENCY, kind: "agency", name: "North Studio", access: "delegated_read" }] });
+    expect(html).toContain("agency tools are for members of North Studio");
+    expect(html).not.toContain('role="tablist"');
+    expect(html).not.toContain("Service requests");
+    expect(html).not.toContain("Loading clients");
   });
 });
