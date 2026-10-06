@@ -202,12 +202,11 @@ create function public.system_version_history_immutable() returns trigger
 language plpgsql set search_path = public, pg_temp as $$
 begin
   if tg_op = 'DELETE' then
-    if tg_table_name = 'system_version_source_revisions'
-        and not exists (select 1 from public.system_version_sources where system_id = old.source_system_id) then
-      return old;
-    end if;
-    if tg_table_name <> 'system_version_source_revisions'
-        and not exists (select 1 from public.system_versions where id = old.version_id) then
+    if tg_table_name = 'system_version_source_revisions' then
+      if not exists (select 1 from public.system_version_sources where system_id = (to_jsonb(old)->>'source_system_id')::uuid) then
+        return old;
+      end if;
+    elsif not exists (select 1 from public.system_versions where id = (to_jsonb(old)->>'version_id')::uuid) then
       return old;
     end if;
   end if;

@@ -266,9 +266,9 @@ function contract(name: string, make: () => Harness) {
       expect(lakeside.bindings).toHaveLength(1);
       // Same business, two Versions of one hidden source: each keeps its own calendar.
       const camillusSystem = await h.system(f.mooney, "Camillus site");
-      let camillus = await f.versions.createVersion(f.mooneyOwner, { source: f.v1.source, version: camillusSystem, context: { kind: "location", label: "Camillus" } });
+      const camillus = await f.versions.createVersion(f.mooneyOwner, { source: f.v1.source, version: camillusSystem, context: { kind: "location", label: "Camillus" } });
       const google = await h.connection(f.mooney, "google");
-      camillus = await f.versions.bindAccount(f.mooneyOwner, camillus.id, { kind: "booking_calendar", connectionId: google, expectedRowRevision: camillus.rowRevision });
+      await f.versions.bindAccount(f.mooneyOwner, camillus.id, { kind: "booking_calendar", connectionId: google, expectedRowRevision: camillus.rowRevision });
       await expect(f.versions.bindAccount(f.mooneyOwner, mooney.id, { kind: "booking_calendar", connectionId: google, expectedRowRevision: mooney.rowRevision })).rejects.toBeInstanceOf(VersionValidationError);
       const outlook = await h.connection(f.mooney, "outlook");
       mooney = await f.versions.bindAccount(f.mooneyOwner, mooney.id, { kind: "booking_calendar", connectionId: outlook, expectedRowRevision: mooney.rowRevision });
