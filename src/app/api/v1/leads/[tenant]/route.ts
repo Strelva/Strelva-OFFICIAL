@@ -16,6 +16,7 @@ import { isTenantId } from "@/lib/scaffold-contracts";
 import { captureLead, recordLead } from "@/lib/leads";
 import { scoreLeadSpam } from "@/lib/lead-spam";
 import { recordSpam } from "@/lib/spam-pit";
+import { readLeadAttribution } from "@/lib/lead-attribution";
 import {
   getInquiryRepository,
   inquiryReleaseEnabled,
@@ -255,7 +256,10 @@ export async function POST(
     }
 
     if (!name) return corsJson({ error: "name is required" }, 400);
-    await recordLead(tenant, { name, email, message, source });
+    // Optional attribution (additive): where on the site the inquiry came
+    // from, for the outcome loop. Absent for every client form sent today.
+    const attribution = readLeadAttribution(body);
+    await recordLead(tenant, { name, email, message, source, ...(attribution ? { fields: attribution } : {}) });
     return corsJson({ ok: true }, 200);
   } catch (err) {
     console.error("[v1 leads POST]", tenant, err);
