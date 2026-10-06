@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
-import { systemsReleaseEnabled } from "@/platform/systems-release";
+import { systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
+import { releaseFlagEnvMode } from "@/platform/release-flags/resolve";
 import { listWork, listWorkspaces } from "@/platform/workspaces";
 import { readWorkspaceExit } from "@/platform/workspace-exit";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
@@ -29,7 +30,7 @@ const input = z.object({
  */
 export async function POST(request: Request) {
   if (!workspaceReleaseEnabled()) return workspaceJson({ error: "The workspace release is not enabled." }, 503);
-  if (!systemsReleaseEnabled()) return workspaceJson({ error: "Make real is not enabled. Nothing changed." }, 503);
+  if (releaseFlagEnvMode("systems") === "off") return workspaceJson({ error: "Make real is not enabled. Nothing changed." }, 503);
   const guarded = workspaceWriteGuard(request);
   if (guarded) return guarded;
   try {
@@ -39,6 +40,7 @@ export async function POST(request: Request) {
     if (await isRateLimitedWindowedAsync(`workspace:make-real:${actor.userId}`, 10, 60_000)) return workspaceJson({ error: "Please wait before trying again." }, 429);
     const workspace = (await listWorkspaces(actor)).find((item) => item.id === body.workspaceId);
     if (!workspace || workspace.kind !== "customer") return workspaceJson({ error: "This business is unavailable to your account." }, 403);
+    if (!(await systemsReleaseEnabledForWorkspace(workspace.id, { operator: false, tester: false, userId: actor.userId }))) return workspaceJson({ error: "Make real is not enabled. Nothing changed." }, 503);
     if (workspace.access !== "member" || workspace.role !== "owner") {
       return workspaceJson({ error: "Only an owner of this business can make a possibility real.", permission: "not_owner" }, 403);
     }

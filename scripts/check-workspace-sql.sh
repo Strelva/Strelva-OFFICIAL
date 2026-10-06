@@ -454,6 +454,10 @@ psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 # against the real workspace, website, tenant-link and calendar tables.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261004120000_systems.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/systems-schema.sql"
+# Owner entry: per-workspace release flags layered over the env flags, and
+# the tenant-to-workspace entry resolution, with cross-workspace denial.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007130000_workspace_release_flags.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \

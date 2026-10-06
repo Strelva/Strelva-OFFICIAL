@@ -30,7 +30,7 @@ import { inquiryReleaseEnabled } from "@/products/inquiries";
 import { parseTrackerWorkPayload, presentTrackerHandoffPreview } from "@/products/tracker";
 import { presentWorkspaceWork } from "@/experience/workspace/result";
 import { readWorkspaceSystems } from "@/experience/systems/server";
-import { systemsReleaseEnabled } from "@/platform/systems-release";
+import { systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
 import type { ManagedWork, WorkspaceDelegation, WorkspaceProduct, WorkspaceSnapshot, WorkspaceWork } from "@/experience/workspace/contracts";
 
 export const dynamic = "force-dynamic";
@@ -256,8 +256,9 @@ export async function GET(request: Request) {
       ? (await Promise.all(work.map((item) => listWorkDelegations(current, item.id)))).flat() : [];
     // Systems are business-level: the spine projection, its health and any
     // Possibility a saved rebuild offers. A failed read is reported as such.
-    // Off (STRELVA_SYSTEMS_RELEASE), no projection is built and the browser renders the pre-Systems workspace.
-    const systemsReleased = systemsReleaseEnabled();
+    // Off (STRELVA_SYSTEMS_RELEASE, per workspace when the env says `workspace`),
+    // no projection is built and the browser renders the pre-Systems workspace.
+    const systemsReleased = await systemsReleaseEnabledForWorkspace(selected.id, { operator: await isSuperAdminUser(current.userId), tester: false, userId: current.userId });
     const systems = systemsReleased && selected.kind === "customer" ? await readWorkspaceSystems({
       actor: current, businessId: selected.id, savedWork: work,
       siteDomains: new Map(managedPresence.managedWork.flatMap((site) => site.domain ? [[site.id, site.domain] as const] : [])),
