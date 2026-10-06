@@ -30,7 +30,7 @@ function bookingDb(operation: string): NonNullable<ReturnType<typeof getSupabase
 }
 
 /** Map a Postgres bookings row to the store's camelCase Booking shape. */
-function mapPgBookingRow(row: Row<"bookings">): Booking {
+export function mapPgBookingRow(row: Row<"bookings">): Booking {
   return {
     id: row.id,
     serviceId: row.service_id,
