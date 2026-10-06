@@ -69,11 +69,11 @@ select pg_temp.ao_expect($$select public.agency_client_overview('8e000000-0000-4
 select pg_temp.ao_expect($$select public.agency_client_overview('8e000000-0000-4000-8000-000000000010','8e000000-0000-4000-8000-000000000002','ao-owner@example.test',null,50)$$, 'business_record_access_denied');
 select pg_temp.ao_expect($$select public.agency_client_overview('8e000000-0000-4000-8000-000000000020','8e000000-0000-4000-8000-000000000001','ao-agency@example.test',null,0)$$, 'system_input_invalid');
 
--- Without workspace_providers, clients come from delegations and assignments only.
+-- With no provider marks (the table may or may not exist yet: the business-ownership
+-- migration adds it), clients come from delegations and assignments only.
 do $$ declare o jsonb; harbor jsonb; per_client jsonb; begin
-  perform pg_temp.ao_assert(to_regclass('public.workspace_providers') is null, 'fixture assumes no provider table yet');
   o := public.agency_client_overview('8e000000-0000-4000-8000-000000000020', '8e000000-0000-4000-8000-000000000001', 'ao-agency@example.test', null, 50);
-  perform pg_temp.ao_assert((o->>'providersRead')::boolean = false, 'says the provider table was not read');
+  perform pg_temp.ao_assert((o->>'providersRead')::boolean = (to_regclass('public.workspace_providers') is not null), 'says whether the provider table was read');
   perform pg_temp.ao_assert((select array_agg(c->>'name' order by c->>'name') from jsonb_array_elements(o->'clients') c) = array['Harbor Dental','Twin Trees'],
     'delegated clients only; an admin membership alone is not a client');
   -- The batched row equals what opening the client returns.
@@ -107,13 +107,15 @@ select pg_temp.ao_assert(jsonb_array_length(public.agency_client_overview('8e000
 
 -- When workspace_providers exists (another 1.0.0 stream adds it), the mark lists
 -- Mooney, read under the operator's admin membership: the whole business.
-create table public.workspace_providers (
+-- Stand-in only when the real table (20261007110000) is absent; same columns used.
+create table if not exists public.workspace_providers (
   customer_workspace_id uuid not null references public.workspaces(id),
   provider_workspace_id uuid not null references public.workspaces(id),
-  status text not null, started_at timestamptz not null default now(), ended_at timestamptz);
-insert into public.workspace_providers(customer_workspace_id, provider_workspace_id, status) values
-  ('8e000000-0000-4000-8000-000000000012', '8e000000-0000-4000-8000-000000000020', 'active'),
-  ('8e000000-0000-4000-8000-000000000011', '8e000000-0000-4000-8000-000000000020', 'ended');
+  status text not null, source text, started_by uuid, started_at timestamptz not null default now(),
+  ended_by uuid, ended_at timestamptz);
+insert into public.workspace_providers(customer_workspace_id, provider_workspace_id, status, source, started_by, ended_by, ended_at) values
+  ('8e000000-0000-4000-8000-000000000012', '8e000000-0000-4000-8000-000000000020', 'active', 'operator', '8e000000-0000-4000-8000-000000000002', null, null),
+  ('8e000000-0000-4000-8000-000000000011', '8e000000-0000-4000-8000-000000000020', 'ended', 'operator', '8e000000-0000-4000-8000-000000000002', '8e000000-0000-4000-8000-000000000002', now());
 do $$ declare o jsonb; mooney jsonb; begin
   o := public.agency_client_overview('8e000000-0000-4000-8000-000000000020', '8e000000-0000-4000-8000-000000000001', 'ao-agency@example.test', null, 50);
   perform pg_temp.ao_assert((o->>'providersRead')::boolean, 'provider table read when present');
@@ -129,8 +131,8 @@ end $$;
 -- A provider-marked client the actor cannot open is left out, not shown.
 insert into public.workspaces(id, kind, name, created_by) values
   ('8e000000-0000-4000-8000-000000000013', 'customer', 'No Access Bakery', '8e000000-0000-4000-8000-000000000002');
-insert into public.workspace_providers(customer_workspace_id, provider_workspace_id, status) values
-  ('8e000000-0000-4000-8000-000000000013', '8e000000-0000-4000-8000-000000000020', 'active');
+insert into public.workspace_providers(customer_workspace_id, provider_workspace_id, status, source, started_by) values
+  ('8e000000-0000-4000-8000-000000000013', '8e000000-0000-4000-8000-000000000020', 'active', 'operator', '8e000000-0000-4000-8000-000000000002');
 select pg_temp.ao_assert(not exists (select 1 from jsonb_array_elements(public.agency_client_overview('8e000000-0000-4000-8000-000000000020',
   '8e000000-0000-4000-8000-000000000001', 'ao-agency@example.test', null, 50)->'clients') c where c->>'name' = 'No Access Bakery'),
   'a provider mark without access is never a row');
