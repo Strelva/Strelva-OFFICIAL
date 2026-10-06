@@ -9,7 +9,7 @@
  * held by any booking is refused before its receipt or calendar write, and
  * open times subtract every booking in the store.
  */
-import { alertOnce } from "@/lib/monitoring";
+import { alertOnce } from "@/platform/infra/monitoring";
 import { getRedis } from "@/platform/infra/redis";
 import type { PublicBookingSlot, PublicBookingStatus, PublicBookingStoreHook } from "@/products/scheduling/public-booking";
 import { blocksTime } from "./availability";

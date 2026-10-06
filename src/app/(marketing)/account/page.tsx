@@ -11,7 +11,7 @@ import type { TenantConfig } from "@/lib/types";
 import Link from "next/link";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { inquiryReleaseEnabled } from "@/products/inquiries/server";
-import { workspaceReturnTarget } from "@/lib/workspace-location";
+import { workspaceReturnTarget } from "@/platform/workspaces/location";
 
 export const dynamic = "force-dynamic";
 

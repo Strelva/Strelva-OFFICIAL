@@ -3,7 +3,7 @@ import type { ModelMessage } from "ai";
 import { z } from "zod";
 import { streamModelText, type ModelTextStream } from "@/platform/infra/model-calls";
 import { logger } from "@/platform/infra/logger";
-import { trackError } from "@/lib/monitoring";
+import { trackError } from "@/platform/infra/monitoring";
 import { isSuperAdmin, requireTenantPermission, getAuthUserId } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateManifestForTenant } from "@/lib/template-manifests";

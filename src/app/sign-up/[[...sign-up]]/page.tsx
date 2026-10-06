@@ -10,7 +10,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { getTenantSiteName } from "@/lib/tenant-display";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { tenantSignInNext } from "@/platform/owner-entry/env";
-import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/lib/workspace-location";
+import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/platform/workspaces/location";
 
 export const metadata: Metadata = {
   title: "Create your Strelva account",

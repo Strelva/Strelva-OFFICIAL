@@ -7,6 +7,7 @@
  * The app cannot read the local Postgres cluster directly: it reaches Postgres
  * only through the Supabase REST client, and no local PostgREST exists here.
  */
+import "../../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { rowToTenant } from "../../src/lib/tenants";

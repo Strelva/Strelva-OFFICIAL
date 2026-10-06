@@ -16,6 +16,7 @@
  * list. It refuses unless SUPABASE_URL is a loopback host or
  * --i-have-jacobs-yes is passed. Reruns are no-ops for leads already copied.
  */
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import { getSupabase } from "../src/platform/infra/db/client";
 import { getAllTenants } from "../src/lib/tenants";
 import { getRedisLeads as getLeads, leadSubmissionHash } from "../src/lib/leads";

@@ -1,6 +1,6 @@
 import { request as httpRequest, type IncomingMessage } from "node:http";
 import { request as httpsRequest } from "node:https";
-import { pinnedRequestOptions } from "@/lib/pinned-lookup";
+import { pinnedRequestOptions } from "@/platform/infra/pinned-lookup";
 import { validateUrlSafety } from "@/lib/audit/checks";
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);

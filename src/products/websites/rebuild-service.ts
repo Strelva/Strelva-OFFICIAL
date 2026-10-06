@@ -20,7 +20,7 @@ import { connectWebsiteCapabilitiesInputSchema } from "./contracts";
 import { listPublishedWebsiteCapabilityOptions, resolvePublishedWebsiteCapabilities } from "./published-capabilities";
 import { auditRebuildHtml } from "./rebuild-audit";
 import { renderSiteDocumentHtml } from "./site-export";
-import { ROOT_DOMAIN } from "@/lib/brand";
+import { ROOT_DOMAIN } from "@/platform/infra/brand";
 import { normalizeCustomDomain } from "@/lib/domains";
 
 interface Loaded { work: SavedWork; rebuild: WebsiteRebuild }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireCronRequest } from "@/lib/cron-auth";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { inquiryReleaseEnabledForTenant, inquiryReleaseMayBeOn } from "@/products/inquiries/server";
 import { runDueInquiryFollowUps } from "@/products/inquiries";
 

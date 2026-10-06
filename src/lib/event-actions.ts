@@ -22,12 +22,9 @@ import {
 } from "./governed-work/shadow";
 import type { ContentMap, ContentSection } from "./types";
 import type { CustomChangeRequestStatus } from "./types";
-import {
-  authorizeInquiryMessageReviewActor,
-  executeInquiryMessageReview,
-  isInquiryMessageReviewEvent,
-  reconcileInquiryMessageReview,
-} from "@/products/inquiries";
+// Inquiries and the Google listing System through the ports src/lib
+// declares (Strelva Reborn section 7).
+import { workspacePorts } from "./workspace-ports";
 
 /** The actor the review auto-post cron approves with: the listing receipt's
  * authority is then the auto-reply policy, never an owner approval. */
@@ -125,8 +122,9 @@ export async function resolveEventAction(
   // receipt and resolve the existing event without calling the provider again.
   // This also covers a process that died while the event was still marked
   // processing: the durable delivery marker is the only safe source of truth.
+  const inquiries = await workspacePorts().inquiries();
   if (
-    isInquiryMessageReviewEvent(event) &&
+    inquiries.isInquiryMessageReviewEvent(event) &&
     (event.metadata?.execution?.state === "external_accepted" || event.metadata?.execution?.state === "processing")
   ) {
     // Reconciliation may close an accepted provider write without sending
@@ -134,11 +132,11 @@ export async function resolveEventAction(
     // be the live responsibility sponsor before we allow that transition.
     // Never infer authorization from the event's requestedBy metadata or from
     // the actor that started the abandoned attempt.
-    const authorized = await authorizeInquiryMessageReviewActor({ tenantId, event, actorId });
+    const authorized = await inquiries.authorizeInquiryMessageReviewActor({ tenantId, event, actorId });
     if (!authorized.allowed) {
       return { changed: false, reason: authorized.reason || "permission_denied" };
     }
-    const recovery = await reconcileInquiryMessageReview({ tenantId, event, actorId });
+    const recovery = await inquiries.reconcileInquiryMessageReview({ tenantId, event, actorId });
     if (!recovery.safeToResolve) {
       return { changed: false, reason: recovery.reason || "responsibility_receipt_reconciliation_required" };
     }
@@ -264,15 +262,16 @@ async function executeResolvedEventAction(
   attemptId: string,
 ): Promise<{ changed: boolean; reason?: string }> {
 
-  if (isInquiryMessageReviewEvent(event)) {
-    const authorized = await authorizeInquiryMessageReviewActor({ tenantId, event, actorId });
+  const inquiries = await workspacePorts().inquiries();
+  if (inquiries.isInquiryMessageReviewEvent(event)) {
+    const authorized = await inquiries.authorizeInquiryMessageReviewActor({ tenantId, event, actorId });
     if (!authorized.allowed) return { changed: false, reason: authorized.reason || "permission_denied" };
     if (action === "dismissed") {
       const resolved = await resolveEvent(eventId, "dismissed", { actor: actorId });
       return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
     }
 
-    const execution = await executeInquiryMessageReview({ tenantId, eventId, event, actorId });
+    const execution = await inquiries.executeInquiryMessageReview({ tenantId, eventId, event, actorId });
     // Once the provider has accepted a message, close the duplicate barrier
     // before any receipt or event-resolution work. A receipt persistence blip
     // therefore leaves a recoverable, blocking event instead of enabling a
@@ -312,8 +311,7 @@ async function executeResolvedEventAction(
         ? event.metadata.publicationClaimId.trim()
         : "";
       if (!claimId) return { changed: false, reason: "inquiry_publication_claim_missing" };
-      const { executeInquiryPublication } = await import("@/products/inquiries/server");
-      const publication = await executeInquiryPublication({ tenantId, eventId, claimId });
+      const publication = await inquiries.executeInquiryPublication({ tenantId, eventId, claimId });
       if (!publication.accepted) {
         return { changed: false, reason: publication.reason || "inquiry_publication_failed" };
       }
@@ -483,7 +481,7 @@ async function executeResolvedEventAction(
       // business, with the publishing release on, posts through the Google
       // listing System and records in google_listing_receipts only. Anyone
       // else keeps the legacy publisher and its outside-write receipt.
-      const { defaultTenantReplyDeps, postTenantReviewReply, routeTenantReviewReply } = await import("@/products/google-listing/tenant-replies");
+      const { defaultTenantReplyDeps, postTenantReviewReply, routeTenantReviewReply } = await workspacePorts().tenantReviewReplies();
       const deps = await defaultTenantReplyDeps();
       const route = await routeTenantReviewReply(tenantId, deps);
       let acceptedUnverified = false;

@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/cron-auth", () => ({ requireCronRequest: mocks.auth }));
-vi.mock("@/lib/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
+vi.mock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: vi.fn(async () => false) }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mocks.workspaceReleased }));
 vi.mock("@/platform/workspaces", () => ({ listWorkspaces: mocks.workspaces }));
@@ -58,7 +58,7 @@ describe("needs-you cron", () => {
   it("is declared in vercel.json and registered for the heartbeat watchdog", async () => {
     const vercel = JSON.parse(readFileSync(join(process.cwd(), "vercel.json"), "utf8")) as { crons: { path: string; schedule: string }[] };
     expect(vercel.crons).toContainEqual({ path: "/api/cron/needs-you", schedule: "0 * * * *" });
-    const { CRON_MAX_AGE_SECONDS } = await vi.importActual<typeof import("@/lib/heartbeat")>("@/lib/heartbeat");
+    const { CRON_MAX_AGE_SECONDS } = await vi.importActual<typeof import("@/platform/infra/heartbeat")>("@/platform/infra/heartbeat");
     expect(CRON_MAX_AGE_SECONDS["needs-you"]).toBeGreaterThan(3600);
   });
 

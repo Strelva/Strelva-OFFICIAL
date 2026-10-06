@@ -51,7 +51,7 @@ vi.mock("@/platform/infra/production-guard", () => ({
 }));
 
 const mockAlert = vi.fn();
-vi.mock("@/lib/monitoring", () => ({
+vi.mock("@/platform/infra/monitoring", () => ({
   alert: (...args: unknown[]) => mockAlert(...args),
 }));
 

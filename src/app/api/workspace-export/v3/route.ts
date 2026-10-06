@@ -4,7 +4,7 @@ import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { exportWorkspace } from "@/platform/workspace-exports/repository";
 import { startWorkspaceExportV3, WorkspaceExportV3Error, type V3Rpc } from "@/platform/workspace-exports/v3";
 import { deliverWorkspaceExportLink } from "@/platform/workspace-exports/v3-delivery";
-import { alert } from "@/lib/monitoring";
+import { alert } from "@/platform/infra/monitoring";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 
 export const dynamic = "force-dynamic";

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { HeartbeatStatus } from "@/lib/heartbeat";
+import type { HeartbeatStatus } from "@/platform/infra/heartbeat";
 import {
   deriveBusinessHealth,
   deriveSystemHealth,

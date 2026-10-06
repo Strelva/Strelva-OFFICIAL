@@ -9,7 +9,7 @@ import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type
 import { siteDocumentHash, siteDocumentSchema, unresolvedSiteFacts, type SiteDocument } from "./site-document";
 import { websiteLaunchReceiptSchema, type WebsiteLaunchReceipt } from "./contracts";
 import { bindToCurrentTenant } from "./hosted-routing";
-import { ROOT_DOMAIN } from "@/lib/brand";
+import { ROOT_DOMAIN } from "@/platform/infra/brand";
 
 export interface WebsiteDocumentRevision {
   workspaceId: string; workId: string; revision: number; contentHash: string;

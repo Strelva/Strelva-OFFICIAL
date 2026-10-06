@@ -5,7 +5,7 @@ const redis = makeRedisMock();
 let redisAvailable = true;
 const alertOnce = vi.hoisted(() => vi.fn());
 vi.mock("@/platform/infra/redis", () => ({ getRedis: () => (redisAvailable ? redis : null) }));
-vi.mock("@/lib/monitoring", () => ({ alertOnce }));
+vi.mock("@/platform/infra/monitoring", () => ({ alertOnce }));
 
 import {
   LEAD_MIRROR_LAST_FAILURE_KEY,

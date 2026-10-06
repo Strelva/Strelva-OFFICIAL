@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { mapPool } from "@/lib/concurrency";
 import { recordMailSend } from "@/lib/storage/mail-log";
-import { alertOnce } from "@/lib/monitoring";
+import { alertOnce } from "@/platform/infra/monitoring";
 import { generateAllReports, buildReportSubject, buildReportHeading } from "@/lib/reports";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { generateWeeklyBrief } from "@/lib/weekly-brief";
-import { EMAIL_DOMAIN } from "@/lib/brand";
+import { EMAIL_DOMAIN } from "@/platform/infra/brand";
 import { sanitizeEmailSubjectText } from "@/lib/invite-email";
 import { emailSendingPaused } from "@/platform/infra/email/enabled";
 import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";

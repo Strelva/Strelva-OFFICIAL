@@ -20,7 +20,14 @@
  * Design: vault 1-projects/scaffold-web/org-layer-architecture.md.
  */
 import { getRedis } from "@/platform/infra/redis";
-import { mirrorClientRecord, mirrorClientRecordRemoval } from "@/platform/client-records/mirror";
+import { workspacePorts, type ClientRecordsPort } from "./workspace-ports";
+
+// The workspace client-records mirror, through the port src/lib declares
+// (Strelva Reborn section 7). Never throws, as before.
+const mirrorClientRecord: ClientRecordsPort["mirrorClientRecord"] = async (...args) =>
+  (await workspacePorts().clientRecords()).mirrorClientRecord(...args);
+const mirrorClientRecordRemoval: ClientRecordsPort["mirrorClientRecordRemoval"] = async (...args) =>
+  (await workspacePorts().clientRecords()).mirrorClientRecordRemoval(...args);
 
 export type AccountStatus = "active" | "paused" | "churned";
 

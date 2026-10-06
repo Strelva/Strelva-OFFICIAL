@@ -12,14 +12,9 @@
  */
 
 import { getRedis } from "@/platform/infra/redis";
-import {
-  planReplyMode,
-  readTenantPolicyRoute,
-  replyModeFromRoute,
-  writeTenantPolicySetting,
-  type BridgeOptions,
-  type TenantPolicyLayer,
-} from "@/platform/needs-you/tenant-settings";
+// The policy bridge (src/platform/needs-you/tenant-settings.ts) through the
+// port src/lib declares (Strelva Reborn section 7).
+import { workspacePorts, type TenantPolicyLayer, type TenantPolicyOptions as BridgeOptions } from "../workspace-ports";
 
 export type ReplyMode = "off" | "approve" | "auto";
 
@@ -64,8 +59,9 @@ function key(tenantId: string): string {
 export async function getReplyVoice(tenantId: string, options: BridgeOptions = {}): Promise<ReplyVoice> {
   const voice = await readRedisVoice(tenantId);
   if (voice.mode === "off") return voice;
-  const route = await readTenantPolicyRoute(tenantId, "review.reply", options);
-  return route ? { ...voice, mode: replyModeFromRoute(route) } : voice;
+  const policy = await workspacePorts().tenantPolicy();
+  const route = await policy.readTenantPolicyRoute(tenantId, "review.reply", options);
+  return route ? { ...voice, mode: policy.replyModeFromRoute(route) } : voice;
 }
 
 async function readRedisVoice(tenantId: string): Promise<ReplyVoice> {
@@ -113,12 +109,13 @@ export async function saveReplyVoice(
     input.mode === "off" || input.mode === "auto" || input.mode === "approve" ? input.mode : "approve";
   let inForce: ReplyMode = requested;
   if (writer && requested !== "off") {
-    const result = await writeTenantPolicySetting({
+    const policy = await workspacePorts().tenantPolicy();
+    const result = await policy.writeTenantPolicySetting({
       tenantId, actor: writer.actor, layer: writer.layer, kind: "review.reply",
       todayValue: (await readRedisVoice(tenantId)).mode, via: writer.layer === "owner" ? "owner_save" : "operator_save",
-      plan: () => planReplyMode(requested, writer.layer),
+      plan: () => policy.planReplyMode(requested, writer.layer),
     }, options);
-    if (result.stored === "decision_policies") inForce = replyModeFromRoute(result.route);
+    if (result.stored === "decision_policies") inForce = policy.replyModeFromRoute(result.route);
   }
   const saved = await saveRedisVoice(tenantId, { ...input, mode: requested });
   return { ...saved, mode: inForce };

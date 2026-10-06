@@ -13,7 +13,7 @@ const mocks = vi.hoisted(() => ({ tenant: vi.fn(), sendNewLeadEmail: vi.fn(), al
 vi.mock("@/platform/infra/redis", () => ({ getRedis: () => (redisAvailable ? redis : null) }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.tenant, getAllTenants: async () => [{ id: "t1" }, { id: "t2" }] }));
 vi.mock("@/lib/delivery-email", () => ({ sendNewLeadEmail: mocks.sendNewLeadEmail }));
-vi.mock("@/lib/monitoring", () => ({ alertOnce: mocks.alertOnce }));
+vi.mock("@/platform/infra/monitoring", () => ({ alertOnce: mocks.alertOnce }));
 vi.mock("@/lib/owner-recipient", () => ({ ownerNoticeEmail: async (t: { ownerEmail?: string }) => t.ownerEmail ?? null }));
 
 import { captureLead, getLeadById, getLeads, getLeadSummary, leadSubmissionHash, type LeadRecord } from "@/lib/leads";

@@ -10,11 +10,11 @@
  */
 
 import { NextResponse } from "next/server";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { mapPool } from "@/lib/concurrency";
 import { getAllTenants } from "@/lib/tenants";
 import { getConnection, saveConnection, updateLastSynced } from "@/lib/connections";
-import { alert } from "@/lib/monitoring";
+import { alert } from "@/platform/infra/monitoring";
 import { addEvent } from "@/lib/events";
 import { getRedis } from "@/platform/infra/redis";
 import type { Connection } from "@/lib/types";

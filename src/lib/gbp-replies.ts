@@ -14,7 +14,13 @@
 import { addEvent } from "./events";
 import { sendSlackNotification } from "./slack";
 import { getGoogleGrant, getGoogleLocation, getValidGoogleAccessToken } from "./google-access";
-import { recordOutsideWrite, reviewReplyWrite } from "@/platform/operator-queue/receipts";
+// Outside-write receipts (src/platform/operator-queue) through the port
+// src/lib declares (Strelva Reborn section 7).
+import { workspacePorts, type OutsideWriteReceiptsPort } from "./workspace-ports";
+
+async function recordReviewReplyReceipt(input: Parameters<OutsideWriteReceiptsPort["recordReviewReply"]>[0]): Promise<void> {
+  await (await workspacePorts().outsideWriteReceipts()).recordReviewReply(input);
+}
 
 // The GBP write scope. New connections via /api/oauth/google already request
 // business.manage; this constant is used for detection only.
@@ -163,14 +169,14 @@ export async function publishReviewReply(
     const evidence = `tenant=${tenantId} reviewId=${reviewId} error=publish_network_error msg=${err instanceof Error ? err.message : String(err)}`;
     await _emitFailure(tenantId, reviewId, evidence, checkedAt);
     // The request may have reached Google: acceptance is unknown, not rejected.
-    await recordOutsideWrite(reviewReplyWrite({ tenantId, reviewId, replyText, actor, outcome: { kind: "unknown", detail: "No response from Google (network error)." } }));
+    await recordReviewReplyReceipt({ tenantId, reviewId, replyText, actor, outcome: { kind: "unknown", detail: "No response from Google (network error)." } });
     return { published: false, verified: false, evidence };
   }
 
   if (!publishResult.ok) {
     const evidence = `tenant=${tenantId} reviewId=${reviewId} error=publish_api_error status=${publishResult.status} body=${publishResult.body.slice(0, 200)}`;
     await _emitFailure(tenantId, reviewId, evidence, checkedAt);
-    await recordOutsideWrite(reviewReplyWrite({ tenantId, reviewId, replyText, actor, outcome: { kind: "rejected", detail: `Google answered ${publishResult.status}.` } }));
+    await recordReviewReplyReceipt({ tenantId, reviewId, replyText, actor, outcome: { kind: "rejected", detail: `Google answered ${publishResult.status}.` } });
     return { published: false, verified: false, evidence };
   }
 
@@ -217,7 +223,7 @@ export async function publishReviewReply(
     await _emitFailure(tenantId, reviewId, evidence, checkedAt);
   }
 
-  await recordOutsideWrite(reviewReplyWrite({ tenantId, reviewId, replyText, actor, outcome: { kind: "accepted", verified, readbackError } }));
+  await recordReviewReplyReceipt({ tenantId, reviewId, replyText, actor, outcome: { kind: "accepted", verified, readbackError } });
 
   return { published: true, verified, evidence };
 }

@@ -10,7 +10,7 @@ import { websiteDocumentStore } from "./document-store";
 import { readWebsiteRebuild } from "./rebuild-service";
 import { sendEmailWithReceipt } from "@/platform/infra/email/send";
 import { getTenantConfig } from "@/lib/tenants";
-import { OPERATOR_URL, ROOT_DOMAIN } from "@/lib/brand";
+import { OPERATOR_URL, ROOT_DOMAIN } from "@/platform/infra/brand";
 import { bindToCurrentTenant } from "./hosted-routing";
 export const websiteReportInputSchema=z.object({month:z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/)}).strict();
 export interface WebsiteMonthlyReport {

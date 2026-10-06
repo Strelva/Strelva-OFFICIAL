@@ -9,7 +9,7 @@
  * acknowledges, and a failed write is reported for the operator, because a
  * missed webhook shows as health, not as a lost booking.
  */
-import { alertOnce } from "@/lib/monitoring";
+import { alertOnce } from "@/platform/infra/monitoring";
 import { timeZoneOf } from "./availability";
 import { bookingStoreWriteEnabled } from "./flags";
 import { readBookingContext, recordBooking } from "./store";

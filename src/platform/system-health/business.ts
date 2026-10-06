@@ -1,4 +1,4 @@
-import type { HeartbeatStatus } from "@/lib/heartbeat";
+import type { HeartbeatStatus } from "@/platform/infra/heartbeat";
 import type { TenantDomainHealth } from "@/lib/domain-monitor";
 import type { ScanSummary } from "@/lib/scan-store";
 import type { Connection } from "@/lib/types";

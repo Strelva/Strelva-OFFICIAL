@@ -8,7 +8,7 @@ vi.mock("@/lib/tenants", () => ({ getActiveTenants: deps.tenants, getAllTenants:
 vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
 vi.mock("@/platform/infra/email/send", () => ({ sendEmailWithReceipt: deps.send }));
 vi.mock("@/lib/delivery-email", () => ({ resolveLeadNotifyRecipients: () => ["operator@example.com"] }));
-vi.mock("@/lib/heartbeat", () => ({ recordHeartbeat: deps.heartbeat }));
+vi.mock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: deps.heartbeat }));
 import { GET } from "@/app/api/cron/website-domain-verification/route";
 
 const now = Date.now();

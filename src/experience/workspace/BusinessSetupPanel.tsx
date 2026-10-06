@@ -6,11 +6,11 @@ import { z } from "zod";
 import { Button } from "@/components/ui/Button";
 import { TextInput, TextArea, SelectInput } from "@/components/ui/TextInput";
 import { businessEntryInputSchema, businessEntryResultSchema, type BusinessEntryInput } from "@/platform/workspaces/business-entry-contract";
-import { businessStartHref, businessStartRequest, businessStartView, type BusinessStartProduct } from "@/lib/business-start";
+import { businessStartHref, businessStartRequest, businessStartView, type BusinessStartProduct } from "@/platform/workspaces/business-start";
 import { useWorkspaceRequest } from "./WorkspaceRequest";
 
 const choicesSchema = z.object({ actorId: z.string().uuid(), businesses: z.array(z.object({ id: z.string().uuid(), name: z.string() })) });
-export type { BusinessStartProduct } from "@/lib/business-start";
+export type { BusinessStartProduct } from "@/platform/workspaces/business-start";
 function message(body: unknown, fallback: string): string {
   return body && typeof body === "object" && typeof (body as { error?: unknown }).error === "string" ? String((body as { error: string }).error) : fallback;
 }

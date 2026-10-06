@@ -1,4 +1,4 @@
-import { verifyPossibilityPreviewToken } from "@/lib/possibility-preview-link";
+import { verifyPossibilityPreviewToken } from "@/platform/possibilities/preview-link";
 import type { PossibilityTryState } from "./PossibilityTry";
 
 /**

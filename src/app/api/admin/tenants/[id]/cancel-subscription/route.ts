@@ -3,7 +3,7 @@ import Stripe from "stripe";
 import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { logAuditEvent } from "@/lib/storage";
-import { trackError } from "@/lib/monitoring";
+import { trackError } from "@/platform/infra/monitoring";
 
 /**
  * Soft-cancels a tenant's Stripe subscription by setting cancel_at_period_end=true.

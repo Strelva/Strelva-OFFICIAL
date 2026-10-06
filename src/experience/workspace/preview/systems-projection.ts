@@ -15,8 +15,8 @@
 import { uuidFromSeed } from "@/platform/business-record/tenant-import";
 import { systemsFromExisting, type ExistingSystemsSnapshot } from "@/platform/systems/from-existing";
 import { domainObservations, heartbeatObservations, scanObservation, type Observation } from "@/platform/system-health";
-import type { HeartbeatStatus } from "@/lib/heartbeat";
-import { CRON_MAX_AGE_SECONDS } from "@/lib/heartbeat";
+import type { HeartbeatStatus } from "@/platform/infra/heartbeat";
+import { CRON_MAX_AGE_SECONDS } from "@/platform/infra/heartbeat";
 import { bareHostname, type WebsiteRebuildCandidate } from "@/products/websites/index";
 import { inquiryFormUnchecked, makeRealInSandbox, projectWorkspaceSystems, type SystemsProjectionInput } from "@/experience/systems/server";
 import type { WorkspaceMakeRealResult, WorkspaceSnapshot, WorkspaceSystems } from "../contracts";

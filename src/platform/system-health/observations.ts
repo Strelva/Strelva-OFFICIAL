@@ -1,4 +1,4 @@
-import { CRON_MAX_AGE_SECONDS, type HeartbeatStatus, type KnownCron } from "@/lib/heartbeat";
+import { CRON_MAX_AGE_SECONDS, type HeartbeatStatus, type KnownCron } from "@/platform/infra/heartbeat";
 import type { TenantDomainHealth } from "@/lib/domain-monitor";
 import type { ScanSummary } from "@/lib/scan-store";
 import type { Connection } from "@/lib/types";

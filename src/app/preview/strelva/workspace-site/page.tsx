@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { strelvaUiPreviewEnabled } from "@/experience/workspace/preview/enabled";
 import { WorkspaceSitePreview } from "@/experience/websites/WorkspaceSitePreview";
-import { isSiteTab } from "@/lib/workspace-site-places";
+import { isSiteTab } from "@/platform/workspaces/site-places";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Strelva · Website preview", robots: { index: false, follow: false } };

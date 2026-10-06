@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/cron-auth", () => ({ requireCronRequest: mocks.auth }));
-vi.mock("@/lib/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
+vi.mock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
 vi.mock("@/products/inquiries/server", () => ({ inquiryReleaseEnabled: mocks.release, inquiryReleaseMayBeOn: (...args: unknown[]) => mocks.release(...args), inquiryReleasedForCurrentUser: async (...args: unknown[]) => mocks.release(...args), inquiryReleaseEnabledForTenant: async (...args: unknown[]) => mocks.release(...args) }));
 vi.mock("@/products/inquiries", () => ({ runDueInquiryFollowUps: mocks.sweep }));
 

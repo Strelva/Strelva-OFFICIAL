@@ -4,7 +4,7 @@ import { getActorContext, isSuperAdmin } from "@/platform/infra/auth";
 import { getAllTenants, isActiveTenant, getTenantConfig } from "@/lib/tenants";
 import { sendUpdateLiveEmail } from "@/lib/delivery-email";
 import { SECTION_LABELS } from "@/components/ui/section-labels";
-import { ROOT_DOMAIN } from "@/lib/brand";
+import { ROOT_DOMAIN } from "@/platform/infra/brand";
 import {
   listDrafts,
   getDraftContent,

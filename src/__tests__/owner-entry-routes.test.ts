@@ -17,7 +17,7 @@ vi.mock("@/platform/release-flags/store", async (importOriginal) => ({
 
 import proxy, { DASHBOARD_PATH_HEADER, adminRootTargetPath, dashboardPathHeaderValue } from "@/proxy";
 import { GET as entry } from "@/app/auth/entry/route";
-import { workspaceReturnTarget } from "@/lib/workspace-location";
+import { workspaceReturnTarget } from "@/platform/workspaces/location";
 import { applyTenantReleaseCommand, dashboardUsesForTenant } from "@/platform/owner-entry/operator";
 import { ReleaseFlagValidationError } from "@/platform/release-flags/store";
 

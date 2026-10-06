@@ -12,6 +12,7 @@
  * Run:
  *   node --env-file=.env.local --import=tsx scripts/migrate-products-to-collections.ts gldf [--dry]
  */
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import { getContent } from "../src/lib/storage";
 import { saveEntry, listEntriesForType } from "../src/lib/cms/collections-service";
 import type { ContentSection, ProductsContent } from "../src/lib/types";

@@ -44,8 +44,12 @@ describe("review reply receipt home", () => {
 
   it("the legacy publisher never writes a listing receipt", () => {
     const source = read("src/lib/gbp-replies.ts");
-    expect(source).toMatch(/recordOutsideWrite/);
+    // Through the outside-write receipts port (Strelva Reborn section 7)...
+    expect(source).toMatch(/outsideWriteReceipts\(\)\)\.recordReviewReply/);
     expect(source).not.toMatch(/google-listing|google_listing_receipt/);
+    // ...which the app edge wires to the outside-write ledger, and only there.
+    const ports = read("src/server/workspace-ports.ts");
+    expect(ports).toMatch(/recordReviewReply: [^\n]*\n\s*receipts\.recordOutsideWrite\(receipts\.reviewReplyWrite\(input\)\)/);
   });
 
   it("the approve path picks one ledger per write: listing when routed there, legacy otherwise, never both", () => {

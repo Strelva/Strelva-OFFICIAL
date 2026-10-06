@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCronRequest } from "@/lib/cron-auth";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { needsYouReleaseEnabled, needsYouService } from "@/platform/needs-you/server";
 
 export const maxDuration = 300;

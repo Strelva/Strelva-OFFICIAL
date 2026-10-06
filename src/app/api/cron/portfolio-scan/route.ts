@@ -1,6 +1,6 @@
 import { ownerNoticeEmail } from "@/lib/owner-recipient";
 import { NextResponse } from "next/server";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { scanAllTenants } from "@/lib/scan";
 import { getAllTenants } from "@/lib/tenants";
 import { getScanSummaries } from "@/lib/scan-store";

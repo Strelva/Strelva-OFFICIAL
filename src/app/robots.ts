@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { MARKETING_URL } from "@/lib/brand";
+import { MARKETING_URL } from "@/platform/infra/brand";
 import { getHostedSite } from "@/products/websites/index";
 
 export const dynamic = "force-dynamic";

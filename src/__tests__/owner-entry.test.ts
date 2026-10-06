@@ -1,7 +1,7 @@
 import { readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { describe, expect, it } from "vitest";
-import { workspaceReturnTarget } from "@/lib/workspace-location";
+import { workspaceReturnTarget } from "@/platform/workspaces/location";
 import { systemOriginId } from "@/platform/systems/invariants";
 import {
   DASHBOARD_DISPOSITIONS,

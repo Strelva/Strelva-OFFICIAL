@@ -10,7 +10,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { getContent, getVersions, restoreVersion } from "@/lib/storage";
 import type { ContentSection } from "@/lib/types";
 import { applySectionUpdate } from "@/lib/apply-section-update";
-import { possibilityPreviewPath } from "@/lib/possibility-preview-link";
+import { possibilityPreviewPath } from "@/platform/possibilities/preview-link";
 import { PostgresNeedsYouStore } from "@/platform/needs-you/repository";
 import { possibilitySchema, type MakeRealChannel, type Possibility } from "@/platform/possibilities/contracts";
 import { createSupabasePossibilityRepository } from "@/platform/possibilities/supabase-repository";

@@ -21,7 +21,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
-import { OPERATOR_URL } from "@/lib/brand";
+import { OPERATOR_URL } from "@/platform/infra/brand";
 import type { SendEmailInput, SendEmailResult } from "@/platform/infra/email/send";
 import type { EmailOptions } from "@/platform/infra/email/layout";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "./types";

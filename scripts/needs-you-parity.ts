@@ -13,6 +13,7 @@
  * unless --i-have-jacobs-yes is passed, because even a read of production is
  * Jacob's call. Exit 2 means a blocking mismatch: the move must not proceed.
  */
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import { getAllTenants, getTenantConfig } from "../src/lib/tenants";
 import { getEvents } from "../src/lib/events";
 import { getContentAutonomy } from "../src/lib/content-autonomy";

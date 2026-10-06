@@ -3,7 +3,7 @@ import Stripe from "stripe";
 import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { logAuditEvent } from "@/lib/storage";
-import { trackError } from "@/lib/monitoring";
+import { trackError } from "@/platform/infra/monitoring";
 
 /**
  * Generates a Stripe Customer Portal session URL for a specific tenant so the

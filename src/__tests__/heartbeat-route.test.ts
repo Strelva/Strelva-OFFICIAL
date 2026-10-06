@@ -12,7 +12,7 @@ const mockRedis = {
 vi.mock("@/platform/infra/redis", () => ({ getRedis: () => mockRedis }));
 vi.mock("../lib/cron-auth", () => ({ requireCronRequest: () => null }));
 const alertOnce = vi.hoisted(() => vi.fn(async () => true));
-vi.mock("../lib/monitoring", () => ({ alertOnce }));
+vi.mock("@/platform/infra/monitoring", () => ({ alertOnce }));
 
 import { GET } from "../app/api/cron/heartbeat/route";
 

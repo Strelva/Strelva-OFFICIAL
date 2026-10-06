@@ -16,7 +16,7 @@ import { getStoredContent, setContent } from "./storage";
 import { setAnalyticsConfig, deriveScDomain } from "./analytics";
 import { defaults } from "./defaults";
 import { CUSTOM_REPO_CONTRACT_VERSION } from "./custom-repos";
-import { CONTROL_PLANE_URL } from "./brand";
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import type { ContentSection, ContentMap, BillingType, CommercialPlanKey, PresenceProfile } from "./types";
 import {
   createVercelProject,

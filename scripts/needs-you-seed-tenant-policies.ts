@@ -17,6 +17,7 @@
  * the database checks it again. Redis keys are never changed. It is
  * idempotent: kinds that already moved are skipped.
  */
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import { getAllTenants } from "../src/lib/tenants";
 import { getContentAutonomy } from "../src/lib/content-autonomy";
 import { getReplyVoice } from "../src/lib/reviews/reply-voice";

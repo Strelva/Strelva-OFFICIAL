@@ -15,6 +15,7 @@
  * price, cycle and card are never touched. An object reachable from two
  * businesses is listed as a conflict and never written.
  */
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import { getSupabase } from "../src/platform/infra/db/client";
 import { getAccountForTenant } from "../src/lib/accounts";
 import { getStripe } from "../src/lib/billing";

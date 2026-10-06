@@ -13,6 +13,7 @@
  * already exists. It writes nothing anywhere and prints counts, never tokens.
  * Logic and guards: scripts/google-binding-copy.ts.
  */
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import { getSupabase } from "../src/platform/infra/db/client";
 import { getConnection } from "../src/lib/connections";
 import { getRedis } from "../src/platform/infra/redis";

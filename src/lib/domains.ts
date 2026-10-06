@@ -3,7 +3,9 @@ import type { DomainClaim, DomainClaimRole, TenantConfig } from "./types";
 import type { SiteConfig } from "./tenant/models";
 import { getAllTenants, getTenantConfig, invalidateDomainMapCache, isActiveTenant, updateTenant } from "./tenants";
 import { normalizeTenantDomain } from "./tenant-urls";
-import { domainAddWrite, domainClaimRemovalWrite, recordOutsideWrite } from "@/platform/operator-queue/receipts";
+// Outside-write receipts (src/platform/operator-queue) through the port
+// src/lib declares (Strelva Reborn section 7).
+import { workspacePorts } from "./workspace-ports";
 
 const CLAIMS_REDIS_KEY = "reb:domain-claims";
 const DOMAIN_REGEX = /^(?=.{1,253}$)(?!-)([a-z0-9-]{1,63}(?<!-)\.)+[a-z]{2,}$/i;
@@ -431,11 +433,12 @@ export async function addCustomDomain(
     const acceptance = vercelState.status === "error"
       ? (vercelState.registrationAttempt === "unknown" ? "unknown" as const : "rejected" as const)
       : "accepted" as const;
-    await recordOutsideWrite(domainAddWrite({
+    const receipts = await workspacePorts().outsideWriteReceipts();
+    await receipts.recordDomainAdd({
       tenantId, domain: normalized, role, at: createdAt, actor: options.actor ?? "strelva",
       acceptance, detail: vercelState.error ?? null, providerRef: vercelState.vercelProjectId ?? null,
       ...(acceptance === "accepted" ? { readback: await readBackVercelDomain(normalized) } : {}),
-    }));
+    });
   }
 
   const claim: DomainClaim = {
@@ -534,7 +537,8 @@ export async function removeCustomDomain(tenantId: string, domain: string, optio
   const stillClaimed = readBack
     ? (readBack.customDomains ?? []).some((item) => claimKey(normalizeCustomDomain(item) ?? item) === claimKey(normalized))
     : null;
-  await recordOutsideWrite(domainClaimRemovalWrite({
+  const receipts = await workspacePorts().outsideWriteReceipts();
+  await receipts.recordDomainClaimRemoval({
     tenantId, domain: normalized, actor: options.actor ?? "strelva", at: nowIso(),
     before: prior ? { role: prior.role, status: prior.status } : null,
     readback: stillClaimed === null
@@ -542,6 +546,6 @@ export async function removeCustomDomain(tenantId: string, domain: string, optio
       : stillClaimed
         ? { result: "differs", detail: "The domain is still listed on the tenant." }
         : { result: "matched", detail: "Strelva's claim is gone. The domain was not touched in Vercel." },
-  }));
+  });
   return { ok: true, tenant: updated };
 }

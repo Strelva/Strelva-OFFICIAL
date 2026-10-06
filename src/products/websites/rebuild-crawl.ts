@@ -3,7 +3,7 @@ import * as http from "node:http";
 import * as https from "node:https";
 import * as cheerio from "cheerio";
 import { computeVisibleText, validateUrlSafety } from "@/lib/audit/checks";
-import { pinnedRequestOptions } from "@/lib/pinned-lookup";
+import { pinnedRequestOptions } from "@/platform/infra/pinned-lookup";
 import { isSafeFetchUrl } from "@/platform/infra/safe-fetch";
 import { registrableRebuildDomain } from "./rebuild-domain-key";
 

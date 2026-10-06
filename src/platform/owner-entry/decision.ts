@@ -1,4 +1,4 @@
-import { workspaceReturnTarget } from "@/lib/workspace-location";
+import { workspaceReturnTarget } from "@/platform/workspaces/location";
 import { releaseFlagEnvMode, resolveReleaseFlag, type ReleaseEnvironment } from "@/platform/release-flags/resolve";
 import { ownerEntryPossible } from "./env";
 import { askReleaseEnabled } from "@/platform/ask/release";

@@ -6,6 +6,7 @@
  * `schedules` copies workspace schedule reservations that have no public
  * receipt (dry run unless --apply).
  */
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import type { BookingBackfillReport, BookingParityReport, ScheduleBackfillReport } from "../src/platform/bookings/move";
 import { isLocalDatabaseUrl } from "./tenant-conversion";
 

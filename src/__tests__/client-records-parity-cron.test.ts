@@ -8,8 +8,8 @@ const mocks = vi.hoisted(() => ({
   tenants: vi.fn(),
 }));
 vi.mock("@/platform/client-records/parity-sweep", () => ({ runClientRecordParitySweep: mocks.sweep }));
-vi.mock("@/lib/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
-vi.mock("@/lib/monitoring", () => ({ alertOnce: mocks.alertOnce }));
+vi.mock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
+vi.mock("@/platform/infra/monitoring", () => ({ alertOnce: mocks.alertOnce }));
 vi.mock("@/lib/cron-auth", () => ({ requireCronRequest: mocks.denied }));
 vi.mock("@/lib/tenants", () => ({ getAllTenants: mocks.tenants }));
 
@@ -81,7 +81,7 @@ describe("client-records-parity cron", () => {
 
 describe("heartbeat registry", () => {
   it("expects the parity cron at least daily", async () => {
-    const actual = await vi.importActual<typeof import("@/lib/heartbeat")>("@/lib/heartbeat");
+    const actual = await vi.importActual<typeof import("@/platform/infra/heartbeat")>("@/platform/infra/heartbeat");
     expect(actual.CRON_MAX_AGE_SECONDS["client-records-parity"]).toBe(26 * 3600);
   });
 });

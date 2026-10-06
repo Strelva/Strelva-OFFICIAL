@@ -19,14 +19,9 @@
  * routine copy edits, never money/contact details.
  */
 import { getRedis } from "@/platform/infra/redis";
-import {
-  contentAutonomyFromRoute,
-  planContentAutonomy,
-  readTenantPolicyRoute,
-  writeTenantPolicySetting,
-  type BridgeOptions,
-  type TenantPolicyLayer,
-} from "@/platform/needs-you/tenant-settings";
+// The policy bridge (src/platform/needs-you/tenant-settings.ts) through the
+// port src/lib declares (Strelva Reborn section 7).
+import { workspacePorts, type TenantPolicyLayer, type TenantPolicyOptions as BridgeOptions } from "./workspace-ports";
 
 export type ContentAutonomy = "auto" | "approve";
 
@@ -49,8 +44,9 @@ async function readRedis(tenantId: string): Promise<ContentAutonomy> {
 }
 
 export async function getContentAutonomy(tenantId: string, options: BridgeOptions = {}): Promise<ContentAutonomy> {
-  const route = await readTenantPolicyRoute(tenantId, "copy.routine", options);
-  if (route) return contentAutonomyFromRoute(route);
+  const policy = await workspacePorts().tenantPolicy();
+  const route = await policy.readTenantPolicyRoute(tenantId, "copy.routine", options);
+  if (route) return policy.contentAutonomyFromRoute(route);
   return readRedis(tenantId);
 }
 
@@ -88,14 +84,15 @@ export async function saveContentAutonomySetting(
   options: BridgeOptions = {},
 ): Promise<ContentAutonomySaveResult> {
   const mode: ContentAutonomy = requested === "auto" ? "auto" : "approve";
-  const result = writer
-    ? await writeTenantPolicySetting({
+  const policy = writer ? await workspacePorts().tenantPolicy() : null;
+  const result = writer && policy
+    ? await policy.writeTenantPolicySetting({
       tenantId, actor: writer.actor, layer: writer.layer, kind: "copy.routine",
       todayValue: await readRedis(tenantId), via: writer.layer === "owner" ? "owner_save" : "operator_save",
-      plan: (state) => planContentAutonomy(mode, writer.layer, state),
+      plan: (state) => policy.planContentAutonomy(mode, writer.layer, state),
     }, options)
     : { stored: "redis" as const };
   await saveContentAutonomy(tenantId, mode);
-  if (result.stored === "redis") return { mode, requested: mode, note: null, storedIn: "redis" };
-  return { mode: contentAutonomyFromRoute(result.route), requested: mode, note: result.notMigrated, storedIn: "decision_policies" };
+  if (result.stored === "redis" || !policy) return { mode, requested: mode, note: null, storedIn: "redis" };
+  return { mode: policy.contentAutonomyFromRoute(result.route), requested: mode, note: result.notMigrated, storedIn: "decision_policies" };
 }

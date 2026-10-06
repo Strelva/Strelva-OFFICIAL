@@ -53,7 +53,7 @@ vi.mock("@/lib/tenants", () => ({ getTenantConfig: async (id: string) => ({ id, 
 vi.mock("@/lib/owner-recipient", () => ({ ownerNoticeEmail: async () => "rae@example.test" }));
 vi.mock("@/lib/tenant-urls", () => ({ getTenantDashboardUrl: (_c: unknown, path: string) => `https://app.strelva.test${path}` }));
 vi.mock("@/lib/delivery-email", () => ({ sendBookingConfirmation: h.sendBookingConfirmation, sendNewBookingOwnerEmail: vi.fn() }));
-vi.mock("@/lib/monitoring", () => ({ alertOnce: vi.fn() }));
+vi.mock("@/platform/infra/monitoring", () => ({ alertOnce: vi.fn() }));
 
 import { POST as postBooking } from "@/app/api/booking/route";
 import { resetBookingFlagCache, bookingReadSource } from "@/platform/bookings/flags";

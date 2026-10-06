@@ -2,7 +2,7 @@
 
 import { prepareWebsiteRequestDraft } from "@/lib/website-request-draft";
 import { WebsiteAuditPage } from "@/products/website-audit";
-import { replaceWorkspaceLocation, workspaceReturnTarget } from "@/lib/workspace-location";
+import { replaceWorkspaceLocation, workspaceReturnTarget } from "@/platform/workspaces/location";
 
 import {
   ArrowRight,

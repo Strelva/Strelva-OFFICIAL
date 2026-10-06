@@ -16,7 +16,7 @@
  * dropped because the resolver failed.
  */
 import { z } from "zod";
-import { resolveTenantOwnerRecipient } from "@/platform/business-record/service";
+import { workspacePorts } from "./workspace-ports";
 
 export interface OwnerNoticeRecipient {
   email: string;
@@ -30,6 +30,10 @@ const RESOLVE_TIMEOUT_MS = 1500;
 const email = z.string().trim().toLowerCase().email().max(254);
 
 type Resolver = (tenantId: string) => Promise<{ email: string; name: string | null; from: "record" | "tenant" | "linked_tenant"; workspaceId: string | null } | null>;
+/** The business record's resolver (resolve_tenant_owner_recipient), through
+ * the port src/lib declares (Strelva Reborn section 7). */
+const resolveTenantOwnerRecipient: Resolver = async (tenantId) =>
+  (await workspacePorts().businessRecord()).resolveTenantOwnerRecipient(tenantId);
 let resolver: Resolver = resolveTenantOwnerRecipient;
 
 /** Tests may replace the database resolver. */

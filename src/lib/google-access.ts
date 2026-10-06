@@ -25,18 +25,11 @@ import { decryptSecret } from "@/platform/infra/crypto/secrets";
 import { refreshGoogleTokens } from "./google-token";
 import { getRedis } from "@/platform/infra/redis";
 import type { Connection } from "./types";
-import {
-  googleBindingsEnabled,
-  readBindingTarget,
-  readGoogleBindingForTenant,
-  setGoogleBindingStatus,
-  updateGoogleBindingTokens,
-  upsertGoogleBinding,
-  upsertGoogleLocation,
-  BindingEncryptionRefused,
-  AccountBindingStoreError,
-} from "@/platform/account-bindings/store";
-import type { AccountBindingWithSecrets } from "@/platform/account-bindings/contracts";
+// The business-level binding store (src/platform/account-bindings) through
+// the port src/lib declares (Strelva Reborn section 7).
+import { workspacePorts, type GoogleBindingWithSecrets, type GoogleBindingsPort } from "./workspace-ports";
+
+const bindingStore = (): Promise<GoogleBindingsPort> => workspacePorts().googleBindings();
 
 const EXPIRY_BUFFER_MS = 5 * 60 * 1000;
 const META_TTL_SECONDS = 60 * 60 * 24 * 365;
@@ -106,7 +99,7 @@ function grantFromConnection(connection: Connection): GoogleGrant {
   };
 }
 
-function grantFromBinding(tenantId: string, binding: AccountBindingWithSecrets): GoogleGrant {
+function grantFromBinding(tenantId: string, binding: GoogleBindingWithSecrets): GoogleGrant {
   const primary = binding.locations.find((location) => location.isPrimary) ?? binding.locations[0] ?? null;
   return {
     source: "binding", tenantId,
@@ -120,8 +113,8 @@ function grantFromBinding(tenantId: string, binding: AccountBindingWithSecrets):
   };
 }
 
-function reasonOf(error: unknown): GoogleFallbackReason {
-  if (error instanceof AccountBindingStoreError) {
+function reasonOf(error: unknown, store: GoogleBindingsPort): GoogleFallbackReason {
+  if (error instanceof store.AccountBindingStoreError) {
     if (error.code === "schema_missing") return "schema_missing";
     if (error.code === "unconfigured") return "unconfigured";
   }
@@ -130,9 +123,10 @@ function reasonOf(error: unknown): GoogleFallbackReason {
 
 /** The tenant's Google grant: the binding first, Redis as the fallback. */
 export async function getGoogleGrant(tenantId: string): Promise<GoogleGrant | null> {
-  if (googleBindingsEnabled()) {
+  const store = await bindingStore();
+  if (store.googleBindingsEnabled()) {
     try {
-      const binding = await readGoogleBindingForTenant(tenantId);
+      const binding = await store.readGoogleBindingForTenant(tenantId);
       if (binding) {
         try {
           return grantFromBinding(tenantId, binding);
@@ -143,7 +137,7 @@ export async function getGoogleGrant(tenantId: string): Promise<GoogleGrant | nu
         await noteFallback(tenantId, "no_binding");
       }
     } catch (error) {
-      await noteFallback(tenantId, reasonOf(error));
+      await noteFallback(tenantId, reasonOf(error, store));
     }
   }
   const connection = await getConnection(tenantId, "google");
@@ -184,7 +178,7 @@ export async function getValidGoogleAccessToken(grant: GoogleGrant, now = Date.n
   const outcome = await refreshGoogleTokens(grant.refreshToken);
   if (!outcome.ok) {
     if (outcome.reason === "invalid_grant" && grant.bindingId) {
-      await setGoogleBindingStatus(grant.bindingId, "needs_reauth", "Google refused the refresh token.", new Date(now).toISOString()).catch(() => {});
+      await (await bindingStore()).setGoogleBindingStatus(grant.bindingId, "needs_reauth", "Google refused the refresh token.", new Date(now).toISOString()).catch(() => {});
     }
     return null;
   }
@@ -194,7 +188,7 @@ export async function getValidGoogleAccessToken(grant: GoogleGrant, now = Date.n
   grant.expiresAt = expiresAt;
   if (rotated) grant.refreshToken = rotated;
   if (grant.source === "binding" && grant.bindingId) {
-    await updateGoogleBindingTokens(grant.bindingId, { accessToken, expiresAt, rotatedRefreshToken: rotated }).catch((error) => {
+    await (await bindingStore()).updateGoogleBindingTokens(grant.bindingId, { accessToken, expiresAt, rotatedRefreshToken: rotated }).catch((error) => {
       console.warn(`[google-access] could not store the refreshed token for ${grant.tenantId}: ${error instanceof Error ? error.message : "error"}`);
     });
   }
@@ -214,7 +208,7 @@ export async function getValidGoogleAccessToken(grant: GoogleGrant, now = Date.n
 /** A dead grant: the owner must reconnect. Marks every store that holds it. */
 export async function markGoogleGrantNeedsReauth(grant: GoogleGrant, reason: string): Promise<void> {
   if (grant.bindingId) {
-    await setGoogleBindingStatus(grant.bindingId, "needs_reauth", reason, new Date().toISOString()).catch(() => {});
+    await (await bindingStore()).setGoogleBindingStatus(grant.bindingId, "needs_reauth", reason, new Date().toISOString()).catch(() => {});
   }
   const connection = grant.connection ?? await getConnection(grant.tenantId, "google").catch(() => null);
   if (connection && connection.status === "connected") {
@@ -225,23 +219,24 @@ export async function markGoogleGrantNeedsReauth(grant: GoogleGrant, reason: str
 /** A good read from Google: the listing's health counts from here. */
 export async function noteGoogleReadSucceeded(grant: GoogleGrant, now = Date.now()): Promise<void> {
   if (!grant.bindingId) return;
-  await setGoogleBindingStatus(grant.bindingId, "connected", null, new Date(now).toISOString()).catch(() => {});
+  await (await bindingStore()).setGoogleBindingStatus(grant.bindingId, "connected", null, new Date(now).toISOString()).catch(() => {});
 }
 
 export type BindingWriteOutcome = "written" | "disabled" | "unlinked" | "refused_plaintext" | "failed";
 
 async function writeBinding(
   tenantId: string,
-  write: (target: { workspaceId: string; tenantStableId: string }) => Promise<void>,
+  write: (target: { workspaceId: string; tenantStableId: string }, store: GoogleBindingsPort) => Promise<void>,
 ): Promise<BindingWriteOutcome> {
-  if (!googleBindingsEnabled()) return "disabled";
+  const store = await bindingStore();
+  if (!store.googleBindingsEnabled()) return "disabled";
   try {
-    const target = await readBindingTarget(tenantId);
+    const target = await store.readBindingTarget(tenantId);
     if (!target) return "unlinked";
-    await write(target);
+    await write(target, store);
     return "written";
   } catch (error) {
-    if (error instanceof BindingEncryptionRefused) {
+    if (error instanceof store.BindingEncryptionRefused) {
       console.error(`[google-access] binding write refused for ${tenantId}: SECRETS_ENC_KEY is not set`);
       return "refused_plaintext";
     }
@@ -283,8 +278,8 @@ export async function recordGoogleConnection(input: GoogleConnectInput, now = Da
       await redis.set(`google-meta:${input.tenantId}`, { accountId: input.accountId, locationId: input.locationId }, { ex: META_TTL_SECONDS });
     }
   }
-  const binding = await writeBinding(input.tenantId, async (target) => {
-    const result = await upsertGoogleBinding({
+  const binding = await writeBinding(input.tenantId, async (target, store) => {
+    const result = await store.upsertGoogleBinding({
       workspaceId: target.workspaceId,
       originTenantStableId: target.tenantStableId,
       scopes: input.scopes ?? null,
@@ -294,7 +289,7 @@ export async function recordGoogleConnection(input: GoogleConnectInput, now = Da
       status: "connected",
     }, "oauth");
     if (input.accountId && input.locationId) {
-      await upsertGoogleLocation(result.id, { accountId: input.accountId, locationId: input.locationId, title: input.locationTitle ?? null });
+      await store.upsertGoogleLocation(result.id, { accountId: input.accountId, locationId: input.locationId, title: input.locationTitle ?? null });
     }
   });
   return { binding };
@@ -305,10 +300,10 @@ export async function recordGoogleLocationSelection(tenantId: string, location: 
   const redis = getRedis();
   if (!redis) throw new Error("persistence_unavailable");
   await redis.set(`google-meta:${tenantId}`, { accountId: location.accountId, locationId: location.locationId }, { ex: META_TTL_SECONDS });
-  const binding = await writeBinding(tenantId, async () => {
-    const existing = await readGoogleBindingForTenant(tenantId);
+  const binding = await writeBinding(tenantId, async (_target, store) => {
+    const existing = await store.readGoogleBindingForTenant(tenantId);
     if (!existing) throw new Error("no binding to attach the location to");
-    await upsertGoogleLocation(existing.id, location);
+    await store.upsertGoogleLocation(existing.id, location);
   });
   return { binding };
 }

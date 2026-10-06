@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { WeeklyBrief } from "@/lib/types";
-import { workspaceReturnTarget } from "@/lib/workspace-location";
+import { workspaceReturnTarget } from "@/platform/workspaces/location";
 import { setReleaseFlagsDb } from "@/platform/release-flags/store";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import { readWorkspaceRecaps, recapView, type RecapDependencies } from "@/products/recaps/server";

@@ -54,7 +54,7 @@ vi.mock("@/platform/infra/production-guard", () => ({
   isProductionEnv: vi.fn(() => false),
 }));
 
-vi.mock("@/lib/monitoring", () => ({
+vi.mock("@/platform/infra/monitoring", () => ({
   alert: vi.fn(),
 }));
 

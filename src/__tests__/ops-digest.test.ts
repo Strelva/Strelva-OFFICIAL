@@ -100,7 +100,7 @@ describe("GET /api/cron/ops-digest — composition", () => {
     vi.doMock("@/lib/churn", () => ({ getAtRiskTenants: mockGetAtRiskTenants }));
     vi.doMock("@/lib/tenants", () => ({ getAllTenants: mockGetAllTenants }));
     vi.doMock("@/lib/delivery-email", () => ({ sendOpsDigestEmail: mockSendOpsDigestEmail }));
-    vi.doMock("@/lib/heartbeat", () => ({ recordHeartbeat: mockRecordHeartbeat }));
+    vi.doMock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: mockRecordHeartbeat }));
     mockSendOpsDigestEmail.mockResolvedValue(true);
     mockRecordHeartbeat.mockResolvedValue(undefined);
   });
@@ -110,7 +110,7 @@ describe("GET /api/cron/ops-digest — composition", () => {
     vi.doUnmock("@/lib/churn");
     vi.doUnmock("@/lib/tenants");
     vi.doUnmock("@/lib/delivery-email");
-    vi.doUnmock("@/lib/heartbeat");
+    vi.doUnmock("@/platform/infra/heartbeat");
   });
 
   it("counts unworked leads, names at-risk clients, and lists recent signups", async () => {

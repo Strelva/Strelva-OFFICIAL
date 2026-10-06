@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConnectedSitesStore } from "@/products/connected-sites/store";
 
 const mocks = vi.hoisted(() => ({ heartbeat: vi.fn(), denied: vi.fn(), purge: vi.fn() }));
-vi.mock("@/lib/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
+vi.mock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
 vi.mock("@/lib/cron-auth", () => ({ requireCronRequest: mocks.denied }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
 
@@ -24,7 +24,7 @@ describe("connected-sites-purge cron", () => {
   it("is declared daily in vercel.json and registered for the heartbeat", async () => {
     const cron = vercel.crons.find((c: { path: string }) => c.path === "/api/cron/connected-sites-purge");
     expect(cron?.schedule).toMatch(/^\d+ \d+ \* \* \*$/);
-    const actual = await vi.importActual<typeof import("@/lib/heartbeat")>("@/lib/heartbeat");
+    const actual = await vi.importActual<typeof import("@/platform/infra/heartbeat")>("@/platform/infra/heartbeat");
     expect(actual.CRON_MAX_AGE_SECONDS["connected-sites-purge"]).toBe(26 * 3600);
   });
 

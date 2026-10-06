@@ -35,8 +35,8 @@ vi.mock("@/lib/review-replies", () => ({
   draftReviewReply: mockDraftReviewReply,
   storeRecentReply: mockStoreRecentReply,
 }));
-vi.mock("@/lib/monitoring", () => ({ alert: mockAlert }));
-vi.mock("@/lib/heartbeat", () => ({ recordHeartbeat: mockRecordHeartbeat }));
+vi.mock("@/platform/infra/monitoring", () => ({ alert: mockAlert }));
+vi.mock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: mockRecordHeartbeat }));
 vi.mock("@/lib/concurrency", () => ({
   // Deterministic sequential runner in place of the real pool.
   mapPool: async <T,>(items: T[], _n: number, fn: (item: T) => Promise<unknown>) => {

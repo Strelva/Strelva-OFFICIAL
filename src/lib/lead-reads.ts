@@ -17,7 +17,7 @@
  */
 import { leadMirrorDb, LEAD_MIRROR_TIMEOUT_MS, type LeadMirrorDb } from "./lead-mirror";
 import { dualWritePgEnabled } from "@/platform/infra/db/dual-write";
-import { alertOnce } from "./monitoring";
+import { alertOnce } from "@/platform/infra/monitoring";
 
 export type LeadReadMode = "redis" | "compare" | "postgres";
 export const LEAD_PARITY_STORE = "tenant_leads";

@@ -18,6 +18,7 @@
  * per day; reads flip (STRELVA_BOOKING_STORE_READ=postgres) only after 7 days
  * in a row. Needs 20261008141000_booking_store.sql applied.
  */
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import { getSupabase } from "../src/platform/infra/db/client";
 import { getAllTenants } from "../src/lib/tenants";
 import { backfillScheduleReservations, backfillTenantBookings, checkTenantBookingParity } from "../src/platform/bookings/move";

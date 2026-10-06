@@ -6,7 +6,7 @@ import { withAskPreview } from "@/experience/workspace/preview/ask-fixture";
 import { ContentWorkspace } from "@/components/dashboard/ContentWorkspace";
 import type { SectionData } from "@/components/dashboard/ContentBrowser";
 import { AskStrelva } from "@/experience/ask/AskStrelva";
-import { NATIVE_TABS, REQUEST_TABS, type SiteTab } from "@/lib/workspace-site-places";
+import { NATIVE_TABS, REQUEST_TABS, type SiteTab } from "@/platform/workspaces/site-places";
 import type { SiteChangeRequest } from "@/products/websites/client";
 import { WebsiteChangeRequests } from "./WebsiteChangeRequests";
 import { WorkspaceSiteFrame, WorkspaceSiteMessage } from "./WorkspaceSiteFrame";

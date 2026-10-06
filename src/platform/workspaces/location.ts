@@ -1,5 +1,5 @@
-import { isBusinessStartProduct } from "./business-start";
-import { workspaceSiteTarget } from "./workspace-site-places";
+import { isBusinessStartProduct } from "@/platform/workspaces/business-start";
+import { workspaceSiteTarget } from "@/platform/workspaces/site-places";
 
 /** Navigation hints only. APIs still authorize the requested workspace and work. */
 const ID = /^[a-z0-9_-]{1,128}$/i;

@@ -2,7 +2,7 @@ import { createRevalidationBody, signRevalidationBody } from "./scaffold-contrac
 import { getTenantConfig, getActiveTenants } from "./tenants";
 import { getTenantDeliveryModel } from "./custom-repos";
 import { getRedis } from "@/platform/infra/redis";
-import { alert } from "./monitoring";
+import { alert } from "@/platform/infra/monitoring";
 import { getSectionTimestamps } from "./storage";
 import { logger } from "@/platform/infra/logger";
 import { addSentryBreadcrumb } from "./sentry-context";

@@ -3,7 +3,7 @@ import { getContent } from "@/lib/storage";
 import { getTenantFromHeaders, isPreviewMode } from "@/lib/tenant";
 import { SectionRenderer } from "@/components/public/SectionRenderer";
 import { PageViewTracker } from "@/components/public/PageViewTracker";
-import { MARKETING_URL } from "@/lib/brand";
+import { MARKETING_URL } from "@/platform/infra/brand";
 
 export const dynamic = "force-dynamic";
 

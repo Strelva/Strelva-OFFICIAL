@@ -10,7 +10,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { mapPool } from "@/lib/concurrency";
 import { getAllTenants } from "@/lib/tenants";
 import { updateLastSynced } from "@/lib/connections";
@@ -21,7 +21,7 @@ import {
   markGoogleGrantNeedsReauth,
   noteGoogleReadSucceeded,
 } from "@/lib/google-access";
-import { alert } from "@/lib/monitoring";
+import { alert } from "@/platform/infra/monitoring";
 import { addEvent } from "@/lib/events";
 import { addReview } from "@/lib/reviews";
 import { getRedis } from "@/platform/infra/redis";

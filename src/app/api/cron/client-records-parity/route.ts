@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCronRequest } from "@/lib/cron-auth";
-import { recordHeartbeat } from "@/lib/heartbeat";
-import { alertOnce } from "@/lib/monitoring";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
+import { alertOnce } from "@/platform/infra/monitoring";
 import { getAllTenants } from "@/lib/tenants";
 import { runClientRecordParitySweep } from "@/platform/client-records/parity-sweep";
 

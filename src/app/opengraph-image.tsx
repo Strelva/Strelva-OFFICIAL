@@ -1,7 +1,7 @@
 import { ImageResponse } from "next/og";
 import { headers } from "next/headers";
 import { getTenantConfig } from "@/lib/tenants";
-import { BRAND_NAME } from "@/lib/brand";
+import { BRAND_NAME } from "@/platform/infra/brand";
 
 export const runtime = "nodejs";
 export const size = { width: 1200, height: 630 };

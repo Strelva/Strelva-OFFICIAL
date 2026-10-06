@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { Booking } from "@/lib/types";
 import { DEFAULT_BOOKING_CONFIG } from "@/lib/booking";
-import { workspaceReturnTarget } from "@/lib/workspace-location";
+import { workspaceReturnTarget } from "@/platform/workspaces/location";
 import { setReleaseFlagsDb } from "@/platform/release-flags/store";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import {

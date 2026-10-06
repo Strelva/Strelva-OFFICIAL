@@ -1,6 +1,6 @@
 import * as http from "node:http";
 import * as https from "node:https";
-import { pinnedRequestOptions } from "@/lib/pinned-lookup";
+import { pinnedRequestOptions } from "@/platform/infra/pinned-lookup";
 
 const REDIRECTS = new Set([301, 302, 303, 307, 308]);
 

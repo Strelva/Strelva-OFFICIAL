@@ -46,7 +46,7 @@ vi.mock("stripe", () => {
   }
   return { default: FakeStripe };
 });
-vi.mock("../lib/monitoring", () => ({ alert: vi.fn() }));
+vi.mock("@/platform/infra/monitoring", () => ({ alert: vi.fn() }));
 vi.mock("../lib/events", () => ({ addEvent: vi.fn() }));
 vi.mock("../lib/delivery-email", () => ({
   sendNewSignupEmail: vi.fn(),

@@ -10,7 +10,7 @@ import type { NextRequest } from "next/server";
 import { getDevAccessTenant, isDevAccessBypassEnabled } from "@/platform/infra/dev-access";
 import { MARKETING_HOSTS, isMarketingHost } from "./lib/marketing-hosts";
 import { parseTenantHost } from "./lib/tenant-host";
-import { CONTROL_PLANE_URL } from "./lib/brand";
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 // No workspace is known here: the proxy only asks "could the rebuild be on";
 // the per-site decision is getPublishedSiteDocument's (per tenant).
 import { websiteRebuildReleaseMayBeOn } from "./products/websites/index";

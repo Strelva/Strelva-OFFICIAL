@@ -1,4 +1,4 @@
-import { CONTROL_PLANE_URL } from "@/lib/brand";
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 
 /**
  * The workspace is served from app.strelva.com in production, not from the

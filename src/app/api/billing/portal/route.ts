@@ -3,7 +3,7 @@ import Stripe from "stripe";
 import { verifyAuth, requireTenantPermission } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
-import { trackError } from "@/lib/monitoring";
+import { trackError } from "@/platform/infra/monitoring";
 
 function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY!, {

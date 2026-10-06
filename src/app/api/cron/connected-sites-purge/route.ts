@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCronRequest } from "@/lib/cron-auth";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { connectedSitesReleaseEnabled } from "@/products/connected-sites/server";
 import { connectedSitesStore } from "@/products/connected-sites/store";
 

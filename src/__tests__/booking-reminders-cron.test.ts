@@ -10,8 +10,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/platform/bookings/lifecycle", () => ({ runBookingLifecycle: mocks.run }));
 vi.mock("@/platform/bookings/lifecycle-ports", () => ({ bookingLifecyclePorts: { marker: "real-ports" } }));
 vi.mock("@/platform/bookings/flags", () => ({ bookingRemindersEnabled: mocks.enabled }));
-vi.mock("@/lib/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
-vi.mock("@/lib/monitoring", () => ({ alertOnce: mocks.alertOnce }));
+vi.mock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
+vi.mock("@/platform/infra/monitoring", () => ({ alertOnce: mocks.alertOnce }));
 vi.mock("@/lib/cron-auth", () => ({ requireCronRequest: mocks.denied }));
 
 import { GET } from "@/app/api/cron/booking-reminders/route";
@@ -69,7 +69,7 @@ describe("booking-reminders cron", () => {
 
 describe("booking-reminders heartbeat", () => {
   it("is registered with a window that tolerates two missed runs", async () => {
-    const actual = await vi.importActual<{ CRON_MAX_AGE_SECONDS: Record<string, number> }>("@/lib/heartbeat");
+    const actual = await vi.importActual<{ CRON_MAX_AGE_SECONDS: Record<string, number> }>("@/platform/infra/heartbeat");
     expect(actual.CRON_MAX_AGE_SECONDS["booking-reminders"]).toBe(45 * 60);
   });
 });

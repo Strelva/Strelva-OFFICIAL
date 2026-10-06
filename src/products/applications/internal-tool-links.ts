@@ -1,4 +1,4 @@
-import { CONTROL_PLANE_URL } from "@/lib/brand";
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import { sendEmailWithReceipt, type SendEmailInput, type SendEmailResult } from "@/platform/infra/email/send";
 import { systemsReleaseEnabled, systemsReleasedFor } from "@/platform/systems-release";
 import { workspaceReleaseOn } from "@/platform/release-flags/resolve";

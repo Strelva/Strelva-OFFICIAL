@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireCronRequest } from "@/lib/cron-auth";
-import { recordHeartbeat } from "@/lib/heartbeat";
-import { alertOnce } from "@/lib/monitoring";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
+import { alertOnce } from "@/platform/infra/monitoring";
 import { bookingRemindersEnabled } from "@/platform/bookings/flags";
 import { runBookingLifecycle } from "@/platform/bookings/lifecycle";
 import { bookingLifecyclePorts } from "@/platform/bookings/lifecycle-ports";

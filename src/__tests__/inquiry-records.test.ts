@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({ tenant: vi.fn(), sendNewLeadEmail: vi.fn(), al
 vi.mock("@/platform/infra/redis", () => ({ getRedis: () => redis }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.tenant }));
 vi.mock("@/lib/delivery-email", () => ({ sendNewLeadEmail: mocks.sendNewLeadEmail }));
-vi.mock("@/lib/monitoring", () => ({ alertOnce: mocks.alertOnce }));
+vi.mock("@/platform/infra/monitoring", () => ({ alertOnce: mocks.alertOnce }));
 
 import { setLeadMirrorDb, type LeadMirrorDb } from "@/lib/lead-mirror";
 import {

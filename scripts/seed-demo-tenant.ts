@@ -32,6 +32,7 @@
  *     Redis-backed stores no-op cleanly), so it always runs clean.
  */
 
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import { existsSync, readFileSync } from "node:fs";
 
 // Load .env.local / .env before any storage module reads process.env to decide

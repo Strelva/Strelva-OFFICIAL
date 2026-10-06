@@ -4,6 +4,9 @@ import { isContentSection } from "./types";
 import type { TenantConfig, SiteCapabilityManifest, ContentSection } from "./types";
 import type { RawTenantConnectionSettings } from "./integration-registry";
 import { GBP_OPERATIONS } from "./agent/gbp-operations";
+// Website documents (src/products/websites) through the port src/lib declares
+// (Strelva Reborn section 7).
+import { workspacePorts, type VerifiedActor } from "./workspace-ports";
 
 /**
  * Shared AI-agent gates. The agent runs through two entry points — the streaming chat
@@ -307,19 +310,19 @@ export function buildUndoTool(hooks: UndoToolHooks) {
  * each execution also requires a verified actor with access to the saved work. */
 export function buildSiteDocumentTools(input: {
   tenantId: string;
-  actor: import("@/platform/workspaces/types").WorkspaceActor | null;
+  actor: VerifiedActor | null;
   onResult?: (status: "queued" | "failed", message: string) => void;
 }) {
   const selection = async () => {
-    const { websiteRebuildReleaseMayBeOn, websiteRebuildReleasedFor } = await import("@/products/websites/index");
+    const { websiteRebuildReleaseMayBeOn, websiteRebuildReleasedFor } = await workspacePorts().websites();
     if (!websiteRebuildReleaseMayBeOn()) throw new Error("Website rebuilds are unavailable.");
     if (!input.actor) throw new Error("A verified signed-in account is required.");
-    const { websiteDocumentStore } = await import("@/products/websites/index");
+    const { websiteDocumentStore } = await workspacePorts().websites();
     const published = await websiteDocumentStore.published(input.tenantId);
     if (!published) throw new Error("This tenant does not have a v2 website document.");
     // Per business under `workspace`: the published document's workspace row decides.
     if (!(await websiteRebuildReleasedFor(input.actor, published.workspaceId))) throw new Error("Website rebuilds are unavailable.");
-    const { readWebsiteRebuild } = await import("@/products/websites/index");
+    const { readWebsiteRebuild } = await workspacePorts().websites();
     const record = await readWebsiteRebuild(input.actor,published.workId);
     if (record.workspaceId !== published.workspaceId || record.rebuild.tenantId !== input.tenantId) throw new Error("Website scope changed. Reload before continuing.");
     return record;
@@ -329,7 +332,7 @@ export function buildSiteDocumentTools(input: {
       description: "Read v2 website pages, metadata, root IDs and stable node IDs. allPages lists the full site even when path selects one page. Use read_section for legacy websites.",
       inputSchema: z.object({ path: z.string().startsWith("/").max(512).optional() }).strict(),
       execute: async ({ path }) => {
-        try { const record = await selection(); const { readSiteNodes } = await import("@/products/websites/index"); if (!record.rebuild.candidate) return { error:"No website candidate is available." }; return { workId:record.workId,expectedRevision:record.rebuild.revision,candidateRevision:record.rebuild.candidate.revision,candidateContentHash:record.rebuild.candidate.contentHash,...readSiteNodes(record.rebuild.candidate.document,path) }; }
+        try { const record = await selection(); const { readSiteNodes } = await workspacePorts().websites(); if (!record.rebuild.candidate) return { error:"No website candidate is available." }; return { workId:record.workId,expectedRevision:record.rebuild.revision,candidateRevision:record.rebuild.candidate.revision,candidateContentHash:record.rebuild.candidate.contentHash,...readSiteNodes(record.rebuild.candidate.document,path) }; }
         catch { return { error:"This website document is unavailable to your account." }; }
       },
     }),
@@ -337,7 +340,7 @@ export function buildSiteDocumentTools(input: {
       description: "Draft RFC6902 /nodes and /pages entry patches on a v2 site. To add a page, add its catalog nodes and a /pages/- entry with path/title/description/root together. Read the site first and include its exact revision/hash. Page copy and navigation require owner review. Facts, assets, capabilities, theme and provenance are immutable.",
       inputSchema: z.object({ expectedRevision:z.number().int().nonnegative(),candidateRevision:z.number().int().positive(),candidateContentHash:z.string().regex(/^[a-f0-9]{64}$/),ops:z.array(z.object({op:z.enum(["add","remove","replace","test","move","copy"]),path:z.string().max(500).regex(/^\/(?:nodes\/[^/]+|pages\/(?:0|[1-9]\d*|-))(?:\/.*)?$/),from:z.string().max(500).regex(/^\/(?:nodes\/[^/]+|pages\/(?:0|[1-9]\d*|-))(?:\/.*)?$/).optional(),value:z.unknown().optional()}).strict()).min(1).max(100) }).strict(),
       execute: async (patch) => {
-        try { const record = await selection(); const { patchWebsiteRebuild } = await import("@/products/websites/index"); await patchWebsiteRebuild(input.actor!,record.workId,{...patch,forceReview:true}); const message="Website changes are saved as a new revision for owner review."; input.onResult?.("queued",message); return { success:true,agentResultStatus:"queued" as const,message,workId:record.workId }; }
+        try { const record = await selection(); const { patchWebsiteRebuild } = await workspacePorts().websites(); await patchWebsiteRebuild(input.actor!,record.workId,{...patch,forceReview:true}); const message="Website changes are saved as a new revision for owner review."; input.onResult?.("queued",message); return { success:true,agentResultStatus:"queued" as const,message,workId:record.workId }; }
         catch { const message="The website patch could not be confirmed. Read the current site before retrying."; input.onResult?.("failed",message); return { success:false,agentResultStatus:"failed" as const,error:message }; }
       },
     }),
@@ -366,7 +369,7 @@ export interface AskToolContext {
   /** From resolveEditableSections. */
   sectionEnum: ReturnType<typeof resolveEditableSections>["sectionEnum"];
   /** Verified signed-in actor, for the v2 website document tools. */
-  actor: import("@/platform/workspaces/types").WorkspaceActor | null;
+  actor: VerifiedActor | null;
   /** Whether the Google Business write tools may be offered (resolveGbpWriteAllowed). */
   gbpWriteAllowed: boolean;
   /** Result hook: each tool reports what it drafted, queued or refused. */
@@ -477,7 +480,7 @@ export async function buildTenantChatTools(ctx: AskToolContext): Promise<Record<
     import("./template-manifests"),
     import("./tenants"),
     import("./connections"),
-    import("./brand"),
+    import("@/platform/infra/brand"),
     import("./integration-registry"),
     import("./image-signature"),
     import("./site-capabilities"),

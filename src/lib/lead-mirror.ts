@@ -27,7 +27,7 @@
 import { getSupabase } from "@/platform/infra/db/client";
 import { dualWritePgEnabled } from "@/platform/infra/db/dual-write";
 import { getRedis } from "@/platform/infra/redis";
-import { alertOnce } from "./monitoring";
+import { alertOnce } from "@/platform/infra/monitoring";
 
 export const LEAD_MIRROR_TIMEOUT_MS = 1500;
 export const LEAD_MIRROR_FAILURE_TIMEOUT_MS = 250;

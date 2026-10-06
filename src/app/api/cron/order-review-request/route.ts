@@ -21,7 +21,7 @@
 
 import { ownerNoticeEmail } from "@/lib/owner-recipient";
 import { NextResponse } from "next/server";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { mapPool } from "@/lib/concurrency";
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 import { getRedis } from "@/platform/infra/redis";

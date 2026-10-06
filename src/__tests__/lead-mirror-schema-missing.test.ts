@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => ({
   sendNewLeadEmail: vi.fn(),
 }));
 vi.mock("@/platform/infra/redis", () => ({ getRedis: () => (redisAvailable ? redis : null) }));
-vi.mock("@/lib/monitoring", () => ({ alertOnce: mocks.alertOnce }));
+vi.mock("@/platform/infra/monitoring", () => ({ alertOnce: mocks.alertOnce }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.tenant, getAllTenants: async () => [] }));
 vi.mock("@/lib/delivery-email", () => ({ sendNewLeadEmail: mocks.sendNewLeadEmail }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: async () => false, rateLimitKey: () => "schema-missing-test" }));

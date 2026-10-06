@@ -2,8 +2,8 @@ import { websiteRebuildReleaseEnabledForWorkspace, websiteRebuildReleaseMayBeOn 
 import { OPERATOR_VIEWER } from "@/platform/release-flags/viewer";
 import { NextResponse } from "next/server";
 import { requireCronRequest } from "@/lib/cron-auth";
-import { recordHeartbeat, checkHeartbeats, CRON_MAX_AGE_SECONDS } from "@/lib/heartbeat";
-import { ROOT_DOMAIN,OPERATOR_URL } from "@/lib/brand";
+import { recordHeartbeat, checkHeartbeats, CRON_MAX_AGE_SECONDS } from "@/platform/infra/heartbeat";
+import { ROOT_DOMAIN,OPERATOR_URL } from "@/platform/infra/brand";
 import { websiteDocumentStore } from "@/products/websites/index";
 import { scanWebsiteHealth, type WebsiteHealthReceipt } from "@/products/websites/index";
 import { sendEmailWithReceipt } from "@/platform/infra/email/send";

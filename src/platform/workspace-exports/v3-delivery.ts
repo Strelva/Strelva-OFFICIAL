@@ -6,7 +6,7 @@
  * while client email is paused, nothing is sent and the operator is told.
  */
 import { sendEmailWithReceipt } from "@/platform/infra/email/send";
-import { alert } from "@/lib/monitoring";
+import { alert } from "@/platform/infra/monitoring";
 import type { V3Manifest } from "./v3";
 
 export function workspaceExportLink(baseUrl: string, buildId: string, token: string): string {

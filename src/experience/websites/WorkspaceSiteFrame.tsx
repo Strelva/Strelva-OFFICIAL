@@ -4,7 +4,7 @@ import { useMemo, type ReactNode } from "react";
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import { DashboardProvider } from "@/components/dashboard/DashboardContext";
 import { resolveRelationship } from "@/platform/relationships";
-import { SITE_TAB_LABEL, workspaceDashboardHref, workspaceSiteHref, type SiteTab } from "@/lib/workspace-site-places";
+import { SITE_TAB_LABEL, workspaceDashboardHref, workspaceSiteHref, type SiteTab } from "@/platform/workspaces/site-places";
 import styles from "./workspace-site.module.css";
 
 export interface WorkspaceSiteFrameProps {

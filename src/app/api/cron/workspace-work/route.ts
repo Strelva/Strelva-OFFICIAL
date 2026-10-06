@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireCronRequest } from "@/lib/cron-auth";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { listDueWork, sweepDueWork } from "@/products/operations/server";
 

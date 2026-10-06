@@ -1,5 +1,5 @@
 import type { TenantDomainHealth } from "@/lib/domain-monitor";
-import type { HeartbeatStatus } from "@/lib/heartbeat";
+import type { HeartbeatStatus } from "@/platform/infra/heartbeat";
 import type { ScanSummary } from "@/lib/scan-store";
 import type { CustomRepoRevalidationHealth, TenantDeliveryModel } from "@/lib/types";
 import { businessHealthGraph, deriveSystemHealth, type HealthReason, type HealthStatus, type Observation } from "@/platform/system-health";

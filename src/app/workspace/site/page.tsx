@@ -9,7 +9,7 @@ import { systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
 import { readExistingSystemsSnapshot } from "@/platform/systems/from-existing";
 import { listWorkspaces } from "@/platform/workspaces";
 import { askReleaseMayBeOn } from "@/platform/ask/release";
-import { NATIVE_TABS, REQUEST_TABS, isSiteTab, workspaceDashboardHref, workspaceSiteHref, type SiteTab } from "@/lib/workspace-site-places";
+import { NATIVE_TABS, REQUEST_TABS, isSiteTab, workspaceDashboardHref, workspaceSiteHref, type SiteTab } from "@/platform/workspaces/site-places";
 import { loadBrandKitSettings, loadCollectionsData, loadGoogleBusinessData, loadSiteEditorData, siteFrameFor } from "@/lib/website-page-data";
 import { getTenantPrimaryDomain } from "@/lib/tenant-urls";
 import { resolveWorkspaceSite } from "@/products/websites/server";

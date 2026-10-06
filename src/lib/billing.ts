@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 import { getTenantDashboardUrl } from "./tenant-urls";
 import { updateTenant } from "./tenants";
-import { businessBillingCheckoutMetadata } from "@/platform/business-billing";
+import { workspacePorts } from "./workspace-ports";
 import type { TenantConfig } from "./types";
 import type { CommercialPlanKey } from "./types";
 
@@ -85,7 +85,7 @@ export async function createTenantSubscriptionCheckout(
 
   // A converted business also gets workspaceId (STRELVA_BUSINESS_BILLING,
   // off by default). Additive: tenantId always stays.
-  const businessMetadata = await businessBillingCheckoutMetadata(tenant.id);
+  const businessMetadata = await (await workspacePorts().businessBilling()).businessBillingCheckoutMetadata(tenant.id);
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     client_reference_id: tenant.id,

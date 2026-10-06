@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { reconcileLeadMirror, runLeadReadParity } from "@/lib/client-leads";
 import { purgeExpiredTenantLeads } from "@/lib/lead-mirror";
-import { alertOnce } from "@/lib/monitoring";
+import { alertOnce } from "@/platform/infra/monitoring";
 import { requireCronRequest } from "@/lib/cron-auth";
 import { repairPendingClientRecords } from "@/platform/client-records/move";
 import { repairPendingBookings } from "@/platform/bookings/move";

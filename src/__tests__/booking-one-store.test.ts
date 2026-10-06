@@ -44,7 +44,7 @@ vi.mock("@/lib/tenants", () => ({ getTenantConfig: async (id: string) => ({ id, 
 vi.mock("@/lib/owner-recipient", () => ({ ownerNoticeEmail: async () => "owner-recipient@example.test" }));
 vi.mock("@/lib/tenant-urls", () => ({ getTenantDashboardUrl: (_c: unknown, path: string) => `https://app.strelva.test${path}` }));
 vi.mock("@/lib/delivery-email", () => ({ sendBookingConfirmation: h.sendBookingConfirmation, sendNewBookingOwnerEmail: h.sendNewBookingOwnerEmail }));
-vi.mock("@/lib/monitoring", () => ({ alertOnce: h.alertOnce }));
+vi.mock("@/platform/infra/monitoring", () => ({ alertOnce: h.alertOnce }));
 vi.mock("@/platform/infra/auth", () => ({ verifyAuth: async () => true, requireTenantPermission: async () => null, requireTenantAccess: async () => null }));
 vi.mock("@/lib/subscription", () => ({ requireActiveSubscription: async () => null }));
 vi.mock("@/lib/leads", () => ({ getLeadById: async () => null }));

@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import { PrivacyAwareAnalytics } from "@/components/PrivacyAwareAnalytics";
-import { BRAND_NAME, MARKETING_URL } from "@/lib/brand";
+import { BRAND_NAME, MARKETING_URL } from "@/platform/infra/brand";
 import "./globals.css";
 
 const geist = Geist({

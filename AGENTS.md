@@ -108,7 +108,7 @@ path (`src/platform/infra/crypto/secrets.ts`). Shared infrastructure lives in
 Extend these; don't build a second.
 
 **Crons.** Declare in `vercel.json`, authenticate with `requireCronRequest`,
-and register in `CRON_MAX_AGE_SECONDS` in `src/lib/heartbeat.ts`.
+and register in `CRON_MAX_AGE_SECONDS` in `src/platform/infra/heartbeat.ts`.
 
 **Outside writes.** Content and Google changes go through
 `src/lib/ai-governance.ts` and approval. The only exception is a tenant's

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makeRealPath, type LiveMakeRealPorts } from "@/experience/systems/live-make-real";
-import { possibilityPreviewPath, signPossibilityPreviewToken, verifyPossibilityPreviewToken, POSSIBILITY_PREVIEW_TTL_MS } from "@/lib/possibility-preview-link";
+import { possibilityPreviewPath, signPossibilityPreviewToken, verifyPossibilityPreviewToken, POSSIBILITY_PREVIEW_TTL_MS } from "@/platform/possibilities/preview-link";
 import { possibilityTryState } from "@/experience/systems/try-state";
 
 const WS = "d1000000-0000-4000-8000-000000000001";

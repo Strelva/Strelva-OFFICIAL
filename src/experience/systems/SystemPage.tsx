@@ -22,7 +22,7 @@ import {
   CONNECTION_KIND_LABEL, INCOMING_CONNECTION_LABEL, PAUSED_KEEPS, POSSIBILITY_STATUS_LABEL, SYSTEM_KIND_LABEL, makeRealSummary,
   type MakeRealOutcome, type SystemConnection, type SystemPossibility, type SystemView,
 } from "./model";
-import { workspaceSiteHref } from "@/lib/workspace-site-places";
+import { workspaceSiteHref } from "@/platform/workspaces/site-places";
 import { SystemPanel as Panel } from "./SystemPanel";
 import { WebsiteSystemPanels, useWebsiteSystemDetail, type WebsiteDetailState } from "./WebsiteSystemPanels";
 import { WebsiteChangeAsk } from "./WebsiteChangeAsk";

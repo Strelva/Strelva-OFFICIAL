@@ -5,7 +5,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { getContent } from "@/lib/storage";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { readJsonObject } from "@/lib/request-body";
-import { trackError } from "@/lib/monitoring";
+import { trackError } from "@/platform/infra/monitoring";
 
 const checkoutItemSchema = z.object({
   productId: z.string(),

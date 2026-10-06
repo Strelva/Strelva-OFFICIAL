@@ -11,9 +11,16 @@
  * score-ordered index trimmed to the newest SPAM_KEEP.
  */
 import { getRedis } from "@/platform/infra/redis";
-import { mirrorClientRecord } from "@/platform/client-records/mirror";
-import { readThroughFlag } from "@/platform/client-records/move";
+import { workspacePorts, type ClientRecordsPort, type ClientRecordStoreName, type ClientRecordCopy } from "./workspace-ports";
 import { holdSpamForReview } from "./inquiry-records";
+
+// The workspace client-records mirror, through the port src/lib declares
+// (Strelva Reborn section 7). Never throws, as before.
+const mirrorClientRecord: ClientRecordsPort["mirrorClientRecord"] = async (...args) =>
+  (await workspacePorts().clientRecords()).mirrorClientRecord(...args);
+async function readThroughFlag<T>(store: ClientRecordStoreName, tenant: string, fromRedis: () => Promise<T>, fromPostgres: (records: ClientRecordCopy[]) => T): Promise<T> {
+  return (await workspacePorts().clientRecords()).readThroughFlag(store, tenant, fromRedis, fromPostgres);
+}
 
 const SPAM_TTL_SECONDS = 30 * 24 * 60 * 60;
 const SPAM_KEEP = 1000;

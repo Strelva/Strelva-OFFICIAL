@@ -13,8 +13,8 @@ vi.mock("@/platform/bookings/move", () => ({ repairPendingBookings: mocks.bookin
 vi.mock("@/platform/bookings/legacy-ports", () => ({ legacyBookingPorts: {} }));
 vi.mock("@/lib/client-leads", () => ({ reconcileLeadMirror: mocks.reconcile, runLeadReadParity: mocks.parity }));
 vi.mock("@/lib/lead-mirror", () => ({ purgeExpiredTenantLeads: mocks.purge }));
-vi.mock("@/lib/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
-vi.mock("@/lib/monitoring", () => ({ alertOnce: mocks.alertOnce }));
+vi.mock("@/platform/infra/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
+vi.mock("@/platform/infra/monitoring", () => ({ alertOnce: mocks.alertOnce }));
 vi.mock("@/lib/cron-auth", () => ({ requireCronRequest: mocks.denied }));
 
 import { GET } from "@/app/api/cron/lead-mirror-reconcile/route";

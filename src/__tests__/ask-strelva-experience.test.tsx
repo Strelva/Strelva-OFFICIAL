@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { AskStrelva } from "@/experience/ask/AskStrelva";
 import { askErrorMessage, readAskResult, receiptLines, resultHeadline, sameAppPath } from "@/experience/ask/ask-model";
-import { workspaceReturnTarget } from "@/lib/workspace-location";
+import { workspaceReturnTarget } from "@/platform/workspaces/location";
 import { sectionFromView, sectionTitle } from "@/experience/app-frame/workspace-places";
 
 const WS = "11111111-1111-4111-8111-111111111111";

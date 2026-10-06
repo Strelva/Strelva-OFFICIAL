@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import * as http from "node:http";
 import * as https from "node:https";
 import { validateUrlSafety } from "@/lib/audit/checks";
-import { pinnedRequestOptions } from "@/lib/pinned-lookup";
+import { pinnedRequestOptions } from "@/platform/infra/pinned-lookup";
 import { sniffImageType, readImageDimensions } from "@/lib/image-signature";
 import { uploadTenantMedia } from "@/lib/media-store";
 import type { SiteDocument } from "./site-document";

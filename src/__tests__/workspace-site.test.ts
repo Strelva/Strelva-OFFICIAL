@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import { CONTENT_READING_REPOS, siteEditingFor } from "@/products/websites/site-editing";
 import { resolveWorkspaceSite, type WorkspaceSiteDeps } from "@/products/websites/workspace-site";
 import { SITE_CHANGE_STAGE_LABEL, siteChangeRequestCommand, siteChangeStage, recordSiteChangeSchema, type SiteChangeRequest } from "@/products/websites/site-change-model";
-import { sitePlaceForDashboardPath, workspaceDashboardHref, workspaceSiteHref, workspaceSiteTarget } from "@/lib/workspace-site-places";
-import { workspaceReturnTarget } from "@/lib/workspace-location";
+import { sitePlaceForDashboardPath, workspaceDashboardHref, workspaceSiteHref, workspaceSiteTarget } from "@/platform/workspaces/site-places";
+import { workspaceReturnTarget } from "@/platform/workspaces/location";
 import { systemOriginId } from "@/platform/systems/invariants";
 import type { ExistingSystemsSnapshot } from "@/platform/systems/from-existing";
 

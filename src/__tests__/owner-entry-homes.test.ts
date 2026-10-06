@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { workspaceReturnTarget } from "@/lib/workspace-location";
+import { workspaceReturnTarget } from "@/platform/workspaces/location";
 import { setReleaseFlagsDb } from "@/platform/release-flags/store";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import { linkedSiteDefaults, ownerEntryHomesOpen, readLinkedSite, readLinkedSites, type LinkedSiteDependencies } from "@/platform/owner-entry/linked-sites";

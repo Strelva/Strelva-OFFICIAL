@@ -1,6 +1,6 @@
 import { systemOriginId } from "@/platform/systems/invariants";
 import type { ReleaseFlag } from "@/platform/release-flags/resolve";
-import { workspaceSiteHref, type SiteTab } from "@/lib/workspace-site-places";
+import { workspaceSiteHref, type SiteTab } from "@/platform/workspaces/site-places";
 
 /**
  * Where each `/dashboard` page lands in the workspace (owner-entry spec §5).

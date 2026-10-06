@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/platform/infra/redis", () => ({ getRedis: () => (redisAvailable ? redis : null) }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.tenant }));
 vi.mock("@/lib/delivery-email", () => ({ sendNewLeadEmail: mocks.sendNewLeadEmail }));
-vi.mock("@/lib/monitoring", () => ({ alertOnce: mocks.alertOnce }));
+vi.mock("@/platform/infra/monitoring", () => ({ alertOnce: mocks.alertOnce }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: async () => false, rateLimitKey: () => "v1-leads-test" }));
 vi.mock("@/lib/spam-pit", () => ({ recordSpam: vi.fn() }));
 vi.mock("@/products/inquiries/server", () => ({

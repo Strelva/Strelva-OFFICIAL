@@ -11,7 +11,7 @@
  * - Possibilities: a saved website rebuild becomes a Possibility of the site
  *   it rebuilds, prepared and marked Ready through src/platform/possibilities.
  */
-import { checkHeartbeats } from "@/lib/heartbeat";
+import { checkHeartbeats } from "@/platform/infra/heartbeat";
 import { getDomainHealth } from "@/lib/domain-monitor-store";
 import { getScanSummaries } from "@/lib/scan-store";
 import type { WorkspaceActor } from "@/platform/workspaces/types";

@@ -1,7 +1,7 @@
 import { createServer, request, type Server } from "node:http";
 import type { AddressInfo, LookupFunction } from "node:net";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { pinnedLookup, pinnedRequestOptions } from "@/lib/pinned-lookup";
+import { pinnedLookup, pinnedRequestOptions } from "@/platform/infra/pinned-lookup";
 
 let server: Server; let port = 0;
 beforeAll(async () => {
