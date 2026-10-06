@@ -21,7 +21,7 @@ import { bareHostname, type WebsiteRebuildCandidate } from "@/products/websites/
 import { inquiryFormUnchecked, makeRealInSandbox, projectWorkspaceSystems, type SystemsProjectionInput } from "@/experience/systems/server";
 import type { WorkspaceMakeRealResult, WorkspaceSnapshot, WorkspaceSystems } from "../contracts";
 import { createPreviewRequest, type PreviewScenario } from "./fixture";
-import { MOONEY_TENANT } from "./systems-fixture";
+import { MOONEY_TENANT, previewStoredVersions } from "./systems-fixture";
 import { addPublishingSystems } from "@/products/publishing/projection";
 import { previewPublishingExtras, previewPublishingSnapshot, type PreviewPublishing } from "./publishing-fixture";
 import { withPreviewMakeReal, type PreviewMakeReal } from "./make-real-fixture";
@@ -124,7 +124,10 @@ export async function previewSystems(scenario: PreviewScenario, options: { insta
       now,
     };
     const projected = await projectWorkspaceSystems({ ...base, observations: [...fixtureEvidence(scenario, { listing }, now), ...(published?.observations ?? [])] });
-    const projection = scenario.startsWith("mooney") ? withPreviewMakeReal(projected, options.makeReal ?? "off", now) : projected;
+    // Lineage comes only from stored Version rows, as on the route (withVersions).
+    const versions = projected.status === "ready" ? previewStoredVersions(workspace.id, projected.systems) : [];
+    const withLineage = versions.length ? { ...projected, versions } : projected;
+    const projection = scenario.startsWith("mooney") ? withPreviewMakeReal(withLineage, options.makeReal ?? "off", now) : withLineage;
     result.systems[workspace.id] = projection;
     for (const possibility of projection.possibilities.filter((item) => item.status === "ready")) {
       const made = await makeRealInSandbox(base, PREVIEW_ACTOR, possibility.id, { canActivate: true });
