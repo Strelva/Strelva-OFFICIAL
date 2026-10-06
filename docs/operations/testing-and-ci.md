@@ -113,6 +113,18 @@ no Redis. It needs `redis-server` on `PATH` (`brew install redis`). Run it when
 a delivery-store script or the stored checkpoint shape changes. A green run is
 local proof only.
 
+## Scrubbed production copy check
+
+`pnpm check:scrubbed-copy` proves the scrubbed-copy tooling
+([runbook](scrubbed-production-copy.md)) end to end against a fake source. It
+builds a throwaway PostgreSQL cluster at production's recorded migration level,
+seeded with fixture tenants, and a throwaway redis-server behind the Upstash
+REST protocol. It then copies, scrubs, loads and dry-runs every active
+tenant's conversion. It never contacts a hosted service. It needs PostgreSQL 18
+binaries, `redis-server` and `LC_ALL` set (see below). `pnpm test` runs only the
+unit tests (`src/__tests__/scrubbed-copy.test.ts`); the end-to-end file skips
+unless `SCRUBBED_COPY_E2E=1`. A green run is local proof only.
+
 ## Workspace schema checks
 
 `pnpm check:workspace-sql` builds the current workspace and recovery schema in
