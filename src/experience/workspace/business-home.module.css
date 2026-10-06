@@ -481,3 +481,75 @@
     transition: none;
   }
 }
+
+/* Needs you and Strelva handled rows: text on the left, actions on the right;
+   actions wrap under the text on narrow screens. */
+.decision {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 12px 8px;
+}
+
+.decisionBody {
+  min-width: 0;
+  flex: 1 1 280px;
+}
+
+.decisionBody strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.decisionBody p {
+  margin: 2px 0 0;
+  color: var(--warm-black);
+  font-size: 12px;
+  line-height: 19px;
+  overflow-wrap: anywhere;
+}
+
+.decisionBody small {
+  display: block;
+  margin-top: 2px;
+  color: var(--gray-muted);
+  font-size: 11px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+
+.decisionActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.decisionLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding-inline: 8px;
+  color: var(--warm-black);
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.decisionError {
+  color: var(--critical);
+}
+
+.outcomes {
+  margin: 8px 0 0;
+  padding: 0 8px;
+  list-style: none;
+  color: var(--gray-muted);
+  font-size: 12px;
+  line-height: 20px;
+}
