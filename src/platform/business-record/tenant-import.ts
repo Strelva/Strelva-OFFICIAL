@@ -293,3 +293,24 @@ export function planTenantImport(source: TenantImportSource, options: { targetWo
     },
   };
 }
+
+export interface TenantUnlinkCommand {
+  tenantId: string;
+  workspaceId: string;
+  digest: string;
+  commandId: string;
+}
+
+/** The unlink command for one specific link. Rerunning against the same link
+ * yields the same command, so a retried rollback replays instead of acting
+ * twice; a later link (after a reconversion) gets a new one. */
+export function planTenantUnlink(link: { tenantId: string; tenantStableId: string; workspaceId: string; linkedAt: string }): TenantUnlinkCommand {
+  const body = { kind: "tenant_unlink", version: 1, ...link };
+  const digest = sha256(canonicalJson(body));
+  return {
+    tenantId: link.tenantId,
+    workspaceId: link.workspaceId,
+    digest,
+    commandId: uuidFromSeed(`strelva-tenant-unlink:v1:${link.tenantStableId}:${digest}`),
+  };
+}

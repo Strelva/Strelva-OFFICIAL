@@ -58,6 +58,10 @@ const CONFLICTS: Record<string, string> = {
   tenant_conversion_idempotency_conflict: "This conversion command was already used with a different plan.",
   tenant_conversion_identity_mismatch: "The tenant changed identity since the plan was made. Plan again.",
   tenant_conversion_target_invalid: "The target business is not a converted business this operator runs.",
+  tenant_unlink_idempotency_conflict: "This unlink command was already used for a different unlink.",
+  tenant_unlink_workspace_mismatch: "The site is linked to a different business than the one previewed. Preview again.",
+  tenant_unlink_not_linked: "That site is not linked to a business.",
+  tenant_unlink_conflict: "The business record changed during the unlink. Preview again.",
 };
 
 const VALIDATION: Record<string, string> = {
@@ -65,12 +69,14 @@ const VALIDATION: Record<string, string> = {
   business_record_source_invalid: "That source cannot make this change.",
   business_record_command_invalid: "The command id or digest is missing.",
   tenant_conversion_invalid: "The conversion plan is malformed.",
+  tenant_unlink_invalid: "The unlink command is malformed.",
 };
 
 const ACCESS = [
   "business_record_access_denied",
   "tenant_conversion_operator_required",
   "tenant_conversion_tenant_not_found",
+  "tenant_unlink_access_denied",
 ];
 
 export function mapBusinessRecordError(error: DbError, fallback: string): never {

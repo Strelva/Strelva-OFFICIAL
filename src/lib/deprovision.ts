@@ -42,6 +42,23 @@ export const TENANT_SCOPED_TABLES = [
   "proposals", "weekly_briefs",
 ] as const;
 
+// Tables that carry a tenant_id but belong to a business workspace's own
+// website (20261001120000_website_documents.sql). They are deliberately NOT
+// swept: their tenant foreign keys are `on delete restrict`, so the final
+// `tenants` delete fails while a workspace website still publishes to, or
+// reserved, this tenant. Release it through the workspace first. Because the
+// sweep deletes child tables before `tenants`, such a failure today comes
+// after the other tenant tables were already deleted.
+export const WORKSPACE_OWNED_TENANT_TABLES = [
+  "website_document_publications", "website_hosted_tenant_reservations",
+] as const;
+
+// Tables keyed on the tenant's stable_id are not swept by slug either; the
+// `tenants` delete settles them through their foreign keys:
+//   tenant_leads            on delete cascade (the tenant's leads are deleted)
+//   tenant_workspace_links  on delete set null (the business and receipt stay)
+//   tenant_workspace_unlinks no foreign key (unlink receipts stay)
+
 // Global Redis caches that include this tenant; safe to bust (they rebuild).
 const GLOBAL_CACHE_KEYS = ["reb:tenants:all", "reb:domain-map", "reb:portfolio:summary"];
 

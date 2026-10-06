@@ -36,4 +36,13 @@ describe("deprovision-tenant table coverage", () => {
     const missing = tenantTables.filter((t) => !new RegExp(`"${t}"`).test(deprovisionLib));
     expect(missing, `src/lib/deprovision.ts is missing tenant_id tables: ${missing.join(", ")}`).toEqual([]);
   });
+
+  it("keeps workspace-owned website tables out of the sweep", () => {
+    const swept = deprovisionLib.slice(deprovisionLib.indexOf("TENANT_SCOPED_TABLES = ["), deprovisionLib.indexOf("] as const;"));
+    for (const table of ["website_document_publications", "website_hosted_tenant_reservations"]) {
+      expect(tenantTables).toContain(table);
+      expect(swept).not.toContain(`"${table}"`);
+      expect(deprovisionLib).toMatch(new RegExp(`WORKSPACE_OWNED_TENANT_TABLES = \\[[^\\]]*"${table}"`));
+    }
+  });
 });
