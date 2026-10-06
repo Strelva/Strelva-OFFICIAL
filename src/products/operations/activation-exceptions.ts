@@ -41,7 +41,7 @@ export function activationExceptions(
         ageAt: step.finishedAt || step.startedAt || a.updatedAt,
         owner,
         safeAction: step.status === "unknown" || readBackFailed ? "reconcile" : step.effect === "none" ? "retry" : "inspect",
-        deepLink: `/admin/make-real?workspaceId=${encodeURIComponent(workspaceId)}&activationId=${encodeURIComponent(a.id)}#step-${encodeURIComponent(step.id)}`,
+        deepLink: `/api/admin/make-real?workspaceId=${encodeURIComponent(workspaceId)}&activationId=${encodeURIComponent(a.id)}`,
       });
     }
   }

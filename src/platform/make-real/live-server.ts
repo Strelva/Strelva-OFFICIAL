@@ -117,6 +117,24 @@ export async function readReadyPossibilities(workspaceId: string): Promise<Possi
   return (await readReadyPossibilitiesWithNames(workspaceId)).possibilities;
 }
 
+/**
+ * The identity an activation runs under: the owner whose approval started it
+ * (the activation RPCs accept only a direct owner or admin). An operator's
+ * resume, reconcile or rollback runs as that owner and names the operator in
+ * the history event, so the log says who acted.
+ */
+export async function activationStarter(workspaceId: string, activationId: string): Promise<WorkspaceActor | null> {
+  const client = getSupabase();
+  if (!client) return null;
+  const db = client as unknown as { from(table: string): { select(c: string): { eq(c: string, v: string): { eq(c: string, v: string): { eq(c: string, v: string): { eq(c: string, v: string): { maybeSingle(): PromiseLike<{ data: Record<string, unknown> | null; error: unknown }> } } } } } } };
+  const row = await db.from("saved_product_work").select("created_by").eq("workspace_id", workspaceId).eq("product_id", "operations").eq("resource_kind", "activation").eq("payload->>id", activationId).maybeSingle();
+  const userId = typeof row.data?.created_by === "string" ? row.data.created_by : null;
+  if (row.error || !userId) return null;
+  const users = client as unknown as { from(table: string): { select(c: string): { eq(c: string, v: string): { maybeSingle(): PromiseLike<{ data: Record<string, unknown> | null; error: unknown }> } } } };
+  const user = await users.from("users").select("email").eq("id", userId).maybeSingle();
+  return typeof user.data?.email === "string" ? { userId, verifiedEmail: user.data.email.toLowerCase() } : null;
+}
+
 const dueSchema = z.array(z.object({ workspaceId: z.string().uuid(), activationId: z.string(), userId: z.string().uuid(), email: z.string() }));
 /** In-progress activations for the existing workspace-work cron. */
 export async function listDueActivations(limit = 20): Promise<Array<{ workspaceId: string; activationId: string; actor: WorkspaceActor }>> {
