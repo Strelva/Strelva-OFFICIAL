@@ -1,0 +1,261 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+import {
+  assertNoSensitiveOutput,
+  formatReport,
+  MIGRATION_SENTINELS,
+  parseSnapshotArgs,
+  runReadinessSnapshot,
+  type DbFilter,
+  type ReadOnlyDb,
+  type ReadOnlyRedis,
+  type SnapshotDeps,
+} from "../../scripts/readiness-snapshot";
+
+const NOW = Date.parse("2026-10-06T12:00:00.000Z");
+
+type Row = Record<string, unknown>;
+
+/** In-memory Postgres fake: tables that exist hold rows; others are "missing". */
+function fakeDb(tables: Record<string, Row[]>) {
+  const calls: string[] = [];
+  const match = (row: Row, filters: DbFilter[] = []) =>
+    filters.every((f) =>
+      f.op === "eq" ? row[f.column] === f.value
+        : f.op === "not_null" ? row[f.column] !== null && row[f.column] !== undefined
+          : f.op === "is_null" ? row[f.column] === null || row[f.column] === undefined
+            : String(row[f.column]) >= f.value);
+  const db: ReadOnlyDb = {
+    async count(table, filters) {
+      calls.push(`count ${table}`);
+      const rows = tables[table];
+      if (!rows) return { ok: false, missing: true, reason: `relation "${table}" does not exist` };
+      return { ok: true, count: rows.filter((r) => match(r, filters)).length };
+    },
+    async rows<T extends Row>(table: string, columns: string, options?: { filters?: DbFilter[]; orderBy?: { column: string; ascending: boolean }; limit?: number }) {
+      calls.push(`rows ${table} ${columns}`);
+      const rows = tables[table];
+      if (!rows) return { ok: false as const, missing: true, reason: "missing" };
+      let out = rows.filter((r) => match(r, options?.filters));
+      if (options?.orderBy) {
+        const { column, ascending } = options.orderBy;
+        out = [...out].sort((a, b) => (String(a[column]) < String(b[column]) ? -1 : 1) * (ascending ? 1 : -1));
+      }
+      if (options?.limit) out = out.slice(0, options.limit);
+      const cols = columns.split(",").map((c) => c.trim());
+      return { ok: true as const, rows: out.map((r) => Object.fromEntries(cols.map((c) => [c, r[c]])) as T) };
+    },
+  };
+  return { db, calls };
+}
+
+/** Redis fake that only implements the read interface; values are never exposed. */
+function fakeRedis(keys: Record<string, { type: string; card?: number }>) {
+  const calls: string[] = [];
+  const redis: ReadOnlyRedis = {
+    async scan(cursor, { match }) {
+      calls.push(`scan ${match}`);
+      const re = new RegExp(`^${match.split("*").map((p) => p.replace(/[.+?^${}()|[\]\\]/g, "\\$&")).join(".*")}$`);
+      const all = Object.keys(keys).filter((k) => re.test(k)).sort();
+      // Two pages, to prove the cursor loop.
+      if (cursor === "0" && all.length > 1) return ["7", all.slice(0, 1)];
+      return ["0", cursor === "0" ? all : all.slice(1)];
+    },
+    async type(key) {
+      calls.push(`type ${key}`);
+      return keys[key]?.type ?? "none";
+    },
+    async cardinality(key) {
+      calls.push(`card ${key}`);
+      return keys[key]?.card ?? null;
+    },
+  };
+  return { redis, calls };
+}
+
+const tables: Record<string, Row[]> = {
+  tenants: [
+    { id: "gldf", active: true, features: ["rewards", "commerce"], resend_domain: "mail.strelva.com", google_search_console_key: "enc:v1:abc", owner_email: "owner@gldf.example" },
+    { id: "rohlax", active: true, features: null, resend_domain: null, google_search_console_key: null, owner_email: "x@rohlax.example" },
+    { id: "old-client", active: false, features: [], resend_domain: null, google_search_console_key: null },
+  ],
+  workspaces: [{ kind: "personal" }, { kind: "agency" }],
+  workspace_memberships: [{}, {}],
+  memberships: [],
+  invites: [{ claimed_at: null }, { claimed_at: "2026-09-01" }],
+  workspace_invitations: [{ status: "pending" }, { status: "accepted" }],
+  proposals: [{ created_at: "2026-10-01T00:00:00.000Z" }],
+  unified_events: [
+    { created_at: "2026-10-06T06:00:00.000Z" },
+    { created_at: "2026-10-02T00:00:00.000Z" },
+    { created_at: "2026-08-01T00:00:00.000Z" },
+  ],
+  tenant_leads: [{}, {}, {}],
+  // 20261005090000 applied; nothing else from the pending set.
+};
+
+const redisKeys = {
+  "reb:client-email:gldf": { type: "string" },
+  "orders:gldf": { type: "zset", card: 12 },
+  "order:gldf:o1": { type: "string" },
+  "reb:rewards:gldf:members": { type: "set" },
+  "reb:rewards:gldf:member:a": { type: "hash" },
+  "leads:gldf": { type: "zset", card: 40 },
+  "leads:rohlax": { type: "zset", card: 2 },
+  "connections:gldf:google": { type: "string" },
+  "connections:rohlax:yelp": { type: "string" },
+  "analytics:cfg:rohlax": { type: "string" },
+  "analytics:cfg:old-client": { type: "string" },
+};
+
+function deps(overrides: Partial<SnapshotDeps> = {}) {
+  const pg = fakeDb(tables);
+  const r = fakeRedis(redisKeys);
+  const value: SnapshotDeps = {
+    db: pg.db,
+    redis: r.redis,
+    authUsers: async () => ({ total: 16, emailConfirmed: 4, signedInLast30Days: 1 }),
+    appliedVersions: null,
+    repoMigrations: [
+      "20260921220000_customer_business_entry",
+      "20260928130000_business_effort_minutes",
+      "20260930120000_revoke_public_execute_internal_functions",
+      "20261005090000_tenant_leads",
+      "20261007130000_workspace_release_flags",
+    ],
+    env: {
+      EMAIL_SENDING_ENABLED: "true",
+      STRELVA_WORKSPACE_RELEASE: "1",
+      STRELVA_OWNER_ENTRY: "operators",
+      SECRETS_ENC_KEY: "c2VjcmV0LWtleS1tYXRlcmlhbC10aGF0LW11c3QtbmV2ZXItcHJpbnQ=",
+    },
+    now: () => NOW,
+    log: () => undefined,
+    ...overrides,
+  };
+  return { value, pgCalls: pg.calls, redisCalls: r.calls };
+}
+
+describe("production readiness snapshot", () => {
+  it("refuses to run without Jacob's yes and reads nothing", async () => {
+    const d = deps();
+    await expect(runReadinessSnapshot({ jacobsYes: false }, d.value)).rejects.toThrow(/Jacob's yes/);
+    expect(d.pgCalls).toEqual([]);
+    expect(d.redisCalls).toEqual([]);
+    expect(parseSnapshotArgs([])).toEqual({ jacobsYes: false, json: false });
+    expect(parseSnapshotArgs(["--i-have-jacobs-yes", "--json"])).toEqual({ jacobsYes: true, json: true });
+    expect(() => parseSnapshotArgs(["--apply"])).toThrow(/Unknown/);
+  });
+
+  it("answers the open production facts with counts and flags", async () => {
+    const d = deps();
+    const report = await runReadinessSnapshot({ jacobsYes: true }, d.value);
+
+    expect(report.env.flags.EMAIL_SENDING_ENABLED).toBe("on");
+    expect(report.env.flags.CUSTOMER_EMAIL_ENABLED).toBe("absent");
+    expect(report.env.flags.STRELVA_OWNER_ENTRY).toBe("set (not a boolean)");
+    expect(report.env.secrets.SECRETS_ENC_KEY).toBe("present");
+    expect(report.env.secrets.GOOGLE_CLIENT_SECRET).toBe("absent");
+
+    expect(report.postgres.tenants).toEqual({ total: 3, active: 2 });
+    expect(report.postgres.activeTenants).toEqual([
+      { id: "gldf", features: ["commerce", "rewards"], resendDomain: "mail.strelva.com", hasSearchConsoleKey: true },
+      { id: "rohlax", features: [], resendDomain: null, hasSearchConsoleKey: false },
+    ]);
+    expect(report.postgres.workspaces).toEqual({ total: 2, byKind: { personal: 1, customer: 0, agency: 1 } });
+    expect(report.postgres.workspaceMemberships).toBe(2);
+    expect(report.postgres.tenantMemberships).toBe(0);
+    expect(report.postgres.openTenantInvites).toBe(1);
+    expect(report.postgres.pendingWorkspaceInvitations).toBe(1);
+    expect(report.postgres.workspaceTenantLinks).toBeNull(); // table not there yet
+    expect(report.postgres.tenantLeads).toBe(3);
+    expect(report.postgres.unifiedEvents).toEqual({ total: 3, last24h: 1, last7d: 2, latestAt: "2026-10-06T06:00:00.000Z" });
+    expect(report.postgres.governedWork).toEqual({ proposals: 1, latestProposalAt: "2026-10-01T00:00:00.000Z" });
+    expect(report.auth).toEqual({ total: 16, emailConfirmed: 4, signedInLast30Days: 1 });
+
+    const family = (name: string) => report.redis!.families.find((f) => f.name === name)!;
+    expect(family("client email overrides")).toMatchObject({ keys: 1, byTenant: { gldf: 1 } });
+    expect(family("orders")).toMatchObject({ keys: 1, byTenant: { gldf: 1 }, entriesByTenant: { gldf: 12 } });
+    expect(family("rewards")).toMatchObject({ keys: 2, byTenant: { gldf: 2 } });
+    expect(family("leads")).toMatchObject({ keys: 2, entriesByTenant: { gldf: 40, rohlax: 2 } });
+    expect(family("google connections")).toMatchObject({ keys: 1, byTenant: { gldf: 1 } });
+    expect(report.redis!.activeTenantsWithAnalyticsConfig).toEqual(["rohlax"]); // inactive tenant left out
+    expect(report.redis!.activeTenantsWithGoogleConnection).toEqual(["gldf"]);
+    expect(report.redis!.activeTenantsWithClientEmailOverride).toEqual(["gldf"]);
+  });
+
+  it("works out migration state from the Sept 30 record, sentinels and schema_migrations", async () => {
+    const withoutSql = await runReadinessSnapshot({ jacobsYes: true }, deps().value);
+    expect(withoutSql.migrations.pendingBySept30Record).toEqual([
+      "20260928130000_business_effort_minutes",
+      "20261005090000_tenant_leads",
+      "20261007130000_workspace_release_flags",
+    ]);
+    expect(withoutSql.migrations.applied).toBeNull();
+    expect(withoutSql.migrations.sentinels["20261005090000"]).toBe("present");
+    expect(withoutSql.migrations.sentinels["20261007130000"]).toBe("missing");
+    expect(withoutSql.notes.join("\n")).toMatch(/schema_migrations not read/);
+
+    const withSql = await runReadinessSnapshot({ jacobsYes: true }, deps({
+      appliedVersions: async () => ["20260921220000", "20260930120000", "20261007130000", "20991231000000"],
+    }).value);
+    expect(withSql.migrations.unappliedInRepo).toEqual([
+      "20260928130000_business_effort_minutes",
+      "20261005090000_tenant_leads",
+    ]);
+    expect(withSql.migrations.appliedNotInRepo).toEqual(["20991231000000"]);
+    // Sentinel says tenant_leads exists but schema_migrations does not list it, and the reverse for release flags.
+    expect(withSql.notes.filter((n) => /disagree/.test(n))).toHaveLength(2);
+  });
+
+  it("degrades to unknown, not zero, when Postgres or Redis is not configured", async () => {
+    const report = await runReadinessSnapshot({ jacobsYes: true }, deps({ db: null, redis: null, authUsers: null }).value);
+    expect(report.postgres.tenants).toEqual({ total: null, active: null });
+    expect(report.postgres.unifiedEvents.total).toBeNull();
+    expect(report.redis).toBeNull();
+    expect(Object.values(report.migrations.sentinels).every((s) => s === "unknown")).toBe(true);
+    expect(report.notes.join("\n")).toMatch(/Postgres not configured/);
+    expect(formatReport(report).join("\n")).toContain("Tenants: unknown total, unknown active");
+  });
+
+  it("never prints secrets or customer data", async () => {
+    const report = await runReadinessSnapshot({ jacobsYes: true }, deps().value);
+    const text = formatReport(report).join("\n") + JSON.stringify(report);
+    expect(text).not.toContain("c2VjcmV0");
+    expect(text).not.toContain("enc:v1");
+    expect(text).not.toMatch(/@/);
+    expect(() => assertNoSensitiveOutput(text)).not.toThrow();
+    expect(() => assertNoSensitiveOutput("owner owner@gldf.example")).toThrow(/email/);
+    expect(() => assertNoSensitiveOutput("key sk_live_abcdefghijklmnop")).toThrow(/token/);
+    expect(() => assertNoSensitiveOutput("c2VjcmV0LWtleS1tYXRlcmlhbC10aGF0LW11c3QtbmV2ZXItcHJpbnQ=")).toThrow(/token/);
+  });
+
+  it("only ever reads: no column with secrets or PII is selected and Redis values are never fetched", async () => {
+    const d = deps();
+    await runReadinessSnapshot({ jacobsYes: true }, d.value);
+    for (const call of d.pgCalls.filter((c) => c.startsWith("rows "))) {
+      expect(call).not.toMatch(/owner_email|owner_name|owner_phone|google_search_console_key|email/);
+    }
+    expect(d.redisCalls.every((c) => /^(scan|type|card) /.test(c))).toBe(true);
+    expect(d.redisCalls.some((c) => c.startsWith("scan "))).toBe(true);
+  });
+
+  it("the CLI and the logic contain no write call", () => {
+    for (const file of ["scripts/readiness-snapshot.ts", "scripts/production-readiness-snapshot.ts"]) {
+      const source = readFileSync(join(process.cwd(), file), "utf8");
+      expect(source, file).not.toMatch(/\.(insert|update|upsert|delete|rpc)\(/);
+      expect(source, file).not.toMatch(/redis\.(set|del|get|hset|zadd|expire|rename|unlink|incr|lpush|rpush|sadd|eval)\(/i);
+    }
+  });
+
+  it("has a sentinel table for every unapplied migration that creates a table", () => {
+    const dir = join(process.cwd(), "supabase", "migrations");
+    for (const [version, table] of Object.entries(MIGRATION_SENTINELS)) {
+      const file = readdirSync(dir).find((f) => f.startsWith(version));
+      expect(file, version).toBeTruthy();
+      expect(readFileSync(join(dir, file!), "utf8"), `${version} creates ${table}`).toMatch(new RegExp(`create table (if not exists )?public\\.${table}\\b`, "i"));
+    }
+  });
+});
+
