@@ -255,3 +255,61 @@ describe("the make_real_link session client", () => {
     }
   });
 });
+
+describe("the make_real_owner_link release flag (20261009140000)", () => {
+  const ITEM = "bbbbbbbb-0000-4000-8000-0000000000d1";
+  async function harness(rowState: "on" | "off" | null) {
+    const { setReleaseFlagsDb } = await import("@/platform/release-flags/store");
+    const { setServiceActorDb } = await import("@/platform/needs-you/service-actor");
+    const { PostgresNeedsYouStore } = await import("@/platform/needs-you/repository");
+    const flags = rowState ? { make_real_owner_link: { state: rowState, revision: 1, changedAt: "2026-10-06T00:00:00Z" } } : {};
+    setReleaseFlagsDb({ rpc: vi.fn(async () => ({ data: { workspaceId: WS, flags, testers: [], testerEmails: [] }, error: null })) });
+    const rpc = vi.fn(async () => ({
+      data: { sessionId: randomUUID(), workspaceId: WS, purpose: "make_real_link", label: "Strelva (system)", role: "admin", userId: STRELVA_ADMIN.userId, verifiedEmail: STRELVA_ADMIN.verifiedEmail, decisionId: ITEM },
+      error: null,
+    }));
+    setServiceActorDb({ rpc });
+    return { rpc, linkSession: PostgresNeedsYouStore.linkSession!, reset: () => { setReleaseFlagsDb(null); setServiceActorDb(null); } };
+  }
+
+  it("is off by default: Needs you and Systems on are not enough, and no session is asked for", async () => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    vi.stubEnv("STRELVA_NEEDS_YOU_RELEASE", "1");
+    vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "1");
+    vi.stubEnv("STRELVA_MAKE_REAL_OWNER_LINK_RELEASE", "");
+    const h = await harness("on");
+    try {
+      expect(await h.linkSession(WS, ITEM, OWNER_EMAIL)).toBeNull();
+      expect(h.rpc).not.toHaveBeenCalled();
+    } finally { h.reset(); vi.unstubAllEnvs(); }
+  });
+
+  it("under `workspace`, only a business whose row says on starts a session", async () => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    vi.stubEnv("STRELVA_MAKE_REAL_OWNER_LINK_RELEASE", "workspace");
+    for (const [row, expected] of [["on", true], ["off", false], [null, false]] as const) {
+      const h = await harness(row);
+      try {
+        const started = await h.linkSession(WS, ITEM, OWNER_EMAIL);
+        expect(started !== null).toBe(expected);
+        expect(h.rpc).toHaveBeenCalledTimes(expected ? 1 : 0);
+      } finally { h.reset(); }
+    }
+    vi.unstubAllEnvs();
+  });
+
+  it("`1` turns it on except where a business's row says off; the workspace kill switch wins", async () => {
+    vi.stubEnv("STRELVA_MAKE_REAL_OWNER_LINK_RELEASE", "1");
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    let h = await harness(null);
+    try { expect(await h.linkSession(WS, ITEM, OWNER_EMAIL)).not.toBeNull(); } finally { h.reset(); }
+    h = await harness("off");
+    try { expect(await h.linkSession(WS, ITEM, OWNER_EMAIL)).toBeNull(); } finally { h.reset(); }
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "");
+    h = await harness("on");
+    try {
+      expect(await h.linkSession(WS, ITEM, OWNER_EMAIL)).toBeNull();
+      expect(h.rpc).not.toHaveBeenCalled();
+    } finally { h.reset(); vi.unstubAllEnvs(); }
+  });
+});

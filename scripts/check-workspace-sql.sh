@@ -644,6 +644,13 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009131000_mak
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
+# Make real by owner link gets its own per-business flag key (wave 5).
+# Replaces workspace_release_flag_names(); the release flag contracts rerun.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009140000_make_real_owner_link_flag.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-flag-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
 # The real Make real runner, checkpointing through these RPCs (psql-backed port).
 STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run src/__tests__/make-real-activation-repository.test.ts

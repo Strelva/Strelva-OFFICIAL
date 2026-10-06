@@ -33,8 +33,13 @@ export type MakeRealLiveFlag = (typeof MAKE_REAL_LIVE_FLAGS)[number];
  * STRELVA_CONNECTED_SITES_RELEASE. `1` keeps today's meaning (on wherever
  * Systems is on) unless a business's row says `off`; `workspace` turns it on
  * business by business, including the public `/api/v1/connect/*` gate.
+ *
+ * `make_real_owner_link` (20261009140000): Make real approved by signed email
+ * link for an owner with no account (20261009131000). Its own row per
+ * business, under STRELVA_MAKE_REAL_OWNER_LINK_RELEASE, off by default. Off:
+ * the link answers "Sign in to decide this", as before 20261009131000.
  */
-export const RELEASE_FLAGS = ["owner_entry", "inquiries", "website_rebuild", "systems", ...MAKE_REAL_LIVE_FLAGS, "connected_sites"] as const;
+export const RELEASE_FLAGS = ["owner_entry", "inquiries", "website_rebuild", "systems", ...MAKE_REAL_LIVE_FLAGS, "connected_sites", "make_real_owner_link"] as const;
 export type ReleaseFlag = (typeof RELEASE_FLAGS)[number];
 export type ReleaseFlagEnvMode = "off" | "workspace" | "on";
 export type ReleaseFlagRowState = "off" | "operators" | "on";
@@ -54,6 +59,7 @@ export const RELEASE_FLAG_ENV: Record<ReleaseFlag, string> = {
   "make_real_live:booking_page": "STRELVA_MAKE_REAL_LIVE",
   "make_real_live:internal_app": "STRELVA_MAKE_REAL_LIVE",
   connected_sites: "STRELVA_CONNECTED_SITES_RELEASE",
+  make_real_owner_link: "STRELVA_MAKE_REAL_OWNER_LINK_RELEASE",
 };
 
 export const RELEASE_FLAG_LABELS: Record<ReleaseFlag, string> = {
@@ -67,6 +73,7 @@ export const RELEASE_FLAG_LABELS: Record<ReleaseFlag, string> = {
   "make_real_live:booking_page": "Make real live: booking page",
   "make_real_live:internal_app": "Make real live: internal app",
   connected_sites: "Connected sites",
+  make_real_owner_link: "Make real by owner email link",
 };
 
 export type ReleaseEnvironment = Partial<Record<string, string | undefined>>;

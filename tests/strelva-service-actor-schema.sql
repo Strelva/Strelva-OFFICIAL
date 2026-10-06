@@ -37,8 +37,9 @@ select pg_temp.sa_assert(
   and not has_function_privilege('service_role', 'public.strelva_runs_business(uuid)', 'execute'),
   'only service_role runs the service actor, and only through the public entry points');
 
--- connected_sites has its own flag row; every earlier key stays.
-select pg_temp.sa_assert(public.workspace_release_flag_names() = array['owner_entry', 'inquiries', 'website_rebuild', 'systems',
+-- connected_sites has its own flag row; every earlier key stays (later
+-- migrations may add keys, e.g. 20261009140000's make_real_owner_link).
+select pg_temp.sa_assert(public.workspace_release_flag_names() @> array['owner_entry', 'inquiries', 'website_rebuild', 'systems',
   'make_real_live:hosted_website', 'make_real_live:tenant_content', 'make_real_live:inquiry_form',
   'make_real_live:booking_page', 'make_real_live:internal_app', 'connected_sites'], 'flag names');
 
