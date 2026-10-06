@@ -639,3 +639,12 @@ describe("Make real through Needs you", () => {
     await expect(adapter.resolve({ workspaceId: BIZ }, item, "approve", { kind: "session", actor: OWNER })).resolves.toMatchObject({ outcome: "failed", reason: expect.stringMatching(/make_real_refused: .*cannot start/) });
   });
 });
+
+describe("live plans name their source rebuild", () => {
+  it("a stored possibility from a rebuild carries its rebuildWorkId, so Home shows one Make real item for it", async () => {
+    const { p } = await readyPossibility({ effects: [hostedEffect()] });
+    expect(liveReadyPlan(p, new Map()).sourceRebuild).toBeUndefined();
+    const fromRebuild = { ...p, changes: p.changes.map((change) => ({ ...change, candidate: { ...change.candidate, content: { ...change.candidate.content, rebuildWorkId: "rebuild-w1" } } })) };
+    expect(liveReadyPlan(fromRebuild, new Map()).sourceRebuild).toBe("rebuild-w1");
+  });
+});

@@ -193,7 +193,9 @@ function changedNames(p: Possibility, names: ReadonlyMap<string, string>): strin
  * its item shape and its approval reader.
  */
 export function liveReadyPlan(p: Possibility, names: ReadonlyMap<string, string>, openHref?: string | null): ReadyPlan {
+  const rebuild = p.changes.map((change) => change.candidate.content.rebuildWorkId).find((value): value is string => typeof value === "string" && value.length > 0);
   return {
+    ...(rebuild ? { sourceRebuild: rebuild } : {}),
     possibilityId: p.id,
     candidateRevision: p.candidateRevision,
     fingerprint: planFingerprint(p),

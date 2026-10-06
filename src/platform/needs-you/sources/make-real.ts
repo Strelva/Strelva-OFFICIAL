@@ -36,6 +36,29 @@ export interface ReadyPlan {
   live?: boolean;
   /** Where the owner tries it first (the signed "Try it" link for live plans). */
   openHref?: string;
+  /**
+   * The website rebuild this plan came from (`rebuildWorkId`). A stored live
+   * plan and the per-request isolated plan of the same rebuild are one ask:
+   * the live one wins.
+   */
+  sourceRebuild?: string;
+}
+
+/** Live plans first; an isolated plan is dropped when a live plan has its id or its source rebuild. */
+export function dedupeReadyPlans(live: readonly ReadyPlan[], isolated: readonly ReadyPlan[]): ReadyPlan[] {
+  const liveIds = new Set(live.map((plan) => plan.possibilityId));
+  const liveRebuilds = new Set(live.flatMap((plan) => plan.sourceRebuild ? [plan.sourceRebuild] : []));
+  const kept: ReadyPlan[] = [...live];
+  const seenRebuilds = new Set(liveRebuilds);
+  for (const plan of isolated) {
+    if (liveIds.has(plan.possibilityId)) continue;
+    if (plan.sourceRebuild) {
+      if (seenRebuilds.has(plan.sourceRebuild)) continue;
+      seenRebuilds.add(plan.sourceRebuild);
+    }
+    kept.push(plan);
+  }
+  return kept;
 }
 
 export interface MakeRealRunResult {
@@ -90,8 +113,7 @@ export function makeRealAdapter(ports: MakeRealSourcePorts): SourceAdapter {
   async function plans(actor: WorkspaceActor | undefined, workspaceId: string): Promise<ReadyPlan[]> {
     const live = ports.livePlans ? await ports.livePlans(workspaceId) : [];
     const isolated = actor && (await ports.enabled(workspaceId, actor)) ? await ports.readyPlans(actor, workspaceId) : [];
-    const liveIds = new Set(live.map((plan) => plan.possibilityId));
-    return [...live, ...isolated.filter((plan) => !liveIds.has(plan.possibilityId))];
+    return dedupeReadyPlans(live, isolated);
   }
   return {
     lifecycle: "make_real",

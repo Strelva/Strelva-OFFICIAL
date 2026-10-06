@@ -469,6 +469,8 @@ export interface ReadyMakeRealPlan {
   introducesSystem: boolean;
   /** The System page the owner opens to see it. */
   systemId: string;
+  /** The rebuild it came from, so a stored live plan of the same rebuild replaces it in Needs you. */
+  sourceRebuild?: string;
 }
 
 /** Every Ready Possibility of this business, for Needs you. */
@@ -487,6 +489,7 @@ export async function readyMakeRealPlans(deps: LiveSystemsDeps): Promise<ReadyMa
         affects: item.affects.map((system) => system.name),
         introducesSystem: p.introduces.length > 0,
         systemId: item.site.system.id,
+        sourceRebuild: item.candidate.workId,
       };
     });
 }
