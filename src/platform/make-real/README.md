@@ -203,8 +203,13 @@ survive a process restart.
   revisions included) and one approval reader (`createNeedsYouApprovalRecords`).
 - `live-server.ts`: the server bindings, `readLiveReadyPlans` and
   `startLiveMakeReal` for that source, `listDueActivations`
-  (`due_make_real_activations`) and `activationStarter` for operator routes.
-- Steps 3-5 above: the runner still isn't an `ExecutionAdapter`; activations
-  run as the approving owner (the activation RPCs accept only an owner or
-  admin), and operators act as that owner with their name in the history.
+  (`due_make_real_activations_for_service`) and `activationRunner` /
+  `activationStarter` for operator routes.
+- Steps 3-5 above: the runner still isn't an `ExecutionAdapter`. Approval
+  starts an activation as the approving owner. Resume, run, reconcile and
+  roll back (the workspace-work cron and the operator tools) run as
+  Strelva (system) for a business Strelva runs: one logged `make_real_resume`
+  session per business (`src/platform/needs-you/service-actor.ts`, migration
+  `20261009100000`), each action logged before it runs, the owner staying
+  approver of record. Elsewhere they run as the starter, as before.
   The in-memory repository is still exported for the sandbox.

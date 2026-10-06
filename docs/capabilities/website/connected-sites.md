@@ -1,8 +1,10 @@
 # Connected sites
 
 Status: built locally Oct 8 on `w2/website-system`, flag
-`STRELVA_CONNECTED_SITES_RELEASE` off. Not in production; the migration needs
-Jacob's yes. Working default for decision 3 in the
+`STRELVA_CONNECTED_SITES_RELEASE` off. Oct 6 on `w3/decision-gaps` (local): a
+per-business `connected_sites` release row, the public gate per business, the
+daily purge cron, the Home link and inquiries in the workspace inbox. Not in
+production; the migrations need Jacob's yes. Working default for decision 3 in the
 [website System spec](./website-system-spec-2026-10-06.md#9-open-decisions).
 
 A business keeps its website where it is (Wix, Squarespace, WordPress, a
@@ -46,16 +48,32 @@ All `/api/v1/connect/*` routes are additive to the v1 contract.
   `connected_site_id`; held spam is `tenant_client_records` `spam_held`.
 - Domain-ownership proof added; writes without an Origin are refused.
 - Retention: events 400 days, held spam 30 days, inquiries kept with the
-  business. `purge_connected_site_records` is not on a cron yet.
+  business. `purge_connected_site_records` runs daily from
+  `/api/cron/connected-sites-purge` (bounded batches, heartbeat, off with the
+  env switch).
 - Not carried over (still on the branch): assistant tokens and OAuth, MCP,
   the `/b/{handle}` context page, response checks, platform detection in the
   audit, the integrations folder.
 
+## Release gate
+
+`STRELVA_CONNECTED_SITES_RELEASE` is the env switch for the `connected_sites`
+release flag (`20261009100000`): `1` is on wherever Systems is on, except a
+business whose row says `off`; `workspace` is on only where the business row
+says `on` (or `operators`). The workspace screens also need Systems on for the
+business. The public `/api/v1/connect/*` routes resolve the site key's
+business and check its row (an `operators` row counts as on there, so an
+operator can test a real install); an off business answers `503` exactly like
+the env switch off and stores nothing.
+
+## Built Oct 6 (`w3/decision-gaps`, local)
+
+- Home links to `/workspace/site` when connected sites are on for the business
+  ("Already have a website?" or "Have another website?").
+- Connected-site inquiries in `/workspace/inquiries`, one section per site; a
+  failed read shows as unavailable, never as an empty inbox.
+
 ## Not done
 
-- A link to `/workspace/site` from Home for a business with no website (Home
-  is a shared file; one line in `BusinessHome.tsx`).
-- Connected inquiries in the Inquiries System inbox (they show on the
-  website System page and in `business_outcome_month`).
 - Installation on a real Wix or Squarespace site. Never run end to end on a
   builder.

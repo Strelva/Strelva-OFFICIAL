@@ -33,13 +33,26 @@ stays gated.
   operator queue's "Owner not told" list; content autonomy and reply mode in
   `decision_policies` for linked tenants, Redis otherwise (migration
   `20261008124000`, seed script dry run by default).
+- **Built locally on `w3/decision-gaps` (2026-10-06), same flag:** owners who
+  never sign in (product model rule 6). The hourly cron starts one logged
+  "Strelva (system)" session per business Strelva runs
+  (`strelva_service_reader`, migration `20261009100000`) and reads every
+  workspace source through it, so each source kind reaches the owner in the
+  morning email. The session reads and opens only: items it opens are marked
+  `openedBy: "Strelva (system)"` and logged in `strelva_service_actions`; it
+  never reaches a resolver, and deciding still takes the owner's signed link
+  or session. A business Strelva doesn't run, or one with no verified owner or
+  admin, gets no session (workspace sources stay unread there). Home shows one
+  Make real item per rebuild (live plan wins). The leftover SMS check
+  (`staleSmsApprovals`, `ClearSmsButton`, `/api/admin/ops/clear-stale-sms`) is
+  gone.
 - **Not built:** operational assignment offers (nothing waits on the owner
   today; it needs a new proposed-assignment record) and exit/export (no
   pending state; the adapter proposes nothing); per-System policy overrides
-  in the UI; the monthly report's handled list with signed undo links;
-  retiring the SMS check. Workspace-lifecycle adapters need a member
-  identity, so the hourly cron can't open their items for an owner who never
-  signs in (no service-role readers yet).
+  in the UI; the monthly report's handled list with signed undo links. Money
+  read by the session is the reader's own: a payer change or job limit the
+  owner hasn't accepted reaches them only when the session reads as that
+  owner (a verified owner member), not as Strelva's admin.
 - **Unproven:** the parity replay against a scrubbed copy of real tenants,
   the never-signs-in journey with real email, and any production behavior.
 
@@ -402,6 +415,7 @@ policy, the item, delivery and expiry.
   readable (frozen `reb:` names).
 - The leftover SMS approval check (`staleSmsApprovals`, `ClearSmsButton`).
   SMS approval was removed in May 2026 and nothing writes `sms:pending:*`.
+  Removed locally Oct 6 (`w3/decision-gaps`).
 
 ## 6. Moving today's clients
 

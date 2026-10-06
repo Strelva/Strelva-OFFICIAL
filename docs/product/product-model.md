@@ -170,7 +170,17 @@ turned up problems no single plan had. Each is from code reading unless marked.
    `owner`. For owners who never sign in, that only works through signed
    one-tap links bound to the item and recipient
    ([needs-you](./specs/needs-you.md)). Access, money and exit need a
-   magic-link sign-in.
+   magic-link sign-in. The links only help if the item is opened in the first
+   place: the workspace sources are read as a member, so the hourly cron
+   could open nothing but tenant events for an owner who never signs in.
+   *Built locally Oct 6 on `w3/decision-gaps`:* a narrow, logged service
+   actor, "Strelva (system)", per business Strelva runs. The cron reads and
+   opens with it; it never decides. Make real's durable runner resumes and
+   reconciles with the same actor, the owner staying approver of record.
+   It reads through the business's verified owner, else its verified admin
+   (the Strelva operator after conversion), because the existing RPCs are the
+   only read path; reads that are per person (money waiting on the payer)
+   still reach only that person. Nothing applied to production.
 3. **Owner email may reach nobody today.** Client email is sent only when
    `EMAIL_SENDING_ENABLED` is `"true"` or a per-client override is set. If it
    is off in production, review approve links and weekly reports have gone
