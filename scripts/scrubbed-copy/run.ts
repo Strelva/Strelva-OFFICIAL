@@ -28,7 +28,7 @@ import {
 } from "./postgres";
 import { RespClient, ReadOnlyRestSource, loadRedisRecords, startLocalRedis, startUpstashBridge, type FetchLike, type LocalRedis, type UpstashBridge } from "./redis";
 import {
-  RefusalError, assertCleanParentEnv, assertExplicitSource, assertLocalDestinationUrl, assertLocalOutputDir, assertOutboundDisabled,
+  RefusalError, assertCleanParentEnv, assertExplicitSource, assertLocalDestinationUrl, assertLocalOutputDir, enclosingGitCheckout, assertOutboundDisabled,
   copyEnvironment, parseEnvFile, renderEnvFile,
 } from "./safety";
 import { assertManifestHasNoPersonalData, emptyTenantCounts, findLeaks, fingerprint, increment, type CopyManifest, type TenantCounts } from "./manifest";
@@ -130,7 +130,7 @@ function readTextFiles(dir: string): Array<{ name: string; text: string }> {
 export function preflightCreate(options: CreateOptions) {
   assertCleanParentEnv(options.env);
   const source = assertExplicitSource({ source: options.source, sourceRedis: options.sourceRedis, confirmed: options.confirmed, skipRedis: options.skipRedis }, options.env);
-  assertLocalOutputDir(options.out, { repoRoot: options.repoRoot, replace: options.replace, ...dirState(options.out) });
+  assertLocalOutputDir(options.out, { repoRoot: options.repoRoot, gitCheckout: enclosingGitCheckout(options.out), replace: options.replace, ...dirState(options.out) });
   if (options.destDatabaseUrl) assertLocalDestinationUrl("--dest-database-url", options.destDatabaseUrl);
   if (options.grandfathered && !/^[a-z0-9-]+(,[a-z0-9-]+)*$/.test(options.grandfathered)) throw new RefusalError("--grandfathered takes comma-separated tenant slugs.");
   return source;
@@ -474,6 +474,10 @@ export async function dryRunCopy(out: string, options: { repoRoot: string; env: 
   const manifest = JSON.parse(readFileSync(p.manifest, "utf8")) as CopyManifest;
   const slugs = (options.tenants?.length ? options.tenants : manifest.tenants.filter((tenant) => tenant.active).map((tenant) => tenant.slug)).sort();
   const running = await startCopy(out, { env: options.env });
+  if (options.rehearse && !running.target) {
+    await running.stop();
+    throw new RefusalError("this copy has no database the dry run can reach (it was loaded with --dest-database-url, which is not saved), so no conversion could be rehearsed. Pass --no-rehearse to plan only, or recreate the copy in its own managed cluster.");
+  }
   const entries: DryRunEntry[] = [];
   try {
     const tsx = path.join(options.repoRoot, "node_modules/.bin/tsx");
@@ -501,7 +505,8 @@ export async function dryRunCopy(out: string, options: { repoRoot: string; env: 
       tenants: entries.length,
       planned: entries.filter((entry) => entry.planned).length,
       rehearsedOk: entries.filter((entry) => entry.rehearsal?.applied).length,
-      failed: entries.filter((entry) => !entry.planned || (options.rehearse && entry.rehearsal && !entry.rehearsal.applied)).length,
+      // A requested rehearsal that never ran counts as a failure, not a pass.
+      failed: entries.filter((entry) => !entry.planned || (options.rehearse && !entry.rehearsal?.applied)).length,
     },
   };
   assertManifestHasNoPersonalData(report);

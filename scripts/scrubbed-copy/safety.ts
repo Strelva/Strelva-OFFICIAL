@@ -3,6 +3,7 @@
  * source is contacted or any local process is started. Pure: callers pass env
  * maps and paths in, so each refusal is unit-tested without side effects.
  */
+import { existsSync } from "node:fs";
 import path from "node:path";
 
 export class RefusalError extends Error {
@@ -44,10 +45,26 @@ export function assertLoopbackBind(host: string): void {
 }
 
 /**
+ * The git checkout that contains `dir`, or null. Walks up from `dir` itself
+ * (which may not exist yet) looking for a `.git` directory or worktree file, so
+ * any repository counts, not only this one.
+ */
+export function enclosingGitCheckout(dir: string, exists: (candidate: string) => boolean = existsSync): string | null {
+  let current = path.resolve(dir);
+  for (;;) {
+    if (exists(path.join(current, ".git"))) return current;
+    const parent = path.dirname(current);
+    if (parent === current) return null;
+    current = parent;
+  }
+}
+
+/**
  * Output directory: an absolute local path, outside every git checkout (the copy
  * must never be committed), and new or empty. URLs and remote specs are refused.
+ * `gitCheckout` is the checkout enclosing `out`, from enclosingGitCheckout.
  */
-export function assertLocalOutputDir(out: string, options: { repoRoot: string; exists: boolean; empty: boolean; isCopy: boolean; replace: boolean }): void {
+export function assertLocalOutputDir(out: string, options: { repoRoot: string; gitCheckout?: string | null; exists: boolean; empty: boolean; isCopy: boolean; replace: boolean }): void {
   if (!out) throw new RefusalError("--out=<absolute directory> is required.");
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(out) || /^[^/]+:/.test(out)) throw new RefusalError(`--out must be a local directory, not a URL or remote path (${out.split(":")[0]}:).`);
   if (!path.isAbsolute(out)) throw new RefusalError("--out must be an absolute path.");
@@ -58,6 +75,9 @@ export function assertLocalOutputDir(out: string, options: { repoRoot: string; e
   const relative = path.relative(options.repoRoot, out);
   if (!relative.startsWith("..") && !path.isAbsolute(relative)) {
     throw new RefusalError("--out is inside the repository. Put the copy outside every git checkout so it can never be committed.");
+  }
+  if (options.gitCheckout) {
+    throw new RefusalError(`--out is inside the git checkout at ${options.gitCheckout}. Put the copy outside every git checkout so it can never be committed.`);
   }
   if (options.exists && !options.empty) {
     if (!options.isCopy) throw new RefusalError("--out exists, is not empty and is not a scrubbed copy.");

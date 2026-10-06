@@ -320,6 +320,20 @@ describe.skipIf(!ENABLED)("scrubbed production copy end to end (local fake sourc
     }
   }, 300_000);
 
+  it("refuses a rehearsal it cannot run instead of reporting zero failures", async () => {
+    // A copy loaded with --dest-database-url keeps no database the dry run can reach.
+    const statePath = path.join(root, "copy", "state.json");
+    const original = readFileSync(statePath, "utf8");
+    writeFileSync(statePath, JSON.stringify({ ...JSON.parse(original), managedCluster: false }), { mode: 0o600 });
+    try {
+      await expect(dryRunCopy(path.join(root, "copy"), { repoRoot, env, rehearse: true })).rejects.toThrow(/no database the dry run can reach/);
+      const planOnly = await dryRunCopy(path.join(root, "copy"), { repoRoot, env, rehearse: false });
+      expect(planOnly.summary).toEqual({ tenants: 2, planned: 2, rehearsedOk: 0, failed: 0 });
+    } finally {
+      writeFileSync(statePath, original, { mode: 0o600 });
+    }
+  }, 300_000);
+
   it("refuses to rebuild over an existing copy without --replace, and refuses a re-enabled outbound switch", async () => {
     await expect(create(path.join(root, "copy"))).rejects.toThrow(/--replace/);
     const envFile = path.join(root, "copy-2", "copy.env");

@@ -10,7 +10,7 @@ import {
   TABLE_POLICIES, classifyRedisKey, columnsToRead, familyById, scrubRedisKey, scrubRedisValue, scrubRow, uncoveredColumns, type RowContext, type TablePolicy,
 } from "../../scripts/scrubbed-copy/policy";
 import {
-  COPY_ENV_REQUIRED, RefusalError, assertCleanParentEnv, assertLocalDestinationUrl, assertLocalOutputDir,
+  COPY_ENV_REQUIRED, RefusalError, assertCleanParentEnv, assertLocalDestinationUrl, assertLocalOutputDir, enclosingGitCheckout,
   assertLoopbackBind, assertOutboundDisabled, copyEnvironment, parseEnvFile, renderEnvFile,
 } from "../../scripts/scrubbed-copy/safety";
 import { assertManifestHasNoPersonalData, findLeaks } from "../../scripts/scrubbed-copy/manifest";
@@ -325,6 +325,18 @@ describe("refusals", () => {
     expect(() => assertLocalDestinationUrl("dest", "postgresql:///copy?host=/tmp/sock")).not.toThrow();
     expect(() => assertLoopbackBind("0.0.0.0")).toThrow(/127.0.0.1/);
     expect(() => assertLoopbackBind("127.0.0.1")).not.toThrow();
+  });
+
+  it("refuses an output directory inside any git checkout, not only this repository", () => {
+    const dir = { exists: false, empty: true, isCopy: false, replace: false, repoRoot: "/work/strelva/REB" };
+    const checkouts = new Set(["/Users/j/code/other-repo/.git", "/Users/j/code/linked-worktree/.git"]);
+    const exists = (candidate: string) => checkouts.has(candidate);
+    expect(enclosingGitCheckout("/Users/j/code/other-repo/exports/copy", exists)).toBe("/Users/j/code/other-repo");
+    expect(enclosingGitCheckout("/Users/j/code/linked-worktree/copy", exists)).toBe("/Users/j/code/linked-worktree");
+    expect(enclosingGitCheckout("/Users/j/strelva-copies/2026-10-06", exists)).toBeNull();
+    const out = "/Users/j/code/other-repo/exports/copy";
+    expect(() => assertLocalOutputDir(out, { ...dir, gitCheckout: enclosingGitCheckout(out, exists) })).toThrow(/inside the git checkout at \/Users\/j\/code\/other-repo/);
+    expect(() => assertLocalOutputDir("/Users/j/strelva-copies/2026-10-06", { ...dir, gitCheckout: null })).not.toThrow();
   });
 
   it("refuses to run app code unless email, Stripe and Google are all disabled", () => {
