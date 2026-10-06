@@ -46,6 +46,20 @@ const HANDLED: HandledReceipt[] = [
 ];
 
 /** Answers /api/workspace/needs-you for the Mooney scenarios and adds the release to snapshots. */
+/** Fictional numbers for the fictional firm's site. */
+const SITE_SUMMARY = {
+  tenantId: "mooney", siteName: "attymooney.com",
+  visits: { total: 2140, thisWeek: 96 }, actions: { total: 61, thisWeek: 4 },
+  leads: { count: 3, recent: [
+    { id: "lead-1", name: "Priya S.", message: "Do you handle small business leases? I have a renewal in November.", createdAt: "2026-10-05T14:10:00Z" },
+    { id: "lead-2", name: "Tom R.", message: "Looking for a consult about a contractor dispute.", createdAt: "2026-10-03T09:30:00Z" },
+  ] },
+  activity: [
+    { id: "act-1", label: "Updated your hours on Google", detail: null, time: "2026-10-04T15:00:00Z" },
+    { id: "act-2", label: "Replied to a review", detail: "Dana, 5 stars", time: "2026-10-02T21:00:00Z" },
+  ],
+};
+
 export function withNeedsYouPreview(base: typeof fetch, scenario: string, enabled: boolean): typeof fetch {
   let items = scenario === "mooney-empty" ? [] : initialItems();
   let handled = scenario === "mooney-empty" ? [] : [...HANDLED];
@@ -74,6 +88,13 @@ export function withNeedsYouPreview(base: typeof fetch, scenario: string, enable
       const body = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as { receiptId?: string };
       handled = handled.map(receipt => receipt.id === body.receiptId ? { ...receipt, undo: { state: "undone" } } : receipt);
       return json({ result: { revision: 15 } });
+    }
+    // Home's "From your site" (owner entry): shown with Needs you, for The Mooney Firm only.
+    if (url.pathname === "/api/workspace/site-summary" && method === "GET") {
+      if (!enabled || url.searchParams.get("workspaceId") !== MOONEY) return json({ error: "Not open for this business yet." }, 503);
+      if (scenario === "mooney-loading") await new Promise(resolve => setTimeout(resolve, 20_000));
+      if (scenario === "mooney-error") return json({ error: "Unavailable." }, 500);
+      return json(scenario === "mooney-empty" ? { sites: [{ ...SITE_SUMMARY, leads: { count: 0, recent: [] }, activity: [] }], deniedSites: [] } : { sites: [SITE_SUMMARY], deniedSites: [] });
     }
     const response = await base(input, init);
     if (url.pathname !== "/api/workspace" || method !== "GET" || !response.ok) return response;
