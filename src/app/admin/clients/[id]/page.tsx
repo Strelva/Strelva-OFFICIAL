@@ -27,6 +27,7 @@ import { getClientEmailOverride } from "@/lib/client-email-override";
 import { emailSendingPaused } from "@/lib/email-enabled";
 import { TenantEditor } from "./TenantEditor";
 import { OperatorControlsPanel } from "./OperatorControlsPanel";
+import { ReleaseFlagsPanel } from "./ReleaseFlagsPanel";
 import { SiteScan } from "./SiteScan";
 import { ReviewIntelPanel } from "./ReviewIntelPanel";
 import { DomainManager } from "./DomainManager";
@@ -354,6 +355,7 @@ export default async function ClientDetailPage({
             visibilityTowns: (tenant.visibility?.towns ?? []).join(", "),
           }}
         />
+        <ReleaseFlagsPanel tenantId={tenant.id} />
         <DomainManager tenantId={tenant.id} initialDomains={domainClaims.map(serializeDomainClaim)} />
         <IntegrationsPanel tenantId={tenant.id} />
         <DeploymentStatus status={deployStatus} tenantId={tenant.id} />

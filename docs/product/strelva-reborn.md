@@ -307,15 +307,19 @@ Neither is used by any journey today.
 
 ### 6. Owners enter the workspace
 
-- [ ] Signing in on a client admin host lands in that client's workspace.
-      Today the sign-in page and auth callback hard-code `/dashboard`.
-      *Not started · M*
+- [x] Signing in on a client admin host lands in that client's workspace.
+      *Built and proven locally on `build/owner-entry` (unit tests; no
+      authenticated browser journey yet): sign-in, sign-up and the admin root
+      go through `/auth/entry` when `STRELVA_OWNER_ENTRY` is on; off, nothing
+      changes.*
 - [ ] Each `/dashboard` page has a workspace home or redirects to one. Of 22
       pages: 3 have a home, 4 partial, 4 retire, the rest need building.
-      *Not started · L*
-- [ ] `/dashboard` and `/client/{tenant}/dashboard` stay permanent redirects;
+      *Partial: 25 page files mapped (2 ready incl. `/reports` → Recaps,
+      4 retire, 2 frozen, 17 stay) on `build/owner-entry` · L*
+- [x] `/dashboard` and `/client/{tenant}/dashboard` stay permanent redirects;
       gldf and rohlax repos hard-code them and are not changed.
-      *Not started · S*
+      *Built locally on `build/owner-entry`: 307 only for a member of the
+      destination workspace, else the page renders as today.*
 - [ ] Owner memberships exist for every converted client, in both the
       workspace and the tenant while `/dashboard` pages remain. Workspace
       invites don't email today; tenant invites do. *Path built and proven
@@ -326,7 +330,10 @@ Neither is used by any journey today.
       per client*
 - [ ] Per-workspace flags layered over the env flags, so each client's
       landing, inquiries and rebuild turn on and roll back on their own. The
-      same flags split Preview per tester. *Not started · M*
+      same flags split Preview per tester. *Built locally on
+      `build/owner-entry`: migration `20261007130000` (not applied anywhere),
+      SQL checks and unit tests pass; operator controls on
+      `/admin/clients/[id]`.*
 
 ### 7. Structure that keeps it this way
 

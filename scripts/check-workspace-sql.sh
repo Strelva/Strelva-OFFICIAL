@@ -471,6 +471,10 @@ psql "${psql_args[@]}" --file="$repo_root/tests/business-ownership-schema.sql"
 psql "${psql_args[@]}" --set=tenant_import="$(cat "$repo_root/tests/fixtures/business-record-tenant-import.json")" \
   --file="$repo_root/tests/business-record-conversion-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
+# Owner entry: per-workspace release flags layered over the env flags, and
+# the tenant-to-workspace entry resolution, with cross-workspace denial.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007130000_workspace_release_flags.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \

@@ -18,6 +18,7 @@ vi.mock("@/products/managed-presence/server", () => ({ listManagedPresenceWork: 
 vi.mock("@/experience/systems/server", () => ({ makeRealForWorkspace: deps.makeReal }));
 
 import { POST } from "@/app/api/workspace/systems/make-real/route";
+import { setReleaseFlagsDb } from "@/platform/release-flags/store";
 
 const BUSINESS = "a0000000-0000-4000-8000-000000000001";
 const ORIGIN = "http://localhost:3000";
@@ -35,9 +36,20 @@ describe("POST /api/workspace/systems/make-real", () => {
     deps.makeReal.mockReset().mockResolvedValue(RESULT);
     deps.limited.mockReset().mockResolvedValue(false);
     vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "1");
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    setReleaseFlagsDb({ rpc: async () => ({ data: { workspaceId: BUSINESS, flags: {}, testers: [] }, error: null }) });
   });
 
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => { vi.unstubAllEnvs(); setReleaseFlagsDb(null); });
+
+  it("answers 503 for a business an operator set off, and runs where its workspace row is on under env workspace", async () => {
+    setReleaseFlagsDb({ rpc: async () => ({ data: { workspaceId: BUSINESS, flags: { systems: { state: "off", revision: 1, changedAt: "2026-10-06T00:00:00Z" } }, testers: [] }, error: null }) });
+    expect((await call()).status).toBe(503);
+    expect(deps.makeReal).not.toHaveBeenCalled();
+    vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "workspace");
+    setReleaseFlagsDb({ rpc: async () => ({ data: { workspaceId: BUSINESS, flags: { systems: { state: "on", revision: 1, changedAt: "2026-10-06T00:00:00Z" } }, testers: [] }, error: null }) });
+    expect((await call()).status).toBe(200);
+  });
 
   it("answers 503 and reads nothing while STRELVA_SYSTEMS_RELEASE is off", async () => {
     for (const value of [undefined, "", "0", "true"]) {
