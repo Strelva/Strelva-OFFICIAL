@@ -1,3 +1,5 @@
+import type { UnifiedEvent } from "@/lib/types";
+import { observedTenantRoute } from "@/platform/needs-you/tenant-classify";
 import { createPossibility, type PossibilityRepository } from "@/platform/possibilities";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { AskChangeKind, AskChangeOrigin, AskNeedsYouRoute, AskedOnBehalf } from "./contracts";
@@ -35,7 +37,7 @@ export interface AskNeedsYouRouting {
 }
 
 /**
- * The narrow port to src/platform/needs-you (built on another stream). Ask
+ * The narrow port to src/platform/needs-you. Ask
  * Strelva never decides the route itself; it only reports what this says.
  */
 export interface NeedsYouPort {
@@ -43,13 +45,13 @@ export interface NeedsYouPort {
 }
 
 /**
- * Stub adapter until the Needs you policy is wired in. Today's tenant tools
- * already queue a pending event that `/api/approve` and the dashboard review
- * queue (`/dashboard/review`) resolve, so email approval keeps working (spec
- * section 6, step 4). This adapter routes every Ask draft to the owner and
- * points at that event. It never answers `handle`: nothing drafted in Ask
- * publishes on its own until the real policy says it may. A draft that
- * created no pending event has nothing to decide, so it is `never`.
+ * Today's tenant queue, used while Needs you is off and for a site not yet
+ * linked to a business. Today's tenant tools already queue a pending event
+ * that `/api/approve` and the dashboard review queue (`/dashboard/review`)
+ * resolve, so email approval keeps working (needs-you spec section 6, step
+ * 4). It routes every Ask draft to the owner and points at that event. It
+ * never answers `handle`. A draft that created no pending event has nothing
+ * to decide, so it is `never`. `createNeedsYouAskAdapter` is the real port.
  */
 export function createTenantEventNeedsYouAdapter(options: { decideAt?: string } = {}): NeedsYouPort {
   const decideAt = options.decideAt ?? "/dashboard/review";
@@ -57,6 +59,80 @@ export function createTenantEventNeedsYouAdapter(options: { decideAt?: string } 
     async submit(draft) {
       if (draft.eventIds.length === 0) return { route: "never", itemRef: null, decideAt: null };
       return { route: "owner_decides", itemRef: draft.eventIds[0]!, decideAt };
+    },
+  };
+}
+
+/** The parts of a Needs you item Ask reports back. */
+export interface AskNeedsYouItem {
+  id: string;
+  route: "strelva_reviews" | "owner_decides";
+  state: string;
+  sourceLifecycle: string;
+  sourceId: string;
+}
+
+/** Bound to the signed-in actor by the caller. */
+export interface NeedsYouAskDeps {
+  /** Tenants linked to this business (needs_you_linked_tenants). */
+  linkedTenants(workspaceId: string): Promise<string[]>;
+  /** Open items for every pending ask the adapters can read (Needs you `sync`). */
+  sync(workspaceId: string): Promise<unknown>;
+  /** Open items, every route (the store's list, not the owner view). */
+  openItems(workspaceId: string): Promise<AskNeedsYouItem[]>;
+  /** The tenant event, to report the route it actually took when no item opened. */
+  readEvent(eventId: string): Promise<UnifiedEvent | null>;
+  /** Used for a draft whose site is not linked to a business yet: today's tenant queue. */
+  fallback: NeedsYouPort;
+  /** Where the owner decides: Home's Needs you. */
+  decideAt(workspaceId: string): string;
+}
+
+const ROUTE_RANK: Record<AskNeedsYouRoute, number> = { never: -1, handle: 0, handle_after_notice: 1, strelva_reviews: 2, owner_decides: 3 };
+
+/**
+ * The real Needs you port. Ask's tenant tools still queue a pending tenant
+ * event (today's approval store); this opens the Needs you item for it
+ * through the tenant-event adapter and reports the item's route, so the
+ * route Ask names is the one the policy holds and the item the owner
+ * decides is the one Home and the email show. Ask never decides the route.
+ *
+ * - Site not linked to this business: today's tenant queue (fallback).
+ * - Several events: the strictest route wins; the item named is the first
+ *   one the owner decides.
+ * - An event that opened no item (published under today's rules, or already
+ *   resolved): the route it actually took (`observedTenantRoute`).
+ */
+export function createNeedsYouAskAdapter(deps: NeedsYouAskDeps): NeedsYouPort {
+  return {
+    async submit(draft) {
+      if (draft.eventIds.length === 0) return { route: "never", itemRef: null, decideAt: null };
+      if (!draft.tenantId) return deps.fallback.submit(draft);
+      const linked = await deps.linkedTenants(draft.workspaceId).catch(() => null);
+      if (!linked || !linked.includes(draft.tenantId)) return deps.fallback.submit(draft);
+      await deps.sync(draft.workspaceId);
+      const items = await deps.openItems(draft.workspaceId);
+      let route: AskNeedsYouRoute = "never";
+      let item: AskNeedsYouItem | null = null;
+      for (const eventId of draft.eventIds) {
+        const sourceId = `${draft.tenantId}:${eventId}`;
+        const open = items.find((row) => row.state === "open" && row.sourceLifecycle === "tenant_event" && row.sourceId === sourceId);
+        let eventRoute: AskNeedsYouRoute;
+        if (open) {
+          eventRoute = open.route;
+          if (!item || (open.route === "owner_decides" && item.route !== "owner_decides")) item = open;
+        } else {
+          const event = await deps.readEvent(eventId).catch(() => null);
+          // An event that can't be read is held for the owner: never claim it was handled.
+          eventRoute = event && event.tenantId === draft.tenantId ? observedTenantRoute(event).route : "owner_decides";
+        }
+        if (ROUTE_RANK[eventRoute] > ROUTE_RANK[route]) route = eventRoute;
+      }
+      return {
+        route,
+        itemRef: item?.id ?? null,
+        decideAt: route === "owner_decides" ? deps.decideAt(draft.workspaceId) : null,
+      };
     },
   };
 }

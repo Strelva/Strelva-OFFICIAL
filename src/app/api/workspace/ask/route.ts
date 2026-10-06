@@ -5,8 +5,10 @@ import { inquiryReleaseEnabled } from "@/products/inquiries";
 import {
   askReleaseEnabled,
   createPossibilityAdapter,
+  createNeedsYouAskAdapter,
   createServiceRequestAdapter,
   createTenantEventNeedsYouAdapter,
+  type NeedsYouPort,
   startAskTurn,
   type AskTurnDeps,
 } from "@/platform/ask";
@@ -17,6 +19,9 @@ import { PostgresServiceRequestStore, ServiceRequestService } from "@/platform/s
 import { readExistingSystemsSnapshot } from "@/platform/systems/from-existing";
 import { readWorkspaceExit } from "@/platform/workspace-exit";
 import { listWorkspaces } from "@/platform/workspaces";
+import type { WorkspaceActor } from "@/platform/workspaces/types";
+import { getEventRaw } from "@/lib/events";
+import { needsYouReleaseEnabled, needsYouService, needsYouStore } from "@/platform/needs-you/server";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +32,28 @@ export const dynamic = "force-dynamic";
  * until the server restarts; the receipt marks it `durable: false`.
  */
 const possibilityRepository = createInMemoryPossibilityRepository();
+
+/**
+ * With STRELVA_NEEDS_YOU_RELEASE on, Ask hands every draft to the real Needs
+ * you service: the item opens through the tenant-event adapter and the owner
+ * decides it on Home or from the email. Off, today's tenant queue.
+ */
+function askNeedsYou(actor: WorkspaceActor): { port: NeedsYouPort; path: string } {
+  const fallback = createTenantEventNeedsYouAdapter();
+  if (!needsYouReleaseEnabled()) return { port: fallback, path: "/dashboard/review" };
+  const service = needsYouService();
+  return {
+    path: "/workspace",
+    port: createNeedsYouAskAdapter({
+      fallback,
+      linkedTenants: async (workspaceId) => (await needsYouStore.linkedTenants(workspaceId)).map((link) => link.tenantId),
+      sync: (workspaceId) => service.sync({ workspaceId, actor }),
+      openItems: (workspaceId) => needsYouStore.list(actor, workspaceId, false),
+      readEvent: getEventRaw,
+      decideAt: (workspaceId) => `/workspace?workspaceId=${encodeURIComponent(workspaceId)}`,
+    }),
+  };
+}
 
 /**
  * POST /api/workspace/ask: Ask Strelva in a business workspace.
@@ -46,6 +73,7 @@ export async function POST(request: Request) {
     if (await isRateLimitedAsync(`ask:${actor.userId}`, 30)) return workspaceJson({ error: "Too many requests. Try again in a minute." }, 429);
     const body = await readWorkspaceBody(request, 150_000);
     const requests = createServiceRequestAdapter(new ServiceRequestService(PostgresServiceRequestStore));
+    const needsYou = askNeedsYou(actor);
     const deps: AskTurnDeps = {
       isOperator: await isSuperAdmin(),
       async readMembership(current, workspaceId) {
@@ -60,7 +88,7 @@ export async function POST(request: Request) {
       loadTenantTools: loadTenantAskTools,
       googleWriteGranted: tenantGoogleWriteGranted,
       inquiriesEnabled: () => inquiryReleaseEnabled(),
-      needsYou: createTenantEventNeedsYouAdapter(),
+      needsYou: needsYou.port,
       requests,
       possibilities: createPossibilityAdapter(possibilityRepository, { durable: false }),
       async stream(input, consume, emitted) {
@@ -72,7 +100,7 @@ export async function POST(request: Request) {
         );
       },
       newTurnId: () => crypto.randomUUID(),
-      needsYouPath: "/dashboard/review",
+      needsYouPath: needsYou.path,
     };
     const start = await startAskTurn(deps, actor, body);
     if (start.kind === "refused") return workspaceJson({ error: start.error }, start.status);
