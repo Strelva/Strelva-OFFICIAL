@@ -11,7 +11,9 @@ import { getDevAccessTenant, isDevAccessBypassEnabled } from "./lib/dev-access";
 import { MARKETING_HOSTS, isMarketingHost } from "./lib/marketing-hosts";
 import { parseTenantHost } from "./lib/tenant-host";
 import { CONTROL_PLANE_URL } from "./lib/brand";
-import { websiteRebuildReleaseEnabled } from "./products/websites/index";
+// No workspace is known here: the proxy only asks "could the rebuild be on";
+// the per-site decision is getPublishedSiteDocument's (per tenant).
+import { websiteRebuildReleaseMayBeOn } from "./products/websites/index";
 import { hostedRedirectTarget } from "./products/websites/index";
 import { strelvaHostedPreviewEnabled } from "./experience/workspace/preview/enabled";
 import { OWNER_ENTRY_PATH, ownerEntryPossible } from "./platform/owner-entry/env";
@@ -350,7 +352,7 @@ export function buildContentSecurityPolicy(params: {
 function applySecurityHeaders(response: NextResponse, req: NextRequest): NextResponse {
   applyMiddlewareSupabaseResponse(req, response);
   const livePreviewRequest = isLivePreviewRequest(req);
-  const websiteCandidate = isWebsiteCandidatePreviewRequest(req.nextUrl.pathname, req.nextUrl.searchParams, websiteRebuildReleaseEnabled());
+  const websiteCandidate = isWebsiteCandidatePreviewRequest(req.nextUrl.pathname, req.nextUrl.searchParams, websiteRebuildReleaseMayBeOn());
   response.headers.set(
     "Content-Security-Policy",
     buildContentSecurityPolicy({
@@ -504,7 +506,7 @@ export default async function proxy(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
   // HTML assets skipped the proxy before the v2 redirect matcher was added.
   // Keep the original passthrough bytes while the rebuild release is disabled.
-  if (/\.html?$/i.test(pathname) && !websiteRebuildReleaseEnabled()) return NextResponse.next();
+  if (/\.html?$/i.test(pathname) && !websiteRebuildReleaseMayBeOn()) return NextResponse.next();
   const devAccessBypass = isDevAccessBypassEnabled();
   const devPreviewRequest = devAccessBypass && req.nextUrl.searchParams.get("preview") === "true";
 
@@ -743,7 +745,7 @@ export default async function proxy(req: NextRequest) {
 
     // Rebuilt old paths redirect only on the trusted public tenant host. This
     // does not participate in client fallback, impersonation or preview routing.
-    if (websiteRebuildReleaseEnabled() && !isAdminSubdomain && !tenantFromClientPath && !tenantFromQueryParam && !isPreviewMode && /^\/(?:[a-zA-Z0-9_.-]+\/?)*$/.test(pathname) && !pathname.split("/").some(segment => segment === "." || segment === "..") && !/^\/(?:api|admin|dashboard|workspace|sign-in|sign-up|auth|preview)(?:\/|$)/.test(pathname)) {
+    if (websiteRebuildReleaseMayBeOn() && !isAdminSubdomain && !tenantFromClientPath && !tenantFromQueryParam && !isPreviewMode && /^\/(?:[a-zA-Z0-9_.-]+\/?)*$/.test(pathname) && !pathname.split("/").some(segment => segment === "." || segment === "..") && !/^\/(?:api|admin|dashboard|workspace|sign-in|sign-up|auth|preview)(?:\/|$)/.test(pathname)) {
       const { getPublishedSiteDocument } = await import("./products/websites/index");
       const published = await getPublishedSiteDocument(tenantId);
       const target = published ? hostedRedirectTarget(published, pathname) : null;

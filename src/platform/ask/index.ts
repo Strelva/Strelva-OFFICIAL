@@ -6,4 +6,4 @@ export * from "./ports";
 export * from "./tools";
 export * from "./turn";
 export * from "./history";
-export { askReleaseEnabled } from "./release";
+export { askReleaseEnabled, askReleaseMayBeOn } from "./release";

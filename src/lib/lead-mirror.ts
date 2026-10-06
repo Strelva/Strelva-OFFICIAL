@@ -14,6 +14,13 @@
  *     `reb:lead-mirror:last-failure`), paged once an hour per reason, shown in
  *     the operator console, and retried by the lead-mirror-reconcile cron.
  *
+ * Missing schema (the app deployed before `tenant_leads` / `record_tenant_lead`
+ * exist): the first refusal sets `reb:lead-mirror:schema-missing` and pages
+ * once (`lead_mirror_schema_missing`). Until the marker clears, live captures
+ * skip the RPC and only queue the lead in `pending` (no per-lead page); one
+ * capture or cron run per LEAD_MIRROR_SCHEMA_RECHECK_MS re-tries, and the
+ * first success clears the marker. The backfill script always tries.
+ *
  * Kill switch: DUAL_WRITE_PG=0, the same switch as the other Postgres mirrors.
  * Without Supabase env it is a no-op.
  */
@@ -26,6 +33,9 @@ export const LEAD_MIRROR_TIMEOUT_MS = 1500;
 export const LEAD_MIRROR_FAILURE_TIMEOUT_MS = 250;
 export const LEAD_MIRROR_PENDING_KEY = "reb:lead-mirror:pending";
 export const LEAD_MIRROR_LAST_FAILURE_KEY = "reb:lead-mirror:last-failure";
+export const LEAD_MIRROR_SCHEMA_MISSING_KEY = "reb:lead-mirror:schema-missing";
+/** How often a missing schema is re-checked while the marker is set. */
+export const LEAD_MIRROR_SCHEMA_RECHECK_MS = 60 * 60 * 1000;
 const PENDING_KEEP = 5000;
 
 export type LeadMirrorVia = "dual_write" | "repair" | "backfill";
@@ -46,7 +56,7 @@ export interface LeadMirrorInput {
 
 export type LeadMirrorResult =
   | { status: "recorded" | "exists" | "duplicate"; id: string; workspaceId: string | null }
-  | { status: "skipped"; reason: "disabled" | "unconfigured" }
+  | { status: "skipped"; reason: "disabled" | "unconfigured" | "schema_missing" }
   | { status: "failed"; reason: LeadMirrorFailureReason };
 
 export interface LeadMirrorFailure {
@@ -62,6 +72,14 @@ export interface LeadMirrorHealth {
   pending: number;
   oldestPendingAt: string | null;
   lastFailure: LeadMirrorFailure | null;
+  /** Set while Postgres lacks the lead table or RPC; null otherwise or when unknown. */
+  schemaMissing?: LeadMirrorSchemaMissing | null;
+}
+
+export interface LeadMirrorSchemaMissing {
+  since: string;
+  checkedAt: string;
+  detail: string;
 }
 
 type RpcResult = { data: unknown; error: { message?: string; code?: string } | null };
@@ -119,7 +137,7 @@ function classify(error: { message?: string; code?: string }): LeadMirrorFailure
   const detail = `${error.code ?? ""} ${error.message ?? ""}`;
   if (detail.includes("tenant_lead_unknown_tenant")) return "unknown_tenant";
   if (detail.includes("tenant_lead_invalid")) return "invalid";
-  if (/PGRST202|42883|42P01|record_tenant_lead/.test(detail)) return "schema_missing";
+  if (/PGRST202|PGRST205|42883|42P01|record_tenant_lead/.test(detail)) return "schema_missing";
   if (/abort/i.test(detail)) return "timeout";
   return "error";
 }
@@ -139,9 +157,11 @@ export async function recordLeadMirrorFailure(
   tenant: string,
   leadId: string,
   reason: LeadMirrorFailureReason,
+  options: { page?: boolean } = {},
 ): Promise<void> {
   const failure: LeadMirrorFailure = { at: new Date().toISOString(), tenant, leadId, reason };
-  console.error("[lead-mirror] lead not copied to Postgres", failure);
+  const page = options.page ?? true;
+  if (page) console.error("[lead-mirror] lead not copied to Postgres", failure);
   const redis = getRedis();
   let expired = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -161,7 +181,7 @@ export async function recordLeadMirrorFailure(
   // the operator alert from being attempted. Neither blocks visitor intake.
   try {
     await Promise.race([
-      Promise.allSettled([remember(), alertOnce("lead_mirror_failed", "high", { reason }, 3600)]),
+      Promise.allSettled([remember(), page ? alertOnce("lead_mirror_failed", "high", { reason }, 3600) : Promise.resolve()]),
       new Promise<void>(resolve => {
         timer = setTimeout(() => { expired = true; resolve(); }, LEAD_MIRROR_FAILURE_TIMEOUT_MS);
       }),
@@ -169,6 +189,67 @@ export async function recordLeadMirrorFailure(
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+/** Bound a Redis call on the capture path; a slow or failed call resolves to `fallback`. */
+async function bounded<T>(work: () => PromiseLike<T>, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(work).catch(() => fallback),
+      new Promise<T>(resolve => { timer = setTimeout(() => resolve(fallback), LEAD_MIRROR_FAILURE_TIMEOUT_MS); }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+export async function readLeadMirrorSchemaMissing(): Promise<LeadMirrorSchemaMissing | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+  return bounded(async () => (await redis.get<LeadMirrorSchemaMissing>(LEAD_MIRROR_SCHEMA_MISSING_KEY)) ?? null, null);
+}
+
+/**
+ * Whether the next write should reach Postgres. "closed": the schema was
+ * missing within the last recheck window, so skip the RPC. "recheck": the
+ * marker is due; this caller re-tries and claims the check for the window.
+ * Redis down or unreadable: "open", today's behavior.
+ */
+export async function leadMirrorSchemaGate(now = Date.now()): Promise<"open" | "recheck" | "closed"> {
+  const marker = await readLeadMirrorSchemaMissing();
+  if (!marker) return "open";
+  const checked = Date.parse(marker.checkedAt);
+  if (Number.isFinite(checked) && now - checked >= 0 && now - checked < LEAD_MIRROR_SCHEMA_RECHECK_MS) return "closed";
+  const redis = getRedis();
+  if (redis) await bounded(() => redis.set(LEAD_MIRROR_SCHEMA_MISSING_KEY, { ...marker, checkedAt: new Date(now).toISOString() }), null);
+  return "recheck";
+}
+
+/** First sighting sets the marker and pages once; later sightings only move `checkedAt`. */
+export async function noteLeadMirrorSchemaMissing(detail: string): Promise<void> {
+  const redis = getRedis();
+  const at = new Date().toISOString();
+  const marker: LeadMirrorSchemaMissing = { since: at, checkedAt: at, detail: detail.slice(0, 300) };
+  if (!redis) {
+    await bounded(() => alertOnce("lead_mirror_schema_missing", "high", { detail: marker.detail }, 24 * 3600), undefined);
+    return;
+  }
+  const created = await bounded(() => redis.set(LEAD_MIRROR_SCHEMA_MISSING_KEY, marker, { nx: true }), null);
+  if (created) {
+    console.error("[lead-mirror] Postgres has no tenant_leads / record_tenant_lead; live copies paused until it exists", marker);
+    await bounded(() => alertOnce("lead_mirror_schema_missing", "high", { detail: marker.detail }, 24 * 3600), undefined);
+    return;
+  }
+  const existing = await readLeadMirrorSchemaMissing();
+  if (existing) await bounded(() => redis.set(LEAD_MIRROR_SCHEMA_MISSING_KEY, { ...existing, checkedAt: at }), null);
+}
+
+export async function clearLeadMirrorSchemaMissing(): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+  const removed = await bounded(() => redis.del(LEAD_MIRROR_SCHEMA_MISSING_KEY), 0);
+  if (removed) console.info("[lead-mirror] tenant_leads is present again; live copies resumed");
 }
 
 export async function clearLeadMirrorPending(tenant: string, leadId: string): Promise<void> {
@@ -193,10 +274,11 @@ export async function getLeadMirrorHealth(): Promise<LeadMirrorHealth> {
   const redis = getRedis();
   if (!redis) return { known: false, pending: 0, oldestPendingAt: null, lastFailure: null };
   try {
-    const [pending, oldest, lastFailure] = await Promise.all([
+    const [pending, oldest, lastFailure, schemaMissing] = await Promise.all([
       redis.zcard(LEAD_MIRROR_PENDING_KEY),
       redis.zrange<(string | number)[]>(LEAD_MIRROR_PENDING_KEY, 0, 0, { withScores: true }),
       redis.get<LeadMirrorFailure>(LEAD_MIRROR_LAST_FAILURE_KEY),
+      redis.get<LeadMirrorSchemaMissing>(LEAD_MIRROR_SCHEMA_MISSING_KEY),
     ]);
     const score = Array.isArray(oldest) && oldest.length >= 2 ? Number(oldest[1]) : NaN;
     return {
@@ -204,6 +286,7 @@ export async function getLeadMirrorHealth(): Promise<LeadMirrorHealth> {
       pending: Number(pending) || 0,
       oldestPendingAt: Number.isFinite(score) ? new Date(score).toISOString() : null,
       lastFailure: lastFailure ?? null,
+      schemaMissing: schemaMissing ?? null,
     };
   } catch {
     return { known: false, pending: 0, oldestPendingAt: null, lastFailure: null };
@@ -231,8 +314,22 @@ export async function mirrorLead(
   }
   if (!client) return { status: "skipped", reason: "unconfigured" };
 
-  const fail = async (reason: LeadMirrorFailureReason): Promise<LeadMirrorResult> => {
-    if (via !== "backfill") await recordLeadMirrorFailure(tenant, lead.id, reason);
+  // The backfill always tries: it is how an operator proves the schema landed.
+  const gate = via === "backfill" ? "open" : await leadMirrorSchemaGate();
+  if (gate === "closed") {
+    // Keep the lead recoverable without a failed RPC or a page per lead.
+    if (via === "dual_write") await recordLeadMirrorFailure(tenant, lead.id, "schema_missing", { page: false });
+    return { status: "skipped", reason: "schema_missing" };
+  }
+
+  const fail = async (reason: LeadMirrorFailureReason, detail = ""): Promise<LeadMirrorResult> => {
+    if (via === "backfill") return { status: "failed", reason };
+    if (reason === "schema_missing") {
+      await noteLeadMirrorSchemaMissing(detail || reason);
+      await recordLeadMirrorFailure(tenant, lead.id, reason, { page: false });
+    } else {
+      await recordLeadMirrorFailure(tenant, lead.id, reason);
+    }
     return { status: "failed", reason };
   };
 
@@ -253,11 +350,12 @@ export async function mirrorLead(
     });
     const outcome = await Promise.race([Promise.resolve(request), timeout]);
     if (outcome === "timeout") return fail("timeout");
-    if (outcome.error) return fail(classify(outcome.error));
+    if (outcome.error) return fail(classify(outcome.error), `${outcome.error.code ?? ""} ${outcome.error.message ?? ""}`.trim());
     const data = outcome.data as { status?: unknown; id?: unknown; workspaceId?: unknown } | null;
     if (!data || (data.status !== "recorded" && data.status !== "exists" && data.status !== "duplicate") || typeof data.id !== "string") {
       return fail("error");
     }
+    if (gate === "recheck" || via === "backfill") await clearLeadMirrorSchemaMissing();
     return { status: data.status, id: data.id, workspaceId: typeof data.workspaceId === "string" ? data.workspaceId : null };
   } catch (err) {
     return fail(err instanceof Error && err.name === "AbortError" ? "timeout" : "error");

@@ -5,7 +5,7 @@ import { getSessionUser } from "@/lib/db/server-client";
 import { withClientFallbackRoot } from "@/lib/client-fallback";
 import { resolveTenantOwnerEntry, workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
-import { askReleaseEnabled } from "@/platform/ask/release";
+import { askReleaseMayBeOn } from "@/platform/ask/release";
 import { decideOwnerEntry, entryDestination, routeDashboardRequest, type DashboardRouting, type OwnerEntryDecision } from "./decision";
 import { ownerEntryPossible } from "./env";
 import { effectiveDisposition, routeForDashboardPath, type DispositionGate } from "./dispositions";
@@ -43,7 +43,7 @@ export async function dashboardRoutingFor(tenant: string, pathWithSearch?: strin
     flags.set(flag, flag === "needs_you"
       ? needsYouReleaseEnabled()
       : flag === "ask"
-      ? askReleaseEnabled()
+      ? askReleaseMayBeOn() && await workspaceReleaseFlagEnabled("systems", decision.workspaceId, { operator: decision.operator, tester: decision.tester }).catch(() => false)
       : await workspaceReleaseFlagEnabled(flag, decision.workspaceId, { operator: decision.operator, tester: decision.tester }).catch(() => false));
   }
   return routeDashboardRequest({ decision, pathWithSearch: path, flagOn: (flag) => flags.get(flag) === true });

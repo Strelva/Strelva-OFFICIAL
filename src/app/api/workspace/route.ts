@@ -1,4 +1,4 @@
-import { websiteRebuildReleaseEnabled } from "@/products/websites/index";
+import { websiteRebuildReleaseEnabledForWorkspace, websiteRebuildReleasedFor } from "@/products/websites/index";
 import { websiteRebuildSchema } from "@/products/websites/index";
 import { initializeRebuildHandoff } from "@/products/websites/index";
 import { savePublicWebsiteAudit } from "@/products/website-audit/server";
@@ -26,14 +26,14 @@ import {
 import { listManagedPresenceWork } from "@/products/managed-presence/server";
 import { publicHostname } from "@/products/managed-presence";
 import { resolveHomeFinderPreviewHref } from "@/products/home-finder/server";
-import { inquiryReleaseEnabled } from "@/products/inquiries";
+import { inquiryReleaseEnabledForWorkspace } from "@/products/inquiries";
 import { parseTrackerWorkPayload, presentTrackerHandoffPreview } from "@/products/tracker";
 import { presentWorkspaceWork } from "@/experience/workspace/result";
 import { readWorkspaceSystems } from "@/experience/systems/server";
 import { systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
 import { listProvidedClients } from "@/platform/workspaces/business-ownership";
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
-import { askReleaseEnabled } from "@/platform/ask/release";
+import { askReleaseMayBeOn } from "@/platform/ask/release";
 import type { ManagedWork, WorkspaceDelegation, WorkspaceProduct, WorkspaceSnapshot, WorkspaceWork } from "@/experience/workspace/contracts";
 
 export const dynamic = "force-dynamic";
@@ -181,10 +181,10 @@ async function presentSavedWork(current: WorkspaceActor, work: SavedWork): Promi
   return presentWorkspaceWork(work, { access: workspace ? workAccess(workspace) : "member" });
 }
 
-function supportsHandoff(work: SavedWork): boolean {
+async function supportsHandoff(current: WorkspaceActor, work: SavedWork): Promise<boolean> {
   if (work.productId === "websites" && work.resourceKind === "website") {
     const rebuild = websiteRebuildSchema.safeParse(work.payload);
-    return websiteRebuildReleaseEnabled() && rebuild.success && rebuild.data.status !== "published" && !rebuild.data.tenantId && !rebuild.data.candidate?.document.capabilities;
+    return rebuild.success && await websiteRebuildReleasedFor(current, work.workspaceId) && rebuild.data.status !== "published" && !rebuild.data.tenantId && !rebuild.data.candidate?.document.capabilities;
   }
   const presented = presentWorkspaceWork(work, { access: "owned" });
   if (presented.assessment?.actions.handoff.allowed) return true;
@@ -269,7 +269,12 @@ export async function GET(request: Request) {
     // Possibility a saved rebuild offers. A failed read is reported as such.
     // Off (STRELVA_SYSTEMS_RELEASE, per workspace when the env says `workspace`),
     // no projection is built and the browser renders the pre-Systems workspace.
-    const systemsReleased = await systemsReleaseEnabledForWorkspace(selected.id, { operator: await isSuperAdminUser(current.userId), tester: false, userId: current.userId });
+    const releaseViewer = { operator: await isSuperAdminUser(current.userId), tester: false, userId: current.userId };
+    const [systemsReleased, inquiriesReleased, websiteRebuildReleased] = await Promise.all([
+      systemsReleaseEnabledForWorkspace(selected.id, releaseViewer),
+      inquiryReleaseEnabledForWorkspace(selected.id, releaseViewer),
+      websiteRebuildReleaseEnabledForWorkspace(selected.id, releaseViewer),
+    ]);
     const systems = systemsReleased && selected.kind === "customer" ? await readWorkspaceSystems({
       actor: current, businessId: selected.id, savedWork: work,
       siteDomains: new Map(managedPresence.managedWork.flatMap((site) => site.domain ? [[site.id, site.domain] as const] : [])),
@@ -287,8 +292,8 @@ export async function GET(request: Request) {
       availability: "available",
     })));
     // Inquiry work is intentionally absent while its explicit exposure flag is
-    // off. The route still enforces the same flag for direct deep links.
-    if (inquiryReleaseEnabled()) products.push({ id: "inquiries", name: "Inquiry work", description: "Keep customer requests moving with a clear, inspectable thread.", availability: "available" });
+    // off for this workspace. The route still enforces the flag per site.
+    if (inquiriesReleased) products.push({ id: "inquiries", name: "Inquiry work", description: "Keep customer requests moving with a clear, inspectable thread.", availability: "available" });
     const snapshot: WorkspaceSnapshot = {
       actor: { email: current.verifiedEmail, localPreview: false },
       workspaces: workspaces.map(({ id, kind, name, access, role }) => ({ id, kind, name, access, role })), workspaceId: selected.id,
@@ -303,7 +308,7 @@ export async function GET(request: Request) {
       ...(providedClients ? { providedClients } : {}),
       products,
       ...(systems ? { systems } : {}),
-      releases: { systems: systemsReleased, needsYou: needsYouReleaseEnabled(), ask: askReleaseEnabled() },
+      releases: { systems: systemsReleased, needsYou: needsYouReleaseEnabled(), ask: askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, websiteRebuild: websiteRebuildReleased },
     };
     return json(snapshot);
   } catch (error) { return failed(error); }
@@ -352,13 +357,13 @@ export async function POST(request: Request) {
       case "handoff": {
         const work = await getWork(current, input.workId);
         if (!work) return json({ error: "Saved work unavailable." }, 404);
-        if (!supportsHandoff(work)) return json({ error: "This product does not support handoffs in this release." }, 409);
+        if (!(await supportsHandoff(current, work))) return json({ error: "This product does not support handoffs in this release." }, 409);
         const result = await createHandoff(current, input.workId, input.recipientEmail);
         return json({ token: result.token }, 201);
       }
       case "accept_handoff": {
         const addressed = await inspectHandoff(current, input.token);
-        if (!supportsHandoff(addressed.work)) return json({ error: "This product does not support handoffs in this release." }, 409);
+        if (!(await supportsHandoff(current, addressed.work))) return json({ error: "This product does not support handoffs in this release." }, 409);
         const accepted = await acceptHandoff(current, input.token, input.destination, input.allowAgencyAccess);
         if (addressed.work.productId === "websites") await initializeRebuildHandoff(current, accepted);
         return json({ workspaceId: accepted.customerWorkspaceId, workId: accepted.customerWorkId });

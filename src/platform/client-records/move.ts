@@ -99,14 +99,18 @@ export async function checkClientRecordParity(
     postgresOnly: Object.keys(digests).filter((id) => !redisIds.has(id)).length,
     recorded: false,
   };
-  if (options.record !== false) {
-    const saved = await db.rpc("record_client_record_parity", {
-      p_store: store, p_tenant_id: tenant, p_redis_count: records.length, p_postgres_count: postgresCount,
-      p_missing: missing.length, p_mismatched: mismatched.length,
-    });
-    report.recorded = !saved.error;
-  }
+  if (options.record !== false) report.recorded = await recordClientRecordParity(report, db);
   return report;
+}
+
+/** Records one compared result: one row per store, tenant and UTC day (a
+ *  same-day rerun overwrites it). The only write parity ever makes. */
+export async function recordClientRecordParity(report: ParityReport, db: ClientRecordDb): Promise<boolean> {
+  const saved = await db.rpc("record_client_record_parity", {
+    p_store: report.store, p_tenant_id: report.tenant, p_redis_count: report.redisCount, p_postgres_count: report.postgresCount,
+    p_missing: report.missing.length, p_mismatched: report.mismatched.length,
+  });
+  return !saved.error;
 }
 
 export function clientRecordReadStores(): Set<ClientRecordStore> {

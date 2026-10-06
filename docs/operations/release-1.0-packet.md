@@ -1,6 +1,9 @@
 # Strelva 1.0 release packet
 
 Created: 2026-10-06 against `integrate/reborn-1.0` at `9e0bd441`.
+Updated: 2026-10-06 on `w2/release-hardening`: findings 3, 5, 6, 8, 10 and
+11 are fixed in code and proven locally (tests and SQL checks), never in
+production. Two migrations were added (34 unapplied in total).
 Status: prepared, nothing executed. Every step below is a separate yes.
 
 This is every production step Strelva `1.0.0` needs, in order, written so
@@ -20,34 +23,64 @@ disagree, the checklist's stop conditions win.
 2. **One migration is out of order.** `20260928130000_business_effort_minutes`
    is dated before the applied `20260930120000`. Every push after batch 0
    needs `--include-all`.
-3. **The 1.0 app must not deploy before `tenant_leads` exists.** `DUAL_WRITE_PG`
-   is on unless set to `0`, so lead copies start on deploy. Without the table
-   every copy fails into `reb:lead-mirror:pending` and pages hourly.
+3. **Fixed: a missing `tenant_leads` pages once, not hourly.** `DUAL_WRITE_PG`
+   is on unless set to `0`, so lead copies start on deploy. If `tenant_leads`
+   or `record_tenant_lead` is missing, the first lead sets
+   `reb:lead-mirror:schema-missing` and pages once
+   (`lead_mirror_schema_missing`). After that, captures skip the database call
+   and queue each lead in `reb:lead-mirror:pending` without paging. It
+   rechecks at most hourly and resumes by itself once batch 0 lands; the
+   reconcile cron reports `schemaMissing: true` and stays healthy. Visitors
+   are never affected. Batch 0 should still go first: until it does, every
+   lead waits in the queue for the cron or S1.
 4. **The first conversion needs batch 4.** `20261007180000_business_billing`
    records a business's billing through a trigger at conversion time, with no
    backfill. Converting before it lands leaves converted businesses without a
    billing home. So: all five batches, then conversions.
-5. **Two flags ignore per-workspace rows.** `STRELVA_INQUIRIES_RELEASE` and
-   `STRELVA_WEBSITE_REBUILD_RELEASE` only turn on with exactly `1`, for every
-   client at once. Their `…ForWorkspace` helpers exist and nothing calls them.
-   `workspace` means off. A row set in the admin flags panel does nothing.
-6. **Under `STRELVA_SYSTEMS_RELEASE=workspace`, Ask, the agency library and
-   link fields stay off.** They check for exactly `1`.
+5. **Fixed: inquiries and the website rebuild honor per-workspace rows.**
+   Every caller that knows its business or site now asks the per-workspace
+   or per-site resolver, so `workspace` turns them on client by client. A
+   converted site follows its business's row (looked up through
+   `resolve_billing_workspace`, batch 4); an unconverted site follows the env
+   (`1` on, `workspace` off). Public endpoints (the inquiry form, lead
+   capture, hosted pages) never count as operators, so an `operators` row
+   keeps them closed to visitors. Callers with no business in hand keep the
+   env-only rule: the account landing redirect, the `/workspace` page's
+   first paint (the `/api/workspace` snapshot then says
+   `releases.websiteRebuild` and `releases.inquiries` per workspace), and the
+   preview fixture. The proxy only asks "could it be on" and leaves the
+   per-site decision to the published-document read.
+6. **Fixed: under `STRELVA_SYSTEMS_RELEASE=workspace`, Ask, the agency
+   library and link fields follow the workspace row.** Ask needs
+   `STRELVA_ASK_RELEASE=1` and Systems on for the asked workspace (503
+   otherwise). The library is read for an agency workspace, and rows used to
+   be allowed on business workspaces only; `20261008161000` (batch 3) allows
+   them on agency workspaces too, set with `scripts/workspace-release-flag.ts`
+   (S10). Without the workspace release, link fields keep the env-only rule.
 7. **"Stripe test mode first" can't run as specced.** The script picks its
    mode from the key prefix but reads Stripe ids from whatever Supabase is
    configured. A test key against production ids fails every update. A real
    rehearsal needs test-mode objects seeded on purpose (section 3, step S7).
-8. **Twin Trees defaults to one business.** Converting the second site
-   auto-joins the first site's workspace. There is no switch for "two
-   businesses". Ask the owner before converting either site (section 4).
+8. **Twin Trees defaults to one business; `--separate-business` now exists.**
+   Converting the second site still auto-joins the first site's workspace.
+   `--separate-business` (migration `20261008160000`, batch 4) converts a
+   linked-account site into its own business instead. Ask the owner before
+   converting either site (section 4).
 9. **No rollback SQL exists for any of the 32 migrations**, and production had
    PITR off and no listed backups on Sept 21. A tested dump comes first.
-10. **Client-records parity has no cron.** Seven days of parity means seven
-    daily manual runs, and each run writes parity rows.
-11. **Two scripts touch production without the guard:**
-    `scripts/count-client-redis-keys.ts` (read-only SCAN, comment-guarded) and
-    `scripts/backfill-secret-encryption.ts` (rewrites secrets, no dry run).
-    Neither is part of 1.0. Don't run either without reading it first.
+10. **Fixed: client-records parity runs itself.** A daily cron
+    (`client-records-parity`, 05:40 UTC) compares Redis with Postgres and
+    records one parity row per store, tenant and day. It never writes client
+    rows and only acts while `STRELVA_CLIENT_RECORDS_DUAL_WRITE=1` (and
+    `DUAL_WRITE_PG` isn't `0`). A store with any failed compare that day is
+    left out of the streak and alerts (`client_records_parity`). The 7-day
+    clock starts the day after the backfill. The backfill stays manual.
+11. **Fixed: both scripts are guarded.** `scripts/count-client-redis-keys.ts`
+    refuses any Redis that isn't loopback or `*.localhost` without
+    `--i-have-jacobs-yes`. `scripts/backfill-secret-encryption.ts` is a dry
+    run by default (tenant ids, column and key names only, never a value),
+    writes only with `--apply`, and refuses a non-local Supabase or Redis
+    without the yes, dry run included. Neither is part of 1.0.
 
 ## The whole order
 
@@ -152,11 +185,13 @@ them, applied 2026-07-30 per
 [persistence boundaries](../architecture/persistence-boundaries.md): dormant,
 nothing reads its tables. Batch 4 is the first thing to use them.
 
-### What is unapplied: 32 files
+### What is unapplied: 34 files
 
-`9e0bd441` holds 117 migrations. The 32 below are not in production. Digest
-is the first 12 hex characters of SHA-256 at `9e0bd441`. Re-hash before each
-push and stop on any difference.
+`9e0bd441` holds 117 migrations; `w2/release-hardening` adds two
+(`20261008160000` in batch 4, `20261008161000` in batch 3), so 119. The 34
+below are not in production. Digest is the first 12 hex characters of
+SHA-256 at `9e0bd441` (the two new files at `w2/release-hardening`). Re-hash
+before each push and stop on any difference.
 
 ### Before batch 0: a backup you have restored
 
@@ -216,8 +251,8 @@ After each batch:
 | 0 | `20261005090000` | No | `0.2.1`: leads expire from Redis every day; ship alone, first |
 | 1 | `20260928130000`, `20261002120000`, `20261005120000`, `20261005120100`, `20261007140000`, `20261007194000` | No. New tables and new function names only | Business record and additive foundations |
 | 2 | `20261001120000`, `20261001130000`, `20261001140000`, `20261004120000`, `20261007100000`, `20261007101000` | Yes: wraps three live functions, adds a column to `domain_claims`, a trigger on `saved_product_work`, RESTRICT FKs to `tenants` | Websites v2 and the Systems spine |
-| 3 | `20261007110000`, `20261007120000`, `20261007130000`, `20261007150000`, `20261007150100`, `20261007150200`, `20261007160000`, `20261007160100`, `20261007170000`, `20261007181000`, `20261007183000`, `20261007192000` | Yes: column + check on `workspace_invitations`, an AFTER DELETE trigger on `tenants`, replaces `accept_workspace_invitation` | Ownership, Needs you, flags, Versions, operator queue, Google bindings, client records |
-| 4 | `20261007155000`, `20261007180000`, `20261007182000`, `20261007190000`, `20261007190100`, `20261007190200`, `20261007192100` | Yes, the heaviest: non-concurrent index, FK swap that locks `tenants`, revokes, constraint swaps, replaced live functions, small backfills | Each statement reviewed for locks; grants captured first |
+| 3 | `20261007110000`, `20261007120000`, `20261007130000`, `20261007150000`, `20261007150100`, `20261007150200`, `20261007160000`, `20261007160100`, `20261007170000`, `20261007181000`, `20261007183000`, `20261007192000`, `20261008161000` | Yes: column + check on `workspace_invitations`, an AFTER DELETE trigger on `tenants`, replaces `accept_workspace_invitation` | Ownership, Needs you, flags (incl. agency rows), Versions, operator queue, Google bindings, client records |
+| 4 | `20261007155000`, `20261007180000`, `20261007182000`, `20261007190000`, `20261007190100`, `20261007190200`, `20261007192100`, `20261008160000` | Yes, the heaviest: non-concurrent index, FK swap that locks `tenants`, revokes, constraint swaps, replaced live functions, small backfills | Each statement reviewed for locks; grants captured first |
 
 Each batch depends only on earlier batches. The Sept 30 app must keep
 working on every batch. That is Gate 2 step 4, rehearsed locally by
@@ -444,6 +479,16 @@ grants revoked; every new function is service-role only unless noted.
 - Rollback: restore both from `20261005120000`/`20261005120100`; drop the three.
 - Verify: `select public.workspace_role_allows('owner','make_systems');` → `f`
 
+**`20261008161000_release_flags_agency_workspaces`** · `35f78a9c041a` · new on `w2/release-hardening`
+- Changes: replaces `workspace_release_assert_workspace` (from
+  `20261007130000`, same signature, still callable by nobody) to accept
+  agency workspaces as well as business ones. Personal workspaces stay
+  refused. `lock_timeout 3s`; no table changes.
+- Depends on: `20261007130000`.
+- Rollback: re-run that function's body from `20261007130000` (`kind = 'customer'`).
+  Rows already set on agency workspaces stay readable but can't change.
+- Verify: `select position('agency' in prosrc) > 0 from pg_proc where proname='workspace_release_assert_workspace';` → `t`
+
 #### Batch 4
 
 Before the push, save to a private file:
@@ -523,7 +568,17 @@ Push at the quietest hour. Most of these files have no `lock_timeout`.
   (fails if new values are in use).
 - Verify: `select to_regclass('public.internal_tool_notices'), 'newsletter' = any(public.business_contact_sources());` → `…, t`
 
-**After batch 4:** `select count(*) from supabase_migrations.schema_migrations where version >= '20260928130000';` → `32`
+**`20261008160000_convert_separate_business`** · `d28b0eb4086d` · new on `w2/release-hardening`
+- Changes: replaces `convert_tenant_to_business` (same signature and grants)
+  to accept `separateBusiness: true` (refused with `targetWorkspaceId` or any
+  other value; the receipt records it), and `business_billing_on_link` so a
+  separate business is billed by its own line item, not the account bundle.
+  No table locks; `lock_timeout 3s`.
+- Depends on: `20261002120000`, `20261007180000`.
+- Rollback: re-run both function bodies from those files.
+- Verify: `select proname, position('separateBusiness' in prosrc) > 0 from pg_proc where proname in ('convert_tenant_to_business','business_billing_on_link');` → both `t`
+
+**After batch 4:** `select count(*) from supabase_migrations.schema_migrations where version >= '20260928130000';` → `34`
 
 ---
 
@@ -544,14 +599,14 @@ and named testers; env `1` is on everywhere except rows set to `off`. If
 | Flag | Turns on | Default | Values | Per workspace | Needs | Kill switch |
 | --- | --- | --- | --- | --- | --- | --- |
 | `STRELVA_OWNER_ENTRY` | Signed-in owners on client admin hosts go through `/auth/entry` (workspace or `/dashboard`) | off | `workspace`, `1` | Yes: `off`/`operators`/`on` | batch 3 | unset |
-| `STRELVA_SYSTEMS_RELEASE` | Systems Home, System page, Possibilities, Make real, agency Clients/Queue/Library/Team | off | `workspace` (Home, System, Make real only), `1` | Partly | batches 2–4 | unset |
-| `STRELVA_ASK_RELEASE` | Ask Strelva | off | `1`; also needs WORKSPACE and SYSTEMS exactly `1` | No | batch 1 (`model_call_log`), model keys | unset |
-| `STRELVA_WEBSITE_REBUILD_RELEASE` | Website rebuild, v2 documents, health and domain alerts | off | `1` only | **No** (helper unused) | batch 2; `VERCEL_API_TOKEN` | unset |
+| `STRELVA_SYSTEMS_RELEASE` | Systems Home, System page, Possibilities, Make real, Ask, link fields, agency Clients/Queue/Library/Team | off | `workspace` (per workspace row, business or agency), `1` | Yes: `off`/`operators`/`on`; agency rows need `20261008161000` and S10 | batches 2–4 | unset |
+| `STRELVA_ASK_RELEASE` | Ask Strelva | off | `1`; also needs WORKSPACE `1` and Systems on for the asked workspace (`1`, or `workspace` with its row on) | Through Systems | batch 1 (`model_call_log`), model keys | unset |
+| `STRELVA_WEBSITE_REBUILD_RELEASE` | Website rebuild, v2 documents, health and domain alerts | off | `workspace`, `1` | Yes: per business; a converted site follows its business (needs batch 4); public hosted pages never count as operators | batch 2; `VERCEL_API_TOKEN` | unset |
 | `STRELVA_NEEDS_YOU_RELEASE` | Needs you and Strelva handled; hourly cron does work | off (cron heartbeat only, routes 503) | `1` | No | batch 3 | unset |
 | `STRELVA_PUBLISHING_RELEASE` | Listing and newsletter Systems, Connect Google | off | `1` | No; shows inside Systems | batch 3, S8 | unset |
 | `STRELVA_GOOGLE_BINDINGS` | Read the Postgres Google binding first, fall back to Redis (counted daily in `reb:google-binding:fallback:*`); OAuth callback writes both | off (Redis only) | `1` | No | batch 3, `SECRETS_ENC_KEY`, S8 | unset |
 | `STRELVA_BUSINESS_BILLING` | `workspaceId` on new checkout metadata; webhook copies payment status to the business | off | `1` | No | batch 4 | unset |
-| `STRELVA_CLIENT_RECORDS_DUAL_WRITE` | Copy Redis client stores to `tenant_client_records` | off | `1` (and `DUAL_WRITE_PG` not `0`) | No | batch 3 | unset |
+| `STRELVA_CLIENT_RECORDS_DUAL_WRITE` | Copy Redis client stores to `tenant_client_records`; the daily `client-records-parity` cron records parity | off | `1` (and `DUAL_WRITE_PG` not `0`) | No | batch 3 | unset |
 | `STRELVA_CLIENT_RECORDS_READ` | Read a store from Postgres, only after a 7-day parity streak | empty | comma list of `spam_held`, `inquiry_timeline`, `inquiry_reply`, `booking_config`, `account_grouping` | Per store | batch 3, S3 | remove the store |
 | `STRELVA_EXPORT_SCHEMA_3` | Paged export v3; link emailed to the owner | off (503) | `1` | No | batch 4 | unset |
 | `SCAFFOLD_PREVIEW_SIGNING_SECRET` | HMAC for private website share links | falls back to `CRON_SECRET` | any secret | n/a | none | n/a. Set a dedicated value before rebuild sharing |
@@ -561,14 +616,14 @@ and named testers; env `1` is on everywhere except rows set to `off`. If
 | Flag | Today (Sept 30 record) | Default | Values | Kill switch |
 | --- | --- | --- | --- | --- |
 | `STRELVA_WORKSPACE_RELEASE` | `1` | off | `1` | unset turns off everything layered on it |
-| `STRELVA_INQUIRIES_RELEASE` | unset | off | `1` only, every client at once | unset |
+| `STRELVA_INQUIRIES_RELEASE` | unset | off | `workspace` (per business; a converted site follows its business, needs batch 4), `1` (every client, except a row set `off`) | unset |
 | `STRELVA_BACKGROUND_WORK_RELEASE` | unset | off | `1` | unset |
 | `STRELVA_PLANNING_ENABLED` | unset | off | `1` | unset |
 | `STRELVA_PRODUCT_LEARNING_RELEASE`, `STRELVA_CUSTOMERS_RELEASE` | unset | off | `1` | leave off; the audit proposes cutting both |
 | `EMAIL_SENDING_ENABLED` | unknown (snapshot) | off | `true` (not `1`) | unset. Per-tenant `reb:client-email:{tenant}` = `on`/`off` beats it |
 | `CUSTOMER_EMAIL_ENABLED` | unknown | off | `true` | unset |
 | `OPERATOR_EMAILS_ENABLED`, `PROSPECT_EMAILS_ENABLED` | unknown | **on** | anything but `false` | `false` |
-| `DUAL_WRITE_PG` | unknown | **on** | anything but `0`/`false` | `0` (stops every Postgres mirror) |
+| `DUAL_WRITE_PG` | unknown | **on** | anything but `0`/`false`. A missing lead schema is detected once and paged once; live lead copies pause until `tenant_leads` exists (`reb:lead-mirror:schema-missing`, cleared by the first successful copy or S1) | `0` (stops every Postgres mirror) |
 | `GOVERNED_WORK_DUAL_WRITE`, `GOVERNED_WORK_READ_PG` | unknown (snapshot settles it) | off | `1`/`true` | unset |
 | `SECRETS_ENC_KEY` | unknown | without it, secrets are stored plaintext and binding writes refuse | any passphrase | **never remove once used**: every encrypted secret becomes unreadable |
 | `REB_DEV_UNGATED_ACCESS` | must be absent | off | — | must stay absent in production |
@@ -576,25 +631,36 @@ and named testers; env `1` is on everywhere except rows set to `off`. If
 ### Recommended production order
 
 1. Deploy the 1.0 candidate with every new flag unset, after batch 4. The
-   new crons then: `lead-mirror-reconcile` hourly; `needs-you` heartbeat only;
+   new crons then: `lead-mirror-reconcile` hourly; `client-records-parity`
+   daily, heartbeat only until the dual-write is on; `needs-you` heartbeat only;
    `website-health` and `website-domain-verification` alert only when rebuild
    is on, and the domain cron skips without `VERCEL_API_TOKEN`.
-2. `STRELVA_CLIENT_RECORDS_DUAL_WRITE=1`. Data only, no UI.
+2. `STRELVA_CLIENT_RECORDS_DUAL_WRITE=1`. Data only, no UI. It also turns on
+   the daily read-only parity cron. After S3's backfill, wait 7 clean days
+   (alert `client_records_parity`, heartbeat `client-records-parity`) before
+   adding a store to `STRELVA_CLIENT_RECORDS_READ`.
 3. Confirm `SECRETS_ENC_KEY` is present (`vercel env ls`). If it is absent,
-   stop: adding it means running `backfill-secret-encryption.ts`, which has no
-   dry run. That is its own packet.
+   stop: adding it means running `backfill-secret-encryption.ts` (now a dry
+   run by default, guarded). That is its own packet.
 4. `STRELVA_SYSTEMS_RELEASE=workspace`, `STRELVA_OWNER_ENTRY=workspace`.
-   Invisible until a row says `operators` or `on`.
+   Invisible until a row says `operators` or `on`. The same holds for
+   `STRELVA_INQUIRIES_RELEASE=workspace` and
+   `STRELVA_WEBSITE_REBUILD_RELEASE=workspace`, which now also work per
+   business (after batch 4); each is its own yes.
 5. After conversions (section 4), per workspace rows: test business
-   `operators`, gldf `operators`, Jacob walks every page, then `on`.
+   `operators`, gldf `operators`, Jacob walks every page, then `on`. For the
+   agency library, set the Strelva agency workspace's `systems` row with S10.
 6. `STRELVA_BUSINESS_BILLING=1`, then S7.
 7. After S8: `STRELVA_GOOGLE_BINDINGS=1`; after 30 days with zero fallbacks,
    `STRELVA_PUBLISHING_RELEASE=1`.
 8. `STRELVA_NEEDS_YOU_RELEASE=1`, only after `needs-you-parity` is clean.
    Owners get nothing while email is gated.
-9. One at a time, each a global switch: `STRELVA_INQUIRIES_RELEASE=1`,
-   `STRELVA_WEBSITE_REBUILD_RELEASE=1`, `STRELVA_EXPORT_SCHEMA_3=1`.
-   `STRELVA_SYSTEMS_RELEASE=1` and `STRELVA_ASK_RELEASE=1` when Ask is wanted.
+9. One at a time: `STRELVA_INQUIRIES_RELEASE` and
+   `STRELVA_WEBSITE_REBUILD_RELEASE` per business through `workspace` rows,
+   then `1` only when every converted business is `on` or explicitly `off`
+   (an unconverted site follows `1`). `STRELVA_EXPORT_SCHEMA_3=1` is still a
+   global switch. `STRELVA_ASK_RELEASE=1` when Ask is wanted; under Systems
+   `workspace` it reaches only businesses whose row is on.
 10. Email last: owner invites (S6), then `reb:client-email:{tenant}=on` per
     client (test business, gldf, the rest), then `EMAIL_SENDING_ENABLED=true`,
     then `CUSTOMER_EMAIL_ENABLED=true`.
@@ -617,9 +683,9 @@ Dry runs read production, so they ride on the same yes as the apply.
 | # | When | Dry run | Apply | Writes | Needs |
 | --- | --- | --- | --- | --- | --- |
 | S0 | Step 0 | — | `npx tsx scripts/production-readiness-snapshot.ts --i-have-jacobs-yes` | nothing | — |
-| S1 | After batch 0 and the `0.2.1` deploy | `npx tsx scripts/backfill-tenant-leads.ts` | `npx tsx scripts/backfill-tenant-leads.ts --apply --i-have-jacobs-yes` | `tenant_leads` via `record_tenant_lead`; clears `reb:lead-mirror:pending` entries. Idempotent | batch 0 |
+| S1 | After batch 0 and the `0.2.1` deploy | `npx tsx scripts/backfill-tenant-leads.ts` | `npx tsx scripts/backfill-tenant-leads.ts --apply --i-have-jacobs-yes` | `tenant_leads` via `record_tenant_lead`; clears `reb:lead-mirror:pending` entries, and a successful write also clears `reb:lead-mirror:schema-missing`. Idempotent | batch 0 |
 | S2 | After batch 1 | `npx tsx scripts/copy-report-analytics-state.ts` | `npx tsx scripts/copy-report-analytics-state.ts --apply --i-have-jacobs-yes` | `tenant_report_state`, `tenant_analytics_config` with `via='backfill'`, fills only what's missing | batch 1 |
-| S3 | After batch 3 and `STRELVA_CLIENT_RECORDS_DUAL_WRITE=1` | `npx tsx scripts/client-records-move.ts backfill` | `… backfill --apply --i-have-jacobs-yes`, then daily for 7 days `npx tsx scripts/client-records-move.ts parity --i-have-jacobs-yes` | `tenant_client_records`; parity writes one row per store/tenant/day | batch 3 |
+| S3 | After batch 3 and `STRELVA_CLIENT_RECORDS_DUAL_WRITE=1` | `npx tsx scripts/client-records-move.ts backfill` | `… backfill --apply --i-have-jacobs-yes`; then the daily `client-records-parity` cron records parity on its own (no command). `client-records-move.ts parity --i-have-jacobs-yes` remains for an on-demand check | `tenant_client_records` (backfill only); parity rows (one per store/tenant/day) come from the cron | batch 3 |
 | S4 | After batch 4 | `pnpm check:scrubbed-copy` (local only, no yes) | `pnpm scrubbed-copy create --out=$HOME/strelva-copies/$(date +%F) --source=<pg host> --source-redis=<db>.upstash.io --grandfathered=gldf,rohlax --i-have-jacobs-yes`, then `pnpm scrubbed-copy dry-run --out=…` and `npx tsx scripts/needs-you-parity.ts` against the copy | nothing in production; a local copy outside every git checkout | read-only source credentials in a clean shell ([scrubbed copy](./scrubbed-production-copy.md)). Check free disk first (12 GB on Oct 6) |
 | S5 | Before the first real conversion | — | Jacob, signed in at `app.strelva.com/workspace`, creates the agency workspace "Strelva" (`create_agency`); read its id; then `npx tsx scripts/business-ownership.ts designate-agency <workspace-id> --operator-email=<super admin> --apply --i-have-jacobs-yes` | `strelva_agency_workspace`, mirrored to `platform_workspaces`; marks converted businesses as operated by Strelva. Set once; a second id is refused | batch 3 |
 | — | Conversions | section 4 | section 4 | section 4 | batches 0–4 |
@@ -627,6 +693,8 @@ Dry runs read production, so they ride on the same yes as the apply.
 | S7 | After conversions and `STRELVA_BUSINESS_BILLING=1` | `npx tsx scripts/stripe-workspace-metadata.ts` (no Stripe call) | test key: `npx tsx scripts/stripe-workspace-metadata.ts --apply --i-have-jacobs-yes`; live key: add `--live` | Stripe `metadata.workspaceId` on subscriptions and customers, merge only. An object reachable from two businesses is a conflict and never written | batch 4. A dry run that lists every tenant as "Not converted" means batch 4 is missing: the RPC error is swallowed |
 | S8 | After conversions | `npx tsx scripts/copy-google-bindings.ts` | `npx tsx scripts/copy-google-bindings.ts --apply --i-have-jacobs-yes`, then `npx tsx scripts/copy-google-bindings.ts --verify-google --i-have-jacobs-yes` | `workspace_account_bindings`, `workspace_google_locations`, re-encrypted, `migrated_from='redis'`; never overwrites. Verify mints one token per copy and makes one read-only Google call. Unconverted tenants are skipped | batch 3, `SECRETS_ENC_KEY` (apply refuses without it), conversion |
 | S9 | Around each step | — | `npx tsx scripts/storefront-parity.ts capture … --i-have-jacobs-yes` and `compare` | only the `--out` file | section 4 |
+| S10 | For a workspace with no client page (the Strelva agency workspace) | `npx tsx scripts/workspace-release-flag.ts <workspace-id> systems operators --operator-email=<super admin> --reason="<why>" --i-have-jacobs-yes` (reads the row) | same with `--apply` | one `workspace_release_flags` row and its change record, revision-checked | batch 3 incl. `20261008161000` |
+| — | Not part of 1.0 | `npx tsx scripts/backfill-secret-encryption.ts --i-have-jacobs-yes`; `npx tsx scripts/count-client-redis-keys.ts --i-have-jacobs-yes` (read-only) | backfill: `--apply --i-have-jacobs-yes` | encrypted secret columns and `connections:*` | `SECRETS_ENC_KEY` |
 
 **Stripe, test mode first, done properly (S7).** A test key against
 production ids fails every update. Rehearse on Preview instead: seed one
@@ -722,11 +790,16 @@ businesses?** Only the owner can answer. Ask before converting either site.
   hidden source System "Twin Trees website" with two location Versions.
   Conversion does this by default: the second site auto-joins the first
   site's workspace through the multi-site account.
-- **Two businesses:** two workspaces, each a Version of a source in Strelva's
-  workspace, with a split or shared payment. **There is no switch for this
-  today**: the code must gain a way to refuse the auto-join before the second
-  site is converted. The Stripe script would list the shared subscription as
-  a conflict and leave it alone.
+- **Two businesses:** run every Twin Trees conversion, the first one
+  included, with `--separate-business` (dry run, then
+  `--apply --i-have-jacobs-yes`; needs `20261008160000`). Each site becomes
+  its own business named for the site. Its billing home holds only its own
+  line item (not the $300 bundle) and records the shared account
+  (`sharedAccount: true`). The bundled subscription stays one Stripe object,
+  and S7 lists it as a conflict and leaves it alone. Rollback is the normal
+  `--rollback`; it deletes the separate business and its billing home. The
+  flag is refused with `--rollback` and ignored (logged) on a single-site
+  tenant.
 - Either way, `workspace_calendar_connections` allows one calendar per
   provider per business, so two locations in one business can't each bind
   their own Google calendar.
@@ -823,3 +896,9 @@ project. Nothing in production changes at any point.
 - The `update_bounded_product_work` rewrite assumes production's function text
   matches the repo; the batch 2 pre-check settles it.
 - `storefront-parity.ts` and the snapshot are proven against fakes only.
+- The `w2/release-hardening` fixes (findings 3, 5, 6, 8, 10, 11) are proven
+  with unit and route tests against fakes and with the local SQL checks.
+  None has run against hosted Postgres, real Redis or a deployed app. The
+  per-site flag lookup depends on `resolve_billing_workspace` (batch 4);
+  before batch 4 a failed lookup falls back to the env value, which never
+  turns a flag on that the env has off.

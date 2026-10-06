@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ actor: vi.fn(), rpc: vi.fn() }));
+const mocks = vi.hoisted(() => ({ actor: vi.fn(), rpc: vi.fn(), systemsFor: vi.fn(async (_actor: { userId: string }, _workspaceId: string) => true) }));
 
 vi.mock("ai", () => ({ tool: (def: unknown) => def, stepCountIs: () => () => true }));
 vi.mock("@/lib/auth", () => ({ isSuperAdmin: async () => false }));
@@ -11,6 +11,13 @@ vi.mock("@/platform/workspaces/http", async (importOriginal) => {
   return { ...actual, workspaceHttpActor: () => mocks.actor() };
 });
 
+// Per-workspace Systems resolution is its own module (release-flags tests);
+// here it is on unless a test turns it off for the asked business.
+vi.mock("@/platform/systems-release", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/platform/systems-release")>();
+  return { ...actual, systemsReleasedFor: (actor: { userId: string }, workspaceId: string) => mocks.systemsFor(actor, workspaceId) };
+});
+
 import { GET } from "@/app/api/workspace/ask/route";
 
 const ENV = ["STRELVA_WORKSPACE_RELEASE", "STRELVA_SYSTEMS_RELEASE", "STRELVA_ASK_RELEASE"] as const;
@@ -19,7 +26,7 @@ const CONVERSATION = "44444444-4444-4444-8444-444444444444";
 const get = (query: string) => GET(new Request(`http://localhost/api/workspace/ask?${query}`));
 
 describe("GET /api/workspace/ask (conversation history)", () => {
-  beforeEach(() => { mocks.actor.mockReset(); mocks.rpc.mockReset(); });
+  beforeEach(() => { mocks.actor.mockReset(); mocks.rpc.mockReset(); mocks.systemsFor.mockReset(); mocks.systemsFor.mockResolvedValue(true); });
   afterEach(() => { for (const key of ENV) delete process.env[key]; });
 
   it("is off with the release and reads no session", async () => {
@@ -55,6 +62,14 @@ describe("GET /api/workspace/ask (conversation history)", () => {
       mocks.actor.mockResolvedValue({ userId: "cccccccc-0000-4000-8000-000000000001", verifiedEmail: "o@example.test" });
       mocks.rpc.mockResolvedValue({ data: null, error: { message: "ask_conversation_not_found" } });
       expect((await get(`workspaceId=${WS}&conversationId=${CONVERSATION}`)).status).toBe(404);
+    });
+
+    it("is off for a business where Systems is off, and reads no history", async () => {
+      mocks.actor.mockResolvedValue({ userId: "cccccccc-0000-4000-8000-000000000001", verifiedEmail: "o@example.test" });
+      mocks.systemsFor.mockResolvedValue(false);
+      expect((await get(`workspaceId=${WS}`)).status).toBe(503);
+      expect(mocks.systemsFor).toHaveBeenCalledWith(expect.objectContaining({ userId: "cccccccc-0000-4000-8000-000000000001" }), WS);
+      expect(mocks.rpc).not.toHaveBeenCalled();
     });
 
     it("answers a non-member as forbidden and a store failure as unavailable", async () => {

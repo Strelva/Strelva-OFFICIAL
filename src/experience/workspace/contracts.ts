@@ -165,8 +165,12 @@ export interface WorkspaceReleases {
   systems: boolean;
   /** STRELVA_NEEDS_YOU_RELEASE: Home reads Needs you and Strelva handled from the policy model. */
   needsYou?: boolean;
-  /** STRELVA_ASK_RELEASE (with the workspace and Systems releases): Ask Strelva opens in the workspace. */
+  /** Ask Strelva opens in this workspace: STRELVA_ASK_RELEASE and the workspace release on, and Systems on for this workspace. */
   ask?: boolean;
+  /** STRELVA_INQUIRIES_RELEASE for this workspace (per-workspace row under `workspace`). */
+  inquiries?: boolean;
+  /** STRELVA_WEBSITE_REBUILD_RELEASE for this workspace. Absent: the page's env value decides. */
+  websiteRebuild?: boolean;
 }
 
 /**

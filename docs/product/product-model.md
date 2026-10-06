@@ -229,7 +229,7 @@ a production step. These are the ones that change more than one spec:
 | Turning on client email | Per business, `strelva` test business first, then gldf | needs-you, systems-catalog, owner-entry |
 | How Strelva reaches its clients | Keep the admin membership; add a provider mark that grants nothing | agency-and-versions, operator |
 | One queue or two | One queue, shown in `/admin` and as the agency Queue | operator, agency-and-versions |
-| Twin Trees | Ask the owner: one business with two locations, or two | agency-and-versions, money-and-data |
+| Twin Trees | Ask the owner: one business with two locations (default), or two (`--separate-business`) | agency-and-versions, money-and-data |
 | Existing clients' terms | Kept; the flat plan is for new businesses | money-and-data |
 | When to set the price | After 30 days of measured operator minutes on converted clients | money-and-data |
 | Can owners build Systems | No at 1.0.0; they file a Request | systems-catalog, ADR 0011 |

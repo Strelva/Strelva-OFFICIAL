@@ -1,6 +1,7 @@
 import { CONTROL_PLANE_URL } from "@/lib/brand";
 import { sendEmailWithReceipt, type SendEmailInput, type SendEmailResult } from "@/lib/email/send";
-import { systemsReleaseEnabled } from "@/platform/systems-release";
+import { systemsReleaseEnabled, systemsReleasedFor } from "@/platform/systems-release";
+import { workspaceReleaseOn } from "@/platform/release-flags/resolve";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import type { ApplicationRecord, ApplicationSpec, applicationLinkInputSchema } from "./contracts";
 import type { z } from "zod";
@@ -27,11 +28,27 @@ export function linkFields(spec: ApplicationSpec): LinkField[] {
   return spec.fields.filter((field): field is LinkField => field.type === "contact" || field.type === "assigned_person");
 }
 
-/** Link fields are a Systems feature. Off, a tool cannot be given them. */
+/**
+ * Link fields are a Systems feature. Off, a tool cannot be given them.
+ * `enabled` defaults to the env-only rule (exactly `1`); callers that know the
+ * workspace pass `await linkFieldsReleasedFor(...)` so `workspace` mode works
+ * per business.
+ */
 export function assertLinkFieldsReleased(spec: ApplicationSpec, enabled = systemsReleaseEnabled()): void {
   if (!enabled && linkFields(spec).length) {
     throw new WorkspaceConflictError("Contact and assigned-person fields are not available yet.");
   }
+}
+
+/**
+ * Systems for this workspace and actor. Only reads the flag row when a spec
+ * actually has link fields, so tools without them never pay the read.
+ */
+export async function linkFieldsReleasedFor(spec: ApplicationSpec, actor: { userId: string }, workspaceId: string): Promise<boolean> {
+  if (!linkFields(spec).length) return true;
+  // No workspace release means no rows: the env-only rule stands.
+  if (!workspaceReleaseOn()) return systemsReleaseEnabled();
+  return systemsReleasedFor(actor, workspaceId);
 }
 
 function failure(error: { message?: string; code?: string }, field?: LinkField): never {

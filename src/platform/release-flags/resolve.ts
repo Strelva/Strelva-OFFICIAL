@@ -51,6 +51,16 @@ export function workspaceReleaseOn(environment: ReleaseEnvironment = process.env
   return environment.STRELVA_WORKSPACE_RELEASE === "1";
 }
 
+/**
+ * Whether a flag could be on for at least one workspace: the cheap early gate
+ * for routes that only learn their workspace or tenant later. True for env
+ * `1`, and for `workspace` (some row may say `on`). The route must still ask
+ * the per-workspace or per-tenant resolver once it knows which one.
+ */
+export function releaseFlagMayBeOn(flag: ReleaseFlag, environment: ReleaseEnvironment = process.env): boolean {
+  return workspaceReleaseOn(environment) && releaseFlagEnvMode(flag, environment) !== "off";
+}
+
 export interface ReleaseViewer {
   /** An active super admin. */
   operator: boolean;

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { readWorkspaceBody, workspaceHttpActor, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
-import { websiteRebuildReleaseEnabled } from "@/products/websites/index";
+import { websiteRebuildReleaseMayBeOn, websiteRebuildReleasedFor } from "@/products/websites/index";
 import { readWebsiteRebuild } from "@/products/websites/index";
 
 export function rebuildHttpFailure(error: unknown) {
@@ -12,7 +12,7 @@ export function rebuildHttpFailure(error: unknown) {
   return workspaceJson({ error: "The rebuild operation could not be confirmed. Reopen its saved status before retrying." },503);
 }
 export async function rebuildHttp(request: Request, params: Promise<{ workId: string }>, write: boolean, action: (actor: WorkspaceActor, workId: string, input: unknown) => Promise<Response>) {
-  if (!websiteRebuildReleaseEnabled()) return workspaceJson({ error: "Website rebuilds are not enabled." },503);
+  if (!websiteRebuildReleaseMayBeOn()) return workspaceJson({ error: "Website rebuilds are not enabled." },503);
   if (write) { const denied = workspaceWriteGuard(request); if (denied) return denied; }
   const actor = await workspaceHttpActor();
   if (!actor) return workspaceJson({ error: "Sign in to open this website rebuild." },401);
@@ -20,6 +20,7 @@ export async function rebuildHttp(request: Request, params: Promise<{ workId: st
     const workId = z.string().uuid().parse((await params).workId);
     const body = write ? await readWorkspaceBody(request) : undefined;
     const record = await readWebsiteRebuild(actor,workId);
+    if (!(await websiteRebuildReleasedFor(actor,record.workspaceId))) return workspaceJson({ error: "Website rebuilds are not enabled." },503);
     const queryWorkspace = new URL(request.url).searchParams.get("workspaceId");
     const bodyRecord = body && typeof body === "object" && !Array.isArray(body) ? body as Record<string,unknown> : null;
     const workspaceId = queryWorkspace ?? bodyRecord?.workspaceId;

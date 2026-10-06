@@ -65,6 +65,10 @@
       "schedule": "17 * * * *"
     },
     {
+      "path": "/api/cron/client-records-parity",
+      "schedule": "40 5 * * *"
+    },
+    {
       "path": "/api/cron/visibility",
       "schedule": "0 3 * * 2"
     },

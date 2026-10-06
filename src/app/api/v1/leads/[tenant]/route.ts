@@ -19,7 +19,7 @@ import { recordSpam } from "@/lib/spam-pit";
 import { readLeadAttribution } from "@/lib/lead-attribution";
 import {
   getInquiryRepository,
-  inquiryReleaseEnabled,
+  inquiryReleaseEnabledForTenant,
   projectPublishedInquiry,
   recordInquiryEvidence,
   validateInquiryFields,
@@ -147,7 +147,7 @@ export async function POST(
     }
 
     if (isCapabilitySubmission(body)) {
-      if (!inquiryReleaseEnabled()) return corsJson({ error: "Inquiry forms are not enabled." }, 503);
+      if (!(await inquiryReleaseEnabledForTenant(tenant))) return corsJson({ error: "Inquiry forms are not enabled." }, 503);
       const capabilityId = str(body.capabilityId, 200);
       const capabilityVersion = body.capabilityVersion;
       const fields = readFields(body.fields);

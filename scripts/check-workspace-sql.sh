@@ -479,6 +479,11 @@ psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 # the tenant-to-workspace entry resolution, with cross-workspace denial.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007130000_workspace_release_flags.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
+# Release rows on agency workspaces too (agency library under `workspace`);
+# the business-workspace contract above still holds with it applied.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008161000_release_flags_agency_workspaces.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/release-flags-agency-workspaces-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 # Model-call cost log (one model-call helper, Ask Strelva spec section 5).
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007140000_model_call_log.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/model-call-log-schema.sql"
@@ -531,6 +536,14 @@ psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260729180000_org_layer_phase0_accounts.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007180000_business_billing.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/business-billing-schema.sql"
+# Twin Trees as two businesses: --separate-business converts a linked-account
+# site into its own business with its own billing home. The default join and
+# the billing contract above must still hold with it applied.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008160000_convert_separate_business.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/convert-separate-business-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-billing-schema.sql"
+psql "${psql_args[@]}" --set=tenant_import="$(cat "$repo_root/tests/fixtures/business-record-tenant-import.json")" \
+  --file="$repo_root/tests/business-record-conversion-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007181000_tenant_client_records.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-client-records-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007182000_workspace_export_v3.sql"

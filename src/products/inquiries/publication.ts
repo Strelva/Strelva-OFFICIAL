@@ -1,6 +1,6 @@
 import { decideAiContentGovernance } from "@/lib/ai-governance";
 import { InquiryEngine } from "./inquiry-engine";
-import { inquiryReleaseEnabled } from "./release";
+import { inquiryReleaseEnabledForTenant } from "./release";
 import { getInquiryRepository, publicationClaimToken, type InquiryRepository, type InquiryWorkspaceSnapshot, type PublicationClaim } from "./repository";
 import type { InquiryCapabilityDefinition, InquiryEngineState } from "./contracts";
 import { stateForReceive } from "./receive";
@@ -25,7 +25,9 @@ export async function executeInquiryPublication(input: {
   claimId: string;
   repository?: InquiryRepository;
 }): Promise<InquiryPublicationResult> {
-  if (!inquiryReleaseEnabled()) return { accepted: false, verified: false, reason: "inquiries_not_enabled" };
+  // Per site: a converted tenant follows its business's row. Publishing feeds
+  // the public form, which visitors see, so `operators` doesn't count here.
+  if (!(await inquiryReleaseEnabledForTenant(input.tenantId))) return { accepted: false, verified: false, reason: "inquiries_not_enabled" };
   const repository = input.repository ?? getInquiryRepository();
   const claim = await repository.getPublicationClaim(input.tenantId, input.claimId);
   if (!claim || claim.tenantId !== input.tenantId || claim.governanceEventId !== input.eventId || !claim.actorId) {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireCronRequest } from "@/lib/cron-auth";
 import { recordHeartbeat } from "@/lib/heartbeat";
-import { inquiryReleaseEnabled } from "@/products/inquiries/server";
+import { inquiryReleaseEnabledForTenant, inquiryReleaseMayBeOn } from "@/products/inquiries/server";
 import { runDueInquiryFollowUps } from "@/products/inquiries";
 
 export const maxDuration = 300;
@@ -17,13 +17,15 @@ export async function GET(request: Request): Promise<NextResponse> {
   const denied = requireCronRequest(request);
   if (denied) return denied;
 
-  if (!inquiryReleaseEnabled()) {
+  if (!inquiryReleaseMayBeOn()) {
     await recordHeartbeat("inquiry-follow-ups", { ok: true, processed: 0 });
     return NextResponse.json({ status: "disabled", ranAt: new Date().toISOString() });
   }
 
   try {
-    const result = await runDueInquiryFollowUps();
+    // Customers get follow-ups only where inquiries are on for their site
+    // (every site under `1`, except a business row set `off`).
+    const result = await runDueInquiryFollowUps({ released: (tenantId) => inquiryReleaseEnabledForTenant(tenantId) });
     await recordHeartbeat("inquiry-follow-ups", {
       ok: result.failed === 0,
       processed: result.attempted,

@@ -4,7 +4,7 @@ import { WorkspaceAccessError,WorkspaceConflictError } from "@/platform/workspac
 import { rebuildSelectionSchema } from "@/products/websites/rebuild-contracts";
 import { siteDocumentSchema,siteDocumentHash } from "@/products/websites/site-document";
 const deps=vi.hoisted(()=>({release:vi.fn(),user:vi.fn(),read:vi.fn(),approve:vi.fn(),launch:vi.fn(),create:vi.fn(),retry:vi.fn(),list:vi.fn(),member:vi.fn(),work:vi.fn(),workspaces:vi.fn(),handoff:vi.fn(),document:vi.fn(),after:vi.fn(),connect:vi.fn(),legacyConnect:vi.fn(),legacyOptions:vi.fn(),nativeOptions:vi.fn(),documentList:vi.fn(),documentReceipts:vi.fn()}));
-vi.mock("@/products/websites/rebuild-release",()=>({websiteRebuildReleaseEnabled:deps.release}));
+vi.mock("@/products/websites/rebuild-release",()=>({websiteRebuildReleaseEnabled:deps.release,websiteRebuildReleaseMayBeOn:(...args:unknown[])=>deps.release(...args),websiteRebuildReleaseEnabledForWorkspace:async(...args:unknown[])=>deps.release(...args),websiteRebuildReleaseEnabledForTenant:async(...args:unknown[])=>deps.release(...args),websiteRebuildReleasedFor:async(...args:unknown[])=>deps.release(...args)}));
 vi.mock("@/lib/db/server-client",()=>({getSessionUser:deps.user}));
 vi.mock("@/products/websites/rebuild-service",()=>({readWebsiteRebuild:deps.read,approveWebsiteRebuild:deps.approve,launchWebsiteRebuild:deps.launch,createWebsiteRebuild:deps.create,retryWebsiteRebuild:deps.retry,listWebsiteRebuilds:deps.list,connectWebsiteRebuildCapabilities:deps.connect}));
 vi.mock("@/platform/workspaces/repository",()=>({assertWorkspaceMember:deps.member,getWork:deps.work,listWorkspaces:deps.workspaces,createHandoff:deps.handoff}));

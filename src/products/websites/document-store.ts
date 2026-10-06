@@ -3,7 +3,7 @@ import { z } from "zod";
 import { provisionHostedWebsiteTenant } from "@/lib/tenants";
 import type { CrawledPage } from "./rebuild-crawl";
 import { getRedis } from "@/lib/redis";
-import { websiteRebuildReleaseEnabled } from "./rebuild-release";
+import { websiteRebuildReleaseEnabledForTenant, websiteRebuildReleaseMayBeOn } from "./rebuild-release";
 import { getSupabase } from "@/lib/db/client";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type SavedWork, type WorkspaceActor } from "@/platform/workspaces/types";
 import { siteDocumentHash, siteDocumentSchema, unresolvedSiteFacts, type SiteDocument } from "./site-document";
@@ -150,8 +150,10 @@ export const websiteDocumentStore = createWebsiteDocumentStore();
 export const saveDocument = websiteDocumentStore.append;
 export const readDocument = websiteDocumentStore.read;
 export async function getPublishedSiteDocument(tenantId: string): Promise<SiteDocument | null> {
-  if (!websiteRebuildReleaseEnabled()) return null;
+  if (!websiteRebuildReleaseMayBeOn()) return null;
   tenant.parse(tenantId);
+  // Per site: a converted tenant follows its business's row (visitors are never operators).
+  if (!(await websiteRebuildReleaseEnabledForTenant(tenantId))) return null;
   const redis = getRedis();
   try {
     const cached = await redis?.get<unknown>(`reb:website-document:${tenantId}`);

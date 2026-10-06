@@ -1,10 +1,12 @@
 import { stepCountIs } from "ai";
 import { isSuperAdmin } from "@/lib/auth";
 import { isRateLimitedAsync } from "@/lib/rate-limit";
-import { inquiryReleaseEnabled } from "@/products/inquiries";
+import { inquiryReleaseEnabledForWorkspace } from "@/products/inquiries";
+import { releaseViewerFor } from "@/platform/release-flags/viewer";
+import { systemsReleasedFor } from "@/platform/systems-release";
 import {
   AskConversationNotFoundError,
-  askReleaseEnabled,
+  askReleaseMayBeOn,
   createPossibilityAdapter,
   createServiceRequestAdapter,
   createSupabaseAskHistory,
@@ -33,13 +35,15 @@ const possibilityRepository = createInMemoryPossibilityRepository();
 /**
  * POST /api/workspace/ask: Ask Strelva in a business workspace.
  *
- * Off unless STRELVA_WORKSPACE_RELEASE, STRELVA_SYSTEMS_RELEASE and
- * STRELVA_ASK_RELEASE are all "1", checked before any session or body read.
+ * Off unless STRELVA_WORKSPACE_RELEASE and STRELVA_ASK_RELEASE are "1" and
+ * STRELVA_SYSTEMS_RELEASE is "1" or "workspace", checked before any session
+ * or body read. Under "workspace" the turn also needs Systems on for the
+ * asked workspace (its release row), checked after membership.
  * Streams the same line protocol as /api/agent (`__TOOL__`, `__CARD__`,
  * `__RESULT__`), so one chat component renders both.
  */
 export async function POST(request: Request) {
-  if (!askReleaseEnabled()) return workspaceJson({ error: "Ask Strelva is not enabled. Nothing changed." }, 503);
+  if (!askReleaseMayBeOn()) return workspaceJson({ error: "Ask Strelva is not enabled. Nothing changed." }, 503);
   const guarded = workspaceWriteGuard(request);
   if (guarded) return guarded;
   try {
@@ -61,7 +65,8 @@ export async function POST(request: Request) {
       readSystems: (current, workspaceId) => readExistingSystemsSnapshot(current, workspaceId),
       loadTenantTools: loadTenantAskTools,
       googleWriteGranted: tenantGoogleWriteGranted,
-      inquiriesEnabled: () => inquiryReleaseEnabled(),
+      inquiriesEnabled: async (workspaceId) => inquiryReleaseEnabledForWorkspace(workspaceId, await releaseViewerFor(actor)),
+      released: (current, workspaceId) => systemsReleasedFor(current, workspaceId),
       needsYou: createTenantEventNeedsYouAdapter(),
       requests,
       possibilities: createPossibilityAdapter(possibilityRepository, { durable: false }),
@@ -104,7 +109,7 @@ const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
  * Same release gate as POST; reads only.
  */
 export async function GET(request: Request) {
-  if (!askReleaseEnabled()) return workspaceJson({ error: "Ask Strelva is not enabled." }, 503);
+  if (!askReleaseMayBeOn()) return workspaceJson({ error: "Ask Strelva is not enabled." }, 503);
   try {
     const actor = await workspaceHttpActor();
     if (!actor) return workspaceJson({ error: "Sign in with a confirmed email to continue." }, 401);
@@ -115,6 +120,8 @@ export async function GET(request: Request) {
     if (!UUID.test(workspaceId) || (systemId !== null && !UUID.test(systemId)) || (conversationId !== null && !UUID.test(conversationId))) {
       return workspaceJson({ error: "Check the request. Some fields are missing or invalid." }, 400);
     }
+    // Per workspace, like POST: Ask is on only where Systems is on for this business.
+    if (!(await systemsReleasedFor(actor, workspaceId))) return workspaceJson({ error: "Ask Strelva is not enabled." }, 503);
     const history = createSupabaseAskHistory();
     if (conversationId) return workspaceJson({ conversation: await history.read(actor, { workspaceId, conversationId, limit: 100 }) });
     return workspaceJson({ conversations: await history.list(actor, { workspaceId, systemId, limit: 20 }) });

@@ -8,7 +8,7 @@ import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
 import { readExistingSystemsSnapshot } from "@/platform/systems/from-existing";
 import { listWorkspaces } from "@/platform/workspaces";
-import { askReleaseEnabled } from "@/platform/ask/release";
+import { askReleaseMayBeOn } from "@/platform/ask/release";
 import { NATIVE_TABS, REQUEST_TABS, isSiteTab, workspaceDashboardHref, workspaceSiteHref, type SiteTab } from "@/lib/workspace-site-places";
 import { loadBrandKitSettings, loadCollectionsData, loadGoogleBusinessData, loadSiteEditorData, siteFrameFor } from "@/lib/website-page-data";
 import { getTenantPrimaryDomain } from "@/lib/tenant-urls";
@@ -83,7 +83,8 @@ export default async function WorkspaceSitePage({ searchParams }: { searchParams
   const frame = siteFrameFor(site.tenantId, config, { clientFallbackRoot: tenantRoot || "", requestHost, requestProto });
   const domain = config ? getTenantPrimaryDomain(config) : null;
   const siteLabel = domain ? domain.replace(/^www\./, "") : site.siteName;
-  const askReleased = askReleaseEnabled();
+  // Past the `off` state Systems is on for this workspace, so Ask is on here when it may be on at all.
+  const askReleased = askReleaseMayBeOn();
   const readOnly = !state.canChange;
   const dashboardHref = workspaceDashboardHref({ workspaceId, systemId, tenantRoot, askReleased });
 

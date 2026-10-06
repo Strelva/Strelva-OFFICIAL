@@ -56,6 +56,7 @@ const _CRON_SCHEDULE = {
   "workspace-work": 30 * 60, // every 5 min, independently release-gated
   "governed-work-reconcile": 7 * 3600, // every 6h — durability sweep for the PG mirror
   "lead-mirror-reconcile": 3 * 3600, // hourly — retries client leads not yet in Postgres
+  "client-records-parity": 26 * 3600, // daily — read-only Redis/Postgres compare, records parity
   "website-domain-verification": 10 * 60, // every minute, bounded domain polling
   "website-health": 26 * 3600, // daily hosted document read-back
   "domain-monitor": 70 * 60, // every 30 min (schedule) + 40 min grace

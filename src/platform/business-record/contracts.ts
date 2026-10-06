@@ -310,6 +310,11 @@ export const tenantImportPayloadSchema = z.object({
   tenantStableId: uuid,
   workspaceName: trimmed(1, 120),
   targetWorkspaceId: uuid.optional(),
+  /** Convert a site of a multi-site account into its own business instead of
+   *  joining a sibling's (Twin Trees as two businesses). Present only when
+   *  true, so default payloads and their digests are unchanged. Needs
+   *  20261008160000_convert_separate_business; older databases refuse it. */
+  separateBusiness: z.literal(true).optional(),
   billing: conversionBillingSchema.nullable(),
   account: conversionAccountSchema.nullable(),
   patch: z.object({
@@ -330,6 +335,8 @@ export const conversionReceiptSchema = z.object({
   workspaceId: uuid,
   workspaceName: z.string(),
   joinedExistingWorkspace: z.boolean(),
+  /** Absent on receipts written before 20261008160000. */
+  separateBusiness: z.boolean().optional(),
   operatorId: uuid,
   operatorRole: z.literal("admin"),
   billing: conversionBillingSchema.nullable(),

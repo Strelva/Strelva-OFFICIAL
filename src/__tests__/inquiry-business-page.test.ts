@@ -11,7 +11,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/auth", () => ({ requireTenantAccess: mocks.access }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.config }));
-vi.mock("@/products/inquiries/server", () => ({ inquiryReleaseEnabled: mocks.release }));
+vi.mock("@/products/inquiries/server", () => ({ inquiryReleaseEnabled: mocks.release, inquiryReleaseMayBeOn: (...args: unknown[]) => mocks.release(...args), inquiryReleasedForCurrentUser: async (...args: unknown[]) => mocks.release(...args), inquiryReleaseEnabledForTenant: async (...args: unknown[]) => mocks.release(...args) }));
 vi.mock("@/experience/inquiries/InquiryServerExperience", () => ({ InquiryServerExperience: () => null }));
 
 import BusinessPage from "@/app/business/[tenant]/page";

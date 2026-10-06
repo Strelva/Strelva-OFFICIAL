@@ -98,6 +98,8 @@ function currentAttention(
 /** Read only explicit, currently authorized memberships into a safe portfolio. */
 export async function discoverInquiryPortfolio(
   repository: InquiryRepository = getInquiryRepository(),
+  /** Per site (release flag). Default: everything the caller can access. */
+  released: (tenantId: string) => Promise<boolean> = async () => true,
 ): Promise<InquiryPortfolio> {
   const attention: InquiryAttentionSummary[] = [];
   const patterns: InquiryPatternSummary[] = [];
@@ -107,6 +109,7 @@ export async function discoverInquiryPortfolio(
   for (const tenantId of tenantIds) {
     const denied = await requireTenantAccess(tenantId);
     if (denied) continue;
+    if (!(await released(tenantId).catch(() => false))) continue;
     try {
       const config = await getTenantConfig(tenantId);
       if (!config?.active) continue;

@@ -16,13 +16,18 @@ export const maxDuration = 120;
  * Hourly retry for client leads whose Postgres copy failed at capture time
  * (src/lib/lead-mirror.ts). Anything still pending after the retry pages
  * operators, at most every six hours, and shows on /admin/client-leads.
+ *
+ * Missing schema (`tenant_leads` not migrated yet): the run reports
+ * `schemaMissing` once, does not page the pending backlog (the mirror already paged
+ * once when it first saw it) and keeps the heartbeat healthy. Leads stay in
+ * the pending queue and copy on the first run after the migration lands.
  */
 export async function GET(request: Request) {
   const denied = requireCronRequest(request);
   if (denied) return denied;
 
   const result = await reconcileLeadMirror({ limit: 200, deadlineMs: 90_000 });
-  if (result.remaining > 0 || result.missing > 0) {
+  if (result.missing > 0 || (!result.schemaMissing && result.remaining > 0)) {
     await alertOnce(
       "lead_mirror_backlog",
       "high",
