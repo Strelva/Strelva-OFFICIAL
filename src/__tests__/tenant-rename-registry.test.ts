@@ -56,6 +56,9 @@ describe("tenant-rename authoritative-store registry", () => {
       `reb:inquiry-capture-repair:${SLUG}`,
       `reb:inquiry-capture-repair-job:${SLUG}:`,
       `reb:inquiry-capture-repair-claim:${SLUG}:`,
+      `reb:spam-pit:${SLUG}`,
+      `reb:spam-pit:item:${SLUG}:`,
+      `reb:client-email:${SLUG}`,
     ];
     for (const stem of required) {
       expect(
