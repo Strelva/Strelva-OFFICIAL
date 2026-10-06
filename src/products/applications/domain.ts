@@ -59,6 +59,9 @@ export function releaseSpec(state: ApplicationState): ApplicationSpec | null {
   return currentRelease(state)?.spec ?? null;
 }
 
+/** A link field stores a business record id. */
+const APPLICATION_LINK_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 export function validateRecord(spec: ApplicationSpec, record: ApplicationRecord): void {
   const fields = new Map(spec.fields.map((field) => [field.id, field]));
   for (const key of Object.keys(record.values)) {
@@ -70,8 +73,11 @@ export function validateRecord(spec: ApplicationSpec, record: ApplicationRecord)
       if (field.required) throw new WorkspaceConflictError(`${field.label} is required.`);
       continue;
     }
-    const expectedType = field.type === "text" || field.type === "select" || field.type === "date" ? "string" : field.type;
+    const expectedType = field.type === "text" || field.type === "select" || field.type === "date" || field.type === "contact" || field.type === "assigned_person" ? "string" : field.type;
     if (typeof value !== expectedType) throw new WorkspaceConflictError(`${field.label} has the wrong type.`);
+    if ((field.type === "contact" || field.type === "assigned_person") && !APPLICATION_LINK_ID.test(value as string)) {
+      throw new WorkspaceConflictError(`${field.label} must point at someone in the business record.`);
+    }
     if (field.type === "select" && !field.options.includes(value as string)) {
       throw new WorkspaceConflictError(`${field.label} must use one of the available options.`);
     }

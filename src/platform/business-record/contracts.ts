@@ -9,16 +9,21 @@ import { z } from "zod";
 
 export const BUSINESS_RECORD_SOURCES = [
   "owner", "operator", "agency", "tenant_import", "website_rebuild", "bookings", "inquiries", "agent",
+  // Written only by an internal tool submit (resolve_internal_tool_links).
+  "internal_app",
 ] as const;
 export const businessRecordSourceSchema = z.enum(BUSINESS_RECORD_SOURCES);
 export type BusinessRecordSource = z.infer<typeof businessRecordSourceSchema>;
 
-/** Sources a caller may write with; `tenant_import` belongs to conversion only. */
-export const businessRecordWriteSourceSchema = businessRecordSourceSchema.exclude(["tenant_import"]);
+/** Sources a caller may write with; `tenant_import` belongs to conversion
+ * only and `internal_app` to internal tool submits. */
+export const businessRecordWriteSourceSchema = businessRecordSourceSchema.exclude(["tenant_import", "internal_app"]);
 export type BusinessRecordWriteSource = z.infer<typeof businessRecordWriteSourceSchema>;
 
 export const CONTACT_SOURCES = [
   "inquiry", "booking", "tenant_import", "owner", "operator", "agency", "website", "agent",
+  // 20261007192100_internal_tool_links.sql
+  "internal_app", "newsletter",
 ] as const;
 export const contactSourceSchema = z.enum(CONTACT_SOURCES);
 export type ContactSource = z.infer<typeof contactSourceSchema>;
