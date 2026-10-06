@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/heartbeat";
-import { reconcileLeadMirror } from "@/lib/client-leads";
+import { reconcileLeadMirror, runLeadReadParity } from "@/lib/client-leads";
 import { purgeExpiredTenantLeads } from "@/lib/lead-mirror";
 import { alertOnce } from "@/lib/monitoring";
 import { requireCronRequest } from "@/lib/cron-auth";
 import { repairPendingClientRecords } from "@/platform/client-records/move";
+import { repairPendingBookings } from "@/platform/bookings/move";
+import { legacyBookingPorts } from "@/platform/bookings/legacy-ports";
 
 export const maxDuration = 120;
 
@@ -49,6 +51,23 @@ export async function GET(request: Request) {
     processed: result.checked + clientRecords.checked,
     failed: result.failed + result.missing + clientRecords.failed,
   });
+  // The lead read-switch parity check (inquiry 1.0 delta, section 6). A no-op
+  // unless STRELVA_LEADS_READ is compare or postgres. Never fails the cron.
+  const leadParity = await runLeadReadParity().catch((error: unknown) => ({
+    ran: false, checked: 0, inParity: 0, outOfParity: [], failed: [{ tenant: "*", reason: error instanceof Error ? error.message : String(error) }],
+  }));
+  if (leadParity.outOfParity.length > 0) {
+    await alertOnce("lead_read_parity_failed", "high", { tenants: leadParity.outOfParity.length }, 6 * 3600);
+  }
+  // Queued copies into the one booking store (Reborn §2). Empty unless its
+  // write switch is on.
+  const bookingStore = await repairPendingBookings({ ports: legacyBookingPorts, limit: 200 }).catch((error: unknown) => ({
+    checked: 0, repaired: 0, dropped: 0, remaining: 0, failed: 1,
+    error: error instanceof Error ? error.message : String(error),
+  }));
+  if (bookingStore.remaining > 0 || bookingStore.failed > 0) {
+    await alertOnce("booking_store_backlog", "high", { remaining: bookingStore.remaining, failed: bookingStore.failed }, 6 * 3600);
+  }
   const retention = await purgeExpiredTenantLeads(1000);
-  return NextResponse.json({ ...result, clientRecords, retention });
+  return NextResponse.json({ ...result, clientRecords, leadParity, bookingStore, retention });
 }

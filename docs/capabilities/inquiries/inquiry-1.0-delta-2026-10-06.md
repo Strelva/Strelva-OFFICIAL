@@ -3,7 +3,28 @@
 Status: working default spec, 2026-10-06. Jacob adopted every spec
 recommendation as the working default on October 6
 ([product model](../../product/product-model.md#decisions-the-specs-need)).
-Not built. No production step is authorized by this page.
+No production step is authorized by this page.
+
+**Built locally October 6 (wave 2, branch `w2/bookings-inquiries`, not
+applied or deployed):** section 6 steps 1 to 4. `src/lib/leads.ts` keeps the
+signatures of `getLeads`, `getLeadById` and `getLeadSummary` and reads through
+a source switch (`src/lib/lead-reads.ts`): `STRELVA_LEADS_READ` unset is
+today's Redis; `compare` serves Redis, reads `tenant_leads` beside it and
+logs any lead id in one and not the other; `postgres` serves `tenant_leads`
+merged with any Redis lead still pending its copy, but only after 7
+consecutive days of parity, and falls back to Redis on any failure. The
+lead-mirror-reconcile cron records one parity result per tenant per day
+(`checkLeadParity`, shared parity ledger, store `tenant_leads`) while the
+switch is on. `STRELVA_LEADS_AUTHORITY=postgres` writes `tenant_leads` first;
+a Postgres failure leaves the lead in Redis and `reb:lead-mirror:pending`
+and the visitor still succeeds. Migration `20261008140000_tenant_lead_reads.sql`
+adds `read_tenant_lead` and `read_tenant_lead_digests`. Scripts and the
+operator merge read Redis on purpose (`getRedisLeads`). Proof:
+`src/__tests__/lead-read-source.test.ts`, `tests/tenant-lead-reads-schema.sql`
+in `check:workspace-sql`, `check:custom-repos` 196/196. Not built: spam
+`held_as_spam`, `inquiry_events`, the workspace-scoped read, contact upsert
+on capture, the Needs you inquiry items. Every production step (migration,
+compare window, each flip) needs Jacob's yes.
 
 This page amends the
 [September 11 inquiry spec](./inquiry-first-product-spec-2026-09-11.md). It

@@ -554,6 +554,14 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007182000_wor
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-export-v3-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007183000_business_outcomes.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/business-outcomes-schema.sql"
+# Inquiries at 1.0.0 (section 6): Postgres reads for the lead read-source
+# switch, with the parity ledger shared with the client stores.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008140000_tenant_lead_reads.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-lead-reads-schema.sql"
+# Bookings at 1.0.0 (Reborn §2): one booking store for both route families,
+# hours and services read from the business record, requests and pause.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008141000_booking_store.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-store-schema.sql"
 # Publishing: the business-level Google grant, its locations and a receipt
 # for every Google write. After Systems, because it extends the origin kinds.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007170000_workspace_account_bindings.sql"
@@ -593,6 +601,11 @@ psql "${psql_args[@]}" --file="$repo_root/tests/tenant-client-records-schema.sql
 # The real Make real runner, checkpointing through these RPCs (psql-backed port).
 STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run src/__tests__/make-real-activation-repository.test.ts
+# The one booking store through both real route families (legacy /api/booking
+# and the public booking service) against the real booking functions. Last,
+# because it commits its fictional rows.
+STRELVA_BOOKINGS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
+  pnpm --dir "$repo_root" exec vitest run src/__tests__/booking-one-store.test.ts
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 

@@ -45,6 +45,11 @@ vi.mock("@/lib/redis", () => ({
   getRedis: () => redisHandle,
 }));
 
+const mockRecordCalendlyBooking = vi.fn();
+vi.mock("@/platform/bookings/calendly", () => ({
+  recordCalendlyBooking: (...args: unknown[]) => mockRecordCalendlyBooking(...args),
+}));
+
 vi.mock("@/lib/production-guard", () => ({
   isProductionEnv: vi.fn(() => false),
 }));
@@ -237,6 +242,49 @@ describe("calendly webhook signature verification", () => {
     expect(json.received).toBe(true);
     // invitee.canceled is acknowledged without creating an event.
     expect(mockAddEvent).not.toHaveBeenCalled();
+  });
+
+  describe("bookings in the one store (behind STRELVA_BOOKING_STORE_WRITE)", () => {
+    const userUri = "https://api.calendly.com/users/U1";
+    const created = JSON.stringify({
+      event: "invitee.created",
+      payload: {
+        invitee: { uri: "https://api.calendly.com/scheduled_events/E1/invitees/I1", name: "Pat Example", email: "pat@example.test" },
+        scheduled_event: { uri: "https://api.calendly.com/users/U1/scheduled_events/E1", name: "Intro call", start_time: "2026-11-06T15:00:00Z", end_time: "2026-11-06T15:30:00Z" },
+      },
+    });
+    beforeEach(() => {
+      redisHandle = { get: vi.fn(async (key: string) => (key === `calendly-user-uri:${userUri}` ? "acme" : null)) };
+      mockRecordCalendlyBooking.mockResolvedValue("recorded");
+    });
+
+    it("an invitee.created writes the import booking and still logs the event", async () => {
+      vi.stubEnv("STRELVA_BOOKING_STORE_WRITE", "1");
+      const res = await post({ "Calendly-Webhook-Signature": calendlySignatureHeader(created), "content-type": "application/json" }, created);
+      expect(res.status).toBe(200);
+      expect(mockRecordCalendlyBooking).toHaveBeenCalledWith("acme", expect.objectContaining({
+        event: "invitee.created",
+        invitee: expect.objectContaining({ uri: "https://api.calendly.com/scheduled_events/E1/invitees/I1" }),
+        scheduledEvent: expect.objectContaining({ start_time: "2026-11-06T15:00:00Z", end_time: "2026-11-06T15:30:00Z" }),
+      }));
+      expect(mockAddEvent).toHaveBeenCalledTimes(1);
+    });
+
+    it("an invitee.canceled cancels the import booking when the store is on, without a new event", async () => {
+      vi.stubEnv("STRELVA_BOOKING_STORE_WRITE", "1");
+      const canceled = created.replace("invitee.created", "invitee.canceled");
+      const res = await post({ "Calendly-Webhook-Signature": calendlySignatureHeader(canceled), "content-type": "application/json" }, canceled);
+      expect(res.status).toBe(200);
+      expect(mockRecordCalendlyBooking).toHaveBeenCalledWith("acme", expect.objectContaining({ event: "invitee.canceled" }));
+      expect(mockAddEvent).not.toHaveBeenCalled();
+    });
+
+    it("with the store off, a cancel is acknowledged exactly as before", async () => {
+      const canceled = created.replace("invitee.created", "invitee.canceled");
+      const res = await post({ "Calendly-Webhook-Signature": calendlySignatureHeader(canceled), "content-type": "application/json" }, canceled);
+      expect(res.status).toBe(200);
+      expect(mockRecordCalendlyBooking).not.toHaveBeenCalled();
+    });
   });
 
   it("returns 500 when the webhook secret is not configured", async () => {

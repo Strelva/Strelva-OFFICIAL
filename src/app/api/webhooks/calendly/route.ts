@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { addEvent } from "@/lib/events";
 import { getRedis } from "@/lib/redis";
 import crypto from "crypto";
+import { recordCalendlyBooking } from "@/platform/bookings/calendly";
+import { bookingStoreWriteEnabled } from "@/platform/bookings/flags";
 
 interface CalendlyInvitee {
   uri: string;
@@ -125,7 +127,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (payload.event !== "invitee.created") {
+  // `invitee.canceled` only matters to the one booking store (it cancels the
+  // imported booking); without the store's write switch it is acknowledged as before.
+  const isCancel = payload.event === "invitee.canceled";
+  if (payload.event !== "invitee.created" && !(isCancel && bookingStoreWriteEnabled())) {
     return NextResponse.json({ received: true });
   }
 
@@ -144,6 +149,19 @@ export async function POST(req: Request) {
     console.error("Calendly webhook: could not determine tenant");
     return NextResponse.json({ error: "Unknown tenant" }, { status: 400 });
   }
+
+  // The booking itself, in the one store (a no-op unless its write switch is on).
+  await recordCalendlyBooking(tenantId, {
+    event: payload.event,
+    invitee: invitee ?? {},
+    scheduledEvent: {
+      uri: eventUri,
+      name: scheduled_event?.name ?? payload.payload.event?.name,
+      start_time: scheduled_event?.start_time ?? payload.payload.event?.start_time,
+      end_time: scheduled_event?.end_time ?? payload.payload.event?.end_time,
+    },
+  });
+  if (isCancel) return NextResponse.json({ received: true });
 
   const eventName = scheduled_event?.name || "Booking";
   const startTime: string | undefined =

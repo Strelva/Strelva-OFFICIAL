@@ -162,6 +162,7 @@ export const SOURCE_LIFECYCLES = [
   "workspace_exit",
   "make_real",
   "version_release",
+  "booking_request",
 ] as const;
 export type SourceLifecycle = (typeof SOURCE_LIFECYCLES)[number];
 

@@ -9,7 +9,7 @@
  * Callers must already have checked super-admin.
  */
 import { getAllTenants } from "./tenants";
-import { getLeadById, getLeads, leadSubmissionHash, type LeadRecord } from "./leads";
+import { getRedisLeadById as getLeadById, getRedisLeads as getLeads, leadSubmissionHash, type LeadRecord } from "./leads";
 import {
   clearLeadMirrorPending,
   getLeadMirrorHealth,
@@ -19,6 +19,7 @@ import {
   type LeadMirrorHealth,
 } from "./lead-mirror";
 import { dualWritePgEnabled } from "./db/dual-write";
+import { checkLeadParity, leadReadMode, type LeadReadMode } from "./lead-reads";
 import { getRedis } from "./redis";
 
 const REDIS_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
@@ -227,4 +228,40 @@ export async function reconcileLeadMirror(
   }
   result.remaining = (await getLeadMirrorHealth()).pending;
   return result;
+}
+
+export interface LeadReadParityRun {
+  /** False when the read switch is `redis`: there is nothing to compare yet. */
+  ran: boolean;
+  checked: number;
+  inParity: number;
+  outOfParity: { tenant: string; missing: number; mismatched: number }[];
+  failed: { tenant: string; reason: string }[];
+}
+
+/**
+ * The daily Redis-versus-Postgres check behind the 7-day rule (inquiry 1.0
+ * delta, section 6 step 2). Runs only while the read switch is `compare` or
+ * `postgres`; records one result per tenant per day. A tenant whose stores
+ * can't be read records nothing that day, which breaks the streak.
+ */
+export async function runLeadReadParity(
+  options: { tenants?: () => Promise<string[]>; mode?: LeadReadMode } = {},
+): Promise<LeadReadParityRun> {
+  const run: LeadReadParityRun = { ran: false, checked: 0, inParity: 0, outOfParity: [], failed: [] };
+  if ((options.mode ?? leadReadMode()) === "redis") return run;
+  if (!leadMirrorDb()) return run;
+  run.ran = true;
+  const tenants = await (options.tenants ?? (async () => (await getAllTenants()).map((tenant) => tenant.id)))();
+  for (const tenant of tenants) {
+    run.checked++;
+    try {
+      const report = await checkLeadParity(tenant, { redisLeads: await getLeads(tenant, 500), hash: (lead) => leadSubmissionHash(lead as LeadRecord) });
+      if (report.ok) run.inParity++;
+      else run.outOfParity.push({ tenant, missing: report.missing.length, mismatched: report.mismatched.length });
+    } catch (error) {
+      run.failed.push({ tenant, reason: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  return run;
 }

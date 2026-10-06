@@ -211,11 +211,42 @@ export interface PublicBookingCalendar {
   }): Promise<PublicBookingCalendarConfirmation>;
 }
 
+/**
+ * The one booking store (bookings spec, "One booking store"). Optional: when
+ * present, every reservation is also a row in the store both route families
+ * share. `claim` runs before the pending receipt is saved; it answers
+ * `conflict` only when the store guards slots (reads flipped), and the
+ * reservation is then refused before any receipt or calendar write. A store
+ * failure never fails the visitor; the hook queues it.
+ */
+export interface PublicBookingStoreHook {
+  claim(input: {
+    binding: PublicBookingBinding;
+    reservationId: string;
+    requestFingerprint: string;
+    title: string;
+    start: string;
+    end: string;
+    visitor: PublicBookingVisitor;
+    inquiryId: string;
+  }): Promise<"claimed" | "conflict" | "skipped">;
+  settle(input: {
+    binding: PublicBookingBinding;
+    reservationId: string;
+    status: PublicBookingStatus;
+    title: string;
+    start: string;
+    end: string;
+    visitor?: PublicBookingVisitor;
+  }): Promise<void>;
+}
+
 export interface PublicBookingDependencies {
   resolve(input: { tenantId: string; capabilityId: string; range?: PublicBookingRange; includeRevoked?: boolean }): Promise<PublicBookingBinding | null>;
   inquiries: PublicBookingInquiryCapture;
   calendar: PublicBookingCalendar;
   tokens: PublicBookingTokenStore;
+  store?: PublicBookingStoreHook;
   createReservationId?: () => string;
   createRequestId?: () => string;
   createManagementToken?: () => string;
@@ -436,6 +467,13 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
     }
     const title = titleFor(safe);
     const pendingReservationId = boundedToken(reservationId(), "The reservation id");
+    if (dependencies.store) {
+      const claim = await dependencies.store.claim({
+        binding: safe, reservationId: pendingReservationId, requestFingerprint, title,
+        start: slot.start, end: slot.end, visitor, inquiryId: captured.inquiryId,
+      }).catch(() => "skipped" as const);
+      if (claim === "conflict") throw new PublicBookingError("conflict", "That booking time is no longer available. Choose another time.");
+    }
     const pending = await saveToken(dependencies, {
       tenantId: input.tenantId,
       ...(safe.tenantStableId ? { tenantStableId: safe.tenantStableId } : {}),
@@ -466,7 +504,10 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
     // A concurrent request can win the durable unique request claim between
     // our lookup and save. Its receipt is authoritative; never call the
     // provider for the losing request.
-    if (pending.reservationId !== pendingReservationId) return receipt(pending);
+    if (pending.reservationId !== pendingReservationId) {
+      await settleStore({ binding: safe, reservationId: pendingReservationId, status: "cancelled", title, start: slot.start, end: slot.end });
+      return receipt(pending);
+    }
     let result: Awaited<ReturnType<PublicBookingCalendar["reserve"]>>;
     try {
       result = await dependencies.calendar.reserve({ binding: safe, requestId: idempotencyRequestId, title, start: slot.start, end: slot.end });
@@ -482,7 +523,13 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
       status: result.verification === "verified" ? "confirmed" : "pending",
     });
     if (ref.requestFingerprint !== requestFingerprint) throw new PublicBookingError("conflict", "This booking request is already used for different booking details.");
+    await settleStore({ binding: safe, reservationId: ref.reservationId, status: ref.status, title, start: ref.start, end: ref.end, visitor });
     return receipt(ref);
+  }
+
+  async function settleStore(input: Parameters<PublicBookingStoreHook["settle"]>[0]): Promise<void> {
+    if (!dependencies.store) return;
+    await dependencies.store.settle(input).catch(() => undefined);
   }
 
   async function change(input: {
@@ -511,7 +558,9 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
       if (error instanceof PublicBookingError) throw error;
       throw new PublicBookingError("unavailable", "The calendar could not confirm this change. Try again or contact the business.");
     }
-    return receipt(await saveToken(dependencies, { ...ref, expectedRevision: result.expectedRevision, start: result.start, end: result.end, status: result.verification === "verified" ? "confirmed" : "pending" }));
+    const changed = await saveToken(dependencies, { ...ref, expectedRevision: result.expectedRevision, start: result.start, end: result.end, status: result.verification === "verified" ? "confirmed" : "pending" });
+    await settleStore({ binding: safe, reservationId: changed.reservationId, status: changed.status, title: changed.title, start: changed.start, end: changed.end });
+    return receipt(changed);
   }
 
   async function cancel(input: { tenantId: string; reservationId: string; managementToken: string }): Promise<PublicBookingReceipt> {
@@ -530,7 +579,9 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
       if (error instanceof PublicBookingError) throw error;
       throw new PublicBookingError("unavailable", "The calendar could not confirm this cancellation. Try again or contact the business.");
     }
-    return receipt(await saveToken(dependencies, { ...ref, expectedRevision: result.expectedRevision, start: result.start, end: result.end, status: result.verification === "verified" ? "cancelled" : "pending" }));
+    const cancelled = await saveToken(dependencies, { ...ref, expectedRevision: result.expectedRevision, start: result.start, end: result.end, status: result.verification === "verified" ? "cancelled" : "pending" });
+    await settleStore({ binding: safe, reservationId: cancelled.reservationId, status: cancelled.status, title: cancelled.title, start: cancelled.start, end: cancelled.end });
+    return receipt(cancelled);
   }
 
   return { read, reserve, change, cancel };

@@ -3,10 +3,54 @@
 Status: working default spec, updated October 6, 2026 (first proposed
 October 1). On October 6 Jacob adopted every spec recommendation as the
 working default ([product model](../../product/product-model.md#decisions-the-specs-need)).
-Nothing here is built or deployed, and no production step is authorized by
-this page. Sibling of the
+Nothing here is deployed, and no production step is authorized by this
+page. Sibling of the
 [website rebuild spec](../website/website-rebuild-spec-2026-10-01.md), whose `Booking`
 and `InquiryForm` components this capability powers.
+
+**Built locally October 6 (wave 2, branch `w2/bookings-inquiries`, not
+applied or deployed; every switch off).** Phase 1a of the build plan:
+
+- **One store.** Migration `20261008141000_booking_store.sql`:
+  `business_bookings` (calendar = the tenant's stable id for both route
+  families, exclusion constraint on held, requested and confirmed time plus
+  buffer; Calendly imports kept, never refused), `business_booking_history`,
+  `booking_settings`, and `public_website_bookings.booking_id`. RLS on,
+  grants revoked, service-role functions, per-business denial tests in
+  `tests/booking-store-schema.sql`. Uses `btree_gist`.
+- **The move** (`src/platform/bookings/`, `src/lib/storage/booking-store.ts`
+  keeps every signature): `STRELVA_BOOKING_STORE_WRITE=1` dual-writes both
+  route families (failures queued in `reb:booking-store:pending`, replayed by
+  the reconcile cron); `scripts/booking-store-move.ts` backfills (dry run by
+  default; legacy bookings, Redis config and overrides, API receipts) and
+  records the 7-day compare (bookings and 60 days of slots per service);
+  `STRELVA_BOOKING_STORE_READ=compare|postgres` flips reads after 7 days of
+  parity, store-first with the legacy path as rollback. Schedule-payload
+  reservations without a receipt are not copied (no tenant calendar).
+- **Record.** Once reads flip, hours, services and phone come from the
+  business record at use; booking settings only narrow; a removed or
+  inactive service stops being bookable.
+- **Pause.** A paused bookings System offers no slots on either route and
+  refuses new bookings with the business phone; every booking, cancel path
+  and API management token keeps working.
+- **Owner.** "New booking" notice through `src/lib/owner-recipient.ts`
+  (`STRELVA_BOOKING_OWNER_NOTICE=1`); request mode creates `requested`
+  bookings that reach Needs you as urgent `customer.commitment` items
+  (approve confirms, Not yet or a lapse declines).
+- **Calendly** writes `import` bookings and cancels them.
+- **Wellness.** `/workspace/bookings` day and week views; `/dashboard/roster`
+  and `/dashboard/schedule` are `ready` behind the Systems flag.
+
+Proof: `src/__tests__/booking-one-store.test.ts` (both real routes, in memory
+and against the real functions in `check:workspace-sql`),
+`booking-store-availability`, `workspace-bookings`, `booking-store-move-plan`,
+`webhook-signatures`; `check:workspace-sql` and `check:workspace-upgrade`
+pass; `check:custom-repos` 196/196. Not built: reminders, the manage link
+page, the hold-expiry sweep, the 24 h and 72 h request clocks (a request
+lapses on the Needs you clock and is declined), agent bookings and MCP,
+calendar busy times on the tenant routes, editing hours from a booking
+screen. Production steps (migration, backfill, compare, each flip, owner
+email) each need Jacob's yes.
 
 **October 6 update.** This spec now sits inside the 1.0.0 model: bookings is
 a **System** that reads the business record. The new section

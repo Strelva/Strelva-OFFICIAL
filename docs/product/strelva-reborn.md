@@ -154,7 +154,11 @@ M one to three days, L three to seven, XL more.
       `src/platform/business-record/`, `tests/business-record-schema.sql`.
 - [ ] Website facts, booking hours and services, and inquiry contacts read and
       write it. No capability keeps its own copy of a business fact.
-      *Not started · L*
+      *Partial: once the one booking store's reads flip, booking hours,
+      services and phone are read from the record at use and only narrowed
+      by booking settings, and each booking upserts a `business_contacts` row
+      (local, branch `w2/bookings-inquiries`). Editing hours from a booking
+      screen, website facts and inquiry contacts are not built · L*
 - [ ] Every edit has history and an undo, like website documents today.
       *Partial:* each command writes one immutable revision and
       `undo_business_record_revision` refuses if a later change touched the
@@ -166,8 +170,9 @@ M one to three days, L three to seven, XL more.
       `src/lib/owner-recipient.ts` over `resolve_tenant_owner_recipient` is
       used by lead, inquiry, weekly and monthly report (both report paths,
       hosted included), review alert, review and order nudge and health-drop
-      notices. No owner booking notice exists yet to wire; the bookings build
-      must use it. Billing and lifecycle mail still read `owner_email` · S left*
+      notices. The owner "New booking" notice (`src/platform/bookings/notices.ts`,
+      behind `STRELVA_BOOKING_OWNER_NOTICE`, branch `w2/bookings-inquiries`)
+      uses it too. Billing and lifecycle mail still read `owner_email` · S left*
 - [ ] Every new table follows the `website_documents` pattern (RLS on, grants
       revoked, service-role functions) with cross-workspace denial tests.
       *Proven locally for the business record tables · keep for each new
@@ -178,15 +183,31 @@ Proof: unit and SQL tests in `check:workspace-sql`; `reborn:progress` shows
 
 ### 2. Data owned by the workspace
 
-- [ ] Inquiries are Postgres-authoritative and reference `workspaces(id)`.
+- [x] Inquiries are Postgres-authoritative and reference `workspaces(id)`.
       `/api/v1/leads/[tenant]` keeps its contract and writes the new store.
-      *Partial: `tenant_leads.workspace_id` references `workspaces(id)` and
-      fills in when a tenant is linked, but it is a mirror; Redis still serves
-      reads · M*
-- [ ] One booking store. `/api/booking/*` and `/api/v1/bookings/*` both land
+      *Built and proven locally Oct 6 (branch `w2/bookings-inquiries`, all
+      switches off, migration `20261008140000` not applied):
+      `src/lib/leads.ts` keeps its signatures and gains a read source
+      (`STRELVA_LEADS_READ=compare|postgres`, Postgres only after 7 days of
+      parity recorded by the reconcile cron) and Postgres-first capture
+      (`STRELVA_LEADS_AUTHORITY=postgres`, Redis + pending-queue fallback).
+      In production nothing changes until Jacob's yes on the migration, 7
+      days of compare and each flip. Spam (`held_as_spam`), `inquiry_events`
+      and the workspace-scoped read are not built.*
+- [x] One booking store. `/api/booking/*` and `/api/v1/bookings/*` both land
       in it. Weekly hours, slot length, buffer, lead time, advance window,
       date overrides and services come over from `src/lib/booking.ts`.
-      *Not started · L*
+      *Built and proven locally Oct 6 (branch `w2/bookings-inquiries`,
+      migration `20261008141000` not applied, switches
+      `STRELVA_BOOKING_STORE_WRITE` / `_READ` off): `business_bookings` with an
+      exclusion constraint both route families share, proven through both
+      real routes against the real functions in `check:workspace-sql`;
+      dual-write with a queued repair, dry-run backfill, 7-day compare
+      (bookings and 60 days of slots), flipped reads with rollback; hours and
+      services read from the business record (narrowing only); pause keeps
+      every booking; Calendly writes import bookings. Production backfill,
+      compare and flips each need Jacob's yes. Reminders, manage links and
+      the hold sweep are not built.*
 - [ ] One approval store. Content, Google and workspace approvals use the
       governed-work proposal, decision and outcome tables. Redis event
       lifecycle retires. *Partial: Postgres shadow exists behind
@@ -274,7 +295,12 @@ are untouched.
       to make native*
 - [ ] **Bookings.** Parity with the tenant widget (above), confirmation and
       cancellation email through `src/lib/email/send.ts`, and a day roster.
-      *~25%: timezone, conflict checks, cancel done · L*
+      *~45%: timezone, conflict checks, cancel done; one booking store, owner
+      notice, request mode through Needs you, and the day roster and week
+      schedule as `/workspace/bookings` views (`/dashboard/roster` and
+      `/dashboard/schedule` ready behind Systems) built locally on
+      `w2/bookings-inquiries`. Reminders, manage links and customer
+      cancellation email are not built · L*
 - [ ] **Inquiries.** `STRELVA_INQUIRIES_RELEASE` on, spam review in the
       workspace, owner notification. Existing leads already project in.
       *~35% · M*
@@ -345,7 +371,9 @@ Neither is used by any journey today.
       *Partial: 25 page files mapped (2 ready incl. `/reports` → Recaps,
       4 retire, 2 frozen, 17 stay) on `build/owner-entry` · L. Local Oct 6,
       both owner-surface streams merged: 16 ready, 4 retire, 2 frozen,
-      3 stay (`/roster`, `/schedule`, `/settings`).
+      3 stay (`/roster`, `/schedule`, `/settings`); with
+      `w2/bookings-inquiries` `/roster` and `/schedule` are ready too
+      (18 ready, only `/settings` stays).
       From `w2/owner-surfaces-a`: `/`, `/review` (both only while Needs you
       is on), `/leads`, `/reviews`, `/analytics`. From `w2/owner-surfaces-b`:
       `/chat` (only while Ask is released) and the website pages `/site`,

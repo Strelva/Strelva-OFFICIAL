@@ -11,6 +11,20 @@
  * pattern as report-cadence/CRM) with the dev-file store as the local fallback
  * when Redis is absent. The Redis slot-lock layer is a separate concern and is
  * preserved as-is.
+ *
+ * One booking store (Reborn §2, src/platform/bookings). Every function here
+ * keeps its signature; switches decide where it reads and writes:
+ *   STRELVA_BOOKING_STORE_WRITE=1        every write is also copied to the one
+ *                                        store (never failing the visitor).
+ *   STRELVA_BOOKING_STORE_READ=compare   legacy serves; the store is read beside
+ *                                        it and differences are logged.
+ *   STRELVA_BOOKING_STORE_READ=postgres  the store serves and guards the slot
+ *                                        (after 7 days of parity). Hours and
+ *                                        services come from the business record;
+ *                                        a paused bookings System offers no
+ *                                        times. The legacy stores still receive
+ *                                        every write, so switching back is the
+ *                                        rollback.
  */
 
 import type { BookingConfig, DateOverride, Booking } from "../types";
@@ -22,6 +36,33 @@ import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
 import { getContent } from "./content-store";
 import { dataSourceIsPostgres } from "../db/source-flags";
 import { getSupabase, type Row, type Insert, type Update } from "../db/client";
+import { bookingReadSource, bookingStoreWriteEnabled } from "@/platform/bookings/flags";
+import {
+  claimStoreBooking,
+  compareBookingsBeside,
+  compareSlotsBeside,
+  mirrorLegacyBooking,
+  mirrorLegacySettings,
+  mirrorLegacyStatus,
+  releaseStoreBooking,
+  storeAvailableSlots,
+  storeGetBookingConfig,
+  storeGetBookings,
+  storeGetDateOverrides,
+  type SiteService,
+} from "@/platform/bookings/tenant";
+import { setBookingStatus, type BookingContext } from "@/platform/bookings/store";
+import { storeBookingToLegacy } from "@/platform/bookings/availability";
+
+/** Serve from the store; on any store failure serve the legacy answer (it still receives every write). */
+async function storeOrLegacy<T>(label: string, tenant: string, fromStore: () => Promise<T>, fromLegacy: () => Promise<T>): Promise<T> {
+  try {
+    return await fromStore();
+  } catch (error) {
+    console.error(`[bookings] store ${label} failed for ${tenant}; serving legacy:`, error instanceof Error ? error.message : error);
+    return fromLegacy();
+  }
+}
 
 // --- Authoritative Postgres `bookings` helpers -----------------------------
 
@@ -122,6 +163,13 @@ const dateOverridesKey = (tenant: string) => `reb:booking:overrides:${tenant}`;
 export async function getBookingConfig(
   tenant: string = DEFAULT_TENANT
 ): Promise<BookingConfig> {
+  if ((await bookingReadSource()) === "postgres") {
+    return storeOrLegacy("config read", tenant, () => storeGetBookingConfig(tenant), () => legacyGetBookingConfig(tenant));
+  }
+  return legacyGetBookingConfig(tenant);
+}
+
+async function legacyGetBookingConfig(tenant: string): Promise<BookingConfig> {
   const redis = getRedis();
   if (redis) {
     // Fail CLOSED: let a Redis error propagate (the caller fails the request)
@@ -147,16 +195,26 @@ export async function setBookingConfig(
     // the save succeeded.
     await redis.set(bookingConfigKey(tenant), config);
     await mirrorClientRecord("booking_config", tenant, { recordId: "config", payload: { value: JSON.parse(JSON.stringify(config)) }, capturedAt: new Date().toISOString() });
-    return;
+  } else {
+    const store = await readDevContent(tenant);
+    store[`__bookingConfig_${tenant}`] = config;
+    await writeDevContent(store, tenant);
   }
-  const store = await readDevContent(tenant);
-  store[`__bookingConfig_${tenant}`] = config;
-  await writeDevContent(store, tenant);
+  if (bookingStoreWriteEnabled()) {
+    await mirrorLegacySettings(tenant, config, await legacyGetDateOverrides(tenant).catch(() => []));
+  }
 }
 
 export async function getDateOverrides(
   tenant: string = DEFAULT_TENANT
 ): Promise<DateOverride[]> {
+  if ((await bookingReadSource()) === "postgres") {
+    return storeOrLegacy("overrides read", tenant, () => storeGetDateOverrides(tenant), () => legacyGetDateOverrides(tenant));
+  }
+  return legacyGetDateOverrides(tenant);
+}
+
+async function legacyGetDateOverrides(tenant: string): Promise<DateOverride[]> {
   // Closed-dates / special-hours overrides persist as a Redis blob (mirrors
   // getBookingConfig), written by setDateOverrides from the owner's Schedule
   // availability editor. The dev-file store is the local fallback when Redis is
@@ -190,15 +248,45 @@ export async function setDateOverrides(
     // the save succeeded — same contract as setBookingConfig.
     await redis.set(dateOverridesKey(tenant), overrides);
     await mirrorClientRecord("booking_config", tenant, { recordId: "overrides", payload: { value: JSON.parse(JSON.stringify(overrides)) }, capturedAt: new Date().toISOString() });
-    return;
+  } else {
+    const store = await readDevContent(tenant);
+    store[`__dateOverrides_${tenant}`] = overrides;
+    await writeDevContent(store, tenant);
   }
-  const store = await readDevContent(tenant);
-  store[`__dateOverrides_${tenant}`] = overrides;
-  await writeDevContent(store, tenant);
+  if (bookingStoreWriteEnabled()) {
+    await mirrorLegacySettings(tenant, await legacyGetBookingConfig(tenant).catch(() => DEFAULT_BOOKING_CONFIG), overrides);
+  }
 }
 
 export async function getBookings(
   tenant: string = DEFAULT_TENANT,
+  dateRange?: { from: string; to: string }
+): Promise<Booking[]> {
+  const source = await bookingReadSource();
+  if (source === "postgres") {
+    return storeOrLegacy("bookings read", tenant, () => storeGetBookings(tenant, dateRange), () => legacyGetBookings(tenant, dateRange));
+  }
+  const legacy = await legacyGetBookings(tenant, dateRange);
+  if (source === "compare") await compareBookingsBeside(tenant, legacy, dateRange);
+  return legacy;
+}
+
+/** One booking from the legacy stores only (the repair and backfill read it). */
+export async function getLegacyBookingById(tenant: string, id: string): Promise<Booking | null> {
+  if (dataSourceIsPostgres()) return pgGetBooking(id, tenant);
+  const store = await readDevContent(tenant);
+  return ((store[`__bookings_${tenant}`] as Booking[]) ?? []).find((b) => b.id === id) ?? null;
+}
+
+/** Legacy config and overrides only (the backfill reads them). */
+export async function getLegacyBookingSettings(tenant: string): Promise<{ config: BookingConfig; overrides: DateOverride[] }> {
+  const [config, overrides] = await Promise.all([legacyGetBookingConfig(tenant), legacyGetDateOverrides(tenant)]);
+  return { config, overrides };
+}
+
+/** Every legacy booking of a tenant, from the legacy stores only. */
+export async function legacyGetBookings(
+  tenant: string,
   dateRange?: { from: string; to: string }
 ): Promise<Booking[]> {
   if (dataSourceIsPostgres()) {
@@ -364,20 +452,7 @@ export async function isSlotClaimed(
   return values.some((value) => !!value);
 }
 
-export async function createBooking(
-  booking: Omit<Booking, "id" | "createdAt" | "status">,
-  tenant: string = DEFAULT_TENANT
-): Promise<Booking> {
-  const bookingId = generateBookingId();
-  const { bufferTime } = await getBookingConfig(tenant);
-
-  const newBooking: Booking = {
-    ...booking,
-    id: bookingId,
-    status: "confirmed",
-    createdAt: new Date().toISOString(),
-  };
-
+async function legacyInsertBooking(newBooking: Booking, tenant: string, bufferTime: number): Promise<void> {
   if (dataSourceIsPostgres()) {
     await pgInsertBooking(newBooking, tenant);
   } else {
@@ -391,27 +466,82 @@ export async function createBooking(
   // Mark the full booked span as confirmed in Redis after successful write
   await confirmBookingSlot(
     tenant,
-    booking.date,
-    booking.startTime,
-    booking.endTime,
+    newBooking.date,
+    newBooking.startTime,
+    newBooking.endTime,
     bufferTime
   );
+}
+
+export async function createBooking(
+  booking: Omit<Booking, "id" | "createdAt" | "status">,
+  tenant: string = DEFAULT_TENANT
+): Promise<Booking> {
+  const bookingId = generateBookingId();
+  const config = await legacyGetBookingConfig(tenant);
+
+  const newBooking: Booking = {
+    ...booking,
+    id: bookingId,
+    status: "confirmed",
+    createdAt: new Date().toISOString(),
+  };
+
+  await legacyInsertBooking(newBooking, tenant, config.bufferTime);
+  // Dual-write: copy to the one store. Never fails the visitor.
+  if (bookingStoreWriteEnabled()) await mirrorLegacyBooking(tenant, newBooking, config);
 
   return newBooking;
 }
 
+async function siteServices(tenant: string): Promise<SiteService[]> {
+  const services = await getContent("services", tenant);
+  const list = Array.isArray(services.services) ? services.services : [];
+  return list.map((s) => ({ id: s.id, name: s.name, duration: s.duration, comingSoon: s.comingSoon }));
+}
+
+export type CreateBookingResult =
+  | { success: true; booking: Booking; /** Request mode: held until the owner approves through Needs you. */ requested?: boolean; context?: BookingContext }
+  | { success: false; error: string; code?: "paused" | "taken" | "invalid_service" };
+
 /**
  * Atomically claim a slot, verify availability, and create booking.
  * Prevents race conditions where two requests check availability simultaneously.
+ *
+ * With reads flipped to the one store, the store's exclusion constraint is the
+ * slot guard: the booking is recorded there first (refused when taken or the
+ * bookings System is paused), then written to the legacy table so a rollback
+ * loses nothing. If the store can't be reached, the legacy path below runs and
+ * the copy is queued.
  */
 export async function createBookingAtomic(
   booking: Omit<Booking, "id" | "createdAt" | "status">,
   tenant: string = DEFAULT_TENANT
-): Promise<{ success: true; booking: Booking } | { success: false; error: string }> {
+): Promise<CreateBookingResult> {
+  if ((await bookingReadSource()) === "postgres") {
+    const legacyId = generateBookingId();
+    let claim: Awaited<ReturnType<typeof claimStoreBooking>> | null = null;
+    try {
+      claim = await claimStoreBooking(tenant, booking, legacyId, await siteServices(tenant));
+    } catch (error) {
+      console.error(`[bookings] store claim failed for ${tenant}; taking the booking on the legacy path:`, error instanceof Error ? error.message : error);
+    }
+    if (claim && !claim.success) return { success: false, error: claim.error, code: claim.code };
+    if (claim?.success) {
+      try {
+        await legacyInsertBooking(claim.booking, tenant, claim.context.settings?.bufferMinutes ?? 0);
+      } catch (error) {
+        await releaseStoreBooking(tenant, legacyId);
+        throw error;
+      }
+      return { success: true, booking: claim.booking, requested: claim.requested, context: claim.context };
+    }
+  }
+
   // Step 1: Atomically claim every grid cell the booking spans. For
   // variable-duration services this prevents two overlapping bookings (whose
   // start times differ) from both succeeding.
-  const { bufferTime } = await getBookingConfig(tenant);
+  const { bufferTime } = await legacyGetBookingConfig(tenant);
   const { claimed, release } = await claimBookingSlot(
     tenant,
     booking.date,
@@ -426,7 +556,7 @@ export async function createBookingAtomic(
 
   try {
     // Step 2: Double-check availability (handles case where slot was booked before Redis key expired)
-    const available = await getAvailableSlots(booking.date, booking.serviceId, tenant);
+    const available = await legacyAvailableSlots(booking.date, booking.serviceId, tenant);
     if (!available.includes(booking.startTime)) {
       await release();
       return { success: false, error: "This time slot is no longer available. Please choose another time." };
@@ -442,10 +572,10 @@ export async function createBookingAtomic(
   }
 }
 
-export async function updateBooking(
+async function legacyUpdateBooking(
   id: string,
   updates: Partial<Pick<Booking, "status" | "notes" | "cancelledAt">>,
-  tenant: string = DEFAULT_TENANT
+  tenant: string
 ): Promise<Booking | null> {
   if (dataSourceIsPostgres()) {
     const existing = await pgGetBooking(id, tenant);
@@ -469,15 +599,36 @@ export async function updateBooking(
   return updated;
 }
 
-export async function getAvailableSlots(
-  date: string,
-  serviceId: string,
+export async function updateBooking(
+  id: string,
+  updates: Partial<Pick<Booking, "status" | "notes" | "cancelledAt">>,
   tenant: string = DEFAULT_TENANT
-): Promise<string[]> {
+): Promise<Booking | null> {
+  const updated = await legacyUpdateBooking(id, updates, tenant);
+  if (!bookingStoreWriteEnabled()) return updated;
+  if (updated) {
+    await mirrorLegacyStatus(tenant, id, updates.status, "owner");
+    return updated;
+  }
+  // A booking only the store has (an API reservation or a Calendly import,
+  // shown by its store id once reads flip) is changed in the store alone.
+  if ((await bookingReadSource()) === "postgres" && updates.status) {
+    const changed = await storeOrLegacy("status change", tenant,
+      async () => {
+        const result = await setBookingStatus(tenant, id, updates.status!, "owner", null);
+        return result.status === "updated" || result.status === "unchanged" ? storeBookingToLegacy(result.booking) : null;
+      },
+      async () => null);
+    return changed;
+  }
+  return null;
+}
+
+async function legacyAvailableSlots(date: string, serviceId: string, tenant: string): Promise<string[]> {
   const [config, bookings, overrides, services] = await Promise.all([
-    getBookingConfig(tenant),
-    getBookings(tenant, { from: date, to: date }),
-    getDateOverrides(tenant),
+    legacyGetBookingConfig(tenant),
+    legacyGetBookings(tenant, { from: date, to: date }),
+    legacyGetDateOverrides(tenant),
     getContent("services", tenant),
   ]);
 
@@ -486,4 +637,20 @@ export async function getAvailableSlots(
   const duration = service ? parseInt(service.duration) || config.slotDuration : config.slotDuration;
 
   return generateSlots(config, date, duration, bookings, overrides);
+}
+
+export async function getAvailableSlots(
+  date: string,
+  serviceId: string,
+  tenant: string = DEFAULT_TENANT
+): Promise<string[]> {
+  const source = await bookingReadSource();
+  if (source === "postgres") {
+    return storeOrLegacy("slots read", tenant,
+      async () => storeAvailableSlots(tenant, date, serviceId, await siteServices(tenant)),
+      () => legacyAvailableSlots(date, serviceId, tenant));
+  }
+  const slots = await legacyAvailableSlots(date, serviceId, tenant);
+  if (source === "compare") await compareSlotsBeside(tenant, date, serviceId, slots, await siteServices(tenant).catch(() => []));
+  return slots;
 }

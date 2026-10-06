@@ -251,6 +251,11 @@ per-workspace release flag | `needs_you` | `ask`, decides when a ready page
 redirects. gldf waits on nothing but `/settings`; rohlax on `/settings`,
 `/schedule` and `/roster`.
 
+*Then with `w2/bookings-inquiries` merged:* `/roster` and `/schedule` are
+ready too (→ `/workspace/bookings?view=day|week`, gate `systems`):
+**18 ready**, 4 retire, 2 frozen, **1 stay** (`/settings`). Both gldf and
+rohlax now wait only on `/settings`.
+
 The nav that owners see comes from `getDashboardSurfaces`
 (`src/lib/dashboard-surfaces.ts`). It shows Today, Ask Strelva, Website,
 Google Business, Analytics, Reports and Reviews, plus Schedule, Members and

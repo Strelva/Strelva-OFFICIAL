@@ -23,6 +23,8 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
   const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "" });
   const [booking, setBooking] = useState<{ id: string; date: string; startTime: string; serviceName: string } | null>(null);
   const [confirmationSent, setConfirmationSent] = useState(false);
+  // Request mode (one booking store): the time is held until the business confirms.
+  const [requested, setRequested] = useState(false);
 
   const bookableServices = services.filter((s) => !s.comingSoon);
   const priceDisplay = minPrice ? `$${minPrice}` : "$60";
@@ -81,6 +83,7 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
 
       setBooking(data.booking);
       setConfirmationSent(Boolean(data.confirmationSent));
+      setRequested(data.requested === true);
       setStep("confirmed");
     } catch {
       setError("Something went wrong. Please try again.");
@@ -356,13 +359,15 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
-                <h3 className="text-lg font-semibold mb-2" style={{ color: "var(--bark)" }}>You&apos;re booked!</h3>
+                <h3 className="text-lg font-semibold mb-2" style={{ color: "var(--bark)" }}>{requested ? "Request sent" : "You're booked!"}</h3>
                 <p className="text-sm mb-1" style={{ color: "var(--bark-light)" }}>{booking.serviceName}</p>
                 <p className="text-sm mb-4" style={{ color: "var(--bark-faded)" }}>
                   {formatDate(booking.date)} at {formatTime(booking.startTime)}
                 </p>
                 <p className="text-xs mb-6" style={{ color: "var(--bark-faded)" }}>
-                  {confirmationSent
+                  {requested
+                    ? "The business will confirm this time with you."
+                    : confirmationSent
                     ? `A confirmation has been sent to ${form.email}`
                     : "We've saved your booking."}
                 </p>

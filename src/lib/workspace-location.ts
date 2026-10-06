@@ -41,6 +41,18 @@ export function workspaceReturnTarget(value: string | null): string | null {
   }
   // A managed website's own pages (editor, photos, look, history, connections).
   if (value?.startsWith("/workspace/site?")) return workspaceSiteTarget(value);
+  if (value?.startsWith("/workspace/bookings?")) {
+    // The bookings System's day and week views (the homes of /dashboard/roster and /dashboard/schedule).
+    const target = new URL(value, "https://workspace.invalid");
+    const workspaceId = target.searchParams.get("workspaceId");
+    const view = target.searchParams.get("view");
+    const date = target.searchParams.get("date");
+    const allowed = [...target.searchParams.keys()].every((key) => key === "workspaceId" || key === "view" || key === "date");
+    if (target.hash || target.pathname !== "/workspace/bookings" || !allowed || target.searchParams.getAll("workspaceId").length !== 1
+      || !workspaceId || !UUID.test(workspaceId) || target.searchParams.getAll("view").length > 1 || (view !== null && view !== "day" && view !== "week")
+      || target.searchParams.getAll("date").length > 1 || (date !== null && !/^\d{4}-\d{2}-\d{2}$/.test(date))) return null;
+    return `${target.pathname}?${target.searchParams}`;
+  }
   if (value?.startsWith("/workspace/business/new?") || value?.startsWith("/workspace/delivery?")) {
     const target = new URL(value, "https://workspace.invalid");
     if (target.hash || target.searchParams.size !== 1) return null;

@@ -50,7 +50,7 @@ built and tested on a branch, not in production.
 | Versions: one System adapted per location or client, with shared improvements offered, never forced | Local, in-memory only | `PRIM_CONTEXT_VERSION` |
 | Health from real monitors; pause that keeps existing obligations | Local; website health reads real monitors in preview | `RULE_SYSTEM_PAUSE_HEALTH` |
 | Ask Strelva inside the workspace, using the same tools as today's owner agent | Local, flag off: route, tools, chat UI and saved conversations (`w2/owner-surfaces-b`); Needs you wiring missing | Reborn §4 |
-| Owners sign in on their client admin host and land in their workspace; old `/dashboard` links redirect | Local: entry, 307s, 16 of 25 pages ready (Today, approvals, leads, reviews, analytics, reports, unknown from `w2/owner-surfaces-a`; chat and the eight website pages from `w2/owner-surfaces-b`); `/settings` stays; flags off | Reborn §6 |
+| Owners sign in on their client admin host and land in their workspace; old `/dashboard` links redirect | Local: entry, 307s, 18 of 25 pages ready (Today, approvals, leads, reviews, analytics, reports, unknown from `w2/owner-surfaces-a`; chat and the eight website pages from `w2/owner-surfaces-b`; roster and schedule from `w2/bookings-inquiries`); `/settings` stays; flags off | Reborn §6 |
 
 ### 2. The systems a business starts with
 
@@ -62,8 +62,8 @@ business, monitoring, and at least the best competitor's bar.
 | System | Must do at launch | Today |
 | --- | --- | --- |
 | **Website** | Live site in the workspace with domain, health and history; edits and publishing for existing sites; connected sites (bring a site made elsewhere via `connect.js`) | Tenant sites live; System page with domains, Waiting on you, Requests and History built locally (Oct 8); connected sites merged locally onto the business record and lead store, flag off; publish-onto-linked-site built locally; rebuild flag off |
-| **Inquiries** | Every lead kept, spam review, reply from the workspace, owner notified | Leads Redis-only (fix on `reborn-stop-losing-data`); product ~35%, flag off |
-| **Bookings** | Weekly hours, services, buffers, confirmations, reminders, one booking store, pause | ~25%; schedule caps at ~125 bookings; two stores |
+| **Inquiries** | Every lead kept, spam review, reply from the workspace, owner notified | Postgres copy of every lead built locally, not applied; read switch, 7-day parity and Postgres-first capture built locally behind off switches (`w2/bookings-inquiries`); product ~35%, flag off |
+| **Bookings** | Weekly hours, services, buffers, confirmations, reminders, one booking store, pause | ~45%; one booking store, hours and services from the record, pause, owner notice, request mode and day/week views built locally behind off switches (`w2/bookings-inquiries`); no reminders or manage links |
 | **Publishing** | Review replies, Google Business Profile, blog and newsletter, all through approval and receipts | 0% in the workspace; GBP writes depend on Google approval |
 | **Internal tools** | Agency/Strelva build from a sentence (work plan → app draft); records link to business contacts; notify on submit | Native apps shipped, unused; drafting flag off; ~10% |
 | **Store, rewards, newsletter, wellness** | Existing client features keep working inside the workspace | Tenant-side only |
