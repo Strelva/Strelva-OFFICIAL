@@ -11,7 +11,7 @@
  */
 import type { SystemLifecycle as SpineLifecycle } from "@/platform/systems/contracts";
 import type { HealthStatus } from "@/platform/system-health/contracts";
-import type { WorkspaceMakeRealResult } from "@/experience/workspace/contracts";
+import type { WorkspaceMakeRealResult, WorkspaceSnapshot } from "@/experience/workspace/contracts";
 
 /** Customer-facing name of the whole set. Jacob still owns the brand call; rename here only. */
 export const SYSTEMS_LABEL = "Systems";
@@ -141,6 +141,14 @@ export const CONNECTION_KIND_LABEL: Record<SystemConnectionKind, string> = {
 export const INCOMING_CONNECTION_LABEL: Record<SystemConnectionKind, string> = {
   read: "Read by", act: "Acted on by", appear: "Shows", share: "Shared with", depend: "Needed by", trigger: "Started by",
 };
+
+/**
+ * The Systems model renders only when the server's snapshot says
+ * STRELVA_SYSTEMS_RELEASE is on. Absent reads as off.
+ */
+export function systemsReleased(snapshot: Pick<WorkspaceSnapshot, "releases">): boolean {
+  return snapshot.releases?.systems === true;
+}
 
 export function systemHref(base: string, workspaceId: string, systemId: string): string {
   const params = new URLSearchParams({ view: "system", system: systemId, workspaceId });

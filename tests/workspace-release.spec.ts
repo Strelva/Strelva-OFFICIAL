@@ -208,7 +208,7 @@ async function pendingWorkspaceSwitchSurvives(page: Page, section: "work" | "set
   await expect.poll(() => releaseTarget.length).toBeGreaterThan(0);
 
   await page.getByRole("complementary", { name: "Strelva navigation", exact: true })
-    .getByRole("link", { name: section === "settings" ? "Business details" : "All systems and files", exact: true })
+    .getByRole("link", { name: section === "settings" ? "Business details" : "All apps and files", exact: true })
     .click();
 
   targetReady = true;
@@ -267,7 +267,7 @@ test("creates a private assessment and restores it after reload", async ({ page 
   });
 
   await page.goto("/workspace");
-  await page.getByRole("link", { name: "All systems and files", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
+  await page.getByRole("link", { name: "All apps and files", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.getByRole("button", { name: "AI Visibility: Start", exact: true }).click();
   await expect(page.getByRole("heading", { name: "AI Visibility", exact: true })).toBeVisible();
@@ -522,10 +522,10 @@ test("keeps My work and Shared with me context-local and read-only", async ({ pa
 
   await page.goto("/workspace");
   await page.getByLabel("Current workspace").selectOption(CUSTOMER_ID);
-  await expect(page.getByRole("heading", { name: "Harbor Dental", exact: true, level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Review what was shared.", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Strelva handled", exact: true })).toBeVisible();
   await expect(page.getByRole("complementary", { name: "Strelva navigation", exact: true }).getByRole("region", { name: "Recent work", exact: true }).getByRole("link", { name: "Customer-owned assessment" })).toBeVisible();
-  await page.getByRole("link", { name: "All systems and files", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
+  await page.getByRole("link", { name: "All apps and files", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.getByRole("button", { name: "AI Visibility: Start", exact: true }).click();
   await expect(page.getByRole("button", { name: "Check a business", exact: true })).toBeDisabled();
@@ -863,7 +863,7 @@ test("does not add a completed assessment to a workspace selected while it was r
   });
 
   await page.goto("/workspace");
-  await page.getByRole("link", { name: "All systems and files", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
+  await page.getByRole("link", { name: "All apps and files", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.getByRole("button", { name: "AI Visibility: Start", exact: true }).click();
   await expect(page.getByRole("heading", { name: "AI Visibility", exact: true })).toBeVisible();
@@ -965,7 +965,7 @@ test("never substitutes another result for an unavailable deep link", async ({ p
   await page.goto(`/workspace?workspaceId=${PERSONAL_ID}&work=missing`);
   await expect(page.getByRole("heading", { name: "This saved result is unavailable." })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Harbor Dental", exact: true })).not.toBeVisible();
-  await page.getByRole("button", { name: "Back to Systems", exact: true }).click();
+  await page.getByRole("button", { name: "Back to Apps", exact: true }).click();
   await page.getByRole("button", { name: "Open Harbor Dental", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Harbor Dental", exact: true })).toBeVisible();
 });
@@ -1024,7 +1024,7 @@ test("recovers the same assessment after a lost response and reload", async ({ p
     return fulfill(route,{work:work()});
   });
   await page.goto("/workspace");
-  await page.getByRole("link", { name: "All systems and files", exact: true }).click(); await page.getByRole("navigation", { name: "Systems", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
+  await page.getByRole("link", { name: "All apps and files", exact: true }).click(); await page.getByRole("navigation", { name: "Apps", exact: true }).getByRole("button", { name: "Get or build", exact: true }).click();
   await page.getByText("More tools and managed services", { exact: true }).click();
   await page.getByRole("button",{name:"AI Visibility: Start", exact:true}).click();
   await expect(page.getByRole("heading",{name:"AI Visibility", exact:true})).toBeVisible();

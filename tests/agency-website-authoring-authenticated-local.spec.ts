@@ -219,7 +219,8 @@ test("customer grants one managed website draft, agency prepares it, and custome
     agencyPage.setDefaultTimeout(25_000);
     await agencyPage.setViewportSize({ width: 390, height: 844 });
     await agencyPage.goto(`/workspace?workspaceId=${agencyId}`, { waitUntil: "domcontentloaded" });
-    await expect(agencyPage.getByRole("heading", { name: "Website possibilities for clients", exact: true })).toBeVisible();
+    // The heading names Possibilities only when STRELVA_SYSTEMS_RELEASE is on for the app under test.
+    await expect(agencyPage.getByRole("heading", { name: process.env.STRELVA_SYSTEMS_RELEASE === "1" ? "Website possibilities for clients" : "Assigned website drafts", exact: true })).toBeVisible();
     await expect(agencyPage.getByRole("link", { name: "Open website", exact: true })).toBeVisible();
     await agencyPage.getByRole("link", { name: "Open website", exact: true }).click();
     await expect(agencyPage.getByText("The customer needs to enable draft editing", { exact: false })).toBeVisible();

@@ -186,8 +186,27 @@ describe("agency home projection", () => {
     expect(html).toContain("Private agency work");
     expect(html).toContain("Intake method");
     expect(html).toContain("Checking shared client work");
-    expect(html).toContain("does not hold a private catalog yet");
+    // Pre-Systems words until STRELVA_SYSTEMS_RELEASE is on (covered below).
+    expect(html).toContain("does not currently hold a private offering catalog");
     expect(html.toLowerCase()).not.toContain("earnings");
     expect(html.toLowerCase()).not.toContain("royalt");
+  });
+
+  it("shows source Systems and client Versions only when STRELVA_SYSTEMS_RELEASE is on", () => {
+    const render = (extra: Partial<WorkspaceSnapshot>) => renderToStaticMarkup(createElement(AgencyHome, {
+      snapshot: snapshot(extra), busy: false,
+      onWorkspace: () => undefined, onOpenClientWork: () => undefined, onOpenWork: () => undefined, onStart: () => undefined,
+    }));
+    for (const off of [render({}), render({ releases: { systems: false } })]) {
+      expect(off).not.toContain("each client’s version");
+      expect(off).not.toContain("Checking client versions");
+      expect(off).not.toMatch(/possibilit|make[s]? it real/i);
+      expect(off).toContain("Assigned website drafts");
+      expect(off).toContain("publishing stays with the customer");
+    }
+    const on = render({ releases: { systems: true } });
+    expect(on).toContain("Systems you keep, and each client’s version");
+    expect(on).toContain("Website possibilities for clients");
+    expect(on).toContain("does not hold a private catalog yet");
   });
 });

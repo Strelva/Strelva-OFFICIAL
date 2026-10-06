@@ -21,8 +21,8 @@ const entry = (systemId: string, kind: string, name: string, extra: Partial<Work
   health: { status: "unknown", summary: "Nothing has checked this yet.", lastVerifiedAt: null }, ...extra,
 });
 const projection = (extra: Partial<WorkspaceSystems> = {}): WorkspaceSystems => ({ status: "ready", systems: [], connections: [], possibilities: [], ...extra });
-const snapshot = (items: WorkspaceWork[], systems?: WorkspaceSystems): Pick<WorkspaceSnapshot, "workspaceId" | "workspaces" | "work" | "delegations" | "systems"> => ({
-  workspaceId: BUSINESS, workspaces: [{ id: BUSINESS, kind: "customer", name: "The Mooney Firm", role: "owner" }], work: items, delegations: [], ...(systems ? { systems } : {}),
+const snapshot = (items: WorkspaceWork[], systems?: WorkspaceSystems, released = true): Pick<WorkspaceSnapshot, "workspaceId" | "workspaces" | "work" | "delegations" | "systems" | "releases"> => ({
+  workspaceId: BUSINESS, workspaces: [{ id: BUSINESS, kind: "customer", name: "The Mooney Firm", role: "owner" }], work: items, delegations: [], ...(systems ? { systems } : {}), releases: { systems: released },
 });
 const mooneySite = { id: "mooney-firm", title: "The Mooney Firm", href: "/dashboard", productId: "managed_presence" as const, relationship: "client" as const, domain: "www.attymooney.com" };
 const mooney = projection({
@@ -33,6 +33,21 @@ const mooney = projection({
   ],
   connections: [{ id: "c1", sourceId: INBOX, kind: "appear", targetSystemId: SITE, targetLabel: "The Mooney Firm", state: "connected", purpose: "Inquiry form on the site" }],
   possibilities: [{ id: "website-rebuild:rebuild", title: "A rebuilt attymooney.com", summary: "Rebuilt.", status: "ready", affects: [SITE, INBOX], evidence: "12 of 12 public pages carried over.", previewHref: "/api/websites/rebuild/preview", workId: "rebuild" }],
+});
+
+describe("Systems read adapter with STRELVA_SYSTEMS_RELEASE off", () => {
+  it("draws no System, Possibility or Version and keeps every saved result a file, even if a projection arrives", () => {
+    const items = [work("intake", "applications", { title: "Mediation intake", sourceWorkId: "source" }), work("rebuild", "websites"), work("check", "ai_visibility")];
+    const off = readBusinessSystems({ snapshot: snapshot(items, mooney, false), sites: [mooneySite] });
+    expect(off).toEqual({ systems: [], files: items, unavailable: false });
+    const down = readBusinessSystems({ snapshot: snapshot(items, projection({ status: "unavailable" }), false), sites: [mooneySite] });
+    expect(down.unavailable).toBe(false);
+  });
+
+  it("treats a snapshot without releases as off", () => {
+    const { releases: _releases, ...legacy } = snapshot([], mooney);
+    expect(readBusinessSystems({ snapshot: legacy, sites: [mooneySite] }).systems).toEqual([]);
+  });
 });
 
 describe("Systems read adapter over the spine projection", () => {

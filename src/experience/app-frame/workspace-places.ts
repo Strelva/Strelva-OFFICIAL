@@ -14,6 +14,8 @@
  * October 5: Customers left the navigation. The page only listed where people
  * reach the business, not customers; `view=customers` still opens it for
  * existing links.
+ * All of October 4 and 5 is behind STRELVA_SYSTEMS_RELEASE. Off, the list is
+ * called "Apps" and Customers stays in the navigation, as before.
  * Every caller that needs to know which place a view belongs to, what it is
  * called, or how to link to it asks this module instead of keeping its own
  * mapping.
@@ -54,9 +56,9 @@ export function sectionFromView(view: string | null | undefined): StrelvaSection
   return view && DIRECT_VIEWS.has(view) ? view as StrelvaSection : "home";
 }
 
-/** The header title for a section. */
-export function sectionTitle(section: StrelvaSection): string {
-  return TITLES[section];
+/** The header title for a section. The app list is "Apps" until Systems are released. */
+export function sectionTitle(section: StrelvaSection, systemsReleased = false): string {
+  return !systemsReleased && APP_VIEWS.has(section) ? "Apps" : TITLES[section];
 }
 
 export function workspaceSectionHref(section: StrelvaSection, base = "", workspaceId?: string): string {

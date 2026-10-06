@@ -30,6 +30,7 @@ import { inquiryReleaseEnabled } from "@/products/inquiries";
 import { parseTrackerWorkPayload, presentTrackerHandoffPreview } from "@/products/tracker";
 import { presentWorkspaceWork } from "@/experience/workspace/result";
 import { readWorkspaceSystems } from "@/experience/systems/server";
+import { systemsReleaseEnabled } from "@/platform/systems-release";
 import type { ManagedWork, WorkspaceDelegation, WorkspaceProduct, WorkspaceSnapshot, WorkspaceWork } from "@/experience/workspace/contracts";
 
 export const dynamic = "force-dynamic";
@@ -255,7 +256,9 @@ export async function GET(request: Request) {
       ? (await Promise.all(work.map((item) => listWorkDelegations(current, item.id)))).flat() : [];
     // Systems are business-level: the spine projection, its health and any
     // Possibility a saved rebuild offers. A failed read is reported as such.
-    const systems = selected.kind === "customer" ? await readWorkspaceSystems({
+    // Off (STRELVA_SYSTEMS_RELEASE), no projection is built and the browser renders the pre-Systems workspace.
+    const systemsReleased = systemsReleaseEnabled();
+    const systems = systemsReleased && selected.kind === "customer" ? await readWorkspaceSystems({
       actor: current, businessId: selected.id, savedWork: work,
       siteDomains: new Map(managedPresence.managedWork.flatMap((site) => site.domain ? [[site.id, site.domain] as const] : [])),
     }) : undefined;
@@ -287,6 +290,7 @@ export async function GET(request: Request) {
       delegations: [...agencyDelegations.map((value) => presentDelegation(value, false)), ...customerDelegations.map((value) => presentDelegation(value, true))],
       products,
       ...(systems ? { systems } : {}),
+      releases: { systems: systemsReleased },
     };
     return json(snapshot);
   } catch (error) { return failed(error); }

@@ -48,7 +48,9 @@ function request(value: unknown, headers: Record<string, string> = {}) {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.unstubAllEnvs();
   vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+  vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "1");
   mocks.user.mockResolvedValue({ id: "actor", email: "OWNER@example.com", email_confirmed_at: "2026-09-05" });
   mocks.rate.mockResolvedValue(false);
   mocks.pending.mockResolvedValue([]);
@@ -176,11 +178,25 @@ describe("release-one private workspace routes", () => {
 
     const customer = await (await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${otherId}`))).json();
     expect(customer.systems).toEqual(systems);
+    expect(customer.releases).toEqual({ systems: true });
     expect(mocks.systems).toHaveBeenCalledWith({ actor: { userId: "actor", verifiedEmail: "owner@example.com" }, businessId: otherId, savedWork: [work], siteDomains: new Map([["mooney-firm", "www.attymooney.com"]]) });
 
     mocks.systems.mockClear();
     const personal = await (await GET(new Request("https://strelva.com/api/workspace"))).json();
     expect(personal.systems).toBeUndefined();
+    expect(mocks.systems).not.toHaveBeenCalled();
+  });
+  it("builds no Systems projection and says so while STRELVA_SYSTEMS_RELEASE is off", async () => {
+    const business = { id: otherId, kind: "customer", name: "The Mooney Firm", access: "member", role: "owner" };
+    mocks.list.mockResolvedValue([workspace, business]);
+    mocks.systems.mockResolvedValue({ status: "ready", systems: [], connections: [], possibilities: [] });
+    for (const value of [undefined, "", "0", "true"]) {
+      vi.stubEnv("STRELVA_SYSTEMS_RELEASE", value);
+      const customer = await (await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${otherId}`))).json();
+      expect(customer.systems).toBeUndefined();
+      expect(customer.releases).toEqual({ systems: false });
+      expect(customer.work).toEqual([expect.objectContaining({ id: work.id })]);
+    }
     expect(mocks.systems).not.toHaveBeenCalled();
   });
   it("keeps unrelated private work available when managed discovery is unavailable", async () => {

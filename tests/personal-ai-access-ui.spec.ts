@@ -102,14 +102,14 @@ test("an owner issues, copies, switches away from, and revokes exact-work AI acc
   expect(Date.parse(String(commands[0]!.expiresAt)) - issuedAt).toBeGreaterThan(6.9 * 86_400_000);
   expect(Date.parse(String(commands[0]!.expiresAt)) - issuedAt).toBeLessThan(7.1 * 86_400_000);
 
-  await page.getByRole("button", { name: "Back to Systems" }).click();
+  await page.getByRole("button", { name: "Back to Apps" }).click();
   await page.getByRole("button", { name: "Open Visitor log" }).click();
   await page.getByText("Sources and collaborators", { exact: true }).click();
   await expect(page.getByRole("heading", { name: "Use this work from your own AI" })).toBeVisible();
   await expect(page.getByTestId("issued-agent-token")).toHaveCount(0);
   await expect(page.getByText("No personal AI access has been created for this work.")).toBeVisible();
 
-  await page.getByRole("button", { name: "Back to Systems" }).click();
+  await page.getByRole("button", { name: "Back to Apps" }).click();
   await page.getByRole("button", { name: "Open Team intake" }).click();
   await page.getByText("Sources and collaborators", { exact: true }).click();
   await expect(page.getByText("Research assistant", { exact: true })).toBeVisible();

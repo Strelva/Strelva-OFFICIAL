@@ -29,8 +29,12 @@ describe("workspace places", () => {
     expect(sectionTitle("home")).toBe("Home");
     expect(sectionTitle("requests")).toBe("Requests");
     expect(sectionTitle("ongoing")).toBe("Running");
-    expect(sectionTitle("work")).toBe("Systems");
-    expect(sectionTitle("products")).toBe("Systems");
+    // The app list is "Apps" until STRELVA_SYSTEMS_RELEASE is on.
+    expect(sectionTitle("work")).toBe("Apps");
+    expect(sectionTitle("products")).toBe("Apps");
+    expect(sectionTitle("apps", true)).toBe("Systems");
+    expect(sectionTitle("work", true)).toBe("Systems");
+    expect(sectionTitle("products", true)).toBe("Systems");
     expect(sectionTitle("settings")).toBe("Business details");
     expect(sectionTitle("access")).toBe("People & access");
   });
