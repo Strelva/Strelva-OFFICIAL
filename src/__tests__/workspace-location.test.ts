@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { accountReturnTarget, replaceWorkspaceLocation, workspaceReturnTarget } from "@/lib/workspace-location";
+import { accountReturnTarget, replaceWorkspaceLocation, workspaceReturnTarget } from "@/platform/workspaces/location";
 
 it("preserves website creation and saved website destinations through sign-in", () => {
   expect(workspaceReturnTarget("/workspace?view=websites")).toBe("/workspace?view=websites");

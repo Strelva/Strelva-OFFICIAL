@@ -32,10 +32,10 @@ vi.mock("../lib/tenants", () => ({
 const mockOrderingRedisSet = vi.fn();
 const mockOrderingRedisGet = vi.fn();
 let orderingRedisHandle: unknown = null;
-vi.mock("../lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => orderingRedisHandle,
 }));
-vi.mock("../lib/production-guard", () => ({
+vi.mock("@/platform/infra/production-guard", () => ({
   isProductionEnv: () => false,
 }));
 const mockStripeConstructEvent = vi.fn();
@@ -46,14 +46,14 @@ vi.mock("stripe", () => {
   }
   return { default: FakeStripe };
 });
-vi.mock("../lib/monitoring", () => ({ alert: vi.fn() }));
+vi.mock("@/platform/infra/monitoring", () => ({ alert: vi.fn() }));
 vi.mock("../lib/events", () => ({ addEvent: vi.fn() }));
 vi.mock("../lib/delivery-email", () => ({
   sendNewSignupEmail: vi.fn(),
   sendPaymentFailedEmail: vi.fn(),
   sendPaymentPastDueEmail: vi.fn(),
 }));
-vi.mock("../lib/db/dual-write", () => ({
+vi.mock("@/platform/infra/db/dual-write", () => ({
   dualWritePgEnabled: () => false,
   buildPaymentToInsert: vi.fn(),
 }));
@@ -67,11 +67,11 @@ vi.mock("../lib/accounts", () => ({
 const mockGetSessionUser = vi.fn();
 const mockGetMembershipRole = vi.fn();
 const mockIsSuperAdminUser = vi.fn();
-vi.mock("../lib/db/server-client", () => ({
+vi.mock("@/platform/infra/db/server-client", () => ({
   isSupabaseAuthConfigured: () => true,
   getSessionUser: () => mockGetSessionUser(),
 }));
-vi.mock("../lib/db/repositories", () => ({
+vi.mock("@/platform/infra/db/repositories", () => ({
   getMembershipRole: (...a: unknown[]) => mockGetMembershipRole(...a),
   isSuperAdminUser: (...a: unknown[]) => mockIsSuperAdminUser(...a),
   listMembershipsForUser: vi.fn(() => Promise.resolve([])),
@@ -113,7 +113,7 @@ describe("Content API - Tenant Access Checks", () => {
   });
 
   it("hasTenantAccess returns false when user has no membership", async () => {
-    const { hasTenantAccess } = await import("../lib/auth");
+    const { hasTenantAccess } = await import("@/platform/infra/auth");
     const result = await hasTenantAccess("test-tenant");
     expect(result).toBe(false);
   });
@@ -121,7 +121,7 @@ describe("Content API - Tenant Access Checks", () => {
   it("hasTenantAccess returns false when user is signed out", async () => {
     mockGetSessionUser.mockResolvedValue(null);
 
-    const { hasTenantAccess } = await import("../lib/auth");
+    const { hasTenantAccess } = await import("@/platform/infra/auth");
     const result = await hasTenantAccess("test-tenant");
     expect(result).toBe(false);
   });
@@ -129,7 +129,7 @@ describe("Content API - Tenant Access Checks", () => {
   it("hasTenantAccess returns true when user has a matching membership", async () => {
     mockGetMembershipRole.mockResolvedValue("owner");
 
-    const { hasTenantAccess } = await import("../lib/auth");
+    const { hasTenantAccess } = await import("@/platform/infra/auth");
     const result = await hasTenantAccess("test-tenant");
     expect(result).toBe(true);
   });
@@ -137,13 +137,13 @@ describe("Content API - Tenant Access Checks", () => {
   it("hasTenantAccess returns true for super admin regardless of tenant assignment", async () => {
     mockIsSuperAdminUser.mockResolvedValue(true);
 
-    const { hasTenantAccess } = await import("../lib/auth");
+    const { hasTenantAccess } = await import("@/platform/infra/auth");
     const result = await hasTenantAccess("any-tenant");
     expect(result).toBe(true);
   });
 
   it("requireTenantAccess returns 403 response when access denied", async () => {
-    const { requireTenantAccess } = await import("../lib/auth");
+    const { requireTenantAccess } = await import("@/platform/infra/auth");
     const result = await requireTenantAccess("test-tenant");
 
     expect(result).not.toBeNull();
@@ -156,7 +156,7 @@ describe("Content API - Tenant Access Checks", () => {
   it("requireTenantAccess returns null when access allowed", async () => {
     mockGetMembershipRole.mockResolvedValue("owner");
 
-    const { requireTenantAccess } = await import("../lib/auth");
+    const { requireTenantAccess } = await import("@/platform/infra/auth");
     const result = await requireTenantAccess("test-tenant");
     expect(result).toBeNull();
   });
@@ -335,7 +335,7 @@ describe("Tenant Access Denial (403)", () => {
   it("returns 401 when user is not authenticated", async () => {
     mockGetSessionUser.mockResolvedValue(null);
 
-    const { requireTenantAccess } = await import("../lib/auth");
+    const { requireTenantAccess } = await import("@/platform/infra/auth");
     const result = await requireTenantAccess("test-tenant");
 
     expect(result).not.toBeNull();
@@ -344,7 +344,7 @@ describe("Tenant Access Denial (403)", () => {
 
   it("returns 403 for a tenant the user has no membership in", async () => {
     // Member of other tenants (getMembershipRole for the requested one → null).
-    const { requireTenantAccess } = await import("../lib/auth");
+    const { requireTenantAccess } = await import("@/platform/infra/auth");
     const result = await requireTenantAccess("tenant-d");
 
     expect(result).not.toBeNull();
@@ -354,7 +354,7 @@ describe("Tenant Access Denial (403)", () => {
   it("resolves super admin via the super_admins table", async () => {
     mockIsSuperAdminUser.mockResolvedValue(true);
 
-    const { isSuperAdmin } = await import("../lib/auth");
+    const { isSuperAdmin } = await import("@/platform/infra/auth");
     const result = await isSuperAdmin();
     expect(result).toBe(true);
   });

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: async () => null }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: async () => null }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
 
 function expectPrivateHeaders(response: Response) {

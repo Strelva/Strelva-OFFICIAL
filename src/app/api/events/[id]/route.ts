@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthUserId, verifyAuth, requireTenantPermission } from "@/lib/auth";
+import { getAuthUserId, verifyAuth, requireTenantPermission } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { resolveEventAction } from "@/lib/event-actions";

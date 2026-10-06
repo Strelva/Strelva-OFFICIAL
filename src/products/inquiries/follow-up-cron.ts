@@ -24,7 +24,7 @@ import {
   sendInquiryReply,
 } from "./delivery";
 import { isInquiryReplyTrackingAddress } from "./delivery-message";
-import { getReceivedEmailReadback } from "@/lib/email/send";
+import { getReceivedEmailReadback } from "@/platform/infra/email/send";
 import type {
   InquiryDeliveryApproval,
   InquiryDeliveryDependencies,
@@ -62,6 +62,8 @@ export interface InquiryFollowUpSweepOptions {
   allowExternalSends?: boolean;
   /** Test/host override for the workspace exit authority. */
   workspaceExitCompleted?: (businessId: string) => Promise<boolean>;
+  /** Per-site release (STRELVA_INQUIRIES_RELEASE rows). Absent: every active tenant. */
+  released?: (tenantId: string) => Promise<boolean>;
 }
 
 export interface InquiryFollowUpSweepResult {
@@ -134,7 +136,12 @@ export async function runDueInquiryFollowUps(
 ): Promise<InquiryFollowUpSweepResult> {
   const now = options.now?.() ?? new Date();
   const tenants = await (options.tenants ?? getAllTenants)();
-  const active = tenants.filter((tenant) => tenant.active !== false);
+  const activeTenants = tenants.filter((tenant) => tenant.active !== false);
+  const released = options.released;
+  const releasedFlags = released
+    ? await Promise.all(activeTenants.map((tenant) => released(tenant.id).catch(() => false)))
+    : null;
+  const active = releasedFlags ? activeTenants.filter((_tenant, index) => releasedFlags[index]) : activeTenants;
   const leadsReader = options.leads ?? getLeads;
   const repository = options.repository ?? getInquiryRepository();
   const deliveryStore = options.store ?? createRedisInquiryDeliveryStore();

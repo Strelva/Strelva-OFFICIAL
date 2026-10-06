@@ -19,7 +19,15 @@
  *
  * Design: vault 1-projects/scaffold-web/org-layer-architecture.md.
  */
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
+import { workspacePorts, type ClientRecordsPort } from "./workspace-ports";
+
+// The workspace client-records mirror, through the port src/lib declares
+// (Strelva Reborn section 7). Never throws, as before.
+const mirrorClientRecord: ClientRecordsPort["mirrorClientRecord"] = async (...args) =>
+  (await workspacePorts().clientRecords()).mirrorClientRecord(...args);
+const mirrorClientRecordRemoval: ClientRecordsPort["mirrorClientRecordRemoval"] = async (...args) =>
+  (await workspacePorts().clientRecords()).mirrorClientRecordRemoval(...args);
 
 export type AccountStatus = "active" | "paused" | "churned";
 
@@ -174,6 +182,10 @@ async function persist(account: Account): Promise<Account> {
   if (redis) {
     await redis.set(key(account.id), account);
     await redis.sadd(INDEX_KEY, account.id);
+    // Postgres copy per member site (account_grouping). Never throws.
+    for (const tenantId of account.tenantIds) {
+      await mirrorClientRecord("account_grouping", tenantId, { recordId: account.id, payload: JSON.parse(JSON.stringify(account)), capturedAt: account.updatedAt });
+    }
   }
   return account;
 }
@@ -276,6 +288,7 @@ export async function linkTenantToAccount(accountId: string, tenantId: string): 
       if (prev && prev !== accountId) {
         const prevAcct = await getAccount(prev);
         if (prevAcct) {
+          await mirrorClientRecordRemoval("account_grouping", clean_tid, prev);
           await persist({
             ...prevAcct,
             tenantIds: prevAcct.tenantIds.filter((t) => t !== clean_tid),
@@ -303,6 +316,7 @@ export async function unlinkTenant(accountId: string, tenantId: string): Promise
       const cur = (await redis.get(tenantLinkKey(tenantId))) as string | null;
       if (cur === accountId) await redis.del(tenantLinkKey(tenantId));
     }
+    await mirrorClientRecordRemoval("account_grouping", tenantId, accountId);
     return persist({
       ...account,
       tenantIds: account.tenantIds.filter((t) => t !== tenantId),
@@ -339,6 +353,7 @@ export async function deleteAccount(id: string): Promise<boolean> {
     for (const tenantId of account.tenantIds) {
       const cur = (await redis.get(tenantLinkKey(tenantId))) as string | null;
       if (cur === id) await redis.del(tenantLinkKey(tenantId));
+      await mirrorClientRecordRemoval("account_grouping", tenantId, id);
     }
   }
   await redis.del(key(id));

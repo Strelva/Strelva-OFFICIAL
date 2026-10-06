@@ -17,8 +17,10 @@ Versioning](https://semver.org/) value. The current production version is `0.2.0
 | `0.2.0` | Workspace machinery in production, 2026-09-30 |
 
 Strelva stays below `1.0.0` until it is something we'd stand behind for any new
-customer; [Strelva Reborn](./docs/product/strelva-reborn.md#versions) lists the
-bar. Jacob decides when it is met. Before `1.0.0`, minor versions may represent
+customer; [Strelva 1.0.0](./docs/product/strelva-1.0.0.md#the-bar) sets the
+bar. Jacob decides when it is met. Since October 6, Reborn builds straight to
+`1.0.0`; only the lead fix (`0.2.1`) ships before it
+([one build, one exception](./docs/product/strelva-reborn.md#one-build-one-exception)). Before `1.0.0`, minor versions may represent
 larger product changes and patch versions may represent smaller public releases. A release that changes only one
 repository still advances both package versions because customers experience
 Strelva as one product.
@@ -42,7 +44,7 @@ Strelva has two channels. **Stable** is what customers use, simply called
 Strelva, and gets `strelva-v<version>` tags. **Preview** is Strelva Preview,
 for Jacob and selected testers. It is built every night from the next
 release's branch, and green builds get a SemVer prerelease tag such as
-`strelva-v0.3.0-preview.20261006`. The
+`strelva-v1.0.0-preview.20261007`. The
 [Strelva Preview](./.github/workflows/preview-nightly.yml) workflow creates
 them. Preview tags are not releases and never deploy to Stable.
 

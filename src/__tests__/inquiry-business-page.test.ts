@@ -9,9 +9,9 @@ vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("NOT_FOUND"); },
   redirect: (href: string) => { throw new Error(`REDIRECT:${href}`); },
 }));
-vi.mock("@/lib/auth", () => ({ requireTenantAccess: mocks.access }));
+vi.mock("@/platform/infra/auth", () => ({ requireTenantAccess: mocks.access }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.config }));
-vi.mock("@/products/inquiries/server", () => ({ inquiryReleaseEnabled: mocks.release }));
+vi.mock("@/products/inquiries/server", () => ({ inquiryReleaseEnabled: mocks.release, inquiryReleaseMayBeOn: (...args: unknown[]) => mocks.release(...args), inquiryReleasedForCurrentUser: async (...args: unknown[]) => mocks.release(...args), inquiryReleaseEnabledForTenant: async (...args: unknown[]) => mocks.release(...args) }));
 vi.mock("@/experience/inquiries/InquiryServerExperience", () => ({ InquiryServerExperience: () => null }));
 
 import BusinessPage from "@/app/business/[tenant]/page";

@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { getActorContext, isSuperAdmin } from "@/lib/auth";
+import { getActorContext, isSuperAdmin } from "@/platform/infra/auth";
 import { getAllTenants, isActiveTenant, getTenantConfig } from "@/lib/tenants";
 import { sendUpdateLiveEmail } from "@/lib/delivery-email";
 import { SECTION_LABELS } from "@/components/ui/section-labels";
-import { ROOT_DOMAIN } from "@/lib/brand";
+import { ROOT_DOMAIN } from "@/platform/infra/brand";
 import {
   listDrafts,
   getDraftContent,
@@ -188,6 +188,8 @@ export async function POST(request: Request) {
           whatChanged,
           siteUrl,
           rollingOut: revalidationFailed,
+          // Client email is tenant-aware: the per-client override must apply here too.
+          tenantId: tenant,
           logPrefix: "[admin/drafts]",
         });
       }

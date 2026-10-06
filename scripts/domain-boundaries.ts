@@ -20,7 +20,7 @@ const EXTENSIONS = [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"
 
 function runtimeModule(target: string): boolean {
   return /^src\/(?:app|components|experience|server)(?:\/|$)/.test(target)
-    || /^src\/lib\/(?:db|auth|redis)(?:\/|$)/.test(target)
+    || /^src\/(?:lib|platform\/infra)\/(?:db|auth|redis)(?:\/|$)/.test(target)
     || /(?:^|\/)(?:server|service|repository|adapters?)(?:\/|$)/.test(target)
     || /-(?:service|repository|adapter)$/.test(target);
 }

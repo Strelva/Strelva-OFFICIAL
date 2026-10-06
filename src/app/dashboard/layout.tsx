@@ -13,18 +13,17 @@ import { getVisibleSurfaces, tenantHasStore } from "@/lib/dashboard-surfaces";
 import { getProducts } from "@/lib/products";
 import { getContent } from "@/lib/storage";
 import { getEffectiveSubscriptionStatus } from "@/lib/subscription";
-import { claimPendingInviteForCurrentUser, getActorContext, getAuthUserId, hasTenantAccess } from "@/lib/auth";
+import { claimPendingInviteForCurrentUser, getActorContext, getAuthUserId, hasTenantAccess } from "@/platform/infra/auth";
 import { getQueueCount } from "@/lib/events";
-import { getTenantPrimaryDomain, getTenantPublicUrl, getTenantPublicUrlFromDomainMap } from "@/lib/tenant-urls";
-import { isDevAccessBypassEnabled } from "@/lib/dev-access";
+import { isDevAccessBypassEnabled } from "@/platform/infra/dev-access";
 import { getClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
 import { isInspecting } from "@/lib/inspect-mode";
-import { getTenantDeliveryModel, getTenantEditablePreviewUrl } from "@/lib/custom-repos";
-import { getLocalClientPreviewUrl } from "@/lib/preview-target";
+import { siteFrameFor } from "@/lib/website-page-data";
 import { ConversationShell } from "@/components/dashboard/ConversationShell";
 import { planByKey } from "@/lib/billing-plans";
 import { resolveLegacyManagedPresence } from "@/products/managed-presence";
 import { resolveRelationship } from "@/platform/relationships";
+import { dashboardRoutingFor } from "@/platform/owner-entry/server";
 
 export default async function DashboardLayout({
   children,
@@ -44,6 +43,13 @@ export default async function DashboardLayout({
   if (!userId && !devAccessBypass && !isDemo) {
     redirect(withClientFallbackRoot(clientFallbackRoot, "/sign-in"));
   }
+
+  // Owner entry (owner-entry spec §3.4–§3.6): for a moved workspace, a page
+  // whose workspace home is ready redirects there (307), only for a member of
+  // that workspace; any other page renders with a way back. Decided before
+  // the tenant access check, since the destination's own access is what counts.
+  const ownerEntry = isDemo ? { kind: "render" as const } : await dashboardRoutingFor(tenant);
+  if (ownerEntry.kind === "redirect") redirect(ownerEntry.location);
 
   const hasAccess = isDemo || (await hasTenantAccess(tenant));
   if (!hasAccess) {
@@ -80,30 +86,14 @@ export default async function DashboardLayout({
   ) {
     return <TenantSuspended siteName={tenantConfig.siteName || tenant} />;
   }
-  const domainMapSiteUrl = getTenantPublicUrlFromDomainMap(tenant);
-  const siteUrl = tenantConfig
-    ? getTenantPublicUrl(tenantConfig, getTenantPrimaryDomain(tenantConfig) ? "production" : process.env.NODE_ENV)
-    : domainMapSiteUrl;
-  const liveSyncEnabled = Boolean(tenantConfig?.revalidateUrl && tenantConfig?.revalidationSecret);
   const requestHost = requestHeaders.get("host") || "";
   const hostname = requestHost.toLowerCase().split(":")[0];
   const appBase = hostname === "localhost" || hostname === "127.0.0.1" || hostname?.endsWith(".localhost") || hostname === "app.strelva.com" || hostname?.endsWith(".vercel.app")
     ? "" : "https://app.strelva.com";
   const requestProto = requestHeaders.get("x-forwarded-proto")
     || (requestHost.includes("localhost") ? "http" : "https");
-  const requestOrigin = requestHost ? `${requestProto}://${requestHost}` : "";
-  const localClientPreviewUrl = getLocalClientPreviewUrl({
-    clientFallbackRoot,
-    requestHost,
-    requestProto,
-  });
-  const tenantEditablePreviewUrl = getTenantEditablePreviewUrl(tenantConfig, { requestOrigin, siteUrl });
-  const shouldUseLocalClientPreviewUrl =
-    Boolean(localClientPreviewUrl) &&
-    (!tenantConfig || getTenantDeliveryModel(tenantConfig) !== "custom_repo");
-  const previewUrl = shouldUseLocalClientPreviewUrl
-    ? localClientPreviewUrl || ""
-    : tenantEditablePreviewUrl;
+  // The same framing the workspace website uses (src/lib/website-page-data.ts).
+  const { siteUrl, previewUrl, liveSyncEnabled } = siteFrameFor(tenant, tenantConfig, { clientFallbackRoot, requestHost, requestProto });
   // Resolve the real business name (config.siteName, known-tenant name, or the
   // owner name) instead of a generic "Your Business" when the content settings
   // haven't set a site name yet. The editable content siteName still wins.
@@ -216,6 +206,14 @@ export default async function DashboardLayout({
             <Link href="/access-request" className="font-semibold text-accent underline-offset-2 hover:underline">
               Get your own site &rarr;
             </Link>
+          </div>
+        )}
+        {ownerEntry.kind === "render-with-back" && (
+          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-b border-accent/30 bg-accent-dim px-4 py-2 text-center text-[12px] text-warm-black" data-owner-entry-back={ownerEntry.route}>
+            <span>This page hasn&apos;t moved to your workspace yet.</span>
+            <a href={ownerEntry.homeHref} className="font-semibold text-accent underline-offset-2 hover:underline focus-visible:underline">
+              Back to {siteName}
+            </a>
           </div>
         )}
         {!isDemo && <SessionKeeper />}

@@ -56,11 +56,11 @@ function query(table: string): Record<string, unknown> {
   return builder;
 }
 
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => ({
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({
   from: (table: string) => query(table),
   rpc: async () => ({ data: state.exitCompleted, error: state.exitError }),
 }) }));
-vi.mock("@/lib/redis", () => ({ getRedis: () => null }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
 
 import { assertWorkspaceCalendarWriteAllowed, getWorkspaceCalendarConnection } from "@/products/scheduling/calendar/repository";
 

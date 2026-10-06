@@ -10,15 +10,16 @@
  */
 import { NextResponse } from "next/server";
 import { getTenantConfig } from "@/lib/tenants";
-import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { readOptionalJsonObject } from "@/lib/request-body";
 import { isTenantId } from "@/lib/scaffold-contracts";
-import { captureLead, recordLead } from "@/lib/leads";
+import { captureLead } from "@/lib/leads";
 import { scoreLeadSpam } from "@/lib/lead-spam";
 import { recordSpam } from "@/lib/spam-pit";
+import { readLeadAttribution } from "@/lib/lead-attribution";
 import {
   getInquiryRepository,
-  inquiryReleaseEnabled,
+  inquiryReleaseEnabledForTenant,
   projectPublishedInquiry,
   recordInquiryEvidence,
   validateInquiryFields,
@@ -146,7 +147,7 @@ export async function POST(
     }
 
     if (isCapabilitySubmission(body)) {
-      if (!inquiryReleaseEnabled()) return corsJson({ error: "Inquiry forms are not enabled." }, 503);
+      if (!(await inquiryReleaseEnabledForTenant(tenant))) return corsJson({ error: "Inquiry forms are not enabled." }, 503);
       const capabilityId = str(body.capabilityId, 200);
       const capabilityVersion = body.capabilityVersion;
       const fields = readFields(body.fields);
@@ -255,7 +256,16 @@ export async function POST(
     }
 
     if (!name) return corsJson({ error: "name is required" }, 400);
-    await recordLead(tenant, { name, email, message, source });
+    // Optional attribution (additive): where on the site the inquiry came
+    // from, for the outcome loop. Absent for every client form sent today.
+    const attribution = readLeadAttribution(body);
+    // Claim receipt only when a store holds the lead: Redis, or the Postgres
+    // copy when Redis is absent. Owner notification is unchanged (captureLead
+    // notifies exactly as recordLead did).
+    const outcome = await captureLead(tenant, { name, email, message, source, ...(attribution ? { fields: attribution } : {}) });
+    if (outcome.status === "unavailable" && !outcome.mirrored) {
+      return corsJson({ error: "Lead storage is temporarily unavailable.", code: "lead_storage_unavailable" }, 503);
+    }
     return corsJson({ ok: true }, 200);
   } catch (err) {
     console.error("[v1 leads POST]", tenant, err);

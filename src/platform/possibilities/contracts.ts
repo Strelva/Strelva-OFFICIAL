@@ -93,9 +93,19 @@ export const proposedConnectionSchema = z.object({
 }).strict();
 export type ProposedConnection = z.infer<typeof proposedConnectionSchema>;
 
+/**
+ * Which existing write path a live effect goes through
+ * (docs/product/specs/systems-experience.md section 5). Part of the effect's
+ * fingerprint. An effect with no channel can only run on an isolated adapter.
+ */
+export const MAKE_REAL_CHANNELS = ["hosted_website", "tenant_content", "inquiry_form", "booking_page", "internal_app", "google_listing"] as const;
+export const makeRealChannelSchema = z.enum(MAKE_REAL_CHANNELS);
+export type MakeRealChannel = z.infer<typeof makeRealChannelSchema>;
+
 export const declaredEffectSchema = z.object({
   id: KEY,
   kind: effectKindSchema,
+  channel: makeRealChannelSchema.optional(),
   system: systemTargetSchema,
   description: z.string().trim().min(1).max(300),
   /** Provider-neutral request; adapters translate it. Never secrets or grants. */

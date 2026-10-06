@@ -16,7 +16,7 @@ import {
   setPageConfig,
 } from "@/lib/storage";
 import { requireTenantFromHeaders } from "@/lib/tenant";
-import { getActorContext, requireTenantAccess, requireTenantPermission, verifyAuth } from "@/lib/auth";
+import { getActorContext, requireTenantAccess, requireTenantPermission, verifyAuth } from "@/platform/infra/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { getTemplateManifestForTenant } from "@/lib/template-manifests";
 import { sectionSchemas } from "@/lib/schemas";

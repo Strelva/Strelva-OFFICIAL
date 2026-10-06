@@ -42,7 +42,7 @@ function builder(): unknown {
   );
 }
 
-vi.mock("@/lib/db/client", async (orig) => ({
+vi.mock("@/platform/infra/db/client", async (orig) => ({
   ...(await (orig() as Promise<Record<string, unknown>>)),
   getSupabase: () => ({
     from: (t: string) => {
@@ -54,7 +54,7 @@ vi.mock("@/lib/db/client", async (orig) => ({
 
 // Redis off so the read path skips the cache and the write path's cache
 // populate is a no-op — only the Postgres branch is observed.
-vi.mock("@/lib/redis", () => ({ getRedis: () => null }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
 
 import {
   getPageConfig,

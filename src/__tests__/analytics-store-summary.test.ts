@@ -3,9 +3,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Force the Postgres path and steer the site_metric_summary RPC (audit #4). This
 // locks the RPC-row → result mapping: total / today / this-week (last7) /
 // last-week (prev7), and the prefix filter.
-vi.mock("@/lib/db/source-flags", () => ({ dataSourceIsPostgres: () => true }));
+vi.mock("@/platform/infra/db/source-flags", () => ({ dataSourceIsPostgres: () => true }));
 const mockRpc = vi.fn();
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => ({ rpc: mockRpc }) }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mockRpc }) }));
 
 import { getClickCounts, getClickCountsByPrefix } from "@/lib/storage/analytics-store";
 

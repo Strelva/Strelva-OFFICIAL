@@ -65,6 +65,14 @@
       "schedule": "17 * * * *"
     },
     {
+      "path": "/api/cron/booking-reminders",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/client-records-parity",
+      "schedule": "40 5 * * *"
+    },
+    {
       "path": "/api/cron/visibility",
       "schedule": "0 3 * * 2"
     },
@@ -97,6 +105,10 @@
       "schedule": "0 * * * *"
     },
     {
+      "path": "/api/cron/needs-you",
+      "schedule": "0 * * * *"
+    },
+    {
       "path": "/api/cron/heartbeat",
       "schedule": "*/30 * * * *"
     },
@@ -111,6 +123,10 @@
     {
       "path": "/api/cron/website-domain-verification",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/connected-sites-purge",
+      "schedule": "50 5 * * *"
     }
   ]
 }

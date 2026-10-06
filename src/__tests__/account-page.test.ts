@@ -31,8 +31,8 @@ vi.mock("@/components/auth/UseInvitedEmailButton", () => ({
   }),
 }));
 
-vi.mock("@/lib/auth", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/auth")>();
+vi.mock("@/platform/infra/auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/platform/infra/auth")>();
   return {
     ...actual,
     getAuthUserId: mockGetAuthUserId,
@@ -42,7 +42,7 @@ vi.mock("@/lib/auth", async (importOriginal) => {
   };
 });
 
-vi.mock("@/lib/dev-access", () => ({
+vi.mock("@/platform/infra/dev-access", () => ({
   getDevAccessTenant: () => null,
   isDevAccessBypassEnabled: () => false,
 }));

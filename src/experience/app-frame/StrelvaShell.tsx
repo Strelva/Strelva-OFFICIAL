@@ -9,7 +9,7 @@ import { StrelvaSidebar } from "./StrelvaSidebar";
 import type { StrelvaPinnedItem, StrelvaSection } from "./workspace-places";
 import styles from "./strelva-shell.module.css";
 
-export { pinnedApps, pinnedSystems, pinnedWebsites, placeForSection, sectionFromView, sectionTitle, workspaceSectionHref, type StrelvaPinnedItem, type StrelvaSection } from "./workspace-places";
+export { isRetiredView, pinnedApps, pinnedSystems, pinnedWebsites, placeForSection, sectionFromView, sectionTitle, workspaceSectionHref, type StrelvaPinnedItem, type StrelvaSection } from "./workspace-places";
 
 interface Props {
   children: ReactNode;

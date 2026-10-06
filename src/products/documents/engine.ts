@@ -7,6 +7,13 @@ const receiptSchema = z.object({
   kind: z.enum(["edit", "undo"]), before: documentContentSchema, after: documentContentSchema,
   undoesRevision: z.number().int().positive().optional(),
 });
+/**
+ * The payload keeps only the most recent receipts. Every receipt is also
+ * appended to `document_revisions` by `update_document_work`, so a document
+ * takes any number of edits. Payloads written before that table existed may
+ * still hold up to 200 receipts and keep parsing.
+ */
+export const DOCUMENT_RECENT_HISTORY = 20;
 export const documentSchema = documentContentSchema.extend({
   version: z.literal(1), revision: z.number().int().nonnegative(),
   createdBy: z.string().min(1), createdAt: z.string().datetime(),
@@ -35,9 +42,11 @@ export function changeDocument(value: WorkspaceDocument, raw: unknown, actorId: 
   } else content = documentContentSchema.parse(command);
   if (doc.title === content.title && doc.text === content.text) throw new WorkspaceConflictError("There are no changes to save.");
   const revision = doc.revision + 1;
-  return documentSchema.parse({ ...doc, ...content, revision, history: [...doc.history, {
+  const receipt = {
     revision, actorId, at: new Date().toISOString(), kind: command.kind,
     before: { title: doc.title, text: doc.text }, after: content,
     ...(command.kind === "undo" ? { undoesRevision: command.targetRevision } : {}),
-  }] });
+  };
+  const history = [...doc.history.slice(-(DOCUMENT_RECENT_HISTORY - 1)), receipt];
+  return documentSchema.parse({ ...doc, ...content, revision, history });
 }

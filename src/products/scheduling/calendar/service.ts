@@ -1,6 +1,6 @@
 import { SCHEDULE_PAUSED_MESSAGE } from "../lifecycle";
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { advance, boundedStore, readBounded, type BoundedStore } from "@/platform/bounded-work/repository";
 import { WorkspaceConflictError, type SavedWork, type WorkspaceActor } from "@/platform/workspaces/types";
 import { calendarAvailabilityQuerySchema, calendarProviderSchema, calendarReminderPolicySchema, reservationSchema, scheduleCommandSchema, scheduleSchema } from "../contracts";

@@ -1,6 +1,7 @@
-import { Output, generateText } from "ai";
-import type { ModelConfig } from "@/lib/ai-models";
-import { getFallbackModel, getPrimaryModel, isTransientModelError } from "@/lib/ai-models";
+import { Output } from "ai";
+import type { ModelConfig } from "@/platform/infra/ai-models";
+import { getFallbackModel, getPrimaryModel } from "@/platform/infra/ai-models";
+import { generateModelText } from "@/platform/infra/model-calls";
 import { type BudgetExecutionEvidenceContext } from "@/platform/work-economics/runtime";
 import { geminiReceiptFromAiSdkResult, trustedReceiptFromAiSdkResult, trustedProviderReceiptSchema, type TrustedProviderReceipt } from "@/platform/work-economics/provider-evidence";
 import { generatedWorkPlanSchema, type WorkPlanEvidence, type WorkPlanNativeOperation } from "./contracts";
@@ -88,29 +89,34 @@ export async function defaultGenerate(input: WorkPlanGenerationInput): Promise<u
     abortSignal,
   });
 
+  // Primary then fallback (transient failures only) through the one helper,
+  // which also writes one cost row per provider call. The receipt is read
+  // from the answering attempt's own result; a receipt that cannot be read
+  // fails that attempt, as it did before the helper.
+  let providerEvidence: TrustedProviderReceipt | null = null;
   try {
-    const result = await generateText({ ...options(), model: models[0]!.model });
-    const providerEvidence = input.executionContext
-      ? trustedReceiptFromFallbackResult(result, input.executionContext, models[0]!.label)
-      : null;
+    const { result } = await generateModelText<{ output: unknown }>(
+      { purpose: "work_plan", actorKind: "member" },
+      options(),
+      {
+        models,
+        receipt: (attempt, model) => {
+          providerEvidence = input.executionContext
+            ? trustedReceiptFromFallbackResult(attempt, input.executionContext, model.label)
+            : null;
+          return providerEvidence ? { costUsd: receiptUsd(providerEvidence) } : null;
+        },
+      },
+    );
     return providerEvidence ? { output: result.output, providerEvidence } : result.output;
-  } catch (error) {
-    if (models[1] && isTransientModelError(error)) {
-      try {
-        const result = await generateText({ ...options(), model: models[1].model });
-        // Fallback providers use the same strict receipt contract. They only
-        // settle when a provider-specific billing gateway supplies an exact
-        // amount and immutable request id; token usage remains unresolved.
-        const providerEvidence = input.executionContext
-          ? trustedReceiptFromFallbackResult(result, input.executionContext, models[1]!.label)
-          : null;
-        return providerEvidence ? { output: result.output, providerEvidence } : result.output;
-      } catch {
-        throw new WorkPlanUnavailableError("The planning provider did not return a plan");
-      }
-    }
+  } catch {
     throw new WorkPlanUnavailableError("The planning provider did not return a plan");
   }
+}
+
+function receiptUsd(receipt: TrustedProviderReceipt): string {
+  if (receipt.billableUsd !== undefined) return receipt.billableUsd;
+  return ((receipt.billableCents ?? 0) / 100).toFixed(2);
 }
 
 function trustedReceiptFromFallbackResult(

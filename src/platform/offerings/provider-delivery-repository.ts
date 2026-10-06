@@ -1,4 +1,4 @@
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { OfferingAccessError, OfferingConflictError, OfferingNotFoundError, OfferingStoreError, type OfferingActor } from "./types";
 import { WORKSPACE_EXIT_STOPPED_MESSAGE } from "@/platform/workspaces/types";
 import { providerDeliverySchema, type ProviderDelivery, type ProviderDeliveryStore } from "./provider-delivery";

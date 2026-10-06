@@ -15,7 +15,7 @@ vi.mock("@/lib/analytics", () => ({
   getAnalyticsConfig: mockGetAnalyticsConfig,
   setAnalyticsConfig: mockSetAnalyticsConfig,
 }));
-vi.mock("@/lib/redis", () => ({ getRedis: mockGetRedis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: mockGetRedis }));
 
 import { discoverGoogleResources, selectGoogleResource } from "@/lib/google-resources";
 

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MARKETING_URL } from "@/lib/brand";
+import { MARKETING_URL } from "@/platform/infra/brand";
 const request = vi.hoisted(() => ({ tenant: "first", preview: false, hosted: true }));
 vi.mock("@/products/websites/hosted-public", () => ({ getHostedSite: async () => request.hosted ? ({ tenant: request.tenant, origin: `https://${request.tenant}.example`, preview: request.preview, document: { pages: [{ path: "/" }, { path: `/services/${request.tenant}-service` }] } }) : null }));
 import sitemap from "@/app/sitemap";

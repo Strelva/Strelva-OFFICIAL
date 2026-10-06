@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { createBrowserSupabase } from "@/lib/db/browser-client";
+import { createBrowserSupabase } from "@/platform/infra/db/browser-client";
 
 interface UseInvitedEmailButtonProps {
   className?: string;

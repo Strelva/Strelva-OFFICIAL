@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDailyMetrics, getClickCounts } from "@/lib/storage";
 import { requireTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess } from "@/lib/auth";
+import { requireTenantAccess } from "@/platform/infra/auth";
 
 export async function GET(request: Request) {
   try {

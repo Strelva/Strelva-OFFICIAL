@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { isSuperAdmin } from "@/lib/auth";
+import { isSuperAdmin } from "@/platform/infra/auth";
 import { getAllTenants, isActiveTenant } from "@/lib/tenants";
 
 import { getActivity, listDrafts } from "@/lib/storage";

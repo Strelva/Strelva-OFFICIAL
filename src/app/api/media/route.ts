@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { requireActiveSubscription } from "@/lib/subscription";
-import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { listTenantMedia, uploadTenantMedia, deleteTenantMedia } from "@/lib/media-store";
 import { verifyRasterImage } from "@/lib/image-signature";
 

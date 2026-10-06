@@ -67,3 +67,14 @@ describe("sendUpdateLiveEmail rollingOut soft variant", () => {
     expect(sent.text).not.toContain("live for visitors right now");
   });
 });
+
+describe("sendUpdateLiveEmail callers honor the per-client email setting", () => {
+  it("the operator draft approval passes the tenant, so reb:client-email:{tenant} applies", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const source = readFileSync(join(process.cwd(), "src/app/api/admin/drafts/route.ts"), "utf8");
+    const calls = source.split("sendUpdateLiveEmail(").slice(1);
+    expect(calls.length).toBeGreaterThan(0);
+    for (const call of calls) expect(call.slice(0, call.indexOf("});"))).toMatch(/\btenantId: tenant\b/);
+  });
+});

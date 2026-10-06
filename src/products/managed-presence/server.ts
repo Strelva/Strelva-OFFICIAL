@@ -7,7 +7,7 @@
  * copy tenant data into workspace storage, or broaden operator access.
  */
 
-import { getCurrentUserTenants } from "@/lib/auth";
+import { getCurrentUserTenants } from "@/platform/infra/auth";
 import { getTenantDashboardFallbackUrl } from "@/lib/tenant-urls";
 import { isActiveTenant, getTenantConfig } from "@/lib/tenants";
 import { resolveLegacyManagedPresence } from "./legacy";

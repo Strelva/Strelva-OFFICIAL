@@ -1,0 +1,145 @@
+/* A managed website's own pages in the workspace: one bar with the way back and the tabs, then the panel. */
+
+.frame {
+  display: flex;
+  height: 100dvh;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--surface-base);
+  color: var(--warm-black);
+}
+
+.bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 24px 0;
+  border-bottom: 1px solid var(--gray-border);
+  background: var(--surface);
+}
+
+.titleRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 16px;
+}
+
+.back {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -.01em;
+}
+
+.business {
+  color: var(--gray-muted);
+  font-size: 13px;
+}
+
+.visit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  color: var(--gray-muted);
+  font-size: 13px;
+}
+
+.visit:hover,
+.back:hover {
+  color: var(--warm-black);
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs a {
+  flex: none;
+  padding: 8px 12px 10px;
+  border-bottom: 2px solid transparent;
+  color: var(--gray-muted);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.tabs a:hover {
+  color: var(--warm-black);
+}
+
+.tabs a[aria-current="page"] {
+  border-bottom-color: var(--accent);
+  color: var(--warm-black);
+}
+
+.notice {
+  padding: 8px 24px;
+  border-bottom: 1px solid var(--gray-border);
+  background: var(--surface-inset);
+  color: var(--gray-muted);
+  font-size: 13px;
+}
+
+.panel {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* The editor fills the panel and scrolls inside itself. */
+.panel[data-tab="edit"] {
+  overflow: hidden;
+}
+
+.message {
+  display: flex;
+  max-width: 560px;
+  flex-direction: column;
+  gap: 12px;
+  margin: 18vh auto 0;
+  padding: 0 24px;
+}
+
+.message h1 {
+  font-size: 28px;
+  font-weight: 500;
+  line-height: 36px;
+}
+
+.message p {
+  color: var(--gray-muted);
+  font-size: 15px;
+  line-height: 24px;
+}
+
+.message a {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.frame :is(a, button):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+  .bar {
+    padding: 10px 16px 0;
+  }
+
+  .notice {
+    padding: 8px 16px;
+  }
+
+  .visit {
+    margin-left: 0;
+  }
+}

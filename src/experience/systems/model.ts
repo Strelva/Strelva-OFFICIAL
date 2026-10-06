@@ -17,7 +17,7 @@ import type { WorkspaceMakeRealResult, WorkspaceSnapshot } from "@/experience/wo
 export const SYSTEMS_LABEL = "Systems";
 export const SYSTEMS_LIST_LABEL = "All systems and files";
 
-export type SystemKind = "website" | "inquiries" | "bookings" | "document" | "app" | "tracker" | "onboarding";
+export type SystemKind = "website" | "inquiries" | "bookings" | "document" | "app" | "tracker" | "onboarding" | "listing" | "newsletter";
 
 /** Intended operation only. Health is a separate signal (RULE_SYSTEM_PAUSE_HEALTH). */
 export type SystemLifecycle = SpineLifecycle;
@@ -65,6 +65,26 @@ export interface SystemPossibility {
   previewSrc?: string;
   /** Where the alternative can be opened and used in full. */
   openHref?: string;
+  /** Why it went back to Exploring, in plain words. */
+  staleReason?: string;
+}
+
+/** Make real that is running or partly live, as the System page and In progress read it. */
+export interface SystemActivation {
+  id: string;
+  title: string;
+  headline: string;
+  partlyLive: boolean;
+  done: number;
+  total: number;
+  lines: ReadonlyArray<{ label: string; state: string; detail: string | null }>;
+}
+
+/** One past change to a System. Never called a Version. */
+export interface SystemHistoryRow {
+  id: string;
+  sentence: string;
+  at: string;
 }
 
 export interface SystemVersion {
@@ -80,9 +100,13 @@ export interface SystemVersion {
 }
 
 export type SystemSurface =
-  | { kind: "website"; domain?: string; liveUrl?: string; previewSrc?: string; previewLabel: string; manageHref?: string }
+  /** `editing`: Strelva edits the content in the workspace (`native`), or every change is a repo Request (`request`). */
+  | { kind: "website"; domain?: string; liveUrl?: string; previewSrc?: string; previewLabel: string; manageHref?: string; editing?: "native" | "request" }
   | { kind: "inquiries"; tenantId: string }
-  | { kind: "work"; workId: string; productId: string };
+  | { kind: "work"; workId: string; productId: string }
+  /** A Google listing: its health in words and what Strelva did on Google. */
+  | { kind: "listing"; healthMessage: string; receipts: ReadonlyArray<{ id: string; headline: string; at: string; status: string }>; unavailable?: boolean }
+  | { kind: "newsletter"; audience: string };
 
 export interface SystemView {
   /** The spine's systemId. Together with the workspace id it is the SystemRef. */
@@ -101,7 +125,27 @@ export interface SystemView {
   connections: SystemConnection[];
   possibilities: SystemPossibility[];
   versions: SystemVersion[];
+  /** Views of this System kept on the managed site (a Bookings System's schedule and roster). */
+  views?: Array<{ id: string; label: string; href?: string }>;
+  /** Issued audits of this website (website audits and AI visibility assessments). Not Systems. */
+  audits?: Array<{ workId: string; title: string; at: string }>;
+  /** Parts of this System that are not Systems themselves (a website's blog). */
+  parts?: ReadonlyArray<{ label: string; published: number; drafts: number }>;
+  /** In-context offers, e.g. connecting Google for this website. */
+  offers?: ReadonlyArray<{ kind: "connect_google"; label: string }>;
+  /** Make real in progress or partly live that changes this System. */
+  activations?: SystemActivation[];
+  /** The last changes, newest first: revisions and Strelva handled receipts. */
+  history?: SystemHistoryRow[];
 }
+
+/** What a paused System still does (ADR 0011 rule 5). */
+export const PAUSED_KEEPS: Partial<Record<SystemKind, string>> = {
+  bookings: "Paused. Bookings already made are kept.",
+  inquiries: "Paused. Inquiries already received are kept.",
+  website: "Paused. Its pages and history are kept.",
+  newsletter: "Paused. Subscribers are kept.",
+};
 
 export interface NeedsYouItem {
   id: string;
@@ -118,8 +162,11 @@ export const SYSTEM_KIND_LABEL: Record<SystemKind, string> = {
   bookings: "Bookings",
   document: "Document",
   app: "Internal tool",
-  tracker: "Tracker",
+  // Retired as a customer label: a tracker is an internal tool started from a list.
+  tracker: "Internal tool",
   onboarding: "Client onboarding",
+  listing: "Google listing",
+  newsletter: "Newsletter",
 };
 
 export const LIFECYCLE_LABEL: Record<SystemLifecycle, string> = { draft: "Draft", live: "Live", paused: "Paused" };
@@ -157,6 +204,8 @@ export function systemHref(base: string, workspaceId: string, systemId: string):
 
 export type MakeRealOutcome =
   | { kind: "result"; result: WorkspaceMakeRealResult }
+  /** Live Make real started (or why not): the result settles on the page as it runs. */
+  | { kind: "live"; headline: string; started: boolean }
   | { kind: "permission"; message: string }
   | { kind: "error"; message: string };
 

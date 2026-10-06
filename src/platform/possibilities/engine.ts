@@ -57,7 +57,11 @@ function validateShape(businessId: string, input: ReturnType<typeof possibilityI
   for (const e of input.effects) {
     if (effectIds.has(e.id)) conflict("Effect ids must be unique.");
     if (e.after.some((id) => !effectIds.has(id))) conflict("An effect can only wait on effects declared before it.");
-    if (e.kind === "publish" && !e.publish) conflict("A publish effect must declare the content it publishes so it can be governed.");
+    // Content goes through ai-governance by section. A publish through a
+    // structural channel (a whole site, a form, a booking page, an app
+    // release) is governed by that channel's own review and the owner's
+    // plan approval instead.
+    if (e.kind === "publish" && !e.publish && (!e.channel || e.channel === "tenant_content")) conflict("A publish effect must declare the content it publishes so it can be governed.");
     effectIds.add(e.id);
     target(e.system);
   }

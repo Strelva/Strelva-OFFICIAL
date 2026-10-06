@@ -113,6 +113,14 @@ export interface WorkspaceDelegation {
   canRevoke: boolean;
 }
 
+/** A business this agency operates (provider of record). A label, not access:
+ * the server lists only businesses the actor already belongs to. */
+export interface WorkspaceProvidedClient {
+  customerWorkspaceId: string;
+  name: string;
+  startedAt: string;
+}
+
 export interface WorkspaceProduct {
   id: string;
   name: string;
@@ -138,6 +146,10 @@ export interface WorkspaceSnapshot {
   managedWorkUnavailable?: boolean;
   handoffs: WorkspaceHandoff[];
   delegations: WorkspaceDelegation[];
+  /** Businesses the selected agency operates that the actor can open as a
+   * member (workspace_providers intersected with membership). Absent when
+   * not an agency, or when the provider list could not be read. Additive. */
+  providedClients?: WorkspaceProvidedClient[];
   products: WorkspaceProduct[];
   /** The business's Systems from the spine, with health and Possibilities.
    * Absent for personal and agency workspaces. Additive. */
@@ -151,6 +163,16 @@ export interface WorkspaceSnapshot {
 
 export interface WorkspaceReleases {
   systems: boolean;
+  /** STRELVA_NEEDS_YOU_RELEASE: Home reads Needs you and Strelva handled from the policy model. */
+  needsYou?: boolean;
+  /** Ask Strelva opens in this workspace: STRELVA_ASK_RELEASE and the workspace release on, and Systems on for this workspace. */
+  ask?: boolean;
+  /** STRELVA_INQUIRIES_RELEASE for this workspace (per-workspace row under `workspace`). */
+  inquiries?: boolean;
+  /** STRELVA_WEBSITE_REBUILD_RELEASE for this workspace. Absent: the page's env value decides. */
+  websiteRebuild?: boolean;
+  /** Connected sites on for this business (its `connected_sites` row, and Systems): Home links to /workspace/site. */
+  connectedSites?: boolean;
 }
 
 /**
@@ -165,6 +187,86 @@ export interface WorkspaceSystems {
   systems: WorkspaceSystemEntry[];
   connections: WorkspaceSystemConnection[];
   possibilities: WorkspaceSystemPossibility[];
+  /**
+   * Stored Version lineage in the actor's scope (read_business_versions).
+   * Absent when it was not read; then no lineage is claimed. Hidden
+   * same-business sources are already left out of `systems`.
+   */
+  versions?: WorkspaceSystemVersion[];
+  /** Google listing, newsletter and website parts. Present only while
+   * STRELVA_PUBLISHING_RELEASE is on. Additive. */
+  publishing?: WorkspacePublishing;
+  /** Make real that is running or partly live, one per activation, read from
+   * Postgres. Absent when it could not be read; then nothing is claimed. Additive. */
+  activations?: WorkspaceSystemActivation[];
+  /** The last changes to each stored System, newest first. Additive. */
+  history?: WorkspaceSystemHistoryRow[];
+  /** Strelva handled receipts from Make real and Possibilities (last 7 days),
+   * newest first. Never an isolated run. Additive. */
+  handled?: WorkspaceSystemReceipt[];
+}
+
+export interface WorkspaceSystemActivation {
+  id: string;
+  possibilityId: string;
+  title: string;
+  status: "in_progress" | "needs_attention" | "made_real" | "rolled_back";
+  /** "Making consult booking live: 2 of 4 done", "Partly live", "Live.", "Undone." */
+  headline: string;
+  partlyLive: boolean;
+  done: number;
+  total: number;
+  /** System ids it changes. */
+  affects: string[];
+  lines: Array<{ label: string; state: string; detail: string | null }>;
+}
+
+export interface WorkspaceSystemHistoryRow {
+  id: string;
+  systemId: string;
+  /** "Strelva published the rebuilt site". Never called a Version. */
+  sentence: string;
+  at: string;
+}
+
+export interface WorkspaceSystemReceipt {
+  id: string;
+  systemId: string | null;
+  sentence: string;
+  at: string;
+  /** Undo state in words: "Undo from History", "Can't be undone: …". */
+  undo: string;
+}
+
+export interface WorkspaceSystemVersion {
+  id: string;
+  /** The Version's own System in this business. */
+  systemId: string;
+  source: { businessId: string; systemId: string; name: string | null; hidden: boolean };
+  context: { kind: string; label: string };
+  baselineRevision: number;
+  latestRevision: number | null;
+  currentRelease: number | null;
+  /** Source revisions this business declined. */
+  declined: number[];
+  /** Other Versions of the same source in this business (another location). */
+  siblings: Array<{ id: string; systemId: string; context: { kind: string; label: string } }>;
+}
+
+export interface WorkspacePublishing {
+  /** `unavailable`: the publishing read failed; nothing about it is claimed. */
+  status: "ready" | "unavailable";
+  listings: Array<{
+    systemId: string;
+    health: string;
+    healthMessage: string;
+    /** Strelva handled: newest first, in the customer's words. */
+    receipts: Array<{ id: string; headline: string; status: string; at: string }>;
+  }>;
+  /** Blog and collections, as parts of the website System they appear on. */
+  websiteParts: Record<string, Array<{ type: string; label: string; published: number; drafts: number }>>;
+  /** In context, e.g. "Connect Google" on a website with no grant. */
+  offers: Array<{ kind: "connect_google"; systemId: string; label: string }>;
 }
 
 export interface WorkspaceSystemEntry {
@@ -180,6 +282,12 @@ export interface WorkspaceSystemEntry {
   tenantId: string | null;
   /** What the evidence shows. Never derived from lifecycle. */
   health: { status: HealthStatus; summary: string; lastVerifiedAt: string | null };
+  /** A Bookings System's day and week views on the managed site (wellness schedule, roster). */
+  views?: Array<"schedule" | "roster">;
+  /** A managed website: Strelva edits its content (`native`) or every change is a repo Request (`request`). */
+  editing?: "native" | "request";
+  /** A website the business runs elsewhere, connected by script. Additive. */
+  connectedSite?: { siteUrl: string; siteHost: string; verified: boolean; lastEventAt: string | null };
 }
 
 export interface WorkspaceSystemConnection {
@@ -206,6 +314,10 @@ export interface WorkspaceSystemPossibility {
   previewHref: string | null;
   /** The saved work the candidate came from. */
   workId: string;
+  /** Stored in Postgres: it survives deploys and restarts. Additive. */
+  stored?: boolean;
+  /** Why it went back to Exploring ("attymooney.com changed since this was built."). Additive. */
+  staleReason?: string | null;
 }
 
 /** Result of Make real on an isolated copy (src/platform/make-real/sandbox.ts). */
@@ -222,6 +334,17 @@ export interface WorkspaceMakeRealResult {
   liveUnchanged: boolean;
   /** Outside effects this change needs that are not connected. */
   notConnected: string[];
+}
+
+/** Live Make real from the System page: the owner's tap was the Needs you
+ * decision and the durable activation started (or why not). */
+export interface WorkspaceLiveMakeRealResult {
+  live: true;
+  /** Needs you decide status, or `not_ready`. */
+  status: string;
+  /** "Live.", "Partly live", or why nothing started. */
+  headline: string;
+  activationId: string | null;
 }
 
 export interface WorkspaceHandoffPreview<TPayload = WorkspaceWorkPayload> {

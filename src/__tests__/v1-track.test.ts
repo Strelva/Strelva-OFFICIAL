@@ -14,7 +14,7 @@ vi.mock("@/lib/tenants", () => ({
   getTenantConfig: (tenant: string) => mockGetTenantConfig(tenant),
 }));
 
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/platform/infra/rate-limit", () => ({
   isRateLimitedAsync: (...args: unknown[]) => mockIsRateLimited(...args),
   rateLimitKey: vi.fn((_request: Request, scope: string) => `${scope}:test`),
 }));

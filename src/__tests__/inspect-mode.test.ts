@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockIsSuperAdmin = vi.hoisted(() => vi.fn());
 const mockCookieStore = vi.hoisted(() => new Map<string, string>());
 
-vi.mock("@/lib/auth", () => ({ isSuperAdmin: mockIsSuperAdmin }));
+vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: mockIsSuperAdmin }));
 vi.mock("next/headers", () => ({
   cookies: vi.fn(() =>
     Promise.resolve({

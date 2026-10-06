@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   rpc: vi.fn(),
 }));
 
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => ({ rpc: mocks.rpc }) }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mocks.rpc }) }));
 
 import { WorkspaceStoreError } from "@/platform/workspaces";
 import { exportWorkspace } from "@/platform/workspace-exports/repository";

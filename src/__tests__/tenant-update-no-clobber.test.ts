@@ -16,8 +16,8 @@ const mockListAllDomainClaims = vi.hoisted(() => vi.fn(async () => []));
 const mockListDomainClaims = vi.hoisted(() => vi.fn(async () => []));
 const mockReplaceDomainClaims = vi.hoisted(() => vi.fn(async () => undefined));
 
-vi.mock("@/lib/db/source-flags", () => ({ tenantsSourceIsPostgres: mockSourceIsPostgres }));
-vi.mock("@/lib/db/repositories", () => ({
+vi.mock("@/platform/infra/db/source-flags", () => ({ tenantsSourceIsPostgres: mockSourceIsPostgres }));
+vi.mock("@/platform/infra/db/repositories", () => ({
   getTenant: mockGetTenant,
   upsertTenant: mockUpsertTenant,
   listAllTenants: mockListAllTenants,
@@ -25,7 +25,7 @@ vi.mock("@/lib/db/repositories", () => ({
   listDomainClaims: mockListDomainClaims,
   replaceDomainClaims: mockReplaceDomainClaims,
 }));
-vi.mock("@/lib/redis", () => ({ getRedis: () => null }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
 // Sanity dual-write is best-effort; stub it so the test never touches a client.
 vi.mock("@/lib/sanity", () => ({ getSanityClient: () => ({ fetch: async () => null }) }));
 

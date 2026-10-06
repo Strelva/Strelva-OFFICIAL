@@ -9,16 +9,21 @@ import { z } from "zod";
 
 export const BUSINESS_RECORD_SOURCES = [
   "owner", "operator", "agency", "tenant_import", "website_rebuild", "bookings", "inquiries", "agent",
+  // Written only by an internal tool submit (resolve_internal_tool_links).
+  "internal_app",
 ] as const;
 export const businessRecordSourceSchema = z.enum(BUSINESS_RECORD_SOURCES);
 export type BusinessRecordSource = z.infer<typeof businessRecordSourceSchema>;
 
-/** Sources a caller may write with; `tenant_import` belongs to conversion only. */
-export const businessRecordWriteSourceSchema = businessRecordSourceSchema.exclude(["tenant_import"]);
+/** Sources a caller may write with; `tenant_import` belongs to conversion
+ * only and `internal_app` to internal tool submits. */
+export const businessRecordWriteSourceSchema = businessRecordSourceSchema.exclude(["tenant_import", "internal_app"]);
 export type BusinessRecordWriteSource = z.infer<typeof businessRecordWriteSourceSchema>;
 
 export const CONTACT_SOURCES = [
   "inquiry", "booking", "tenant_import", "owner", "operator", "agency", "website", "agent",
+  // 20261007192100_internal_tool_links.sql
+  "internal_app", "newsletter",
 ] as const;
 export const contactSourceSchema = z.enum(CONTACT_SOURCES);
 export type ContactSource = z.infer<typeof contactSourceSchema>;
@@ -257,6 +262,18 @@ export const ownerRecipientSchema = z.object({
 });
 export type OwnerRecipient = z.infer<typeof ownerRecipientSchema>;
 
+/** The one owner-recipient rule keyed by tenant (resolve_tenant_owner_recipient):
+ * the linked record's owner contact, else this tenant's owner_email, else the
+ * business's earliest linked tenant's owner_email. */
+export const tenantOwnerRecipientSchema = z.object({
+  email: z.string().email(),
+  name: nullableString,
+  from: z.enum(["record", "tenant", "linked_tenant"]),
+  workspaceId: uuid.nullable(),
+  tenantId: nullableString,
+});
+export type TenantOwnerRecipient = z.infer<typeof tenantOwnerRecipientSchema>;
+
 /** Billing as observed on the tenant at conversion time. Recorded, never acted on. */
 export const conversionBillingSchema = z.object({
   billingType: z.enum(["tier", "custom", "case_study", "none"]),
@@ -273,6 +290,18 @@ export const conversionAccountSchema = z.object({
   name: z.string().min(1).max(120),
   tenantIds: z.array(z.string().min(1).max(120)).max(100),
   multiSite: z.boolean(),
+  /** The bundled subscription's per-site line items (Redis `account:{id}`),
+   *  so the billing home records what Stripe actually charges per site. */
+  subscription: z.object({
+    status: z.string().max(40).nullable(),
+    amountCents: z.number().int().min(0).nullable(),
+    currentPeriodEnd: z.string().max(40).nullable(),
+    items: z.array(z.object({
+      tenantId: z.string().min(1).max(120),
+      label: z.string().max(120),
+      amountCents: z.number().int().min(0),
+    }).strict()).max(100),
+  }).strict().optional(),
 }).strict();
 export type ConversionAccount = z.infer<typeof conversionAccountSchema>;
 
@@ -281,6 +310,11 @@ export const tenantImportPayloadSchema = z.object({
   tenantStableId: uuid,
   workspaceName: trimmed(1, 120),
   targetWorkspaceId: uuid.optional(),
+  /** Convert a site of a multi-site account into its own business instead of
+   *  joining a sibling's (Twin Trees as two businesses). Present only when
+   *  true, so default payloads and their digests are unchanged. Needs
+   *  20261008160000_convert_separate_business; older databases refuse it. */
+  separateBusiness: z.literal(true).optional(),
   billing: conversionBillingSchema.nullable(),
   account: conversionAccountSchema.nullable(),
   patch: z.object({
@@ -301,6 +335,8 @@ export const conversionReceiptSchema = z.object({
   workspaceId: uuid,
   workspaceName: z.string(),
   joinedExistingWorkspace: z.boolean(),
+  /** Absent on receipts written before 20261008160000. */
+  separateBusiness: z.boolean().optional(),
   operatorId: uuid,
   operatorRole: z.literal("admin"),
   billing: conversionBillingSchema.nullable(),

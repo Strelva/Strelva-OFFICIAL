@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess } from "@/lib/auth";
+import { requireTenantAccess } from "@/platform/infra/auth";
 import { getMember, getTransactions } from "@/lib/rewards/memberRepositoryKv";
 import { KvNotConfiguredError } from "@/lib/rewards/kv";
 

@@ -1,6 +1,7 @@
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { responsibilitySchema, type Responsibility } from "@/platform/work-execution/engine";
 import { WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
+import { activationExceptions } from "./activation-exceptions";
 
 type Row = Record<string, unknown>;
 type Failure = { message?: unknown; code?: unknown } | null;
@@ -26,7 +27,7 @@ export type EffectCertainty = "none" | "accepted" | "unknown";
 
 export interface OperationalExceptionProjection {
   id: string;
-  source: "responsibility" | "standing_run";
+  source: "responsibility" | "standing_run" | "activation";
   workspaceId: string;
   workspaceName: string;
   workId: string;
@@ -335,6 +336,8 @@ export async function listOperationalExceptions(): Promise<OperationalExceptionP
       });
     }
   }
+  // Make real activations that need a person (partly live, waiting, unknown).
+  result.push(...activationExceptions(workRows, workspaces, users));
   return result.sort((a, b) => Date.parse(b.ageAt) - Date.parse(a.ageAt)).slice(0, MAX_ROWS);
 }
 

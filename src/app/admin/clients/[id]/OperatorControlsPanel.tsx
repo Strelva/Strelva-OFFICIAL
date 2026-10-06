@@ -6,7 +6,7 @@ import { Field } from "@/app/admin/ui";
 import type { ReportCadence } from "@/lib/report-cadence";
 import type { ReplyMode } from "@/lib/reviews/reply-voice";
 import type { ContentAutonomy } from "@/lib/content-autonomy";
-import type { ClientEmailOverride } from "@/lib/client-email-override";
+import type { ClientEmailOverride } from "@/platform/infra/email/client-override";
 
 /**
  * Operator controls — the founder's per-client override surface for settings

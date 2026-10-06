@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ list: vi.fn() }));
 vi.mock("resend", () => ({ Resend: class { emails = { receiving: { list: mocks.list } }; } }));
-import { getReceivedEmailReadback } from "@/lib/email/send";
+import { getReceivedEmailReadback } from "@/platform/infra/email/send";
 const input = { replyTo: "inquiry+test@reply.example.test", after: "2026-09-11T12:00:00Z", sender: "customer@example.test" };
 const row = { id: "message-1", created_at: "2026-09-11T13:00:00Z", from: "other@example.test", to: [input.replyTo] };
 function page(rows: unknown[], hasMore: unknown = false) { return { data: { data: rows, has_more: hasMore }, error: null }; }

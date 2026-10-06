@@ -12,7 +12,7 @@
 
 import { NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getScanHistory } from "@/lib/scan-store";
 

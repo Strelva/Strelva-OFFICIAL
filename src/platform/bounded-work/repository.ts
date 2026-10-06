@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { baseSchema } from "./contracts";
 export { baseSchema } from "./contracts";
-import { getSupabase } from "@/lib/db/client";
-import { assertWorkspaceMember, getWork, saveWork } from "@/platform/workspaces/repository";
+import { getSupabase } from "@/platform/infra/db/client";
+import { assertWorkspaceMember, getWork, makeSystemsAuthority, saveSystemWork, saveWork, type MakeSystemsAuthority } from "@/platform/workspaces/repository";
 import { WORKSPACE_EXIT_STOPPED_MESSAGE, WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type SavedWork, type SaveWorkInput, type WorkspaceActor } from "@/platform/workspaces/types";
 
 /** Persistence port. Direct membership is rechecked at each mutation, including after provider reads. */
@@ -11,9 +11,17 @@ export interface BoundedStore {
   read(actor: WorkspaceActor, workId: string): Promise<SavedWork | null>;
   create(actor: WorkspaceActor, workspaceId: string, input: SaveWorkInput): Promise<SavedWork>;
   update(actor: WorkspaceActor, work: SavedWork, expectedRevision: number, payload: unknown): Promise<SavedWork>;
+  /** make_systems resolution. Absent only on focused in-memory test stores. */
+  makeSystems?(actor: WorkspaceActor, workspaceId: string): Promise<MakeSystemsAuthority>;
+  /** Maker create path (operator or delegated agency, no direct membership needed). */
+  createSystem?(actor: WorkspaceActor, workspaceId: string, input: SaveWorkInput): Promise<SavedWork>;
 }
 export const boundedStore: BoundedStore = {
   member: assertWorkspaceMember, read: getWork, create: saveWork,
+  // Wrapped so modules that mock the workspace repository without these
+  // exports still load; the lookup happens only when a tool is made.
+  makeSystems: (actor, workspaceId) => makeSystemsAuthority(actor, workspaceId),
+  createSystem: (actor, workspaceId, input) => saveSystemWork(actor, workspaceId, input),
   async update(actor, work, expectedRevision, payload) {
     const db = getSupabase();
     if (!db) throw new WorkspaceStoreError("Work storage is unavailable.");

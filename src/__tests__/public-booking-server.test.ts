@@ -17,7 +17,7 @@ const boundary = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: boundary.getTenantConfig }));
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => boundary.db }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => boundary.db }));
 vi.mock("@/platform/offerings/store", () => ({
   PostgresOfferingStore: class {
     inspect = boundary.inspectOfferings;

@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { mapPool } from "@/lib/concurrency";
 import { getAllTenants } from "@/lib/tenants";
 import { getConnection, updateLastSynced } from "@/lib/connections";
 import { addEvent } from "@/lib/events";
 import { addReview } from "@/lib/reviews";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { maybeAlertNewReview } from "@/lib/review-alert";
 import { requireCronRequest } from "@/lib/cron-auth";

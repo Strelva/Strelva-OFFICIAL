@@ -1,19 +1,21 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin, getActorContext } from "@/lib/auth";
+import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
+import { operatorPolicyWriter } from "@/lib/tenant-policy-writer";
+import { TenantSettingRefusedError } from "@/platform/needs-you/tenant-settings";
 import { logAuditEvent } from "@/lib/storage";
 import { getReportCadence, setReportCadence, type ReportCadence } from "@/lib/report-cadence";
 import { getReplyVoice, saveReplyVoice, type ReplyMode } from "@/lib/reviews/reply-voice";
 import {
   getContentAutonomy,
-  saveContentAutonomy,
+  saveContentAutonomySetting,
   type ContentAutonomy,
 } from "@/lib/content-autonomy";
 import {
   getClientEmailOverride,
   setClientEmailOverride,
   type ClientEmailOverride,
-} from "@/lib/client-email-override";
+} from "@/platform/infra/email/client-override";
 
 /**
  * Operator controls for the Redis-backed per-client settings that are otherwise
@@ -101,27 +103,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const applied: string[] = [];
-  if (reportCadence !== undefined) {
-    await setReportCadence(id, reportCadence as ReportCadence);
-    applied.push("reportCadence");
-  }
-  if (replyMode !== undefined) {
-    // Only touch the mode — preserve the client's guidance + example templates.
-    const current = await getReplyVoice(id);
-    await saveReplyVoice(id, {
-      mode: replyMode as ReplyMode,
-      guidance: current.guidance,
-      templates: current.templates,
-    });
-    applied.push("replyMode");
-  }
-  if (contentAutonomy !== undefined) {
-    await saveContentAutonomy(id, contentAutonomy as ContentAutonomy);
-    applied.push("contentAutonomy");
-  }
-  if (clientEmail !== undefined) {
-    await setClientEmailOverride(id, clientEmail as ClientEmailOverride);
-    applied.push("clientEmail");
+  try {
+    await applySettings(id, { reportCadence, replyMode, contentAutonomy, clientEmail }, applied);
+  } catch (error) {
+    // A Needs you policy refusal (below the floor) is an answer, not an outage.
+    if (!(error instanceof TenantSettingRefusedError)) throw error;
+    return NextResponse.json({ error: error.message, applied }, { status: 409 });
   }
 
   if (applied.length > 0) {
@@ -136,4 +123,37 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   return NextResponse.json(await readCurrent(id));
+}
+
+/**
+ * Content autonomy and reply mode go through the Needs you bridge as
+ * Strelva's layer for a business-linked site (Redis alone otherwise).
+ */
+async function applySettings(
+  id: string,
+  { reportCadence, replyMode, contentAutonomy, clientEmail }: { reportCadence?: unknown; replyMode?: unknown; contentAutonomy?: unknown; clientEmail?: unknown },
+  applied: string[],
+) {
+  if (reportCadence !== undefined) {
+    await setReportCadence(id, reportCadence as ReportCadence);
+    applied.push("reportCadence");
+  }
+  if (replyMode !== undefined) {
+    // Only touch the mode — preserve the client's guidance + example templates.
+    const current = await getReplyVoice(id);
+    await saveReplyVoice(id, {
+      mode: replyMode as ReplyMode,
+      guidance: current.guidance,
+      templates: current.templates,
+    }, await operatorPolicyWriter());
+    applied.push("replyMode");
+  }
+  if (contentAutonomy !== undefined) {
+    await saveContentAutonomySetting(id, contentAutonomy as ContentAutonomy, await operatorPolicyWriter());
+    applied.push("contentAutonomy");
+  }
+  if (clientEmail !== undefined) {
+    await setClientEmailOverride(id, clientEmail as ClientEmailOverride);
+    applied.push("clientEmail");
+  }
 }

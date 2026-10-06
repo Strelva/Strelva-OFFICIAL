@@ -26,8 +26,11 @@ src/app          routes and API handlers (thin)
 src/experience   UI for a capability or the shared frame (app-frame, workspace)
 src/products     one folder per capability: contracts, server, domain logic
 src/platform     shared layers every capability builds on
+  infra/         shared infrastructure both models use: db, redis, auth, email,
+                 crypto, rate-limit, logger, ai-models, safe-fetch, model calls
 src/server       server-only wiring (executable capability definitions)
-src/lib          tenant-model implementations awaiting extraction
+src/lib          tenant-model implementations awaiting extraction; may import
+                 src/platform/infra, never another workspace layer
 src/proxy.ts     request gating
 ```
 

@@ -7,6 +7,7 @@
  * Validates all external dependencies, env vars, and webhook configurations.
  */
 
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import { Redis } from "@upstash/redis";
 import Stripe from "stripe";
 import { execFileSync } from "node:child_process";

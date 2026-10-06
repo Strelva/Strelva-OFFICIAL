@@ -344,7 +344,11 @@ psql "${psql_args[@]}" --file="$repo_root/tests/agency-website-document-schema.s
 # sessions, one write at a time.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261005120000_workspace_authority_helpers.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261005120100_workspace_authority_write_rpcs.sql"
+# Systems catalog: make_systems (operator or delegated agency only) lands
+# before the authority parity file so the role table includes it.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007192000_make_systems_authority.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-authority-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/make-systems-schema.sql"
 
 authority_leaver='c9000000-0000-4000-8000-000000000005'
 authority_session_ready() {
@@ -454,8 +458,207 @@ psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 # against the real workspace, website, tenant-link and calendar tables.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261004120000_systems.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/systems-schema.sql"
+# Safety batch (audit 2026-10-05): scoped provider launch on the customer's
+# approval, then atomic tenant teardown that refuses tenants a workspace
+# website still holds. The teardown test reuses the launch fixture's tenants.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007101000_provider_website_launch_authority.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/provider-website-launch-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007100000_atomic_tenant_teardown.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/atomic-tenant-teardown-schema.sql"
+# Who owns and operates a converted business: provider mark, operator owner
+# invitation (both memberships in one transaction), the tenant owner-recipient
+# rule and client lead copies kept after a tenant is deprovisioned.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007110000_business_ownership.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-ownership-schema.sql"
+# The earlier contracts still hold with the ownership migration applied. (The
+# invitation contract commits its fixture, so the upgrade gate reruns it.)
+psql "${psql_args[@]}" --set=tenant_import="$(cat "$repo_root/tests/fixtures/business-record-tenant-import.json")" \
+  --file="$repo_root/tests/business-record-conversion-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
+# Owner entry: per-workspace release flags layered over the env flags, and
+# the tenant-to-workspace entry resolution, with cross-workspace denial.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007130000_workspace_release_flags.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
+# Release rows on agency workspaces too (agency library under `workspace`);
+# the business-workspace contract above still holds with it applied.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008161000_release_flags_agency_workspaces.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/release-flags-agency-workspaces-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
+# Model-call cost log (one model-call helper, Ask Strelva spec section 5).
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007140000_model_call_log.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/model-call-log-schema.sql"
+# Ask Strelva conversation history, and repo-change receipts on a website
+# System (preview, owner decision, deploy). Fictional rows, rolled back.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008110000_ask_conversations.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/ask-conversations-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008111000_website_change_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-change-receipts-schema.sql"
+# Systems catalog: report cadence, last-sent markers and analytics config
+# moved from Redis into Postgres (tenant-scoped, service role only).
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007194000_tenant_report_and_analytics_state.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-report-analytics-state-schema.sql"
+
+# Systems catalog: history caps. Documents and onboarding keep every receipt
+# in append-only tables, so edit 201 (and change 501) no longer fail.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007190000_document_revisions.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/document-revisions-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007190100_onboarding_revisions.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/onboarding-revisions-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007190200_application_version_history.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/application-version-history-schema.sql"
+
+# Systems catalog, internal tools: contact and assigned-person fields on the
+# business record, the cross-business link guard, and notice receipts.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007192100_internal_tool_links.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-links-schema.sql"
+# Versions and the agency surface, on the Systems spine: lineage tables,
+# the batched agency client read and Strelva's own agency workspace.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007150000_system_versions.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007150100_agency_client_overview.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007150200_platform_agency_workspace.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/system-versions-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-client-overview-schema.sql"
+if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
+  # The same Version store contract the in-memory store passes, run through
+  # createSupabaseVersionStore against this cluster (psql-backed RPC port).
+  STRELVA_VERSIONS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
+    pnpm --dir "$repo_root" exec vitest run src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
+fi
+# Needs you and Strelva handled: decision policy, owner decisions and the
+# handled read model, on the same fictional cluster (needs the business record,
+# tenant links and Systems above).
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007120000_needs_you.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
+# Policy settings: tenant setting moves into decision_policies, the
+# operator "owner not told" list and the operator business list.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008124000_needs_you_policy_settings.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-policy-settings-schema.sql"
+
+# Money and the client's data: the business billing home on the dormant
+# org-layer tables, client records copied out of Redis, export schema 3 and
+# the outcome loop. Fictional tenants only.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260729180000_org_layer_phase0_accounts.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007180000_business_billing.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-billing-schema.sql"
+# Twin Trees as two businesses: --separate-business converts a linked-account
+# site into its own business with its own billing home. The default join and
+# the billing contract above must still hold with it applied.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008160000_convert_separate_business.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/convert-separate-business-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-billing-schema.sql"
+psql "${psql_args[@]}" --set=tenant_import="$(cat "$repo_root/tests/fixtures/business-record-tenant-import.json")" \
+  --file="$repo_root/tests/business-record-conversion-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007181000_tenant_client_records.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-client-records-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007182000_workspace_export_v3.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-export-v3-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007183000_business_outcomes.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-outcomes-schema.sql"
+# Inquiries at 1.0.0 (section 6): Postgres reads for the lead read-source
+# switch, with the parity ledger shared with the client stores.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008140000_tenant_lead_reads.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-lead-reads-schema.sql"
+# Bookings at 1.0.0 (Reborn §2): one booking store for both route families,
+# hours and services read from the business record, requests and pause.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008141000_booking_store.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-store-schema.sql"
+# After a booking is taken: reminders sent once, the hold sweep, the 72-hour
+# request clock, the manage-link lookup, schedule copies and narrower hours.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009110000_booking_lifecycle.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-lifecycle-schema.sql"
+# Publishing: the business-level Google grant, its locations and a receipt
+# for every Google write. After Systems, because it extends the origin kinds.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007170000_workspace_account_bindings.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-account-bindings-schema.sql"
+# Human minutes per business, then the operator queue (marks and the
+# outside-write receipt ledger) and minutes resolved through the conversion
+# link. Fictional rows only; each test rolls back.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260928130000_business_effort_minutes.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-effort-minutes-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007160000_operator_queue.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007160100_business_effort_tenant_links.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-effort-minutes-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-queue-schema.sql"
+# Listing writes whose read-back failed, for /admin/queue (after both the
+# listing receipts and the operator queue).
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008123000_listing_readback_queue.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/listing-readback-queue-schema.sql"
 
 
+# Make real activations persisted as operations/activation saved work.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007155000_make_real_activations.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/make-real-activations-schema.sql"
+# Possibilities in Postgres (stale rule, adoption at conversion, observed
+# revisions, idle withdraw) and Make real live: channel flags and due resume.
+# Before the website System block: its linked-publication test commits a
+# tenant link, and the conversion contract rerun below expects none.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008130000_system_possibilities.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/system-possibilities-schema.sql"
+# Conversion now adopts Systems; undoing an untouched conversion still removes its business.
+psql "${psql_args[@]}" --set=tenant_import="$(cat "$repo_root/tests/fixtures/business-record-tenant-import.json")" \
+  --file="$repo_root/tests/business-record-conversion-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008131000_make_real_live.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
+# The release flag rules still hold after the flag names gain channel keys.
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
+STRELVA_POSSIBILITIES_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
+  pnpm --dir "$repo_root" exec vitest run src/__tests__/possibility-repository.test.ts
+# Website System (2026-10-08): publish onto a linked tenant, routing after a
+# rename, the business template, and operator domain work on owner approval.
+# Replaces reserve_website_hosted_tenant and manage_published_website_tenant;
+# check-workspace-upgrade.sh reruns the original website contract after it.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008150000_website_linked_tenant_publication.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008150100_website_domain_owner_approval.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-linked-publication-schema.sql"
+# Connected sites (from feat/connected-sites, renamed from 20261002120000):
+# facts from the business record, inquiries in tenant_leads, spam in the
+# spam pit, domain-ownership proof, and the connected_site System origin.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008151000_connected_sites.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-client-records-schema.sql"
+# Inquiry records (2026-10-09): spam held in tenant_leads, inquiry_events,
+# contact on capture, the workspace read. Replaces the three lead reads, so
+# their contracts rerun after it.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009113000_inquiry_records.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-records-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-lead-reads-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
+# Strelva (system): the audited service actor for the needs-you and
+# workspace-work crons, and the connected_sites flag row. Replaces
+# owner_decision_json and workspace_release_flag_names(); the Needs you,
+# Make real live and release flag contracts rerun against the replacements.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009100000_strelva_service_actor.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
+# Journey gaps (wave 4): Strelva handled lists decided owner decisions
+# (replaces read_strelva_handled), and Make real by signed owner link for an
+# owner with no account (replaces record_strelva_service_action). The Needs
+# you and service actor contracts rerun against the replacements.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009130000_strelva_handled_decisions.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/strelva-handled-decisions-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009131000_make_real_owner_link.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
+# Make real by owner link gets its own per-business flag key (wave 5).
+# Replaces workspace_release_flag_names(); the release flag contracts rerun.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009140000_make_real_owner_link_flag.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-flag-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
+# The real Make real runner, checkpointing through these RPCs (psql-backed port).
+STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
+  pnpm --dir "$repo_root" exec vitest run src/__tests__/make-real-activation-repository.test.ts
+# The one booking store through both real route families (legacy /api/booking
+# and the public booking service) against the real booking functions. Last,
+# because it commits its fictional rows.
+STRELVA_BOOKINGS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
+  pnpm --dir "$repo_root" exec vitest run src/__tests__/booking-one-store.test.ts
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 

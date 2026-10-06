@@ -62,6 +62,26 @@ export const siteAssetSchema = z.object({
   sourceUrl: z.string().url().max(2048).optional(), contentHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
 }).strict();
 
+/**
+ * Shared child references are allowed (one header on several pages), but each
+ * occurrence renders again. Bound the expanded count per page so a small
+ * document cannot multiply into an enormous render (audit 2026-10-05, finding 2).
+ */
+export const SITE_MAX_EXPANDED_NODES_PER_PAGE = 500;
+/** Expanded occurrences under a root, memoized and capped; cycles count as over the bound. */
+export function siteExpandedNodeCount(nodes: Record<string, { children: string[] } | undefined>, root: string): number {
+  const cap = SITE_MAX_EXPANDED_NODES_PER_PAGE + 1; const memo = new Map<string, number>(); const active = new Set<string>();
+  const size = (id: string, depth: number): number => {
+    const cached = memo.get(id); if (cached !== undefined) return cached;
+    if (active.has(id) || depth > 40) return cap;
+    const node = nodes[id]; if (!node) return 0;
+    active.add(id); let total = 1;
+    for (const child of node.children) { total += size(child, depth + 1); if (total >= cap) { total = cap; break; } }
+    active.delete(id); memo.set(id, total); return total;
+  };
+  return size(root, 0);
+}
+
 export const siteDocumentSchema = z.object({
   version: z.literal(2), siteName: z.string().trim().min(1).max(160),
   theme: z.object({ palette: z.enum(["light", "dark", "warm", "ocean", "forest"]), accent: z.string().regex(/^#[a-fA-F0-9]{6}$/).optional(), typeScale: z.enum(["compact", "standard", "editorial"]), logo: assetId.optional() }).strict(),
@@ -92,6 +112,7 @@ export const siteDocumentSchema = z.object({
       else if (value && typeof value === "object") Object.entries(value).forEach(([childKey, child]) => checkAssets(child, childKey));
     }; checkAssets(entry.props); visit(id, 0);
   }
+  doc.pages.forEach((page, i) => { if (doc.nodes[page.root] && siteExpandedNodeCount(doc.nodes, page.root) > SITE_MAX_EXPANDED_NODES_PER_PAGE) issue(["pages", i, "root"], `The page expands to more than ${SITE_MAX_EXPANDED_NODES_PER_PAGE} rendered sections`); });
   if (doc.theme.logo && !doc.assets[doc.theme.logo]) issue(["theme", "logo"], "Missing logo asset");
   const redirects = new Map<string,string>();
   doc.redirects.forEach((redirect, i) => { if (redirects.has(redirect.from) || paths.has(redirect.from) || redirect.from === redirect.to) issue(["redirects", i], "Redirect source conflicts with a page or redirect"); redirects.set(redirect.from,redirect.to); });

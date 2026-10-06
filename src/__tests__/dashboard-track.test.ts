@@ -11,7 +11,7 @@ vi.mock("@/lib/tenant", () => ({
   getTenantFromHeaders: () => Promise.resolve("gldf"),
 }));
 
-vi.mock("@/lib/rate-limit", () => ({
+vi.mock("@/platform/infra/rate-limit", () => ({
   isRateLimitedAsync: (...args: unknown[]) => mockIsRateLimited(...args),
   rateLimitKey: vi.fn((_request: Request, scope: string) => `${scope}:test`),
 }));

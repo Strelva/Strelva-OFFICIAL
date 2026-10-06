@@ -9,7 +9,7 @@
  *
  * Idempotent on the provider order id so a retried beacon can't double-count.
  */
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 
 const ORDER_TTL_SECONDS = 90 * 24 * 60 * 60;
 const ORDER_KEEP = 500;

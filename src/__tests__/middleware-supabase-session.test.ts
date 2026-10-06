@@ -28,7 +28,7 @@ vi.mock("@supabase/ssr", () => ({
 import {
   applyMiddlewareSupabaseResponse,
   createMiddlewareSupabase,
-} from "@/lib/db/middleware-client";
+} from "@/platform/infra/db/middleware-client";
 
 const originalUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const originalKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;

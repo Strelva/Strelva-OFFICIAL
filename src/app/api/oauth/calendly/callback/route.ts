@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { saveConnection } from "@/lib/connections";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import { consumeOAuthState } from "@/lib/oauth-state";
-import { verifyAuth, requireTenantAccess } from "@/lib/auth";
+import { verifyAuth, requireTenantAccess } from "@/platform/infra/auth";
 
 const TOKEN_URL = "https://auth.calendly.com/oauth/token";
 const USER_URL = "https://api.calendly.com/users/me";

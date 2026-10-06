@@ -5,7 +5,7 @@ import { assertIsolated, createIsolatedAdapter, isolatedAdapters, prepareIsolate
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import { siteDocumentHash, siteDocumentSchema } from "@/products/websites/site-document";
 import { websiteRebuildCandidate, type WebsiteRebuildCandidate } from "@/products/websites/index";
-import { inquiryFormUnchecked, makeRealInSandbox, projectWorkspaceSystems, readWorkspaceSystems, rebuildPossibilityId } from "@/experience/systems/server";
+import { inquiryFormUnchecked, makeRealInSandbox, projectWorkspaceSystems, readWorkspaceSystems, rebuildPossibilityId, withVersions } from "@/experience/systems/server";
 import type { Observation } from "@/platform/system-health";
 
 const BUSINESS = uuidFromSeed("business:mooney");
@@ -34,7 +34,7 @@ function existing(overrides: Partial<ExistingSystemsSnapshot> = {}): ExistingSys
 
 const candidate = (extra: Partial<WebsiteRebuildCandidate> = {}): WebsiteRebuildCandidate => ({
   workId: REBUILD, title: "attymooney.com rebuild", sourceHost: "attymooney.com", tenantId: null, ready: true,
-  summary: "Rebuilt.", evidence: "12 of 12 public pages carried over.", previewHref: `/api/websites/${REBUILD}/preview`, candidateRevision: 2, candidateContentHash: null, ...extra,
+  summary: "Rebuilt.", evidence: "12 of 12 public pages carried over.", previewHref: `/api/websites/${REBUILD}/preview`, candidateRevision: 2, candidateContentHash: null, origin: "rebuild", ...extra,
 });
 
 const ago = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
@@ -48,6 +48,15 @@ function input(snapshot = existing(), candidates = [candidate()], observations: 
 }
 
 describe("Systems projection over the spine", () => {
+  it("says how each managed website changes, only where the tenant was read", async () => {
+    const { ids, ...source } = input();
+    const known = await projectWorkspaceSystems({ ...source, siteEditing: new Map([["mooney-firm", "request" as const]]) });
+    expect(known.status === "ready" && known.systems.find((item) => item.ref.systemId === ids.site)).toMatchObject({ editing: "request" });
+    expect(known.status === "ready" && known.systems.filter((item) => item.editing).map((item) => item.kind)).toEqual(["website"]);
+    const unknown = await projectWorkspaceSystems(source);
+    expect(unknown.status === "ready" && unknown.systems.find((item) => item.ref.systemId === ids.site)).not.toHaveProperty("editing");
+  });
+
   it("lists spine Systems by SystemRef and makes a saved rebuild a Ready Possibility of the website and its inquiries", async () => {
     const { ids, ...source } = input();
     const projection = await projectWorkspaceSystems(source);
@@ -170,5 +179,28 @@ describe("Website rebuild candidates", () => {
     expect(websiteRebuildCandidate(work(payload("failed")))).toBeNull();
     expect(websiteRebuildCandidate(work({ status: "review_ready" }))).toBeNull();
     expect(websiteRebuildCandidate({ ...work(payload("review_ready")), productId: "applications" })).toBeNull();
+  });
+});
+
+describe("Version lineage on the Systems projection", () => {
+  const entry = (id: string) => ({ ref: { businessId: BUSINESS, systemId: id }, name: id, kind: "website", lifecycle: "live" as const, basis: null, savedWorkId: null, tenantId: null,
+    health: { status: "unknown" as const, summary: "", lastVerifiedAt: null } });
+  const ready = { status: "ready" as const, systems: [entry("hidden"), entry("camillus")], connections: [{ id: "c", sourceId: "camillus", kind: "depend" as const, targetSystemId: "hidden", targetLabel: "x", state: "connected" as const, purpose: null }],
+    possibilities: [{ id: "p", title: "t", summary: "s", status: "ready" as const, affects: ["hidden", "camillus"], workId: "w", evidence: null, previewHref: null }] };
+
+  it("never lists a hidden same-business source, and attaches stored Versions", () => {
+    const lineage = { hiddenSources: ["hidden"], versions: [{ id: "v", systemId: "camillus", source: { businessId: BUSINESS, systemId: "hidden", name: "Site", hidden: true },
+      context: { kind: "location", label: "Camillus" }, baselineRevision: 1, latestRevision: 1, currentRelease: null, declined: [], siblings: [] }] };
+    const joined = withVersions(ready, lineage);
+    expect(joined.systems.map((item) => item.ref.systemId)).toEqual(["camillus"]);
+    expect(joined.connections).toEqual([]);
+    expect(joined.possibilities[0]!.affects).toEqual(["camillus"]);
+    expect(joined.versions).toHaveLength(1);
+  });
+
+  it("claims no lineage when it could not be read, and leaves an unavailable spine alone", () => {
+    expect(withVersions(ready, null)).toBe(ready);
+    const down = { status: "unavailable" as const, systems: [], connections: [], possibilities: [] };
+    expect(withVersions(down, { hiddenSources: [], versions: [] })).toBe(down);
   });
 });

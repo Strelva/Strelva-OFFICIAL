@@ -80,6 +80,70 @@ describe("tenant conversion script", () => {
     expect(outcome.targetWorkspaceId).toBe("66666666-6666-4666-8666-666666666666");
     expect(outcome.plan.payload.targetWorkspaceId).toBe("66666666-6666-4666-8666-666666666666");
     expect(lines.join("\n")).toContain("MULTI-SITE");
+    expect(outcome.plan.payload.separateBusiness).toBeUndefined();
+    expect(lines.join("\n")).toContain("pass --separate-business");
+  });
+
+  describe("--separate-business", () => {
+    const sister = "66666666-6666-4666-8666-666666666666";
+    const twin = { id: "acct-1", name: "Twin Trees", tenantIds: ["gldf", "sister-site"], multiSite: true };
+    const readLink = () => vi.fn(async (_email: string, tenantId: string) => ({
+      tenantId, tenantStableId: fixture.tenant.stableId, siteName: tenantId,
+      link: tenantId === "sister-site" ? { workspaceId: sister, linkedBy: receipt.operatorId, linkedAt: "2026-10-02T12:00:00Z", receipt: {} } : null,
+    }));
+
+    it("parses the flag, defaults it off, and refuses it on a rollback", () => {
+      expect(parseConversionArgs(["gldf"]).separateBusiness).toBe(false);
+      expect(parseConversionArgs(["gldf", "--separate-business"]).separateBusiness).toBe(true);
+      expect(parseConversionArgs(["gldf", "--separate-business", "--apply", "--operator-email=o@strelva.example.test"]).apply).toBe(true);
+      expect(() => parseConversionArgs(["gldf", "--separate-business", "--rollback"])).toThrow(/not a rollback/);
+      expect(() => parseConversionArgs(["gldf", "--separate-businesses"])).toThrow(/Unknown flag/);
+    });
+
+    it("dry run: does not join the sibling's business and says why", async () => {
+      const { deps: d, convert, lines } = deps({ read: async () => sources({ account: twin }), readLink: readLink() });
+      const outcome = await runTenantConversion({ ...parseConversionArgs(["gldf", "--separate-business", "--operator-email=operator@strelva.example.test"]), databaseUrl: "http://localhost:54321" }, d);
+      expect(outcome.targetWorkspaceId).toBeNull();
+      expect(outcome.plan.payload.targetWorkspaceId).toBeUndefined();
+      expect(outcome.plan.payload.separateBusiness).toBe(true);
+      // Named for the site, not the shared account.
+      expect(outcome.plan.payload.workspaceName).toBe(fixture.tenant.siteName);
+      const text = lines.join("\n");
+      expect(text).toContain("--separate-business: this site becomes its own business");
+      expect(text).toContain(`sister-site -> ${sister} (not joined: --separate-business)`);
+      expect(text).toContain("would create a separate customer business");
+      expect(convert).not.toHaveBeenCalled();
+    });
+
+    it("apply passes the flag through in the exact planned payload", async () => {
+      const { deps: d, convert } = deps({ read: async () => sources({ account: twin }), readLink: readLink() });
+      const outcome = await runTenantConversion({
+        ...parseConversionArgs(["gldf", "--separate-business", "--apply", "--operator-email=operator@strelva.example.test"]), databaseUrl: "http://127.0.0.1:54321",
+      }, d);
+      expect(convert).toHaveBeenCalledTimes(1);
+      const [, payload, plan] = convert.mock.calls[0] as unknown as [string, { separateBusiness?: boolean; targetWorkspaceId?: string }, { commandId: string; digest: string }];
+      expect(payload.separateBusiness).toBe(true);
+      expect(payload.targetWorkspaceId).toBeUndefined();
+      expect(plan).toEqual({ commandId: outcome.plan.commandId, digest: outcome.plan.digest });
+    });
+
+    it("gives a separate business a different command than the default join", async () => {
+      const run = async (argv: string[]) => runTenantConversion({ ...parseConversionArgs(argv), databaseUrl: "http://localhost:54321" },
+        deps({ read: async () => sources({ account: twin }), readLink: readLink() }).deps);
+      const joined = await run(["gldf", "--operator-email=operator@strelva.example.test"]);
+      const separate = await run(["gldf", "--separate-business", "--operator-email=operator@strelva.example.test"]);
+      expect(separate.plan.digest).not.toBe(joined.plan.digest);
+      expect(separate.plan.commandId).not.toBe(joined.plan.commandId);
+    });
+
+    it("is ignored on a single-site tenant, leaving the default payload byte-identical", async () => {
+      const { deps: d, lines } = deps();
+      const outcome = await runTenantConversion({ ...parseConversionArgs(["gldf", "--separate-business"]), databaseUrl: "http://localhost:54321" }, d);
+      const committed = JSON.parse(readFileSync(join(process.cwd(), "tests/fixtures/business-record-tenant-import.json"), "utf8"));
+      expect(outcome.plan.payload).toEqual(committed.payload);
+      expect(outcome.plan.digest).toBe(committed.digest);
+      expect(lines.join("\n")).toContain("--separate-business: ignored");
+    });
   });
 
   it("recognizes only loopback hosts as local and rejects unknown flags", () => {

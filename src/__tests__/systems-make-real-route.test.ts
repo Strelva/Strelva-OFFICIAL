@@ -7,17 +7,22 @@ const deps = vi.hoisted(() => ({
   exit: vi.fn(),
   makeReal: vi.fn(),
   limited: vi.fn(),
+  throughNeedsYou: vi.fn(),
 }));
 
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: async () => deps.user }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: async () => deps.user }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
-vi.mock("@/lib/rate-limit", () => ({ isRateLimitedWindowedAsync: deps.limited }));
+vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: deps.limited }));
 vi.mock("@/platform/workspaces", () => ({ listWorkspaces: deps.workspaces, listWork: deps.work }));
 vi.mock("@/platform/workspace-exit", () => ({ readWorkspaceExit: deps.exit }));
 vi.mock("@/products/managed-presence/server", () => ({ listManagedPresenceWork: async () => ({ managedWork: [{ id: "mooney-firm", domain: "www.attymooney.com" }] }) }));
 vi.mock("@/experience/systems/server", () => ({ makeRealForWorkspace: deps.makeReal }));
+vi.mock("@/platform/needs-you/systems-sources", () => ({ makeRealThroughNeedsYou: deps.throughNeedsYou }));
+const path = vi.hoisted(() => ({ makeRealPath: vi.fn() }));
+vi.mock("@/experience/systems/live-make-real", () => ({ liveMakeRealPorts: async () => ({}), makeRealPath: path.makeRealPath }));
 
 import { POST } from "@/app/api/workspace/systems/make-real/route";
+import { setReleaseFlagsDb } from "@/platform/release-flags/store";
 
 const BUSINESS = "a0000000-0000-4000-8000-000000000001";
 const ORIGIN = "http://localhost:3000";
@@ -34,10 +39,22 @@ describe("POST /api/workspace/systems/make-real", () => {
     deps.exit.mockReset().mockResolvedValue({ state: null });
     deps.makeReal.mockReset().mockResolvedValue(RESULT);
     deps.limited.mockReset().mockResolvedValue(false);
+    path.makeRealPath.mockReset().mockImplementation(async (_actor: unknown, _ws: string, possibilityId: string) => ({ kind: "isolated", possibilityId }));
     vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "1");
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
+    setReleaseFlagsDb({ rpc: async () => ({ data: { workspaceId: BUSINESS, flags: {}, testers: [] }, error: null }) });
   });
 
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => { vi.unstubAllEnvs(); setReleaseFlagsDb(null); });
+
+  it("answers 503 for a business an operator set off, and runs where its workspace row is on under env workspace", async () => {
+    setReleaseFlagsDb({ rpc: async () => ({ data: { workspaceId: BUSINESS, flags: { systems: { state: "off", revision: 1, changedAt: "2026-10-06T00:00:00Z" } }, testers: [] }, error: null }) });
+    expect((await call()).status).toBe(503);
+    expect(deps.makeReal).not.toHaveBeenCalled();
+    vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "workspace");
+    setReleaseFlagsDb({ rpc: async () => ({ data: { workspaceId: BUSINESS, flags: { systems: { state: "on", revision: 1, changedAt: "2026-10-06T00:00:00Z" } }, testers: [] }, error: null }) });
+    expect((await call()).status).toBe(200);
+  });
 
   it("answers 503 and reads nothing while STRELVA_SYSTEMS_RELEASE is off", async () => {
     for (const value of [undefined, "", "0", "true"]) {
@@ -104,5 +121,66 @@ describe("POST /api/workspace/systems/make-real", () => {
   it("rate limits", async () => {
     deps.limited.mockResolvedValue(true);
     expect((await call()).status).toBe(429);
+  });
+
+  describe("with Needs you on: the tap is the owner's one approval for the plan", () => {
+    beforeEach(() => {
+      vi.stubEnv("STRELVA_NEEDS_YOU_RELEASE", "1");
+      deps.throughNeedsYou.mockReset().mockResolvedValue({ status: "done", result: RESULT, reason: null, receiptRef: null });
+    });
+
+    it("decides the plan's Needs you item and returns Make real's result", async () => {
+      const response = await call();
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ result: RESULT, decision: "done" });
+      expect(deps.throughNeedsYou).toHaveBeenCalledWith({ userId: deps.user!.id, verifiedEmail: "sheri@example.test" }, BUSINESS, "website-rebuild:w", expect.anything());
+      // One write path: the route never runs Make real beside Needs you.
+      expect(deps.makeReal).not.toHaveBeenCalled();
+    });
+
+    it("says so when nothing waits on a decision, or it changed, or the actor may not decide", async () => {
+      deps.throughNeedsYou.mockResolvedValue(null);
+      expect((await call()).status).toBe(404);
+      deps.throughNeedsYou.mockResolvedValue({ status: "changed", result: null, reason: null });
+      expect((await call()).status).toBe(409);
+      deps.throughNeedsYou.mockResolvedValue({ status: "forbidden", result: null, reason: null });
+      expect((await call()).status).toBe(403);
+    });
+
+    it("a failed start says nothing changed", async () => {
+      deps.throughNeedsYou.mockResolvedValue({ status: "failed", result: null, reason: "make_real_refused: live changed" });
+      const response = await call();
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({ error: "Make real could not start. Nothing changed. Strelva is on it." });
+    });
+
+    it("still refuses a non-owner before reaching Needs you", async () => {
+      deps.workspaces.mockResolvedValue([{ id: BUSINESS, kind: "customer", name: "The Mooney Firm", access: "member", role: "admin" }]);
+      expect((await call()).status).toBe(403);
+      expect(deps.throughNeedsYou).not.toHaveBeenCalled();
+    });
+  });
+
+  it("answers the live result when a live channel is on, and never runs the isolated copy then", async () => {
+    const live = { live: true, status: "done_unverified", headline: "Partly live", activationId: "act-1" };
+    path.makeRealPath.mockResolvedValue({ kind: "live", result: live });
+    const response = await call({ workspaceId: BUSINESS, possibilityId: "a0000000-0000-4000-8000-0000000000aa" });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ live });
+    expect(deps.makeReal).not.toHaveBeenCalled();
+  });
+
+  it("runs a stored possibility on the isolated copy of its rebuild while no live channel is on", async () => {
+    path.makeRealPath.mockResolvedValue({ kind: "isolated", possibilityId: "website-rebuild:w9" });
+    expect((await call({ workspaceId: BUSINESS, possibilityId: "a0000000-0000-4000-8000-0000000000aa" })).status).toBe(200);
+    expect(deps.makeReal).toHaveBeenCalledWith(expect.anything(), "website-rebuild:w9", { canActivate: true });
+    path.makeRealPath.mockResolvedValue(null);
+    expect((await call({ workspaceId: BUSINESS, possibilityId: "a0000000-0000-4000-8000-0000000000bb" })).status).toBe(404);
+  });
+
+  it("decides nothing for a member: the owner check comes first", async () => {
+    deps.workspaces.mockResolvedValue([{ id: BUSINESS, kind: "customer", name: "The Mooney Firm", access: "member", role: "member" }]);
+    expect((await call({ workspaceId: BUSINESS, possibilityId: "a0000000-0000-4000-8000-0000000000aa" })).status).toBe(403);
+    expect(path.makeRealPath).not.toHaveBeenCalled();
   });
 });

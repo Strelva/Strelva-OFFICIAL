@@ -1,6 +1,6 @@
 import { request as httpRequest, type IncomingMessage } from "node:http";
 import { request as httpsRequest } from "node:https";
-import type { LookupFunction } from "node:net";
+import { pinnedRequestOptions } from "@/platform/infra/pinned-lookup";
 import { validateUrlSafety } from "@/lib/audit/checks";
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
@@ -39,19 +39,10 @@ function requestPinnedHop(
       clearTimeout(timer);
       resolve(value);
     };
-    const lookup: LookupFunction = (_hostname, lookupOptions, callback) => {
-      if (typeof lookupOptions === "object" && lookupOptions.all) {
-        callback(null, [{ address, family: 4 }]);
-        return;
-      }
-      callback(null, address, 4);
-    };
     const transport = url.protocol === "https:" ? httpsRequest : httpRequest;
     const request = transport(url, {
       method: "GET",
-      lookup,
-      family: 4,
-      ...{ autoSelectFamily: false },
+      ...pinnedRequestOptions(address),
       headers: {
         accept: "text/html,application/xhtml+xml,text/plain;q=0.9",
         "user-agent": options.userAgent,

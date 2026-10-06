@@ -42,16 +42,16 @@ vi.mock("@/lib/events", () => ({
   addEvent: (...args: unknown[]) => mockAddEvent(...args),
 }));
 
-vi.mock("@/lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => redisHandle,
 }));
 
-vi.mock("@/lib/production-guard", () => ({
+vi.mock("@/platform/infra/production-guard", () => ({
   isProductionEnv: () => mockIsProductionEnv(),
 }));
 
 const mockAlert = vi.fn();
-vi.mock("@/lib/monitoring", () => ({
+vi.mock("@/platform/infra/monitoring", () => ({
   alert: (...args: unknown[]) => mockAlert(...args),
 }));
 

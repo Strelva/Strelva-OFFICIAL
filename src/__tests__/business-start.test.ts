@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BUSINESS_START_PRODUCTS, businessStartHref, businessStartRequest, businessStartView, isBusinessStartProduct } from "@/lib/business-start";
-import { workspaceReturnTarget, accountReturnTarget } from "@/lib/workspace-location";
+import { BUSINESS_START_PRODUCTS, businessStartHref, businessStartRequest, businessStartView, isBusinessStartProduct } from "@/platform/workspaces/business-start";
+import { workspaceReturnTarget, accountReturnTarget } from "@/platform/workspaces/location";
 
 describe("public business starts", () => {
   it.each(BUSINESS_START_PRODUCTS)("preserves %s through the bounded sign-in return", product => {

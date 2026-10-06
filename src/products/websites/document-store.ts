@@ -2,12 +2,14 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import { provisionHostedWebsiteTenant } from "@/lib/tenants";
 import type { CrawledPage } from "./rebuild-crawl";
-import { getRedis } from "@/lib/redis";
-import { websiteRebuildReleaseEnabled } from "./rebuild-release";
-import { getSupabase } from "@/lib/db/client";
+import { getRedis } from "@/platform/infra/redis";
+import { websiteRebuildReleaseEnabledForTenant, websiteRebuildReleaseMayBeOn } from "./rebuild-release";
+import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type SavedWork, type WorkspaceActor } from "@/platform/workspaces/types";
 import { siteDocumentHash, siteDocumentSchema, unresolvedSiteFacts, type SiteDocument } from "./site-document";
 import { websiteLaunchReceiptSchema, type WebsiteLaunchReceipt } from "./contracts";
+import { bindToCurrentTenant } from "./hosted-routing";
+import { ROOT_DOMAIN } from "@/platform/infra/brand";
 
 export interface WebsiteDocumentRevision {
   workspaceId: string; workId: string; revision: number; contentHash: string;
@@ -17,6 +19,12 @@ export interface WebsiteDocumentRevision {
 export interface WebsiteDocumentKey { workspaceId: string; workId: string; }
 export interface WebsiteDocumentCandidate extends WebsiteDocumentKey { revision: number; contentHash: string; }
 export interface AgencyWebsiteDocumentCandidate { work: SavedWork; section: string; sections: string[]; }
+/** The tenant a website work routes to now. Publication and reservation rows
+ * follow a slug rename; the saved work payload keeps the slug it was given. */
+export interface WebsiteCurrentTenant { tenantId: string; source: "publication" | "reservation"; deliveryModel: string | null }
+export interface WebsiteLinkedPublication { tenantId: string | null; tenantSlugAtPublication: string; priorDeliveryModel: "custom_repo" | "platform_template"; revision: number; contentHash: string; publishedBy: string; publishedAt: string; fallbackUntil: string }
+export interface WebsiteDomainApproval { hostname: string; approvedBy: string; approvedAt: string; expiresAt: string; current: boolean }
+export type WebsiteDomainAuthority = "owner" | "provider";
 export interface WebsiteDocumentStore {
   readAgencyCandidate(actor: WorkspaceActor, input: { bindingId: string; workId?: string; section?: string; subscriptionExemption: boolean }): Promise<AgencyWebsiteDocumentCandidate | null>;
   commitAgencyCandidate(actor: WorkspaceActor, input: { bindingId: string; workId: string; section: string; expectedWorkRevision: number; expectedRevision: number; expectedCandidateRevision: number; expectedCandidateHash: string; document: SiteDocument; payload: unknown; subscriptionExemption: boolean }): Promise<SavedWork>;
@@ -36,6 +44,13 @@ export interface WebsiteDocumentStore {
   listPublished(): Promise<WebsiteDocumentRevision[]>;
   recordHealth(input: WebsiteDocumentCandidate & { checkedAt: string; status: "healthy" | "unreachable" | "hash_mismatch" | "hash_missing"; observedHash?: string }): Promise<void>;
   claimRebuild(actor: WorkspaceActor, workspaceId: string, input: { requestId: string; domainKey: string; input: unknown; payload: unknown }): Promise<SavedWork>;
+  /** Publish an approved revision onto a tenant this business already runs (owner only). */
+  publishToLinkedTenant?(actor: WorkspaceActor, input: WebsiteDocumentCandidate & { tenantId: string; receipt: WebsiteLaunchReceipt }): Promise<WebsiteDocumentRevision & { priorDeliveryModel: "custom_repo" | "platform_template"; fallbackUntil: string }>;
+  currentTenant?(actor: WorkspaceActor, input: WebsiteDocumentKey): Promise<WebsiteCurrentTenant | null>;
+  linkedPublications?(actor: WorkspaceActor, input: WebsiteDocumentKey): Promise<WebsiteLinkedPublication[]>;
+  approveDomain?(actor: WorkspaceActor, input: WebsiteDocumentKey & { tenantId: string; hostname: string }): Promise<{ hostname: string; expiresAt: string }>;
+  authorizeDomain?(actor: WorkspaceActor, input: WebsiteDocumentKey & { tenantId: string; hostname: string; action: "attach" | "refresh" }): Promise<WebsiteDomainAuthority>;
+  domainApprovals?(actor: WorkspaceActor, input: WebsiteDocumentKey): Promise<WebsiteDomainApproval[]>;
 }
 export interface WebsiteDocumentRpc { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message: string } | null }>; }
 const id = z.string().uuid();
@@ -61,11 +76,13 @@ export function createWebsiteDocumentStore(db?: WebsiteDocumentRpc): WebsiteDocu
     if (!client) throw new WorkspaceStoreError("Website document storage is unavailable.");
     const result = await client.rpc(name,args);
     if (result.error) {
-      if (result.error.message.includes("workspace_access_denied") || result.error.message.includes("website_tenant_access_denied") || result.error.message.includes("agency_managed_website_draft_denied")) throw new WorkspaceAccessError();
+      if (result.error.message.includes("workspace_access_denied") || result.error.message.includes("website_tenant_access_denied") || result.error.message.includes("website_tenant_not_linked") || result.error.message.includes("agency_managed_website_draft_denied")) throw new WorkspaceAccessError();
+      if (result.error.message.includes("website_domain_owner_approval_required")) throw new WorkspaceConflictError("The owner hasn't approved this domain yet. Strelva can prepare the records; the owner decides.");
+      if (result.error.message.includes("website_domain_invalid")) throw new WorkspaceConflictError("Enter a valid domain you control.");
       if (/website_.*(?:conflict|unresolved|approval_required)|workspace_exit_future_work_blocked|website_rebuild_in_progress|bounded_revision_conflict/.test(result.error.message)) throw new WorkspaceConflictError(result.error.message.includes("unresolved") ? "Resolve the flagged website facts before approval." : "This website changed or is already rebuilding. Reload before continuing.");
       throw new WorkspaceStoreError("The website document operation could not be confirmed.");
     }
-    return rows(result.data);
+    return typeof result.data === "string" ? [{ value: result.data }] : rows(result.data);
   }
   const store: WebsiteDocumentStore = {
     async readAgencyCandidate(actor,input) {
@@ -144,14 +161,54 @@ export function createWebsiteDocumentStore(db?: WebsiteDocumentRpc): WebsiteDocu
       const work = result[0]; if (!work) throw new WorkspaceStoreError("The website rebuild could not be confirmed.");
       return workRow(work);
     },
+    async publishToLinkedTenant(actor,input) {
+      const receipt = websiteLaunchReceiptSchema.parse(input.receipt);
+      if (receipt.status !== "published" || receipt.provider !== "strelva-hosted" || receipt.artifactHash !== input.contentHash || receipt.candidateRevision !== input.revision) throw new WorkspaceConflictError("The launch receipt must identify the exact approved hosted revision.");
+      const result = await rpc("publish_website_document_to_linked_tenant", { ...identity(actor), ...candidate(input), p_tenant_id: tenant.parse(input.tenantId), p_receipt: receipt });
+      const row = result[0];
+      if (!row) throw new WorkspaceStoreError("The published website could not be confirmed.");
+      const published = { ...documentRow(row), tenantId: String(row.tenant_id), receipt: row.receipt ? websiteLaunchReceiptSchema.parse(row.receipt) : receipt,
+        priorDeliveryModel: z.enum(["custom_repo","platform_template"]).parse(row.prior_delivery_model), fallbackUntil: String(row.fallback_until) };
+      try { await getRedis()?.set(`reb:website-document:${published.tenantId}`, published.document, { ex: 60 }); } catch { /* Postgres remains authoritative. */ }
+      return published;
+    },
+    async currentTenant(actor,input) {
+      const row = (await rpc("read_website_current_tenant", { ...identity(actor), ...key(input) }))[0];
+      if (!row || typeof row.tenant_id !== "string") return null;
+      return { tenantId: tenant.parse(row.tenant_id), source: row.source === "publication" ? "publication" : "reservation", deliveryModel: typeof row.delivery_model === "string" ? row.delivery_model : null };
+    },
+    async linkedPublications(actor,input) {
+      return (await rpc("read_website_linked_publications", { ...identity(actor), ...key(input) })).map(row => ({
+        tenantId: typeof row.tenant_id === "string" ? row.tenant_id : null, tenantSlugAtPublication: String(row.tenant_slug_at_publication),
+        priorDeliveryModel: z.enum(["custom_repo","platform_template"]).parse(row.prior_delivery_model), revision: revision.parse(Number(row.revision)),
+        contentHash: hash.parse(row.content_hash), publishedBy: String(row.published_by), publishedAt: String(row.published_at), fallbackUntil: String(row.fallback_until),
+      }));
+    },
+    async approveDomain(actor,input) {
+      const row = (await rpc("approve_website_domain_change", { ...identity(actor), ...key(input), p_tenant_id: tenant.parse(input.tenantId), p_hostname: z.string().trim().min(1).max(253).parse(input.hostname) }))[0];
+      const body = row;
+      if (!body || typeof body.hostname !== "string") throw new WorkspaceStoreError("The domain approval could not be confirmed.");
+      return { hostname: body.hostname, expiresAt: String(body.expiresAt) };
+    },
+    async authorizeDomain(actor,input) {
+      const row = (await rpc("authorize_website_domain_change", { ...identity(actor), ...key(input), p_tenant_id: tenant.parse(input.tenantId), p_hostname: z.string().trim().min(1).max(253).parse(input.hostname), p_action: z.enum(["attach","refresh"]).parse(input.action) }))[0];
+      const value = row?.value;
+      if (value === "owner" || value === "provider") return value;
+      throw new WorkspaceStoreError("The domain authority could not be confirmed.");
+    },
+    async domainApprovals(actor,input) {
+      return (await rpc("read_website_domain_approvals", { ...identity(actor), ...key(input) })).map(row => ({ hostname: String(row.hostname), approvedBy: String(row.approved_by), approvedAt: String(row.approved_at), expiresAt: String(row.expires_at), current: row.current === true }));
+    },
   }; return store;
 }
 export const websiteDocumentStore = createWebsiteDocumentStore();
 export const saveDocument = websiteDocumentStore.append;
 export const readDocument = websiteDocumentStore.read;
 export async function getPublishedSiteDocument(tenantId: string): Promise<SiteDocument | null> {
-  if (!websiteRebuildReleaseEnabled()) return null;
+  if (!websiteRebuildReleaseMayBeOn()) return null;
   tenant.parse(tenantId);
+  // Per site: a converted tenant follows its business's row (visitors are never operators).
+  if (!(await websiteRebuildReleaseEnabledForTenant(tenantId))) return null;
   const redis = getRedis();
   try {
     const cached = await redis?.get<unknown>(`reb:website-document:${tenantId}`);
@@ -160,6 +217,21 @@ export async function getPublishedSiteDocument(tenantId: string): Promise<SiteDo
   const published = (await websiteDocumentStore.published(tenantId))?.document ?? null;
   if (published) { try { await redis?.set(`reb:website-document:${tenantId}`, published, { ex: 60 }); } catch { /* Optional cache only. */ } }
   return published;
+}
+/**
+ * After a slug rename the issued document still binds its visitor tools to the
+ * old slug. Returns the current slug to serve them under when the
+ * publication's own receipt proves that binding named this tenant (P2 #8);
+ * undefined otherwise. The stored document and its receipt are never changed.
+ */
+export async function publishedCapabilityTenant(tenantId: string, document: SiteDocument): Promise<string | undefined> {
+  const bound = document.capabilities?.tenant;
+  if (!bound || bound === tenantId) return undefined;
+  try {
+    const row = await websiteDocumentStore.published(tenant.parse(tenantId));
+    if (!row || row.contentHash !== siteDocumentHash(document)) return undefined;
+    return bindToCurrentTenant(row.document, tenantId, row.receipt, ROOT_DOMAIN).capabilities?.tenant === tenantId ? tenantId : undefined;
+  } catch { return undefined; }
 }
 export async function invalidatePublishedSiteDocument(tenantId: string): Promise<void> {
   tenant.parse(tenantId); try { await getRedis()?.del(`reb:website-document:${tenantId}`); } catch { /* TTL bounds recovery. */ }

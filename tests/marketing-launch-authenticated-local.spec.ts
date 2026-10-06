@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { expect, test } from "@playwright/test";
-import { businessStartHref, businessStartRequest, businessStartView } from "../src/lib/business-start";
+import { businessStartHref, businessStartRequest, businessStartView } from "../src/platform/workspaces/business-start";
 import { localEnvironment, signedInContext } from "./support/local-auth";
 
 const enabled = process.env.STRELVA_LOCAL_AUTH_PROOF === "1" && process.env.STRELVA_MARKETING_ENTRY_PROOF === "1";

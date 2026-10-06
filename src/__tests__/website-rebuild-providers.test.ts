@@ -1,7 +1,7 @@
 import { describe,it,expect,vi,beforeEach } from "vitest";
 const dependencies=vi.hoisted(()=>({generate:vi.fn(),primary:vi.fn(),fallback:vi.fn()}));
 vi.mock("ai",()=>({generateObject:dependencies.generate}));
-vi.mock("@/lib/ai-models",()=>({getPrimaryModel:dependencies.primary,getFallbackModel:dependencies.fallback}));
+vi.mock("@/platform/infra/ai-models",()=>({getPrimaryModel:dependencies.primary,getFallbackModel:dependencies.fallback}));
 import {makeJevComposer,makeJevVerifier,makeJevRisk,makeModelComposer,type RebuildProviderAdmission,type RebuildProviderRequest} from "@/products/websites/rebuild-providers";
 import {siteDocumentSchema} from "@/products/websites/site-document";
 const key="test-only-noncredential-placeholder";

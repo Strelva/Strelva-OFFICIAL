@@ -5,6 +5,7 @@ export * from "./governance";
 export * from "./approvals";
 export * from "./runner";
 export * from "./repository";
+export * from "./supabase-repository";
 export * from "./view";
 export * from "./isolated-adapters";
 export * from "./in-memory-live";

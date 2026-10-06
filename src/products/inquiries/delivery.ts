@@ -15,16 +15,17 @@
  */
 
 import { createHash } from "node:crypto";
+import { ownerNoticeEmail } from "@/lib/owner-recipient";
 
 import type { InquiryTimelineEventType, ResponsibilityAction, ResponsibilityEvaluation, ResponsibilityPolicy } from "@/products/inquiries/contracts";
 import type { LeadRecord } from "@/lib/leads";
 import { getTenantConfig } from "@/lib/tenants";
 import { addTenantActivity } from "@/lib/tenant-crm";
-import { renderEmailHtml, renderEmailText } from "@/lib/email/layout";
+import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
 import { createEmailInquiryTransport } from "./delivery-email";
 import { createRedisInquiryDeliveryStore } from "./delivery-store";
 import { INQUIRY_WORKSPACE_EXIT_CODE, isInquiryWorkspaceExited } from "./workspace-exit";
-import type { EmailAudience } from "@/lib/email/send";
+import type { EmailAudience } from "@/platform/infra/email/send";
 import {
   actorForAction,
   createInquiryDeliveryMessage,
@@ -241,7 +242,10 @@ export async function resolveInquiryRoute(
   // The capability's destination is server-authored configuration. Browser
   // fields never populate `staffDestination`; when it is absent or not an
   // email address, retain the tenant owner fallback for the legacy notice.
-  const ownerEmail = validEmail(inquiry.staffDestination) || validEmail(tenant?.ownerEmail);
+  // Without a configured destination, the one owner-recipient rule decides
+  // (src/lib/owner-recipient.ts); it falls back to the tenant's owner_email.
+  const ownerEmail = validEmail(inquiry.staffDestination)
+    || (tenant ? validEmail(await ownerNoticeEmail(tenant)) : null);
   return {
     tenantId: inquiry.tenantId,
     businessName: inquiryBusinessName(inquiry, tenant?.siteName),

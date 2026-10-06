@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceInvitationRecipientError } from "@/platform/workspaces/invitations";
-import { workspaceInvitationReturnTarget } from "@/lib/workspace-location";
+import { workspaceInvitationReturnTarget } from "@/platform/workspaces/location";
 import { isPublicRoute } from "@/proxy";
 import { analyticsAllowedPath } from "@/lib/analytics-privacy";
 import type { NextRequest } from "next/server";

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getSessionUser } from "@/lib/db/server-client";
+import { getSessionUser } from "@/platform/infra/db/server-client";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError } from "@/platform/workspaces/types";
 import { readBoundedBody, isWorkspaceBodyTooLarge } from "@/platform/workspaces/http";

@@ -1,0 +1,443 @@
+{
+  "about": "Strelva Reborn section 7. Boundary imports that existed on 2026-10-06; this list only shrinks. Fix an entry, then run pnpm check:boundaries --prune. Never add one: src/lib -> workspace imports are never allowed, and a new workspace -> src/lib import means the code belongs in src/platform/infra or the workspace layer.",
+  "workspaceImportsLib": {
+    "src/experience/places/WorkspaceResults.tsx": [
+      "src/lib/analytics/period"
+    ],
+    "src/experience/places/WorkspaceReviews.tsx": [
+      "src/lib/reviews/reputation"
+    ],
+    "src/experience/systems/server.ts": [
+      "src/lib/domain-monitor-store",
+      "src/lib/scan-store",
+      "src/lib/tenants"
+    ],
+    "src/experience/systems/website-detail-server.ts": [
+      "src/lib/events",
+      "src/lib/storage/draft-store",
+      "src/lib/storage/site-snapshot-store",
+      "src/lib/storage/version-store",
+      "src/lib/website-history"
+    ],
+    "src/experience/workspace/PublicContinuationCard.tsx": [
+      "src/lib/public-continuation"
+    ],
+    "src/experience/workspace/WorkspaceApp.tsx": [
+      "src/lib/website-request-draft"
+    ],
+    "src/platform/ask/ports.ts": [
+      "src/lib/types"
+    ],
+    "src/platform/ask/tenant-tools-adapter.ts": [
+      "src/lib/agent-prompt-shared",
+      "src/lib/agent-results",
+      "src/lib/agent-shared",
+      "src/lib/capabilities",
+      "src/lib/site-capabilities",
+      "src/lib/template-manifests",
+      "src/lib/tenants"
+    ],
+    "src/platform/ask/turn.ts": [
+      "src/lib/agent-results"
+    ],
+    "src/platform/bookings/availability.ts": [
+      "src/lib/booking",
+      "src/lib/types"
+    ],
+    "src/platform/bookings/legacy-ports.ts": [
+      "src/lib/leads",
+      "src/lib/storage/content-store"
+    ],
+    "src/platform/bookings/legacy-store.ts": [
+      "src/lib/booking",
+      "src/lib/storage/content-store",
+      "src/lib/storage/core",
+      "src/lib/types"
+    ],
+    "src/platform/bookings/lifecycle-ports.ts": [
+      "src/lib/owner-recipient",
+      "src/lib/tenant-urls",
+      "src/lib/tenants"
+    ],
+    "src/platform/bookings/move.ts": [
+      "src/lib/booking",
+      "src/lib/types"
+    ],
+    "src/platform/bookings/notices.ts": [
+      "src/lib/delivery-email",
+      "src/lib/owner-recipient",
+      "src/lib/tenant-urls",
+      "src/lib/tenants",
+      "src/lib/types"
+    ],
+    "src/platform/bookings/tenant.ts": [
+      "src/lib/types"
+    ],
+    "src/platform/business-billing/index.ts": [
+      "src/lib/billing-type"
+    ],
+    "src/platform/customers/readers.ts": [
+      "src/lib/tenant-urls",
+      "src/lib/tenants"
+    ],
+    "src/platform/infra/auth.ts": [
+      "src/lib/tenants"
+    ],
+    "src/platform/infra/db/domain-claims.ts": [
+      "src/lib/types"
+    ],
+    "src/platform/infra/db/dual-write.ts": [
+      "src/lib/storage/mail-log",
+      "src/lib/types"
+    ],
+    "src/platform/make-real/approvals.ts": [
+      "src/lib/types"
+    ],
+    "src/platform/make-real/governance.ts": [
+      "src/lib/ai-governance",
+      "src/lib/types"
+    ],
+    "src/platform/make-real/live-server.ts": [
+      "src/lib/apply-section-update",
+      "src/lib/storage",
+      "src/lib/tenants",
+      "src/lib/types"
+    ],
+    "src/platform/needs-you/adapters.ts": [
+      "src/lib/types"
+    ],
+    "src/platform/needs-you/handled.ts": [
+      "src/lib/types"
+    ],
+    "src/platform/needs-you/parity.ts": [
+      "src/lib/types"
+    ],
+    "src/platform/needs-you/server.ts": [
+      "src/lib/event-actions",
+      "src/lib/events"
+    ],
+    "src/platform/needs-you/service.ts": [
+      "src/lib/approve-link"
+    ],
+    "src/platform/needs-you/tenant-classify.ts": [
+      "src/lib/types"
+    ],
+    "src/platform/offerings/agency-website-draft.ts": [
+      "src/lib/schemas",
+      "src/lib/subscription",
+      "src/lib/template-manifests"
+    ],
+    "src/platform/operator-queue/domain-view-loader.ts": [
+      "src/lib/domain-monitor-store",
+      "src/lib/domains"
+    ],
+    "src/platform/operator-queue/domain-view.ts": [
+      "src/lib/domain-monitor",
+      "src/lib/types"
+    ],
+    "src/platform/operator-queue/service.ts": [
+      "src/lib/tenants"
+    ],
+    "src/platform/operator-queue/site-coverage.ts": [
+      "src/lib/domain-monitor",
+      "src/lib/scan-store",
+      "src/lib/types"
+    ],
+    "src/platform/operator-queue/sources.ts": [
+      "src/lib/access-request-delivery",
+      "src/lib/attention",
+      "src/lib/custom-repos",
+      "src/lib/domain-monitor-store",
+      "src/lib/domains",
+      "src/lib/events",
+      "src/lib/lead-mirror",
+      "src/lib/lead-workflow",
+      "src/lib/maintenance-digest",
+      "src/lib/portfolio",
+      "src/lib/storage",
+      "src/lib/types"
+    ],
+    "src/platform/owner-entry/env.ts": [
+      "src/lib/client-fallback"
+    ],
+    "src/platform/owner-entry/linked-sites.ts": [
+      "src/lib/tenant-display",
+      "src/lib/tenants"
+    ],
+    "src/platform/owner-entry/operator.ts": [
+      "src/lib/dashboard-surfaces",
+      "src/lib/types"
+    ],
+    "src/platform/owner-entry/server.ts": [
+      "src/lib/client-fallback"
+    ],
+    "src/platform/owner-entry/site-summary.ts": [
+      "src/lib/activity-feed",
+      "src/lib/leads",
+      "src/lib/storage",
+      "src/lib/storage/activity-store"
+    ],
+    "src/platform/system-health/business.ts": [
+      "src/lib/domain-monitor",
+      "src/lib/scan-store",
+      "src/lib/types"
+    ],
+    "src/platform/system-health/observations.ts": [
+      "src/lib/domain-monitor",
+      "src/lib/scan-store",
+      "src/lib/types"
+    ],
+    "src/products/ai-visibility/score.ts": [
+      "src/lib/audit/checks",
+      "src/lib/pinned-public-text"
+    ],
+    "src/products/assessment/contracts.ts": [
+      "src/lib/audit/types"
+    ],
+    "src/products/bookings/server.ts": [
+      "src/lib/booking",
+      "src/lib/tenant-display",
+      "src/lib/tenants",
+      "src/lib/types"
+    ],
+    "src/products/connected-sites/server.ts": [
+      "src/lib/lead-spam",
+      "src/lib/pinned-public-text"
+    ],
+    "src/products/domain-monitor/server.ts": [
+      "src/lib/delivery-email"
+    ],
+    "src/products/google-listing/linked-reviews.ts": [
+      "src/lib/connections",
+      "src/lib/events",
+      "src/lib/reviews",
+      "src/lib/reviews/reply-voice",
+      "src/lib/tenants",
+      "src/lib/types"
+    ],
+    "src/products/google-listing/service.ts": [
+      "src/lib/audit/checks",
+      "src/lib/reviews/auto-reply-rule"
+    ],
+    "src/products/google-listing/tenant-replies.ts": [
+      "src/lib/google-access",
+      "src/lib/slack"
+    ],
+    "src/products/inquiries/connections.ts": [
+      "src/lib/types"
+    ],
+    "src/products/inquiries/delivery-approval-primitives.ts": [
+      "src/lib/leads"
+    ],
+    "src/products/inquiries/delivery-approval-service.ts": [
+      "src/lib/event-actions",
+      "src/lib/events",
+      "src/lib/leads",
+      "src/lib/types"
+    ],
+    "src/products/inquiries/delivery-store.ts": [
+      "src/lib/inquiry-records"
+    ],
+    "src/products/inquiries/delivery.ts": [
+      "src/lib/leads",
+      "src/lib/owner-recipient",
+      "src/lib/tenant-crm",
+      "src/lib/tenants"
+    ],
+    "src/products/inquiries/follow-up-cron.ts": [
+      "src/lib/leads",
+      "src/lib/tenants",
+      "src/lib/types"
+    ],
+    "src/products/inquiries/linked-leads.ts": [
+      "src/lib/inquiry-records",
+      "src/lib/leads"
+    ],
+    "src/products/inquiries/message-receipt.ts": [
+      "src/lib/leads"
+    ],
+    "src/products/inquiries/message-review-event.ts": [
+      "src/lib/types"
+    ],
+    "src/products/inquiries/onboarding.ts": [
+      "src/lib/pinned-public-text"
+    ],
+    "src/products/inquiries/portfolio.ts": [
+      "src/lib/tenants"
+    ],
+    "src/products/inquiries/publication.ts": [
+      "src/lib/ai-governance"
+    ],
+    "src/products/inquiries/reconciliation.ts": [
+      "src/lib/leads"
+    ],
+    "src/products/inquiries/record-projection.ts": [
+      "src/lib/leads"
+    ],
+    "src/products/inquiries/server.ts": [
+      "src/lib/connections",
+      "src/lib/event-actions",
+      "src/lib/events",
+      "src/lib/leads",
+      "src/lib/types"
+    ],
+    "src/products/inquiries/workspace-records.ts": [
+      "src/lib/inquiry-records"
+    ],
+    "src/products/investigations/public-website-source.ts": [
+      "src/lib/audit/checks",
+      "src/lib/audit/types"
+    ],
+    "src/products/managed-presence/legacy.ts": [
+      "src/lib/types"
+    ],
+    "src/products/managed-presence/server.ts": [
+      "src/lib/tenant-urls",
+      "src/lib/tenants"
+    ],
+    "src/products/operations/website-draft-adapter.ts": [
+      "src/lib/storage"
+    ],
+    "src/products/publishing/server.ts": [
+      "src/lib/cms/collections-service",
+      "src/lib/storage/newsletter-store"
+    ],
+    "src/products/recaps/server.ts": [
+      "src/lib/tenant-display",
+      "src/lib/tenants",
+      "src/lib/types",
+      "src/lib/weekly-brief"
+    ],
+    "src/products/scheduling/public-booking-server.ts": [
+      "src/lib/leads",
+      "src/lib/tenants"
+    ],
+    "src/products/website-audit/WebsiteAuditPage.tsx": [
+      "src/lib/audit/impact",
+      "src/lib/audit/types"
+    ],
+    "src/products/website-audit/client.ts": [
+      "src/lib/audit/types"
+    ],
+    "src/products/website-audit/server.ts": [
+      "src/lib/audit-report-store"
+    ],
+    "src/products/website-audit/work.ts": [
+      "src/lib/audit/types"
+    ],
+    "src/products/websites/document-store.ts": [
+      "src/lib/tenants"
+    ],
+    "src/products/websites/domain-verification.ts": [
+      "src/lib/types"
+    ],
+    "src/products/websites/generation.ts": [
+      "src/lib/defaults",
+      "src/lib/types"
+    ],
+    "src/products/websites/hosted-public.tsx": [
+      "src/lib/tenant",
+      "src/lib/tenants"
+    ],
+    "src/products/websites/linked-results.ts": [
+      "src/lib/ai-visibility-scorecard",
+      "src/lib/analytics",
+      "src/lib/analytics/period",
+      "src/lib/anomaly",
+      "src/lib/milestone",
+      "src/lib/scan-store",
+      "src/lib/storage",
+      "src/lib/visibility/snapshots"
+    ],
+    "src/products/websites/published-capabilities.ts": [
+      "src/lib/tenants"
+    ],
+    "src/products/websites/rebuild-audit.ts": [
+      "src/lib/audit/checks",
+      "src/lib/audit/context",
+      "src/lib/audit/modules/accessibility",
+      "src/lib/audit/modules/ai-readability",
+      "src/lib/audit/modules/content",
+      "src/lib/audit/modules/seo-foundations",
+      "src/lib/audit/modules/trust"
+    ],
+    "src/products/websites/rebuild-crawl.ts": [
+      "src/lib/audit/checks"
+    ],
+    "src/products/websites/rebuild-domains.ts": [
+      "src/lib/domains"
+    ],
+    "src/products/websites/rebuild-service.ts": [
+      "src/lib/domains"
+    ],
+    "src/products/websites/site-health.ts": [
+      "src/lib/pinned-public-text"
+    ],
+    "src/products/websites/site-media.ts": [
+      "src/lib/audit/checks",
+      "src/lib/image-signature",
+      "src/lib/media-store"
+    ],
+    "src/products/websites/site-operations.ts": [
+      "src/lib/ai-auto-approve",
+      "src/lib/ai-governance",
+      "src/lib/types"
+    ],
+    "src/products/websites/site-report.ts": [
+      "src/lib/owner-recipient",
+      "src/lib/tenants"
+    ],
+    "src/products/websites/site-seo.ts": [
+      "src/lib/tenant-urls",
+      "src/lib/types"
+    ]
+  },
+  "boundaries": [
+    "src/app/admin/websites/page.tsx -> @/products/websites/rebuild-release :: Import a product through its index, contracts, server, or client entry point.",
+    "src/app/agency-websites/[bindingId]/page.tsx -> @/products/websites/rebuild-release :: Import a product through its index, contracts, server, or client entry point.",
+    "src/app/api/cron/connected-sites-purge/route.ts -> @/products/connected-sites/store :: Import a product through its index, contracts, server, or client entry point.",
+    "src/app/api/cron/website-health/route.ts -> @/products/websites/hosted-routing :: Import a product through its index, contracts, server, or client entry point.",
+    "src/app/api/workspace/connected-sites/route.ts -> @/products/connected-sites/store :: Import a product through its index, contracts, server, or client entry point.",
+    "src/app/workspace/inquiries/page.tsx -> @/products/inquiries/linked-leads :: Import a product through its index, contracts, server, or client entry point.",
+    "src/app/workspace/results/page.tsx -> @/products/websites/linked-results :: Import a product through its index, contracts, server, or client entry point.",
+    "src/app/workspace/reviews/page.tsx -> @/products/google-listing/linked-reviews :: Import a product through its index, contracts, server, or client entry point.",
+    "src/experience/places/WorkspaceInquiries.tsx -> @/products/inquiries/linked-leads :: Import a product through its index, contracts, server, or client entry point.",
+    "src/experience/places/WorkspaceResults.tsx -> @/products/websites/linked-results :: Import a product through its index, contracts, server, or client entry point.",
+    "src/experience/places/WorkspaceReviews.tsx -> @/products/google-listing/linked-reviews :: Import a product through its index, contracts, server, or client entry point.",
+    "src/experience/systems/server.ts -> @/products/connected-sites/store :: Import a product through its index, contracts, server, or client entry point.",
+    "src/experience/systems/server.ts -> @/products/google-listing/service :: Import a product through its index, contracts, server, or client entry point.",
+    "src/experience/systems/server.ts -> @/products/investigations/system-health :: Import a product through its index, contracts, server, or client entry point.",
+    "src/experience/systems/server.ts -> @/products/publishing/projection :: Import a product through its index, contracts, server, or client entry point.",
+    "src/experience/systems/website-detail-server.ts -> @/products/websites/document-store :: Import a product through its index, contracts, server, or client entry point.",
+    "src/experience/systems/website-detail-server.ts -> @/products/websites/rebuild-release :: Import a product through its index, contracts, server, or client entry point.",
+    "src/experience/systems/website-detail-server.ts -> @/products/websites/rebuild-service :: Import a product through its index, contracts, server, or client entry point.",
+    "src/experience/workspace/preview/publishing-fixture.ts -> @/products/publishing/projection :: Import a product through its index, contracts, server, or client entry point.",
+    "src/experience/workspace/preview/systems-projection.ts -> @/products/publishing/projection :: Import a product through its index, contracts, server, or client entry point.",
+    "src/platform/bookings/calendar-busy.ts -> @/products/scheduling/server :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/bookings/legacy-ports.ts -> @/products/scheduling/contracts :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/bookings/manage-server.ts -> @/products/scheduling/server :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/bookings/public-api.ts -> @/products/scheduling/public-booking :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/make-real/live-server.ts -> @/products/applications/server :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/make-real/live-server.ts -> @/products/inquiries/publication :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/make-real/live-server.ts -> @/products/inquiries/repository :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/make-real/live-server.ts -> @/products/inquiries/server :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/make-real/live-server.ts -> @/products/scheduling/server :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/make-real/live-server.ts -> @/products/websites/rebuild-service :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/needs-you/sources/live-delivery.ts -> @/products/operations/responsibilities :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/needs-you/sources/live-delivery.ts -> @/products/operations/server :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/needs-you/sources/live-delivery.ts -> @/products/websites/rebuild-release :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/needs-you/sources/live-delivery.ts -> @/products/websites/rebuild-service :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/needs-you/sources/live-products.ts -> @/products/applications/server :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/needs-you/sources/live-products.ts -> @/products/custom-applications/server :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/needs-you/sources/live-products.ts -> @/products/work-plans :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/needs-you/sources/website-document.ts -> @/products/websites/rebuild-contracts :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/needs-you/sources/website-document.ts -> @/products/websites/site-document-schema :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/needs-you/systems-sources.ts -> @/experience/systems/server :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/needs-you/systems-sources.ts -> @/experience/workspace/contracts :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/needs-you/systems-sources.ts -> @/products/managed-presence/server :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/platform/operator-queue/sources.ts -> @/products/operations/inbox :: Platform modules cannot depend on routes, products, or the experience layer.",
+    "src/products/inquiries/linked-leads.ts -> @/products/connected-sites/store :: Import a product through its index, contracts, server, or client entry point.",
+    "src/products/investigations/system-health.ts -> @/products/websites/rebuild-possibility :: Import a product through its index, contracts, server, or client entry point.",
+    "src/products/publishing/projection.ts -> @/products/google-listing/health :: Import a product through its index, contracts, server, or client entry point."
+  ]
+}

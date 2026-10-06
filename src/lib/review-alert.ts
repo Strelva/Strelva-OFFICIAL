@@ -8,7 +8,8 @@
  * email is switched on rather than being lost forever — the same "only stamp on a
  * real send" discipline the review-nudge cron uses.
  */
-import { getRedis } from "./redis";
+import { ownerNoticeEmail } from "./owner-recipient";
+import { getRedis } from "@/platform/infra/redis";
 import { sendReviewNeedsReplyEmail } from "./delivery-email";
 import type { TenantConfig } from "./types";
 
@@ -30,7 +31,7 @@ export async function maybeAlertNewReview(params: {
   notYetUrl?: string;
   logPrefix?: string;
 }): Promise<boolean> {
-  const email = params.tenant.ownerEmail?.trim();
+  const email = await ownerNoticeEmail(params.tenant);
   if (!email) return false;
 
   const redis = getRedis();

@@ -14,11 +14,11 @@
 // This is acceptable because auto-approval is a convenience optimization, not a
 // security boundary. The governance system still validates all changes.
 
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import type { TenantConfig, ContentSection } from "./types";
 import type { AiGovernanceDecision } from "./ai-governance";
 import { getContentAutonomy } from "./content-autonomy";
-import { logger } from "./logger";
+import { logger } from "@/platform/infra/logger";
 
 const APPROVAL_COUNT_PREFIX = "reb:auto-approve:streak:";
 

@@ -15,6 +15,9 @@ import { WorkspaceAllowanceSummary } from "./WorkspaceAllowanceSummary";
 import { WorkspaceComposer } from "./WorkspaceComposer";
 import { requestDraftKey } from "./request-draft";
 import { useBusinessDeliveries } from "./useBusinessDeliveries";
+import { NeedsYouSection, StrelvaHandledSection } from "./NeedsYouSection";
+import { useNeedsYou } from "./useNeedsYou";
+import { SiteSummarySection, useSiteSummary } from "./SiteSummarySection";
 import { workspaceHome } from "./workspace-home";
 import { businessRequestRows, deliveryProviderName, type BusinessRequestRow } from "./WorkspaceRequests";
 import { workspaceWorkLabel } from "./work-label";
@@ -73,12 +76,22 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   const deliveries = useBusinessDeliveries(deliveryScope);
   const deliveryItems = deliveries.state.status === "ready" ? deliveries.state.items : [];
   const deliveryAttention = deliveryItems.filter(item => item.attention);
+  // STRELVA_NEEDS_YOU_RELEASE: Needs you and Strelva handled come from the
+  // policy model. Request decisions arrive there as items, so the delivery
+  // list no longer adds its own.
+  const needsYouReleased = snapshot.releases?.needsYou === true && current?.kind === "customer" && !readOnly;
+  const needsYou = useNeedsYou(needsYouReleased ? snapshot.workspaceId : undefined);
+  // Owner entry: the linked site's numbers, inquiries and Strelva's work (the old Today page).
+  const siteSummary = useSiteSummary(current?.kind === "customer" && !readOnly ? snapshot.workspaceId : undefined);
   const attentionCount = home.attention.length + deliveryAttention.length;
   const fileIds = systemsReleased && files ? new Set(files.map(item => item.id)) : null;
   const results = fileIds ? home.results.filter(work => fileIds.has(work.id)) : home.results;
   const savedResultCount = results.length;
   // The Systems layout (header, Systems list, composer below) is for a business with Systems released.
   const business = systemsReleased && current?.kind === "customer";
+  // Connected sites (the business's own site, any builder) open at /workspace/site when on for this business.
+  const connectSiteHref = business && !readOnly && snapshot.releases?.connectedSites === true
+    ? `${appBase}/workspace/site?${new URLSearchParams({ workspaceId: snapshot.workspaceId })}` : null;
   const openSystemHref = systemHref || ((id: string) => `${appBase}/workspace?view=system&system=${encodeURIComponent(id)}&workspaceId=${encodeURIComponent(snapshot.workspaceId)}`);
   const live = systems.filter(item => item.lifecycle === "live").length;
   const drafts = systems.filter(item => item.lifecycle === "draft").length;
@@ -87,6 +100,12 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   const requestRows = businessRequestRows(deliveryItems, snapshot.work, item => deliveryProviderName(item, agencyNames));
   const handled = requestRows.filter(row => row.stage === "done").slice(0, 5);
   const inProgress = requestRows.filter(row => row.stage === "in_progress" || row.stage === "asked");
+  // With Systems released, Strelva handled is the receipt feed, not done Requests,
+  // and In progress also lists every Make real that is running or partly live.
+  const receipts = systemsReleased ? snapshot.systems?.handled ?? [] : [];
+  const making = systemsReleased ? snapshot.systems?.activations ?? [] : [];
+  const receiptList = <ul className={styles.list} aria-label="What Strelva did this week">{receipts.slice(0, 7).map(receipt => <li key={receipt.id}><span className={styles.row}><span><strong>{receipt.sentence}</strong><small>{new Date(receipt.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {receipt.undo}</small></span></span></li>)}</ul>;
+  const makingRows = making.map(activation => <li key={activation.id}><span className={styles.row}><span><strong>{activation.partlyLive ? `${activation.title}: Partly live` : activation.headline}</strong><small>{activation.done} of {activation.total} done</small></span></span></li>);
   /** Requests belong to a business. Personal workspaces only see these lists when something is in them. */
   const showRequests = current?.kind === "customer" || requestRows.length > 0;
   const deliveryPending = deliveries.state.status === "loading";
@@ -150,18 +169,26 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
 
       {managedWorkUnavailable ? <p role="status" className={styles.notice}>Some websites could not be loaded. <a href={accountHref}>Check website access</a></p> : null}
 
-      <section className={styles.section} aria-labelledby="home-attention">
+      {needsYouReleased ? <NeedsYouSection state={needsYou.state} pending={needsYou.pending} notices={needsYou.notices} onDecide={needsYou.decide} onRetry={needsYou.refresh} appBase={appBase}
+        extraCount={home.attention.length}
+        extra={home.attention.length ? home.attention.map(({ work, reason }) => <li key={work.id}><button type="button" aria-label={`Open ${work.title}`} className={styles.row} onClick={() => onOpen(work.id)}><span><strong>{work.title}</strong><small>{reason}</small></span><ArrowRight size={16} aria-hidden="true" /></button></li>) : null} />
+      : <section className={styles.section} aria-labelledby="home-attention">
         <header className={styles.sectionHeader}><h2 id="home-attention"><Bell size={18} aria-hidden="true" />Needs you</h2>{!busy && !deliveryPending && attentionCount > 0 ? <span className={styles.count}>{attentionCount}</span> : null}</header>
         {busy || deliveryPending ? <p role="status" className={styles.muted}>Checking your work…</p> : attentionCount ? <ul className={styles.list}>
           {deliveryAttention.map(item => <li key={`delivery-${item.id}`}><a className={styles.row} href={item.href}><span><strong>{item.title}</strong><small>{item.detail}</small></span><ArrowRight size={16} aria-hidden="true" /></a></li>)}
           {home.attention.map(({ work, reason }) => <li key={work.id}><button type="button" aria-label={`Open ${work.title}`} className={styles.row} onClick={() => onOpen(work.id)}><span><strong>{work.title}</strong><small>{reason}</small></span><ArrowRight size={16} aria-hidden="true" /></button></li>)}
         </ul> : !deliveryUnavailable ? <p className={styles.muted}>Nothing needs a decision right now.</p> : null}
         {deliveryUnavailable ? <p role="status" className={styles.notice}>{systemsReleased ? "Requests waiting on your decision could not be checked." : "Delivery decisions could not be checked."} <button type="button" onClick={deliveries.refresh}>Check again</button></p> : null}
-      </section>
+      </section>}
+
+      <SiteSummarySection state={siteSummary.state} workspaceId={snapshot.workspaceId} appBase={appBase} onRetry={siteSummary.retry} />
 
       {business || systems.length ? <section className={styles.section} aria-labelledby="home-systems">
         <header className={styles.sectionHeader}><h2 id="home-systems"><LayoutGrid size={18} aria-hidden="true" />{SYSTEMS_LABEL}</h2>{systems.length ? <Button variant="ghost" size="sm" onClick={() => onNavigate("apps")}>{SYSTEMS_LIST_LABEL}<ArrowRight size={16} aria-hidden="true" /></Button> : null}</header>
         {busy || systemsLoading ? <p role="status" className={styles.muted}>Loading your systems…</p> : systemsUnavailable ? <p role="status" className={styles.notice}>Your systems could not be loaded just now. Nothing about them has changed.</p> : systems.length ? <SystemList systems={systems} href={openSystemHref} onOpen={onOpenSystem} label={`${name} ${SYSTEMS_LABEL.toLowerCase()}`} /> : <div className={styles.empty}><LayoutGrid size={24} aria-hidden="true" /><div><h3>{readOnly ? "Nothing has been shared here yet." : "Nothing is running yet."}</h3><p>{readOnly ? "Systems the owner shares will appear here." : "Your website, inquiries, bookings and the tools your team uses will appear here once Strelva builds them. Tell Strelva what you need below."}</p></div></div>}
+        {connectSiteHref && !busy && !systemsLoading ? <p className={styles.muted} data-home-connect-site>{systems.some(item => item.kind === "website")
+          ? <>Have another website? <a className="underline underline-offset-4" href={connectSiteHref}>Connect it</a>. It stays where it is.</>
+          : <>Already have a website? <a className="underline underline-offset-4" href={connectSiteHref}>Bring it into Strelva</a>. It stays where it is; Strelva takes its inquiries.</>}</p> : null}
       </section> : null}
 
       {business && !readOnly ? <section className={styles.ask} aria-labelledby="business-start-title">
@@ -179,14 +206,19 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
           </div>
       </section> : null}
 
-      {showRequests ? <><section className={styles.section} aria-labelledby="home-handled">
+      {needsYouReleased ? <StrelvaHandledSection state={needsYou.state} pending={needsYou.pending} notices={needsYou.receiptNotices} onUndo={needsYou.undo}
+        fallback={receipts.length ? receiptList : handled.length && !systemsReleased ? <ul className={styles.list}>{handled.map(row => requestRow(row))}</ul> : undefined} /> : null}
+      {showRequests ? <>{needsYouReleased ? null : <section className={styles.section} aria-labelledby="home-handled">
         <header className={styles.sectionHeader}><h2 id="home-handled"><CheckCircle2 size={18} aria-hidden="true" />Strelva handled</h2></header>
-        {busy || deliveryPending ? <p role="status" className={styles.muted}>Checking what finished…</p> : handled.length ? <ul className={styles.list}>{handled.map(row => requestRow(row))}</ul> : <p className={styles.muted}>Nothing finished yet. When Strelva or your agency finishes something, it appears here with what changed.</p>}
-      </section>
+        {systemsReleased ? (receipts.length ? receiptList : <p className={styles.muted}>Nothing this week. When Strelva changes something for you, it shows here with what changed and how to undo it.</p>)
+          : busy || deliveryPending ? <p role="status" className={styles.muted}>Checking what finished…</p> : handled.length ? <ul className={styles.list}>{handled.map(row => requestRow(row))}</ul> : <p className={styles.muted}>Nothing finished yet. When Strelva or your agency finishes something, it appears here with what changed.</p>}
+        {current?.kind === "customer" && sites.length ? <a className={styles.textAction} href={`${appBase}/workspace/recaps?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Weekly and monthly recaps<ArrowRight size={16} aria-hidden="true" /></a> : null}
+      </section>}
 
       <section className={styles.section} aria-labelledby="home-progress">
         <header className={styles.sectionHeader}><h2 id="home-progress"><ListChecks size={18} aria-hidden="true" />In progress</h2><Button variant="ghost" size="sm" onClick={() => onNavigate("requests")}>All requests<ArrowRight size={16} aria-hidden="true" /></Button></header>
-        {busy || deliveryPending ? <p role="status" className={styles.muted}>Checking your requests…</p> : inProgress.length ? <ul className={styles.list}>{inProgress.slice(0, 5).map(row => requestRow(row))}</ul> : <p className={styles.muted}>{readOnly ? "No shared requests are in progress." : "Nothing is in progress. Ask Strelva above for something with an end, like a new page or an intake form."}</p>}
+        {makingRows.length ? <ul className={styles.list} aria-label="Making live">{makingRows}</ul> : null}
+        {busy || deliveryPending ? <p role="status" className={styles.muted}>Checking your requests…</p> : inProgress.length ? <ul className={styles.list}>{inProgress.slice(0, 5).map(row => requestRow(row))}</ul> : makingRows.length ? null : <p className={styles.muted}>{readOnly ? "No shared requests are in progress." : "Nothing is in progress. Ask Strelva above for something with an end, like a new page or an intake form."}</p>}
       </section></> : null}
 
       {!business || results.length || !systems.length ? <section className={styles.section} aria-labelledby="home-recent">

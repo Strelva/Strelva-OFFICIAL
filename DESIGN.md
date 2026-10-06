@@ -544,11 +544,10 @@ Retain this record for the local preview's history, not as the palette for new w
 Jacob selected a warm ivory, ink-teal and muted-sage business interface with a
 persistent text navigation rail, a central request composer and recent work,
 and a business context panel. The business implementation is scoped to the
-local `/preview/strelva/client` route; it does not replace the personal workspace
-or agency composition. `src/experience/delivery/BusinessHome.tsx` and
-`business.module.css` own the business composition and use the shared request
-session and AppFrame. `delivery.module.css` scopes its shell refinements under
-`businessTheme`.
+local `/preview/strelva/client` route; it did not replace the personal workspace
+or agency composition. That preview and its `src/experience/delivery` shell were
+deleted on October 6, 2026; the live Home is
+`src/experience/workspace/BusinessHome.tsx`.
 
 Use the existing cairn mark, `font-display` for editorial headings, soft outlined
 controls, restrained surface depth, and purposeful work thumbnails. The Buffalo

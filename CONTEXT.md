@@ -6,8 +6,11 @@ Component checkpoint reviewed on this date; earlier product evidence retains its
 own dates.
 Kind: product
 
-Next releases: **Strelva Reborn**, shipped as `0.x` steps starting with `0.2.1`,
-until every client is in a business workspace. See the [release entry point](./docs/product/strelva-reborn.md). The earlier
+Next release: **Strelva Reborn**, the one build to `1.0.0` (decided Oct 6).
+Only the lead fix, `0.2.1`, ships before it. See the
+[build](./docs/product/strelva-reborn.md) and
+[what Strelva becomes at 1.0.0](./docs/product/product-model.md), the product
+model area by area. The earlier
 [strelvav2](./docs/product/strelvav2.md) release shipped the workspace on Sept 30.
 This branch is for internal work and is not approved for production.
 
@@ -59,6 +62,9 @@ where a System ends and a new one begins, how Versions map onto today's
 release fields, what Make real guarantees after a partial failure, and whether
 any of this makes customer work easier at a cost we can carry.
 
+[docs/product/product-model.md](./docs/product/product-model.md) says what
+every area becomes at 1.0.0, including the two nouns outside the four
+(Requests and Running), Needs you and Strelva handled.
 [docs/product/systems-transition.md](./docs/product/systems-transition.md)
 maps today's code onto Systems, Connections, Possibilities and Versions:
 where each existing module lands and what the inventory found.

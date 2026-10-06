@@ -11,7 +11,10 @@
  * Degrades to a safe default (mode "approve", no templates) without Redis.
  */
 
-import { getRedis } from "../redis";
+import { getRedis } from "@/platform/infra/redis";
+// The policy bridge (src/platform/needs-you/tenant-settings.ts) through the
+// port src/lib declares (Strelva Reborn section 7).
+import { workspacePorts, type TenantPolicyLayer, type TenantPolicyOptions as BridgeOptions } from "../workspace-ports";
 
 export type ReplyMode = "off" | "approve" | "auto";
 
@@ -46,7 +49,22 @@ function key(tenantId: string): string {
   return `reb:reply-voice:${tenantId}`;
 }
 
-export async function getReplyVoice(tenantId: string): Promise<ReplyVoice> {
+/**
+ * The voice, with its mode from `decision_policies` (`review.reply`) when the
+ * tenant is linked to a business, the release is on and the setting has
+ * moved there (src/platform/needs-you/tenant-settings.ts). "off" (draft
+ * nothing) is not a route and stays with the Redis blob, as do the guidance
+ * and templates.
+ */
+export async function getReplyVoice(tenantId: string, options: BridgeOptions = {}): Promise<ReplyVoice> {
+  const voice = await readRedisVoice(tenantId);
+  if (voice.mode === "off") return voice;
+  const policy = await workspacePorts().tenantPolicy();
+  const route = await policy.readTenantPolicyRoute(tenantId, "review.reply", options);
+  return route ? { ...voice, mode: policy.replyModeFromRoute(route) } : voice;
+}
+
+async function readRedisVoice(tenantId: string): Promise<ReplyVoice> {
   const redis = getRedis();
   if (!redis) return defaultReplyVoice();
   try {
@@ -70,7 +88,40 @@ const VALID_KINDS = new Set<ReplyTemplateKey>(REPLY_TEMPLATE_KINDS.map((k) => k.
 
 /** Validate + persist a voice. Trims and caps free text; drops unknown template
  *  kinds and empty examples so the store can't be poisoned by request input. */
+export interface ReplyVoiceWriter {
+  actor: { userId: string; verifiedEmail: string };
+  /** "owner" for the client's own choice; "strelva" for an operator. */
+  layer: TenantPolicyLayer;
+}
+
+/**
+ * With a writer, an "approve" or "auto" mode is written to decision_policies
+ * first when the tenant is linked (a refusal throws and nothing is saved).
+ * The Redis blob is always written. The returned mode is the one in force.
+ */
 export async function saveReplyVoice(
+  tenantId: string,
+  input: { mode?: ReplyMode; guidance?: string; templates?: { key?: string; example?: string }[] },
+  writer: ReplyVoiceWriter | null = null,
+  options: BridgeOptions = {},
+): Promise<ReplyVoice> {
+  const requested: ReplyMode =
+    input.mode === "off" || input.mode === "auto" || input.mode === "approve" ? input.mode : "approve";
+  let inForce: ReplyMode = requested;
+  if (writer && requested !== "off") {
+    const policy = await workspacePorts().tenantPolicy();
+    const result = await policy.writeTenantPolicySetting({
+      tenantId, actor: writer.actor, layer: writer.layer, kind: "review.reply",
+      todayValue: (await readRedisVoice(tenantId)).mode, via: writer.layer === "owner" ? "owner_save" : "operator_save",
+      plan: () => policy.planReplyMode(requested, writer.layer),
+    }, options);
+    if (result.stored === "decision_policies") inForce = policy.replyModeFromRoute(result.route);
+  }
+  const saved = await saveRedisVoice(tenantId, { ...input, mode: requested });
+  return { ...saved, mode: inForce };
+}
+
+async function saveRedisVoice(
   tenantId: string,
   input: { mode?: ReplyMode; guidance?: string; templates?: { key?: string; example?: string }[] },
 ): Promise<ReplyVoice> {

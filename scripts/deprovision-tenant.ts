@@ -30,8 +30,9 @@
  *   --json          Emit a machine-readable summary instead of the human report.
  */
 
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import * as readline from "node:readline";
-import { getSupabase } from "../src/lib/db/client";
+import { getSupabase } from "../src/platform/infra/db/client";
 import { getTenantConfig } from "../src/lib/tenants";
 import { runDeprovision } from "../src/lib/deprovision";
 

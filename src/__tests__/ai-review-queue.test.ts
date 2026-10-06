@@ -7,7 +7,7 @@ const mockRedis = {
 };
 let redisClient: typeof mockRedis | null = mockRedis;
 
-vi.mock("../lib/redis", () => ({
+vi.mock("@/platform/infra/redis", () => ({
   getRedis: () => redisClient,
 }));
 

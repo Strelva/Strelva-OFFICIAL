@@ -6,12 +6,12 @@
  * are self-contained in this file and never throw.
  */
 
-import type { ActorContext } from "../auth";
+import type { ActorContext } from "@/platform/infra/auth";
 import type { ContentMap, ContentSection } from "../types";
 import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
 import { getContent, setContent } from "./content-store";
-import { dataSourceIsPostgres } from "../db/source-flags";
-import { getSupabase, type Row, type Insert } from "../db/client";
+import { dataSourceIsPostgres } from "@/platform/infra/db/source-flags";
+import { getSupabase, type Row, type Insert } from "@/platform/infra/db/client";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

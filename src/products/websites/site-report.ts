@@ -8,9 +8,10 @@ import { scheduleSchema } from "@/products/scheduling/contracts";
 import { aiVisibilityAssessmentPayloadSchema } from "@/products/ai-visibility/client";
 import { websiteDocumentStore } from "./document-store";
 import { readWebsiteRebuild } from "./rebuild-service";
-import { sendEmailWithReceipt } from "@/lib/email/send";
+import { sendEmailWithReceipt } from "@/platform/infra/email/send";
 import { getTenantConfig } from "@/lib/tenants";
-import { OPERATOR_URL } from "@/lib/brand";
+import { OPERATOR_URL, ROOT_DOMAIN } from "@/platform/infra/brand";
+import { bindToCurrentTenant } from "./hosted-routing";
 export const websiteReportInputSchema=z.object({month:z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/)}).strict();
 export interface WebsiteMonthlyReport {
  workId:string;workspaceId:string;tenantId:string|null;siteName:string;month:string;generatedAt:string;
@@ -34,7 +35,9 @@ export async function readWebsiteMonthlyReport(actor:WorkspaceActor,workId:strin
  const publishedRevisions=new Set(receipts.filter(receipt=>receipt.status==="published").map(receipt=>`${receipt.candidateRevision}:${receipt.artifactHash}`));
  let inquiries:WebsiteMonthlyReport["inquiries"]={status:"unavailable",count:null,limitedToRecentRecords:true};
  if(tenantId){try{const data=await readInquiryWorkspace({tenantId,businessId:record.workspaceId,leadLimit:500});if(data.recordsAvailable&&data.records)inquiries={status:"available",count:data.records.filter(row=>during(row.createdAt)).length,limitedToRecentRecords:true};}catch{/* Missing storage is not zero inquiries. */}}
- const bookingBinding=published?.document.capabilities?.tenant===tenantId?published.document.capabilities.booking:undefined;
+ // After a slug rename the issued binding names the old slug; the receipt proves it is this tenant (P2 #8).
+ const servedCapabilities=published&&tenantId?bindToCurrentTenant(published.document,tenantId,published.receipt,ROOT_DOMAIN).capabilities:undefined;
+ const bookingBinding=servedCapabilities?.tenant===tenantId?servedCapabilities.booking:undefined;
  let scheduleId:unknown;
  if(bookingBinding){try{const tenant=tenantId?await getTenantConfig(tenantId):null;const rawGrants=await listPublicWebsiteBookingGrants(actor,record.workspaceId);const grants=Array.isArray(rawGrants)?rawGrants:[rawGrants];scheduleId=grants.find(grant=>grant.status==="published"&&!!tenant?.stableId&&grant.tenant_stable_id===tenant.stableId&&grant.capability_id===bookingBinding.capabilityId&&Number(grant.capability_version)===bookingBinding.version)?.work_id;}catch{/* The booking measurement remains explicitly unavailable. */}}
  const schedule=work.find(row=>row.id===scheduleId);const parsed=scheduleSchema.safeParse(schedule?.payload);
@@ -57,7 +60,12 @@ export async function sendWebsiteMonthlyReport(report:WebsiteMonthlyReport,recip
  const to=z.string().email().parse(recipient);if(!report.tenantId)return{status:"suppressed" as const,reason:"website_not_published"};
  await websiteDocumentStore.managePublishedTenant(actor,{workspaceId:report.workspaceId,workId:report.workId,tenantId:report.tenantId});
  if(to.trim().toLowerCase()!==actor.verifiedEmail.trim().toLowerCase()){const {WorkspaceAccessError}=await import("@/platform/workspaces/types");throw new WorkspaceAccessError("Reports can be sent only to the verified current owner.");}
- return sendEmailWithReceipt({audience:"client",tenantId:report.tenantId,to,fromAddress:"report@updates.strelva.com",subject:`${report.siteName}: ${report.month} website report`,idempotencyKey:`website-report:${report.workId}:${report.month}`,options:{heading:`Your ${report.month} website report`,paragraphs:["Counts come from your native inquiry and booking records. Unavailable measurements are shown below.","Assistant citation results reflect one saved answer. Website readiness checks do not measure whether an assistant names your business."],rows:[{label:"Inquiries (recent retained records)",value:report.inquiries.count===null?"Unavailable":String(report.inquiries.count)},{label:"Bookings scheduled in this period",value:report.bookings.scheduledInPeriod===null?"Unavailable":String(report.bookings.scheduledInPeriod)},{label:"Verified calendar writes",value:report.bookings.providerVerified===null?"Unavailable":String(report.bookings.providerVerified)},{label:"Saved assistant citation check",value:report.visibility.status==="available"?`${report.visibility.mentioned?"Named":"Not named"}; ${report.visibility.recommended?"recommended":"not recommended"} in this check`:"Not measured"},{label:"Website readiness checks",value:report.readiness.status==="available"?`${report.readiness.passedChecks} of ${report.readiness.totalChecks} passed`:"Not measured"},{label:"Website revisions",value:String(report.changes.length)}],button:{label:"Open website report",url:new URL(`/workspace/${report.workspaceId}/websites/${report.workId}`,OPERATOR_URL).toString()}}});
+ return deliverWebsiteMonthlyReport({...report,tenantId:report.tenantId},to);
+}
+
+/** Transport only. Callers have already checked who may send and resolved the recipient server-side. */
+function deliverWebsiteMonthlyReport(report:WebsiteMonthlyReport&{tenantId:string},to:string){
+ return sendEmailWithReceipt({audience:"client",tenantId:report.tenantId,to,fromAddress:"report@updates.strelva.com",subject:`${report.siteName}: ${report.month} website report`,idempotencyKey:`website-report:${report.workId}:${report.month}`,options:{heading:`Your ${report.month} website report`,paragraphs:["Counts come from your native inquiry and booking records. Unavailable measurements are shown below.","Assistant citation results reflect one saved answer. Website readiness checks do not measure whether an assistant names your business."],rows:[{label:"Inquiries (recent retained records)",value:report.inquiries.count===null?"Unavailable":String(report.inquiries.count)},{label:"Bookings scheduled in this period",value:report.bookings.scheduledInPeriod===null?"Unavailable":String(report.bookings.scheduledInPeriod)},{label:"Verified calendar writes",value:report.bookings.providerVerified===null?"Unavailable":String(report.bookings.providerVerified)},{label:"Saved assistant citation check",value:report.visibility.status==="available"?`${report.visibility.mentioned?"Named":"Not named"}; ${report.visibility.recommended?"recommended":"not recommended"} in this check`:"Not measured"},{label:"Website readiness checks",value:report.readiness.status==="available"?`${report.readiness.passedChecks} of ${report.readiness.totalChecks} passed`:"Not measured"},{label:"Website revisions",value:String(report.changes.length)}],button:{label:"Open website report",url:new URL(`/workspace?${new URLSearchParams({workspaceId:report.workspaceId,view:"websites",work:report.workId})}`,OPERATOR_URL).toString()}}});
 }
 
 export async function sendOwnerWebsiteMonthlyReport(actor:WorkspaceActor,workId:string,raw:unknown){
@@ -68,24 +76,55 @@ export async function sendOwnerWebsiteMonthlyReport(actor:WorkspaceActor,workId:
  return{report,delivery:await sendWebsiteMonthlyReport(report,actor.verifiedEmail,actor)};
 }
 
+/** The business's owner recipient by the one rule (Reborn §1): the record's
+ * owner contact, else the published site's tenant rule, else the reading
+ * owner's own verified address. Resolved server-side only. */
+export async function resolveWebsiteReportRecipient(workspaceId:string,tenantId:string|null,ownerEmail:string):Promise<{email:string;from:"record"|"tenant"|"linked_tenant"|"tenant_fallback"|"owner"}>{
+ const parse=(value:unknown)=>z.string().trim().toLowerCase().email().safeParse(value);
+ try{const { resolveOwnerRecipient }=await import("@/platform/business-record/service");const found=await resolveOwnerRecipient(workspaceId);const parsed=parse(found?.email);if(found&&parsed.success)return{email:parsed.data,from:found.from==="record"?"record":"linked_tenant"};}catch{/* Fall through to the tenant rule. */}
+ if(tenantId){const tenant=await getTenantConfig(tenantId).catch(()=>undefined);const { resolveOwnerNoticeRecipient }=await import("@/lib/owner-recipient");const found=await resolveOwnerNoticeRecipient({id:tenantId,ownerEmail:tenant?.ownerEmail});if(found)return{email:found.email,from:found.from};}
+ return{email:z.string().email().parse(ownerEmail.trim().toLowerCase()),from:"owner"};
+}
+
+/** Cron send: the report is read under the current owner's authority (the
+ * reads require the business owner who also owns the published tenant), then
+ * goes to the recipient the one owner-recipient rule names. The recipient is
+ * never browser-supplied. */
+async function sendCronWebsiteMonthlyReport(actor:WorkspaceActor,workId:string,month:string){
+ const report=await readWebsiteMonthlyReport(actor,workId,{month});
+ const { listWorkspaces }=await import("@/platform/workspaces/repository");
+ const workspace=(await listWorkspaces(actor)).find(row=>row.id===report.workspaceId&&row.access==="member"&&row.role==="owner");
+ if(!workspace){const { WorkspaceAccessError }=await import("@/platform/workspaces/types");throw new WorkspaceAccessError("Only the business owner can send a website report.");}
+ if(!report.tenantId)return{status:"suppressed" as const,reason:"website_not_published"};
+ await websiteDocumentStore.managePublishedTenant(actor,{workspaceId:report.workspaceId,workId:report.workId,tenantId:report.tenantId});
+ const recipient=await resolveWebsiteReportRecipient(report.workspaceId,report.tenantId,actor.verifiedEmail);
+ return deliverWebsiteMonthlyReport({...report,tenantId:report.tenantId},recipient.email);
+}
+
 /** Monthly cron resolves the current workspace owner from trusted membership,
- * then verifies their Supabase identity. It cannot impersonate the creator or
- * send customer data to a browser-supplied destination. */
+ * then verifies their Supabase identity to read the report. It cannot
+ * impersonate the creator or send customer data to a browser-supplied
+ * destination. A business with no owner yet (a converted client before its
+ * owner accepts) is reported as such: nobody may read its report. */
 export async function runWebsiteMonthlyReports(month:string){
- const { websiteRebuildReleaseEnabled }=await import("./rebuild-release");
- if(!websiteRebuildReleaseEnabled())return{tenants:[] as string[],sent:0,suppressed:0,errors:[] as string[]};
- const { getSupabase }=await import("@/lib/db/client");
+ const { websiteRebuildReleaseMayBeOn, websiteRebuildReleaseEnabledForWorkspace }=await import("./rebuild-release");
+ if(!websiteRebuildReleaseMayBeOn())return{tenants:[] as string[],sent:0,suppressed:0,errors:[] as string[]};
+ const { getSupabase }=await import("@/platform/infra/db/client");
  const { WorkspaceStoreError }=await import("@/platform/workspaces/types");
  const db=getSupabase();if(!db)throw new WorkspaceStoreError("Website report storage is unavailable.");
- const published=await websiteDocumentStore.listPublished();const result={tenants:published.flatMap(row=>row.tenantId?[row.tenantId]:[]),sent:0,suppressed:0,errors:[] as string[]};
+ // Owners get the report only where the rebuild is on for their business (per row under `workspace`).
+ const listed=await websiteDocumentStore.listPublished();
+ const released=await Promise.all(listed.map(row=>websiteRebuildReleaseEnabledForWorkspace(row.workspaceId).catch(()=>false)));
+ const published=listed.filter((_row,index)=>released[index]);const result={tenants:published.flatMap(row=>row.tenantId?[row.tenantId]:[]),sent:0,suppressed:0,errors:[] as string[]};
  for(const site of published){
   try{
    const {data,error}=await (db as unknown as WorkspaceDb).from("workspace_memberships").select("user_id").eq("workspace_id",site.workspaceId).eq("role","owner").order("created_at",{ascending:true}).limit(1);
-   if(error||!data?.[0])throw new WorkspaceStoreError("No current workspace owner could be confirmed.");
+   if(error)throw new WorkspaceStoreError("No current workspace owner could be confirmed.");
+   if(!data?.[0]){result.errors.push(`${site.tenantId??site.workId}: no owner has accepted this business yet; invite one (scripts/business-ownership.ts)`);continue;}
    const identity=await db.auth.admin.getUserById(z.string().uuid().parse(data[0].user_id));
    const user=identity.data.user;if(identity.error||!user?.email||!user.email_confirmed_at)throw new WorkspaceStoreError("No verified workspace owner could be confirmed.");
-   const delivery=await sendOwnerWebsiteMonthlyReport({userId:user.id,verifiedEmail:user.email.trim().toLowerCase()},site.workId,{month});
-   if(delivery.delivery.status==="accepted")result.sent++;else result.suppressed++;
+   const delivery=await sendCronWebsiteMonthlyReport({userId:user.id,verifiedEmail:user.email.trim().toLowerCase()},site.workId,month);
+   if(delivery.status==="accepted")result.sent++;else result.suppressed++;
   }catch{result.errors.push(`${site.tenantId??site.workId}: native monthly report could not be confirmed`);}
  }
  return result;

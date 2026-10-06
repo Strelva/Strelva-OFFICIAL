@@ -5,7 +5,7 @@ import {
   getExistingLeadToken,
   saveDeliveryLead,
 } from "@/lib/access-request-delivery";
-import { isRateLimitedWindowedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedWindowedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

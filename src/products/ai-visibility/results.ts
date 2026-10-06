@@ -6,7 +6,7 @@
  * interest is promoted into the existing pre-tenant Delivery Lead lifecycle so
  * it becomes operator-actionable instead of landing in an invisible side store.
  */
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import type { AiVisibilityResult, ScoreInput, StoredAiVisibilityResult } from "./contracts";
 
 const RESULT_TTL_SECONDS = 180 * 24 * 60 * 60;

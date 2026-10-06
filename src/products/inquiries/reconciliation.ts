@@ -6,7 +6,7 @@
  * fields remain in the lead record and are reread when a repair is processed.
  */
 
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import { getLeadById, getLeads, type LeadRecord } from "@/lib/leads";
 import type { InquiryTimelineEventType } from "./contracts";
 import type { InquiryRepository, InquiryWorkspaceSnapshot } from "./repository";

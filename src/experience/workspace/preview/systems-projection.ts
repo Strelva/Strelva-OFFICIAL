@@ -15,13 +15,16 @@
 import { uuidFromSeed } from "@/platform/business-record/tenant-import";
 import { systemsFromExisting, type ExistingSystemsSnapshot } from "@/platform/systems/from-existing";
 import { domainObservations, heartbeatObservations, scanObservation, type Observation } from "@/platform/system-health";
-import type { HeartbeatStatus } from "@/lib/heartbeat";
-import { CRON_MAX_AGE_SECONDS } from "@/lib/heartbeat";
+import type { HeartbeatStatus } from "@/platform/infra/heartbeat";
+import { CRON_MAX_AGE_SECONDS } from "@/platform/infra/heartbeat";
 import { bareHostname, type WebsiteRebuildCandidate } from "@/products/websites/index";
 import { inquiryFormUnchecked, makeRealInSandbox, projectWorkspaceSystems, type SystemsProjectionInput } from "@/experience/systems/server";
 import type { WorkspaceMakeRealResult, WorkspaceSnapshot, WorkspaceSystems } from "../contracts";
 import { createPreviewRequest, type PreviewScenario } from "./fixture";
-import { MOONEY_TENANT } from "./systems-fixture";
+import { MOONEY_TENANT, previewStoredVersions } from "./systems-fixture";
+import { addPublishingSystems } from "@/products/publishing/projection";
+import { previewPublishingExtras, previewPublishingSnapshot, type PreviewPublishing } from "./publishing-fixture";
+import { withPreviewMakeReal, type PreviewMakeReal } from "./make-real-fixture";
 
 export interface PreviewSystems {
   systems: Record<string, WorkspaceSystems>;
@@ -33,7 +36,7 @@ export interface PreviewSystems {
 }
 
 const PREVIEW_ACTOR = { userId: "c0000000-0000-4000-8000-000000000001", verifiedEmail: "owner@example.invalid" };
-const SPINE_PRODUCTS = new Set(["websites", "applications", "custom-applications", "scheduling", "documents", "tracker"]);
+const SPINE_PRODUCTS = new Set(["websites", "applications", "custom-applications", "scheduling", "tracker"]);
 const text = (value: unknown) => typeof value === "string" && value.trim() ? value : null;
 
 function existingSnapshot(snapshot: WorkspaceSnapshot, inquiryTenant: string | null): ExistingSystemsSnapshot {
@@ -66,7 +69,7 @@ function candidates(snapshot: WorkspaceSnapshot): WebsiteRebuildCandidate[] {
       workId: work.id, title: work.title, sourceHost: source ? bareHostname(source) : null, tenantId: null,
       ready: ["review", "approved", "ready"].includes(work.operation?.status ?? ""),
       summary: text(work.input.summary) ?? "The same business, pages and facts, rebuilt on Strelva's website system.",
-      evidence: text(work.input.evidence), previewHref: preview, candidateRevision: 1, candidateContentHash: null,
+      evidence: text(work.input.evidence), previewHref: preview, candidateRevision: 1, candidateContentHash: null, origin: "rebuild" as const,
     }];
   });
 }
@@ -93,8 +96,8 @@ function fixtureEvidence(scenario: PreviewScenario, input: Pick<SystemsProjectio
   return observations;
 }
 
-export async function previewSystems(scenario: PreviewScenario, options: { installedStaffRequest?: boolean; seededRequests?: boolean; systems: boolean }, now: number = Date.now()): Promise<PreviewSystems> {
-  const { systems: released, ...fixtureOptions } = options;
+export async function previewSystems(scenario: PreviewScenario, options: { installedStaffRequest?: boolean; seededRequests?: boolean; systems: boolean; publishing?: PreviewPublishing; makeReal?: PreviewMakeReal }, now: number = Date.now()): Promise<PreviewSystems> {
+  const { systems: released, publishing: publishingMode = "off", makeReal: _makeReal, ...fixtureOptions } = options;
   if (!released) return { systems: {}, makeReal: {}, owners: [], released };
   const request = createPreviewRequest(scenario, fixtureOptions);
   const first = await (await request("/api/workspace")).json() as WorkspaceSnapshot;
@@ -107,15 +110,26 @@ export async function previewSystems(scenario: PreviewScenario, options: { insta
     const response = await request(`/api/workspace?workspaceId=${encodeURIComponent(workspace.id)}`);
     if (!response.ok) continue;
     const snapshot = await response.json() as WorkspaceSnapshot;
-    const listing = systemsFromExisting(existingSnapshot(snapshot, inquiryTenant));
+    const existing = systemsFromExisting(existingSnapshot(snapshot, inquiryTenant));
+    // Publishing runs the workspace route's projection over a fictional snapshot.
+    const published = publishingMode === "off" ? null
+      : addPublishingSystems(existing, previewPublishingSnapshot(existing, scenario, publishingMode, now), { ...previewPublishingExtras(scenario), now });
+    const listing = published?.listing ?? existing;
     const base = {
       listing,
+      ...(published ? { publishing: { websiteParts: published.websiteParts, offers: published.offers, listings: published.listings } } : {}),
       siteDomains: new Map((snapshot.managedWork ?? []).flatMap((site) => site.domain ? [[site.id, site.domain] as const] : [])),
       candidates: candidates(snapshot),
       actorId: PREVIEW_ACTOR.userId,
       now,
+      // The Mooney Firm's site is changed through Requests (a custom repo), so Ask for a change files one.
+      ...(scenario.startsWith("mooney") ? { siteEditing: new Map([[MOONEY_TENANT, "request" as const]]) } : {}),
     };
-    const projection = await projectWorkspaceSystems({ ...base, observations: fixtureEvidence(scenario, { listing }, now) });
+    const projected = await projectWorkspaceSystems({ ...base, observations: [...fixtureEvidence(scenario, { listing }, now), ...(published?.observations ?? [])] });
+    // Lineage comes only from stored Version rows, as on the route (withVersions).
+    const versions = projected.status === "ready" ? previewStoredVersions(workspace.id, projected.systems) : [];
+    const withLineage = versions.length ? { ...projected, versions } : projected;
+    const projection = scenario.startsWith("mooney") ? withPreviewMakeReal(withLineage, options.makeReal ?? "off", now) : withLineage;
     result.systems[workspace.id] = projection;
     for (const possibility of projection.possibilities.filter((item) => item.status === "ready")) {
       const made = await makeRealInSandbox(base, PREVIEW_ACTOR, possibility.id, { canActivate: true });

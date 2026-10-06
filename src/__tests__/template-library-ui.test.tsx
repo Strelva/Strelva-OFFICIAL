@@ -42,6 +42,19 @@ describe("template creation and recovery", () => {
     expect(node.textContent).toContain("Your private tool is ready");
     expect(node.querySelector(`a[href*="${appId}"]`)).toBeTruthy();
   });
+  it("offers a Request when only Strelva may build the tool, and creates nothing", async () => {
+    const onRequest = vi.fn();
+    const request = vi.fn(async () => new Response(JSON.stringify({ error: "Ask Strelva to build this.", code: "make_systems_required" }), { status: 403 })) as unknown as typeof fetch;
+    const node = await render(request, { onRequest });
+    await act(async () => button(node, "Create private tool").click());
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(node.textContent).toContain("Ask Strelva to build this.");
+    expect(node.querySelector('[role="alert"]')).toBeNull();
+    expect(node.textContent).not.toContain("Your private tool is ready");
+    await act(async () => button(node, "Ask Strelva to build this").click());
+    expect(onRequest).toHaveBeenCalledWith(expect.stringContaining("Build this tool for us: Staff requests."));
+    expect(button(node, "Create private tool").disabled).toBe(false);
+  });
   it("can start a fresh copy after creating from the same template", async () => {
     const ids = ["aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"];
     const request = vi.fn(async () => new Response(JSON.stringify({ id: ids[vi.mocked(request).mock.calls.length - 1] ?? ids[0], workspaceId, productId: "applications" }), { status: 201 })) as unknown as typeof fetch;

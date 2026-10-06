@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const boundary = vi.hoisted(() => ({ user: vi.fn(), rpc: vi.fn() }));
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: boundary.user }));
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => ({ rpc: boundary.rpc }) }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: boundary.user }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: boundary.rpc }) }));
 import { POST as participationPost, GET as participationGet } from "@/app/api/work-participation/route";
 import { POST as contextPost } from "@/app/api/work-context/route";
 const userId = "11111111-1111-4111-8111-111111111111";

@@ -1,8 +1,8 @@
 import { notFound, redirect } from "next/navigation";
-import { requireTenantAccess } from "@/lib/auth";
+import { requireTenantAccess } from "@/platform/infra/auth";
 import { isTenantId } from "@/lib/scaffold-contracts";
 import { getTenantConfig } from "@/lib/tenants";
-import { inquiryReleaseEnabled } from "@/products/inquiries/server";
+import { inquiryReleaseMayBeOn, inquiryReleasedForCurrentUser } from "@/products/inquiries/server";
 import { InquiryServerExperience } from "@/experience/inquiries/InquiryServerExperience";
 
 export const dynamic = "force-dynamic";
@@ -13,12 +13,13 @@ export const metadata = {
 };
 
 export default async function BusinessPage({ params }: { params: Promise<{ tenant: string }> }) {
-  if (!inquiryReleaseEnabled()) notFound();
+  if (!inquiryReleaseMayBeOn()) notFound();
   const { tenant } = await params;
   if (!isTenantId(tenant)) notFound();
   const denied = await requireTenantAccess(tenant);
   if (denied?.status === 401) redirect(`/sign-in?next=${encodeURIComponent(`/business/${tenant}`)}`);
   if (denied) notFound();
+  if (!(await inquiryReleasedForCurrentUser(tenant))) notFound();
   const business = await getTenantConfig(tenant);
   if (!business || !business.active) notFound();
   // Private state is loaded by the API, which repeats authorization per read/write.

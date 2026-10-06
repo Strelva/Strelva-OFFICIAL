@@ -17,12 +17,10 @@
  * proven by tests; live calls require the API access grant to go live.
  */
 
-import { getConnection } from "./connections";
 import { addEvent } from "./events";
 import { sendSlackNotification } from "./slack";
-import { getRedis } from "./redis";
 import { GBP_WRITE_SCOPE, connectionHasWriteScope } from "./gbp-replies";
-import { refreshAccessToken } from "./google-token";
+import { getGoogleGrant, getGoogleLocation, getValidGoogleAccessToken } from "./google-access";
 
 // ─── GBP API base URLs ────────────────────────────────────────────────────────
 
@@ -171,36 +169,6 @@ async function emitSetupPending(
   }
 }
 
-// ─── Token helpers (refreshAccessToken shared via google-token.ts) ────────────
-
-async function getValidToken(tenantId: string): Promise<string | null> {
-  const connection = await getConnection(tenantId, "google");
-  if (!connection || connection.status !== "connected") return null;
-
-  if (connection.expiresAt) {
-    const buf = 5 * 60 * 1000;
-    if (Date.now() + buf > new Date(connection.expiresAt).getTime()) {
-      if (!connection.refreshToken) return null;
-      return refreshAccessToken(connection.refreshToken);
-    }
-  }
-  return connection.accessToken;
-}
-
-// ─── Account/location meta (mirrors gbp-replies.ts) ──────────────────────────
-
-async function fetchGBPMeta(
-  tenantId: string
-): Promise<{ accountId: string; locationId: string } | null> {
-  const redis = getRedis();
-  if (!redis) return null;
-  const meta = await redis.get<{ accountId?: string; locationId?: string }>(
-    `google-meta:${tenantId}`
-  );
-  if (!meta?.accountId || !meta?.locationId) return null;
-  return { accountId: meta.accountId, locationId: meta.locationId };
-}
-
 // ─── Shared error emitter ─────────────────────────────────────────────────────
 
 async function emitFailure(
@@ -216,7 +184,7 @@ async function emitFailure(
       title: `GBP ${operation} failed`,
       body: evidence,
       status: "pending",
-      metadata: { kind: `gbp_${operation}_failed`, evidence },
+      metadata: { kind: `gbp_${operation}_failed`, evidence, reviewAudience: "operator" },
     });
     sendSlackNotification({
       text: `GBP ${operation} FAILED for *${tenantId}* — ${evidence}`,
@@ -235,14 +203,14 @@ async function resolveWriteContext(
   tenantId: string,
   operation: string
 ): Promise<WriteContextResult> {
-  const connection = await getConnection(tenantId, "google");
-  if (!connection || connection.status !== "connected") {
+  const grant = await getGoogleGrant(tenantId);
+  if (!grant || grant.status !== "connected") {
     const evidence = `tenant=${tenantId} error=no_connected_google_account`;
     await emitFailure(tenantId, operation, evidence);
     return { ok: false, evidence };
   }
 
-  if (!connectionHasWriteScope(connection.scopes)) {
+  if (!connectionHasWriteScope(grant.scopes)) {
     const evidence = `tenant=${tenantId} error=missing_gbp_write_scope scope=${GBP_WRITE_SCOPE} requires_reconnect=true`;
     await emitFailure(tenantId, operation, evidence);
     sendSlackNotification({
@@ -251,14 +219,14 @@ async function resolveWriteContext(
     return { ok: false, evidence };
   }
 
-  const accessToken = await getValidToken(tenantId);
+  const accessToken = await getValidGoogleAccessToken(grant);
   if (!accessToken) {
     const evidence = `tenant=${tenantId} error=token_refresh_failed`;
     await emitFailure(tenantId, operation, evidence);
     return { ok: false, evidence };
   }
 
-  const meta = await fetchGBPMeta(tenantId);
+  const meta = await getGoogleLocation(tenantId, grant);
   if (!meta) {
     const evidence = `tenant=${tenantId} error=missing_account_location_meta`;
     await emitFailure(tenantId, operation, evidence);
@@ -687,13 +655,13 @@ export interface GbpState {
  * Requires: Business Profile API access approval + business.manage scope.
  */
 export async function getGbpState(tenantId: string): Promise<GbpState | null> {
-  const connection = await getConnection(tenantId, "google");
-  if (!connection || connection.status !== "connected") return null;
+  const grant = await getGoogleGrant(tenantId);
+  if (!grant || grant.status !== "connected") return null;
 
-  const accessToken = await getValidToken(tenantId);
+  const accessToken = await getValidGoogleAccessToken(grant);
   if (!accessToken) return null;
 
-  const meta = await fetchGBPMeta(tenantId);
+  const meta = await getGoogleLocation(tenantId, grant);
   if (!meta) return null;
 
   const { accountId, locationId } = meta;

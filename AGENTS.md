@@ -101,12 +101,14 @@ and `created_at` on partial updates. `stable_id` never changes. Slug renames go
 through `src/lib/tenant-rename.ts` so no Redis state is left under the old slug.
 
 **One of each.** One scanner (`src/lib/scan.ts`, `scan-store.ts`). One set of
-agent tools (`src/lib/agent-shared.ts`). One email path (`src/lib/email/send.ts`,
-gated by `email-enabled.ts`). One secrets path (`src/lib/crypto/secrets.ts`).
+agent tools (`src/lib/agent-shared.ts`). One email path
+(`src/platform/infra/email/send.ts`, gated by `email/enabled.ts`). One secrets
+path (`src/platform/infra/crypto/secrets.ts`). Shared infrastructure lives in
+`src/platform/infra`; the old `src/lib` paths only re-export it.
 Extend these; don't build a second.
 
 **Crons.** Declare in `vercel.json`, authenticate with `requireCronRequest`,
-and register in `CRON_MAX_AGE_SECONDS` in `src/lib/heartbeat.ts`.
+and register in `CRON_MAX_AGE_SECONDS` in `src/platform/infra/heartbeat.ts`.
 
 **Outside writes.** Content and Google changes go through
 `src/lib/ai-governance.ts` and approval. The only exception is a tenant's

@@ -8,6 +8,7 @@ import styles from "./workspace-surface.module.css";
 import {
   createWorkspaceStartContinuation,
   planWorkspaceStart,
+  selfServiceWorkspaceStartPlan,
   workspaceStartContinueLabel,
   type WorkspaceStartContext,
   type WorkspaceStartContinuation,
@@ -120,6 +121,16 @@ export function WorkspaceStart({ context, systemsReleased = false, initialReques
     setError("");
   }
 
+  /** The managed request's second choice: the owner makes the website themselves. Nothing was sent. */
+  function makeItYourself() {
+    if (!plan) return;
+    const next = selfServiceWorkspaceStartPlan(plan);
+    if (!next) return;
+    setPlan(next);
+    setSelectedPartIds(next.selectedPartIds);
+    setError("");
+  }
+
   function chooseExample(value: string) {
     setComposerSeed(value);
     setPlan(null);
@@ -197,7 +208,7 @@ export function WorkspaceStart({ context, systemsReleased = false, initialReques
         {plan.status === "blocked" ? <div className={styles.startBlocked} role="status"><CircleHelp size={17} aria-hidden="true" /><p>{plan.reason}</p></div> : null}
       </>}
       {error ? <p className={styles.startError} role="alert">{error}</p> : null}
-      <div className={styles.startProposalActions}>{plan.kind === "help" ? <><button type="button" className={styles.primaryAction} disabled={!canContinue} onClick={continueToSupportedFlow}>{plan.deliveryMode === "service" ? "Review website request" : "Prepare a plan"}<ArrowRight size={16} /></button><button type="button" className={styles.secondaryAction} onClick={() => onHelp(plan.helpRequest || plan.request)}>Ask about available paths<ArrowRight size={16} /></button></> : plan.status === "blocked" ? <>{canPreparePlan ? <button type="button" className={styles.primaryAction} onClick={preparePlan}>Prepare a plan<ArrowRight size={16} /></button> : null}<button type="button" className={styles.secondaryAction} onClick={continueToSupportedFlow}>Ask about this path<ArrowRight size={16} /></button></> : <><button type="button" className={styles.primaryAction} disabled={!canContinue} onClick={continueToSupportedFlow}>{workspaceStartContinueLabel(plan)}<ArrowRight size={16} /></button>{canPreparePlan ? <button type="button" className={styles.secondaryAction} onClick={preparePlan}>Prepare a plan<ArrowRight size={16} /></button> : null}</>}</div>
+      <div className={styles.startProposalActions}>{plan.kind === "help" ? <><button type="button" className={styles.primaryAction} disabled={!canContinue} onClick={continueToSupportedFlow}>{plan.deliveryMode === "service" ? "Review website request" : "Prepare a plan"}<ArrowRight size={16} /></button>{plan.deliveryMode === "service" && plan.selfServiceRoute ? <button type="button" className={styles.secondaryAction} onClick={makeItYourself}>Make it yourself instead<ArrowRight size={16} /></button> : null}<button type="button" className={styles.secondaryAction} onClick={() => onHelp(plan.helpRequest || plan.request)}>Ask about available paths<ArrowRight size={16} /></button></> : plan.status === "blocked" ? <>{canPreparePlan ? <button type="button" className={styles.primaryAction} onClick={preparePlan}>Prepare a plan<ArrowRight size={16} /></button> : null}<button type="button" className={styles.secondaryAction} onClick={continueToSupportedFlow}>Ask about this path<ArrowRight size={16} /></button></> : <><button type="button" className={styles.primaryAction} disabled={!canContinue} onClick={continueToSupportedFlow}>{workspaceStartContinueLabel(plan)}<ArrowRight size={16} /></button>{canPreparePlan ? <button type="button" className={styles.secondaryAction} onClick={preparePlan}>Prepare a plan<ArrowRight size={16} /></button> : null}</>}</div>
       {plan.status === "blocked" && context.readOnly ? <p className={styles.startFootnote}>Use the workspace selector above to switch to a workspace where you can start work. No work has been created.</p> : null}
     </section> : null}
   </div>;

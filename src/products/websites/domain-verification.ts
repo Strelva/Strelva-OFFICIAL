@@ -1,5 +1,4 @@
 import type { DomainClaim } from "@/lib/types";
-import type { WebsiteDocumentRevision } from "./document-store";
 export const DOMAIN_VERIFICATION_INITIAL_MS=48*60*60*1000;
 export const DOMAIN_VERIFICATION_ESCALATION_MS=7*24*60*60*1000;
 export function domainVerificationDue(claim:DomainClaim,now:number){
@@ -10,7 +9,9 @@ export function domainVerificationDue(claim:DomainClaim,now:number){
  return now-updated>=interval;
 }
 export async function verifyHostedDomains(dependencies:{
- list:()=>Promise<WebsiteDocumentRevision[]>;
+ /** Every site whose claims are polled: active tenants (custom repos and
+  * hosted sites alike). Only `tenantId` is read; duplicates are polled once. */
+ list:()=>Promise<ReadonlyArray<{tenantId?:string|null}>>;
  claims:(tenantId:string)=>Promise<DomainClaim[]>;
  refresh:(tenantId:string,hostname:string)=>Promise<{ok:boolean}>;
  alert?:(input:{tenantId:string;hostname:string;createdAt:string;checkedAt:string})=>Promise<void>;
@@ -18,7 +19,8 @@ export async function verifyHostedDomains(dependencies:{
 }){
  const now=dependencies.now?.()??Date.now();const sites=await dependencies.list();
  const pending:Array<{tenantId:string;claim:DomainClaim}>=[];
- for(const site of sites){if(!site.tenantId)continue;for(const claim of await dependencies.claims(site.tenantId)){if(claim.status!=="verified"&&claim.role!=="admin")pending.push({tenantId:site.tenantId,claim});}}
+ const tenantIds=[...new Set(sites.map(site=>site.tenantId).filter((id):id is string=>Boolean(id)))];
+ for(const tenantId of tenantIds){for(const claim of await dependencies.claims(tenantId)){if(claim.status!=="verified"&&claim.role!=="admin")pending.push({tenantId,claim});}}
  const due=pending.filter(row=>domainVerificationDue(row.claim,now)).sort((a,b)=>Date.parse(a.claim.updatedAt)-Date.parse(b.claim.updatedAt));
  const selected=due.slice(0,Math.max(1,Math.min(dependencies.limit??10,25)));let failed=0;let refreshed=0;let alerted=0;
  for(const {tenantId,claim}of selected){try{const result=await dependencies.refresh(tenantId,claim.domain);if(!result.ok)failed++;else refreshed++;}catch{failed++;}}

@@ -13,7 +13,7 @@ import { describe, it, expect } from "vitest";
  */
 describe("deprovision-tenant table coverage", () => {
   const root = process.cwd();
-  const types = readFileSync(join(root, "src/lib/db/database.types.ts"), "utf8");
+  const types = readFileSync(join(root, "src/platform/infra/db/database.types.ts"), "utf8");
   const deprovisionLib = readFileSync(join(root, "src/lib/deprovision.ts"), "utf8");
 
   // Tenant-scoped tables = every `Tables` entry whose Row block contains tenant_id.
@@ -35,6 +35,19 @@ describe("deprovision-tenant table coverage", () => {
   it("sweeps every tenant_id table (plus the tenants row itself)", () => {
     const missing = tenantTables.filter((t) => !new RegExp(`"${t}"`).test(deprovisionLib));
     expect(missing, `src/lib/deprovision.ts is missing tenant_id tables: ${missing.join(", ")}`).toEqual([]);
+  });
+
+  it("lists the tables whose sweep is undecided, outside the sweep, and lets that list only shrink", () => {
+    const swept = deprovisionLib.slice(deprovisionLib.indexOf("TENANT_SCOPED_TABLES = ["), deprovisionLib.indexOf("] as const;"));
+    const undecided = /TENANT_TABLES_SWEEP_UNDECIDED = \[([^\]]*)\]/.exec(deprovisionLib)?.[1] ?? "";
+    const listed = [...undecided.matchAll(/"([a-z_]+)"/g)].map((m) => m[1]!);
+    const known = ["agency_managed_website_draft_grants", "agency_managed_website_draft_preparations",
+      "agency_managed_website_draft_revisions", "outside_write_receipts", "report_snapshots"];
+    expect(listed.every((t) => known.includes(t)), "a table was added to the undecided list; sweep it or decide instead").toBe(true);
+    for (const table of listed) {
+      expect(tenantTables).toContain(table);
+      expect(swept).not.toContain(`"${table}"`);
+    }
   });
 
   it("keeps workspace-owned website tables out of the sweep", () => {

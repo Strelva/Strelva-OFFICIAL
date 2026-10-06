@@ -9,7 +9,7 @@ import {
   type Possibility,
 } from "@/platform/possibilities";
 import type { SystemRef } from "@/platform/systems/contracts";
-import { createInMemoryApprovalRecords } from "./approvals";
+import { createInMemoryApprovalRecords, planApprovalAuthority, type ApprovalRecordsPort } from "./approvals";
 import type { Activation } from "./contracts";
 import { createInMemoryLiveSystems } from "./in-memory-live";
 import { createIsolatedAdapter, type IsolatedAdapter } from "./isolated-adapters";
@@ -62,7 +62,16 @@ export interface IsolatedPossibilityInput {
 
 export interface IsolatedSandbox {
   possibility: Possibility;
-  run(actor: WorkspaceActor, authority: { canActivate: boolean; reason?: string }): Promise<IsolatedRun>;
+  run(actor: WorkspaceActor, authority: { canActivate: boolean; reason?: string }, options?: SandboxRunOptions): Promise<IsolatedRun>;
+}
+
+export interface SandboxRunOptions {
+  /**
+   * The owner's one approval for this plan (a Needs you item). When given,
+   * activation is allowed only while that record still approves this exact
+   * plan, and it stands in for every effect that needs an approval.
+   */
+  planApproval?: { approvalId: string; approvals: ApprovalRecordsPort };
 }
 
 export interface IsolatedRun {
@@ -121,11 +130,11 @@ export async function prepareIsolatedPossibility(input: IsolatedPossibilityInput
 
   return {
     possibility: prepared,
-    async run(actor, permission) {
+    async run(actor, permission, options = {}) {
       const possibilities = createInMemoryPossibilityRepository();
       await possibilities.create(prepared);
       const activations = createInMemoryActivationRepository();
-      const authority: AuthorityPort = {
+      const base: AuthorityPort = {
         async check(_actor, request) {
           if (request.scope === "system.activate") {
             return permission.canActivate ? { allowed: true, grantId: "isolated-sandbox" } : { allowed: false, reason: permission.reason ?? "only an owner can make this real" };
@@ -133,13 +142,18 @@ export async function prepareIsolatedPossibility(input: IsolatedPossibilityInput
           return { allowed: false, reason: "this outside connection is not connected to Make real yet" };
         },
       };
+      const plan = options.planApproval;
+      const authority = plan
+        ? planApprovalAuthority(base, { approvals: plan.approvals, businessId: input.businessId, approvalId: plan.approvalId, plan: async () => prepared })
+        : base;
       const makeReal = createMakeReal({
         possibilities, activations, live: live.port, authority, adapters,
         checks: { async run() { return { passed: false, detail: "Not run: this was an isolated copy, not the live System." }; } },
-        approvals: createInMemoryApprovalRecords(),
+        approvals: plan?.approvals ?? createInMemoryApprovalRecords(),
         clock: () => input.at,
       });
-      let activation = await makeReal.start(actor, input.businessId, prepared.id);
+      let activation = await makeReal.start(actor, input.businessId, prepared.id,
+        plan ? { approvals: prepared.effects.map((effect) => ({ effectId: effect.id, approvalId: plan.approvalId })) } : {});
       for (let guard = 0; guard < activation.steps.length; guard++) {
         const next = nextRunnable(activation);
         if (!next || !PREP_STEPS.has(next.kind) || activation.status !== "in_progress") break;

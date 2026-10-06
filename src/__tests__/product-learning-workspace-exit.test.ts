@@ -5,12 +5,12 @@ const workspaceId = "11111111-1111-4111-8111-111111111111";
 const sourceWorkId = "22222222-2222-4222-8222-222222222222";
 const actor = { userId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", verifiedEmail: "staff@example.test" };
 
-vi.mock("@/lib/db/client", () => ({
+vi.mock("@/platform/infra/db/client", () => ({
   getSupabase: () => ({
     rpc: async () => ({ data: null, error: { message: "workspace_exit_future_work_blocked" } }),
   }),
 }));
-vi.mock("@/lib/db/repositories", () => ({ isSuperAdminUser: async () => true }));
+vi.mock("@/platform/infra/db/repositories", () => ({ isSuperAdminUser: async () => true }));
 vi.mock("@/platform/workspaces/repository", () => ({
   assertWorkspaceMember: async () => undefined,
   getWork: async () => ({

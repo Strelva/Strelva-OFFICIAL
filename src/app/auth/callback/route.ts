@@ -1,4 +1,4 @@
-import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/lib/workspace-location";
+import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/platform/workspaces/location";
 /**
  * Supabase Auth callback (migration Phase 4) — redirect target for OAuth (Google)
  * and magic-link. Exchanges the `code` for a session and writes the session cookies

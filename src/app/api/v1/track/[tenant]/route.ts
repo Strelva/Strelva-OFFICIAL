@@ -28,10 +28,10 @@
 import { NextResponse } from "next/server";
 import { trackClick } from "@/lib/storage";
 import { getTenantConfig } from "@/lib/tenants";
-import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { readOptionalJsonObject } from "@/lib/request-body";
 import { isTenantId } from "@/lib/scaffold-contracts";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 
 // The minimal public event vocabulary. Kept intentionally small: this is a
 // non-sensitive beacon, not the full internal event set. Maps 1:1 onto the

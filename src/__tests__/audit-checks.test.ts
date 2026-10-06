@@ -13,6 +13,14 @@ vi.mock("node:dns", () => ({
 // Mock global fetch for network-dependent checks (SSL, PageSpeed, HTML fetch)
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
+// Site reads use the pinned transport (redirect boundary covered in
+// audit-redirect-boundary.test.ts); route them through the same mock here.
+vi.mock("../lib/audit/pinned-fetch", () => ({
+  fetchPinnedAuditResponse: async (url: string) => {
+    const res = (await mockFetch(url)) as Response;
+    return { url: res.url || url, status: res.status, ok: res.ok, headers: res.headers, text: await res.text() };
+  },
+}));
 
 // ---------------------------------------------------------------------------
 // Imports (after mocks)

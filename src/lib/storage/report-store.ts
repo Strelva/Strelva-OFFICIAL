@@ -11,8 +11,8 @@
 import path from "path";
 import type { WeeklyReportData } from "../reports";
 import { readDevFile, writeDevFile } from "./core";
-import { dataSourceIsPostgres } from "../db/source-flags";
-import { getSupabase, type Row, type Insert } from "../db/client";
+import { dataSourceIsPostgres } from "@/platform/infra/db/source-flags";
+import { getSupabase, type Row, type Insert } from "@/platform/infra/db/client";
 
 export interface StoredWeeklyReport {
   id: string;

@@ -256,6 +256,8 @@ firm's ADR template/permissions must be verified at the authorized live boundary
 - Private fixed-part applications, scheduling, recurring record comparisons,
   owner-approved work with runtime budgets, scoped contributions and source context.
 - Internal evidence and learning work, restricted to active Strelva administrators.
+  October 6, 2026: product learning is out of 1.0.0 release scope. Its code stays
+  behind `STRELVA_PRODUCT_LEARNING_RELEASE` (off) and is not a release gate.
 - Record assignments and links, with source-workspace coordination removed on handoff.
 
 CSV is the supported import format. Excel workbooks, spreadsheet formulas,

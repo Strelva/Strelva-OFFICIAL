@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const boundary = vi.hoisted(() => ({ database: null as unknown }));
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => boundary.database }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => boundary.database }));
 
 import {
   acceptOnboardingRequirement,

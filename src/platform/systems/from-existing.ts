@@ -47,7 +47,10 @@ import type { SystemStore } from "./store";
  *
  * Not mapped, on purpose: plans, investigations, responsibilities, learning
  * items and onboarding cases are work or records inside a System, not
- * Systems themselves (RULE_SYSTEM_OUTPUT_IDENTITY boundary). Retired
+ * Systems themselves (RULE_SYSTEM_OUTPUT_IDENTITY boundary). Private
+ * documents are supporting files under the business ("All apps and files"),
+ * not Systems, at 1.0.0 (docs/product/specs/systems-catalog.md 3.5). A saved
+ * check is evidence in the health of the System it watches (3.6). Retired
  * applications are omitted.
  */
 
@@ -90,6 +93,20 @@ export const existingManagedWebsiteSchema = z.object({
   linkedAt: iso,
 });
 
+/** A website the business runs elsewhere and connected by script (connected_sites). */
+export const existingConnectedSiteSchema = z.object({
+  id: z.string().uuid(),
+  label: z.string(),
+  siteUrl: z.string(),
+  siteHost: z.string(),
+  status: z.enum(["active", "revoked"]),
+  verifiedAt: z.string().nullable(),
+  lastEventAt: z.string().nullable(),
+  createdAt: iso,
+  updatedAt: iso,
+});
+export type ExistingConnectedSite = z.input<typeof existingConnectedSiteSchema>;
+
 export const existingSystemsSnapshotSchema = z.object({
   businessId: z.string().uuid(),
   /** What the reader may see: the whole business, or only assigned work.
@@ -111,6 +128,8 @@ export const existingSystemsSnapshotSchema = z.object({
     id: z.string().uuid(), provider: z.string(), calendarName: z.string(),
     status: z.enum(["authorized", "connected", "revoked", "error"]),
   })),
+  /** Read separately (list_connected_sites) while STRELVA_CONNECTED_SITES_RELEASE is on. */
+  connectedSites: z.array(existingConnectedSiteSchema).optional().transform((value) => value ?? []),
 });
 export type ExistingSystemsSnapshot = z.input<typeof existingSystemsSnapshotSchema>;
 type Snapshot = z.output<typeof existingSystemsSnapshotSchema>;
@@ -129,6 +148,7 @@ function withinScope(snapshot: Snapshot): Snapshot {
     inquiryWorkspaces: [],
     bookingGrants: snapshot.bookingGrants.filter((grant) => workIds.has(grant.workId)),
     calendarConnections: [],
+    connectedSites: [],
   };
 }
 
@@ -139,8 +159,10 @@ export interface SystemListing {
   provenance: SystemProvenance;
   /** Why the lifecycle reads as it does, for an existing thing. */
   basis: string | null;
-  /** Native ids this System stands for (work id, tenant id). */
-  references: { savedWorkId: string | null; tenantStableId: string | null; tenantId: string | null };
+  /** Native ids this System stands for (work id, tenant id, connected site). */
+  references: { savedWorkId: string | null; tenantStableId: string | null; tenantId: string | null; connectedSiteId?: string | null };
+  /** A connected site's address and reporting, for its surface and health. */
+  connectedSite?: { siteUrl: string; siteHost: string; verified: boolean; lastEventAt: string | null };
 }
 
 export interface ConnectionListing {
@@ -160,8 +182,9 @@ const SAVED_WORK_KINDS: Record<string, { kind: SystemKind; fallbackName: string 
   "custom-applications/custom-application": { kind: "internal_app", fallbackName: "Custom app" },
   "scheduling/schedule": { kind: "booking", fallbackName: "Bookings" },
   "inquiry/inquiry_capability": { kind: "inquiry", fallbackName: "Inquiries" },
-  "documents/document": { kind: "document", fallbackName: "Document" },
-  "tracker/tracker": { kind: "tracker", fallbackName: "Tracker" },
+  // A tracker is an internal tool that started from a list or CSV: the same
+  // System kind as an application, with its own engine and data kept.
+  "tracker/tracker": { kind: "internal_app", fallbackName: "Internal tool" },
 };
 
 function savedWorkLifecycle(work: SavedWork, snapshot: Snapshot): { lifecycle: SystemLifecycle; basis: string } | null {
@@ -282,6 +305,25 @@ export function systemsFromExisting(raw: ExistingSystemsSnapshot): BusinessSyste
     websiteByTenant.set(site.tenantStableId, system);
   }
 
+  // A site the business already runs elsewhere, connected by script. Its id is
+  // connected_site:<id> and survives a later rebuild (a new revision, same System).
+  for (const site of snapshot.connectedSites) {
+    const verified = site.verifiedAt !== null;
+    const lifecycle: SystemLifecycle = site.status === "revoked" ? "paused" : verified ? "live" : "draft";
+    const system = existingSystem(businessId, { kind: "connected_site", ref: site.id }, {
+      name: site.siteHost.replace(/^www\./, ""), kind: "website", lifecycle, createdAt: site.createdAt, updatedAt: site.updatedAt,
+    });
+    systems.push({
+      system, provenance: "existing",
+      basis: site.status === "revoked" ? "Disconnected from Strelva; the site itself is unchanged." : verified ? `Connected; ${site.siteHost} is proven to be this business's.` : `Waiting for proof that ${site.siteHost} is this business's.`,
+      references: { savedWorkId: null, tenantStableId: null, tenantId: null, connectedSiteId: site.id },
+      connectedSite: { siteUrl: site.siteUrl, siteHost: site.siteHost, verified, lastEventAt: site.lastEventAt },
+    });
+    connections.push({ provenance: "existing", connection: existingConnection(system, "read",
+      { type: "business_resource", resource: "business_record:facts" }, verified && site.status === "active" ? "connected" : "disconnected",
+      "Confirmed facts from the business record are filled into the site") });
+  }
+
   // Only tenants this business holds now; a stale binding never leaks another
   // business's inquiries (the SQL reader applies the same rule).
   const heldTenants = new Set(snapshot.managedWebsites.map((site) => site.tenantStableId));
@@ -364,6 +406,96 @@ export function mergeBusinessSystems(graph: SystemGraph, existing: BusinessSyste
   return { businessId: existing.businessId, systems, connections: [...storedConnections, ...derived] };
 }
 
+/**
+ * What the tenant side says about a managed site this business holds, read
+ * on the server from the tenant's own config (never copied into the
+ * workspace). Absent means unknown, and nothing is added for it.
+ */
+export interface TenantSiteFacts {
+  /** `tenants.features` as stored (legacy aliases allowed). */
+  features: readonly string[];
+  /** Public hostname of the live site, when the tenant records one. */
+  domain?: string | null;
+}
+
+/** Feature ids that mean the client runs its own checkout. */
+const CLIENT_CHECKOUT_FEATURES = new Set(["commerce", "shop", "products"]);
+/** Wellness surfaces that are views of the Bookings System, not Systems. */
+const BOOKING_VIEW_FEATURES = ["schedule", "roster"] as const;
+export type BookingView = (typeof BOOKING_VIEW_FEATURES)[number];
+
+/** The Store Connection's contract, in the words a customer reads. */
+export function clientStorePurpose(domain: string | null): string {
+  const where = domain ? `Store on ${domain}` : "Store on the site";
+  return `${where} · runs in the client's own checkout. Strelva has no authority there: the client's Stripe is the source of truth, and Strelva does not read it.`;
+}
+
+/** Projection-only identity for a managed site's tenant booking widget. */
+export function tenantBookingsSystemId(businessId: string, tenantStableId: string): string {
+  return uuidFromSeed(`system:${businessId}:tenant_bookings:${tenantStableId}`);
+}
+
+export interface TenantSurfaceListing extends BusinessSystems {
+  /** Day and week views of a Bookings System, by System id. */
+  bookingViews: Map<string, BookingView[]>;
+}
+
+/**
+ * Adds what the tenant side runs beside a managed website, without copying
+ * it (docs/product/specs/systems-catalog.md 3.2, 3.3):
+ *
+ * - A client checkout (`commerce`) is a Store Connection on the website
+ *   System: it appears with the site, Strelva has no authority, the client's
+ *   Stripe is the source of truth and Strelva does not read it. Never a
+ *   System, never a write.
+ * - Wellness schedule and roster are the Bookings System's day and week
+ *   views. When a Bookings System already appears on that site they attach to
+ *   it. Otherwise the site's own booking widget is shown as a Bookings System
+ *   that appears on the site. Its id is projection-only (origin null) until
+ *   the bookings spec gives the one booking store a stored origin; Make real
+ *   never targets it. Members stay frozen and are not shown.
+ */
+export function withTenantSurfaces(listing: BusinessSystems, facts: ReadonlyMap<string, TenantSiteFacts>): TenantSurfaceListing {
+  const systems = [...listing.systems];
+  const connections = [...listing.connections];
+  const bookingViews = new Map<string, BookingView[]>();
+  const websites = listing.systems.filter((item) => item.system.kind === "website" && item.references.tenantId);
+  for (const site of websites) {
+    const fact = facts.get(site.references.tenantId!);
+    if (!fact) continue;
+    const features = new Set(fact.features);
+    if ([...features].some((feature) => CLIENT_CHECKOUT_FEATURES.has(feature))) {
+      connections.push({ provenance: "existing", connection: existingConnection(site.system, "appear",
+        { type: "api", api: `client-checkout:${site.references.tenantId}` }, "connected", clientStorePurpose(fact.domain ?? null)) });
+    }
+    const views = BOOKING_VIEW_FEATURES.filter((feature) => features.has(feature));
+    if (!views.length || !site.references.tenantStableId) continue;
+    const onSite = listing.connections.find(({ connection }) => connection.kind === "appear"
+      && connection.target.type === "system" && connection.target.system.systemId === site.system.id
+      && listing.systems.some((item) => item.system.id === connection.source.systemId && item.system.kind === "booking"));
+    if (onSite) {
+      const id = onSite.connection.source.systemId;
+      bookingViews.set(id, [...new Set([...(bookingViews.get(id) ?? []), ...views])]);
+      continue;
+    }
+    const system: System = {
+      id: tenantBookingsSystemId(listing.businessId, site.references.tenantStableId),
+      businessId: listing.businessId, name: `${site.system.name} bookings`.slice(0, 160), purpose: null, kind: "booking",
+      lifecycle: site.system.lifecycle, currentRevision: null, origin: null, changeNumber: 1,
+      createdAt: site.system.createdAt, updatedAt: site.system.updatedAt,
+    };
+    systems.push({
+      system, provenance: "existing",
+      basis: "Bookings taken by the site's booking widget. The schedule and roster are its day and week views.",
+      references: { savedWorkId: null, tenantStableId: site.references.tenantStableId, tenantId: site.references.tenantId },
+    });
+    connections.push({ provenance: "existing", connection: existingConnection(system, "appear",
+      { type: "system", system: { businessId: listing.businessId, systemId: site.system.id } }, "connected", "Booking on the site") });
+    bookingViews.set(system.id, views);
+  }
+  return { businessId: listing.businessId, systems, connections, bookingViews };
+}
+
 /** Reads what the business already has (actor-checked, read-only). */
 export function readExistingSystemsSnapshot(actor: WorkspaceActor, businessId: string, db?: SystemsDb): Promise<Snapshot> {
   return callSystems("read_existing_business_systems", {
@@ -376,11 +508,13 @@ export function readExistingSystemsSnapshot(actor: WorkspaceActor, businessId: s
 /** Everything a business should see as its Systems: stored ones plus every
  * existing thing not yet stored. Both reads recheck the actor. */
 export async function listBusinessSystems(
-  actor: WorkspaceActor, businessId: string, deps: { store: SystemStore; db?: SystemsDb },
+  actor: WorkspaceActor, businessId: string,
+  deps: { store: SystemStore; db?: SystemsDb; connectedSites?: () => Promise<ExistingConnectedSite[]> },
 ): Promise<BusinessSystems> {
-  const [graph, snapshot] = await Promise.all([
+  const [graph, snapshot, connectedSites] = await Promise.all([
     deps.store.readGraph(actor, businessId),
     readExistingSystemsSnapshot(actor, businessId, deps.db),
+    deps.connectedSites ? deps.connectedSites().catch(() => []) : Promise.resolve([]),
   ]);
-  return mergeBusinessSystems(graph, systemsFromExisting(snapshot));
+  return mergeBusinessSystems(graph, systemsFromExisting({ ...snapshot, connectedSites }));
 }

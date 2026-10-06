@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { requireTenantAccess, verifyAuth } from "@/lib/auth";
+import { requireTenantAccess, verifyAuth } from "@/platform/infra/auth";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
-import { getInquiryRepository, inquiryReleaseEnabled, readInquiryRecord } from "@/products/inquiries/server";
+import { getInquiryRepository, inquiryReleaseMayBeOn, inquiryReleasedForCurrentUser, readInquiryRecord } from "@/products/inquiries/server";
 import { resolveInquiryWorkspace } from "@/products/inquiries/server";
 
 export const dynamic = "force-dynamic";
@@ -18,12 +18,13 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  if (!inquiryReleaseEnabled()) return json({ error: "Inquiry workspace is not enabled." }, 503);
+  if (!inquiryReleaseMayBeOn()) return json({ error: "Inquiry workspace is not enabled." }, 503);
   if (!(await verifyAuth())) return json({ error: "Unauthorized" }, 401);
   try {
     const tenant = await getTenantFromHeaders();
     const denied = await requireTenantAccess(tenant);
     if (denied) return denied;
+    if (!(await inquiryReleasedForCurrentUser(tenant))) return json({ error: "Inquiry workspace is not enabled." }, 503);
     const config = await getTenantConfig(tenant);
     if (!config || !config.active) return json({ error: "Business unavailable." }, 404);
     const workspace = await resolveInquiryWorkspace({

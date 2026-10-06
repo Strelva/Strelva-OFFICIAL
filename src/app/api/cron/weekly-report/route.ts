@@ -1,19 +1,19 @@
 import { NextResponse } from "next/server";
-import { recordHeartbeat } from "@/lib/heartbeat";
+import { recordHeartbeat } from "@/platform/infra/heartbeat";
 import { mapPool } from "@/lib/concurrency";
 import { recordMailSend } from "@/lib/storage/mail-log";
-import { alertOnce } from "@/lib/monitoring";
+import { alertOnce } from "@/platform/infra/monitoring";
 import { generateAllReports, buildReportSubject, buildReportHeading } from "@/lib/reports";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { generateWeeklyBrief } from "@/lib/weekly-brief";
-import { EMAIL_DOMAIN } from "@/lib/brand";
+import { EMAIL_DOMAIN } from "@/platform/infra/brand";
 import { sanitizeEmailSubjectText } from "@/lib/invite-email";
-import { emailSendingPaused } from "@/lib/email-enabled";
-import { renderEmailHtml, renderEmailText } from "@/lib/email/layout";
-import type { EmailRow } from "@/lib/email/layout";
+import { emailSendingPaused } from "@/platform/infra/email/enabled";
+import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
+import type { EmailRow } from "@/platform/infra/email/layout";
 import { isReportDue, markReportSent } from "@/lib/report-cadence";
 import { requireCronRequest } from "@/lib/cron-auth";
-import { sendEmail } from "@/lib/email/send";
+import { sendEmail } from "@/platform/infra/email/send";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and
 // would otherwise die mid-batch at scale on a lower default.
@@ -114,7 +114,8 @@ export async function GET(request: Request) {
 
 await mapPool(reports, 8, async (report) => {
     try {
-      const email = report.tenant.ownerEmail;
+      // Resolved once by generateAllReports (the one owner-recipient rule).
+      const email = report.ownerRecipient ?? report.tenant.ownerEmail;
       if (!email) {
         skippedReasons.push({ tenantId: report.tenant.id, reason: "missing_owner_email" });
         return;

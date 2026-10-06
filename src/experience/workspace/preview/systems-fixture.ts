@@ -9,7 +9,7 @@ import mooneyEvidence from "@/experience/websites/fixtures/mooney-evidence-2026-
 import { applicationSchema } from "@/products/applications/contracts";
 import type { ServiceRequest } from "@/platform/service-requests";
 import type { InquiryPreviewProfile } from "@/experience/inquiries/preview-fixture";
-import type { WorkspaceSnapshot, WorkspaceWork } from "../contracts";
+import type { WorkspaceSnapshot, WorkspaceSystemEntry, WorkspaceSystemVersion, WorkspaceWork } from "../contracts";
 
 export const SYSTEMS_PREVIEW_SCENARIOS = ["mooney", "mooney-empty", "mooney-loading", "mooney-shared", "mooney-member", "mooney-error", "agency-systems", "twin-trees"] as const;
 export type SystemsPreviewScenario = typeof SYSTEMS_PREVIEW_SCENARIOS[number];
@@ -188,4 +188,27 @@ export function createSystemsPreviewRequest(scenario: SystemsPreviewScenario): t
     if (url.pathname === "/api/work-allowances") return json({ error: "Allowances are not simulated in this preview." }, 403);
     return json({ error: "This action is not performed in the local preview. Nothing was changed." }, method === "GET" ? 404 : 409);
   };
+}
+
+/**
+ * Stored Version rows (system_versions) for the fixture, in the shape
+ * read_business_versions returns. Lineage is read only from these rows, so
+ * without them the preview would show no Versions at all. Fictional: the
+ * Mooney and Harbor intakes are Versions of the agency's intake source.
+ */
+export function previewStoredVersions(businessId: string, systems: readonly WorkspaceSystemEntry[]): WorkspaceSystemVersion[] {
+  const contexts: Record<string, { workId: string; label: string }> = {
+    [MOONEY]: { workId: MOONEY_INTAKE, label: "The Mooney Firm" },
+    [HARBOR]: { workId: HARBOR_INTAKE, label: "Harbor Dental" },
+  };
+  const context = contexts[businessId];
+  const system = context ? systems.find((entry) => entry.savedWorkId === context.workId) : undefined;
+  if (!context || !system) return [];
+  return [{
+    id: `f0000000-0000-4000-8000-${businessId.slice(-12)}`,
+    systemId: system.ref.systemId,
+    source: { businessId: AGENCY, systemId: "f1000000-0000-4000-8000-000000000001", name: "Intake for professional practices", hidden: false },
+    context: { kind: "agency_client", label: context.label },
+    baselineRevision: 3, latestRevision: 3, currentRelease: 2, declined: [], siblings: [],
+  }];
 }

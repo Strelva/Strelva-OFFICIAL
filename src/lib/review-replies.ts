@@ -13,9 +13,8 @@
  * publishReviewReply both enforce this.
  */
 
-import { generateText } from "ai";
-import { google } from "@ai-sdk/google";
-import { getRedis } from "./redis";
+import { generateModelText } from "@/platform/infra/model-calls";
+import { getRedis } from "@/platform/infra/redis";
 import type { TenantConfig } from "./types";
 import { analyzeReview, TOPIC_LABELS } from "./reviews/sentiment";
 import { getReplyVoice, defaultReplyVoice, buildVoicePromptSection } from "./reviews/reply-voice";
@@ -335,8 +334,7 @@ export async function draftReviewReply(
   // ── First AI pass ──────────────────────────────────────────────────────────
   let firstDraft: string | null = null;
   try {
-    const { text } = await generateText({
-      model: google("gemini-2.5-flash"),
+    const { result: { text } } = await generateModelText({ purpose: "review_reply", tenantId: tenantConfig.id, actorKind: "strelva" }, {
       prompt: basePrompt,
       maxOutputTokens: 200,
     });
@@ -361,8 +359,7 @@ export async function draftReviewReply(
       : `The previous draft contained these issues: ${firstLint.violations.join("; ")}. Fix them.`;
 
     try {
-      const { text: secondText } = await generateText({
-        model: google("gemini-2.5-flash"),
+      const { result: { text: secondText } } = await generateModelText({ purpose: "review_reply", tenantId: tenantConfig.id, actorKind: "strelva" }, {
         prompt:
           basePrompt +
           `\n\nIMPORTANT FEEDBACK ON YOUR PREVIOUS ATTEMPT: ${violationFeedback}`,

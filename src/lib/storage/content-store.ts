@@ -14,8 +14,8 @@ import {
   setCachedContent,
 } from "./content-cache";
 import { addSentryBreadcrumb } from "../sentry-context";
-import { getContentData, getStoredContentData, upsertContentData } from "../db/repositories";
-import { contentSourceIsPostgres } from "../db/source-flags";
+import { getContentData, getStoredContentData, upsertContentData } from "@/platform/infra/db/repositories";
+import { contentSourceIsPostgres } from "@/platform/infra/db/source-flags";
 import { getTenantContentDefault } from "../tenant-content-defaults";
 
 export { DEFAULT_TENANT };

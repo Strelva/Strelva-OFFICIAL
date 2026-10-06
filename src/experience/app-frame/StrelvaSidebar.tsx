@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { MouseEvent, ReactNode } from "react";
-import { AppWindow, Building2, CalendarDays, CircleHelp, FileText, Globe2, Home, Inbox, KeyRound, ListChecks, MessageSquareText, Repeat, Search, Sheet, UserPlus, Users, X, type LucideIcon } from "lucide-react";
+import { AppWindow, Building2, CalendarDays, CircleHelp, FileText, Globe2, Home, Inbox, KeyRound, ListChecks, Mail, MapPin, MessageSquareText, Repeat, Search, Sheet, UserPlus, X, type LucideIcon } from "lucide-react";
 import { SYSTEMS_LABEL, SYSTEMS_LIST_LABEL } from "@/experience/systems/model";
 import { LogoMark } from "@/components/Logo";
 import { WorkspaceSignOutButton } from "@/experience/workspace/WorkspaceSignOutButton";
@@ -19,14 +19,7 @@ const PRIMARY_ITEMS: readonly { id: NavigableSection; icon: LucideIcon }[] = [
   { id: "requests", icon: ListChecks },
   { id: "ongoing", icon: Repeat },
 ];
-/** Before Systems (STRELVA_SYSTEMS_RELEASE off), Customers is a place. */
-const PRIMARY_ITEMS_BEFORE_SYSTEMS: readonly { id: NavigableSection; icon: LucideIcon }[] = [
-  { id: "home", icon: Home },
-  { id: "customers", icon: Users },
-  { id: "requests", icon: ListChecks },
-  { id: "ongoing", icon: Repeat },
-];
-const PINNED_ICONS: Record<NonNullable<StrelvaPinnedItem["kind"]>, LucideIcon> = { website: Globe2, app: AppWindow, inquiries: Inbox, bookings: CalendarDays, document: FileText, tracker: Sheet, onboarding: UserPlus };
+const PINNED_ICONS: Record<NonNullable<StrelvaPinnedItem["kind"]>, LucideIcon> = { website: Globe2, app: AppWindow, inquiries: Inbox, bookings: CalendarDays, document: FileText, tracker: Sheet, onboarding: UserPlus, listing: MapPin, newsletter: Mail };
 
 const BUSINESS_ITEMS: readonly { id: NavigableSection; icon: LucideIcon }[] = [
   { id: "settings", icon: Building2 },
@@ -91,7 +84,7 @@ export function StrelvaSidebar({ active, appBase = "", workspaceId, accountName,
         {onStart ? <button type="button" className={styles.newAction} disabled={startDisabled} onClick={() => { onCloseMobile?.(); onStart(); }}><MessageSquareText size={18} aria-hidden="true" /><span>Ask Strelva</span></button> : <Link className={styles.newAction} href={newHref} aria-disabled={startDisabled || undefined} tabIndex={startDisabled ? -1 : undefined} onClick={event => { if (startDisabled) event.preventDefault(); onCloseMobile?.(); }}><MessageSquareText size={18} aria-hidden="true" /><span>Ask Strelva</span></Link>}
         {onSearch ? <button type="button" className={styles.navItem} onClick={() => { onCloseMobile?.(); onSearch(); }} title="Search (Ctrl or Command + K)"><Search size={18} aria-hidden="true" /><span>Search</span></button> : <Link className={styles.navItem} href={searchHref} onClick={onCloseMobile}><Search size={18} aria-hidden="true" /><span>Search</span></Link>}
       </div>
-      <nav className={styles.primary} aria-label="Main">{(systemsReleased ? PRIMARY_ITEMS : PRIMARY_ITEMS_BEFORE_SYSTEMS).map(item)}</nav>
+      <nav className={styles.primary} aria-label="Main">{PRIMARY_ITEMS.map(item)}</nav>
       {pinned.length ? <section className={styles.recent} aria-label={pinnedLabel}><h2>{pinnedLabel}</h2>{pinned.map(entry => {
         const Icon = PINNED_ICONS[entry.kind || "website"];
         return <Link key={entry.id} className={styles.pinned} href={entry.href} title={entry.title} aria-current={entry.current ? "page" : undefined} onClick={event => navigateInPlace(event, entry.onOpen ? () => { onCloseMobile?.(); entry.onOpen?.(); } : undefined)}><Icon size={15} strokeWidth={1.6} aria-hidden="true" /><span>{entry.title}</span></Link>;

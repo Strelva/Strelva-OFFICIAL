@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { readJsonObject } from "@/lib/request-body";
 import {
   getPayLink,

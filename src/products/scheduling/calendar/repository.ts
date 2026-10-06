@@ -1,5 +1,5 @@
-import { decryptSecret, encryptSecret } from "@/lib/crypto/secrets";
-import { getSupabase } from "@/lib/db/client";
+import { decryptSecret, encryptSecret } from "@/platform/infra/crypto/secrets";
+import { getSupabase } from "@/platform/infra/db/client";
 import { isWorkspaceAuthorityFailure, workspaceRoleAllows } from "@/platform/workspaces/permissions";
 import { assertWorkspaceMember } from "@/platform/workspaces/repository";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor, type WorkspaceRole } from "@/platform/workspaces/types";

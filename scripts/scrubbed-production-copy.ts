@@ -15,6 +15,7 @@
  * SCRUBBED_COPY_SOURCE_DATABASE_URL, SCRUBBED_COPY_SOURCE_REDIS_REST_URL and
  * SCRUBBED_COPY_SOURCE_REDIS_REST_TOKEN, never from arguments.
  */
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
 import path from "node:path";
 import { createCopy, defaultSaltFile, dryRunCopy, startCopy } from "./scrubbed-copy/run";
 import { projectDevFiles } from "./scrubbed-copy/dev-files";

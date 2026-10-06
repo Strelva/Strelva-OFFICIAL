@@ -5,9 +5,9 @@ const mockIsSuperAdmin = vi.hoisted(() => vi.fn());
 const mockGetActorContext = vi.hoisted(() => vi.fn());
 const mockLogAuditEvent = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/redis", () => ({ getRedis: mockGetRedis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: mockGetRedis }));
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   isSuperAdmin: mockIsSuperAdmin,
   getActorContext: mockGetActorContext,
 }));

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin, getActorContext } from "@/lib/auth";
+import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { logAuditEvent } from "@/lib/storage";
 import {
   setLeadWorkflowStatus,
@@ -12,7 +12,7 @@ import {
   isDeliveryStatus,
   DELIVERY_STATUSES,
 } from "@/lib/access-request-delivery";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 
 /**
  * Operator workflow status for one onboard-form lead — how the operator is

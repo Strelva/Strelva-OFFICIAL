@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin, getCurrentUserEmail } from "@/lib/auth";
+import { isSuperAdmin, getCurrentUserEmail } from "@/platform/infra/auth";
 import { listPendingDigests, decideMaintenanceDigest } from "@/lib/maintenance-digest";
 
 /** GET — all pending maintenance digests for operator review. */

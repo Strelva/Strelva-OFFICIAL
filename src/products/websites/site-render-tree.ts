@@ -1,4 +1,5 @@
 import type { SiteDocument, CatalogNode } from "./site-document";
+import { SITE_MAX_EXPANDED_NODES_PER_PAGE, siteExpandedNodeCount } from "./site-document-schema";
 
 /** A small, closed HTML tree: document props can supply text, never tags or markup. */
 export type SiteTree = string | { tag: string; attrs: Record<string, string | number | boolean>; children: SiteTree[] };
@@ -44,6 +45,7 @@ export const SITE_CATALOG_CSS = `
 export function sitePageTree(document: SiteDocument, path = "/", options: { preview?: boolean; tenant?: string } = {}): SiteTree {
   const page = document.pages.find(item => item.path === path);
   if (!page) throw new Error(`This website has no page at ${path}.`);
+  if (siteExpandedNodeCount(document.nodes, page.root) > SITE_MAX_EXPANDED_NODES_PER_PAGE) throw new Error(`This website page expands to more than ${SITE_MAX_EXPANDED_NODES_PER_PAGE} rendered sections.`);
   const active = new Set<string>();
   const image = (id?: string): SiteTree | null => {
     const asset = id ? document.assets[id] : undefined;

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getSessionUser } from "@/lib/db/server-client";
-import { isSuperAdminUser } from "@/lib/db/repositories";
+import { getSessionUser } from "@/platform/infra/db/server-client";
+import { isSuperAdminUser } from "@/platform/infra/db/repositories";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import {
   OfferingAccessError,

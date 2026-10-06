@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { checkHeartbeats, recordHeartbeat } from "@/lib/heartbeat";
-import { alertOnce } from "@/lib/monitoring";
+import { checkHeartbeats, recordHeartbeat } from "@/platform/infra/heartbeat";
+import { alertOnce } from "@/platform/infra/monitoring";
 import { requireCronRequest } from "@/lib/cron-auth";
 
 // Cap matches the platform function ceiling — this cron iterates tenants and

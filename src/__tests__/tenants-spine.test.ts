@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { rowToTenant, tenantToRow } from "@/lib/tenants";
-import type { Row } from "@/lib/db/client";
+import type { Row } from "@/platform/infra/db/client";
 
 // A realistic tenants row, modeled on the live gldf prod row (the routing-
 // critical fields are what matter — a mapping slip here 500s the control plane).

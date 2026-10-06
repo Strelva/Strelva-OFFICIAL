@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "node:crypto";
-import { isSuperAdmin, getActorContext } from "@/lib/auth";
+import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { getTenantConfig, updateTenant } from "@/lib/tenants";
 import { logAuditEvent } from "@/lib/storage";
 import { runDeprovision } from "@/lib/deprovision";

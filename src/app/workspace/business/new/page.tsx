@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { BusinessSetupPanel } from "@/experience/workspace/BusinessSetupPanel";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
-import { BUSINESS_START_PRODUCTS } from "@/lib/business-start";
+import { BUSINESS_START_PRODUCTS } from "@/platform/workspaces/business-start";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Your business", robots: { index: false, follow: false }, referrer: "no-referrer" };

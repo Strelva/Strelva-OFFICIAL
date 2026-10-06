@@ -5,7 +5,7 @@
  * path so there is one blog store end to end (write + read).
  */
 import { listEntriesForType, getEntry } from "./collections-service";
-import type { Row } from "../db/client";
+import type { Row } from "@/platform/infra/db/client";
 
 export interface PublicBlogPost {
   id: string;

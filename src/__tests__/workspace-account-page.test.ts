@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   readPublicContinuationImport: vi.fn(),
 }));
 
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: mocks.getSessionUser }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.getSessionUser }));
 vi.mock("@/platform/workspaces", () => ({
   ensurePersonalWorkspace: mocks.ensurePersonalWorkspace,
   listWorkspaces: mocks.listWorkspaces,

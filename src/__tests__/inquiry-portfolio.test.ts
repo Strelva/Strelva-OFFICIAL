@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   workspace: vi.fn(),
 }));
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   getCurrentUserTenants: mocks.tenants,
   requireTenantAccess: mocks.access,
 }));

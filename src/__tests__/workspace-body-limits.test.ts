@@ -17,7 +17,7 @@ const onboarding = vi.hoisted(() => ({
   OnboardingUnavailableError: class extends Error {},
 }));
 const continuation = vi.hoisted(() => ({ importPublicContinuation: vi.fn() }));
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: async () => state.user }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: async () => state.user }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
 vi.mock("@/products/onboarding/server", () => onboarding);
 vi.mock("@/platform/public-continuations/repository", () => continuation);

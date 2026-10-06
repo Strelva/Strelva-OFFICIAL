@@ -34,7 +34,7 @@ function query(table: string) {
   return builder;
 }
 
-vi.mock("@/lib/db/client", () => ({ getSupabase: () => ({ from: query }) }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ from: query }) }));
 
 const { listAuthorizedOperationalInbox } = await import("@/products/operations/inbox");
 

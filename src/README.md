@@ -37,8 +37,19 @@ contracts beneath the common composition.
 | `app/` | Routing, request validation, session resolution, page composition | Duplicated product logic |
 | `experience/` | Workspace/product presentation and shared interaction mechanics | Tenant permissions or product-specific delivery rules |
 | `products/<product>/` | Product operations, types, storage adapters, focused UI | Route imports or assumptions that every user has a website |
-| `platform/` | Shared relationship and infrastructure concepts | Product or presentation dependencies |
-| `lib/` | Existing implementations awaiting deliberate extraction | A second copy of an extracted implementation |
+| `platform/` | Shared relationship concepts | Product or presentation dependencies |
+| `platform/infra/` | Shared infrastructure both models use: db, redis, auth, email, crypto, rate-limit, logger, ai-models, safe-fetch, model calls, monitoring, heartbeat | Workspace or tenant domain rules |
+| `lib/` | Existing implementations awaiting deliberate extraction | A second copy of an extracted implementation; any import of a workspace layer |
+| `server/workspace-ports.ts`, `register-workspace-ports.ts` | The app edge: what `lib/` needs from the workspace layers, through the ports in `lib/workspace-ports.ts` | Logic of its own |
+
+`lib/` never imports `platform/` (outside `platform/infra`), `products/`,
+`experience/` or `server/`. When tenant code needs workspace behavior it
+declares a port in `lib/workspace-ports.ts`; the loaders live in
+`server/workspace-ports.ts` and `register-workspace-ports.ts` registers them
+once per runtime (`instrumentation.ts`, `vitest.setup.ts`, and scripts that
+reach those modules). A workspace layer's existing `lib/` imports are listed
+in `scripts/boundary-baseline.json`, which only shrinks: fix one, then run
+`pnpm check:boundaries --prune`.
 
 New product consumers import `index`, `contracts`, `server`, or `client` entry
 points. Keep browser-safe types and components separate from server operations.

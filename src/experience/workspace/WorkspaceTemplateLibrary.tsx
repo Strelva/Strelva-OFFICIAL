@@ -81,7 +81,7 @@ export function WorkspaceTemplateLibrary(props: WorkspaceTemplateLibraryProps) {
   </section>;
 }
 
-function TemplateSession({ workspaceId, actorEmail, businessName, canCreate, onCreated, template }: WorkspaceTemplateLibraryProps & { template: AppTemplate }) {
+function TemplateSession({ workspaceId, actorEmail, businessName, canCreate, onCreated, onRequest, template }: WorkspaceTemplateLibraryProps & { template: AppTemplate }) {
   const transport = useWorkspaceRequest();
   const [draft, setDraft] = useState<ApplicationDraftSpec>(() => templateDraft(template));
   const [ready, setReady] = useState(false);
@@ -91,6 +91,9 @@ function TemplateSession({ workspaceId, actorEmail, businessName, canCreate, onC
   const [mobileView, setMobileView] = useState<"edit" | "preview">("edit");
   const [checkedSavedWork, setCheckedSavedWork] = useState(false);
   const [error, setError] = useState("");
+  // Only Strelva or a delegated agency makes tools (make_systems). Everyone
+  // else gets "Ask Strelva to build this" and can file the tool as a Request.
+  const [askStrelva, setAskStrelva] = useState(false);
   const mutation = useRef(false);
   const mounted = useRef(true);
   const storageKey = `strelva:template-draft:v1:${encodeURIComponent(actorEmail.toLowerCase())}:${workspaceId}:${template.id}`;
@@ -149,6 +152,10 @@ function TemplateSession({ workspaceId, actorEmail, businessName, canCreate, onC
         // This existing create endpoint has no idempotency contract. Never blindly retry an ambiguous write.
         if (response.status >= 400 && response.status < 500 && ![408, 429].includes(response.status)) { setState("editing"); remember(draft, "editing"); }
         const detail = body && typeof body === "object" && "error" in body && typeof body.error === "string" ? body.error : "The tool could not be confirmed.";
+        if (response.status === 403 && body && typeof body === "object" && "code" in body && body.code === "make_systems_required") {
+          setAskStrelva(true);
+          return;
+        }
         throw new Error(detail);
       }
       const result = savedApplicationSchema.safeParse(body);
@@ -168,6 +175,7 @@ function TemplateSession({ workspaceId, actorEmail, businessName, canCreate, onC
     {!canCreate ? <p role="status" className={styles.notice}>Choose an editable workspace with applications enabled to create this tool. The preview is still available.</p> : null}
     {invalid && state === "editing" ? <p role="status" className={styles.notice}>Check the proposed fields: {invalid}</p> : null}
     {error ? <p role="alert" className={styles.error}>{error}</p> : null}
+    {askStrelva ? <div role="status" className={styles.notice}><strong>Ask Strelva to build this.</strong><p>Strelva builds and changes tools for your business. Send this one as a request and it shows up in Requests with its stage.</p><Button type="button" variant="secondary" onClick={() => onRequest(`Build this tool for us: ${draft.title}. Fields: ${draft.fields.map(field => field.label).join(", ")}.`)}>Ask Strelva to build this<ArrowRight size={16} aria-hidden="true" /></Button></div> : null}
     {state === "unconfirmed" && !busy ? <div role="status" className={styles.notice}><strong>Check whether it was saved.</strong><p>Your draft is retained. This attempt is not automatically repeated because it could create another copy.</p><a href={workHref} target="_blank" rel="noreferrer">Open saved work in another tab</a><label className="mt-4 flex min-h-11 items-center gap-3"><input type="checkbox" checked={checkedSavedWork} onChange={event => setCheckedSavedWork(event.target.checked)} />I checked saved work and need another attempt.</label><p>A new attempt may create another copy if the first save completed.</p><Button type="button" variant="secondary" disabled={!canCreate || !checkedSavedWork} onClick={() => { if (!checkedSavedWork || !canCreate) return; remember(draft, "editing"); setState("editing"); setError(""); setCheckedSavedWork(false); }}>Allow a new attempt</Button></div> : null}
   </>;
 }

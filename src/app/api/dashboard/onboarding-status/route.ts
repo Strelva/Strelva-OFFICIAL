@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess } from "@/lib/auth";
+import { requireTenantAccess } from "@/platform/infra/auth";
 import { getActivity, getContent } from "@/lib/storage";
 import { getWeeklyBrief } from "@/lib/weekly-brief";
 import { getConnections } from "@/lib/connections";

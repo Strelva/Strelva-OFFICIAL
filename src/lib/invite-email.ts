@@ -1,4 +1,4 @@
-import { renderEmailHtml, renderEmailText } from "@/lib/email/layout";
+import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
 
 export function sanitizeEmailSubjectText(value: string): string {
   return value

@@ -10,8 +10,8 @@ const mockGetActorContext = vi.hoisted(() => vi.fn());
 const mockLogAuditEvent = vi.hoisted(() => vi.fn());
 const mockGetTenantConfig = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/redis", () => ({ getRedis: mockGetRedis }));
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/redis", () => ({ getRedis: mockGetRedis }));
+vi.mock("@/platform/infra/auth", () => ({
   isSuperAdmin: mockIsSuperAdmin,
   getActorContext: mockGetActorContext,
 }));
@@ -79,7 +79,7 @@ describe("getClientEmailOverride / setClientEmailOverride", () => {
   it("defaults to 'inherit' and round-trips on/off", async () => {
     mockGetRedis.mockReturnValue(fakeRedis());
     const { getClientEmailOverride, setClientEmailOverride } = await import(
-      "@/lib/client-email-override"
+      "@/platform/infra/email/client-override"
     );
     expect(await getClientEmailOverride(TENANT)).toBe("inherit");
     expect(await setClientEmailOverride(TENANT, "on")).toBe("on");
@@ -90,7 +90,7 @@ describe("getClientEmailOverride / setClientEmailOverride", () => {
 
   it("defaults to 'inherit' without Redis (can't fabricate an 'on')", async () => {
     mockGetRedis.mockReturnValue(null);
-    const { getClientEmailOverride } = await import("@/lib/client-email-override");
+    const { getClientEmailOverride } = await import("@/platform/infra/email/client-override");
     expect(await getClientEmailOverride(TENANT)).toBe("inherit");
   });
 });

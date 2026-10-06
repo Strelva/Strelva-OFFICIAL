@@ -3,12 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockListAllTenants = vi.hoisted(() => vi.fn());
 const mockListAllDomainClaims = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/db/source-flags", () => ({ tenantsSourceIsPostgres: () => true }));
-vi.mock("@/lib/redis", () => ({ getRedis: () => null }));
-vi.mock("@/lib/db/repositories", () => ({
+vi.mock("@/platform/infra/db/source-flags", () => ({ tenantsSourceIsPostgres: () => true }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
+vi.mock("@/platform/infra/db/repositories", () => ({
   listAllTenants: mockListAllTenants,
 }));
-vi.mock("@/lib/db/domain-claims", () => ({
+vi.mock("@/platform/infra/db/domain-claims", () => ({
   listAllDomainClaims: mockListAllDomainClaims,
   listDomainClaims: vi.fn(async () => []),
   replaceDomainClaims: vi.fn(async () => undefined),

@@ -17,6 +17,16 @@
  * row, `reb:` keys, /api/v1, memberships, Stripe, and never invites anyone.
  * Reruns are no-ops; a failed run left nothing behind and can simply rerun.
  *
+ *   npx tsx scripts/convert-tenant-to-workspace.ts <slug> --separate-business --operator-email=<email>  # dry run
+ *
+ * A site of a multi-site account joins the business a sibling site was
+ * already converted into, by default (one business, several locations).
+ * --separate-business makes it its own business instead: named for the site,
+ * not the account, with a billing home holding only its own line item. The
+ * shared Stripe subscription is not split; the Stripe metadata script reports
+ * it as a conflict. Pass it for every site that should stand alone, the first
+ * one included. Needs 20261008160000_convert_separate_business.
+ *
  *   npx tsx scripts/convert-tenant-to-workspace.ts <slug> --rollback --operator-email=<email>          # preview
  *   npx tsx scripts/convert-tenant-to-workspace.ts <slug> --rollback --apply --operator-email=<email>  # local only
  *
@@ -26,12 +36,13 @@
  * lives there. The preview needs the database (the link lives there) and
  * writes nothing. Same refusal rules as --apply.
  */
-import { getSupabase, type Row } from "../src/lib/db/client";
+import "../src/register-workspace-ports"; // workspace ports src/lib declares (Strelva Reborn section 7)
+import { getSupabase, type Row } from "../src/platform/infra/db/client";
 import { getTenantConfig, rowToTenant } from "../src/lib/tenants";
 import { getStoredContent } from "../src/lib/storage/content-store";
-import { getBookingConfig, getBookings, getDateOverrides } from "../src/lib/storage/booking-store";
+import { getBookingConfig, getBookings, getDateOverrides } from "../src/platform/bookings/legacy-store";
 import { DEFAULT_BOOKING_CONFIG } from "../src/lib/booking";
-import { getLeads } from "../src/lib/leads";
+import { getRedisLeads as getLeads } from "../src/lib/leads";
 import { getAccountForTenant } from "../src/lib/accounts";
 import { billingMonthlyCents, resolveBillingType } from "../src/lib/billing-type";
 import { isGrandfathered } from "../src/lib/subscription";
@@ -87,6 +98,14 @@ async function read(slug: string): Promise<ConversionSources> {
       name: account.name.slice(0, 120),
       tenantIds: account.tenantIds.slice(0, 100),
       multiSite: account.tenantIds.length > 1,
+      ...(account.subscription ? { subscription: {
+        status: account.subscription.status?.slice(0, 40) ?? null,
+        amountCents: account.subscription.amountCents ?? null,
+        currentPeriodEnd: account.subscription.currentPeriodEnd?.slice(0, 40) ?? null,
+        items: account.subscription.items.slice(0, 100).map((item) => ({
+          tenantId: item.tenantId.slice(0, 120), label: item.label.slice(0, 120), amountCents: Math.max(0, Math.round(item.amountCents)),
+        })),
+      } } : {}),
     } : null,
   };
 }

@@ -6,7 +6,7 @@ import { composeRebuildSite, verifyRebuildSite, JevComposer, ModelComposer } fro
 import { unresolvedSiteFacts, siteDocumentSchema } from "@/products/websites/site-document";
 const modelMocks = vi.hoisted(() => ({ generate: vi.fn() }));
 vi.mock("ai", () => ({ generateObject: modelMocks.generate }));
-vi.mock("@/lib/ai-models", () => ({ getPrimaryModel: () => ({ model: "primary", label: "primary" }), getFallbackModel: () => ({ model: "fallback", label: "fallback" }) }));
+vi.mock("@/platform/infra/ai-models", () => ({ getPrimaryModel: () => ({ model: "primary", label: "primary" }), getFallbackModel: () => ({ model: "fallback", label: "fallback" }) }));
 
 const home = `<!doctype html><html><head><title>The Mooney Firm | Buffalo</title><script type="application/ld+json">{"@type":"LegalService","name":"The Mooney Firm","telephone":"716-555-0100"}</script></head><body><header><a href="/">Home</a><a href="/practice/estate-planning">Estate planning</a><a href="/about">About</a><a href="/private">Private</a></header><main><h1>The Mooney Firm</h1><p>Personal counsel for your next chapter.</p><p>We help families prepare wills and trusts.</p><p>Our attorney has 20 years of experience.</p><a href="tel:716-555-0100">Call us</a><blockquote>They took time to explain every step.</blockquote></main></body></html>`;
 const about = `<html><head><title>About | The Mooney Firm</title></head><body><main><h1>About the firm</h1><p>Meet with us to discuss your plans and questions.</p></main></body></html>`;

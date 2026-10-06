@@ -210,7 +210,44 @@ psql "${psql_args[@]}" --file="$repo_root/tests/business-record-schema.sql"
 psql "${psql_args[@]}" --set=tenant_import="$(cat "$repo_root/tests/fixtures/business-record-tenant-import.json")" \
   --file="$repo_root/tests/business-record-conversion-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-ownership-schema.sql"
+# accept_workspace_invitation is replaced by 20261007110000; the original
+# invitation contract must still hold against the replacement.
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-invitations-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-report-analytics-state-schema.sql"
 psql "${psql_args[@]}" -Atc "select count(*) from pg_trigger where tgname = 'tenant_workspace_links_attach_leads'" | grep -qx 1 \
   || { printf 'Conversion trigger for client leads is missing after out-of-order apply.\n' >&2; exit 1; }
+psql "${psql_args[@]}" --file="$repo_root/tests/business-effort-minutes-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-queue-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-account-bindings-schema.sql"
+# 20261008160000 replaces convert_tenant_to_business and the billing link
+# trigger; the billing contract and the separate-business option both hold.
+psql "${psql_args[@]}" --file="$repo_root/tests/business-billing-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/convert-separate-business-schema.sql"
+# Release rows: agency workspaces accepted since 20261008161000; business
+# workspaces still accepted, personal ones still refused.
+psql "${psql_args[@]}" --file="$repo_root/tests/release-flags-agency-workspaces-schema.sql"
+# 20261009113000 replaces read_tenant_leads, read_tenant_lead and
+# read_tenant_lead_digests; their contracts and the new records hold.
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-lead-reads-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-records-schema.sql"
+# 20261008150000 replaces reserve_website_hosted_tenant and
+# manage_published_website_tenant; website-documents-schema above proves the
+# original contract against the replacements.
+psql "${psql_args[@]}" --file="$repo_root/tests/website-linked-publication-schema.sql"
+# 20261008151000 widens tenant_leads, tenant_client_records and
+# system_origin_kinds; their earlier contracts ran above against it.
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
+# 20261009100000 (Strelva service actor) replaces owner_decision_json and
+# workspace_release_flag_names(); its contract holds after the full ordered upgrade.
+psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
+# 20261009130000 replaces read_strelva_handled and 20261009131000 replaces
+# record_strelva_service_action; both contracts hold after the full upgrade.
+psql "${psql_args[@]}" --file="$repo_root/tests/strelva-handled-decisions-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
+# 20261009140000 replaces workspace_release_flag_names() with the full list
+# plus make_real_owner_link.
+psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-flag-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

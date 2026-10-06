@@ -6,7 +6,7 @@
  * an accepted message by itself.
  */
 
-import { getEmailReadback, sendEmailWithReceipt } from "@/lib/email/send";
+import { getEmailReadback, sendEmailWithReceipt } from "@/platform/infra/email/send";
 
 import type { InquiryOutboundTransport } from "./delivery-types";
 

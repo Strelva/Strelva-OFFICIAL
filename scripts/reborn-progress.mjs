@@ -37,18 +37,22 @@ const migrations = readdirSync(join(root, "supabase/migrations")).filter(f => f.
 const migrationText = migrations.map(f => read(`supabase/migrations/${f}`)).join("\n");
 const routes = src.filter(f => f.startsWith("src/app/api/") && /\/route\.ts$/.test(f));
 
+// Shared infrastructure (db, redis, auth, email, crypto, rate-limit, logger,
+// ai-models, safe-fetch, model calls) lives in src/platform/infra and belongs
+// to neither model: src/lib may import it, and the old src/lib paths re-export it.
+const WORKSPACE_PREFIXES = ["@/platform/(?!infra/)", "@/products", "@/experience", "@/server"];
 const workspaceOnLib = workspace.filter(f => importsFrom(read(f), "@/lib/"));
 const libOnWorkspace = lib.filter(f => {
   const s = read(f);
-  return ["@/platform", "@/products", "@/experience", "@/server"].some(p => importsFrom(s, p));
+  return WORKSPACE_PREFIXES.some(p => importsFrom(s, p));
 });
 const tenantGate = src.filter(f => /requireTenant(Access|Permissions?)\(/.test(read(f)));
 const modelCallSites = src.filter(f => /(from\s+|import\(\s*)["']ai["']/.test(read(f)) &&
   /\b(generateText|streamText|generateObject|streamObject)\b/.test(read(f)));
-const resendOutsideSend = src.filter(f => f !== "src/lib/email/send.ts" && /new Resend\(/.test(read(f)));
+const resendOutsideSend = src.filter(f => f !== "src/platform/infra/email/send.ts" && /new Resend\(/.test(read(f)));
 const routeKind = f => {
   const s = read(f);
-  const ws = ["@/platform", "@/products", "@/experience", "@/server"].some(p => importsFrom(s, p));
+  const ws = WORKSPACE_PREFIXES.some(p => importsFrom(s, p));
   const tl = importsFrom(s, "@/lib/");
   return ws && !tl ? "workspace" : ws ? "mixed" : tl ? "tenant" : "neither";
 };
@@ -72,7 +76,7 @@ const checks = [
   { id: "workspace_imports_lib", label: "Workspace files importing @/lib", value: workspaceOnLib.length, target: 0, baseline: 98 },
   { id: "lib_imports_workspace", label: "src/lib files importing workspace layers", value: libOnWorkspace.length, target: 0, baseline: 2 },
   { id: "model_call_sites", label: "Files calling the model directly", value: modelCallSites.length, target: 1, baseline: 12 },
-  { id: "resend_outside_send", label: "Resend clients outside email/send.ts (webhook verify allowed)", value: resendOutsideSend.length, target: 1, baseline: 2 },
+  { id: "resend_outside_send", label: "Resend clients outside infra/email/send.ts (webhook verify allowed)", value: resendOutsideSend.length, target: 1, baseline: 2 },
   { id: "tenant_gate_files", label: "Files using requireTenantAccess/Permission", value: tenantGate.length, target: null, baseline: 79 },
   { id: "routes_tenant_only", label: "API routes on tenant model only", value: routeCounts.tenant ?? 0, target: null, baseline: 153 },
   { id: "routes_workspace_only", label: "API routes on workspace model only", value: routeCounts.workspace ?? 0, target: null, baseline: 47 },

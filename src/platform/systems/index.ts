@@ -35,5 +35,8 @@ export {
   mergeBusinessSystems,
   readExistingSystemsSnapshot,
   systemsFromExisting,
+  clientStorePurpose,
+  tenantBookingsSystemId,
+  withTenantSurfaces,
 } from "./from-existing";
-export type { BusinessSystems, ConnectionListing, ExistingSystemsSnapshot, SystemListing } from "./from-existing";
+export type { BookingView, BusinessSystems, ConnectionListing, ExistingSystemsSnapshot, SystemListing, TenantSiteFacts, TenantSurfaceListing } from "./from-existing";

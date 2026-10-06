@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import {
   getWork,
   listWork,

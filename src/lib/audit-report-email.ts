@@ -10,8 +10,8 @@
  * (the hosted one-pager), which the recipient views in-browser and prints to PDF.
  */
 
-import { type EmailOptions, type EmailHighlight } from "./email/layout";
-import { sendEmail } from "./email/send";
+import { type EmailOptions, type EmailHighlight } from "@/platform/infra/email/layout";
+import { sendEmail } from "@/platform/infra/email/send";
 import { findingsFromCategories } from "./lead-audit";
 import type { AuditResult } from "./audit/types";
 

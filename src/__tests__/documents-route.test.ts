@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   edit: vi.fn(),
 }));
 
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: mocks.user }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.user }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mocks.release }));
 vi.mock("@/products/documents/server", () => ({
   readWorkspaceDocument: mocks.read,

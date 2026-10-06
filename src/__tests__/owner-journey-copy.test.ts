@@ -80,7 +80,7 @@ describe("owner journey copy and links", () => {
   it("keeps rollback safety reachable under the Website History tab", () => {
     // Safety net + recent changes moved off the dashboard into Website > History
     // (site-management tools, not at-a-glance metrics).
-    const historyPage = readRepoFile("src/app/dashboard/history/page.tsx");
+    const historyPage = readRepoFile("src/components/dashboard/SiteHistoryContent.tsx");
     const safetyPanel = readRepoFile("src/components/dashboard/SiteSafetyPanel.tsx");
     const snapshotRoute = readRepoFile("src/app/api/site-snapshots/route.ts");
     const maintenance = readRepoFile("src/app/api/cron/maintenance/route.ts");

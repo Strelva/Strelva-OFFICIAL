@@ -14,7 +14,7 @@ vi.mock("@/lib/events", () => ({
 
 // ── Mock DB tenant listing ────────────────────────────────────────────────────
 const mockListAllTenants = vi.fn();
-vi.mock("@/lib/db/repositories", () => ({
+vi.mock("@/platform/infra/db/repositories", () => ({
   listAllTenants: (...a: unknown[]) => mockListAllTenants(...a),
 }));
 

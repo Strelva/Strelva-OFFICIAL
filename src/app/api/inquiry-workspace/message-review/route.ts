@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { getAuthUserId, requireTenantAccess, requireTenantPermission, verifyAuth } from "@/lib/auth";
+import { getAuthUserId, requireTenantAccess, requireTenantPermission, verifyAuth } from "@/platform/infra/auth";
 import { readJsonObject } from "@/lib/request-body";
 import { getTenantConfig } from "@/lib/tenants";
 import {
   approveInquiryMessageReview,
-  inquiryReleaseEnabled,
+  inquiryReleaseMayBeOn,
+  inquiryReleasedForCurrentUser,
   prepareInquiryMessageReview,
 } from "@/products/inquiries";
 import { INQUIRY_WORKSPACE_EXIT_CODE, resolveInquiryWorkspace } from "@/products/inquiries/server";
@@ -96,6 +97,7 @@ async function contextFor(body: Record<string, unknown>) {
   if (!tenant) return { error: json({ error: "A tenantId is required." }, 400) } as const;
   const denied = await requireTenantAccess(tenant);
   if (denied) return { error: denied } as const;
+  if (!(await inquiryReleasedForCurrentUser(tenant))) return { error: json({ error: "Inquiry workspace is not enabled." }, 503) } as const;
   const config = await getTenantConfig(tenant);
   if (!config || !config.active) return { error: json({ error: "Business unavailable." }, 404) } as const;
   const workspace = await resolveInquiryWorkspace({
@@ -161,7 +163,7 @@ function safeReview(review: InquiryMessageReviewPreview, inquiryId: string, acti
 }
 
 export async function POST(request: Request) {
-  if (!inquiryReleaseEnabled()) return json({ error: "Inquiry workspace is not enabled." }, 503);
+  if (!inquiryReleaseMayBeOn()) return json({ error: "Inquiry workspace is not enabled." }, 503);
   if (!(await verifyAuth())) return json({ error: "Unauthorized" }, 401);
   if (!sameOrigin(request)) return json({ error: "Open Strelva directly to make this change." }, 403);
   if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) return json({ error: "Send a JSON request." }, 415);

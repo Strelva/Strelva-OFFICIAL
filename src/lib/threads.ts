@@ -8,7 +8,7 @@
 
 import { promises as fs } from "fs";
 import path from "path";
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import type { Thread } from "./conversation-types";
 
 export type { ChatMessage, Thread } from "./conversation-types";

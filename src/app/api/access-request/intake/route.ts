@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isRateLimitedWindowedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedWindowedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { readJsonObject } from "@/lib/request-body";
 import {
   buildDeliveryStatusUrl,
@@ -9,7 +9,7 @@ import {
   type DeliveryPlan,
 } from "@/lib/access-request-delivery";
 import { sendDeliveryStatusEmail, sendNewIntakeLeadEmail } from "@/lib/delivery-email";
-import { OPERATOR_URL } from "@/lib/brand";
+import { OPERATOR_URL } from "@/platform/infra/brand";
 import { scoreLeadSpam } from "@/lib/lead-spam";
 
 export async function POST(req: Request) {

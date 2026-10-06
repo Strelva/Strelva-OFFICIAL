@@ -6,6 +6,8 @@ import {
   type WorkspaceActor,
 } from "@/platform/workspaces/types";
 import { boundedStore, initial, type BoundedStore } from "@/platform/bounded-work/repository";
+import { createSystemWork, requireSystemChanger, requireSystemMaker } from "@/platform/bounded-work/make-systems";
+import { assertLinkFieldsReleased, linkFields, linkFieldsReleasedFor, notifyAssignedPerson, resolveRecordLinks, type AssignedPersonNoticeStatus } from "./internal-tool-links";
 import { applicationCommandSchema, applicationPublishInputSchema, applicationRehearseInputSchema, applicationReviseInputSchema, applicationRollbackInputSchema, applicationSchema, applicationSpecSchema, applicationSubmitInputSchema, APPLICATION_RECORD_LIMIT, type ApplicationRelease } from "./contracts";
 import { applyLegacyApplicationCommand, assertLegacyApplicationRevision, cloneState, currentRelease, normalizeReleaseVersion, releaseSpec, reviseCandidate, rehearseCandidate, publishCandidate, rollbackRelease, validateRecord } from "./domain";
 import {
@@ -90,8 +92,9 @@ async function ensureCandidateEditor(store: BoundedStore, actor: WorkspaceActor,
 }
 
 /** Builds private initial state; persistence and plan-output receipts retain their existing transaction boundaries. */
-export function createApplicationDraft(raw: unknown, actor: WorkspaceActor) {
+export function createApplicationDraft(raw: unknown, actor: WorkspaceActor, linkFieldsReleased?: boolean) {
   const spec = applicationSpecSchema.parse(raw);
+  assertLinkFieldsReleased(spec, linkFieldsReleased);
   if (spec.maintenanceOwner !== actor.userId) throw new WorkspaceConflictError("The creator must own maintenance until a scoped handoff is accepted.");
   return applicationSchema.parse({
     ...initial(spec.title, actor),
@@ -117,10 +120,11 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
 
   async function create(actor: WorkspaceActor, workspaceId: string, raw: unknown) {
     const db = durableDb(store);
-    await store.member(actor, workspaceId);
+    await requireSystemMaker(store, actor, workspaceId);
     if (db) await assertApplicationStorage(db);
-    const payload = createApplicationDraft(raw, actor);
-    const saved = await store.create(actor, workspaceId, {
+    const parsed = applicationSpecSchema.safeParse(raw);
+    const payload = createApplicationDraft(raw, actor, parsed.success ? await linkFieldsReleasedFor(parsed.data, actor, workspaceId) : undefined);
+    const saved = await createSystemWork(store, actor, workspaceId, {
       productId: "applications",
       resourceKind: "application",
       title: payload.spec.title,
@@ -133,7 +137,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
 
   async function fromSource(actor: WorkspaceActor, workspaceId: string, sourceWorkId: string) {
     const db = durableDb(store);
-    await store.member(actor, workspaceId);
+    await requireSystemMaker(store, actor, workspaceId);
     const source = await load(store, actor, sourceWorkId);
     await ensureActorMember(store, actor, source.work);
     const sourceSpec = releaseSpec(source.state);
@@ -149,7 +153,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
       records: [],
       installation: { sourceWorkId, sourceVersion: source.state.currentReleaseVersion ?? 1, baseSpec: spec },
     });
-    const saved = await store.create(actor, workspaceId, {
+    const saved = await createSystemWork(store, actor, workspaceId, {
       productId: "applications",
       resourceKind: "application",
       title: spec.title,
@@ -165,6 +169,8 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     const input = applicationReviseInputSchema.parse(raw);
     const db = durableDb(store);
     const permission = await load(store, actor, id);
+    assertLinkFieldsReleased(input.spec, await linkFieldsReleasedFor(input.spec, actor, permission.work.workspaceId));
+    await requireSystemChanger(store, actor, permission.work.workspaceId);
     await ensureCandidateEditor(store, actor, permission.work);
     if (db) {
       await durableRpc(db, "update_application_candidate", {
@@ -188,6 +194,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     const input = applicationRehearseInputSchema.parse(raw);
     const db = durableDb(store);
     const permission = await load(store, actor, id);
+    await requireSystemChanger(store, actor, permission.work.workspaceId);
     await ensureCandidateEditor(store, actor, permission.work);
     if (db) {
       await durableRpc(db, "rehearse_application_candidate", {
@@ -210,6 +217,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     const input = applicationPublishInputSchema.parse(raw);
     const db = durableDb(store);
     const permission = await load(store, actor, id);
+    await requireSystemChanger(store, actor, permission.work.workspaceId);
     await ensureManager(store, actor, permission.work);
     if (db) {
       await durableRpc(db, "publish_application_candidate", {
@@ -233,6 +241,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     const input = applicationRollbackInputSchema.parse(raw);
     const db = durableDb(store);
     const permission = await load(store, actor, id);
+    await requireSystemChanger(store, actor, permission.work.workspaceId);
     await ensureManager(store, actor, permission.work);
     if (db) {
       await durableRpc(db, "rollback_application_release", {
@@ -261,17 +270,29 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
       const release = currentRelease(loaded.state);
       if (!release) throw new WorkspaceConflictError("This application has no usable released version.");
       if (authorize) await authorize({ actor, application: loaded.work, release });
+      // Contact and assigned-person fields (STRELVA_SYSTEMS_RELEASE): the
+      // record stores business record ids, then the assigned person gets one
+      // email. Off, such a release cannot be used.
+      const linked = linkFields(release.spec).length > 0;
+      if (linked) assertLinkFieldsReleased(release.spec, await linkFieldsReleasedFor(release.spec, actor, loaded.work.workspaceId));
+      const target = { workspaceId: loaded.work.workspaceId, workId: id };
+      const { record, conflicts } = linked
+        ? await resolveRecordLinks(db, actor, target, release.spec, input.record, input.links)
+        : { record: input.record, conflicts: [] as string[] };
       await durableRpc(db, "submit_application_record", {
         p_work_id: id,
         p_workspace_id: loaded.work.workspaceId,
         p_expected_release_version: input.expectedReleaseVersion,
         p_expected_records_revision: input.expectedRecordsRevision,
-        p_record_id: input.record.id,
-        p_values: input.record.values,
+        p_record_id: record.id,
+        p_values: record.values,
         p_user_id: actor.userId,
         p_verified_email: actor.verifiedEmail,
       }, "The application record could not be saved.");
-      return readRuntime(actor, id);
+      let notice: AssignedPersonNoticeStatus = "none";
+      if (linked) notice = (await notifyAssignedPerson(db, actor, { ...target, toolTitle: release.spec.title, spec: release.spec, record })).status;
+      const runtimeResult = await readRuntime(actor, id);
+      return linked ? Object.assign(runtimeResult, { linkResult: { notice, contactConflicts: conflicts } }) : runtimeResult;
     }
     return withMemoryLane(store, id, async () => {
       const loaded = await load(store, actor, id);
@@ -316,6 +337,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     // before translation so stale dashboard links retain their conflict UX.
     if (durableDb(store)) {
       const loaded = await load(store, actor, id);
+      if (command.kind !== "submit") await requireSystemChanger(store, actor, loaded.work.workspaceId);
       if (command.kind !== "submit" && command.kind !== "revise" && command.kind !== "rehearse") await ensureManager(store, actor, loaded.work);
       assertLegacyApplicationRevision(loaded.state, command);
       if (command.kind === "revise") return revise(actor, id, { expectedDesignRevision: loaded.state.candidate.designRevision, spec: command.spec });
@@ -359,7 +381,10 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
 
     return withMemoryLane(store, id, async () => {
       const loaded = await load(store, actor, id);
-      if (command.kind !== "submit") await ensureManager(store, actor, loaded.work);
+      if (command.kind !== "submit") {
+        await requireSystemChanger(store, actor, loaded.work.workspaceId);
+        await ensureManager(store, actor, loaded.work);
+      }
       assertLegacyApplicationRevision(loaded.state, command);
       let source;
       if (command.kind === "adopt_update") {

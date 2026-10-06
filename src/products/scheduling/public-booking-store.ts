@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import { decryptSecret, encryptSecret } from "@/lib/crypto/secrets";
-import { getSupabase } from "@/lib/db/client";
+import { decryptSecret, encryptSecret } from "@/platform/infra/crypto/secrets";
+import { getSupabase } from "@/platform/infra/db/client";
 import type {
   PublicBookingReservationRef,
   PublicBookingTokenStore,

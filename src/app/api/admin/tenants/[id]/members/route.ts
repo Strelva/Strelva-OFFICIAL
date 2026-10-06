@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { isSuperAdmin, getActorContext, getTenantOwnerUserIds, LastOwnerError } from "@/lib/auth";
+import { isSuperAdmin, getActorContext, getTenantOwnerUserIds, LastOwnerError } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
 import { logAuditEvent } from "@/lib/storage";
-import { listTenantMembers, deleteMembership } from "@/lib/db/repositories";
+import { listTenantMembers, deleteMembership } from "@/platform/infra/db/repositories";
 
 /**
  * Tenant membership list and revoke — super-admin only.

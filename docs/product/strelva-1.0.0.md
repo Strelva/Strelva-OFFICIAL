@@ -7,8 +7,31 @@ Status: planning. Nothing here is a 1.0.0 release yet; production runs `0.2.0`.
 workspace and finds its real systems working.** Its website, inquiries,
 bookings, publishing and internal tools read one business record, Strelva
 keeps them running, and the owner only sees the few decisions that are theirs.
-[Strelva Reborn](./strelva-reborn.md) gets there in `0.x` steps; this page is
-the full list of what the launch contains.
+[Strelva Reborn](./strelva-reborn.md) is the build that gets there. Since
+October 6 it builds straight to `1.0.0`; only the lead fix (`0.2.1`) ships
+first. This page is the full list of what the launch contains.
+[What Strelva becomes at 1.0.0](./product-model.md) is the product model behind
+it, area by area.
+
+## Specs
+
+| Area | Spec | State |
+| --- | --- | --- |
+| The model, every area | [product-model.md](./product-model.md) | Draft, Oct 6 |
+| Needs you and Strelva handled | [specs/needs-you.md](./specs/needs-you.md) | Draft, Oct 6 |
+| Owners entering, leaving `/dashboard` | [specs/owner-entry.md](./specs/owner-entry.md) | Draft, Oct 6 |
+| Ask Strelva in the workspace | [specs/ask-strelva.md](./specs/ask-strelva.md) | Draft, Oct 6 |
+| Agency surface and Versions | [specs/agency-and-versions.md](./specs/agency-and-versions.md) | Draft, Oct 6 |
+| One operator place | [specs/operator.md](./specs/operator.md) | Draft, Oct 6 |
+| Internal tools, store, wellness, reports, documents | [specs/systems-catalog.md](./specs/systems-catalog.md) | Draft, Oct 6 |
+| Billing, Redis exit, export, outcome loop | [specs/money-and-data.md](./specs/money-and-data.md) | Draft, Oct 6 |
+| Publishing | [publishing spec](../capabilities/publishing/publishing-spec-2026-10-06.md) | Draft, Oct 6 |
+| Website System | [website-system spec](../capabilities/website/website-system-spec-2026-10-06.md) | Draft, Oct 6; large parts built locally Oct 8 (`w2/website-system`), see its Status |
+| Systems Home, System page, Possibilities, Make real | [specs/systems-experience.md](./specs/systems-experience.md) | Draft, Oct 6 |
+| Website rebuild | [rebuild spec](../capabilities/website/website-rebuild-spec-2026-10-01.md) | Built locally, flag off |
+| Inquiries | [inquiry spec](../capabilities/inquiries/inquiry-first-product-spec-2026-09-11.md) + [1.0 delta](../capabilities/inquiries/inquiry-1.0-delta-2026-10-06.md) | Sept 11 spec amended Oct 6, incl. Redis read cutover |
+| Bookings | [bookings spec](../capabilities/bookings/bookings-spec-2026-10-01.md) | Working default, updated Oct 6 to the model |
+| Business record, conversion, structure | [Reborn §1, §3, §7](./strelva-reborn.md) | Line-level plan |
 
 Every feature below names its source and its state today. States come from the
 October 4 product audit (`output/product-audit-2026-10-04/`, local only), the Reborn page and `pnpm reborn:progress`. "Local" means
@@ -21,13 +44,13 @@ built and tested on a branch, not in production.
 | Feature | Today | Source |
 | --- | --- | --- |
 | Home shows the business's actual Systems, each with Draft/Live/Paused and a separate health signal | Local on `transition/systems` | ADR 0011, `PRIM_SYSTEM` |
-| **Needs you**: only the decisions the owner must make, set by policy, not an approval per change | Local UI, no real policy source | agency-in-the-loop decision, Oct 2 |
+| **Needs you**: only the decisions the owner must make, set by policy, not an approval per change | Local, flag off: one policy evaluator; every lifecycle resolves through Needs you (Ask, Make real, Versions included); policy settings for owners and operators; owners who never sign in get every workspace source by email, opened by the logged "Strelva (system)" service actor that never decides (`w3/decision-gaps`, migration `20261009100000` not applied); decided items listed under Strelva handled with an honest undo state, and an owner with no account approves Make real by email link (`w4/journey-gaps`, migrations `20261009130000` and `20261009131000` not applied) | agency-in-the-loop decision, Oct 2 |
 | System page: the real thing first (live site, inbox, calendar, tool), Connections, Possibilities and Versions beside it | Local | `DESIGN.md` Oct 4 |
-| Possibilities you can open, compare and **Make real**, with honest partial states and undo where undo exists | Local, fake effects only, in-memory progress | `COMP_MULTI_SYSTEM_ACTIVATION` |
+| Possibilities you can open, compare and **Make real**, with honest partial states and undo where undo exists | Local (branch `w2/systems-live`, Oct 6): Possibilities and activations in Postgres (migrations `20261008130000`, `20261008131000`, not applied anywhere), five live channel adapters behind `make_real_live:<channel>` flags (all off), one plan approval through Needs you, cron resume under the Strelva (system) service actor with the owner as approver of record (`w3/decision-gaps`); one Home item per rebuild. No live effect has run outside tests | `COMP_MULTI_SYSTEM_ACTIVATION` |
 | Versions: one System adapted per location or client, with shared improvements offered, never forced | Local, in-memory only | `PRIM_CONTEXT_VERSION` |
 | Health from real monitors; pause that keeps existing obligations | Local; website health reads real monitors in preview | `RULE_SYSTEM_PAUSE_HEALTH` |
-| Ask Strelva inside the workspace, using the same tools as today's owner agent | 0% in the workspace | Reborn §4 |
-| Owners sign in on their client admin host and land in their workspace; old `/dashboard` links redirect | Not started | Reborn §6 |
+| Ask Strelva inside the workspace, using the same tools as today's owner agent | Local, flag off: route, tools, chat UI and saved conversations (`w2/owner-surfaces-b`); Needs you wiring missing | Reborn §4 |
+| Owners sign in on their client admin host and land in their workspace; old `/dashboard` links redirect | Local: entry, 307s, 18 of 25 pages ready (Today, approvals, leads, reviews, analytics, reports, unknown from `w2/owner-surfaces-a`; chat and the eight website pages from `w2/owner-surfaces-b`; roster and schedule from `w2/bookings-inquiries`); `/settings` stays; flags off | Reborn §6 |
 
 ### 2. The systems a business starts with
 
@@ -38,9 +61,12 @@ business, monitoring, and at least the best competitor's bar.
 
 | System | Must do at launch | Today |
 | --- | --- | --- |
-| **Website** | Live site in the workspace with domain, health and history; edits and publishing for existing sites; connected sites (bring a site made elsewhere via `connect.js`) | Tenant sites live; workspace view ~30%; connected sites on `feat/connected-sites`, unmerged; rebuild flag off |
-| **Inquiries** | Every lead kept, spam review, reply from the workspace, owner notified | Leads Redis-only (fix on `reborn-stop-losing-data`); product ~35%, flag off |
-| **Bookings** | Weekly hours, services, buffers, confirmations, reminders, one booking store, pause | ~25%; schedule caps at ~125 bookings; two stores |
+| **Website** | Live site in the workspace with domain, health and history; edits and publishing for existing sites; connected sites (bring a site made elsewhere via `connect.js`) | Tenant sites live; System page with domains, Waiting on you, Requests and History built locally (Oct 8); connected sites merged locally onto the business record and lead store, flag off; publish-onto-linked-site built locally; rebuild flag off |
+| **Inquiries** | Every lead kept, spam review, reply from the workspace, owner notified | Postgres copy of every lead built locally, not applied; read switch, 7-day parity and Postgres-first capture built locally behind off switches (`w2/bookings-inquiries`); spam review in the workspace, `inquiry_events`, workspace read, contact on capture and commitment replies to the owner built locally behind `STRELVA_INQUIRY_RECORDS` (`w3/inquiries-gaps`); product ~45%, flags off |
+| **Bookings** | Weekly hours, services, buffers, confirmations, reminders, one booking store, pause | ~55%; one booking store, hours and services from the record, pause, owner notice, request mode and day/week views built locally behind off switches (`w2/bookings-inquiries`); reminders, request clocks, hold sweep, manage link page, calendar busy times, booking-only hours and schedule copies built locally behind off switches (`w3/bookings-inquiries-gaps`); the visitor's booking keeps working without Redis once the store serves, and says honestly when nothing was booked (`w4/journey-gaps`, local); no agent bookings or MCP |
+| **Website** | Live site in the workspace with domain, health and history; edits and publishing for existing sites; connected sites (bring a site made elsewhere via `connect.js`) | Tenant sites live; System page with domains, Waiting on you, Requests and History built locally (Oct 8); connected sites merged locally onto the business record and lead store, flag off, now with a per-business release row and public gate, a daily purge cron, a Home link and inquiries in the workspace inbox (`w3/decision-gaps`); Ask for a change on a managed site files a Request (local); publish-onto-linked-site built locally; rebuild flag off |
+| **Inquiries** | Every lead kept, spam review, reply from the workspace, owner notified | Postgres copy of every lead built locally, not applied; read switch, 7-day parity and Postgres-first capture built locally behind off switches (`w2/bookings-inquiries`); product ~35%, flag off |
+| **Bookings** | Weekly hours, services, buffers, confirmations, reminders, one booking store, pause | ~45%; one booking store, hours and services from the record, pause, owner notice, request mode and day/week views built locally behind off switches (`w2/bookings-inquiries`); no reminders or manage links |
 | **Publishing** | Review replies, Google Business Profile, blog and newsletter, all through approval and receipts | 0% in the workspace; GBP writes depend on Google approval |
 | **Internal tools** | Agency/Strelva build from a sentence (work plan → app draft); records link to business contacts; notify on submit | Native apps shipped, unused; drafting flag off; ~10% |
 | **Store, rewards, newsletter, wellness** | Existing client features keep working inside the workspace | Tenant-side only |
@@ -93,14 +119,23 @@ business, monitoring, and at least the best competitor's bar.
 
 ## Underneath (customers don't see it, launch needs it)
 
-- Shared infrastructure out of `src/lib`; 99 workspace files still import it.
-- One capability registry instead of seven declarations; one finite-job record
-  instead of four (service request, provider delivery, work job, budget).
+- Shared infrastructure out of `src/lib`. (Local, Oct 6, `w5/structure`: in
+  `src/platform/infra`; `src/lib` imports no workspace layer (21 files to 0,
+  through ports registered at the app edge); `check:boundaries` refuses any
+  new crossing; 93 workspace files still import `src/lib`, listed in a
+  shrink-only baseline.)
+- One capability registry instead of seven declarations (local, Oct 6:
+  `src/capability-registry.ts` over the six files, through adapters; the
+  declarations are not folded together yet); one finite-job record instead of
+  four (service request, provider delivery, work job, budget).
 - One model-call helper (12 call sites today); one email sender (`newsletter.ts`
   bypasses `send.ts`); one approval store (five today).
-- Make real progress in Postgres on `work-execution`, not memory.
+- Make real progress in Postgres on `work-execution`, not memory. (Local,
+  Oct 6: the live service runs on the Postgres activation store and the
+  workspace-work cron resumes in-progress activations. Not applied anywhere.)
 - A Preview environment with its own Supabase, so testers can sign in.
-- Regenerated database types.
+- Regenerated database types. (Local, Oct 6: from every migration with
+  `pnpm db:types`; not from production.)
 
 ## Cut or frozen for 1.0.0
 

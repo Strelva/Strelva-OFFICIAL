@@ -1,4 +1,4 @@
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 
 /**
  * What a client is trying to grow. NOT every business is booking-led — a trades

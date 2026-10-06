@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, Clock } from "lucide-react";
 import { getGuide, listGuides } from "@/lib/guides";
-import { MARKETING_URL } from "@/lib/brand";
+import { MARKETING_URL } from "@/platform/infra/brand";
 
 // Serialize JSON-LD safely: JSON.stringify escapes quotes but NOT `<`, so a
 // `</script>` in the data would close the tag. Mirrors the escaper in

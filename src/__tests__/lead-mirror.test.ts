@@ -4,8 +4,8 @@ import { makeRedisMock } from "./support/redis-mock";
 const redis = makeRedisMock();
 let redisAvailable = true;
 const alertOnce = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/redis", () => ({ getRedis: () => (redisAvailable ? redis : null) }));
-vi.mock("@/lib/monitoring", () => ({ alertOnce }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => (redisAvailable ? redis : null) }));
+vi.mock("@/platform/infra/monitoring", () => ({ alertOnce }));
 
 import {
   LEAD_MIRROR_LAST_FAILURE_KEY,
@@ -98,6 +98,8 @@ describe("mirrorLead", () => {
     await expect(mirrorLead("gldf", lead, "abc123")).resolves.toEqual({ status: "failed", reason: "invalid" });
     db(async () => ({ data: null, error: { code: "PGRST202", message: "Could not find the function public.record_tenant_lead" } }));
     await expect(mirrorLead("gldf", lead, "abc123")).resolves.toEqual({ status: "failed", reason: "schema_missing" });
+    // A missing schema pauses live copies (lead-mirror-schema-missing.test.ts); clear it.
+    redis.store.clear();
     db(async () => ({ data: { surprise: true }, error: null }));
     await expect(mirrorLead("gldf", lead, "abc123")).resolves.toEqual({ status: "failed", reason: "error" });
   });

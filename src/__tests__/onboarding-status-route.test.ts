@@ -9,7 +9,7 @@ const mockGetWeeklyBrief = vi.hoisted(() => vi.fn());
 const mockGetConnections = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/tenant", () => ({ getTenantFromHeaders: mockGetTenantFromHeaders }));
-vi.mock("@/lib/auth", () => ({ requireTenantAccess: mockRequireTenantAccess }));
+vi.mock("@/platform/infra/auth", () => ({ requireTenantAccess: mockRequireTenantAccess }));
 vi.mock("@/lib/storage", () => ({ getActivity: mockGetActivity, getContent: mockGetContent }));
 vi.mock("@/lib/weekly-brief", () => ({ getWeeklyBrief: mockGetWeeklyBrief }));
 vi.mock("@/lib/connections", () => ({ getConnections: mockGetConnections }));

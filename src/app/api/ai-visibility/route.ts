@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { scoreAiVisibility, type ScoreInput, saveAiVisibilityResult } from "@/products/ai-visibility/server";
-import { isRateLimitedWindowedAsync, rateLimitKey } from "@/lib/rate-limit";
+import { isRateLimitedWindowedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 
 /**
  * Public AI-visibility audit endpoint (sales lead-magnet front door).

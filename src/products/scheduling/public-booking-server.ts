@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import { getTenantConfig } from "@/lib/tenants";
 import { captureLead } from "@/lib/leads";
 import { PostgresOfferingStore } from "@/platform/offerings/store";
@@ -22,6 +22,7 @@ import {
 import { scheduleSchema } from "./contracts";
 import { createPublicBookingService, PublicBookingError, type PublicBookingBinding, type PublicBookingCalendar, type PublicBookingInquiryCapture, type PublicBookingRange } from "./public-booking";
 import { postgresPublicBookingTokenStore } from "./public-booking-store";
+import { publicBookingStoreHook, subtractStoreBookings } from "@/platform/bookings/public-api";
 
 type DbRow = Record<string, unknown>;
 type DbResult = { data: unknown; error: { code?: unknown; message?: unknown } | null };
@@ -158,6 +159,8 @@ export async function resolvePublishedPublicBooking(input: {
       start: slot.start,
       end: slot.end,
     }));
+  // One booking store: once reads flip, a time a widget booking holds is not offered here.
+  const openSlots = await subtractStoreBookings(input.tenantId, slots);
   return {
     tenantId: input.tenantId,
     tenantStableId: config.stableId,
@@ -172,7 +175,7 @@ export async function resolvePublishedPublicBooking(input: {
     name: requiredText(grant, "display_name"),
     provider: requiredText(grant, "provider") as "outlook" | "google",
     timeZone: text(grant, "time_zone") || availability.timeZone || "UTC",
-    slots,
+    slots: openSlots,
     owner,
     workspaceId,
     workId,
@@ -294,6 +297,7 @@ export function createPublicWebsiteBookingService() {
     inquiries: publicInquiryCapture(),
     calendar: nativeCalendar(),
     tokens: postgresPublicBookingTokenStore,
+    store: publicBookingStoreHook(),
     createRequestId: () => `public-${randomUUID()}`,
   });
 }

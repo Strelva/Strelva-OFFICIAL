@@ -8,7 +8,7 @@
  * GLDF signed-proxy path.
  */
 
-import { getRedis } from "../redis";
+import { getRedis } from "@/platform/infra/redis";
 
 export class KvNotConfiguredError extends Error {
   constructor() {

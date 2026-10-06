@@ -1,5 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { getRedis } from "@/lib/redis";
+import { getRedis } from "@/platform/infra/redis";
 import { calendarProviderSchema, type CalendarProvider } from "./contracts";
 import { CalendarProviderError } from "./adapters";
 

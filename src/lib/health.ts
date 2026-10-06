@@ -4,8 +4,8 @@
  * same checks server-side without an HTTP round-trip.
  */
 
-import { getRedis } from "./redis";
-import { getSupabase } from "./db/client";
+import { getRedis } from "@/platform/infra/redis";
+import { getSupabase } from "@/platform/infra/db/client";
 import { version as productVersion } from "../../package.json";
 
 const TIMEOUT_MS = 3_000;

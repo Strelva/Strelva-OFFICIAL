@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const transport = vi.hoisted(() => ({ eval: vi.fn(), get: vi.fn(), set: vi.fn(), del: vi.fn(), zrange: vi.fn(), scan: vi.fn() }));
-vi.mock("@/lib/redis", () => ({ getRedis: () => transport }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => transport }));
 import { rekeyTenantRedis } from "@/lib/tenant-rename";
 import { LEAD_MIRROR_LAST_FAILURE_KEY, LEAD_MIRROR_PENDING_KEY } from "@/lib/lead-mirror";
 

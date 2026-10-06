@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantPermission, verifyAuth } from "@/lib/auth";
+import { requireTenantPermission, verifyAuth } from "@/platform/infra/auth";
 import { getContent, SECTION_TO_TYPE } from "@/lib/storage";
 import { collectTenantMedia } from "@/lib/media-store";
 import type { ContentSection } from "@/lib/types";

@@ -8,7 +8,7 @@ const mockGetRecentFailures = vi.hoisted(() => vi.fn());
 const mockGetEvents = vi.hoisted(() => vi.fn());
 const mockGetQueueCount = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/redis", () => ({ getRedis: mockGetRedis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: mockGetRedis }));
 vi.mock("@/lib/tenants", () => ({ getAllTenants: mockGetAllTenants, getTenantConfig: mockGetTenantConfig }));
 vi.mock("@/lib/tenant-urls", () => ({ getTenantPrimaryDomain: mockGetTenantPrimaryDomain }));
 vi.mock("@/lib/revalidate-client", () => ({ getRecentFailures: mockGetRecentFailures }));
@@ -36,6 +36,14 @@ describe("buildOpsReport", () => {
     const report = await buildOpsReport();
     expect(report.activeTenants).toBe(2);
     expect(report.metrics.webhookFailures).toBe(0);
+  });
+
+  it("no longer checks SMS approvals: nothing sends SMS, so no sms:pending key is read or reported", async () => {
+    const get = vi.fn(async () => ({ sentAt: "2026-01-01T00:00:00Z" }));
+    mockGetRedis.mockReturnValue({ get, scan: vi.fn(async () => ["0", []]) });
+    const report = await buildOpsReport();
+    expect(get).not.toHaveBeenCalledWith(expect.stringMatching(/^sms:pending:/));
+    expect(Object.keys(report.metrics).some((key) => /sms/i.test(key))).toBe(false);
   });
 
   it("surfaces revalidation failures from getRecentFailures", async () => {

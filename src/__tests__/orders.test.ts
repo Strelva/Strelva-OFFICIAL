@@ -4,7 +4,7 @@ import { makeRedisMock } from "./support/redis-mock";
 const mockRedis = makeRedisMock();
 let clock = 1_000;
 
-vi.mock("@/lib/redis", () => ({ getRedis: () => mockRedis }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => mockRedis }));
 
 // orders.ts stamps createdAt from Date.now via new Date(); advance a fake clock
 // so ordering + the 30-day window are deterministic.

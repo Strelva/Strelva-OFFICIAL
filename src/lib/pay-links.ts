@@ -19,7 +19,7 @@
  * intentionally separate and untouched.
  */
 
-import { getRedis } from "./redis";
+import { getRedis } from "@/platform/infra/redis";
 import { formatWholeDollarsUsd } from "./currency";
 
 /**

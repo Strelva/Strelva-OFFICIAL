@@ -25,13 +25,13 @@ let sessionUser: { id: string; email_confirmed_at: string | null } | null = null
 const superAdminIds = new Set<string>();
 const memberships = new Map<string, string>(); // `${userId}:${tenant}` -> role
 
-vi.mock("@/lib/dev-access", () => ({
+vi.mock("@/platform/infra/dev-access", () => ({
   isDevAccessBypassEnabled: () => bypass,
 }));
-vi.mock("@/lib/db/server-client", () => ({
+vi.mock("@/platform/infra/db/server-client", () => ({
   getSessionUser: () => Promise.resolve(sessionUser),
 }));
-vi.mock("@/lib/db/repositories", () => ({
+vi.mock("@/platform/infra/db/repositories", () => ({
   getMembershipRole: (userId: string, tenant: string) =>
     Promise.resolve(memberships.get(`${userId}:${tenant}`) ?? null),
   isSuperAdminUser: (userId: string) => Promise.resolve(superAdminIds.has(userId)),
@@ -43,10 +43,10 @@ vi.mock("@/lib/db/repositories", () => ({
   markInviteClaimed: vi.fn(),
   getUserByEmail: vi.fn(),
 }));
-vi.mock("@/lib/redis", () => ({ getRedis: () => null }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: () => Promise.resolve(undefined) }));
 
-import { hasTenantAccess, isSuperAdmin, requireTenantAccess } from "@/lib/auth";
+import { hasTenantAccess, isSuperAdmin, requireTenantAccess } from "@/platform/infra/auth";
 
 const CONFIRMED = "2026-01-01T00:00:00.000Z";
 

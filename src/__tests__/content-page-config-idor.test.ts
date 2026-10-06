@@ -22,7 +22,7 @@ vi.mock("@/lib/tenant", () => ({
   getTenantFromHeaders: () => Promise.resolve("tenant-a"),
 }));
 
-vi.mock("@/lib/auth", () => ({
+vi.mock("@/platform/infra/auth", () => ({
   requireTenantAccess: (t: string) => mockRequireTenantAccess(t),
   requireTenantPermission: () => Promise.resolve(null),
   verifyAuth: () => Promise.resolve(true),

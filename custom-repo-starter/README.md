@@ -120,7 +120,9 @@ Two ways to handle form submissions; pick per site:
    owner gets the platform's lead email. This path has no published inquiry capability
    version, so it does not enter the governed reply/follow-up workspace. Use the
    versioned `StrelvaInquiryForm.tsx` path below when the owner needs that record and
-   responsibility history.
+   responsibility history. A `200 {ok:true}` means a store holds the lead. When no store
+   could confirm it, the route answers `503` with `code: "lead_storage_unavailable"`, and
+   the form shows its try-again message instead of a false receipt.
 2. **Standalone email** — `form-route.template.tsx` + `scaffold-forms.ts`. The drop-in
    **Formspree replacement** for ANY site (Studio sites, or any repo not wired as a
    tenant): the form POSTs, the owner is emailed the submission directly via Resend.

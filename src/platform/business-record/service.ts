@@ -11,6 +11,7 @@ import {
   contactBatchSchema,
   conversionReceiptSchema,
   ownerRecipientSchema,
+  tenantOwnerRecipientSchema,
   patchVerificationAllowed,
   tenantImportPayloadSchema,
   tenantLinkStateSchema,
@@ -22,6 +23,7 @@ import {
   type BusinessRecordWriteResult,
   type ConversionReceipt,
   type OwnerRecipient,
+  type TenantOwnerRecipient,
   type TenantImportPayload,
   type TenantLinkState,
   type TenantUnlinkPreview,
@@ -107,6 +109,13 @@ export async function readBusinessRecordHistory(actor: WorkspaceActor, workspace
 export async function resolveOwnerRecipient(workspace: string): Promise<OwnerRecipient | null> {
   return callBusinessRecord("resolve_business_owner_recipient", { p_workspace_id: workspaceId.parse(workspace) },
     ownerRecipientSchema.nullable(), "The owner recipient could not be resolved.");
+}
+
+/** The owner-recipient rule for one tenant (record contact, then the tenant's
+ * own owner_email, then the business's first site). Server-only; sends nothing. */
+export async function resolveTenantOwnerRecipient(tenantId: string): Promise<TenantOwnerRecipient | null> {
+  return callBusinessRecord("resolve_tenant_owner_recipient", { p_tenant_id: z.string().min(1).max(120).parse(tenantId) },
+    tenantOwnerRecipientSchema.nullable(), "The owner recipient could not be resolved.");
 }
 
 export async function readTenantWorkspaceLink(operatorEmail: string, tenantId: string): Promise<TenantLinkState> {

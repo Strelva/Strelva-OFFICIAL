@@ -5,8 +5,10 @@
  * `snapshot.systems` (src/experience/systems/server.ts over
  * src/platform/systems, system-health and possibilities). This adapter only
  * resolves what opens (the site, the inquiry inbox or the saved work), the
- * sentences customers read, and Versions recorded on saved work. It infers no
- * System, health or lineage the server did not send.
+ * sentences customers read, and the stored Version rows the server sent
+ * (`systems.versions`). It infers no System, health or lineage the server did
+ * not send. The agency's source and Version list is the Library
+ * (GET /api/workspace/agency-library), read from system_versions.
  *
  * Unless the snapshot says STRELVA_SYSTEMS_RELEASE is on, there are no
  * Systems: every saved result stays a file, as before the Systems model.
@@ -14,7 +16,7 @@
 import type { OfferingInstallation } from "@/platform/offerings";
 import type { ManagedWork, WorkspaceSnapshot, WorkspaceSystemEntry, WorkspaceSystems, WorkspaceWork } from "@/experience/workspace/contracts";
 import { sameAppHref } from "@/experience/workspace/workspace-discovery";
-import { systemsReleased, type SystemConnection, type SystemKind, type SystemPossibility, type SystemSurface, type SystemVersion, type SystemView } from "./model";
+import { systemsReleased, type SystemConnection, type SystemHistoryRow, type SystemKind, type SystemPossibility, type SystemSurface, type SystemVersion, type SystemView } from "./model";
 
 export interface SystemsInput {
   snapshot: Pick<WorkspaceSnapshot, "workspaceId" | "workspaces" | "work" | "delegations" | "systems" | "releases">;
@@ -42,11 +44,14 @@ const KIND_VIEW: Record<string, SystemKind> = {
   document: "document",
   report: "document",
   proposal: "document",
-  tracker: "tracker",
+  // Stored Systems made before the merge keep their slug; a tracker reads as an internal tool.
+  tracker: "app",
   onboarding: "onboarding",
   internal_app: "app",
   portal: "app",
   pricing: "app",
+  listing: "listing",
+  newsletter: "newsletter",
 };
 
 function hostname(value: unknown): string | undefined {
@@ -70,12 +75,36 @@ const CONNECTION_STATUS = { connected: "connected", disconnected: "not_connected
 
 function detailFor(kind: SystemKind, work: WorkspaceWork | undefined, entry: WorkspaceSystemEntry): string {
   if (kind === "document" && work?.document) return `Revision ${work.document.revision}`;
-  if (kind === "app") return "Used by your team";
+  if (kind === "app") return work?.productId === "tracker" ? "Used by your team · started from a list" : "Used by your team";
   if (kind === "bookings") return "Time people can reserve";
-  if (kind === "tracker") return "Working data";
   if (kind === "onboarding") return "New-client intake";
   if (kind === "website" && !entry.tenantId) return "Website draft";
+  if (kind === "listing") return "Reviews, hours and posts on Google";
+  if (kind === "newsletter") return "Issues to your subscribers";
   return "";
+}
+
+const BOOKING_VIEW_LABEL = { schedule: "Day and week schedule", roster: "Roster" } as const;
+
+/** Wellness schedule and roster are views of the Bookings System on the managed site's dashboard. */
+function bookingViews(views: NonNullable<WorkspaceSystemEntry["views"]>, site: ManagedWork | undefined): NonNullable<SystemView["views"]> {
+  const dashboard = site?.href && /\/dashboard\/?$/.test(site.href) ? site.href.replace(/\/$/, "") : undefined;
+  return views.map(view => ({ id: view, label: BOOKING_VIEW_LABEL[view], ...(dashboard ? { href: `${dashboard}/${view}` } : {}) }));
+}
+
+/**
+ * Assessments and website audits are one thing on a website: issued
+ * outputs about that site. They open from its page, never as a separate
+ * presentation or System. Matched by the address they were run against.
+ */
+function auditsFor(domain: string, work: readonly WorkspaceWork[]): Pick<SystemView, "audits"> {
+  const audits = work.flatMap(item => {
+    const subject = item.assessment?.subject.url;
+    if (!subject || bare(hostname(subject)) !== domain) return [];
+    const method = item.assessment!.method.id === "website_audit" ? "Website audit" : "Website audit · AI visibility";
+    return [{ workId: item.id, title: method, at: item.assessment!.observedAt ?? item.assessment!.recordedAt }];
+  });
+  return audits.length ? { audits } : {};
 }
 
 export function readBusinessSystems(input: SystemsInput): BusinessSystems {
@@ -83,13 +112,14 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
   const projection: WorkspaceSystems | undefined = systemsReleased(snapshot) ? snapshot.systems : undefined;
   const ready = projection?.status === "ready" ? projection : null;
   const entries = ready?.systems ?? [];
+  const publishing = ready?.publishing?.status === "ready" ? ready.publishing : undefined;
   const installationFor = new Map<string, OfferingInstallation>();
   for (const installation of installations) {
     if (installation.status === "retired") continue;
     for (const resource of installation.nativeResources) installationFor.set(resource.id, installation);
   }
   const agencyNames = new Map(snapshot.workspaces.filter(item => item.kind === "agency").map(item => [item.id, item.name]));
-  const delegationAgency = new Map(snapshot.delegations.filter(item => item.status === "active").map(item => [item.workId, item.agencyWorkspaceId]));
+  const versionBySystem = new Map((ready?.versions ?? []).map(item => [item.systemId, item]));
   const businessName = snapshot.workspaces.find(item => item.id === snapshot.workspaceId)?.name || "This business";
   const workById = new Map(snapshot.work.map(work => [work.id, work]));
   const siteById = new Map(sites.map(site => [site.id, site]));
@@ -105,31 +135,57 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
     const domain = bare(hostname(site?.domain));
     const installation = entry.savedWorkId ? installationFor.get(entry.savedWorkId) : undefined;
     let surface: SystemSurface | null = null;
-    if (kind === "website" && entry.tenantId) {
+    if (kind === "website" && entry.connectedSite) {
+      // The business's own site, built elsewhere. Strelva frames it and never edits it.
+      const liveUrl = entry.connectedSite.siteUrl;
+      surface = { kind: "website", domain: bare(hostname(liveUrl)), liveUrl, previewSrc: liveUrl, previewLabel: `${bare(entry.connectedSite.siteHost)}, as visitors see it now` };
+    } else if (kind === "website" && entry.tenantId) {
       const liveUrl = site?.domain ? `https://${site.domain.replace(/^https?:\/\//, "")}` : undefined;
       const previewSrc = (site?.previewHref && sameAppHref(site.previewHref)) || liveUrl;
-      surface = { kind: "website", domain, liveUrl, previewSrc, previewLabel: site?.previewHref ? `Rendered from the saved copy of ${domain || entry.name}` : `${domain || entry.name}, as visitors see it now`, manageHref: site?.href && sameAppHref(site.href) ? sameAppHref(site.href) || undefined : undefined };
+      surface = { kind: "website", domain, liveUrl, previewSrc, previewLabel: site?.previewHref ? `Rendered from the saved copy of ${domain || entry.name}` : `${domain || entry.name}, as visitors see it now`, manageHref: site?.href && sameAppHref(site.href) ? sameAppHref(site.href) || undefined : undefined, ...(entry.editing ? { editing: entry.editing } : {}) };
+    } else if (kind === "listing") {
+      const listing = publishing?.listings.find(item => item.systemId === entry.ref.systemId);
+      surface = listing
+        ? { kind: "listing", healthMessage: listing.healthMessage, receipts: listing.receipts }
+        : { kind: "listing", healthMessage: "Strelva couldn't read this listing just now.", receipts: [], unavailable: true };
+    } else if (kind === "newsletter") {
+      surface = { kind: "newsletter", audience: entry.basis ?? "Sent to active subscribers." };
     } else if (work) {
       surface = { kind: "work", workId: work.id, productId: work.productId };
     }
     const versions: SystemVersion[] = [];
     if (work && installation) versions.push({ id: `${work.id}:offering`, relation: "version", context: businessName, title: work.title, lineage: `Adapted from ${definitionNames.get(installation.definitionId) || installation.definitionId}, version ${installation.definitionVersion}.` });
-    if (work?.sourceWorkId && kind !== "document") {
-      const agency = delegationAgency.get(work.id);
-      versions.push({ id: `${work.id}:source`, relation: "version", context: businessName, title: work.title, lineage: `Adapted from a source system${agency && agencyNames.get(agency) ? ` kept by ${agencyNames.get(agency)}` : " your provider keeps"}. Your records and access stay here.` });
+    // Lineage comes only from stored Version rows (system_versions). Saved
+    // work's sourceWorkId is work-to-work history and never a Version.
+    const stored = versionBySystem.get(entry.ref.systemId);
+    if (stored) {
+      const sourceBusiness = stored.source.businessId === snapshot.workspaceId ? null : agencyNames.get(stored.source.businessId);
+      const sourceLabel = stored.source.hidden ? "this business's shared setup" : stored.source.name ?? (sourceBusiness ? `a source kept by ${sourceBusiness}` : "a source your provider keeps");
+      const waiting = stored.latestRevision !== null && stored.latestRevision > stored.baselineRevision && !stored.declined.includes(stored.latestRevision);
+      versions.push({ id: `${stored.id}:source`, relation: "source", context: stored.context.label, title: stored.source.name ?? "Source",
+        lineage: `${stored.context.label} is adapted from ${sourceLabel}.${waiting ? " An improvement is waiting for a decision." : ""} Records and accounts stay here.` });
+      for (const sibling of stored.siblings) {
+        versions.push({ id: `${stored.id}->${sibling.id}`, relation: "version", context: sibling.context.label, title: sibling.context.label, systemId: sibling.systemId,
+          lineage: `Another Version of the same ${stored.source.hidden ? "setup" : "source"}, with its own accounts.` });
+      }
     }
     return {
       id: entry.ref.systemId,
       kind,
       // A managed website reads by its address; the spine keeps the site name.
       name: kind === "website" && domain ? domain : entry.name,
-      detail: kind === "website" && domain ? entry.name : detailFor(kind, work, entry),
+      detail: kind === "website" && entry.connectedSite ? "Connected site" : kind === "website" && domain ? entry.name : detailFor(kind, work, entry),
       ...(entry.basis ? { basis: entry.basis } : {}),
       lifecycle: stopped ? "paused" : entry.lifecycle,
       health: { state: entry.health.status, summary: work?.unavailableReason || entry.health.summary, lastVerifiedAt: entry.health.lastVerifiedAt },
       surface: surface ?? { kind: "work", workId: entry.savedWorkId ?? entry.ref.systemId, productId: "unknown" },
       operatedBy: kind === "website" && site ? site.relationship === "enterprise" ? "Your enterprise team" : "Strelva" : provider(installation),
+      ...(kind === "bookings" && entry.views?.length ? { views: bookingViews(entry.views, entry.tenantId ? siteById.get(entry.tenantId) : undefined) } : {}),
+      ...(kind === "website" && domain ? auditsFor(domain, snapshot.work) : {}),
       connections: [], possibilities: [], versions,
+      ...(publishing?.websiteParts[entry.ref.systemId]?.length ? { parts: publishing.websiteParts[entry.ref.systemId]!.map(({ label, published, drafts }) => ({ label, published, drafts })) } : {}),
+      ...(publishing?.offers.some(offer => offer.systemId === entry.ref.systemId)
+        ? { offers: publishing.offers.filter(offer => offer.systemId === entry.ref.systemId).map(({ kind, label }) => ({ kind, label })) } : {}),
     };
   });
   const byId = new Map(systems.map(system => [system.id, system]));
@@ -159,12 +215,32 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
       ...(possibility.evidence ? { evidence: possibility.evidence } : {}),
       ...(possibility.previewHref && sameAppHref(possibility.previewHref) ? { previewSrc: sameAppHref(possibility.previewHref) || undefined } : {}),
       openHref: `/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&view=websites&work=${encodeURIComponent(possibility.workId)}`,
+      ...(possibility.staleReason ? { staleReason: possibility.staleReason } : {}),
     };
     for (const id of view.affects) byId.get(id)!.possibilities.push(view);
   }
 
-  // Several websites under one business are location Versions of one website (Twin Trees: one account, two locations).
-  const websites = systems.filter(item => item.kind === "website" && item.surface.kind === "website");
+  // Make real in progress or partly live, on every System it changes.
+  for (const activation of ready?.activations ?? []) {
+    const view = { id: activation.id, title: activation.title, headline: activation.headline, partlyLive: activation.partlyLive, done: activation.done, total: activation.total, lines: activation.lines };
+    for (const id of activation.affects) {
+      const system = byId.get(id);
+      if (system) system.activations = [...(system.activations ?? []), view];
+    }
+  }
+  // History: the System's own changes and Strelva handled receipts for it, newest first, last five.
+  const history = new Map<string, SystemHistoryRow[]>();
+  for (const row of ready?.history ?? []) history.set(row.systemId, [...(history.get(row.systemId) ?? []), { id: row.id, sentence: row.sentence, at: row.at }]);
+  for (const receipt of ready?.handled ?? []) if (receipt.systemId) history.set(receipt.systemId, [...(history.get(receipt.systemId) ?? []), { id: receipt.id, sentence: receipt.sentence, at: receipt.at }]);
+  for (const [id, rows] of history) {
+    const system = byId.get(id);
+    if (system) system.history = rows.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 5);
+  }
+
+  // Several websites under one business with no stored Versions yet are
+  // shown as location siblings (Twin Trees: one account, two locations).
+  // Stored Version rows replace this.
+  const websites = systems.filter(item => item.kind === "website" && item.surface.kind === "website" && !versionBySystem.has(item.id));
   if (websites.length > 1) for (const site of websites) {
     site.versions.push(...websites.filter(other => other.id !== site.id).map(other => ({
       id: `${site.id}->${other.id}`, relation: "version" as const, context: other.detail || other.name, title: other.name, systemId: other.id,
@@ -182,30 +258,4 @@ export function possibilityScope(possibility: SystemPossibility, systems: readon
     ...possibility.affects.map(id => systems.find(item => item.id === id)?.name || "A system"),
     ...(possibility.introduces || []).map(name => `New: ${name}`),
   ];
-}
-
-/** Saved-work products the spine maps to Systems (systems/from-existing SAVED_WORK_KINDS), less websites. */
-const SYSTEM_PRODUCTS: ReadonlySet<string> = new Set(["applications", "custom-applications", "scheduling", "documents", "tracker"]);
-
-export interface AgencyLineage {
-  sources: Array<{ source: WorkspaceWork; versions: Array<{ businessId: string; businessName: string; work: WorkspaceWork }> }>;
-  /** Client systems with no recorded source in this agency. */
-  unlinked: Array<{ businessId: string; businessName: string; work: WorkspaceWork }>;
-}
-
-/**
- * Agency view: its own source Systems and the client Versions adapted from them.
- * Only `sourceWorkId` establishes lineage; matching titles never do.
- */
-export function agencySystemLineage(agencyWork: readonly WorkspaceWork[], clients: readonly { workspace: { id: string; name: string }; work: readonly WorkspaceWork[] }[]): AgencyLineage {
-  const sources = agencyWork.filter(work => SYSTEM_PRODUCTS.has(work.productId) && work.operation?.status !== "retired").map(source => ({ source, versions: [] as AgencyLineage["sources"][number]["versions"] }));
-  const byId = new Map(sources.map(entry => [entry.source.id, entry]));
-  const unlinked: AgencyLineage["unlinked"] = [];
-  for (const client of clients) for (const work of client.work) {
-    if (!SYSTEM_PRODUCTS.has(work.productId) && work.productId !== "websites") continue;
-    const entry = work.sourceWorkId ? byId.get(work.sourceWorkId) : undefined;
-    const item = { businessId: client.workspace.id, businessName: client.workspace.name, work };
-    if (entry) entry.versions.push(item); else unlinked.push(item);
-  }
-  return { sources, unlinked };
 }

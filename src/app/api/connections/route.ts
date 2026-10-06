@@ -4,7 +4,7 @@
 
 import { NextResponse } from "next/server";
 import { getTenantFromHeaders } from "@/lib/tenant";
-import { requireTenantAccess } from "@/lib/auth";
+import { requireTenantAccess } from "@/platform/infra/auth";
 import { getConnections } from "@/lib/connections";
 import type { Connection, IntegrationProvider } from "@/lib/types";
 

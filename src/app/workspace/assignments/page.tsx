@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/db/server-client";
+import { getSessionUser } from "@/platform/infra/db/server-client";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { OperationalInbox } from "@/experience/operations/OperationalInbox";

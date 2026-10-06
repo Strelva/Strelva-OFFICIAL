@@ -21,8 +21,11 @@ const APPROVAL_REASON: Record<Exclude<DeclaredEffect["kind"], "publish">, string
  * payment effects are outside writes and always need a recorded approval
  * (AGENTS.md: outside writes). "block" means the candidate must change.
  */
+const STRUCTURAL_REASON = "This changes what visitors or your team use, so it goes live only on the owner's approval of this exact plan.";
+
 export function gatePublish(effect: DeclaredEffect): PublishGate {
   if (effect.kind !== "publish") return { kind: "needs_approval", reason: APPROVAL_REASON[effect.kind] };
+  if (effect.channel && effect.channel !== "tenant_content" && !effect.publish) return { kind: "needs_approval", reason: STRUCTURAL_REASON };
   if (!effect.publish || !isContentSection(effect.publish.section)) {
     return { kind: "blocked", reason: "This publish effect names a section governance does not recognize." };
   }

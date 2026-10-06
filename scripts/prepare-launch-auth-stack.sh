@@ -79,6 +79,14 @@ for value in (anon,service): print('::add-mask::'+value)
 values={'NEXT_PUBLIC_SUPABASE_URL':url,'SUPABASE_URL':url,
         'NEXT_PUBLIC_SUPABASE_ANON_KEY':anon,'SUPABASE_SERVICE_ROLE_KEY':service,
         'PLAYWRIGHT_BASE_URL':'http://127.0.0.1:3100','NEXT_PUBLIC_APP_URL':'http://127.0.0.1:3100'}
+# The disposable database itself, for journey fixtures no RPC can write
+# (seven past days of booking parity). Loopback only, like the API.
+db=next((status.get(n) for n in ('DB_URL','db.url') if isinstance(status.get(n),str) and status.get(n)),None)
+if db:
+    if urllib.parse.urlparse(db).hostname not in ('127.0.0.1','localhost'):
+        raise SystemExit('Refusing a non-loopback database')
+    print('::add-mask::'+db)
+    values['STRELVA_LOCAL_DB_URL']=db
 with open(sys.argv[2],'a') as output:
     for name,value in values.items():
         if '\n' in value or '\r' in value: raise SystemExit('Invalid local configuration value')

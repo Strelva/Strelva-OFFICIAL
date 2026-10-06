@@ -10,7 +10,7 @@ const boundary = vi.hoisted(() => ({
   run: vi.fn(),
 }));
 
-vi.mock("@/lib/db/server-client", () => ({ getSessionUser: boundary.session }));
+vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: boundary.session }));
 vi.mock("@/products/operations/server", () => ({
   inspectOperationalAssignment: boundary.inspect,
   inspectOperationalAssignmentForWork: boundary.inspectForWork,

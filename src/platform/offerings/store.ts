@@ -1,4 +1,4 @@
-import { getSupabase } from "@/lib/db/client";
+import { getSupabase } from "@/platform/infra/db/client";
 import type { OfferingDb } from "./schema";
 import { WORKSPACE_EXIT_STOPPED_MESSAGE } from "@/platform/workspaces/types";
 import {

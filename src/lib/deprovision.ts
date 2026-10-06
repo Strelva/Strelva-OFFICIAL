@@ -13,11 +13,13 @@
  * server-side (confirmSlug === id in the request body).
  */
 
-import { getSupabase } from "@/lib/db/client";
-import { getRedis } from "@/lib/redis";
+import { getSupabase } from "@/platform/infra/db/client";
+import { getRedis } from "@/platform/infra/redis";
 import type { TenantConfig } from "@/lib/types";
 import { clearTenantDomainClaims } from "@/lib/domains";
 import { deleteVercelProject, isVercelConfigured } from "@/lib/vercel";
+import { authoritativePatterns } from "@/lib/tenant-rename";
+import { getAccountForTenant, unlinkTenant } from "@/lib/accounts";
 
 // Real tenants that must never be torn down by accident. A backstop only —
 // the live "has paid" guard is the primary defense (this set drifts stale).
@@ -27,7 +29,7 @@ export const PROTECTED_TENANTS = new Set(["gldf", "rohlax"]);
 const PAYING_STATUSES = new Set(["active", "trialing", "past_due"]);
 
 // Every public table carrying a tenant_id, purged child-first. Kept in sync with
-// src/lib/db/database.types.ts (asserted by src/__tests__/deprovision-coverage.test.ts).
+// src/platform/infra/db/database.types.ts (asserted by src/__tests__/deprovision-coverage.test.ts).
 // `tenants` (keyed by id) is deleted last, after its children are gone.
 export const TENANT_SCOPED_TABLES = [
   "activity_log", "audit_logs", "auto_approval_streaks", "bookings",
@@ -44,18 +46,33 @@ export const TENANT_SCOPED_TABLES = [
 
 // Tables that carry a tenant_id but belong to a business workspace's own
 // website (20261001120000_website_documents.sql). They are deliberately NOT
-// swept: their tenant foreign keys are `on delete restrict`, so the final
-// `tenants` delete fails while a workspace website still publishes to, or
-// reserved, this tenant. Release it through the workspace first. Because the
-// sweep deletes child tables before `tenants`, such a failure today comes
-// after the other tenant tables were already deleted.
+// swept: their tenant foreign keys are `on delete restrict`. A tenant that a
+// workspace website still publishes to, or reserved, is refused before any
+// deletion (refusalReason "workspace_website"); release it through the
+// workspace first. The Postgres purge itself is one transaction
+// (deprovision_tenant_rows, 20261007100000_atomic_tenant_teardown.sql), so a
+// late failure never leaves the tenant partially erased.
 export const WORKSPACE_OWNED_TENANT_TABLES = [
   "website_document_publications", "website_hosted_tenant_reservations",
 ] as const;
 
+// Tables with a tenant_id that the sweep does NOT cover yet, found when
+// database.types.ts was regenerated from every migration (Strelva Reborn
+// section 7, 2026-10-06). None has a foreign key to `tenants`, so their rows
+// outlive a deprovisioned tenant. Whether each is purged, kept as a receipt
+// (outside_write_receipts) or settled through its workspace (the agency draft
+// tables) is an open decision for Jacob; this list changes nothing at run
+// time. It only shrinks; deprovision-coverage.test.ts still fails on any new
+// tenant_id table.
+export const TENANT_TABLES_SWEEP_UNDECIDED = [
+  "agency_managed_website_draft_grants", "agency_managed_website_draft_preparations",
+  "agency_managed_website_draft_revisions", "outside_write_receipts", "report_snapshots",
+] as const;
+
 // Tables keyed on the tenant's stable_id are not swept by slug either; the
 // `tenants` delete settles them through their foreign keys:
-//   tenant_leads            on delete cascade (the tenant's leads are deleted)
+//   tenant_leads            kept (20261007110000): stamped tenant_deleted_at; a lead
+//                           in no business is purged 365 days later with a receipt
 //   tenant_workspace_links  on delete set null (the business and receipt stay)
 //   tenant_workspace_unlinks no foreign key (unlink receipts stay)
 
@@ -72,7 +89,7 @@ export interface StoreAction {
 export interface DeprovisionResult {
   ok: boolean;
   /** Non-null when a safety guard refused the operation. */
-  refusalReason?: "protected_tenant" | "active_subscription";
+  refusalReason?: "protected_tenant" | "active_subscription" | "workspace_website";
   refusalDetail?: string;
   tenantId: string;
   executed: boolean;
@@ -103,19 +120,61 @@ async function countRows(table: string, tenantId: string): Promise<number> {
   return count ?? 0;
 }
 
-async function deleteRows(table: string, tenantId: string): Promise<void> {
-  const t = dyn(table);
-  if (!t) return;
-  const col = table === "tenants" ? "id" : "tenant_id";
-  const { error } = await t.delete().eq(col, tenantId);
-  if (error) throw new Error(`${table}: ${error.message}`);
+type TeardownRpc = (name: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: PgError }>;
+function rpc(): TeardownRpc | null {
+  const db = getSupabase();
+  return db ? ((name, args) => (db.rpc as unknown as TeardownRpc)(name, args)) : null;
+}
+
+/** Workspace website rows that hold this tenant (service-role SQL; the tables revoke direct reads). */
+async function workspaceWebsiteBlockers(tenantId: string): Promise<{ publications: number; reservations: number }> {
+  const call = rpc();
+  if (!call) return { publications: 0, reservations: 0 };
+  const { data, error } = await call("tenant_teardown_blockers", { p_tenant_id: tenantId });
+  if (error) throw new Error(`tenant_teardown_blockers: ${error.message}`);
+  const row = (Array.isArray(data) ? data[0] : data) as { publications?: number | string; reservations?: number | string } | undefined;
+  return { publications: Number(row?.publications ?? 0), reservations: Number(row?.reservations ?? 0) };
+}
+
+/** Pause every stored System adopted from this tenant (pause_tenant_systems). */
+export async function pauseStoredSystems(tenantId: string): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+  const call = rpc();
+  if (!call) return { ok: true, count: 0 };
+  try {
+    const { data, error } = await call("pause_tenant_systems", { p_tenant_id: tenantId });
+    if (error) return { ok: false, error: (error.message ?? "unknown error").slice(0, 200) };
+    return { ok: true, count: Number(data ?? 0) };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message.slice(0, 200) : "unknown error" };
+  }
+}
+
+/** Delete every tenant-scoped row and the tenant in one transaction. */
+async function deleteTenantRowsAtomically(tenantId: string): Promise<Record<string, number>> {
+  const call = rpc();
+  if (!call) return {};
+  const { data, error } = await call("deprovision_tenant_rows", { p_tenant_id: tenantId });
+  if (error) throw new Error(`deprovision_tenant_rows: ${error.message}`);
+  return Object.fromEntries(Object.entries((data ?? {}) as Record<string, unknown>).map(([table, n]) => [table, Number(n)]));
 }
 
 /** Per-tenant Redis key patterns, with the tenant id pinned to its KNOWN
  *  position. A bare "id appears anywhere" match would delete OTHER tenants' keys
  *  for an unlucky id. Wildcards are SCANned; exact keys checked with EXISTS. */
 export function tenantRedisPatterns(tenantId: string, ownerEmail?: string): string[] {
+  // Client data that Redis holds as the only copy (leads, orders, threads,
+  // connections with encrypted secrets, booking config, rewards, settings,
+  // spam held for review) is the same registry a rename moves, so the two
+  // can't drift. The operator's own CRM record about this client is Strelva's
+  // data, not the client's, and stays.
+  const clientData = authoritativePatterns(tenantId).filter(
+    (pattern) => pattern !== `crm:${tenantId}` && pattern !== `reb:crm-lock:${tenantId}`,
+  );
   const p = [
+    ...clientData,
+    `events:${tenantId}`, // event index; its id-keyed blobs are found by value below
+    `account-of:${tenantId}`, // multi-site grouping reverse lookup
+    `calendly-meta:${tenantId}`,
     `reb:content:${tenantId}:*`,
     `reb:chat:${tenantId}:*`,
     `reb:rewards:${tenantId}:*`,
@@ -140,7 +199,21 @@ export function tenantRedisPatterns(tenantId: string, ownerEmail?: string): stri
     `reb:inquiry-reply-target:*`,
   ];
   if (ownerEmail) p.push(`reb:invites:${ownerEmail.toLowerCase()}`);
-  return p;
+  return [...new Set(p)];
+}
+
+/** Event blobs are keyed by event id, not tenant. The tenant's index names
+ *  them; a blob is only taken when it still says it belongs to this tenant. */
+export async function findTenantEventBlobKeys(tenantId: string): Promise<string[]> {
+  const redis = getRedis();
+  if (!redis) return [];
+  const ids = ((await redis.zrange<string[]>(`events:${tenantId}`, 0, -1)) ?? []).map(String);
+  const found: string[] = [];
+  for (const id of ids) {
+    const blob = await redis.get<{ tenantId?: unknown }>(`event:${id}`);
+    if (blob && typeof blob === "object" && blob.tenantId === tenantId) found.push(`event:${id}`);
+  }
+  return found;
 }
 
 export async function findTenantRedisKeys(patterns: string[], tenantId?: string): Promise<string[]> {
@@ -230,23 +303,60 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
     };
   }
 
-  // Postgres: count (always) then optionally delete, child tables first.
+  // Guard 3: a workspace website still publishes to, or reserved, this
+  // tenant. Refuse before anything is deleted; --force cannot override it
+  // because the restricting foreign keys would roll the purge back anyway.
+  const blockers = await workspaceWebsiteBlockers(tenantId);
+  if (blockers.publications + blockers.reservations > 0) {
+    return {
+      ok: false,
+      refusalReason: "workspace_website",
+      refusalDetail: `"${tenantId}" is held by a workspace website (publications=${blockers.publications}, reservations=${blockers.reservations}). Release it through the business workspace first. Nothing was deleted.`,
+      tenantId,
+      executed: false,
+      pgRowTotal: 0,
+      summary,
+    };
+  }
+
+  // Postgres: count (always), then purge every table and the tenant in one
+  // transaction. A failure throws here, before Redis or Vercel are touched.
   let pgTotal = 0;
+  const found: Array<[string, number]> = [];
   for (const table of [...TENANT_SCOPED_TABLES, "tenants"]) {
     const n = await countRows(table, tenantId);
     pgTotal += n;
-    if (n === 0) continue;
-    if (executed) await deleteRows(table, tenantId);
-    summary.postgres!.push({ target: table, found: n, deleted: executed });
+    if (n > 0) found.push([table, n]);
+  }
+  // A converted business keeps its stored Systems (and their history); they
+  // must read Paused, never Live, for a site that is gone. Done before the
+  // purge, while the tenant's stable id still resolves. Best effort: a
+  // failure is reported and never blocks the deprovision.
+  if (executed) {
+    const paused = await pauseStoredSystems(tenantId);
+    summary.postgres!.push({ target: "systems", found: paused.ok ? paused.count : "?", deleted: false, detail: paused.ok ? "stored Systems paused; records kept" : `stored Systems not paused: ${paused.error}` });
+  } else {
+    summary.postgres!.push({ target: "systems", found: "?", deleted: false, detail: "would pause any stored Systems (dry run)" });
+  }
+  const removed = executed ? await deleteTenantRowsAtomically(tenantId) : {};
+  for (const [table, n] of found) {
+    summary.postgres!.push({ target: table, found: n, deleted: executed && (removed[table] ?? 0) > 0 });
   }
 
   // Redis: per-tenant keys (pinned patterns) + global cache busts.
   const redis = getRedis();
-  const tenantKeys = await findTenantRedisKeys(
-    tenantRedisPatterns(tenantId, tenant?.ownerEmail ?? undefined),
-    tenantId,
-  );
-  if (executed && redis && tenantKeys.length) await redis.del(...tenantKeys);
+  const tenantKeys = [
+    ...(await findTenantEventBlobKeys(tenantId)),
+    ...(await findTenantRedisKeys(tenantRedisPatterns(tenantId, tenant?.ownerEmail ?? undefined), tenantId)),
+  ];
+  // The multi-site account blob is shared with other sites: take this site out
+  // of it (and its line item) rather than deleting it.
+  const account = await getAccountForTenant(tenantId).catch(() => null);
+  if (account) {
+    if (executed) await unlinkTenant(account.id, tenantId);
+    summary.redis!.push({ target: `account:${account.id}`, found: 1, deleted: executed, detail: "site removed from the account grouping" });
+  }
+  for (let i = 0; executed && redis && i < tenantKeys.length; i += 500) await redis.del(...tenantKeys.slice(i, i + 500));
   for (const k of tenantKeys) summary.redis!.push({ target: k, found: 1, deleted: executed });
 
   // Domain claims live in one shared map — clear just this tenant's entries.

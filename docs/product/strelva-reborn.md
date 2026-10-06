@@ -1,63 +1,60 @@
 # Strelva Reborn
 
 Created: 2026-10-02
-Versions: a series of `0.x` releases, starting with `0.2.1`. Not `1.0.0`.
-Status: preparing. Nothing in this release is deployed.
+Changed: 2026-10-06. Reborn is now the one build to `1.0.0`, not a ladder of `0.x` releases.
+Status: building. Nothing in this release is deployed.
 
-**Strelva Reborn is the release where every Strelva client runs inside a business
-workspace.** The managed website becomes one capability in that workspace,
-next to bookings, inquiries, publishing and internal apps. All five read the
-same business record. Strelva operates it for them.
+**Strelva Reborn is the build that becomes Strelva 1.0.0: every client runs
+inside a business workspace, and the workspace is the product.** Each client's
+website becomes its first System, next to inquiries, bookings, publishing and
+internal tools. All of them read one business record. Strelva runs them, and
+the owner only sees the decisions that are theirs.
+
+[What Strelva becomes at 1.0.0](./product-model.md) is the product model, area
+by area, with a spec for each. [Strelva 1.0.0](./strelva-1.0.0.md) is the
+feature list. This page is the build: what's done, what's left, in what order,
+and what needs Jacob's yes.
 
 The Sept 30 release (internal name `strelvav2`, version `0.2.0`) put the
 workspace machinery in production: memberships, grants, saved work, approvals,
-exits, exports, allowances. It moved no client. Strelva Reborn is the release
-that moves them. The [strelvav2 page](./strelvav2.md) is now history.
+exits, exports, allowances. It moved no client. The
+[strelvav2 page](./strelvav2.md) is now history.
 
-## Versions
+## One build, one exception
 
-Strelva Reborn ships in steps. Each step is a minor or patch release that goes
-to production on its own once it is proven, so the leads fix doesn't wait for
-client conversion and conversion doesn't wait for every capability.
+On October 6 Jacob dropped the `0.3.0`–`0.6.0` steps. Everything they held,
+including owners entering, production-complete capabilities and one operator
+place, is built now, together, toward `1.0.0`. The Systems model (Systems,
+Connections, Possibilities, Versions, Make real) is in scope, not deferred.
 
-| Version | Ships when | Sections |
+| Release | What it is | When |
 | --- | --- | --- |
-| `0.2.1` | Every client lead is also kept in Postgres; all 9 client repos are checked | 0 |
-| `0.3.0` | One business record, and gldf converted into a workspace in production | 1, first of 3 |
-| `0.4.0` | Leads, inquiries, bookings and approvals are owned by the workspace, not Redis | 2 |
-| `0.5.0` | Every client converted, storefront responses unchanged | 3 |
-| `0.6.0` | Owners can enter; capabilities and one operator place are production-complete | 4, 5, 6 |
+| `0.2.1` | Every client lead also kept in Postgres; all 9 client repos checked | Now, alone, on Jacob's yes. Leads expire from Redis every day ([PR #213](https://github.com/Strelva/Strelva-OFFICIAL/pull/213)) |
+| `1.0.0` | Everything below and in [Strelva 1.0.0](./strelva-1.0.0.md) | When every line is true in production and Jacob says Strelva would stand behind it for any new customer |
 
-Numbers after `0.3.0` can shift as evidence comes in; the order holds.
-
-**`1.0.0` is the launch, after these steps.** [Strelva 1.0.0](./strelva-1.0.0.md)
-lists every feature it contains. It means Strelva is something we'd stand
-behind for any new customer: every client running in a workspace in
-production, owners using it, no client data held only in Redis, every client
-repo checked, and the customer model (Systems, Connections, Possibilities,
-Versions) proven with real customers. Jacob decides when that is true.
+Building together does not mean deploying everything at once. Production steps
+still go one at a time behind their own flags and Jacob's yes: migrations,
+each client conversion (gldf first), owner invites, flag changes. What changes
+is that no step waits for a release number, and no feature is parked for a
+later `0.x`.
 
 ## Reborn in Systems terms
 
-On October 4 Jacob selected Systems, Connections, Possibilities and Versions
-as the customer model ([CONTEXT.md](../../CONTEXT.md#product-model)). Reborn
-doesn't change scope for it. It lays the ground the model stands on.
+| Reborn section | What it becomes in the model |
+| --- | --- |
+| 1. One business record | The shared context every System reads. The business is the owner, not a System |
+| 3. Every client converted | Each live client website becomes that business's first **System**, keyed to the tenant's `stable_id`. Twin Trees: one business, the same website System in two **Versions** |
+| 1–2. Facts read from the record | **Connections** of kind *read*: website, bookings and inquiries read hours and services instead of keeping copies |
+| 4. Publishing, Google | The Google listing and the newsletter become **Systems**; blog stays part of the website. Google writes are **Connections** of kind *act* on an account the business granted ([publishing spec](../capabilities/publishing/publishing-spec-2026-10-06.md)) |
+| 4. Bookings, inquiries, internal tools | Each its own **System** ([systems catalog](./specs/systems-catalog.md)) |
+| 4. Website rebuild, agency drafts | **Possibilities** on the website System; approve and publish is **Make real** |
+| 5. Receipts, site health, one operator place | **Strelva handled** and System health ([operator](./specs/operator.md)) |
+| 6. Owners enter the workspace | Home shows the business's Systems and **Needs you** ([owner entry](./specs/owner-entry.md), [needs you](./specs/needs-you.md)) |
+| New | **Versions** for multi-location and agency clients ([agency and Versions](./specs/agency-and-versions.md)); **Ask Strelva** in the workspace ([ask-strelva](./specs/ask-strelva.md)); billing and Redis exit ([money and data](./specs/money-and-data.md)) |
 
-| Reborn section | What it becomes in the model | In Reborn scope |
-| --- | --- | --- |
-| 1. One business record | The shared context every System reads. The business is the owner, not a System | Yes |
-| 3. Every client converted | Each live client website becomes that business's first **System**, keyed to the tenant's `stable_id` through the link table. Twin Trees gets two Systems | Yes, as data; a System screen is not promised |
-| 1–2. Facts read from the record | **Connections** of kind *reads*: website, bookings and inquiries read hours and services instead of keeping copies | Yes |
-| 4. Publishing, Google | **Connections** of kind *acts*, on an account the business granted | Yes, per section 4 |
-| 4. Bookings, inquiries, internal apps | Each one a **System** of its own, or part of the website System. Which is an open question | Built as capabilities; the split is decided later |
-| 5. Receipts, site health | System health, kept separate from Draft/Live/Paused | Partly |
-| 6. Owners enter the workspace | Home shows the business's Systems and Needs you | Only if it passes this page's gates |
-
-Not in Reborn (they are [1.0.0](./strelva-1.0.0.md) launch features): Possibilities and **Make real**, contextual **Versions**
-(agencies and multi-location; partner agencies are already out), and any
-customer-facing claim that a System can grow without limit. The live-client
-rules don't move: `/api/v1` stays additive, `reb:` keys and tenant rows stay,
-and clients who never log in keep working.
+The live-client rules don't move: `/api/v1` stays additive, `reb:` keys and
+tenant rows stay, and clients who never log in keep working. Owners are never
+required to sign in for 1.0.0 to work.
 
 ## Where we are
 
@@ -104,10 +101,15 @@ production.
   import `src/lib` (98 on Oct 2; Systems, system health, the business-record
   repository and inquiry receipts added ten). `lib` imports back into
   `products` from `agent-shared.ts` and `event-actions.ts`.
-- **Systems, Possibilities and Make real sit behind only
-  `STRELVA_WORKSPACE_RELEASE`,** which production turned on Sept 30. They
-  need their own flag before any Reborn step ships, because Possibilities and
-  Make real are not in Reborn.
+- **Systems, Possibilities and Make real have their own flag.**
+  `STRELVA_SYSTEMS_RELEASE` (PR #214, Oct 5) is off by default, so they no
+  longer ride `STRELVA_WORKSPACE_RELEASE`, which production turned on Sept 30.
+  Make real still runs on fake effects. On branch `build/versions-agency`
+  (local only), Make real progress and Versions have Postgres stores
+  proven against a throwaway cluster; neither is applied anywhere. On
+  branch `w2/systems-live` (local only, Oct 6) Possibilities are in
+  Postgres and Make real has five live channel adapters behind per-channel
+  flags that are all off; no live effect has run outside tests.
 - **Lead copies are deleted with their tenant.** `tenant_leads` cascades on
   tenant delete. Whether a deprovisioned client's leads are kept is Jacob's
   call.
@@ -155,15 +157,29 @@ M one to three days, L three to seven, XL more.
       `src/platform/business-record/`, `tests/business-record-schema.sql`.
 - [ ] Website facts, booking hours and services, and inquiry contacts read and
       write it. No capability keeps its own copy of a business fact.
-      *Not started · L*
+      *Partial: once the one booking store's reads flip, booking hours,
+      services and phone are read from the record at use and only narrowed
+      by booking settings, and each booking upserts a `business_contacts` row
+      (local, branch `w2/bookings-inquiries`). Booking-only hours are edited
+      from the bookings screen, narrowing the record's opening hours only
+      (local, `w3/bookings-inquiries-gaps`, migration `20261009110000` not
+      applied). Inquiry contacts on capture are built locally
+      (`w3/inquiries-gaps`, behind `STRELVA_INQUIRY_RECORDS`). Website facts
+      are not built · M*
 - [ ] Every edit has history and an undo, like website documents today.
       *Partial:* each command writes one immutable revision and
       `undo_business_record_revision` refuses if a later change touched the
       same item, proven locally. Nothing outside tests calls undo yet · S
 - [ ] One owner-recipient rule: the record's owner contact, falling back to
       `tenants.owner_email`. Every owner notice (leads, bookings, reports)
-      uses it. *Partial: `owner_recipient` fact and
-      `resolve_business_owner_recipient` exist; no notice uses them yet · M*
+      uses it. *Built and proven locally Oct 6 (branch
+      `build/business-ownership`, migration `20261007110000`, not applied):
+      `src/lib/owner-recipient.ts` over `resolve_tenant_owner_recipient` is
+      used by lead, inquiry, weekly and monthly report (both report paths,
+      hosted included), review alert, review and order nudge and health-drop
+      notices. The owner "New booking" notice (`src/platform/bookings/notices.ts`,
+      behind `STRELVA_BOOKING_OWNER_NOTICE`, branch `w2/bookings-inquiries`)
+      uses it too. Billing and lifecycle mail still read `owner_email` · S left*
 - [ ] Every new table follows the `website_documents` pattern (RLS on, grants
       revoked, service-role functions) with cross-workspace denial tests.
       *Proven locally for the business record tables · keep for each new
@@ -174,15 +190,39 @@ Proof: unit and SQL tests in `check:workspace-sql`; `reborn:progress` shows
 
 ### 2. Data owned by the workspace
 
-- [ ] Inquiries are Postgres-authoritative and reference `workspaces(id)`.
+- [x] Inquiries are Postgres-authoritative and reference `workspaces(id)`.
       `/api/v1/leads/[tenant]` keeps its contract and writes the new store.
-      *Partial: `tenant_leads.workspace_id` references `workspaces(id)` and
-      fills in when a tenant is linked, but it is a mirror; Redis still serves
-      reads · M*
-- [ ] One booking store. `/api/booking/*` and `/api/v1/bookings/*` both land
+      *Built and proven locally Oct 6 (branch `w2/bookings-inquiries`, all
+      switches off, migration `20261008140000` not applied):
+      `src/lib/leads.ts` keeps its signatures and gains a read source
+      (`STRELVA_LEADS_READ=compare|postgres`, Postgres only after 7 days of
+      parity recorded by the reconcile cron) and Postgres-first capture
+      (`STRELVA_LEADS_AUTHORITY=postgres`, Redis + pending-queue fallback).
+      In production nothing changes until Jacob's yes on the migration, 7
+      days of compare and each flip. Spam held for review in `tenant_leads`
+      (`held_as_spam`, `released`, `confirmed_spam`), `inquiry_events`, the
+      workspace-scoped read (`read_workspace_leads`) and the inquiry contact
+      on capture are built and proven locally Oct 9 (branch
+      `w3/inquiries-gaps`, migration `20261009113000` not applied, writes
+      behind `STRELVA_INQUIRY_RECORDS`, off).*
+- [x] One booking store. `/api/booking/*` and `/api/v1/bookings/*` both land
       in it. Weekly hours, slot length, buffer, lead time, advance window,
       date overrides and services come over from `src/lib/booking.ts`.
-      *Not started · L*
+      *Built and proven locally Oct 6 (branch `w2/bookings-inquiries`,
+      migration `20261008141000` not applied, switches
+      `STRELVA_BOOKING_STORE_WRITE` / `_READ` off): `business_bookings` with an
+      exclusion constraint both route families share, proven through both
+      real routes against the real functions in `check:workspace-sql`;
+      dual-write with a queued repair, dry-run backfill, 7-day compare
+      (bookings and 60 days of slots), flipped reads with rollback; hours and
+      services read from the business record (narrowing only); pause keeps
+      every booking; Calendly writes import bookings. Production backfill,
+      compare and flips each need Jacob's yes. Oct 9 (local,
+      `w3/bookings-inquiries-gaps`, migration `20261009110000` not applied):
+      schedule reservations without a public receipt copy into the store
+      (`booking-store-move.ts schedules`), reminders and the hold sweep run
+      in the `booking-reminders` cron, the manage link page exists, and a
+      connected calendar's busy times block tenant-route slots.*
 - [ ] One approval store. Content, Google and workspace approvals use the
       governed-work proposal, decision and outcome tables. Redis event
       lifecycle retires. *Partial: Postgres shadow exists behind
@@ -190,9 +230,19 @@ Proof: unit and SQL tests in `check:workspace-sql`; `reborn:progress` shows
       L. Decide against [governed work](../architecture/ontology-phase2-governed-work.md),
       which calls the hybrid deliberate.*
 - [ ] Orders, rewards, OAuth connections and analytics config move to
-      Postgres. Redis is a cache again. *Not started · L*
+      Postgres. Redis is a cache again. *Partial (branch `build/money-data`,
+      local only): the move pattern (`src/platform/client-records`: dual-write
+      behind `STRELVA_CLIENT_RECORDS_DUAL_WRITE`, dry-run backfill, daily
+      parity, per-store read flag after 7 days) is built and applied to spam
+      held for review, inquiry timelines and first replies, booking config,
+      analytics config and report markers, and account grouping. Orders and
+      rewards: read-only key count only (`scripts/count-client-redis-keys.ts`).
+      OAuth connections not started. Nothing applied to production · L*
 - [ ] Workspace export and exit include the business record and every linked
-      tenant's data. *Not started · M*
+      tenant's data. *Partial (branch `build/money-data`, local only): export
+      schema 3 with background builds behind `STRELVA_EXPORT_SCHEMA_3`; orders
+      and rewards listed as unavailable; exit steps per linked site not
+      started · M*
 
 Proof: failure-path tests, `pnpm check:custom-repos`, and a byte-identical
 storefront comparison like Sept 30 (60/60).
@@ -210,8 +260,13 @@ storefront comparison like Sept 30 (60/60).
       (`unlink_tenant_from_business`): dry-run preview by default, same
       refusal, receipt in `tenant_workspace_unlinks`; proven locally for
       convert → unlink → reconvert, unlink twice, unlink after an owner
-      edit, a joined site, and cross-workspace denial. Never run against
-      Supabase · S*
+      edit, a joined site, and cross-workspace denial. Billing state:
+      conversion now writes one billing state per business on the `accounts`
+      billing home (branch `build/money-data`, proven in the local SQL
+      cluster). `--separate-business` converts a multi-site account's site
+      into its own business instead of joining its sibling (Twin Trees as
+      two businesses; branch `w2/release-hardening`, migration
+      `20261008160000`, proven locally). Never run against Supabase · S*
 - [x] Links and new rows survive tenant renames and deprovision. *Proven
       locally:* links key on `stable_id`; deleting a tenant clears the link
       and keeps the business. Exception: `tenant_leads` rows cascade-delete
@@ -255,14 +310,36 @@ are untouched.
       to make native*
 - [ ] **Bookings.** Parity with the tenant widget (above), confirmation and
       cancellation email through `src/lib/email/send.ts`, and a day roster.
-      *~25%: timezone, conflict checks, cancel done · L*
+      *~45%: timezone, conflict checks, cancel done; one booking store, owner
+      notice, request mode through Needs you, and the day roster and week
+      schedule as `/workspace/bookings` views (`/dashboard/roster` and
+      `/dashboard/schedule` ready behind Systems) built locally on
+      `w2/bookings-inquiries`. Built locally Oct 9 on
+      `w3/bookings-inquiries-gaps`, every switch off: customer reminders 24 h
+      and 2 h before, the owner's 24-hour chase and 72-hour lapse of a
+      request (declined, customer offered new times, Needs you closes it
+      with the reason), the 15-minute hold sweep, the `/b/[token]` manage
+      page (change time, cancel), calendar busy times on the tenant routes,
+      booking-only hours from the bookings screen, and Calendly imports and
+      cancels end to end through the signed webhook. Built locally Oct 6 on
+      `w4/journey-gaps`: once the store serves, a visitor's booking works
+      with Redis absent or down, and says when nothing was booked. Customer
+      cancellation email, agent bookings and MCP are not built · M*
 - [ ] **Inquiries.** `STRELVA_INQUIRIES_RELEASE` on, spam review in the
       workspace, owner notification. Existing leads already project in.
-      *~35% · M*
+      *~45%: spam review on the workspace Inquiries page (owner or Strelva
+      releases, confirms or puts back; members refused) and reply drafts
+      that quote a price, date or promise routed to the owner as urgent
+      `customer.commitment` Needs you items, built locally Oct 9 on
+      `w3/inquiries-gaps` behind `STRELVA_INQUIRY_RECORDS`. Release flag,
+      production email and the migration wait on Jacob · M*
 - [ ] **Publishing.** Reviews and replies, Google Business, and blog and
       collections run from the workspace. Tenant Google tokens move to
       workspace connections through `crypto/secrets.ts` without re-consent.
-      *Not started · L–XL*
+      *Partial: built locally on `build/publishing` behind
+      `STRELVA_GOOGLE_BINDINGS` and `STRELVA_PUBLISHING_RELEASE` (bindings,
+      copy script, listing System, receipts and undo with a mocked Google).
+      Approve path, reconnect link and the production copy remain · L–XL*
 - [ ] **Internal apps.** App building is agency or Strelva only (today any
       member can create through `applications/server.ts` and
       `custom-applications/lifecycle.ts`). *Not started · S*
@@ -278,7 +355,14 @@ are untouched.
 - [ ] **Ask Strelva runs in the workspace.** The ~24 tools inline in
       `src/app/api/agent/route.ts` move into `src/lib/agent-shared.ts`, a
       workspace agent route resolves workspace → link → tenant and re-checks
-      permission, and approvals go through section 2. *Not started · L*
+      permission, and approvals go through section 2. *Partial, local Oct 6
+      (`build/ask-strelva`): tools moved, route and per-call checks built
+      behind `STRELVA_ASK_RELEASE`. Workspace chat UI (`view=ask`, on Home,
+      on each System and beside the site editor) and conversation history in
+      Postgres (`20261008110000`) built and proven locally Oct 6 on
+      `w2/owner-surfaces-b`, not migrated or deployed. Real Needs you wiring
+      done locally Oct 6 (`w2/decisions-wiring`, behind
+      `STRELVA_NEEDS_YOU_RELEASE`); both merged on `integrate/reborn-1.0` · L*
 
 Proof: authenticated local journeys per capability on desktop and mobile, in
 empty, loading, error and permission states, using The Mooney Firm and gldf.
@@ -292,54 +376,104 @@ Neither is used by any journey today.
       inbox). *Not started · L*
 - [ ] Every outside write leaves a receipt with read-back and undo. Google
       Business, Stripe and domain removal have no undo; Vercel domains are
-      never removed. *Partial · L*
+      never removed. *Partial · L. Built locally Oct 6 on `w4/journey-gaps`:
+      every decided Needs you item is a Strelva handled receipt that says why
+      it can't be undone in one tap (migration `20261009130000`, not applied)*
 - [ ] Site health and domain checks cover every site. `website-health` skips
       custom-repo client sites; domain verification skips non-workspace
       tenants. *Partial · S*
 - [ ] One domain view per workspace across both domain stores. *Not started ·
       S*
-- [ ] The agency home loads every delegated client, not pages of 8. Needs a
-      batched server read; today each client is its own request.
-      *Not started · M*
+- [x] The agency home loads every delegated client, not pages of 8. One
+      batched read (`agency_client_overview`, `GET /api/workspace/agency-clients`),
+      server cursors, Clients/Queue/Library/Team views. *Built and proven
+      locally Oct 6 (branch `build/versions-agency`); not applied anywhere.
+      Strelva's converted clients list once `workspace_providers` lands.*
 
 ### 6. Owners enter the workspace
 
-- [ ] Signing in on a client admin host lands in that client's workspace.
-      Today the sign-in page and auth callback hard-code `/dashboard`.
-      *Not started · M*
+- [x] Signing in on a client admin host lands in that client's workspace.
+      *Built and proven locally on `build/owner-entry` (unit tests; no
+      authenticated browser journey yet): sign-in, sign-up and the admin root
+      go through `/auth/entry` when `STRELVA_OWNER_ENTRY` is on; off, nothing
+      changes.*
 - [ ] Each `/dashboard` page has a workspace home or redirects to one. Of 22
       pages: 3 have a home, 4 partial, 4 retire, the rest need building.
-      *Not started · L*
-- [ ] `/dashboard` and `/client/{tenant}/dashboard` stay permanent redirects;
+      *Partial: 25 page files mapped (2 ready incl. `/reports` → Recaps,
+      4 retire, 2 frozen, 17 stay) on `build/owner-entry` · L. Local Oct 6,
+      both owner-surface streams merged: 16 ready, 4 retire, 2 frozen,
+      3 stay (`/roster`, `/schedule`, `/settings`); with
+      `w2/bookings-inquiries` `/roster` and `/schedule` are ready too
+      (18 ready, only `/settings` stays).
+      From `w2/owner-surfaces-a`: `/`, `/review` (both only while Needs you
+      is on), `/leads`, `/reviews`, `/analytics`. From `w2/owner-surfaces-b`:
+      `/chat` (only while Ask is released) and the website pages `/site`,
+      `/assets`, `/brand-kit`, `/collections`, `/history`, `/integrations`,
+      `/sources/[id]`, `/google` → the workspace website (`/workspace/site`),
+      Systems on for the workspace. `/settings` stays on `/dashboard` until
+      the workspace edits branding, site basics and domains. Parity gaps
+      listed per page in the spec §5.*
+- [x] `/dashboard` and `/client/{tenant}/dashboard` stay permanent redirects;
       gldf and rohlax repos hard-code them and are not changed.
-      *Not started · S*
+      *Built locally on `build/owner-entry`: 307 only for a member of the
+      destination workspace, else the page renders as today.*
 - [ ] Owner memberships exist for every converted client, in both the
       workspace and the tenant while `/dashboard` pages remain. Workspace
-      invites don't email today; tenant invites do. *Not started · M*
+      invites don't email today; tenant invites do. *Path built and proven
+      locally Oct 6 (`build/business-ownership`): operator-issued owner
+      invitation, emailed through `send.ts`; accepting writes both
+      memberships in one transaction. No converted client has an owner yet:
+      each invitation is Jacob's yes (`scripts/business-ownership.ts`) · S
+      per client*
 - [ ] Per-workspace flags layered over the env flags, so each client's
       landing, inquiries and rebuild turn on and roll back on their own. The
-      same flags split Preview per tester. *Not started · M*
+      same flags split Preview per tester. *Built locally on
+      `build/owner-entry`: migration `20261007130000` (not applied anywhere),
+      SQL checks and unit tests pass; operator controls on
+      `/admin/clients/[id]`.*
 
 ### 7. Structure that keeps it this way
 
-- [ ] Shared infrastructure (`db`, `redis`, `auth`, `email`, `crypto`,
+- [x] Shared infrastructure (`db`, `redis`, `auth`, `email`, `crypto`,
       `rate-limit`, `logger`, `ai-models`, `safe-fetch`) moves to
       `src/platform/infra`. `check:boundaries` blocks new workspace → `src/lib`
       imports (162 import sites today, baseline-and-shrink) and any `src/lib`
-      → workspace import (8 today). *Not started · L*
+      → workspace import (8 today). *Done locally Oct 6, branch
+      `w5/structure`, not deployed:* infra moved with re-exports at the old
+      paths (plus brand, monitoring, heartbeat, pinned-lookup); `src/lib` →
+      workspace 21 files to 0 through ports in `src/lib/workspace-ports.ts`
+      registered at the app edge (`src/register-workspace-ports.ts`, from
+      `instrumentation.ts`); `check:boundaries` fails CI on any new crossing,
+      with `scripts/boundary-baseline.json` (204 workspace → `src/lib`
+      imports in 93 files, and 46 older boundary imports that already failed
+      the check) only shrinking.
 - [ ] One capability registry replaces the seven declaration files listed in
       [capabilities](../capabilities/README.md#where-capabilities-are-declared).
-      `site-capabilities.ts` stays as per-tenant v1 state. *Not started · L*
-- [ ] One model-call helper. Every `generateText`, `streamText` and
+      `site-capabilities.ts` stays as per-tenant v1 state. *Partial, local
+      Oct 6 (`w5/structure`):* `src/capability-registry.ts` lists all six
+      through adapters and `/api/workspace` reads from it; the declarations
+      are not folded into one file (the tenant kinds would have to leave
+      `src/lib` first) and the other readers still read their file
+      (capabilities README lists them).
+- [x] One model-call helper. Every `generateText`, `streamText` and
       `generateObject` call goes through it (12 files in `src` today; six
       hard-code `gemini-2.5-flash`). It handles streaming, tools, structured
-      output, fallback, logging and cost. *Not started · M*
-- [ ] `src/lib/newsletter.ts` sends through `email/send.ts`;
+      output, fallback, logging and cost. *Done locally Oct 6, branch
+      `build/ask-strelva`, not applied or deployed:*
+      `src/platform/infra/model-calls.ts`, cost log
+      `20261007140000_model_call_log.sql`, lint rule against direct calls.
+- [x] `src/lib/newsletter.ts` sends through `email/send.ts`;
       `src/lib/public-continuation.ts` encrypts through `crypto/secrets.ts`.
-      *Not started · S*
-- [ ] `src/lib/db/database.types.ts` is regenerated; it's missing the Oct 1
+      *Done locally Oct 6 (`w5/structure`): the continuation seals through
+      `secrets.ts` (`sealWithKey`, same key and format, so cookies sealed
+      before still open); the newsletter already sends through `send.ts`.*
+- [x] `src/lib/db/database.types.ts` is regenerated; it's missing the Oct 1
       website tables, so `deprovision-coverage.test.ts` can't see them.
-      *Not started · S*
+      *Done locally Oct 6 (`w5/structure`), from every migration with `pnpm
+      db:types` (no Supabase CLI here); now at
+      `src/platform/infra/db/database.types.ts`. It showed five tenant_id
+      tables the deprovision sweep doesn't cover; they are listed for a
+      decision (`TENANT_TABLES_SWEEP_UNDECIDED`), the sweep is unchanged.*
 
 Proof: `pnpm reborn:progress --strict` passes.
 
@@ -352,16 +486,34 @@ Proof: `pnpm reborn:progress --strict` passes.
 
 ## Order
 
-1. **Stop losing data:** lead dual-write and full client-repo checks. Built
-   locally Oct 5; production needs the migration, backfill and deploy below.
-2. **Foundation:** business record, link table, owner-recipient rule.
-3. **Conversion:** script, scrubbed local copy, dry runs, then gldf on
-   Jacob's yes.
-4. **Data:** inquiries, bookings, approvals, remaining Redis stores.
-5. **Capabilities:** website card and app-building limit first (small), then
-   inquiries, Ask Strelva, bookings, store and reports, publishing.
-6. **Entry:** per-workspace flags, owners in, dashboard redirects.
-7. **Operate and structure:** run alongside from step 2.
+One build, several streams. The critical path is 1 → 2 → 3; everything else
+runs beside it from step 2.
+
+1. **Stop losing data (`0.2.1`):** lead dual-write and full client-repo
+   checks. Built locally Oct 5; production needs the migration, backfill and
+   deploy, each on Jacob's yes.
+2. **Safety batch:** the seven P1 findings in the
+   [Oct 5 integration audit](../operations/reborn-integration-audit-2026-10-05.md#open-release-findings)
+   before any of that code goes near production. Built and proven locally
+   Oct 7 on `build/safety-batch` (all seven P1s plus P2 #9). P2 #8 built
+   locally Oct 8 on `w2/website-system` (routing from the publication and
+   reservation rows; receipts unchanged).
+   The two migrations need Jacob's yes before production.
+3. **Foundation and conversion:** business record, one workspace-to-tenant
+   link, owner-recipient rule, scrubbed local copy, dry runs for every active
+   tenant, then gldf on Jacob's yes, then the rest.
+4. **Data:** inquiries, bookings, approvals and the remaining Redis stores
+   move to Postgres ([money and data](./specs/money-and-data.md)).
+5. **Systems:** website, inquiries, bookings, publishing, internal tools and
+   the catalog decisions, each to the capability bar in
+   [Strelva 1.0.0](./strelva-1.0.0.md#the-bar).
+6. **The model on screen:** Systems Home, System pages, Connections,
+   Possibilities and Make real with real effects, Versions in Postgres,
+   Needs you and Strelva handled, Ask Strelva.
+7. **Entry and operation:** per-workspace flags, owners in (never required),
+   dashboard redirects, the agency home and one operator queue.
+8. **Structure:** shared infrastructure out of `src/lib`, one capability
+   registry, one model-call helper. Runs alongside throughout.
 
 ## Preview and Stable
 
@@ -379,7 +531,7 @@ must not wait for the rest (like `0.2.1`) is built from `main` directly.
   workspace SQL and full upgrade, tests with coverage, audit, build, public
   smoke and workspace browser acceptance. A green build is tagged
   `strelva-v<next version>-preview.YYYYMMDD`, today
-  `strelva-v0.3.0-preview.YYYYMMDD`. Unchanged source isn't re-tagged.
+  `strelva-v1.0.0-preview.YYYYMMDD`. Unchanged source isn't re-tagged.
 - **Progress.** The run summary shows the progress table: now, last Preview,
   Oct 2 baseline and target. The tag message stores that build's numbers so
   the next one can compare. Run it by hand from the Actions tab with any
@@ -393,7 +545,21 @@ must not wait for the rest (like `0.2.1`) is built from `main` directly.
 ## Needs Jacob's yes
 
 Each of these gets an exact action prepared and verified before asking.
+The [1.0 release packet](../operations/release-1.0-packet.md) holds every one
+as a numbered step: the read-only snapshot first, the 32 unapplied migrations
+in five batches with rollback and verify queries, each env flag with its kill
+switch, every `--i-have-jacobs-yes` command in order, the per-client
+conversion runbook, the Google console checks and the Preview plan.
 
+- The Systems spine migration `20261004120000_systems.sql` and every Oct 7 build-stream migration.
+- Possibilities and Make real live (branch `w2/systems-live`, local only):
+  `20261008130000_system_possibilities.sql` (Possibilities tables, the stale
+  trigger on `systems`, adoption trigger on `tenant_workspace_links`) and
+  `20261008131000_make_real_live.sql` (replaces `workspace_release_flag_names()`
+  to add five `make_real_live:<channel>` keys). Each needs its own yes, after
+  the Systems spine and the Oct 7 needs-you and activation migrations.
+- Turning on any `make_real_live:<channel>` flag, and the
+  `STRELVA_MAKE_REAL_LIVE` env value, per client.
 - Each production migration: the client lead store (Oct 5, can go first and
   alone), the three Oct 1 website migrations, the business record,
   tenant-to-workspace links, inquiry and booking stores.
@@ -418,11 +584,13 @@ Every production step also passes the
 New pricing or plan tiers. Partner agencies (Strelva is the only agency in
 this release). Home Finder. Enterprise customers. Self-serve website building
 for owners. `/api/v2`. No `/api/v1` change except additive.
-Possibilities, Make real across Systems, and contextual Versions.
+(Possibilities, Make real and Versions moved into Reborn on October 6.)
 
 ## Still unproven
 
 - Production counts are from the Sept 30 record, not a fresh read. Run
+  `scripts/production-readiness-snapshot.ts --i-have-jacobs-yes` (step 0 of
+  the [release packet](../operations/release-1.0-packet.md)) and
   `scripts/workspace-target-snapshot.sql` read-only before the first
   migration.
 - Whether governed-work tables are live and both flags on: the governed-work

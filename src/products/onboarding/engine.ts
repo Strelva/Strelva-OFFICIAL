@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
+  ONBOARDING_RECENT_HISTORY,
   onboardingCaseSchema,
   onboardingHistoryEntrySchema,
   type OnboardingAssignee,
@@ -99,7 +100,10 @@ function mutate(
   change(draft);
   const revision = current.revision + 1;
   draft.revision = revision;
-  draft.history = [...current.history, { revision, kind, actorId, at, requirementId, before, after, note }];
+  draft.history = [
+    ...current.history.slice(-(ONBOARDING_RECENT_HISTORY - 1)),
+    { revision, kind, actorId, at, requirementId, before, after, note },
+  ];
   return onboardingCaseSchema.parse(draft);
 }
 

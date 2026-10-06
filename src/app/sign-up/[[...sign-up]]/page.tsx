@@ -4,12 +4,13 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { AuthDocumentTitle } from "@/components/AuthDocumentTitle";
-import { getClientFallbackRoot, isClientFallbackRoot, withClientFallbackRoot } from "@/lib/client-fallback";
+import { getClientFallbackRoot, isClientFallbackRoot } from "@/lib/client-fallback";
 import { getInvite } from "@/lib/invites";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantSiteName } from "@/lib/tenant-display";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
-import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/lib/workspace-location";
+import { tenantSignInNext } from "@/platform/owner-entry/env";
+import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/platform/workspaces/location";
 
 export const metadata: Metadata = {
   title: "Create your Strelva account",
@@ -118,7 +119,7 @@ export default async function SignUpPage({
 
   const tenantAuth = await getTenantAuthContext();
   if (tenantAuth) {
-    const dashboardPath = withClientFallbackRoot(tenantAuth.clientFallbackRoot, "/dashboard");
+    const dashboardPath = tenantSignInNext(tenantAuth.clientFallbackRoot);
 
     return (
       <main className="marketing-root min-h-dvh px-5 py-5 md:px-8">

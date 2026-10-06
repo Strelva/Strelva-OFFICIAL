@@ -15,7 +15,7 @@ import {
 import { diffFields } from "@/lib/utils";
 import { requireTenantFromHeaders } from "@/lib/tenant";
 import { getTemplateManifestForTenant } from "@/lib/template-manifests";
-import { getActorContext, requireTenantAccess, requireTenantPermission } from "@/lib/auth";
+import { getActorContext, requireTenantAccess, requireTenantPermission } from "@/platform/infra/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { revalidateClientSite } from "@/lib/revalidate-client";
 import { readJsonObject } from "@/lib/request-body";

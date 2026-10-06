@@ -8,7 +8,7 @@ import type { WebsiteDocumentStore, WebsiteDocumentRevision } from "@/products/w
 import type { BoundedStore } from "@/platform/bounded-work/repository";
 import { WorkspaceAccessError, WorkspaceConflictError, type SavedWork, type WorkspaceActor } from "@/platform/workspaces/types";
 
-vi.mock("@/lib/redis", () => ({ getRedis: () => null }));
+vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 const actor: WorkspaceActor = { userId: "71000000-0000-4000-8000-000000000001", verifiedEmail: "owner@example.test" };
 const workspaceId = "71000000-0000-4000-8000-000000000002";
@@ -87,6 +87,14 @@ describe("website rebuild service lifecycle and durable recovery", () => {
   it("reopens an idempotent request without rerunning the pipeline or consuming another rate admission", async () => {
     const h = harness(); const first = await h.create(); const again = await h.create(); expect(again.workId).toBe(first.workId); expect(h.pipeline).toHaveBeenCalledTimes(1); expect(h.rateLimited).toHaveBeenCalledTimes(1);
     await expect(h.create({ ...brief, description: "Different owner inputs." })).rejects.toBeInstanceOf(WorkspaceConflictError);
+  });
+  it("launch preserves the customer's approval instead of re-approving as the launcher (audit finding 6)", async () => {
+    const h = harness(); const reviewed = await h.create();
+    const approve = vi.spyOn(h.documents, "approve");
+    const approved = await h.service.approve(actor,reviewed.workId,selection(reviewed)); expect(approve).toHaveBeenCalledTimes(1);
+    const published = await h.service.launch(actor,approved.workId,selection(approved));
+    expect(published.rebuild.status).toBe("published"); expect(approve).toHaveBeenCalledTimes(1);
+    expect(h.documents.reserveHostedTenant).toHaveBeenCalledTimes(1);
   });
   it("does not publish a preview before approval", async () => { const h = harness(); const record = await h.create(); await expect(h.service.launch(actor,record.workId,selection(record))).rejects.toBeInstanceOf(WorkspaceConflictError); expect(h.documents.reserveHostedTenant).not.toHaveBeenCalled(); expect(h.documents.publish).not.toHaveBeenCalled(); });
   it.each(["work","document","hash"])("rejects a stale %s selection before approving", async kind => { const h = harness(); const record = await h.create(); const input = selection(record); if (kind === "work") input.expectedRevision--; if (kind === "document") input.candidateRevision++; if (kind === "hash") input.candidateContentHash = "f".repeat(64); await expect(h.service.approve(actor,record.workId,input)).rejects.toBeInstanceOf(WorkspaceConflictError); expect(h.documents.publish).not.toHaveBeenCalled(); });
@@ -242,4 +250,94 @@ describe("website rebuild service lifecycle and durable recovery", () => {
     await expect(h.service.approve(actor,copyId,selection(received))).rejects.toBeInstanceOf(WorkspaceConflictError);
   });
 
+});
+
+describe("website System: publish onto a linked site, routing after a rename, operator domains (2026-10-08)", () => {
+  /** A linked-site publication port over the harness's memory maps. The SQL proof is tests/website-linked-publication-schema.sql. */
+  function withLinkedSite(h: ReturnType<typeof harness>, linked = "linked-client") {
+    const approvals = new Map<string,{ revision: number; contentHash: string }>();
+    const originalApprove = h.documents.approve;
+    h.documents.approve = async (user,key) => { await originalApprove(user,key); approvals.set(key.workId,{ revision: key.revision, contentHash: key.contentHash }); };
+    h.documents.publishToLinkedTenant = vi.fn(async (_user, key) => {
+      if (key.tenantId !== linked) throw new WorkspaceAccessError();
+      const approval = approvals.get(key.workId);
+      if (!approval || approval.revision !== key.revision || approval.contentHash !== key.contentHash) throw new WorkspaceConflictError("This website changed or is already rebuilding. Reload before continuing.");
+      const row = h.revisions.get(key.workId)!.find(item => item.revision === key.revision)!;
+      const publication = { ...row, tenantId: key.tenantId, receipt: key.receipt };
+      h.publications.set(key.tenantId, clone(publication));
+      return { ...clone(publication), priorDeliveryModel: "custom_repo" as const, fallbackUntil: "2026-10-31T12:00:00.000Z" };
+    });
+    return h;
+  }
+  it("publishes an approved rebuild onto the linked site and reports each part of the cutover", async () => {
+    const h = withLinkedSite(harness()); const reviewed = await h.create();
+    const approved = await h.service.approve(actor,reviewed.workId,selection(reviewed));
+    const result = await h.service.publishOntoLinkedTenant(actor,approved.workId,{ ...selection(approved), tenantId: "linked-client" });
+    expect(h.documents.publishToLinkedTenant).toHaveBeenCalledOnce();
+    expect(h.documents.reserveHostedTenant).not.toHaveBeenCalled();
+    expect(result.rebuild).toMatchObject({ status: "published", tenantId: "linked-client" });
+    expect(result.rebuild.launch.receipt).toMatchObject({ provider: "strelva-hosted", providerUrl: "https://linked-client.strelva.com/", artifactHash: approved.rebuild.candidate!.contentHash });
+    expect(Object.fromEntries(result.cutover.map(item => [item.id, item.status]))).toEqual({ document_published: "done", read_back: "done", domain_moved: "waiting", old_project_kept: "waiting", redirects_live: expect.stringMatching(/^(done|not_needed)$/) });
+    expect(result.cutover.find(item => item.id === "old_project_kept")!.label).toContain("2026-10-31");
+    expect(result.cutover.find(item => item.id === "domain_moved")!.label).toMatch(/DNS step/);
+    expect(result.priorDeliveryModel).toBe("custom_repo");
+  });
+  it("refuses before approval, for an unlinked site and when the store cannot publish onto a site", async () => {
+    const h = withLinkedSite(harness()); const reviewed = await h.create();
+    await expect(h.service.publishOntoLinkedTenant(actor,reviewed.workId,{ ...selection(reviewed), tenantId: "linked-client" })).rejects.toBeInstanceOf(WorkspaceConflictError);
+    expect(h.documents.publishToLinkedTenant).not.toHaveBeenCalled();
+    const approved = await h.service.approve(actor,reviewed.workId,selection(reviewed));
+    await expect(h.service.publishOntoLinkedTenant(actor,approved.workId,{ ...selection(approved), tenantId: "someone-else" })).rejects.toBeInstanceOf(WorkspaceAccessError);
+    await expect(h.service.publishOntoLinkedTenant(actor,approved.workId,{ ...selection(approved), tenantId: "Not A Slug" })).rejects.toThrow();
+    const bare = harness(); const other = await bare.create(); const ok = await bare.service.approve(actor,other.workId,selection(other));
+    await expect(bare.service.publishOntoLinkedTenant(actor,ok.workId,{ ...selection(ok), tenantId: "linked-client" })).rejects.toThrow(/unavailable/);
+  });
+  it("records a failed read-back without publishing again", async () => {
+    const h = withLinkedSite(harness({ checkLiveFailure: true })); const reviewed = await h.create();
+    const approved = await h.service.approve(actor,reviewed.workId,selection(reviewed));
+    const result = await h.service.publishOntoLinkedTenant(actor,approved.workId,{ ...selection(approved), tenantId: "linked-client" });
+    expect(result.cutover.find(item => item.id === "read_back")!.status).toBe("failed");
+    expect(result.rebuild.status).toBe("published");
+    expect(h.documents.publishToLinkedTenant).toHaveBeenCalledOnce();
+  });
+  it("routes reads and domain work to the current slug after a rename without rewriting the receipt", async () => {
+    const h = harness(); const record = await h.launch(await h.create());
+    const oldSlug = record.rebuild.tenantId!; const issued = record.rebuild.launch.receipt!;
+    // A rename moves the publication row (on update cascade); the saved payload keeps the old slug.
+    const row = h.publications.get(oldSlug)!; h.publications.delete(oldSlug); h.publications.set("renamed-site",{ ...row, tenantId: "renamed-site" });
+    h.documents.currentTenant = vi.fn(async () => ({ tenantId: "renamed-site", source: "publication" as const, deliveryModel: "platform_template" }));
+    const read = await h.service.read(actor,record.workId);
+    expect(read.rebuild.tenantId).toBe("renamed-site");
+    expect(read.rebuild.launch.receipt).toEqual(issued);
+    expect(websiteRebuildSchema.parse(h.works.get(record.workId)!.payload).tenantId).toBe(oldSlug);
+    await h.service.domain(actor,record.workId,{ expectedRevision: read.rebuild.revision, domain: "business.example.test", action: "attach" });
+    expect(h.domainChange).toHaveBeenCalledWith("renamed-site", { domain: "business.example.test", action: "attach" }, expect.anything());
+  });
+  it("keeps the payload slug when current routing cannot be read, but never hides an access failure", async () => {
+    const h = harness(); const record = await h.launch(await h.create());
+    h.documents.currentTenant = vi.fn(async () => { throw new Error("storage unavailable"); });
+    expect((await h.service.read(actor,record.workId)).rebuild.tenantId).toBe(record.rebuild.tenantId);
+    h.documents.currentTenant = vi.fn(async () => { throw new WorkspaceAccessError(); });
+    await expect(h.service.read(actor,record.workId)).rejects.toBeInstanceOf(WorkspaceAccessError);
+  });
+  it("lets the owner approve a hostname and an operator attach it only through the domain authority", async () => {
+    const h = harness(); const record = await h.launch(await h.create());
+    h.documents.approveDomain = vi.fn(async (_user, input) => ({ hostname: input.hostname, expiresAt: "2026-10-22T12:00:00.000Z" }));
+    const approved = await h.service.domain(actor,record.workId,{ expectedRevision: record.rebuild.revision, domain: "WWW.Business.example.test", action: "approve" }) as { approved?: { hostname: string } };
+    expect(approved.approved?.hostname).toBe("www.business.example.test");
+    expect(h.domainChange).not.toHaveBeenCalled();
+    h.documents.authorizeDomain = vi.fn(async () => "provider" as const);
+    await h.service.domain(actor,record.workId,{ expectedRevision: record.rebuild.revision, domain: "www.business.example.test", action: "attach" });
+    expect(h.documents.authorizeDomain).toHaveBeenCalledWith(actor, expect.objectContaining({ hostname: "www.business.example.test", action: "attach", tenantId: record.rebuild.tenantId }));
+    expect(h.domainChange).toHaveBeenCalledOnce();
+    // The provider write re-checks the same authority before touching the provider.
+    const options = (h.domainChange.mock.calls[0] as unknown[])[2] as { authorizeWrite: () => Promise<void> };
+    await options.authorizeWrite(); expect(h.documents.authorizeDomain).toHaveBeenCalledTimes(2);
+  });
+  it("does not touch the domain provider when the owner has not approved the hostname", async () => {
+    const h = harness(); const record = await h.launch(await h.create());
+    h.documents.authorizeDomain = vi.fn(async () => { throw new WorkspaceConflictError("The owner hasn't approved this domain yet. Strelva can prepare the records; the owner decides."); });
+    await expect(h.service.domain(actor,record.workId,{ expectedRevision: record.rebuild.revision, domain: "www.business.example.test", action: "attach" })).rejects.toThrow(/owner hasn't approved/);
+    expect(h.domainChange).not.toHaveBeenCalled();
+  });
 });
