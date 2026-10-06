@@ -227,7 +227,10 @@ storefront comparison like Sept 30 (60/60).
       edit, a joined site, and cross-workspace denial. Billing state:
       conversion now writes one billing state per business on the `accounts`
       billing home (branch `build/money-data`, proven in the local SQL
-      cluster). Never run against Supabase · S*
+      cluster). `--separate-business` converts a multi-site account's site
+      into its own business instead of joining its sibling (Twin Trees as
+      two businesses; branch `w2/release-hardening`, migration
+      `20261008160000`, proven locally). Never run against Supabase · S*
 - [x] Links and new rows survive tenant renames and deprovision. *Proven
       locally:* links key on `stable_id`; deleting a tenant clears the link
       and keeps the business. Exception: `tenant_leads` rows cascade-delete
