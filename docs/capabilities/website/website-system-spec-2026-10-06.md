@@ -1,6 +1,19 @@
 # The website System at 1.0.0
 
-Status: draft spec, 2026-10-06. Not built, not approved. For Jacob's review.
+Status: draft spec, 2026-10-06, for Jacob's review. **Built locally Oct 8 on
+`w2/website-system` (not production, migrations need Jacob's yes):**
+new item 5 (publish a rebuild onto a linked tenant,
+`publish_website_document_to_linked_tenant`, real template instead of
+`wellness`), audit P2 #8 (routing after a rename), connected sites as the
+new-business entry (decision 3 working default: item 7, behavior 18, with the
+fact and inquiry merges, the `connected_site` origin, domain-ownership proof
+and retention), behaviors 3, 4, 5 and 10 on the System page (domain state,
+Waiting on you, Requests, one History), operator domain work on the owner's
+approval (behaviors 12 and 13), and "Make it yourself instead". **Not built:**
+website `system_revisions` (item 1), repo-deploy receipts (item 6), Make real
+wired to the linked publish (behavior 16 still runs in the sandbox), owner
+email approval of a domain, the rebuild cutover undo, and "Ask for a change"
+filing a Request (it still pre-fills the composer).
 
 Under the October 6 working defaults, every recommendation here is what the
 build follows unless Jacob overturns it

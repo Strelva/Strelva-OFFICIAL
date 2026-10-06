@@ -401,7 +401,9 @@ runs beside it from step 2.
 2. **Safety batch:** the seven P1 findings in the
    [Oct 5 integration audit](../operations/reborn-integration-audit-2026-10-05.md#open-release-findings)
    before any of that code goes near production. Built and proven locally
-   Oct 7 on `build/safety-batch` (all seven P1s plus P2 #9; P2 #8 open).
+   Oct 7 on `build/safety-batch` (all seven P1s plus P2 #9). P2 #8 built
+   locally Oct 8 on `w2/website-system` (routing from the publication and
+   reservation rows; receipts unchanged).
    The two migrations need Jacob's yes before production.
 3. **Foundation and conversion:** business record, one workspace-to-tenant
    link, owner-recipient rule, scrubbed local copy, dry runs for every active

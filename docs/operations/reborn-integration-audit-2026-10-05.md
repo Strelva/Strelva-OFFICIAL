@@ -88,7 +88,9 @@ renderer; 3 the audit reads every hop through a pinned, validated transport;
 holds the lead; 6 scoped provider launch on an owner's approval, and launch no
 longer re-approves (`20261007101000`); 7 a managed relationship routes new
 website work to Strelva without special wording; 9 the report link uses the
-workspace query route. Finding 8 remains open. Each fix has a test that failed
+workspace query route. Finding 8 is fixed locally Oct 8 on
+`w2/website-system` (`read_website_current_tenant`, current-slug forms,
+reports, domain work and health read-back; receipts unchanged). Each fix has a test that failed
 first; SQL is proven on the isolated local cluster only.
 
 These findings were independently reviewed against actual source. Severity ranks

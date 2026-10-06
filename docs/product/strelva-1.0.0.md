@@ -26,7 +26,7 @@ it, area by area.
 | Internal tools, store, wellness, reports, documents | [specs/systems-catalog.md](./specs/systems-catalog.md) | Draft, Oct 6 |
 | Billing, Redis exit, export, outcome loop | [specs/money-and-data.md](./specs/money-and-data.md) | Draft, Oct 6 |
 | Publishing | [publishing spec](../capabilities/publishing/publishing-spec-2026-10-06.md) | Draft, Oct 6 |
-| Website System | [website-system spec](../capabilities/website/website-system-spec-2026-10-06.md) | Draft, Oct 6; works decision 3 both ways |
+| Website System | [website-system spec](../capabilities/website/website-system-spec-2026-10-06.md) | Draft, Oct 6; large parts built locally Oct 8 (`w2/website-system`), see its Status |
 | Systems Home, System page, Possibilities, Make real | [specs/systems-experience.md](./specs/systems-experience.md) | Draft, Oct 6 |
 | Website rebuild | [rebuild spec](../capabilities/website/website-rebuild-spec-2026-10-01.md) | Built locally, flag off |
 | Inquiries | [inquiry spec](../capabilities/inquiries/inquiry-first-product-spec-2026-09-11.md) + [1.0 delta](../capabilities/inquiries/inquiry-1.0-delta-2026-10-06.md) | Sept 11 spec amended Oct 6, incl. Redis read cutover |
@@ -61,7 +61,7 @@ business, monitoring, and at least the best competitor's bar.
 
 | System | Must do at launch | Today |
 | --- | --- | --- |
-| **Website** | Live site in the workspace with domain, health and history; edits and publishing for existing sites; connected sites (bring a site made elsewhere via `connect.js`) | Tenant sites live; workspace view ~30%; connected sites on `feat/connected-sites`, unmerged; rebuild flag off |
+| **Website** | Live site in the workspace with domain, health and history; edits and publishing for existing sites; connected sites (bring a site made elsewhere via `connect.js`) | Tenant sites live; System page with domains, Waiting on you, Requests and History built locally (Oct 8); connected sites merged locally onto the business record and lead store, flag off; publish-onto-linked-site built locally; rebuild flag off |
 | **Inquiries** | Every lead kept, spam review, reply from the workspace, owner notified | Leads Redis-only (fix on `reborn-stop-losing-data`); product ~35%, flag off |
 | **Bookings** | Weekly hours, services, buffers, confirmations, reminders, one booking store, pause | ~25%; schedule caps at ~125 bookings; two stores |
 | **Publishing** | Review replies, Google Business Profile, blog and newsletter, all through approval and receipts | 0% in the workspace; GBP writes depend on Google approval |
