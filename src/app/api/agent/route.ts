@@ -282,7 +282,7 @@ Only use tools for manifest-supported sections and actions. If the user requests
           try {
             controller.enqueue(
               encoder.encode(
-                "Sorry — I'm having trouble reaching the AI right now. Please try that again in a moment."
+                "Strelva can't answer right now. Nothing was changed. Please try again in a moment."
               )
             );
           } catch {
