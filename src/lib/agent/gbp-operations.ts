@@ -4,13 +4,13 @@ import type { getEvent } from "../events";
 /**
  * Operation registry (ontology Phase 3, first increment) — each executable agent
  * operation defined ONCE here, then the AI tools are GENERATED from these
- * definitions (see `buildGbpTools` in `src/lib/agent-shared.ts`) instead of being
+ * definitions (see `buildGbpTools` in `src/lib/agent/shared-tools.ts`) instead of being
  * hand-written. This increment covers the three Google Business Profile write ops,
  * the cleanest already-factored set. It is a pure refactor: the generated tools are
  * behaviour-identical to the previous hand-rolled literals.
  *
  * This file owns the GBP input-schema primitives (`GBP_DAY`, `GBP_PHOTO_CATEGORY`,
- * `optionalUrl`) so the registry is self-contained; `agent-shared.ts` imports the
+ * `optionalUrl`) so the registry is self-contained; `shared-tools.ts` imports the
  * registry, never the reverse (no circular import).
  */
 

@@ -124,8 +124,9 @@ describe("resolveGbpWriteAllowed", () => {
 describe("agent path parity (wiring)", () => {
   const executor = readFileSync(path.join(process.cwd(), "src/lib/agent-executor.ts"), "utf8");
   const route = readFileSync(path.join(process.cwd(), "src/app/api/agent/route.ts"), "utf8");
-  // The chat route's tools are defined once in agent-shared (buildTenantChatTools).
-  const shared = readFileSync(path.join(process.cwd(), "src/lib/agent-shared.ts"), "utf8");
+  // The chat route's tools are defined once in src/lib/agent/chat-tools.ts
+  // (buildTenantChatTools, re-exported from agent-shared).
+  const shared = readFileSync(path.join(process.cwd(), "src/lib/agent/chat-tools.ts"), "utf8");
   const chatTools = shared.slice(shared.indexOf("export async function buildTenantChatTools("));
 
   it("executor threads the manifest into applySectionUpdate (was skipped)", () => {
