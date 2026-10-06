@@ -1,6 +1,25 @@
 # Money and the client's data
 
-Status: draft spec, 2026-10-06. Not built, not approved. For Jacob's review.
+Status: draft spec, 2026-10-06; built and proven **locally only** on branch
+`build/money-data` (2026-10-06). Nothing applied to production, Stripe or
+Supabase. Every new behavior is behind a flag that is off by default.
+
+| Part | Built | Proven (local) | Not built |
+| --- | --- | --- | --- |
+| Rename fix (6.6) | `tenant-rename.ts` moves zsets, hashes, sets and lists atomically in Lua, keeps TTLs, keeps going after one bad key; spam pit and client-email keys added | real disposable `redis-server` test; fails on the old code | |
+| Deprovision (6.6) | Sweeps every client store the rename registry moves, event blobs, account grouping; keeps the operator CRM | real `redis-server` test | Postgres retention rule (decision 5) |
+| (a) Billing | `20261007180000_business_billing.sql`: billing state on `accounts` keyed by `workspace_id`, written by a trigger at conversion, undone at unlink, payer = owner recipient; webhook mirror and checkout `workspaceId` behind `STRELVA_BUSINESS_BILLING`; `scripts/stripe-workspace-metadata.ts` (dry run, no Stripe call) | SQL cluster test for every tenant shape, Twin Trees, rename, unlink, access; unit tests; `/api/v1`, hosted pages, lead capture and the public booking POST pinned ungated | Portfolio MRR reading the billing home (5); failed-payment Needs you item (7, webhook already emails); the flat plan (9) |
+| (b) Redis → Postgres | `20261007181000_tenant_client_records.sql` + `src/platform/client-records`: dual-write (`STRELVA_CLIENT_RECORDS_DUAL_WRITE`), dry-run backfill and parity script, read flag per store (`STRELVA_CLIENT_RECORDS_READ`) after 7 days; applied to spam held, inquiry timelines and first replies, booking config, analytics config and report markers, account grouping | SQL cluster test; real `redis-server` tests for dual-write failure, repair, backfill, parity mismatch, read flip and fallback | Orders and rewards (read-only key count only); events, threads, connections, owner settings |
+| (c) Export | `20261007182000_workspace_export_v3.sql` + `src/platform/workspace-exports/v3.ts`, `POST /api/workspace-export/v3` behind `STRELVA_EXPORT_SCHEMA_3`: paged categories, background builds in parts, credential-shape check, expiring token link to the owner recipient | SQL cluster test (pages, isolation, partial builds refused, token, expiry); unit tests | Exit steps per linked site (20); assets manifest; orders and rewards |
+| (d) Outcome loop | `20261007183000_business_outcomes.sql` + `src/platform/business-outcomes`; optional `page`, `referrer`, `utm_*` on `/api/v1/leads` and the starter form | SQL cluster test with every join; formatter tests | Wiring into the monthly report email; Calendly bookings |
+
+Corrections found while building: the Postgres home for these stores is one
+table, `tenant_client_records`, not per-store tables (section 5); typed tables
+can follow when reads move. Its `workspace_id` and `accounts.workspace_id`
+carry no foreign key, because unlinking counts every foreign key to
+`workspaces` as use. `subscription_items.tenant_id` did not cascade on slug
+rename; the billing migration fixes it. The public booking widget's
+`POST /api/booking` was billing-gated (section 10 unknown); it no longer is.
 
 Four parts: (a) billing follows the client into the workspace, (b) no client
 data is held only in Redis, (c) export and exit carry everything, (d) the
