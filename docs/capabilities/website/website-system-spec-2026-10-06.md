@@ -15,6 +15,28 @@ preview, never an editor; the workspace editor carries today's
 `/dashboard/site` editor over for parity (owners and admins), so that rule
 is not enforced yet.
 
+**Then built locally Oct 8 on
+`w2/website-system` (not production, migrations need Jacob's yes):**
+new item 5 (publish a rebuild onto a linked tenant,
+`publish_website_document_to_linked_tenant`, real template instead of
+`wellness`), audit P2 #8 (routing after a rename), connected sites as the
+new-business entry (decision 3 working default: item 7, behavior 18, with the
+fact and inquiry merges, the `connected_site` origin, domain-ownership proof
+and retention), behaviors 3, 4, 5 and 10 on the System page (domain state,
+Waiting on you, Requests, one History), operator domain work on the owner's
+approval (behaviors 12 and 13), and "Make it yourself instead". **Not built:**
+website `system_revisions` (item 1), repo-deploy receipts (item 6), Make real
+wired to the linked publish (behavior 16 still runs in the sandbox), owner
+email approval of a domain, the rebuild cutover undo, and "Ask for a change"
+filing a Request (it still pre-fills the composer).
+
+Both merged on `integrate/reborn-1.0` (Oct 6): `/workspace/site` is one route.
+With a `system` it opens the site editor tabs (Strelva-content sites) or
+"Ask for a change" (repo-only sites, files a Request); without one it is the
+connected-site entry (bring the website the business already has), open only
+where `STRELVA_CONNECTED_SITES_RELEASE=1` and Systems is on for that business.
+The System page's own "Ask for a change" still pre-fills the composer.
+
 Under the October 6 working defaults, every recommendation here is what the
 build follows unless Jacob overturns it
 ([product model](../../product/product-model.md#decisions-the-specs-need)).

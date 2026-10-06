@@ -20,8 +20,12 @@ import { connectWebsiteCapabilitiesInputSchema } from "./contracts";
 import { listPublishedWebsiteCapabilityOptions, resolvePublishedWebsiteCapabilities } from "./published-capabilities";
 import { auditRebuildHtml } from "./rebuild-audit";
 import { renderSiteDocumentHtml } from "./site-export";
+import { ROOT_DOMAIN } from "@/lib/brand";
+import { normalizeCustomDomain } from "@/lib/domains";
 
 interface Loaded { work: SavedWork; rebuild: WebsiteRebuild }
+/** One part of a cutover onto an existing site, reported on its own. */
+export interface WebsiteCutoverItem { id: "document_published" | "read_back" | "domain_moved" | "old_project_kept" | "redirects_live"; status: "done" | "waiting" | "failed" | "not_needed"; label: string }
 interface ServiceDependencies {
   documents?: WebsiteDocumentStore;
   pipeline?: typeof runWebsiteRebuild;
@@ -77,6 +81,14 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
   const documents = dependencies.documents ?? websiteDocumentStore;
   const now = dependencies.now ?? (() => new Date().toISOString());
   const pipeline = dependencies.pipeline ?? runWebsiteRebuild;
+  /** The tenant this work routes to now (P2 #8): the publication or
+   * reservation row, which follows a slug rename. The payload's tenantId is
+   * the slug at launch and stays as written. */
+  async function routeTenant(actor: WorkspaceActor, loaded: Loaded): Promise<string | null> {
+    if (!loaded.rebuild.tenantId || !documents.currentTenant) return loaded.rebuild.tenantId;
+    try { return (await documents.currentTenant(actor,{ workspaceId: loaded.work.workspaceId, workId: loaded.work.id }))?.tenantId ?? loaded.rebuild.tenantId; }
+    catch (error) { if (error instanceof WorkspaceAccessError) throw error; return loaded.rebuild.tenantId; }
+  }
   async function load(actor: WorkspaceActor, workId: string): Promise<Loaded> { return loadWork(await store.read(actor, z.string().uuid().parse(workId))); }
   async function update(actor: WorkspaceActor, loaded: Loaded, kind: string, changes: Partial<WebsiteRebuild>): Promise<Loaded> {
     const revision = loaded.rebuild.revision + 1;
@@ -162,9 +174,12 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     return deferBuild ? present(loaded) : build(actor,loaded);
   }
   async function read(actor: WorkspaceActor, workId: string) {
-    const loaded = await load(actor,workId);
-    if (loaded.rebuild.tenantId && loaded.rebuild.candidate && (loaded.rebuild.launch.receipt?.artifactHash !== loaded.rebuild.candidate.contentHash || loaded.rebuild.launch.receipt?.candidateRevision !== loaded.rebuild.candidate.revision)) {
-      const published = await documents.published(loaded.rebuild.tenantId);
+    const stored = await load(actor,workId);
+    const tenantId = await routeTenant(actor,stored);
+    // Presented with the current slug; the stored payload is not rewritten.
+    const loaded = tenantId === stored.rebuild.tenantId ? stored : { ...stored, rebuild: { ...stored.rebuild, tenantId } };
+    if (tenantId && loaded.rebuild.candidate && (loaded.rebuild.launch.receipt?.artifactHash !== loaded.rebuild.candidate.contentHash || loaded.rebuild.launch.receipt?.candidateRevision !== loaded.rebuild.candidate.revision)) {
+      const published = await documents.published(tenantId);
       if (published?.workId === workId && published.revision === loaded.rebuild.candidate.revision && published.contentHash === loaded.rebuild.candidate.contentHash && published.receipt) return present({ ...loaded, rebuild: { ...loaded.rebuild, status: "published", launch: { receipt: published.receipt, readBack: { status: "pending", checkedAt: now(), message: "Publication is committed; the public read-back has not been confirmed yet." } } } });
     }
     return present(loaded);
@@ -244,8 +259,9 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
   async function launch(actor: WorkspaceActor, workId: string, raw: unknown) {
     let loaded = await load(actor,workId); const { candidate } = exact(loaded,raw);
     if (loaded.rebuild.launch.receipt?.status === "published" && loaded.rebuild.launch.receipt.artifactHash === candidate.contentHash && loaded.rebuild.launch.receipt.candidateRevision === candidate.revision) return present(loaded.rebuild.status === "published" ? loaded : await update(actor,loaded,"publish_reconciled",{ status:"published" }));
-    if (loaded.rebuild.tenantId) {
-      const published = await documents.published(loaded.rebuild.tenantId);
+    const routedTenant = await routeTenant(actor,loaded);
+    if (routedTenant) {
+      const published = await documents.published(routedTenant);
       if (published?.workId === workId && published.revision === candidate.revision && published.contentHash === candidate.contentHash && published.receipt) return present(await update(actor,loaded,"publish_reconciled",{ status: "published", launch: { receipt: published.receipt, readBack: { status: "pending", checkedAt: now(), message: "Publication is committed; the public read-back has not been confirmed yet." } } }));
     }
     if (loaded.rebuild.status !== "approved" || loaded.rebuild.approvedCandidateRevision !== candidate.revision) throw new WorkspaceConflictError("Approve the exact current preview before launching.");
@@ -257,9 +273,9 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     // approval with the operator's (audit 2026-10-05, finding 6). Reserve and
     // publish each check launch authority and the exact approved revision
     // atomically; a scoped provider may launch only an owner's approval.
-    const tenantId = dependencies.createHostedTenant ? await dependencies.createHostedTenant(actor,present(loaded)) : await documents.reserveHostedTenant(actor,{ workspaceId: loaded.work.workspaceId, workId, revision: candidate.revision, contentHash: candidate.contentHash, tenantId: hostedTenantSlug(present(loaded)) });
+    const tenantId = dependencies.createHostedTenant ? await dependencies.createHostedTenant(actor,present(loaded)) : await documents.reserveHostedTenant(actor,{ workspaceId: loaded.work.workspaceId, workId, revision: candidate.revision, contentHash: candidate.contentHash, tenantId: routedTenant ?? hostedTenantSlug(present(loaded)) });
     loaded = await update(actor,loaded,"hosted_tenant_bound",{ tenantId });
-    const providerUrl = `https://${tenantId}.strelva.com/`;
+    const providerUrl = `https://${tenantId}.${ROOT_DOMAIN}/`;
     const receipt: WebsiteLaunchReceipt = websiteLaunchReceiptSchema.parse({ status: "published", provider: "strelva-hosted", providerUrl, receiptId: `hosted-${createHash("sha256").update(`${workId}:${candidate.revision}:${candidate.contentHash}`).digest("hex").slice(0,32)}`, artifactHash: candidate.contentHash, candidateRevision: candidate.revision, publishedAt: now(), evidence: "The approved immutable site document is the hosted tenant's published revision." });
     const row = await documents.publish(actor,{ workspaceId: loaded.work.workspaceId, workId, revision: candidate.revision, contentHash: candidate.contentHash, tenantId, receipt });
     // Once this pointer/receipt exists, read-back failures cannot create a new
@@ -272,6 +288,46 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
       readBack = dependencies.checkLive ? await dependencies.checkLive(row,providerUrl) : await (async () => { const result = await checkWebsiteHealth({ workspaceId: row.workspaceId, workId, tenantId, revision: row.revision, contentHash: row.contentHash, url: providerUrl }); return { status: result.status === "healthy" ? "verified" as const : "failed" as const, checkedAt: result.checkedAt, message: result.status === "healthy" ? "The public site matches the published document." : "Live, but we couldn't confirm the public document yet." }; })();
     } catch { readBack = { status: "failed", checkedAt: now(), message: "Live, but we couldn't confirm the public document yet." }; }
     return present(await update(actor,loaded,"hosted_read_back",{ launch: { receipt: committedReceipt, readBack } }));
+  }
+  /**
+   * Publish an approved rebuild onto a site this business already runs (a
+   * tenant linked through tenant_workspace_links). Owner only, decided in SQL.
+   * The website System keeps its identity (origin tenant:<stable_id>); only
+   * the tenant's delivery model changes. Reports each part of the cutover
+   * separately and never claims a part that did not happen: the domain stays
+   * where it is until the owner's DNS step, and the client's old project is
+   * kept as a fallback by the operator (nothing here can remove it).
+   */
+  async function publishOntoLinkedTenant(actor: WorkspaceActor, workId: string, raw: unknown) {
+    const input = rebuildSelectionSchema.extend({ tenantId: z.string().regex(/^[a-z0-9][a-z0-9-]{0,62}$/) }).strict().parse(raw);
+    let loaded = await load(actor,workId);
+    const { candidate } = exact(loaded,{ expectedRevision: input.expectedRevision, candidateRevision: input.candidateRevision, candidateContentHash: input.candidateContentHash });
+    if (!documents.publishToLinkedTenant) throw new WorkspaceStoreError("Publishing onto an existing site is unavailable.");
+    if (loaded.rebuild.status !== "approved" && loaded.rebuild.status !== "published") throw new WorkspaceConflictError("Approve the exact current preview before publishing it onto your site.");
+    if (loaded.rebuild.approvedCandidateRevision !== candidate.revision) throw new WorkspaceConflictError("Approve the exact current preview before publishing it onto your site.");
+    const providerUrl = `https://${input.tenantId}.${ROOT_DOMAIN}/`;
+    const receipt: WebsiteLaunchReceipt = websiteLaunchReceiptSchema.parse({ status: "published", provider: "strelva-hosted", providerUrl, receiptId: `hosted-${createHash("sha256").update(`${workId}:${input.tenantId}:${candidate.revision}:${candidate.contentHash}`).digest("hex").slice(0,32)}`, artifactHash: candidate.contentHash, candidateRevision: candidate.revision, publishedAt: now(), evidence: "The approved immutable site document is the linked tenant's published revision." });
+    const row = await documents.publishToLinkedTenant(actor,{ workspaceId: loaded.work.workspaceId, workId, revision: candidate.revision, contentHash: candidate.contentHash, tenantId: input.tenantId, receipt });
+    const committedReceipt = row.receipt ?? receipt;
+    const tenantId = row.tenantId ?? input.tenantId;
+    // The publication is committed. Nothing after this point can make it retryable.
+    loaded = await update(actor,loaded,"published_onto_linked_site",{ status: "published", tenantId, launch: { receipt: committedReceipt, readBack: { status: "pending", checkedAt: now(), message: "Published; checking the public site." } } });
+    try { await invalidatePublishedSiteDocument(tenantId); await (dependencies.revalidate ?? (async () => { revalidatePath("/","layout"); }))(); } catch { /* Cache and read-back are separate from the publication. */ }
+    const readUrl = committedReceipt.providerUrl;
+    let readBack: WebsiteRebuild["launch"]["readBack"];
+    try {
+      readBack = dependencies.checkLive ? await dependencies.checkLive(row,readUrl) : await (async () => { const result = await checkWebsiteHealth({ workspaceId: row.workspaceId, workId, tenantId, revision: row.revision, contentHash: row.contentHash, url: readUrl }); return { status: result.status === "healthy" ? "verified" as const : "failed" as const, checkedAt: result.checkedAt, message: result.status === "healthy" ? "The public site matches the published document." : "Published, but we couldn't confirm the public document yet." }; })();
+    } catch { readBack = { status: "failed", checkedAt: now(), message: "Published, but we couldn't confirm the public document yet." }; }
+    loaded = await update(actor,loaded,"hosted_read_back",{ launch: { receipt: committedReceipt, readBack } });
+    const redirects = candidate.document.redirects.length;
+    const cutover: WebsiteCutoverItem[] = [
+      { id: "document_published", status: "done", label: `Published revision ${row.revision} at ${tenantId}.${ROOT_DOMAIN}.` },
+      { id: "read_back", status: readBack?.status === "verified" ? "done" : readBack?.status === "failed" ? "failed" : "waiting", label: readBack?.message ?? "Not checked yet." },
+      { id: "domain_moved", status: "waiting", label: "Your domain still points at the old site. Moving it is a DNS step you approve; Strelva prepares the exact records." },
+      { id: "old_project_kept", status: "waiting", label: `Your old site's project is kept as a fallback until ${row.fallbackUntil.slice(0,10)}. Strelva never removes it automatically.` },
+      { id: "redirects_live", status: redirects ? "done" : "not_needed", label: redirects ? `${redirects} redirect${redirects === 1 ? "" : "s"} from old addresses are served by the new site.` : "No old addresses needed redirects." },
+    ];
+    return { ...present(loaded), cutover, priorDeliveryModel: row.priorDeliveryModel, fallbackUntil: row.fallbackUntil };
   }
   async function patch(actor: WorkspaceActor, workId: string, raw: unknown) {
     const input = rebuildSelectionSchema.extend({ ops: z.unknown(), forceReview: z.boolean().optional() }).strict().parse(raw);
@@ -289,19 +345,31 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     return present(await saveCandidate(actor,loaded,prepareSiteUndo(previous.document).document,"site_undo_requested",true));
   }
   async function domain(actor: WorkspaceActor, workId: string, raw?: unknown) {
-    const loaded = await load(actor,workId); const tenantId = loaded.rebuild.tenantId;
+    const loaded = await load(actor,workId); const tenantId = await routeTenant(actor,loaded);
     if (!tenantId || !loaded.rebuild.launch.receipt) return { domain: null, domains: [] };
     if (raw === undefined) return (dependencies.domainRead ?? readHostedDomains)(tenantId);
-    const input = z.object({ expectedRevision: z.number().int().nonnegative(), domain: z.string(), action: z.enum(["attach","refresh"]) }).strict().parse(raw);
+    const input = z.object({ expectedRevision: z.number().int().nonnegative(), domain: z.string().trim().min(1).max(253), action: z.enum(["attach","refresh","approve"]) }).strict().parse(raw);
     if (input.expectedRevision !== loaded.rebuild.revision) throw new WorkspaceConflictError("Reload the website before changing its domain.");
     const published = await documents.published(tenantId);
     if (!published || published.workId !== workId || published.workspaceId !== loaded.work.workspaceId) throw new WorkspaceAccessError();
     await store.member(actor,loaded.work.workspaceId);
-    // The actual published revision carries the tenant ownership check. A new
-    // unapproved draft neither grants nor removes domain management authority.
-    await documents.managePublishedTenant(actor,{ workspaceId: loaded.work.workspaceId, workId, tenantId });
-    const { expectedRevision: _expectedRevision, ...change } = input;
-    return (dependencies.domainChange ?? changeHostedDomain)(tenantId,change,{ authorizeWrite: () => documents.managePublishedTenant(actor,{ workspaceId:loaded.work.workspaceId,workId,tenantId }) });
+    const key = { workspaceId: loaded.work.workspaceId, workId, tenantId };
+    const hostname = normalizeCustomDomain(input.domain) ?? input.domain.toLowerCase();
+    if (input.action === "approve") {
+      // The owner decides the exact hostname; Strelva may then do the work.
+      if (!documents.approveDomain) throw new WorkspaceStoreError("Domain approvals are unavailable.");
+      const approved = await documents.approveDomain(actor,{ ...key, hostname });
+      return { approved };
+    }
+    // The actual published revision carries the authority check: the owner as
+    // before, or a Strelva operator on this owner's approval of this hostname.
+    // A new unapproved draft neither grants nor removes domain authority.
+    const action = input.action;
+    const authorize = documents.authorizeDomain
+      ? async () => { await documents.authorizeDomain!(actor,{ ...key, hostname, action }); }
+      : () => documents.managePublishedTenant(actor,key);
+    await authorize();
+    return (dependencies.domainChange ?? changeHostedDomain)(tenantId,{ domain: input.domain, action },{ authorizeWrite: authorize });
   }
   async function initializeHandoff(actor: WorkspaceActor, accepted: AcceptedHandoff) {
     const loaded = await load(actor,accepted.customerWorkId);
@@ -318,7 +386,8 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     const input = connectWebsiteCapabilitiesInputSchema.parse(raw); const loaded = await load(actor,workId);
     if (loaded.rebuild.revision !== input.expectedRevision || !loaded.rebuild.candidate) throw new WorkspaceConflictError("Reload the current website preview before connecting visitor tools.");
     await store.member(actor,loaded.work.workspaceId);
-    if (input.selection && (!loaded.rebuild.tenantId || input.selection.tenantId !== loaded.rebuild.tenantId)) throw new WorkspaceConflictError("Publish this hosted website first, then connect visitor tools belonging to its own business and tenant.");
+    const currentTenant = input.selection ? await routeTenant(actor,loaded) : null;
+    if (input.selection && (!currentTenant || input.selection.tenantId !== currentTenant)) throw new WorkspaceConflictError("Publish this hosted website first, then connect visitor tools belonging to its own business and tenant.");
     const projection = input.selection ? await (dependencies.resolveCapabilities ?? resolvePublishedWebsiteCapabilities)(actor,loaded.work.workspaceId,workId,input.selection) : undefined;
     if (input.selection && !projection) throw new WorkspaceConflictError("This visitor-tool grant is no longer available. Choose a current published connection.");
     const document = structuredClone(loaded.rebuild.candidate.document);
@@ -332,7 +401,7 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     return present(await saveCandidate(actor,{ ...loaded,rebuild },siteDocumentSchema.parse(document),"visitor_tools_connected"));
   }
   async function capabilityOptions(actor: WorkspaceActor,workId: string) { const loaded = await load(actor,workId); return listPublishedWebsiteCapabilityOptions(actor,loaded.work.workspaceId,workId); }
-  return { create, read, list, retry, resolveFact, approve, launch, patch, undo, domain, initializeHandoff, connectCapabilities, capabilityOptions };
+  return { create, read, list, retry, resolveFact, approve, launch, publishOntoLinkedTenant, patch, undo, domain, initializeHandoff, connectCapabilities, capabilityOptions };
 }
 export const websiteRebuildService = createWebsiteRebuildService();
 export const createWebsiteRebuild = websiteRebuildService.create;
@@ -343,6 +412,7 @@ export const resolveWebsiteRebuildFact = websiteRebuildService.resolveFact;
 export const approveWebsiteRebuild = websiteRebuildService.approve;
 export const launchWebsiteRebuild = websiteRebuildService.launch;
 export const patchWebsiteRebuild = websiteRebuildService.patch;
+export const publishWebsiteRebuildOntoLinkedSite = websiteRebuildService.publishOntoLinkedTenant;
 export const undoWebsiteRebuild = websiteRebuildService.undo;
 export const websiteRebuildDomain = websiteRebuildService.domain;
 export const initializeRebuildHandoff = websiteRebuildService.initializeHandoff;

@@ -16,7 +16,9 @@ import { getDomainHealth } from "@/lib/domain-monitor-store";
 import { getScanSummaries } from "@/lib/scan-store";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { BusinessSystems, SystemListing } from "@/platform/systems/from-existing";
-import { listBusinessSystems, withTenantSurfaces, type BookingView, type TenantSiteFacts } from "@/platform/systems/from-existing";
+import { listBusinessSystems, withTenantSurfaces, type BookingView, type ExistingConnectedSite, type TenantSiteFacts } from "@/platform/systems/from-existing";
+import { connectedSitesReleaseEnabled } from "@/products/connected-sites/server";
+import { connectedSitesStore } from "@/products/connected-sites/store";
 import { getTenantConfig } from "@/lib/tenants";
 import { siteEditingFor, type SiteEditing } from "@/products/websites/server";
 import { savedCheckObservations } from "@/products/investigations/system-health";
@@ -191,6 +193,7 @@ export async function projectWorkspaceSystems(input: SystemsProjectionInput): Pr
       health: healthSummary(health.get(item.system.id)),
       ...(input.bookingViews?.get(item.system.id)?.length ? { views: [...input.bookingViews.get(item.system.id)!] } : {}),
       ...(item.system.kind === "website" && item.references.tenantId && input.siteEditing?.get(item.references.tenantId) ? { editing: input.siteEditing.get(item.references.tenantId)! } : {}),
+      ...(item.connectedSite ? { connectedSite: { ...item.connectedSite } } : {}),
     })),
     connections: connections.map(({ connection }) => {
       const targetSystemId = connection.target.type === "system" ? connection.target.system.systemId : null;
@@ -225,7 +228,8 @@ export async function projectWorkspaceSystems(input: SystemsProjectionInput): Pr
 export async function readSystemsEvidence(listing: BusinessSystems, now: number = Date.now()): Promise<Observation[]> {
   const websites = listing.systems.filter((item) => item.system.kind === "website" && item.references.tenantId);
   const inquiries = listing.systems.filter((item) => item.system.kind === "inquiry");
-  if (!websites.length && !inquiries.length) return [];
+  const connected = listing.systems.flatMap((item) => item.connectedSite ? [connectedSiteObservation(item.system.id, item.connectedSite)] : []);
+  if (!websites.length && !inquiries.length) return connected;
   const [heartbeats, domains, scans] = await Promise.all([
     checkHeartbeats(now).catch(() => []),
     getDomainHealth().catch(() => null),
@@ -242,12 +246,28 @@ export async function readSystemsEvidence(listing: BusinessSystems, now: number 
     observations.push(inquiryFormUnchecked(inquiry.system.id));
     observations.push(...heartbeatObservations(inquiry.system.id, heartbeats, ["inquiry-follow-ups"]));
   }
-  return observations;
+  return [...observations, ...connected];
+}
+
+/** A connected site is "reporting" while its script sends visits; silence for a week is worth a look. */
+export function connectedSiteObservation(subjectId: string, site: { siteHost: string; verified: boolean; lastEventAt: string | null }): Observation {
+  if (!site.verified) return { subjectId, signal: "connected_site.reporting", outcome: "unknown", observedAt: null, maxAgeSeconds: 7 * 24 * 3600, source: "connected-site", message: `Waiting for proof that ${site.siteHost} is this business's site.` };
+  if (!site.lastEventAt) return { subjectId, signal: "connected_site.reporting", outcome: "unknown", observedAt: null, maxAgeSeconds: 7 * 24 * 3600, source: "connected-site", message: `${site.siteHost} has not reported a visit yet. Check the Strelva script is on the page.` };
+  return { subjectId, signal: "connected_site.reporting", outcome: "pass", observedAt: site.lastEventAt, maxAgeSeconds: 7 * 24 * 3600, source: "connected-site", message: `${site.siteHost} is reporting visits.` };
 }
 
 /** Follow-ups running says nothing about whether the form on the site works. */
 export function inquiryFormUnchecked(subjectId: string): Observation {
   return { subjectId, signal: "inquiry.publication", outcome: "unknown", observedAt: null, maxAgeSeconds: 7 * 24 * 3600, source: "inquiry-capability", message: "Whether the form on the site delivers has not been checked." };
+}
+
+/** Connected sites join the projection only while their release is on. */
+function connectedSitesReader(actor: WorkspaceActor, businessId: string): (() => Promise<ExistingConnectedSite[]>) | undefined {
+  if (!connectedSitesReleaseEnabled()) return undefined;
+  return async () => (await connectedSitesStore().list(actor, businessId)).map((site) => ({
+    id: site.id, label: site.label, siteUrl: site.siteUrl, siteHost: site.siteHost, status: site.status,
+    verifiedAt: site.verifiedAt, lastEventAt: site.lastEventAt, createdAt: site.createdAt, updatedAt: site.updatedAt,
+  }));
 }
 
 export interface LiveSystemsDeps {
@@ -286,7 +306,8 @@ export function savedCheckEvidence(listing: BusinessSystems, siteDomains: Readon
 
 async function liveProjectionInput(deps: LiveSystemsDeps): Promise<SystemsProjectionInput> {
   const now = deps.now ?? Date.now();
-  const spine = await listBusinessSystems(deps.actor, deps.businessId, { store: createSupabaseSystemStore() });
+  // Connected sites are read here only because Systems is already on for this business.
+  const spine = await listBusinessSystems(deps.actor, deps.businessId, { store: createSupabaseSystemStore(), connectedSites: connectedSitesReader(deps.actor, deps.businessId) });
   const tenantFacts = await readTenantSiteFacts(spine, deps.siteDomains);
   const { bookingViews, ...surfaced } = withTenantSurfaces(spine, tenantFacts.facts);
   const published = publishingReleaseEnabled() ? await withPublishing(surfaced, deps.actor, now) : null;

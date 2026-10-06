@@ -10,7 +10,8 @@ import { websiteDocumentStore } from "./document-store";
 import { readWebsiteRebuild } from "./rebuild-service";
 import { sendEmailWithReceipt } from "@/lib/email/send";
 import { getTenantConfig } from "@/lib/tenants";
-import { OPERATOR_URL } from "@/lib/brand";
+import { OPERATOR_URL, ROOT_DOMAIN } from "@/lib/brand";
+import { bindToCurrentTenant } from "./hosted-routing";
 export const websiteReportInputSchema=z.object({month:z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/)}).strict();
 export interface WebsiteMonthlyReport {
  workId:string;workspaceId:string;tenantId:string|null;siteName:string;month:string;generatedAt:string;
@@ -34,7 +35,9 @@ export async function readWebsiteMonthlyReport(actor:WorkspaceActor,workId:strin
  const publishedRevisions=new Set(receipts.filter(receipt=>receipt.status==="published").map(receipt=>`${receipt.candidateRevision}:${receipt.artifactHash}`));
  let inquiries:WebsiteMonthlyReport["inquiries"]={status:"unavailable",count:null,limitedToRecentRecords:true};
  if(tenantId){try{const data=await readInquiryWorkspace({tenantId,businessId:record.workspaceId,leadLimit:500});if(data.recordsAvailable&&data.records)inquiries={status:"available",count:data.records.filter(row=>during(row.createdAt)).length,limitedToRecentRecords:true};}catch{/* Missing storage is not zero inquiries. */}}
- const bookingBinding=published?.document.capabilities?.tenant===tenantId?published.document.capabilities.booking:undefined;
+ // After a slug rename the issued binding names the old slug; the receipt proves it is this tenant (P2 #8).
+ const servedCapabilities=published&&tenantId?bindToCurrentTenant(published.document,tenantId,published.receipt,ROOT_DOMAIN).capabilities:undefined;
+ const bookingBinding=servedCapabilities?.tenant===tenantId?servedCapabilities.booking:undefined;
  let scheduleId:unknown;
  if(bookingBinding){try{const tenant=tenantId?await getTenantConfig(tenantId):null;const rawGrants=await listPublicWebsiteBookingGrants(actor,record.workspaceId);const grants=Array.isArray(rawGrants)?rawGrants:[rawGrants];scheduleId=grants.find(grant=>grant.status==="published"&&!!tenant?.stableId&&grant.tenant_stable_id===tenant.stableId&&grant.capability_id===bookingBinding.capabilityId&&Number(grant.capability_version)===bookingBinding.version)?.work_id;}catch{/* The booking measurement remains explicitly unavailable. */}}
  const schedule=work.find(row=>row.id===scheduleId);const parsed=scheduleSchema.safeParse(schedule?.payload);

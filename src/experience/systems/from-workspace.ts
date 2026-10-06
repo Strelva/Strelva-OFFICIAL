@@ -135,7 +135,11 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
     const domain = bare(hostname(site?.domain));
     const installation = entry.savedWorkId ? installationFor.get(entry.savedWorkId) : undefined;
     let surface: SystemSurface | null = null;
-    if (kind === "website" && entry.tenantId) {
+    if (kind === "website" && entry.connectedSite) {
+      // The business's own site, built elsewhere. Strelva frames it and never edits it.
+      const liveUrl = entry.connectedSite.siteUrl;
+      surface = { kind: "website", domain: bare(hostname(liveUrl)), liveUrl, previewSrc: liveUrl, previewLabel: `${bare(entry.connectedSite.siteHost)}, as visitors see it now` };
+    } else if (kind === "website" && entry.tenantId) {
       const liveUrl = site?.domain ? `https://${site.domain.replace(/^https?:\/\//, "")}` : undefined;
       const previewSrc = (site?.previewHref && sameAppHref(site.previewHref)) || liveUrl;
       surface = { kind: "website", domain, liveUrl, previewSrc, previewLabel: site?.previewHref ? `Rendered from the saved copy of ${domain || entry.name}` : `${domain || entry.name}, as visitors see it now`, manageHref: site?.href && sameAppHref(site.href) ? sameAppHref(site.href) || undefined : undefined, ...(entry.editing ? { editing: entry.editing } : {}) };
@@ -170,7 +174,7 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
       kind,
       // A managed website reads by its address; the spine keeps the site name.
       name: kind === "website" && domain ? domain : entry.name,
-      detail: kind === "website" && domain ? entry.name : detailFor(kind, work, entry),
+      detail: kind === "website" && entry.connectedSite ? "Connected site" : kind === "website" && domain ? entry.name : detailFor(kind, work, entry),
       ...(entry.basis ? { basis: entry.basis } : {}),
       lifecycle: stopped ? "paused" : entry.lifecycle,
       health: { state: entry.health.status, summary: work?.unavailableReason || entry.health.summary, lastVerifiedAt: entry.health.lastVerifiedAt },

@@ -244,6 +244,8 @@ export interface WorkspaceSystemEntry {
   views?: Array<"schedule" | "roster">;
   /** A managed website: Strelva edits its content (`native`) or every change is a repo Request (`request`). */
   editing?: "native" | "request";
+  /** A website the business runs elsewhere, connected by script. Additive. */
+  connectedSite?: { siteUrl: string; siteHost: string; verified: boolean; lastEventAt: string | null };
 }
 
 export interface WorkspaceSystemConnection {

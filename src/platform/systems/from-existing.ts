@@ -93,6 +93,20 @@ export const existingManagedWebsiteSchema = z.object({
   linkedAt: iso,
 });
 
+/** A website the business runs elsewhere and connected by script (connected_sites). */
+export const existingConnectedSiteSchema = z.object({
+  id: z.string().uuid(),
+  label: z.string(),
+  siteUrl: z.string(),
+  siteHost: z.string(),
+  status: z.enum(["active", "revoked"]),
+  verifiedAt: z.string().nullable(),
+  lastEventAt: z.string().nullable(),
+  createdAt: iso,
+  updatedAt: iso,
+});
+export type ExistingConnectedSite = z.input<typeof existingConnectedSiteSchema>;
+
 export const existingSystemsSnapshotSchema = z.object({
   businessId: z.string().uuid(),
   /** What the reader may see: the whole business, or only assigned work.
@@ -114,6 +128,8 @@ export const existingSystemsSnapshotSchema = z.object({
     id: z.string().uuid(), provider: z.string(), calendarName: z.string(),
     status: z.enum(["authorized", "connected", "revoked", "error"]),
   })),
+  /** Read separately (list_connected_sites) while STRELVA_CONNECTED_SITES_RELEASE is on. */
+  connectedSites: z.array(existingConnectedSiteSchema).optional().transform((value) => value ?? []),
 });
 export type ExistingSystemsSnapshot = z.input<typeof existingSystemsSnapshotSchema>;
 type Snapshot = z.output<typeof existingSystemsSnapshotSchema>;
@@ -132,6 +148,7 @@ function withinScope(snapshot: Snapshot): Snapshot {
     inquiryWorkspaces: [],
     bookingGrants: snapshot.bookingGrants.filter((grant) => workIds.has(grant.workId)),
     calendarConnections: [],
+    connectedSites: [],
   };
 }
 
@@ -142,8 +159,10 @@ export interface SystemListing {
   provenance: SystemProvenance;
   /** Why the lifecycle reads as it does, for an existing thing. */
   basis: string | null;
-  /** Native ids this System stands for (work id, tenant id). */
-  references: { savedWorkId: string | null; tenantStableId: string | null; tenantId: string | null };
+  /** Native ids this System stands for (work id, tenant id, connected site). */
+  references: { savedWorkId: string | null; tenantStableId: string | null; tenantId: string | null; connectedSiteId?: string | null };
+  /** A connected site's address and reporting, for its surface and health. */
+  connectedSite?: { siteUrl: string; siteHost: string; verified: boolean; lastEventAt: string | null };
 }
 
 export interface ConnectionListing {
@@ -284,6 +303,25 @@ export function systemsFromExisting(raw: ExistingSystemsSnapshot): BusinessSyste
       references: { savedWorkId: null, tenantStableId: site.tenantStableId, tenantId: site.tenantId },
     });
     websiteByTenant.set(site.tenantStableId, system);
+  }
+
+  // A site the business already runs elsewhere, connected by script. Its id is
+  // connected_site:<id> and survives a later rebuild (a new revision, same System).
+  for (const site of snapshot.connectedSites) {
+    const verified = site.verifiedAt !== null;
+    const lifecycle: SystemLifecycle = site.status === "revoked" ? "paused" : verified ? "live" : "draft";
+    const system = existingSystem(businessId, { kind: "connected_site", ref: site.id }, {
+      name: site.siteHost.replace(/^www\./, ""), kind: "website", lifecycle, createdAt: site.createdAt, updatedAt: site.updatedAt,
+    });
+    systems.push({
+      system, provenance: "existing",
+      basis: site.status === "revoked" ? "Disconnected from Strelva; the site itself is unchanged." : verified ? `Connected; ${site.siteHost} is proven to be this business's.` : `Waiting for proof that ${site.siteHost} is this business's.`,
+      references: { savedWorkId: null, tenantStableId: null, tenantId: null, connectedSiteId: site.id },
+      connectedSite: { siteUrl: site.siteUrl, siteHost: site.siteHost, verified, lastEventAt: site.lastEventAt },
+    });
+    connections.push({ provenance: "existing", connection: existingConnection(system, "read",
+      { type: "business_resource", resource: "business_record:facts" }, verified && site.status === "active" ? "connected" : "disconnected",
+      "Confirmed facts from the business record are filled into the site") });
   }
 
   // Only tenants this business holds now; a stale binding never leaks another
@@ -470,11 +508,13 @@ export function readExistingSystemsSnapshot(actor: WorkspaceActor, businessId: s
 /** Everything a business should see as its Systems: stored ones plus every
  * existing thing not yet stored. Both reads recheck the actor. */
 export async function listBusinessSystems(
-  actor: WorkspaceActor, businessId: string, deps: { store: SystemStore; db?: SystemsDb },
+  actor: WorkspaceActor, businessId: string,
+  deps: { store: SystemStore; db?: SystemsDb; connectedSites?: () => Promise<ExistingConnectedSite[]> },
 ): Promise<BusinessSystems> {
-  const [graph, snapshot] = await Promise.all([
+  const [graph, snapshot, connectedSites] = await Promise.all([
     deps.store.readGraph(actor, businessId),
     readExistingSystemsSnapshot(actor, businessId, deps.db),
+    deps.connectedSites ? deps.connectedSites().catch(() => []) : Promise.resolve([]),
   ]);
-  return mergeBusinessSystems(graph, systemsFromExisting(snapshot));
+  return mergeBusinessSystems(graph, systemsFromExisting({ ...snapshot, connectedSites }));
 }

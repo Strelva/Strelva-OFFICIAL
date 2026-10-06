@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { ArrowLeft, ArrowUpRight, MessageSquareText } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { InquiryServerWorkspaceExperience } from "@/experience/inquiries/InquiryServerExperience";
@@ -23,6 +23,8 @@ import {
   type MakeRealOutcome, type SystemPossibility, type SystemView,
 } from "./model";
 import { workspaceSiteHref } from "@/lib/workspace-site-places";
+import { SystemPanel as Panel } from "./SystemPanel";
+import { WebsiteSystemPanels, useWebsiteSystemDetail, type WebsiteDetailState } from "./WebsiteSystemPanels";
 import styles from "./systems.module.css";
 
 export interface SystemPageProps {
@@ -46,6 +48,8 @@ export interface SystemPageProps {
   localPreview?: boolean;
   workspaceStopped?: boolean;
   calendarRecoveryAllowed?: boolean;
+  /** Domains, Waiting on you, Requests and History for a website System. Supplied by tests; otherwise read from the server. */
+  websiteDetail?: WebsiteDetailState;
   inquiryAdapter?: { tenantId: string; adapter?: InquirySurfaceAdapter };
   systemHref: (id: string) => string;
   onHome: () => void;
@@ -58,6 +62,8 @@ export function SystemPage(props: SystemPageProps) {
   const { system, systems, readOnly, readOnlyReason, loading, onHome, onAsk } = props;
   const [compareId, setCompareId] = useState<string | null>(null);
   const [mode, setMode] = useState<"current" | "possibility" | "both">("current");
+  const fetchedDetail = useWebsiteSystemDetail(props.workspaceId, system?.id ?? "", Boolean(system && system.kind === "website" && !props.websiteDetail));
+  const websiteDetail = props.websiteDetail ?? fetchedDetail;
   const back = <button type="button" className={styles.back} onClick={onHome}><ArrowLeft size={16} aria-hidden="true" />Home</button>;
   if (loading && !system) return <div className={styles.page}>{back}<p role="status" className="mt-6 text-sm text-gray-muted">Opening this system…</p></div>;
   if (!system) return <div className={styles.page}>{back}<div className={styles.notFound}><h1 className="font-display">This system isn’t available here.</h1><p>It may belong to another business, or your access may have changed. Nothing about it was changed.</p></div></div>;
@@ -108,6 +114,7 @@ export function SystemPage(props: SystemPageProps) {
       </section>
 
       <aside className={styles.aside} aria-label={`About ${system.name}`}>
+        {system.kind === "website" && websiteDetail ? <WebsiteSystemPanels workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} onAsk={onAsk} readOnly={readOnly} /> : null}
         <ConnectionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} siteHref={system.surface.kind === "website" && system.surface.editing ? (tab) => workspaceSiteHref({ workspaceId: props.workspaceId, systemId: system.id, tab }, props.appBase || "") : undefined} />
         <PartsPanel system={system} />
         <PossibilitiesPanel system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} />
@@ -179,14 +186,6 @@ function PartsPanel({ system }: { system: SystemView }) {
       <small>{part.published} published{part.drafts ? ` · ${part.drafts} draft${part.drafts === 1 ? "" : "s"} waiting` : ""}</small>
     </li>)}</ul>
   </Panel>;
-}
-
-function Panel({ id, title, count, intro, children }: { id: string; title: string; count: number; intro: string; children: ReactNode }) {
-  return <section className={styles.panel} aria-labelledby={id}>
-    <h2 id={id}>{title}{count ? <span>{count}</span> : null}</h2>
-    <p>{intro}</p>
-    {children}
-  </section>;
 }
 
 function SystemLink({ id, label, systemHref, onOpenSystem }: { id?: string; label: string; systemHref: (id: string) => string; onOpenSystem?: (id: string) => void }) {

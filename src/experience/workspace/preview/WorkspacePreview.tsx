@@ -8,6 +8,7 @@ import { createPreviewInquiryAdapter } from "@/experience/inquiries/preview-fixt
 import { createPreviewRequest, PREVIEW_SCENARIOS, type PreviewScenario } from "./fixture";
 import { MOONEY_INQUIRY_PROFILE, MOONEY_TENANT } from "./systems-fixture";
 import { withNeedsYouPreview } from "./needs-you-fixture";
+import { previewWebsiteDetail, previewWebsiteDetailMode, type PreviewWebsiteDetailMode } from "./website-detail-fixture";
 import type { PreviewSystems } from "./systems-projection";
 import { agencyPreviewState, withAgencyPreview } from "./agency-fixture";
 import { withAskPreview, type AskPreviewMode } from "./ask-fixture";
@@ -21,12 +22,19 @@ const previewJson = (body: unknown, status = 200) => new Response(JSON.stringify
  * on the server. Non-owners get the same 403 the route returns. With
  * Systems off, every snapshot says so and Make real answers the route's 503.
  */
-function withSystems(base: typeof fetch, systems: PreviewSystems | undefined): typeof fetch {
+function withSystems(base: typeof fetch, systems: PreviewSystems | undefined, websiteDetail: PreviewWebsiteDetailMode = "full"): typeof fetch {
   if (!systems) return base;
   return async (input, init) => {
     const raw = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const url = new URL(raw, "http://preview.invalid");
     const method = init?.method || "GET";
+    if (url.pathname === "/api/workspace/systems/website" && method === "GET") {
+      if (!systems.released) return previewJson({ error: "Systems are not enabled for this business." }, 503);
+      if (websiteDetail === "loading") return new Promise<Response>(() => undefined);
+      if (websiteDetail === "error") return previewJson({ error: "This website's details could not be loaded." }, 503);
+      if (websiteDetail === "permission") return previewJson({ error: "This business is unavailable to your account." }, 403);
+      return previewJson({ detail: previewWebsiteDetail(url.searchParams.get("systemId") ?? "", websiteDetail) });
+    }
     if (url.pathname === "/api/workspace/systems/make-real" && method === "POST") {
       if (!systems.released) return previewJson({ error: "Make real is not enabled. Nothing changed." }, 503);
       const body = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as { workspaceId?: string; possibilityId?: string };
@@ -69,7 +77,8 @@ export function WorkspacePreview({ scenario, systems, needsYou = false, ask = nu
     return () => observer.disconnect();
   }, []);
   const [agencyState] = useState(() => agencyPreviewState(searchParams.get("agency")));
-  const request = useMemo(() => withAskPreview(withNeedsYouPreview(withAgencyPreview(withSystems(createPreviewRequest(scenario, { installedStaffRequest, seededRequests }), systems), scenario, agencyState), scenario, needsYou), ask), [agencyState, installedStaffRequest, seededRequests, scenario, systems, needsYou, ask]);
+  const [websiteDetail] = useState(() => previewWebsiteDetailMode(searchParams.get("websiteDetail")));
+  const request = useMemo(() => withAskPreview(withNeedsYouPreview(withAgencyPreview(withSystems(createPreviewRequest(scenario, { installedStaffRequest, seededRequests }), systems, websiteDetail), scenario, agencyState), scenario, needsYou), ask), [agencyState, installedStaffRequest, seededRequests, scenario, systems, needsYou, ask, websiteDetail]);
   useEffect(() => {
     if (!installedStaffRequest) return;
     const url = new URL(window.location.href);

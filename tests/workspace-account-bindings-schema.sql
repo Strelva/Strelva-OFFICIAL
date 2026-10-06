@@ -43,7 +43,8 @@ select pg_temp.ab_assert(not has_function_privilege('anon', 'public.read_google_
   'only service_role executes the binding functions');
 
 -- The two new origins exist; the earlier ones keep their ids.
-select pg_temp.ab_assert(public.system_origin_kinds() = array['saved_work','tenant','inquiry_workspace','google_location','tenant_newsletter'],
+-- Later migrations may append origins (20261008151000 adds connected_site).
+select pg_temp.ab_assert((public.system_origin_kinds())[1:5] = array['saved_work','tenant','inquiry_workspace','google_location','tenant_newsletter'],
   'origin kinds extended in order');
 select pg_temp.ab_assert(public.system_origin_id('5e000000-0000-4000-8000-000000000010', 'tenant', '5e000000-0000-4000-8000-0000000000b2')
   = '60111262-7fba-474e-a004-3f5d2eee18f0', 'tenant origin id unchanged');
