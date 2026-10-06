@@ -190,7 +190,8 @@ export const TABLE_POLICIES: TablePolicy[] = [
   {
     schema: "public", table: "tenant_leads", scope: "tenant_stable_id", optional: true,
     columns: {
-      ...keep("id", "tenant_stable_id", "tenant_slug_at_capture", "workspace_id", "lead_id", "source", "capability_id", "capability_version", "captured_at", "recorded_at", "recorded_via"),
+      ...keep("id", "tenant_stable_id", "tenant_slug_at_capture", "workspace_id", "lead_id", "source", "capability_id", "capability_version", "captured_at", "recorded_at", "recorded_via",
+        "tenant_deleted_at", "site_name_at_delete", "retain_until"),
       submission_hash: "lead_hash", name: "name", email: "email", message: "text", fields: "lead_fields",
     },
   },

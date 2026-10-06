@@ -143,6 +143,65 @@ describe("agency home projection", () => {
     expect(agencyAttentionQueue(result.clients).map((item) => item.work.id)).toEqual([selectedWork.id]);
   });
 
+  it("lists businesses the agency operates only where the actor is already a member", () => {
+    const CONVERTED = "55555555-5555-4555-8555-555555555555";
+    const NOT_MINE = "66666666-6666-4666-8666-666666666666";
+    const value = agencyClientTargets(snapshot({
+      workspaces: [
+        ...snapshot().workspaces,
+        { id: CONVERTED, kind: "customer", name: "Great Lakes Dried Fruit", role: "admin", access: "member" },
+      ],
+      providedClients: [
+        { customerWorkspaceId: CONVERTED, name: "Great Lakes Dried Fruit", startedAt: "2026-10-06T12:00:00.000Z" },
+        // A mark the snapshot gives no access to is never a client target.
+        { customerWorkspaceId: NOT_MINE, name: "Someone else", startedAt: "2026-10-06T12:00:00.000Z" },
+        // A mark on a delegated-read business does not widen it to the whole business.
+        { customerWorkspaceId: CLIENT, name: "Harbor Dental", startedAt: "2026-10-06T12:00:00.000Z" },
+      ],
+    }));
+    expect(value.targets).toEqual([
+      { id: CLIENT, name: "Harbor Dental", workIds: ["work-a"] },
+      { id: CONVERTED, name: "Great Lakes Dried Fruit", workIds: [], operated: true },
+    ]);
+  });
+
+  it("loads an operated client's whole business, not a delegated slice", async () => {
+    const CONVERTED = "55555555-5555-4555-8555-555555555555";
+    const agency = snapshot({
+      workspaces: [
+        { id: AGENCY, kind: "agency", name: "Strelva", access: "member", role: "owner" },
+        { id: CONVERTED, kind: "customer", name: "Great Lakes Dried Fruit", role: "admin", access: "member" },
+      ],
+      delegations: [],
+      providedClients: [{ customerWorkspaceId: CONVERTED, name: "Great Lakes Dried Fruit", startedAt: "2026-10-06T12:00:00.000Z" }],
+    });
+    const request = vi.fn<typeof fetch>(async () => Response.json({
+      ...agency, workspaceId: CONVERTED,
+      work: [work("site", CONVERTED, { operation: { status: "needs_attention" } }), work("form", CONVERTED)],
+    }));
+    const result = await loadAgencyClientSnapshots(request, agency);
+    expect(request).toHaveBeenCalledWith(`/api/workspace?workspaceId=${CONVERTED}`, expect.anything());
+    expect(result.clients[0]?.work.map((item) => item.id)).toEqual(["site", "form"]);
+    expect(result.totalCount).toBe(1);
+  });
+
+  it("renders an operated client on the agency home", () => {
+    const CONVERTED = "55555555-5555-4555-8555-555555555555";
+    const html = renderToStaticMarkup(createElement(AgencyHome, {
+      snapshot: snapshot({
+        workspaces: [
+          { id: AGENCY, kind: "agency", name: "Strelva", access: "member", role: "owner" },
+          { id: CONVERTED, kind: "customer", name: "Great Lakes Dried Fruit", role: "admin", access: "member" },
+        ],
+        delegations: [],
+        providedClients: [{ customerWorkspaceId: CONVERTED, name: "Great Lakes Dried Fruit", startedAt: "2026-10-06T12:00:00.000Z" }],
+      }),
+      busy: false, onWorkspace: () => undefined, onOpenClientWork: () => undefined, onOpenWork: () => undefined, onStart: () => undefined,
+    }));
+    expect(html).toContain("Strelva");
+    expect(html).not.toContain("No clients");
+  });
+
   it("orders only recorded client attention and keeps quiet work out of the queue", () => {
     const queue = agencyAttentionQueue([
       { workspace: { id: CLIENT, kind: "customer", name: "Harbor Dental", access: "delegated_read" }, work: [

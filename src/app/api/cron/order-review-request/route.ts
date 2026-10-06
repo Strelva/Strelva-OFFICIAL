@@ -19,6 +19,7 @@
  * Auth: handled by proxy (CRON_SECRET check). Schedule: see vercel.json.
  */
 
+import { ownerNoticeEmail } from "@/lib/owner-recipient";
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/heartbeat";
 import { mapPool } from "@/lib/concurrency";
@@ -70,7 +71,7 @@ export async function GET(request: Request) {
   let ordersScanned = 0;
 
   await mapPool(tenants, 6, async (tenant) => {
-    const email = tenant.ownerEmail?.trim();
+    const email = await ownerNoticeEmail(tenant);
     if (!email) {
       skippedNoEmail++;
       return;

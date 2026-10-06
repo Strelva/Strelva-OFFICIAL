@@ -162,7 +162,7 @@ export async function runTenantConversion(options: ConversionOptions, deps: Conv
   const account = sources.account;
   log(`  account: ${account ? `${account.name} (${account.tenantIds.length} site${account.tenantIds.length === 1 ? "" : "s"})${account.multiSite ? " MULTI-SITE: all sites share one business workspace" : ""}` : "none"}`);
   if (siblingLinks.length) log(`  sibling sites already converted: ${siblingLinks.join(", ")}`);
-  log(`  would ${link?.link ? "do nothing" : targetWorkspaceId ? `join business ${targetWorkspaceId} (fill only missing facts)` : `create customer business "${plan.payload.workspaceName}" with the operator as admin (no client membership, no invite, no email)`}`);
+  log(`  would ${link?.link ? "do nothing" : targetWorkspaceId ? `join business ${targetWorkspaceId} (fill only missing facts)` : `create customer business "${plan.payload.workspaceName}" with the operator as admin (no client membership, no invite, no email; marked as operated by Strelva once its agency workspace is designated, which grants nothing)`}`);
   log(`  facts (${plan.counts.facts}, source tenant_import, unverified):`);
   for (const [key, entry] of Object.entries(plan.payload.patch.facts ?? {})) log(`    ${key}: ${describe(entry?.value)}`);
   log(`  services: ${plan.counts.services}${plan.payload.patch.services?.length ? ` (${plan.payload.patch.services.map((item) => item.op === "upsert" ? item.name : item.id).join(", ")})` : ""}`);

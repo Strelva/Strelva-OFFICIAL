@@ -461,6 +461,16 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007101000_pro
 psql "${psql_args[@]}" --file="$repo_root/tests/provider-website-launch-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007100000_atomic_tenant_teardown.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/atomic-tenant-teardown-schema.sql"
+# Who owns and operates a converted business: provider mark, operator owner
+# invitation (both memberships in one transaction), the tenant owner-recipient
+# rule and client lead copies kept after a tenant is deprovisioned.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007110000_business_ownership.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-ownership-schema.sql"
+# The earlier contracts still hold with the ownership migration applied. (The
+# invitation contract commits its fixture, so the upgrade gate reruns it.)
+psql "${psql_args[@]}" --set=tenant_import="$(cat "$repo_root/tests/fixtures/business-record-tenant-import.json")" \
+  --file="$repo_root/tests/business-record-conversion-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \

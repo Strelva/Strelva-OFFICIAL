@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({
   user: vi.fn(), rate: vi.fn(), score: vi.fn(), personal: vi.fn(), list: vi.fn(), work: vi.fn(), getWork: vi.fn(),
   save: vi.fn(), createAgency: vi.fn(), handoff: vi.fn(), inspect: vi.fn(), accept: vi.fn(),
   revoke: vi.fn(), cancel: vi.fn(), handoffs: vi.fn(), agencyDelegations: vi.fn(), workDelegations: vi.fn(),
-  pending: vi.fn(), operation: vi.fn(), saveAudit: vi.fn(), preflight: vi.fn(), runPrivate: vi.fn(), savePublicResult: vi.fn(), managedWork: vi.fn(), exitRead: vi.fn(), exitCompleted: vi.fn(), systems: vi.fn(),
+  pending: vi.fn(), operation: vi.fn(), saveAudit: vi.fn(), preflight: vi.fn(), runPrivate: vi.fn(), savePublicResult: vi.fn(), managedWork: vi.fn(), exitRead: vi.fn(), exitCompleted: vi.fn(), systems: vi.fn(), provided: vi.fn(),
 }));
 vi.mock("@/lib/db/server-client", () => ({ getSessionUser: mocks.user }));
 vi.mock("@/lib/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate }));
@@ -12,6 +12,7 @@ vi.mock("@/products/ai-visibility/server", () => ({ runPrivateAiVisibilityAssess
 vi.mock("@/products/website-audit/server", () => ({ savePublicWebsiteAudit: mocks.saveAudit }));
 vi.mock("@/products/managed-presence/server", () => ({ listManagedPresenceWork: mocks.managedWork }));
 vi.mock("@/experience/systems/server", () => ({ readWorkspaceSystems: mocks.systems }));
+vi.mock("@/platform/workspaces/business-ownership", () => ({ listProvidedClients: mocks.provided }));
 vi.mock("@/platform/workspace-exit", () => ({ readWorkspaceExit: mocks.exitRead, readWorkspaceExitCompleted: mocks.exitCompleted }));
 vi.mock("@/platform/workspaces", async () => {
   const types = await import("@/platform/workspaces/types");
@@ -425,6 +426,28 @@ describe("release-one private workspace routes", () => {
       agencyWorkspaceId: workspaceId,
       status: "active",
     })]);
+  });
+});
+
+describe("agency provided clients", () => {
+  it("lists the businesses an agency operates for its members, and only for agencies", async () => {
+    mocks.list.mockResolvedValue([{ ...workspace, kind: "agency" }]);
+    mocks.provided.mockResolvedValue([{ customerWorkspaceId: otherId, name: "Great Lakes Dried Fruit", role: "admin", source: "tenant_conversion", startedAt: "2026-10-06T12:00:00.000Z" }]);
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+    expect(mocks.provided).toHaveBeenCalledWith({ userId: "actor", verifiedEmail: "owner@example.com" }, workspaceId);
+    expect((await response.json()).providedClients).toEqual([{ customerWorkspaceId: otherId, name: "Great Lakes Dried Fruit", startedAt: "2026-10-06T12:00:00.000Z" }]);
+    mocks.provided.mockClear();
+    mocks.list.mockResolvedValue([workspace]);
+    const personal = await GET(new Request("https://strelva.com/api/workspace"));
+    expect((await personal.json()).providedClients).toBeUndefined();
+    expect(mocks.provided).not.toHaveBeenCalled();
+  });
+  it("a failed provider read leaves the agency snapshot working without the list", async () => {
+    mocks.list.mockResolvedValue([{ ...workspace, kind: "agency" }]);
+    mocks.provided.mockRejectedValue(new Error("function list_provided_clients does not exist"));
+    const response = await GET(new Request("https://strelva.com/api/workspace"));
+    expect(response.status).toBe(200);
+    expect((await response.json()).providedClients).toBeUndefined();
   });
 });
 

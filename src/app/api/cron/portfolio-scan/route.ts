@@ -1,3 +1,4 @@
+import { ownerNoticeEmail } from "@/lib/owner-recipient";
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/heartbeat";
 import { scanAllTenants } from "@/lib/scan";
@@ -78,8 +79,9 @@ export async function GET(request: Request) {
     if (prior.overallScore - s.score < HEALTH_REGRESSION_MIN_DROP) continue;
 
     const tenant = tenantById.get(s.tenant);
-    const email = tenant?.ownerEmail?.trim();
-    if (!tenant || !email || !redis) continue;
+    if (!tenant || !redis) continue;
+    const email = await ownerNoticeEmail(tenant);
+    if (!email) continue;
 
     const key = `reb:health-alert-sent:${s.tenant}:${prior.grade}>${s.grade}`;
     const fresh = await redis.set(key, "1", { nx: true, ex: HEALTH_ALERT_TTL_SECONDS }).catch(() => null);

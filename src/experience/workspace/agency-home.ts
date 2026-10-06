@@ -9,6 +9,9 @@ export interface AgencyClientTarget {
   id: string;
   name: string;
   workIds: string[];
+  /** The agency operates this business and the actor is a member of it, so
+   * the whole business is in view (not only delegated work). */
+  operated?: true;
 }
 
 export interface AgencyClientSnapshot {
@@ -37,9 +40,11 @@ export interface AgencyQueueItem {
 }
 
 /**
- * A relationship label is not access. Only active work delegations naming the
- * selected agency can create client targets, and the customer must still be a
- * delegated-read workspace in the server-authored snapshot.
+ * A relationship label is not access. Client targets come from active work
+ * delegations naming the selected agency, and from businesses the agency
+ * operates (providedClients) where the actor is already a direct member in
+ * the server-authored snapshot. Strelva reaches its converted clients the
+ * second way: its operator is their admin member.
  */
 export function agencyClientTargets(
   snapshot: WorkspaceSnapshot,
@@ -58,12 +63,16 @@ export function agencyClientTargets(
     if (!workIds.includes(delegation.workId)) workIds.push(delegation.workId);
     delegatedWork.set(delegation.customerWorkspaceId, workIds);
   }
-  const all = snapshot.workspaces.flatMap((workspace): AgencyClientTarget[] => (
-    workspace.kind === "customer"
-      && delegatedWork.has(workspace.id)
+  const operated = new Set((snapshot.providedClients ?? []).map((client) => client.customerWorkspaceId));
+  const all = snapshot.workspaces.flatMap((workspace): AgencyClientTarget[] => {
+    if (workspace.kind !== "customer") return [];
+    if (operated.has(workspace.id) && workspace.access === "member") {
+      return [{ id: workspace.id, name: workspace.name, workIds: [], operated: true }];
+    }
+    return delegatedWork.has(workspace.id)
       ? [{ id: workspace.id, name: workspace.name, workIds: delegatedWork.get(workspace.id)! }]
-      : []
-  ));
+      : [];
+  });
   const boundedLimit = Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : MAX_AGENCY_CLIENT_LOADS;
   const start = Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0;
   const targets = all.slice(start, start + boundedLimit);
@@ -108,7 +117,7 @@ export async function loadAgencyClientSnapshots(
       if (!response.ok) throw new Error(responseError(value));
       if (!isAuthorizedClientSnapshot(value, target)) throw new Error("Client work returned outside its authorized workspace.");
       const delegatedWorkIds = new Set(target.workIds);
-      const normalized = normalizeWorkspaceSnapshot({ ...value, work: value.work.filter((work) => delegatedWorkIds.has(work.id)) });
+      const normalized = normalizeWorkspaceSnapshot(target.operated ? value : { ...value, work: value.work.filter((work) => delegatedWorkIds.has(work.id)) });
       const workspace = normalized.workspaces.find((item) => item.id === target.id)!;
       return { ok: true as const, client: { workspace, work: normalized.work } };
     } catch (error) {

@@ -160,8 +160,13 @@ M one to three days, L three to seven, XL more.
       same item, proven locally. Nothing outside tests calls undo yet · S
 - [ ] One owner-recipient rule: the record's owner contact, falling back to
       `tenants.owner_email`. Every owner notice (leads, bookings, reports)
-      uses it. *Partial: `owner_recipient` fact and
-      `resolve_business_owner_recipient` exist; no notice uses them yet · M*
+      uses it. *Built and proven locally Oct 6 (branch
+      `build/business-ownership`, migration `20261007110000`, not applied):
+      `src/lib/owner-recipient.ts` over `resolve_tenant_owner_recipient` is
+      used by lead, inquiry, weekly and monthly report (both report paths,
+      hosted included), review alert, review and order nudge and health-drop
+      notices. No owner booking notice exists yet to wire; the bookings build
+      must use it. Billing and lifecycle mail still read `owner_email` · S left*
 - [ ] Every new table follows the `website_documents` pattern (RLS on, grants
       revoked, service-role functions) with cross-workspace denial tests.
       *Proven locally for the business record tables · keep for each new
@@ -313,7 +318,12 @@ Neither is used by any journey today.
       *Not started · S*
 - [ ] Owner memberships exist for every converted client, in both the
       workspace and the tenant while `/dashboard` pages remain. Workspace
-      invites don't email today; tenant invites do. *Not started · M*
+      invites don't email today; tenant invites do. *Path built and proven
+      locally Oct 6 (`build/business-ownership`): operator-issued owner
+      invitation, emailed through `send.ts`; accepting writes both
+      memberships in one transaction. No converted client has an owner yet:
+      each invitation is Jacob's yes (`scripts/business-ownership.ts`) · S
+      per client*
 - [ ] Per-workspace flags layered over the env flags, so each client's
       landing, inquiries and rebuild turn on and roll back on their own. The
       same flags split Preview per tester. *Not started · M*

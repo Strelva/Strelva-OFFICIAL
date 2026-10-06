@@ -13,6 +13,7 @@
  * and never failing the capture, so leads outlive the Redis window. Reads stay
  * on Redis until cutover.
  */
+import { ownerNoticeEmail } from "./owner-recipient";
 import { getRedis } from "./redis";
 import { getTenantConfig } from "./tenants";
 import { getTenantDashboardUrl } from "./tenant-urls";
@@ -215,10 +216,13 @@ export async function captureLead(
 async function notifyOwnerOfLead(tenant: string, lead: LeadRecord): Promise<void> {
   try {
     const config = await getTenantConfig(tenant);
-    if (!config?.ownerEmail) return;
+    if (!config) return;
+    // One owner-recipient rule for every owner notice (src/lib/owner-recipient.ts).
+    const email = await ownerNoticeEmail(config);
+    if (!email) return;
     await sendNewLeadEmail({
       tenantId: tenant,
-      email: config.ownerEmail,
+      email,
       siteName: config.siteName,
       lead: { name: lead.name, email: lead.email, message: lead.message },
       dashboardUrl: getTenantDashboardUrl(config, "/dashboard"),

@@ -122,6 +122,7 @@ function failure(error: { message?: string; code?: string } | null, fallback: st
   const detail = `${error?.code ?? ""} ${error?.message ?? ""}`;
   if (detail.includes("workspace_invitation_recipient_mismatch")) throw new WorkspaceInvitationRecipientError();
   if (detail.includes("workspace_invitation_identity_required") || detail.includes("workspace_invitation_owner_required") || detail.includes("workspace_invitation_sponsor_invalid") || detail.includes("workspace_invitation_workspace_invalid") || detail.includes("workspace_invitation_not_found")) throw new WorkspaceAccessError();
+  if (detail.includes("operator_owner_invitation_owner_exists")) throw new WorkspaceConflictError("This business already has an owner.");
   if (detail.includes("workspace_invitation_pending")) throw new WorkspaceConflictError("A pending invitation already exists for this email. Revoke it before creating another.");
   if (detail.includes("workspace_invitation_limit_reached")) throw new WorkspaceConflictError("This workspace has reached its pending invitation limit.");
   if (detail.includes("workspace_invitation_access_removed")) throw new WorkspaceConflictError("This invitation was already accepted, but that workspace access was later removed.");
