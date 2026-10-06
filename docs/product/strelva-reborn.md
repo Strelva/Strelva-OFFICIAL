@@ -20,8 +20,10 @@ Audited 2026-10-02 against code, line by line. Production facts come from the
 [Sept 30 release record](../operations/strelvav2-horizontal-acceptance.md#september-30-workspace-production-release),
 not a fresh read.
 
-**3 of 48 lines are done, 5 are in progress, 9 are partial and 31 are not
-started.** Summing the sizes below (S half a day, M two, L five, XL ten)
+**5 of 48 lines are done (section 0's two proven locally only), 5 are in
+progress, 9 are partial and 29 are not started.** Section 0 was finished
+locally on Oct 5 and ships as 0.2.1; nothing in it is deployed. Summing the
+sizes below (S half a day, M two, L five, XL ten)
 gives about 108 agent-days if done one at a time. Sections 0, 1 and 3 are the
 critical path at about 31 of them; the rest can run in parallel streams.
 These are estimates, not measurements. Nothing below is proven in
@@ -32,8 +34,10 @@ production.
   booking blob and inside each website document.
 - **No client in a workspace.** Production: 0 workspaces, 0 tenant
   memberships, 1 sign-in in 30 days. No conversion script exists.
-- **Leads are being lost today.** Leads live only in Redis: `lead:{tenant}:{id}`
-  expires after 90 days and `leads:{tenant}` keeps 500. Older leads are gone.
+- **Leads are being lost today.** In production, leads live only in Redis:
+  `lead:{tenant}:{id}` expires after 90 days and `leads:{tenant}` keeps 500.
+  Older leads are gone. The fix (section 0) is built locally and waits on a
+  migration, a backfill and a deploy.
 - **Data lives tenant-side.** Leads, booking config, orders, rewards, OAuth
   connections and analytics config are Redis. Bookings and content each have
   two stores that don't talk.
@@ -42,9 +46,11 @@ production.
 - **A link already exists.** `offering_website_bindings` maps a business
   workspace to a `tenant_stable_id`. Owners need a tenant membership to create
   one, and production has none.
-- **Client contract checks cover 2 of 9 repos.** `release-manifest.json` lists
-  gldf and rohlax. McClear's Cottage and Orange Crate Brewing post to
-  `/api/v1/leads`; four repos post to `/api/v1/track`. None are checked.
+- **Client contract checks covered 2 of 9 repos.** Fixed locally Oct 5: the
+  manifest lists all 9. Only McClear's Cottage (`mclears`) posts to
+  `/api/v1/leads` (Orange Crate only mentions it in a comment); five repos post
+  to `/api/v1/track`; Cocard calls `/api/v1/spam-pit`; Vermont Unlimited calls
+  nothing.
 - **The layers are tangled.** 98 workspace files import `src/lib`; `lib`
   imports back into `products` from `agent-shared.ts` and `event-actions.ts`.
 
@@ -58,12 +64,30 @@ M one to three days, L three to seven, XL more.
 
 ### 0. Stop losing data (first)
 
-- [ ] Every `/api/v1/leads/[tenant]` submission is also written to Postgres,
+- [x] Every `/api/v1/leads/[tenant]` submission is also written to Postgres,
       keyed by tenant now and by workspace after conversion. Redis keeps
-      serving reads until cutover. *Not started · M*
-- [ ] `release-manifest.json` lists all 9 client repos with the endpoints each
+      serving reads until cutover. *Done locally Oct 5, not applied or
+      deployed:* `20261005090000_tenant_leads.sql` (`tenant_leads` keyed by
+      `stable_id`, nullable `workspace_id`, RLS on, two service-role RPCs),
+      `src/lib/lead-mirror.ts` (1.5 s bound, never fails the submission,
+      failures pending in Redis, paged, retried hourly by
+      `lead-mirror-reconcile`), `scripts/backfill-tenant-leads.ts` (dry run by
+      default). Operators see client leads at `/admin/client-leads` and on each
+      client page. The owner lead email now carries the tenant, so the
+      per-client override can turn it on. Proof: `tests/tenant-leads-schema.sql`
+      in both SQL checks (including applying it before the Oct 1
+      migrations), `v1-leads-dual-write`, `lead-mirror`,
+      `client-leads-operator`, `tenant-lead-backfill`,
+      `new-lead-email-tenant` tests.
+- [x] `release-manifest.json` lists all 9 client repos with the endpoints each
       calls. `check:custom-repos` exercises leads and track for McClear's,
-      Leslie, RHM and Smokin' Buddha. *Not started · M*
+      Leslie, RHM and Smokin' Buddha. *Done locally Oct 5:* per-repo `profile`
+      and `v1Endpoints`; call sites read at the pinned commit; the real route
+      handlers run against each repo's body shape
+      (`custom-repo-v1-contracts.test.ts`). With `CUSTOM_REPO_VERIFY_PINS=1`
+      the sibling folders fail because they are ahead of their pins or have the
+      owners' uncommitted edits; clean clones at each pin pass. Smokin' Buddha's
+      tenant slug is unconfirmed and it isn't in the Sept 30 active list.
 
 ### 1. One business record
 
@@ -241,7 +265,8 @@ Proof: `pnpm reborn:progress --strict` passes.
 
 ## Order
 
-1. **Stop losing data:** lead dual-write and full client-repo checks.
+1. **Stop losing data:** lead dual-write and full client-repo checks. Built
+   locally Oct 5; production needs the migration, backfill and deploy below.
 2. **Foundation:** business record, link table, owner-recipient rule.
 3. **Conversion:** script, scrubbed local copy, dry runs, then gldf on
    Jacob's yes.
@@ -280,8 +305,11 @@ stays Stable until the `1.0.0` cut merges `reborn` into it.
 
 Each of these gets an exact action prepared and verified before asking.
 
-- Each production migration: the three Oct 1 website migrations, the
-  business record, tenant-to-workspace links, inquiry and booking stores.
+- Each production migration: the client lead store (Oct 5, can go first and
+  alone), the three Oct 1 website migrations, the business record,
+  tenant-to-workspace links, inquiry and booking stores.
+- The client lead backfill against production
+  (`scripts/backfill-tenant-leads.ts --apply --i-have-jacobs-yes`).
 - Making a scrubbed local copy of production data.
 - Each production conversion run, starting with gldf.
 - Owner invites. Tenant invites send client email.
