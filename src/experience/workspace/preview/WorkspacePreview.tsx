@@ -78,7 +78,6 @@ export function WorkspacePreview({ scenario, systems }: { scenario: PreviewScena
   return <div ref={previewRef} data-dashboard className={styles.preview}>
     <aside ref={controlsRef} className={styles.controls} aria-label="Local preview controls">
       <div><strong>Local interface preview</strong><span>Fictional data · changes reset on reload · no live actions</span></div>
-      <Link href="/preview/strelva/start">All interfaces</Link>
       <label>Example<select value={scenario} onChange={event => { router.push(previewHref(event.target.value, releaseParam)); }}>{PREVIEW_SCENARIOS.map(item => <option key={item} value={item}>{item === "read-only" ? "Shared, read-only" : item.replace(/^./, letter => letter.toUpperCase())}</option>)}</select></label>
       {systems ? <Link href={previewHref(scenario, systems.released ? "off" : "on")} aria-label={`Systems are ${systems.released ? "on" : "off"}. Turn them ${systems.released ? "off" : "on"}.`}>Systems: {systems.released ? "on" : "off"}</Link> : null}
       {(scenario === "paid" || scenario === "enterprise") && <p>Relationship example only. Pricing and permissions are not simulated.</p>}

@@ -145,7 +145,7 @@ this branch.
 | applications, custom-applications | `src/experience/{applications,custom-applications}/` ("Build candidate", "Release candidate", "Live release") | System view + release | "Release candidate" becomes a Possibility, or stays release language for builders *(decision for E/G)*. | Low. | E |
 | scheduling | `src/experience/scheduling/` ("Calendar connections") | Connections panel (external) | Show as a Connection on the booking System. | Low. | E |
 | operations | `src/experience/operations/` ("Keep something running", "Restore an earlier live version", "Allow this exact source version for seven days") | Responsibility (missing noun), history, Connection grants | "Restore an earlier live version" is release language; keep it. | Low. | E, G |
-| delivery | `src/experience/delivery/` (preview fixtures; `BusinessHome` is imported by `WorkspaceLayout`) | retire the fixture shell; keep `BusinessHome` | None for Systems beyond Home. | None. | E |
+| delivery | `src/experience/delivery/` (preview fixtures only; `WorkspaceLayout` imports the workspace's own `BusinessHome`, not this one) | deleted October 6, 2026 with `/preview/strelva/{agency,client,start}` | None. | None. | E |
 | customers | `src/experience/customers/` (Home Finder) | out of scope | None. | None. | — |
 | product, conversation | `ProductShell`, `stream.ts` | public assessment shell; chat plumbing | None. | None. | — |
 | `/workspace/*` routes | `src/app/workspace/` (account, assignments, business/new, contribute, delivery, exit, export, invitations) | supporting routes | Add a System route (for example `/workspace?view=system&system=<id>`) *(lane E's call)*. | Low. | E |
