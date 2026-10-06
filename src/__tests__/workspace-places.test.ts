@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { pinnedApps, pinnedWebsites, placeForSection, sectionFromView, sectionTitle, workspaceSectionHref } from "@/experience/app-frame/workspace-places";
+import { isRetiredView, pinnedApps, pinnedWebsites, placeForSection, sectionFromView, sectionTitle, workspaceSectionHref } from "@/experience/app-frame/workspace-places";
 
 describe("workspace places", () => {
   it("puts every view in a main place, the app list or the business menu", () => {
-    for (const view of ["home", "customers", "requests", "ongoing"] as const) expect(placeForSection(view)).toBe(view);
+    for (const view of ["home", "requests", "ongoing"] as const) expect(placeForSection(view)).toBe(view);
     for (const view of ["apps", "work", "products"] as const) expect(placeForSection(view)).toBe("apps");
     for (const view of ["settings", "access", "help", "account"] as const) expect(placeForSection(view)).toBe(view);
     expect(placeForSection(undefined)).toBeUndefined();
@@ -17,7 +17,10 @@ describe("workspace places", () => {
     expect(sectionFromView("operations")).toBe("ongoing");
     expect(sectionFromView("products")).toBe("products");
     for (const view of ["tracker", "inquiries", "document", "plan"]) expect(sectionFromView(view)).toBe("work");
-    expect(sectionFromView("customers")).toBe("customers");
+    // The Customers page is retired (October 6). Its old address opens Home.
+    expect(sectionFromView("customers")).toBe("home");
+    expect(isRetiredView("customers")).toBe(true);
+    for (const view of [null, undefined, "", "home", "requests", "apps"]) expect(isRetiredView(view)).toBe(false);
     expect(sectionFromView("apps")).toBe("apps");
   });
 
@@ -41,9 +44,9 @@ describe("workspace places", () => {
 
   it("builds links that round-trip through the view parser", () => {
     expect(workspaceSectionHref("home")).toBe("/workspace");
-    expect(workspaceSectionHref("customers", "", "w1")).toBe("/workspace?view=customers&workspaceId=w1");
+    expect(workspaceSectionHref("requests", "", "w1")).toBe("/workspace?view=requests&workspaceId=w1");
     expect(workspaceSectionHref("account", "https://app.example", "w1")).toBe("https://app.example/workspace/account");
-    for (const section of ["customers", "requests", "apps", "work", "ongoing", "products", "settings", "access", "help"] as const) {
+    for (const section of ["requests", "apps", "work", "ongoing", "products", "settings", "access", "help"] as const) {
       const view = new URL(workspaceSectionHref(section, "https://app.example")).searchParams.get("view");
       expect(sectionFromView(view)).toBe(section);
     }

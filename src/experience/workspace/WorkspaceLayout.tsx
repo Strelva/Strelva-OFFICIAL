@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, ArrowUpRight, FileSearch, Globe2, MessageSquareText, Search, Users } from "lucide-react";
+import { ArrowLeft, ArrowRight, ArrowUpRight, FileSearch, Globe2, MessageSquareText, Search } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { StrelvaShell, pinnedApps, pinnedSystems, pinnedWebsites, sectionFromView, sectionTitle as placeTitle, type StrelvaSection } from "@/experience/app-frame/StrelvaShell";
+import { StrelvaShell, isRetiredView, pinnedApps, pinnedSystems, pinnedWebsites, sectionFromView, sectionTitle as placeTitle, type StrelvaSection } from "@/experience/app-frame/StrelvaShell";
 import { SystemPage } from "@/experience/systems/SystemPage";
 import { readBusinessSystems } from "@/experience/systems/from-workspace";
 import { SYSTEMS_LABEL, systemHref as buildSystemHref, systemsReleased as readSystemsReleased } from "@/experience/systems/model";
@@ -88,6 +88,15 @@ function initialSection(): StrelvaSection {
   return sectionFromView(new URLSearchParams(window.location.search).get("view"));
 }
 
+/** A retired page's old address (`view=customers`) opens Home; drop it from the URL. */
+function forgetRetiredView(): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (!isRetiredView(url.searchParams.get("view"))) return;
+  url.searchParams.delete("view");
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
 function initialStartOpen(): boolean {
   if (typeof window === "undefined") return false;
   return new URLSearchParams(window.location.search).get("view") === "start";
@@ -129,8 +138,9 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
   const scrollRef = useRef<HTMLDivElement>(null);
   const productHeadingRef = useRef<HTMLHeadingElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { forgetRetiredView(); }, []);
   useEffect(() => {
-    const restore = () => { setSection(initialSection()); setSystemId(initialSystemId()); setStartOpen(initialStartOpen()); if (initialStartOpen()) { try { setStartDraft(readRequestDraft(window.sessionStorage, draftKey)); } catch { /* Keep the current draft. */ } setStartSession(value => value + 1); } setProductId(null); setOfferingId(initialOfferingId()); setQuery(""); setHelpRequest(undefined); setWebsiteHandoff(null); };
+    const restore = () => { forgetRetiredView(); setSection(initialSection()); setSystemId(initialSystemId()); setStartOpen(initialStartOpen()); if (initialStartOpen()) { try { setStartDraft(readRequestDraft(window.sessionStorage, draftKey)); } catch { /* Keep the current draft. */ } setStartSession(value => value + 1); } setProductId(null); setOfferingId(initialOfferingId()); setQuery(""); setHelpRequest(undefined); setWebsiteHandoff(null); };
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
   }, [draftKey]);
@@ -538,13 +548,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
           <div className={styles.invitation}><h2>Something missing?</h2><p>Tell us what you want to do, what you use today, and where it falls short.</p><button type="button" className={styles.textAction} onClick={() => navigate("help")}>Tell us what you need<ArrowRight size={16} /></button></div>
         </>}
       </div> : section === "requests" ? <WorkspaceRequests businessName={current?.name || "this business"} deliveryScope={deliveryScope} work={snapshot.work} agencyNames={agencyNames} readOnly={workspaceMutationReadOnly} busy={busy} onOpenWork={openWork} onAsk={() => openStart()} />
-      : section === "customers" ? <div className={styles.page} aria-labelledby="customers-title">
-        <header className={styles.pageHeader}><p className={styles.eyebrow}>{readOnly ? "Shared with you" : current?.name}</p><h1 id="customers-title">Customers</h1><p>Every request, booking and review from a person will collect here, with their whole history in one place.</p></header>
-        {busy ? <p role="status">Loading where your customers reach you…</p> : inquiryBusinesses.length || visibleSites.length ? <section aria-labelledby="customer-sources-title"><h2 id="customer-sources-title" className={styles.eyebrow}>Where customers reach you today</h2><div className={styles.workList}>
-          {inquiryBusinesses.map(business => <button key={business.id} type="button" className={styles.workRow} disabled={workspaceMutationReadOnly} onClick={() => openInquiry(business.id)}><MessageSquareText size={20} strokeWidth={1.5} /><span><strong>{business.title}</strong><small>Requests</small></span><ArrowUpRight size={17} aria-hidden="true" /></button>)}
-          {visibleSites.map(site => <Link key={site.id} href={site.href} className={styles.workRow} prefetch={false}><Globe2 size={20} strokeWidth={1.5} /><span><strong>{site.title}</strong><small>Website requests and reviews</small></span><ArrowUpRight size={17} aria-hidden="true" /></Link>)}
-        </div></section> : <div className={styles.empty}><Users size={24} aria-hidden="true" /><h2>No customers yet.</h2><p>When your website or a request form is connected, the people who reach you appear here.</p><button type="button" className={styles.textAction} onClick={() => navigate("products")}>{systemsReleased ? "Browse ready-made systems" : "Get or build an app"}<ArrowRight size={16} /></button></div>}
-      </div> : section === "work" || section === "apps" ? <div className={styles.page}>
+      : section === "work" || section === "apps" ? <div className={styles.page}>
         <header className={styles.pageHeader}><p className={styles.eyebrow}>{readOnly ? "Shared with you" : current?.name}</p><h1>{appsLabel}</h1><p>{systemsReleased ? "Everything this business runs, and the files it has made." : "Your website, your apps and what they’ve made, ready to return to."}</p></header>
         {appsTabs("yours")}
         <label className={styles.search}><Search size={18} aria-hidden="true" /><span className="sr-only">Search saved work</span><input ref={searchInputRef} id="workspace-search" type="search" placeholder="Find a website or saved work…" value={query} onChange={event => setQuery(event.target.value)} /></label>
