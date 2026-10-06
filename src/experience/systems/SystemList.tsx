@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import type { MouseEvent } from "react";
-import { AppWindow, CalendarDays, FileText, Globe2, Inbox, Sheet, UserPlus, type LucideIcon } from "lucide-react";
+import { AppWindow, CalendarDays, FileText, Globe2, Inbox, Mail, MapPin, Sheet, UserPlus, type LucideIcon } from "lucide-react";
 import { HEALTH_LABEL, LIFECYCLE_LABEL, SYSTEM_KIND_LABEL, type SystemHealth, type SystemKind, type SystemLifecycle, type SystemView } from "./model";
 import styles from "./systems.module.css";
 
 export const SYSTEM_ICONS: Record<SystemKind, LucideIcon> = {
   website: Globe2, inquiries: Inbox, bookings: CalendarDays, document: FileText, app: AppWindow, tracker: Sheet, onboarding: UserPlus,
+  listing: MapPin, newsletter: Mail,
 };
 
 export function LifecyclePill({ lifecycle }: { lifecycle: SystemLifecycle }) {

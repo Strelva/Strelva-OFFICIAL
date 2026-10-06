@@ -22,6 +22,8 @@ import { inquiryFormUnchecked, makeRealInSandbox, projectWorkspaceSystems, type 
 import type { WorkspaceMakeRealResult, WorkspaceSnapshot, WorkspaceSystems } from "../contracts";
 import { createPreviewRequest, type PreviewScenario } from "./fixture";
 import { MOONEY_TENANT } from "./systems-fixture";
+import { addPublishingSystems } from "@/products/publishing/projection";
+import { previewPublishingExtras, previewPublishingSnapshot, type PreviewPublishing } from "./publishing-fixture";
 
 export interface PreviewSystems {
   systems: Record<string, WorkspaceSystems>;
@@ -93,8 +95,8 @@ function fixtureEvidence(scenario: PreviewScenario, input: Pick<SystemsProjectio
   return observations;
 }
 
-export async function previewSystems(scenario: PreviewScenario, options: { installedStaffRequest?: boolean; seededRequests?: boolean; systems: boolean }, now: number = Date.now()): Promise<PreviewSystems> {
-  const { systems: released, ...fixtureOptions } = options;
+export async function previewSystems(scenario: PreviewScenario, options: { installedStaffRequest?: boolean; seededRequests?: boolean; systems: boolean; publishing?: PreviewPublishing }, now: number = Date.now()): Promise<PreviewSystems> {
+  const { systems: released, publishing: publishingMode = "off", ...fixtureOptions } = options;
   if (!released) return { systems: {}, makeReal: {}, owners: [], released };
   const request = createPreviewRequest(scenario, fixtureOptions);
   const first = await (await request("/api/workspace")).json() as WorkspaceSnapshot;
@@ -107,15 +109,20 @@ export async function previewSystems(scenario: PreviewScenario, options: { insta
     const response = await request(`/api/workspace?workspaceId=${encodeURIComponent(workspace.id)}`);
     if (!response.ok) continue;
     const snapshot = await response.json() as WorkspaceSnapshot;
-    const listing = systemsFromExisting(existingSnapshot(snapshot, inquiryTenant));
+    const existing = systemsFromExisting(existingSnapshot(snapshot, inquiryTenant));
+    // Publishing runs the workspace route's projection over a fictional snapshot.
+    const published = publishingMode === "off" ? null
+      : addPublishingSystems(existing, previewPublishingSnapshot(existing, scenario, publishingMode, now), { ...previewPublishingExtras(scenario), now });
+    const listing = published?.listing ?? existing;
     const base = {
       listing,
+      ...(published ? { publishing: { websiteParts: published.websiteParts, offers: published.offers, listings: published.listings } } : {}),
       siteDomains: new Map((snapshot.managedWork ?? []).flatMap((site) => site.domain ? [[site.id, site.domain] as const] : [])),
       candidates: candidates(snapshot),
       actorId: PREVIEW_ACTOR.userId,
       now,
     };
-    const projection = await projectWorkspaceSystems({ ...base, observations: fixtureEvidence(scenario, { listing }, now) });
+    const projection = await projectWorkspaceSystems({ ...base, observations: [...fixtureEvidence(scenario, { listing }, now), ...(published?.observations ?? [])] });
     result.systems[workspace.id] = projection;
     for (const possibility of projection.possibilities.filter((item) => item.status === "ready")) {
       const made = await makeRealInSandbox(base, PREVIEW_ACTOR, possibility.id, { canActivate: true });

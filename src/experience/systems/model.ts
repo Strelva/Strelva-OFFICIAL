@@ -17,7 +17,7 @@ import type { WorkspaceMakeRealResult, WorkspaceSnapshot } from "@/experience/wo
 export const SYSTEMS_LABEL = "Systems";
 export const SYSTEMS_LIST_LABEL = "All systems and files";
 
-export type SystemKind = "website" | "inquiries" | "bookings" | "document" | "app" | "tracker" | "onboarding";
+export type SystemKind = "website" | "inquiries" | "bookings" | "document" | "app" | "tracker" | "onboarding" | "listing" | "newsletter";
 
 /** Intended operation only. Health is a separate signal (RULE_SYSTEM_PAUSE_HEALTH). */
 export type SystemLifecycle = SpineLifecycle;
@@ -82,7 +82,10 @@ export interface SystemVersion {
 export type SystemSurface =
   | { kind: "website"; domain?: string; liveUrl?: string; previewSrc?: string; previewLabel: string; manageHref?: string }
   | { kind: "inquiries"; tenantId: string }
-  | { kind: "work"; workId: string; productId: string };
+  | { kind: "work"; workId: string; productId: string }
+  /** A Google listing: its health in words and what Strelva did on Google. */
+  | { kind: "listing"; healthMessage: string; receipts: ReadonlyArray<{ id: string; headline: string; at: string; status: string }>; unavailable?: boolean }
+  | { kind: "newsletter"; audience: string };
 
 export interface SystemView {
   /** The spine's systemId. Together with the workspace id it is the SystemRef. */
@@ -101,6 +104,10 @@ export interface SystemView {
   connections: SystemConnection[];
   possibilities: SystemPossibility[];
   versions: SystemVersion[];
+  /** Parts of this System that are not Systems themselves (a website's blog). */
+  parts?: ReadonlyArray<{ label: string; published: number; drafts: number }>;
+  /** In-context offers, e.g. connecting Google for this website. */
+  offers?: ReadonlyArray<{ kind: "connect_google"; label: string }>;
 }
 
 export interface NeedsYouItem {
@@ -120,6 +127,8 @@ export const SYSTEM_KIND_LABEL: Record<SystemKind, string> = {
   app: "Internal tool",
   tracker: "Tracker",
   onboarding: "Client onboarding",
+  listing: "Google listing",
+  newsletter: "Newsletter",
 };
 
 export const LIFECYCLE_LABEL: Record<SystemLifecycle, string> = { draft: "Draft", live: "Live", paused: "Paused" };

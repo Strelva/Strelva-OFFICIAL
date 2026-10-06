@@ -84,7 +84,7 @@ export interface PublishingProjection {
   listings: ListingSummary[];
 }
 
-const COLLECTION_LABELS: Record<string, string> = { blog: "Blog", videos: "Videos", products: "Product catalog", events: "Events" };
+const COLLECTION_LABELS: Record<string, string> = { blog: "Blog", video: "Videos", product: "Product catalog" };
 
 function system(businessId: string, origin: SystemOrigin, fields: Pick<System, "name" | "kind" | "lifecycle" | "createdAt" | "updatedAt">): System {
   return {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { MouseEvent, ReactNode } from "react";
-import { AppWindow, Building2, CalendarDays, CircleHelp, FileText, Globe2, Home, Inbox, KeyRound, ListChecks, MessageSquareText, Repeat, Search, Sheet, UserPlus, Users, X, type LucideIcon } from "lucide-react";
+import { AppWindow, Building2, CalendarDays, CircleHelp, FileText, Globe2, Home, Inbox, KeyRound, ListChecks, Mail, MapPin, MessageSquareText, Repeat, Search, Sheet, UserPlus, Users, X, type LucideIcon } from "lucide-react";
 import { SYSTEMS_LABEL, SYSTEMS_LIST_LABEL } from "@/experience/systems/model";
 import { LogoMark } from "@/components/Logo";
 import { WorkspaceSignOutButton } from "@/experience/workspace/WorkspaceSignOutButton";
@@ -26,7 +26,7 @@ const PRIMARY_ITEMS_BEFORE_SYSTEMS: readonly { id: NavigableSection; icon: Lucid
   { id: "requests", icon: ListChecks },
   { id: "ongoing", icon: Repeat },
 ];
-const PINNED_ICONS: Record<NonNullable<StrelvaPinnedItem["kind"]>, LucideIcon> = { website: Globe2, app: AppWindow, inquiries: Inbox, bookings: CalendarDays, document: FileText, tracker: Sheet, onboarding: UserPlus };
+const PINNED_ICONS: Record<NonNullable<StrelvaPinnedItem["kind"]>, LucideIcon> = { website: Globe2, app: AppWindow, inquiries: Inbox, bookings: CalendarDays, document: FileText, tracker: Sheet, onboarding: UserPlus, listing: MapPin, newsletter: Mail };
 
 const BUSINESS_ITEMS: readonly { id: NavigableSection; icon: LucideIcon }[] = [
   { id: "settings", icon: Building2 },

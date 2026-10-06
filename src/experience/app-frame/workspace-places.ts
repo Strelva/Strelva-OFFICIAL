@@ -73,7 +73,7 @@ export interface StrelvaPinnedItem {
   id: string;
   title: string;
   href: string;
-  kind?: "website" | "app" | "inquiries" | "bookings" | "document" | "tracker" | "onboarding";
+  kind?: "website" | "app" | "inquiries" | "bookings" | "document" | "tracker" | "onboarding" | "listing" | "newsletter";
   onOpen?: () => void;
   /** The System currently open. */
   current?: boolean;

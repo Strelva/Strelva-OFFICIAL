@@ -22,6 +22,9 @@ import { getReplyVoice } from "./reply-voice";
 import { getReviews } from "../reviews";
 import { draftReviewReply, storeRecentReply, isReviewReplyDeclined } from "../review-replies";
 import { mapPool } from "../concurrency";
+import { autoReplyAllowed } from "./auto-reply-rule";
+
+export { AUTO_REPLY_MIN_RATING, autoReplyAllowed } from "./auto-reply-rule";
 
 /** Tenant-level concurrency for the auto-reply crons. A serial per-tenant loop
  *  with up-to-2 Gemini calls each blows Vercel's 300s budget past ~30 tenants;
@@ -37,16 +40,6 @@ export const AUTO_POST_DELAY_MS = 12 * 60 * 60 * 1000;
  *  non-Google review that can never resolve) retries every cron run forever,
  *  each failure emitting a new pending alert event + Slack ping. */
 export const MAX_AUTO_POST_ATTEMPTS = 3;
-
-/** The lowest rating a reply may auto-post for. A 1 or 2 star review's reply
- * always goes to the owner, even in `auto` mode (publishing spec, section 3). */
-export const AUTO_REPLY_MIN_RATING = 3;
-
-/** Whether `auto` mode may post this review's reply on its own. Unknown
- * ratings go to the owner. */
-export function autoReplyAllowed(rating: unknown): boolean {
-  return typeof rating === "number" && Number.isFinite(rating) && rating >= AUTO_REPLY_MIN_RATING;
-}
 
 function hasReply(reply: string | undefined | null): boolean {
   return typeof reply === "string" && reply.trim().length > 0;

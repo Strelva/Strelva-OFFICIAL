@@ -47,6 +47,8 @@ const KIND_VIEW: Record<string, SystemKind> = {
   internal_app: "app",
   portal: "app",
   pricing: "app",
+  listing: "listing",
+  newsletter: "newsletter",
 };
 
 function hostname(value: unknown): string | undefined {
@@ -75,6 +77,8 @@ function detailFor(kind: SystemKind, work: WorkspaceWork | undefined, entry: Wor
   if (kind === "tracker") return "Working data";
   if (kind === "onboarding") return "New-client intake";
   if (kind === "website" && !entry.tenantId) return "Website draft";
+  if (kind === "listing") return "Reviews, hours and posts on Google";
+  if (kind === "newsletter") return "Issues to your subscribers";
   return "";
 }
 
@@ -83,6 +87,7 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
   const projection: WorkspaceSystems | undefined = systemsReleased(snapshot) ? snapshot.systems : undefined;
   const ready = projection?.status === "ready" ? projection : null;
   const entries = ready?.systems ?? [];
+  const publishing = ready?.publishing?.status === "ready" ? ready.publishing : undefined;
   const installationFor = new Map<string, OfferingInstallation>();
   for (const installation of installations) {
     if (installation.status === "retired") continue;
@@ -109,6 +114,13 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
       const liveUrl = site?.domain ? `https://${site.domain.replace(/^https?:\/\//, "")}` : undefined;
       const previewSrc = (site?.previewHref && sameAppHref(site.previewHref)) || liveUrl;
       surface = { kind: "website", domain, liveUrl, previewSrc, previewLabel: site?.previewHref ? `Rendered from the saved copy of ${domain || entry.name}` : `${domain || entry.name}, as visitors see it now`, manageHref: site?.href && sameAppHref(site.href) ? sameAppHref(site.href) || undefined : undefined };
+    } else if (kind === "listing") {
+      const listing = publishing?.listings.find(item => item.systemId === entry.ref.systemId);
+      surface = listing
+        ? { kind: "listing", healthMessage: listing.healthMessage, receipts: listing.receipts }
+        : { kind: "listing", healthMessage: "Strelva couldn't read this listing just now.", receipts: [], unavailable: true };
+    } else if (kind === "newsletter") {
+      surface = { kind: "newsletter", audience: entry.basis ?? "Sent to active subscribers." };
     } else if (work) {
       surface = { kind: "work", workId: work.id, productId: work.productId };
     }
@@ -130,6 +142,9 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
       surface: surface ?? { kind: "work", workId: entry.savedWorkId ?? entry.ref.systemId, productId: "unknown" },
       operatedBy: kind === "website" && site ? site.relationship === "enterprise" ? "Your enterprise team" : "Strelva" : provider(installation),
       connections: [], possibilities: [], versions,
+      ...(publishing?.websiteParts[entry.ref.systemId]?.length ? { parts: publishing.websiteParts[entry.ref.systemId]!.map(({ label, published, drafts }) => ({ label, published, drafts })) } : {}),
+      ...(publishing?.offers.some(offer => offer.systemId === entry.ref.systemId)
+        ? { offers: publishing.offers.filter(offer => offer.systemId === entry.ref.systemId).map(({ kind, label }) => ({ kind, label })) } : {}),
     };
   });
   const byId = new Map(systems.map(system => [system.id, system]));

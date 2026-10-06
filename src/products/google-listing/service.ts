@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import type { FactValues } from "@/platform/business-record/contracts";
 import type { SystemLifecycle } from "@/platform/systems/contracts";
-import { autoReplyAllowed } from "@/lib/reviews/auto-reply";
+import { autoReplyAllowed } from "@/lib/reviews/auto-reply-rule";
 import type { GoogleListingClient, GoogleLocationRef, GoogleLocationState, GoogleResult, GoogleReview } from "./client";
 import {
   authoritySchema,
@@ -80,7 +80,7 @@ export function routeReviewReply(mode: "off" | "approve" | "auto", rating: numbe
 }
 
 /** The customer-facing line for a receipt. Strelva acts; no AI words. */
-export function receiptHeadline(receipt: ListingReceipt, subject?: string): string {
+export function receiptHeadline(receipt: Pick<ListingReceipt, "status" | "action">, subject?: string): string {
   const who = subject ? `${subject}'s review` : "a review";
   if (receipt.status === "failed") return "Google didn't take this change. Nothing changed on Google.";
   if (receipt.status === "undone") return "Strelva undid this change on Google.";
