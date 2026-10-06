@@ -144,6 +144,38 @@ export async function addSubscriber(
   return { duplicate: false };
 }
 
+/** Mark a subscriber unsubscribed. Unknown addresses are a no-op (true either
+ * way, so the page never confirms who is on the list). */
+export async function unsubscribeSubscriber(
+  email: string,
+  tenant: string = DEFAULT_TENANT
+): Promise<void> {
+  const address = email.trim();
+  if (dataSourceIsPostgres()) {
+    const db = newsletterDb(`unsubscribe ${tenant}`);
+    const { error } = await db
+      .from("newsletter_subscribers")
+      .update({ status: "unsubscribed" })
+      .eq("tenant_id", tenant)
+      .eq("email", address);
+    if (error) throw error;
+    return;
+  }
+  const store = await readDevNewsletter();
+  const subscribers = store[tenant] || [];
+  let changed = false;
+  for (const subscriber of subscribers) {
+    if (subscriber.email === address && subscriber.status !== "unsubscribed") {
+      subscriber.status = "unsubscribed";
+      changed = true;
+    }
+  }
+  if (changed) {
+    store[tenant] = subscribers;
+    await writeDevNewsletter(store);
+  }
+}
+
 export async function getSubscribers(
   tenant: string = DEFAULT_TENANT
 ): Promise<NewsletterSubscriber[]> {

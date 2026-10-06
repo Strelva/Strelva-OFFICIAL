@@ -70,6 +70,8 @@ const PUBLIC_EXACT = new Set([
   "/api/workspace-export",
   "/api/health",
   "/api/newsletter/subscribe",
+  // Signed one-click unsubscribe (RFC 8058); the token is the authorization.
+  "/api/newsletter/unsubscribe",
   "/api/track",
   "/api/billing/webhook",
 ]);
