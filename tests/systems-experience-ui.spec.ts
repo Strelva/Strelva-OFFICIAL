@@ -1,7 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
 
-test.skip(process.env.STRELVA_UI_PREVIEW !== "1", "Systems fixtures require the local UI preview.");
-
 // Local preview fixtures (STRELVA_UI_PREVIEW=1). The Mooney Firm website content
 // comes from the October 1 capture; everything else is fictional fixture data.
 // Systems, health and Possibilities are projected on the server by the same

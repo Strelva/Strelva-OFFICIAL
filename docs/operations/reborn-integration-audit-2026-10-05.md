@@ -58,6 +58,8 @@ install; no dependency was added.
   server stopped before retry. This failure is retained in `integration-check-ci.log`.
 
 Final correction and browser/build receipts are appended below after execution.
+The first final check caught incorrect TypeScript types in the new System runtime
+test fixtures; that failed check is retained in `final-check-ci.log`.
 
 ## Dependency evidence
 
@@ -128,6 +130,15 @@ incident. The website rebuild remains release-gated.
    `src/products/websites/site-report.ts` generates
    `/workspace/{workspaceId}/websites/{workId}`. The implemented workspace opens
    work through query parameters; there is no corresponding path route or rewrite.
+
+10. **Release boundary: Systems and isolated Make real inherit the workspace gate.**
+    That gate was enabled in the September 30 production release. Merging source
+    does not activate it, but a future deployment needs an explicit feature
+    boundary and acceptance decision before exposing the prepared experience.
+    The newer October 5 release re-audit also leaves business-record product
+    adoption partial: the conversion script calls the record, while capability
+    routes and owner notices do not yet consistently read it. Lead copies cascade
+    with tenant deletion; retention beyond deprovision remains an owner decision.
 
 The integration fixes tenant-specific lead email gating. The new System summary
 also improves name, domain, live link, health and change access; a health signal
