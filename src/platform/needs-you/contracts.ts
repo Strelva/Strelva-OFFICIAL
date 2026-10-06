@@ -143,8 +143,26 @@ export const DELIVERY_STATES = ["not_sent", "sent", "suppressed", "bounced", "re
 export type DeliveryState = (typeof DELIVERY_STATES)[number];
 export type Decision = "approve" | "not_yet";
 
-/** The source lifecycles an adapter can resolve. Each keeps its own resolver. */
-export const SOURCE_LIFECYCLES = ["tenant_event", "service_request", "provider_delivery"] as const;
+/**
+ * The source lifecycles an adapter can resolve. Each keeps its own resolver.
+ * Adapters beyond the first two live in ./sources/<lifecycle>.ts.
+ */
+export const SOURCE_LIFECYCLES = [
+  "tenant_event",
+  "service_request",
+  "provider_delivery",
+  "website_document",
+  "standing_responsibility",
+  "work_responsibility",
+  "assignment_offer",
+  "agency_grant",
+  "application_release",
+  "work_plan",
+  "work_money",
+  "workspace_exit",
+  "make_real",
+  "version_release",
+] as const;
 export type SourceLifecycle = (typeof SOURCE_LIFECYCLES)[number];
 
 const isoSchema = z.string().min(1);
