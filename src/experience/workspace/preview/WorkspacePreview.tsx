@@ -10,6 +10,7 @@ import { MOONEY_INQUIRY_PROFILE, MOONEY_TENANT } from "./systems-fixture";
 import { withNeedsYouPreview } from "./needs-you-fixture";
 import type { PreviewSystems } from "./systems-projection";
 import { agencyPreviewState, withAgencyPreview } from "./agency-fixture";
+import { withAskPreview, type AskPreviewMode } from "./ask-fixture";
 import styles from "./preview.module.css";
 
 const previewJson = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -48,7 +49,7 @@ function previewHref(scenario: string, systems: string | null): string {
   return `/preview/strelva?${params}`;
 }
 
-export function WorkspacePreview({ scenario, systems, needsYou = false }: { scenario: PreviewScenario; systems?: PreviewSystems; needsYou?: boolean }) {
+export function WorkspacePreview({ scenario, systems, needsYou = false, ask = null }: { scenario: PreviewScenario; systems?: PreviewSystems; needsYou?: boolean; ask?: AskPreviewMode | null }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [installedStaffRequest] = useState(() => searchParams.get("previewSetup") === "staff-request");
@@ -68,7 +69,7 @@ export function WorkspacePreview({ scenario, systems, needsYou = false }: { scen
     return () => observer.disconnect();
   }, []);
   const [agencyState] = useState(() => agencyPreviewState(searchParams.get("agency")));
-  const request = useMemo(() => withNeedsYouPreview(withAgencyPreview(withSystems(createPreviewRequest(scenario, { installedStaffRequest, seededRequests }), systems), scenario, agencyState), scenario, needsYou), [agencyState, installedStaffRequest, seededRequests, scenario, systems, needsYou]);
+  const request = useMemo(() => withAskPreview(withNeedsYouPreview(withAgencyPreview(withSystems(createPreviewRequest(scenario, { installedStaffRequest, seededRequests }), systems), scenario, agencyState), scenario, needsYou), ask), [agencyState, installedStaffRequest, seededRequests, scenario, systems, needsYou, ask]);
   useEffect(() => {
     if (!installedStaffRequest) return;
     const url = new URL(window.location.href);
@@ -85,6 +86,6 @@ export function WorkspacePreview({ scenario, systems, needsYou = false }: { scen
       {systems ? <Link href={previewHref(scenario, systems.released ? "off" : "on")} aria-label={`Systems are ${systems.released ? "on" : "off"}. Turn them ${systems.released ? "off" : "on"}.`}>Systems: {systems.released ? "on" : "off"}</Link> : null}
       {(scenario === "paid" || scenario === "enterprise") && <p>Relationship example only. Pricing and permissions are not simulated.</p>}
     </aside>
-    <WorkspaceApp key={`${scenario}:${systems?.released ? "systems" : "reborn"}:${needsYou ? "needs-you" : ""}`} request={request} appBase="/preview/strelva" signOut={null} inquiry={inquiry} />
+    <WorkspaceApp key={`${scenario}:${systems?.released ? "systems" : "reborn"}:${needsYou ? "needs-you" : ""}:${ask ?? ""}`} request={request} appBase="/preview/strelva" signOut={null} inquiry={inquiry} />
   </div>;
 }
