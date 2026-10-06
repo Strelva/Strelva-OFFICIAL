@@ -486,7 +486,8 @@ email. Working defaults from section 9 were followed (decision 1a, 5 forced to
 
 Not built: the signed reconnect link (item 14); wiring the tenant approve
 path (`event-actions.ts`) to write `google_listing_receipts` (the old
-`publishReviewReply` path still posts approved replies); digest emails
+`publishReviewReply` path still posts approved replies, and since the
+operator merge it records them in `outside_write_receipts`); digest emails
 (decision 4); one approval for record plus Google (decision 3, needs Jacob's
 yes); a review-sync job into the workspace; Versions for a second location.
 
@@ -494,3 +495,14 @@ Behavior changes to know before deploy: the newsletter now uses the
 `customer` email gate (`CUSTOMER_EMAIL_ENABLED`) instead of the client gate,
 sends from `newsletter@mail.strelva.com` even when a tenant has a
 `resendDomain`, and keeps sending later batches after one fails.
+
+**One receipt per review reply (integration, 2026-10-06).** The operator
+stream added an `outside_write_receipts` ledger and wired `publishReviewReply`
+into it. Rule: every review reply write gets exactly one receipt, in one
+ledger. Listing-System writes (`src/products/google-listing`) record in
+`google_listing_receipts`; the legacy approve path (`publishReviewReply`)
+records in `outside_write_receipts`. Neither path calls the other's writer
+(`review-reply-receipt-home.test.ts`). When the approve path moves onto the
+listing System, it switches ledgers rather than writing both. The poller URL
+fix, v1 `locations/{id}` parsing and the 1–2 star rule are unchanged by the
+merge. See `docs/architecture/persistence-boundaries.md`.

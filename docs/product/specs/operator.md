@@ -140,6 +140,15 @@ per business.
    whether undo exists. A failed read-back becomes its own `readback_failed`
    item; the write is never re-sent automatically (`AGENTS.md`, "Outside
    writes").
+
+   Review replies get exactly one receipt each, in one ledger (integration
+   with the publishing stream, 2026-10-06): the legacy approve path
+   (`publishReviewReply`) records here in `outside_write_receipts`; writes
+   made by the Google listing System record in its own
+   `google_listing_receipts` and never here. When the approve path moves onto
+   the listing System it switches ledgers, and the queue's `readback_failed`
+   source must read listing receipts for those writes. See
+   `docs/architecture/persistence-boundaries.md`.
 7. **Undo where it exists, plain labels where it doesn't.**
 
    | Write | Undo at 1.0.0 |
