@@ -29,6 +29,10 @@ import {
   reconcileInquiryMessageReview,
 } from "@/products/inquiries";
 
+/** The actor the review auto-post cron approves with: the listing receipt's
+ * authority is then the auto-reply policy, never an owner approval. */
+export const AUTO_REPLY_ACTOR = "auto-reply-policy";
+
 export type EventWorkflowAction =
   | "approved"
   | "dismissed"
@@ -233,7 +237,7 @@ export async function resolveEventAction(
     action === "approved" ? await shadowStartExecutionAttempt(eventId, claim.attemptId) : null;
 
   try {
-    const result = await executeResolvedEventAction(tenantId, eventId, action, event, actorId);
+    const result = await executeResolvedEventAction(tenantId, eventId, action, event, actorId, claim.attemptId);
     await finishEventAction(eventId, claim.attemptId, {
       state: result.changed ? "completed" : "failed",
       reason: result.reason,
@@ -257,6 +261,7 @@ async function executeResolvedEventAction(
   action: "approved" | "dismissed",
   event: NonNullable<Awaited<ReturnType<typeof getEvent>>>,
   actorId: string,
+  attemptId: string,
 ): Promise<{ changed: boolean; reason?: string }> {
 
   if (isInquiryMessageReviewEvent(event)) {
@@ -474,9 +479,30 @@ async function executeResolvedEventAction(
             ? event.body
             : "";
       if (!reviewId || !replyText) return { changed: false, reason: "review_reply_invalid" };
-      const { publishReviewReply } = await import("./gbp-replies");
-      const result = await publishReviewReply(tenantId, reviewId, replyText, { actor: `approved event ${eventId}` });
-      if (!result.published) return { changed: false, reason: "review_reply_failed" };
+      // One ledger per write (persistence-boundaries.md). A tenant linked to a
+      // business, with the publishing release on, posts through the Google
+      // listing System and records in google_listing_receipts only. Anyone
+      // else keeps the legacy publisher and its outside-write receipt.
+      const { defaultTenantReplyDeps, postTenantReviewReply, routeTenantReviewReply } = await import("@/products/google-listing/tenant-replies");
+      const deps = await defaultTenantReplyDeps();
+      const route = await routeTenantReviewReply(tenantId, deps);
+      let acceptedUnverified = false;
+      if (route.kind === "listing") {
+        const rating = typeof event.metadata?.rating === "number" ? event.metadata.rating : null;
+        const authority = actorId === AUTO_REPLY_ACTOR
+          ? rating !== null && rating >= 3 && rating <= 5 && Number.isInteger(rating)
+            ? { kind: "auto_reply_policy" as const, rating }
+            : null
+          : { kind: "owner_approval" as const, actor: actorId.slice(0, 200) || "user", approvalRef: `event:${eventId}`.slice(0, 200) };
+        if (!authority) return { changed: false, reason: "review_reply_needs_owner" };
+        const posted = await postTenantReviewReply({ tenantId, workspaceId: route.workspaceId, eventId, attemptId, reviewId, text: replyText, authority }, deps);
+        if (posted.status === "failed" || posted.status === "refused") return { changed: false, reason: "review_reply_failed" };
+        acceptedUnverified = posted.status === "posted_unverified" || posted.status === "held_by_google" || posted.status === "accepted_unrecorded";
+      } else {
+        const { publishReviewReply } = await import("./gbp-replies");
+        const result = await publishReviewReply(tenantId, reviewId, replyText, { actor: `approved event ${eventId}` });
+        if (!result.published) return { changed: false, reason: "review_reply_failed" };
+      }
       // Reply accepted by Google — mark acceptance before resolving so a lost
       // lock / crash can't let a retry re-post it.
       await markExecutionExternalAccepted(eventId);
@@ -485,6 +511,10 @@ async function executeResolvedEventAction(
       // unreplied and re-drafts + re-posts it in an endless loop.
       const { replyToReviewByExternalId } = await import("./reviews");
       await replyToReviewByExternalId(tenantId, reviewId, replyText).catch(() => {});
+      if (acceptedUnverified) {
+        const resolved = await resolveEvent(eventId, action, { actor: "user" });
+        return resolved.changed ? { changed: true, reason: "accepted_unverified" } : { changed: false, reason: "already_resolved" };
+      }
     }
     const resolved = await resolveEvent(eventId, action, { actor: "user" });
     if (resolved.changed && action === "dismissed" && metaReviewId) {
