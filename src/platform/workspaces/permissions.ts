@@ -6,7 +6,8 @@ import type { WorkspaceRole } from "./types";
  * Assignment on specific work, and delegated read satisfies none of them.
  *
  * Mirrored in SQL by `public.workspace_role_allows` (migration
- * 20261005120000_workspace_authority_helpers.sql). The parity test in
+ * 20261005120000_workspace_authority_helpers.sql, last redefined in
+ * 20261007192000_make_systems_authority.sql). The parity test in
  * src/__tests__/workspace-permissions.test.ts fails if the two drift.
  */
 export const WORKSPACE_PERMISSIONS = [
@@ -23,6 +24,10 @@ export const WORKSPACE_PERMISSIONS = [
   "sponsor_assignment",
   "exit_workspace",
   "manage_members",
+  // Named here so the SQL table and this one stay in parity. No role grants
+  // it: a Strelva operator or a delegated agency holds it, resolved by
+  // public.workspace_make_systems_authority (assertCanMakeSystems).
+  "make_systems",
 ] as const;
 
 export type WorkspacePermission = (typeof WORKSPACE_PERMISSIONS)[number];

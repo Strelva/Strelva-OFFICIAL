@@ -107,6 +107,22 @@ export class WorkspaceAccessError extends Error {
   }
 }
 
+/** Shown to owners, admins and members who try to make or change an internal tool. */
+export const MAKE_SYSTEMS_REQUIRED_MESSAGE = "Ask Strelva to build this.";
+
+/**
+ * Only a Strelva operator inside the workspace or a delegated agency makes
+ * Systems (`make_systems`). Everyone else files a Request instead. Extends the
+ * access error so every existing 403 path still applies.
+ */
+export class WorkspaceMakeSystemsError extends WorkspaceAccessError {
+  readonly code = "make_systems_required" as const;
+  constructor(message = MAKE_SYSTEMS_REQUIRED_MESSAGE) {
+    super(message);
+    this.name = "WorkspaceMakeSystemsError";
+  }
+}
+
 export class WorkspaceConflictError extends Error {
   constructor(message = "The workspace operation conflicts with its current state") {
     super(message);

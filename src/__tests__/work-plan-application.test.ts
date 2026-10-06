@@ -11,6 +11,8 @@ type Row = Record<string, unknown>;
 function databaseBoundary() {
   const tables: Record<string, Row[]> = {
     workspace_memberships: [{ workspace_id: workspaceId, user_id: actor.userId, role: "owner" }],
+    // Strelva staff runs the Make path in this fixture (make_systems).
+    super_admins: [{ user_id: actor.userId, revoked_at: null }],
     saved_product_work: [], workspace_delegations: [], application_states: [], application_releases: [], application_records: [],
   };
   const executions: Row[] = [];
@@ -43,7 +45,13 @@ function databaseBoundary() {
     }
     return query;
   }
-  return { from, async rpc(name: string, args: Row) {
+  return { tables, from, async rpc(name: string, args: Row) {
+      // Mirrors public.workspace_make_systems_authority (operator branch only).
+      if (name === "workspace_make_systems_authority") {
+        const member = (tables.workspace_memberships ?? []).some((row) => row.workspace_id === args.p_workspace_id && row.user_id === args.p_user_id);
+        const staff = (tables.super_admins ?? []).some((row) => row.user_id === args.p_user_id && !row.revoked_at);
+        return { data: member ? (staff ? "operator" : "member") : null, error: null };
+      }
       // Mirrors public.save_workspace_work: membership is re-checked inside the write.
       if (name === "save_workspace_work") {
         const member = (tables.workspace_memberships ?? []).some((row) => row.workspace_id === args.p_workspace_id && row.user_id === args.p_user_id);
@@ -170,6 +178,15 @@ describe("goal to reviewed private application", () => {
     expect(accepted).toMatchObject({ nativeProductId: "applications", nativeResourceKind: "application", capabilityVersion: 1, receipt: { capabilityVersion: 1 } });
     const app = await readWorkspaceApplication(actor, accepted.nativeWorkId);
     expect(app.payload).toMatchObject({ status: "draft", records: [], rehearsal: null, spec: { title: "Equipment requests", maintenanceOwner: actor.userId, fields: equipmentDraft.fields } });
+  });
+
+  it("refuses an owner who is not Strelva staff at the Make step and saves no application", async () => {
+    const database = boundary.database as { tables: Record<string, Row[]> };
+    const plan = await createWorkPlan({ actor, workspaceId, userGoal: "Let staff report repairs", generate: async () => generated(draft) });
+    database.tables.super_admins = [];
+    await expect(executeWorkPlanOutput({ actor, workspaceId, planWorkId: plan.work.id, outputId: "repair-app", expectedPlanRevision: 1 }))
+      .rejects.toMatchObject({ name: "WorkspaceMakeSystemsError", message: "Ask Strelva to build this." });
+    expect(database.tables.saved_product_work!.filter((row) => row.product_id === "applications")).toHaveLength(0);
   });
 
   it("rejects a ready create_application output without a draft before saving the plan", async () => {

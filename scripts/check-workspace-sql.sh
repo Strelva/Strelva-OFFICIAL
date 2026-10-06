@@ -344,7 +344,11 @@ psql "${psql_args[@]}" --file="$repo_root/tests/agency-website-document-schema.s
 # sessions, one write at a time.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261005120000_workspace_authority_helpers.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261005120100_workspace_authority_write_rpcs.sql"
+# Systems catalog: make_systems (operator or delegated agency only) lands
+# before the authority parity file so the role table includes it.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007192000_make_systems_authority.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-authority-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/make-systems-schema.sql"
 
 authority_leaver='c9000000-0000-4000-8000-000000000005'
 authority_session_ready() {

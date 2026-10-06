@@ -22,6 +22,9 @@ type Row = Record<string, unknown>;
 function databaseBoundary() {
   const tables: Record<string, Row[]> & { workspace_memberships: Row[]; saved_product_work: Row[]; workspace_delegations: Row[] } = {
     workspace_memberships: [{ workspace_id: workspaceId, user_id: owner.id, role: "owner" }],
+    // The fixture's owner is Strelva staff, so it may make internal tools
+    // (make_systems). The plain-owner refusal has its own test below.
+    super_admins: [{ user_id: owner.id, revoked_at: null }],
     saved_product_work: [], workspace_delegations: [], operational_assignments: [], offering_provider_deliveries: [], offering_installations: [], standing_responsibility_jobs: [], standing_responsibility_runs: [], application_states: [], application_releases: [], application_records: [], job_economics: [], job_economics_usage: [], job_economics_reservations: [], job_economics_executions: [],
   };
   let rpcError: string | null = null;
@@ -91,10 +94,25 @@ function databaseBoundary() {
     failNextCommit(message: string) { rpcError = message; },
     from,
     async rpc(name: string, args: Record<string, unknown>) {
-      // Mirrors public.save_workspace_work: membership is re-checked inside the write.
-      if (name === "save_workspace_work") {
+      // Mirrors public.workspace_make_systems_authority.
+      const makeAuthority = () => {
+        const member = tables.workspace_memberships.some((row) => row.workspace_id === args.p_workspace_id && row.user_id === args.p_user_id);
+        if (member && (tables.super_admins ?? []).some((row) => row.user_id === args.p_user_id && !row.revoked_at)) return "operator";
+        if (tables.workspace_delegations.some((row) => row.customer_workspace_id === args.p_workspace_id && row.status === "active"
+          && tables.workspace_memberships.some((m) => m.workspace_id === row.agency_workspace_id && m.user_id === args.p_user_id))) return "agency";
+        return member ? "member" : null;
+      };
+      if (name === "workspace_make_systems_authority") return { data: makeAuthority(), error: null };
+      // Mirrors public.save_workspace_work and public.save_system_work: membership
+      // or make_systems is re-checked inside the write.
+      if (name === "save_workspace_work" || name === "save_system_work") {
         const member = (tables.workspace_memberships ?? []).some((row) => row.workspace_id === args.p_workspace_id && row.user_id === args.p_user_id);
-        if (!member) return { data: null, error: { message: "workspace_membership_required" } };
+        const authority = makeAuthority();
+        if (name === "save_workspace_work" && !member) return { data: null, error: { message: "workspace_membership_required" } };
+        if ((name === "save_system_work" || ["applications", "custom-applications"].includes(String(args.p_product_id)))
+          && authority !== "operator" && authority !== "agency") {
+          return { data: null, error: { message: authority ? "workspace_make_systems_required" : "workspace_membership_required" } };
+        }
         const saved = await from("saved_product_work").insert({ workspace_id: args.p_workspace_id, product_id: args.p_product_id, resource_kind: args.p_resource_kind, title: args.p_title, payload: args.p_payload, input: args.p_input, source_work_id: args.p_source_work_id, created_by: args.p_user_id }).select().single();
         return { data: saved.data ? [saved.data] : null, error: saved.error };
       }
@@ -268,6 +286,24 @@ describe("horizontal work HTTP authority and execution", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ workspaceId, createdBy: owner.id, payload: { status: "draft", spec: { maintenanceOwner: owner.id } } });
     expect((await postBounded(post("bounded-work", { action: "create", productId: "applications", workspaceId, input: { ...applicationInput, script: "fetch('https://other.test')" } }))).status).toBe(400);
+  });
+
+  it("tells an owner who is not Strelva staff to ask Strelva, and creates nothing", async () => {
+    database.tables.super_admins = [];
+    const response = await postBounded(post("bounded-work", { action: "create", productId: "applications", workspaceId, input: applicationInput }));
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "Ask Strelva to build this.", code: "make_systems_required" });
+    expect(database.tables.saved_product_work).toHaveLength(0);
+  });
+
+  it("lets a delegated agency make a tool in its client's business without a direct membership", async () => {
+    database.tables.super_admins = [];
+    database.tables.workspace_memberships.push({ workspace_id: agencyWorkspaceId, user_id: agency.id, role: "member" });
+    database.tables.workspace_delegations.push({ id: randomUUID(), customer_workspace_id: workspaceId, agency_workspace_id: agencyWorkspaceId, status: "active" });
+    boundary.session.mockResolvedValue(agency);
+    const response = await postBounded(post("bounded-work", { action: "create", productId: "applications", workspaceId, input: applicationInput }));
+    expect(response.status).toBe(201);
+    expect(database.tables.saved_product_work).toEqual([expect.objectContaining({ workspace_id: workspaceId, created_by: agency.id, product_id: "applications" })]);
   });
 
   it("refuses another account's reads and mutations through actual workspace membership", async () => {

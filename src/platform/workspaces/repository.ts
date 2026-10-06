@@ -4,6 +4,7 @@ import type { WorkspaceDb } from "./schema";
 import {
   WorkspaceAccessError,
   WorkspaceConflictError,
+  WorkspaceMakeSystemsError,
   WorkspaceStoreError,
   WORKSPACE_EXIT_STOPPED_MESSAGE,
   type AcceptedHandoff,
@@ -56,6 +57,7 @@ const CONFLICT_FAILURES = [
 
 function workspaceDbFailure(error: DbFailure, fallback: string): never {
   const detail = `${error?.code ?? ""} ${error?.message ?? ""}`;
+  if (detail.includes("workspace_make_systems_required")) throw new WorkspaceMakeSystemsError();
   if (ACCESS_FAILURES.some((value) => detail.includes(value))) {
     throw new WorkspaceAccessError();
   }
@@ -358,6 +360,55 @@ export async function saveWork(input: WorkspaceActor, workspaceId: string, work:
   const { data, error } = await rpc("save_workspace_work", {
     p_workspace_id: workspaceId,
     p_user_id: a.userId,
+    p_product_id: cleanProductId(work.productId, "productId"),
+    p_resource_kind: cleanProductId(work.resourceKind, "resourceKind"),
+    p_title: title,
+    p_payload: work.payload,
+    p_input: work.input ?? null,
+    p_source_work_id: work.sourceWorkId ?? null,
+  });
+  if (error) workspaceDbFailure(error, "Work was not saved");
+  const row = firstRow(data);
+  if (!row) throw new WorkspaceStoreError("Work was not saved");
+  return mapWork(row);
+}
+
+/**
+ * How the actor relates to making Systems in this workspace, from
+ * public.workspace_make_systems_authority: "operator" (Strelva staff with a
+ * membership), "agency" (an active delegation into this business), "member"
+ * (a direct member who may use but not make tools), or null.
+ */
+export type MakeSystemsAuthority = "operator" | "agency" | "member" | null;
+
+export async function makeSystemsAuthority(input: WorkspaceActor, workspaceId: string): Promise<MakeSystemsAuthority> {
+  const a = actor(input);
+  const { data, error } = await rpc("workspace_make_systems_authority", { p_workspace_id: workspaceId, p_user_id: a.userId });
+  if (error) workspaceDbFailure(error, "Workspace authority is unavailable");
+  const value = Array.isArray(data) ? data[0] : data;
+  return value === "operator" || value === "agency" || value === "member" ? value : null;
+}
+
+/** First gate for making or changing an internal tool. SQL rechecks on create. */
+export async function assertCanMakeSystems(input: WorkspaceActor, workspaceId: string): Promise<"operator" | "agency"> {
+  const authority = await makeSystemsAuthority(input, workspaceId);
+  if (authority === "operator" || authority === "agency") return authority;
+  if (authority === "member") throw new WorkspaceMakeSystemsError();
+  throw new WorkspaceAccessError();
+}
+
+/**
+ * Create an internal tool as its maker. An agency is not a direct member of
+ * the business, so this path never needs create_work; public.save_system_work
+ * checks the verified identity and make_systems under the same lock.
+ */
+export async function saveSystemWork(input: WorkspaceActor, workspaceId: string, work: SaveWorkInput): Promise<SavedWork> {
+  const a = actor(input);
+  const title = work.title?.trim().slice(0, 160) || null;
+  const { data, error } = await rpc("save_system_work", {
+    p_workspace_id: workspaceId,
+    p_user_id: a.userId,
+    p_verified_email: a.verifiedEmail,
     p_product_id: cleanProductId(work.productId, "productId"),
     p_resource_kind: cleanProductId(work.resourceKind, "resourceKind"),
     p_title: title,

@@ -6,6 +6,7 @@ import {
   type WorkspaceActor,
 } from "@/platform/workspaces/types";
 import { boundedStore, initial, type BoundedStore } from "@/platform/bounded-work/repository";
+import { createSystemWork, requireSystemChanger, requireSystemMaker } from "@/platform/bounded-work/make-systems";
 import { applicationCommandSchema, applicationPublishInputSchema, applicationRehearseInputSchema, applicationReviseInputSchema, applicationRollbackInputSchema, applicationSchema, applicationSpecSchema, applicationSubmitInputSchema, APPLICATION_RECORD_LIMIT, type ApplicationRelease } from "./contracts";
 import { applyLegacyApplicationCommand, assertLegacyApplicationRevision, cloneState, currentRelease, normalizeReleaseVersion, releaseSpec, reviseCandidate, rehearseCandidate, publishCandidate, rollbackRelease, validateRecord } from "./domain";
 import {
@@ -117,10 +118,10 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
 
   async function create(actor: WorkspaceActor, workspaceId: string, raw: unknown) {
     const db = durableDb(store);
-    await store.member(actor, workspaceId);
+    await requireSystemMaker(store, actor, workspaceId);
     if (db) await assertApplicationStorage(db);
     const payload = createApplicationDraft(raw, actor);
-    const saved = await store.create(actor, workspaceId, {
+    const saved = await createSystemWork(store, actor, workspaceId, {
       productId: "applications",
       resourceKind: "application",
       title: payload.spec.title,
@@ -133,7 +134,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
 
   async function fromSource(actor: WorkspaceActor, workspaceId: string, sourceWorkId: string) {
     const db = durableDb(store);
-    await store.member(actor, workspaceId);
+    await requireSystemMaker(store, actor, workspaceId);
     const source = await load(store, actor, sourceWorkId);
     await ensureActorMember(store, actor, source.work);
     const sourceSpec = releaseSpec(source.state);
@@ -149,7 +150,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
       records: [],
       installation: { sourceWorkId, sourceVersion: source.state.currentReleaseVersion ?? 1, baseSpec: spec },
     });
-    const saved = await store.create(actor, workspaceId, {
+    const saved = await createSystemWork(store, actor, workspaceId, {
       productId: "applications",
       resourceKind: "application",
       title: spec.title,
@@ -165,6 +166,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     const input = applicationReviseInputSchema.parse(raw);
     const db = durableDb(store);
     const permission = await load(store, actor, id);
+    await requireSystemChanger(store, actor, permission.work.workspaceId);
     await ensureCandidateEditor(store, actor, permission.work);
     if (db) {
       await durableRpc(db, "update_application_candidate", {
@@ -188,6 +190,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     const input = applicationRehearseInputSchema.parse(raw);
     const db = durableDb(store);
     const permission = await load(store, actor, id);
+    await requireSystemChanger(store, actor, permission.work.workspaceId);
     await ensureCandidateEditor(store, actor, permission.work);
     if (db) {
       await durableRpc(db, "rehearse_application_candidate", {
@@ -210,6 +213,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     const input = applicationPublishInputSchema.parse(raw);
     const db = durableDb(store);
     const permission = await load(store, actor, id);
+    await requireSystemChanger(store, actor, permission.work.workspaceId);
     await ensureManager(store, actor, permission.work);
     if (db) {
       await durableRpc(db, "publish_application_candidate", {
@@ -233,6 +237,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     const input = applicationRollbackInputSchema.parse(raw);
     const db = durableDb(store);
     const permission = await load(store, actor, id);
+    await requireSystemChanger(store, actor, permission.work.workspaceId);
     await ensureManager(store, actor, permission.work);
     if (db) {
       await durableRpc(db, "rollback_application_release", {
@@ -316,6 +321,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     // before translation so stale dashboard links retain their conflict UX.
     if (durableDb(store)) {
       const loaded = await load(store, actor, id);
+      if (command.kind !== "submit") await requireSystemChanger(store, actor, loaded.work.workspaceId);
       if (command.kind !== "submit" && command.kind !== "revise" && command.kind !== "rehearse") await ensureManager(store, actor, loaded.work);
       assertLegacyApplicationRevision(loaded.state, command);
       if (command.kind === "revise") return revise(actor, id, { expectedDesignRevision: loaded.state.candidate.designRevision, spec: command.spec });
@@ -359,7 +365,10 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
 
     return withMemoryLane(store, id, async () => {
       const loaded = await load(store, actor, id);
-      if (command.kind !== "submit") await ensureManager(store, actor, loaded.work);
+      if (command.kind !== "submit") {
+        await requireSystemChanger(store, actor, loaded.work.workspaceId);
+        await ensureManager(store, actor, loaded.work);
+      }
       assertLegacyApplicationRevision(loaded.state, command);
       let source;
       if (command.kind === "adopt_update") {
