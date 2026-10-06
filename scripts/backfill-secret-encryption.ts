@@ -152,7 +152,11 @@ export async function runSecretBackfill(options: BackfillOptions, deps: Backfill
 
 async function main(): Promise<void> {
   const options = parseBackfillArgs(process.argv.slice(2));
-  assertBackfillTargetsAllowed(process.env, options);
+  assertBackfillTargetsAllowed({
+    SUPABASE_URL: process.env.SUPABASE_URL,
+    UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
+    SECRETS_ENC_KEY: process.env.SECRETS_ENC_KEY,
+  }, options);
   const [{ getSupabase }, { getRedis }, { encryptSecret }, { saveConnection }] = await Promise.all([
     import("../src/lib/db/client"),
     import("../src/lib/redis"),
@@ -164,7 +168,7 @@ async function main(): Promise<void> {
 
   console.log(`Backfilling at-rest secret encryption (enc:v1:, AES-256-GCM), ${options.apply ? "APPLY" : "dry run"}…\n`);
   await runSecretBackfill(options, {
-    encryptSecret: (value) => encryptSecret(value),
+    encryptSecret: (value) => encryptSecret(value) ?? null,
     log: (line) => console.log(line),
     tenants: db ? {
       async list() {
