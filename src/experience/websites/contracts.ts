@@ -11,6 +11,13 @@ import { websiteSchema } from "@/products/websites/contracts";
 
 export type { Website, WebsiteBrief, WebsiteRecord } from "@/products/websites/contracts";
 
+/** Saved work determines which website interface can read it, independently of new-work rollout. */
+export function websiteDocumentVersion(value: unknown): 2 | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const item = value as { version?: unknown; rebuild?: { version?: unknown } };
+  return item.version === 2 || item.rebuild?.version === 2 ? 2 : undefined;
+}
+
 /**
  * Browser transport for the website product. The product contract owns the
  * lifecycle and revisions; this interface only adds the workspace context the

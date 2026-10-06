@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+test.skip(process.env.STRELVA_UI_PREVIEW !== "1", "Systems fixtures require the local UI preview.");
+
 // Local preview fixtures (STRELVA_UI_PREVIEW=1). The Mooney Firm website content
 // comes from the October 1 capture; everything else is fictional fixture data.
 // Systems, health and Possibilities are projected on the server by the same
@@ -7,6 +9,16 @@ import { expect, test, type Page } from "@playwright/test";
 
 async function noHorizontalScroll(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+}
+
+async function fullPhoneContent(page: Page) {
+  // No overflow alone misses a retained desktop navigation column. Wait for
+  // the responsive transition and require the main to use the phone width.
+  await expect.poll(async () => {
+    const box = await page.locator("[data-frame-main]").boundingBox();
+    const width = page.viewportSize()!.width;
+    return Boolean(box && Math.abs(box.x) <= 1 && box.width >= width - 2);
+  }).toBe(true);
 }
 
 test("Home presents The Mooney Firm's actual Systems and what needs the owner", async ({ page }) => {
@@ -83,6 +95,20 @@ test("a member who is not an owner sees why Make real is unavailable", async ({ 
   await expect(about.getByText("Only an owner of this business can make a possibility real.")).toBeVisible();
 });
 
+test("a member can use apps and bookings without management controls", async ({ page }) => {
+  await page.goto("/preview/strelva?scenario=mooney-member");
+  await page.getByRole("link", { name: /^Open Mediation intake/ }).click();
+  await expect(page.getByRole("button", { name: "Ask for a change" })).toBeDisabled();
+  await expect(page.getByRole("textbox", { name: "Your name" })).toBeEnabled();
+  await expect(page.getByRole("tab", { name: "Edit", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "Sharing", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Home" }).click();
+  await page.getByRole("link", { name: /^Open Mediation sessions/ }).click();
+  await expect(page.getByRole("textbox", { name: "Reservation name" })).toBeEnabled();
+  await expect(page.getByRole("region", { name: "External calendar sync" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Ask for a change" })).toBeDisabled();
+});
+
 test("empty, loading and error states say what is true", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=mooney-empty");
   await expect(page.getByRole("heading", { name: "Nothing is running yet." })).toBeVisible();
@@ -119,9 +145,16 @@ test("Home and a System reflow on a phone", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=mooney");
   await expect(page.getByRole("heading", { name: "The Mooney Firm", level: 1 })).toBeVisible();
   await noHorizontalScroll(page);
+  await fullPhoneContent(page);
   await page.getByRole("link", { name: /^Open attymooney\.com/ }).click();
   await expect(page.getByRole("heading", { name: "attymooney.com", level: 1 })).toBeVisible();
   await noHorizontalScroll(page);
+  await fullPhoneContent(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect.poll(async () => (await page.locator("[data-frame-main]").boundingBox())?.x ?? 0).toBeGreaterThan(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await fullPhoneContent(page);
   await page.setViewportSize({ width: 320, height: 720 });
   await noHorizontalScroll(page);
+  await fullPhoneContent(page);
 });

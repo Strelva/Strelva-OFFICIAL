@@ -23,7 +23,7 @@ type Investigation = z.infer<typeof investigationSchema>;
 type InvestigationSource = z.infer<typeof investigationSourceSchema>;
 type Spec = z.infer<typeof applicationSpecSchema>;
 type Saved = { id: string; payload: Application | Schedule | Investigation };
-type Props = { initialRequest?: string; workspaceId: string; workId?: string; productId: Product; readOnly?: boolean; draftEditOnly?: boolean; workspaceStopped?: boolean; calendarRecoveryAllowed?: boolean; sources: WorkspaceWork[]; onSaved: (id: string) => void };
+type Props = { initialRequest?: string; workspaceId: string; workId?: string; productId: Product; readOnly?: boolean; canManage?: boolean; draftEditOnly?: boolean; workspaceStopped?: boolean; calendarRecoveryAllowed?: boolean; sources: WorkspaceWork[]; onSaved: (id: string) => void };
 type Command = (command: Record<string, unknown>, action?: "command" | "run") => Promise<boolean>;
 const labels = { applications: "Internal tool", scheduling: "Reservations", investigations: "Website monitoring" };
 const control = "block w-full rounded-xl border border-gray-border bg-surface px-3 py-2 text-sm min-h-11";
@@ -86,7 +86,7 @@ export function BoundedWorkExperience(props: Props) {
   const onSaved = props.workId ? props.onSaved : (id: string) => { intent.spend(props.productId); props.onSaved(id); };
   return <Session key={`${props.workspaceId}:${props.workId ?? "new"}:${props.productId}`} {...props} onSaved={onSaved} initialRequest={props.initialRequest || (!props.workId ? intentRequestFor(intent, props.productId) : undefined)} />;
 }
-function Session({ initialRequest, workspaceId, workId, productId, readOnly = false, draftEditOnly = false, workspaceStopped = false, calendarRecoveryAllowed = false, sources, onSaved }: Props) {
+function Session({ initialRequest, workspaceId, workId, productId, readOnly = false, draftEditOnly = false, canManage = !readOnly || draftEditOnly, workspaceStopped = false, calendarRecoveryAllowed = false, sources, onSaved }: Props) {
   const request = useWorkspaceRequest();
   const [saved, setSaved] = useState<Saved | null>(null);
   const [busy, setBusy] = useState(false);
@@ -106,6 +106,7 @@ function Session({ initialRequest, workspaceId, workId, productId, readOnly = fa
   const handingOff = Boolean(saved && !workId);
   async function write(body: Record<string, unknown>) {
     if ((readOnly && !draftEditOnly) || busy || handingOff || writing.current) return false;
+    if (!canManage && body.action !== "command") return false;
     writing.current = true;
     setBusy(true); setError(""); setNotice("");
     try {
@@ -119,6 +120,10 @@ function Session({ initialRequest, workspaceId, workId, productId, readOnly = fa
   }
   const command: Command = (input, action = "command") => {
     if (!saved) return Promise.resolve(false);
+    const runtimeCommand = productId === "applications"
+      ? input.kind === "submit"
+      : productId === "scheduling" && ["reserve", "reschedule", "cancel"].includes(String(input.kind));
+    if (!canManage && !runtimeCommand) return Promise.resolve(false);
     // Lifecycle calls bind to their own candidate/release clocks. Keep the
     // legacy aggregate clock on older dashboard commands for compatibility.
     const explicitLifecycle = "expectedCandidateRevision" in input || "expectedDesignRevision" in input || ("expectedReleaseVersion" in input && "expectedRecordsRevision" in input);
@@ -136,9 +141,9 @@ function Session({ initialRequest, workspaceId, workId, productId, readOnly = fa
     {error ? <div role="alert" className="space-y-2 text-sm text-critical"><p>{error}</p>{workId ? <Button variant="secondary" disabled={busy} onClick={() => setReload(value => value + 1)}>Reload current work</Button> : null}</div> : null}
     {notice ? <p role="status" className="text-sm">{notice}</p> : null}
     {handingOff && saved ? <p role="status" className="text-sm text-gray-muted">Saved. Opening your work before the next change. <a className="underline underline-offset-4" href={`?workspaceId=${encodeURIComponent(workspaceId)}&view=${productId}&work=${encodeURIComponent(saved.id)}`}>Open saved work</a></p> : workId && !saved ? <p role="status">{busy ? "Loading your work…" : "No result is available to display."}</p> : saved ? <>
-      {productId === "applications" ? <ApplicationResult value={saved.payload as Application} workId={saved.id} canManage={!readOnly || draftEditOnly} draftEditOnly={draftEditOnly} disabled={disabled} command={command} /> : productId === "scheduling" ? <ScheduleResult value={saved.payload as Schedule} disabled={disabled} calendarRecoveryAllowed={calendarRecoveryAllowed} command={command} workspaceId={workspaceId} workId={saved.id} onChanged={() => setReload(value => value + 1)} /> : <InvestigationResult value={saved.payload as Investigation} disabled={disabled} command={command} sources={sources} workspaceId={workspaceId} />}
+      {productId === "applications" ? <ApplicationResult value={saved.payload as Application} workId={saved.id} canManage={canManage} draftEditOnly={draftEditOnly} disabled={disabled} command={command} /> : productId === "scheduling" ? <ScheduleResult value={saved.payload as Schedule} canManage={canManage} disabled={disabled} calendarRecoveryAllowed={calendarRecoveryAllowed} command={command} workspaceId={workspaceId} workId={saved.id} onChanged={() => setReload(value => value + 1)} /> : <InvestigationResult value={saved.payload as Investigation} disabled={disabled} command={command} sources={sources} workspaceId={workspaceId} />}
       <details className={group}><summary className="cursor-pointer text-sm">History and responsibility</summary><p className="text-sm text-gray-muted">Revision {saved.payload.revision}. Created {time(saved.payload.createdAt)}.</p>{productId === "applications" ? <p className="break-all text-sm">Maintenance owner: {(saved.payload as Application).spec.maintenanceOwner}</p> : null}<ol className="space-y-2 text-sm">{saved.payload.history.slice().reverse().map(item => <li key={item.revision}>{item.kind.replaceAll("_", " ")} · {time(item.at)}<span className="block break-all text-gray-muted">Recorded actor: {item.actorId}</span></li>)}</ol></details>
-    </> : !readOnly ? <>{productId === "applications" ? <CopyApplication sources={sources} disabled={disabled} copy={sourceWorkId => write({ action: "from_source", workspaceId, sourceWorkId })} /> : null}<Create productId={productId} sources={sources} disabled={disabled} create={input => write({ action: "create", workspaceId, input })} /></> : null}
+    </> : !readOnly && canManage ? <>{productId === "applications" ? <CopyApplication sources={sources} disabled={disabled} copy={sourceWorkId => write({ action: "from_source", workspaceId, sourceWorkId })} /> : null}<Create productId={productId} sources={sources} disabled={disabled} create={input => write({ action: "create", workspaceId, input })} /></> : null}
   </section>;
 }
 
@@ -359,7 +364,7 @@ function ApplicationResult({ value, workId, canManage, draftEditOnly = false, co
       <Tabs aria-label="Application workspace" value={section} onChange={setSection} items={[
         { value: "use", label: liveRelease ? "Use" : "Preview", id: `${id}-use-tab`, panelId: `${id}-use-panel` },
         ...(canManage ? [{ value: "edit", label: "Edit", id: `${id}-edit-tab`, panelId: `${id}-edit-panel` }] : []),
-        ...(!draftEditOnly ? [{ value: "sharing", label: "Sharing", id: `${id}-sharing-tab`, panelId: `${id}-sharing-panel` }] : []),
+        ...(canManage && !draftEditOnly ? [{ value: "sharing", label: "Sharing", id: `${id}-sharing-tab`, panelId: `${id}-sharing-panel` }] : []),
       ]} />
       {canManage && !liveRelease && section === "use" ? <Button variant="secondary" onClick={() => setSection("edit")}>Review and publish</Button> : null}
     </div>
@@ -376,14 +381,14 @@ function ApplicationResult({ value, workId, canManage, draftEditOnly = false, co
       })}</div>
     </section> : <ApplicationDraftPreview spec={value.candidate?.spec || value.spec} />}
     </TabsPanel>
-    <TabsPanel id={`${id}-edit-panel`} tabId={`${id}-edit-tab`} active={section === "edit" && canManage}>
+    {canManage ? <TabsPanel id={`${id}-edit-panel`} tabId={`${id}-edit-tab`} active={section === "edit" && canManage}>
     <ApplicationReview value={value} command={command} disabled={disabled} canPublish={!draftEditOnly} />
     {!draftEditOnly && value.installation ? <SourceUpdate key={value.installation.sourceVersion} value={value} command={command} disabled={disabled} /> : null}
     <EditApplicationSpec key={value.specVersion} value={value} command={command} disabled={disabled} />
     {!draftEditOnly && (value.releases?.length ?? 0) > 1 && liveRelease ? <details className={group}><summary className="cursor-pointer text-sm">Restore an earlier live version</summary><p className="text-sm text-gray-muted">This changes the version people use now. Existing records and their attribution remain in place.</p><label className="text-sm">Released version<select className={control} value={priorRelease} disabled={disabled} onChange={event => setPriorRelease(event.target.value)}><option value="">Choose a released version</option>{value.releases?.filter(release => release.version !== liveRelease.version).map(release => <option key={release.version} value={release.version}>Version {release.version}: {release.spec.title}</option>)}</select></label><Button variant="secondary" disabled={disabled || !priorRelease} onClick={() => void command({ kind: "rollback_release", expectedDesignRevision: value.candidate?.designRevision ?? value.designRevision ?? 0, expectedReleaseVersion: liveRelease.version, version: Number(priorRelease) })}>Restore released version</Button></details> : null}
     {!draftEditOnly && value.versions.length > 1 ? <details className={group}><summary className="cursor-pointer text-sm">Use an earlier version as a proposed change</summary><p className="text-sm text-gray-muted">This prepares an earlier version for review. It does not change the live app until you check and publish it. Existing records remain.</p><label className="text-sm">Earlier version<select className={control} value={priorVersion} disabled={disabled} onChange={event => setPriorVersion(event.target.value)}><option value="">Choose a version</option>{value.versions.filter(version => version.version !== value.specVersion).map(version => <option key={version.version} value={version.version}>Version {version.version}: {version.spec.title}</option>)}</select></label><Button variant="secondary" disabled={disabled || !priorVersion} onClick={() => void command({ kind: "rollback", version: Number(priorVersion) })}>Use version as proposed change</Button></details> : null}
-    </TabsPanel>
-    {!draftEditOnly ? <TabsPanel id={`${id}-sharing-panel`} tabId={`${id}-sharing-tab`} active={section === "sharing"}>
+    </TabsPanel> : null}
+    {canManage && !draftEditOnly ? <TabsPanel id={`${id}-sharing-panel`} tabId={`${id}-sharing-tab`} active={section === "sharing"}>
       <ApplicationAccessControls workId={workId} status={value.status} hasRelease={Boolean(value.release)} canManage={canManage} disabled={disabled} />
     </TabsPanel> : null}
   </>;
@@ -391,7 +396,7 @@ function ApplicationResult({ value, workId, canManage, draftEditOnly = false, co
 function scheduleProviderLabel(provider?: Schedule["reservations"][number]["provider"]): string {
   return provider === "outlook" ? "Outlook" : provider === "google" ? "Google Calendar" : "The calendar";
 }
-function ScheduleResult({ value, command, disabled, calendarRecoveryAllowed = false, workspaceId, workId, onChanged }: { value: Schedule; command: Command; disabled: boolean; calendarRecoveryAllowed?: boolean; workspaceId: string; workId: string; onChanged: () => void }) {
+function ScheduleResult({ value, command, disabled, canManage, calendarRecoveryAllowed = false, workspaceId, workId, onChanged }: { value: Schedule; command: Command; disabled: boolean; canManage: boolean; calendarRecoveryAllowed?: boolean; workspaceId: string; workId: string; onChanged: () => void }) {
   const [title, setTitle] = useState(""); const [start, setStart] = useState(""); const [end, setEnd] = useState(""); const [error, setError] = useState("");
   const [reschedule, setReschedule] = useState<{ requestId: string; start: string; end: string; error: string } | null>(null);
   const requestId = useRef<string | null>(null);
@@ -420,7 +425,7 @@ function ScheduleResult({ value, command, disabled, calendarRecoveryAllowed = fa
       {reschedule?.requestId === reservation.requestId ? <form className="space-y-3 rounded-xl border border-gray-border p-3" onSubmit={event => void saveReschedule(event, reservation.requestId)}><h3 className="font-medium">Change time for {reservation.title}</h3><TimeFields labelPrefix="New " start={reschedule.start} end={reschedule.end} setStart={startValue => setReschedule(current => current ? { ...current, start: startValue } : current)} setEnd={endValue => setReschedule(current => current ? { ...current, end: endValue } : current)} disabled={disabled} />{reschedule.error ? <p role="alert" className="text-sm text-critical">{reschedule.error}</p> : null}<div className="flex flex-wrap gap-2"><Button type="submit" disabled={disabled}>Save new time for {reservation.title}</Button><Button type="button" variant="secondary" disabled={disabled} onClick={() => setReschedule(null)}>Keep current time</Button></div></form> : null}
     </> : null}</li>)}</ul> : <p className="text-sm text-gray-muted">No time has been reserved yet.</p>}</section>
     <form className={group} onSubmit={event => void reserve(event)}><h2 className="font-display text-xl">Reserve a time</h2><TextInput label="Reservation name" value={title} required maxLength={160} disabled={disabled} onChange={event => setTitle(event.target.value)} /><TimeFields start={start} end={end} setStart={setStart} setEnd={setEnd} disabled={disabled} />{error ? <p role="alert" className="text-sm text-critical">{error}</p> : null}<Button type="submit" disabled={disabled || !title.trim()}>Reserve in workspace</Button></form>
-    <ScheduleCalendarControls workspaceId={workspaceId} workId={workId} revision={value.revision} reservations={value.reservations} disabled={disabled} recoveryAllowed={calendarRecoveryAllowed} onChanged={onChanged} />
+    {canManage || calendarRecoveryAllowed ? <ScheduleCalendarControls workspaceId={workspaceId} workId={workId} revision={value.revision} reservations={value.reservations} disabled={disabled} recoveryAllowed={calendarRecoveryAllowed} onChanged={onChanged} /> : null}
   </>;
 }
 function investigationSourceIdentity(source: InvestigationSource): string {

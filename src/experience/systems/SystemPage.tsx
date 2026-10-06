@@ -9,6 +9,7 @@ import type { InquirySurfaceAdapter } from "@/experience/inquiries/contracts";
 import { BoundedWorkExperience } from "@/experience/operations/BoundedWorkExperience";
 import { CustomApplicationManageExperience } from "@/experience/custom-applications/CustomApplicationManageExperience";
 import { WebsiteExperience } from "@/experience/websites/WebsiteExperience";
+import { websiteDocumentVersion } from "@/experience/websites/contracts";
 import { DocumentExperience } from "@/experience/workspace/DocumentExperience";
 import { OnboardingWorkspaceExperience } from "@/experience/workspace/OnboardingWorkspaceExperience";
 import { TrackerExperience } from "@/experience/workspace/TrackerExperience";
@@ -28,8 +29,13 @@ export interface SystemPageProps {
   systems: readonly SystemView[];
   workspaceId: string;
   appBase?: string;
-  /** No changes or Make real for this account (shared read-only, member, or stopped workspace). */
+  /** No management or requests for changes (shared read-only, member, or stopped workspace). */
   readOnly: boolean;
+  /** Runtime use can remain available to members who cannot manage the System. */
+  useReadOnly?: boolean;
+  rebuildEnabled?: boolean;
+  managed?: boolean;
+  agency?: boolean;
   readOnlyReason?: string;
   /** Only owners can make a Possibility real. When false, say why. */
   canMakeReal?: boolean;
@@ -122,7 +128,7 @@ export function websiteSandbox(src: string): string {
   }
 }
 
-function SystemSurface({ system, workspaceId, readOnly, sources, localPreview, workspaceStopped, calendarRecoveryAllowed, inquiryAdapter }: SystemPageProps & { system: SystemView }) {
+function SystemSurface({ system, workspaceId, readOnly, useReadOnly = readOnly, rebuildEnabled, managed, agency, sources, localPreview, workspaceStopped, calendarRecoveryAllowed, inquiryAdapter }: SystemPageProps & { system: SystemView }) {
   const noop = () => undefined;
   if (system.surface.kind === "inquiries") {
     const adapter = inquiryAdapter?.tenantId === system.surface.tenantId ? inquiryAdapter.adapter : undefined;
@@ -130,12 +136,12 @@ function SystemSurface({ system, workspaceId, readOnly, sources, localPreview, w
   }
   if (system.surface.kind !== "work") return null;
   const { workId, productId } = system.surface;
-  if (productId === "applications" || productId === "scheduling") return <BoundedWorkExperience key={workId} workspaceId={workspaceId} workId={workId} productId={productId} sources={[...sources]} readOnly={readOnly} workspaceStopped={workspaceStopped} calendarRecoveryAllowed={calendarRecoveryAllowed} onSaved={noop} />;
+  if (productId === "applications" || productId === "scheduling") return <BoundedWorkExperience key={workId} workspaceId={workspaceId} workId={workId} productId={productId} sources={[...sources]} readOnly={useReadOnly} canManage={!readOnly} workspaceStopped={workspaceStopped} calendarRecoveryAllowed={calendarRecoveryAllowed} onSaved={noop} />;
   if (productId === "custom-applications") return <CustomApplicationManageExperience key={workId} workId={workId} readOnly={readOnly} />;
   if (productId === "documents" && !localPreview) return <DocumentExperience key={workId} workspaceId={workspaceId} workId={workId} readOnly={readOnly} onSaved={noop} sources={[...sources]} />;
   if (productId === "tracker" && !localPreview) return <TrackerExperience key={workId} workspaceId={workspaceId} workId={workId} readOnly={readOnly} onSaved={noop} />;
   if (productId === "onboarding") return <OnboardingWorkspaceExperience key={workId} workspaceId={workspaceId} initialCaseId={workId} readOnly={readOnly} onSaved={noop} />;
-  if (productId === "websites") return <WebsiteExperience key={workId} workspaceId={workspaceId} workId={workId} readOnly={readOnly} onSaved={noop} />;
+  if (productId === "websites") return <WebsiteExperience key={workId} workspaceId={workspaceId} workId={workId} rebuildVersion={websiteDocumentVersion(sources.find(work => work.id === workId)?.payload)} rebuildEnabled={rebuildEnabled} managed={managed} agency={agency} readOnly={readOnly} onSaved={noop} />;
   if (productId === "unknown") return <p className="p-6 text-sm text-gray-muted">There is nothing to open for this system here yet. Its record and status are beside it.</p>;
   return <p className="p-6 text-sm text-gray-muted">This system opens in its own view. <Link className="underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&work=${encodeURIComponent(workId)}`}>Open it</Link></p>;
 }

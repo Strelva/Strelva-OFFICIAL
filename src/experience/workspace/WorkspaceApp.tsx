@@ -26,6 +26,7 @@ import { LocalDocumentPreview } from "./preview/LocalDocumentPreview";
 import { WorkPlanExperience } from "./WorkPlanExperience";
 import { WorkBudgetPanel } from "./WorkBudgetPanel";
 import { OnboardingWorkspaceExperience } from "./OnboardingWorkspaceExperience";
+import { websiteDocumentVersion } from "@/experience/websites/contracts";
 import { WebsiteExperience } from "@/experience/websites/WebsiteExperience";
 import { CustomApplicationManageExperience } from "@/experience/custom-applications/CustomApplicationManageExperience";
 import { BoundedWorkExperience } from "@/experience/operations/BoundedWorkExperience";
@@ -546,7 +547,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   return (
     <WorkspaceFrame>
       <div inert={Boolean(handoffLoading || (handoffToken && handoffPreview) || publicSaveResultId) || undefined}>
-      <WorkspaceLayout appBase={appBase} signOut={signOut} key={snapshot.workspaceId} snapshot={snapshot} home={home} agency={view === "agency"} busy={loading} selectedWork={showAssessment ? null : selectedWork}
+      <WorkspaceLayout rebuildEnabled={rebuildEnabled} appBase={appBase} signOut={signOut} key={snapshot.workspaceId} snapshot={snapshot} home={home} agency={view === "agency"} busy={loading} selectedWork={showAssessment ? null : selectedWork}
         workingTitle={view === "websites" ? "Website" : view === "operations" ? finiteJobOpen ? "Request" : "Running" : view === "applications" ? "Applications" : view === "scheduling" ? "Reservations" : view === "investigations" ? "Saved checks" : view === "product-learning" ? "Learning" : undefined}
         workingSection={view === "operations" ? finiteJobOpen ? "requests" : "ongoing" : "work"}
         atSectionRoot={view === "operations" && !selectedWork && !selectedStandingId && !selectedAssignmentId}
@@ -793,10 +794,4 @@ function PublicResultSaveOverlay({ workspaceName, saving, error, onSave, onClose
       </div>
     </div>
   );
-}
-
-function websiteDocumentVersion(value: unknown): 2 | undefined {
-  if (!value || typeof value !== "object") return undefined;
-  const item = value as { version?: unknown; rebuild?: { version?: unknown } };
-  return item.version === 2 || item.rebuild?.version === 2 ? 2 : undefined;
 }
