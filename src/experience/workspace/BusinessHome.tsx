@@ -97,6 +97,12 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   const requestRows = businessRequestRows(deliveryItems, snapshot.work, item => deliveryProviderName(item, agencyNames));
   const handled = requestRows.filter(row => row.stage === "done").slice(0, 5);
   const inProgress = requestRows.filter(row => row.stage === "in_progress" || row.stage === "asked");
+  // With Systems released, Strelva handled is the receipt feed, not done Requests,
+  // and In progress also lists every Make real that is running or partly live.
+  const receipts = systemsReleased ? snapshot.systems?.handled ?? [] : [];
+  const making = systemsReleased ? snapshot.systems?.activations ?? [] : [];
+  const receiptList = <ul className={styles.list} aria-label="What Strelva did this week">{receipts.slice(0, 7).map(receipt => <li key={receipt.id}><span className={styles.row}><span><strong>{receipt.sentence}</strong><small>{new Date(receipt.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {receipt.undo}</small></span></span></li>)}</ul>;
+  const makingRows = making.map(activation => <li key={activation.id}><span className={styles.row}><span><strong>{activation.partlyLive ? `${activation.title}: Partly live` : activation.headline}</strong><small>{activation.done} of {activation.total} done</small></span></span></li>);
   /** Requests belong to a business. Personal workspaces only see these lists when something is in them. */
   const showRequests = current?.kind === "customer" || requestRows.length > 0;
   const deliveryPending = deliveries.state.status === "loading";
@@ -195,16 +201,18 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
       </section> : null}
 
       {needsYouReleased ? <StrelvaHandledSection state={needsYou.state} pending={needsYou.pending} notices={needsYou.receiptNotices} onUndo={needsYou.undo}
-        fallback={handled.length ? <ul className={styles.list}>{handled.map(row => requestRow(row))}</ul> : undefined} /> : null}
+        fallback={receipts.length ? receiptList : handled.length && !systemsReleased ? <ul className={styles.list}>{handled.map(row => requestRow(row))}</ul> : undefined} /> : null}
       {showRequests ? <>{needsYouReleased ? null : <section className={styles.section} aria-labelledby="home-handled">
         <header className={styles.sectionHeader}><h2 id="home-handled"><CheckCircle2 size={18} aria-hidden="true" />Strelva handled</h2></header>
-        {busy || deliveryPending ? <p role="status" className={styles.muted}>Checking what finished…</p> : handled.length ? <ul className={styles.list}>{handled.map(row => requestRow(row))}</ul> : <p className={styles.muted}>Nothing finished yet. When Strelva or your agency finishes something, it appears here with what changed.</p>}
+        {systemsReleased ? (receipts.length ? receiptList : <p className={styles.muted}>Nothing this week. When Strelva changes something for you, it shows here with what changed and how to undo it.</p>)
+          : busy || deliveryPending ? <p role="status" className={styles.muted}>Checking what finished…</p> : handled.length ? <ul className={styles.list}>{handled.map(row => requestRow(row))}</ul> : <p className={styles.muted}>Nothing finished yet. When Strelva or your agency finishes something, it appears here with what changed.</p>}
         {current?.kind === "customer" && sites.length ? <a className={styles.textAction} href={`${appBase}/workspace/recaps?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Weekly and monthly recaps<ArrowRight size={16} aria-hidden="true" /></a> : null}
       </section>}
 
       <section className={styles.section} aria-labelledby="home-progress">
         <header className={styles.sectionHeader}><h2 id="home-progress"><ListChecks size={18} aria-hidden="true" />In progress</h2><Button variant="ghost" size="sm" onClick={() => onNavigate("requests")}>All requests<ArrowRight size={16} aria-hidden="true" /></Button></header>
-        {busy || deliveryPending ? <p role="status" className={styles.muted}>Checking your requests…</p> : inProgress.length ? <ul className={styles.list}>{inProgress.slice(0, 5).map(row => requestRow(row))}</ul> : <p className={styles.muted}>{readOnly ? "No shared requests are in progress." : "Nothing is in progress. Ask Strelva above for something with an end, like a new page or an intake form."}</p>}
+        {makingRows.length ? <ul className={styles.list} aria-label="Making live">{makingRows}</ul> : null}
+        {busy || deliveryPending ? <p role="status" className={styles.muted}>Checking your requests…</p> : inProgress.length ? <ul className={styles.list}>{inProgress.slice(0, 5).map(row => requestRow(row))}</ul> : makingRows.length ? null : <p className={styles.muted}>{readOnly ? "No shared requests are in progress." : "Nothing is in progress. Ask Strelva above for something with an end, like a new page or an intake form."}</p>}
       </section></> : null}
 
       {!business || results.length || !systems.length ? <section className={styles.section} aria-labelledby="home-recent">

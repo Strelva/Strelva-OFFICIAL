@@ -17,10 +17,10 @@ import type { WorkspaceWork } from "@/experience/workspace/contracts";
 import { possibilityScope } from "./from-workspace";
 import { HealthSignal, LifecyclePill, SYSTEM_ICONS } from "./SystemList";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
-import type { WorkspaceMakeRealResult } from "@/experience/workspace/contracts";
+import type { WorkspaceLiveMakeRealResult, WorkspaceMakeRealResult } from "@/experience/workspace/contracts";
 import {
-  CONNECTION_KIND_LABEL, INCOMING_CONNECTION_LABEL, POSSIBILITY_STATUS_LABEL, SYSTEM_KIND_LABEL, makeRealSummary,
-  type MakeRealOutcome, type SystemPossibility, type SystemView,
+  CONNECTION_KIND_LABEL, INCOMING_CONNECTION_LABEL, PAUSED_KEEPS, POSSIBILITY_STATUS_LABEL, SYSTEM_KIND_LABEL, makeRealSummary,
+  type MakeRealOutcome, type SystemConnection, type SystemPossibility, type SystemView,
 } from "./model";
 import { workspaceSiteHref } from "@/lib/workspace-site-places";
 import { SystemPanel as Panel } from "./SystemPanel";
@@ -64,9 +64,12 @@ export function SystemPage(props: SystemPageProps) {
   const [mode, setMode] = useState<"current" | "possibility" | "both">("current");
   const fetchedDetail = useWebsiteSystemDetail(props.workspaceId, system?.id ?? "", Boolean(system && system.kind === "website" && !props.websiteDetail));
   const websiteDetail = props.websiteDetail ?? fetchedDetail;
+  const siteHref = system && system.surface.kind === "website" && system.surface.editing ? (tab: "connections" | "google") => workspaceSiteHref({ workspaceId: props.workspaceId, systemId: system.id, tab }, props.appBase || "") : undefined;
   const back = <button type="button" className={styles.back} onClick={onHome}><ArrowLeft size={16} aria-hidden="true" />Home</button>;
   if (loading && !system) return <div className={styles.page}>{back}<p role="status" className="mt-6 text-sm text-gray-muted">Opening this system…</p></div>;
   if (!system) return <div className={styles.page}>{back}<div className={styles.notFound}><h1 className="font-display">This system isn’t available here.</h1><p>It may belong to another business, or your access may have changed. Nothing about it was changed.</p></div></div>;
+  // Website panels and the site's own editor links count as context too.
+  const showAside = hasContext(system) || Boolean(system.kind === "website" && websiteDetail) || Boolean(siteHref);
 
   const Icon = SYSTEM_ICONS[system.kind];
   const titled = system.surface.kind !== "work";
@@ -87,6 +90,7 @@ export function SystemPage(props: SystemPageProps) {
           <HealthSignal health={system.health} detailed />
           {system.operatedBy ? <span>Run by {system.operatedBy}</span> : null}
         </p>
+        {system.lifecycle === "paused" ? <p className={styles.meta} role="note">{PAUSED_KEEPS[system.kind] ?? "Paused. Its records are kept."}</p> : null}
       </div>
       <div className={styles.actions}>
         {system.surface.kind === "website" && system.surface.liveUrl ? <a className={styles.linkAction} href={system.surface.liveUrl} target="_blank" rel="noreferrer">Visit site<ArrowUpRight size={16} aria-hidden="true" /></a> : null}
@@ -97,7 +101,7 @@ export function SystemPage(props: SystemPageProps) {
       </div>
     </header>
 
-    <div className={styles.body}>
+    <div className={styles.body} data-context={hasContext(system) ? undefined : "none"}>
       <section className={styles.surface} data-kind={system.surface.kind} aria-label={`${system.name}, the actual ${SYSTEM_KIND_LABEL[system.kind].toLowerCase()}`}>
         {system.surface.kind === "website" ? <>
           <div className={styles.surfaceBar}>
@@ -113,16 +117,49 @@ export function SystemPage(props: SystemPageProps) {
         </> : <div className={styles.workSurface}><SystemSurface {...props} system={system} /></div>}
       </section>
 
-      <aside className={styles.aside} aria-label={`About ${system.name}`}>
+      {showAside ? <aside className={styles.aside} aria-label={`About ${system.name}`}>
         {system.kind === "website" && websiteDetail ? <WebsiteSystemPanels workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} onAsk={onAsk} readOnly={readOnly} /> : null}
-        <ConnectionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} siteHref={system.surface.kind === "website" && system.surface.editing ? (tab) => workspaceSiteHref({ workspaceId: props.workspaceId, systemId: system.id, tab }, props.appBase || "") : undefined} />
+        {system.activations?.length ? <ActivationsPanel system={system} /> : null}
+        {system.possibilities.length ? <PossibilitiesPanel system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} /> : null}
+        {system.connections.length || system.offers?.length || siteHref ? <ConnectionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} siteHref={siteHref} /> : null}
         <PartsPanel system={system} />
-        <PossibilitiesPanel system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} />
-        <VersionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} />
+        {system.versions.length ? <VersionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} /> : null}
+        {system.history?.length ? <HistoryPanel system={system} /> : null}
         {system.audits?.length ? <AuditsPanel system={system} workspaceId={props.workspaceId} appBase={props.appBase || ""} /> : null}
-      </aside>
+      </aside> : null}
     </div>
+    {hasContext(system) ? null : <p className={styles.askMore}><button type="button" className="underline" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else {system.name} could become.</button></p>}
   </div>;
+}
+
+/** Spec behavior 11-12: an empty block is not drawn; nothing at all is one line under the surface. */
+export function hasContext(system: SystemView): boolean {
+  return Boolean(system.activations?.length || system.possibilities.length || system.connections.length || system.offers?.length
+    || system.parts?.length || system.versions.length || system.history?.length || system.audits?.length);
+}
+
+function ActivationsPanel({ system }: { system: SystemView }) {
+  const activations = system.activations ?? [];
+  return <Panel id={`${system.id}-making-live`} title="Making it live" count={activations.length} intro="What landed stays. Strelva tells you when it settles.">
+    <ul className={styles.panelList}>{activations.map(activation => <li key={activation.id}>
+      <span><strong>{activation.title}</strong></span>
+      <small role="status">{activation.headline}{activation.partlyLive ? "" : ` · ${activation.done} of ${activation.total} done`}</small>
+      <ul className={styles.stepList} aria-label={`Steps of ${activation.title}`}>{activation.lines.map(line => <li key={line.label} data-state={line.state}>
+        <span>{line.label}</span><small>{line.state}{line.detail ? `: ${line.detail}` : ""}</small>
+      </li>)}</ul>
+    </li>)}</ul>
+  </Panel>;
+}
+
+function HistoryPanel({ system }: { system: SystemView }) {
+  const rows = system.history ?? [];
+  const when = (at: string) => {
+    const date = new Date(at);
+    return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  };
+  return <Panel id={`${system.id}-history`} title="History" count={0} intro="The last changes, newest first.">
+    <ul className={styles.panelList}>{rows.map(row => <li key={row.id}><span>{row.sentence}</span><small><time dateTime={row.at}>{when(row.at)}</time></small></li>)}</ul>
+  </Panel>;
 }
 
 /**
@@ -194,11 +231,19 @@ function SystemLink({ id, label, systemHref, onOpenSystem }: { id?: string; labe
 }
 
 function ConnectionsPanel({ system, systemHref, onOpenSystem, siteHref }: { system: SystemView; systemHref: (id: string) => string; onOpenSystem?: (id: string) => void; siteHref?: (tab: "connections" | "google") => string }) {
+  // Anything disconnected or unconfirmed shows in full; connected ones fold into one line.
+  const attention = system.connections.filter(connection => connection.status !== "connected");
+  const working = system.connections.filter(connection => connection.status === "connected");
+  const item = (connection: SystemConnection) => <li key={connection.id}>
+    <span>{connection.sentence}</span>
+    <small>{(connection.direction === "in" ? INCOMING_CONNECTION_LABEL : CONNECTION_KIND_LABEL)[connection.kind]} <SystemLink id={connection.systemId} label={connection.target} systemHref={systemHref} onOpenSystem={onOpenSystem} />{connection.status === "connected" ? "" : connection.status === "not_connected" ? " · Not connected" : " · Not confirmed"}</small>
+  </li>;
   return <Panel id={`${system.id}-connections`} title="Connections" count={system.connections.length} intro="What it works with.">
-    {system.connections.length ? <ul className={styles.panelList}>{system.connections.map(connection => <li key={connection.id}>
-      <span>{connection.sentence}</span>
-      <small>{(connection.direction === "in" ? INCOMING_CONNECTION_LABEL : CONNECTION_KIND_LABEL)[connection.kind]} <SystemLink id={connection.systemId} label={connection.target} systemHref={systemHref} onOpenSystem={onOpenSystem} />{connection.status === "connected" ? "" : connection.status === "not_connected" ? " · Not connected" : " · Not confirmed"}</small>
-    </li>)}</ul> : <p className="mt-3">Nothing else is connected to it yet.</p>}
+    {attention.length ? <ul className={styles.panelList}>{attention.map(item)}</ul> : null}
+    {working.length ? <details className={styles.fold}>
+      <summary>Works with {working.length} {working.length === 1 ? "thing" : "things"}</summary>
+      <ul className={styles.panelList}>{working.map(item)}</ul>
+    </details> : null}
     {system.offers?.map(offer => <p key={offer.kind} className="mt-3">{offer.label}. <Link className="underline" href={siteHref ? siteHref("google") : "/dashboard/google"}>Connect Google</Link></p>)}
     {siteHref ? <p className="mt-3"><Link className="underline" href={siteHref("connections")}>Accounts and sources this site uses</Link></p> : null}
   </Panel>;
@@ -209,7 +254,8 @@ async function requestMakeReal(request: typeof fetch, workspaceId: string, possi
     const response = await request("/api/workspace/systems/make-real", {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, possibilityId }),
     });
-    const body = await response.json().catch(() => null) as { result?: WorkspaceMakeRealResult; error?: string; permission?: string } | null;
+    const body = await response.json().catch(() => null) as { result?: WorkspaceMakeRealResult; live?: WorkspaceLiveMakeRealResult; error?: string; permission?: string } | null;
+    if (response.ok && body?.live) return { kind: "live", headline: body.live.headline, started: Boolean(body.live.activationId) };
     if (response.ok && body?.result) return { kind: "result", result: body.result };
     if (response.status === 403) return { kind: "permission", message: body?.error || "Only an owner of this business can make a possibility real." };
     return { kind: "error", message: `${body?.error || "Make real could not be confirmed."} Your live systems are unchanged.` };
@@ -219,6 +265,10 @@ async function requestMakeReal(request: typeof fetch, workspaceId: string, possi
 }
 
 function MakeRealState({ outcome, onAsk, title }: { outcome: MakeRealOutcome; onAsk: (request: string) => void; title: string }) {
+  if (outcome.kind === "live") return <div role="status" className={styles.makeRealNotice} aria-label="Make real result">
+    <h3>{outcome.headline}</h3>
+    <p>{outcome.started ? "Strelva is making it live now. Each step shows above as it lands; what lands stays." : "Nothing changed."}</p>
+  </div>;
   if (outcome.kind !== "result") return <p role={outcome.kind === "error" ? "alert" : "status"} className={styles.makeRealNotice}>{outcome.message}</p>;
   const { result } = outcome;
   return <div role="status" className={styles.makeRealNotice} aria-label="Make real result">
@@ -251,6 +301,7 @@ function PossibilitiesPanel({ system, systems, workspaceId, readOnly, readOnlyRe
       return <li key={possibility.id}>
         <span className={styles.possibilityHead}><strong>{possibility.title}</strong><span className={styles.lifecycle} data-lifecycle={possibility.status === "ready" ? "live" : "draft"}>{POSSIBILITY_STATUS_LABEL[possibility.status]}</span></span>
         <small>{possibility.summary}</small>
+        {possibility.staleReason ? <small role="note">{possibility.staleReason} Strelva is refreshing it.</small> : null}
         {possibility.evidence ? <small>{possibility.evidence}</small> : null}
         <small>Changes: {scope.join(", ")}</small>
         <span className={styles.possibilityActions}>

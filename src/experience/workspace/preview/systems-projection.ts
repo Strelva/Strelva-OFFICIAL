@@ -24,6 +24,7 @@ import { createPreviewRequest, type PreviewScenario } from "./fixture";
 import { MOONEY_TENANT } from "./systems-fixture";
 import { addPublishingSystems } from "@/products/publishing/projection";
 import { previewPublishingExtras, previewPublishingSnapshot, type PreviewPublishing } from "./publishing-fixture";
+import { withPreviewMakeReal, type PreviewMakeReal } from "./make-real-fixture";
 
 export interface PreviewSystems {
   systems: Record<string, WorkspaceSystems>;
@@ -95,8 +96,8 @@ function fixtureEvidence(scenario: PreviewScenario, input: Pick<SystemsProjectio
   return observations;
 }
 
-export async function previewSystems(scenario: PreviewScenario, options: { installedStaffRequest?: boolean; seededRequests?: boolean; systems: boolean; publishing?: PreviewPublishing }, now: number = Date.now()): Promise<PreviewSystems> {
-  const { systems: released, publishing: publishingMode = "off", ...fixtureOptions } = options;
+export async function previewSystems(scenario: PreviewScenario, options: { installedStaffRequest?: boolean; seededRequests?: boolean; systems: boolean; publishing?: PreviewPublishing; makeReal?: PreviewMakeReal }, now: number = Date.now()): Promise<PreviewSystems> {
+  const { systems: released, publishing: publishingMode = "off", makeReal: _makeReal, ...fixtureOptions } = options;
   if (!released) return { systems: {}, makeReal: {}, owners: [], released };
   const request = createPreviewRequest(scenario, fixtureOptions);
   const first = await (await request("/api/workspace")).json() as WorkspaceSnapshot;
@@ -122,7 +123,8 @@ export async function previewSystems(scenario: PreviewScenario, options: { insta
       actorId: PREVIEW_ACTOR.userId,
       now,
     };
-    const projection = await projectWorkspaceSystems({ ...base, observations: [...fixtureEvidence(scenario, { listing }, now), ...(published?.observations ?? [])] });
+    const projected = await projectWorkspaceSystems({ ...base, observations: [...fixtureEvidence(scenario, { listing }, now), ...(published?.observations ?? [])] });
+    const projection = scenario.startsWith("mooney") ? withPreviewMakeReal(projected, options.makeReal ?? "off", now) : projected;
     result.systems[workspace.id] = projection;
     for (const possibility of projection.possibilities.filter((item) => item.status === "ready")) {
       const made = await makeRealInSandbox(base, PREVIEW_ACTOR, possibility.id, { canActivate: true });

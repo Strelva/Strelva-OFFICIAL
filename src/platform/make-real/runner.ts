@@ -4,10 +4,10 @@ import { EFFECT_SCOPE, type DeclaredEffect, type Possibility, type SystemTarget 
 import { attachActivation, detachActivation, markMadeReal, returnToExploring, staleBaselines } from "@/platform/possibilities/engine";
 import type { PossibilityRepository } from "@/platform/possibilities/repository";
 import { activationSchema, type Activation, type ActivationStep } from "./contracts";
-import { approvalProblem, type ApprovalRecordsPort } from "./approvals";
+import { approvalProblem, planApprovalProblem, type ApprovalRecordsPort } from "./approvals";
 import { gatePublish } from "./governance";
 import { initialChecks, planActivation } from "./plan";
-import { BaselineMovedError, type AuthorityPort, type EffectAdapter, type LiveSystemsPort, type OperatingChecksPort } from "./ports";
+import { BaselineMovedError, selectAdapter, type AuthorityPort, type EffectAdapter, type LiveSystemsPort, type OperatingChecksPort } from "./ports";
 import type { ActivationRepository } from "./repository";
 
 /** A worker that started a step this recently may still be running it. */
@@ -27,6 +27,9 @@ export interface MakeRealDeps {
   checks: OperatingChecksPort;
   /** The approval store. Approval ids are only trusted once resolved here. */
   approvals: ApprovalRecordsPort;
+  /** Live Make real: every effect runs only under the owner's recorded plan
+   * approval, re-read before each step (spec section 3, behaviors 21-22). */
+  requirePlanApproval?: boolean;
   clock?: () => string;
   ids?: () => string;
 }
@@ -78,9 +81,9 @@ export function createMakeReal(deps: MakeRealDeps) {
     return p;
   }
 
-  function adapterFor(kind: DeclaredEffect["kind"]): EffectAdapter {
-    const adapter = deps.adapters.find((a) => a.kind === kind);
-    if (!adapter) conflict(`No ${kind} connection is available for this business.`);
+  function adapterFor(effect: Pick<DeclaredEffect, "kind" | "channel">): EffectAdapter {
+    const adapter = selectAdapter(deps.adapters, effect);
+    if (!adapter) conflict(`No ${effect.channel ?? effect.kind} connection is available for this business.`);
     return adapter;
   }
 
@@ -142,7 +145,7 @@ export function createMakeReal(deps: MakeRealDeps) {
       }
       case "effect": {
         const effect = p.effects.find((e) => e.id === step.target)!;
-        const adapter = adapterFor(effect.kind);
+        const adapter = adapterFor(effect);
         let result;
         try {
           result = await adapter.perform({ businessId: a.businessId, effect, idempotencyKey: step.idempotencyKey });
@@ -224,6 +227,14 @@ export function createMakeReal(deps: MakeRealDeps) {
     if (step.kind === "effect") {
       const effect = p.effects.find((e) => e.id === step.target)!;
       const publish = gatePublish(effect);
+      if (publish.kind === "allowed" && deps.requirePlanApproval) {
+        // Live Make real: the owner's plan approval covers every effect, and
+        // it is read again now, so a withdrawal after start stops the write.
+        const entry = a.approvals.find((x) => x.effectId === effect.id && !x.consumedAt);
+        if (!entry) return { denied: "Needs approval: the owner has not approved this plan." };
+        const problem = approvalProblem(await deps.approvals.get(a.businessId, entry.approvalId), a.businessId, p, effect);
+        if (problem) return { denied: `Needs approval: ${problem}.` };
+      }
       if (publish.kind === "blocked") return { denied: publish.reason, refused: true };
       if (publish.kind === "needs_approval") {
         const entry = a.approvals.find((x) => x.effectId === effect.id && !x.consumedAt);
@@ -231,6 +242,12 @@ export function createMakeReal(deps: MakeRealDeps) {
         // Re-read the record now: a dismissal after start must stop the write.
         const problem = approvalProblem(await deps.approvals.get(a.businessId, entry.approvalId), a.businessId, p, effect);
         if (problem) return { denied: `Needs approval: ${problem}.` };
+      }
+      const adapter = selectAdapter(deps.adapters, effect);
+      if (adapter?.ready) {
+        let ready: { ok: true } | { ok: false; reason: string };
+        try { ready = await adapter.ready({ businessId: a.businessId, effect }); } catch (error) { ready = { ok: false, reason: error instanceof Error ? error.message : "The connection could not be checked." }; }
+        if (!ready.ok) return { denied: `Waiting: ${ready.reason}` };
       }
     }
     return { grantId };
@@ -286,7 +303,7 @@ export function createMakeReal(deps: MakeRealDeps) {
 
   return {
     /** Pin, validate baselines and preflight every grant before anything runs. */
-    async start(actor: WorkspaceActor, businessId: string, possibilityId: string, opts: { approvals?: Array<{ effectId: string; approvalId: string }> } = {}): Promise<Activation> {
+    async start(actor: WorkspaceActor, businessId: string, possibilityId: string, opts: { approvals?: Array<{ effectId: string; approvalId: string }>; planApprovalId?: string } = {}): Promise<Activation> {
       let p = await loadPossibility(businessId, possibilityId);
       if (p.status !== "ready") conflict("Only a ready possibility can be made real.");
       if (p.activationId) conflict("This possibility is already being made real.");
@@ -306,12 +323,28 @@ export function createMakeReal(deps: MakeRealDeps) {
       for (const given of opts.approvals ?? []) {
         if (!p.effects.some((e) => e.id === given.effectId)) problems.push(`${given.effectId}: not an effect of this possibility`);
       }
+      let planRecord: Awaited<ReturnType<ApprovalRecordsPort["get"]>> = null;
+      if (opts.planApprovalId) {
+        if (p.consumedApprovalIds?.includes(opts.planApprovalId)) problems.push(`approval ${opts.planApprovalId} was already used by an accepted write`);
+        planRecord = await deps.approvals.get(businessId, opts.planApprovalId);
+        const problem = planApprovalProblem(planRecord, businessId, p);
+        if (problem) problems.push(`the plan approval was refused (${problem})`);
+      } else if (deps.requirePlanApproval) {
+        problems.push("the owner has not approved this plan");
+      }
       for (const effect of p.effects) {
-        if (!deps.adapters.some((x) => x.kind === effect.kind)) problems.push(`${effect.id}: no ${effect.kind} connection`);
+        if (!selectAdapter(deps.adapters, effect)) problems.push(`${effect.id}: no ${effect.channel ?? effect.kind} connection`);
         const decision = await deps.authority.check(actor, { businessId, scope: EFFECT_SCOPE[effect.kind] });
         if (!decision.allowed) problems.push(`${effect.id}: ${decision.reason}`);
         const publish = gatePublish(effect);
         if (publish.kind === "blocked") problems.push(`${effect.id}: ${publish.reason}`);
+        if (opts.planApprovalId && planRecord && publish.kind !== "blocked") {
+          // One approval for the whole plan; each effect must still sit inside it.
+          const problem = approvalProblem(planRecord, businessId, p, effect);
+          if (problem) { problems.push(`${effect.id}: approval refused (${problem})`); continue; }
+          verified.push({ effectId: effect.id, approvalId: opts.planApprovalId, approvedBy: planRecord.decidedBy ?? `approval:${opts.planApprovalId}`, at });
+          continue;
+        }
         if (publish.kind !== "needs_approval") continue;
         const given = opts.approvals?.find((x) => x.effectId === effect.id);
         if (!given) { problems.push(`${effect.id}: needs approval (${publish.reason})`); continue; }
@@ -347,7 +380,7 @@ export function createMakeReal(deps: MakeRealDeps) {
 
     /** Continue only unfinished work. Accepted effects are never replayed; an
      * interrupted effect is resolved by provider lookup on its idempotency key. */
-    async resume(actor: WorkspaceActor, businessId: string, id: string): Promise<Activation> {
+    async resume(actor: WorkspaceActor, businessId: string, id: string, note?: string): Promise<Activation> {
       const a = await load(businessId, id);
       if (a.status === "made_real" || a.status === "rolled_back") conflict("This activation is closed.");
       if (a.rollbackStartedAt) conflict("Rollback has started. Reconcile any unknown step and finish the rollback instead.");
@@ -357,8 +390,8 @@ export function createMakeReal(deps: MakeRealDeps) {
           if (Date.parse(now()) - Date.parse(step.startedAt ?? now()) < RUNNING_STEP_GRACE_MS) conflict("A worker may still be running this step. Wait before resuming.");
           if (step.kind !== "effect") { step.status = "pending"; step.leaseId = undefined; notes.push(`${step.id}: internal, resumed`); continue; }
           const effect = (await loadPossibility(businessId, a.possibilityId)).effects.find((e) => e.id === step.target)!;
-          const adapter = adapterFor(effect.kind);
-          const found = await adapter.find({ businessId, idempotencyKey: step.idempotencyKey });
+          const adapter = adapterFor(effect);
+          const found = await adapter.find({ businessId, idempotencyKey: step.idempotencyKey, effect });
           step.leaseId = undefined;
           if (found?.found) {
             const rb = await adapter.readBack({ businessId, providerRef: found.providerRef }).catch((e: unknown) => ({ ok: false, detail: e instanceof Error ? e.message : "Read-back failed." }));
@@ -384,7 +417,7 @@ export function createMakeReal(deps: MakeRealDeps) {
       if (a.steps.some((s) => s.kind === "verify" && s.status === "pending")) a.checks = a.checks.map((c) => ({ id: c.id, description: c.description, status: "pending" }));
       a.status = "in_progress";
       a.status = deriveStatus(a);
-      const next = record(a, "resume", actor.userId, now(), notes.join("; ") || undefined);
+      const next = record(a, "resume", actor.userId, now(), [note, ...notes].filter(Boolean).join("; ") || undefined);
       await deps.activations.save(next, a.revision);
       if (next.status !== "in_progress") return next;
       return run(actor, businessId, id);
@@ -414,7 +447,7 @@ export function createMakeReal(deps: MakeRealDeps) {
 
     /** Operator evidence for an unknown outcome. An accepted write can never
      * be declared safe to replay. */
-    async reconcile(actor: WorkspaceActor, businessId: string, id: string, input: { stepId: string; resolution: "completed" | "not_applied"; evidence: string; providerRef?: string }): Promise<Activation> {
+    async reconcile(actor: WorkspaceActor, businessId: string, id: string, input: { stepId: string; resolution: "completed" | "not_applied"; evidence: string; providerRef?: string; note?: string }): Promise<Activation> {
       const a = await load(businessId, id);
       const step = a.steps.find((s) => s.id === input.stepId);
       // Declaring what happened outside is an authority act, rechecked now.
@@ -424,7 +457,8 @@ export function createMakeReal(deps: MakeRealDeps) {
       if (input.resolution === "not_applied" && step.effect === "accepted") conflict("An accepted write cannot be declared safe to replay.");
       if (input.resolution === "completed") {
         step.status = "completed"; step.effect = "accepted";
-        step.receipt = { adapterMode: step.effectKind ? adapterFor(step.effectKind).mode : "internal", acceptedAt: now(), reconciledBy: "operator_evidence", ...(input.providerRef ? { providerRef: input.providerRef } : {}) };
+        const declared = step.kind === "effect" ? (await loadPossibility(businessId, a.possibilityId)).effects.find((e) => e.id === step.target) : undefined;
+        step.receipt = { adapterMode: declared ? adapterFor(declared).mode : "internal", acceptedAt: now(), reconciledBy: "operator_evidence", ...(input.providerRef ? { providerRef: input.providerRef } : {}) };
       } else {
         step.status = "failed"; step.effect = "none";
       }
@@ -432,7 +466,7 @@ export function createMakeReal(deps: MakeRealDeps) {
       step.finishedAt = now();
       a.status = "in_progress";
       a.status = deriveStatus(a);
-      const next = record(a, "reconcile", actor.userId, now(), `${step.id}: ${input.resolution}`);
+      const next = record(a, "reconcile", actor.userId, now(), `${step.id}: ${input.resolution}${input.note ? ` (${input.note})` : ""}`);
       await deps.activations.save(next, a.revision);
       return settle(actor, next);
     },
@@ -444,7 +478,7 @@ export function createMakeReal(deps: MakeRealDeps) {
      * `rolled_back` until it is reconciled with evidence; calling rollback
      * again then finishes it. Each undone step is checkpointed on its own so
      * an interrupted rollback resumes instead of repeating live writes. */
-    async rollback(actor: WorkspaceActor, businessId: string, id: string): Promise<Activation> {
+    async rollback(actor: WorkspaceActor, businessId: string, id: string, note?: string): Promise<Activation> {
       let a = await load(businessId, id);
       if (a.status === "made_real") conflict("This is already real. Change it with a new possibility instead of rolling back.");
       if (a.status === "rolled_back") return a;
@@ -461,7 +495,7 @@ export function createMakeReal(deps: MakeRealDeps) {
       };
       if (!a.rollbackStartedAt) {
         a.rollbackStartedAt = now();
-        await checkpoint("rollback_started");
+        await checkpoint("rollback_started", note);
       }
 
       for (const stepId of [...a.steps].reverse().map((s) => s.id)) {
@@ -487,7 +521,7 @@ export function createMakeReal(deps: MakeRealDeps) {
           }
         } else if (step.kind === "effect" && step.effect === "accepted") {
           const effect = p.effects.find((e) => e.id === step.target)!;
-          const adapter = adapterFor(effect.kind);
+          const adapter = adapterFor(effect);
           if (step.reversibility === "compensable" && adapter.compensate && step.receipt?.providerRef) {
             const r = await adapter.compensate({ businessId, providerRef: step.receipt.providerRef, idempotencyKey: `${step.idempotencyKey}:compensate` });
             if (r.ok) { step.status = "compensated"; step.reason = r.detail; } else { step.reason = `Compensation failed: ${r.detail}`; }

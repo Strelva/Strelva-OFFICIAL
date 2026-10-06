@@ -106,7 +106,10 @@ production.
   longer ride `STRELVA_WORKSPACE_RELEASE`, which production turned on Sept 30.
   Make real still runs on fake effects. On branch `build/versions-agency`
   (local only), Make real progress and Versions have Postgres stores
-  proven against a throwaway cluster; neither is applied anywhere.
+  proven against a throwaway cluster; neither is applied anywhere. On
+  branch `w2/systems-live` (local only, Oct 6) Possibilities are in
+  Postgres and Make real has five live channel adapters behind per-channel
+  flags that are all off; no live effect has run outside tests.
 - **Lead copies are deleted with their tenant.** `tenant_leads` cascades on
   tenant delete. Whether a deprovisioned client's leads are kept is Jacob's
   call.
@@ -503,6 +506,14 @@ switch, every `--i-have-jacobs-yes` command in order, the per-client
 conversion runbook, the Google console checks and the Preview plan.
 
 - The Systems spine migration `20261004120000_systems.sql` and every Oct 7 build-stream migration.
+- Possibilities and Make real live (branch `w2/systems-live`, local only):
+  `20261008130000_system_possibilities.sql` (Possibilities tables, the stale
+  trigger on `systems`, adoption trigger on `tenant_workspace_links`) and
+  `20261008131000_make_real_live.sql` (replaces `workspace_release_flag_names()`
+  to add five `make_real_live:<channel>` keys). Each needs its own yes, after
+  the Systems spine and the Oct 7 needs-you and activation migrations.
+- Turning on any `make_real_live:<channel>` flag, and the
+  `STRELVA_MAKE_REAL_LIVE` env value, per client.
 - Each production migration: the client lead store (Oct 5, can go first and
   alone), the three Oct 1 website migrations, the business record,
   tenant-to-workspace links, inquiry and booking stores.

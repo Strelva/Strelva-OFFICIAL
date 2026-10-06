@@ -90,8 +90,13 @@ export function createSystemStoreLiveSystems(options: SystemStoreLiveSystemsOpti
     }
   }
 
+  // A pinned baseline is a SystemRevisionRef; the store takes a bare SystemRef
+  // and its Postgres implementation refuses extra keys.
+  const bare = (ref: SystemRef): SystemRef => ({ businessId: ref.businessId, systemId: ref.systemId });
+
   return {
-    async current(ref) {
+    async current(raw) {
+      const ref = bare(raw);
       const detail = await store.readSystem(actor, ref);
       const pointer = detail.system.currentRevision;
       if (!pointer) return null;
@@ -123,14 +128,16 @@ export function createSystemStoreLiveSystems(options: SystemStoreLiveSystemsOpti
       return { systemId: system.id, revisionId: revision.id };
     },
 
-    async activate(ref, revisionId, expectedCurrent) {
+    async activate(raw, revisionId, expectedCurrent) {
+      const ref = bare(raw);
       const system = await swap(ref, revisionId, expectedCurrent);
       if (system.lifecycle === "draft") {
         await store.transitionLifecycle(actor, ref, system.changeNumber, "live");
       }
     },
 
-    async restore(ref, revisionId, expectedCurrent) {
+    async restore(raw, revisionId, expectedCurrent) {
+      const ref = bare(raw);
       if (revisionId !== null) {
         await swap(ref, revisionId, expectedCurrent);
         return;

@@ -19,7 +19,7 @@ import type { SourceAdapter } from "./adapters";
 import type { NeedsYouStore } from "./repository";
 import { createNeedsYouService, type DecideStatus, type NeedsYouDeps } from "./service";
 import type { WorkspaceMakeRealResult } from "@/experience/workspace/contracts";
-import { makeRealAdapter, needsYouMakeRealApprovals } from "./sources/make-real";
+import { makeRealAdapter, needsYouMakeRealApprovals, type ReadyPlan } from "./sources/make-real";
 import { versionReleaseAdapter, type PendingVersionRelease } from "./sources/version-release";
 
 function systemsOn(workspaceId: string, actor: WorkspaceActor): Promise<boolean> {
@@ -61,12 +61,31 @@ async function pendingVersionReleases(actor: WorkspaceActor, workspaceId: string
   return pending;
 }
 
+/** Stored plans with a live channel on (systems-live). Lazy: the live bindings load the write paths. */
+async function liveReadyPlans(workspaceId: string): Promise<ReadyPlan[]> {
+  const { readLiveReadyPlans } = await import("@/platform/make-real/live-server");
+  return readLiveReadyPlans(workspaceId);
+}
+
+/**
+ * The one `make_real` Needs you source. Plans come from two places: the
+ * per-request website-rebuild Possibilities (run on the isolated copy) and,
+ * where a live channel is on, the stored Possibilities (run live, durably,
+ * src/platform/make-real/live.ts). Same item shape, same
+ * `<possibility>@<revision>` source id, same approval reader.
+ */
 function makeRealSource(store: NeedsYouStore, onResult?: (result: WorkspaceMakeRealResult) => void): SourceAdapter {
   return makeRealAdapter({
     enabled: systemsOn,
     readyPlans: async (actor, workspaceId) => readyMakeRealPlans(await liveDeps(actor, workspaceId)),
+    livePlans: liveReadyPlans,
     policies: (actor, workspaceId) => store.policies(actor, workspaceId),
     async start(actor, workspaceId, possibilityId, approvalId) {
+      const live = (await liveReadyPlans(workspaceId)).find((plan) => plan.possibilityId === possibilityId);
+      if (live) {
+        const { startLiveMakeReal } = await import("@/platform/make-real/live-server");
+        return startLiveMakeReal({ actor, workspaceId, possibilityId, approvalId, title: live.title });
+      }
       const result = await makeRealForWorkspace(await liveDeps(actor, workspaceId), possibilityId, { canActivate: true }, {
         planApproval: { approvalId, approvals: needsYouMakeRealApprovals((ws, id) => store.read(ws, id)) },
       });
@@ -86,7 +105,7 @@ export async function makeRealThroughNeedsYou(
   workspaceId: string,
   possibilityId: string,
   deps: { store: NeedsYouStore; appOrigin: string; sendEmail: NeedsYouDeps["sendEmail"]; adapter?: (onResult: (result: WorkspaceMakeRealResult) => void) => SourceAdapter },
-): Promise<{ status: DecideStatus; result: WorkspaceMakeRealResult | null; reason: string | null } | null> {
+): Promise<{ status: DecideStatus; result: WorkspaceMakeRealResult | null; reason: string | null; receiptRef: string | null } | null> {
   let captured: WorkspaceMakeRealResult | null = null;
   const capture = (result: WorkspaceMakeRealResult) => { captured = result; };
   const service = createNeedsYouService({
@@ -101,7 +120,7 @@ export async function makeRealThroughNeedsYou(
     .find((row) => row.state === "open" && row.sourceLifecycle === "make_real" && row.sourceId.startsWith(`${possibilityId}@`));
   if (!item) return null;
   const decided = await service.decide({ workspaceId, itemId: item.id, revision: item.revisionHash, decision: "approve", by: { kind: "session", actor } });
-  return { status: decided.status, result: captured, reason: decided.item?.outcomeReason ?? null };
+  return { status: decided.status, result: captured, reason: decided.item?.outcomeReason ?? null, receiptRef: decided.item?.receiptRef ?? null };
 }
 
 export function systemsSourceAdapters(store: NeedsYouStore): SourceAdapter[] {

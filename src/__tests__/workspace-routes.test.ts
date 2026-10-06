@@ -180,7 +180,7 @@ describe("release-one private workspace routes", () => {
     const customer = await (await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${otherId}`))).json();
     expect(customer.systems).toEqual(systems);
     expect(customer.releases).toEqual({ systems: true, needsYou: false, ask: false, inquiries: false, websiteRebuild: false });
-    expect(mocks.systems).toHaveBeenCalledWith({ actor: { userId: "actor", verifiedEmail: "owner@example.com" }, businessId: otherId, savedWork: [work], siteDomains: new Map([["mooney-firm", "www.attymooney.com"]]) });
+    expect(mocks.systems).toHaveBeenCalledWith({ actor: { userId: "actor", verifiedEmail: "owner@example.com" }, businessId: otherId, savedWork: [work], canWrite: true, siteDomains: new Map([["mooney-firm", "www.attymooney.com"]]) });
 
     mocks.systems.mockClear();
     const personal = await (await GET(new Request("https://strelva.com/api/workspace"))).json();

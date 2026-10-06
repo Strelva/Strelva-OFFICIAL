@@ -18,6 +18,8 @@ vi.mock("@/platform/workspace-exit", () => ({ readWorkspaceExit: deps.exit }));
 vi.mock("@/products/managed-presence/server", () => ({ listManagedPresenceWork: async () => ({ managedWork: [{ id: "mooney-firm", domain: "www.attymooney.com" }] }) }));
 vi.mock("@/experience/systems/server", () => ({ makeRealForWorkspace: deps.makeReal }));
 vi.mock("@/platform/needs-you/systems-sources", () => ({ makeRealThroughNeedsYou: deps.throughNeedsYou }));
+const path = vi.hoisted(() => ({ makeRealPath: vi.fn() }));
+vi.mock("@/experience/systems/live-make-real", () => ({ liveMakeRealPorts: async () => ({}), makeRealPath: path.makeRealPath }));
 
 import { POST } from "@/app/api/workspace/systems/make-real/route";
 import { setReleaseFlagsDb } from "@/platform/release-flags/store";
@@ -37,6 +39,7 @@ describe("POST /api/workspace/systems/make-real", () => {
     deps.exit.mockReset().mockResolvedValue({ state: null });
     deps.makeReal.mockReset().mockResolvedValue(RESULT);
     deps.limited.mockReset().mockResolvedValue(false);
+    path.makeRealPath.mockReset().mockImplementation(async (_actor: unknown, _ws: string, possibilityId: string) => ({ kind: "isolated", possibilityId }));
     vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "1");
     vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
     setReleaseFlagsDb({ rpc: async () => ({ data: { workspaceId: BUSINESS, flags: {}, testers: [] }, error: null }) });
@@ -123,7 +126,7 @@ describe("POST /api/workspace/systems/make-real", () => {
   describe("with Needs you on: the tap is the owner's one approval for the plan", () => {
     beforeEach(() => {
       vi.stubEnv("STRELVA_NEEDS_YOU_RELEASE", "1");
-      deps.throughNeedsYou.mockReset().mockResolvedValue({ status: "done", result: RESULT, reason: null });
+      deps.throughNeedsYou.mockReset().mockResolvedValue({ status: "done", result: RESULT, reason: null, receiptRef: null });
     });
 
     it("decides the plan's Needs you item and returns Make real's result", async () => {
@@ -156,5 +159,28 @@ describe("POST /api/workspace/systems/make-real", () => {
       expect((await call()).status).toBe(403);
       expect(deps.throughNeedsYou).not.toHaveBeenCalled();
     });
+  });
+
+  it("answers the live result when a live channel is on, and never runs the isolated copy then", async () => {
+    const live = { live: true, status: "done_unverified", headline: "Partly live", activationId: "act-1" };
+    path.makeRealPath.mockResolvedValue({ kind: "live", result: live });
+    const response = await call({ workspaceId: BUSINESS, possibilityId: "a0000000-0000-4000-8000-0000000000aa" });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ live });
+    expect(deps.makeReal).not.toHaveBeenCalled();
+  });
+
+  it("runs a stored possibility on the isolated copy of its rebuild while no live channel is on", async () => {
+    path.makeRealPath.mockResolvedValue({ kind: "isolated", possibilityId: "website-rebuild:w9" });
+    expect((await call({ workspaceId: BUSINESS, possibilityId: "a0000000-0000-4000-8000-0000000000aa" })).status).toBe(200);
+    expect(deps.makeReal).toHaveBeenCalledWith(expect.anything(), "website-rebuild:w9", { canActivate: true });
+    path.makeRealPath.mockResolvedValue(null);
+    expect((await call({ workspaceId: BUSINESS, possibilityId: "a0000000-0000-4000-8000-0000000000bb" })).status).toBe(404);
+  });
+
+  it("decides nothing for a member: the owner check comes first", async () => {
+    deps.workspaces.mockResolvedValue([{ id: BUSINESS, kind: "customer", name: "The Mooney Firm", access: "member", role: "member" }]);
+    expect((await call({ workspaceId: BUSINESS, possibilityId: "a0000000-0000-4000-8000-0000000000aa" })).status).toBe(403);
+    expect(path.makeRealPath).not.toHaveBeenCalled();
   });
 });

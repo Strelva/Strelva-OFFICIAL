@@ -123,6 +123,19 @@ async function workspaceWebsiteBlockers(tenantId: string): Promise<{ publication
   return { publications: Number(row?.publications ?? 0), reservations: Number(row?.reservations ?? 0) };
 }
 
+/** Pause every stored System adopted from this tenant (pause_tenant_systems). */
+export async function pauseStoredSystems(tenantId: string): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+  const call = rpc();
+  if (!call) return { ok: true, count: 0 };
+  try {
+    const { data, error } = await call("pause_tenant_systems", { p_tenant_id: tenantId });
+    if (error) return { ok: false, error: (error.message ?? "unknown error").slice(0, 200) };
+    return { ok: true, count: Number(data ?? 0) };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message.slice(0, 200) : "unknown error" };
+  }
+}
+
 /** Delete every tenant-scoped row and the tenant in one transaction. */
 async function deleteTenantRowsAtomically(tenantId: string): Promise<Record<string, number>> {
   const call = rpc();
@@ -301,6 +314,16 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
     const n = await countRows(table, tenantId);
     pgTotal += n;
     if (n > 0) found.push([table, n]);
+  }
+  // A converted business keeps its stored Systems (and their history); they
+  // must read Paused, never Live, for a site that is gone. Done before the
+  // purge, while the tenant's stable id still resolves. Best effort: a
+  // failure is reported and never blocks the deprovision.
+  if (executed) {
+    const paused = await pauseStoredSystems(tenantId);
+    summary.postgres!.push({ target: "systems", found: paused.ok ? paused.count : "?", deleted: false, detail: paused.ok ? "stored Systems paused; records kept" : `stored Systems not paused: ${paused.error}` });
+  } else {
+    summary.postgres!.push({ target: "systems", found: "?", deleted: false, detail: "would pause any stored Systems (dry run)" });
   }
   const removed = executed ? await deleteTenantRowsAtomically(tenantId) : {};
   for (const [table, n] of found) {

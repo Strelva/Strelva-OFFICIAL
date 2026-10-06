@@ -18,7 +18,7 @@
  * nothing live changes. The outcome says so instead of claiming it went live.
  */
 import type { WorkspaceActor } from "@/platform/workspaces/types";
-import type { ApprovalRecord, ApprovalRecordsPort } from "@/platform/make-real/approvals";
+import { createNeedsYouApprovalRecords, makeRealSourceId, splitMakeRealSource, type ApprovalRecordsPort } from "@/platform/make-real/approvals";
 import { evaluateRoute } from "../evaluator";
 import type { OwnerDecision, PolicySetting, ProposedItem } from "../contracts";
 import type { SourceAdapter } from "../adapters";
@@ -32,6 +32,10 @@ export interface ReadyPlan {
   affects: string[];
   introducesSystem: boolean;
   systemId: string;
+  /** A stored Possibility with a live Make real channel on: runs live (src/platform/make-real/live.ts), not on the isolated copy. */
+  live?: boolean;
+  /** Where the owner tries it first (the signed "Try it" link for live plans). */
+  openHref?: string;
 }
 
 export interface MakeRealRunResult {
@@ -40,27 +44,23 @@ export interface MakeRealRunResult {
   isolated: boolean;
   liveUnchanged: boolean;
   headline: string;
+  /** A live run's activation id (the receipt). */
+  activationId?: string;
 }
 
 export interface MakeRealSourcePorts {
   /** Systems (and so Make real) is on for this business. */
   enabled(workspaceId: string, actor: WorkspaceActor): Promise<boolean>;
   readyPlans(actor: WorkspaceActor, workspaceId: string): Promise<ReadyPlan[]>;
+  /** Live plans (stored Possibilities with a live channel on), readable without a session, so an owner who never signs in still gets the ask. */
+  livePlans?(workspaceId: string): Promise<ReadyPlan[]>;
   policies(actor: WorkspaceActor, workspaceId: string): Promise<PolicySetting[]>;
   /** Make real's own resolver, started with the owner's plan approval. Null: the plan is no longer this business's. */
   start(actor: WorkspaceActor, workspaceId: string, possibilityId: string, approvalId: string): Promise<MakeRealRunResult | null>;
 }
 
-const SOURCE = /^(.+)@(\d+)$/;
-
-export function makeRealSourceId(possibilityId: string, candidateRevision: number): string {
-  return `${possibilityId}@${candidateRevision}`;
-}
-
-function splitSource(sourceId: string): { possibilityId: string; candidateRevision: number } | null {
-  const match = SOURCE.exec(sourceId);
-  return match ? { possibilityId: match[1]!, candidateRevision: Number(match[2]) } : null;
-}
+export { makeRealSourceId };
+const splitSource = splitMakeRealSource;
 
 export function makeRealItem(plan: ReadyPlan, workspaceId: string, policies: readonly PolicySetting[]): ProposedItem | null {
   if (!/^[0-9a-f]{64}$/.test(plan.fingerprint)) return null;
@@ -82,31 +82,34 @@ export function makeRealItem(plan: ReadyPlan, workspaceId: string, policies: rea
     urgent: false,
     // Approve Make real: the owner, one tap. Not an admin (spec authority table).
     adminMayDecide: false,
-    openHref: `/workspace?view=system&system=${encodeURIComponent(plan.systemId)}&workspaceId=${encodeURIComponent(workspaceId)}`,
+    openHref: plan.openHref ?? `/workspace?view=system&system=${encodeURIComponent(plan.systemId)}&workspaceId=${encodeURIComponent(workspaceId)}`,
   };
 }
 
 export function makeRealAdapter(ports: MakeRealSourcePorts): SourceAdapter {
-  async function plans(actor: WorkspaceActor, workspaceId: string): Promise<ReadyPlan[]> {
-    if (!(await ports.enabled(workspaceId, actor))) return [];
-    return ports.readyPlans(actor, workspaceId);
+  async function plans(actor: WorkspaceActor | undefined, workspaceId: string): Promise<ReadyPlan[]> {
+    const live = ports.livePlans ? await ports.livePlans(workspaceId) : [];
+    const isolated = actor && (await ports.enabled(workspaceId, actor)) ? await ports.readyPlans(actor, workspaceId) : [];
+    const liveIds = new Set(live.map((plan) => plan.possibilityId));
+    return [...live, ...isolated.filter((plan) => !liveIds.has(plan.possibilityId))];
   }
   return {
     lifecycle: "make_real",
     needsMemberActor: true,
     async propose(ctx) {
-      if (!ctx.actor) return { items: [], complete: false };
+      if (!ctx.actor && !ports.livePlans) return { items: [], complete: false };
       try {
         const ready = await plans(ctx.actor, ctx.workspaceId);
-        if (!ready.length) return { items: [], complete: true };
-        const policies = await ports.policies(ctx.actor, ctx.workspaceId).catch(() => []);
-        return { items: ready.flatMap((plan) => makeRealItem(plan, ctx.workspaceId, policies) ?? []), complete: true };
+        // Without a session only live plans can be read: the rest are unknown, not absent.
+        if (!ready.length) return { items: [], complete: Boolean(ctx.actor) };
+        const policies = ctx.actor ? await ports.policies(ctx.actor, ctx.workspaceId).catch(() => []) : [];
+        return { items: ready.flatMap((plan) => makeRealItem(plan, ctx.workspaceId, policies) ?? []), complete: Boolean(ctx.actor) };
       } catch {
         return { items: [], complete: false };
       }
     },
     async currentRevision(ctx, sourceId) {
-      if (!ctx.actor) return null;
+      if (!ctx.actor && !ports.livePlans) return null;
       const source = splitSource(sourceId);
       if (!source) return null;
       const plan = (await plans(ctx.actor, ctx.workspaceId)).find((item) => item.possibilityId === source.possibilityId);
@@ -128,7 +131,7 @@ export function makeRealAdapter(ports: MakeRealSourcePorts): SourceAdapter {
         return { outcome: "failed", reason: `make_real_refused: ${error instanceof Error ? error.message : "unknown"}`.slice(0, 500) };
       }
       if (!result) return { outcome: "failed", reason: "possibility_unavailable" };
-      const receiptRef = `make_real:${source.possibilityId}@${source.candidateRevision}`;
+      const receiptRef = result.activationId ?? `make_real:${source.possibilityId}@${source.candidateRevision}`;
       if (result.isolated || result.liveUnchanged) {
         return { outcome: "done", reason: `Approved. Make real ran on an isolated copy: nothing live changed yet. ${result.headline}`.slice(0, 500), receiptRef };
       }
@@ -138,29 +141,11 @@ export function makeRealAdapter(ports: MakeRealSourcePorts): SourceAdapter {
 }
 
 /**
- * Make real's approval store, read from Needs you. An approval id is an
- * owner_decisions id of lifecycle `make_real`; it approves only while that
- * item is `approved` and its outcome isn't `failed`. The subject is the plan
- * the owner saw: possibility, candidate revision and plan fingerprint.
+ * Make real's approval store, read from Needs you: the one reader
+ * (createNeedsYouApprovalRecords) for isolated and live runs alike. An
+ * approval id is an owner_decisions id of lifecycle `make_real`; it approves
+ * only while that item is `approved` and its outcome isn't `failed`.
  */
 export function needsYouMakeRealApprovals(read: (workspaceId: string, itemId: string) => Promise<OwnerDecision | null>): ApprovalRecordsPort {
-  return {
-    async get(businessId, approvalId) {
-      if (!/^[0-9a-f-]{36}$/i.test(approvalId)) return null;
-      const item = await read(businessId, approvalId).catch(() => null);
-      if (!item || item.workspaceId !== businessId || item.sourceLifecycle !== "make_real") return null;
-      const source = splitSource(item.sourceId);
-      if (!source) return null;
-      const status: ApprovalRecord["status"] = item.state === "approved" && item.outcome !== "failed" ? "approved"
-        : item.state === "open" ? "pending" : "dismissed";
-      return {
-        id: item.id,
-        businessId,
-        subject: { kind: "make_real_plan", possibilityId: source.possibilityId, candidateRevision: source.candidateRevision, fingerprint: item.revisionHash },
-        status,
-        ...(item.decidedByKind ? { decidedBy: `needs-you:${item.decidedByKind}` } : {}),
-        ...(item.decidedAt ? { decidedAt: item.decidedAt } : {}),
-      };
-    },
-  };
+  return createNeedsYouApprovalRecords({ read: async (workspaceId, itemId) => read(workspaceId, itemId).catch(() => null) });
 }

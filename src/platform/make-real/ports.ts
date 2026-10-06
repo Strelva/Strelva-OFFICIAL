@@ -1,5 +1,5 @@
 import type { WorkspaceActor } from "@/platform/workspaces/types";
-import type { AuthorityScope, DeclaredEffect, EffectKind, ProposedConnection, Reversibility, SystemIntroduction } from "@/platform/possibilities/contracts";
+import type { AuthorityScope, DeclaredEffect, EffectKind, MakeRealChannel, ProposedConnection, Reversibility, SystemIntroduction } from "@/platform/possibilities/contracts";
 import type { IsolatedEffectRehearsal, LiveSystemsReader } from "@/platform/possibilities/ports";
 import type { SystemRef } from "@/platform/systems/contracts";
 import type { Activation } from "./contracts";
@@ -15,16 +15,37 @@ export type EffectPerformResult =
 export interface EffectAdapter extends IsolatedEffectRehearsal {
   readonly kind: EffectKind;
   readonly mode: "isolated" | "live";
+  /** The write path a live adapter wraps. An adapter with no channel serves
+   * any effect of its kind (the isolated fakes); a channel adapter serves only
+   * effects that name its channel. */
+  readonly channel?: MakeRealChannel;
   /** True when the provider itself dedupes on the idempotency key, so a replay
    * with the same key after an interrupted attempt cannot create a duplicate. */
   readonly idempotentByKey: boolean;
   reversibility(effect: DeclaredEffect): Reversibility;
+  /** Checked right before the step, after authority: not ready blocks the
+   * step without attempting it ("Waiting: reason"), so it is safe to resume. */
+  ready?(input: { businessId: string; effect: DeclaredEffect }): Promise<{ ok: true } | { ok: false; reason: string }>;
   perform(input: { businessId: string; effect: DeclaredEffect; idempotencyKey: string }): Promise<EffectPerformResult>;
   /** Look up whether an earlier attempt with this key was accepted. `null`
-   * means the provider cannot answer, which leaves the step unknown. */
-  find(input: { businessId: string; idempotencyKey: string }): Promise<{ found: true; providerRef: string } | { found: false } | null>;
+   * means the provider cannot answer, which leaves the step unknown. The
+   * declared effect is passed when known, for providers keyed by its content. */
+  find(input: { businessId: string; idempotencyKey: string; effect?: DeclaredEffect }): Promise<{ found: true; providerRef: string } | { found: false } | null>;
   readBack(input: { businessId: string; providerRef: string }): Promise<{ ok: boolean; detail: string }>;
   compensate?(input: { businessId: string; providerRef: string; idempotencyKey: string }): Promise<{ ok: boolean; detail: string }>;
+}
+
+/**
+ * The adapter for one declared effect: the one wrapping its channel, else an
+ * adapter of its kind that names no channel (an isolated fake). A live
+ * channel adapter never serves an effect that names another channel or none.
+ */
+export function selectAdapter<A extends Pick<EffectAdapter, "kind" | "channel">>(adapters: readonly A[], effect: Pick<DeclaredEffect, "kind" | "channel">): A | undefined {
+  if (effect.channel) {
+    const exact = adapters.find((a) => a.kind === effect.kind && a.channel === effect.channel);
+    if (exact) return exact;
+  }
+  return adapters.find((a) => a.kind === effect.kind && !a.channel);
 }
 
 export class BaselineMovedError extends Error {

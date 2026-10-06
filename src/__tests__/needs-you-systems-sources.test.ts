@@ -95,9 +95,9 @@ describe("one owner approval per Make real plan", () => {
     const record = { id: "plan-1", businessId: BIZ, subject: planApprovalSubject(p), status: "approved" as const };
     expect(approvalProblem(record, BIZ, p, p.effects[0]!)).toBeNull();
     const stranger = { ...p.effects[0]!, id: "smuggled", request: { minutes: 600 } };
-    expect(approvalProblem(record, BIZ, p, stranger)).toBe("the effect is not part of the approved plan");
+    expect(approvalProblem(record, BIZ, p, stranger)).toBe("the approval is for a different effect");
     const changed = { ...p, effects: [{ ...p.effects[0]!, request: { minutes: 90 } }, p.effects[1]!] };
-    expect(approvalProblem(record, BIZ, changed, changed.effects[0]!)).toBe("the approval was given for a different plan");
+    expect(approvalProblem(record, BIZ, changed, changed.effects[0]!)).toBe("the approval was given for different content");
     expect(approvalProblem({ ...record, status: "pending" }, BIZ, p, p.effects[0]!)).toBe("the approval is pending");
     expect(approvalProblem({ ...record, businessId: "elsewhere" }, BIZ, p, p.effects[0]!)).toMatch(/no approval record/);
     // An effect approval still works the old way.
@@ -111,8 +111,9 @@ describe("one owner approval per Make real plan", () => {
     expect(planFingerprint({ ...p, changes: [{ ...p.changes[0]!, candidate: { summary: "Deposit on booking", content: { deposit: 9999 } } }] })).not.toBe(base);
     expect(planFingerprint({ ...p, candidateRevision: p.candidateRevision + 1 })).not.toBe(base);
     expect(planFingerprint({ ...p, introduces: [{ key: "consult", name: "Consult booking", purpose: "Book consults", candidate: { summary: "x", content: {} }, extractedFrom: [], conflicts: [] }] })).not.toBe(base);
-    // A pinned baseline revision is live state, checked separately: not part of what the owner approved.
-    expect(planFingerprint({ ...p, changes: [{ ...p.changes[0]!, baseline: { ...p.changes[0]!.baseline, revisionId: "other-revision" } }] })).toBe(base);
+    // One fingerprint for isolated and live plans (integration, Oct 6): the pinned baseline revision is
+    // part of it, so a live change underneath the plan supersedes the owner's ask.
+    expect(planFingerprint({ ...p, changes: [{ ...p.changes[0]!, baseline: { ...p.changes[0]!.baseline, revisionId: "other-revision" } }] })).not.toBe(base);
   });
 
   it("a dismissal after start stops the next write", async () => {
@@ -197,7 +198,7 @@ describe("the make_real source", () => {
     const [item] = (await ny.list(owner, BIZ)).items;
     const result = await ny.decide({ workspaceId: BIZ, itemId: item!.id, revision: item!.revisionHash, decision: "approve", by: { kind: "session", actor: owner } });
     expect(start).toHaveBeenCalledWith(owner, BIZ, "website-rebuild:w1", item!.id);
-    expect(seen).toMatchObject({ id: item!.id, status: "approved", subject: { kind: "make_real_plan", possibilityId: "website-rebuild:w1", candidateRevision: 1, fingerprint: "a".repeat(64) } });
+    expect(seen).toMatchObject({ id: item!.id, status: "approved", subject: { kind: "make_real_plan", possibilityId: "website-rebuild:w1", fingerprint: "a".repeat(64) } });
     expect(result.status).toBe("done");
     // Honest: the isolated run changed nothing live.
     expect(result.item?.outcomeReason).toMatch(/isolated copy: nothing live changed/);

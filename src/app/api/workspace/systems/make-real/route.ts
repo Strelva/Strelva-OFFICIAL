@@ -11,6 +11,7 @@ import { makeRealForWorkspace } from "@/experience/systems/server";
 import { sendEmailWithReceipt } from "@/lib/email/send";
 import { needsYouAppOrigin, needsYouReleaseEnabled, needsYouStore } from "@/platform/needs-you/server";
 import { makeRealThroughNeedsYou } from "@/platform/needs-you/systems-sources";
+import { liveMakeRealPorts, makeRealPath } from "@/experience/systems/live-make-real";
 
 export const dynamic = "force-dynamic";
 
@@ -20,9 +21,14 @@ const input = z.object({
 }).strict();
 
 /**
- * Make real for a Ready Possibility, run on an isolated copy.
+ * Make real for a Ready Possibility.
  *
- * Owners of the business only. The runner is wired to isolated adapters and
+ * With a `make_real_live:<channel>` flag on for the business and a stored
+ * Possibility, the owner's tap is the Needs you decision for the plan and
+ * starts the durable, live activation (src/experience/systems/live-make-real):
+ * the response is `{ live }`. Otherwise it runs on an isolated copy, as below.
+ *
+ * Owners of the business only. The isolated runner is wired to isolated adapters and
  * an in-memory copy of the affected Systems (src/platform/make-real/sandbox):
  * it cannot publish, send, charge, book or switch a live System. The response
  * is the activation's partial state and the outside effects that are not
@@ -31,10 +37,11 @@ const input = z.object({
  * A 1.0.0 launch feature: it also needs STRELVA_SYSTEMS_RELEASE, checked
  * before any session or body read.
  *
- * With STRELVA_NEEDS_YOU_RELEASE on, the tap is the owner's one approval for
- * the plan: it decides the plan's Needs you item (the same item Home and the
- * email show), and Make real starts from that item's resolver with the item
- * as its approval record. Off, it runs as before.
+ * A stored Possibility with a live channel on runs live: the tap is the
+ * owner's Needs you decision (makeRealPath). Otherwise it runs on the
+ * isolated copy; with STRELVA_NEEDS_YOU_RELEASE on, that too is the owner's
+ * one approval for the plan through the same `make_real` item Home and the
+ * email show. Off, it runs as before.
  */
 export async function POST(request: Request) {
   if (!workspaceReleaseEnabled()) return workspaceJson({ error: "The workspace release is not enabled." }, 503);
@@ -54,8 +61,11 @@ export async function POST(request: Request) {
     }
     const exit = await readWorkspaceExit(actor, workspace.id).catch(() => null);
     if (!exit || exit.state?.status === "completed") return workspaceJson({ error: "Work in this business has stopped, or its state could not be confirmed. Nothing changed." }, 409);
+    const path = await makeRealPath(actor, workspace.id, body.possibilityId, await liveMakeRealPorts());
+    if (!path) return workspaceJson({ error: "This possibility is not available. Nothing changed." }, 404);
+    if (path.kind === "live") return workspaceJson({ live: path.result });
     if (needsYouReleaseEnabled()) {
-      const decided = await makeRealThroughNeedsYou(actor, workspace.id, body.possibilityId, {
+      const decided = await makeRealThroughNeedsYou(actor, workspace.id, path.possibilityId, {
         store: needsYouStore, appOrigin: needsYouAppOrigin(), sendEmail: sendEmailWithReceipt,
       });
       if (!decided) return workspaceJson({ error: "This possibility is not waiting on a decision. Nothing changed." }, 404);
@@ -72,7 +82,7 @@ export async function POST(request: Request) {
     const result = await makeRealForWorkspace({
       actor, businessId: workspace.id, savedWork: await listWork(actor, workspace.id),
       siteDomains: new Map(managed.managedWork.flatMap((site) => site.domain ? [[site.id, site.domain] as const] : [])),
-    }, body.possibilityId, { canActivate: true });
+    }, path.possibilityId, { canActivate: true });
     if (!result) return workspaceJson({ error: "This possibility is not available. Nothing changed." }, 404);
     return workspaceJson({ result });
   } catch (error) {

@@ -277,6 +277,7 @@ export async function GET(request: Request) {
     ]);
     const systems = systemsReleased && selected.kind === "customer" ? await readWorkspaceSystems({
       actor: current, businessId: selected.id, savedWork: work,
+      canWrite: selected.access === "member" && (selected.role === "owner" || selected.role === "admin"),
       siteDomains: new Map(managedPresence.managedWork.flatMap((site) => site.domain ? [[site.id, site.domain] as const] : [])),
     }) : undefined;
     const homeFinderPreview = resolveHomeFinderPreviewHref();

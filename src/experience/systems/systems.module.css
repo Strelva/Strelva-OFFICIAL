@@ -231,6 +231,11 @@
   gap: 24px;
 }
 
+/* No context beside the thing: the thing takes the whole width. */
+.body[data-context="none"] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .surface {
   display: flex;
   min-width: 0;
@@ -432,6 +437,50 @@
 .makeRealNotice li {
   padding: 0;
   border: 0;
+}
+
+/* Connected Connections fold into one line ("Works with 4 things"). */
+.fold {
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.fold > summary {
+  cursor: pointer;
+  color: var(--gray-fg);
+}
+
+.fold > summary:focus-visible {
+  outline: 2px solid var(--gray-fg);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* One line per Make real step, in the customer's words. */
+.stepList {
+  display: grid;
+  gap: 4px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stepList > li {
+  display: grid;
+  gap: 0;
+  padding: 0;
+  background: none;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+/* Nothing beside the thing: one line under it. */
+.askMore {
+  margin: 16px 0 0;
+  color: var(--gray-muted);
+  font-size: 14px;
+  line-height: 20px;
 }
 
 .notFound {

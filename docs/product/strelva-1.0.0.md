@@ -46,7 +46,7 @@ built and tested on a branch, not in production.
 | Home shows the business's actual Systems, each with Draft/Live/Paused and a separate health signal | Local on `transition/systems` | ADR 0011, `PRIM_SYSTEM` |
 | **Needs you**: only the decisions the owner must make, set by policy, not an approval per change | Local, flag off: one policy evaluator; every lifecycle resolves through Needs you (Ask, Make real, Versions included); policy settings for owners and operators | agency-in-the-loop decision, Oct 2 |
 | System page: the real thing first (live site, inbox, calendar, tool), Connections, Possibilities and Versions beside it | Local | `DESIGN.md` Oct 4 |
-| Possibilities you can open, compare and **Make real**, with honest partial states and undo where undo exists | Local, fake effects only, in-memory progress | `COMP_MULTI_SYSTEM_ACTIVATION` |
+| Possibilities you can open, compare and **Make real**, with honest partial states and undo where undo exists | Local (branch `w2/systems-live`, Oct 6): Possibilities and activations in Postgres (migrations `20261008130000`, `20261008131000`, not applied anywhere), five live channel adapters behind `make_real_live:<channel>` flags (all off), one plan approval through Needs you, cron resume. No live effect has run outside tests | `COMP_MULTI_SYSTEM_ACTIVATION` |
 | Versions: one System adapted per location or client, with shared improvements offered, never forced | Local, in-memory only | `PRIM_CONTEXT_VERSION` |
 | Health from real monitors; pause that keeps existing obligations | Local; website health reads real monitors in preview | `RULE_SYSTEM_PAUSE_HEALTH` |
 | Ask Strelva inside the workspace, using the same tools as today's owner agent | Local, flag off: route, tools, chat UI and saved conversations (`w2/owner-surfaces-b`); Needs you wiring missing | Reborn §4 |
@@ -121,7 +121,9 @@ business, monitoring, and at least the best competitor's bar.
   instead of four (service request, provider delivery, work job, budget).
 - One model-call helper (12 call sites today); one email sender (`newsletter.ts`
   bypasses `send.ts`); one approval store (five today).
-- Make real progress in Postgres on `work-execution`, not memory.
+- Make real progress in Postgres on `work-execution`, not memory. (Local,
+  Oct 6: the live service runs on the Postgres activation store and the
+  workspace-work cron resumes in-progress activations. Not applied anywhere.)
 - A Preview environment with its own Supabase, so testers can sign in.
 - Regenerated database types.
 

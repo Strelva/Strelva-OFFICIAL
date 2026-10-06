@@ -1,6 +1,25 @@
 # Systems Home, the System page, Possibilities and Make real
 
-Status: draft spec, 2026-10-06. Not built, not approved. For Jacob's review.
+Status: draft spec, 2026-10-06. Not approved. Wave 2 (branch
+`w2/systems-live`, local only, nothing applied or turned on anywhere) built:
+Possibilities in Postgres with the stale rule in the same transaction, the
+90-day idle withdraw and signed 14-day Try it links; adoption of each
+converted tenant's website and inquiry Systems at revision 1; observed
+revisions from tenant content edits; deprovision pausing stored Systems; five
+live Make real channel adapters (hosted website, website sections, inquiry
+form, booking page, internal app) behind `make_real_live:<channel>` flags,
+one plan approval keyed by workspace through the one `make_real` Needs you
+source (merged on `integrate/reborn-1.0` with the decisions-wiring source:
+live stored plans and isolated rebuild plans share one adapter, item id,
+fingerprint and approval reader; `src/platform/needs-you/systems-sources.ts`),
+durable activations resumed by the workspace-work cron, partly live steps in
+the operator queue, operator resume/reconcile/roll back, and the Home and
+System page gaps (History, Make real in progress, Strelva handled receipts,
+no empty panels, paused copy). Not built: History Restore (no undo action
+from History yet), Needs you for this System on the System page, the
+"form-delivers" operating check (fails honestly, so a rebuild with
+inquiries never reads Made real without an operator), Google as a live
+channel (it waits), and every per-channel production proof in section 8.
 
 Built locally on `w2/decisions-wiring` (2026-10-06), behind
 `STRELVA_NEEDS_YOU_RELEASE`: behavior 21 (one Needs you item and one approval
