@@ -13,6 +13,7 @@ const db = vi.hoisted(() => ({
   counts: {} as Record<string, number>,
   blockers: { publications: 0, reservations: 0 },
   teardownError: null as null | { message: string },
+  pauseError: null as null | { message: string },
 }));
 const redis = vi.hoisted(() => ({ del: vi.fn(async () => 1), exists: vi.fn(async () => 0), scan: vi.fn(async () => ["0", []]), get: vi.fn(async () => null), zrange: vi.fn(async () => []) }));
 const vercel = vi.hoisted(() => ({ deleteVercelProject: vi.fn(async () => ({ ok: true })), isVercelConfigured: vi.fn(() => true) }));
@@ -27,6 +28,7 @@ vi.mock("@/lib/db/client", () => ({
       db.rpcs.push({ name, args });
       if (name === "tenant_teardown_blockers") return { data: [db.blockers], error: null };
       if (name === "deprovision_tenant_rows") return db.teardownError ? { data: null, error: db.teardownError } : { data: { memberships: 1, tenants: 1 }, error: null };
+      if (name === "pause_tenant_systems") return db.pauseError ? { data: null, error: db.pauseError } : { data: 2, error: null };
       return { data: null, error: { message: `unexpected rpc ${name}` } };
     },
   }),
@@ -39,7 +41,7 @@ import { runDeprovision, TENANT_SCOPED_TABLES } from "@/lib/deprovision";
 
 beforeEach(() => {
   db.deletes.length = 0; db.rpcs.length = 0; db.counts = { memberships: 1, tenants: 1 };
-  db.blockers = { publications: 0, reservations: 0 }; db.teardownError = null;
+  db.blockers = { publications: 0, reservations: 0 }; db.teardownError = null; db.pauseError = null;
   redis.del.mockClear(); vercel.deleteVercelProject.mockClear();
 });
 
@@ -66,6 +68,25 @@ describe("atomic hosted-tenant deprovision", () => {
     expect(db.deletes).toEqual([]);
     expect(db.rpcs.filter((call) => call.name === "deprovision_tenant_rows")).toEqual([{ name: "deprovision_tenant_rows", args: { p_tenant_id: "fictional-free" } }]);
     expect(result.summary.postgres).toEqual(expect.arrayContaining([expect.objectContaining({ target: "memberships", deleted: true }), expect.objectContaining({ target: "tenants", deleted: true })]));
+  });
+
+  it("pauses the converted business's stored Systems before the purge, and never deletes them", async () => {
+    const result = await runDeprovision({ tenantId: "fictional-converted", tenant: null, dryRun: false });
+    const names = db.rpcs.map((call) => call.name);
+    expect(names.indexOf("pause_tenant_systems")).toBeGreaterThan(-1);
+    expect(names.indexOf("pause_tenant_systems")).toBeLessThan(names.indexOf("deprovision_tenant_rows"));
+    expect(result.summary.postgres).toEqual(expect.arrayContaining([{ target: "systems", found: 2, deleted: false, detail: "stored Systems paused; records kept" }]));
+  });
+
+  it("reports a failed pause without blocking the deprovision, and only says it would on a dry run", async () => {
+    db.pauseError = { message: "function pause_tenant_systems does not exist" };
+    const result = await runDeprovision({ tenantId: "fictional-converted", tenant: null, dryRun: false });
+    expect(result.ok).toBe(true);
+    expect(result.summary.postgres).toEqual(expect.arrayContaining([expect.objectContaining({ target: "systems", found: "?", detail: expect.stringMatching(/not paused/) })]));
+    db.rpcs.length = 0;
+    const dry = await runDeprovision({ tenantId: "fictional-converted", tenant: null, dryRun: true });
+    expect(db.rpcs.map((call) => call.name)).not.toContain("pause_tenant_systems");
+    expect(dry.summary.postgres).toEqual(expect.arrayContaining([expect.objectContaining({ target: "systems", detail: expect.stringMatching(/dry run/) })]));
   });
 
   it("stops before Redis and Vercel when the atomic purge fails", async () => {

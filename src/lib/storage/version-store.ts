@@ -67,6 +67,26 @@ async function pgInsertVersion(v: ContentVersion, tenant: string): Promise<void>
   if (error) throw error;
 }
 
+/**
+ * A published content version moves the converted business's website System
+ * to an observed revision naming it (observe_tenant_content in
+ * 20261008130000_system_possibilities.sql), so a Possibility built on the
+ * old content goes back to Exploring in the same transaction. Only while
+ * Systems is released; best effort, so it can never fail the content write.
+ */
+export async function observeTenantContentVersion(tenant: string, versionId: string): Promise<void> {
+  const mode = process.env.STRELVA_SYSTEMS_RELEASE?.trim();
+  if (mode !== "1" && mode !== "workspace") return;
+  try {
+    const db = getSupabase() as unknown as { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ error: { message?: string } | null }> } | null;
+    if (!db) return;
+    const { error } = await db.rpc("observe_tenant_content", { p_tenant_id: tenant, p_version_ref: versionId });
+    if (error) console.warn("[versions] System revision not observed", { tenant, versionId, error: error.message });
+  } catch (error) {
+    console.warn("[versions] System revision not observed", { tenant, versionId, error: error instanceof Error ? error.message : String(error) });
+  }
+}
+
 async function pgListVersions(
   section: string,
   tenant: string,
@@ -109,6 +129,7 @@ export async function appendVersion(
 
   if (dataSourceIsPostgres()) {
     await pgInsertVersion(version, tenant);
+    await observeTenantContentVersion(tenant, version.id);
   }
 
   if (!dataSourceIsPostgres()) {
