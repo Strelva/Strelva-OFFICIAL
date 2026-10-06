@@ -50,7 +50,7 @@ model** (`src/platform`, `src/products`, `src/experience`, `/workspace`,
 | [Billing](#billing) | Stripe subscriptions, pay links, workspace allowances | Both | Stripe live; workspace allowances in production, unproven | — |
 | [Analytics and reports](#analytics-and-reports) | Traffic, Search Console, weekly and monthly reports | Tenant | Live | — |
 | [Domain monitor](#domain-monitor) | Flags managed domains that are down, parked, or expiring | Tenant | Internal | — |
-| [Product learning](#product-learning) | Collects research evidence from registered sources | Workspace | Internal, flag off in production | — |
+| [Product learning](#product-learning) | Collects research evidence from registered sources | Workspace | Internal, flag off in production. Out of 1.0.0 release scope (Oct 6); code kept | — |
 | [Home Finder](#home-finder) | Guided home search for brokerages (separate product) | Workspace | Not enabled | — |
 
 Also present but not customer capabilities on their own: enterprise customers
@@ -229,6 +229,7 @@ reviews, blog, and newsletter. Writes go through governance and owner approval.
 ## Product learning
 
 - `src/products/product-learning/`, `src/experience/operations/LearningExperience.tsx`, `/admin/work`, `/api/product-learning`. Super-admin only.
+- Out of 1.0.0 release scope (October 6, 2026, systems-catalog spec §9.6). The code, migration and SQL test stay, behind `STRELVA_PRODUCT_LEARNING_RELEASE` (off). Release gates do not count it, and it is not offered to customers.
 
 ## Home Finder
 
