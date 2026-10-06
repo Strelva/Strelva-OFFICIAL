@@ -39,6 +39,7 @@ src/proxy.ts     request gating
 | Layer | What it does |
 | --- | --- |
 | `workspaces/` | Workspaces, memberships, `saved_product_work`, handoffs, invitations, actor resolution |
+| `business-record/` | One shared record per customer business: typed facts with provenance, services, people, deduplicated contacts, revision history with undo, and the tenant -> workspace conversion (`tenant_workspace_links`). Local only; migration `20261002120000` not applied to production |
 | `capabilities/` | Executable capability contracts, qualification, registry factory |
 | `products/` | Descriptive catalog and the workspace executable list. Grants no access |
 | `bounded-work/` | Revisioned payload store shared by apps, scheduling, checks, websites |

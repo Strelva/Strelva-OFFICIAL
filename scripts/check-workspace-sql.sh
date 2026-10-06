@@ -438,6 +438,13 @@ do $$ begin
 end $$;
 SQL
 
+# Strelva Reborn business record and tenant conversion. The conversion import
+# is the planner output for a synthetic gldf-like tenant (no real data).
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261002120000_business_record.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-record-schema.sql"
+psql "${psql_args[@]}" --set=tenant_import="$(cat "$repo_root/tests/fixtures/business-record-tenant-import.json")" \
+  --file="$repo_root/tests/business-record-conversion-schema.sql"
+
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

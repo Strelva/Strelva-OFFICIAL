@@ -43,8 +43,8 @@ Audited 2026-10-02 against code, line by line. Production facts come from the
 [Sept 30 release record](../operations/strelvav2-horizontal-acceptance.md#september-30-workspace-production-release),
 not a fresh read.
 
-**3 of 48 lines are done, 5 are in progress, 9 are partial and 31 are not
-started.** Summing the sizes below (S half a day, M two, L five, XL ten)
+**7 of 48 lines are done (4 proven locally only), 11 are partial and 30
+are not started.** Summing the sizes below (S half a day, M two, L five, XL ten)
 gives about 108 agent-days if done one at a time. Sections 0, 1 and 3 are the
 critical path at about 31 of them; the rest can run in parallel streams.
 These are estimates, not measurements. Nothing below is proven in
@@ -90,20 +90,24 @@ M one to three days, L three to seven, XL more.
 
 ### 1. One business record
 
-- [ ] A business record per workspace holding facts (name, address, hours,
-      services, phone, links), contacts and people. *In progress on
-      `reborn-business-record` · M*
+- [x] A business record per workspace holding facts (name, address, hours,
+      services, phone, links), contacts and people. *Proven locally Oct 2,
+      not applied:* `20261002120000_business_record.sql`,
+      `src/platform/business-record/`, `tests/business-record-schema.sql`.
 - [ ] Website facts, booking hours and services, and inquiry contacts read and
       write it. No capability keeps its own copy of a business fact.
       *Not started · L*
-- [ ] Every edit has history and an undo, like website documents today.
-      *In progress · S*
+- [x] Every edit has history and an undo, like website documents today.
+      *Proven locally:* each command writes one immutable revision; undo
+      refuses if a later change touched the same item.
 - [ ] One owner-recipient rule: the record's owner contact, falling back to
       `tenants.owner_email`. Every owner notice (leads, bookings, reports)
-      uses it. *Not started · M*
+      uses it. *Partial: `owner_recipient` fact and
+      `resolve_business_owner_recipient` exist; no notice uses them yet · M*
 - [ ] Every new table follows the `website_documents` pattern (RLS on, grants
       revoked, service-role functions) with cross-workspace denial tests.
-      *In progress · M*
+      *Proven locally for the business record tables · keep for each new
+      table*
 
 Proof: unit and SQL tests in `check:workspace-sql`; `reborn:progress` shows
 `business_record` done.
@@ -137,10 +141,14 @@ storefront comparison like Sept 30 (60/60).
       the tenant through a link table (the `tenants` row is not altered),
       backfills facts, contacts, leads and bookings, and records billing
       state. One workspace can hold several tenants (Twin Trees pays for two
-      sites). Idempotent, with a dry-run mode and a rollback. *In progress ·
-      M*
-- [ ] Links and new rows survive tenant renames and are swept by deprovision
-      and the rename registry. *In progress · S*
+      sites). Idempotent, with a dry-run mode and a rollback. *Partial:
+      built and proven locally as one atomic `convert_tenant_to_business`
+      call; dry run is the default; `--apply` refuses a non-local database
+      without `--i-have-jacobs-yes`. Rollback only undoes the import
+      revision; a full unlink isn't built. Never run against Supabase · S*
+- [x] Links and new rows survive tenant renames and deprovision. *Proven
+      locally:* links key on `stable_id`; deleting a tenant clears the link
+      and keeps the business.
 - [ ] Tooling for a scrubbed local copy of production (Postgres, Auth users,
       Redis leads, bookings, events and connections; outgoing email, Stripe
       and Google disabled). *Not started · M*
@@ -154,6 +162,14 @@ storefront comparison like Sept 30 (60/60).
       subscriptions carry `workspaceId`. *Not started · L*
 
 Proof: per-client conversion receipt; storefront responses unchanged.
+
+**Who runs a conversion (decided Oct 2).** A named Strelva operator: a
+verified user with an active `super_admins` row. They become the workspace's
+`created_by` and an `admin` member, not `owner`; owner carries payer, exit,
+launch and publish authority that belongs to the client once invited in
+section 6. No client user, invite or email is involved. The receipt records
+billing type and multi-site accounts for review only; Stripe and allowances
+are untouched.
 
 ### 4. Capabilities, production-complete in the workspace
 
