@@ -1,5 +1,4 @@
-import { generateText } from "ai";
-import { google } from "@ai-sdk/google";
+import { generateModelText } from "@/platform/infra/model-calls";
 import { getAllTenants, getTenantConfig } from "./tenants";
 import { getMetricsBatch, getActivity, getSectionTimestamps, getContent, getSearchData, getDailyMetrics } from "./storage";
 import { getEvents } from "./events";
@@ -303,6 +302,8 @@ export function detectStaleSections(
 }
 
 interface ReportSummaryInput {
+  /** Tenant slug, for the cost log. */
+  tenantId?: string;
   siteName: string;
   ownerName: string;
   pageViews: { total: number; thisWeek: number };
@@ -450,8 +451,7 @@ async function generateReportSummary(data: ReportSummaryInput): Promise<string> 
 
   let text: string;
   try {
-    ({ text } = await generateText({
-      model: google("gemini-2.5-flash"),
+    ({ result: { text } } = await generateModelText({ purpose: "report", tenantId: data.tenantId ?? null, actorKind: "strelva" }, {
       prompt: `Write a short, warm weekly report email for ${data.ownerName} about their business website "${data.siteName}".
 
 ${statsBlock}
@@ -581,6 +581,7 @@ export async function generateWeeklyReport(
   const anomalyNarrative = formatAnomalyNarrative(detectTrafficAnomaly(dailyMetrics));
 
   const summary = await generateReportSummary({
+    tenantId: tenant.id,
     siteName: settings.siteName || tenant.siteName,
     ownerName: tenant.ownerName,
     pageViews,

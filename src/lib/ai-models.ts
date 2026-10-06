@@ -80,3 +80,12 @@ export function isTransientModelError(err: unknown): boolean {
 
   return false;
 }
+
+/**
+ * One named Google model, for the only caller allowed to pin a model: a
+ * visibility probe that measures what that model says
+ * (src/platform/infra/model-calls.ts enforces the purpose).
+ */
+export function getGoogleModel(modelId: string): ModelConfig {
+  return { model: google(modelId), label: `google/${modelId}` };
+}

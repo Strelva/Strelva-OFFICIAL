@@ -1,5 +1,4 @@
-import { generateText } from "ai";
-import { google } from "@ai-sdk/google";
+import { generateModelText } from "@/platform/infra/model-calls";
 import type { WeeklyBrief, WeeklyBriefStats } from "./types";
 import { getRedis } from "./redis";
 import { getClickCounts, getActivity, getClickCountsByPrefix, getContent, getSearchData, getSectionTimestamps } from "./storage";
@@ -218,6 +217,7 @@ export async function generateWeeklyBrief(tenantId: string): Promise<WeeklyBrief
     ...buildHighlights(stats, weeklyEvents, activity, reviewSummary, phoneCounts.thisWeek),
   ].slice(0, 5);
   const summary = await buildSummary({
+    tenantId,
     stats,
     phoneClicks: phoneCounts.thisWeek,
     highlights,
@@ -321,6 +321,7 @@ export async function generateMonthlyRecap(tenantId: string): Promise<WeeklyBrie
   const nextAction = suggestion ? { title: suggestion.title, description: suggestion.description } : undefined;
 
   const summary = await buildSummary({
+    tenantId,
     stats,
     phoneClicks: period.phoneClicks,
     highlights,
@@ -440,6 +441,8 @@ export function buildHighlights(
 }
 
 async function buildSummary(data: {
+  /** Tenant slug, for the cost log. */
+  tenantId: string;
   stats: WeeklyBriefStats;
   phoneClicks: number;
   highlights: string[];
@@ -454,8 +457,7 @@ async function buildSummary(data: {
   const vsPrior = period === "month" ? "vs last month" : "vs last week";
   const periodNoun = period === "month" ? "month" : "week";
   try {
-    const { text } = await generateText({
-      model: google("gemini-2.5-flash"),
+    const { result: { text } } = await generateModelText({ purpose: "weekly_brief", tenantId: data.tenantId, actorKind: "strelva" }, {
       prompt: `Write a concise ${periodWord} dashboard brief for a local business owner.
 
 Stats:

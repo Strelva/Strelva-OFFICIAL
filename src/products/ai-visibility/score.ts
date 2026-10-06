@@ -228,15 +228,16 @@ async function citationProbe(input: ScoreInput): Promise<CitationProbe> {
     };
   }
   try {
-    const { google } = await import("@ai-sdk/google");
-    const { generateText } = await import("ai");
+    const { getGoogleModel } = await import("@/lib/ai-models");
+    const { generateModelText } = await import("@/platform/infra/model-calls");
     const where = input.location ? ` in ${input.location}` : "";
     const what = input.category ?? "businesses";
     const prompt =
       `You are a consumer assistant. Question: "What are the best ${what}${where}? List specific named businesses you'd recommend."\n` +
       `Answer naturally with specific business names. Then on a final line output strict JSON: ` +
       `{"names":[".."]} listing every business you named.`;
-    const { text } = await generateText({ model: google("gemini-2.5-flash"), prompt });
+    // A probe of what Gemini itself says: the one purpose allowed to pin a model.
+    const { result: { text } } = await generateModelText({ purpose: "visibility_probe", actorKind: "visitor" }, { prompt }, { pinnedModel: getGoogleModel("gemini-2.5-flash") });
     const named = text.toLowerCase();
     // Use word-boundary matching to avoid false positives where the business
     // name appears as a substring of another word (e.g. "Ace" inside "Acera").

@@ -1,4 +1,4 @@
-import { generateText, tool, stepCountIs } from "ai";
+import { tool, stepCountIs } from "ai";
 import { z } from "zod";
 import { getSectionTimestamps } from "@/lib/storage";
 import { getRedis } from "@/lib/redis";
@@ -11,8 +11,7 @@ import { detectStaleSections } from "@/lib/reports";
 import { applySectionUpdate } from "@/lib/apply-section-update";
 import type { ContentSection } from "@/lib/types";
 import { agentResultFromToolOutput, buildAgentResultContract, type AgentResultContract } from "@/lib/agent-results";
-import { getPrimaryModel, getFallbackModel, isTransientModelError } from "@/lib/ai-models";
-import { logger } from "@/lib/logger";
+import { generateModelText } from "@/platform/infra/model-calls";
 import { addSentryBreadcrumb } from "@/lib/sentry-context";
 import { scheduleVerification } from "@/lib/verify-live";
 import { getSiteCapabilityManifest, manifestAllowsAction } from "@/lib/site-capabilities";
@@ -374,34 +373,17 @@ export async function executeAgentPromptDetailed(
   }
   assertAgentToolCatalog(Object.keys(tools), "background");
 
-  const primary = getPrimaryModel();
-  const fallback = getFallbackModel();
-  let modelUsed = primary.label;
-
-  const generateOptions = {
-    system: systemPrompt,
-    messages: [{ role: "user" as const, content: userMessage }],
-    tools,
-    stopWhen: stepCountIs(8),
-  };
-
-  let result;
-  try {
-    result = await generateText({ ...generateOptions, model: primary.model });
-  } catch (primaryErr) {
-    if (fallback && isTransientModelError(primaryErr)) {
-      logger.warn("[agent] Primary model failed, trying fallback", {
-        primary: primary.label,
-        fallback: fallback.label,
-        error: primaryErr instanceof Error ? primaryErr.message : "unknown",
-        tenantId,
-      });
-      modelUsed = fallback.label;
-      result = await generateText({ ...generateOptions, model: fallback.model });
-    } else {
-      throw primaryErr;
-    }
-  }
+  // Primary then fallback (transient failures only) through the one
+  // model-call helper, which writes one cost row per provider step.
+  const { result, modelLabel: modelUsed } = await generateModelText(
+    { purpose: "ask.background", tenantId, actorKind: "strelva" },
+    {
+      system: systemPrompt,
+      messages: [{ role: "user" as const, content: userMessage }],
+      tools,
+      stopWhen: stepCountIs(8),
+    },
+  );
 
   const toolCalls: AgentExecutionToolTrace[] = result.steps.flatMap((step) => {
     const okCalls = step.toolResults.map((toolResult) => ({
