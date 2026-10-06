@@ -30,6 +30,8 @@ import { OperatorControlsPanel } from "./OperatorControlsPanel";
 import { SiteScan } from "./SiteScan";
 import { ReviewIntelPanel } from "./ReviewIntelPanel";
 import { DomainManager } from "./DomainManager";
+import { DomainView } from "./DomainView";
+import { loadDomainView } from "@/platform/operator-queue/domain-view-loader";
 import { VisibilityPanel } from "./VisibilityPanel";
 import { ClientCrmSections } from "./ClientCrmSections";
 import { OperatorOpportunities } from "./OperatorOpportunities";
@@ -106,6 +108,7 @@ export default async function ClientDetailPage({
 
   // loadBusinessEffort never throws; it reports disabled/denied/unavailable states.
   const effortLoad = loadBusinessEffort();
+  const domainViewLoad = loadDomainView([{ tenantId: id, label: `${tenant.siteName || id} website` }]).catch(() => null);
   const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk, dailyMetrics, suggestions, vercelStatus, goal, account, reportCadence, replyVoice, contentAutonomy, clientEmailOverride, clientLeads] =
     await Promise.all([
       getClickCounts("page-view", id).catch(() => ({ thisWeek: 0, total: 0 })),
@@ -359,6 +362,7 @@ export default async function ClientDetailPage({
             visibilityTowns: (tenant.visibility?.towns ?? []).join(", "),
           }}
         />
+        <DomainView load={await domainViewLoad} />
         <DomainManager tenantId={tenant.id} initialDomains={domainClaims.map(serializeDomainClaim)} />
         <IntegrationsPanel tenantId={tenant.id} />
         <DeploymentStatus status={deployStatus} tenantId={tenant.id} />

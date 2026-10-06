@@ -475,7 +475,7 @@ async function executeResolvedEventAction(
             : "";
       if (!reviewId || !replyText) return { changed: false, reason: "review_reply_invalid" };
       const { publishReviewReply } = await import("./gbp-replies");
-      const result = await publishReviewReply(tenantId, reviewId, replyText);
+      const result = await publishReviewReply(tenantId, reviewId, replyText, { actor: `approved event ${eventId}` });
       if (!result.published) return { changed: false, reason: "review_reply_failed" };
       // Reply accepted by Google — mark acceptance before resolving so a lost
       // lock / crash can't let a retry re-post it.

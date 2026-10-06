@@ -68,7 +68,7 @@ create table public.outside_write_receipts (
   tenant_stable_id uuid,
   workspace_id uuid references public.workspaces(id) on delete set null,
   system_id uuid,
-  provider text not null check (provider in ('google_business','vercel','strelva_content')),
+  provider text not null check (provider in ('google_business','vercel','strelva_routing','strelva_content')),
   write_kind text not null check (write_kind in ('review_reply','gbp_hours','gbp_post','gbp_photo','domain_add','domain_claim_removal','content_publish')),
   subject text not null check (char_length(btrim(subject)) between 1 and 300),
   request jsonb not null check (jsonb_typeof(request) = 'object' and octet_length(request::text) <= 16000),
@@ -91,7 +91,7 @@ create table public.outside_write_receipts (
   -- A Vercel domain is never removed by Strelva: the only undo for a domain
   -- add is dropping Strelva's own claim.
   check (write_kind <> 'domain_add' or undo = 'claim_only'),
-  check (write_kind <> 'domain_claim_removal' or undo = 'not_available')
+  check (write_kind <> 'domain_claim_removal' or (undo = 'not_available' and provider = 'strelva_routing'))
 );
 create index outside_write_receipts_tenant_idx on public.outside_write_receipts(tenant_id, created_at desc) where tenant_id is not null;
 create index outside_write_receipts_workspace_idx on public.outside_write_receipts(workspace_id, created_at desc) where workspace_id is not null;

@@ -68,7 +68,7 @@ describe("admin domains route — mutations (super-admin)", () => {
       params("gldf")
     );
     expect(res.status).toBe(200);
-    expect(mockAddCustomDomain).toHaveBeenCalledWith("gldf", "new.com", "production");
+    expect(mockAddCustomDomain).toHaveBeenCalledWith("gldf", "new.com", "production", { actor: "operator console" });
     expect(mockLogAuditEvent).toHaveBeenCalled();
   });
 
@@ -97,7 +97,7 @@ describe("admin domains route — mutations (super-admin)", () => {
       params("gldf")
     );
     expect(res.status).toBe(200);
-    expect(mockRemove).toHaveBeenCalledWith("gldf", "gone.com");
+    expect(mockRemove).toHaveBeenCalledWith("gldf", "gone.com", { actor: "operator console" });
     expect(mockLogAuditEvent).toHaveBeenCalled();
   });
 });

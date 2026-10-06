@@ -1189,7 +1189,9 @@ describe("Tenant Domains Route Handler", () => {
     const response = await GET();
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
+    const body = await response.json();
+    expect(body).toHaveProperty("view");
+    expect({ domains: body.domains }).toEqual({
       domains: [
         {
           domain: "example.com",
@@ -1218,7 +1220,7 @@ describe("Tenant Domains Route Handler", () => {
     const response = await POST(request);
 
     expect(response.status).toBe(200);
-    expect(mockAddCustomDomain).toHaveBeenCalledWith("test-tenant", "new.example.com", undefined);
+    expect(mockAddCustomDomain).toHaveBeenCalledWith("test-tenant", "new.example.com", undefined, { actor: "owner dashboard" });
   });
 
   it("POST /api/tenant/domains rejects missing tenant headers before mutation", async () => {

@@ -1,6 +1,12 @@
 # One place to operate
 
-Status: draft spec, 2026-10-06. Not built, not approved. For Jacob's review.
+Status: draft spec, 2026-10-06. Not approved. Built locally on branch
+`build/operator`, proven local only: health and domain crons over every site,
+the 15-source projection (`src/platform/operator-queue/`), marks and receipts
+migrations (not applied anywhere), `/admin/queue` beside today's `/admin`,
+receipts on review replies and domain add / claim removal, one domain view,
+close-with-minutes, and the agency Queue view model (no route). Not in
+production; the §9 clocks are proposals in `rules.ts` `PROPOSED_CLOCKS`.
 
 Strelva's main delivery cost is operator time. Today that time is spread over
 six queues in two stores and fifteen `/admin` pages, and some live sites are
