@@ -100,7 +100,7 @@ function ComparisonResult({ comparison, work, onOpenTracker }: { comparison: Tra
         <p className="text-sm text-accent-text">Internal R&amp;D · Candidate comparison</p>
         <h1 className="font-display text-3xl font-medium text-warm-black">{work.title}</h1>
         <p className="max-w-3xl text-[15px] leading-relaxed text-gray-muted">{comparison.hypothesis}</p>
-        <p className="inline-flex w-fit rounded-full border border-gray-border px-3 py-1 text-xs text-gray-muted">Experimental · {evidenceLabel(comparison.evidenceKind)} evidence · Not promoted</p>
+        <p className="inline-flex w-fit rounded-full border border-gray-border px-3 py-1 text-xs text-gray-muted">Trial · {evidenceLabel(comparison.evidenceKind)} evidence · Not promoted</p>
       </header>
 
       <section aria-labelledby="experiment-workload-title" className="space-y-3 border-y border-gray-border py-5">

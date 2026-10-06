@@ -190,7 +190,7 @@ function TrackerSession({ workspaceId, workId, readOnly = false, onSaved, transp
 
   return <section className="mx-auto w-full max-w-5xl space-y-6 p-4 sm:p-8" aria-label="Spreadsheet tracker" aria-busy={busy}>
     <header>
-      <p className="text-sm text-gray-muted">Experimental · Spreadsheet tracker</p>
+      <p className="text-sm text-gray-muted">Internal tool · Started from a list</p>
       <h1 className="font-display text-2xl">{tracker?.title ?? "Turn a spreadsheet into a tracker"}</h1>
       <p className="mt-2 text-sm text-gray-muted">Start with suggested fields or import a CSV. Review changes and keep a history you can undo. Formulas are not calculated.</p>
     </header>

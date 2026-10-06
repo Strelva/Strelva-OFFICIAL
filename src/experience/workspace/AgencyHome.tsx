@@ -29,7 +29,7 @@ function workLabel(work: WorkspaceWork, systemsReleased: boolean): string {
   if (work.productId === "applications") return systemsReleased ? "Internal tool" : "Application";
   if (work.productId === "documents") return "Document";
   if (work.productId === "operations") return "Ongoing work";
-  if (work.productId === "tracker") return "Tracker";
+  if (work.productId === "tracker") return "Internal tool";
   if (work.productId === "work_plans") return "Work plan";
   return work.assessment?.method.label ?? "Saved work";
 }
