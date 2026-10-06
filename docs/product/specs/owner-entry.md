@@ -206,7 +206,14 @@ yet.
 
 *As built on `build/owner-entry` (2026-10-06):* **2 ready** (`/reports`,
 `[...notFound]`), **4 retire**, **2 frozen** (`/store`, `/members`), **17
-stay**. The map is `src/platform/owner-entry/dispositions.ts`; each `stay`
+stay**. *Then on `w2/owner-surfaces-b` (Oct 6, local):* **11 ready**:
+`/chat` → `view=ask` while `STRELVA_ASK_RELEASE` is on, and `/site`,
+`/assets`, `/brand-kit`, `/collections`, `/history`, `/integrations`,
+`/sources/[id]`, `/google` → `/workspace/site?…&tab=…` (the website
+System's own pages, reusing the dashboard's panels) where Systems are on
+for the workspace. **8 stay**. Not at parity yet, and why they are not
+`ready`: `/analytics` (no results panel), `/` and `/review` (Needs you),
+`/leads`, `/roster`, `/schedule`, `/reviews`, `/settings`. The map is `src/platform/owner-entry/dispositions.ts`; each `stay`
 entry carries its reason. gldf still waits on `/`, `/review` (needs-you spec)
 and `/site` (editing still opens `/dashboard/site`, so a redirect would loop).
 rohlax still waits on `/schedule` and `/roster` (the one booking store).

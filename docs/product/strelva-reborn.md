@@ -299,8 +299,11 @@ are untouched.
       workspace agent route resolves workspace → link → tenant and re-checks
       permission, and approvals go through section 2. *Partial, local Oct 6
       (`build/ask-strelva`): tools moved, route and per-call checks built
-      behind `STRELVA_ASK_RELEASE`; no workspace UI, history or real Needs
-      you wiring yet · L*
+      behind `STRELVA_ASK_RELEASE`. Workspace chat UI (`view=ask`, on Home,
+      on each System and beside the site editor) and conversation history in
+      Postgres (`20261008110000`) built and proven locally Oct 6 on
+      `w2/owner-surfaces-b`, not migrated or deployed. Real Needs you wiring
+      still missing · L*
 
 Proof: authenticated local journeys per capability on desktop and mobile, in
 empty, loading, error and permission states, using The Mooney Firm and gldf.
@@ -335,8 +338,13 @@ Neither is used by any journey today.
       changes.*
 - [ ] Each `/dashboard` page has a workspace home or redirects to one. Of 22
       pages: 3 have a home, 4 partial, 4 retire, the rest need building.
-      *Partial: 25 page files mapped (2 ready incl. `/reports` → Recaps,
-      4 retire, 2 frozen, 17 stay) on `build/owner-entry` · L*
+      *Partial: 25 page files mapped. Local Oct 6 on `w2/owner-surfaces-b`:
+      11 ready (`/reports`, `[...notFound]`, `/chat` while Ask is released,
+      and the website pages `/site`, `/assets`, `/brand-kit`, `/collections`,
+      `/history`, `/integrations`, `/sources/[id]`, `/google` → the workspace
+      website, Systems on), 4 retire, 2 frozen, 8 stay (`/`, `/review`,
+      `/leads`, `/roster`, `/schedule`, `/analytics`, `/reviews`,
+      `/settings`) · L*
 - [x] `/dashboard` and `/client/{tenant}/dashboard` stay permanent redirects;
       gldf and rohlax repos hard-code them and are not changed.
       *Built locally on `build/owner-entry`: 307 only for a member of the

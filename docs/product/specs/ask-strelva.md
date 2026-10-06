@@ -8,11 +8,18 @@ cost log migration `20261007140000_model_call_log.sql`, lint rule) with all
 `src/lib/agent-shared.ts` (`buildTenantChatTools`); `POST /api/workspace/ask`
 behind `STRELVA_ASK_RELEASE` (plus the workspace and Systems releases) with
 per-call authority, resolution, the 18 tools, refusals, the managed default
-and a stub Needs you adapter. Not built: the chat UI in the workspace,
-workspace conversation history, Postgres Possibilities (opened ones are
-in-memory), the real Needs you policy wiring, inquiry reply drafts, and a
-business-record draft store (fact changes are filed as Requests). See
-"Build notes" at the end.
+and a stub Needs you adapter. **Built and proven locally Oct 6 on
+`w2/owner-surfaces-b`, not migrated or deployed, flag off:** the chat UI
+in the workspace (`view=ask`, on Home, on each System page and beside the
+site editor; streaming, receipts for each of the four results, error,
+read-only and unsaved states) and workspace conversation history in
+Postgres (`20261008110000_ask_conversations.sql`, `GET /api/workspace/ask`);
+`/dashboard/chat` is `ready` while `STRELVA_ASK_RELEASE` is on. Not built:
+Postgres Possibilities (opened ones are in-memory), the real Needs you
+policy wiring, inquiry reply drafts, a business-record draft store (fact
+changes are filed as Requests), and copying old tenant chat threads (the
+workspace starts fresh; `/dashboard/chat` keeps them). See "Build notes" at
+the end.
 
 Ask Strelva is the one way in. A person in a business workspace says what they
 want in plain words. Strelva answers, drafts a change, opens a Possibility, or

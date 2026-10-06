@@ -1,6 +1,19 @@
 # The website System at 1.0.0
 
-Status: draft spec, 2026-10-06. Not built, not approved. For Jacob's review.
+Status: draft spec, 2026-10-06, not approved. **Built and proven locally
+Oct 6 on `w2/owner-surfaces-b`, not migrated or deployed:** the System
+page's edit control opens `/workspace/site` (the existing editor, photos,
+look, collections, history, connections and Google Business panels, reused
+under the tenant's own API checks) for sites that read Strelva content
+(gldf, rohlax, rhm-innovations, hosted templates); custom-repo sites with
+no Strelva content get "Ask for a change", which files a Request and shows
+its preview, owner decision and deploy receipts
+(`20261008111000_website_change_receipts.sql`, behavior 9 and "New" item
+6). Strelva records previews and deploys by hand; nothing deploys from
+here. Not built: the rest of this spec. Note: behavior 6 says owners see a
+preview, never an editor; the workspace editor carries today's
+`/dashboard/site` editor over for parity (owners and admins), so that rule
+is not enforced yet.
 
 Under the October 6 working defaults, every recommendation here is what the
 build follows unless Jacob overturns it
