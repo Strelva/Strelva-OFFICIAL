@@ -10,7 +10,7 @@ import {
   type applicationRollbackInputSchema,
   applicationReleaseSchema,
   applicationSpecSchema,
-  APPLICATION_VERSION_HISTORY_LIMIT,
+  APPLICATION_RECENT_VERSIONS,
   type ApplicationCandidate,
   type ApplicationRecord,
   type ApplicationRelease,
@@ -40,8 +40,13 @@ export interface ApplicationState {
   legacyRevision: number;
 }
 
-export function appendVersion<T>(values: T[], value: T, message: string): T[] {
-  if (values.length >= APPLICATION_VERSION_HISTORY_LIMIT) throw new WorkspaceConflictError(message);
+/** Candidate versions keep a recent window; the full list is archived in SQL. */
+export function appendVersion<T>(values: T[], value: T): T[] {
+  return [...values.slice(-(APPLICATION_RECENT_VERSIONS - 1)), value];
+}
+
+/** Releases are rows in `application_releases`; every one stays addressable. */
+export function appendRelease(values: ApplicationRelease[], value: ApplicationRelease): ApplicationRelease[] {
   return [...values, value];
 }
 
@@ -112,7 +117,7 @@ export function reviseCandidate(current: ApplicationState, input: z.infer<typeof
     spec: input.spec,
     rehearsal: null,
   };
-  state.versions = appendVersion(state.versions, { version: state.candidate.specVersion, spec: input.spec }, "This application has reached its candidate history limit.");
+  state.versions = appendVersion(state.versions, { version: state.candidate.specVersion, spec: input.spec });
   state.status = "draft";
   return state;
 }
@@ -145,7 +150,7 @@ export function publishCandidate(
     publishedBy: publication.by,
     provenance: "published",
   });
-  state.releases = appendVersion(state.releases, release, "This application has reached its release history limit.");
+  state.releases = appendRelease(state.releases, release);
   state.currentReleaseVersion = release.version;
   state.status = "installed";
   return state;
@@ -165,7 +170,7 @@ export function rollbackRelease(current: ApplicationState, input: z.infer<typeof
     spec: target.spec,
     rehearsal: null,
   };
-  state.versions = appendVersion(state.versions, { version: state.candidate.specVersion, spec: target.spec }, "This application has reached its candidate history limit.");
+  state.versions = appendVersion(state.versions, { version: state.candidate.specVersion, spec: target.spec });
   state.status = "installed";
   return state;
 }
@@ -220,7 +225,7 @@ export function applyLegacyApplicationCommand(
     });
     for (const record of state.records) validateRecord(spec, record);
     state.candidate = { designRevision: state.candidate.designRevision + 1, specVersion: state.candidate.specVersion + 1, spec, rehearsal: null };
-    state.versions = appendVersion(state.versions, { version: state.candidate.specVersion, spec }, "This application has reached its candidate history limit.");
+    state.versions = appendVersion(state.versions, { version: state.candidate.specVersion, spec });
     state.installation = { ...state.installation, sourceVersion: command.sourceVersion, baseSpec: remote };
     state.status = "draft";
     return state;
@@ -232,7 +237,7 @@ export function applyLegacyApplicationCommand(
     for (const record of state.records) validateRecord(command.spec, record);
     if (command.spec.maintenanceOwner !== state.candidate.spec.maintenanceOwner) throw new WorkspaceConflictError("Changing maintenance responsibility requires an accepted handoff.");
     state.candidate = { designRevision: state.candidate.designRevision + 1, specVersion: state.candidate.specVersion + 1, spec: command.spec, rehearsal: null };
-    state.versions = appendVersion(state.versions, { version: state.candidate.specVersion, spec: command.spec }, "This application has reached its candidate history limit.");
+    state.versions = appendVersion(state.versions, { version: state.candidate.specVersion, spec: command.spec });
     state.status = "draft";
     return state;
   }
@@ -245,7 +250,7 @@ export function applyLegacyApplicationCommand(
     for (const record of state.records) validateRecord(state.candidate.spec, record);
     const nextVersion = Math.max(0, ...state.releases.map((release) => release.version)) + 1;
     const release = applicationReleaseSchema.parse({ version: nextVersion, spec: state.candidate.spec, publishedAt: at, publishedBy: actorId, provenance: "published" });
-    state.releases = appendVersion(state.releases, release, "This application has reached its release history limit.");
+    state.releases = appendRelease(state.releases, release);
     state.currentReleaseVersion = release.version;
     state.status = "installed";
     return state;
@@ -260,7 +265,7 @@ export function applyLegacyApplicationCommand(
     if (spec.maintenanceOwner !== state.candidate.spec.maintenanceOwner) throw new WorkspaceConflictError("Changing maintenance responsibility requires an accepted handoff.");
     for (const record of state.records) validateRecord(spec, record);
     state.candidate = { designRevision: state.candidate.designRevision + 1, specVersion: state.candidate.specVersion + 1, spec, rehearsal: null };
-    state.versions = appendVersion(state.versions, { version: state.candidate.specVersion, spec }, "This application has reached its candidate history limit.");
+    state.versions = appendVersion(state.versions, { version: state.candidate.specVersion, spec });
     state.status = "draft";
     return state;
   }

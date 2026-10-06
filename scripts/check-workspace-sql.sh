@@ -461,6 +461,8 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007190000_doc
 psql "${psql_args[@]}" --file="$repo_root/tests/document-revisions-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007190100_onboarding_revisions.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/onboarding-revisions-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007190200_application_version_history.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/application-version-history-schema.sql"
 
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \

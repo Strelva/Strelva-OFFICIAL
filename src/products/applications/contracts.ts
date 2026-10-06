@@ -5,6 +5,14 @@ import { applicationDateOnlySchema } from "./date-only";
 /** Bounded-work compatibility keeps a clear failure at these finite limits. */
 export const APPLICATION_RECORD_LIMIT = 1_000;
 export const APPLICATION_VERSION_HISTORY_LIMIT = 100;
+/**
+ * Candidate versions and the compatibility list of releases keep only the
+ * latest entries. Every candidate version is archived in
+ * `application_candidate_versions` and every release stays in
+ * `application_releases`, so an application takes any number of changes.
+ * `APPLICATION_VERSION_HISTORY_LIMIT` remains the parse bound for older rows.
+ */
+export const APPLICATION_RECENT_VERSIONS = 50;
 export const APPLICATION_SELECT_OPTION_LIMIT = 20;
 export const APPLICATION_SELECT_OPTION_LENGTH_LIMIT = 80;
 export const APPLICATION_RECORD_HISTORY_LIMIT = 100;
