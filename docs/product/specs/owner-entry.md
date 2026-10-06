@@ -1,6 +1,22 @@
 # Owner entry and the move off /dashboard
 
-Status: draft spec, 2026-10-06. Not built, not approved. For Jacob's review.
+Status: draft spec, 2026-10-06. Partly built on branch `build/owner-entry`,
+proven locally only (not migrated, not deployed, every flag off):
+
+- Built: per-workspace release flags (`workspace_release_flags`, testers,
+  immutable history; migration `20261007130000`), the env layering
+  (`0`/`workspace`/`1`) for all four flags, `STRELVA_OWNER_ENTRY`, operator
+  controls on `/admin/clients/[id]`, sign-in/sign-up/admin root through
+  `/auth/entry`, 307 redirects from `/dashboard` and
+  `/client/<tenant>/dashboard` only for a member of the destination,
+  "Back to <business>" on pages that haven't moved, `view=system` kept
+  after sign-in, the disposition map (§5) with a page-file test, and
+  `/dashboard/reports` → `/workspace/recaps` (ready).
+- Not built here: the owner invitation (requirements 8–10, another stream),
+  email links pointing at the new place (11), and the workspace homes of
+  every page still marked `stay` in §5.
+- Proof: `src/__tests__/{release-flags,owner-entry,owner-entry-routes,workspace-recaps}.test.ts(x)`,
+  `tests/workspace-release-flags-schema.sql` in `check:workspace-sql`.
 
 Covers Reborn section 6 and the 1.0.0 line "Owners sign in on their client
 admin host and land in their workspace; old `/dashboard` links redirect."
@@ -141,7 +157,12 @@ open decision 2).
 
 **Disposition states, per `/dashboard` path:** `ready` (redirect when owner
 entry is on), `stay` (render `/dashboard` with a back link), `retire`
-(already a redirect today; maps straight to its target's home).
+(already a redirect today; maps straight to its target's home), `frozen`
+(kept on `/dashboard` by a written decision in the
+[systems catalog](./systems-catalog.md) §3.2–3.3; renders with the back link
+and never blocks owner entry `on`). *Corrected while building:* without
+`frozen`, gldf (store) and wellness clients (members) could never go `on`,
+since the catalog gives those pages no workspace home at 1.0.0.
 
 **Authority.**
 
@@ -176,6 +197,13 @@ Reborn's "3 have a home" don't hold up when checked page by page. In each
 case the workspace place exists, but none of them reads the tenant's data
 yet.
 
+*As built on `build/owner-entry` (2026-10-06):* **2 ready** (`/reports`,
+`[...notFound]`), **4 retire**, **2 frozen** (`/store`, `/members`), **17
+stay**. The map is `src/platform/owner-entry/dispositions.ts`; each `stay`
+entry carries its reason. gldf still waits on `/`, `/review` (needs-you spec)
+and `/site` (editing still opens `/dashboard/site`, so a redirect would loop).
+rohlax still waits on `/schedule` and `/roster` (the one booking store).
+
 The nav that owners see comes from `getDashboardSurfaces`
 (`src/lib/dashboard-surfaces.ts`). It shows Today, Ask Strelva, Website,
 Google Business, Analytics, Reports and Reviews, plus Schedule, Members and
@@ -199,16 +227,16 @@ The other pages are reached from inside those.
 | `/sources` | Same as `/integrations` | Retire. Redirects to `/integrations` | Map · S |
 | `/sources/[id]` Connection detail | That Connection on its System | None | Connection detail view · S–M |
 | `/leads` | Inquiries System | Partial. ~35%, `STRELVA_INQUIRIES_RELEASE` off, leads Redis-authoritative | Inquiries spec · M |
-| `/members` (wellness) | Bookings System, its people (business record contacts) | None | Read-only members list on Bookings · M |
+| `/members` (wellness) | **Frozen** on `/dashboard` (rewards frozen, systems catalog §3.2–3.3) | Frozen | None at 1.0.0 |
 | `/roster` (wellness) | Bookings System, day roster | None | Day roster (Reborn §4 Bookings) · in L |
 | `/schedule` (wellness) | Bookings System | Partial. Workspace scheduling is ~25% and uses a different store from the tenant widget | One booking store (Reborn §2) · L |
 | `/ownership` | Business menu: Business details → ownership, plus `/workspace/export` and `/workspace/exit` | Retire. Redirects to `/settings#ownership` today. Export and exit exist in production | Map to the exit and ownership section · S |
-| `/reports` Weekly and monthly recaps | Home → Recent (each recap is a record), linked from the Website System | None. Report crons resolve tenants, not workspaces | Recap view in the workspace; crons resolve the recipient through the link · M |
+| `/reports` Weekly and monthly recaps | `/workspace/recaps`, linked from Home (`?view=monthly` → `period=month`) | **Ready** (branch `build/owner-entry`). Reads every linked site's recaps through the tenant link | Crons resolving the recipient through the link is the systems-catalog stream's |
 | `/analytics` Live traffic, milestone, AI visibility | Website System, results and health | None | Results panel on the Website System · M |
 | `/review` Approval queue | Needs you | Partial. Needs-you UI is local with no real policy source; the queue is Redis events | Needs-you spec · L |
 | `/reviews` Reviews and replies | Publishing System (reviews), *acts on* Google | None | Reborn §4 Publishing · L |
 | `/settings` | Split. *Business* (profile) → Business details on the business record. *Branding* and *site config* → Website System. *Dependencies* → Connections. *Shortcuts* and *ownership* → business menu. *Account* → `/workspace/account`. *Domains* → Website System *appears on* Connection. *Plan* → business menu billing | Partial. `WorkspaceBusinessSettings` and `/workspace/account` exist in production. Business details doesn't edit the business record. Billing has no `workspaceId` in Stripe | Business record editing (business-record spec), domain view (Reborn §5), billing that follows the client (Reborn §3) · L |
-| `/store` (gldf) | Store System ("Great Lakes Dried Fruit store") | None. Orders and rewards are Redis | Store System view over orders and catalog · L |
+| `/store` (gldf) | **Frozen** on `/dashboard`; the website System shows a Store *Connection* (systems catalog §3.2, decision 9.4) | Frozen | None at 1.0.0 |
 | `[...notFound]` | Home | n/a | Map · S |
 
 **Which pages block which client.** gldf can't move until `/store`,
@@ -263,6 +291,12 @@ read-only check that hasn't been run (see Unknowns).
 - A flag resolver used by the four release helpers. It takes a workspace
   id, keeps today's signatures as the env-only path, and has a 60-second
   cache.
+- *As built:* sign-in, sign-up and the admin root send the person to
+  `/auth/entry` (only when `STRELVA_OWNER_ENTRY` is not off), which decides
+  once the person is known; the sign-in page can't know membership before
+  the magic link. With the env off, `next` stays `/dashboard` exactly as
+  before. The trusted header is `x-strelva-dashboard-path`. A `ready` page
+  also checks itself, since a soft navigation doesn't re-render the layout.
 - A dashboard disposition map: path → workspace target builder → `ready`,
   `stay` or `retire`. It's one module with a test that fails if a new
   `src/app/dashboard/**/page.tsx` has no entry.
