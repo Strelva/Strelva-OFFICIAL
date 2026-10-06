@@ -434,14 +434,27 @@ Neither is used by any journey today.
 
 ### 7. Structure that keeps it this way
 
-- [ ] Shared infrastructure (`db`, `redis`, `auth`, `email`, `crypto`,
+- [x] Shared infrastructure (`db`, `redis`, `auth`, `email`, `crypto`,
       `rate-limit`, `logger`, `ai-models`, `safe-fetch`) moves to
       `src/platform/infra`. `check:boundaries` blocks new workspace → `src/lib`
       imports (162 import sites today, baseline-and-shrink) and any `src/lib`
-      → workspace import (8 today). *Not started · L*
+      → workspace import (8 today). *Done locally Oct 6, branch
+      `w5/structure`, not deployed:* infra moved with re-exports at the old
+      paths (plus brand, monitoring, heartbeat, pinned-lookup); `src/lib` →
+      workspace 21 files to 0 through ports in `src/lib/workspace-ports.ts`
+      registered at the app edge (`src/register-workspace-ports.ts`, from
+      `instrumentation.ts`); `check:boundaries` fails CI on any new crossing,
+      with `scripts/boundary-baseline.json` (204 workspace → `src/lib`
+      imports in 93 files, and 46 older boundary imports that already failed
+      the check) only shrinking.
 - [ ] One capability registry replaces the seven declaration files listed in
       [capabilities](../capabilities/README.md#where-capabilities-are-declared).
-      `site-capabilities.ts` stays as per-tenant v1 state. *Not started · L*
+      `site-capabilities.ts` stays as per-tenant v1 state. *Partial, local
+      Oct 6 (`w5/structure`):* `src/capability-registry.ts` lists all six
+      through adapters and `/api/workspace` reads from it; the declarations
+      are not folded into one file (the tenant kinds would have to leave
+      `src/lib` first) and the other readers still read their file
+      (capabilities README lists them).
 - [x] One model-call helper. Every `generateText`, `streamText` and
       `generateObject` call goes through it (12 files in `src` today; six
       hard-code `gemini-2.5-flash`). It handles streaming, tools, structured
@@ -449,13 +462,18 @@ Neither is used by any journey today.
       `build/ask-strelva`, not applied or deployed:*
       `src/platform/infra/model-calls.ts`, cost log
       `20261007140000_model_call_log.sql`, lint rule against direct calls.
-- [ ] `src/lib/newsletter.ts` sends through `email/send.ts`;
+- [x] `src/lib/newsletter.ts` sends through `email/send.ts`;
       `src/lib/public-continuation.ts` encrypts through `crypto/secrets.ts`.
-      *Partial: the newsletter half is built locally on `build/publishing` ·
-      S*
-- [ ] `src/lib/db/database.types.ts` is regenerated; it's missing the Oct 1
+      *Done locally Oct 6 (`w5/structure`): the continuation seals through
+      `secrets.ts` (`sealWithKey`, same key and format, so cookies sealed
+      before still open); the newsletter already sends through `send.ts`.*
+- [x] `src/lib/db/database.types.ts` is regenerated; it's missing the Oct 1
       website tables, so `deprovision-coverage.test.ts` can't see them.
-      *Not started · S*
+      *Done locally Oct 6 (`w5/structure`), from every migration with `pnpm
+      db:types` (no Supabase CLI here); now at
+      `src/platform/infra/db/database.types.ts`. It showed five tenant_id
+      tables the deprovision sweep doesn't cover; they are listed for a
+      decision (`TENANT_TABLES_SWEEP_UNDECIDED`), the sweep is unchanged.*
 
 Proof: `pnpm reborn:progress --strict` passes.
 

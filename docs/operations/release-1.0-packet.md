@@ -139,6 +139,24 @@ disagree, the checklist's stop conditions win.
     the guard. If neither the store nor Redis can hold a booking, the visitor
     gets a 503 that says nothing was booked (it was a 500). Code only; no
     migration or flag.
+18. **Tenant code now reaches the workspace through ports registered at
+    server start** (wave 5, `w5/structure`, Reborn section 7). `src/lib` no
+    longer imports a workspace layer; `instrumentation.ts` imports
+    `src/register-workspace-ports.ts`, which plugs in the owner-recipient
+    rule, client-record mirrors, Google bindings, outside-write receipts,
+    business billing metadata, the policy bridge, inquiry review and the
+    agent's website tools. If that registration did not run, those calls
+    throw "Workspace ports are not registered" (the owner notice still falls
+    back to the tenant's own address). Check on Preview before production:
+    one lead capture and one domain add log no such error. Scripts that reach
+    these modules register themselves. Code only; no migration or flag.
+19. **Five tenant_id tables are not swept by deprovision** (found by the
+    regenerated database types, wave 5): `agency_managed_website_draft_grants`,
+    `…_preparations`, `…_revisions`, `outside_write_receipts`,
+    `report_snapshots`. None has a foreign key to `tenants`, so their rows
+    outlive a deprovisioned tenant. Unchanged and listed in
+    `TENANT_TABLES_SWEEP_UNDECIDED` (`src/lib/deprovision.ts`) for Jacob to
+    decide: purge, keep as receipts, or settle through the workspace.
 
 ## The whole order
 

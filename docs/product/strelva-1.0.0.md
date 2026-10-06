@@ -119,16 +119,23 @@ business, monitoring, and at least the best competitor's bar.
 
 ## Underneath (customers don't see it, launch needs it)
 
-- Shared infrastructure out of `src/lib`; 99 workspace files still import it.
-- One capability registry instead of seven declarations; one finite-job record
-  instead of four (service request, provider delivery, work job, budget).
+- Shared infrastructure out of `src/lib`. (Local, Oct 6, `w5/structure`: in
+  `src/platform/infra`; `src/lib` imports no workspace layer (21 files to 0,
+  through ports registered at the app edge); `check:boundaries` refuses any
+  new crossing; 93 workspace files still import `src/lib`, listed in a
+  shrink-only baseline.)
+- One capability registry instead of seven declarations (local, Oct 6:
+  `src/capability-registry.ts` over the six files, through adapters; the
+  declarations are not folded together yet); one finite-job record instead of
+  four (service request, provider delivery, work job, budget).
 - One model-call helper (12 call sites today); one email sender (`newsletter.ts`
   bypasses `send.ts`); one approval store (five today).
 - Make real progress in Postgres on `work-execution`, not memory. (Local,
   Oct 6: the live service runs on the Postgres activation store and the
   workspace-work cron resumes in-progress activations. Not applied anywhere.)
 - A Preview environment with its own Supabase, so testers can sign in.
-- Regenerated database types.
+- Regenerated database types. (Local, Oct 6: from every migration with
+  `pnpm db:types`; not from production.)
 
 ## Cut or frozen for 1.0.0
 
