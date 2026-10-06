@@ -44,11 +44,12 @@ export const TENANT_SCOPED_TABLES = [
 
 // Tables that carry a tenant_id but belong to a business workspace's own
 // website (20261001120000_website_documents.sql). They are deliberately NOT
-// swept: their tenant foreign keys are `on delete restrict`, so the final
-// `tenants` delete fails while a workspace website still publishes to, or
-// reserved, this tenant. Release it through the workspace first. Because the
-// sweep deletes child tables before `tenants`, such a failure today comes
-// after the other tenant tables were already deleted.
+// swept: their tenant foreign keys are `on delete restrict`. A tenant that a
+// workspace website still publishes to, or reserved, is refused before any
+// deletion (refusalReason "workspace_website"); release it through the
+// workspace first. The Postgres purge itself is one transaction
+// (deprovision_tenant_rows, 20261007100000_atomic_tenant_teardown.sql), so a
+// late failure never leaves the tenant partially erased.
 export const WORKSPACE_OWNED_TENANT_TABLES = [
   "website_document_publications", "website_hosted_tenant_reservations",
 ] as const;
@@ -72,7 +73,7 @@ export interface StoreAction {
 export interface DeprovisionResult {
   ok: boolean;
   /** Non-null when a safety guard refused the operation. */
-  refusalReason?: "protected_tenant" | "active_subscription";
+  refusalReason?: "protected_tenant" | "active_subscription" | "workspace_website";
   refusalDetail?: string;
   tenantId: string;
   executed: boolean;
@@ -103,12 +104,29 @@ async function countRows(table: string, tenantId: string): Promise<number> {
   return count ?? 0;
 }
 
-async function deleteRows(table: string, tenantId: string): Promise<void> {
-  const t = dyn(table);
-  if (!t) return;
-  const col = table === "tenants" ? "id" : "tenant_id";
-  const { error } = await t.delete().eq(col, tenantId);
-  if (error) throw new Error(`${table}: ${error.message}`);
+type TeardownRpc = (name: string, args: Record<string, unknown>) => PromiseLike<{ data: unknown; error: PgError }>;
+function rpc(): TeardownRpc | null {
+  const db = getSupabase();
+  return db ? ((name, args) => (db.rpc as unknown as TeardownRpc)(name, args)) : null;
+}
+
+/** Workspace website rows that hold this tenant (service-role SQL; the tables revoke direct reads). */
+async function workspaceWebsiteBlockers(tenantId: string): Promise<{ publications: number; reservations: number }> {
+  const call = rpc();
+  if (!call) return { publications: 0, reservations: 0 };
+  const { data, error } = await call("tenant_teardown_blockers", { p_tenant_id: tenantId });
+  if (error) throw new Error(`tenant_teardown_blockers: ${error.message}`);
+  const row = (Array.isArray(data) ? data[0] : data) as { publications?: number | string; reservations?: number | string } | undefined;
+  return { publications: Number(row?.publications ?? 0), reservations: Number(row?.reservations ?? 0) };
+}
+
+/** Delete every tenant-scoped row and the tenant in one transaction. */
+async function deleteTenantRowsAtomically(tenantId: string): Promise<Record<string, number>> {
+  const call = rpc();
+  if (!call) return {};
+  const { data, error } = await call("deprovision_tenant_rows", { p_tenant_id: tenantId });
+  if (error) throw new Error(`deprovision_tenant_rows: ${error.message}`);
+  return Object.fromEntries(Object.entries((data ?? {}) as Record<string, unknown>).map(([table, n]) => [table, Number(n)]));
 }
 
 /** Per-tenant Redis key patterns, with the tenant id pinned to its KNOWN
@@ -230,14 +248,34 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
     };
   }
 
-  // Postgres: count (always) then optionally delete, child tables first.
+  // Guard 3: a workspace website still publishes to, or reserved, this
+  // tenant. Refuse before anything is deleted; --force cannot override it
+  // because the restricting foreign keys would roll the purge back anyway.
+  const blockers = await workspaceWebsiteBlockers(tenantId);
+  if (blockers.publications + blockers.reservations > 0) {
+    return {
+      ok: false,
+      refusalReason: "workspace_website",
+      refusalDetail: `"${tenantId}" is held by a workspace website (publications=${blockers.publications}, reservations=${blockers.reservations}). Release it through the business workspace first. Nothing was deleted.`,
+      tenantId,
+      executed: false,
+      pgRowTotal: 0,
+      summary,
+    };
+  }
+
+  // Postgres: count (always), then purge every table and the tenant in one
+  // transaction. A failure throws here, before Redis or Vercel are touched.
   let pgTotal = 0;
+  const found: Array<[string, number]> = [];
   for (const table of [...TENANT_SCOPED_TABLES, "tenants"]) {
     const n = await countRows(table, tenantId);
     pgTotal += n;
-    if (n === 0) continue;
-    if (executed) await deleteRows(table, tenantId);
-    summary.postgres!.push({ target: table, found: n, deleted: executed });
+    if (n > 0) found.push([table, n]);
+  }
+  const removed = executed ? await deleteTenantRowsAtomically(tenantId) : {};
+  for (const [table, n] of found) {
+    summary.postgres!.push({ target: table, found: n, deleted: executed && (removed[table] ?? 0) > 0 });
   }
 
   // Redis: per-tenant keys (pinned patterns) + global cache busts.
