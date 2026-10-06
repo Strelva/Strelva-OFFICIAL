@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { parseBackfillArgs, runLeadBackfill, type BackfillDeps } from "../../scripts/tenant-lead-backfill";
+import { isLocalDatabaseUrl, parseBackfillArgs, runLeadBackfill, type BackfillDeps } from "../../scripts/tenant-lead-backfill";
 import type { LeadRecord } from "@/lib/leads";
 
 const NOW = Date.parse("2026-10-05T12:00:00.000Z");
@@ -75,5 +75,17 @@ describe("client lead backfill", () => {
     expect(() => parseBackfillArgs(["--force"])).toThrow(/Unknown flag/);
     expect(() => parseBackfillArgs(["../etc"])).toThrow(/not a tenant slug/);
     expect(parseBackfillArgs(["--apply", "--i-have-jacobs-yes"])).toMatchObject({ apply: true, jacobsYes: true });
+  });
+});
+
+describe("isLocalDatabaseUrl", () => {
+  it("accepts only loopback hosts", () => {
+    expect(isLocalDatabaseUrl("http://127.0.0.1:54321")).toBe(true);
+    expect(isLocalDatabaseUrl("http://[::1]:54321")).toBe(true);
+    expect(isLocalDatabaseUrl("http://db.localhost:54321")).toBe(true);
+    expect(isLocalDatabaseUrl("https://abc.supabase.co")).toBe(false);
+    expect(isLocalDatabaseUrl("https://localhost.example.com")).toBe(false);
+    expect(isLocalDatabaseUrl("not a url")).toBe(false);
+    expect(isLocalDatabaseUrl(undefined)).toBe(false);
   });
 });
