@@ -10,6 +10,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { getContent, getVersions, restoreVersion } from "@/lib/storage";
 import type { ContentSection } from "@/lib/types";
 import { applySectionUpdate } from "@/lib/apply-section-update";
+import { possibilityPreviewPath } from "@/lib/possibility-preview-link";
 import { PostgresNeedsYouStore } from "@/platform/needs-you/repository";
 import { possibilitySchema, type MakeRealChannel, type Possibility } from "@/platform/possibilities/contracts";
 import { createSupabasePossibilityRepository } from "@/platform/possibilities/supabase-repository";
@@ -136,4 +137,11 @@ export const makeRealNeedsYouAdapter = createMakeRealNeedsYouAdapter({
   readReady: readReadyPossibilities,
   systemNames: async (workspaceId) => (await readReadyPossibilitiesWithNames(workspaceId)).names,
   service: liveMakeReal,
+  previewPath: (workspaceId, p) => {
+    try {
+      return possibilityPreviewPath({ workspaceId, possibilityId: p.id, candidateRevision: p.candidateRevision });
+    } catch {
+      return null;
+    }
+  },
 });

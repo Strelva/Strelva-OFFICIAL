@@ -8,6 +8,7 @@ import { readWorkspaceExit } from "@/platform/workspace-exit";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { listManagedPresenceWork } from "@/products/managed-presence/server";
 import { makeRealForWorkspace } from "@/experience/systems/server";
+import { liveMakeRealPorts, makeRealPath } from "@/experience/systems/live-make-real";
 
 export const dynamic = "force-dynamic";
 
@@ -17,9 +18,14 @@ const input = z.object({
 }).strict();
 
 /**
- * Make real for a Ready Possibility, run on an isolated copy.
+ * Make real for a Ready Possibility.
  *
- * Owners of the business only. The runner is wired to isolated adapters and
+ * With a `make_real_live:<channel>` flag on for the business and a stored
+ * Possibility, the owner's tap is the Needs you decision for the plan and
+ * starts the durable, live activation (src/experience/systems/live-make-real):
+ * the response is `{ live }`. Otherwise it runs on an isolated copy, as below.
+ *
+ * Owners of the business only. The isolated runner is wired to isolated adapters and
  * an in-memory copy of the affected Systems (src/platform/make-real/sandbox):
  * it cannot publish, send, charge, book or switch a live System. The response
  * is the activation's partial state and the outside effects that are not
@@ -46,11 +52,14 @@ export async function POST(request: Request) {
     }
     const exit = await readWorkspaceExit(actor, workspace.id).catch(() => null);
     if (!exit || exit.state?.status === "completed") return workspaceJson({ error: "Work in this business has stopped, or its state could not be confirmed. Nothing changed." }, 409);
+    const path = await makeRealPath(actor, workspace.id, body.possibilityId, await liveMakeRealPorts());
+    if (!path) return workspaceJson({ error: "This possibility is not available. Nothing changed." }, 404);
+    if (path.kind === "live") return workspaceJson({ live: path.result });
     const managed = await listManagedPresenceWork().catch(() => ({ managedWork: [] as Array<{ id: string; domain?: string }> }));
     const result = await makeRealForWorkspace({
       actor, businessId: workspace.id, savedWork: await listWork(actor, workspace.id),
       siteDomains: new Map(managed.managedWork.flatMap((site) => site.domain ? [[site.id, site.domain] as const] : [])),
-    }, body.possibilityId, { canActivate: true });
+    }, path.possibilityId, { canActivate: true });
     if (!result) return workspaceJson({ error: "This possibility is not available. Nothing changed." }, 404);
     return workspaceJson({ result });
   } catch (error) {

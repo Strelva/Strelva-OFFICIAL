@@ -172,6 +172,8 @@ export function createMakeRealNeedsYouAdapter(deps: {
   readReady(workspaceId: string): Promise<Possibility[]>;
   systemNames(workspaceId: string): Promise<ReadonlyMap<string, string>>;
   service: Pick<LiveMakeRealService, "startApproved">;
+  /** The signed "Try it" path for this candidate, so an owner who never signs in can try it from the email. */
+  previewPath?(workspaceId: string, p: Possibility): string | null;
 }): SourceAdapter {
   return {
     lifecycle: MAKE_REAL_LIFECYCLE,
@@ -195,7 +197,7 @@ export function createMakeRealNeedsYouAdapter(deps: {
           revisionHash: planFingerprint(p),
           urgent: false,
           adminMayDecide: false,
-          openHref: `/workspace?workspaceId=${encodeURIComponent(ctx.workspaceId)}&possibility=${encodeURIComponent(p.id)}`,
+          openHref: deps.previewPath?.(ctx.workspaceId, p) ?? `/workspace?workspaceId=${encodeURIComponent(ctx.workspaceId)}&possibility=${encodeURIComponent(p.id)}`,
         } satisfies ProposedItem;
       });
       return { items, complete: true };

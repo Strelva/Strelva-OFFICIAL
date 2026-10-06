@@ -324,6 +324,17 @@ export interface WorkspaceMakeRealResult {
   notConnected: string[];
 }
 
+/** Live Make real from the System page: the owner's tap was the Needs you
+ * decision and the durable activation started (or why not). */
+export interface WorkspaceLiveMakeRealResult {
+  live: true;
+  /** Needs you decide status, or `not_ready`. */
+  status: string;
+  /** "Live.", "Partly live", or why nothing started. */
+  headline: string;
+  activationId: string | null;
+}
+
 export interface WorkspaceHandoffPreview<TPayload = WorkspaceWorkPayload> {
   recipientEmail: string;
   agencyName: string;
