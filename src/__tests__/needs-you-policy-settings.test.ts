@@ -94,6 +94,8 @@ describe("owner changes", () => {
   it("refuses fixed kinds and a stale version", () => {
     expect(planOwnerChange(empty(), { action: "set", kind: "money", systemId: null, route: "owner_decides", expectedVersion: 0 })).toEqual({ ok: false, reason: "fixed" });
     expect(planOwnerChange(empty(), { action: "reset", kind: "google.post", systemId: null, expectedVersion: 3 })).toEqual({ ok: false, reason: "stale" });
+    // An unconfirmed write never becomes the owner's decision.
+    expect(planOwnerChange(empty(), { action: "set", kind: "verify.failed", systemId: null, route: "owner_decides", expectedVersion: 0 })).toEqual({ ok: false, reason: "not_configurable" });
   });
 
   it("goes back to Strelva's default by clearing the owner's row", async () => {
