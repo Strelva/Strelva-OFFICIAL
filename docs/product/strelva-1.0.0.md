@@ -26,9 +26,11 @@ it, area by area.
 | Internal tools, store, wellness, reports, documents | [specs/systems-catalog.md](./specs/systems-catalog.md) | Draft, Oct 6 |
 | Billing, Redis exit, export, outcome loop | [specs/money-and-data.md](./specs/money-and-data.md) | Draft, Oct 6 |
 | Publishing | [publishing spec](../capabilities/publishing/publishing-spec-2026-10-06.md) | Draft, Oct 6 |
+| Website System | [website-system spec](../capabilities/website/website-system-spec-2026-10-06.md) | Draft, Oct 6; works decision 3 both ways |
+| Systems Home, System page, Possibilities, Make real | [specs/systems-experience.md](./specs/systems-experience.md) | Draft, Oct 6 |
 | Website rebuild | [rebuild spec](../capabilities/website/website-rebuild-spec-2026-10-01.md) | Built locally, flag off |
-| Inquiries | [inquiry spec](../capabilities/inquiries/inquiry-first-product-spec-2026-09-11.md) | Canonical Sept 11; predates Systems and the business record |
-| Bookings | [bookings spec](../capabilities/bookings/bookings-spec-2026-10-01.md) | Proposed Oct 1, not approved |
+| Inquiries | [inquiry spec](../capabilities/inquiries/inquiry-first-product-spec-2026-09-11.md) + [1.0 delta](../capabilities/inquiries/inquiry-1.0-delta-2026-10-06.md) | Sept 11 spec amended Oct 6, incl. Redis read cutover |
+| Bookings | [bookings spec](../capabilities/bookings/bookings-spec-2026-10-01.md) | Working default, updated Oct 6 to the model |
 | Business record, conversion, structure | [Reborn §1, §3, §7](./strelva-reborn.md) | Line-level plan |
 
 Every feature below names its source and its state today. States come from the

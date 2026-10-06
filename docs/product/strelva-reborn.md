@@ -406,6 +406,7 @@ must not wait for the rest (like `0.2.1`) is built from `main` directly.
 
 Each of these gets an exact action prepared and verified before asking.
 
+- The Systems spine migration `20261004120000_systems.sql` and every Oct 7 build-stream migration.
 - Each production migration: the client lead store (Oct 5, can go first and
   alone), the three Oct 1 website migrations, the business record,
   tenant-to-workspace links, inquiry and booking stores.
