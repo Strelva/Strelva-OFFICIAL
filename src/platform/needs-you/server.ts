@@ -5,7 +5,7 @@ import { DeliveryCommitmentService, PostgresServiceRequestStore, mutateServiceRe
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { serviceRequestAdapter, tenantEventAdapter } from "./adapters";
 import type { HandledReceipt } from "./contracts";
-import { handledFromStore, handledFromTenantEvent, mergeHandled } from "./handled";
+import { decidedTenantEventIds, handledFromStore, handledFromTenantEvent, mergeHandled } from "./handled";
 import { PostgresNeedsYouStore, type NeedsYouStore } from "./repository";
 import { createNeedsYouService } from "./service";
 import { systemsSourceAdapters } from "./systems-sources";
@@ -68,6 +68,9 @@ export async function readStrelvaHandled(actor: WorkspaceActor, workspaceId: str
   const since = now - 7 * 24 * 60 * 60 * 1000;
   const rows = await store.handled(actor, workspaceId, new Date(since).toISOString());
   const tenants = await store.linkedTenants(workspaceId).catch(() => []);
-  const events = (await Promise.all(tenants.map(link => getEvents(link.tenantId, { limit: 100 }).catch(() => [])))).flat();
+  // A tenant event an owner decided through Needs you is shown once, as the decision's receipt.
+  const decided = decidedTenantEventIds(rows);
+  const events = (await Promise.all(tenants.map(async link => (await getEvents(link.tenantId, { limit: 100 }).catch(() => []))
+    .filter(event => !decided.has(`${link.tenantId}:${event.id}`))))).flat();
   return mergeHandled([...rows.map(handledFromStore), ...events.map(handledFromTenantEvent)], since).slice(0, 50);
 }
