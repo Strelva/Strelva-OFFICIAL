@@ -549,6 +549,13 @@ psql "${psql_args[@]}" --file="$repo_root/tests/operator-queue-schema.sql"
 # Make real activations persisted as operations/activation saved work.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007155000_make_real_activations.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-activations-schema.sql"
+# Website System (2026-10-08): publish onto a linked tenant, routing after a
+# rename, the business template, and operator domain work on owner approval.
+# Replaces reserve_website_hosted_tenant and manage_published_website_tenant;
+# check-workspace-upgrade.sh reruns the original website contract after it.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008150000_website_linked_tenant_publication.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008150100_website_domain_owner_approval.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-linked-publication-schema.sql"
 # The real Make real runner, checkpointing through these RPCs (psql-backed port).
 STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run src/__tests__/make-real-activation-repository.test.ts

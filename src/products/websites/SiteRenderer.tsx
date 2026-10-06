@@ -12,13 +12,17 @@ export interface SiteRendererProps {
   preview?: boolean;
   tenant?: string;
   contentHash?: string;
+  /** Serve visitor tools under this current tenant slug (after a rename). The
+   * page still emits the issued document's hash. */
+  capabilityTenant?: string;
 }
 
 /** Dependency-free catalog renderer behind the replaceable SiteRenderer boundary. */
-export function SiteRenderer({ document: input, path = "/", preview = false, tenant, contentHash }: SiteRendererProps) {
-  const document = siteDocumentSchema.parse(input);
+export function SiteRenderer({ document: input, path = "/", preview = false, tenant, contentHash, capabilityTenant }: SiteRendererProps) {
+  const issued = siteDocumentSchema.parse(input);
+  const documentHash = siteDocumentHash(issued);
+  const document = capabilityTenant && issued.capabilities && capabilityTenant === tenant ? { ...issued, capabilities: { ...issued.capabilities, tenant: capabilityTenant } } : issued;
   const faqSchema = preview ? null : siteFaqJsonLd(document, path);
-  const documentHash = siteDocumentHash(document);
   if (contentHash && contentHash !== documentHash) throw new Error("The rendered website document does not match its approved hash.");
   const render = (tree: SiteTree, key: string): ReactNode => {
     if (typeof tree === "string") return tree;

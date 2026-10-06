@@ -33,6 +33,7 @@ export const retryWebsiteRebuild: typeof import("./rebuild-service").retryWebsit
 export const resolveWebsiteRebuildFact: typeof import("./rebuild-service").resolveWebsiteRebuildFact = (...args) => import("./rebuild-service").then(module => module.resolveWebsiteRebuildFact(...args));
 export const approveWebsiteRebuild: typeof import("./rebuild-service").approveWebsiteRebuild = (...args) => import("./rebuild-service").then(module => module.approveWebsiteRebuild(...args));
 export const launchWebsiteRebuild: typeof import("./rebuild-service").launchWebsiteRebuild = (...args) => import("./rebuild-service").then(module => module.launchWebsiteRebuild(...args));
+export const publishWebsiteRebuildOntoLinkedSite: typeof import("./rebuild-service").publishWebsiteRebuildOntoLinkedSite = (...args) => import("./rebuild-service").then(module => module.publishWebsiteRebuildOntoLinkedSite(...args));
 export const patchWebsiteRebuild: typeof import("./rebuild-service").patchWebsiteRebuild = (...args) => import("./rebuild-service").then(module => module.patchWebsiteRebuild(...args));
 export const undoWebsiteRebuild: typeof import("./rebuild-service").undoWebsiteRebuild = (...args) => import("./rebuild-service").then(module => module.undoWebsiteRebuild(...args));
 export const websiteRebuildDomain: typeof import("./rebuild-service").websiteRebuildDomain = (...args) => import("./rebuild-service").then(module => module.websiteRebuildDomain(...args));

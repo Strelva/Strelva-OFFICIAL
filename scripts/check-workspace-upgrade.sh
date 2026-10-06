@@ -220,5 +220,9 @@ psql "${psql_args[@]}" -Atc "select count(*) from pg_trigger where tgname = 'ten
 psql "${psql_args[@]}" --file="$repo_root/tests/business-effort-minutes-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/operator-queue-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-account-bindings-schema.sql"
+# 20261008150000 replaces reserve_website_hosted_tenant and
+# manage_published_website_tenant; website-documents-schema above proves the
+# original contract against the replacements.
+psql "${psql_args[@]}" --file="$repo_root/tests/website-linked-publication-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
