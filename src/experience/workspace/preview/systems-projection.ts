@@ -122,6 +122,8 @@ export async function previewSystems(scenario: PreviewScenario, options: { insta
       candidates: candidates(snapshot),
       actorId: PREVIEW_ACTOR.userId,
       now,
+      // The Mooney Firm's site is changed through Requests (a custom repo), so Ask for a change files one.
+      ...(scenario.startsWith("mooney") ? { siteEditing: new Map([[MOONEY_TENANT, "request" as const]]) } : {}),
     };
     const projected = await projectWorkspaceSystems({ ...base, observations: [...fixtureEvidence(scenario, { listing }, now), ...(published?.observations ?? [])] });
     const projection = scenario.startsWith("mooney") ? withPreviewMakeReal(projected, options.makeReal ?? "off", now) : projected;
