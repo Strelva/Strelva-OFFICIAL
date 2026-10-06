@@ -46,9 +46,37 @@ describe("agency routes", () => {
     deps.library.mockReset().mockResolvedValue({ agencyWorkspaceId: AGENCY, sources: [] });
     deps.review.mockReset().mockResolvedValue({ sourceSystemId: SOURCE, revision: 2, results: [] });
     deps.limited.mockReset().mockResolvedValue(false);
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
     vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "1");
   });
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(async () => {
+    vi.unstubAllEnvs();
+    (await import("@/platform/release-flags/store")).setReleaseFlagsDb(null);
+  });
+
+  it("under STRELVA_SYSTEMS_RELEASE=workspace, opens the library only for an agency whose row is on", async () => {
+    vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "workspace");
+    const OTHER = "a0000000-0000-4000-8000-0000000000e9";
+    const { setReleaseFlagsDb } = await import("@/platform/release-flags/store");
+    setReleaseFlagsDb({
+      rpc: async (_name, args) => ({
+        data: {
+          workspaceId: args.p_workspace_id,
+          flags: args.p_workspace_id === AGENCY ? { systems: { state: "on", revision: 1, changedAt: "2026-10-06T00:00:00Z" } } : {},
+          testers: [], testerEmails: [],
+        },
+        error: null,
+      }),
+    });
+    expect((await getLibrary(new Request(`${ORIGIN}/api/workspace/agency-library?workspaceId=${AGENCY}`))).status).toBe(200);
+    expect((await getLibrary(new Request(`${ORIGIN}/api/workspace/agency-library?workspaceId=${OTHER}`))).status).toBe(503);
+    const post = (workspaceId: string) => postLibrary(new Request(`${ORIGIN}/api/workspace/agency-library`, { method: "POST", headers: { origin: ORIGIN, "content-type": "application/json" },
+      body: JSON.stringify({ action: "review_all", workspaceId, sourceSystemId: SOURCE, revision: 2, versionIds: [VERSION] }) }));
+    expect((await post(OTHER)).status).toBe(503);
+    expect(deps.review).not.toHaveBeenCalled();
+    expect((await post(AGENCY)).status).toBe(200);
+    expect(deps.library).toHaveBeenCalledTimes(1);
+  });
 
   it("reads every client in one call under the signed-in actor", async () => {
     const response = await getClients(new Request(`${ORIGIN}/api/workspace/agency-clients?workspaceId=${AGENCY}`));

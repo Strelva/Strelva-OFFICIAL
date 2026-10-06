@@ -25,6 +25,9 @@ vi.mock("@/products/inquiries/workspace-exit", () => ({
 }));
 vi.mock("@/products/inquiries", () => ({
   inquiryReleaseEnabled: mocks.release,
+  inquiryReleaseMayBeOn: (...args: unknown[]) => mocks.release(...args),
+  inquiryReleasedForCurrentUser: async (...args: unknown[]) => mocks.release(...args),
+  inquiryReleaseEnabledForTenant: async (...args: unknown[]) => mocks.release(...args),
   prepareInquiryMessageReview: mocks.prepare,
   approveInquiryMessageReview: mocks.approve,
 }));

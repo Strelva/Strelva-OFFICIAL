@@ -1,4 +1,5 @@
-import { websiteRebuildReleaseEnabled } from "@/products/websites/index";
+import { websiteRebuildReleaseEnabledForWorkspace, websiteRebuildReleaseMayBeOn } from "@/products/websites/index";
+import { OPERATOR_VIEWER } from "@/platform/release-flags/viewer";
 import { NextResponse } from "next/server";
 import { requireCronRequest } from "@/lib/cron-auth";
 import { recordHeartbeat, checkHeartbeats, CRON_MAX_AGE_SECONDS } from "@/lib/heartbeat";
@@ -31,10 +32,10 @@ export async function GET(request:Request){
  const denied=requireCronRequest(request);if(denied)return denied;const started=Date.now();let ok=false;let processed=0;let failed=0;
  try{
   let hosted:Record<string,unknown>={skipped:true,reason:"website_rebuild_release_disabled"};let receipts:WebsiteHealthReceipt[]=[];
-  if(websiteRebuildReleaseEnabled()){
+  if(websiteRebuildReleaseMayBeOn()){
    let retention:{status:"pruned";removed:number}|{status:"failed"};
    try{retention={status:"pruned",removed:await websiteDocumentStore.pruneCrawls()};}catch{retention={status:"failed"};failed++;}
-   const result=await scanWebsiteHealth({list:async()=>{const rows=await websiteDocumentStore.listPublished();return Promise.all(rows.filter(row=>row.tenantId).map(async row=>{return{workspaceId:row.workspaceId,workId:row.workId,tenantId:row.tenantId!,revision:row.revision,contentHash:row.contentHash,url:row.receipt?.providerUrl??`https://${row.tenantId}.${ROOT_DOMAIN}/`};}));},save:receipt=>websiteDocumentStore.recordHealth(receipt),alert:async receipts=>{await sendEmailWithReceipt({audience:"operator",to:resolveLeadNotifyRecipients(),fromAddress:"health@updates.strelva.com",subject:`Strelva: ${receipts.length} hosted website checks need attention`,idempotencyKey:`website-health:${new Date().toISOString().slice(0,10)}`,options:{heading:"Hosted website checks need attention",paragraphs:["The published revision could not be verified. Each result is saved as a health receipt; no content was republished."],rows:receipts.map(value=>({label:value.tenantId,value:`${value.status}: ${value.url}`})),button:{label:"Open operator workspace",url:OPERATOR_URL}}});}});
+   const result=await scanWebsiteHealth({list:async()=>{const listed=await websiteDocumentStore.listPublished();const released=await Promise.all(listed.map(row=>websiteRebuildReleaseEnabledForWorkspace(row.workspaceId,OPERATOR_VIEWER).catch(()=>false)));const rows=listed.filter((_row,index)=>released[index]);return Promise.all(rows.filter(row=>row.tenantId).map(async row=>{return{workspaceId:row.workspaceId,workId:row.workId,tenantId:row.tenantId!,revision:row.revision,contentHash:row.contentHash,url:row.receipt?.providerUrl??`https://${row.tenantId}.${ROOT_DOMAIN}/`};}));},save:receipt=>websiteDocumentStore.recordHealth(receipt),alert:async receipts=>{await sendEmailWithReceipt({audience:"operator",to:resolveLeadNotifyRecipients(),fromAddress:"health@updates.strelva.com",subject:`Strelva: ${receipts.length} hosted website checks need attention`,idempotencyKey:`website-health:${new Date().toISOString().slice(0,10)}`,options:{heading:"Hosted website checks need attention",paragraphs:["The published revision could not be verified. Each result is saved as a health receipt; no content was republished."],rows:receipts.map(value=>({label:value.tenantId,value:`${value.status}: ${value.url}`})),button:{label:"Open operator workspace",url:OPERATOR_URL}}});}});
    processed+=result.processed;failed+=result.failed;receipts=result.results;hosted={processed:result.processed,failed:result.failed,crawlRetention:retention};
   }
   const coverage=await coverEverySite(receipts);processed+=coverage.sites;failed+=coverage.failed;

@@ -4,7 +4,7 @@ const deps=vi.hoisted(()=>({workspace:true,rebuild:true,identity:vi.fn(),grant:v
 vi.mock("@/platform/workspace-release",()=>({workspaceReleaseEnabled:()=>deps.workspace}));
 vi.mock("@/lib/db/server-client",()=>({getSessionUser:deps.identity}));
 vi.mock("@/platform/offerings/agency-website-draft",()=>({createAgencyManagedWebsiteDraftAccessService:()=>({read:deps.grant,state:deps.state}),assertAgencyWebsiteDraftSubscription:vi.fn()}));
-vi.mock("@/products/websites/index",()=>({websiteRebuildReleaseEnabled:()=>deps.rebuild,readAgencyWebsiteDocument:deps.read,patchAgencyWebsiteDocument:deps.patch,previewAgencyWebsiteDocument:deps.preview}));
+vi.mock("@/products/websites/index",()=>({websiteRebuildReleaseEnabled:()=>deps.rebuild,websiteRebuildReleaseMayBeOn:()=>deps.rebuild,websiteRebuildReleaseEnabledForTenant:async()=>deps.rebuild,readAgencyWebsiteDocument:deps.read,patchAgencyWebsiteDocument:deps.patch,previewAgencyWebsiteDocument:deps.preview}));
 vi.mock("@/lib/tenants",()=>({getTenantConfig:vi.fn(async()=>undefined)}));
 import {GET,POST} from "@/app/api/agency-website-draft-access/route";
 import {agencyWebsiteDocumentPatchSchema} from "@/products/websites/agency-document-service";

@@ -224,5 +224,8 @@ psql "${psql_args[@]}" --file="$repo_root/tests/workspace-account-bindings-schem
 # trigger; the billing contract and the separate-business option both hold.
 psql "${psql_args[@]}" --file="$repo_root/tests/business-billing-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/convert-separate-business-schema.sql"
+# Release rows: agency workspaces accepted since 20261008161000; business
+# workspaces still accepted, personal ones still refused.
+psql "${psql_args[@]}" --file="$repo_root/tests/release-flags-agency-workspaces-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

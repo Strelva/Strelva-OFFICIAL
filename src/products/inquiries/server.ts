@@ -46,7 +46,7 @@ import { currentResponsibility } from "./currentness";
 
 export { recordedInquiryAssignee, recordedInquiryStatus } from "./record-projection";
 
-export { inquiryReleaseEnabled } from "./release";
+export { inquiryReleaseEnabled, inquiryReleaseMayBeOn, inquiryReleaseEnabledForWorkspace, inquiryReleaseEnabledForTenant, inquiryReleasedForCurrentUser } from "./release";
 export {
   INQUIRY_WORKSPACE_EXIT_CODE,
   InquiryWorkspaceExitBlockedError,

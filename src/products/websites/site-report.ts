@@ -104,12 +104,15 @@ async function sendCronWebsiteMonthlyReport(actor:WorkspaceActor,workId:string,m
  * destination. A business with no owner yet (a converted client before its
  * owner accepts) is reported as such: nobody may read its report. */
 export async function runWebsiteMonthlyReports(month:string){
- const { websiteRebuildReleaseEnabled }=await import("./rebuild-release");
- if(!websiteRebuildReleaseEnabled())return{tenants:[] as string[],sent:0,suppressed:0,errors:[] as string[]};
+ const { websiteRebuildReleaseMayBeOn, websiteRebuildReleaseEnabledForWorkspace }=await import("./rebuild-release");
+ if(!websiteRebuildReleaseMayBeOn())return{tenants:[] as string[],sent:0,suppressed:0,errors:[] as string[]};
  const { getSupabase }=await import("@/lib/db/client");
  const { WorkspaceStoreError }=await import("@/platform/workspaces/types");
  const db=getSupabase();if(!db)throw new WorkspaceStoreError("Website report storage is unavailable.");
- const published=await websiteDocumentStore.listPublished();const result={tenants:published.flatMap(row=>row.tenantId?[row.tenantId]:[]),sent:0,suppressed:0,errors:[] as string[]};
+ // Owners get the report only where the rebuild is on for their business (per row under `workspace`).
+ const listed=await websiteDocumentStore.listPublished();
+ const released=await Promise.all(listed.map(row=>websiteRebuildReleaseEnabledForWorkspace(row.workspaceId).catch(()=>false)));
+ const published=listed.filter((_row,index)=>released[index]);const result={tenants:published.flatMap(row=>row.tenantId?[row.tenantId]:[]),sent:0,suppressed:0,errors:[] as string[]};
  for(const site of published){
   try{
    const {data,error}=await (db as unknown as WorkspaceDb).from("workspace_memberships").select("user_id").eq("workspace_id",site.workspaceId).eq("role","owner").order("created_at",{ascending:true}).limit(1);

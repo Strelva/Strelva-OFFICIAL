@@ -7,6 +7,7 @@ import {
   type BackfillDeps,
   type TenantSecretRow,
 } from "../../scripts/backfill-secret-encryption";
+import { assertFlagTargetAllowed, parseFlagArgs, runFlagCommand } from "../../scripts/workspace-release-flag";
 import type { Connection } from "@/lib/types";
 
 const PROD_REDIS = "https://example-123.upstash.io";
@@ -105,5 +106,35 @@ describe("runSecretBackfill", () => {
     const outcome = await runSecretBackfill(parseBackfillArgs([]), { encryptSecret: (v) => v, tenants: null, connections: null, log: (l) => lines.push(l) });
     expect(outcome.tenants.total).toBe(0);
     expect(lines.join("\n")).toMatch(/skipping tenants[\s\S]*skipping connections/);
+  });
+});
+
+describe("workspace-release-flag script", () => {
+  const WS = "7e000000-0000-4000-8000-000000000010";
+  const base = [WS, "systems", "on", "--operator-email=ops@example.test", "--reason=Agency library walk-through"];
+
+  it("parses a command and defaults to a dry run", () => {
+    expect(parseFlagArgs(base)).toMatchObject({ workspaceId: WS, flag: "systems", state: "on", apply: false, jacobsYes: false });
+    expect(() => parseFlagArgs([WS, "ask", "on", "--operator-email=a@b.test", "--reason=why"])).toThrow(/Flag must be/);
+    expect(() => parseFlagArgs([WS, "systems", "maybe", "--operator-email=a@b.test", "--reason=why"])).toThrow(/State must be/);
+    expect(() => parseFlagArgs(["not-a-uuid", "systems", "on", "--operator-email=a@b.test", "--reason=why"])).toThrow(/workspace id/);
+    expect(() => parseFlagArgs([WS, "systems", "on", "--reason=why"])).toThrow(/operator-email/);
+    expect(() => parseFlagArgs([...base, "--force"])).toThrow(/Unknown/);
+  });
+
+  it("refuses a non-local database without a yes, dry run included", () => {
+    expect(() => assertFlagTargetAllowed("http://127.0.0.1:54321", parseFlagArgs(base))).not.toThrow();
+    expect(() => assertFlagTargetAllowed(PROD_DB, parseFlagArgs(base))).toThrow(/--i-have-jacobs-yes/);
+    expect(() => assertFlagTargetAllowed(PROD_DB, parseFlagArgs([...base, "--i-have-jacobs-yes"]))).not.toThrow();
+    expect(() => assertFlagTargetAllowed(undefined, parseFlagArgs(base))).toThrow(/not configured/);
+  });
+
+  it("dry run reads only; apply writes with the current revision", async () => {
+    const set = vi.fn(async () => ({ flags: { systems: { state: "on", revision: 3 } } }));
+    const read = vi.fn(async () => ({ flags: { systems: { state: "operators", revision: 2 } } }));
+    expect(await runFlagCommand(parseFlagArgs(base), { read, set })).toEqual({ mode: "dry-run", from: "operators", to: "on" });
+    expect(set).not.toHaveBeenCalled();
+    expect(await runFlagCommand(parseFlagArgs([...base, "--apply"]), { read, set })).toEqual({ mode: "apply", from: "operators", to: "on" });
+    expect(set).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: WS, flag: "systems", state: "on", expectedRevision: 2 }));
   });
 });

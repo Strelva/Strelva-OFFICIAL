@@ -547,7 +547,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
   return (
     <WorkspaceFrame>
       <div inert={Boolean(handoffLoading || (handoffToken && handoffPreview) || publicSaveResultId) || undefined}>
-      <WorkspaceLayout rebuildEnabled={rebuildEnabled} appBase={appBase} signOut={signOut} key={snapshot.workspaceId} snapshot={snapshot} home={home} agency={view === "agency"} busy={loading} selectedWork={showAssessment ? null : selectedWork}
+      <WorkspaceLayout rebuildEnabled={snapshot.releases?.websiteRebuild ?? rebuildEnabled} appBase={appBase} signOut={signOut} key={snapshot.workspaceId} snapshot={snapshot} home={home} agency={view === "agency"} busy={loading} selectedWork={showAssessment ? null : selectedWork}
         workingTitle={view === "websites" ? "Website" : view === "operations" ? finiteJobOpen ? "Request" : "Running" : view === "applications" ? "Applications" : view === "scheduling" ? "Reservations" : view === "investigations" ? "Saved checks" : view === "product-learning" ? "Learning" : undefined}
         workingSection={view === "operations" ? finiteJobOpen ? "requests" : "ongoing" : "work"}
         atSectionRoot={view === "operations" && !selectedWork && !selectedStandingId && !selectedAssignmentId}
@@ -649,7 +649,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
               onOpenStanding={openStanding}
               onSaved={horizontalSaved}
             />
-              : view === "websites" ? <WebsiteExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} rebuildEnabled={rebuildEnabled} rebuildVersion={websiteDocumentVersion(selectedWork?.payload)} managed={Boolean(snapshot.managedWork?.length)} agency={currentWorkspace?.kind === "agency"} readOnly={workspaceReadOnly} initialRequest={horizontalRequest} onSaved={horizontalSaved} />
+              : view === "websites" ? <WebsiteExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} rebuildEnabled={snapshot.releases?.websiteRebuild ?? rebuildEnabled} rebuildVersion={websiteDocumentVersion(selectedWork?.payload)} managed={Boolean(snapshot.managedWork?.length)} agency={currentWorkspace?.kind === "agency"} readOnly={workspaceReadOnly} initialRequest={horizontalRequest} onSaved={horizontalSaved} />
               : view === "custom-applications" ? selectedWork?.productId === view ? <CustomApplicationManageExperience key={selectedWork.id} workId={selectedWork.id} readOnly={Boolean(workspaceReadOnly || currentWorkspace?.role === "member")} /> : <p role="status">Select a saved custom application to review its delivery.</p>
               : view === "onboarding" ? <OnboardingWorkspaceExperience key={`${snapshot.workspaceId}:${selectedWork?.id || "new"}`} workspaceId={snapshot.workspaceId} initialCaseId={selectedWork?.productId === view ? selectedWork.id : undefined} initialRequest={horizontalRequest} readOnly={workspaceReadOnly} onSaved={horizontalSaved} />
               : view === "product-learning" ? <LearningExperience workspaceId={snapshot.workspaceId} workId={selectedWork?.productId === view ? selectedWork.id : undefined} sources={snapshot.work} readOnly={workspaceReadOnly} onSaved={horizontalSaved} />

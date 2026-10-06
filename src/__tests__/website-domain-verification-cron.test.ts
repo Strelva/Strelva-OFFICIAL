@@ -3,7 +3,7 @@ import { authenticatedCronRequest } from "@/__tests__/support/cron";
 import type { DomainClaim, TenantConfig } from "@/lib/types";
 
 const deps = vi.hoisted(() => ({ release: vi.fn(), tenants: vi.fn(), all: vi.fn(), config: vi.fn(), update: vi.fn(), send: vi.fn(), heartbeat: vi.fn() }));
-vi.mock("@/products/websites/rebuild-release", () => ({ websiteRebuildReleaseEnabled: deps.release }));
+vi.mock("@/products/websites/rebuild-release",()=>({websiteRebuildReleaseEnabled:deps.release,websiteRebuildReleaseMayBeOn:(...args:unknown[])=>deps.release(...args),websiteRebuildReleaseEnabledForWorkspace:async(...args:unknown[])=>deps.release(...args),websiteRebuildReleaseEnabledForTenant:async(...args:unknown[])=>deps.release(...args),websiteRebuildReleasedFor:async(...args:unknown[])=>deps.release(...args)}));
 vi.mock("@/lib/tenants", () => ({ getActiveTenants: deps.tenants, getAllTenants: deps.all, getTenantConfig: deps.config, updateTenant: deps.update, isActiveTenant: (tenant: { active?: boolean }) => tenant.active !== false, invalidateDomainMapCache: () => undefined }));
 vi.mock("@/lib/redis", () => ({ getRedis: () => null }));
 vi.mock("@/lib/email/send", () => ({ sendEmailWithReceipt: deps.send }));

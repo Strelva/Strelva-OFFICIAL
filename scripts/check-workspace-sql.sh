@@ -479,6 +479,11 @@ psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 # the tenant-to-workspace entry resolution, with cross-workspace denial.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007130000_workspace_release_flags.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
+# Release rows on agency workspaces too (agency library under `workspace`);
+# the business-workspace contract above still holds with it applied.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008161000_release_flags_agency_workspaces.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/release-flags-agency-workspaces-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 # Model-call cost log (one model-call helper, Ask Strelva spec section 5).
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007140000_model_call_log.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/model-call-log-schema.sql"

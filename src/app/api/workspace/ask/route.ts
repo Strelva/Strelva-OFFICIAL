@@ -1,9 +1,11 @@
 import { stepCountIs } from "ai";
 import { isSuperAdmin } from "@/lib/auth";
 import { isRateLimitedAsync } from "@/lib/rate-limit";
-import { inquiryReleaseEnabled } from "@/products/inquiries";
+import { inquiryReleaseEnabledForWorkspace } from "@/products/inquiries";
+import { releaseViewerFor } from "@/platform/release-flags/viewer";
+import { systemsReleasedFor } from "@/platform/systems-release";
 import {
-  askReleaseEnabled,
+  askReleaseMayBeOn,
   createPossibilityAdapter,
   createServiceRequestAdapter,
   createTenantEventNeedsYouAdapter,
@@ -31,13 +33,15 @@ const possibilityRepository = createInMemoryPossibilityRepository();
 /**
  * POST /api/workspace/ask: Ask Strelva in a business workspace.
  *
- * Off unless STRELVA_WORKSPACE_RELEASE, STRELVA_SYSTEMS_RELEASE and
- * STRELVA_ASK_RELEASE are all "1", checked before any session or body read.
+ * Off unless STRELVA_WORKSPACE_RELEASE and STRELVA_ASK_RELEASE are "1" and
+ * STRELVA_SYSTEMS_RELEASE is "1" or "workspace", checked before any session
+ * or body read. Under "workspace" the turn also needs Systems on for the
+ * asked workspace (its release row), checked after membership.
  * Streams the same line protocol as /api/agent (`__TOOL__`, `__CARD__`,
  * `__RESULT__`), so one chat component renders both.
  */
 export async function POST(request: Request) {
-  if (!askReleaseEnabled()) return workspaceJson({ error: "Ask Strelva is not enabled. Nothing changed." }, 503);
+  if (!askReleaseMayBeOn()) return workspaceJson({ error: "Ask Strelva is not enabled. Nothing changed." }, 503);
   const guarded = workspaceWriteGuard(request);
   if (guarded) return guarded;
   try {
@@ -59,7 +63,8 @@ export async function POST(request: Request) {
       readSystems: (current, workspaceId) => readExistingSystemsSnapshot(current, workspaceId),
       loadTenantTools: loadTenantAskTools,
       googleWriteGranted: tenantGoogleWriteGranted,
-      inquiriesEnabled: () => inquiryReleaseEnabled(),
+      inquiriesEnabled: async (workspaceId) => inquiryReleaseEnabledForWorkspace(workspaceId, await releaseViewerFor(actor)),
+      released: (current, workspaceId) => systemsReleasedFor(current, workspaceId),
       needsYou: createTenantEventNeedsYouAdapter(),
       requests,
       possibilities: createPossibilityAdapter(possibilityRepository, { durable: false }),

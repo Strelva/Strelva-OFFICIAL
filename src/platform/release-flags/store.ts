@@ -27,6 +27,7 @@ let override: ReleaseFlagsDb | null = null;
 export function setReleaseFlagsDb(client: ReleaseFlagsDb | null): void {
   override = client;
   cache.clear();
+  tenantCache.clear();
 }
 function db(): ReleaseFlagsDb {
   if (override) return override;
@@ -122,7 +123,7 @@ export async function readWorkspaceReleaseFlags(workspaceId: string, options: { 
 
 export function clearReleaseFlagCache(workspaceId?: string): void {
   if (workspaceId) cache.delete(workspaceId);
-  else cache.clear();
+  else { cache.clear(); tenantCache.clear(); }
 }
 
 export function rowStateFor(flags: WorkspaceReleaseFlags | null, flag: ReleaseFlag): ReleaseFlagRowState | null {
@@ -151,6 +152,54 @@ export async function workspaceReleaseFlagEnabled(
   }
   const tester = Boolean(viewer.tester || (viewer.userId && flags?.testers.includes(viewer.userId)));
   return resolveReleaseFlag({ workspaceRelease, env, row: rowStateFor(flags, flag), viewer: { operator: viewer.operator, tester } });
+}
+
+const tenantCache = new Map<string, { at: number; value: string | null }>();
+const tenantWorkspaceSchema = z.object({ workspaceId: z.string().uuid() }).passthrough().nullable();
+
+/**
+ * The business workspace a tenant was converted into, or null when it has not
+ * been converted. Read through `resolve_billing_workspace`
+ * (20261007180000_business_billing.sql, batch 4; only its tenant-link half is
+ * used), cached like flag rows. Throws when the read fails.
+ */
+export async function releaseWorkspaceForTenant(tenantId: string, options: { now?: number } = {}): Promise<string | null> {
+  const id = z.string().min(1).max(120).parse(tenantId);
+  const now = options.now ?? Date.now();
+  const hit = tenantCache.get(id);
+  if (hit && now - hit.at >= 0 && now - hit.at < RELEASE_FLAG_CACHE_MS) return hit.value;
+  const { data, error } = await db().rpc("resolve_billing_workspace", { p_workspace_id: null, p_tenant_id: id });
+  if (error) throw new WorkspaceStoreError("The tenant's business could not be read.");
+  const parsed = tenantWorkspaceSchema.safeParse(data ?? null);
+  if (!parsed.success) throw new WorkspaceStoreError("The tenant's business could not be read. The response was malformed.");
+  const value = parsed.data?.workspaceId ?? null;
+  tenantCache.set(id, { at: now, value });
+  return value;
+}
+
+/**
+ * Whether one flag is on for one tenant (a managed site). A converted tenant
+ * follows its business workspace's row; an unconverted one has no row, so the
+ * env decides (`1` on, `workspace` off). A failed lookup also lets the env
+ * decide, and is logged.
+ */
+export async function tenantReleaseFlagEnabled(
+  flag: ReleaseFlag,
+  tenantId: string,
+  viewer: ReleaseViewer = NO_VIEWER,
+  environment: ReleaseEnvironment = process.env,
+): Promise<boolean> {
+  const workspaceRelease = workspaceReleaseOn(environment);
+  const env = releaseFlagEnvMode(flag, environment);
+  if (!workspaceRelease || env === "off") return false;
+  let workspaceId: string | null = null;
+  try {
+    workspaceId = await releaseWorkspaceForTenant(tenantId);
+  } catch (error) {
+    console.error("[release-flags] tenant lookup failed; using the env value", { flag, tenantId, error: error instanceof Error ? error.message : String(error) });
+  }
+  if (!workspaceId) return resolveReleaseFlag({ workspaceRelease, env, row: null, viewer });
+  return workspaceReleaseFlagEnabled(flag, workspaceId, viewer, environment);
 }
 
 export async function setWorkspaceReleaseFlag(input: {

@@ -41,6 +41,9 @@ vi.mock("@/lib/tenants", () => ({ getTenantConfig: mocks.config }));
 vi.mock("@/products/inquiries/server", async () => ({
   ...(await import("@/products/inquiries/workspace-exit")),
   inquiryReleaseEnabled: mocks.release,
+  inquiryReleaseMayBeOn: (...args: unknown[]) => mocks.release(...args),
+  inquiryReleasedForCurrentUser: async (...args: unknown[]) => mocks.release(...args),
+  inquiryReleaseEnabledForTenant: async (...args: unknown[]) => mocks.release(...args),
   parseInquirySurfaceAction: mocks.parse,
   inquiryPermissionForAction: mocks.permissionForAction,
   readInquirySurface: mocks.read,

@@ -2,7 +2,7 @@
 
 export { runDueInquiryFollowUps } from "./follow-up-cron";
 
-export { inquiryReleaseEnabled } from "./release";
+export { inquiryReleaseEnabled, inquiryReleaseMayBeOn, inquiryReleaseEnabledForWorkspace, inquiryReleaseEnabledForTenant, inquiryReleasedForCurrentUser } from "./release";
 export { discoverInquiryPortfolio, resolveInquiryPatternVersion } from "./portfolio";
 export type { ResolveInquiryPatternVersionInput } from "./portfolio";
 export { reconcileInquiryProviderEvent } from "./reconciliation";

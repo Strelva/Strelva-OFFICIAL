@@ -7,7 +7,7 @@ import {
 } from "@/platform/workspaces/types";
 import { boundedStore, initial, type BoundedStore } from "@/platform/bounded-work/repository";
 import { createSystemWork, requireSystemChanger, requireSystemMaker } from "@/platform/bounded-work/make-systems";
-import { assertLinkFieldsReleased, linkFields, notifyAssignedPerson, resolveRecordLinks, type AssignedPersonNoticeStatus } from "./internal-tool-links";
+import { assertLinkFieldsReleased, linkFields, linkFieldsReleasedFor, notifyAssignedPerson, resolveRecordLinks, type AssignedPersonNoticeStatus } from "./internal-tool-links";
 import { applicationCommandSchema, applicationPublishInputSchema, applicationRehearseInputSchema, applicationReviseInputSchema, applicationRollbackInputSchema, applicationSchema, applicationSpecSchema, applicationSubmitInputSchema, APPLICATION_RECORD_LIMIT, type ApplicationRelease } from "./contracts";
 import { applyLegacyApplicationCommand, assertLegacyApplicationRevision, cloneState, currentRelease, normalizeReleaseVersion, releaseSpec, reviseCandidate, rehearseCandidate, publishCandidate, rollbackRelease, validateRecord } from "./domain";
 import {
@@ -92,9 +92,9 @@ async function ensureCandidateEditor(store: BoundedStore, actor: WorkspaceActor,
 }
 
 /** Builds private initial state; persistence and plan-output receipts retain their existing transaction boundaries. */
-export function createApplicationDraft(raw: unknown, actor: WorkspaceActor) {
+export function createApplicationDraft(raw: unknown, actor: WorkspaceActor, linkFieldsReleased?: boolean) {
   const spec = applicationSpecSchema.parse(raw);
-  assertLinkFieldsReleased(spec);
+  assertLinkFieldsReleased(spec, linkFieldsReleased);
   if (spec.maintenanceOwner !== actor.userId) throw new WorkspaceConflictError("The creator must own maintenance until a scoped handoff is accepted.");
   return applicationSchema.parse({
     ...initial(spec.title, actor),
@@ -122,7 +122,8 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
     const db = durableDb(store);
     await requireSystemMaker(store, actor, workspaceId);
     if (db) await assertApplicationStorage(db);
-    const payload = createApplicationDraft(raw, actor);
+    const parsed = applicationSpecSchema.safeParse(raw);
+    const payload = createApplicationDraft(raw, actor, parsed.success ? await linkFieldsReleasedFor(parsed.data, actor, workspaceId) : undefined);
     const saved = await createSystemWork(store, actor, workspaceId, {
       productId: "applications",
       resourceKind: "application",
@@ -166,9 +167,9 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
 
   async function revise(actor: WorkspaceActor, id: string, raw: unknown) {
     const input = applicationReviseInputSchema.parse(raw);
-    assertLinkFieldsReleased(input.spec);
     const db = durableDb(store);
     const permission = await load(store, actor, id);
+    assertLinkFieldsReleased(input.spec, await linkFieldsReleasedFor(input.spec, actor, permission.work.workspaceId));
     await requireSystemChanger(store, actor, permission.work.workspaceId);
     await ensureCandidateEditor(store, actor, permission.work);
     if (db) {
@@ -273,7 +274,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
       // record stores business record ids, then the assigned person gets one
       // email. Off, such a release cannot be used.
       const linked = linkFields(release.spec).length > 0;
-      if (linked) assertLinkFieldsReleased(release.spec);
+      if (linked) assertLinkFieldsReleased(release.spec, await linkFieldsReleasedFor(release.spec, actor, loaded.work.workspaceId));
       const target = { workspaceId: loaded.work.workspaceId, workId: id };
       const { record, conflicts } = linked
         ? await resolveRecordLinks(db, actor, target, release.spec, input.record, input.links)

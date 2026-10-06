@@ -311,12 +311,14 @@ export function buildSiteDocumentTools(input: {
   onResult?: (status: "queued" | "failed", message: string) => void;
 }) {
   const selection = async () => {
-    const { websiteRebuildReleaseEnabled } = await import("@/products/websites/index");
-    if (!websiteRebuildReleaseEnabled()) throw new Error("Website rebuilds are unavailable.");
+    const { websiteRebuildReleaseMayBeOn, websiteRebuildReleasedFor } = await import("@/products/websites/index");
+    if (!websiteRebuildReleaseMayBeOn()) throw new Error("Website rebuilds are unavailable.");
     if (!input.actor) throw new Error("A verified signed-in account is required.");
     const { websiteDocumentStore } = await import("@/products/websites/index");
     const published = await websiteDocumentStore.published(input.tenantId);
     if (!published) throw new Error("This tenant does not have a v2 website document.");
+    // Per business under `workspace`: the published document's workspace row decides.
+    if (!(await websiteRebuildReleasedFor(input.actor, published.workspaceId))) throw new Error("Website rebuilds are unavailable.");
     const { readWebsiteRebuild } = await import("@/products/websites/index");
     const record = await readWebsiteRebuild(input.actor,published.workId);
     if (record.workspaceId !== published.workspaceId || record.rebuild.tenantId !== input.tenantId) throw new Error("Website scope changed. Reload before continuing.");

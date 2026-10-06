@@ -48,7 +48,13 @@ export interface AskTurnDeps {
   readSystems(actor: WorkspaceActor, workspaceId: string): Promise<ExistingSystemsSnapshot>;
   loadTenantTools(input: { tenantId: string; actor: WorkspaceActor; onResult: (result: AgentActionResult) => void }): Promise<TenantAskTools>;
   googleWriteGranted(tenantId: string): Promise<boolean>;
-  inquiriesEnabled(): boolean;
+  /** Inquiries for this workspace (per-workspace release flag). */
+  inquiriesEnabled(workspaceId: string): boolean | Promise<boolean>;
+  /**
+   * Systems (and so Ask) released for this workspace and actor. Absent: the
+   * route's env gate already decided. Checked after membership.
+   */
+  released?(actor: WorkspaceActor, workspaceId: string): Promise<boolean>;
   needsYou: NeedsYouPort;
   requests: AskRequestPort;
   possibilities: AskPossibilityPort;
@@ -109,6 +115,9 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
   if (!membership || membership.access !== "member" || !membership.role || membership.kind !== "customer") {
     return { kind: "refused", status: 403, error: "This business is unavailable to your account." };
   }
+  if (deps.released && !(await deps.released(actor, request.workspaceId).catch(() => false))) {
+    return { kind: "refused", status: 503, error: "Ask Strelva is not enabled. Nothing changed." };
+  }
   const snapshot = await deps.readSystems(actor, request.workspaceId);
   const lastUserText = request.messages.at(-1)!.content;
   const target = resolveAskTarget(snapshot, { systemId: request.systemId ?? null, text: lastUserText });
@@ -158,7 +167,7 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
           const googleWriteGranted = site && siteState && siteState.state !== "deprovisioned"
             ? await deps.googleWriteGranted(site.tenantId).catch(() => false)
             : false;
-          return { role, exited, site: siteState, googleWriteGranted, inquiriesEnabled: deps.inquiriesEnabled() };
+          return { role, exited, site: siteState, googleWriteGranted, inquiriesEnabled: await Promise.resolve(deps.inquiriesEnabled(request.workspaceId)).catch(() => false) };
         },
       };
 
