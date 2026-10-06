@@ -165,3 +165,26 @@ Still not done:
 
 Until a live caller uses the Postgres repository, an activation doesn't
 survive a process restart.
+
+### Live Make real (October 6, 2026, branch `w2/systems-live`, local only)
+
+- `live-adapters.ts`: five live `EffectAdapter`s, each wrapping the write
+  path that owns the change (hosted website launch, `applySectionUpdate`,
+  inquiry publication, booking grant, app release), each serving only
+  effects that name its `channel` and checking its own
+  `make_real_live:<channel>` flag in `ready` (off: the step Waits, never
+  attempted). `createWaitingAdapter` holds Google until it can write.
+- `approvals.ts`: one plan approval (`make_real_plan`, fingerprint over
+  every change, introduction, connection and effect of the candidate),
+  read from Needs you by workspace (`createNeedsYouApprovalRecords`). The
+  per-effect check stays inside it.
+- `live.ts`: the durable service (`createLiveMakeRealService`) over the
+  Postgres possibility and activation stores; authority is the approval,
+  re-read before every step; `resumeDue` for the workspace-work cron;
+  `createMakeRealNeedsYouAdapter`, the `make_real` Needs you source.
+- `live-server.ts`: the server bindings, `listDueActivations`
+  (`due_make_real_activations`) and `activationStarter` for operator routes.
+- Steps 3-5 above: the runner still isn't an `ExecutionAdapter`; activations
+  run as the approving owner (the activation RPCs accept only an owner or
+  admin), and operators act as that owner with their name in the history.
+  The in-memory repository is still exported for the sandbox.
