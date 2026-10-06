@@ -188,6 +188,46 @@ export interface WorkspaceSystems {
   /** Google listing, newsletter and website parts. Present only while
    * STRELVA_PUBLISHING_RELEASE is on. Additive. */
   publishing?: WorkspacePublishing;
+  /** Make real that is running or partly live, one per activation, read from
+   * Postgres. Absent when it could not be read; then nothing is claimed. Additive. */
+  activations?: WorkspaceSystemActivation[];
+  /** The last changes to each stored System, newest first. Additive. */
+  history?: WorkspaceSystemHistoryRow[];
+  /** Strelva handled receipts from Make real and Possibilities (last 7 days),
+   * newest first. Never an isolated run. Additive. */
+  handled?: WorkspaceSystemReceipt[];
+}
+
+export interface WorkspaceSystemActivation {
+  id: string;
+  possibilityId: string;
+  title: string;
+  status: "in_progress" | "needs_attention" | "made_real" | "rolled_back";
+  /** "Making consult booking live: 2 of 4 done", "Partly live", "Live.", "Undone." */
+  headline: string;
+  partlyLive: boolean;
+  done: number;
+  total: number;
+  /** System ids it changes. */
+  affects: string[];
+  lines: Array<{ label: string; state: string; detail: string | null }>;
+}
+
+export interface WorkspaceSystemHistoryRow {
+  id: string;
+  systemId: string;
+  /** "Strelva published the rebuilt site". Never called a Version. */
+  sentence: string;
+  at: string;
+}
+
+export interface WorkspaceSystemReceipt {
+  id: string;
+  systemId: string | null;
+  sentence: string;
+  at: string;
+  /** Undo state in words: "Undo from History", "Can't be undone: …". */
+  undo: string;
 }
 
 export interface WorkspaceSystemVersion {
@@ -262,6 +302,10 @@ export interface WorkspaceSystemPossibility {
   previewHref: string | null;
   /** The saved work the candidate came from. */
   workId: string;
+  /** Stored in Postgres: it survives deploys and restarts. Additive. */
+  stored?: boolean;
+  /** Why it went back to Exploring ("attymooney.com changed since this was built."). Additive. */
+  staleReason?: string | null;
 }
 
 /** Result of Make real on an isolated copy (src/platform/make-real/sandbox.ts). */

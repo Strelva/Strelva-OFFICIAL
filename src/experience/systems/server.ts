@@ -39,6 +39,15 @@ import type { WorkspaceMakeRealResult, WorkspacePublishing, WorkspaceSystems } f
 import { addPublishingSystems, type PublishingProjection } from "@/products/publishing/projection";
 import { publishingReleaseEnabled, readPublishingExtras, readPublishingSnapshot } from "@/products/publishing/server";
 import { receiptHeadline } from "@/products/google-listing/service";
+import {
+  REBUILD_SOURCE_PREFIX,
+  activationViews,
+  makeRealReceipts,
+  revisionHistory,
+  storedPossibilityViews,
+  storedTargets,
+  syncRebuildPossibilities,
+} from "./stored-possibilities";
 
 export interface SystemsProjectionInput {
   listing: BusinessSystems;
@@ -251,6 +260,8 @@ export interface LiveSystemsDeps {
   siteDomains: ReadonlyMap<string, string>;
   savedWork: ReadonlyArray<{ id: string; productId: string; resourceKind: string; title?: string | null; payload: unknown }>;
   now?: number;
+  /** An owner or admin: stored Possibilities may be created or refreshed on read. */
+  canWrite?: boolean;
 }
 
 /**
@@ -315,12 +326,66 @@ export function withVersions(projection: WorkspaceSystems, lineage: { hiddenSour
 /** The `systems` field of GET /api/workspace. A failed spine read is reported, not hidden. */
 export async function readWorkspaceSystems(deps: LiveSystemsDeps): Promise<WorkspaceSystems> {
   try {
-    const projection = await projectWorkspaceSystems(await liveProjectionInput(deps));
+    const input = await liveProjectionInput(deps);
+    const projection = await projectWorkspaceSystems(input);
+    const stored = await withStoredPossibilities(projection, input, deps).catch(() => projection);
     const lineage = await readBusinessVersions(deps.actor, deps.businessId).catch(() => null);
-    return withVersions(projection, lineage);
+    return withVersions(stored, lineage);
   } catch {
     return { status: "unavailable", systems: [], connections: [], possibilities: [] };
   }
+}
+
+const HANDLED_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Possibilities in Postgres, Make real activations, History and Strelva
+ * handled receipts, laid over the per-request projection. A stored
+ * Possibility replaces the per-request one for the same rebuild. Any read
+ * failure leaves the projection as it was and claims none of these.
+ */
+export async function withStoredPossibilities(projection: WorkspaceSystems, input: SystemsProjectionInput, deps: LiveSystemsDeps): Promise<WorkspaceSystems> {
+  if (projection.status !== "ready") return projection;
+  const [{ createSupabasePossibilityRepository }, { createSupabaseActivationRepository }, { createSupabaseRevisionContent }, { createSystemStoreLiveSystems }] = await Promise.all([
+    import("@/platform/possibilities/supabase-repository"), import("@/platform/make-real/supabase-repository"),
+    import("@/platform/make-real/supabase-content"), import("@/platform/make-real/systems-adapter"),
+  ]);
+  const store = createSupabaseSystemStore();
+  const repo = createSupabasePossibilityRepository(deps.actor);
+  const live = createSystemStoreLiveSystems({ store, content: createSupabaseRevisionContent(deps.actor), actor: deps.actor });
+  const targets = storedTargets(input.listing, input.candidates, (candidate) => {
+    const site = targetSite(candidate, input.listing, input.siteDomains);
+    return site ? { site, domain: siteDomain(site, input.siteDomains) ?? site.system.name } : undefined;
+  });
+  const revisions = new Map(input.listing.systems.flatMap((item) => item.provenance === "stored" && item.system.currentRevision
+    ? [[item.system.id, { revisionId: item.system.currentRevision.revisionId, number: item.system.currentRevision.number }] as const] : []));
+  const stored = await syncRebuildPossibilities({
+    repo, live, businessId: deps.businessId, targets, revisions, actorId: deps.actor.userId,
+    at: new Date(input.now).toISOString(), canWrite: deps.canWrite === true,
+  });
+  const activations = createSupabaseActivationRepository(deps.actor);
+  const withActivation = await Promise.all(stored.map(async ({ possibility }) => ({
+    possibility,
+    activation: possibility.activationId ? await activations.get(deps.businessId, possibility.activationId).catch(() => null) : null,
+  })));
+  const storedWork = new Set(stored.flatMap(({ sourceRef }) => sourceRef?.startsWith(REBUILD_SOURCE_PREFIX) ? [sourceRef.slice(REBUILD_SOURCE_PREFIX.length)] : []));
+  const visible = new Set(projection.systems.map((system) => system.ref.systemId));
+  const storedSystems = input.listing.systems.filter((item) => item.provenance === "stored" && visible.has(item.system.id)).slice(0, 12);
+  const history = (await Promise.all(storedSystems.map(async (item) => {
+    const detail = await store.readSystem(deps.actor, { businessId: deps.businessId, systemId: item.system.id }).catch(() => null);
+    return detail ? revisionHistory(item.system.id, detail.revisions) : [];
+  }))).flat();
+  const running = withActivation.flatMap((row) => row.activation && row.activation.status !== "made_real" && row.activation.status !== "rolled_back" ? [{ possibility: row.possibility, activation: row.activation }] : []);
+  return {
+    ...projection,
+    possibilities: [
+      ...projection.possibilities.filter((item) => !storedWork.has(item.workId)),
+      ...storedPossibilityViews(stored, input.candidates),
+    ],
+    activations: activationViews(running),
+    history,
+    handled: makeRealReceipts(withActivation, input.now - HANDLED_WINDOW_MS),
+  };
 }
 
 /**
