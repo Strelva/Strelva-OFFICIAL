@@ -1,7 +1,7 @@
 /**
  * Operational health aggregation, shared by the admin ops route and the
  * portfolio snapshot. Surfaces the things that are otherwise invisible:
- * webhook failures, revalidation failures, stale SMS approvals, the pending
+ * webhook failures, revalidation failures, the pending
  * event queue, failed AI writes, and tenant domain drift.
  *
  * Extracted from src/app/api/admin/ops/route.ts so the cron-built portfolio
@@ -50,17 +50,9 @@ export interface FailedAiWriteItem {
   error: string;
 }
 
-export interface StaleSmsItem {
-  tenantId: string;
-  sentAt: string;
-}
-
 export interface OpsMetrics {
   webhookFailures: number;
   revalidationFailures: number;
-  staleSmsApprovals: number;
-  /** Tenants with stale SMS approvals, for the drilldown list. */
-  staleSmsItems?: StaleSmsItem[];
   pendingEvents: Record<string, number>;
   totalPendingEvents: number;
   failedAiWrites: number;
@@ -95,8 +87,6 @@ export async function buildOpsReport(): Promise<OpsReport> {
   const metrics: OpsMetrics = {
     webhookFailures: 0,
     revalidationFailures: 0,
-    staleSmsApprovals: 0,
-    staleSmsItems: [],
     pendingEvents: {},
     totalPendingEvents: 0,
     failedAiWrites: 0,
@@ -123,9 +113,7 @@ export async function buildOpsReport(): Promise<OpsReport> {
   // Previously: 3 separate for...of loops → ~3 sequential Redis round trips per
   // tenant. Now: all per-tenant work runs in parallel with a bounded concurrency
   // cap so Redis/HTTP connections don't storm at scale.
-  const staleCutoff = Date.now() - 24 * 60 * 60 * 1000;
   type PerTenantResult = {
-    staleSms?: StaleSmsItem;
     pendingCount: number;
     failedWrites: FailedAiWriteItem[];
     drift?: DomainDriftItem;
@@ -133,18 +121,6 @@ export async function buildOpsReport(): Promise<OpsReport> {
 
   const perTenantResults = await mapPool(active, 8, async (tenant): Promise<PerTenantResult> => {
     const result: PerTenantResult = { pendingCount: 0, failedWrites: [] };
-
-    // SMS stale-approval check
-    if (redis) {
-      const pendingKey = `sms:pending:${tenant.id}`;
-      const pending = await redis.get<{ sentAt?: string; expiresAt?: string }>(pendingKey).catch(() => null);
-      if (pending?.sentAt) {
-        const sentAtMs = new Date(pending.sentAt).getTime();
-        if (sentAtMs < staleCutoff) {
-          result.staleSms = { tenantId: tenant.id, sentAt: pending.sentAt };
-        }
-      }
-    }
 
     // Queue count + failed AI writes
     const [count, events] = await Promise.all([
@@ -189,10 +165,6 @@ export async function buildOpsReport(): Promise<OpsReport> {
   const domainDrift: DomainDriftItem[] = [];
   for (let i = 0; i < active.length; i++) {
     const r = perTenantResults[i]!;
-    if (r.staleSms) {
-      metrics.staleSmsApprovals++;
-      metrics.staleSmsItems!.push(r.staleSms);
-    }
     if (r.pendingCount > 0) {
       metrics.pendingEvents[active[i]!.id] = r.pendingCount;
       metrics.totalPendingEvents += r.pendingCount;
