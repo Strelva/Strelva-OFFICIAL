@@ -111,8 +111,8 @@ describe("connected sites on the server", () => {
 describe("owner notice for a connected-site inquiry", () => {
   const inquiry = { id: "77000000-0000-4000-8000-0000000000aa", name: "Pat Visitor", email: "pat@example.test", message: "A cake?" };
   it("goes to the one owner recipient through the one email path", async () => {
-    const send = vi.fn(async () => ({ status: "accepted" as const, providerMessageId: "m", acceptedAt: "now" }));
-    expect(await notifyConnectedSiteInquiry({ site, inquiry }, { paused: () => false, recipient: async () => ({ email: "owner@bakery.example", name: null, from: "record", source: "owner" }), send })).toBe("sent");
+    const send = vi.fn(async () => true);
+    expect(await notifyConnectedSiteInquiry({ site, inquiry }, { paused: () => false, recipient: async () => ({ email: "owner@bakery.example", name: null, from: "record" as const, source: "owner" as const, verified: true, tenantId: null }), send })).toBe("sent");
     expect(send).toHaveBeenCalledWith(expect.objectContaining({ audience: "client", to: "owner@bakery.example", idempotencyKey: `connected-inquiry:${inquiry.id}` }));
     expect(connectedInquiryEmail(site, inquiry).subject).toBe("New inquiry from fictional-bakery.example");
   });
