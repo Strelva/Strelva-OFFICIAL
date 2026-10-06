@@ -7,8 +7,29 @@ Status: planning. Nothing here is a 1.0.0 release yet; production runs `0.2.0`.
 workspace and finds its real systems working.** Its website, inquiries,
 bookings, publishing and internal tools read one business record, Strelva
 keeps them running, and the owner only sees the few decisions that are theirs.
-[Strelva Reborn](./strelva-reborn.md) gets there in `0.x` steps; this page is
-the full list of what the launch contains.
+[Strelva Reborn](./strelva-reborn.md) is the build that gets there. Since
+October 6 it builds straight to `1.0.0`; only the lead fix (`0.2.1`) ships
+first. This page is the full list of what the launch contains.
+[What Strelva becomes at 1.0.0](./product-model.md) is the product model behind
+it, area by area.
+
+## Specs
+
+| Area | Spec | State |
+| --- | --- | --- |
+| The model, every area | [product-model.md](./product-model.md) | Draft, Oct 6 |
+| Needs you and Strelva handled | [specs/needs-you.md](./specs/needs-you.md) | Draft, Oct 6 |
+| Owners entering, leaving `/dashboard` | [specs/owner-entry.md](./specs/owner-entry.md) | Draft, Oct 6 |
+| Ask Strelva in the workspace | [specs/ask-strelva.md](./specs/ask-strelva.md) | Draft, Oct 6 |
+| Agency surface and Versions | [specs/agency-and-versions.md](./specs/agency-and-versions.md) | Draft, Oct 6 |
+| One operator place | [specs/operator.md](./specs/operator.md) | Draft, Oct 6 |
+| Internal tools, store, wellness, reports, documents | [specs/systems-catalog.md](./specs/systems-catalog.md) | Draft, Oct 6 |
+| Billing, Redis exit, export, outcome loop | [specs/money-and-data.md](./specs/money-and-data.md) | Draft, Oct 6 |
+| Publishing | [publishing spec](../capabilities/publishing/publishing-spec-2026-10-06.md) | Draft, Oct 6 |
+| Website rebuild | [rebuild spec](../capabilities/website/website-rebuild-spec-2026-10-01.md) | Built locally, flag off |
+| Inquiries | [inquiry spec](../capabilities/inquiries/inquiry-first-product-spec-2026-09-11.md) | Canonical Sept 11; predates Systems and the business record |
+| Bookings | [bookings spec](../capabilities/bookings/bookings-spec-2026-10-01.md) | Proposed Oct 1, not approved |
+| Business record, conversion, structure | [Reborn §1, §3, §7](./strelva-reborn.md) | Line-level plan |
 
 Every feature below names its source and its state today. States come from the
 October 4 product audit (`output/product-audit-2026-10-04/`, local only), the Reborn page and `pnpm reborn:progress`. "Local" means

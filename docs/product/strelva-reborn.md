@@ -1,63 +1,60 @@
 # Strelva Reborn
 
 Created: 2026-10-02
-Versions: a series of `0.x` releases, starting with `0.2.1`. Not `1.0.0`.
-Status: preparing. Nothing in this release is deployed.
+Changed: 2026-10-06. Reborn is now the one build to `1.0.0`, not a ladder of `0.x` releases.
+Status: building. Nothing in this release is deployed.
 
-**Strelva Reborn is the release where every Strelva client runs inside a business
-workspace.** The managed website becomes one capability in that workspace,
-next to bookings, inquiries, publishing and internal apps. All five read the
-same business record. Strelva operates it for them.
+**Strelva Reborn is the build that becomes Strelva 1.0.0: every client runs
+inside a business workspace, and the workspace is the product.** Each client's
+website becomes its first System, next to inquiries, bookings, publishing and
+internal tools. All of them read one business record. Strelva runs them, and
+the owner only sees the decisions that are theirs.
+
+[What Strelva becomes at 1.0.0](./product-model.md) is the product model, area
+by area, with a spec for each. [Strelva 1.0.0](./strelva-1.0.0.md) is the
+feature list. This page is the build: what's done, what's left, in what order,
+and what needs Jacob's yes.
 
 The Sept 30 release (internal name `strelvav2`, version `0.2.0`) put the
 workspace machinery in production: memberships, grants, saved work, approvals,
-exits, exports, allowances. It moved no client. Strelva Reborn is the release
-that moves them. The [strelvav2 page](./strelvav2.md) is now history.
+exits, exports, allowances. It moved no client. The
+[strelvav2 page](./strelvav2.md) is now history.
 
-## Versions
+## One build, one exception
 
-Strelva Reborn ships in steps. Each step is a minor or patch release that goes
-to production on its own once it is proven, so the leads fix doesn't wait for
-client conversion and conversion doesn't wait for every capability.
+On October 6 Jacob dropped the `0.3.0`–`0.6.0` steps. Everything they held,
+including owners entering, production-complete capabilities and one operator
+place, is built now, together, toward `1.0.0`. The Systems model (Systems,
+Connections, Possibilities, Versions, Make real) is in scope, not deferred.
 
-| Version | Ships when | Sections |
+| Release | What it is | When |
 | --- | --- | --- |
-| `0.2.1` | Every client lead is also kept in Postgres; all 9 client repos are checked | 0 |
-| `0.3.0` | One business record, and gldf converted into a workspace in production | 1, first of 3 |
-| `0.4.0` | Leads, inquiries, bookings and approvals are owned by the workspace, not Redis | 2 |
-| `0.5.0` | Every client converted, storefront responses unchanged | 3 |
-| `0.6.0` | Owners can enter; capabilities and one operator place are production-complete | 4, 5, 6 |
+| `0.2.1` | Every client lead also kept in Postgres; all 9 client repos checked | Now, alone, on Jacob's yes. Leads expire from Redis every day ([PR #213](https://github.com/Strelva/Strelva-OFFICIAL/pull/213)) |
+| `1.0.0` | Everything below and in [Strelva 1.0.0](./strelva-1.0.0.md) | When every line is true in production and Jacob says Strelva would stand behind it for any new customer |
 
-Numbers after `0.3.0` can shift as evidence comes in; the order holds.
-
-**`1.0.0` is the launch, after these steps.** [Strelva 1.0.0](./strelva-1.0.0.md)
-lists every feature it contains. It means Strelva is something we'd stand
-behind for any new customer: every client running in a workspace in
-production, owners using it, no client data held only in Redis, every client
-repo checked, and the customer model (Systems, Connections, Possibilities,
-Versions) proven with real customers. Jacob decides when that is true.
+Building together does not mean deploying everything at once. Production steps
+still go one at a time behind their own flags and Jacob's yes: migrations,
+each client conversion (gldf first), owner invites, flag changes. What changes
+is that no step waits for a release number, and no feature is parked for a
+later `0.x`.
 
 ## Reborn in Systems terms
 
-On October 4 Jacob selected Systems, Connections, Possibilities and Versions
-as the customer model ([CONTEXT.md](../../CONTEXT.md#product-model)). Reborn
-doesn't change scope for it. It lays the ground the model stands on.
+| Reborn section | What it becomes in the model |
+| --- | --- |
+| 1. One business record | The shared context every System reads. The business is the owner, not a System |
+| 3. Every client converted | Each live client website becomes that business's first **System**, keyed to the tenant's `stable_id`. Twin Trees: one business, the same website System in two **Versions** |
+| 1–2. Facts read from the record | **Connections** of kind *read*: website, bookings and inquiries read hours and services instead of keeping copies |
+| 4. Publishing, Google | The Google listing and the newsletter become **Systems**; blog stays part of the website. Google writes are **Connections** of kind *act* on an account the business granted ([publishing spec](../capabilities/publishing/publishing-spec-2026-10-06.md)) |
+| 4. Bookings, inquiries, internal tools | Each its own **System** ([systems catalog](./specs/systems-catalog.md)) |
+| 4. Website rebuild, agency drafts | **Possibilities** on the website System; approve and publish is **Make real** |
+| 5. Receipts, site health, one operator place | **Strelva handled** and System health ([operator](./specs/operator.md)) |
+| 6. Owners enter the workspace | Home shows the business's Systems and **Needs you** ([owner entry](./specs/owner-entry.md), [needs you](./specs/needs-you.md)) |
+| New | **Versions** for multi-location and agency clients ([agency and Versions](./specs/agency-and-versions.md)); **Ask Strelva** in the workspace ([ask-strelva](./specs/ask-strelva.md)); billing and Redis exit ([money and data](./specs/money-and-data.md)) |
 
-| Reborn section | What it becomes in the model | In Reborn scope |
-| --- | --- | --- |
-| 1. One business record | The shared context every System reads. The business is the owner, not a System | Yes |
-| 3. Every client converted | Each live client website becomes that business's first **System**, keyed to the tenant's `stable_id` through the link table. Twin Trees gets two Systems | Yes, as data; a System screen is not promised |
-| 1–2. Facts read from the record | **Connections** of kind *reads*: website, bookings and inquiries read hours and services instead of keeping copies | Yes |
-| 4. Publishing, Google | **Connections** of kind *acts*, on an account the business granted | Yes, per section 4 |
-| 4. Bookings, inquiries, internal apps | Each one a **System** of its own, or part of the website System. Which is an open question | Built as capabilities; the split is decided later |
-| 5. Receipts, site health | System health, kept separate from Draft/Live/Paused | Partly |
-| 6. Owners enter the workspace | Home shows the business's Systems and Needs you | Only if it passes this page's gates |
-
-Not in Reborn (they are [1.0.0](./strelva-1.0.0.md) launch features): Possibilities and **Make real**, contextual **Versions**
-(agencies and multi-location; partner agencies are already out), and any
-customer-facing claim that a System can grow without limit. The live-client
-rules don't move: `/api/v1` stays additive, `reb:` keys and tenant rows stay,
-and clients who never log in keep working.
+The live-client rules don't move: `/api/v1` stays additive, `reb:` keys and
+tenant rows stay, and clients who never log in keep working. Owners are never
+required to sign in for 1.0.0 to work.
 
 ## Where we are
 
@@ -104,10 +101,11 @@ production.
   import `src/lib` (98 on Oct 2; Systems, system health, the business-record
   repository and inquiry receipts added ten). `lib` imports back into
   `products` from `agent-shared.ts` and `event-actions.ts`.
-- **Systems, Possibilities and Make real sit behind only
-  `STRELVA_WORKSPACE_RELEASE`,** which production turned on Sept 30. They
-  need their own flag before any Reborn step ships, because Possibilities and
-  Make real are not in Reborn.
+- **Systems, Possibilities and Make real have their own flag.**
+  `STRELVA_SYSTEMS_RELEASE` (PR #214, Oct 5) is off by default, so they no
+  longer ride `STRELVA_WORKSPACE_RELEASE`, which production turned on Sept 30.
+  Make real still runs on fake effects with in-memory progress, and Versions
+  are in-memory only.
 - **Lead copies are deleted with their tenant.** `tenant_leads` cascades on
   tenant delete. Whether a deprovisioned client's leads are kept is Jacob's
   call.
@@ -352,16 +350,30 @@ Proof: `pnpm reborn:progress --strict` passes.
 
 ## Order
 
-1. **Stop losing data:** lead dual-write and full client-repo checks. Built
-   locally Oct 5; production needs the migration, backfill and deploy below.
-2. **Foundation:** business record, link table, owner-recipient rule.
-3. **Conversion:** script, scrubbed local copy, dry runs, then gldf on
-   Jacob's yes.
-4. **Data:** inquiries, bookings, approvals, remaining Redis stores.
-5. **Capabilities:** website card and app-building limit first (small), then
-   inquiries, Ask Strelva, bookings, store and reports, publishing.
-6. **Entry:** per-workspace flags, owners in, dashboard redirects.
-7. **Operate and structure:** run alongside from step 2.
+One build, several streams. The critical path is 1 → 2 → 3; everything else
+runs beside it from step 2.
+
+1. **Stop losing data (`0.2.1`):** lead dual-write and full client-repo
+   checks. Built locally Oct 5; production needs the migration, backfill and
+   deploy, each on Jacob's yes.
+2. **Safety batch:** the seven P1 findings in the
+   [Oct 5 integration audit](../operations/reborn-integration-audit-2026-10-05.md#open-release-findings)
+   before any of that code goes near production.
+3. **Foundation and conversion:** business record, one workspace-to-tenant
+   link, owner-recipient rule, scrubbed local copy, dry runs for every active
+   tenant, then gldf on Jacob's yes, then the rest.
+4. **Data:** inquiries, bookings, approvals and the remaining Redis stores
+   move to Postgres ([money and data](./specs/money-and-data.md)).
+5. **Systems:** website, inquiries, bookings, publishing, internal tools and
+   the catalog decisions, each to the capability bar in
+   [Strelva 1.0.0](./strelva-1.0.0.md#the-bar).
+6. **The model on screen:** Systems Home, System pages, Connections,
+   Possibilities and Make real with real effects, Versions in Postgres,
+   Needs you and Strelva handled, Ask Strelva.
+7. **Entry and operation:** per-workspace flags, owners in (never required),
+   dashboard redirects, the agency home and one operator queue.
+8. **Structure:** shared infrastructure out of `src/lib`, one capability
+   registry, one model-call helper. Runs alongside throughout.
 
 ## Preview and Stable
 
@@ -379,7 +391,7 @@ must not wait for the rest (like `0.2.1`) is built from `main` directly.
   workspace SQL and full upgrade, tests with coverage, audit, build, public
   smoke and workspace browser acceptance. A green build is tagged
   `strelva-v<next version>-preview.YYYYMMDD`, today
-  `strelva-v0.3.0-preview.YYYYMMDD`. Unchanged source isn't re-tagged.
+  `strelva-v1.0.0-preview.YYYYMMDD`. Unchanged source isn't re-tagged.
 - **Progress.** The run summary shows the progress table: now, last Preview,
   Oct 2 baseline and target. The tag message stores that build's numbers so
   the next one can compare. Run it by hand from the Actions tab with any
@@ -418,7 +430,7 @@ Every production step also passes the
 New pricing or plan tiers. Partner agencies (Strelva is the only agency in
 this release). Home Finder. Enterprise customers. Self-serve website building
 for owners. `/api/v2`. No `/api/v1` change except additive.
-Possibilities, Make real across Systems, and contextual Versions.
+(Possibilities, Make real and Versions moved into Reborn on October 6.)
 
 ## Still unproven
 

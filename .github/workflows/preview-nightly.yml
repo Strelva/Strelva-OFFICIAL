@@ -24,7 +24,7 @@ concurrency:
 env:
   REBORN_REF: ${{ inputs.ref || 'reborn' }}
   # The next Reborn version the reborn branch is building toward.
-  REBORN_VERSION: 0.3.0
+  REBORN_VERSION: 1.0.0
 
 jobs:
   verify:
