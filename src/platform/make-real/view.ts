@@ -54,3 +54,89 @@ export function describeActivation(a: Activation): ActivationView {
     checks: a.checks,
   };
 }
+
+/** The customer's word for one step (systems-experience spec section 4). */
+export type CustomerStepState =
+  | "Done"
+  | "Done, not yet confirmed"
+  | "Waiting"
+  | "Didn't happen"
+  | "Not sure yet"
+  | "Undone"
+  | "Can't be undone"
+  | "Not started";
+
+export interface CustomerStepLine {
+  step: string;
+  label: string;
+  state: CustomerStepState;
+  /** The reason, and who unblocks it, in plain words. */
+  detail: string | null;
+  /** An isolated fake's receipt is never shown as a real change. */
+  isolated: boolean;
+}
+
+export interface CustomerActivationView {
+  status: Activation["status"];
+  /** "Making consult booking live: 2 of 4 done", "Partly live", "Live.", "Undone." */
+  headline: string;
+  partlyLive: boolean;
+  done: number;
+  total: number;
+  lines: CustomerStepLine[];
+  /** Strelva never says done while any step is unknown. */
+  checking: boolean;
+}
+
+function plainReason(reason: string | undefined): string | null {
+  if (!reason) return null;
+  return reason.replace(/^(Waiting|Needs approval): /, "").slice(0, 300) || null;
+}
+
+/** One line per step, in the customer's words. Accepted effects that rollback
+ * left in place say they can't be undone, with why. */
+export function customerStepLines(a: Activation): CustomerStepLine[] {
+  return a.steps.map((s) => {
+    const isolated = s.receipt?.adapterMode === "isolated";
+    let state: CustomerStepState;
+    let detail: string | null = null;
+    switch (s.status) {
+      case "completed":
+        if (s.kind === "effect" && s.effect === "accepted" && a.rollbackStartedAt) {
+          state = "Can't be undone";
+          detail = plainReason(s.reason) ?? "It already happened outside Strelva.";
+        } else if (s.kind === "effect" && s.readBack?.status === "failed") {
+          state = "Done, not yet confirmed";
+          detail = s.readBack.detail;
+        } else {
+          state = "Done";
+        }
+        break;
+      case "blocked": state = "Waiting"; detail = plainReason(s.reason); break;
+      case "failed": state = "Didn't happen"; detail = plainReason(s.reason); break;
+      case "unknown": state = "Not sure yet"; detail = "Strelva is checking."; break;
+      case "restored":
+      case "compensated": state = "Undone"; detail = plainReason(s.reason); break;
+      case "running": state = "Not started"; detail = "Running now."; break;
+      default: state = "Not started";
+    }
+    return { step: s.id, label: s.label, state, detail, isolated };
+  });
+}
+
+/** The status table in spec section 4. `name` is what is being made live. */
+export function customerActivationView(a: Activation, name: string): CustomerActivationView {
+  const lines = customerStepLines(a);
+  const done = a.steps.filter((s) => s.status === "completed").length;
+  const total = a.steps.length;
+  const landed = a.steps.some((s) => (s.kind === "effect" && s.effect === "accepted") || (s.kind === "activate" && s.status === "completed"));
+  const checking = a.steps.some((s) => s.status === "unknown");
+  const partlyLive = a.status === "needs_attention" && landed && !a.rollbackStartedAt;
+  const headline =
+    a.status === "made_real" ? "Live."
+      : a.status === "rolled_back" ? "Undone."
+        : a.rollbackStartedAt ? (checking ? "Undoing. Strelva is checking what already happened." : "Undoing.")
+          : a.status === "needs_attention" ? (landed ? "Partly live" : "Nothing changed yet. Strelva is on it.")
+            : `Making ${name} live: ${done} of ${total} done`;
+  return { status: a.status, headline, partlyLive, done, total, lines, checking };
+}

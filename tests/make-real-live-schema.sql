@@ -103,8 +103,10 @@ insert into public.system_possibilities(id, business_workspace_id, status, revis
    '{"id":"7a000000-0000-4000-8000-0000000003a3","title":"Exploring"}', '7a000000-0000-4000-8000-000000000001', null),
   ('7a000000-0000-4000-8000-0000000003a4', '7a000000-0000-4000-8000-000000000011', 'ready', 2, 1,
    '{"id":"7a000000-0000-4000-8000-0000000003a4","title":"Other business"}', '7a000000-0000-4000-8000-000000000003', null);
-select pg_temp.ml_assert((select array_agg(x->>'title') from jsonb_array_elements(public.read_ready_system_possibilities('7a000000-0000-4000-8000-000000000010')) x)
+select pg_temp.ml_assert((select array_agg(x->'possibility'->>'title') from jsonb_array_elements(public.read_ready_system_possibilities('7a000000-0000-4000-8000-000000000010')) x)
   = array['Ready'], 'only Ready possibilities not being made real, in the named business');
+select pg_temp.ml_assert((select x->'systems' from jsonb_array_elements(public.read_ready_system_possibilities('7a000000-0000-4000-8000-000000000010')) x)
+  = '[]'::jsonb, 'pinned System names come with each possibility');
 
 rollback;
 \echo 'Make real live schema checks passed.'

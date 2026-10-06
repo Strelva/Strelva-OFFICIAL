@@ -46,7 +46,10 @@ $$;
 
 create function public.read_ready_system_possibilities(p_workspace_id uuid) returns jsonb
 language sql stable security definer set search_path = public, pg_temp as $$
-  select coalesce(jsonb_agg(public.system_possibility_json(p, 0) order by p.created_at, p.id), '[]'::jsonb)
+  select coalesce(jsonb_agg(jsonb_build_object('possibility', public.system_possibility_json(p, 0),
+      'systems', coalesce((select jsonb_agg(jsonb_build_object('id', s.id, 'name', s.name) order by s.name)
+        from public.system_possibility_pins pin join public.systems s on s.id = pin.system_id
+        where pin.possibility_id = p.id), '[]'::jsonb)) order by p.created_at, p.id), '[]'::jsonb)
     from public.system_possibilities p
     where p.business_workspace_id = p_workspace_id and p.status = 'ready' and p.activation_id is null
 $$;

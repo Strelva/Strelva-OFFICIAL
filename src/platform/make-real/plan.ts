@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { canonicalJson } from "@/platform/business-record/tenant-import";
 import { EFFECT_SCOPE, type Possibility } from "@/platform/possibilities/contracts";
 import type { Activation, ActivationStep } from "./contracts";
-import type { EffectAdapter } from "./ports";
+import { selectAdapter, type EffectAdapter } from "./ports";
 
 /**
  * Deterministic idempotency key for one step of one candidate. It never
@@ -46,7 +46,7 @@ export function planActivation(p: Possibility, adapters: readonly EffectAdapter[
   }
   const effectIds: string[] = [];
   for (const effect of p.effects) {
-    const adapter = adapters.find((a) => a.kind === effect.kind);
+    const adapter = selectAdapter(adapters, effect);
     const id = `effect:${effect.id}`;
     effectIds.push(id);
     steps.push(step({

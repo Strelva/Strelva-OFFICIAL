@@ -52,6 +52,12 @@ export interface ApplySectionUpdateInput {
    * validation, draft, and versioning path as a normal edit.
    */
   forceReview?: boolean;
+  /**
+   * Stored on the published content version (content_versions.request_id),
+   * so a caller that lost the response can find whether this exact write
+   * landed. Make real passes its step's idempotency key.
+   */
+  requestId?: string;
 }
 
 export type ApplySectionUpdateResult =
@@ -180,7 +186,8 @@ export async function applySectionUpdate(
     // Version history is bookkeeping — the content is already durably saved, so
     // a version-write hiccup must not turn a successful publish into a failure.
     try {
-      await appendVersion(section, parsed.data, "ai", tenantId, changes);
+      if (input.requestId) await appendVersion(section, parsed.data, "ai", tenantId, changes, input.requestId);
+      else await appendVersion(section, parsed.data, "ai", tenantId, changes);
     } catch (err) {
       console.error("[agent] appendVersion failed after publish:", err);
     }
