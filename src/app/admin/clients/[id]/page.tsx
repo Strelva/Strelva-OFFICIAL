@@ -31,6 +31,8 @@ import { ReleaseFlagsPanel } from "./ReleaseFlagsPanel";
 import { SiteScan } from "./SiteScan";
 import { ReviewIntelPanel } from "./ReviewIntelPanel";
 import { DomainManager } from "./DomainManager";
+import { DomainView } from "./DomainView";
+import { loadDomainView } from "@/platform/operator-queue/domain-view-loader";
 import { VisibilityPanel } from "./VisibilityPanel";
 import { ClientCrmSections } from "./ClientCrmSections";
 import { OperatorOpportunities } from "./OperatorOpportunities";
@@ -41,6 +43,8 @@ import { getTenantSiteName } from "@/lib/tenant-display";
 import { getClientLeadsForOperator } from "@/lib/client-leads";
 import { ClientLeadList } from "../../client-leads/ClientLeadList";
 import { ClientLogo, Chip, faviconFor, Panel, PanelLink } from "../../console";
+import { BusinessEffortForSite } from "../../work/BusinessEffort";
+import { loadBusinessEffort } from "../../work/effort-data";
 import { ChevronLeft, LayoutDashboard, Eye, ExternalLink } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -103,6 +107,9 @@ export default async function ClientDetailPage({
     subscriptionStatus: null,
   };
 
+  // loadBusinessEffort never throws; it reports disabled/denied/unavailable states.
+  const effortLoad = loadBusinessEffort();
+  const domainViewLoad = loadDomainView([{ tenantId: id, label: `${tenant.siteName || id} website` }]).catch(() => null);
   const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk, dailyMetrics, suggestions, vercelStatus, goal, account, reportCadence, replyVoice, contentAutonomy, clientEmailOverride, clientLeads] =
     await Promise.all([
       getClickCounts("page-view", id).catch(() => ({ thisWeek: 0, total: 0 })),
@@ -127,6 +134,7 @@ export default async function ClientDetailPage({
       getClientEmailOverride(id).catch(() => "inherit" as const),
       getClientLeadsForOperator({ tenant: id, limit: 5 }).catch(() => null),
     ]);
+  const effort = await effortLoad;
   const opportunities = operatorSuggestions(suggestions);
   const deployStatus = vercelStatus && vercelStatus.ok ? vercelStatus.data : null;
 
@@ -356,9 +364,15 @@ export default async function ClientDetailPage({
           }}
         />
         <ReleaseFlagsPanel tenantId={tenant.id} />
+        <DomainView load={await domainViewLoad} />
         <DomainManager tenantId={tenant.id} initialDomains={domainClaims.map(serializeDomainClaim)} />
         <IntegrationsPanel tenantId={tenant.id} />
         <DeploymentStatus status={deployStatus} tenantId={tenant.id} />
+      </Section>
+
+      {/* ── Human effort (ADR 0009 factory measure) ── */}
+      <Section label="Human effort">
+        <BusinessEffortForSite load={effort} tenantId={tenant.id} />
       </Section>
 
       {/* ── CRM ── */}

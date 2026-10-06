@@ -57,7 +57,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!domain) return NextResponse.json({ error: "Domain is required" }, { status: 400 });
 
   const role = parseRole(body?.role);
-  const result = await addCustomDomain(id, domain, role);
+  const result = await addCustomDomain(id, domain, role, { actor: "operator console" });
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
 
   await logAuditEvent({
@@ -101,7 +101,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const domain = new URL(req.url).searchParams.get("domain") || "";
   if (!domain) return NextResponse.json({ error: "Domain is required" }, { status: 400 });
 
-  const result = await removeCustomDomain(id, domain);
+  const result = await removeCustomDomain(id, domain, { actor: "operator console" });
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
 
   await logAuditEvent({

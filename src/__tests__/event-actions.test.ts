@@ -439,7 +439,7 @@ describe("resolveEventAction", () => {
     const result = await resolveEventAction("tenant-a", "evt_rr", "approved");
 
     expect(result).toEqual({ changed: true });
-    expect(mockPublishReviewReply).toHaveBeenCalledWith("tenant-a", "rev_9", "Thank you!");
+    expect(mockPublishReviewReply).toHaveBeenCalledWith("tenant-a", "rev_9", "Thank you!", { actor: "approved event evt_rr" });
     expect(mockResolveEvent).toHaveBeenCalledWith("evt_rr", "approved", { actor: "user" });
   });
 
