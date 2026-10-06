@@ -98,6 +98,8 @@ describe("mirrorLead", () => {
     await expect(mirrorLead("gldf", lead, "abc123")).resolves.toEqual({ status: "failed", reason: "invalid" });
     db(async () => ({ data: null, error: { code: "PGRST202", message: "Could not find the function public.record_tenant_lead" } }));
     await expect(mirrorLead("gldf", lead, "abc123")).resolves.toEqual({ status: "failed", reason: "schema_missing" });
+    // A missing schema pauses live copies (lead-mirror-schema-missing.test.ts); clear it.
+    redis.store.clear();
     db(async () => ({ data: { surprise: true }, error: null }));
     await expect(mirrorLead("gldf", lead, "abc123")).resolves.toEqual({ status: "failed", reason: "error" });
   });

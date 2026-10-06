@@ -49,6 +49,21 @@ describe("lead-mirror-reconcile cron", () => {
     expect(mocks.heartbeat).toHaveBeenCalledWith("lead-mirror-reconcile", { ok: false, processed: 3, failed: 2 });
   });
 
+  it("missing tenant_leads schema: one state in the response, no hourly backlog page, heartbeat stays healthy", async () => {
+    mocks.reconcile.mockResolvedValue({ checked: 0, repaired: 0, failed: 0, missing: 0, remaining: 40, schemaMissing: true });
+    const res = await GET(new Request("http://localhost/api/cron/lead-mirror-reconcile"));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ schemaMissing: true, remaining: 40 });
+    expect(mocks.alertOnce).not.toHaveBeenCalledWith("lead_mirror_backlog", expect.anything(), expect.anything(), expect.anything());
+    expect(mocks.heartbeat).toHaveBeenCalledWith("lead-mirror-reconcile", { ok: true, processed: 0, failed: 0 });
+  });
+
+  it("missing schema still pages for leads that left Redis before they were copied", async () => {
+    mocks.reconcile.mockResolvedValue({ checked: 1, repaired: 0, failed: 0, missing: 1, remaining: 40, schemaMissing: true });
+    await GET(new Request("http://localhost/api/cron/lead-mirror-reconcile"));
+    expect(mocks.alertOnce).toHaveBeenCalledWith("lead_mirror_backlog", "high", { remaining: 40, missing: 1, failed: 0 }, 6 * 3600);
+  });
+
   it("runs the lead retention purge and reports it without affecting the heartbeat", async () => {
     mocks.reconcile.mockResolvedValue({ checked: 0, repaired: 0, failed: 0, missing: 0, remaining: 0 });
     mocks.purge.mockResolvedValue({ status: "unavailable", reason: "function does not exist" });
