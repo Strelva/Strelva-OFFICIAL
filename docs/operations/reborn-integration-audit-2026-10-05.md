@@ -57,7 +57,7 @@ install; no dependency was added.
   route types in `.next-audit`. The audit-created include was removed and the
   server stopped before retry. This failure is retained in `integration-check-ci.log`.
 
-Final correction and browser/build receipts are appended below after execution.
+Final correction and browser/build receipts are recorded below.
 The first final check caught incorrect TypeScript types in the new System runtime
 test fixtures; that failed check is retained in `final-check-ci.log`.
 
@@ -169,3 +169,60 @@ Exact next release action: resolve the open safety and managed-delivery findings
 rehearse a representative conversion and complete the existing production checklist
 before requesting any production action. Keep paid model benchmarking, real email,
 provider writes, migrations, billing and deployments behind their existing authority.
+
+
+## Integration corrections and final receipt
+
+The audited integration includes the later `51571c15` release re-audit and these
+corrections, with no database migration or provider write:
+
+- `e862140c`: tenant rename moves queued lead-mirror repairs and their payloads
+  atomically, retaining TTL, retry order and failure diagnostics. Mirror failure
+  reporting and alert deduplication have bounded waits. Failure tests include a
+  real throwaway Redis Lua execution, acknowledgement loss and stalled reporting.
+- `7024d5e7`: System website work uses the existing v2 document renderer. App and
+  booking use is separated from management authority: a member can submit and
+  reserve while revise, pause and management tabs remain denied. Native commands
+  still enforce their own authority.
+- `22358721`: the new runtime fixtures use their real workspace payload types;
+  production contracts were not widened to make tests compile.
+
+The final checked source is `2235872102e425a9d2390de1b678fdeecf50ec71`.
+`pnpm check:ci` passed lint, typecheck, boundaries, ontology, isolated SQL, the
+coverage gate and production build on that source: 563 suites, 4,409 tests passed,
+14 skipped, 68.97% line coverage and 54.51% branch coverage. Dependency audit passed
+its configured high gate with the explicit exception described above.
+
+The browser phase then stopped because another local task occupied port 3100.
+That failure remains in `final-check-ci-corrected.log`; the unchanged remaining
+browser commands were resumed with empty providers on port 3312. Public smoke
+passed 94 tests and skipped 240 opt-in fixture/authenticated tests. Its 62 UX
+capture cases only take screenshots and do not assert visual correctness; their
+inclusion does not make this a complete visual audit.
+
+
+Remaining hosted-equivalent browser phases passed: workspace acceptance 38/38
+(`final-workspace-browser.log`) and synthetic owner/operator surfaces 20/20
+(`final-surface-browser.log`). The extra opt-in runtime run passed 38 of 39 tests
+before catching a test interaction error: an existing-record app keeps its add
+form collapsed. The test now opens “Add another record” before checking the field.
+The corrected Systems suite passed 10/10 with zero retries, including member use,
+management denial, empty/loading/error states and desktop-to-390-to-320px reflow
+(`final-system-browser-corrected.log`). The other 29 opt-in application/custom-app/
+workspace cases already passed unchanged in `final-system-runtime-browser.log`.
+The original failure and traces are retained in `failed-system-browser-artifacts/`.
+
+A T3 browser inspection also observed the final member Home at 390px using local
+fixtures. Successful checks do not erase warnings: the workspace browser log
+contains a duplicate synthetic React key, and the preview run reports a missing
+fixture product image. Neither is evidence of complete production UI acceptance.
+
+The ordered migration upgrade, all-nine-repository compatibility and version
+parity receipts remain applicable: these corrections changed no SQL migration,
+client contract or version. The canonical ledger validates at revision 6 (93 nodes,
+133 edges), and the integration diff passes `git diff --check`.
+
+Overall state: the branches can be developed and tested together. Reborn's dated
+line audit remains 8/48 done locally, 13 partial and 27 not started; passing checks
+does not close the release findings above. The next move is the safety and managed
+website correction batch, followed by a scrubbed representative-client conversion.

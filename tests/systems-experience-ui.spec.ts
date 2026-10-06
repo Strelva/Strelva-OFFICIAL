@@ -98,6 +98,7 @@ test("a member can use apps and bookings without management controls", async ({ 
   await page.goto("/preview/strelva?scenario=mooney-member");
   await page.getByRole("link", { name: /^Open Mediation intake/ }).click();
   await expect(page.getByRole("button", { name: "Ask for a change" })).toBeDisabled();
+  await page.getByText("Add another record", { exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Your name" })).toBeEnabled();
   await expect(page.getByRole("tab", { name: "Edit", exact: true })).toHaveCount(0);
   await expect(page.getByRole("tab", { name: "Sharing", exact: true })).toHaveCount(0);
