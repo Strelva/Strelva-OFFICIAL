@@ -148,7 +148,7 @@ describe("per-workspace resolution through the store", () => {
 
   it("covers every flag the spec names", () => {
     expect([...RELEASE_FLAGS].sort()).toEqual([
-      "inquiries",
+      "connected_sites", "inquiries",
       "make_real_live:booking_page", "make_real_live:hosted_website", "make_real_live:inquiry_form",
       "make_real_live:internal_app", "make_real_live:tenant_content",
       "owner_entry", "systems", "website_rebuild",

@@ -17,7 +17,7 @@ import { getScanSummaries } from "@/lib/scan-store";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { BusinessSystems, SystemListing } from "@/platform/systems/from-existing";
 import { listBusinessSystems, withTenantSurfaces, type BookingView, type ExistingConnectedSite, type TenantSiteFacts } from "@/platform/systems/from-existing";
-import { connectedSitesReleaseEnabled } from "@/products/connected-sites/server";
+import { connectedSitesReleaseEnabled, connectedSitesReleasedFor } from "@/products/connected-sites/server";
 import { connectedSitesStore } from "@/products/connected-sites/store";
 import { getTenantConfig } from "@/lib/tenants";
 import { siteEditingFor, type SiteEditing } from "@/products/websites/server";
@@ -270,10 +270,10 @@ export function inquiryFormUnchecked(subjectId: string): Observation {
   return { subjectId, signal: "inquiry.publication", outcome: "unknown", observedAt: null, maxAgeSeconds: 7 * 24 * 3600, source: "inquiry-capability", message: "Whether the form on the site delivers has not been checked." };
 }
 
-/** Connected sites join the projection only while their release is on. */
+/** Connected sites join the projection only while their release is on for this business. */
 function connectedSitesReader(actor: WorkspaceActor, businessId: string): (() => Promise<ExistingConnectedSite[]>) | undefined {
   if (!connectedSitesReleaseEnabled()) return undefined;
-  return async () => (await connectedSitesStore().list(actor, businessId)).map((site) => ({
+  return async () => !(await connectedSitesReleasedFor(actor, businessId).catch(() => false)) ? [] : (await connectedSitesStore().list(actor, businessId)).map((site) => ({
     id: site.id, label: site.label, siteUrl: site.siteUrl, siteHost: site.siteHost, status: site.status,
     verifiedAt: site.verifiedAt, lastEventAt: site.lastEventAt, createdAt: site.createdAt, updatedAt: site.updatedAt,
   }));

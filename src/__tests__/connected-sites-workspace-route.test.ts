@@ -2,12 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConnectedSitesStore } from "@/products/connected-sites/store";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 
-const deps = vi.hoisted(() => ({ user: null as null | { id: string; email: string; email_confirmed_at: string }, limited: vi.fn(), systemsOn: true }));
+const deps = vi.hoisted(() => ({ user: null as null | { id: string; email: string; email_confirmed_at: string }, limited: vi.fn(), systemsOn: true, flag: vi.fn() }));
 vi.mock("@/lib/db/server-client", () => ({ getSessionUser: async () => deps.user }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
 vi.mock("@/lib/rate-limit", () => ({ isRateLimitedWindowedAsync: deps.limited }));
 // Per workspace: connected sites follow Systems for the business (release-flag rule).
 vi.mock("@/platform/systems-release", () => ({ systemsReleasedFor: async () => deps.systemsOn }));
+// And the business's own connected_sites row.
+vi.mock("@/platform/release-flags/store", () => ({ workspaceReleaseFlagEnabled: deps.flag }));
 
 import { setConnectedSitesStoreForTests } from "@/products/connected-sites/store";
 import { GET, POST } from "@/app/api/workspace/connected-sites/route";
@@ -25,6 +27,7 @@ describe("/api/workspace/connected-sites", () => {
     deps.user = { id: "79000000-0000-4000-8000-000000000001", email: "Owner@Example.test", email_confirmed_at: "2026-10-01" };
     deps.limited.mockReset().mockResolvedValue(false);
     deps.systemsOn = true;
+    deps.flag.mockReset().mockResolvedValue(true);
     store = { create: vi.fn(async () => stored), list: vi.fn(async () => [stored]), activity: vi.fn(async () => ({})), inquiries: vi.fn(async () => []), revoke: vi.fn(async () => ({ ...stored, status: "revoked", revokedAt: "2026-10-08T02:00:00Z" })), update: vi.fn(async () => stored), confirmVerification: vi.fn() } as unknown as ConnectedSitesStore;
     setConnectedSitesStoreForTests(store);
   });
@@ -54,6 +57,12 @@ describe("/api/workspace/connected-sites", () => {
     expect((await post({ action: "rename", workspaceId: BUSINESS })).status).toBe(400);
     vi.stubEnv("STRELVA_CONNECTED_SITES_RELEASE", "0");
     expect((await post({ action: "connect", workspaceId: BUSINESS, siteUrl: "bakery.example" })).status).toBe(503);
+  });
+  it("is off for a business whose own connected_sites row is off, even with Systems on", async () => {
+    deps.flag.mockResolvedValue(false);
+    expect((await post({ action: "connect", workspaceId: BUSINESS, siteUrl: "bakery.example" })).status).toBe(503);
+    expect(deps.flag).toHaveBeenCalledWith("connected_sites", BUSINESS, { operator: false, tester: false, userId: "79000000-0000-4000-8000-000000000001" });
+    expect(store.create).not.toHaveBeenCalled();
   });
   it("lists sites with activity and inquiries, and disconnects", async () => {
     const list = await GET(new Request(`${ORIGIN}/api/workspace/connected-sites?workspaceId=${BUSINESS}`));
