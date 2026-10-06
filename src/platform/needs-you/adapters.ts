@@ -42,6 +42,8 @@ export interface SourceAdapter {
   propose(ctx: AdapterContext): Promise<{ items: ProposedItem[]; complete: boolean }>;
   /** The source's current revision, or null when it is no longer waiting on anyone. */
   currentRevision(ctx: AdapterContext, sourceId: string): Promise<string | null>;
+  /** Optional: why a source stopped waiting (it lapsed on its own clock, the customer cancelled), for the withdrawn item. */
+  goneReason?(ctx: AdapterContext, sourceId: string): Promise<string | null>;
   resolve(ctx: AdapterContext, item: OwnerDecision, decision: Decision, by: ResolveBy): Promise<ResolveOutcome>;
 }
 

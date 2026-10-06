@@ -12,7 +12,7 @@ import { systemsSourceAdapters } from "./systems-sources";
 import { deliverySourceAdapters } from "./sources/live-delivery";
 import { productSourceAdapters } from "./sources/live-products";
 import { bookingRequestAdapter } from "@/platform/bookings/needs-you-adapter";
-import { decideBookingRequest, readWorkspaceBookingRequests } from "@/platform/bookings/store";
+import { decideBookingRequest, readWorkspaceBooking, readWorkspaceBookingRequests } from "@/platform/bookings/store";
 import { bookingStoreWriteEnabled } from "@/platform/bookings/flags";
 import { updateBooking as updateLegacyBookingStatus } from "@/lib/storage/booking-store";
 
@@ -51,6 +51,8 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
         // Nothing to read until the store receives writes (and its migration exists).
         requests: async (workspaceId) => (bookingStoreWriteEnabled() ? readWorkspaceBookingRequests(workspaceId) : []),
         decide: (workspaceId, bookingId, decision, actor) => decideBookingRequest(workspaceId, bookingId, decision, actor),
+        // Why a request stopped waiting (its own 72-hour clock, a cancel) for the closed item.
+        booking: (workspaceId, bookingId) => readWorkspaceBooking(workspaceId, bookingId),
         afterDecision: async (booking) => {
           if (booking.legacyId && booking.tenantId) {
             await updateLegacyBookingStatus(booking.legacyId, { status: booking.status === "confirmed" ? "confirmed" : "cancelled" }, booking.tenantId);

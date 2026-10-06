@@ -41,6 +41,32 @@ export function bookingOwnerNoticeEnabled(env: Env = process.env): boolean {
   return env.STRELVA_BOOKING_OWNER_NOTICE?.trim() === "1";
 }
 
+/**
+ * STRELVA_BOOKING_REMINDERS=1 turns on the `booking-reminders` cron's work:
+ * customer reminders (24 h and 2 h), the owner's one 24-hour chase of a
+ * request, the 72-hour request lapse and the 15-minute hold sweep. It also
+ * needs the store's write switch: the cron acts on the one store only.
+ * Every email still goes through the one send path and its audience gates.
+ */
+export function bookingRemindersEnabled(env: Env = process.env): boolean {
+  return env.STRELVA_BOOKING_REMINDERS?.trim() === "1" && bookingStoreWriteEnabled(env);
+}
+
+/** STRELVA_BOOKING_MANAGE_PAGE=1 serves the customer manage link (/b/[token]) and puts it in reminders. */
+export function bookingManagePageEnabled(env: Env = process.env): boolean {
+  return env.STRELVA_BOOKING_MANAGE_PAGE?.trim() === "1";
+}
+
+/**
+ * STRELVA_BOOKING_CALENDAR_BUSY=1 subtracts a connected Google or Outlook
+ * calendar's busy times from the tenant routes' store-served slots (60-second
+ * cache). A failed read never refuses a booking: slots are offered and an
+ * instant booking becomes a request for that booking.
+ */
+export function bookingCalendarBusyEnabled(env: Env = process.env): boolean {
+  return env.STRELVA_BOOKING_CALENDAR_BUSY?.trim() === "1";
+}
+
 let streakCache: { days: number; at: number } | null = null;
 export function resetBookingFlagCache(): void {
   streakCache = null;

@@ -113,7 +113,10 @@ export interface BookingContext {
 }
 
 export class BookingStoreError extends Error {
-  constructor(readonly code: "unconfigured" | "timeout" | "unknown_tenant" | "invalid" | "not_found" | "failed", message?: string) {
+  constructor(
+    readonly code: "unconfigured" | "timeout" | "unknown_tenant" | "invalid" | "not_found" | "failed" | "hours_need_record" | "hours_outside_record",
+    message?: string,
+  ) {
     super(message ?? `booking_store_${code}`);
     this.name = "BookingStoreError";
   }
@@ -157,6 +160,8 @@ async function call<T>(name: string, args: Record<string, unknown>, db: BookingS
       if (detail.includes("booking_unknown_tenant")) throw new BookingStoreError("unknown_tenant");
       if (detail.includes("booking_invalid")) throw new BookingStoreError("invalid");
       if (detail.includes("booking_not_found")) throw new BookingStoreError("not_found");
+      if (detail.includes("booking_hours_need_record")) throw new BookingStoreError("hours_need_record");
+      if (detail.includes("booking_hours_outside_record")) throw new BookingStoreError("hours_outside_record");
       throw new BookingStoreError("failed", detail.trim() || "booking_store_failed");
     }
     return outcome.data as T;
@@ -341,4 +346,158 @@ export async function decideBookingRequest(
   const booking = parseStoreBooking(data?.booking);
   if (!booking || (data?.status !== "decided" && data?.status !== "already_decided")) throw new BookingStoreError("failed", "booking_store_unexpected_response");
   return { status: data.status, booking };
+}
+
+// --- After a booking is taken (20261009110000_booking_lifecycle.sql) ---------------
+
+export type BookingMessageKind = "reminder_24h" | "reminder_2h" | "request_owner_reminder" | "request_lapsed";
+export type BookingMessageStatus = "sent" | "suppressed" | "failed" | "skipped";
+
+export interface ClaimedBookingMessage {
+  messageId: string;
+  kind: BookingMessageKind;
+  booking: StoreBooking;
+}
+
+const MESSAGE_KINDS: ReadonlySet<string> = new Set(["reminder_24h", "reminder_2h", "request_owner_reminder", "request_lapsed"]);
+
+/** Claim every message due at `now` (at most `limit`). Each is claimed once, ever. */
+export async function claimBookingMessages(now: Date, limit: number, db?: BookingStoreDb | null): Promise<ClaimedBookingMessage[]> {
+  const data = await call<unknown>("claim_booking_messages", { p_now: now.toISOString(), p_limit: limit }, db);
+  if (!Array.isArray(data)) throw new BookingStoreError("failed", "booking_store_malformed");
+  return data.flatMap((raw) => {
+    const r = (raw ?? {}) as Record<string, unknown>;
+    const booking = parseStoreBooking(r.booking);
+    if (typeof r.messageId !== "string" || typeof r.kind !== "string" || !MESSAGE_KINDS.has(r.kind) || !booking) return [];
+    return [{ messageId: r.messageId, kind: r.kind as BookingMessageKind, booking }];
+  });
+}
+
+/** Record what the send path returned. A message finishes once. */
+export async function finishBookingMessage(
+  messageId: string,
+  status: BookingMessageStatus,
+  providerMessageId: string | null,
+  detail: string | null,
+  db?: BookingStoreDb | null,
+): Promise<"finished" | "not_claimed"> {
+  const data = await call<{ status?: string }>("finish_booking_message", {
+    p_message_id: messageId, p_status: status, p_provider_message_id: providerMessageId, p_detail: detail,
+  }, db);
+  return data?.status === "finished" ? "finished" : "not_claimed";
+}
+
+/** The hold sweep: holds a customer has not confirmed in 15 minutes are released. */
+export async function expireBookingHolds(now: Date, db?: BookingStoreDb | null): Promise<number> {
+  const data = await call<{ expired?: unknown }>("expire_booking_holds", { p_now: now.toISOString() }, db);
+  return Number(data?.expired ?? 0) || 0;
+}
+
+/** The request's own 72-hour clock. Returns the lapsed (declined) bookings and their customer message claim. */
+export async function lapseBookingRequests(now: Date, limit: number, db?: BookingStoreDb | null): Promise<Array<{ messageId: string | null; booking: StoreBooking }>> {
+  const data = await call<unknown>("lapse_booking_requests", { p_now: now.toISOString(), p_limit: limit }, db);
+  if (!Array.isArray(data)) throw new BookingStoreError("failed", "booking_store_malformed");
+  return data.flatMap((raw) => {
+    const r = (raw ?? {}) as Record<string, unknown>;
+    const booking = parseStoreBooking(r.booking);
+    return booking ? [{ messageId: typeof r.messageId === "string" ? r.messageId : null, booking }] : [];
+  });
+}
+
+export interface BookingLastChange {
+  actor: string;
+  from: string | null;
+  to: string;
+  reason: string | null;
+}
+
+/** One booking of one business with why it last changed, or null (also for another business's booking). */
+export async function readWorkspaceBooking(
+  workspaceId: string,
+  bookingId: string,
+  db?: BookingStoreDb | null,
+): Promise<(StoreBooking & { lastChange: BookingLastChange | null }) | null> {
+  const data = await call<Record<string, unknown> | null>("read_workspace_booking", { p_workspace_id: workspaceId, p_booking_id: bookingId }, db);
+  const booking = parseStoreBooking(data);
+  if (!booking) return null;
+  const last = data?.lastChange && typeof data.lastChange === "object" ? data.lastChange as Record<string, unknown> : null;
+  return {
+    ...booking,
+    lastChange: last && typeof last.to === "string"
+      ? { actor: String(last.actor ?? ""), from: text(last.from), to: last.to, reason: text(last.reason) }
+      : null,
+  };
+}
+
+export interface ManagedReservation {
+  tenantId: string;
+  siteName: string;
+  reservationId: string;
+  capabilityId: string;
+  capabilityVersion: number;
+  title: string;
+  start: string;
+  end: string;
+  timeZone: string;
+  status: "pending" | "confirmed" | "cancelled";
+}
+
+/** The receipt a manage link's token belongs to, found by the token's hash alone. */
+export async function readReservationByManageTokenHash(tokenHash: string, db?: BookingStoreDb | null): Promise<ManagedReservation | null> {
+  if (!/^[a-f0-9]{64}$/.test(tokenHash)) return null;
+  const data = await call<Record<string, unknown> | null>("read_public_booking_by_manage_token", { p_token_hash: tokenHash }, db);
+  if (!data || typeof data.tenantId !== "string" || typeof data.reservationId !== "string" || typeof data.start !== "string" || typeof data.end !== "string") {
+    return null;
+  }
+  const status = data.status === "confirmed" || data.status === "cancelled" ? data.status : "pending";
+  return {
+    tenantId: data.tenantId,
+    siteName: typeof data.siteName === "string" ? data.siteName : "",
+    reservationId: data.reservationId,
+    capabilityId: String(data.capabilityId ?? ""),
+    capabilityVersion: Number(data.capabilityVersion) || 0,
+    title: String(data.title ?? "Booking"),
+    start: data.start,
+    end: data.end,
+    timeZone: String(data.timeZone ?? "UTC"),
+    status,
+  };
+}
+
+export interface WorkspaceScheduleReservationInput {
+  workId: string;
+  requestId: string;
+  status: "confirmed" | "cancelled";
+  title: string;
+  start: string;
+  end: string;
+  timeZone: string;
+}
+
+/** Copy one schedule reservation made in the workspace (no public receipt) into the one store. */
+export async function recordWorkspaceBooking(
+  workspaceId: string,
+  input: WorkspaceScheduleReservationInput,
+  via: "backfill" | "repair" | "native",
+  db?: BookingStoreDb | null,
+): Promise<RecordBookingResult> {
+  const data = await call<{ status?: string; booking?: unknown }>("record_workspace_booking", { p_workspace_id: workspaceId, p_booking: input, p_via: via }, db);
+  if (data?.status === "conflict") return { status: "conflict" };
+  const booking = parseStoreBooking(data?.booking);
+  if (!booking || (data?.status !== "recorded" && data?.status !== "updated" && data?.status !== "unchanged")) {
+    throw new BookingStoreError("failed", "booking_store_unexpected_response");
+  }
+  return { status: data.status, booking };
+}
+
+/** Booking-only hours for one site of this business. Narrowing only; null clears the narrowing. */
+export async function setTenantBookingHours(
+  workspaceId: string,
+  tenant: string,
+  hours: Array<{ day: number; opens: string; closes: string }> | null,
+  db?: BookingStoreDb | null,
+): Promise<{ revision: number }> {
+  const data = await call<{ status?: string; revision?: unknown }>("set_tenant_booking_hours", { p_workspace_id: workspaceId, p_tenant_id: tenant, p_hours: hours }, db);
+  if (data?.status !== "updated") throw new BookingStoreError("failed", "booking_store_unexpected_response");
+  return { revision: Number(data.revision) || 0 };
 }

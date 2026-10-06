@@ -562,6 +562,10 @@ psql "${psql_args[@]}" --file="$repo_root/tests/tenant-lead-reads-schema.sql"
 # hours and services read from the business record, requests and pause.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008141000_booking_store.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-store-schema.sql"
+# After a booking is taken: reminders sent once, the hold sweep, the 72-hour
+# request clock, the manage-link lookup, schedule copies and narrower hours.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009110000_booking_lifecycle.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-lifecycle-schema.sql"
 # Publishing: the business-level Google grant, its locations and a receipt
 # for every Google write. After Systems, because it extends the origin kinds.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007170000_workspace_account_bindings.sql"

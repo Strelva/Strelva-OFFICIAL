@@ -85,7 +85,10 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     }
     if (current === item.revisionHash) return "current";
     if (current === null) {
-      if (item.state === "open") await deps.store.withdraw(ctx.workspaceId, item.id, "The source no longer waits on a decision.").catch(() => null);
+      if (item.state === "open") {
+        const reason = await adapter.goneReason?.(ctx, item.sourceId).catch(() => null);
+        await deps.store.withdraw(ctx.workspaceId, item.id, reason || "The source no longer waits on a decision.").catch(() => null);
+      }
       return "gone";
     }
     await sync(ctx);

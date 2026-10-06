@@ -65,6 +65,10 @@
       "schedule": "17 * * * *"
     },
     {
+      "path": "/api/cron/booking-reminders",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/cron/client-records-parity",
       "schedule": "40 5 * * *"
     },

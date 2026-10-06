@@ -22,6 +22,24 @@ export interface BookingRequestPorts {
   decide(workspaceId: string, bookingId: string, decision: "approve" | "not_yet", actor: "owner" | "member"): Promise<{ status: "decided" | "already_decided"; booking: StoreBooking }>;
   /** Keeps the legacy booking row in step (rollback needs both stores). Best effort. */
   afterDecision?(booking: StoreBooking): Promise<void>;
+  /** One booking of this business with why it last changed (null for another business's). */
+  booking?(workspaceId: string, bookingId: string): Promise<(StoreBooking & { lastChange: { actor: string; reason: string | null } | null }) | null>;
+}
+
+/**
+ * Why a request stopped waiting, for the Needs you item it closes. The
+ * request's own 72-hour clock (lifecycle.ts) declines it as "Expired"; that
+ * replaces the Needs you 3/7/14-day clock for this kind.
+ */
+export function bookingRequestGoneReason(booking: (StoreBooking & { lastChange: { actor: string; reason: string | null } | null }) | null): string | null {
+  if (!booking) return null;
+  if (booking.status === "declined" && booking.lastChange?.actor === "system" && booking.lastChange.reason?.startsWith("Expired")) {
+    return "Expired, nothing confirmed: no answer in 72 hours. The customer was told and offered other times.";
+  }
+  if (booking.status === "cancelled") return "The customer cancelled the request.";
+  if (booking.status === "confirmed") return "Already confirmed.";
+  if (booking.status === "declined") return "Already declined.";
+  return null;
 }
 
 export function bookingRequestRevision(booking: StoreBooking): string {
@@ -72,6 +90,10 @@ export function bookingRequestAdapter(ports: BookingRequestPorts): SourceAdapter
     async currentRevision(ctx, sourceId) {
       const row = (await ports.requests(ctx.workspaceId)).find((b) => b.id === sourceId);
       return row ? bookingRequestRevision(row) : null;
+    },
+    async goneReason(ctx, sourceId) {
+      if (!ports.booking) return null;
+      return bookingRequestGoneReason(await ports.booking(ctx.workspaceId, sourceId));
     },
     async resolve(ctx, item, decision, by) {
       const effective = by.kind === "expiry" ? "not_yet" : decision;
