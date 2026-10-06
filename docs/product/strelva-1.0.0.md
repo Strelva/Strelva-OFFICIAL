@@ -44,7 +44,7 @@ built and tested on a branch, not in production.
 | Feature | Today | Source |
 | --- | --- | --- |
 | Home shows the business's actual Systems, each with Draft/Live/Paused and a separate health signal | Local on `transition/systems` | ADR 0011, `PRIM_SYSTEM` |
-| **Needs you**: only the decisions the owner must make, set by policy, not an approval per change | Local UI, no real policy source | agency-in-the-loop decision, Oct 2 |
+| **Needs you**: only the decisions the owner must make, set by policy, not an approval per change | Local, flag off: one policy evaluator; every lifecycle resolves through Needs you (Ask, Make real, Versions included); policy settings for owners and operators | agency-in-the-loop decision, Oct 2 |
 | System page: the real thing first (live site, inbox, calendar, tool), Connections, Possibilities and Versions beside it | Local | `DESIGN.md` Oct 4 |
 | Possibilities you can open, compare and **Make real**, with honest partial states and undo where undo exists | Local, fake effects only, in-memory progress | `COMP_MULTI_SYSTEM_ACTIVATION` |
 | Versions: one System adapted per location or client, with shared improvements offered, never forced | Local, in-memory only | `PRIM_CONTEXT_VERSION` |

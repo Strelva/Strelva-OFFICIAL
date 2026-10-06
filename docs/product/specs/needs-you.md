@@ -17,13 +17,29 @@ stays gated.
   Strelva handled; a route for `undo_business_record_revision`; the parity
   replay (`scripts/needs-you-parity.ts`); the `change_verify_failed` and
   `sendUpdateLiveEmail` fixes.
-- **Not built:** adapters for the other lifecycles in section 6 (website
-  documents, provider delivery, standing responsibilities, offers, agency
-  grants, apps, work plans, money, exit); policy settings UI and one-tap
-  policy undo; the operator queue's "owner not told" view (the data is
-  recorded); the monthly report's handled list with signed undo links;
-  migrating `ContentAutonomy`/`ReplyVoice` values into `decision_policies`;
-  retiring the SMS check.
+- **Built locally on `w2/decisions-wiring` (2026-10-06), same flag:**
+  adapters for website documents (approve, launch), provider delivery,
+  standing responsibilities, finite responsibilities, agency draft grants,
+  app and custom-app releases, work plan outputs, money (allowance cap, job
+  budget, payer change) and Make real and Version releases, each resolving
+  through its lifecycle's own resolver (`src/platform/needs-you/sources/`);
+  Ask Strelva's real Needs you port; Make real decided once per plan (the
+  item is the approval record, `make_real_plan` fingerprint) and the System
+  page's Make it live deciding that item; the Versions release gate's
+  approvals port; review-reply approve moved onto the Google listing System
+  for linked businesses with `STRELVA_PUBLISHING_RELEASE` (listing receipts
+  only, `/admin/queue` reads them); owner policy settings (tighten only, back
+  to default, one-tap undo) and the operator's Who decides screen; the
+  operator queue's "Owner not told" list; content autonomy and reply mode in
+  `decision_policies` for linked tenants, Redis otherwise (migration
+  `20261008124000`, seed script dry run by default).
+- **Not built:** operational assignment offers (nothing waits on the owner
+  today; it needs a new proposed-assignment record) and exit/export (no
+  pending state; the adapter proposes nothing); per-System policy overrides
+  in the UI; the monthly report's handled list with signed undo links;
+  retiring the SMS check. Workspace-lifecycle adapters need a member
+  identity, so the hourly cron can't open their items for an owner who never
+  signs in (no service-role readers yet).
 - **Unproven:** the parity replay against a scrubbed copy of real tenants,
   the never-signs-in journey with real email, and any production behavior.
 

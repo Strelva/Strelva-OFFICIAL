@@ -299,8 +299,9 @@ are untouched.
       workspace agent route resolves workspace → link → tenant and re-checks
       permission, and approvals go through section 2. *Partial, local Oct 6
       (`build/ask-strelva`): tools moved, route and per-call checks built
-      behind `STRELVA_ASK_RELEASE`; no workspace UI, history or real Needs
-      you wiring yet · L*
+      behind `STRELVA_ASK_RELEASE`; real Needs you wiring done locally Oct 6
+      (`w2/decisions-wiring`, behind `STRELVA_NEEDS_YOU_RELEASE`); no
+      workspace UI or history yet · L*
 
 Proof: authenticated local journeys per capability on desktop and mobile, in
 empty, loading, error and permission states, using The Mooney Firm and gldf.

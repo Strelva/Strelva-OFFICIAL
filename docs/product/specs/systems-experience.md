@@ -2,6 +2,13 @@
 
 Status: draft spec, 2026-10-06. Not built, not approved. For Jacob's review.
 
+Built locally on `w2/decisions-wiring` (2026-10-06), behind
+`STRELVA_NEEDS_YOU_RELEASE`: behavior 21 (one Needs you item and one approval
+record per Make real plan, each effect inside the plan fingerprint) and the
+approval half of 22 (`planApprovalAuthority` rechecks the record before
+activation and every publish step). Make real still runs on the isolated
+sandbox.
+
 This spec covers what a business sees of its Systems: Home, the System page,
 Possibilities, and Make real with real outside effects. It also covers the
 storage underneath: the System registry, System identity across tenants and
