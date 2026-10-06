@@ -482,6 +482,12 @@ psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.s
 # Model-call cost log (one model-call helper, Ask Strelva spec section 5).
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007140000_model_call_log.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/model-call-log-schema.sql"
+# Ask Strelva conversation history, and repo-change receipts on a website
+# System (preview, owner decision, deploy). Fictional rows, rolled back.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008110000_ask_conversations.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/ask-conversations-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008111000_website_change_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-change-receipts-schema.sql"
 # Systems catalog: report cadence, last-sent markers and analytics config
 # moved from Redis into Postgres (tenant-scoped, service role only).
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007194000_tenant_report_and_analytics_state.sql"
