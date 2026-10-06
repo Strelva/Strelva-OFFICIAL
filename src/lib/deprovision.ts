@@ -55,7 +55,8 @@ export const WORKSPACE_OWNED_TENANT_TABLES = [
 
 // Tables keyed on the tenant's stable_id are not swept by slug either; the
 // `tenants` delete settles them through their foreign keys:
-//   tenant_leads            on delete cascade (the tenant's leads are deleted)
+//   tenant_leads            kept (20261007110000): stamped tenant_deleted_at; a lead
+//                           in no business is purged 365 days later with a receipt
 //   tenant_workspace_links  on delete set null (the business and receipt stay)
 //   tenant_workspace_unlinks no foreign key (unlink receipts stay)
 

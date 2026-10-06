@@ -7,6 +7,7 @@ export {
   readBusinessRecordHistory,
   readTenantWorkspaceLink,
   resolveOwnerRecipient,
+  resolveTenantOwnerRecipient,
   undoBusinessRecordRevision,
   unlinkTenantFromBusiness,
   upsertBusinessContacts,

@@ -87,6 +87,30 @@ describe("leads store", () => {
     expect(arg.lead.message).toBe("Saturday?");
   });
 
+  it("sends the lead notice to the business record's owner contact once the site is converted", async () => {
+    const { setOwnerRecipientResolver } = await import("@/lib/owner-recipient");
+    const resolver = vi.fn().mockResolvedValue({ email: "pat@business.example", name: "Pat", from: "record", workspaceId: "11111111-1111-4111-8111-111111111111", tenantId: "t1" });
+    setOwnerRecipientResolver(resolver);
+    try {
+      await recordLead("t1", { name: "Sarah Chen", email: "s@x.com", message: "Saturday?" });
+    } finally {
+      setOwnerRecipientResolver(null);
+    }
+    expect(resolver).toHaveBeenCalledWith("t1");
+    expect(mockSendNewLeadEmail.mock.calls[0]![0]).toMatchObject({ email: "pat@business.example", tenantId: "t1" });
+  });
+
+  it("falls back to the tenant owner_email when the rule can't be read", async () => {
+    const { setOwnerRecipientResolver } = await import("@/lib/owner-recipient");
+    setOwnerRecipientResolver(vi.fn().mockRejectedValue(new Error("db down")));
+    try {
+      await recordLead("t1", { name: "Sarah Chen", email: "s@x.com", message: "Saturday?" });
+    } finally {
+      setOwnerRecipientResolver(null);
+    }
+    expect(mockSendNewLeadEmail.mock.calls[0]![0].email).toBe("owner@example.com");
+  });
+
   it("does not re-email the owner on a duplicate re-submission", async () => {
     await recordLead("t1", { name: "Sarah Chen", email: "s@x.com", message: "Saturday?" });
     await recordLead("t1", { name: "Sarah Chen", email: "s@x.com", message: "Saturday?" });

@@ -257,6 +257,18 @@ export const ownerRecipientSchema = z.object({
 });
 export type OwnerRecipient = z.infer<typeof ownerRecipientSchema>;
 
+/** The one owner-recipient rule keyed by tenant (resolve_tenant_owner_recipient):
+ * the linked record's owner contact, else this tenant's owner_email, else the
+ * business's earliest linked tenant's owner_email. */
+export const tenantOwnerRecipientSchema = z.object({
+  email: z.string().email(),
+  name: nullableString,
+  from: z.enum(["record", "tenant", "linked_tenant"]),
+  workspaceId: uuid.nullable(),
+  tenantId: nullableString,
+});
+export type TenantOwnerRecipient = z.infer<typeof tenantOwnerRecipientSchema>;
+
 /** Billing as observed on the tenant at conversion time. Recorded, never acted on. */
 export const conversionBillingSchema = z.object({
   billingType: z.enum(["tier", "custom", "case_study", "none"]),

@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/heartbeat";
 import { reconcileLeadMirror } from "@/lib/client-leads";
+import { purgeExpiredTenantLeads } from "@/lib/lead-mirror";
 import { alertOnce } from "@/lib/monitoring";
 import { requireCronRequest } from "@/lib/cron-auth";
 
 export const maxDuration = 120;
 
 /**
+ * Also enforces the stated retention for lead copies of deprovisioned clients
+ * (365 days, then deleted with a receipt). A purge failure never affects the
+ * retry or the heartbeat; it is reported in the response.
+ *
  * Hourly retry for client leads whose Postgres copy failed at capture time
  * (src/lib/lead-mirror.ts). Anything still pending after the retry pages
  * operators, at most every six hours, and shows on /admin/client-leads.
@@ -29,5 +34,6 @@ export async function GET(request: Request) {
     processed: result.checked,
     failed: result.failed + result.missing,
   });
-  return NextResponse.json(result);
+  const retention = await purgeExpiredTenantLeads(1000);
+  return NextResponse.json({ ...result, retention });
 }

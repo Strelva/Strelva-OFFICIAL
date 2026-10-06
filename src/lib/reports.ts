@@ -4,6 +4,7 @@ import { getAllTenants, getTenantConfig } from "./tenants";
 import { getMetricsBatch, getActivity, getSectionTimestamps, getContent, getSearchData, getDailyMetrics } from "./storage";
 import { getEvents } from "./events";
 import { mapPool } from "./concurrency";
+import { ownerNoticeEmail } from "./owner-recipient";
 import { detectTrafficAnomaly } from "./anomaly";
 import type { TrafficAnomaly } from "./anomaly";
 import { STALE_DAYS } from "./utils";
@@ -33,6 +34,8 @@ export interface VerifiedChangeItem {
 
 export interface WeeklyReportData {
   tenant: TenantConfig;
+  /** Who the report email goes to, by the one owner-recipient rule. Set by generateAllReports. */
+  ownerRecipient?: string;
   pageViews: { total: number; thisWeek: number };
   bookingClicks: { total: number; thisWeek: number };
   /** tel: taps — a customer action folded into the "booked or called" total. */
@@ -642,7 +645,8 @@ export async function generateAllReports(): Promise<GenerateAllReportsResult> {
       skipped.push({ tenantId: tenant.id, reason: "inactive" });
       return;
     }
-    if (!tenant.ownerEmail) {
+    const ownerRecipient = await ownerNoticeEmail(tenant);
+    if (!ownerRecipient) {
       skipped.push({ tenantId: tenant.id, reason: "missing_owner_email" });
       return;
     }
@@ -650,7 +654,7 @@ export async function generateAllReports(): Promise<GenerateAllReportsResult> {
     try {
       const report = await generateWeeklyReport(tenant.id);
       if (report) {
-        reports.push(report);
+        reports.push({ ...report, ownerRecipient });
       } else {
         skipped.push({ tenantId: tenant.id, reason: "no_report" });
       }

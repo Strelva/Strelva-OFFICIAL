@@ -5,8 +5,10 @@ const mocks = vi.hoisted(() => ({
   heartbeat: vi.fn(),
   alertOnce: vi.fn(),
   denied: vi.fn(),
+  purge: vi.fn(),
 }));
 vi.mock("@/lib/client-leads", () => ({ reconcileLeadMirror: mocks.reconcile }));
+vi.mock("@/lib/lead-mirror", () => ({ purgeExpiredTenantLeads: mocks.purge }));
 vi.mock("@/lib/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
 vi.mock("@/lib/monitoring", () => ({ alertOnce: mocks.alertOnce }));
 vi.mock("@/lib/cron-auth", () => ({ requireCronRequest: mocks.denied }));
@@ -17,6 +19,7 @@ import vercel from "../../vercel.json";
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.denied.mockReturnValue(null);
+  mocks.purge.mockResolvedValue({ status: "purged", purged: 0, tenants: 0 });
 });
 
 describe("lead-mirror-reconcile cron", () => {
@@ -44,5 +47,15 @@ describe("lead-mirror-reconcile cron", () => {
     await GET(new Request("http://localhost/api/cron/lead-mirror-reconcile"));
     expect(mocks.alertOnce).toHaveBeenCalledWith("lead_mirror_backlog", "high", { remaining: 2, missing: 0, failed: 2 }, 6 * 3600);
     expect(mocks.heartbeat).toHaveBeenCalledWith("lead-mirror-reconcile", { ok: false, processed: 3, failed: 2 });
+  });
+
+  it("runs the lead retention purge and reports it without affecting the heartbeat", async () => {
+    mocks.reconcile.mockResolvedValue({ checked: 0, repaired: 0, failed: 0, missing: 0, remaining: 0 });
+    mocks.purge.mockResolvedValue({ status: "unavailable", reason: "function does not exist" });
+    const res = await GET(new Request("http://localhost/api/cron/lead-mirror-reconcile"));
+    expect(res.status).toBe(200);
+    expect(mocks.purge).toHaveBeenCalledWith(1000);
+    expect((await res.json()).retention).toEqual({ status: "unavailable", reason: "function does not exist" });
+    expect(mocks.heartbeat).toHaveBeenCalledWith("lead-mirror-reconcile", { ok: true, processed: 0, failed: 0 });
   });
 });

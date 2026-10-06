@@ -265,3 +265,35 @@ export async function mirrorLead(
     if (timer) clearTimeout(timer);
   }
 }
+
+export type LeadRetentionPurge =
+  | { status: "purged"; purged: number; tenants: number }
+  | { status: "unavailable"; reason: string };
+
+/**
+ * Delete client lead copies whose stated retention has passed: leads of a
+ * deprovisioned tenant that belong to no business, 365 days after the tenant
+ * row went (20261007110000_business_ownership.sql). Each purge leaves one
+ * receipt per tenant in `tenant_lead_purges`. Never throws: a missing function
+ * (migration not applied) or an unconfigured database reports unavailable.
+ */
+export async function purgeExpiredTenantLeads(limit = 1000): Promise<LeadRetentionPurge> {
+  let db: LeadMirrorDb | null;
+  try {
+    db = leadMirrorDb();
+  } catch {
+    db = null;
+  }
+  if (!db) return { status: "unavailable", reason: "unconfigured" };
+  try {
+    const { data, error } = await db.rpc("purge_expired_tenant_leads", { p_limit: limit });
+    if (error) return { status: "unavailable", reason: error.message || "rpc_failed" };
+    const row = data as { purged?: unknown; tenants?: unknown } | null;
+    const purged = Number(row?.purged ?? NaN);
+    const tenants = Number(row?.tenants ?? NaN);
+    if (!Number.isInteger(purged) || !Number.isInteger(tenants)) return { status: "unavailable", reason: "malformed_response" };
+    return { status: "purged", purged, tenants };
+  } catch (err) {
+    return { status: "unavailable", reason: err instanceof Error ? err.message : "rpc_failed" };
+  }
+}

@@ -12,6 +12,7 @@ import { sanitizeEmailSubjectText } from "@/lib/invite-email";
 import { emailSendingPaused } from "@/lib/email-enabled";
 import { renderEmailHtml, renderEmailText } from "@/lib/email/layout";
 import { getRedis } from "@/lib/redis";
+import { ownerNoticeEmail } from "@/lib/owner-recipient";
 import { requireCronRequest } from "@/lib/cron-auth";
 import { sendEmail } from "@/lib/email/send";
 import type { WeeklyBrief } from "@/lib/types";
@@ -58,9 +59,17 @@ export async function GET(request: Request) {
 
   const hostedReports = await runWebsiteMonthlyReports(monthKey).catch(() => ({ tenants: [] as string[], sent: 0, suppressed: 0, errors: ["Native website monthly reporting is unavailable"] }));
   const hostedTenants = new Set(hostedReports.tenants);
-  const tenants = (await getAllTenants().catch(() => [])).filter(
-    (t) => !hostedTenants.has(t.id) && t.active !== false && t.subscriptionStatus !== "cancelled" && !!t.ownerEmail,
+  // The one owner-recipient rule (src/lib/owner-recipient.ts) picks each
+  // recipient; a tenant with nobody on record is not sent a recap.
+  const candidates = (await getAllTenants().catch(() => [])).filter(
+    (t) => !hostedTenants.has(t.id) && t.active !== false && t.subscriptionStatus !== "cancelled",
   );
+  const recipients = new Map<string, string>();
+  await mapPool(candidates, 8, async (t) => {
+    const email = await ownerNoticeEmail(t);
+    if (email) recipients.set(t.id, email);
+  });
+  const tenants = candidates.filter((t) => recipients.has(t.id));
 
   const sent: string[] = [];
   const errors: string[] = [...hostedReports.errors];
@@ -68,6 +77,7 @@ export async function GET(request: Request) {
   const redis = getRedis();
 
   await mapPool(tenants, 8, async (tenant) => {
+    const to = recipients.get(tenant.id)!;
     try {
       // Always refresh the recap so the Reports surface is current.
       const recap = await generateMonthlyRecap(tenant.id);
@@ -106,7 +116,7 @@ export async function GET(request: Request) {
           ok = await sendEmail({
             audience: "client",
             tenantId: tenant.id,
-            to: tenant.ownerEmail!,
+            to: to,
             subject: `Your ${monthName} recap`,
             html,
             text,
@@ -116,20 +126,20 @@ export async function GET(request: Request) {
         } catch (err) {
           const reason = err instanceof Error ? err.message : "send failed";
           errors.push(`${tenant.id}: ${reason}`);
-          await recordMailSend(tenant.id, "monthly_report", { ok: false, error: reason, to: tenant.ownerEmail! }).catch(() => {});
+          await recordMailSend(tenant.id, "monthly_report", { ok: false, error: reason, to: to }).catch(() => {});
           return;
         }
         if (!ok) {
           errors.push(`${tenant.id}: send suppressed or unconfigured`);
-          await recordMailSend(tenant.id, "monthly_report", { ok: false, error: "suppressed_or_unconfigured", to: tenant.ownerEmail! }).catch(() => {});
+          await recordMailSend(tenant.id, "monthly_report", { ok: false, error: "suppressed_or_unconfigured", to: to }).catch(() => {});
           return;
         }
-        await recordMailSend(tenant.id, "monthly_report", { ok: true, to: tenant.ownerEmail! }).catch(() => {});
+        await recordMailSend(tenant.id, "monthly_report", { ok: true, to: to }).catch(() => {});
         // Mark sent ONLY after a confirmed real send so a dev-mode run (no
         // RESEND_API_KEY) never consumes the once-per-month dedup marker.
         if (redis) await redis.set(sentKey(tenant.id, monthKey), "1", { ex: 60 * 60 * 24 * 45 }).catch(() => {});
       } else {
-        console.log(`[Monthly report dev] "Your ${monthName} recap" -> ${tenant.ownerEmail}`);
+        console.log(`[Monthly report dev] "Your ${monthName} recap" -> ${to}`);
       }
 
       sent.push(tenant.id);

@@ -114,7 +114,8 @@ export async function GET(request: Request) {
 
 await mapPool(reports, 8, async (report) => {
     try {
-      const email = report.tenant.ownerEmail;
+      // Resolved once by generateAllReports (the one owner-recipient rule).
+      const email = report.ownerRecipient ?? report.tenant.ownerEmail;
       if (!email) {
         skippedReasons.push({ tenantId: report.tenant.id, reason: "missing_owner_email" });
         return;
