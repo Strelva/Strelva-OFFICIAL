@@ -276,7 +276,10 @@ are untouched.
 - [ ] **Ask Strelva runs in the workspace.** The ~24 tools inline in
       `src/app/api/agent/route.ts` move into `src/lib/agent-shared.ts`, a
       workspace agent route resolves workspace → link → tenant and re-checks
-      permission, and approvals go through section 2. *Not started · L*
+      permission, and approvals go through section 2. *Partial, local Oct 6
+      (`build/ask-strelva`): tools moved, route and per-call checks built
+      behind `STRELVA_ASK_RELEASE`; no workspace UI, history or real Needs
+      you wiring yet · L*
 
 Proof: authenticated local journeys per capability on desktop and mobile, in
 empty, loading, error and permission states, using The Mooney Firm and gldf.
@@ -328,10 +331,13 @@ Neither is used by any journey today.
 - [ ] One capability registry replaces the seven declaration files listed in
       [capabilities](../capabilities/README.md#where-capabilities-are-declared).
       `site-capabilities.ts` stays as per-tenant v1 state. *Not started · L*
-- [ ] One model-call helper. Every `generateText`, `streamText` and
+- [x] One model-call helper. Every `generateText`, `streamText` and
       `generateObject` call goes through it (12 files in `src` today; six
       hard-code `gemini-2.5-flash`). It handles streaming, tools, structured
-      output, fallback, logging and cost. *Not started · M*
+      output, fallback, logging and cost. *Done locally Oct 6, branch
+      `build/ask-strelva`, not applied or deployed:*
+      `src/platform/infra/model-calls.ts`, cost log
+      `20261007140000_model_call_log.sql`, lint rule against direct calls.
 - [ ] `src/lib/newsletter.ts` sends through `email/send.ts`;
       `src/lib/public-continuation.ts` encrypts through `crypto/secrets.ts`.
       *Not started · S*

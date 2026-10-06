@@ -1,6 +1,18 @@
 # Ask Strelva in the workspace
 
-Status: draft spec, 2026-10-06. Not built, not approved. For Jacob's review.
+Status: draft spec, 2026-10-06, not approved. **Built and proven locally
+Oct 6 on branch `build/ask-strelva`, not deployed, flag off:** the one
+model-call helper (`src/platform/infra/model-calls.ts`, dated price table,
+cost log migration `20261007140000_model_call_log.sql`, lint rule) with all
+12 call sites on it; the chat route's inline tools moved into
+`src/lib/agent-shared.ts` (`buildTenantChatTools`); `POST /api/workspace/ask`
+behind `STRELVA_ASK_RELEASE` (plus the workspace and Systems releases) with
+per-call authority, resolution, the 18 tools, refusals, the managed default
+and a stub Needs you adapter. Not built: the chat UI in the workspace,
+workspace conversation history, Postgres Possibilities (opened ones are
+in-memory), the real Needs you policy wiring, inquiry reply drafts, and a
+business-record draft store (fact changes are filed as Requests). See
+"Build notes" at the end.
 
 Ask Strelva is the one way in. A person in a business workspace says what they
 want in plain words. Strelva answers, drafts a change, opens a Possibility, or
@@ -325,7 +337,7 @@ Twelve files call the model directly:
 | `src/lib/suggestions.ts` | `generateText` | hard-coded |
 | `src/lib/weekly-brief.ts` | `generateText` | hard-coded |
 | `src/lib/visibility/ai-answers.ts` | `generateText` | hard-coded, on purpose: it measures what that model says |
-| `src/products/ai-visibility/score.ts` | `generateText` | hard-coded |
+| `src/products/ai-visibility/score.ts` | `generateText` | hard-coded, also on purpose: its note says what Gemini named, so it is a `visibility_probe` too (corrected in the build) |
 
 The helper lives with shared infrastructure (`src/platform/infra`, per Reborn
 §7) next to `src/lib/ai-models.ts`, which it absorbs. One function per mode
@@ -474,3 +486,39 @@ Inferences, to check:
 - Whether 18 tools stay accurate in one prompt with System context. Run the
   existing agent tests plus a fixed set of Mooney and gldf asks against both
   catalogs and compare.
+
+## Build notes (Oct 6, local)
+
+What the build found that differs from the text above:
+
+- **Two probes, not one.** `src/products/ai-visibility/score.ts` measures what
+  Gemini says ("Gemini named ..."), so it pins its model as a
+  `visibility_probe` like `ai-answers.ts`. Every other caller now gets the
+  configured model plus the fallback, where before six had no fallback.
+- **Flag.** Ask Strelva has its own flag, `STRELVA_ASK_RELEASE`, and also needs
+  `STRELVA_WORKSPACE_RELEASE` and `STRELVA_SYSTEMS_RELEASE`. Per-workspace flags
+  (Reborn §6) don't exist yet.
+- **Refusals and the managed default run before the model.** A model-free
+  classifier (`src/platform/ask/classify.ts`) answers refusals, "approve it",
+  and "build a new website / redo the site / add a booking page" (a Request in
+  a linked business, an offer to make it otherwise). Everything else goes to
+  the model.
+- **Drafts never auto-publish yet.** Until the Needs you policy is wired in,
+  the workspace route builds the tenant tools with `forceReview`, and the stub
+  adapter routes every draft to the owner through today's pending events
+  (`/dashboard/review`, `/api/approve`).
+- **Business record changes** are filed as a Request with the exact change,
+  because the record has no draft store. Nothing is described as done.
+- **Possibilities** can only introduce a new System from Ask (a change to an
+  existing System needs a pinned baseline revision managed sites don't have).
+  Keys are kebab-case.
+- **Activity text** like "AI saved a reply" is unchanged: the activity feed
+  filters on that text, so renaming it needs its own change. The chat failure
+  line now says "Strelva can't answer right now. Nothing was changed."
+
+Proof (local): `src/__tests__/model-calls.test.ts`,
+`model-call-sites.test.ts`, `ask-strelva.test.ts` (authority matrix of 18
+tools × 4 roles × 4 link states, re-check, resolution, managed default,
+refusals, injection, catalog parity), `ask-strelva-route.test.ts`, the
+existing agent tests, and `tests/model-call-log-schema.sql` in
+`check:workspace-sql`.
