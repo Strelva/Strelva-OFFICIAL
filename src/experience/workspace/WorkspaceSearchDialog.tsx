@@ -6,7 +6,7 @@ import { IconButton } from "@/components/ui/Button";
 import { searchWorkspaceItems, type WorkspaceSearchItem } from "./workspace-search";
 import styles from "./workspace-search.module.css";
 
-export function WorkspaceSearchDialog({ open, items, scopeName, storageKey, onClose }: { storageKey?: string; open: boolean; items: readonly WorkspaceSearchItem[]; scopeName: string; onClose: () => void }) {
+export function WorkspaceSearchDialog({ open, items, scopeName, storageKey, onClose, systemsReleased = false }: { storageKey?: string; open: boolean; items: readonly WorkspaceSearchItem[]; scopeName: string; onClose: () => void; systemsReleased?: boolean }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLInputElement>(null);
   const trigger = useRef<HTMLElement | null>(null);
@@ -66,7 +66,7 @@ export function WorkspaceSearchDialog({ open, items, scopeName, storageKey, onCl
       <div id={`${id}-results`} role="listbox" aria-label="Search results" className={styles.results}>
         {results.map((item, index) => <button key={item.id} id={`${id}-result-${index}`} type="button" role="option" tabIndex={-1} aria-selected={index === activeIndex} className={styles.result} onMouseMove={() => setSelected(index)} onClick={() => choose(item)}><span><strong>{item.title}</strong><small>{item.detail}</small></span><ArrowUpRight size={16} aria-hidden="true" /></button>)}
       </div>
-      {!results.length ? <div className={styles.empty}><strong>{query ? "No matching work" : "No saved work yet"}</strong><p>{query ? "Try a different name or a shorter search." : "Your systems, documents and files will be searchable here."}</p></div> : null}
+      {!results.length ? <div className={styles.empty}><strong>{query ? "No matching work" : "No saved work yet"}</strong><p>{query ? "Try a different name or a shorter search." : systemsReleased ? "Your systems, documents and files will be searchable here." : "Your saved apps, documents, and work will be searchable here."}</p></div> : null}
       <footer className={styles.footer}>Use ↑ ↓ to choose, Enter to open, and Esc to close.</footer>
     </div>
   </dialog>;

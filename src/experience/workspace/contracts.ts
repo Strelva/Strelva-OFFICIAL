@@ -142,6 +142,15 @@ export interface WorkspaceSnapshot {
   /** The business's Systems from the spine, with health and Possibilities.
    * Absent for personal and agency workspaces. Additive. */
   systems?: WorkspaceSystems;
+  /** Server-read release flags the browser needs to choose what to render.
+   * Absent means off. `systems`: STRELVA_SYSTEMS_RELEASE, which gates the
+   * Systems model (Home Systems, System pages, Possibilities, Make real,
+   * Versions). Additive. */
+  releases?: WorkspaceReleases;
+}
+
+export interface WorkspaceReleases {
+  systems: boolean;
 }
 
 /**

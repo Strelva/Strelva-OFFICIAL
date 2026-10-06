@@ -18,6 +18,8 @@ import {
 
 export interface WorkspaceStartProps {
   context: WorkspaceStartContext;
+  /** STRELVA_SYSTEMS_RELEASE, for the composer's templates label. */
+  systemsReleased?: boolean;
   initialRequest?: string;
   draftKey?: string;
   onTemplates?: () => void;
@@ -96,7 +98,7 @@ function WebsiteRequestHandoff({ handoff, onBack }: { handoff: WorkspaceStartWeb
   </section>;
 }
 
-export function WorkspaceStart({ context, initialRequest = "", draftKey, onTemplates, onDraftChange, websiteHandoff = null, onWebsiteHandoffBack, onContinue, onHelp, onPlan }: WorkspaceStartProps) {
+export function WorkspaceStart({ context, systemsReleased = false, initialRequest = "", draftKey, onTemplates, onDraftChange, websiteHandoff = null, onWebsiteHandoffBack, onContinue, onHelp, onPlan }: WorkspaceStartProps) {
   const [composerSeed, setComposerSeed] = useState(initialRequest);
   const [plan, setPlan] = useState<WorkspaceStartPlan | null>(() => initialRequest.trim() ? planWorkspaceStart(initialRequest, context) : null);
   const [selectedPartIds, setSelectedPartIds] = useState<readonly string[]>(() => plan?.selectedPartIds || []);
@@ -176,7 +178,7 @@ export function WorkspaceStart({ context, initialRequest = "", draftKey, onTempl
       <p>Describe the outcome in your own words. Strelva will shape the right interface, workflow, or work from there.</p>
     </header>
 
-    <div className="mt-6"><WorkspaceComposer key={composerSeed} initialRequest={composerSeed} draftKey={draftKey} disabled={context.readOnly} autoFocus={!plan} onTemplates={onTemplates} onSubmit={submit} onChange={request => { setPlan(null); setError(""); onDraftChange?.(request); }} placeholder="What do you want Strelva to make happen?" /></div>
+    <div className="mt-6"><WorkspaceComposer key={composerSeed} initialRequest={composerSeed} draftKey={draftKey} disabled={context.readOnly} autoFocus={!plan} onTemplates={onTemplates} systemsReleased={systemsReleased} onSubmit={submit} onChange={request => { setPlan(null); setError(""); onDraftChange?.(request); }} placeholder="What do you want Strelva to make happen?" /></div>
 
     <section className={styles.startExamples} aria-labelledby={`${formId}-examples`}>
       <div className={styles.startSectionHeading}><h2 id={`${formId}-examples`}>Example outcomes</h2><span>Optional</span></div>

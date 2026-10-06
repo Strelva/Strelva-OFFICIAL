@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const deps = vi.hoisted(() => ({
   user: null as null | { id: string; email: string; email_confirmed_at: string },
@@ -34,6 +34,21 @@ describe("POST /api/workspace/systems/make-real", () => {
     deps.exit.mockReset().mockResolvedValue({ state: null });
     deps.makeReal.mockReset().mockResolvedValue(RESULT);
     deps.limited.mockReset().mockResolvedValue(false);
+    vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "1");
+  });
+
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("answers 503 and reads nothing while STRELVA_SYSTEMS_RELEASE is off", async () => {
+    for (const value of [undefined, "", "0", "true"]) {
+      vi.stubEnv("STRELVA_SYSTEMS_RELEASE", value);
+      const response = await call();
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({ error: "Make real is not enabled. Nothing changed." });
+    }
+    expect(deps.workspaces).not.toHaveBeenCalled();
+    expect(deps.limited).not.toHaveBeenCalled();
+    expect(deps.makeReal).not.toHaveBeenCalled();
   });
 
   it("runs the isolated sandbox for an owner and returns its partial state", async () => {

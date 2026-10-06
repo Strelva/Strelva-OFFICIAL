@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isRateLimitedWindowedAsync } from "@/lib/rate-limit";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
+import { systemsReleaseEnabled } from "@/platform/systems-release";
 import { listWork, listWorkspaces } from "@/platform/workspaces";
 import { readWorkspaceExit } from "@/platform/workspace-exit";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
@@ -22,9 +23,13 @@ const input = z.object({
  * it cannot publish, send, charge, book or switch a live System. The response
  * is the activation's partial state and the outside effects that are not
  * connected.
+ *
+ * A 1.0.0 launch feature: it also needs STRELVA_SYSTEMS_RELEASE, checked
+ * before any session or body read.
  */
 export async function POST(request: Request) {
   if (!workspaceReleaseEnabled()) return workspaceJson({ error: "The workspace release is not enabled." }, 503);
+  if (!systemsReleaseEnabled()) return workspaceJson({ error: "Make real is not enabled. Nothing changed." }, 503);
   const guarded = workspaceWriteGuard(request);
   if (guarded) return guarded;
   try {

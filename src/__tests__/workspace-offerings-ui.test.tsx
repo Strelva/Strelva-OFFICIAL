@@ -286,9 +286,13 @@ describe("workspace offering experience", () => {
     };
     const state: WorkspaceOfferingState = { status: "ready", collection: installed, saving: false };
     expect([...boundManagedWebsiteIds(state)]).toEqual(["bound-site"]);
+    // Home's summary keeps the pre-Systems words until STRELVA_SYSTEMS_RELEASE is on.
     const html = renderToStaticMarkup(createElement(BusinessOfferingSummary, { state, work: [], onOpen: () => undefined }));
-    expect(html).toContain("Ready-made systems");
+    expect(html).toContain("Business offerings");
     expect(html).toContain("managed website");
+    const released = renderToStaticMarkup(createElement(BusinessOfferingSummary, { state, work: [], onOpen: () => undefined, systemsReleased: true }));
+    expect(released).toContain("Ready-made systems");
+    expect(released).toContain("managed website");
   });
 
   it("shows provider delivery and customer decision from the business delivery list", () => {

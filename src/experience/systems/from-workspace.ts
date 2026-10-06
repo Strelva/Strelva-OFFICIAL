@@ -7,14 +7,17 @@
  * resolves what opens (the site, the inquiry inbox or the saved work), the
  * sentences customers read, and Versions recorded on saved work. It infers no
  * System, health or lineage the server did not send.
+ *
+ * Unless the snapshot says STRELVA_SYSTEMS_RELEASE is on, there are no
+ * Systems: every saved result stays a file, as before the Systems model.
  */
 import type { OfferingInstallation } from "@/platform/offerings";
 import type { ManagedWork, WorkspaceSnapshot, WorkspaceSystemEntry, WorkspaceSystems, WorkspaceWork } from "@/experience/workspace/contracts";
 import { sameAppHref } from "@/experience/workspace/workspace-discovery";
-import type { SystemConnection, SystemKind, SystemPossibility, SystemSurface, SystemVersion, SystemView } from "./model";
+import { systemsReleased, type SystemConnection, type SystemKind, type SystemPossibility, type SystemSurface, type SystemVersion, type SystemView } from "./model";
 
 export interface SystemsInput {
-  snapshot: Pick<WorkspaceSnapshot, "workspaceId" | "workspaces" | "work" | "delegations" | "systems">;
+  snapshot: Pick<WorkspaceSnapshot, "workspaceId" | "workspaces" | "work" | "delegations" | "systems" | "releases">;
   /** Managed sites this account can open, for the site surface (address, controls). */
   sites: readonly ManagedWork[];
   installations?: readonly OfferingInstallation[];
@@ -77,7 +80,7 @@ function detailFor(kind: SystemKind, work: WorkspaceWork | undefined, entry: Wor
 
 export function readBusinessSystems(input: SystemsInput): BusinessSystems {
   const { snapshot, sites, installations = [], definitionNames = new Map(), stopped = false } = input;
-  const projection: WorkspaceSystems | undefined = snapshot.systems;
+  const projection: WorkspaceSystems | undefined = systemsReleased(snapshot) ? snapshot.systems : undefined;
   const ready = projection?.status === "ready" ? projection : null;
   const entries = ready?.systems ?? [];
   const installationFor = new Map<string, OfferingInstallation>();

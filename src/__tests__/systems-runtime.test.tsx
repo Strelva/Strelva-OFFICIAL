@@ -44,7 +44,7 @@ async function snapshot(work: WorkspaceWork<unknown>, role: "owner" | "member" =
   const response: Omit<WorkspaceSnapshot, "work"> & { work: WorkspaceWork<unknown>[] } = {
     actor: { email: member.verifiedEmail, localPreview: true }, workspaceId: work.workspaceId,
     workspaces: [{ id: work.workspaceId, kind: "customer", name: "Fixture business", role, ...(access ? { access } : {}) }],
-    work: [work], products: [], handoffs: [], delegations: [],
+    work: [work], products: [], handoffs: [], delegations: [], releases: { systems: true },
     systems: { status: "ready", systems: [{ ref: { businessId: work.workspaceId, systemId: SYSTEM }, name: work.title, kind: work.productId === "websites" ? "website" : work.productId === "applications" ? "internal_app" : "booking", lifecycle: "live", basis: null, savedWorkId: work.id, tenantId: null, health: { status: "unknown", summary: "No verification recorded.", lastVerifiedAt: null } }], connections: [], possibilities: [] },
   };
   // The workspace JSON boundary accepts each product's own payload. The default

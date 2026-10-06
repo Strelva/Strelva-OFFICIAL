@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { MouseEvent, ReactNode } from "react";
-import { AppWindow, Building2, CalendarDays, CircleHelp, FileText, Globe2, Home, Inbox, KeyRound, ListChecks, MessageSquareText, Repeat, Search, Sheet, UserPlus, X, type LucideIcon } from "lucide-react";
+import { AppWindow, Building2, CalendarDays, CircleHelp, FileText, Globe2, Home, Inbox, KeyRound, ListChecks, MessageSquareText, Repeat, Search, Sheet, UserPlus, Users, X, type LucideIcon } from "lucide-react";
 import { SYSTEMS_LABEL, SYSTEMS_LIST_LABEL } from "@/experience/systems/model";
 import { LogoMark } from "@/components/Logo";
 import { WorkspaceSignOutButton } from "@/experience/workspace/WorkspaceSignOutButton";
@@ -16,6 +16,13 @@ type NavigableSection = Exclude<StrelvaSection, "account">;
 
 const PRIMARY_ITEMS: readonly { id: NavigableSection; icon: LucideIcon }[] = [
   { id: "home", icon: Home },
+  { id: "requests", icon: ListChecks },
+  { id: "ongoing", icon: Repeat },
+];
+/** Before Systems (STRELVA_SYSTEMS_RELEASE off), Customers is a place. */
+const PRIMARY_ITEMS_BEFORE_SYSTEMS: readonly { id: NavigableSection; icon: LucideIcon }[] = [
+  { id: "home", icon: Home },
+  { id: "customers", icon: Users },
   { id: "requests", icon: ListChecks },
   { id: "ongoing", icon: Repeat },
 ];
@@ -36,7 +43,7 @@ interface Props {
   businessContext?: ReactNode;
   contextualNavigation?: ReactNode;
   recentWork?: readonly WorkspaceSearchItem[];
-  /** Pinned Systems. A managed website appears first, by its name or domain. */
+  /** Pinned Systems (or, before Systems, the website and apps). A managed website appears first, by its name or domain. */
   pinned?: readonly StrelvaPinnedItem[];
   mobileOpen?: boolean;
   onCloseMobile?: () => void;
@@ -48,6 +55,8 @@ interface Props {
   signInHref?: string;
   signOut?: ReactNode;
   standalone?: boolean;
+  /** STRELVA_SYSTEMS_RELEASE, from the workspace snapshot. Off: the pre-Systems places and labels. */
+  systemsReleased?: boolean;
 }
 
 function navigateInPlace(event: MouseEvent<HTMLAnchorElement>, action: (() => void) | undefined) {
@@ -57,13 +66,15 @@ function navigateInPlace(event: MouseEvent<HTMLAnchorElement>, action: (() => vo
 }
 
 /** One navigation contract for owners, agencies, account and managed work. */
-export function StrelvaSidebar({ active, appBase = "", workspaceId, accountName, accountDetail, businessContext, contextualNavigation, recentWork = [], pinned = [], mobileOpen = false, onCloseMobile, onNavigate, onSearch, onStart, startDisabled = false, signedIn = true, signInHref, signOut, standalone = false }: Props) {
+export function StrelvaSidebar({ active, appBase = "", workspaceId, accountName, accountDetail, businessContext, contextualNavigation, recentWork = [], pinned = [], mobileOpen = false, onCloseMobile, onNavigate, onSearch, onStart, startDisabled = false, signedIn = true, signInHref, signOut, standalone = false, systemsReleased = false }: Props) {
+  const pinnedLabel = systemsReleased ? SYSTEMS_LABEL : "Website and apps";
+  const listLabel = systemsReleased ? SYSTEMS_LIST_LABEL : "All apps and files";
   const href = (section: StrelvaSection) => workspaceSectionHref(section, appBase, workspaceId);
   const newHref = `${appBase}/workspace?view=start${workspaceId ? `&workspaceId=${encodeURIComponent(workspaceId)}` : ""}`;
   const searchHref = `${href("work")}&search=1`;
   const place = placeForSection(active);
   function item({ id, icon: Icon }: (typeof PRIMARY_ITEMS)[number]) {
-    const label = sectionTitle(id);
+    const label = sectionTitle(id, systemsReleased);
     return <Link key={id} className={styles.navItem} href={href(id)} aria-current={place === id ? "page" : undefined} onClick={event => {
       navigateInPlace(event, onNavigate ? () => { onCloseMobile?.(); onNavigate(id); } : undefined);
       if (!onNavigate) onCloseMobile?.();
@@ -80,17 +91,17 @@ export function StrelvaSidebar({ active, appBase = "", workspaceId, accountName,
         {onStart ? <button type="button" className={styles.newAction} disabled={startDisabled} onClick={() => { onCloseMobile?.(); onStart(); }}><MessageSquareText size={18} aria-hidden="true" /><span>Ask Strelva</span></button> : <Link className={styles.newAction} href={newHref} aria-disabled={startDisabled || undefined} tabIndex={startDisabled ? -1 : undefined} onClick={event => { if (startDisabled) event.preventDefault(); onCloseMobile?.(); }}><MessageSquareText size={18} aria-hidden="true" /><span>Ask Strelva</span></Link>}
         {onSearch ? <button type="button" className={styles.navItem} onClick={() => { onCloseMobile?.(); onSearch(); }} title="Search (Ctrl or Command + K)"><Search size={18} aria-hidden="true" /><span>Search</span></button> : <Link className={styles.navItem} href={searchHref} onClick={onCloseMobile}><Search size={18} aria-hidden="true" /><span>Search</span></Link>}
       </div>
-      <nav className={styles.primary} aria-label="Main">{PRIMARY_ITEMS.map(item)}</nav>
-      {pinned.length ? <section className={styles.recent} aria-label={SYSTEMS_LABEL}><h2>{SYSTEMS_LABEL}</h2>{pinned.map(entry => {
+      <nav className={styles.primary} aria-label="Main">{(systemsReleased ? PRIMARY_ITEMS : PRIMARY_ITEMS_BEFORE_SYSTEMS).map(item)}</nav>
+      {pinned.length ? <section className={styles.recent} aria-label={pinnedLabel}><h2>{pinnedLabel}</h2>{pinned.map(entry => {
         const Icon = PINNED_ICONS[entry.kind || "website"];
         return <Link key={entry.id} className={styles.pinned} href={entry.href} title={entry.title} aria-current={entry.current ? "page" : undefined} onClick={event => navigateInPlace(event, entry.onOpen ? () => { onCloseMobile?.(); entry.onOpen?.(); } : undefined)}><Icon size={15} strokeWidth={1.6} aria-hidden="true" /><span>{entry.title}</span></Link>;
       })}<Link className={styles.allApps} href={href("apps")} aria-current={place === "apps" ? "page" : undefined} onClick={event => {
         navigateInPlace(event, onNavigate ? () => { onCloseMobile?.(); onNavigate("apps"); } : undefined);
         if (!onNavigate) onCloseMobile?.();
-      }}><span>{SYSTEMS_LIST_LABEL}</span></Link></section> : <nav className={styles.recent} aria-label={SYSTEMS_LIST_LABEL}><Link className={styles.allApps} href={href("apps")} aria-current={place === "apps" ? "page" : undefined} onClick={event => {
+      }}><span>{listLabel}</span></Link></section> : <nav className={styles.recent} aria-label={systemsReleased ? SYSTEMS_LIST_LABEL : "All apps"}><Link className={styles.allApps} href={href("apps")} aria-current={place === "apps" ? "page" : undefined} onClick={event => {
         navigateInPlace(event, onNavigate ? () => { onCloseMobile?.(); onNavigate("apps"); } : undefined);
         if (!onNavigate) onCloseMobile?.();
-      }}><AppWindow size={15} strokeWidth={1.6} aria-hidden="true" /><span>{SYSTEMS_LIST_LABEL}</span></Link></nav>}
+      }}><AppWindow size={15} strokeWidth={1.6} aria-hidden="true" /><span>{listLabel}</span></Link></nav>}
       {recentWork.length ? <section className={styles.recent} aria-label="Recent work"><h2>Recent</h2>{recentWork.slice(0, 8).map(work => <Link key={work.id} href={work.href} title={work.title} onClick={event => navigateInPlace(event, work.onOpen ? () => { onCloseMobile?.(); work.onOpen?.(); } : undefined)}><span>{work.title}</span></Link>)}</section> : null}
       {contextualNavigation ? <div className={styles.contextual}>{contextualNavigation}</div> : null}
     </div>
