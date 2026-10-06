@@ -126,8 +126,16 @@ begin
     and (select count(*) from public.tenant_leads where tenant_stable_id = 'c0ffee00-0000-4000-8000-0000000000b2' and workspace_id = (v_receipt->>'workspaceId')::uuid) = 2, 'reconversion reattached both leads');
 end $$;
 
--- Deprovisioning the tenant deletes its leads and nothing else.
+-- Deprovisioning the tenant touches only that tenant's leads. Before
+-- 20261007110000 they cascade away; after it they are kept and stamped.
 delete from public.tenants where id = 'other-lead-site';
-select pg_temp.tl_assert((select count(*) from public.tenant_leads where tenant_stable_id = 'c0ffee00-0000-4000-8000-0000000000b2') = 0
-  and (select count(*) from public.tenant_leads where tenant_stable_id = 'c0ffee00-0000-4000-8000-0000000000b1') >= 3, 'deprovision removes only that tenant');
+select pg_temp.tl_assert(case when exists (select 1 from information_schema.columns where table_schema = 'public'
+    and table_name = 'tenant_leads' and column_name = 'tenant_deleted_at')
+  then (select count(*) > 0 and bool_and(to_jsonb(l)->>'tenant_deleted_at' is not null) from public.tenant_leads l
+    where tenant_stable_id = 'c0ffee00-0000-4000-8000-0000000000b2')
+  else (select count(*) from public.tenant_leads where tenant_stable_id = 'c0ffee00-0000-4000-8000-0000000000b2') = 0 end
+  and (select count(*) from public.tenant_leads where tenant_stable_id = 'c0ffee00-0000-4000-8000-0000000000b1') >= 3
+  and (select bool_and(to_jsonb(l)->>'tenant_deleted_at' is null) from public.tenant_leads l
+    where tenant_stable_id = 'c0ffee00-0000-4000-8000-0000000000b1'),
+  'deprovision acts only on that tenant');
 rollback;

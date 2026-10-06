@@ -210,6 +210,10 @@ psql "${psql_args[@]}" --file="$repo_root/tests/business-record-schema.sql"
 psql "${psql_args[@]}" --set=tenant_import="$(cat "$repo_root/tests/fixtures/business-record-tenant-import.json")" \
   --file="$repo_root/tests/business-record-conversion-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-ownership-schema.sql"
+# accept_workspace_invitation is replaced by 20261007110000; the original
+# invitation contract must still hold against the replacement.
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-invitations-schema.sql"
 psql "${psql_args[@]}" -Atc "select count(*) from pg_trigger where tgname = 'tenant_workspace_links_attach_leads'" | grep -qx 1 \
   || { printf 'Conversion trigger for client leads is missing after out-of-order apply.\n' >&2; exit 1; }
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
