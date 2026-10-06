@@ -7,8 +7,8 @@ production. Two migrations were added (34 unapplied in total).
 Updated: 2026-10-06 on `w4/journey-gaps` against `integrate/reborn-1.0` at
 `30dcba1b` (waves 1–3 merged): 14 more migrations (48 unapplied, two new
 batches 5 and 6), 11 new flags, two new crons, two new guarded scripts, and
-the snapshot reads the new facts. Findings 12–15 are new. Wave 4's own
-migrations go in batch 7.
+the snapshot reads the new facts. Findings 12–17 are new. Wave 4's journey
+gaps add two migrations as batch 7 (50 unapplied in total).
 Status: prepared, nothing executed. Every step below is a separate yes.
 
 This is every production step Strelva `1.0.0` needs, in order, written so
@@ -72,7 +72,7 @@ disagree, the checklist's stop conditions win.
    `--separate-business` (migration `20261008160000`, batch 4) converts a
    linked-account site into its own business instead. Ask the owner before
    converting either site (section 4).
-9. **No rollback SQL exists for any of the 48 migrations**, and production had
+9. **No rollback SQL exists for any of the 50 migrations**, and production had
    PITR off and no listed backups on Sept 21. A tested dump comes first.
 10. **Fixed: client-records parity runs itself.** A daily cron
     (`client-records-parity`, 05:40 UTC) compares Redis with Postgres and
@@ -117,6 +117,22 @@ disagree, the checklist's stop conditions win.
     approved Make real activation the same way. The chase stays a
     heartbeat until `STRELVA_NEEDS_YOU_RELEASE=1`; a resume only happens
     for an activation an owner approved under Systems.
+16. **An owner with no account can now approve Make real by email link**
+    (owner-entry decision 6, batch 7). The link's recipient must be the owner
+    recipient on record and have no owner account; Strelva (system) then
+    reads and runs that one plan under a `make_real_link` session, logged
+    before it runs, and the plan fingerprint is checked again at decision
+    time. No new flag: it only happens where `STRELVA_NEEDS_YOU_RELEASE` and
+    `STRELVA_SYSTEMS_RELEASE` are both on for the business (and live
+    channels only with `STRELVA_MAKE_REAL_LIVE`). Turning either of the first
+    two off stops it. Access, money and exit still need a sign-in.
+17. **The visitor's booking no longer needs Redis once the one store
+    serves.** With `STRELVA_BOOKING_STORE_READ=postgres` in force (after the
+    parity streak), a Redis outage falls back to a per-instance rate limit
+    and a best-effort Redis slot lock; the store's exclusion constraint is
+    the guard. If neither the store nor Redis can hold a booking, the visitor
+    gets a 503 that says nothing was booked (it was a 500). Code only; no
+    migration or flag.
 
 ## The whole order
 
@@ -244,15 +260,15 @@ nothing reads its tables. Batch 4 is the first thing to use them.
   `supabase migration list --linked` lists it. Either missing: stop; nothing
   in this packet is pushed until it is explained.
 
-### What is unapplied: 48 files
+### What is unapplied: 50 files
 
 `9e0bd441` held 117 migrations; `w2/release-hardening` added two
 (`20261008160000` in batch 4, `20261008161000` in batch 3); waves 2–3 added
 14 more (batches 5 and 6). `30dcba1b` holds 133: the 85 applied plus the 48
 below. Digest is the first 12 hex characters of SHA-256; every one of the
 48 was re-hashed at `30dcba1b` and the 34 older ones are unchanged. Re-hash
-before each push and stop on any difference. Wave 4's migrations
-(`20261009130000`–`20261009135900`) are batch 7 and come on top.
+before each push and stop on any difference. Wave 4's journey gaps add two
+more (`20261009130000`, `20261009131000`) as batch 7, on top: 50 in all.
 
 ### Before batch 0: a backup you have restored
 
@@ -316,7 +332,7 @@ After each batch:
 | 4 | `20261007155000`, `20261007180000`, `20261007182000`, `20261007190000`, `20261007190100`, `20261007190200`, `20261007192100`, `20261008160000` | Yes, the heaviest: non-concurrent index, FK swap that locks `tenants`, revokes, constraint swaps, replaced live functions, small backfills | Each statement reviewed for locks; grants captured first |
 | 5 | `20261008110000`, `20261008111000`, `20261008123000`, `20261008124000`, `20261008130000`, `20261008131000`, `20261008140000` | No Sept 30 objects. Triggers on batch 1–2 tables (`systems`, `tenant_workspace_links`), wraps `tenant_unlink_plan`, replaces `workspace_release_flag_names` | Ask history, website change receipts, listing read-back queue, Needs you policy imports, Possibilities, Make real live, lead reads |
 | 6 | `20261008141000`, `20261008150000`, `20261008150100`, `20261008151000`, `20261009100000`, `20261009110000`, `20261009113000` | Yes: `btree_gist` extension, a column + FK and an index on live `public_website_bookings`; checks, columns and indexes on `tenant_leads` (written since `0.2.1`); a column + trigger on `owner_decisions`; replaces batch 1–5 functions | Booking store and lifecycle, linked-tenant publishing, domain approvals, connected sites, the Strelva service actor, inquiry records |
-| 7 | `20261009130000`–`20261009135900` | Filled in by `w4/journey-gaps` (below) | Wave 4 journey gaps |
+| 7 | `20261009130000`, `20261009131000` | Yes, small: replaces two batch 3/6 functions (`read_strelva_handled`, `record_strelva_service_action`) with the same signatures, and swaps the `purpose` check on `strelva_service_actions` (batch 6, append-only) | Strelva handled lists decided Needs you items; Make real by signed link for an owner with no account |
 
 Batches 5 and 6 are in filename order; batch 6 depends on batch 5
 (`20261009100000` keeps every flag name `20261008131000` adds;
@@ -841,9 +857,59 @@ written today (finding 13).
 
 #### Batch 7: Wave 4 journey gaps (`w4/journey-gaps`)
 
-Placeholder. Migrations in `20261009130000`–`20261009135900` are added by
-`w4/journey-gaps` and listed here by that branch with the same fields.
-Until then this batch is empty and nothing in it is pushed.
+Two files, in filename order. Batch 7 depends on batches 3 and 6. Neither file
+writes a row; both are rehearsed in `check:workspace-sql` and
+`check:workspace-upgrade` with their own contracts plus the Needs you and
+service actor contracts rerun against the replacements. Code that reads the
+new keys (`src/platform/needs-you/handled.ts`) and calls the new function
+(`startMakeRealLinkSession`) degrades safely without them: the old
+`read_strelva_handled` simply lists fewer receipts, and a missing
+`strelva_make_real_link_session` makes the link answer "Sign in to decide
+this", as today. Still, deploy the app after batch 7, not before.
+
+**`20261009130000_strelva_handled_decisions`** · `5f85457c73e3`
+- Changes: replaces `read_strelva_handled(uuid, uuid, text, timestamptz)`
+  (from `20261007120000`) with the same signature and grants. It also returns
+  approved and declined `owner_decisions` in the window (not only expired
+  ones), with `outcomeReason`, `sourceLifecycle`, `sourceId`,
+  `decidedByKind`, `receiptRef`, `approveEffect`, `notYetEffect`, `systemId`
+  and `openHref`. Every decision row says `not_undoable`; the app maps each
+  lifecycle to its reason. Writes nothing. `lock_timeout 3s`.
+- Depends on: `20261007120000` (the function, `owner_decisions`,
+  `needs_you_member_role`, `needs_you_operator_id`), `20261002120000`
+  (`business_record_revisions`), `20261001120000` (`website_document_receipts`).
+- Rollback: re-create `read_strelva_handled` from `20261007120000` (its body
+  at lines 731–772) with `create or replace`, then the same revoke and grant.
+  Nothing else depends on the new keys.
+- Verify: `select pg_get_functiondef('public.read_strelva_handled(uuid,uuid,text,timestamptz)'::regprocedure) like '%''approved'', ''declined''%', has_function_privilege('authenticated', 'public.read_strelva_handled(uuid,uuid,text,timestamptz)', 'execute');` → `t, f`
+
+**`20261009131000_make_real_owner_link`** · `d76caeff5f91`
+- Changes: the `strelva_service_actions_purpose_check` constraint is
+  dropped and re-added with `make_real_link` (validates existing rows; the
+  table is append-only and small). New `strelva_make_real_link_session(uuid,
+  uuid, text)`: a 30-minute Strelva (system) session bound to one open
+  `make_real` decision routed to the owner, not sign-in-only, for the owner
+  recipient on record (`resolve_business_owner_recipient`) only when that
+  recipient has no owner account, and only for a business Strelva runs.
+  Replaces `record_strelva_service_action` (from `20261009100000`, same
+  signature): it also accepts a `make_real_link` session, for one `run`, only
+  after its decision is approved by owner link and before its outcome is
+  recorded. `claim_owner_decision` is unchanged. `lock_timeout 3s`.
+- Depends on: `20261009100000` (the table, `strelva_runs_business`, the
+  function it replaces), `20261007120000` (`owner_decisions`,
+  `needs_you_owner_actor`), `20261002120000`
+  (`resolve_business_owner_recipient`).
+- Rollback: drop `strelva_make_real_link_session`; restore
+  `record_strelva_service_action` from `20261009100000`; then, in one
+  transaction with `alter table public.strelva_service_actions disable trigger
+  strelva_service_actions_immutable`, delete rows with purpose
+  `make_real_link`, re-enable the trigger, and restore the check to
+  `('needs_you_sync', 'make_real_resume')`. Activations a link run started
+  keep running under `make_real_resume`; their approval record is the owner's
+  decision, which rollback doesn't touch.
+- Verify: `select to_regprocedure('public.strelva_make_real_link_session(uuid,uuid,text)') is not null, pg_get_constraintdef((select oid from pg_constraint where conname = 'strelva_service_actions_purpose_check')) like '%make_real_link%';` → `t, t`
+
+**After batch 7:** the same count → `50`
 
 ---
 
@@ -915,8 +981,7 @@ and named testers; env `1` is on everywhere except rows set to `off`. If
 
 ### Recommended production order
 
-1. Deploy the 1.0 candidate with every new flag unset, after batch 6 (and
-   batch 7 once wave 4 fills it). The new crons then: `lead-mirror-reconcile`
+1. Deploy the 1.0 candidate with every new flag unset, after batch 7. The new crons then: `lead-mirror-reconcile`
    hourly (also retries queued booking-store writes, none while the booking
    write is off); `client-records-parity` daily, heartbeat only until the
    dual-write is on; `needs-you` heartbeat only; `booking-reminders` and
