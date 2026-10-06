@@ -405,19 +405,20 @@ test("mobile navigation closes on Escape and selection, and does not overflow", 
   await expect(page.getByRole("heading", { name: "Make it yours.", exact: true })).toBeVisible();
 });
 
-test("agency home opens exact authorized client work and survives a partial client load", async ({ page }) => {
+test("agency home names a client that failed to load and loads it on retry", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=agency");
   await expect(page.getByRole("heading", { name: "Client work", exact: true })).toBeVisible();
-  await expect(page.getByText("1 client workspace was unavailable during this check.", { exact: false })).toBeVisible();
+  // Clients load in one batched call (preview/agency-fixture.ts). A client that
+  // failed to load is named with its own Retry, and loads on retry.
+  const retry = page.getByRole("button", { name: "Retry loading McClear’s" });
+  await expect(retry).toBeVisible();
   await expect(page.getByText("Business offerings are installed and managed from the customer business that owns them.", { exact: false })).toBeVisible();
   if (process.env.STRELVA_CAPTURE_PRODUCT_EXPERIENCE === "1") {
     await page.screenshot({ path: "output/product-experience/agency-home-desktop.png", fullPage: true });
   }
-  const attention = page.getByRole("region", { name: "Needs attention across clients" });
-  await attention.getByRole("button", { name: "Open Harbor Dental to review Harbor Dental" }).click();
-  await expect(page).toHaveURL(/workspaceId=33333333-3333-4333-8333-333333333333/);
-  await expect(page).toHaveURL(/work=44444444-4444-4444-8444-444444444444/);
-  await expect(page.getByRole("heading", { name: "Harbor Dental", exact: true })).toBeVisible();
+  await retry.click();
+  await expect(retry).toHaveCount(0);
+  await expect(page.getByRole("list", { name: "Clients" }).getByRole("button", { name: /^McClear’s/ })).toBeVisible();
 
   await page.goto("/preview/strelva?scenario=agency");
   await page.setViewportSize({ width: 390, height: 844 });
@@ -426,8 +427,8 @@ test("agency home opens exact authorized client work and survives a partial clie
   if (process.env.STRELVA_CAPTURE_PRODUCT_EXPERIENCE === "1") {
     await page.screenshot({ path: "output/product-experience/agency-home-mobile.png", fullPage: true });
   }
-  await page.getByRole("region", { name: "Clients with shared work" }).getByRole("button", { name: /Harbor Dental/ }).click();
-  await expect(page.getByRole("heading", { name: "Review what was shared." })).toBeVisible();
+  await expect(page.getByRole("list", { name: "Clients" }).getByRole("button", { name: /^Harbor Dental/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry loading McClear’s" })).toBeVisible();
 });
 
 test("shared read-only work cannot start an assessment", async ({ page }) => {

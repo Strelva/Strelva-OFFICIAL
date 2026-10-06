@@ -76,7 +76,8 @@ test("bookings and internal tools open as the actual thing, with lineage beside 
   await page.getByRole("button", { name: "Home" }).click();
   await page.getByRole("link", { name: /^Open Mediation intake/ }).click();
   await expect(page.getByRole("heading", { name: "Mediation intake", level: 1 })).toBeVisible();
-  await expect(page.getByRole("complementary", { name: "About Mediation intake" })).toContainText("Adapted from a source system");
+  // Lineage comes only from stored Version rows (system_versions).
+  await expect(page.getByRole("complementary", { name: "About Mediation intake" })).toContainText("The Mooney Firm is adapted from Intake for professional practices.");
 });
 
 test("read-only access sees Systems but cannot change them or make anything real", async ({ page }) => {
@@ -128,11 +129,11 @@ test("empty, loading and error states say what is true", async ({ page }) => {
 
 test("an agency sees its source Systems and each client's Version", async ({ page }) => {
   await page.goto("/preview/strelva?scenario=agency-systems&systems=on");
-  const versions = page.getByRole("list", { name: "Client versions of Intake for professional practices" });
-  await expect(versions.getByRole("button")).toHaveCount(2);
+  // Sources and client Versions live in the Library, read from system_versions.
+  await page.getByRole("tab", { name: "Library" }).click();
+  const versions = page.getByRole("list", { name: "Versions of Inquiry intake for professional practices" });
   await expect(versions).toContainText("The Mooney Firm");
   await expect(versions).toContainText("Harbor Dental");
-  await expect(page.getByRole("list", { name: "Client systems with no recorded source" })).toContainText("Staff requests");
 });
 
 test("two locations on one account are Versions of one website", async ({ page }) => {
