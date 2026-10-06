@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { getTenantDashboardUrl } from "./tenant-urls";
 import { updateTenant } from "./tenants";
+import { businessBillingCheckoutMetadata } from "@/platform/business-billing";
 import type { TenantConfig } from "./types";
 import type { CommercialPlanKey } from "./types";
 
@@ -82,6 +83,9 @@ export async function createTenantSubscriptionCheckout(
     await updateTenant(tenant.id, { stripeCustomerId: customerId });
   }
 
+  // A converted business also gets workspaceId (STRELVA_BUSINESS_BILLING,
+  // off by default). Additive: tenantId always stays.
+  const businessMetadata = await businessBillingCheckoutMetadata(tenant.id);
   const session = await stripe.checkout.sessions.create({
     customer: customerId,
     client_reference_id: tenant.id,
@@ -98,6 +102,7 @@ export async function createTenantSubscriptionCheckout(
         ? { planMonthlyCents: String(input.planMonthlyCents) }
         : {}),
       planCurrency: input.planCurrency ?? "usd",
+      ...businessMetadata,
     },
     subscription_data: {
       metadata: {
@@ -107,6 +112,7 @@ export async function createTenantSubscriptionCheckout(
           ? { planMonthlyCents: String(input.planMonthlyCents) }
           : {}),
         planCurrency: input.planCurrency ?? "usd",
+        ...businessMetadata,
       },
     },
   });

@@ -16,6 +16,7 @@ import { isTenantId } from "@/lib/scaffold-contracts";
 import { captureLead } from "@/lib/leads";
 import { scoreLeadSpam } from "@/lib/lead-spam";
 import { recordSpam } from "@/lib/spam-pit";
+import { readLeadAttribution } from "@/lib/lead-attribution";
 import {
   getInquiryRepository,
   inquiryReleaseEnabled,
@@ -255,10 +256,13 @@ export async function POST(
     }
 
     if (!name) return corsJson({ error: "name is required" }, 400);
+    // Optional attribution (additive): where on the site the inquiry came
+    // from, for the outcome loop. Absent for every client form sent today.
+    const attribution = readLeadAttribution(body);
     // Claim receipt only when a store holds the lead: Redis, or the Postgres
     // copy when Redis is absent. Owner notification is unchanged (captureLead
     // notifies exactly as recordLead did).
-    const outcome = await captureLead(tenant, { name, email, message, source });
+    const outcome = await captureLead(tenant, { name, email, message, source, ...(attribution ? { fields: attribution } : {}) });
     if (outcome.status === "unavailable" && !outcome.mirrored) {
       return corsJson({ error: "Lead storage is temporarily unavailable.", code: "lead_storage_unavailable" }, 503);
     }

@@ -290,6 +290,18 @@ export const conversionAccountSchema = z.object({
   name: z.string().min(1).max(120),
   tenantIds: z.array(z.string().min(1).max(120)).max(100),
   multiSite: z.boolean(),
+  /** The bundled subscription's per-site line items (Redis `account:{id}`),
+   *  so the billing home records what Stripe actually charges per site. */
+  subscription: z.object({
+    status: z.string().max(40).nullable(),
+    amountCents: z.number().int().min(0).nullable(),
+    currentPeriodEnd: z.string().max(40).nullable(),
+    items: z.array(z.object({
+      tenantId: z.string().min(1).max(120),
+      label: z.string().max(120),
+      amountCents: z.number().int().min(0),
+    }).strict()).max(100),
+  }).strict().optional(),
 }).strict();
 export type ConversionAccount = z.infer<typeof conversionAccountSchema>;
 

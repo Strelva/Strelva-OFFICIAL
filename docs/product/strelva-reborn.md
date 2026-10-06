@@ -194,9 +194,19 @@ Proof: unit and SQL tests in `check:workspace-sql`; `reborn:progress` shows
       L. Decide against [governed work](../architecture/ontology-phase2-governed-work.md),
       which calls the hybrid deliberate.*
 - [ ] Orders, rewards, OAuth connections and analytics config move to
-      Postgres. Redis is a cache again. *Not started · L*
+      Postgres. Redis is a cache again. *Partial (branch `build/money-data`,
+      local only): the move pattern (`src/platform/client-records`: dual-write
+      behind `STRELVA_CLIENT_RECORDS_DUAL_WRITE`, dry-run backfill, daily
+      parity, per-store read flag after 7 days) is built and applied to spam
+      held for review, inquiry timelines and first replies, booking config,
+      analytics config and report markers, and account grouping. Orders and
+      rewards: read-only key count only (`scripts/count-client-redis-keys.ts`).
+      OAuth connections not started. Nothing applied to production · L*
 - [ ] Workspace export and exit include the business record and every linked
-      tenant's data. *Not started · M*
+      tenant's data. *Partial (branch `build/money-data`, local only): export
+      schema 3 with background builds behind `STRELVA_EXPORT_SCHEMA_3`; orders
+      and rewards listed as unavailable; exit steps per linked site not
+      started · M*
 
 Proof: failure-path tests, `pnpm check:custom-repos`, and a byte-identical
 storefront comparison like Sept 30 (60/60).
@@ -214,8 +224,10 @@ storefront comparison like Sept 30 (60/60).
       (`unlink_tenant_from_business`): dry-run preview by default, same
       refusal, receipt in `tenant_workspace_unlinks`; proven locally for
       convert → unlink → reconvert, unlink twice, unlink after an owner
-      edit, a joined site, and cross-workspace denial. Never run against
-      Supabase · S*
+      edit, a joined site, and cross-workspace denial. Billing state:
+      conversion now writes one billing state per business on the `accounts`
+      billing home (branch `build/money-data`, proven in the local SQL
+      cluster). Never run against Supabase · S*
 - [x] Links and new rows survive tenant renames and deprovision. *Proven
       locally:* links key on `stable_id`; deleting a tenant clears the link
       and keeps the business. Exception: `tenant_leads` rows cascade-delete

@@ -258,6 +258,16 @@ applications, documents and trackers); `business_contacts` and
 | `orders:{tenant}`, `order:{tenant}:{id}` | 90-day visibility layer (`src/lib/orders.ts`) | Not moved. Frozen. Read their size first (§10) |
 | `reb:rewards:{tenant}:*` | Strelva-side rewards (`src/lib/rewards/kv.ts`) | Not moved. Frozen. Read their size first (§10) |
 
+Built locally: `tenant_analytics_config` and `tenant_report_state`
+(`20261007194000`) through `src/lib/storage/redis-move.ts`. These are the only
+Postgres home for these keys. The money-and-data stream's generic
+`tenant_client_records` store also covered them; at integration (2026-10-06)
+it was dropped for these keys so nothing writes them to two Postgres homes.
+The typed tables won because they hold rules a generic JSON row cannot: a
+forward-only last-sent marker read as the later of both stores, and
+Postgres-first writes that stop before Redis on failure. `redis-move.ts`
+stays a local helper for these two stores.
+
 Booking config in Redis (`src/lib/booking.ts`) belongs to the bookings spec.
 Workspace products already live in Postgres; nothing there moves.
 

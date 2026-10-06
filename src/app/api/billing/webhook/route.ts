@@ -18,6 +18,7 @@ import { OPERATOR_URL } from "@/lib/brand";
 import { getAccountForTenant, setAccountSubscription, type AccountSubscriptionItem } from "@/lib/accounts";
 import { getStripe } from "@/lib/billing";
 import { syncConfiguredSubscriptionAllowance } from "@/platform/work-economics";
+import { mirrorStripeEventToBusinessBilling, stripeBillingContext } from "@/platform/business-billing";
 
 const PROCESSED_EVENT_TTL_SECONDS = 60 * 60 * 24 * 30;
 const PROCESSING_STALE_MINUTES = 5;
@@ -228,6 +229,19 @@ async function applyTenantSubscriptionStatus(
       tenantId,
       eventType: event.type,
     });
+  }
+
+  // Business billing home (STRELVA_BUSINESS_BILLING, off by default): mirror
+  // the payment status onto the converted business. Best-effort; the tenant
+  // above is processed exactly as before whatever happens here.
+  if (patch.subscriptionStatus) {
+    const context = stripeBillingContext(event.data.object);
+    const mirrored = await mirrorStripeEventToBusinessBilling({ ...context, tenantId, status: patch.subscriptionStatus });
+    if (mirrored.status === "failed") {
+      alert("billing_webhook_business_mirror_failed", "medium", { tenantId, eventType: event.type, reason: mirrored.reason });
+    } else if (mirrored.status === "skipped" && mirrored.reason === "unresolved" && context.workspaceId) {
+      alert("billing_webhook_workspace_unresolved", "medium", { tenantId, eventType: event.type });
+    }
   }
 }
 

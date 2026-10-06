@@ -87,6 +87,14 @@ async function read(slug: string): Promise<ConversionSources> {
       name: account.name.slice(0, 120),
       tenantIds: account.tenantIds.slice(0, 100),
       multiSite: account.tenantIds.length > 1,
+      ...(account.subscription ? { subscription: {
+        status: account.subscription.status?.slice(0, 40) ?? null,
+        amountCents: account.subscription.amountCents ?? null,
+        currentPeriodEnd: account.subscription.currentPeriodEnd?.slice(0, 40) ?? null,
+        items: account.subscription.items.slice(0, 100).map((item) => ({
+          tenantId: item.tenantId.slice(0, 120), label: item.label.slice(0, 120), amountCents: Math.max(0, Math.round(item.amountCents)),
+        })),
+      } } : {}),
     } : null,
   };
 }

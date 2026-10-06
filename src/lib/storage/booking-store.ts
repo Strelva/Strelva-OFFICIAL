@@ -16,6 +16,8 @@
 import type { BookingConfig, DateOverride, Booking } from "../types";
 import { DEFAULT_BOOKING_CONFIG, generateBookingId, generateSlots } from "../booking";
 import { getRedis } from "../redis";
+import { mirrorClientRecord } from "@/platform/client-records/mirror";
+import { readThroughFlag } from "@/platform/client-records/move";
 import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
 import { getContent } from "./content-store";
 import { dataSourceIsPostgres } from "../db/source-flags";
@@ -127,8 +129,9 @@ export async function getBookingConfig(
     // could offer slots on a day the tenant is actually closed, or hide a day
     // it's open, on a live booking surface. A genuine miss (null) means "no
     // custom config yet" → DEFAULT is the correct answer.
-    const raw = await redis.get<BookingConfig>(bookingConfigKey(tenant));
-    return raw ?? DEFAULT_BOOKING_CONFIG;
+    return readThroughFlag("booking_config", tenant,
+      async () => (await redis.get<BookingConfig>(bookingConfigKey(tenant))) ?? DEFAULT_BOOKING_CONFIG,
+      (records) => (records.find((r) => r.recordId === "config")?.payload.value as BookingConfig | undefined) ?? DEFAULT_BOOKING_CONFIG);
   }
   const store = await readDevContent(tenant);
   return (store[`__bookingConfig_${tenant}`] as BookingConfig) ?? DEFAULT_BOOKING_CONFIG;
@@ -143,6 +146,7 @@ export async function setBookingConfig(
     // Let a real Redis write failure surface (route → 500) rather than pretend
     // the save succeeded.
     await redis.set(bookingConfigKey(tenant), config);
+    await mirrorClientRecord("booking_config", tenant, { recordId: "config", payload: { value: JSON.parse(JSON.stringify(config)) }, capturedAt: new Date().toISOString() });
     return;
   }
   const store = await readDevContent(tenant);
@@ -162,8 +166,15 @@ export async function getDateOverrides(
     // Fail CLOSED like getBookingConfig: propagate a Redis error rather than
     // silently dropping a "closed" override and accepting a booking on a day the
     // owner blocked off.
-    const raw = await redis.get<DateOverride[]>(dateOverridesKey(tenant));
-    return Array.isArray(raw) ? raw : [];
+    return readThroughFlag("booking_config", tenant,
+      async () => {
+        const raw = await redis.get<DateOverride[]>(dateOverridesKey(tenant));
+        return Array.isArray(raw) ? raw : [];
+      },
+      (records) => {
+        const value = records.find((r) => r.recordId === "overrides")?.payload.value;
+        return Array.isArray(value) ? (value as DateOverride[]) : [];
+      });
   }
   const store = await readDevContent(tenant);
   return (store[`__dateOverrides_${tenant}`] as DateOverride[]) ?? [];
@@ -178,6 +189,7 @@ export async function setDateOverrides(
     // Let a real Redis write failure surface (route → 500) rather than pretend
     // the save succeeded — same contract as setBookingConfig.
     await redis.set(dateOverridesKey(tenant), overrides);
+    await mirrorClientRecord("booking_config", tenant, { recordId: "overrides", payload: { value: JSON.parse(JSON.stringify(overrides)) }, capturedAt: new Date().toISOString() });
     return;
   }
   const store = await readDevContent(tenant);

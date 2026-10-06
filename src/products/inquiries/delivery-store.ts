@@ -21,6 +21,8 @@ import type {
   InquiryDeliveryStore,
   InquiryDeliveryTimelineInput,
 } from "./delivery-types";
+import { mirrorClientRecord } from "@/platform/client-records/mirror";
+import { FIRST_REPLY_ACTIONS, firstReplyRecord, timelineRecord } from "@/platform/client-records/stores";
 
 const DELIVERY_TTL_SECONDS = 90 * 24 * 60 * 60;
 const DELIVERY_TIMELINE_KEEP = 100;
@@ -471,6 +473,10 @@ export function createRedisInquiryDeliveryStore(
         ],
         [JSON.stringify(next), target ? JSON.stringify(target) : "", replyTarget ? JSON.stringify(replyTarget) : "", replyTarget ? JSON.stringify(replyTarget) : "", String(DELIVERY_TTL_SECONDS)],
       );
+      // The first message to the customer is the inquiry's first reply (outcome loop).
+      if ((FIRST_REPLY_ACTIONS as readonly string[]).includes(input.action)) {
+        await mirrorClientRecord("inquiry_reply", input.tenantId, firstReplyRecord(input.inquiryId, input.acceptedAt, input.action), "keep_first");
+      }
       return next;
     },
     async markVerified(input) {
@@ -656,8 +662,12 @@ export function createRedisInquiryDeliveryStore(
       if (!redis) return unavailable();
       const event = { ...input, at: input.at || new Date().toISOString(), summary: input.summary.slice(0, 500) };
       const key = timelineKey(input.tenantId, input.inquiryId);
-      await redis.zadd(key, { score: Date.parse(event.at) || Date.now(), member: JSON.stringify(event) });
+      const member = JSON.stringify(event);
+      await redis.zadd(key, { score: Date.parse(event.at) || Date.now(), member });
       if (redis.zremrangebyrank) await redis.zremrangebyrank(key, 0, -(DELIVERY_TIMELINE_KEEP + 1));
+      // Postgres copy keeps the timeline past the 90-day TTL and 100-event trim.
+      const record = timelineRecord(input.inquiryId, member);
+      if (record) await mirrorClientRecord("inquiry_timeline", input.tenantId, record);
     },
     async listTimeline(input) {
       if (!redis) return unavailable();

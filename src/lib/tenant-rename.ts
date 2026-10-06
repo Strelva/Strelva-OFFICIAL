@@ -109,6 +109,10 @@ export const authoritativePatterns = (t: string): string[] => [
   `reb:inquiry-capture-repair:${t}`, // durable capture-repair due index
   `reb:inquiry-capture-repair-job:${t}:*`, // capture-repair payloads
   `reb:inquiry-capture-repair-claim:${t}:*`, // capture-repair leases
+  // Submissions held as spam, including false positives (30-day TTL):
+  `reb:spam-pit:${t}`, // sorted index
+  `reb:spam-pit:item:${t}:*`, // one JSON record per held submission
+  `reb:client-email:${t}`, // operator's per-client email override
 ];
 
 export type RenameResult = {
@@ -138,6 +142,66 @@ function rewriteBlobTenant(value: unknown, oldSlug: string, newSlug: string): { 
   if (rec.tenantId === oldSlug) { rec.tenantId = newSlug; changed = true; }
   if (rec.tenant === oldSlug) { rec.tenant = newSlug; changed = true; }
   return { value: rec, changed };
+}
+
+/** Moves a non-string key in one atomic step. Returns the key's type, `none`
+ *  when the source is gone, or `string` (moved by the caller, which rewrites the
+ *  embedded tenant field). A free destination takes RENAME, which keeps the
+ *  TTL. An occupied destination (written under the new slug after the database
+ *  rename) keeps its own data and TTL: sorted-set members keep the higher
+ *  score, hash fields and set members already there win, and list items from
+ *  the old key are appended. Exported for the real-Redis test. */
+export const MOVE_TENANT_KEY_LUA = `
+local kind = redis.call('TYPE', KEYS[1])['ok']
+if kind == 'none' or kind == 'string' then return kind end
+if redis.call('EXISTS', KEYS[2]) == 0 then
+  redis.call('RENAME', KEYS[1], KEYS[2])
+  return kind
+end
+if kind == 'zset' then
+  local rows = redis.call('ZRANGE', KEYS[1], 0, -1, 'WITHSCORES')
+  for i = 1, #rows, 2 do
+    local current = redis.call('ZSCORE', KEYS[2], rows[i])
+    if not current or tonumber(current) < tonumber(rows[i + 1]) then
+      redis.call('ZADD', KEYS[2], rows[i + 1], rows[i])
+    end
+  end
+elseif kind == 'hash' then
+  local rows = redis.call('HGETALL', KEYS[1])
+  for i = 1, #rows, 2 do redis.call('HSETNX', KEYS[2], rows[i], rows[i + 1]) end
+elseif kind == 'set' then
+  local rows = redis.call('SMEMBERS', KEYS[1])
+  for i = 1, #rows do redis.call('SADD', KEYS[2], rows[i]) end
+elseif kind == 'list' then
+  local rows = redis.call('LRANGE', KEYS[1], 0, -1)
+  for i = 1, #rows do redis.call('RPUSH', KEYS[2], rows[i]) end
+else
+  return redis.error_reply('tenant_rename_unsupported_type:' .. kind)
+end
+redis.call('DEL', KEYS[1])
+return 'merged:' .. kind
+`;
+
+type RenameRedis = NonNullable<ReturnType<typeof getRedis>>;
+
+async function moveTenantKey(
+  redis: RenameRedis,
+  key: string,
+  newKey: string,
+  oldSlug: string,
+  newSlug: string,
+): Promise<{ moved: boolean; rewritten: boolean }> {
+  const kind = String(await redis.eval<[], string>(MOVE_TENANT_KEY_LUA, [key, newKey], []));
+  if (kind === "none") return { moved: false, rewritten: false };
+  if (kind !== "string") return { moved: true, rewritten: false };
+  const value = await redis.get(key);
+  if (value === null || value === undefined) return { moved: false, rewritten: false };
+  const ttl = Number(await redis.pttl(key));
+  const { value: rewritten, changed } = rewriteBlobTenant(value, oldSlug, newSlug);
+  if (ttl > 0) await redis.set(newKey, rewritten, { px: ttl });
+  else await redis.set(newKey, rewritten);
+  await redis.del(key);
+  return { moved: true, rewritten: changed };
 }
 
 /**
@@ -230,31 +294,40 @@ export async function rekeyTenantRedis(oldSlug: string, newSlug: string): Promis
     out.redisErrors.push(`reb:inquiry-reply-target:*: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  // 2) Generic authoritative prefixes: SCAN → copy value (rewriting an embedded
-  //    tenant field) to the rekeyed key → delete the old key.
+  // 2) Generic authoritative prefixes: SCAN, then move each key by its Redis
+  //    type. Strings are JSON blobs whose embedded tenant field is rewritten and
+  //    whose TTL is kept. Sorted sets, hashes, sets and lists (leads and orders
+  //    indexes, rewards, the spam index) move atomically in Lua: RENAME when the
+  //    new key is free (keeps the TTL), otherwise a merge that never overwrites
+  //    newer data already under the new slug. `get` on those types is a
+  //    WRONGTYPE error, which used to abort the rest of the pattern.
   for (const pattern of authoritativePatterns(oldSlug)) {
     // A failed atomic queue migration must retain its source lead records.
     if (pattern === `lead:${oldSlug}:*` && out.redisErrors.some(error => error.startsWith("lead-mirror:"))) continue;
-    try {
-      let cursor = "0";
-      do {
-        const [next, keys] = await redis.scan(cursor, { match: pattern, count: 250 });
-        cursor = next;
-        for (const key of keys) {
-          const newKey = rekeySegments(key, oldSlug, newSlug);
-          if (newKey === key) continue;
-          const value = await redis.get(key);
-          if (value === null || value === undefined) continue;
-          const { value: rewritten, changed } = rewriteBlobTenant(value, oldSlug, newSlug);
-          await redis.set(newKey, rewritten);
-          await redis.del(key);
-          out.movedKeys++;
-          if (changed) out.rewrittenBlobs++;
+    let cursor = "0";
+    do {
+      let keys: string[] = [];
+      try {
+        const [next, found] = await redis.scan(cursor, { match: pattern, count: 250 });
+        cursor = String(next);
+        keys = found;
+      } catch (err) {
+        out.redisErrors.push(`${pattern}: ${err instanceof Error ? err.message : String(err)}`);
+        break;
+      }
+      for (const key of keys) {
+        const newKey = rekeySegments(key, oldSlug, newSlug);
+        if (newKey === key) continue;
+        try {
+          const moved = await moveTenantKey(redis, key, newKey, oldSlug, newSlug);
+          if (moved.moved) out.movedKeys++;
+          if (moved.rewritten) out.rewrittenBlobs++;
+        } catch (err) {
+          // One bad key is recorded; the rest of the pattern still moves.
+          out.redisErrors.push(`${key}: ${err instanceof Error ? err.message : String(err)}`);
         }
-      } while (cursor !== "0");
-    } catch (err) {
-      out.redisErrors.push(`${pattern}: ${err instanceof Error ? err.message : String(err)}`);
-    }
+      }
+    } while (cursor !== "0");
   }
 
   // 3) Bust the tenant-list cache so the renamed slug is picked up on next read.

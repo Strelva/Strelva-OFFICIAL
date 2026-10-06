@@ -69,6 +69,10 @@ const PUBLIC_EXACT = new Set([
   "/api/workspace-invitations",
   "/api/workspace-invitations/revoke",
   "/api/workspace-export",
+  "/api/workspace-export/v3",
+  // The emailed export link authenticates with its own expiring token (the
+  // owner may never sign in); the route serves nothing without it.
+  "/api/workspace-export/v3/download",
   "/api/health",
   "/api/newsletter/subscribe",
   "/api/track",

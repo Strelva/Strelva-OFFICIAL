@@ -11,6 +11,8 @@
  * score-ordered index trimmed to the newest SPAM_KEEP.
  */
 import { getRedis } from "./redis";
+import { mirrorClientRecord } from "@/platform/client-records/mirror";
+import { readThroughFlag } from "@/platform/client-records/move";
 
 const SPAM_TTL_SECONDS = 30 * 24 * 60 * 60;
 const SPAM_KEEP = 1000;
@@ -89,11 +91,20 @@ export async function recordSpam(tenant: string, input: RecordSpamInput): Promis
   await redis.set(itemKey(tenant, record.id), JSON.stringify(record), { ex: SPAM_TTL_SECONDS });
   await redis.zadd(indexKey(tenant), { score: Date.now(), member: record.id });
   await redis.zremrangebyrank(indexKey(tenant), 0, -(SPAM_KEEP + 1));
+  // Postgres copy so a false positive outlives the 30-day TTL. Never throws.
+  await mirrorClientRecord("spam_held", tenant, { recordId: record.id, payload: JSON.parse(JSON.stringify(record)), capturedAt: record.createdAt });
   return record;
 }
 
 /** Newest first. Items past their 30-day TTL drop out of the result. */
 export async function getSpam(tenant: string, limit = 100): Promise<SpamRecord[]> {
+  // After the read flip (STRELVA_CLIENT_RECORDS_READ + 7 days of parity) the
+  // Postgres copy is read, which keeps items past the 30-day TTL.
+  return readThroughFlag("spam_held", tenant, () => getSpamFromRedis(tenant, limit),
+    (records) => records.slice(0, limit).map((r) => r.payload as unknown as SpamRecord));
+}
+
+async function getSpamFromRedis(tenant: string, limit: number): Promise<SpamRecord[]> {
   const redis = getRedis();
   if (!redis) return [];
   const ids = await redis.zrange<string[]>(indexKey(tenant), 0, Math.max(0, limit - 1), { rev: true });
