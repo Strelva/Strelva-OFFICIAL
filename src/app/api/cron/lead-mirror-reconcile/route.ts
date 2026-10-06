@@ -3,6 +3,7 @@ import { recordHeartbeat } from "@/lib/heartbeat";
 import { reconcileLeadMirror } from "@/lib/client-leads";
 import { alertOnce } from "@/lib/monitoring";
 import { requireCronRequest } from "@/lib/cron-auth";
+import { repairPendingClientRecords } from "@/platform/client-records/move";
 
 export const maxDuration = 120;
 
@@ -24,10 +25,19 @@ export async function GET(request: Request) {
       6 * 3600,
     );
   }
+  // The same hourly retry for the other client stores moving out of Redis
+  // (src/platform/client-records). Empty unless their dual-write is on.
+  const clientRecords = await repairPendingClientRecords({ limit: 200 }).catch((error: unknown) => ({
+    checked: 0, repaired: 0, dropped: 0, remaining: 0, failed: 1,
+    error: error instanceof Error ? error.message : String(error),
+  }));
+  if (clientRecords.remaining > 0 || clientRecords.failed > 0) {
+    await alertOnce("client_records_backlog", "high", { remaining: clientRecords.remaining, failed: clientRecords.failed }, 6 * 3600);
+  }
   await recordHeartbeat("lead-mirror-reconcile", {
-    ok: result.failed === 0 && result.missing === 0,
-    processed: result.checked,
-    failed: result.failed + result.missing,
+    ok: result.failed === 0 && result.missing === 0 && clientRecords.failed === 0,
+    processed: result.checked + clientRecords.checked,
+    failed: result.failed + result.missing + clientRecords.failed,
   });
-  return NextResponse.json(result);
+  return NextResponse.json({ ...result, clientRecords });
 }

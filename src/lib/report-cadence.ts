@@ -20,6 +20,7 @@
  */
 
 import { getRedis } from "./redis";
+import { mirrorClientRecord } from "@/platform/client-records/mirror";
 
 export type ReportCadence = "weekly" | "monthly";
 
@@ -86,7 +87,10 @@ export async function setReportCadence(
 ): Promise<ReportCadence> {
   const value: ReportCadence = cadence === "weekly" ? "weekly" : "monthly";
   const redis = getRedis();
-  if (redis) await redis.set(cadenceKey(tenant), value);
+  if (redis) {
+    await redis.set(cadenceKey(tenant), value);
+    await mirrorClientRecord("analytics_settings", tenant, { recordId: "report_cadence", payload: { value }, capturedAt: new Date().toISOString() });
+  }
   return value;
 }
 
@@ -110,6 +114,7 @@ export async function markReportSent(tenant: string, ts: number = Date.now()): P
   if (!redis) return;
   try {
     await redis.set(lastSentKey(tenant), String(ts));
+    await mirrorClientRecord("analytics_settings", tenant, { recordId: "report_sent", payload: { value: String(ts) }, capturedAt: new Date(ts).toISOString() });
   } catch {
     // A lost last-sent write only risks one extra send next run — never fail
     // the cron over it.

@@ -30,6 +30,8 @@
  */
 
 import { getRedis } from "./redis";
+import { mirrorClientRecord } from "@/platform/client-records/mirror";
+import { readThroughFlag } from "@/platform/client-records/move";
 import { getTenantConfig } from "./tenants";
 import { getAccessToken, getServiceAccountCredential, queryGscTotals } from "./search-console";
 import { getGoogleAccessToken, getGoogleScopeGrants } from "./google-token";
@@ -140,12 +142,16 @@ export function deriveScDomain(siteUrl?: string | null): string | null {
 async function readStored(tenantId: string): Promise<StoredConfig | null> {
   const redis = getRedis();
   if (!redis) return null;
-  try {
-    const raw = await redis.get<StoredConfig>(cfgKey(tenantId));
-    return raw ?? null;
-  } catch {
-    return null;
-  }
+  const fromRedis = async () => {
+    try {
+      const raw = await redis.get<StoredConfig>(cfgKey(tenantId));
+      return raw ?? null;
+    } catch {
+      return null;
+    }
+  };
+  return readThroughFlag("analytics_settings", tenantId, fromRedis,
+    (records) => (records.find((r) => r.recordId === "analytics")?.payload.value as StoredConfig | undefined) ?? null);
 }
 
 /** Apply the siteUrl-derived GSC default when no property is stored. */
@@ -187,6 +193,7 @@ export async function setAnalyticsConfig(
   if (redis) {
     try {
       await redis.set(cfgKey(tenantId), next);
+      await mirrorClientRecord("analytics_settings", tenantId, { recordId: "analytics", payload: { value: { ...next } }, capturedAt: next.updatedAt ?? new Date().toISOString() });
     } catch {
       // Config store degrades to defaults without Redis — a failed write is not fatal.
     }
