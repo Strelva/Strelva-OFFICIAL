@@ -14,7 +14,7 @@ const db = vi.hoisted(() => ({
   blockers: { publications: 0, reservations: 0 },
   teardownError: null as null | { message: string },
 }));
-const redis = vi.hoisted(() => ({ del: vi.fn(async () => 1), exists: vi.fn(async () => 0), scan: vi.fn(async () => ["0", []]), get: vi.fn(async () => null) }));
+const redis = vi.hoisted(() => ({ del: vi.fn(async () => 1), exists: vi.fn(async () => 0), scan: vi.fn(async () => ["0", []]), get: vi.fn(async () => null), zrange: vi.fn(async () => []) }));
 const vercel = vi.hoisted(() => ({ deleteVercelProject: vi.fn(async () => ({ ok: true })), isVercelConfigured: vi.fn(() => true) }));
 
 vi.mock("@/lib/db/client", () => ({

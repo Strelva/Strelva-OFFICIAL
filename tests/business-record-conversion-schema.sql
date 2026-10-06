@@ -76,7 +76,10 @@ select pg_temp.cv_assert((select kind = 'customer' and name = 'Great Lakes Dried
 select pg_temp.cv_assert((select count(*) = 1 and bool_and(user_id = 'cf000000-0000-4000-8000-000000000001' and role = 'admin')
   from public.workspace_memberships where workspace_id = (select id from cv_ws)), 'the operator is the only member, as admin; no client user, no owner');
 select pg_temp.cv_assert((select count(*) from public.memberships) = (select tenant_memberships from cv_counts_before), 'no tenant membership created');
-select pg_temp.cv_assert((select to_jsonb(t) from public.tenants t where id = 'gldf') = (select row from cv_tenant_before), 'tenant row unchanged');
+-- `account_id` is excluded: once the business billing migration
+-- (20261007180000) is applied, its link trigger points the tenant at the
+-- business's billing account on purpose. Every other column must hold.
+select pg_temp.cv_assert((select to_jsonb(t) - 'account_id' from public.tenants t where id = 'gldf') = (select row - 'account_id' from cv_tenant_before), 'tenant row unchanged');
 
 -- Record contents: facts, provenance, services, people, contacts, history.
 select pg_temp.cv_assert((select count(*) from public.business_record_facts where workspace_id = (select id from cv_ws)) = 9, 'nine facts imported');
@@ -260,7 +263,7 @@ select pg_temp.cv_assert(not exists (select 1 from public.workspaces where id = 
   and not exists (select 1 from public.business_record_revisions where workspace_id = (select id from cv_uws))
   and not exists (select 1 from public.business_contacts where workspace_id = (select id from cv_uws))
   and not exists (select 1 from public.tenant_workspace_links where tenant_stable_id = 'c0ffee00-0000-4000-8000-0000000000d1'), 'business, membership, record and link are gone');
-select pg_temp.cv_assert((select to_jsonb(t) from public.tenants t where id = 'unlink-site') = (select row from cv_unlink_tenant_before), 'tenant row unchanged by unlink');
+select pg_temp.cv_assert((select to_jsonb(t) - 'account_id' from public.tenants t where id = 'unlink-site') = (select row - 'account_id' from cv_unlink_tenant_before), 'tenant row unchanged by unlink (account_id: see the billing note above)');
 select pg_temp.cv_assert((public.read_tenant_workspace_link('operator@strelva.example.test', 'unlink-site')->'link') = 'null'::jsonb, 'link state reads unlinked');
 select pg_temp.cv_assert((select count(*) from public.business_record_facts where workspace_id = (select id from cv_ws)) = (select facts from cv_w1_before)
   and (select count(*) from public.business_contacts where workspace_id = (select id from cv_ws)) = (select contacts from cv_w1_before)

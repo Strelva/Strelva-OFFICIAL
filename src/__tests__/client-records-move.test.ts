@@ -7,6 +7,7 @@ vi.mock("@/lib/db/client", () => ({ getSupabase: () => null }));
 
 import {
   CLIENT_RECORD_PENDING_KEY,
+  CLIENT_RECORD_STORES,
   canonicalJson,
   clientRecordHash,
   mirrorClientRecord,
@@ -230,7 +231,7 @@ describe("client-records move script guard", () => {
     const d = deps();
     const out = await runClientRecordMove({ ...parseMoveArgs(["backfill"]), databaseUrl: "https://prod.supabase.co" }, d);
     expect(out.apply).toBe(false);
-    expect(d.backfill).toHaveBeenCalledTimes(12);
+    expect(d.backfill).toHaveBeenCalledTimes(CLIENT_RECORD_STORES.length * 2);
     expect(d.backfill.mock.calls.every((c) => c[2] === false)).toBe(true);
   });
   it("refuses --apply and parity against a non-local database without Jacob's yes", async () => {
