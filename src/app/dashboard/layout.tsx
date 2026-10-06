@@ -25,6 +25,7 @@ import { ConversationShell } from "@/components/dashboard/ConversationShell";
 import { planByKey } from "@/lib/billing-plans";
 import { resolveLegacyManagedPresence } from "@/products/managed-presence";
 import { resolveRelationship } from "@/platform/relationships";
+import { dashboardRoutingFor } from "@/platform/owner-entry/server";
 
 export default async function DashboardLayout({
   children,
@@ -44,6 +45,13 @@ export default async function DashboardLayout({
   if (!userId && !devAccessBypass && !isDemo) {
     redirect(withClientFallbackRoot(clientFallbackRoot, "/sign-in"));
   }
+
+  // Owner entry (owner-entry spec §3.4–§3.6): for a moved workspace, a page
+  // whose workspace home is ready redirects there (307), only for a member of
+  // that workspace; any other page renders with a way back. Decided before
+  // the tenant access check, since the destination's own access is what counts.
+  const ownerEntry = isDemo ? { kind: "render" as const } : await dashboardRoutingFor(tenant);
+  if (ownerEntry.kind === "redirect") redirect(ownerEntry.location);
 
   const hasAccess = isDemo || (await hasTenantAccess(tenant));
   if (!hasAccess) {
@@ -216,6 +224,14 @@ export default async function DashboardLayout({
             <Link href="/access-request" className="font-semibold text-accent underline-offset-2 hover:underline">
               Get your own site &rarr;
             </Link>
+          </div>
+        )}
+        {ownerEntry.kind === "render-with-back" && (
+          <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-b border-accent/30 bg-accent-dim px-4 py-2 text-center text-[12px] text-warm-black" data-owner-entry-back={ownerEntry.route}>
+            <span>This page hasn&apos;t moved to your workspace yet.</span>
+            <a href={ownerEntry.homeHref} className="font-semibold text-accent underline-offset-2 hover:underline focus-visible:underline">
+              Back to {siteName}
+            </a>
           </div>
         )}
         {!isDemo && <SessionKeeper />}

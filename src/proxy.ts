@@ -14,6 +14,7 @@ import { CONTROL_PLANE_URL } from "./lib/brand";
 import { websiteRebuildReleaseEnabled } from "./products/websites/index";
 import { hostedRedirectTarget } from "./products/websites/index";
 import { strelvaHostedPreviewEnabled } from "./experience/workspace/preview/enabled";
+import { OWNER_ENTRY_PATH, ownerEntryPossible } from "./platform/owner-entry/env";
 
 export { isMarketingHost } from "./lib/marketing-hosts";
 export { validateCronRequest } from "@/lib/cron-auth";
@@ -203,6 +204,22 @@ export function getLegacyPublicSiteRedirect(host: string): string | null {
 
 export function shouldRedirectAdminRoot(isAdminSubdomain: boolean, pathname: string): boolean {
   return isAdminSubdomain && pathname === "/";
+}
+
+/**
+ * Where an admin-host root goes. With owner entry possible (env on), the
+ * entry route decides after auth between the client's workspace and
+ * /dashboard; otherwise /dashboard as before.
+ */
+export function adminRootTargetPath(environment: Record<string, string | undefined> = process.env): string {
+  return ownerEntryPossible(environment) ? OWNER_ENTRY_PATH : "/dashboard";
+}
+
+/** Trusted copy of a /dashboard request's path and query, for the dashboard layout. */
+export const DASHBOARD_PATH_HEADER = "x-strelva-dashboard-path";
+
+export function dashboardPathHeaderValue(targetPath: string, search: string): string | null {
+  return /^\/dashboard(?:\/|$)/.test(targetPath) ? `${targetPath}${search}` : null;
 }
 
 export function getOwnershipSettingsRedirectPath(pathname: string): string | null {
@@ -626,11 +643,12 @@ export default async function proxy(req: NextRequest) {
 
   if (tenantId) {
     if (shouldRedirectAdminRoot(isAdminSubdomain, pathname)) {
+      const rootTarget = adminRootTargetPath();
       const url = shouldUseFallbackAuthForAdminHost(host, isAdminSubdomain)
-        ? buildTenantFallbackUrl(req, tenantId, "/dashboard")
+        ? buildTenantFallbackUrl(req, tenantId, rootTarget)
         : req.nextUrl.clone();
       if (!shouldUseFallbackAuthForAdminHost(host, isAdminSubdomain)) {
-        url.pathname = "/dashboard";
+        url.pathname = rootTarget;
       }
       return applySecurityHeaders(NextResponse.redirect(url), req);
     }
@@ -651,10 +669,13 @@ export default async function proxy(req: NextRequest) {
     headers.delete("x-tenant");
     headers.delete("x-preview-mode");
     headers.delete("x-client-fallback-root");
+    headers.delete(DASHBOARD_PATH_HEADER);
     headers.set("x-tenant", tenantId);
     if (tenantFromClientPath) {
       headers.set("x-client-fallback-root", `/client/${tenantId}`);
     }
+    const dashboardPath = dashboardPathHeaderValue(tenantFromClientPath ? clientPathTarget : pathname, req.nextUrl.search);
+    if (dashboardPath) headers.set(DASHBOARD_PATH_HEADER, dashboardPath);
 
     // Check for preview mode (dashboard iframe access)
     const isPreviewMode = req.nextUrl.searchParams.get("preview") === "true";
@@ -747,6 +768,7 @@ export default async function proxy(req: NextRequest) {
   fallbackHeaders.delete("x-tenant");
   fallbackHeaders.delete("x-preview-mode");
   fallbackHeaders.delete("x-client-fallback-root");
+  fallbackHeaders.delete(DASHBOARD_PATH_HEADER);
   return applySecurityHeaders(
     NextResponse.next({ request: { headers: fallbackHeaders } }),
     req
