@@ -108,37 +108,46 @@ export const SECRET_ENV = [
   "RESEND_API_KEY",
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
+  "GOOGLE_CALENDAR_CLIENT_ID",
+  "GOOGLE_CALENDAR_CLIENT_SECRET",
+  "GOOGLE_SEARCH_CONSOLE_KEY",
+  "OAUTH_STATE_SECRET",
+  "INTERNAL_API_SECRET",
+  "SCAFFOLD_PREVIEW_SIGNING_SECRET",
+  "VERCEL_API_TOKEN",
   "STRIPE_SECRET_KEY",
   "STRIPE_WEBHOOK_SECRET",
   "CRON_SECRET",
   "ANTHROPIC_API_KEY",
 ] as const;
 
+/** Flag names from src at 9e0bd441 (release packet section 3). Values are printed when short and plain. */
 export const FLAG_ENV = [
   "EMAIL_SENDING_ENABLED",
   "CUSTOMER_EMAIL_ENABLED",
+  "OPERATOR_EMAILS_ENABLED",
+  "PROSPECT_EMAILS_ENABLED",
   "DUAL_WRITE_PG",
   "GOVERNED_WORK_DUAL_WRITE",
   "GOVERNED_WORK_READ_PG",
   "STRELVA_WORKSPACE_RELEASE",
   "STRELVA_INQUIRIES_RELEASE",
   "STRELVA_BACKGROUND_WORK_RELEASE",
-  "STRELVA_PLANNING_RELEASE",
+  "STRELVA_PLANNING_ENABLED",
   "STRELVA_PRODUCT_LEARNING_RELEASE",
   "STRELVA_CUSTOMERS_RELEASE",
   "STRELVA_WEBSITE_REBUILD_RELEASE",
   "STRELVA_OWNER_ENTRY",
-  "STRELVA_SYSTEMS",
-  "STRELVA_NEEDS_YOU",
-  "STRELVA_OPERATOR_QUEUE",
-  "STRELVA_ASK",
-  "STRELVA_MAKE_REAL",
-  "STRELVA_VERSIONS",
+  "STRELVA_SYSTEMS_RELEASE",
+  "STRELVA_ASK_RELEASE",
+  "STRELVA_NEEDS_YOU_RELEASE",
+  "STRELVA_PUBLISHING_RELEASE",
+  "STRELVA_GOOGLE_BINDINGS",
   "STRELVA_BUSINESS_BILLING",
-  "STRELVA_GOOGLE_BINDINGS_READ",
-  "STRELVA_PUBLISHING",
-  "STRELVA_CLIENT_RECORDS_PG",
-  "STRELVA_REPORT_STATE_PG",
+  "STRELVA_CLIENT_RECORDS_DUAL_WRITE",
+  "STRELVA_CLIENT_RECORDS_READ",
+  "STRELVA_EXPORT_SCHEMA_3",
+  "REB_DEV_UNGATED_ACCESS",
 ] as const;
 
 /** Redis key families counted by SCAN. `tenantAt` is the key segment holding the tenant slug. */
@@ -155,6 +164,7 @@ export const REDIS_FAMILIES = [
   { name: "analytics config", match: "analytics:cfg:*", tenantAt: 2, cardinality: false },
   { name: "report cadence", match: "reb:report-cadence:*", tenantAt: 2, cardinality: false },
   { name: "google binding fallback days", match: "reb:google-binding:fallback:*", tenantAt: null, cardinality: false },
+  { name: "lead mirror pending", match: "reb:lead-mirror:pending*", tenantAt: null, cardinality: true },
   { name: "events", match: "events:*", tenantAt: 1, cardinality: true },
   { name: "accounts", match: "account:*", tenantAt: null, cardinality: false },
 ] as const;
@@ -164,7 +174,8 @@ const SCAN_KEY_LIMIT = 200_000;
 
 /* ---------------------------------------------------------------- report -- */
 
-export type Tri = "on" | "off" | "set (not a boolean)" | "absent";
+/** on/off for boolean-like values, the value itself when short and plain (e.g. "workspace"), else "set". */
+export type Tri = string;
 
 export interface SnapshotReport {
   version: 1;
@@ -236,7 +247,7 @@ function flagState(value: string | undefined): Tri {
   const v = value.trim().toLowerCase();
   if (["1", "true", "on", "yes"].includes(v)) return "on";
   if (["0", "false", "off", "no"].includes(v)) return "off";
-  return "set (not a boolean)";
+  return /^[a-z0-9_,-]{1,64}$/i.test(v) ? `value: ${v}` : "set (value hidden)";
 }
 
 function versionOf(migration: string): string {
@@ -269,9 +280,10 @@ async function scanFamily(redis: ReadOnlyRedis, family: (typeof REDIS_FAMILIES)[
     if (index < 50 || family.cardinality) {
       const type = await redis.type(key);
       if (index < 50) types[type] = (types[type] ?? 0) + 1;
-      if (family.cardinality && tenant) {
+      if (family.cardinality) {
         const n = await redis.cardinality(key, type);
-        if (n !== null) entriesByTenant[tenant] = (entriesByTenant[tenant] ?? 0) + n;
+        const bucket = tenant ?? "all";
+        if (n !== null) entriesByTenant[bucket] = (entriesByTenant[bucket] ?? 0) + n;
       }
     }
   }

@@ -449,6 +449,11 @@ must not wait for the rest (like `0.2.1`) is built from `main` directly.
 ## Needs Jacob's yes
 
 Each of these gets an exact action prepared and verified before asking.
+The [1.0 release packet](../operations/release-1.0-packet.md) holds every one
+as a numbered step: the read-only snapshot first, the 32 unapplied migrations
+in five batches with rollback and verify queries, each env flag with its kill
+switch, every `--i-have-jacobs-yes` command in order, the per-client
+conversion runbook, the Google console checks and the Preview plan.
 
 - The Systems spine migration `20261004120000_systems.sql` and every Oct 7 build-stream migration.
 - Each production migration: the client lead store (Oct 5, can go first and
@@ -480,6 +485,8 @@ for owners. `/api/v2`. No `/api/v1` change except additive.
 ## Still unproven
 
 - Production counts are from the Sept 30 record, not a fresh read. Run
+  `scripts/production-readiness-snapshot.ts --i-have-jacobs-yes` (step 0 of
+  the [release packet](../operations/release-1.0-packet.md)) and
   `scripts/workspace-target-snapshot.sql` read-only before the first
   migration.
 - Whether governed-work tables are live and both flags on: the governed-work

@@ -104,6 +104,7 @@ const redisKeys = {
   "leads:gldf": { type: "zset", card: 40 },
   "leads:rohlax": { type: "zset", card: 2 },
   "connections:gldf:google": { type: "string" },
+  "reb:lead-mirror:pending": { type: "zset", card: 3 },
   "connections:rohlax:yelp": { type: "string" },
   "analytics:cfg:rohlax": { type: "string" },
   "analytics:cfg:old-client": { type: "string" },
@@ -128,6 +129,7 @@ function deps(overrides: Partial<SnapshotDeps> = {}) {
       EMAIL_SENDING_ENABLED: "true",
       STRELVA_WORKSPACE_RELEASE: "1",
       STRELVA_OWNER_ENTRY: "operators",
+      STRELVA_CLIENT_RECORDS_READ: "spam_held booking_config",
       SECRETS_ENC_KEY: "c2VjcmV0LWtleS1tYXRlcmlhbC10aGF0LW11c3QtbmV2ZXItcHJpbnQ=",
     },
     now: () => NOW,
@@ -154,7 +156,9 @@ describe("production readiness snapshot", () => {
 
     expect(report.env.flags.EMAIL_SENDING_ENABLED).toBe("on");
     expect(report.env.flags.CUSTOMER_EMAIL_ENABLED).toBe("absent");
-    expect(report.env.flags.STRELVA_OWNER_ENTRY).toBe("set (not a boolean)");
+    expect(report.env.flags.STRELVA_OWNER_ENTRY).toBe("value: operators");
+    expect(report.env.flags.STRELVA_CLIENT_RECORDS_READ).toBe("set (value hidden)");
+    expect(report.env.flags.DUAL_WRITE_PG).toBe("absent");
     expect(report.env.secrets.SECRETS_ENC_KEY).toBe("present");
     expect(report.env.secrets.GOOGLE_CLIENT_SECRET).toBe("absent");
 
@@ -180,6 +184,7 @@ describe("production readiness snapshot", () => {
     expect(family("rewards")).toMatchObject({ keys: 2, byTenant: { gldf: 2 } });
     expect(family("leads")).toMatchObject({ keys: 2, entriesByTenant: { gldf: 40, rohlax: 2 } });
     expect(family("google connections")).toMatchObject({ keys: 1, byTenant: { gldf: 1 } });
+    expect(family("lead mirror pending")).toMatchObject({ keys: 1, entriesByTenant: { all: 3 } });
     expect(report.redis!.activeTenantsWithAnalyticsConfig).toEqual(["rohlax"]); // inactive tenant left out
     expect(report.redis!.activeTenantsWithGoogleConnection).toEqual(["gldf"]);
     expect(report.redis!.activeTenantsWithClientEmailOverride).toEqual(["gldf"]);
