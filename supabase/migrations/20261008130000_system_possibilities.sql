@@ -538,6 +538,32 @@ $$;
 create trigger tenant_workspace_links_adopt_systems after insert on public.tenant_workspace_links
   for each row execute function public.adopt_systems_on_conversion();
 
+-- Undoing a conversion (unlink_tenant_from_business) still removes a business
+-- the conversion created and nobody used. Systems stored by adoption alone
+-- (revision 1, nothing after) are conversion machinery, like the operator's
+-- membership, and go with it; any other System, revision or Possibility keeps
+-- the business. The plan function is wrapped, not rewritten: the original
+-- keeps every rule and its name moves to tenant_unlink_plan_before_systems.
+alter function public.tenant_unlink_plan(uuid) rename to tenant_unlink_plan_before_systems;
+
+create function public.tenant_unlink_plan(p_link_id uuid) returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare plan jsonb; v_workspace uuid; reasons jsonb;
+begin
+  plan := public.tenant_unlink_plan_before_systems(p_link_id);
+  v_workspace := (plan->>'workspaceId')::uuid;
+  if v_workspace is null or not (plan->'workspaceKeptBecause' ? 'workspace_in_use:systems') then return plan; end if;
+  if exists (select 1 from public.systems s where s.business_workspace_id = v_workspace
+      and (s.command_digest <> encode(sha256(convert_to('adopt:' || s.id::text, 'UTF8')), 'hex')
+        or exists (select 1 from public.system_revisions r where r.system_id = s.id and r.number > 1))) then
+    return plan;
+  end if;
+  reasons := coalesce((select jsonb_agg(r) from jsonb_array_elements(plan->'workspaceKeptBecause') r
+    where r <> to_jsonb('workspace_in_use:systems'::text)), '[]'::jsonb);
+  return plan || jsonb_build_object('workspaceKeptBecause', reasons, 'deleteWorkspace', jsonb_array_length(reasons) = 0);
+end;
+$$;
+
 -- Deprovisioning or deactivating a tenant pauses every stored System adopted
 -- from it, so a card never says Live for a dead site. Records are kept.
 create function public.pause_tenant_systems(p_tenant_id text) returns integer
@@ -567,6 +593,7 @@ revoke all on function public.system_possibilities_follow_revision() from public
 revoke all on function public.adopt_system_with_revision(uuid, text, text, text, text, jsonb, boolean, uuid) from public, anon, authenticated, service_role;
 revoke all on function public.adopt_systems_on_conversion() from public, anon, authenticated, service_role;
 revoke all on function public.observe_system_revision(uuid, uuid, jsonb, text) from public, anon, authenticated, service_role;
+revoke all on function public.tenant_unlink_plan(uuid) from public, anon, authenticated, service_role;
 
 revoke all on function public.read_system_possibility(uuid, uuid, text, uuid) from public, anon, authenticated;
 revoke all on function public.list_system_possibilities(uuid, uuid, text) from public, anon, authenticated;

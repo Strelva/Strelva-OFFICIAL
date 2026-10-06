@@ -556,6 +556,9 @@ STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$
 # revisions, idle withdraw) and Make real live: channel flags and due resume.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008130000_system_possibilities.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/system-possibilities-schema.sql"
+# Conversion now adopts Systems; undoing an untouched conversion still removes its business.
+psql "${psql_args[@]}" --set=tenant_import="$(cat "$repo_root/tests/fixtures/business-record-tenant-import.json")" \
+  --file="$repo_root/tests/business-record-conversion-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008131000_make_real_live.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
 # The release flag rules still hold after the flag names gain channel keys.
