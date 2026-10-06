@@ -140,6 +140,34 @@ export async function getVersions(
   return (store[key] as ContentVersion[]) ?? [];
 }
 
+/**
+ * The tenant's most recent content versions across every section, newest
+ * first. Read-only; used by the website System's one History list.
+ */
+export async function getRecentVersions(
+  tenant: string = DEFAULT_TENANT,
+  limit = 30,
+): Promise<ContentVersion[]> {
+  const safeLimit = Math.max(1, Math.min(limit, 100));
+  if (dataSourceIsPostgres()) {
+    const db = versionDb(`list recent ${tenant}`);
+    const { data, error } = await db
+      .from("content_versions")
+      .select("*")
+      .eq("tenant_id", tenant)
+      .order("created_at", { ascending: false })
+      .limit(safeLimit);
+    if (error) throw error;
+    return (data ?? []).map(mapPgVersionRow);
+  }
+  const store = await readDevContent(tenant);
+  return Object.entries(store)
+    .filter(([key]) => key.startsWith("__versions:"))
+    .flatMap(([, value]) => (Array.isArray(value) ? value as ContentVersion[] : []))
+    .sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))
+    .slice(0, safeLimit);
+}
+
 export async function restoreVersion(
   section: ContentSection,
   versionId: string,

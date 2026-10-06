@@ -261,7 +261,7 @@ describe("website System: publish onto a linked site, routing after a rename, op
     h.documents.publishToLinkedTenant = vi.fn(async (_user, key) => {
       if (key.tenantId !== linked) throw new WorkspaceAccessError();
       const approval = approvals.get(key.workId);
-      if (approval?.revision !== key.revision || approval.contentHash !== key.contentHash) throw new WorkspaceConflictError("This website changed or is already rebuilding. Reload before continuing.");
+      if (!approval || approval.revision !== key.revision || approval.contentHash !== key.contentHash) throw new WorkspaceConflictError("This website changed or is already rebuilding. Reload before continuing.");
       const row = h.revisions.get(key.workId)!.find(item => item.revision === key.revision)!;
       const publication = { ...row, tenantId: key.tenantId, receipt: key.receipt };
       h.publications.set(key.tenantId, clone(publication));
@@ -331,7 +331,7 @@ describe("website System: publish onto a linked site, routing after a rename, op
     expect(h.documents.authorizeDomain).toHaveBeenCalledWith(actor, expect.objectContaining({ hostname: "www.business.example.test", action: "attach", tenantId: record.rebuild.tenantId }));
     expect(h.domainChange).toHaveBeenCalledOnce();
     // The provider write re-checks the same authority before touching the provider.
-    const options = h.domainChange.mock.calls[0]![2] as { authorizeWrite: () => Promise<void> };
+    const options = (h.domainChange.mock.calls[0] as unknown[])[2] as { authorizeWrite: () => Promise<void> };
     await options.authorizeWrite(); expect(h.documents.authorizeDomain).toHaveBeenCalledTimes(2);
   });
   it("does not touch the domain provider when the owner has not approved the hostname", async () => {
