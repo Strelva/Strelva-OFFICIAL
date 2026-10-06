@@ -245,10 +245,12 @@ describe("public inquiry capability submission", () => {
   });
 
   it("preserves the additive legacy lead contract", async () => {
+    mocks.capture.mockResolvedValueOnce({ status: "captured", lead: { id: "lead_legacy" } });
     const response = await request({ name: "Legacy visitor", email: "legacy@example.test", source: "contact-form" });
 
     expect(response.status).toBe(200);
-    expect(mocks.legacy).toHaveBeenCalledWith("acme", {
+    // Same legacy input and default owner notice (no options argument).
+    expect(mocks.capture).toHaveBeenCalledWith("acme", {
       name: "Legacy visitor",
       email: "legacy@example.test",
       message: undefined,
@@ -257,7 +259,16 @@ describe("public inquiry capability submission", () => {
     expect(mocks.snapshot).not.toHaveBeenCalled();
   });
 
+  it("answers 503 on the legacy path when no store confirmed the lead", async () => {
+    mocks.capture.mockResolvedValueOnce({ status: "unavailable", mirrored: false });
+    const response = await request({ name: "Legacy visitor", email: "legacy@example.test", source: "contact-form" });
+    expect(response.status).toBe(503);
+    mocks.capture.mockResolvedValueOnce({ status: "unavailable", mirrored: true });
+    expect((await request({ name: "Legacy visitor", email: "legacy@example.test", source: "contact-form" })).status).toBe(200);
+  });
+
   it("keeps a legacy form with extra fields on the legacy owner-notice path", async () => {
+    mocks.capture.mockResolvedValueOnce({ status: "captured", lead: { id: "lead_legacy" } });
     const response = await request({
       name: "Legacy visitor",
       email: "legacy@example.test",
@@ -266,13 +277,13 @@ describe("public inquiry capability submission", () => {
     });
 
     expect(response.status).toBe(200);
-    expect(mocks.legacy).toHaveBeenCalledWith("acme", {
+    expect(mocks.capture).toHaveBeenCalledTimes(1);
+    expect(mocks.capture).toHaveBeenCalledWith("acme", {
       name: "Legacy visitor",
       email: "legacy@example.test",
       message: undefined,
       source: "contact-form",
     });
-    expect(mocks.capture).not.toHaveBeenCalled();
     expect(mocks.snapshot).not.toHaveBeenCalled();
   });
 });
