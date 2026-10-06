@@ -11,7 +11,8 @@ import { getSessionUser } from "@/platform/infra/db/server-client";
 import { isSuperAdminUser } from "@/platform/infra/db/repositories";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
-import { listWorkspaceDiscoveryProducts, listWorkspaceExecutableProducts, type ProductDefinition } from "@/platform/products";
+import type { ProductDefinition } from "@/platform/products";
+import { workspaceDiscoveryProducts, workspaceExecutables } from "@/capability-registry";
 import {
   acceptHandoff, createAgencyWorkspace, createHandoff, ensurePersonalWorkspace, getWork,
   listPendingAssessments, inspectHandoff, listAgencyDelegations, listAgencyHandoffs, listWork,
@@ -284,14 +285,14 @@ export async function GET(request: Request) {
     const connectedSitesReleased = systemsReleased && selected.kind === "customer" && selected.access === "member"
       ? await connectedSitesReleasedFor(current, selected.id).catch(() => false) : false;
     const homeFinderPreview = resolveHomeFinderPreviewHref();
-    const products: WorkspaceProduct[] = listWorkspaceDiscoveryProducts().map((product): WorkspaceProduct => ({ id: product.id, name: product.name, description: product.promise,
+    const products: WorkspaceProduct[] = workspaceDiscoveryProducts().map((product): WorkspaceProduct => ({ id: product.id, name: product.name, description: product.promise,
       availability: workspaceAvailability(product),
       ...(product.id === "homefinder" && homeFinderPreview ? { previewHref: homeFinderPreview } : {}),
     }));
     // Reaching this projection already proves the local workspace release gate
     // is enabled. Keep the registry's commercial posture internal while making
     // the executable routes honestly usable in this authenticated workspace.
-    products.push(...listWorkspaceExecutableProducts().map((product): WorkspaceProduct => ({
+    products.push(...workspaceExecutables().map((product): WorkspaceProduct => ({
       ...product,
       availability: "available",
     })));

@@ -60,7 +60,25 @@ continuation (carry a public result into a workspace).
 
 ## Where capabilities are declared
 
-There is no single registry. Six files each name a slice:
+One registry lists them all: `src/capability-registry.ts` (Strelva Reborn
+section 7, local). `listCapabilities()` returns every declared capability as
+`{ key, kind, id, name, description, declaredIn }`; `getCapability(key)`
+finds one. It reads the six declaration files below through adapters, so each
+capability is still declared once, in the file that owns its kind. It sits at
+the app edge because two kinds are tenant-model declarations in `src/lib` and
+the rest live in workspace layers, and neither may import the other. Listing
+grants nothing: access, release state and execution stay with the owner.
+
+Readers that list capabilities for a surface take them from the registry
+(`/api/workspace` does). Still reading their declaration directly, and fine to
+move one at a time: the offerings service (`getOfferingDefinition`), the
+operations runtime (`requireExactExecutableCapability`,
+`executableCapabilityRegistry`), the agent prompt (`capabilityPromptFragment`)
+and the dashboard feature editor and banner (client components, which must
+not load the server registry). Folding the declarations themselves into one
+file is not done: the tenant-model kinds would have to leave `src/lib` first.
+
+The six declaration files:
 
 | File | Declares |
 | --- | --- |
