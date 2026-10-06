@@ -29,7 +29,7 @@ export const PROTECTED_TENANTS = new Set(["gldf", "rohlax"]);
 const PAYING_STATUSES = new Set(["active", "trialing", "past_due"]);
 
 // Every public table carrying a tenant_id, purged child-first. Kept in sync with
-// src/lib/db/database.types.ts (asserted by src/__tests__/deprovision-coverage.test.ts).
+// src/platform/infra/db/database.types.ts (asserted by src/__tests__/deprovision-coverage.test.ts).
 // `tenants` (keyed by id) is deleted last, after its children are gone.
 export const TENANT_SCOPED_TABLES = [
   "activity_log", "audit_logs", "auto_approval_streaks", "bookings",
@@ -54,6 +54,19 @@ export const TENANT_SCOPED_TABLES = [
 // late failure never leaves the tenant partially erased.
 export const WORKSPACE_OWNED_TENANT_TABLES = [
   "website_document_publications", "website_hosted_tenant_reservations",
+] as const;
+
+// Tables with a tenant_id that the sweep does NOT cover yet, found when
+// database.types.ts was regenerated from every migration (Strelva Reborn
+// section 7, 2026-10-06). None has a foreign key to `tenants`, so their rows
+// outlive a deprovisioned tenant. Whether each is purged, kept as a receipt
+// (outside_write_receipts) or settled through its workspace (the agency draft
+// tables) is an open decision for Jacob; this list changes nothing at run
+// time. It only shrinks; deprovision-coverage.test.ts still fails on any new
+// tenant_id table.
+export const TENANT_TABLES_SWEEP_UNDECIDED = [
+  "agency_managed_website_draft_grants", "agency_managed_website_draft_preparations",
+  "agency_managed_website_draft_revisions", "outside_write_receipts", "report_snapshots",
 ] as const;
 
 // Tables keyed on the tenant's stable_id are not swept by slug either; the
