@@ -164,7 +164,7 @@ export function buildWebsiteSystemDetail(input: WebsiteDetailInputs): WebsiteSys
   ]).slice(0, 50);
 
   if (input.connectedSite && !input.connectedSite.verified) {
-    waiting.unshift({ id: `connect:${input.connectedSite.siteId}`, kind: "decision", title: `Prove ${input.connectedSite.siteHost} is yours`, detail: "Add the two lines below to your site, publish it, then check. Nothing is collected until then.", at: null, href: null });
+    waiting.unshift({ id: `connect:${input.connectedSite.siteId}`, kind: "decision", title: `Prove ${input.connectedSite.siteHost} is yours`, detail: "Add the two lines shown under Connected site, publish your site, then check. Nothing is collected until then.", at: null, href: null });
   }
   return { systemId: input.systemId, ...(input.connectedSite ? { connectedSite: input.connectedSite } : {}), domains: input.domains, waiting, requests, history, unavailable: [...new Set(input.unavailable)] };
 }
