@@ -20,9 +20,11 @@ const h = vi.hoisted(() => ({
   sendNewBookingOwnerEmail: vi.fn(),
   alertOnce: vi.fn(),
   logActivity: vi.fn(),
+  addEvent: vi.fn(),
 }));
 
 vi.mock("@/lib/redis", () => ({ getRedis: () => redis }));
+vi.mock("@/lib/events", () => ({ addEvent: h.addEvent }));
 vi.mock("@/lib/storage/core", () => ({
   DEFAULT_TENANT: "demo",
   readDevContent: async (tenant: string) => ({ ...(devStore.get(tenant) ?? {}) }),
@@ -490,6 +492,53 @@ describe("Calendly imports", () => {
     expect(imported).toMatchObject({ externalSource: "calendly", status: "confirmed", timeZone: "America/New_York" });
     expect(await recordCalendlyBooking("t1", { ...payload, event: "invitee.canceled" })).toBe("updated");
     expect(imported.status).toBe("cancelled");
+  });
+
+  it("end to end through the signed webhook: an import blocks the site's time, and a cancel frees it (API v2 payload)", async () => {
+    const { fake } = fakeWorld();
+    env("postgres");
+    vi.stubEnv("CALENDLY_WEBHOOK_SECRET", "calendly_e2e_secret");
+    await redis.set("calendly-user-uri:https://api.calendly.com/users/HOST1", "t1");
+    const { POST: calendlyWebhook } = await import("@/app/api/webhooks/calendly/route");
+    const { createHmac } = await import("node:crypto");
+    const send = async (event: "invitee.created" | "invitee.canceled") => {
+      // The API v2 shape: the invitee resource is the payload; the host is an event membership.
+      const body = JSON.stringify({
+        event,
+        payload: {
+          uri: "https://api.calendly.com/scheduled_events/E9/invitees/I9", name: "Pat Example", email: "pat@example.test", timezone: "America/Chicago",
+          status: event === "invitee.canceled" ? "canceled" : "active",
+          scheduled_event: {
+            uri: "https://api.calendly.com/scheduled_events/E9", name: "Intro call",
+            start_time: "2026-11-06T16:30:00.000000Z", end_time: "2026-11-06T17:00:00.000000Z",
+            event_memberships: [{ user: "https://api.calendly.com/users/HOST1" }],
+          },
+        },
+      });
+      const ts = Math.floor(Date.now() / 1000);
+      const sig = createHmac("sha256", "calendly_e2e_secret").update(`${ts}.${body}`).digest("hex");
+      return calendlyWebhook(new Request("https://app.strelva.test/api/webhooks/calendly", {
+        method: "POST", headers: { "Calendly-Webhook-Signature": `t=${ts},v1=${sig}`, "content-type": "application/json" }, body,
+      }));
+    };
+    // 11:30 New York is 16:30Z on Friday Nov 6.
+    expect(await availability()).toContain("11:30");
+    expect((await send("invitee.created")).status).toBe(200);
+    expect(fake.rows).toEqual([expect.objectContaining({ origin: "import", externalSource: "calendly", externalRef: "https://api.calendly.com/scheduled_events/E9/invitees/I9", status: "confirmed" })]);
+    expect(h.addEvent).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "t1", source: "calendly", title: "New booking: Pat Example" }));
+    expect(await availability()).not.toContain("11:30");
+    // The import shows in the owner's list.
+    expect((await getBookings("t1")).map((b) => [b.clientName, b.startTime, b.status])).toContainEqual(["Pat Example", "11:30", "confirmed"]);
+    // A replay changes nothing.
+    expect((await send("invitee.created")).status).toBe(200);
+    expect(fake.rows).toHaveLength(1);
+
+    const activityBefore = h.addEvent.mock.calls.length;
+    expect((await send("invitee.canceled")).status).toBe(200);
+    expect(fake.rows[0]).toMatchObject({ status: "cancelled" });
+    expect(await availability()).toContain("11:30");
+    // A cancel changes the booking only; it writes no "New booking" activity.
+    expect(h.addEvent).toHaveBeenCalledTimes(activityBefore);
   });
 
   it("is off without the write switch, and ignores events it doesn't know", async () => {

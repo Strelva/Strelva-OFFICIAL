@@ -20,18 +20,38 @@ interface CalendlyEvent {
   event_type: string;
 }
 
+/**
+ * Two payload shapes are accepted. The older one nests the invitee
+ * (`payload.invitee`); Calendly's API v2 webhooks send the invitee resource
+ * itself as `payload` (its `uri`, `name`, `email`, `timezone`), with the host in
+ * `scheduled_event.event_memberships[].user`.
+ */
 interface CalendlyWebhookPayload {
   event: string;
-  payload: {
-    invitee: CalendlyInvitee;
-    event: CalendlyEvent;
-    scheduled_event: {
+  payload: Partial<CalendlyInvitee> & {
+    invitee?: CalendlyInvitee;
+    event?: CalendlyEvent;
+    scheduled_event?: {
       uri: string;
       name: string;
       start_time: string;
       end_time: string;
+      event_memberships?: Array<{ user?: string }>;
     };
   };
+}
+
+function inviteeOf(payload: CalendlyWebhookPayload["payload"]): Partial<CalendlyInvitee> {
+  if (payload.invitee) return payload.invitee;
+  return { uri: payload.uri, name: payload.name, email: payload.email, timezone: payload.timezone };
+}
+
+/** The host's Calendly user: from the event membership (API v2), else from a user-scoped event URI. */
+function userUriOf(payload: CalendlyWebhookPayload["payload"], eventUri: string): string | null {
+  const member = payload.scheduled_event?.event_memberships?.find((m) => typeof m.user === "string" && m.user.startsWith("https://api.calendly.com/users/"))?.user;
+  if (member) return member;
+  const match = eventUri.match(/users\/([^/]+)/);
+  return match ? `https://api.calendly.com/users/${match[1]}` : null;
 }
 
 const SIGNATURE_MAX_AGE_SECONDS = 300;
@@ -134,11 +154,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ received: true });
   }
 
-  const { invitee, scheduled_event } = payload.payload;
+  const inner = payload.payload && typeof payload.payload === "object" ? payload.payload : {};
+  const invitee = inviteeOf(inner);
+  const { scheduled_event } = inner;
 
-  const eventUri = scheduled_event?.uri || payload.payload.event?.uri || "";
-  const userUriMatch = eventUri.match(/users\/([^/]+)/);
-  const userUri = userUriMatch ? `https://api.calendly.com/users/${userUriMatch[1]}` : null;
+  const eventUri = scheduled_event?.uri || inner.event?.uri || "";
+  const userUri = userUriOf(inner, eventUri);
 
   let tenantId: string | null = null;
   if (userUri) {
@@ -153,12 +174,12 @@ export async function POST(req: Request) {
   // The booking itself, in the one store (a no-op unless its write switch is on).
   await recordCalendlyBooking(tenantId, {
     event: payload.event,
-    invitee: invitee ?? {},
+    invitee,
     scheduledEvent: {
       uri: eventUri,
-      name: scheduled_event?.name ?? payload.payload.event?.name,
-      start_time: scheduled_event?.start_time ?? payload.payload.event?.start_time,
-      end_time: scheduled_event?.end_time ?? payload.payload.event?.end_time,
+      name: scheduled_event?.name ?? inner.event?.name,
+      start_time: scheduled_event?.start_time ?? inner.event?.start_time,
+      end_time: scheduled_event?.end_time ?? inner.event?.end_time,
     },
   });
   if (isCancel) return NextResponse.json({ received: true });
@@ -167,8 +188,8 @@ export async function POST(req: Request) {
   const startTime: string | undefined =
     typeof scheduled_event?.start_time === "string"
       ? scheduled_event.start_time
-      : typeof payload.payload.event?.start_time === "string"
-      ? payload.payload.event.start_time
+      : typeof inner.event?.start_time === "string"
+      ? inner.event.start_time
       : undefined;
   const startTimeStr = startTime ? new Date(startTime).toLocaleString() : "time TBD";
 
@@ -177,7 +198,7 @@ export async function POST(req: Request) {
       tenantId,
       source: "calendly",
       type: "booking",
-      title: `New booking: ${invitee.name}`,
+      title: `New booking: ${invitee.name ?? "Customer"}`,
       body: `${eventName} scheduled for ${startTimeStr}`,
       status: "pending",
       metadata: {
