@@ -9,8 +9,7 @@
  */
 import type { NextResponse } from "next/server";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
-import { recordBeacon } from "@/products/connected-sites/server";
-import { connectErrorResponse, connectJson, connectPreflight, readConnectBody, resolveConnectSite } from "@/lib/connected-site-http";
+import { connectErrorResponse, connectJson, connectPreflight, readConnectBody, recordBeacon, resolveConnectSite } from "@/products/connected-sites/server";
 
 const EVENTS_PER_MINUTE = 120;
 

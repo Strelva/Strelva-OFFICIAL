@@ -4,7 +4,7 @@ import type { ConnectedSitesStore } from "@/products/connected-sites/store";
 const deps = vi.hoisted(() => ({ limited: vi.fn(), spam: vi.fn(), notify: vi.fn(), flag: vi.fn() }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: deps.limited, rateLimitKey: (_req: Request, prefix: string) => prefix }));
 vi.mock("@/lib/lead-spam", () => ({ scoreLeadSpam: deps.spam }));
-vi.mock("@/lib/connected-site-notify", () => ({ notifyConnectedSiteInquiry: deps.notify }));
+vi.mock("@/products/connected-sites/notify", () => ({ notifyConnectedSiteInquiry: deps.notify }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
 vi.mock("@/platform/release-flags/store", () => ({ workspaceReleaseFlagEnabled: deps.flag }));
 

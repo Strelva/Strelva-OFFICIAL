@@ -13,15 +13,12 @@ import {
   INQUIRY_RECORDS_TIMEOUT_MS,
   InquiryRecordsError,
   copyInquiryEvent,
-  decideHeldInquiry,
   followUpLeadCapture,
   holdSpamForReview,
   inquiryRecordsEnabled,
-  parseWorkspaceLead,
-  readInquiryEvents,
-  readWorkspaceInquiryLeads,
   setInquiryRecordsDb,
 } from "@/lib/inquiry-records";
+import { decideHeldInquiry, parseWorkspaceLead, readInquiryEvents, readWorkspaceInquiryLeads } from "@/products/inquiries/workspace-records";
 import { captureLead } from "@/lib/leads";
 import { recordSpam } from "@/lib/spam-pit";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";

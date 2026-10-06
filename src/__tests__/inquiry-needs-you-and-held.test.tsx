@@ -9,7 +9,7 @@ import { readWorkspaceLeads, type LeadDependencies } from "@/products/inquiries/
 import { WorkspaceInquiries } from "@/experience/places/WorkspaceInquiries";
 import { heldErrorMessage } from "@/experience/places/HeldInquiryActions";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
-import type { WorkspaceInquiryLead } from "@/lib/inquiry-records";
+import type { WorkspaceInquiryLead } from "@/products/inquiries/workspace-records";
 import { createRedisInquiryDeliveryStore } from "@/products/inquiries/delivery-store";
 import { setInquiryRecordsDb } from "@/lib/inquiry-records";
 import type { LeadMirrorDb } from "@/lib/lead-mirror";

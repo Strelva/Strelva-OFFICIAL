@@ -10,8 +10,8 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { WorkspaceStoreError } from "@/platform/workspaces/types";
-import { ConnectedSiteInputError, ConnectedSiteRefusedError, connectedSitesPublicFor, connectedSitesReleaseEnabled, resolvePublicSite } from "@/products/connected-sites/server";
-import { normalizeOrigin, type ResolvedConnectedSite } from "@/products/connected-sites/contracts";
+import { ConnectedSiteInputError, ConnectedSiteRefusedError, connectedSitesPublicFor, connectedSitesReleaseEnabled, resolvePublicSite } from "./server";
+import { normalizeOrigin, type ResolvedConnectedSite } from "./contracts";
 
 export const CONNECT_CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",

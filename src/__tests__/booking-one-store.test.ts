@@ -32,7 +32,7 @@ vi.mock("@/lib/storage/core", () => ({
 }));
 vi.mock("@/lib/storage/content-store", () => ({ getContent: async () => ({ services: h.services }) }));
 vi.mock("@/lib/storage", async () => ({
-  ...(await vi.importActual<typeof import("@/lib/storage/booking-store")>("@/lib/storage/booking-store")),
+  ...(await vi.importActual<typeof import("@/platform/bookings/legacy-store")>("@/platform/bookings/legacy-store")),
   getContent: async () => ({ services: h.services }),
   logActivity: h.logActivity,
   DEFAULT_TENANT: "demo",
@@ -52,7 +52,7 @@ vi.mock("@/lib/leads", () => ({ getLeadById: async () => null }));
 import { POST as postBooking } from "@/app/api/booking/route";
 import { GET as getAvailability } from "@/app/api/booking/availability/route";
 import { PUT as putBooking } from "@/app/api/booking/[id]/route";
-import { getBookings } from "@/lib/storage/booking-store";
+import { getBookings } from "@/platform/bookings/legacy-store";
 import type { Booking } from "@/lib/types";
 import { resetBookingFlagCache } from "@/platform/bookings/flags";
 import { setBookingStoreDb, readTenantBookings, upsertBookingSettings, type BookingStoreDb } from "@/platform/bookings/store";
@@ -63,7 +63,7 @@ import { backfillTenantBookings, checkTenantBookingParity, repairPendingBookings
 import { recordCalendlyBooking } from "@/platform/bookings/calendly";
 import { bookingRequestAdapter } from "@/platform/bookings/needs-you-adapter";
 import { decideBookingRequest, readWorkspaceBookingRequests } from "@/platform/bookings/store";
-import { updateBooking } from "@/lib/storage/booking-store";
+import { updateBooking } from "@/platform/bookings/legacy-store";
 import { setCalendarBusyPorts, type CalendarBusyPorts } from "@/platform/bookings/calendar-busy";
 
 const FRIDAY = "2026-11-06";

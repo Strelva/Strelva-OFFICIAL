@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { businessJsonLd, defaultAllowedOrigins, publicFactsFromRecord, verificationProofs } from "@/products/connected-sites/contracts";
 import { connectSite, connectedSiteSystemId, normalizeSiteUrl, readPublicContext, recordBeacon, submitPublicInquiry, verifySite } from "@/products/connected-sites/server";
 import { ConnectedSiteInputError, type ConnectedSitesStore } from "@/products/connected-sites/store";
-import { connectedInquiryEmail, notifyConnectedSiteInquiry } from "@/lib/connected-site-notify";
+import { connectedInquiryEmail, notifyConnectedSiteInquiry } from "@/products/connected-sites/server";
 import { systemsFromExisting } from "@/platform/systems/from-existing";
 import { systemOriginId } from "@/platform/systems/invariants";
 import { WorkspaceConflictError } from "@/platform/workspaces/types";

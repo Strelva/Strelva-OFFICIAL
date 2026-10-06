@@ -9,7 +9,7 @@
 import { emailSendingPaused } from "@/platform/infra/email/enabled";
 import { sendEmail } from "@/platform/infra/email/send";
 import { resolveOwnerRecipient } from "@/platform/business-record/service";
-import type { ConnectedInquiry, ResolvedConnectedSite } from "@/products/connected-sites/contracts";
+import type { ConnectedInquiry, ResolvedConnectedSite } from "./contracts";
 
 function appOrigin(): string {
   return (process.env.NEXT_PUBLIC_APP_URL || "https://app.strelva.com").replace(/\/+$/, "");

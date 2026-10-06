@@ -1,5 +1,5 @@
 import { requireDashboardFeature } from "@/lib/dashboard-feature-guard";
-import { getBookings, getBookingConfig, getDateOverrides } from "@/lib/storage";
+import { getBookings, getBookingConfig, getDateOverrides } from "@/platform/bookings/legacy-store";
 import { DEFAULT_BOOKING_CONFIG, zonedTodayIso } from "@/lib/booking";
 import { SchedulePanel } from "@/components/dashboard/SchedulePanel";
 import { InspectPreviewBanner } from "@/components/dashboard/InspectPreviewBanner";

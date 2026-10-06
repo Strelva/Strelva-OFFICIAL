@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getBookingConfig, getBookings, updateBooking } from "@/lib/storage/booking-store";
+import { getBookingConfig, getBookings, updateBooking } from "@/platform/bookings/legacy-store";
 import { zonedTodayIso } from "@/lib/booking";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantSiteName } from "@/lib/tenant-display";

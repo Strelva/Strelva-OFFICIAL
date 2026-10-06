@@ -6,7 +6,7 @@
 import { getSupabase } from "@/platform/infra/db/client";
 import { getLeadById } from "@/lib/leads";
 import { getContent } from "@/lib/storage/content-store";
-import { getLegacyBookingById, getLegacyBookingSettings, legacyGetBookings } from "@/lib/storage/booking-store";
+import { getLegacyBookingById, getLegacyBookingSettings, legacyGetBookings } from "@/platform/bookings/legacy-store";
 import { scheduleSchema } from "@/products/scheduling/contracts";
 import type { LegacyBookingPorts, ScheduleReservationPorts, WorkspaceSchedule } from "./move";
 import type { StoreBookingInput } from "./store";

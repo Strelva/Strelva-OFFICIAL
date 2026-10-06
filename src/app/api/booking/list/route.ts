@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getBookings, getBookingConfig } from "@/lib/storage";
+import { getBookings, getBookingConfig } from "@/platform/bookings/legacy-store";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { verifyAuth, requireTenantAccess } from "@/platform/infra/auth";
 import { zonedTodayIso } from "@/lib/booking";

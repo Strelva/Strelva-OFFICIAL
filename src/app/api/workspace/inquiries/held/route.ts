@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
-import { decideHeldInquiry, inquiryRecordsEnabled, InquiryRecordsError } from "@/lib/inquiry-records";
+import { inquiryRecordsEnabled, InquiryRecordsError } from "@/lib/inquiry-records";
+import { decideHeldInquiry } from "@/products/inquiries/server";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { ownerEntryHomesOpen } from "@/platform/owner-entry/linked-sites";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";

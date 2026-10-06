@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { createBookingAtomic, getContent, logActivity } from "@/lib/storage";
+import { getContent, logActivity } from "@/lib/storage";
+import { createBookingAtomic } from "@/platform/bookings/legacy-store";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
 import { isRateLimitedAsync, isRateLimitedPerInstance, rateLimitKey } from "@/platform/infra/rate-limit";

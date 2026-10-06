@@ -11,8 +11,8 @@ vi.mock("@/platform/workspaces/http", async (importOriginal) => ({
 }));
 vi.mock("@/platform/owner-entry/linked-sites", () => ({ ownerEntryHomesOpen: homesOpen }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: limited }));
-vi.mock("@/lib/inquiry-records", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/inquiry-records")>()),
+vi.mock("@/products/inquiries/workspace-records", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/products/inquiries/workspace-records")>()),
   decideHeldInquiry: decide,
 }));
 

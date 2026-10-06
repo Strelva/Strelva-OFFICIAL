@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { updateBooking, logActivity } from "@/lib/storage";
+import { logActivity } from "@/lib/storage";
+import { updateBooking } from "@/platform/bookings/legacy-store";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { verifyAuth, requireTenantPermission } from "@/platform/infra/auth";
 import { requireActiveSubscription } from "@/lib/subscription";

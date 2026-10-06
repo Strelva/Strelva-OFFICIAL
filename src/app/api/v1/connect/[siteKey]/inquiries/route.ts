@@ -15,9 +15,15 @@
 import { randomUUID } from "node:crypto";
 import type { NextResponse } from "next/server";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
-import { notifyConnectedSiteInquiry } from "@/lib/connected-site-notify";
-import { submitPublicInquiry } from "@/products/connected-sites/server";
-import { connectErrorResponse, connectJson, connectPreflight, readConnectBody, resolveConnectSite } from "@/lib/connected-site-http";
+import {
+  connectErrorResponse,
+  connectJson,
+  connectPreflight,
+  notifyConnectedSiteInquiry,
+  readConnectBody,
+  resolveConnectSite,
+  submitPublicInquiry,
+} from "@/products/connected-sites/server";
 
 const INQUIRIES_PER_MINUTE = 10;
 

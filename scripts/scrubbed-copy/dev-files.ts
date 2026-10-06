@@ -11,7 +11,7 @@ import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { rowToTenant } from "../../src/lib/tenants";
 import { SECTION_TO_TYPE, transformSanityImages } from "../../src/lib/storage/content-store";
-import { mapPgBookingRow } from "../../src/lib/storage/booking-store";
+import { mapPgBookingRow } from "../../src/platform/bookings/legacy-store";
 import type { Row } from "../../src/platform/infra/db/client";
 import type { ContentSection } from "../../src/lib/types";
 

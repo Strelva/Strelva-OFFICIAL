@@ -43,7 +43,7 @@ import {
   setBookingConfig,
   getDateOverrides,
   setDateOverrides,
-} from "@/lib/storage/booking-store";
+} from "@/platform/bookings/legacy-store";
 import type { DateOverride } from "@/lib/types";
 import { DEFAULT_BOOKING_CONFIG } from "@/lib/booking";
 

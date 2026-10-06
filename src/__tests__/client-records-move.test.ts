@@ -24,7 +24,7 @@ import {
 } from "@/platform/client-records/move";
 import { CLIENT_RECORD_STORE_DEFINITIONS, timelineRecord } from "@/platform/client-records/stores";
 import { getSpam, recordSpam } from "@/lib/spam-pit";
-import { setBookingConfig } from "@/lib/storage/booking-store";
+import { setBookingConfig } from "@/platform/bookings/legacy-store";
 import { countClientRedisKeys } from "../../scripts/count-client-redis-keys";
 import { parseMoveArgs, runClientRecordMove } from "../../scripts/client-records-move-plan";
 

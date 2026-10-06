@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getAvailableSlots, getContent } from "@/lib/storage";
+import { getContent } from "@/lib/storage";
+import { getAvailableSlots } from "@/platform/bookings/legacy-store";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 

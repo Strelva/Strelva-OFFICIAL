@@ -46,7 +46,7 @@ vi.mock("@/platform/infra/db/client", async (orig) => ({
 // Redis null so the slot-lock layer is inert and never touches a real client.
 vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
 
-import { getBookings, createBooking } from "@/lib/storage/booking-store";
+import { getBookings, createBooking } from "@/platform/bookings/legacy-store";
 
 beforeEach(() => {
   vi.stubEnv("DATA_SOURCE", "postgres");

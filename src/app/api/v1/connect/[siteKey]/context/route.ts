@@ -8,8 +8,7 @@
  * New in the public /api/v1/* contract (additive); change only additively.
  */
 import type { NextResponse } from "next/server";
-import { readPublicContext } from "@/products/connected-sites/server";
-import { connectErrorResponse, connectJson, connectPreflight, resolveConnectSite } from "@/lib/connected-site-http";
+import { connectErrorResponse, connectJson, connectPreflight, readPublicContext, resolveConnectSite } from "@/products/connected-sites/server";
 
 export async function OPTIONS(): Promise<NextResponse> {
   return connectPreflight();

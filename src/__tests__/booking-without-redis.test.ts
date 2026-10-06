@@ -32,7 +32,7 @@ vi.mock("@/lib/storage/core", () => ({
 }));
 vi.mock("@/lib/storage/content-store", () => ({ getContent: async () => ({ services: [{ id: "svc-consult", name: "Consultation", duration: "30" }] }) }));
 vi.mock("@/lib/storage", async () => ({
-  ...(await vi.importActual<typeof import("@/lib/storage/booking-store")>("@/lib/storage/booking-store")),
+  ...(await vi.importActual<typeof import("@/platform/bookings/legacy-store")>("@/platform/bookings/legacy-store")),
   getContent: async () => ({ services: [{ id: "svc-consult", name: "Consultation", duration: "30" }] }),
   logActivity: h.logActivity,
   DEFAULT_TENANT: "demo",

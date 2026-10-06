@@ -210,3 +210,8 @@ export async function readConnectedSites(actor: WorkspaceActor, businessId: stri
   const [sites, activity, inquiries] = await Promise.all([store.list(actor, businessId), store.activity(actor, businessId, 30), store.inquiries(actor, businessId, 50)]);
   return { sites: sites.map(site => ({ ...presentConnectedSite(site), activity: activity[site.id] ?? {} })), inquiries };
 }
+
+// The public connect routes' HTTP plumbing and the owner notice (moved from
+// src/lib in Strelva Reborn section 7; routes import them through this entry).
+export { CONNECT_CORS_HEADERS, CONNECT_MAX_BODY_BYTES, ConnectBodyError, connectErrorResponse, connectJson, connectPreflight, readConnectBody, resolveConnectSite } from "./http";
+export { connectedInquiryEmail, notifyConnectedSiteInquiry } from "./notify";

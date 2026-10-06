@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDateOverrides, setDateOverrides } from "@/lib/storage";
+import { getDateOverrides, setDateOverrides } from "@/platform/bookings/legacy-store";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { verifyAuth, requireTenantAccess, requireTenantPermission } from "@/platform/infra/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
