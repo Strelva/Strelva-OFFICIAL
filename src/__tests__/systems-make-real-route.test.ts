@@ -7,6 +7,7 @@ const deps = vi.hoisted(() => ({
   exit: vi.fn(),
   makeReal: vi.fn(),
   limited: vi.fn(),
+  throughNeedsYou: vi.fn(),
 }));
 
 vi.mock("@/lib/db/server-client", () => ({ getSessionUser: async () => deps.user }));
@@ -16,6 +17,7 @@ vi.mock("@/platform/workspaces", () => ({ listWorkspaces: deps.workspaces, listW
 vi.mock("@/platform/workspace-exit", () => ({ readWorkspaceExit: deps.exit }));
 vi.mock("@/products/managed-presence/server", () => ({ listManagedPresenceWork: async () => ({ managedWork: [{ id: "mooney-firm", domain: "www.attymooney.com" }] }) }));
 vi.mock("@/experience/systems/server", () => ({ makeRealForWorkspace: deps.makeReal }));
+vi.mock("@/platform/needs-you/systems-sources", () => ({ makeRealThroughNeedsYou: deps.throughNeedsYou }));
 
 import { POST } from "@/app/api/workspace/systems/make-real/route";
 import { setReleaseFlagsDb } from "@/platform/release-flags/store";
@@ -116,5 +118,43 @@ describe("POST /api/workspace/systems/make-real", () => {
   it("rate limits", async () => {
     deps.limited.mockResolvedValue(true);
     expect((await call()).status).toBe(429);
+  });
+
+  describe("with Needs you on: the tap is the owner's one approval for the plan", () => {
+    beforeEach(() => {
+      vi.stubEnv("STRELVA_NEEDS_YOU_RELEASE", "1");
+      deps.throughNeedsYou.mockReset().mockResolvedValue({ status: "done", result: RESULT, reason: null });
+    });
+
+    it("decides the plan's Needs you item and returns Make real's result", async () => {
+      const response = await call();
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ result: RESULT, decision: "done" });
+      expect(deps.throughNeedsYou).toHaveBeenCalledWith({ userId: deps.user!.id, verifiedEmail: "sheri@example.test" }, BUSINESS, "website-rebuild:w", expect.anything());
+      // One write path: the route never runs Make real beside Needs you.
+      expect(deps.makeReal).not.toHaveBeenCalled();
+    });
+
+    it("says so when nothing waits on a decision, or it changed, or the actor may not decide", async () => {
+      deps.throughNeedsYou.mockResolvedValue(null);
+      expect((await call()).status).toBe(404);
+      deps.throughNeedsYou.mockResolvedValue({ status: "changed", result: null, reason: null });
+      expect((await call()).status).toBe(409);
+      deps.throughNeedsYou.mockResolvedValue({ status: "forbidden", result: null, reason: null });
+      expect((await call()).status).toBe(403);
+    });
+
+    it("a failed start says nothing changed", async () => {
+      deps.throughNeedsYou.mockResolvedValue({ status: "failed", result: null, reason: "make_real_refused: live changed" });
+      const response = await call();
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({ error: "Make real could not start. Nothing changed. Strelva is on it." });
+    });
+
+    it("still refuses a non-owner before reaching Needs you", async () => {
+      deps.workspaces.mockResolvedValue([{ id: BUSINESS, kind: "customer", name: "The Mooney Firm", access: "member", role: "admin" }]);
+      expect((await call()).status).toBe(403);
+      expect(deps.throughNeedsYou).not.toHaveBeenCalled();
+    });
   });
 });

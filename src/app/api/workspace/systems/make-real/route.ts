@@ -8,6 +8,9 @@ import { readWorkspaceExit } from "@/platform/workspace-exit";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 import { listManagedPresenceWork } from "@/products/managed-presence/server";
 import { makeRealForWorkspace } from "@/experience/systems/server";
+import { sendEmailWithReceipt } from "@/lib/email/send";
+import { needsYouAppOrigin, needsYouReleaseEnabled, needsYouStore } from "@/platform/needs-you/server";
+import { makeRealThroughNeedsYou } from "@/platform/needs-you/systems-sources";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +30,11 @@ const input = z.object({
  *
  * A 1.0.0 launch feature: it also needs STRELVA_SYSTEMS_RELEASE, checked
  * before any session or body read.
+ *
+ * With STRELVA_NEEDS_YOU_RELEASE on, the tap is the owner's one approval for
+ * the plan: it decides the plan's Needs you item (the same item Home and the
+ * email show), and Make real starts from that item's resolver with the item
+ * as its approval record. Off, it runs as before.
  */
 export async function POST(request: Request) {
   if (!workspaceReleaseEnabled()) return workspaceJson({ error: "The workspace release is not enabled." }, 503);
@@ -46,6 +54,20 @@ export async function POST(request: Request) {
     }
     const exit = await readWorkspaceExit(actor, workspace.id).catch(() => null);
     if (!exit || exit.state?.status === "completed") return workspaceJson({ error: "Work in this business has stopped, or its state could not be confirmed. Nothing changed." }, 409);
+    if (needsYouReleaseEnabled()) {
+      const decided = await makeRealThroughNeedsYou(actor, workspace.id, body.possibilityId, {
+        store: needsYouStore, appOrigin: needsYouAppOrigin(), sendEmail: sendEmailWithReceipt,
+      });
+      if (!decided) return workspaceJson({ error: "This possibility is not waiting on a decision. Nothing changed." }, 404);
+      if (decided.status === "forbidden" || decided.status === "not_owner" || decided.status === "sign_in") {
+        return workspaceJson({ error: "Only an owner of this business can make a possibility real.", permission: "not_owner" }, 403);
+      }
+      if (decided.status === "changed" || decided.status === "already_handled" || decided.status === "expired") {
+        return workspaceJson({ error: "This changed since you opened it. Reload and look again. Nothing changed.", status: decided.status }, 409);
+      }
+      if (!decided.result) return workspaceJson({ error: "Make real could not start. Nothing changed. Strelva is on it.", status: decided.status, reason: decided.reason }, 409);
+      return workspaceJson({ result: decided.result, decision: decided.status });
+    }
     const managed = await listManagedPresenceWork().catch(() => ({ managedWork: [] as Array<{ id: string; domain?: string }> }));
     const result = await makeRealForWorkspace({
       actor, businessId: workspace.id, savedWork: await listWork(actor, workspace.id),

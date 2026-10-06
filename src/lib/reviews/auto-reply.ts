@@ -16,7 +16,7 @@
 
 import type { TenantConfig, UnifiedEvent } from "../types";
 import { getEventsRaw, addEvent, updateEvent } from "../events";
-import { resolveEventAction } from "../event-actions";
+import { AUTO_REPLY_ACTOR, resolveEventAction } from "../event-actions";
 import { getAllTenants } from "../tenants";
 import { getReplyVoice } from "./reply-voice";
 import { getReviews } from "../reviews";
@@ -154,7 +154,7 @@ export async function runDueAutoPosts(nowMs: number): Promise<{ posted: number; 
       if (Number.isNaN(due) || due > nowMs) continue; // still inside the window
       let ok = false;
       try {
-        const result = await resolveEventAction(t.id, e.id, "approved");
+        const result = await resolveEventAction(t.id, e.id, "approved", AUTO_REPLY_ACTOR);
         ok = result.changed;
       } catch {
         ok = false;

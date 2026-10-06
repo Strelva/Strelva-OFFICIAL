@@ -6,6 +6,11 @@ import type { TenantConfig } from "../lib/types";
  * claim removal. The write itself is unchanged; each sent write leaves one
  * receipt; a failed read-back is recorded, never retried; a claim removal
  * never calls Vercel.
+ *
+ * Review replies here are the legacy publisher, which the approve path still
+ * uses for a tenant not linked to a business (or with the publishing release
+ * off). A linked tenant's reply records in google_listing_receipts instead:
+ * see review-reply-listing-path.test.ts.
  */
 
 const receipts: Record<string, unknown>[] = [];

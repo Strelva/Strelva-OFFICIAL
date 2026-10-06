@@ -34,7 +34,8 @@ import {
   type Observation,
   type SystemHealth,
 } from "@/platform/system-health";
-import { prepareIsolatedPossibility, type IsolatedSandbox } from "@/platform/make-real/sandbox";
+import { prepareIsolatedPossibility, type IsolatedSandbox, type SandboxRunOptions } from "@/platform/make-real/sandbox";
+import { planFingerprint } from "@/platform/make-real/approvals";
 import { bareHostname, websiteRebuildCandidate, type WebsiteRebuildCandidate } from "@/products/websites/index";
 import type { WorkspaceMakeRealResult, WorkspacePublishing, WorkspaceSystems } from "@/experience/workspace/contracts";
 import { addPublishingSystems, type PublishingProjection } from "@/products/publishing/projection";
@@ -341,10 +342,11 @@ export async function makeRealInSandbox(
   actor: WorkspaceActor,
   possibilityId: string,
   permission: { canActivate: boolean; reason?: string },
+  options: SandboxRunOptions = {},
 ): Promise<WorkspaceMakeRealResult | null> {
   const prepared = (await prepareRebuildPossibilities(input)).find((item) => item.sandbox.possibility.id === possibilityId);
   if (!prepared) return null;
-  const { activation, view, stoppedBefore } = await prepared.sandbox.run(actor, permission);
+  const { activation, view, stoppedBefore } = await prepared.sandbox.run(actor, permission, options);
   // Step labels name Systems by id; customers read names.
   const names = new Map(prepared.affects.map((system) => [system.id, system.name]));
   const readable = (label: string) => [...names].reduce((text, [id, name]) => text.replaceAll(id, name), label);
@@ -362,7 +364,43 @@ export async function makeRealInSandbox(
   };
 }
 
-export async function makeRealForWorkspace(deps: LiveSystemsDeps, possibilityId: string, permission: { canActivate: boolean; reason?: string }): Promise<WorkspaceMakeRealResult | null> {
+export async function makeRealForWorkspace(deps: LiveSystemsDeps, possibilityId: string, permission: { canActivate: boolean; reason?: string }, options: SandboxRunOptions = {}): Promise<WorkspaceMakeRealResult | null> {
   const input = await liveProjectionInput(deps);
-  return makeRealInSandbox(input, deps.actor, possibilityId, permission);
+  return makeRealInSandbox(input, deps.actor, possibilityId, permission, options);
+}
+
+/** A Ready plan as Needs you sees it: one owner decision per plan. */
+export interface ReadyMakeRealPlan {
+  possibilityId: string;
+  candidateRevision: number;
+  /** Covers every effect, change, connection and introduced System of this candidate. */
+  fingerprint: string;
+  title: string;
+  intent: string;
+  /** The Systems it changes, by name. */
+  affects: string[];
+  /** It brings a new System live (system.go_live) rather than changing a live one. */
+  introducesSystem: boolean;
+  /** The System page the owner opens to see it. */
+  systemId: string;
+}
+
+/** Every Ready Possibility of this business, for Needs you. */
+export async function readyMakeRealPlans(deps: LiveSystemsDeps): Promise<ReadyMakeRealPlan[]> {
+  const input = await liveProjectionInput(deps);
+  return (await prepareRebuildPossibilities(input))
+    .filter((item) => item.sandbox.possibility.status === "ready")
+    .map((item) => {
+      const p = item.sandbox.possibility;
+      return {
+        possibilityId: p.id,
+        candidateRevision: p.candidateRevision,
+        fingerprint: planFingerprint(p),
+        title: p.title,
+        intent: p.intent,
+        affects: item.affects.map((system) => system.name),
+        introducesSystem: p.introduces.length > 0,
+        systemId: item.site.system.id,
+      };
+    });
 }

@@ -20,6 +20,20 @@ provider. The customer sees `describeActivation()` for that run and the
 outside effects that are not connected. Nothing it does reaches a provider,
 the SystemStore or a live site.
 
+## One owner approval per plan (Needs you)
+
+With `STRELVA_NEEDS_YOU_RELEASE` on, a Ready Possibility opens one Needs you
+item (`src/platform/needs-you/sources/make-real.ts`), bound to the plan
+fingerprint (`planFingerprint`: every effect's fingerprint, change, Connection
+and introduced System of the candidate revision). That item is the approval
+record: `needsYouMakeRealApprovals` reads it as a `make_real_plan` subject.
+Approving it (Home, the email link, or the System page's Make it live, which
+now decides the same item) starts Make real with the item as the approval for
+every effect; each effect's own fingerprint must sit inside the plan
+(`approvalProblem`), and `planApprovalAuthority` lets `system.activate` and
+`site.publish` run only while the record still approves this plan. Off, the
+route runs as before. The run itself is still the isolated sandbox.
+
 ## Rules the runner enforces
 
 - An approval is a record, not a string. `ApprovalRecordsPort` resolves an

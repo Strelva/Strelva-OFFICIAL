@@ -398,8 +398,12 @@ export function createMakeReal(deps: MakeRealDeps) {
       if (!effect || !a.steps.some((s) => s.kind === "effect" && s.target === effectId)) conflict("That effect is not part of this activation.");
       const decision = await deps.authority.check(actor, { businessId, scope: EFFECT_SCOPE[effect.kind] });
       if (!decision.allowed) throw new WorkspaceAccessError(decision.reason);
-      if (p.consumedApprovalIds?.includes(approvalId) || a.approvals.some((x) => x.approvalId === approvalId && x.consumedAt)) conflict("That approval was already used by an accepted write.");
       const recordRow = await deps.approvals.get(businessId, approvalId);
+      // A plan approval covers every effect of the plan once each; an effect approval is used once.
+      const usedHere = recordRow?.subject.kind === "make_real_plan"
+        ? a.approvals.some((x) => x.approvalId === approvalId && x.effectId === effectId && x.consumedAt)
+        : a.approvals.some((x) => x.approvalId === approvalId && x.consumedAt);
+      if (p.consumedApprovalIds?.includes(approvalId) || usedHere) conflict("That approval was already used by an accepted write.");
       const problem = approvalProblem(recordRow, businessId, p, effect);
       if (problem) conflict(`That approval cannot be used: ${problem}.`);
       a.approvals.push({ effectId, approvalId, approvedBy: recordRow!.decidedBy ?? `approval:${approvalId}`, at: now() });

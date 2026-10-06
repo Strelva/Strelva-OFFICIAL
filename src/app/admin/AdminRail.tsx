@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import type { CSSProperties } from "react";
 import {
   LayoutGrid, Users, Building2, Inbox, UserPlus, CreditCard, BarChart3,
-  Zap, FileText, Wrench, Activity, ScrollText, Globe, BriefcaseBusiness, MessageSquareText, ListChecks,
+  Zap, FileText, Wrench, Activity, ScrollText, Globe, BriefcaseBusiness, MessageSquareText, ListChecks, ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 import { LogoMark } from "@/components/Logo";
@@ -20,6 +20,7 @@ export const NAV: Group[] = [
     items: [
       { href: "/admin", label: "Overview", icon: LayoutGrid, exact: true },
       { href: "/admin/queue", label: "Queue", icon: ListChecks },
+      { href: "/admin/needs-you", label: "Who decides", icon: ShieldCheck },
       { href: "/admin/work", label: "Internal work", icon: BriefcaseBusiness },
     ],
   },

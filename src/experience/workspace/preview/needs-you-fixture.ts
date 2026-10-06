@@ -4,6 +4,30 @@
  * only change this in-memory list.
  */
 import type { HandledReceipt, OwnerDecision } from "@/platform/needs-you/contracts";
+import { buildPolicyView, ownerChangeSchema, planOwnerChange, REFUSAL_WORDS, type PlannedWrite, type PolicyRows } from "@/platform/needs-you/policy-model";
+
+/** The Mooney Firm has made Google posts its own call; Strelva lets routine edits through after notice. */
+const POLICY_ROWS: PolicyRows = {
+  settings: [
+    { layer: "owner", kind: "google.post", systemId: null, route: "owner_decides", version: 1, reason: "owner_setting", updatedAt: "2026-10-05T15:00:00Z" },
+    { layer: "strelva", kind: "copy.routine", systemId: null, route: "handle_after_notice", version: 1, reason: "strelva_default", updatedAt: "2026-10-01T15:00:00Z" },
+  ],
+  history: [
+    { id: "e0000000-0000-4000-8000-000000000001", systemId: null, kind: "google.post", layer: "owner", oldRoute: null, newRoute: "owner_decides", reason: "owner_setting", version: 1, at: "2026-10-05T15:00:00Z" },
+    { id: "e0000000-0000-4000-8000-000000000002", systemId: null, kind: "copy.routine", layer: "strelva", oldRoute: null, newRoute: "handle_after_notice", reason: "strelva_default", version: 1, at: "2026-10-01T15:00:00Z" },
+  ],
+};
+
+let previewHistory = 10;
+/** What set_decision_policy does, in memory, for the preview only. */
+function applyPreviewPolicy(rows: PolicyRows, write: Extract<PlannedWrite, { ok: true }>["write"]): PolicyRows {
+  const current = rows.settings.find(row => row.layer === write.layer && row.kind === write.kind && row.systemId === write.systemId) ?? null;
+  const version = (current?.version ?? 0) + 1;
+  const others = rows.settings.filter(row => row !== current);
+  const settings = write.route ? [...others, { layer: write.layer, kind: write.kind, systemId: write.systemId, route: write.route, version, reason: "owner_setting", updatedAt: new Date().toISOString() }] : others;
+  const id = `e0000000-0000-4000-8000-${String(++previewHistory).padStart(12, "0")}`;
+  return { settings, history: [{ id, systemId: write.systemId, kind: write.kind, layer: write.layer, oldRoute: current?.route ?? null, newRoute: write.route, reason: write.route ? "owner_setting" : "owner_reset", version, at: new Date().toISOString() }, ...rows.history] };
+}
 
 const MOONEY = "a0000000-0000-4000-8000-000000000001";
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -63,6 +87,7 @@ const SITE_SUMMARY = {
 export function withNeedsYouPreview(base: typeof fetch, scenario: string, enabled: boolean): typeof fetch {
   let items = scenario === "mooney-empty" ? [] : initialItems();
   let handled = scenario === "mooney-empty" ? [] : [...HANDLED];
+  let policyRows: PolicyRows = scenario === "mooney-empty" ? { settings: [], history: [] } : structuredClone(POLICY_ROWS);
   const role = scenario === "mooney-member" ? "member" : "owner";
   return async (input, init) => {
     const raw = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -95,6 +120,20 @@ export function withNeedsYouPreview(base: typeof fetch, scenario: string, enable
       if (scenario === "mooney-loading") await new Promise(resolve => setTimeout(resolve, 20_000));
       if (scenario === "mooney-error") return json({ error: "Unavailable." }, 500);
       return json(scenario === "mooney-empty" ? { sites: [{ ...SITE_SUMMARY, leads: { count: 0, recent: [] }, activity: [] }], deniedSites: [] } : { sites: [SITE_SUMMARY], deniedSites: [] });
+    }
+    if (url.pathname === "/api/workspace/needs-you/policy") {
+      if (!enabled) return json({ error: "Needs you is not enabled." }, 503);
+      if (scenario === "mooney-loading") await new Promise(resolve => setTimeout(resolve, 20_000));
+      if (scenario === "mooney-error") return json({ error: "Who decides could not be loaded. Nothing about it changed." }, 503);
+      if (method === "GET") return json({ role, view: buildPolicyView(policyRows) });
+      if (role !== "owner") return json({ error: "Only the owner can change who decides. Nothing changed." }, 403);
+      const body = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as { change?: unknown };
+      const change = ownerChangeSchema.safeParse(body.change);
+      if (!change.success) return json({ error: "Check the request." }, 400);
+      const planned = planOwnerChange(policyRows, change.data);
+      if (!planned.ok) return json({ error: REFUSAL_WORDS[planned.reason], code: planned.reason }, planned.reason === "stale" ? 409 : 422);
+      policyRows = applyPreviewPolicy(policyRows, planned.write);
+      return json({ role, view: buildPolicyView(policyRows) });
     }
     const response = await base(input, init);
     if (url.pathname !== "/api/workspace" || method !== "GET" || !response.ok) return response;

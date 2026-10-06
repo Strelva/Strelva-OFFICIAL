@@ -306,7 +306,8 @@ are untouched.
       on each System and beside the site editor) and conversation history in
       Postgres (`20261008110000`) built and proven locally Oct 6 on
       `w2/owner-surfaces-b`, not migrated or deployed. Real Needs you wiring
-      still missing · L*
+      done locally Oct 6 (`w2/decisions-wiring`, behind
+      `STRELVA_NEEDS_YOU_RELEASE`); both merged on `integrate/reborn-1.0` · L*
 
 Proof: authenticated local journeys per capability on desktop and mobile, in
 empty, loading, error and permission states, using The Mooney Firm and gldf.

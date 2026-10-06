@@ -18,6 +18,7 @@ import type { UnifiedEvent } from "@/lib/types";
 import type { QueueActor, QueueContext, QueueItemRaw, QueueKind } from "./contracts";
 import type { SourceRead } from "./project";
 import { readSiteHealth } from "./site-health-store";
+import { readListingReadbackFailures, type ListingReadbackFailure } from "./store";
 import { EVENT_RETENTION_DAYS, DOMAIN_VERIFICATION_ESCALATION_DAYS } from "./rules";
 
 /**
@@ -368,6 +369,34 @@ export function readbackFailureItems(context: QueueContext | null): SourceRead {
   };
 }
 
+const LISTING_WRITE_LABEL: Record<string, string> = {
+  reply_post: "Google review reply", reply_update: "Google review reply edit", reply_delete: "Google review reply removal",
+  hours_patch: "Google hours", info_patch: "Google business info", post_create: "Google post", post_delete: "Google post removal",
+};
+
+/**
+ * Google listing writes (review replies on a linked business among them) keep
+ * their one receipt in google_listing_receipts, not the outside-write ledger,
+ * so their failed read-backs are read from there. Never re-sent.
+ */
+export function listingReadbackItems(rows: readonly ListingReadbackFailure[]): QueueItemRaw[] {
+  return rows.map((receipt) => ({
+    kind: "readback_failed" as const, sourceRef: `listing:${receipt.id}`, tenantId: receipt.tenantId, workspaceId: receipt.workspaceId,
+    title: `${LISTING_WRITE_LABEL[receipt.action] ?? "Google listing change"} for ${receipt.workspaceName}: accepted, read-back ${receipt.readback}`,
+    openedAt: receipt.completedAt ?? receipt.createdAt, receiptIds: [receipt.id],
+    href: receipt.tenantId ? clientHref(receipt.tenantId, "receipts") : "/admin",
+  }));
+}
+
+export async function readListingReadbackSource(actor: QueueActor, read: typeof readListingReadbackFailures = readListingReadbackFailures): Promise<SourceRead> {
+  const source = "Google listing receipts";
+  try {
+    return { kind: "readback_failed", source, ok: true, rows: listingReadbackItems(await read(actor)) };
+  } catch (error) {
+    return failure("readback_failed", source, error);
+  }
+}
+
 /** Every source, read in parallel. A reader that throws becomes a named gap. */
 export async function readAllSources(input: { tenants: QueueTenant[]; context: QueueContext | null; actor: QueueActor; now: number }): Promise<SourceRead[]> {
   const { tenants, context, actor, now } = input;
@@ -394,6 +423,7 @@ export async function readAllSources(input: { tenants: QueueTenant[]; context: Q
     guard("lead_unkept", "Client lead copies", readUnkeptLeads),
     guard("prospect_lead", "Strelva sales leads", () => readProspectLeads(now)),
     Promise.resolve([readbackFailureItems(context)]),
+    guard("readback_failed", "Google listing receipts", () => readListingReadbackSource(actor)),
   ]);
   return groups.flat();
 }
