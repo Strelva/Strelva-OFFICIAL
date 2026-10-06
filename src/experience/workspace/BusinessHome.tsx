@@ -17,6 +17,7 @@ import { requestDraftKey } from "./request-draft";
 import { useBusinessDeliveries } from "./useBusinessDeliveries";
 import { NeedsYouSection, StrelvaHandledSection } from "./NeedsYouSection";
 import { useNeedsYou } from "./useNeedsYou";
+import { SiteSummarySection, useSiteSummary } from "./SiteSummarySection";
 import { workspaceHome } from "./workspace-home";
 import { businessRequestRows, deliveryProviderName, type BusinessRequestRow } from "./WorkspaceRequests";
 import { workspaceWorkLabel } from "./work-label";
@@ -80,6 +81,8 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   // list no longer adds its own.
   const needsYouReleased = snapshot.releases?.needsYou === true && current?.kind === "customer" && !readOnly;
   const needsYou = useNeedsYou(needsYouReleased ? snapshot.workspaceId : undefined);
+  // Owner entry: the linked site's numbers, inquiries and Strelva's work (the old Today page).
+  const siteSummary = useSiteSummary(current?.kind === "customer" && !readOnly ? snapshot.workspaceId : undefined);
   const attentionCount = home.attention.length + deliveryAttention.length;
   const fileIds = systemsReleased && files ? new Set(files.map(item => item.id)) : null;
   const results = fileIds ? home.results.filter(work => fileIds.has(work.id)) : home.results;
@@ -168,6 +171,8 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
         </ul> : !deliveryUnavailable ? <p className={styles.muted}>Nothing needs a decision right now.</p> : null}
         {deliveryUnavailable ? <p role="status" className={styles.notice}>{systemsReleased ? "Requests waiting on your decision could not be checked." : "Delivery decisions could not be checked."} <button type="button" onClick={deliveries.refresh}>Check again</button></p> : null}
       </section>}
+
+      <SiteSummarySection state={siteSummary.state} workspaceId={snapshot.workspaceId} appBase={appBase} onRetry={siteSummary.retry} />
 
       {business || systems.length ? <section className={styles.section} aria-labelledby="home-systems">
         <header className={styles.sectionHeader}><h2 id="home-systems"><LayoutGrid size={18} aria-hidden="true" />{SYSTEMS_LABEL}</h2>{systems.length ? <Button variant="ghost" size="sm" onClick={() => onNavigate("apps")}>{SYSTEMS_LIST_LABEL}<ArrowRight size={16} aria-hidden="true" /></Button> : null}</header>
