@@ -27,7 +27,8 @@ import {
   createWaitingAdapter,
   type LiveChannelContext,
 } from "./live-adapters";
-import { createLiveMakeRealService, liveReadyPlan, startLiveApproved } from "./live";
+import { createLiveMakeRealService, liveReadyPlan, startLiveApproved, type DueActivation } from "./live";
+import { recordServiceAction, startServiceSession, type ServiceSession } from "@/platform/needs-you/service-actor";
 import type { ReadyPlan } from "@/platform/needs-you/sources/make-real";
 import { createSupabaseActivationRepository } from "./supabase-repository";
 import { createSupabaseRevisionContent } from "./supabase-content";
@@ -88,6 +89,7 @@ export const liveMakeReal = createLiveMakeRealService({
   live: (actor) => createSystemStoreLiveSystems({ store: createSupabaseSystemStore(), content: createSupabaseRevisionContent(actor), actor }),
   adapters: liveChannelAdapters,
   approvals: createNeedsYouApprovalRecords({ read: (workspaceId, itemId) => PostgresNeedsYouStore.read(workspaceId, itemId) }),
+  recordService: recordServiceAction,
 });
 
 type Rpc = { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: { message?: string } | null }> };
@@ -136,14 +138,41 @@ export async function activationStarter(workspaceId: string, activationId: strin
   return typeof user.data?.email === "string" ? { userId, verifiedEmail: user.data.email.toLowerCase() } : null;
 }
 
-const dueSchema = z.array(z.object({ workspaceId: z.string().uuid(), activationId: z.string(), userId: z.string().uuid(), email: z.string() }));
-/** In-progress activations for the existing workspace-work cron. */
-export async function listDueActivations(limit = 20): Promise<Array<{ workspaceId: string; activationId: string; actor: WorkspaceActor }>> {
-  const { data, error } = await db().rpc("due_make_real_activations", { p_limit: limit, p_grace_seconds: 120 });
+const dueSchema = z.array(z.object({ workspaceId: z.string().uuid(), activationId: z.string(), starterUserId: z.string().uuid().nullable(), starterEmail: z.string().nullable() }));
+
+/**
+ * In-progress activations for the existing workspace-work cron, each with
+ * who runs it: Strelva (system) for a business Strelva runs (one logged
+ * `make_real_resume` session per business), else its starter while still an
+ * owner or admin. One with neither is left for the operator queue.
+ */
+export async function listDueActivations(limit = 20, deps: { startSession?: typeof startServiceSession } = {}): Promise<DueActivation[]> {
+  const { data, error } = await db().rpc("due_make_real_activations_for_service", { p_limit: limit, p_grace_seconds: 120 });
   if (error) throw new WorkspaceStoreError("Due activations could not be read.");
   const parsed = dueSchema.safeParse(data);
   if (!parsed.success) throw new WorkspaceStoreError("Due activations could not be read. The response was malformed.");
-  return parsed.data.map((row) => ({ workspaceId: row.workspaceId, activationId: row.activationId, actor: { userId: row.userId, verifiedEmail: row.email } }));
+  const start = deps.startSession ?? startServiceSession;
+  const sessions = new Map<string, ServiceSession | null>();
+  const due: DueActivation[] = [];
+  for (const row of parsed.data) {
+    if (!sessions.has(row.workspaceId)) sessions.set(row.workspaceId, await start(row.workspaceId, "make_real_resume").catch(() => null));
+    const service = sessions.get(row.workspaceId) ?? null;
+    if (service) due.push({ workspaceId: row.workspaceId, activationId: row.activationId, actor: service.actor, service });
+    else if (row.starterUserId && row.starterEmail) due.push({ workspaceId: row.workspaceId, activationId: row.activationId, actor: { userId: row.starterUserId, verifiedEmail: row.starterEmail } });
+  }
+  return due;
+}
+
+/**
+ * Who an operator's resume, reconcile or rollback runs as: Strelva (system)
+ * for a business Strelva runs (logged, with the operator named), else the
+ * starter as before. The owner's approval record is unchanged either way.
+ */
+export async function activationRunner(workspaceId: string, activationId: string, deps: { startSession?: typeof startServiceSession; starter?: typeof activationStarter } = {}): Promise<{ actor: WorkspaceActor; service: ServiceSession | null } | null> {
+  const service = await (deps.startSession ?? startServiceSession)(workspaceId, "make_real_resume").catch(() => null);
+  if (service) return { actor: service.actor, service };
+  const actor = await (deps.starter ?? activationStarter)(workspaceId, activationId);
+  return actor ? { actor, service: null } : null;
 }
 
 /**

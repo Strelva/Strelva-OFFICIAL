@@ -234,5 +234,8 @@ psql "${psql_args[@]}" --file="$repo_root/tests/website-linked-publication-schem
 # 20261008151000 widens tenant_leads, tenant_client_records and
 # system_origin_kinds; their earlier contracts ran above against it.
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
+# 20261009100000 (Strelva service actor) replaces owner_decision_json and
+# workspace_release_flag_names(); its contract holds after the full ordered upgrade.
+psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

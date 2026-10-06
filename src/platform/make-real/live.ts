@@ -8,6 +8,7 @@ import type { AuthorityPort, EffectAdapter, LiveSystemsPort, OperatingChecksPort
 import type { ActivationRepository } from "./repository";
 import { createMakeReal, type MakeReal } from "./runner";
 import { customerActivationView } from "./view";
+import { STRELVA_SYSTEM_LABEL, type ServiceAction, type ServiceSession } from "@/platform/needs-you/service-actor";
 
 /**
  * Durable, live Make real (systems-experience spec behaviors 21-27).
@@ -35,6 +36,20 @@ export interface LiveMakeRealDeps {
   checks?: OperatingChecksPort;
   clock?: () => string;
   ids?: () => string;
+  /** Strelva (system)'s log (record_strelva_service_action). Required to run under a service session. */
+  recordService?: (session: ServiceSession, action: ServiceAction, subject: string, detail?: string) => Promise<void>;
+}
+
+/**
+ * One activation for the workspace-work cron. `service` set: it runs as
+ * Strelva (system) for this business (`actor` is that session's identity);
+ * the owner stays approver of record. Unset: it runs as its starter, as before.
+ */
+export interface DueActivation {
+  workspaceId: string;
+  activationId: string;
+  actor: WorkspaceActor;
+  service?: ServiceSession;
 }
 
 const LIVE_SCOPES = new Set(["system.activate", "site.publish"]);
@@ -129,17 +144,27 @@ export function createLiveMakeRealService(deps: LiveMakeRealDeps) {
      * left running is reconciled first (provider lookup by key, never a
      * blind replay); the rest runs until it finishes or needs attention.
      */
-    async resumeDue(due: Array<{ workspaceId: string; activationId: string; actor: WorkspaceActor }>, deadlineMs = 20_000): Promise<{ processed: number; failed: number; results: Array<{ activationId: string; status: string; error?: string }> }> {
+    async resumeDue(due: DueActivation[], deadlineMs = 20_000): Promise<{ processed: number; failed: number; results: Array<{ activationId: string; status: string; error?: string }> }> {
       const started = Date.now();
       const results: Array<{ activationId: string; status: string; error?: string }> = [];
       let processed = 0, failed = 0;
       for (const item of due) {
         if (Date.now() - started >= deadlineMs) break;
         try {
+          if (item.service && (item.service.purpose !== "make_real_resume" || item.service.workspaceId !== item.workspaceId)) throw new WorkspaceAccessError();
           const { activation, makeReal } = await forActivation(item.actor, item.workspaceId, item.activationId);
           if (activation.status !== "in_progress") { results.push({ activationId: item.activationId, status: activation.status }); continue; }
-          const next = activation.steps.some((s) => s.status === "running")
-            ? await makeReal.resume(item.actor, item.workspaceId, item.activationId, "Resumed by Strelva after an interruption.")
+          const reconciling = activation.steps.some((s) => s.status === "running");
+          const by = item.service ? STRELVA_SYSTEM_LABEL : "Strelva";
+          const approval = activation.approvals[0]?.approvalId;
+          const note = `Resumed by ${by} after an interruption.${approval ? ` The owner's approval ${approval} stands.` : ""}`;
+          // Logged before it runs: nothing runs as Strelva (system) unrecorded.
+          if (item.service) {
+            if (!deps.recordService) throw new WorkspaceAccessError("Strelva (system) can't run Make real without its log.");
+            await deps.recordService(item.service, reconciling ? "resume" : "run", `activation:${item.activationId}`, note);
+          }
+          const next = reconciling
+            ? await makeReal.resume(item.actor, item.workspaceId, item.activationId, note)
             : await makeReal.run(item.actor, item.workspaceId, item.activationId);
           processed++;
           results.push({ activationId: item.activationId, status: next.status });
