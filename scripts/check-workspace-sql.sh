@@ -455,6 +455,15 @@ psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261004120000_systems.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/systems-schema.sql"
 
+# Money and the client's data: the business billing home on the dormant
+# org-layer tables, client records copied out of Redis, export schema 3 and
+# the outcome loop. Fictional tenants only.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260729180000_org_layer_phase0_accounts.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007180000_business_billing.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-billing-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007181000_tenant_client_records.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-client-records-schema.sql"
+
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
