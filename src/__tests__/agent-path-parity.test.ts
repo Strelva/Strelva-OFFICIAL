@@ -124,6 +124,9 @@ describe("resolveGbpWriteAllowed", () => {
 describe("agent path parity (wiring)", () => {
   const executor = readFileSync(path.join(process.cwd(), "src/lib/agent-executor.ts"), "utf8");
   const route = readFileSync(path.join(process.cwd(), "src/app/api/agent/route.ts"), "utf8");
+  // The chat route's tools are defined once in agent-shared (buildTenantChatTools).
+  const shared = readFileSync(path.join(process.cwd(), "src/lib/agent-shared.ts"), "utf8");
+  const chatTools = shared.slice(shared.indexOf("export async function buildTenantChatTools("));
 
   it("executor threads the manifest into applySectionUpdate (was skipped)", () => {
     expect(executor).toContain("siteManifest,");
@@ -143,14 +146,15 @@ describe("agent path parity (wiring)", () => {
 
   it("both paths build GBP tools from the shared factory (no hand-rolled defs)", () => {
     expect(executor).toContain("buildGbpTools(");
-    expect(route).toContain("buildGbpTools(");
+    expect(route).toContain("buildTenantChatTools(");
+    expect(chatTools).toContain("buildGbpTools(");
     // The executor previously LACKED upload_gbp_photo — it must have it now.
     expect(executor).toContain("tools.upload_gbp_photo = gbpTools.upload_gbp_photo");
   });
 
   it("both paths build undo_last_change from the shared factory (executor gained it)", () => {
     expect(executor).toContain("buildUndoTool(");
-    expect(route).toContain("buildUndoTool(");
+    expect(chatTools).toContain("buildUndoTool(");
     expect(executor).toContain("tools.undo_last_change = buildUndoTool");
   });
 });
