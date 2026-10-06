@@ -150,3 +150,51 @@ describe("public-to-account continuation", () => {
     expect(await denied.text()).not.toContain(brief.request);
   });
 });
+
+// Sealing moved onto the one secrets path (crypto/secrets.ts, Strelva Reborn
+// section 7). A cookie sealed before the move must still open, and the other
+// way round, so nobody mid-sign-up loses their brief at deploy.
+describe("public continuation sealing through crypto/secrets", () => {
+  const SECRET = "unit-test-continuation-secret";
+  async function legacyKey() {
+    const { createHash } = await import("node:crypto");
+    return createHash("sha256").update("strelva:public-continuation:v1\0").update(SECRET).digest();
+  }
+  async function legacySeal(value: unknown): Promise<string> {
+    const { createCipheriv, randomBytes } = await import("node:crypto");
+    const iv = randomBytes(12);
+    const cipher = createCipheriv("aes-256-gcm", await legacyKey(), iv);
+    const ciphertext = Buffer.concat([cipher.update(JSON.stringify(value), "utf8"), cipher.final()]);
+    return [iv, cipher.getAuthTag(), ciphertext].map((part) => part.toString("base64url")).join(".");
+  }
+  async function legacyOpen(value: string): Promise<unknown> {
+    const { createDecipheriv } = await import("node:crypto");
+    const [iv, tag, ciphertext] = value.split(".").map((part) => Buffer.from(part, "base64url")) as [Buffer, Buffer, Buffer];
+    const decipher = createDecipheriv("aes-256-gcm", await legacyKey(), iv);
+    decipher.setAuthTag(tag);
+    return JSON.parse(Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8"));
+  }
+
+  beforeEach(() => {
+    vi.stubEnv("PUBLIC_CONTINUATION_SECRET", SECRET);
+  });
+
+  it("opens a cookie sealed by the previous implementation, and seals one it could open", async () => {
+    const { openPublicContinuation, sealPublicContinuation } = await import("@/lib/public-continuation");
+    expect(openPublicContinuation(await legacySeal(brief))).toEqual(brief);
+    expect(await legacyOpen(sealPublicContinuation(brief)!)).toEqual(brief);
+  });
+
+  it("refuses a token sealed under another secret, a truncated one, or one with a short iv", async () => {
+    const { deriveSealKey, openWithKey, sealWithKey } = await import("@/platform/infra/crypto/secrets");
+    const { openPublicContinuation } = await import("@/lib/public-continuation");
+    expect(openPublicContinuation(sealWithKey(deriveSealKey("strelva:public-continuation:v1", "another-secret"), JSON.stringify(brief)))).toBeNull();
+    const sealed = sealWithKey(deriveSealKey("strelva:public-continuation:v1", SECRET), JSON.stringify(brief));
+    expect(openPublicContinuation(sealed)).toEqual(brief);
+    expect(openPublicContinuation(sealed.split(".").slice(0, 2).join("."))).toBeNull();
+    const [, tag, body] = sealed.split(".");
+    expect(openWithKey(deriveSealKey("strelva:public-continuation:v1", SECRET), [Buffer.alloc(8).toString("base64url"), tag, body].join("."))).toBeNull();
+    // Purposes never share a key.
+    expect(deriveSealKey("a", SECRET).equals(deriveSealKey("b", SECRET))).toBe(false);
+  });
+});

@@ -1,5 +1,6 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
+// The one secrets path (AGENTS.md): sealing goes through crypto/secrets.ts.
+import { deriveSealKey, openWithKey, sealWithKey } from "@/platform/infra/crypto/secrets";
 
 export const PUBLIC_CONTINUATION_COOKIE = "strelva_public_continuation";
 export const PUBLIC_CONTINUATION_NEXT = "/workspace/account?continue=public";
@@ -22,7 +23,7 @@ const MAX_PLAINTEXT_BYTES = 2_700;
 
 function key(): Buffer | null {
   const secret = process.env.PUBLIC_CONTINUATION_SECRET || process.env.INTERNAL_API_SECRET;
-  return secret ? createHash("sha256").update("strelva:public-continuation:v1\0").update(secret).digest() : null;
+  return secret ? deriveSealKey("strelva:public-continuation:v1", secret) : null;
 }
 
 export function parsePublicContinuation(value: unknown): PublicContinuation | null {
@@ -36,23 +37,15 @@ export function sealPublicContinuation(value: PublicContinuation): string | null
   const parsed = parsePublicContinuation(value);
   const encryptionKey = key();
   if (!parsed || !encryptionKey) return null;
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", encryptionKey, iv);
-  const ciphertext = Buffer.concat([cipher.update(JSON.stringify(parsed), "utf8"), cipher.final()]);
-  return [iv, cipher.getAuthTag(), ciphertext].map((part) => part.toString("base64url")).join(".");
+  return sealWithKey(encryptionKey, JSON.stringify(parsed));
 }
 
 export function openPublicContinuation(value: string | undefined): PublicContinuation | null {
   const encryptionKey = key();
   if (!value || !encryptionKey || value.length > 4_000) return null;
-  const parts = value.split(".");
-  if (parts.length !== 3) return null;
+  const plaintext = openWithKey(encryptionKey, value);
+  if (plaintext === null) return null;
   try {
-    const [iv, tag, ciphertext] = parts.map((part) => Buffer.from(part, "base64url")) as [Buffer, Buffer, Buffer];
-    if (iv.length !== 12 || tag.length !== 16) return null;
-    const decipher = createDecipheriv("aes-256-gcm", encryptionKey, iv);
-    decipher.setAuthTag(tag);
-    const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
     return parsePublicContinuation(JSON.parse(plaintext));
   } catch {
     return null;

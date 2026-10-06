@@ -93,3 +93,38 @@ export function decryptSecret(value: string | null | undefined): string | null |
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(ct), decipher.final()]).toString("utf8");
 }
+
+// ── Short-lived sealed tokens with their own key ─────────────────────────────
+//
+// The one secrets path also seals small values that never reach the database
+// (Strelva Reborn section 7), such as the public continuation cookie: AES-256-
+// GCM under a key derived from a purpose label and that purpose's secret, as
+// a compact base64url `iv.tag.ciphertext`. Not for stored provider secrets;
+// those use encryptSecret/decryptSecret under SECRETS_ENC_KEY.
+
+/** SHA-256 of `${purpose}\0` then the secret: one 32-byte key per purpose. */
+export function deriveSealKey(purpose: string, secret: string): Buffer {
+  return createHash("sha256").update(`${purpose}\0`).update(secret).digest();
+}
+
+export function sealWithKey(key: Buffer, plaintext: string): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+  return [iv, cipher.getAuthTag(), ciphertext].map((part) => part.toString("base64url")).join(".");
+}
+
+/** The plaintext, or null for anything malformed, tampered with or sealed under another key. */
+export function openWithKey(key: Buffer, sealed: string): string | null {
+  const parts = sealed.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const [iv, tag, ciphertext] = parts.map((part) => Buffer.from(part, "base64url")) as [Buffer, Buffer, Buffer];
+    if (iv.length !== 12 || tag.length !== 16) return null;
+    const decipher = createDecipheriv("aes-256-gcm", key, iv);
+    decipher.setAuthTag(tag);
+    return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString("utf8");
+  } catch {
+    return null;
+  }
+}
