@@ -10,6 +10,7 @@ import { PostgresNeedsYouStore, type NeedsYouStore } from "./repository";
 import { createNeedsYouService } from "./service";
 import { systemsSourceAdapters } from "./systems-sources";
 import { workspaceSourceAdaptersA } from "./sources/server";
+import { liveSourceAdaptersB } from "./sources/live-b";
 
 export { needsYouReleaseEnabled } from "./release";
 
@@ -40,6 +41,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
       }),
       ...systemsSourceAdapters(store),
       ...workspaceSourceAdaptersA(),
+      ...liveSourceAdaptersB(),
     ],
   });
 }
