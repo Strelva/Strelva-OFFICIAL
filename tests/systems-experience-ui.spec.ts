@@ -72,7 +72,7 @@ test("read-only access sees Systems but cannot change them or make anything real
   await expect(page.getByRole("heading", { name: "What should happen next?" })).toHaveCount(0);
   await page.getByRole("link", { name: /^Open Mediation intake/ }).click();
   await expect(page.getByRole("button", { name: "Ask for a change" })).toBeDisabled();
-  await expect(page.getByText("Only The Mooney Firm owners can make changes.")).toBeVisible();
+  await expect(page.getByText("The Mooney Firm shared this with your agency to review.")).toBeVisible();
 });
 
 test("a member who is not an owner sees why Make real is unavailable", async ({ page }) => {

@@ -110,7 +110,7 @@ export function BusinessHome({ snapshot, unassignedSites, siteAssignmentsKnown, 
       {business ? <header className={styles.businessHeader}>
         <p>{readOnly ? "Shared with you" : "Your business"}</p>
         <h1 className="font-display">{name}</h1>
-        <p>{busy || systemsLoading ? "Checking your systems…" : systems.length ? [live ? `${live} live` : "", drafts ? `${drafts} in draft` : "", paused ? `${paused} paused` : ""].filter(Boolean).join(" · ") : readOnly ? `Only ${name} owners can make changes.` : "Strelva builds and runs your systems. You make the calls only you can make."}</p>
+        <p>{busy || systemsLoading ? "Checking your systems…" : systems.length ? [live ? `${live} live` : "", drafts ? `${drafts} in draft` : "", paused ? `${paused} paused` : ""].filter(Boolean).join(" · ") : readOnly ? `${name} shared this with your agency to review.` : "Strelva builds and runs your systems. You make the calls only you can make."}</p>
       </header> : <section className={styles.start} aria-labelledby="business-start-title">
         <header className={styles.greeting}>
           <p>{readOnly ? "Shared workspace" : name}</p>

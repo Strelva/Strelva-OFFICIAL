@@ -28,7 +28,7 @@ describe("read-only copy names the real reason", () => {
       offerings: { status: "unavailable", reason: "n/a" }, busy: false,
       onOpen: noop, onStart: noop, onRequest: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account",
     }));
-    expect(html).toContain("Review what was shared.");
+    expect(html).toContain("Shared with you");
     expect(html).toContain("Alder Workshop shared this with your agency to review.");
     expect(html).not.toContain("owners can make changes");
   });
