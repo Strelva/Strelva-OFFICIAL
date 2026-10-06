@@ -11,11 +11,13 @@ export type WebsiteDetailState =
   | { status: "ready"; detail: WebsiteSystemDetail }
   | { status: "error"; message: string };
 
-/** Reads GET /api/workspace/systems/website for one website System. */
-export function useWebsiteSystemDetail(workspaceId: string, systemId: string, enabled: boolean): WebsiteDetailState | null {
+/** Reads GET /api/workspace/systems/website for one website System. A new `version` reads it again (after filing a Request). */
+export function useWebsiteSystemDetail(workspaceId: string, systemId: string, enabled: boolean, version = 0): WebsiteDetailState | null {
   const request = useWorkspaceRequest();
   const [state, setState] = useState<{ key: string; value: WebsiteDetailState } | null>(null);
+  const [shown, setShown] = useState<{ key: string; value: WebsiteDetailState } | null>(null);
   const key = `${workspaceId}:${systemId}`;
+  const readKey = `${key}:${version}`;
   useEffect(() => {
     if (!enabled) return;
     let active = true;
@@ -24,15 +26,19 @@ export function useWebsiteSystemDetail(workspaceId: string, systemId: string, en
         const response = await request(`/api/workspace/systems/website?${new URLSearchParams({ workspaceId, systemId })}`);
         const body = await response.json().catch(() => null) as { detail?: WebsiteSystemDetail; error?: string } | null;
         if (!active) return;
-        setState({ key, value: response.ok && body?.detail ? { status: "ready", detail: body.detail } : { status: "error", message: body?.error || "This website's details could not be loaded." } });
+        const value: WebsiteDetailState = response.ok && body?.detail ? { status: "ready", detail: body.detail } : { status: "error", message: body?.error || "This website's details could not be loaded." };
+        setState({ key: readKey, value });
+        if (value.status === "ready") setShown({ key, value });
       } catch {
-        if (active) setState({ key, value: { status: "error", message: "This website's details could not be reached." } });
+        if (active) setState({ key: readKey, value: { status: "error", message: "This website's details could not be reached." } });
       }
     })();
     return () => { active = false; };
-  }, [enabled, key, request, systemId, workspaceId]);
+  }, [enabled, key, readKey, request, systemId, workspaceId]);
   if (!enabled) return null;
-  return state?.key === key ? state.value : { status: "loading" };
+  if (state?.key === readKey) return state.value;
+  // A re-read keeps showing the last good lists instead of flashing to loading.
+  return shown?.key === key ? shown.value : { status: "loading" };
 }
 
 function when(at: string | null): string {
@@ -109,7 +115,7 @@ function ConnectedSitePanel({ workspaceId, systemId, site, readOnly }: { workspa
  * list comes from the store that owns it (website-detail-server.ts); a list
  * that could not be read says so instead of reading as empty.
  */
-export function WebsiteSystemPanels({ workspaceId, systemId, state, onAsk, readOnly }: { workspaceId: string; systemId: string; state: WebsiteDetailState; onAsk: (request: string) => void; readOnly: boolean }) {
+export function WebsiteSystemPanels({ workspaceId, systemId, state, onAsk, onAskChange, readOnly }: { workspaceId: string; systemId: string; state: WebsiteDetailState; onAsk: (request: string) => void; /** A managed site files a Request instead of prefilling the composer. */ onAskChange?: () => void; readOnly: boolean }) {
   if (state.status === "loading") return <section className={styles.panel} aria-busy="true" aria-label="Website details"><p role="status">Loading domains, requests and history…</p></section>;
   if (state.status === "error") return <section className={styles.panel} aria-label="Website details"><p role="alert">{state.message} The site itself is unchanged.</p></section>;
   const { detail } = state;
@@ -136,7 +142,7 @@ export function WebsiteSystemPanels({ workspaceId, systemId, state, onAsk, readO
       {detail.requests.length ? <ul className={styles.panelList} aria-label="Requests">{detail.requests.map(item => <li key={item.id}>
         <span>{item.href ? <a href={item.href}>{item.title}</a> : item.title}</span>
         <small>{STAGE_LABEL[item.stage]} · <time dateTime={item.at}>{when(item.at)}</time></small>
-      </li>)}</ul> : requestsMissing.length ? null : <p className="mt-3">No open requests. <button type="button" className="underline" disabled={readOnly} onClick={() => onAsk("Change on the website: ")}>Ask for a change</button></p>}
+      </li>)}</ul> : requestsMissing.length ? null : <p className="mt-3">No open requests. <button type="button" className="underline" disabled={readOnly} onClick={() => onAskChange ? onAskChange() : onAsk("Change on the website: ")}>Ask for a change</button></p>}
       <Unavailable names={requestsMissing} />
     </Panel>
     <Panel id={`${systemId}-history`} title="History" count={detail.history.length} intro="Every release of this site, newest first. Issued changes are never rewritten; undo is a new release.">
