@@ -9,8 +9,8 @@ import { handledFromStore, handledFromTenantEvent, mergeHandled } from "./handle
 import { PostgresNeedsYouStore, type NeedsYouStore } from "./repository";
 import { createNeedsYouService } from "./service";
 import { systemsSourceAdapters } from "./systems-sources";
-import { workspaceSourceAdaptersA } from "./sources/server";
-import { liveSourceAdaptersB } from "./sources/live-b";
+import { deliverySourceAdapters } from "./sources/live-delivery";
+import { productSourceAdapters } from "./sources/live-products";
 
 export { needsYouReleaseEnabled } from "./release";
 
@@ -40,8 +40,8 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
         change: (actor, input) => commitments.execute(actor, { action: "delivery_commitment", ...input }),
       }),
       ...systemsSourceAdapters(store),
-      ...workspaceSourceAdaptersA(),
-      ...liveSourceAdaptersB(),
+      ...deliverySourceAdapters(),
+      ...productSourceAdapters(),
     ],
   });
 }

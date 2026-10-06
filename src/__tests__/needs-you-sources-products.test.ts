@@ -9,10 +9,10 @@ import type { OwnerDecision, ProposedItem } from "@/platform/needs-you/contracts
 import type { SourceAdapter } from "@/platform/needs-you/adapters";
 import { NeedsYouRefusedError, type NeedsYouStore } from "@/platform/needs-you/repository";
 import { createNeedsYouService } from "@/platform/needs-you/service";
-import { applicationReleaseAdapter, type ApplicationReleasePorts, type CustomAppView, type NativeAppView } from "@/platform/needs-you/sources/application_release";
-import { workPlanAdapter, type WorkPlanPorts, type WorkPlanView } from "@/platform/needs-you/sources/work_plan";
-import { workMoneyAdapter, type MoneyAllowanceView, type MoneyJobView, type MoneyPayerChangeView, type WorkMoneyPorts } from "@/platform/needs-you/sources/work_money";
-import { workspaceExitAdapter } from "@/platform/needs-you/sources/workspace_exit";
+import { applicationReleaseAdapter, type ApplicationReleasePorts, type CustomAppView, type NativeAppView } from "@/platform/needs-you/sources/application-release";
+import { workPlanAdapter, type WorkPlanPorts, type WorkPlanView } from "@/platform/needs-you/sources/work-plan";
+import { workMoneyAdapter, type MoneyAllowanceView, type MoneyJobView, type MoneyPayerChangeView, type WorkMoneyPorts } from "@/platform/needs-you/sources/work-money";
+import { workspaceExitAdapter } from "@/platform/needs-you/sources/workspace-exit";
 
 const WS = "bbbbbbbb-0000-4000-8000-000000000001";
 const OTHER_WS = "bbbbbbbb-0000-4000-8000-000000000002";

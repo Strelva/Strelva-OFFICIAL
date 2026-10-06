@@ -323,8 +323,8 @@ describe("agency draft grants", () => {
 
 describe("wiring", () => {
   it("registers one adapter per lifecycle, each needing a member identity", async () => {
-    const { workspaceSourceAdaptersA } = await import("@/platform/needs-you/sources/server");
-    const adapters = workspaceSourceAdaptersA();
+    const { deliverySourceAdapters } = await import("@/platform/needs-you/sources/live-delivery");
+    const adapters = deliverySourceAdapters();
     expect(adapters.map(adapter => adapter.lifecycle).sort()).toEqual(["agency_grant", "provider_delivery", "standing_responsibility", "website_document", "work_responsibility"]);
     expect(adapters.every(adapter => adapter.needsMemberActor)).toBe(true);
     // The hourly cron has no actor: nothing is read, nothing is called.

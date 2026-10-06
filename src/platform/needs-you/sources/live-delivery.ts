@@ -68,7 +68,7 @@ async function pendingAgencyGrants(actor: WorkspaceActor, workspaceId: string): 
 }
 
 /** Adapters for website documents, provider delivery, Running, finite work and agency grants. */
-export function workspaceSourceAdaptersA(): SourceAdapter[] {
+export function deliverySourceAdapters(): SourceAdapter[] {
   return [
     websiteDocumentAdapter({
       async list(actor, workspaceId) {

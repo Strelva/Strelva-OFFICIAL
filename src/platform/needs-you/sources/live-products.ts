@@ -11,10 +11,10 @@ import { publishWorkspaceApplication, readWorkspaceApplication } from "@/product
 import { CUSTOM_APPLICATION_PRODUCT, CUSTOM_APPLICATION_RESOURCE_KIND, createCustomApplicationService, type CustomApplication } from "@/products/custom-applications/server";
 import { WORK_PLAN_PRODUCT_ID, WORK_PLAN_RESOURCE_KIND, executeWorkPlanOutput, listWorkPlanOutputs, readWorkPlan, workPlanSchema, type WorkPlan } from "@/products/work-plans";
 import type { SourceAdapter } from "../adapters";
-import { applicationReleaseAdapter, type CustomAppView, type NativeAppView } from "./application_release";
-import { workMoneyAdapter } from "./work_money";
-import { workPlanAdapter, type WorkPlanView } from "./work_plan";
-import { workspaceExitAdapter } from "./workspace_exit";
+import { applicationReleaseAdapter, type CustomAppView, type NativeAppView } from "./application-release";
+import { workMoneyAdapter } from "./work-money";
+import { workPlanAdapter, type WorkPlanView } from "./work-plan";
+import { workspaceExitAdapter } from "./workspace-exit";
 
 const LIST_LIMIT = 50;
 
@@ -61,7 +61,7 @@ async function planView(actor: WorkspaceActor, workspaceId: string, work: SavedW
 const byKind = (rows: SavedWork[], productId: string, resourceKind: string) =>
   rows.filter(row => row.productId === productId && row.resourceKind === resourceKind).slice(0, LIST_LIMIT);
 
-export function liveSourceAdaptersB(): SourceAdapter[] {
+export function productSourceAdapters(): SourceAdapter[] {
   const custom = createCustomApplicationService();
   return [
     applicationReleaseAdapter({
