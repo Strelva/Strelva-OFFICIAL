@@ -6,7 +6,7 @@
  * the daily delivery budget. Inquiry records themselves remain in leads Redis.
  */
 
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { getRedis } from "@/lib/redis";
 import type { InquiryTimelineEventType } from "@/products/inquiries/contracts";
@@ -23,6 +23,7 @@ import type {
 } from "./delivery-types";
 import { mirrorClientRecord } from "@/platform/client-records/mirror";
 import { FIRST_REPLY_ACTIONS, firstReplyRecord, timelineRecord } from "@/platform/client-records/stores";
+import { copyInquiryEvent } from "@/lib/inquiry-records";
 
 const DELIVERY_TTL_SECONDS = 90 * 24 * 60 * 60;
 const DELIVERY_TIMELINE_KEEP = 100;
@@ -477,6 +478,12 @@ export function createRedisInquiryDeliveryStore(
       if ((FIRST_REPLY_ACTIONS as readonly string[]).includes(input.action)) {
         await mirrorClientRecord("inquiry_reply", input.tenantId, firstReplyRecord(input.inquiryId, input.acceptedAt, input.action), "keep_first");
       }
+      // inquiry_events copy (off unless STRELVA_INQUIRY_RECORDS=1; never throws).
+      await copyInquiryEvent({
+        tenantId: input.tenantId, inquiryId: input.inquiryId, kind: "delivery",
+        detail: { action: input.action, status: "accepted", acceptedAt: input.acceptedAt, ...(input.providerMessageId ? { providerMessageId: input.providerMessageId.slice(0, 240) } : {}) },
+        dedupeKey: `delivery:${input.action}:${input.attemptId}`,
+      });
       return next;
     },
     async markVerified(input) {
@@ -636,6 +643,10 @@ export function createRedisInquiryDeliveryStore(
         receivedAt: input.receivedAt,
       };
       await redis.set(stateKey, next, { ex: DELIVERY_TTL_SECONDS });
+      await copyInquiryEvent({
+        tenantId: input.tenantId, inquiryId: input.inquiryId, kind: "reply", actor: "system",
+        detail: { receivedAt: input.receivedAt }, dedupeKey: `reply:${next.providerEventId}`,
+      });
       return next;
     },
     async markFailed(input) {
@@ -668,6 +679,11 @@ export function createRedisInquiryDeliveryStore(
       // Postgres copy keeps the timeline past the 90-day TTL and 100-event trim.
       const record = timelineRecord(input.inquiryId, member);
       if (record) await mirrorClientRecord("inquiry_timeline", input.tenantId, record);
+      await copyInquiryEvent({
+        tenantId: input.tenantId, inquiryId: input.inquiryId, kind: "timeline",
+        detail: { type: event.type, summary: event.summary, outcome: event.outcome, ...(event.receiptId ? { receiptId: event.receiptId } : {}) },
+        dedupeKey: `timeline:${createHash("sha256").update(member).digest("hex")}`,
+      });
     },
     async listTimeline(input) {
       if (!redis) return unavailable();

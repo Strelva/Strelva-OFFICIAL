@@ -1,5 +1,6 @@
 import { getLeads, type LeadRecord } from "@/lib/leads";
 import { getRedis } from "@/lib/redis";
+import { inquiryRecordsEnabled, readWorkspaceInquiryLeads, type WorkspaceInquiryLead } from "@/lib/inquiry-records";
 import { readLinkedSites, type LinkedSite, type LinkedSites } from "@/platform/owner-entry/linked-sites";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 
@@ -14,6 +15,8 @@ import type { WorkspaceActor } from "@/platform/workspaces/types";
 
 export interface LeadView {
   id: string;
+  /** Set for a held item released from spam review: the `tenant_leads` row id, for putting it back. */
+  releasedRowId?: string;
   name: string;
   email: string | null;
   message: string | null;
@@ -31,9 +34,32 @@ export interface SiteLeads {
   unavailable: boolean;
 }
 
+export interface HeldView {
+  /** The `tenant_leads` row id the review acts on. */
+  rowId: string;
+  tenantId: string | null;
+  name: string;
+  email: string | null;
+  message: string | null;
+  reason: string | null;
+  createdAt: string;
+}
+
+/** Spam held for review (inquiry 1.0 delta, C8). Absent when STRELVA_INQUIRY_RECORDS is off. */
+export interface HeldInquiries {
+  items: HeldView[];
+  unavailable: boolean;
+}
+
 export interface WorkspaceLeads {
   sites: SiteLeads[];
   denied: LinkedSite[];
+  held?: HeldInquiries;
+}
+
+export interface InquiryRecordsRead {
+  held: WorkspaceInquiryLead[];
+  released: WorkspaceInquiryLead[];
 }
 
 /** The retention cap, as on /dashboard/leads. */
@@ -44,6 +70,8 @@ export interface LeadDependencies {
   storeReady: () => boolean;
   leads: (tenantId: string) => Promise<LeadRecord[]>;
   now: () => number;
+  /** Held and released items from Postgres; null when the switch is off. Membership is checked again in SQL. */
+  records?: (actor: WorkspaceActor, workspaceId: string) => Promise<InquiryRecordsRead> | null;
 }
 
 const defaults: LeadDependencies = {
@@ -51,7 +79,34 @@ const defaults: LeadDependencies = {
   storeReady: () => getRedis() !== null,
   leads: (tenantId) => getLeads(tenantId, LEAD_READ_LIMIT),
   now: () => Date.now(),
+  records: (actor, workspaceId) => inquiryRecordsEnabled()
+    ? Promise.all([
+      readWorkspaceInquiryLeads(actor, workspaceId, { states: ["held_as_spam"], limit: 100 }),
+      readWorkspaceInquiryLeads(actor, workspaceId, { states: ["released"], limit: 100 }),
+    ]).then(([held, released]) => ({ held, released }))
+    : null,
 };
+
+export function heldView(lead: WorkspaceInquiryLead): HeldView {
+  return {
+    rowId: lead.id,
+    tenantId: lead.tenantId,
+    name: lead.name.trim() || "Someone",
+    email: lead.email?.trim() || null,
+    message: lead.message?.trim() || null,
+    reason: lead.heldReason,
+    createdAt: lead.capturedAt,
+  };
+}
+
+/** A released item reads as a normal lead, marked so it can be put back. */
+export function releasedLeadView(lead: WorkspaceInquiryLead): LeadView {
+  return {
+    ...leadView({ id: lead.leadId, name: lead.name, email: lead.email ?? undefined, message: lead.message ?? undefined,
+      source: lead.source ?? undefined, fields: lead.fields, createdAt: lead.capturedAt }),
+    releasedRowId: lead.id,
+  };
+}
 
 export function recentCount(leads: readonly LeadView[], now: number, days = 30): number {
   const cutoff = now - days * 24 * 60 * 60 * 1000;
@@ -77,12 +132,29 @@ export function leadView(lead: LeadRecord): LeadView {
 export async function readWorkspaceLeads(actor: WorkspaceActor, workspaceId: string, dependencies: LeadDependencies = defaults): Promise<WorkspaceLeads> {
   const { sites, denied } = await dependencies.sites(actor, workspaceId);
   const ready = dependencies.storeReady();
-  return {
+  let records: InquiryRecordsRead | null = null;
+  let recordsUnavailable = false;
+  const pending = dependencies.records?.(actor, workspaceId) ?? null;
+  if (pending) {
+    try {
+      records = await pending;
+    } catch (error) {
+      // Only a held list that couldn't be read; the inbox itself still shows.
+      if (error instanceof Error && error.name === "WorkspaceAccessError") throw error;
+      console.error("[inquiries] held items read failed", { workspaceId, error: error instanceof Error ? error.message : String(error) });
+      recordsUnavailable = true;
+    }
+  }
+  const allowed = new Set(sites.map((site) => site.tenantId));
+  const result: WorkspaceLeads = {
     denied,
     sites: await Promise.all(sites.map(async (site) => {
       if (!ready) return { tenantId: site.tenantId, siteName: site.siteName, leads: [], lastThirtyDays: 0, unavailable: true };
       try {
-        const leads = (await dependencies.leads(site.tenantId)).map(leadView).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+        const kept = (await dependencies.leads(site.tenantId)).map(leadView);
+        const seen = new Set(kept.map((lead) => lead.id));
+        const released = (records?.released ?? []).filter((lead) => lead.tenantId === site.tenantId && !seen.has(lead.leadId)).map(releasedLeadView);
+        const leads = [...kept, ...released].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
         return { tenantId: site.tenantId, siteName: site.siteName, leads, lastThirtyDays: recentCount(leads, dependencies.now()), unavailable: false };
       } catch (error) {
         console.error("[inquiries] lead store read failed", { tenantId: site.tenantId, error: error instanceof Error ? error.message : String(error) });
@@ -90,4 +162,12 @@ export async function readWorkspaceLeads(actor: WorkspaceActor, workspaceId: str
       }
     })),
   };
+  if (pending) {
+    // Held items of a site this person can't read through the tenant check stay hidden, like its inbox.
+    result.held = {
+      items: (records?.held ?? []).filter((lead) => lead.tenantId !== null && allowed.has(lead.tenantId)).map(heldView),
+      unavailable: recordsUnavailable,
+    };
+  }
+  return result;
 }
