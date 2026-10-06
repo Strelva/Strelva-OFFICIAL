@@ -32,7 +32,14 @@
           "src/app/api/reb-custom-request/route.ts",
           "scripts/production-checklist.ts"
         ],
-        "requiredEnv": ["REB_CUSTOM_REQUEST_SECRET", "REVALIDATE_SECRET"]
+        "requiredEnv": ["REB_CUSTOM_REQUEST_SECRET", "REVALIDATE_SECRET"],
+        "v1Endpoints": ["content", "page-config", "site-capabilities"],
+        "v1CallSites": [
+          { "endpoint": "content", "file": "src/lib/reb-contracts.ts", "responseUse": "GET via src/lib/storage.ts with a local fallback when REB_API_URL is unset or REB fails" },
+          { "endpoint": "page-config", "file": "src/lib/reb-contracts.ts", "responseUse": "GET via src/lib/storage.ts with a local fallback when REB_API_URL is unset or REB fails" },
+          { "endpoint": "site-capabilities", "file": "src/lib/reb-contracts.ts", "responseUse": "GET via src/lib/storage.ts with a local fallback when REB_API_URL is unset or REB fails" }
+        ],
+        "notes": "Also serves /api/v1/revalidate (revalidatePath) and calls the non-v1 /api/newsletter/subscribe?tenant=gldf. Local checkout 86be10a is 10 commits ahead of the pin plus 1 local-only commit; origin/master is 8d1dd50."
       },
       {
         "tenant": "rohlax",
@@ -43,9 +50,215 @@
         "compatibleTag": "rohlax-v2026.05.12.1",
         "packageScripts": ["check:scaffold"],
         "requiredFiles": ["src/lib/reb.ts", "scripts/scaffold-web-check.mjs"],
-        "requiredEnv": ["TENANT_ID", "REB_DASHBOARD_URL", "REVALIDATION_SECRET"]
+        "requiredEnv": ["TENANT_ID", "REB_DASHBOARD_URL", "REVALIDATION_SECRET"],
+        "v1Endpoints": ["content", "page-config", "site-capabilities"],
+        "v1CallSites": [
+          { "endpoint": "content", "file": "src/lib/reb-contracts.ts", "responseUse": "GET via src/lib/reb.ts with local fallbacks" },
+          { "endpoint": "page-config", "file": "src/lib/reb-contracts.ts", "responseUse": "GET via src/lib/reb.ts with local fallbacks" },
+          { "endpoint": "site-capabilities", "file": "src/lib/reb-contracts.ts", "responseUse": "GET via src/lib/reb.ts with local fallbacks" }
+        ],
+        "notes": "Also serves /api/v1/revalidate (revalidatePath) and calls the non-v1 /api/newsletter/subscribe. Local checkout 9ed876b is 16 commits ahead of the pin; origin/main is 8cb62c9."
+      },
+      {
+        "tenant": "mclears",
+        "localPath": "../mclears-cottage",
+        "profile": "next-beacon-site",
+        "compatibleCommit": "595c75b153c0fd483864e8c4e4f13dce5de8aa2f",
+        "pinSource": "origin/main as last fetched in the local clone (2026-07-30); the deployed production SHA was not verified",
+        "tenantEvidence": "tenant read from NEXT_PUBLIC_TENANT_ID inlined in the live JS bundle at https://mclears.com on 2026-10-05; matches active tenant id 'mclears'",
+        "v1Endpoints": ["leads", "track"],
+        "v1CallSites": [
+          {
+            "endpoint": "leads",
+            "file": "src/app/api/contact/route.ts",
+            "transport": "json",
+            "bodyFields": ["name", "email", "message", "source"],
+            "responseUse": "fire-and-forget after() beacon; response ignored, the Resend email is the owner's source of truth",
+            "fixtures": [
+              {
+                "name": "contact-with-email",
+                "body": { "name": "Jane Visitor", "email": "jane.visitor@example.com", "message": "Phone: 716-555-0142\nMessage: Do you have a cottage free the first week of July?", "source": "Contact" },
+                "expectStatus": 200,
+                "expectBody": { "ok": true }
+              },
+              {
+                "name": "contact-without-email",
+                "body": { "name": "Website visitor", "message": "Message: Is the cottage pet friendly?", "source": "Website message" },
+                "expectStatus": 200,
+                "expectBody": { "ok": true }
+              }
+            ]
+          },
+          {
+            "endpoint": "track",
+            "file": "src/components/ScaffoldTracker.tsx",
+            "transport": "beacon-text",
+            "bodyFields": ["event", "serviceId", "amountCents", "currency", "items", "orderId"],
+            "responseUse": "fire-and-forget; response ignored. Mounted once in the root layout: page-view on load, phone-click on tel: taps. trackOrder/trackBookingClick are exported but not called.",
+            "fixtures": [
+              { "name": "page-view", "body": {"event": "page-view"}, "expectStatus": 200, "expectBody": {"ok": true} },
+              { "name": "phone-click", "body": {"event": "phone-click"}, "expectStatus": 200, "expectBody": {"ok": true} }
+            ]
+          }
+        ]
+      },
+      {
+        "tenant": "orange-crate",
+        "localPath": "../orange-crate-brewing",
+        "profile": "next-beacon-site",
+        "compatibleCommit": "f9586bc89639599cbbd3a2671557489bd65826ee",
+        "pinSource": "origin/main as last fetched in the local clone (2026-07-30); the deployed production SHA was not verified",
+        "tenantEvidence": "tenant read from NEXT_PUBLIC_TENANT_ID inlined in the live JS bundle at https://orangecratebrewingco.com on 2026-10-05; matches active tenant id 'orange-crate'",
+        "v1Endpoints": ["track"],
+        "v1CallSites": [
+          {
+            "endpoint": "track",
+            "file": "components/ScaffoldTracker.tsx",
+            "transport": "beacon-text",
+            "bodyFields": ["event", "serviceId", "amountCents", "currency", "items", "orderId"],
+            "responseUse": "fire-and-forget; response ignored. Mounted once in the root layout: page-view on load, phone-click on tel: taps. trackOrder/trackBookingClick are exported but not called.",
+            "fixtures": [
+              { "name": "page-view", "body": {"event": "page-view"}, "expectStatus": 200, "expectBody": {"ok": true} },
+              { "name": "phone-click", "body": {"event": "phone-click"}, "expectStatus": 200, "expectBody": {"ok": true} }
+            ]
+          }
+        ],
+        "notes": "Does not call /api/v1/leads: lib/scaffold-forms.ts only mentions it in a comment; app/api/forms/route.ts sends via Resend and an optional webhook."
+      },
+      {
+        "tenant": "leslie-bookkeeping",
+        "localPath": "../leslie-bookkeeping",
+        "profile": "next-beacon-site",
+        "compatibleCommit": "5c86641e3aac029ba36b4766cac849ee417b00a2",
+        "pinSource": "origin/main as last fetched in the local clone (2026-07-21); the deployed production SHA was not verified",
+        "tenantEvidence": "tenant read from NEXT_PUBLIC_TENANT_ID inlined in the live JS bundle at https://lesliebookkeeping.com on 2026-10-05; matches active tenant id 'leslie-bookkeeping'",
+        "v1Endpoints": ["track"],
+        "v1CallSites": [
+          {
+            "endpoint": "track",
+            "file": "src/components/ScaffoldTracker.tsx",
+            "transport": "beacon-text",
+            "bodyFields": ["event", "serviceId", "amountCents", "currency", "items", "orderId"],
+            "responseUse": "fire-and-forget; response ignored. Mounted once in the root layout: page-view on load, phone-click on tel: taps. trackOrder/trackBookingClick are exported but not called.",
+            "fixtures": [
+              { "name": "page-view", "body": {"event": "page-view"}, "expectStatus": 200, "expectBody": {"ok": true} },
+              { "name": "phone-click", "body": {"event": "phone-click"}, "expectStatus": 200, "expectBody": {"ok": true} }
+            ]
+          }
+        ]
+      },
+      {
+        "tenant": "rhm-innovations",
+        "localPath": "../rhm-innovations",
+        "profile": "next-beacon-site",
+        "compatibleCommit": "7005140f356d0984a2b1d47d9fc2dc07717815ed",
+        "pinSource": "origin/main as last fetched in the local clone (2026-09-11); the deployed production SHA was not verified",
+        "tenantEvidence": "tenant read from NEXT_PUBLIC_TENANT_ID inlined in the live JS bundle at https://rhminnovations.com on 2026-10-05; .env.example TENANT_ID=rhm-innovations; matches active tenant id 'rhm-innovations'",
+        "v1Endpoints": ["content", "site-capabilities", "track"],
+        "v1CallSites": [
+          { "endpoint": "content", "file": "src/lib/reb-client.ts", "responseUse": "GET only when REB_API_URL is set (commented out in .env.example); falls back to local defaults" },
+          { "endpoint": "site-capabilities", "file": "src/lib/reb-client.ts", "responseUse": "GET only when REB_API_URL is set (commented out in .env.example); falls back to local defaults" },
+          {
+            "endpoint": "track",
+            "file": "src/components/ScaffoldTracker.tsx",
+            "transport": "beacon-text",
+            "bodyFields": ["event", "serviceId", "amountCents", "currency", "items", "orderId"],
+            "responseUse": "fire-and-forget; response ignored. Mounted once in the root layout: page-view on load, phone-click on tel: taps. trackOrder/trackBookingClick are exported but not called.",
+            "fixtures": [
+              { "name": "page-view", "body": {"event": "page-view"}, "expectStatus": 200, "expectBody": {"ok": true} },
+              { "name": "phone-click", "body": {"event": "phone-click"}, "expectStatus": 200, "expectBody": {"ok": true} }
+            ]
+          }
+        ]
+      },
+      {
+        "tenant": "smokin-buddha",
+        "tenantConfirmed": false,
+        "localPath": "../smokin-buddha",
+        "profile": "next-beacon-site",
+        "compatibleCommit": "2344386c4f08ec22e3bf686b5f4513f3007ce680",
+        "pinSource": "origin/main as last fetched in the local clone (2026-10-01); the deployed production SHA was not verified",
+        "tenantEvidence": "UNCONFIRMED: .env.example sets NEXT_PUBLIC_TENANT_ID=smokin-buddha, but 'smokin-buddha' is not in the Sept 2026 active tenant list (docs/operations/strelvav2-horizontal-acceptance.md) and www.thesmokinbuddha.com is served by Squarespace, not this repo",
+        "v1Endpoints": ["track"],
+        "v1CallSites": [
+          {
+            "endpoint": "track",
+            "file": "src/components/ScaffoldTracker.tsx",
+            "transport": "beacon-text",
+            "bodyFields": ["event", "serviceId", "amountCents", "currency", "items", "orderId"],
+            "responseUse": "fire-and-forget; response ignored. Mounted once in the root layout: page-view on load, phone-click on tel: taps. trackOrder/trackBookingClick are exported but not called.",
+            "fixtures": [
+              { "name": "page-view", "body": {"event": "page-view"}, "expectStatus": 200, "expectBody": {"ok": true} },
+              { "name": "phone-click", "body": {"event": "phone-click"}, "expectStatus": 200, "expectBody": {"ok": true} }
+            ]
+          }
+        ]
+      },
+      {
+        "tenant": "cocard-anderson",
+        "localPath": "../cocard-anderson",
+        "profile": "static-site",
+        "compatibleCommit": "4feb74a5be9cffb2ecad3bbed22122519eb0181d",
+        "pinSource": "origin/main as last fetched in the local clone (2026-09-23); the deployed production SHA was not verified",
+        "tenantEvidence": "hard-coded in api/contact.js SPAM_PIT_URL; matches active tenant id 'cocard-anderson'",
+        "requiredFiles": ["api/contact.js"],
+        "v1Endpoints": ["spam-pit"],
+        "v1CallSites": [
+          {
+            "endpoint": "spam-pit",
+            "file": "api/contact.js",
+            "transport": "json",
+            "auth": "spam-pit-write-key",
+            "bodyFields": ["reason", "source", "name", "email", "message", "fields", "ip", "userAgent"],
+            "responseUse": "checks r.ok; on failure logs the record to the function log. Server-to-server, Bearer SPAM_PIT_WRITE_KEY",
+            "fixtures": [
+              {
+                "name": "caught-spam",
+                "body": {
+                  "reason": "canned-message",
+                  "source": "contact-form",
+                  "name": "Samantha Moore",
+                  "email": "samantha@example.com",
+                  "message": "I can get your site to the first page of Google.",
+                  "fields": { "business": "", "phone": "", "interest": "POS Systems" },
+                  "ip": "203.0.113.9",
+                  "userAgent": "Mozilla/5.0"
+                },
+                "expectStatus": 200,
+                "expectBody": { "ok": true }
+              }
+            ]
+          }
+        ],
+        "notes": "The local checkout (5c32b54) predates the spam-pit call; it is on origin/main."
+      },
+      {
+        "tenant": "vermont-unlimited",
+        "localPath": "../vermont-unlimited",
+        "profile": "static-site",
+        "compatibleCommit": "83f34645d1e406b93168ba915db3420d68bfd237",
+        "pinSource": "origin/main as last fetched in the local clone (2026-10-01); the deployed production SHA was not verified",
+        "tenantEvidence": "no tenant id in the repo; matches active tenant id 'vermont-unlimited' and the account fixture in scripts/seed-account-andy.ts",
+        "requiredFiles": ["api/contact.js"],
+        "v1Endpoints": [],
+        "v1CallSites": [],
+        "notes": "Calls no /api/v1 endpoint: api/contact.js sends through Resend only."
       }
-    ]
+    ],
+    "profiles": {
+      "next-beacon-site": {
+        "description": "Next.js client site that does not read REB content; it only sends v1 beacons (track, leads). No own release-manifest.json.",
+        "packageScripts": ["dev", "build"],
+        "requiredFiles": ["package.json"],
+        "requiredEnv": []
+      },
+      "static-site": {
+        "description": "Static HTML site on Vercel with serverless functions under api/. No package.json, no own release-manifest.json.",
+        "packageScripts": [],
+        "requiredFiles": ["index.html", "vercel.json"],
+        "requiredEnv": []
+      }
+    }
   },
   "requiredEnv": ["REVALIDATE_SECRET", "SENTRY_DSN", "NEXT_PUBLIC_SENTRY_DSN"]
 }

@@ -445,6 +445,11 @@ psql "${psql_args[@]}" --file="$repo_root/tests/business-record-schema.sql"
 psql "${psql_args[@]}" --set=tenant_import="$(cat "$repo_root/tests/fixtures/business-record-tenant-import.json")" \
   --file="$repo_root/tests/business-record-conversion-schema.sql"
 
+# Strelva Reborn section 0: client leads copied to Postgres. Applied after the
+# business record here, so conversion attaches leads to the business.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261005090000_tenant_leads.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
+
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
