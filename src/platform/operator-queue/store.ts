@@ -94,3 +94,24 @@ export async function insertReadback(receiptId: string, readback: "matched" | "d
     p_receipt_id: receiptId, p_readback: readback, p_detail: detail,
   }));
 }
+
+/** A Google listing write Google took but didn't show back (google_listing_receipts). */
+export const listingReadbackFailureSchema = z.object({
+  id: z.string().uuid(),
+  workspaceId: z.string().uuid(),
+  workspaceName: z.string(),
+  tenantId: z.string().nullable(),
+  action: z.string(),
+  targetRef: z.string().nullable(),
+  status: z.literal("posted_unverified"),
+  readback: z.enum(["failed", "differs"]),
+  error: z.string().nullable(),
+  createdAt: z.string(),
+  completedAt: z.string().nullable(),
+}).strict();
+export type ListingReadbackFailure = z.infer<typeof listingReadbackFailureSchema>;
+
+/** Operator only: listing writes Google accepted whose read-back failed. Read only. */
+export async function readListingReadbackFailures(actor: QueueActor, limit = 200): Promise<ListingReadbackFailure[]> {
+  return parse(z.array(listingReadbackFailureSchema), await rpc("read_google_listing_readback_failures", { ...identity(actor), p_limit: limit }));
+}
