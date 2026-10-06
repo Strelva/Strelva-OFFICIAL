@@ -92,6 +92,24 @@ describe("business home", () => {
     expect(html).not.toContain("Get or build");
   });
 
+  it("links to /workspace/site to bring the business's own website in, only while connected sites are on for it", () => {
+    const base = { sites: [], unassignedSites: [], siteAssignmentsKnown: true, offerings: offeringState, busy: false,
+      onOpen: noop, onStart: noop, onRequest: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account", files: [], systemsReleased: true };
+    const on = { ...snapshot([]), releases: { systems: true, connectedSites: true } };
+    const empty = renderToStaticMarkup(createElement(BusinessHome, { ...base, snapshot: on, systems: [] }));
+    expect(empty).toContain("Already have a website?");
+    expect(empty).toContain('href="/workspace/site?workspaceId=business-1"');
+    const website = { id: "site-1", kind: "website" as const, name: "alder.example", detail: "", lifecycle: "live" as const, health: { state: "unknown" as const, summary: "" }, surface: { kind: "website" as const, previewSrc: "", previewLabel: "", domain: "alder.example" }, connections: [], possibilities: [], versions: [] };
+    const withSite = renderToStaticMarkup(createElement(BusinessHome, { ...base, snapshot: on, systems: [website] as never }));
+    expect(withSite).toContain("Have another website?");
+    // Off for this business, or a read-only agency view: no link.
+    expect(renderToStaticMarkup(createElement(BusinessHome, { ...base, snapshot: { ...snapshot([]), releases: { systems: true } }, systems: [] }))).not.toContain("/workspace/site");
+    const shared = { ...on, workspaces: [{ id: "business-1", kind: "customer" as const, name: "Alder Workshop", access: "delegated_read" as const }] };
+    expect(renderToStaticMarkup(createElement(BusinessHome, { ...base, snapshot: shared, systems: [] }))).not.toContain("/workspace/site");
+    // While Systems load, no link yet.
+    expect(renderToStaticMarkup(createElement(BusinessHome, { ...base, snapshot: on, systems: [], systemsLoading: true }))).not.toContain("Already have a website?");
+  });
+
   it("renders the pre-Systems Home while STRELVA_SYSTEMS_RELEASE is off, even if Systems are passed", () => {
     const items = [work("Mediation intake", { productId: "applications" }), work("AI check", { productId: "ai_visibility" })];
     const html = renderToStaticMarkup(createElement(BusinessHome, {

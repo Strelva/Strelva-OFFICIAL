@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConnectedSitesStore } from "@/products/connected-sites/store";
 
-const deps = vi.hoisted(() => ({ limited: vi.fn(), spam: vi.fn(), notify: vi.fn() }));
+const deps = vi.hoisted(() => ({ limited: vi.fn(), spam: vi.fn(), notify: vi.fn(), flag: vi.fn() }));
 vi.mock("@/lib/rate-limit", () => ({ isRateLimitedAsync: deps.limited, rateLimitKey: (_req: Request, prefix: string) => prefix }));
 vi.mock("@/lib/lead-spam", () => ({ scoreLeadSpam: deps.spam }));
 vi.mock("@/lib/connected-site-notify", () => ({ notifyConnectedSiteInquiry: deps.notify }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => true }));
+vi.mock("@/platform/release-flags/store", () => ({ workspaceReleaseFlagEnabled: deps.flag }));
 
 import { setConnectedSitesStoreForTests } from "@/products/connected-sites/store";
 import { POST as postInquiry, OPTIONS } from "@/app/api/v1/connect/[siteKey]/inquiries/route";
@@ -26,6 +27,7 @@ describe("public connect routes", () => {
     deps.limited.mockReset().mockResolvedValue(false);
     deps.spam.mockReset().mockReturnValue({ isSpam: false, score: 0, signals: [] });
     deps.notify.mockReset().mockResolvedValue("sent");
+    deps.flag.mockReset().mockResolvedValue(true);
     store = {
       resolve: vi.fn(async () => site), context: vi.fn(async () => ({ revision: 1, facts: { display_name: "Fictional Bakery" }, services: [], site: { captureForms: true, injectSchema: true } })),
       recordEvents: vi.fn(async () => 1), recordInquiry: vi.fn(async () => ({ status: "recorded" as const, id: "78000000-0000-4000-8000-0000000000aa", workspaceId: site.workspaceId })),
@@ -39,6 +41,26 @@ describe("public connect routes", () => {
     vi.stubEnv("STRELVA_CONNECTED_SITES_RELEASE", "0");
     expect((await inquiry()).status).toBe(503);
     expect((await getContext(new Request(`https://app.strelva.test/api/v1/connect/${KEY}/context`), params())).status).toBe(503);
+  });
+  it("is gated per business: the site key's business row decides, and an off business stores nothing", async () => {
+    expect((await inquiry()).status).toBe(201);
+    expect(deps.flag).toHaveBeenCalledWith("connected_sites", site.workspaceId, { operator: true, tester: false });
+    deps.flag.mockResolvedValue(false);
+    (store.recordInquiry as ReturnType<typeof vi.fn>).mockClear();
+    expect((await inquiry()).status).toBe(503);
+    expect((await postEvents(new Request(`https://app.strelva.test/api/v1/connect/${KEY}/events`, { method: "POST", headers: { origin: ORIGIN }, body: JSON.stringify({ events: [{ id: "e1", kind: "visit" }] }) }), params())).status).toBe(503);
+    expect((await getContext(new Request(`https://app.strelva.test/api/v1/connect/${KEY}/context`), params())).status).toBe(503);
+    expect(store.recordInquiry).not.toHaveBeenCalled();
+    expect(store.recordEvents).not.toHaveBeenCalled();
+    // A failed flag read fails closed.
+    deps.flag.mockRejectedValue(new Error("db down"));
+    expect((await inquiry()).status).toBe(503);
+  });
+  it("workspace mode: on only where the business row turns it on", async () => {
+    vi.stubEnv("STRELVA_CONNECTED_SITES_RELEASE", "workspace");
+    expect((await inquiry()).status).toBe(201);
+    deps.flag.mockResolvedValue(false);
+    expect((await inquiry()).status).toBe(503);
   });
   it("records an inquiry from the verified site's own origin and tells the owner", async () => {
     const response = await inquiry();

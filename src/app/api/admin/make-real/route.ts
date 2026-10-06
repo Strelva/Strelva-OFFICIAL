@@ -18,9 +18,11 @@ const command = z.discriminatedUnion("action", [
 /**
  * Operator tools for one Make real activation (systems-experience spec
  * section 4): read its state, resume after fixing the cause, reconcile an
- * unknown step with evidence, or roll back. Super admins only. Each action
- * runs as the owner whose approval started the activation, with the
- * operator named in the history event. Nothing here rolls back on its own.
+ * unknown step with evidence, or roll back. Super admins only. For a
+ * business Strelva runs, each action runs as Strelva (system), logged in
+ * strelva_service_actions with the operator named; otherwise it runs as the
+ * owner whose approval started the activation, as before. The owner stays
+ * approver of record either way. Nothing here rolls back on its own.
  */
 export async function GET(request: Request) {
   const operator = await operatorEmail();
@@ -29,8 +31,10 @@ export async function GET(request: Request) {
   const parsed = z.object(ids).safeParse({ workspaceId: url.searchParams.get("workspaceId"), activationId: url.searchParams.get("activationId") });
   if (!parsed.success) return NextResponse.json({ error: "Check the request." }, { status: 400, headers: noStore });
   try {
-    const { activationStarter, liveMakeReal } = await import("@/platform/make-real/live-server");
-    const actor = await activationStarter(parsed.data.workspaceId, parsed.data.activationId);
+    const { activationStarter, activationRunner, liveMakeReal } = await import("@/platform/make-real/live-server");
+    // The starter reads it; once the starter has left, Strelva (system) does (a logged session).
+    const actor = await activationStarter(parsed.data.workspaceId, parsed.data.activationId)
+      ?? (await activationRunner(parsed.data.workspaceId, parsed.data.activationId))?.actor ?? null;
     if (!actor) return NextResponse.json({ error: "That activation is not available." }, { status: 404, headers: noStore });
     const activation = await liveMakeReal.read(actor, parsed.data.workspaceId, parsed.data.activationId);
     return NextResponse.json({ activation, view: describeActivation(activation), customer: customerActivationView(activation, "this change") }, { headers: noStore });
@@ -46,10 +50,16 @@ export async function POST(request: Request) {
   if (!parsed.success) return NextResponse.json({ error: "Check the request. Reconciling needs evidence of at least 10 characters; rolling back needs confirm." }, { status: 400, headers: noStore });
   const input = parsed.data;
   try {
-    const { activationStarter, liveMakeReal } = await import("@/platform/make-real/live-server");
-    const actor = await activationStarter(input.workspaceId, input.activationId);
-    if (!actor) return NextResponse.json({ error: "That activation is not available." }, { status: 404, headers: noStore });
-    const note = `operator ${operator}`;
+    const { activationRunner, liveMakeReal } = await import("@/platform/make-real/live-server");
+    const runner = await activationRunner(input.workspaceId, input.activationId);
+    if (!runner) return NextResponse.json({ error: "That activation is not available." }, { status: 404, headers: noStore });
+    const { actor, service } = runner;
+    const note = service ? `${service.label} for operator ${operator}` : `operator ${operator}`;
+    // Strelva (system) acts only once its log has the row; the owner's approval is untouched.
+    if (service) {
+      const { recordServiceAction } = await import("@/platform/needs-you/service-actor");
+      await recordServiceAction(service, input.action, `activation:${input.activationId}`, note);
+    }
     const activation = input.action === "resume" ? await liveMakeReal.resume(actor, input.workspaceId, input.activationId, note)
       : input.action === "rollback" ? await liveMakeReal.rollback(actor, input.workspaceId, input.activationId, note)
         : await liveMakeReal.reconcile(actor, input.workspaceId, input.activationId, { stepId: input.stepId, resolution: input.resolution, evidence: input.evidence, ...(input.providerRef ? { providerRef: input.providerRef } : {}), note });

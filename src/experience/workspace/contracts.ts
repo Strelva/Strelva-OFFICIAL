@@ -171,6 +171,8 @@ export interface WorkspaceReleases {
   inquiries?: boolean;
   /** STRELVA_WEBSITE_REBUILD_RELEASE for this workspace. Absent: the page's env value decides. */
   websiteRebuild?: boolean;
+  /** Connected sites on for this business (its `connected_sites` row, and Systems): Home links to /workspace/site. */
+  connectedSites?: boolean;
 }
 
 /**

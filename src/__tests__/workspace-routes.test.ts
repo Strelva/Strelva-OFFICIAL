@@ -187,6 +187,18 @@ describe("release-one private workspace routes", () => {
     expect(personal.systems).toBeUndefined();
     expect(mocks.systems).not.toHaveBeenCalled();
   });
+  it("tells Home when connected sites are on for the business, so it can link to /workspace/site", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const business = { id: otherId, kind: "customer", name: "The Mooney Firm", access: "member", role: "owner" };
+    mocks.list.mockResolvedValue([workspace, business]);
+    mocks.systems.mockResolvedValue({ status: "ready", systems: [], connections: [], possibilities: [] });
+    vi.stubEnv("STRELVA_CONNECTED_SITES_RELEASE", "1");
+    const on = await (await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${otherId}`))).json();
+    expect(on.releases.connectedSites).toBe(true);
+    vi.stubEnv("STRELVA_CONNECTED_SITES_RELEASE", "0");
+    const off = await (await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${otherId}`))).json();
+    expect(off.releases.connectedSites).toBeUndefined();
+  });
   it("builds no Systems projection and says so while STRELVA_SYSTEMS_RELEASE is off", async () => {
     const business = { id: otherId, kind: "customer", name: "The Mooney Firm", access: "member", role: "owner" };
     mocks.list.mockResolvedValue([workspace, business]);

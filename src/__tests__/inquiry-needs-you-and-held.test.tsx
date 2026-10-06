@@ -97,7 +97,7 @@ describe("held spam on the workspace Inquiries page", () => {
   it("renders held items with Release and It's spam, and released ones with Move back", () => {
     const html = renderToStaticMarkup(<WorkspaceInquiries workspaceId={WS} state={{ kind: "ready", data: {
       denied: [],
-      sites: [{ tenantId: "mclears", siteName: "McClear's", lastThirtyDays: 1, unavailable: false,
+      sites: [{ key: "mclears", tenantId: "mclears", siteName: "McClear's", lastThirtyDays: 1, unavailable: false,
         leads: [{ id: "lead_spam_b", releasedRowId: "r2", name: "Marta", email: null, message: "Bread?", source: null, fields: [], createdAt: "2026-10-05T12:00:00.000Z" }] }],
       held: { items: [{ rowId: "r1", tenantId: "mclears", name: "Ana", email: "ana@example.test", message: "gluten free?", reason: "honeypot", createdAt: "2026-10-05T10:00:00.000Z" }], unavailable: false },
     } }} />);

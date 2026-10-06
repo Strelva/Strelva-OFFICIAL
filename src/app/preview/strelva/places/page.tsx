@@ -86,7 +86,10 @@ export default async function PlacesPreviewPage({ searchParams }: { searchParams
     { id: "l2", name: "Tom R.", email: "tom@example.test", message: "Do you deliver catering trays to offices downtown?", source: "quote", fields: [], createdAt: "2026-10-03T09:30:00Z" },
     { id: "l1", name: "Someone", email: null, message: "Are you open on Thanksgiving?", source: null, fields: [], createdAt: "2026-08-20T09:30:00Z" },
   ];
-  const site = { tenantId: "juniper", siteName: "Juniper Bakery", leads, lastThirtyDays: 3, unavailable: false };
+  const site = { key: "juniper", tenantId: "juniper", siteName: "Juniper Bakery", leads, lastThirtyDays: 2, unavailable: false };
+  // A site the business connected itself (any builder): its form inquiries come in beside the managed site's.
+  const connected = { key: "connected:juniper-pop-up", tenantId: null, connected: true as const, siteName: "juniperpopup.example", lastThirtyDays: 1, unavailable: false,
+    leads: [{ id: "c1", name: "Ana M.", email: "ana@example.test", message: "Is the pop-up open Saturday morning?", source: "Your site's form", fields: [], createdAt: "2026-10-06T08:15:00Z" }] };
   // Held spam for review: `held=1` shows two items, `held=error` a list that failed.
   const held = params.held === "1"
     ? { items: [
@@ -95,5 +98,5 @@ export default async function PlacesPreviewPage({ searchParams }: { searchParams
     ], unavailable: false }
     : params.held === "error" ? { items: [], unavailable: true } : undefined;
   const withHeld = <T extends object>(data: T) => (held ? { ...data, held } : data);
-  return <WorkspaceInquiries workspaceId={WORKSPACE} state={frame(state, withHeld({ sites: [site], denied: [] }), withHeld({ sites: [{ ...site, leads: [], lastThirtyDays: 0 }], denied: [] }), { sites: [{ ...site, leads: [], unavailable: true }], denied: [] }, { sites: [site], denied: DENIED })} />;
+  return <WorkspaceInquiries workspaceId={WORKSPACE} state={frame(state, withHeld({ sites: [site, connected], denied: [] as typeof DENIED }), withHeld({ sites: [{ ...site, leads: [], lastThirtyDays: 0 }, { ...connected, leads: [], lastThirtyDays: 0 }], denied: [] as typeof DENIED }), { sites: [{ ...site, leads: [], unavailable: true }, { ...connected, leads: [], unavailable: true }], denied: [] as typeof DENIED }, { sites: [site], denied: DENIED })} />;
 }

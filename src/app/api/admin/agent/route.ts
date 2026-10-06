@@ -158,7 +158,7 @@ export async function POST(req: Request) {
     }),
     read_ops: tool({
       description:
-        "Read live operational health: webhook failures, revalidation failures, stale SMS approvals, pending event queues, failed AI writes, and tenant domain drift.",
+        "Read live operational health: webhook failures, revalidation failures, pending event queues, failed AI writes, and tenant domain drift.",
       inputSchema: z.object({}),
       execute: async () => await buildOpsReport(),
     }),

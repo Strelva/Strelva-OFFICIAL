@@ -10,7 +10,7 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
 import { WorkspaceStoreError } from "@/platform/workspaces/types";
-import { ConnectedSiteInputError, ConnectedSiteRefusedError, connectedSitesReleaseEnabled, resolvePublicSite } from "@/products/connected-sites/server";
+import { ConnectedSiteInputError, ConnectedSiteRefusedError, connectedSitesPublicFor, connectedSitesReleaseEnabled, resolvePublicSite } from "@/products/connected-sites/server";
 import { normalizeOrigin, type ResolvedConnectedSite } from "@/products/connected-sites/contracts";
 
 export const CONNECT_CORS_HEADERS: Record<string, string> = {
@@ -33,12 +33,20 @@ export function connectPreflight(): NextResponse {
 
 type SiteResolution = { ok: true; site: ResolvedConnectedSite; origin: string | null } | { ok: false; response: NextResponse };
 
-/** Release gate, key, then (writes) proven host and Origin, in that order. Unknown and revoked keys look the same. */
+/**
+ * Release gate, key, the key's business gate, then (writes) proven host and
+ * Origin, in that order. Unknown and revoked keys look the same; a business
+ * whose `connected_sites` row is off answers exactly like the env switch off.
+ */
 export async function resolveConnectSite(req: Request, siteKey: string, options: { write: boolean }): Promise<SiteResolution> {
-  if (!connectedSitesReleaseEnabled()) return { ok: false, response: connectJson({ error: "Connected sites are not enabled." }, 503) };
+  const disabled = () => ({ ok: false as const, response: connectJson({ error: "Connected sites are not enabled." }, 503) });
+  if (!connectedSitesReleaseEnabled()) return disabled();
   let site: ResolvedConnectedSite | null;
   try { site = await resolvePublicSite(siteKey); } catch (error) { return { ok: false, response: connectErrorResponse(error, "resolve") }; }
   if (!site) return { ok: false, response: connectJson({ error: "Site not found." }, 404) };
+  let open = false;
+  try { open = await connectedSitesPublicFor(site.workspaceId); } catch { open = false; }
+  if (!open) return disabled();
   const origin = normalizeOrigin(req.headers.get("origin") ?? "");
   if (options.write) {
     if (!site.verified) return { ok: false, response: connectJson({ error: "This site has not been verified yet." }, 403) };

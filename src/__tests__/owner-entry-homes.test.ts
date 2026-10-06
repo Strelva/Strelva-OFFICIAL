@@ -112,6 +112,26 @@ describe("Inquiries reads the same lead store as /dashboard/leads", () => {
     expect(result).toEqual({ sites: [], denied: [site] });
   });
 
+  it("adds a section per connected site while connected sites are on for the business", async () => {
+    const SITE_ID = "7f000000-0000-4000-8000-0000000000c1";
+    const inquiry = { id: "c1", siteId: SITE_ID, siteHost: "www.bakery.example", leadId: "lead_x", name: "Pat", email: "pat@example.test", message: "Open Saturday?", source: "connected-site:site-form", capturedAt: "2026-10-04T09:00:00.000Z" };
+    const connected = vi.fn(async () => [{ siteId: SITE_ID, siteHost: "www.bakery.example", inquiries: [inquiry] }]);
+    const result = await readWorkspaceLeads(ACTOR, WS, deps({ connected }));
+    expect(connected).toHaveBeenCalledWith(ACTOR, WS);
+    expect(result.sites.map((s) => s.key)).toEqual(["lakeshore", `connected:${SITE_ID}`]);
+    expect(result.sites[1]).toMatchObject({ tenantId: null, connected: true, siteName: "bakery.example", lastThirtyDays: 1, unavailable: false,
+      leads: [{ id: "c1", name: "Pat", email: "pat@example.test", message: "Open Saturday?", source: "Your site's form", createdAt: "2026-10-04T09:00:00.000Z" }] });
+    // Off for this business: no section at all.
+    expect((await readWorkspaceLeads(ACTOR, WS, deps({ connected: async () => null }))).sites.map((s) => s.key)).toEqual(["lakeshore"]);
+  });
+
+  it("a connected-site read that fails is unavailable, never empty; a membership refusal passes through", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const failed = await readWorkspaceLeads(ACTOR, WS, deps({ connected: async () => { throw new Error("db"); } }));
+    expect(failed.sites[1]).toMatchObject({ key: "connected", connected: true, unavailable: true, leads: [] });
+    await expect(readWorkspaceLeads(ACTOR, WS, deps({ connected: async () => { throw new WorkspaceAccessError(); } }))).rejects.toBeInstanceOf(WorkspaceAccessError);
+  });
+
   it("trims a lead for display", () => {
     expect(leadView({ id: "x", name: "  Ann ", message: "  hi ", createdAt: "2026-10-01" })).toMatchObject({ name: "Ann", message: "hi", source: null });
   });

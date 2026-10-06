@@ -35,7 +35,7 @@ describe("every place has the same way home and the same failure states", () => 
 describe("Inquiries", () => {
   const lead = { id: "l1", name: "Dana", email: "dana@example.test", message: "Do you ship?", source: "contact-form", fields: [["phone", "716"]] as Array<[string, string]>, createdAt: "2026-10-01T10:00:00Z" };
   it("shows each person with a reply link, and counts the last 30 days", () => {
-    const page = html(createElement(WorkspaceInquiries, { workspaceId: WS, state: { kind: "ready", data: { sites: [{ tenantId: "lakeshore", siteName: "Lakeshore", leads: [lead], lastThirtyDays: 1, unavailable: false }], denied: [] } } }));
+    const page = html(createElement(WorkspaceInquiries, { workspaceId: WS, state: { kind: "ready", data: { sites: [{ key: "lakeshore", tenantId: "lakeshore", siteName: "Lakeshore", leads: [lead], lastThirtyDays: 1, unavailable: false }], denied: [] } } }));
     expect(page).toContain("Dana");
     expect(page).toContain('href="mailto:dana@example.test"');
     expect(page).toContain("Contact form");
@@ -43,10 +43,20 @@ describe("Inquiries", () => {
     expect(recentCount([lead], Date.parse("2026-12-01T00:00:00Z"))).toBe(0);
   });
   it("says unavailable and empty differently", () => {
-    const unavailable = html(createElement(WorkspaceInquiries, { workspaceId: WS, state: { kind: "ready", data: { sites: [{ tenantId: "lakeshore", siteName: "Lakeshore", leads: [], lastThirtyDays: 0, unavailable: true }], denied: [] } } }));
+    const unavailable = html(createElement(WorkspaceInquiries, { workspaceId: WS, state: { kind: "ready", data: { sites: [{ key: "lakeshore", tenantId: "lakeshore", siteName: "Lakeshore", leads: [], lastThirtyDays: 0, unavailable: true }], denied: [] } } }));
     expect(unavailable).toContain("couldn&#x27;t be read right now");
-    const empty = html(createElement(WorkspaceInquiries, { workspaceId: WS, state: { kind: "ready", data: { sites: [{ tenantId: "lakeshore", siteName: "Lakeshore", leads: [], lastThirtyDays: 0, unavailable: false }], denied: [] } } }));
+    const empty = html(createElement(WorkspaceInquiries, { workspaceId: WS, state: { kind: "ready", data: { sites: [{ key: "lakeshore", tenantId: "lakeshore", siteName: "Lakeshore", leads: [], lastThirtyDays: 0, unavailable: false }], denied: [] } } }));
     expect(empty).toContain("No one has reached out yet");
+  });
+  it("shows a connected site's inquiries in their own section, with the same reply link", () => {
+    const connected = { key: "connected:78000000-0000-4000-8000-000000000003", tenantId: null, connected: true as const, siteName: "bakery.example", leads: [{ ...lead, id: "c1", name: "Pat", email: "pat@example.test", source: "Your site's form", fields: [] }], lastThirtyDays: 1, unavailable: false };
+    const page = html(createElement(WorkspaceInquiries, { workspaceId: WS, state: { kind: "ready", data: { sites: [{ key: "lakeshore", tenantId: "lakeshore", siteName: "Lakeshore", leads: [lead], lastThirtyDays: 1, unavailable: false }, connected], denied: [] } } }));
+    expect(page).toContain("bakery.example (your site)");
+    expect(page).toContain('id="site-connected-78000000-0000-4000-8000-000000000003"');
+    expect(page).toContain('href="mailto:pat@example.test"');
+    expect(page).toContain("Your site&#x27;s form");
+    const empty = html(createElement(WorkspaceInquiries, { workspaceId: WS, state: { kind: "ready", data: { sites: [{ ...connected, leads: [], lastThirtyDays: 0 }], denied: [] } } }));
+    expect(empty).toContain("Strelva takes it and it shows up here");
   });
 });
 

@@ -67,9 +67,32 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     for (const adapter of deps.adapters) {
       const proposal = await adapter.propose(ctx).catch(() => ({ items: [], complete: false }));
       complete &&= proposal.complete;
-      for (const item of proposal.items) opened.push(await deps.store.open(ctx.workspaceId, item));
+      for (const item of proposal.items) {
+        opened.push(ctx.service && deps.store.openAsService
+          ? await deps.store.openAsService(ctx.workspaceId, ctx.service.sessionId, item)
+          : await deps.store.open(ctx.workspaceId, item));
+      }
     }
     return { opened, complete };
+  }
+
+  /**
+   * The cron's read context for one business: Strelva (system) when Strelva
+   * runs the business and it has a verified owner or admin, otherwise no
+   * member (only sources that need none are read). One session per business
+   * per chase.
+   */
+  async function cronContext(workspaceId: string, sessions: Map<string, AdapterContext>): Promise<AdapterContext> {
+    const known = sessions.get(workspaceId);
+    if (known) return known;
+    const session = deps.store.serviceSession
+      ? await deps.store.serviceSession(workspaceId).catch(() => null)
+      : null;
+    const ctx: AdapterContext = session && session.workspaceId === workspaceId && session.purpose === "needs_you_sync"
+      ? { workspaceId, actor: session.actor, service: session }
+      : { workspaceId };
+    sessions.set(workspaceId, ctx);
+    return ctx;
   }
 
   /** An open item whose source moved on: a newer revision supersedes it; a source no one waits on any more withdraws it. */
@@ -235,10 +258,12 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
   async function chase(): Promise<ChaseSummary> {
     const now = deps.now();
     const summary: ChaseSummary = { lapsed: 0, reminded: 0, digests: 0, urgent: 0, ownerNotTold: 0, failed: 0 };
-    // Open items for converted businesses even when nobody visits Home.
+    // Open items for converted businesses even when nobody visits Home or
+    // signs in: workspace sources are read as Strelva (system).
+    const sessions = new Map<string, AdapterContext>();
     const linked = await deps.store.linkedTenants(null).catch(() => []);
     for (const workspaceId of new Set(linked.map(link => link.workspaceId))) {
-      await sync({ workspaceId }).catch(() => { summary.failed += 1; });
+      await sync(await cronContext(workspaceId, sessions)).catch(() => { summary.failed += 1; });
     }
     const rows = await deps.store.dueForDelivery(500);
     const byBusiness = new Map<string, DeliveryRow[]>();
@@ -267,8 +292,9 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
         }
         // Don't chase an ask whose source already moved on.
         const adapter = adapterFor(row.sourceLifecycle);
-        if (adapter && !adapter.needsMemberActor) {
-          const fresh = await reconcile({ workspaceId }, row);
+        const readCtx = adapter?.needsMemberActor ? await cronContext(workspaceId, sessions) : { workspaceId };
+        if (adapter && (!adapter.needsMemberActor || readCtx.actor)) {
+          const fresh = await reconcile(readCtx, row);
           if (fresh === "gone" || fresh === "changed") continue;
         }
         if (row.urgent && row.deliveryState === "not_sent") {

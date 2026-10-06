@@ -27,15 +27,24 @@ Waiting on you, Requests, one History), operator domain work on the owner's
 approval (behaviors 12 and 13), and "Make it yourself instead". **Not built:**
 website `system_revisions` (item 1), repo-deploy receipts (item 6), Make real
 wired to the linked publish (behavior 16 still runs in the sandbox), owner
-email approval of a domain, the rebuild cutover undo, and "Ask for a change"
-filing a Request (it still pre-fills the composer).
+email approval of a domain and the rebuild cutover undo.
 
 Both merged on `integrate/reborn-1.0` (Oct 6): `/workspace/site` is one route.
 With a `system` it opens the site editor tabs (Strelva-content sites) or
 "Ask for a change" (repo-only sites, files a Request); without one it is the
 connected-site entry (bring the website the business already has), open only
-where `STRELVA_CONNECTED_SITES_RELEASE=1` and Systems is on for that business.
-The System page's own "Ask for a change" still pre-fills the composer.
+where connected sites and Systems are on for that business.
+
+**Built locally Oct 6 on `w3/decision-gaps` (not production, flags off):**
+the System page's "Ask for a change" on a managed website (Strelva content or
+repo-only) files a Request through `/api/workspace/site-changes` and rereads
+the Requests panel; other websites still open the composer. Home links to
+`/workspace/site` when connected sites are on for the business. Connected
+sites have their own per-business `connected_sites` release row
+(`20261009100000`), and the public `/api/v1/connect/*` routes check the site
+key's business row. `purge_connected_site_records` runs daily
+(`/api/cron/connected-sites-purge`). Connected-site inquiries appear in
+`/workspace/inquiries`.
 
 Under the October 6 working defaults, every recommendation here is what the
 build follows unless Jacob overturns it

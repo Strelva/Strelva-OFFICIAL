@@ -196,6 +196,8 @@ export const ownerDecisionSchema = z.object({
   expiresAt: isoSchema,
   reminded1At: isoSchema.nullable(),
   reminded2At: isoSchema.nullable(),
+  /** "Strelva (system)" when the hourly cron opened it for an owner who wasn't signed in (20261009100000). */
+  openedBy: z.literal("Strelva (system)").nullable().optional(),
   deliveries: z.array(z.object({
     kind: z.enum(["urgent", "digest", "reminder_1", "reminder_2"]),
     status: z.enum(["sent", "suppressed", "bounced", "failed"]),

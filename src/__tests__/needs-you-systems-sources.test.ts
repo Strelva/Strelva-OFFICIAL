@@ -26,7 +26,7 @@ import {
 } from "@/platform/system-versions";
 import { createNeedsYouService } from "@/platform/needs-you/service";
 import type { SourceAdapter } from "@/platform/needs-you/adapters";
-import { makeRealAdapter, makeRealSourceId, needsYouMakeRealApprovals, type MakeRealSourcePorts, type ReadyPlan } from "@/platform/needs-you/sources/make-real";
+import { dedupeReadyPlans, makeRealAdapter, makeRealSourceId, needsYouMakeRealApprovals, type MakeRealSourcePorts, type ReadyPlan } from "@/platform/needs-you/sources/make-real";
 import { needsYouVersionReleaseApprovals, versionReleaseAdapter, versionReleaseRevision, type PendingVersionRelease, type VersionReleaseSourcePorts } from "@/platform/needs-you/sources/version-release";
 import { makeRealThroughNeedsYou } from "@/platform/needs-you/systems-sources";
 import { needsYouMemoryStore } from "./support/needs-you-memory";
@@ -170,6 +170,34 @@ describe("the make_real source", () => {
       ["system.go_live", "owner_decides", makeRealSourceId("website-rebuild:w2", 1), "b".repeat(64), false],
     ]);
     expect(items[0]!.openHref).toContain("view=system");
+  });
+
+  it("a stored live plan and the isolated plan of the same rebuild are one Home item: the live one", async () => {
+    const mem = needsYouMemoryStore({ clock: { now: Date.parse(at) }, roles: { [owner.userId]: "owner" } });
+    const live = plan({ possibilityId: "b0000000-0000-4000-8000-0000000000f1", fingerprint: "c".repeat(64), live: true, sourceRebuild: "w1" });
+    const { ports } = makeRealPorts({
+      plans: [plan({ sourceRebuild: "w1" }), plan({ possibilityId: "website-rebuild:w2", fingerprint: "b".repeat(64), sourceRebuild: "w2" })],
+      livePlans: async () => [live],
+    });
+    const { items } = await service(mem.store, [makeRealAdapter(ports)]).list(owner, BIZ);
+    expect(items.map((i) => i.sourceId)).toEqual([makeRealSourceId(live.possibilityId, 1), makeRealSourceId("website-rebuild:w2", 1)]);
+  });
+
+  it("an isolated item opened before the live plan existed is withdrawn once the live plan of its rebuild appears", async () => {
+    const mem = needsYouMemoryStore({ clock: { now: Date.parse(at) }, roles: { [owner.userId]: "owner" } });
+    const state = { live: [] as ReadyPlan[] };
+    const { ports } = makeRealPorts({ plans: [plan({ sourceRebuild: "w1" })], livePlans: async () => state.live });
+    const ny = service(mem.store, [makeRealAdapter(ports)]);
+    expect((await ny.list(owner, BIZ)).items.map((i) => i.sourceId)).toEqual([makeRealSourceId("website-rebuild:w1", 1)]);
+    state.live = [plan({ possibilityId: "b0000000-0000-4000-8000-0000000000f1", fingerprint: "c".repeat(64), live: true, sourceRebuild: "w1" })];
+    const after = (await ny.list(owner, BIZ)).items;
+    expect(after.map((i) => i.sourceId)).toEqual([makeRealSourceId("b0000000-0000-4000-8000-0000000000f1", 1)]);
+    expect([...mem.items.values()].find((i) => i.sourceId === makeRealSourceId("website-rebuild:w1", 1))!.state).toBe("withdrawn");
+  });
+
+  it("plans without a source rebuild are never merged", () => {
+    const kept = dedupeReadyPlans([plan({ possibilityId: "p-live", live: true })], [plan({ possibilityId: "p-a" }), plan({ possibilityId: "p-b" }), plan({ possibilityId: "p-live" })]);
+    expect(kept.map((p) => p.possibilityId)).toEqual(["p-live", "p-a", "p-b"]);
   });
 
   it("Strelva's policy routes a change to its own review, never below the floor", async () => {

@@ -28,6 +28,17 @@ approval half of 22 (`planApprovalAuthority` rechecks the record before
 activation and every publish step). Make real still runs on the isolated
 sandbox.
 
+Built locally on `w3/decision-gaps` (2026-10-06): the service-actor half of
+22. The workspace-work cron and the operator's resume, reconcile and roll back
+run under Strelva (system) for a business Strelva runs (one logged
+`make_real_resume` session per business, `20261009100000`), falling back to
+the starter elsewhere; each action is logged before it runs, the history event
+says "Resumed by Strelva (system)", and the owner stays approver of record
+(the activation's approval is unchanged and rechecked before every step). An
+activation whose starter left is no longer stranded. Home shows one Make real
+item when a stored live plan and an isolated plan come from the same rebuild
+(the live plan wins; `sourceRebuild`).
+
 This spec covers what a business sees of its Systems: Home, the System page,
 Possibilities, and Make real with real outside effects. It also covers the
 storage underneath: the System registry, System identity across tenants and

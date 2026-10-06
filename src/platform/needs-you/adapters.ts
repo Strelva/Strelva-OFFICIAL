@@ -16,11 +16,19 @@ import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { ServiceRequest } from "@/platform/service-requests/types";
 import { KIND_RULES, OWNER_ONLY_KINDS, isConfigurableKind, type ChangeKind, type Decision, type OwnerDecision, type ProposedItem, type SourceLifecycle } from "./contracts";
 import { classifyTenantEvent, observedTenantRoute, tenantEventRevision } from "./tenant-classify";
+import type { ServiceSession } from "./service-actor";
 
 export interface AdapterContext {
   workspaceId: string;
   /** Present when a signed-in member is looking; some sources can only be read as a member. */
   actor?: WorkspaceActor;
+  /**
+   * Set only by the hourly cron: `actor` is then Strelva (system)'s read
+   * identity for this business (service-actor.ts), good for propose and
+   * currentRevision. It never reaches `resolve`: deciding takes the owner's
+   * signed link or session.
+   */
+  service?: ServiceSession;
 }
 
 export type ResolveBy =

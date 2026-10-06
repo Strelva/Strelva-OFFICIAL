@@ -19,7 +19,6 @@ function snapshot(overrides: Partial<PortfolioSnapshot> = {}): PortfolioSnapshot
       metrics: {
         webhookFailures: 0,
         revalidationFailures: 0,
-        staleSmsApprovals: 0,
         pendingEvents: {},
         totalPendingEvents: 0,
         failedAiWrites: 0,
@@ -141,7 +140,6 @@ describe("buildAttentionFromSnapshot", () => {
           metrics: {
             webhookFailures: 2,
             revalidationFailures: 1,
-            staleSmsApprovals: 0,
             pendingEvents: {},
             totalPendingEvents: 0,
             failedAiWrites: 3,

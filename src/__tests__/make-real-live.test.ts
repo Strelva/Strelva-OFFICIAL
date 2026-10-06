@@ -306,7 +306,7 @@ describe("plan approvals keyed by workspace", () => {
 
 // The live service ----------------------------------------------------------------
 
-function service(input: { p: Possibility; live: ReturnType<typeof createInMemoryLiveSystems>; adapters: EffectAdapter[]; activations?: ActivationRepository; clock?: { now: number } }) {
+function service(input: { p: Possibility; live: ReturnType<typeof createInMemoryLiveSystems>; adapters: EffectAdapter[]; activations?: ActivationRepository; clock?: { now: number }; recordService?: Parameters<typeof createLiveMakeRealService>[0]["recordService"] }) {
   const possibilities = createInMemoryPossibilityRepository();
   const activations = input.activations ?? createInMemoryActivationRepository();
   const approvals = createInMemoryApprovalRecords();
@@ -314,6 +314,7 @@ function service(input: { p: Possibility; live: ReturnType<typeof createInMemory
   const svc = createLiveMakeRealService({
     possibilities: () => possibilities, activations: () => activations, live: () => input.live.port,
     adapters: () => input.adapters, approvals, clock: () => new Date(clock.now).toISOString(),
+    ...(input.recordService ? { recordService: input.recordService } : {}),
   });
   return { svc, possibilities, activations, approvals, clock };
 }
@@ -428,6 +429,71 @@ describe("live Make real service", () => {
     expect(hosted.state.launches).toBe(1);
     const done = await memory.get(BIZ, activationId);
     expect(done!.steps.find((s) => s.kind === "effect")!.receipt).toMatchObject({ reconciledBy: "provider_lookup", adapterMode: "live" });
+  });
+
+  it("the cron resumes as Strelva (system) once the starter has left; logged first, and the owner stays approver of record", async () => {
+    const hosted = hostedPorts();
+    const { p, live } = await readyPossibility({ effects: [hostedEffect()] });
+    const memory = createInMemoryActivationRepository();
+    let killAfterStart = true;
+    const crashing: ActivationRepository = {
+      get: (b, id) => memory.get(b, id), create: (v) => memory.create(v),
+      async save(value, expected) {
+        if (killAfterStart && value.history.at(-1)?.kind === "outcome" && value.history.at(-1)?.detail?.startsWith("effect:")) { killAfterStart = false; throw new Error("worker killed"); }
+        return memory.save(value, expected);
+      },
+    };
+    const clock = { now: Date.parse(AT) };
+    const log: string[] = [];
+    const recordService = vi.fn(async (_session: unknown, action: string, subject: string) => { log.push(`${action} ${subject}`); });
+    const { svc, possibilities, approvals } = service({ p, live, adapters: [createHostedWebsiteAdapter(hosted.ports, ctx())], activations: crashing, clock, recordService });
+    await possibilities.create(p);
+    approvals.record({ id: "a1", businessId: BIZ, subject: planApprovalSubject(p), status: "approved", decidedBy: "owner_link" });
+    await expect(svc.startApproved({ actor: OWNER, workspaceId: BIZ, possibilityId: p.id, approvalId: "a1" })).rejects.toThrow("worker killed");
+    const activationId = (await possibilities.get(BIZ, p.id))!.activationId!;
+    clock.now += 3 * 60_000;
+    const SYSTEM: WorkspaceActor = { userId: "b1000000-0000-4000-8000-0000000000c9", verifiedEmail: "operator@strelva.test" };
+    const session = { kind: "strelva_system" as const, label: "Strelva (system)" as const, sessionId: "b1000000-0000-4000-8000-0000000000d1", workspaceId: BIZ, purpose: "make_real_resume" as const, onBehalf: { role: "admin" as const }, actor: SYSTEM };
+    // A session for another business, or one for Needs you, never runs it.
+    expect((await svc.resumeDue([{ workspaceId: BIZ, activationId, actor: SYSTEM, service: { ...session, workspaceId: "b1000000-0000-4000-8000-0000000000ff" } }])).results[0]).toMatchObject({ status: "error" });
+    expect((await svc.resumeDue([{ workspaceId: BIZ, activationId, actor: SYSTEM, service: { ...session, purpose: "needs_you_sync" } }])).results[0]).toMatchObject({ status: "error" });
+    // The log is down: nothing runs.
+    recordService.mockRejectedValueOnce(new Error("log down"));
+    expect((await svc.resumeDue([{ workspaceId: BIZ, activationId, actor: SYSTEM, service: session }])).results[0]).toMatchObject({ status: "error" });
+    expect(hosted.state.launches).toBe(1);
+    const resumed = await svc.resumeDue([{ workspaceId: BIZ, activationId, actor: SYSTEM, service: session }]);
+    expect(resumed.results[0]).toMatchObject({ status: "made_real" });
+    expect(log.at(-1)).toBe(`resume activation:${activationId}`);
+    expect(hosted.state.launches).toBe(1);
+    const done = (await memory.get(BIZ, activationId))!;
+    // Approver of record: the owner who started it, with the same approval.
+    expect(done.actorId).toBe(OWNER.userId);
+    expect(done.approvals[0]).toMatchObject({ approvalId: "a1" });
+    expect(done.history.find((event) => event.kind === "resume")).toMatchObject({ actorId: SYSTEM.userId, detail: expect.stringContaining("Resumed by Strelva (system) after an interruption. The owner's approval a1 stands.") });
+  });
+
+  it("without its log Strelva (system) cannot run Make real at all", async () => {
+    const hosted = hostedPorts();
+    const { p, live } = await readyPossibility({ effects: [hostedEffect()] });
+    const memory = createInMemoryActivationRepository();
+    let kill = true;
+    const crashing: ActivationRepository = {
+      get: (b, id) => memory.get(b, id), create: (v) => memory.create(v),
+      async save(value, expected) {
+        if (kill && value.history.at(-1)?.kind === "outcome" && value.history.at(-1)?.detail?.startsWith("effect:")) { kill = false; throw new Error("worker killed"); }
+        return memory.save(value, expected);
+      },
+    };
+    const clock = { now: Date.parse(AT) };
+    const { svc, possibilities, approvals } = service({ p, live, adapters: [createHostedWebsiteAdapter(hosted.ports, ctx())], activations: crashing, clock });
+    await possibilities.create(p);
+    approvals.record({ id: "a1", businessId: BIZ, subject: planApprovalSubject(p), status: "approved" });
+    await expect(svc.startApproved({ actor: OWNER, workspaceId: BIZ, possibilityId: p.id, approvalId: "a1" })).rejects.toThrow("worker killed");
+    const activationId = (await possibilities.get(BIZ, p.id))!.activationId!;
+    clock.now += 3 * 60_000;
+    const session = { kind: "strelva_system" as const, label: "Strelva (system)" as const, sessionId: "b1000000-0000-4000-8000-0000000000d1", workspaceId: BIZ, purpose: "make_real_resume" as const, onBehalf: { role: "owner" as const }, actor: OWNER };
+    expect((await svc.resumeDue([{ workspaceId: BIZ, activationId, actor: OWNER, service: session }])).results[0]).toMatchObject({ status: "error", error: expect.stringContaining("log") });
+    expect((await memory.get(BIZ, activationId))!.steps.find((step) => step.kind === "effect")!.status).toBe("running");
   });
 
   it("an unknown outcome is never replayed, by the cron or a resume", async () => {
@@ -571,5 +637,14 @@ describe("Make real through Needs you", () => {
     expect(startApproved).not.toHaveBeenCalled();
     startApproved.mockRejectedValueOnce(new WorkspaceConflictError("Make real cannot start yet. the plan approval was refused"));
     await expect(adapter.resolve({ workspaceId: BIZ }, item, "approve", { kind: "session", actor: OWNER })).resolves.toMatchObject({ outcome: "failed", reason: expect.stringMatching(/make_real_refused: .*cannot start/) });
+  });
+});
+
+describe("live plans name their source rebuild", () => {
+  it("a stored possibility from a rebuild carries its rebuildWorkId, so Home shows one Make real item for it", async () => {
+    const { p } = await readyPossibility({ effects: [hostedEffect()] });
+    expect(liveReadyPlan(p, new Map()).sourceRebuild).toBeUndefined();
+    const fromRebuild = { ...p, changes: p.changes.map((change) => ({ ...change, candidate: { ...change.candidate, content: { ...change.candidate.content, rebuildWorkId: "rebuild-w1" } } })) };
+    expect(liveReadyPlan(fromRebuild, new Map()).sourceRebuild).toBe("rebuild-w1");
   });
 });

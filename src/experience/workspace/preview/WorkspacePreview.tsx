@@ -35,6 +35,13 @@ function withSystems(base: typeof fetch, systems: PreviewSystems | undefined, we
       if (websiteDetail === "permission") return previewJson({ error: "This business is unavailable to your account." }, 403);
       return previewJson({ detail: previewWebsiteDetail(url.searchParams.get("systemId") ?? "", websiteDetail) });
     }
+    if (url.pathname === "/api/workspace/site-changes" && method === "POST") {
+      // Ask for a change on a managed site: a Request at Asked. Words containing "refuse" show the refusal.
+      const body = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as { action?: string; request?: string; workspaceId?: string };
+      if (body.action !== "ask") return base(input, init);
+      if (!body.workspaceId || !systems.owners.includes(body.workspaceId) || /refuse/i.test(body.request ?? "")) return previewJson({ error: "Only an owner or admin of this business can ask for a change here." }, 403);
+      return previewJson({ requestId: "00000000-0000-4000-8000-00000000c4a1", requests: [] }, 201);
+    }
     if (url.pathname === "/api/workspace/systems/make-real" && method === "POST") {
       if (!systems.released) return previewJson({ error: "Make real is not enabled. Nothing changed." }, 503);
       const body = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as { workspaceId?: string; possibilityId?: string };
@@ -46,7 +53,8 @@ function withSystems(base: typeof fetch, systems: PreviewSystems | undefined, we
     if (url.pathname !== "/api/workspace" || method !== "GET" || !response.ok) return response;
     const snapshot = await response.json() as { workspaceId: string };
     const projection = systems.systems[snapshot.workspaceId];
-    const releases = { systems: systems.released };
+    // Connected sites on wherever Systems is, so Home shows the /workspace/site link.
+    const releases = { systems: systems.released, ...(systems.released ? { connectedSites: true } : {}) };
     return previewJson(projection ? { ...snapshot, systems: projection, releases } : { ...snapshot, releases });
   };
 }

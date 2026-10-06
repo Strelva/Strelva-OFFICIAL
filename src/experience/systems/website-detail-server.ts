@@ -32,7 +32,7 @@ import { needsYouReleaseEnabled, needsYouService } from "@/platform/needs-you/se
 import { PostgresServiceRequestStore } from "@/platform/service-requests";
 import { websiteDocumentStore } from "@/products/websites/document-store";
 import { websiteRebuildReleaseEnabled } from "@/products/websites/rebuild-release";
-import { connectedSitesReleaseEnabled, readConnectedSites, type ConnectedSitesOverview } from "@/products/connected-sites/server";
+import { connectedSitesReleaseEnabled, connectedSitesReleasedFor, readConnectedSites, type ConnectedSitesOverview } from "@/products/connected-sites/server";
 import { buildWebsiteSystemDetail, type WebsiteDetailInputs, type WebsiteDomainItem, type WebsiteSystemDetail } from "./website-detail";
 
 export interface WebsiteDetailSources {
@@ -65,7 +65,9 @@ const liveSources: WebsiteDetailSources = {
     const { readWebsiteRebuild } = await import("@/products/websites/rebuild-service");
     return readWebsiteRebuild(actor, workId);
   },
-  connectedSites: (actor, businessId) => connectedSitesReleaseEnabled() ? readConnectedSites(actor, businessId) : null,
+  connectedSites: (actor, businessId) => connectedSitesReleaseEnabled()
+    ? connectedSitesReleasedFor(actor, businessId).catch(() => false).then((on) => on ? readConnectedSites(actor, businessId) : { sites: [], inquiries: [] })
+    : null,
 };
 
 const DOMAIN_STATES = new Set(["verified", "pending", "misconfigured", "conflict", "error", "not_claimed"]);

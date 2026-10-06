@@ -28,7 +28,13 @@ export const MAKE_REAL_LIVE_FLAGS = [
 ] as const;
 export type MakeRealLiveFlag = (typeof MAKE_REAL_LIVE_FLAGS)[number];
 
-export const RELEASE_FLAGS = ["owner_entry", "inquiries", "website_rebuild", "systems", ...MAKE_REAL_LIVE_FLAGS] as const;
+/**
+ * `connected_sites` (20261009100000): its own row per business, under
+ * STRELVA_CONNECTED_SITES_RELEASE. `1` keeps today's meaning (on wherever
+ * Systems is on) unless a business's row says `off`; `workspace` turns it on
+ * business by business, including the public `/api/v1/connect/*` gate.
+ */
+export const RELEASE_FLAGS = ["owner_entry", "inquiries", "website_rebuild", "systems", ...MAKE_REAL_LIVE_FLAGS, "connected_sites"] as const;
 export type ReleaseFlag = (typeof RELEASE_FLAGS)[number];
 export type ReleaseFlagEnvMode = "off" | "workspace" | "on";
 export type ReleaseFlagRowState = "off" | "operators" | "on";
@@ -47,6 +53,7 @@ export const RELEASE_FLAG_ENV: Record<ReleaseFlag, string> = {
   "make_real_live:inquiry_form": "STRELVA_MAKE_REAL_LIVE",
   "make_real_live:booking_page": "STRELVA_MAKE_REAL_LIVE",
   "make_real_live:internal_app": "STRELVA_MAKE_REAL_LIVE",
+  connected_sites: "STRELVA_CONNECTED_SITES_RELEASE",
 };
 
 export const RELEASE_FLAG_LABELS: Record<ReleaseFlag, string> = {
@@ -59,6 +66,7 @@ export const RELEASE_FLAG_LABELS: Record<ReleaseFlag, string> = {
   "make_real_live:inquiry_form": "Make real live: inquiry form",
   "make_real_live:booking_page": "Make real live: booking page",
   "make_real_live:internal_app": "Make real live: internal app",
+  connected_sites: "Connected sites",
 };
 
 export type ReleaseEnvironment = Partial<Record<string, string | undefined>>;
