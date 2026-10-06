@@ -62,6 +62,7 @@ import { recordCalendlyBooking } from "@/platform/bookings/calendly";
 import { bookingRequestAdapter } from "@/platform/bookings/needs-you-adapter";
 import { decideBookingRequest, readWorkspaceBookingRequests } from "@/platform/bookings/store";
 import { updateBooking } from "@/lib/storage/booking-store";
+import { setCalendarBusyPorts, type CalendarBusyPorts } from "@/platform/bookings/calendar-busy";
 
 const FRIDAY = "2026-11-06";
 const NOW = Date.parse("2026-11-02T12:00:00.000Z");
@@ -634,5 +635,77 @@ describe("the wellness schedule and roster show the same bookings before and aft
     } finally {
       setReleaseFlagsDb(null);
     }
+  });
+});
+
+describe("a connected calendar's busy times on the tenant routes", () => {
+  function calendar(over: Partial<CalendarBusyPorts> = {}) {
+    const ports: CalendarBusyPorts = {
+      connection: vi.fn(async () => ({ provider: "google" as const, status: "connected" })),
+      // Busy Friday 10:00-10:30 New York (15:00Z-15:30Z).
+      busy: vi.fn(async () => [{ start: "2026-11-06T15:00:00.000Z", end: "2026-11-06T15:30:00.000Z" }]),
+      cache: null,
+      ...over,
+    };
+    setCalendarBusyPorts(ports);
+    return ports;
+  }
+  afterEach(() => setCalendarBusyPorts(undefined));
+
+  it("busy times are not offered and can't be booked; the read is for the business's own workspace and day", async () => {
+    const { tenant } = fakeWorld();
+    env("postgres");
+    vi.stubEnv("STRELVA_BOOKING_CALENDAR_BUSY", "1");
+    const ports = calendar();
+    const slots = await availability();
+    expect(slots).not.toContain("10:00");
+    expect(slots).toContain("10:45");
+    expect(ports.busy).toHaveBeenCalledWith(tenant.workspaceId, "google", { start: "2026-11-06T05:00:00.000Z", end: "2026-11-07T05:00:00.000Z", timeZone: "America/New_York" });
+    expect((await postBooking(bookingRequest("10:00"))).status).toBe(409);
+    expect((await postBooking(bookingRequest("10:45"))).status).toBe(200);
+  });
+
+  it("an unreadable calendar never refuses a booking: slots are offered and an instant booking becomes a request", async () => {
+    const { fake } = fakeWorld();
+    env("postgres");
+    vi.stubEnv("STRELVA_BOOKING_CALENDAR_BUSY", "1");
+    calendar({ busy: vi.fn(async () => { throw new Error("token revoked"); }) });
+    expect(await availability()).toContain("10:00");
+    const body = await (await postBooking(bookingRequest("10:00"))).json();
+    expect(body).toMatchObject({ success: true, requested: true, booking: { status: "requested" } });
+    expect(fake.rows[0]).toMatchObject({ status: "requested" });
+  });
+
+  it("an errored connection is treated as unreadable, no connection changes nothing, and the switch off reads nothing", async () => {
+    fakeWorld();
+    env("postgres");
+    vi.stubEnv("STRELVA_BOOKING_CALENDAR_BUSY", "1");
+    const errored = calendar({ connection: vi.fn(async () => ({ provider: "outlook" as const, status: "error" })) });
+    expect(await availability()).toContain("10:00");
+    expect(errored.busy).not.toHaveBeenCalled();
+    expect(await (await postBooking(bookingRequest("10:00"))).json()).toMatchObject({ requested: true });
+
+    fakeWorld();
+    calendar({ connection: vi.fn(async () => null) });
+    expect(await (await postBooking(bookingRequest("10:00"))).json()).toMatchObject({ success: true, booking: { status: "confirmed" } });
+
+    fakeWorld();
+    vi.stubEnv("STRELVA_BOOKING_CALENDAR_BUSY", "");
+    const off = calendar();
+    expect(await availability()).toContain("10:00");
+    expect(off.connection).not.toHaveBeenCalled();
+  });
+
+  it("caches a day's busy times for 60 seconds", async () => {
+    fakeWorld();
+    env("postgres");
+    vi.stubEnv("STRELVA_BOOKING_CALENDAR_BUSY", "1");
+    const store = new Map<string, unknown>();
+    const set = vi.fn(async (key: string, value: unknown) => { store.set(key, value); });
+    const ports = calendar({ cache: { get: async (key) => store.get(key) ?? null, set } });
+    await availability();
+    await availability();
+    expect(ports.busy).toHaveBeenCalledTimes(1);
+    expect(set).toHaveBeenCalledWith(expect.stringMatching(/^reb:booking:busy:.+:2026-11-06$/), expect.any(Array), 60);
   });
 });

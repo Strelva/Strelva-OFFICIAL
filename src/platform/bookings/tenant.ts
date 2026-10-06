@@ -24,6 +24,7 @@ import {
   storeSlotsForDate,
   timeZoneOf,
 } from "./availability";
+import { readCalendarBusy, withoutBusy } from "./calendar-busy";
 import {
   BookingStoreError,
   readBookingContext,
@@ -149,13 +150,20 @@ export async function storeGetDateOverrides(tenant: string): Promise<DateOverrid
 
 export type SiteService = { id: string; name: string; duration?: string | number | null; comingSoon?: boolean };
 
-/** getAvailableSlots, served by the store. Paused, removed or inactive service: no slots. */
+/**
+ * getAvailableSlots, served by the store. Paused, removed or inactive service:
+ * no slots. A connected calendar's busy times are subtracted; when it can't be
+ * read the slots are offered anyway (claimStoreBooking then takes a request).
+ */
 export async function storeAvailableSlots(tenant: string, date: string, serviceId: string, siteServices: SiteService[]): Promise<string[]> {
   const [ctx, bookings] = await Promise.all([context(tenant), readTenantBookings(tenant, { from: date, to: date })]);
   const siteService = siteServices.find((s) => s.id === serviceId && !s.comingSoon) ?? null;
   const service = resolveService(ctx, serviceId, siteService);
   if (!service.bookable) return [];
-  return storeSlotsForDate(ctx, date, service.durationMinutes, bookings);
+  const slots = storeSlotsForDate(ctx, date, service.durationMinutes, bookings);
+  if (!slots.length) return slots;
+  const calendar = await readCalendarBusy(ctx, date, timeZoneOf(ctx));
+  return calendar.connected && calendar.checked ? withoutBusy(slots, date, service.durationMinutes, timeZoneOf(ctx), calendar.busy) : slots;
 }
 
 // --- Store-first booking (reads flipped) -----------------------------------------
@@ -193,15 +201,26 @@ export async function claimStoreBooking(
   if (!storeSlotsForDate(ctx, draft.date, service.durationMinutes, sameDay).includes(draft.startTime)) {
     return { success: false, code: "taken", error: TAKEN };
   }
+  // A connected calendar: busy refuses the time; unreadable turns instant into a request.
+  const calendar = await readCalendarBusy(ctx, draft.date, timeZoneOf(ctx));
+  if (calendar.connected && calendar.checked
+    && withoutBusy([draft.startTime], draft.date, service.durationMinutes, timeZoneOf(ctx), calendar.busy).length === 0) {
+    return { success: false, code: "taken", error: TAKEN };
+  }
   const settings = settingsOrDefault(ctx);
-  const requested = settings.mode === "request";
+  const requested = settings.mode === "request" || (calendar.connected && !calendar.checked);
   const createdAt = new Date().toISOString();
   // Length comes from the record's service, not the site copy.
   const [h, m] = draft.startTime.split(":").map(Number);
   const endMinutes = (h ?? 0) * 60 + (m ?? 0) + service.durationMinutes;
   const endTime = `${String(Math.floor(endMinutes / 60) % 24).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
   const legacy: Booking = { ...draft, endTime, id: legacyId, status: requested ? "requested" : "confirmed", createdAt };
-  const input = legacyBookingToStoreInput(legacy, { timeZone: timeZoneOf(ctx), bufferMinutes: settings.bufferMinutes });
+  const unchecked = settings.mode !== "request" && requested;
+  const input = legacyBookingToStoreInput(legacy, {
+    timeZone: timeZoneOf(ctx),
+    bufferMinutes: settings.bufferMinutes,
+    ...(unchecked ? { reason: "The calendar couldn't be checked, so the owner confirms this one" } : {}),
+  });
   const result = await recordBooking(tenant, { ...input, origin: "site", serviceName: service.name }, "native");
   if (result.status === "conflict") return { success: false, code: "taken", error: TAKEN };
   return { success: true, booking: { ...legacy, serviceName: service.name }, requested, context: ctx };
