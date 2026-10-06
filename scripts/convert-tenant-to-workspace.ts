@@ -17,6 +17,16 @@
  * row, `reb:` keys, /api/v1, memberships, Stripe, and never invites anyone.
  * Reruns are no-ops; a failed run left nothing behind and can simply rerun.
  *
+ *   npx tsx scripts/convert-tenant-to-workspace.ts <slug> --separate-business --operator-email=<email>  # dry run
+ *
+ * A site of a multi-site account joins the business a sibling site was
+ * already converted into, by default (one business, several locations).
+ * --separate-business makes it its own business instead: named for the site,
+ * not the account, with a billing home holding only its own line item. The
+ * shared Stripe subscription is not split; the Stripe metadata script reports
+ * it as a conflict. Pass it for every site that should stand alone, the first
+ * one included. Needs 20261008160000_convert_separate_business.
+ *
  *   npx tsx scripts/convert-tenant-to-workspace.ts <slug> --rollback --operator-email=<email>          # preview
  *   npx tsx scripts/convert-tenant-to-workspace.ts <slug> --rollback --apply --operator-email=<email>  # local only
  *

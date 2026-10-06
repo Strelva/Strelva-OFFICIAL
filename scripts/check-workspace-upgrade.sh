@@ -220,5 +220,9 @@ psql "${psql_args[@]}" -Atc "select count(*) from pg_trigger where tgname = 'ten
 psql "${psql_args[@]}" --file="$repo_root/tests/business-effort-minutes-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/operator-queue-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-account-bindings-schema.sql"
+# 20261008160000 replaces convert_tenant_to_business and the billing link
+# trigger; the billing contract and the separate-business option both hold.
+psql "${psql_args[@]}" --file="$repo_root/tests/business-billing-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/convert-separate-business-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

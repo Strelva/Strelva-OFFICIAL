@@ -58,6 +58,17 @@ describe("tenant import planner", () => {
     expect(plan.digest).not.toBe(planTenantImport(source()).digest);
   });
 
+  it("names a separate business after the site and marks it, never with a join target", () => {
+    const input = source();
+    input.account = { id: "acct-1", name: "Twin Trees", tenantIds: ["a", "b"], multiSite: true };
+    const plan = planTenantImport(input, { separateBusiness: true });
+    expect(plan.payload.workspaceName).toBe(input.tenant.siteName);
+    expect(plan.payload.separateBusiness).toBe(true);
+    expect(plan.payload.account?.multiSite).toBe(true);
+    expect(planTenantImport(input).payload).not.toHaveProperty("separateBusiness");
+    expect(() => planTenantImport(input, { separateBusiness: true, targetWorkspaceId: "11111111-1111-4111-8111-111111111111" })).toThrow(/cannot also join/);
+  });
+
   it("flags a tenant without a stable id as not appliable", () => {
     const input = source();
     delete input.tenant.stableId;

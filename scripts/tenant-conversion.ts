@@ -48,6 +48,9 @@ export interface ConversionOptions {
   /** Reverse the conversion instead of running it. */
   rollback?: boolean;
   operatorEmail?: string;
+  /** Make this site its own business even when a sibling site of its
+   *  multi-site account is already converted (default: join that business). */
+  separateBusiness?: boolean;
   jacobsYes: boolean;
   databaseUrl?: string;
 }
@@ -75,14 +78,16 @@ export function isLocalDatabaseUrl(value: string | undefined): boolean {
 
 export function parseConversionArgs(argv: string[]): ConversionOptions & { json: boolean; rollback: boolean } {
   const slug = argv.find((arg) => !arg.startsWith("--"));
-  if (!slug) throw new Error("Usage: convert-tenant-to-workspace <tenant-slug> [--rollback] [--apply] [--operator-email=<email>] [--json]");
+  if (!slug) throw new Error("Usage: convert-tenant-to-workspace <tenant-slug> [--rollback] [--apply] [--separate-business] [--operator-email=<email>] [--json]");
   const operator = argv.find((arg) => arg.startsWith("--operator-email="))?.slice("--operator-email=".length);
-  const unknown = argv.filter((arg) => arg.startsWith("--") && !/^--(?:apply|dry-run|rollback|json|i-have-jacobs-yes|operator-email=.+)$/.test(arg));
+  const unknown = argv.filter((arg) => arg.startsWith("--") && !/^--(?:apply|dry-run|rollback|json|separate-business|i-have-jacobs-yes|operator-email=.+)$/.test(arg));
   if (unknown.length) throw new Error(`Unknown flag(s): ${unknown.join(", ")}`);
   const apply = argv.includes("--apply");
   if (apply && argv.includes("--dry-run")) throw new Error("Choose --dry-run or --apply, not both.");
+  const separateBusiness = argv.includes("--separate-business");
+  if (separateBusiness && argv.includes("--rollback")) throw new Error("--separate-business applies to a conversion, not a rollback.");
   return {
-    slug, apply, rollback: argv.includes("--rollback"), operatorEmail: operator,
+    slug, apply, rollback: argv.includes("--rollback"), operatorEmail: operator, separateBusiness,
     jacobsYes: argv.includes("--i-have-jacobs-yes"), json: argv.includes("--json"),
   };
 }
@@ -145,13 +150,16 @@ export async function runTenantConversion(options: ConversionOptions, deps: Conv
         const state = await deps.readLink(options.operatorEmail, sibling).catch(() => null);
         if (state?.link) {
           siblingLinks.push(`${sibling} -> ${state.link.workspaceId}`);
-          targetWorkspaceId ??= state.link.workspaceId;
+          if (!options.separateBusiness) targetWorkspaceId ??= state.link.workspaceId;
         }
       }
     }
   }
 
-  const plan = planTenantImport(sourceFor(sources), targetWorkspaceId ? { targetWorkspaceId } : {});
+  // Only a multi-site account ever joins a sibling, so the option only
+  // means something there; on a single site it is ignored (and said so).
+  const separate = Boolean(options.separateBusiness && sources.account?.multiSite);
+  const plan = planTenantImport(sourceFor(sources), targetWorkspaceId ? { targetWorkspaceId } : separate ? { separateBusiness: true } : {});
   const log = deps.log;
   log(`Tenant conversion: ${options.slug} (${mode})`);
   log(`  database: ${options.databaseUrl ? (isLocalDatabaseUrl(options.databaseUrl) ? "local" : "NOT local") : "not configured"}`);
@@ -160,9 +168,10 @@ export async function runTenantConversion(options: ConversionOptions, deps: Conv
   const billing = sources.billing;
   log(`  billing: ${billing ? `${billing.billingType} status=${billing.subscriptionStatus ?? "none"} plan=${billing.subscriptionPlan ?? "none"} monthly=${billing.monthlyCents}c stripeSubscription=${billing.hasStripeSubscription}${billing.grandfathered ? " GRANDFATHERED" : ""}` : "unknown"} (recorded only; Stripe and allowances unchanged)`);
   const account = sources.account;
-  log(`  account: ${account ? `${account.name} (${account.tenantIds.length} site${account.tenantIds.length === 1 ? "" : "s"})${account.multiSite ? " MULTI-SITE: all sites share one business workspace" : ""}` : "none"}`);
-  if (siblingLinks.length) log(`  sibling sites already converted: ${siblingLinks.join(", ")}`);
-  log(`  would ${link?.link ? "do nothing" : targetWorkspaceId ? `join business ${targetWorkspaceId} (fill only missing facts)` : `create customer business "${plan.payload.workspaceName}" with the operator as admin (no client membership, no invite, no email; marked as operated by Strelva once its agency workspace is designated, which grants nothing)`}`);
+  log(`  account: ${account ? `${account.name} (${account.tenantIds.length} site${account.tenantIds.length === 1 ? "" : "s"})${account.multiSite ? (separate ? " MULTI-SITE, --separate-business: this site becomes its own business; billing records only its own line item and the shared subscription is left for Stripe review" : " MULTI-SITE: all sites share one business workspace (pass --separate-business to make this site its own business)") : ""}` : "none"}`);
+  if (siblingLinks.length) log(`  sibling sites already converted: ${siblingLinks.join(", ")}${separate ? " (not joined: --separate-business)" : ""}`);
+  if (options.separateBusiness && !separate) log("  --separate-business: ignored, this site has no multi-site account and becomes its own business anyway");
+  log(`  would ${link?.link ? "do nothing" : targetWorkspaceId ? `join business ${targetWorkspaceId} (fill only missing facts)` : `create ${separate ? "a separate " : ""}customer business "${plan.payload.workspaceName}" with the operator as admin (no client membership, no invite, no email; marked as operated by Strelva once its agency workspace is designated, which grants nothing)`}`);
   log(`  facts (${plan.counts.facts}, source tenant_import, unverified):`);
   for (const [key, entry] of Object.entries(plan.payload.patch.facts ?? {})) log(`    ${key}: ${describe(entry?.value)}`);
   log(`  services: ${plan.counts.services}${plan.payload.patch.services?.length ? ` (${plan.payload.patch.services.map((item) => item.op === "upsert" ? item.name : item.id).join(", ")})` : ""}`);

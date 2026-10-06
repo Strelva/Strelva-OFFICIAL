@@ -138,7 +138,8 @@ export function uuidFromSeed(seed: string): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${variant}${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
-export function planTenantImport(source: TenantImportSource, options: { targetWorkspaceId?: string } = {}): TenantImportPlan {
+export function planTenantImport(source: TenantImportSource, options: { targetWorkspaceId?: string; separateBusiness?: boolean } = {}): TenantImportPlan {
+  if (options.separateBusiness && options.targetWorkspaceId) throw new Error("A separate business cannot also join an existing business.");
   const { tenant } = source;
   const skipped: SkippedField[] = [];
   const facts: Partial<Record<FactKey, { value: unknown; verified: false }>> = {};
@@ -265,8 +266,11 @@ export function planTenantImport(source: TenantImportSource, options: { targetWo
   const payload = tenantImportPayloadSchema.parse({
     tenantId: tenant.id,
     tenantStableId: tenant.stableId ?? "00000000-0000-4000-8000-000000000000",
-    workspaceName: (clean(source.account?.multiSite ? source.account.name : undefined) ?? clean(tenant.siteName) ?? tenant.id).slice(0, 120),
+    // A multi-site account's business is named for the account, unless this
+    // site becomes its own business: then it keeps the site's name.
+    workspaceName: (clean(source.account?.multiSite && !options.separateBusiness ? source.account.name : undefined) ?? clean(tenant.siteName) ?? tenant.id).slice(0, 120),
     ...(options.targetWorkspaceId ? { targetWorkspaceId: options.targetWorkspaceId } : {}),
+    ...(options.separateBusiness ? { separateBusiness: true as const } : {}),
     billing: source.billing ?? null,
     account: source.account ?? null,
     patch: {
