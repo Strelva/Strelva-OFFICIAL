@@ -50,7 +50,7 @@ built and tested on a branch, not in production.
 | Versions: one System adapted per location or client, with shared improvements offered, never forced | Local, in-memory only | `PRIM_CONTEXT_VERSION` |
 | Health from real monitors; pause that keeps existing obligations | Local; website health reads real monitors in preview | `RULE_SYSTEM_PAUSE_HEALTH` |
 | Ask Strelva inside the workspace, using the same tools as today's owner agent | 0% in the workspace | Reborn §4 |
-| Owners sign in on their client admin host and land in their workspace; old `/dashboard` links redirect | Not started | Reborn §6 |
+| Owners sign in on their client admin host and land in their workspace; old `/dashboard` links redirect | Local: entry, 307s, 8 of 25 pages ready (Today, approvals, leads, reviews, analytics, settings, reports, unknown); flags off | Reborn §6 |
 
 ### 2. The systems a business starts with
 
