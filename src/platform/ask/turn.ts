@@ -171,7 +171,10 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
       };
       let emitted = false;
       let replyText = "";
-      const say = (text: string) => { emitted = true; replyText += text; emit(text); };
+      // Control lines (`__TOOL__`, `__CARD__`) only count at a line start, so one never lands mid-sentence.
+      let atLineStart = true;
+      const say = (text: string) => { emitted = true; replyText += text; atLineStart = text.endsWith("\n"); emit(text); };
+      const marker = (line: string) => { emit(`${atLineStart ? "" : "\n"}${line}`); atLineStart = true; };
 
       // The authority snapshot, re-read before every tool call.
       const authority = {
@@ -266,10 +269,10 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
               if (part.type === "error") throw part.error;
               if (part.type === "tool-call") {
                 emitted = true;
-                emit(`__TOOL__${askToolLabel(String(part.toolName))}\n`);
+                marker(`__TOOL__${askToolLabel(String(part.toolName))}\n`);
               } else if (part.type === "tool-result") {
                 const output = ("output" in part ? part.output : undefined) as unknown;
-                if (output && typeof output === "object" && "__inlineTool" in output) emit(`__CARD__${JSON.stringify(output)}\n`);
+                if (output && typeof output === "object" && "__inlineTool" in output) marker(`__CARD__${JSON.stringify(output)}\n`);
                 const action = agentResultFromToolOutput(output);
                 if (action) record(action);
               } else if (part.type === "text-delta") {

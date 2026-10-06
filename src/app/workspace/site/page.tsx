@@ -90,9 +90,12 @@ export default async function WorkspaceSitePage({ searchParams }: { searchParams
   // The tenant's own pages need the tenant's permission too (owners get both memberships; Strelva operators have it).
   const needsTenant = tab !== "request";
   let panel: React.ReactNode;
-  let notice: string | undefined = readOnly ? "You can see this site. Only an owner or admin of this business can change it." : undefined;
+  const notice: string | undefined = readOnly ? "You can see this site. Only an owner or admin of this business can change it." : undefined;
   if (needsTenant && !state.tenantAccess) {
     panel = <WorkspaceSiteMessageInline title="Your account can't open this site's editor yet." body={`Your place in ${state.workspaceName} doesn't include ${siteLabel}'s own tools. Ask Strelva for the change instead, or ask the owner to add you.`} href={workspaceSiteHref({ workspaceId, systemId, tab: "request" })} action="Ask for a change" />;
+  } else if (tab === "edit" && readOnly) {
+    // The editor's own read-only screen is written for the public demo; a member gets this instead.
+    panel = <WorkspaceSiteMessageInline title="Only an owner or admin can edit this site." body={`You can see ${siteLabel}'s history, photos and connections here. To change something, ask an owner or admin of ${state.workspaceName}.`} href={workspaceSiteHref({ workspaceId, systemId, tab: "history" })} action="See what changed" />;
   } else if (tab === "edit") {
     const data = await loadSiteEditorData(site.tenantId);
     panel = <ContentWorkspace siteName={data.siteName} ownerName={data.ownerName} sectionData={data.sectionData} timestamps={data.timestamps}
@@ -114,7 +117,6 @@ export default async function WorkspaceSitePage({ searchParams }: { searchParams
     const data = await loadGoogleBusinessData(site.tenantId);
     panel = <GoogleBusinessPanel connected={data.connected} state={data.state} />;
   } else {
-    if (state.role === "owner" || state.role === "admin") notice = undefined;
     panel = <WebsiteChangeRequests workspaceId={workspaceId} systemId={systemId} siteLabel={siteLabel} editing={editing} canAsk={!readOnly} canDecide={state.role === "owner"} operator={operator} />;
   }
 

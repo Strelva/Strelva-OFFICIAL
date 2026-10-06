@@ -157,6 +157,26 @@ describe("Ask Strelva conversation history in a turn", () => {
     expect(stored.messages[1]!.content).toBe("Strelva can't answer right now. Nothing was changed.");
   });
 
+  it("starts a tool line on its own line, so a tool after text never shows as prose", async () => {
+    const { deps } = harness(undefined);
+    deps.stream = async (_input, consume) => {
+      await consume((async function* (): AsyncGenerator<Part> {
+        yield { type: "text-delta", text: "Your hero says one thing." };
+        yield { type: "tool-call", toolName: "read_system" };
+        yield { type: "text-delta", text: "Done." };
+      })());
+    };
+    const start = await startAskTurn(deps, owner, { workspaceId: WS, messages: [{ role: "user", content: "What does the hero say?" }] });
+    if (start.kind !== "stream") throw new Error("refused");
+    let out = "";
+    await start.run((chunk) => { out += chunk; });
+    const { ConversationStreamDecoder } = await import("@/experience/conversation/stream");
+    const decoder = new ConversationStreamDecoder();
+    const events = [...decoder.push(new TextEncoder().encode(out)), ...decoder.finish()];
+    expect(events.some((event) => event.type === "tool")).toBe(true);
+    expect(events.filter((event) => event.type === "text").map((event) => (event as { text: string }).text).join("")).not.toContain("__TOOL__");
+  });
+
   it("without a history port the turn is unchanged and unsaved", async () => {
     const result = await run(harness(undefined).deps, owner, { messages: [{ role: "user", content: "What are my services?" }] });
     expect(result.result?.ask).toMatchObject({ saved: false, conversationId: null });

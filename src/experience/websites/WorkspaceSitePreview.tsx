@@ -63,7 +63,8 @@ export function WorkspaceSitePreview({ kind, tab, role, state }: { kind: "native
       tabs={kind === "native" && current === "request" ? [...tabs, "request"] : tabs} tenantRoot={FIXTURE_API} tenantId="preview-business" workspaceBase="/preview/strelva" askReleased readOnly={readOnly}
       liveUrl="https://example.com" site={{ siteUrl: "", previewUrl: `${FIXTURE_API}/dashboard/site`, liveSyncEnabled: false, siteModel: "food-brand", autoPublish: false }}
       notice={readOnly ? "You can see this site. Only an owner or admin of this business can change it." : undefined}>
-      {current === "edit" ? <ContentWorkspace siteName="Great Lakes Dried Fruit" ownerName="Ruth" sectionData={SECTIONS} timestamps={{}}
+      {current === "edit" && readOnly ? <p className="p-8 text-sm text-gray-muted">Only an owner or admin can edit this site. The page links to History instead.</p>
+        : current === "edit" ? <ContentWorkspace siteName="Great Lakes Dried Fruit" ownerName="Ruth" sectionData={SECTIONS} timestamps={{}}
         assistant={<AskStrelva compact request={request} workspaceId={WS} businessName="Great Lakes Dried Fruit" systemId={SYSTEM} systemName={siteLabel} readOnly={readOnly} />} />
         : current === "request" ? <WebsiteChangeRequests request={request} workspaceId={WS} systemId={SYSTEM} siteLabel={siteLabel} editing={kind} canAsk={!readOnly} canDecide={role === "owner"} operator={role === "operator"} />
         : <p className="p-8 text-sm text-gray-muted">This tab reuses the dashboard&apos;s own panel against the tenant&apos;s API. The local fixture serves the editor and requests only.</p>}
