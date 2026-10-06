@@ -49,8 +49,8 @@ built and tested on a branch, not in production.
 | Possibilities you can open, compare and **Make real**, with honest partial states and undo where undo exists | Local, fake effects only, in-memory progress | `COMP_MULTI_SYSTEM_ACTIVATION` |
 | Versions: one System adapted per location or client, with shared improvements offered, never forced | Local, in-memory only | `PRIM_CONTEXT_VERSION` |
 | Health from real monitors; pause that keeps existing obligations | Local; website health reads real monitors in preview | `RULE_SYSTEM_PAUSE_HEALTH` |
-| Ask Strelva inside the workspace, using the same tools as today's owner agent | 0% in the workspace | Reborn §4 |
-| Owners sign in on their client admin host and land in their workspace; old `/dashboard` links redirect | Local: entry, 307s, 8 of 25 pages ready (Today, approvals, leads, reviews, analytics, settings, reports, unknown); flags off | Reborn §6 |
+| Ask Strelva inside the workspace, using the same tools as today's owner agent | Local, flag off: route, tools, chat UI and saved conversations (`w2/owner-surfaces-b`); Needs you wiring missing | Reborn §4 |
+| Owners sign in on their client admin host and land in their workspace; old `/dashboard` links redirect | Local: entry, 307s, 16 of 25 pages ready (Today, approvals, leads, reviews, analytics, reports, unknown from `w2/owner-surfaces-a`; chat and the eight website pages from `w2/owner-surfaces-b`); `/settings` stays; flags off | Reborn §6 |
 
 ### 2. The systems a business starts with
 

@@ -18,6 +18,8 @@ interface ContentWorkspaceProps {
   ownerName: string;
   sectionData: Record<string, SectionData>;
   timestamps: Record<string, string>;
+  /** Replaces the tenant chat in the right panel (the workspace passes Ask Strelva about this System). */
+  assistant?: React.ReactNode;
 }
 
 type WorkspaceViewport = "mobile" | "tablet" | "desktop";
@@ -34,6 +36,7 @@ export function ContentWorkspace({
   ownerName,
   sectionData,
   timestamps,
+  assistant,
 }: ContentWorkspaceProps) {
   const {
     activeSection,
@@ -223,7 +226,7 @@ export function ContentWorkspace({
 
       <div className="flex min-h-0 flex-1 flex-col">
         {inChat ? (
-          <ChatPanel ownerName={ownerName || siteName} variant="compact" />
+          assistant ?? <ChatPanel ownerName={ownerName || siteName} variant="compact" />
         ) : inRequest ? (
           <CustomChangeRequestPanel />
         ) : (

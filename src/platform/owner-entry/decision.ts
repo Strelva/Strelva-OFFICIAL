@@ -1,6 +1,7 @@
 import { workspaceReturnTarget } from "@/lib/workspace-location";
 import { releaseFlagEnvMode, resolveReleaseFlag, type ReleaseEnvironment } from "@/platform/release-flags/resolve";
 import { ownerEntryPossible } from "./env";
+import { askReleaseEnabled } from "@/platform/ask/release";
 import type { OwnerEntryResolution } from "@/platform/release-flags/store";
 import { effectiveDisposition, routeForDashboardPath, workspaceHome, type DispositionGate, type DispositionState } from "./dispositions";
 
@@ -53,16 +54,21 @@ export function routeDashboardRequest(input: {
   decision: OwnerEntryDecision;
   pathWithSearch: string;
   flagOn?: (flag: DispositionGate) => boolean;
+  /** Ask Strelva's release (the `ask` gate); read from the env when neither this nor flagOn is given. */
+  askReleased?: boolean;
 }): DashboardRouting {
   const { decision } = input;
   if (decision.kind !== "workspace") return { kind: "render" };
   const url = new URL(input.pathWithSearch || "/dashboard", "https://dashboard.invalid");
   const route = routeForDashboardPath(url.pathname);
   const entry = effectiveDisposition(route);
-  const context = { workspaceId: decision.workspaceId, tenantStableId: decision.tenantStableId, search: url.searchParams };
+  const context = { workspaceId: decision.workspaceId, tenantStableId: decision.tenantStableId, search: url.searchParams, path: url.pathname };
   const homeHref = workspaceHome(decision.workspaceId);
   const legacy = decision.operator && url.searchParams.get("legacy") === "1";
-  const flagsReady = (entry.requires ?? []).every((flag) => input.flagOn?.(flag) === true);
+  const gateOn = (flag: DispositionGate) => flag === "ask"
+    ? input.askReleased ?? (input.flagOn ? input.flagOn(flag) === true : askReleaseEnabled())
+    : input.flagOn?.(flag) === true;
+  const flagsReady = (entry.requires ?? []).every(gateOn);
   if (entry.state === "ready" && flagsReady && !legacy) {
     // A target that wouldn't survive sign-in is never a redirect.
     const location = workspaceReturnTarget(entry.target(context));

@@ -24,10 +24,10 @@
  */
 import { SYSTEMS_LABEL } from "@/experience/systems/model";
 
-export type StrelvaSection = "home" | "requests" | "ongoing" | "apps" | "work" | "access" | "settings" | "products" | "help" | "account" | "system";
+export type StrelvaSection = "home" | "requests" | "ongoing" | "apps" | "work" | "access" | "settings" | "products" | "help" | "account" | "system" | "ask";
 
 const APP_VIEWS: ReadonlySet<StrelvaSection> = new Set(["apps", "work", "products"]);
-const DIRECT_VIEWS: ReadonlySet<string> = new Set(["requests", "apps", "work", "ongoing", "products", "access", "settings", "help", "system"]);
+const DIRECT_VIEWS: ReadonlySet<string> = new Set(["requests", "apps", "work", "ongoing", "products", "access", "settings", "help", "system", "ask"]);
 const WORK_DETAIL_VIEWS: ReadonlySet<string> = new Set(["tracker", "inquiries", "document", "plan"]);
 
 const TITLES: Record<StrelvaSection, string> = {
@@ -42,6 +42,7 @@ const TITLES: Record<StrelvaSection, string> = {
   help: "Help",
   account: "Account",
   system: "System",
+  ask: "Ask Strelva",
 };
 
 /** The sidebar place that owns a section. Every view of the app list counts as Apps. */

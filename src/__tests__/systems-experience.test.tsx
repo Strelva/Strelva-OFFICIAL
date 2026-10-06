@@ -160,6 +160,25 @@ describe("Make real and the System page", () => {
     expect(html).not.toContain("Not checked here yet");
   });
 
+  it("opens the site's own editor in the workspace instead of /dashboard/site", () => {
+    const native = render({ system: { ...site, surface: { ...site.surface, editing: "native" } as SystemView["surface"] } });
+    expect(native).toContain(`href="/workspace/site?workspaceId=${BUSINESS}&amp;system=${SITE}"`);
+    expect(native).toContain(">Edit site<");
+    expect(native).not.toContain("Website controls");
+    expect(native).toContain(`tab=connections`);
+    const repo = render({ system: { ...site, surface: { ...site.surface, editing: "request" } as SystemView["surface"] }, appBase: "/preview/strelva" });
+    expect(repo).toContain(`href="/preview/strelva/workspace/site?workspaceId=${BUSINESS}&amp;system=${SITE}&amp;tab=request"`);
+    expect(repo).toContain(">Changes to this site<");
+  });
+
+  it("carries how the site changes from the projection to the System page", () => {
+    const withEditing = projection({ systems: [entry(SITE, "website", "The Mooney Firm", { tenantId: "mooney-firm", editing: "request" })] });
+    const [system] = readBusinessSystems({ snapshot: snapshot([], withEditing), sites: [mooneySite] }).systems;
+    expect(system!.surface).toMatchObject({ kind: "website", editing: "request" });
+    const [unknown] = readBusinessSystems({ snapshot: snapshot([], mooney), sites: [mooneySite] }).systems;
+    expect(unknown!.surface).not.toHaveProperty("editing");
+  });
+
   it("gives a non-owner a visible permission state on Make real", () => {
     const html = render({ readOnly: true, canMakeReal: false, readOnlyReason: "Ask an owner or admin to make changes.", makeRealReason: "Only an owner of this business can make a possibility real." });
     expect(html).toContain("Only an owner of this business can make a possibility real.");

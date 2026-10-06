@@ -138,7 +138,7 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
     if (kind === "website" && entry.tenantId) {
       const liveUrl = site?.domain ? `https://${site.domain.replace(/^https?:\/\//, "")}` : undefined;
       const previewSrc = (site?.previewHref && sameAppHref(site.previewHref)) || liveUrl;
-      surface = { kind: "website", domain, liveUrl, previewSrc, previewLabel: site?.previewHref ? `Rendered from the saved copy of ${domain || entry.name}` : `${domain || entry.name}, as visitors see it now`, manageHref: site?.href && sameAppHref(site.href) ? sameAppHref(site.href) || undefined : undefined };
+      surface = { kind: "website", domain, liveUrl, previewSrc, previewLabel: site?.previewHref ? `Rendered from the saved copy of ${domain || entry.name}` : `${domain || entry.name}, as visitors see it now`, manageHref: site?.href && sameAppHref(site.href) ? sameAppHref(site.href) || undefined : undefined, ...(entry.editing ? { editing: entry.editing } : {}) };
     } else if (kind === "listing") {
       const listing = publishing?.listings.find(item => item.systemId === entry.ref.systemId);
       surface = listing

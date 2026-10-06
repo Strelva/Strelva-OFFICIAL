@@ -179,7 +179,7 @@ describe("release-one private workspace routes", () => {
 
     const customer = await (await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${otherId}`))).json();
     expect(customer.systems).toEqual(systems);
-    expect(customer.releases).toEqual({ systems: true, needsYou: false });
+    expect(customer.releases).toEqual({ systems: true, needsYou: false, ask: false });
     expect(mocks.systems).toHaveBeenCalledWith({ actor: { userId: "actor", verifiedEmail: "owner@example.com" }, businessId: otherId, savedWork: [work], siteDomains: new Map([["mooney-firm", "www.attymooney.com"]]) });
 
     mocks.systems.mockClear();
@@ -195,7 +195,7 @@ describe("release-one private workspace routes", () => {
       vi.stubEnv("STRELVA_SYSTEMS_RELEASE", value);
       const customer = await (await GET(new Request(`https://strelva.com/api/workspace?workspaceId=${otherId}`))).json();
       expect(customer.systems).toBeUndefined();
-      expect(customer.releases).toEqual({ systems: false, needsYou: false });
+      expect(customer.releases).toEqual({ systems: false, needsYou: false, ask: false });
       expect(customer.work).toEqual([expect.objectContaining({ id: work.id })]);
     }
     expect(mocks.systems).not.toHaveBeenCalled();

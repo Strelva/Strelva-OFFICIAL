@@ -3,9 +3,11 @@ import { isSuperAdmin } from "@/lib/auth";
 import { isRateLimitedAsync } from "@/lib/rate-limit";
 import { inquiryReleaseEnabled } from "@/products/inquiries";
 import {
+  AskConversationNotFoundError,
   askReleaseEnabled,
   createPossibilityAdapter,
   createServiceRequestAdapter,
+  createSupabaseAskHistory,
   createTenantEventNeedsYouAdapter,
   startAskTurn,
   type AskTurnDeps,
@@ -73,6 +75,7 @@ export async function POST(request: Request) {
       },
       newTurnId: () => crypto.randomUUID(),
       needsYouPath: "/dashboard/review",
+      history: createSupabaseAskHistory(),
     };
     const start = await startAskTurn(deps, actor, body);
     if (start.kind === "refused") return workspaceJson({ error: start.error }, start.status);
@@ -87,6 +90,36 @@ export async function POST(request: Request) {
       headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" },
     });
   } catch (error) {
+    return workspaceHttpFailure(error);
+  }
+}
+
+const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
+
+/**
+ * GET /api/workspace/ask?workspaceId=…[&systemId=…][&conversationId=…]
+ *
+ * Saved conversations for this business (owners and admins see all; a member
+ * sees their own), or one conversation's messages with each turn's result.
+ * Same release gate as POST; reads only.
+ */
+export async function GET(request: Request) {
+  if (!askReleaseEnabled()) return workspaceJson({ error: "Ask Strelva is not enabled." }, 503);
+  try {
+    const actor = await workspaceHttpActor();
+    if (!actor) return workspaceJson({ error: "Sign in with a confirmed email to continue." }, 401);
+    const params = new URL(request.url).searchParams;
+    const workspaceId = params.get("workspaceId") ?? "";
+    const systemId = params.get("systemId");
+    const conversationId = params.get("conversationId");
+    if (!UUID.test(workspaceId) || (systemId !== null && !UUID.test(systemId)) || (conversationId !== null && !UUID.test(conversationId))) {
+      return workspaceJson({ error: "Check the request. Some fields are missing or invalid." }, 400);
+    }
+    const history = createSupabaseAskHistory();
+    if (conversationId) return workspaceJson({ conversation: await history.read(actor, { workspaceId, conversationId, limit: 100 }) });
+    return workspaceJson({ conversations: await history.list(actor, { workspaceId, systemId, limit: 20 }) });
+  } catch (error) {
+    if (error instanceof AskConversationNotFoundError) return workspaceJson({ error: error.message }, 404);
     return workspaceHttpFailure(error);
   }
 }

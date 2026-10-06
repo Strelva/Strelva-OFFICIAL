@@ -137,7 +137,7 @@ describe("operator commands", () => {
   it("refuses owner entry on while a page the client uses hasn't moved, but allows operators", async () => {
     readTenantWorkspaceLink.mockResolvedValue({ tenantId: "gldf", link: { workspaceId: WS } });
     await expect(applyTenantReleaseCommand("op@example.test", "gldf", plain, { kind: "flag", flag: "owner_entry", state: "on", reason: "go", expectedRevision: 0, jacobApproved: true }))
-      .rejects.toThrow(/\/dashboard\/site/);
+      .rejects.toThrow(/\/dashboard\/settings/);
     await applyTenantReleaseCommand("op@example.test", "gldf", plain, { kind: "flag", flag: "owner_entry", state: "operators", reason: "walk pages", expectedRevision: 0 });
     expect(setWorkspaceReleaseFlag).toHaveBeenCalledTimes(1);
     expect(setWorkspaceReleaseFlag).toHaveBeenCalledWith(expect.objectContaining({ state: "operators", reason: "walk pages" }));

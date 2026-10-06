@@ -22,6 +22,7 @@ import {
   CONNECTION_KIND_LABEL, INCOMING_CONNECTION_LABEL, POSSIBILITY_STATUS_LABEL, SYSTEM_KIND_LABEL, makeRealSummary,
   type MakeRealOutcome, type SystemPossibility, type SystemView,
 } from "./model";
+import { workspaceSiteHref } from "@/lib/workspace-site-places";
 import styles from "./systems.module.css";
 
 export interface SystemPageProps {
@@ -83,7 +84,8 @@ export function SystemPage(props: SystemPageProps) {
       </div>
       <div className={styles.actions}>
         {system.surface.kind === "website" && system.surface.liveUrl ? <a className={styles.linkAction} href={system.surface.liveUrl} target="_blank" rel="noreferrer">Visit site<ArrowUpRight size={16} aria-hidden="true" /></a> : null}
-        {system.surface.kind === "website" && system.surface.manageHref ? <a className={styles.linkAction} data-variant="secondary" href={system.surface.manageHref}>Website controls</a> : null}
+        {system.surface.kind === "website" && system.surface.editing ? <a className={styles.linkAction} data-variant="secondary" href={workspaceSiteHref({ workspaceId: props.workspaceId, systemId: system.id, tab: system.surface.editing === "native" ? "edit" : "request" }, props.appBase || "")}>{system.surface.editing === "native" ? "Edit site" : "Changes to this site"}</a>
+          : system.surface.kind === "website" && system.surface.manageHref ? <a className={styles.linkAction} data-variant="secondary" href={system.surface.manageHref}>Website controls</a> : null}
         {readOnly && readOnlyReason ? <span className="self-center text-xs text-gray-muted">{readOnlyReason}</span> : null}
         <Button size="sm" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} icon={<MessageSquareText size={16} />} onClick={() => onAsk(`About ${system.name}: `)}>Ask for a change</Button>
       </div>
@@ -106,7 +108,7 @@ export function SystemPage(props: SystemPageProps) {
       </section>
 
       <aside className={styles.aside} aria-label={`About ${system.name}`}>
-        <ConnectionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} />
+        <ConnectionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} siteHref={system.surface.kind === "website" && system.surface.editing ? (tab) => workspaceSiteHref({ workspaceId: props.workspaceId, systemId: system.id, tab }, props.appBase || "") : undefined} />
         <PartsPanel system={system} />
         <PossibilitiesPanel system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} />
         <VersionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} />
@@ -192,13 +194,14 @@ function SystemLink({ id, label, systemHref, onOpenSystem }: { id?: string; labe
   return <Link href={systemHref(id)} onClick={event => { if (!onOpenSystem || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return; event.preventDefault(); onOpenSystem(id); }}>{label}</Link>;
 }
 
-function ConnectionsPanel({ system, systemHref, onOpenSystem }: { system: SystemView; systemHref: (id: string) => string; onOpenSystem?: (id: string) => void }) {
+function ConnectionsPanel({ system, systemHref, onOpenSystem, siteHref }: { system: SystemView; systemHref: (id: string) => string; onOpenSystem?: (id: string) => void; siteHref?: (tab: "connections" | "google") => string }) {
   return <Panel id={`${system.id}-connections`} title="Connections" count={system.connections.length} intro="What it works with.">
     {system.connections.length ? <ul className={styles.panelList}>{system.connections.map(connection => <li key={connection.id}>
       <span>{connection.sentence}</span>
       <small>{(connection.direction === "in" ? INCOMING_CONNECTION_LABEL : CONNECTION_KIND_LABEL)[connection.kind]} <SystemLink id={connection.systemId} label={connection.target} systemHref={systemHref} onOpenSystem={onOpenSystem} />{connection.status === "connected" ? "" : connection.status === "not_connected" ? " · Not connected" : " · Not confirmed"}</small>
     </li>)}</ul> : <p className="mt-3">Nothing else is connected to it yet.</p>}
-    {system.offers?.map(offer => <p key={offer.kind} className="mt-3">{offer.label}. <Link className="underline" href="/dashboard/google">Connect Google</Link></p>)}
+    {system.offers?.map(offer => <p key={offer.kind} className="mt-3">{offer.label}. <Link className="underline" href={siteHref ? siteHref("google") : "/dashboard/google"}>Connect Google</Link></p>)}
+    {siteHref ? <p className="mt-3"><Link className="underline" href={siteHref("connections")}>Accounts and sources this site uses</Link></p> : null}
   </Panel>;
 }
 

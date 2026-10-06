@@ -299,8 +299,11 @@ are untouched.
       workspace agent route resolves workspace → link → tenant and re-checks
       permission, and approvals go through section 2. *Partial, local Oct 6
       (`build/ask-strelva`): tools moved, route and per-call checks built
-      behind `STRELVA_ASK_RELEASE`; no workspace UI, history or real Needs
-      you wiring yet · L*
+      behind `STRELVA_ASK_RELEASE`. Workspace chat UI (`view=ask`, on Home,
+      on each System and beside the site editor) and conversation history in
+      Postgres (`20261008110000`) built and proven locally Oct 6 on
+      `w2/owner-surfaces-b`, not migrated or deployed. Real Needs you wiring
+      still missing · L*
 
 Proof: authenticated local journeys per capability on desktop and mobile, in
 empty, loading, error and permission states, using The Mooney Firm and gldf.
@@ -336,10 +339,17 @@ Neither is used by any journey today.
 - [ ] Each `/dashboard` page has a workspace home or redirects to one. Of 22
       pages: 3 have a home, 4 partial, 4 retire, the rest need building.
       *Partial: 25 page files mapped (2 ready incl. `/reports` → Recaps,
-      4 retire, 2 frozen, 17 stay) on `build/owner-entry` · L. Local Oct 6
-      (`w2/owner-surfaces-a`): 8 ready, adding `/`, `/review` (both only
-      while Needs you is on), `/leads`, `/reviews`, `/analytics` and
-      `/settings`; 11 stay. Parity gaps listed per page in the spec §5.*
+      4 retire, 2 frozen, 17 stay) on `build/owner-entry` · L. Local Oct 6,
+      both owner-surface streams merged: 16 ready, 4 retire, 2 frozen,
+      3 stay (`/roster`, `/schedule`, `/settings`).
+      From `w2/owner-surfaces-a`: `/`, `/review` (both only while Needs you
+      is on), `/leads`, `/reviews`, `/analytics`. From `w2/owner-surfaces-b`:
+      `/chat` (only while Ask is released) and the website pages `/site`,
+      `/assets`, `/brand-kit`, `/collections`, `/history`, `/integrations`,
+      `/sources/[id]`, `/google` → the workspace website (`/workspace/site`),
+      Systems on for the workspace. `/settings` stays on `/dashboard` until
+      the workspace edits branding, site basics and domains. Parity gaps
+      listed per page in the spec §5.*
 - [x] `/dashboard` and `/client/{tenant}/dashboard` stay permanent redirects;
       gldf and rohlax repos hard-code them and are not changed.
       *Built locally on `build/owner-entry`: 307 only for a member of the

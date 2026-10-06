@@ -48,6 +48,15 @@ function input(snapshot = existing(), candidates = [candidate()], observations: 
 }
 
 describe("Systems projection over the spine", () => {
+  it("says how each managed website changes, only where the tenant was read", async () => {
+    const { ids, ...source } = input();
+    const known = await projectWorkspaceSystems({ ...source, siteEditing: new Map([["mooney-firm", "request" as const]]) });
+    expect(known.status === "ready" && known.systems.find((item) => item.ref.systemId === ids.site)).toMatchObject({ editing: "request" });
+    expect(known.status === "ready" && known.systems.filter((item) => item.editing).map((item) => item.kind)).toEqual(["website"]);
+    const unknown = await projectWorkspaceSystems(source);
+    expect(unknown.status === "ready" && unknown.systems.find((item) => item.ref.systemId === ids.site)).not.toHaveProperty("editing");
+  });
+
   it("lists spine Systems by SystemRef and makes a saved rebuild a Ready Possibility of the website and its inquiries", async () => {
     const { ids, ...source } = input();
     const projection = await projectWorkspaceSystems(source);

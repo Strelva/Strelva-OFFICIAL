@@ -1,13 +1,25 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const reads = vi.hoisted(() => ({ activity: vi.fn(), snapshots: vi.fn(), events: vi.fn(), history: vi.fn(), summary: vi.fn() }));
+const reads = vi.hoisted(() => ({ activity: vi.fn(), snapshots: vi.fn(), events: vi.fn(), history: vi.fn(), summary: vi.fn(), moved: vi.fn() }));
 vi.mock("@/lib/dashboard-auth", () => ({ requireDashboardView: async () => ({ tenant: "gldf", clientFallbackRoot: null }) }));
 vi.mock("@/lib/storage", () => ({ getActivity: reads.activity, getSiteSnapshots: reads.snapshots }));
 vi.mock("@/lib/events", () => ({ getEvents: reads.events }));
 vi.mock("@/lib/scan-store", () => ({ getScanHistory: reads.history, getScanSummary: reads.summary }));
 vi.mock("@/components/dashboard/SiteSafetyPanel", () => ({ SiteSafetyPanel: () => <p>Saved versions are available.</p> }));
-import SiteHistoryPage from "@/app/dashboard/history/page";
+vi.mock("@/lib/tenant", () => ({ getTenantFromHeaders: async () => "gldf" }));
+vi.mock("@/platform/owner-entry/server", () => ({ redirectIfDashboardPageMoved: reads.moved }));
+import { isValidElement, type ReactElement } from "react";
+import SitePageModule from "@/app/dashboard/history/page";
+import { SiteHistoryContent } from "@/components/dashboard/SiteHistoryContent";
+
+/** The page renders the shared (async) history content; render that content the way the page configures it. */
+async function SiteHistoryPage(input: { searchParams?: Promise<{ request?: string }> }) {
+  const page = await SitePageModule(input) as ReactElement<{ children: ReactElement<Parameters<typeof SiteHistoryContent>[0]> }>;
+  const child = page.props.children;
+  if (!isValidElement(child)) throw new Error("history content missing");
+  return <div>{await SiteHistoryContent(child.props)}</div>;
+}
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -19,6 +31,11 @@ beforeEach(() => {
 });
 
 describe("website history availability", () => {
+  it("checks first whether the page moved to the workspace website", async () => {
+    await SitePageModule({});
+    expect(reads.moved).toHaveBeenCalledWith("gldf", "/history");
+  });
+
   it("shows an unavailable request read without claiming no requests exist", async () => {
     reads.events.mockRejectedValue(new Error("offline"));
     const html = renderToStaticMarkup(await SiteHistoryPage({ searchParams: Promise.resolve({ request: "evt_saved_request" }) }));

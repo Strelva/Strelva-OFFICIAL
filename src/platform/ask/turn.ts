@@ -8,6 +8,8 @@ import { authorizeAskTool } from "./authority";
 import { classifyAsk, MANAGED_REQUEST_SUMMARY } from "./classify";
 import { ASK_REFUSALS, type AskedOnBehalf, type AskResultKind } from "./contracts";
 import type { AskPossibilityPort, AskRequestPort, NeedsYouPort } from "./ports";
+import { AskConversationNotFoundError, type AskHistoryPort } from "./history";
+import { WorkspaceAccessError, WorkspaceConflictError } from "@/platform/workspaces/types";
 import { isManagedBusiness, resolveAskTarget, type AskResolution, type ResolvedSite } from "./resolution";
 import type { TenantAskTools } from "./tenant-tools-adapter";
 import { askToolLabel, buildAskTools, type AskReceiptItem } from "./tools";
@@ -21,6 +23,8 @@ import { askToolLabel, buildAskTools, type AskReceiptItem } from "./tools";
 export const askRequestSchema = z.object({
   workspaceId: z.string().uuid(),
   systemId: z.string().uuid().optional(),
+  /** Continue a saved conversation. The stored messages replace the client's copy. */
+  conversationId: z.string().uuid().optional(),
   askedOnBehalf: z.enum(["email", "phone"]).optional(),
   messages: z.array(z.object({
     role: z.enum(["user", "assistant"]),
@@ -62,7 +66,12 @@ export interface AskTurnDeps {
   newTurnId(): string;
   /** Where the owner decides (Needs you). */
   needsYouPath: string;
+  /** Conversation history. Absent, or failing to save, the turn still runs and says it wasn't saved. */
+  history?: AskHistoryPort;
 }
+
+/** How many stored messages go back to the model as context. */
+export const ASK_HISTORY_CONTEXT = 40;
 
 export type AskTurnStart =
   | { kind: "refused"; status: number; error: string }
@@ -119,6 +128,32 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
   const systemId = target.kind === "site" ? target.site.systemId : target.kind === "system" || target.kind === "site_not_connected" ? target.systemId : null;
   const actorKind = deps.isOperator ? "operator" : role === "owner" ? "owner" : "member";
 
+  // Save the person's words first. A conversation that isn't theirs (or is
+  // another place's) is refused before anything runs; a history store that's
+  // down only means this turn isn't saved.
+  let conversationId: string | null = request.conversationId ?? null;
+  let saved = Boolean(deps.history);
+  let modelMessages: ModelMessage[] = request.messages as ModelMessage[];
+  if (deps.history) {
+    try {
+      if (conversationId) {
+        const stored = await deps.history.read(actor, { workspaceId: request.workspaceId, conversationId, limit: ASK_HISTORY_CONTEXT });
+        modelMessages = [...stored.messages.map((message) => ({ role: message.role, content: message.content }) as ModelMessage), { role: "user", content: lastUserText }];
+      }
+      const appended = await deps.history.append(actor, {
+        workspaceId: request.workspaceId, conversationId, systemId: request.systemId ?? null,
+        role: "user", content: lastUserText, askedOnBehalf: request.askedOnBehalf ?? null,
+      });
+      conversationId = appended.conversationId;
+    } catch (error) {
+      if (error instanceof AskConversationNotFoundError) return { kind: "refused", status: 404, error: error.message };
+      if (error instanceof WorkspaceConflictError) return { kind: "refused", status: 409, error: error.message };
+      if (error instanceof WorkspaceAccessError) return { kind: "refused", status: 403, error: "This business is unavailable to your account." };
+      saved = false;
+      modelMessages = request.messages as ModelMessage[];
+    }
+  }
+
   return {
     kind: "stream",
     async run(emit) {
@@ -135,7 +170,11 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
         else if (resultKind === "answer") resultKind = "refusal";
       };
       let emitted = false;
-      const say = (text: string) => { emitted = true; emit(text); };
+      let replyText = "";
+      // Control lines (`__TOOL__`, `__CARD__`) only count at a line start, so one never lands mid-sentence.
+      let atLineStart = true;
+      const say = (text: string) => { emitted = true; replyText += text; atLineStart = text.endsWith("\n"); emit(text); };
+      const marker = (line: string) => { emit(`${atLineStart ? "" : "\n"}${line}`); atLineStart = true; };
 
       // The authority snapshot, re-read before every tool call.
       const authority = {
@@ -224,16 +263,16 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
           businessContext: tenant?.businessContext ?? null, askedOnBehalf: request.askedOnBehalf ?? null,
         });
         await deps.stream(
-          { system, messages: request.messages as ModelMessage[], tools, context: { workspaceId: request.workspaceId, systemId, tenantId: site?.tenantId ?? null, actorKind } },
+          { system, messages: modelMessages, tools, context: { workspaceId: request.workspaceId, systemId, tenantId: site?.tenantId ?? null, actorKind } },
           async (parts) => {
             for await (const part of parts) {
               if (part.type === "error") throw part.error;
               if (part.type === "tool-call") {
                 emitted = true;
-                emit(`__TOOL__${askToolLabel(String(part.toolName))}\n`);
+                marker(`__TOOL__${askToolLabel(String(part.toolName))}\n`);
               } else if (part.type === "tool-result") {
                 const output = ("output" in part ? part.output : undefined) as unknown;
-                if (output && typeof output === "object" && "__inlineTool" in output) emit(`__CARD__${JSON.stringify(output)}\n`);
+                if (output && typeof output === "object" && "__inlineTool" in output) marker(`__CARD__${JSON.stringify(output)}\n`);
                 const action = agentResultFromToolOutput(output);
                 if (action) record(action);
               } else if (part.type === "text-delta") {
@@ -246,12 +285,21 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
         );
       } catch {
         if (!emitted) {
+          replyText = NO_ANSWER;
           try { emit(NO_ANSWER); } catch { /* client gone */ }
         }
       } finally {
         const contract = buildAgentResultContract(actions);
+        if (deps.history && saved && conversationId) {
+          try {
+            await deps.history.append(actor, {
+              workspaceId: request.workspaceId, conversationId, systemId: request.systemId ?? null, role: "assistant",
+              content: (replyText.trim() || NO_ANSWER).slice(0, 20_000), result: { kind: resultKind, items: items.slice(0, 20), systemId },
+            });
+          } catch { saved = false; }
+        }
         try {
-          emit(`\n__RESULT__${JSON.stringify({ ...contract, ask: { kind: resultKind, items, systemId, workspaceId: request.workspaceId } })}\n`);
+          emit(`\n__RESULT__${JSON.stringify({ ...contract, ask: { kind: resultKind, items, systemId, workspaceId: request.workspaceId, conversationId, saved } })}\n`);
         } catch { /* client gone */ }
       }
     },

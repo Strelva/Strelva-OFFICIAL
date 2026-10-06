@@ -1,11 +1,12 @@
 import { isBusinessStartProduct } from "./business-start";
+import { workspaceSiteTarget } from "./workspace-site-places";
 
 /** Navigation hints only. APIs still authorize the requested workspace and work. */
 const ID = /^[a-z0-9_-]{1,128}$/i;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 const RECORD_ID = /^[a-z0-9_.:-]{1,200}$/i;
 const INVITATION_TOKEN = /^[A-Za-z0-9_-]{43}$/;
-const VIEWS = new Set(["system", "requests", "customers", "apps", "work", "ongoing", "settings", "products", "access", "help", "inquiries", "tracker", "document", "plan", "start", "websites", "custom-applications", "onboarding", "applications", "scheduling", "investigations", "operations", "product-learning"]);
+const VIEWS = new Set(["system", "requests", "customers", "apps", "work", "ongoing", "settings", "products", "access", "help", "inquiries", "tracker", "document", "plan", "start", "websites", "custom-applications", "onboarding", "applications", "scheduling", "investigations", "operations", "product-learning", "ask"]);
 const INQUIRY_VIEWS = new Set(["home", "new", "shape", "work", "plan", "preview", "rehearsal", "receipt", "search", "record", "why", "responsibility", "connections", "onboarding", "account", "attention", "patterns"]);
 
 export function workspaceReturnTarget(value: string | null): string | null {
@@ -38,6 +39,8 @@ export function workspaceReturnTarget(value: string | null): string | null {
     }
     return `${target.pathname}?${params}`;
   }
+  // A managed website's own pages (editor, photos, look, history, connections).
+  if (value?.startsWith("/workspace/site?")) return workspaceSiteTarget(value);
   if (value?.startsWith("/workspace/business/new?") || value?.startsWith("/workspace/delivery?")) {
     const target = new URL(value, "https://workspace.invalid");
     if (target.hash || target.searchParams.size !== 1) return null;
@@ -62,7 +65,7 @@ export function workspaceReturnTarget(value: string | null): string | null {
       : key === "inquiryRequest" || key === "inquiryRecord" ? !ID.test(item)
       : key === "offering" || key === "template" ? !ID.test(item) || params.get("view") !== "products"
       : key === "standingId" || key === "assignmentId" ? !UUID.test(item) || !["operations", "ongoing"].includes(params.get("view") || "")
-      : key === "system" ? !UUID.test(item) || params.get("view") !== "system"
+      : key === "system" ? !UUID.test(item) || !["system", "ask"].includes(params.get("view") || "")
       : key === "search" ? item !== "1" || !["work", "apps"].includes(params.get("view") || "")
       : key === "row" ? !RECORD_ID.test(item) || params.get("view") !== "tracker" || !params.get("work")
       : key === "save" ? !/^(scan_[a-z0-9]{1,251}|audit_[a-f0-9]{32})$/i.test(item)

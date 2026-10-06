@@ -263,15 +263,21 @@ describe("the pages that moved (owner-entry spec §5)", () => {
     expect(route("/dashboard/review", ["needs_you"])).toMatchObject({ kind: "redirect", location: `/workspace?workspaceId=${WS}` });
   });
 
+  it("routes /chat through the same gate type as needs_you (ask)", () => {
+    const only = (gate: string) => (flag: string) => flag === gate;
+    expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/chat", flagOn: only("ask") })).toMatchObject({ kind: "redirect", location: `/workspace?view=ask&workspaceId=${WS}` });
+    expect(routeDashboardRequest({ decision: moved, pathWithSearch: "/dashboard/chat", flagOn: only("needs_you") }).kind).toBe("render-with-back");
+  });
+
   it("lets an operator keep the old page, and keeps everyone else on /dashboard when not moved", () => {
     expect(routeDashboardRequest({ decision: { ...moved, operator: true }, pathWithSearch: "/dashboard/leads?legacy=1" }).kind).toBe("render-with-back");
     expect(routeDashboardRequest({ decision: { kind: "dashboard", reason: "entry_off" }, pathWithSearch: "/dashboard/leads" })).toEqual({ kind: "render" });
   });
 
-  it("no longer blocks owner entry for these pages; the site editor still does", () => {
+  it("no longer blocks owner entry for these pages; Settings still does", () => {
     const blocking = pagesBlockingOwnerEntry(new Set(["always", "local"])).map((entry) => entry.route);
-    for (const path of ["/", "/review", "/leads", "/reviews", "/analytics", "/health"]) expect(blocking, path).not.toContain(path);
-    expect(blocking).toContain("/site");
+    for (const path of ["/", "/review", "/leads", "/reviews", "/analytics", "/health", "/site"]) expect(blocking, path).not.toContain(path);
+    expect(blocking).toContain("/settings");
     expect(effectiveDisposition("/health").route).toBe("/analytics");
   });
 
