@@ -26,7 +26,7 @@ export {
 export type { InquiryCapabilityStatus, SystemRuleCode } from "./invariants";
 export type { SystemStore } from "./store";
 export { createMemorySystemStore } from "./memory-store";
-export type { MemorySystemStoreOptions, SystemAccess } from "./memory-store";
+export type { AgencySystemScope, MemorySystemStoreOptions, SystemAccess } from "./memory-store";
 export { createSupabaseSystemStore, mapSystemsError, setSystemsDb } from "./supabase-store";
 export type { SystemsDb } from "./supabase-store";
 export {

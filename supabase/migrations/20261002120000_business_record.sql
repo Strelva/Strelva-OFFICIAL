@@ -27,8 +27,12 @@
 -- Access. Reads: any member of the customer workspace, or an agency member
 -- holding an accepted, unexpired agency assignment with an accepted provider
 -- delivery for that business (the same delivery authority used by
--- 20260918010000/20260920030000). Writes: workspace owner/admin, or that
--- agency. Source `operator` requires an active super admin who is a member;
+-- 20260918010000/20260920030000). That agency reads the profile (facts,
+-- services, people) and the history of it; contacts, the contact count and
+-- any revision that touched a contact stay with direct members. Systems and
+-- other work-shaped reads narrow an agency further, to the exact work it was
+-- delegated or assigned (business_record_agency_work_ids). Writes: workspace
+-- owner/admin, or that agency. Source `operator` requires an active super admin who is a member;
 -- `tenant_import` is reserved to the conversion RPC. Facts may be marked
 -- verified only by owner or operator sources. Writes take the shared workspace
 -- lock (hashtextextended(workspace,7415)) and stop after workspace exit.
@@ -427,6 +431,67 @@ begin
   end if;
   return actor_role;
 end;
+$$;
+
+-- The exact saved work a user who is NOT a direct member of this customer
+-- business may reach, by the same two grants listWork/getWork honour in
+-- src/platform/workspaces/repository.ts:
+--   * an active workspace_delegations row held by an agency workspace the
+--     user belongs to. Its scope is work:read, so it never counts for writes;
+--   * an accepted, unexpired agency assignment whose provider delivery is
+--     accepted on an active installation, checked per work id by
+--     agency_can_read_assigned_work (the assignment's work and its steps).
+-- The agency role from business_record_assert_actor says the agency serves
+-- this business; it does not say which of the business's things it serves.
+-- Every agency-facing read of work-shaped data filters by this list. Direct
+-- members never need it. Returns an empty array, never null.
+create function public.business_record_agency_work_ids(
+  p_workspace_id uuid, p_user_id uuid, p_verified_email text, p_write boolean
+) returns uuid[]
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare ids uuid[];
+begin
+  if p_workspace_id is null or p_user_id is null or p_verified_email is null then return '{}'; end if;
+  perform 1 from public.users
+    where id = p_user_id and lower(email) = lower(btrim(p_verified_email)) and verified_at is not null;
+  if not found then return '{}'; end if;
+  perform 1 from public.workspaces where id = p_workspace_id and kind = 'customer';
+  if not found then return '{}'; end if;
+  select coalesce(array_agg(distinct g.work_id), '{}') into ids from (
+    select d.customer_work_id as work_id
+      from public.workspace_delegations d
+      join public.workspaces agency on agency.id = d.agency_workspace_id and agency.kind = 'agency'
+      join public.workspace_memberships am on am.workspace_id = d.agency_workspace_id and am.user_id = p_user_id
+      where not p_write and d.customer_workspace_id = p_workspace_id and d.status = 'active'
+    union
+    select w.id
+      from public.saved_product_work w
+      where w.workspace_id = p_workspace_id
+        and w.id in (
+          select a.work_id from public.operational_assignments a
+            where a.workspace_id = p_workspace_id and a.assignee_user_id = p_user_id and a.assignee_kind = 'agency'
+              and a.status = 'accepted' and a.expires_at > clock_timestamp()
+          union
+          select (step->>'workId')::uuid
+            from public.operational_assignments a
+            join public.saved_product_work aw on aw.id = a.work_id and aw.workspace_id = p_workspace_id
+            cross join lateral jsonb_array_elements(case when jsonb_typeof(aw.payload->'steps') = 'array'
+              then aw.payload->'steps' else '[]'::jsonb end) step
+            where a.workspace_id = p_workspace_id and a.assignee_user_id = p_user_id and a.assignee_kind = 'agency'
+              and a.status = 'accepted' and a.expires_at > clock_timestamp()
+              and step->>'workId' ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+        and public.agency_can_read_assigned_work(p_user_id, p_verified_email, p_workspace_id, w.id)
+  ) g;
+  return ids;
+end;
+$$;
+
+-- True when a history row's changes include a contact. Agency reads of
+-- history and agency undo both use this one rule.
+create function public.business_record_revision_touches_contacts(p_changes jsonb) returns boolean
+language sql immutable set search_path = public, pg_temp as $$
+  select exists (select 1 from jsonb_array_elements(case when jsonb_typeof(p_changes) = 'array' then p_changes else '[]'::jsonb end) c
+    where c->>'entity' = 'contact')
 $$;
 
 -- Entity state is what history compares and restores. Timestamps use one
@@ -846,7 +911,10 @@ begin
         'email', p.email, 'phone', p.phone, 'userId', p.user_id, 'active', p.active, 'source', p.source,
         'verified', p.verified, 'updatedAt', p.updated_at) order by p.name, p.id)
       from public.business_people p where p.workspace_id = p_workspace_id), '[]'::jsonb),
-    'contactCount', (select count(*) from public.business_contacts c where c.workspace_id = p_workspace_id)
+    -- Contacts are the business's customers, not part of any agency's work:
+    -- an agency reads the profile it helps keep, never the contact book.
+    'contactCount', case when access = 'agency' then null
+      else (select count(*) from public.business_contacts c where c.workspace_id = p_workspace_id) end
   );
 end;
 $$;
@@ -888,6 +956,12 @@ begin
   select * into w from public.business_record_begin_write(p_workspace_id, p_user_id, p_verified_email, p_source, p_command_id, p_command_digest);
   if w.replay is not null then return w.replay; end if;
   if p_sequence is null or p_sequence < 1 then raise exception 'business_record_revision_not_found'; end if;
+  -- An agency never sees a revision that touched contacts, so it cannot undo one.
+  if w.access = 'agency' and exists (select 1 from public.business_record_revisions r
+      where r.workspace_id = p_workspace_id and r.sequence = p_sequence
+        and public.business_record_revision_touches_contacts(r.changes)) then
+    raise exception 'business_record_revision_not_found';
+  end if;
   return public.business_record_apply(p_workspace_id, p_user_id, w.actor_kind, p_source, null, null, p_sequence,
     p_command_id, p_command_digest);
 end;
@@ -912,7 +986,11 @@ create function public.read_business_contacts(
 ) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
 begin
-  perform public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, false);
+  -- Direct members only. Contacts carry no work or delivery an agency could
+  -- be scoped to, so an agency is refused rather than shown a filtered list.
+  if public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, false) = 'agency' then
+    raise exception 'business_record_access_denied';
+  end if;
   if p_limit is null or p_limit not between 1 and 500 then raise exception 'business_record_patch_invalid'; end if;
   return coalesce((select jsonb_agg(item order by (item->>'lastSeenAt') desc, item->>'id') from (
     select jsonb_build_object('id', c.id, 'name', c.name, 'email', c.email, 'phone', c.phone, 'sources', to_jsonb(c.sources),
@@ -926,15 +1004,20 @@ create function public.read_business_record_history(
   p_workspace_id uuid, p_user_id uuid, p_verified_email text, p_limit integer default 50
 ) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
+declare access text;
 begin
-  perform public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, false);
+  access := public.business_record_assert_actor(p_workspace_id, p_user_id, p_verified_email, false);
   if p_limit is null or p_limit not between 1 and 200 then raise exception 'business_record_patch_invalid'; end if;
+  -- An agency sees the profile history it can act on (facts, services,
+  -- people). Revisions that touched contacts carry customer details in their
+  -- before/after states and stay with direct members.
   return coalesce((select jsonb_agg(item order by (item->>'sequence')::bigint desc) from (
     select jsonb_build_object('sequence', r.sequence, 'revision', r.record_revision, 'actorId', r.actor_id,
       'actorKind', r.actor_kind, 'source', r.source, 'undoOf', r.undo_of_sequence,
       'undoneBy', (select u.sequence from public.business_record_revisions u where u.workspace_id = r.workspace_id and u.undo_of_sequence = r.sequence),
       'changes', r.changes, 'createdAt', r.created_at) item
     from public.business_record_revisions r where r.workspace_id = p_workspace_id
+      and (access <> 'agency' or not public.business_record_revision_touches_contacts(r.changes))
     order by r.sequence desc limit p_limit) page), '[]'::jsonb);
 end;
 $$;
@@ -1445,6 +1528,8 @@ revoke all on function public.business_record_fact_valid(text, jsonb) from publi
 revoke all on function public.business_record_history_immutable() from public, anon, authenticated;
 revoke all on function public.tenant_workspace_link_guard() from public, anon, authenticated;
 revoke all on function public.business_record_assert_actor(uuid, uuid, text, boolean) from public, anon, authenticated, service_role;
+revoke all on function public.business_record_agency_work_ids(uuid, uuid, text, boolean) from public, anon, authenticated, service_role;
+revoke all on function public.business_record_revision_touches_contacts(jsonb) from public, anon, authenticated, service_role;
 revoke all on function public.business_record_entity_state(uuid, text, text) from public, anon, authenticated, service_role;
 revoke all on function public.business_record_entity_write(uuid, text, text, jsonb, uuid) from public, anon, authenticated, service_role;
 revoke all on function public.business_record_apply(uuid, uuid, text, text, jsonb, jsonb, bigint, uuid, text) from public, anon, authenticated, service_role;

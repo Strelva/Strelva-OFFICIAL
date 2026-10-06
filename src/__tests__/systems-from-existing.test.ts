@@ -54,6 +54,27 @@ describe("systems from existing things", () => {
     expect(systems.every(({ provenance }) => provenance === "existing")).toBe(true);
   });
 
+  it("projects an agency's assigned snapshot from its own work only, even if more slips in", () => {
+    // The SQL reader already narrows an agency; the projection holds the same
+    // line so a broader snapshot can never surface more than the work.
+    const site = snapshot.savedWork[0]!;
+    const assigned = systemsFromExisting({ ...snapshot, scope: "assigned", savedWork: [site] });
+    expect(assigned.systems.map(({ system }) => [system.name, system.origin])).toEqual([
+      ["Juniper site", { kind: "saved_work", ref: site.id }],
+    ]);
+    expect(assigned.systems[0]!.references).toMatchObject({ tenantStableId: NATIVE_TENANT, tenantId: "juniper" });
+    expect(assigned.connections).toEqual([]);
+
+    const schedule = snapshot.savedWork[1]!;
+    const delegated = systemsFromExisting({ ...snapshot, scope: "assigned", savedWork: [schedule] });
+    expect(delegated.systems.map(({ system }) => system.kind)).toEqual(["booking"]);
+    // No site it hosts to appear on, and the business's calendars are not its work.
+    expect(delegated.connections).toEqual([]);
+
+    // A direct member's snapshot keeps everything.
+    expect(systemsFromExisting({ ...snapshot, scope: "business" }).connections.length).toBeGreaterThan(0);
+  });
+
   it("lists a paused schedule's booking System as paused even while it is published on a website", () => {
     const paused = { ...snapshot, savedWork: snapshot.savedWork.map((w) => (w.id.endsWith("a3") ? { ...w, schedulePaused: true } : w)) };
     const booking = systemsFromExisting(paused).systems.find(({ system }) => system.kind === "booking")!;

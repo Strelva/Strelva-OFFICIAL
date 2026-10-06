@@ -205,7 +205,8 @@ export const businessRecordSchema = z.object({
     id: uuid, name: z.string(), roleTitle: nullableString, email: nullableString, phone: nullableString,
     userId: uuid.nullable(), active: z.boolean(), source: businessRecordSourceSchema, verified: z.boolean(), updatedAt: timestamp,
   })),
-  contactCount: z.number().int().min(0),
+  /** Null for an agency: contacts stay with direct members of the business. */
+  contactCount: z.number().int().min(0).nullable(),
 });
 export type BusinessRecord = z.infer<typeof businessRecordSchema>;
 
