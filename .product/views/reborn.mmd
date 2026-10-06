@@ -1,6 +1,6 @@
-%% Generated from PRODUCT_MODEL revision 5; status=all, inactive=False, focus=all, hops=1
+%% Generated from PRODUCT_MODEL revision 6; status=all, inactive=False, focus=all, hops=1
 flowchart LR
-  LATENT_VIEW_TITLE["Strelva #124; revision 5 #124; view: status=all, inactive=False, focus=all, hops=1"]
+  LATENT_VIEW_TITLE["Strelva #124; revision 6 #124; view: status=all, inactive=False, focus=all, hops=1"]
   N_REL_REBORN["release: Strelva Reborn 1.0.0 #91;planned#93;"]
   class N_REL_REBORN type_custom;
   class N_REL_REBORN confirmed;
@@ -13,7 +13,7 @@ flowchart LR
   N_CAP_CONVERT{{"capability: Convert tenant to business #91;partial#93;"}}
   class N_CAP_CONVERT type_capability;
   class N_CAP_CONVERT confirmed;
-  N_STATE_LEADS_REDIS(("state: Leads in Redis only #91;available#93;"))
+  N_STATE_LEADS_REDIS(("state: Redis lead reads with a conditional durable copy #91;available#93;"))
   class N_STATE_LEADS_REDIS type_state;
   class N_STATE_LEADS_REDIS confirmed;
   N_CAP_CONTACT_DEDUP{{"capability: Contact upsert with dedup #91;partial#93;"}}
@@ -40,7 +40,7 @@ flowchart LR
   N_UNK_EMAIL_PROD["unknown: Is client email on in production? #91;unknown#93;"]
   class N_UNK_EMAIL_PROD type_custom;
   class N_UNK_EMAIL_PROD inferred;
-  N_COMP_LEADS_TO_RECORD[["composition: Leads land in the business record #91;planned#93;"]]
+  N_COMP_LEADS_TO_RECORD[["composition: Leads land in the business record #91;stale / planned#93;"]]
   class N_COMP_LEADS_TO_RECORD type_composition;
   class N_COMP_LEADS_TO_RECORD proposed;
   N_COMP_OWNER_BY_EMAIL[["composition: Run the workspace from the inbox #91;planned#93;"]]
@@ -163,13 +163,13 @@ flowchart LR
   N_DESIGN_EXECUTION["architecture: One execution engine #91;partial#93;"]
   class N_DESIGN_EXECUTION type_custom;
   class N_DESIGN_EXECUTION proposed;
-  N_ISSUE_SYSTEMS_AUDIT_DEFECTS["issue: Open defects on transition/systems #91;absent#93;"]
+  N_ISSUE_SYSTEMS_AUDIT_DEFECTS["issue: Open defects on transition/systems #91;stale / absent#93;"]
   class N_ISSUE_SYSTEMS_AUDIT_DEFECTS type_custom;
   class N_ISSUE_SYSTEMS_AUDIT_DEFECTS confirmed;
   N_RISK_PUBLIC_BOOKING_PAUSE["risk: Paused schedule still takes public bookings #91;partial#93;"]
   class N_RISK_PUBLIC_BOOKING_PAUSE type_custom;
   class N_RISK_PUBLIC_BOOKING_PAUSE confirmed;
-  N_GAP_LEADS_UNSEEN["gap: Client leads expire unseen #91;absent#93;"]
+  N_GAP_LEADS_UNSEEN["gap: Lead durability and delivery acceptance need operating proof #91;partial#93;"]
   class N_GAP_LEADS_UNSEEN type_custom;
   class N_GAP_LEADS_UNSEEN confirmed;
   N_OFFER_MANAGED_WEBSITES("offering: Managed websites for nine clients (tenant model) #91;operating#93;")
@@ -247,6 +247,9 @@ flowchart LR
   N_PROD_WORKSPACE_SCHEDULING["product: Workspace scheduling #91;partial#93;"]
   class N_PROD_WORKSPACE_SCHEDULING type_custom;
   class N_PROD_WORKSPACE_SCHEDULING confirmed;
+  N_ISSUE_REBORN_RELEASE_AUDIT["issue: Remaining Reborn release findings #91;blocked#93;"]
+  class N_ISSUE_REBORN_RELEASE_AUDIT type_custom;
+  class N_ISSUE_REBORN_RELEASE_AUDIT confirmed;
   N_REL_REBORN -->|"requires"| N_PRIM_BUSINESS_RECORD
   N_REL_REBORN -->|"requires"| N_CAP_CONVERT
   N_CAP_CONVERT -->|"depends_on"| N_PRIM_TENANT_LINK

@@ -5,7 +5,7 @@ The ledger below is authoritative; graphs and research reports are derived views
 ```json product-model
 {
   "schema_version": 1,
-  "revision": 5,
+  "revision": 6,
   "product": {
     "id": "STRELVA",
     "name": "Strelva",
@@ -475,6 +475,20 @@ The ledger below is authoritative; graphs and research reports are derived views
       "locator": "git status --short / git check-ignore / git rev-list --count main..origin/main / git ls-remote --heads origin 'transition/*' in REB, 2026-10-05",
       "observed_at": "2026-10-05",
       "claim": "PRODUCT_MODEL.md and .product/ are untracked and not gitignored; local main is 7 commits behind origin/main (ff817d86); ADRs 0006-0011 untracked in the parent repo; no transition/* branch on origin."
+    },
+    {
+      "id": "SRC_REBORN_COMBINED",
+      "kind": "git",
+      "locator": "Prepared integration d1010f5e, ancestor of reborn integration; business-record 40aa1f9e, durable-leads 26b1d562, Systems f5d11d71, model 96f1790a, deepening 3fe06f32",
+      "observed_at": "2026-10-05",
+      "claim": "Combined local implementation; no production migrations, flag changes, client conversion, live effects or deployments. Source branch boundaries no longer constrain this candidate."
+    },
+    {
+      "id": "SRC_REBORN_MERGE_AUDIT",
+      "kind": "doc",
+      "locator": "docs/operations/reborn-integration-audit-2026-10-05.md",
+      "observed_at": "2026-10-05",
+      "claim": "Independent branch audits, combined verification and explicit remaining release findings. Local checks and source inspection only; evidence never establishes production operation or new commercial authority."
     }
   ],
   "nodes": [
@@ -517,14 +531,20 @@ The ledger below is authoritative; graphs and research reports are derived views
         "SRC_BR_MIG",
         "SRC_PROGRESS",
         "SRC_RECORD_CURRENT",
-        "SRC_AUDIT_PLATFORM"
+        "SRC_AUDIT_PLATFORM",
+        "SRC_REBORN_COMBINED"
       ],
       "rationale": "",
       "premise_ids": [],
       "details": {
         "environment": "local only; migration unapplied",
         "current_inspection": "Separate reborn-business-record worktree at observed HEAD 276bb09a; typed contract remains a partial implementation, not current-branch or production proof.",
-        "rev5": "0 non-test importers in src/app, src/products or src/experience; only conversion scripts call it; owner_recipient unused. Spine migration depends on it (D13)."
+        "rev5": "0 non-test importers in src/app, src/products or src/experience; only conversion scripts call it; owner_recipient unused. Spine migration depends on it (D13).",
+        "rev6_integration": {
+          "scope": "Combined local source on reborn integration; not production. See SRC_REBORN_COMBINED and the merge audit.",
+          "prior_branch_observations": "Earlier rev5 worktree and defect notes are historical; preserve their evidence.",
+          "remaining": "Production schema, real customer migration/use and provider effects remain unproven."
+        }
       }
     },
     {
@@ -578,8 +598,8 @@ The ledger below is authoritative; graphs and research reports are derived views
     {
       "id": "STATE_LEADS_REDIS",
       "type": "state",
-      "label": "Leads in Redis only",
-      "claim": "Inspected lead code writes contents to Redis with a 90-day TTL and a 500-item index cap; this creates expiry/retention exposure. Actual production data loss is unmeasured.",
+      "label": "Redis lead reads with a conditional durable copy",
+      "claim": "Lead reads still use Redis with a 90-day per-record TTL and 500-item recent index. Combined local source also mirrors captured leads to Postgres through a service-role RPC, with retry and operator visibility; the mirror needs its schema/configuration and has not been proven in production.",
       "status": "confirmed",
       "lifecycle": "active",
       "freshness": "current",
@@ -587,13 +607,15 @@ The ledger below is authoritative; graphs and research reports are derived views
       "evidence": [
         "SRC_LEADS",
         "SRC_AUDIT_CUSTOMER_OPS",
-        "SRC_AUDIT_WEBSITES"
+        "SRC_AUDIT_WEBSITES",
+        "SRC_REBORN_COMBINED"
       ],
       "rationale": "",
       "premise_ids": [],
       "details": {
         "evidence_scope": "Source evidence only; operating readiness from revision 1 was not supported by runtime evidence. Production behavior not freshly verified.",
-        "rev5": "Re-confirmed in code (leads.ts:18-19,147-153). New hosted v2 sites (SiteLeadForm.tsx, site-lead-runtime.mjs) and every workspace public booking also post into it. The workspace inquiry System reads these same Redis records. See GAP_LEADS_UNSEEN."
+        "rev5": "Re-confirmed in code (leads.ts:18-19,147-153). New hosted v2 sites (SiteLeadForm.tsx, site-lead-runtime.mjs) and every workspace public booking also post into it. The workspace inquiry System reads these same Redis records. See GAP_LEADS_UNSEEN.",
+        "rev6": "The prior Redis-only implementation claim is superseded for combined local code, not the dated production record. Legacy POST still ignores unavailable storage outcomes."
       }
     },
     {
@@ -630,13 +652,19 @@ The ledger below is authoritative; graphs and research reports are derived views
       "realization": "available",
       "evidence": [
         "SRC_OWNER_MSG",
-        "SRC_AUDIT_CUSTOMER_OPS"
+        "SRC_AUDIT_CUSTOMER_OPS",
+        "SRC_REBORN_COMBINED"
       ],
       "rationale": "",
       "premise_ids": [],
       "details": {
         "evidence_scope": "Source evidence only; operating readiness from revision 1 was not supported by runtime evidence. Production behavior not freshly verified.",
-        "rev5_violation": "src/lib/newsletter.ts:60-62 is a second Resend transport that bypasses send.ts and picks a per-tenant resendDomain (one email path, no per-client domains)."
+        "rev5_violation": "src/lib/newsletter.ts:60-62 is a second Resend transport that bypasses send.ts and picks a per-tenant resendDomain (one email path, no per-client domains).",
+        "rev6_integration": {
+          "scope": "Combined local source on reborn integration; not production. See SRC_REBORN_COMBINED and the merge audit.",
+          "prior_branch_observations": "Earlier rev5 worktree and defect notes are historical; preserve their evidence.",
+          "remaining": "Production schema, real customer migration/use and provider effects remain unproven."
+        }
       }
     },
     {
@@ -778,7 +806,7 @@ The ledger below is authoritative; graphs and research reports are derived views
       "claim": "Bundle an inquiries table (keyed tenant stable_id, nullable workspace) into the unapplied business-record migration; lead route dual-writes contents and calls contact upsert",
       "status": "proposed",
       "lifecycle": "active",
-      "freshness": "current",
+      "freshness": "stale",
       "realization": "planned",
       "evidence": [],
       "rationale": "Section 0 and section 1 both need a migration yes; the business-record migration is unapplied so one migration and one approval covers both, and contact dedup already exists",
@@ -788,7 +816,8 @@ The ledger below is authoritative; graphs and research reports are derived views
         "PRIM_BUSINESS_RECORD"
       ],
       "details": {
-        "validation": "SQL check proves lead row + contact merge; contract test proves /api/v1/leads response unchanged; pnpm check:custom-repos"
+        "validation": "SQL check proves lead row + contact merge; contract test proves /api/v1/leads response unchanged; pnpm check:custom-repos",
+        "rev6_recheck": "Combined source changes prior implementation premises. Re-evaluate this proposal/defect set against SRC_REBORN_COMBINED; no implied contact-upsert integration, live activation or complete historical-defect closure."
       }
     },
     {
@@ -1947,7 +1976,8 @@ The ledger below is authoritative; graphs and research reports are derived views
         "SRC_ADR_0011",
         "SRC_SYSTEMS_INTEGRATION",
         "SRC_AUDIT_LATENT",
-        "SRC_SPINE"
+        "SRC_SPINE",
+        "SRC_REBORN_COMBINED"
       ],
       "rationale": "Separate the selected customer product model from supporting architecture and operational proof.",
       "premise_ids": [],
@@ -1995,7 +2025,12 @@ The ledger below is authoritative; graphs and research reports are derived views
           "PRIM_RECORD_REF (as spine SystemRevisionRef + implementation.ref)",
           "PRIM_RESOURCE (websites/apps/calendars as Systems)"
         ],
-        "boundary_conflict": "Spine's from-existing.ts excludes onboarding and produces two Twin Trees Systems; the transition map and strelva-reborn.md:26 disagree. See Q_SYSTEM_BOUNDARY, Q_TWIN_TREES."
+        "boundary_conflict": "Spine's from-existing.ts excludes onboarding and produces two Twin Trees Systems; the transition map and strelva-reborn.md:26 disagree. See Q_SYSTEM_BOUNDARY, Q_TWIN_TREES.",
+        "rev6_integration": {
+          "scope": "Combined local source on reborn integration; not production. See SRC_REBORN_COMBINED and the merge audit.",
+          "prior_branch_observations": "Earlier rev5 worktree and defect notes are historical; preserve their evidence.",
+          "remaining": "Production schema, real customer migration/use and provider effects remain unproven."
+        }
       }
     },
     {
@@ -2012,7 +2047,8 @@ The ledger below is authoritative; graphs and research reports are derived views
         "SRC_ADR_0011",
         "SRC_SYSTEMS_INTEGRATION",
         "SRC_AUDIT_LATENT",
-        "SRC_SPINE"
+        "SRC_SPINE",
+        "SRC_REBORN_COMBINED"
       ],
       "rationale": "Separate the selected customer product model from supporting architecture and operational proof.",
       "premise_ids": [],
@@ -2047,7 +2083,12 @@ The ledger below is authoritative; graphs and research reports are derived views
           ],
           "defect_status": "Recorded open. A fix pass on 9 audit defects was running on transition/systems at observation; which of these it covers was not inspected. Line numbers are from the pre-integration branches."
         },
-        "term_distinction": "Not the customer noun. PRIM_CONNECTION = credentials/scopes/health of one outside account (Google, Outlook, domain claim). PRIM_SYSTEM_CONNECTION = a typed relation a System has (read/act/appear/share/depend/trigger); an external account is one of its targets via spine account_binding."
+        "term_distinction": "Not the customer noun. PRIM_CONNECTION = credentials/scopes/health of one outside account (Google, Outlook, domain claim). PRIM_SYSTEM_CONNECTION = a typed relation a System has (read/act/appear/share/depend/trigger); an external account is one of its targets via spine account_binding.",
+        "rev6_integration": {
+          "scope": "Combined local source on reborn integration; not production. See SRC_REBORN_COMBINED and the merge audit.",
+          "prior_branch_observations": "Earlier rev5 worktree and defect notes are historical; preserve their evidence.",
+          "remaining": "Production schema, real customer migration/use and provider effects remain unproven."
+        }
       }
     },
     {
@@ -2064,7 +2105,8 @@ The ledger below is authoritative; graphs and research reports are derived views
         "SRC_ADR_0011",
         "SRC_SYSTEMS_INTEGRATION",
         "SRC_AUDIT_LATENT",
-        "SRC_MAKE_REAL"
+        "SRC_MAKE_REAL",
+        "SRC_REBORN_COMBINED"
       ],
       "rationale": "Separate the selected customer product model from supporting architecture and operational proof.",
       "premise_ids": [],
@@ -2094,6 +2136,11 @@ The ledger below is authoritative; graphs and research reports are derived views
             "D01: Rollback skips non-completed steps, so a payment in unknown is ignored; the activation reads 'No outside effect remains', and a restart mints new idempotency keys, allowing a second charge."
           ],
           "defect_status": "Recorded open. A fix pass on 9 audit defects was running on transition/systems at observation; which of these it covers was not inspected. Line numbers are from the pre-integration branches."
+        },
+        "rev6_integration": {
+          "scope": "Combined local source on reborn integration; not production. See SRC_REBORN_COMBINED and the merge audit.",
+          "prior_branch_observations": "Earlier rev5 worktree and defect notes are historical; preserve their evidence.",
+          "remaining": "Production schema, real customer migration/use and provider effects remain unproven."
         }
       }
     },
@@ -2111,7 +2158,8 @@ The ledger below is authoritative; graphs and research reports are derived views
         "SRC_ADR_0011",
         "SRC_SYSTEMS_INTEGRATION",
         "SRC_AUDIT_LATENT",
-        "SRC_VERSIONS"
+        "SRC_VERSIONS",
+        "SRC_REBORN_COMBINED"
       ],
       "rationale": "Separate the selected customer product model from supporting architecture and operational proof.",
       "premise_ids": [],
@@ -2141,7 +2189,12 @@ The ledger below is authoritative; graphs and research reports are derived views
           "PRIM_METHOD_DEFINITION (lineage origin)",
           "PRIM_METHOD_INSTALLATION (descendant with pinned origin, local bindings and owned overrides)"
         ],
-        "term_collision": "docs/architecture/product-ontology.md:317 still defines Version as restorable historical state; two definitions stand until lane G fixes it."
+        "term_collision": "docs/architecture/product-ontology.md:317 still defines Version as restorable historical state; two definitions stand until lane G fixes it.",
+        "rev6_integration": {
+          "scope": "Combined local source on reborn integration; not production. See SRC_REBORN_COMBINED and the merge audit.",
+          "prior_branch_observations": "Earlier rev5 worktree and defect notes are historical; preserve their evidence.",
+          "remaining": "Production schema, real customer migration/use and provider effects remain unproven."
+        }
       }
     },
     {
@@ -2530,7 +2583,7 @@ The ledger below is authoritative; graphs and research reports are derived views
       "claim": "The 2026-10-04 audit found correctness and authority defects in the spine, make-real, Versions and health code that now lives on transition/systems.",
       "status": "confirmed",
       "lifecycle": "active",
-      "freshness": "current",
+      "freshness": "stale",
       "realization": "absent",
       "evidence": [
         "SRC_AUDIT_LATENT",
@@ -2669,7 +2722,8 @@ The ledger below is authoritative; graphs and research reports are derived views
         ],
         "status": "Recorded open. A fix pass on 9 audit defects was running on transition/systems at observation; which of these it covers was not inspected. Line numbers are from the pre-integration branches.",
         "scope": "Local and unmerged: branch transition/systems at b891b295 in REB-sys-integrate; not pushed, spine SQL unapplied, make-real and Versions in-memory. Not a production claim.",
-        "test_strength": "20 single-line deletions in runner.ts leave all 11 make-real tests green; spine's Supabase store test mocks rpc."
+        "test_strength": "20 single-line deletions in runner.ts leave all 11 make-real tests green; spine's Supabase store test mocks rpc.",
+        "rev6_recheck": "Combined source changes prior implementation premises. Re-evaluate this proposal/defect set against SRC_REBORN_COMBINED; no implied contact-upsert integration, live activation or complete historical-defect closure."
       }
     },
     {
@@ -2717,17 +2771,19 @@ The ledger below is authoritative; graphs and research reports are derived views
     {
       "id": "GAP_LEADS_UNSEEN",
       "type": "gap",
-      "label": "Client leads expire unseen",
-      "claim": "Live client leads sit only in Redis (90-day TTL per lead, 500-entry index cap); no owner email can arm, no operator view lists client leads, and owners rarely sign in, so leads can be captured, unseen and then lost.",
+      "label": "Lead durability and delivery acceptance need operating proof",
+      "claim": "Combined local code adds a durable Postgres lead copy, repair and operator view; whether production leads are preserved and owners receive notices is still unverified. Legacy intake can return success without confirmed storage.",
       "status": "confirmed",
       "lifecycle": "active",
       "freshness": "current",
-      "realization": "absent",
+      "realization": "partial",
       "evidence": [
         "SRC_LEADS",
         "SRC_AUDIT_CUSTOMER_OPS",
         "SRC_AUDIT_WEBSITES",
-        "SRC_SEPT30_RELEASE"
+        "SRC_SEPT30_RELEASE",
+        "SRC_REBORN_COMBINED",
+        "SRC_REBORN_MERGE_AUDIT"
       ],
       "rationale": "",
       "premise_ids": [],
@@ -2745,7 +2801,8 @@ The ledger below is authoritative; graphs and research reports are derived views
           "workspace inquiry System"
         ],
         "unmeasured": "How many leads have expired (Q_LEAD_LOSS); whether client-repo Resend mail is a durable copy for some clients (Q_OWNER_LEAD_EMAIL).",
-        "fix_order": "Reborn section 0 dual-write to Postgres (COMP_LEADS_TO_RECORD), pass tenantId, add client leads to /admin/clients/[id]."
+        "fix_order": "Reborn section 0 dual-write to Postgres (COMP_LEADS_TO_RECORD), pass tenantId, add client leads to /admin/clients/[id].",
+        "rev6": "Source gap reduced by integration; production activation, backfill and measured loss remain unknown. Prior 90-day expiry and unseen-lead evidence remains historical."
       }
     },
     {
@@ -3372,6 +3429,25 @@ The ledger below is authoritative; graphs and research reports are derived views
         "audit_call": "fix: reservations as rows, adopt weekly hours, calendar optional.",
         "audit_verdict": "SHIPPED-UNUSED; public path unreachable",
         "verdict_scope": "Verdict from the 2026-10-04 lane audit (local code, Sept 30 release record); no production read was made."
+      }
+    },
+    {
+      "id": "ISSUE_REBORN_RELEASE_AUDIT",
+      "type": "issue",
+      "label": "Remaining Reborn release findings",
+      "claim": "The combined local source still has verified website safety, lifecycle, managed-delivery and intake-acceptance defects listed in the integration audit. A merge is not production readiness.",
+      "status": "confirmed",
+      "lifecycle": "active",
+      "freshness": "current",
+      "realization": "blocked",
+      "evidence": [
+        "SRC_REBORN_MERGE_AUDIT"
+      ],
+      "rationale": "",
+      "premise_ids": [],
+      "details": {
+        "validation": "Resolve each reported reachable defect with focused failure tests, then rehearse representative conversion and the production release checklist.",
+        "authority": "No production action or new commercial promise authorized."
       }
     }
   ],
@@ -5924,8 +6000,8 @@ The ledger below is authoritative; graphs and research reports are derived views
       "affects": [
         "REL_REBORN"
       ],
-      "next_check": "Include only these product-memory changes in a reviewed commit; reconcile canonical revision before branch merge. No commit made in this research task.",
-      "status": "open",
+      "next_check": "Canonical model and .product views were committed on product-model 96f1790a and included in d1010f5e. Preserve unrelated untracked parent ADRs/artifacts; remote reborn state is recorded by the integration receipt.",
+      "status": "resolved",
       "risk": {
         "revision": 5,
         "at": "2026-10-05",
@@ -5940,7 +6016,10 @@ The ledger below is authoritative; graphs and research reports are derived views
           "ADRs 0006-0011 are untracked in the parent repo"
         ],
         "action_not_taken": "Not committed in this update by instruction. Answerable now: commit PRODUCT_MODEL.md, .product/ and the ADRs on a branch from origin/main (git only, not production)."
-      }
+      },
+      "resolution_sources": [
+        "SRC_REBORN_COMBINED"
+      ]
     },
     {
       "id": "Q_SHARED_GRAMMAR_PROOF",
@@ -6609,6 +6688,49 @@ The ledger below is authoritative; graphs and research reports are derived views
         "SRC_ADR_0011",
         "SRC_SEPT30_RELEASE",
         "SRC_MODEL_STORAGE"
+      ]
+    },
+    {
+      "revision": 6,
+      "at": "2026-10-05",
+      "reason": "Reconcile combined Reborn source and independent audit without promoting operating, demand or economic claims. Preserve prior evidence; make remaining release findings and exact continuation explicit.",
+      "added": [
+        "SRC_REBORN_COMBINED",
+        "SRC_REBORN_MERGE_AUDIT",
+        "ISSUE_REBORN_RELEASE_AUDIT"
+      ],
+      "updated": [
+        "PRIM_BUSINESS_RECORD",
+        "STATE_LEADS_REDIS",
+        "RULE_EMAIL_GATE",
+        "COMP_LEADS_TO_RECORD",
+        "PRIM_SYSTEM",
+        "PRIM_SYSTEM_CONNECTION",
+        "PRIM_POSSIBILITY",
+        "PRIM_CONTEXT_VERSION",
+        "ISSUE_SYSTEMS_AUDIT_DEFECTS",
+        "GAP_LEADS_UNSEEN",
+        "Q_MODEL_BACKUP"
+      ],
+      "invalidated": [
+        "COMP_LEADS_TO_RECORD",
+        "ISSUE_SYSTEMS_AUDIT_DEFECTS"
+      ],
+      "retired": [],
+      "reviews": {
+        "overhang": "Combined local rehearsal is newly possible; representative isolated conversion is the decisive next check. No offer change.",
+        "feature_vault": "Existing proposed compositions remain unpromoted; live capability consolidation and activation prerequisites unchanged. No separate feature vault exists.",
+        "product_vault": "No buyer/offer/pricing change; existing proposed futures remain unpromoted. No separate product vault exists."
+      },
+      "resume": {
+        "objective": "Complete integration and verification of business record, durable leads, Systems and supporting fixes into reborn.",
+        "next_action": "After merge, fix the release findings in the integration audit and rehearse scrubbed representative-client conversion with storefront/member/owner proof.",
+        "unknown": "No fresh production/user/economics proof; paid provider, email, schema and deployment authority unchanged.",
+        "record": "docs/operations/reborn-integration-audit-2026-10-05.md"
+      },
+      "sources": [
+        "SRC_REBORN_COMBINED",
+        "SRC_REBORN_MERGE_AUDIT"
       ]
     }
   ]
