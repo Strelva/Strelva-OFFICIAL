@@ -454,6 +454,9 @@ psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 # against the real workspace, website, tenant-link and calendar tables.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261004120000_systems.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/systems-schema.sql"
+# Model-call cost log (one model-call helper, Ask Strelva spec section 5).
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007140000_model_call_log.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/model-call-log-schema.sql"
 
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
