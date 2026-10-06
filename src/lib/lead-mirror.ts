@@ -45,7 +45,7 @@ export interface LeadMirrorInput {
 }
 
 export type LeadMirrorResult =
-  | { status: "recorded" | "exists" | "duplicate"; id: string; workspaceId: string | null }
+  | { status: "recorded" | "exists" | "duplicate"; id: string; workspaceId: string | null; /** For `duplicate`: the lead id Postgres already holds. */ leadId?: string }
   | { status: "skipped"; reason: "disabled" | "unconfigured" }
   | { status: "failed"; reason: LeadMirrorFailureReason };
 
@@ -254,11 +254,11 @@ export async function mirrorLead(
     const outcome = await Promise.race([Promise.resolve(request), timeout]);
     if (outcome === "timeout") return fail("timeout");
     if (outcome.error) return fail(classify(outcome.error));
-    const data = outcome.data as { status?: unknown; id?: unknown; workspaceId?: unknown } | null;
+    const data = outcome.data as { status?: unknown; id?: unknown; workspaceId?: unknown; leadId?: unknown } | null;
     if (!data || (data.status !== "recorded" && data.status !== "exists" && data.status !== "duplicate") || typeof data.id !== "string") {
       return fail("error");
     }
-    return { status: data.status, id: data.id, workspaceId: typeof data.workspaceId === "string" ? data.workspaceId : null };
+    return { status: data.status, id: data.id, workspaceId: typeof data.workspaceId === "string" ? data.workspaceId : null, ...(typeof data.leadId === "string" ? { leadId: data.leadId } : {}) };
   } catch (err) {
     return fail(err instanceof Error && err.name === "AbortError" ? "timeout" : "error");
   } finally {

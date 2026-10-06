@@ -6,8 +6,9 @@ const mocks = vi.hoisted(() => ({
   alertOnce: vi.fn(),
   denied: vi.fn(),
   purge: vi.fn(),
+  parity: vi.fn(),
 }));
-vi.mock("@/lib/client-leads", () => ({ reconcileLeadMirror: mocks.reconcile }));
+vi.mock("@/lib/client-leads", () => ({ reconcileLeadMirror: mocks.reconcile, runLeadReadParity: mocks.parity }));
 vi.mock("@/lib/lead-mirror", () => ({ purgeExpiredTenantLeads: mocks.purge }));
 vi.mock("@/lib/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
 vi.mock("@/lib/monitoring", () => ({ alertOnce: mocks.alertOnce }));
@@ -20,6 +21,26 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.denied.mockReturnValue(null);
   mocks.purge.mockResolvedValue({ status: "purged", purged: 0, tenants: 0 });
+  mocks.parity.mockResolvedValue({ ran: false, checked: 0, inParity: 0, outOfParity: [], failed: [] });
+});
+
+describe("lead read parity in the reconcile cron", () => {
+  it("pages when a tenant is out of parity, and reports the run", async () => {
+    mocks.reconcile.mockResolvedValue({ checked: 0, repaired: 0, failed: 0, missing: 0, remaining: 0 });
+    mocks.parity.mockResolvedValue({ ran: true, checked: 2, inParity: 1, outOfParity: [{ tenant: "t2", missing: 1, mismatched: 0 }], failed: [] });
+    const res = await GET(new Request("http://localhost/api/cron/lead-mirror-reconcile"));
+    expect(res.status).toBe(200);
+    expect((await res.json()).leadParity).toMatchObject({ ran: true, inParity: 1 });
+    expect(mocks.alertOnce).toHaveBeenCalledWith("lead_read_parity_failed", "high", { tenants: 1 }, 6 * 3600);
+  });
+
+  it("a parity failure never fails the cron", async () => {
+    mocks.reconcile.mockResolvedValue({ checked: 0, repaired: 0, failed: 0, missing: 0, remaining: 0 });
+    mocks.parity.mockRejectedValue(new Error("redis down"));
+    const res = await GET(new Request("http://localhost/api/cron/lead-mirror-reconcile"));
+    expect(res.status).toBe(200);
+    expect((await res.json()).leadParity).toMatchObject({ ran: false, failed: [{ tenant: "*", reason: "redis down" }] });
+  });
 });
 
 describe("lead-mirror-reconcile cron", () => {

@@ -31,7 +31,7 @@ import { getTenantConfig, rowToTenant } from "../src/lib/tenants";
 import { getStoredContent } from "../src/lib/storage/content-store";
 import { getBookingConfig, getBookings, getDateOverrides } from "../src/lib/storage/booking-store";
 import { DEFAULT_BOOKING_CONFIG } from "../src/lib/booking";
-import { getLeads } from "../src/lib/leads";
+import { getRedisLeads as getLeads } from "../src/lib/leads";
 import { getAccountForTenant } from "../src/lib/accounts";
 import { billingMonthlyCents, resolveBillingType } from "../src/lib/billing-type";
 import { isGrandfathered } from "../src/lib/subscription";

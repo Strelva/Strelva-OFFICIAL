@@ -531,6 +531,10 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007182000_wor
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-export-v3-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007183000_business_outcomes.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/business-outcomes-schema.sql"
+# Inquiries at 1.0.0 (section 6): Postgres reads for the lead read-source
+# switch, with the parity ledger shared with the client stores.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008140000_tenant_lead_reads.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-lead-reads-schema.sql"
 # Publishing: the business-level Google grant, its locations and a receipt
 # for every Google write. After Systems, because it extends the origin kinds.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007170000_workspace_account_bindings.sql"

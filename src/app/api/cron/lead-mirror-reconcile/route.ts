@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/lib/heartbeat";
-import { reconcileLeadMirror } from "@/lib/client-leads";
+import { reconcileLeadMirror, runLeadReadParity } from "@/lib/client-leads";
 import { purgeExpiredTenantLeads } from "@/lib/lead-mirror";
 import { alertOnce } from "@/lib/monitoring";
 import { requireCronRequest } from "@/lib/cron-auth";
@@ -44,6 +44,14 @@ export async function GET(request: Request) {
     processed: result.checked + clientRecords.checked,
     failed: result.failed + result.missing + clientRecords.failed,
   });
+  // The lead read-switch parity check (inquiry 1.0 delta, section 6). A no-op
+  // unless STRELVA_LEADS_READ is compare or postgres. Never fails the cron.
+  const leadParity = await runLeadReadParity().catch((error: unknown) => ({
+    ran: false, checked: 0, inParity: 0, outOfParity: [], failed: [{ tenant: "*", reason: error instanceof Error ? error.message : String(error) }],
+  }));
+  if (leadParity.outOfParity.length > 0) {
+    await alertOnce("lead_read_parity_failed", "high", { tenants: leadParity.outOfParity.length }, 6 * 3600);
+  }
   const retention = await purgeExpiredTenantLeads(1000);
-  return NextResponse.json({ ...result, clientRecords, retention });
+  return NextResponse.json({ ...result, clientRecords, leadParity, retention });
 }

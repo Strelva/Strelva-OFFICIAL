@@ -18,7 +18,7 @@
  */
 import { getSupabase } from "../src/lib/db/client";
 import { getAllTenants } from "../src/lib/tenants";
-import { getLeads, leadSubmissionHash } from "../src/lib/leads";
+import { getRedisLeads as getLeads, leadSubmissionHash } from "../src/lib/leads";
 import { clearLeadMirrorPending, mirrorLead } from "../src/lib/lead-mirror";
 import { parseBackfillArgs, runLeadBackfill, type BackfillTenant } from "./tenant-lead-backfill";
 
