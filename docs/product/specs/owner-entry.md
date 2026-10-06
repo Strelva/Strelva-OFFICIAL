@@ -27,8 +27,9 @@ Requirement 10 (magic-link claim) and the rest are not built.
 
 Built and proven locally on `w2/owner-surfaces-a` (Oct 6): workspace homes
 for `/`, `/review`, `/leads`, `/reviews`, `/analytics` (and `/health`) and
-`/settings` (and `/ownership`), each marked `ready` with its parity gaps in
-`dispositions.ts`. Every home reads through `tenant_workspace_links`
+`/settings` (and `/ownership`), each with its parity gaps in `dispositions.ts`.
+All are `ready` except `/settings`, which stays on `/dashboard` (Oct 6) until
+owners can edit branding, site basics and domains in the workspace. Every home reads through `tenant_workspace_links`
 (`read_workspace_tenant_links`, direct members only) and then applies the
 `/dashboard` tenant check (`hasDashboardViewAccess`) per linked site; a site
 that fails it is named and not read
@@ -263,7 +264,7 @@ The other pages are reached from inside those.
 | `/analytics` Live traffic, milestone, AI visibility | Website results and health, `/workspace/results` (`?range=` kept) | **Ready** (`w2/owner-surfaces-a`). Same reads as the old page; Search Console and GA4 through `tenant_analytics_config`; latest scan as site health | Parity gaps: site health is the scan summary, not the interactive audit card; no custom date picker; no Ask Strelva hand-offs; not yet a panel on the Website System page |
 | `/review` Approval queue | Needs you, on Home | **Ready** while Needs you is on (`w2/owner-surfaces-a`) | Parity gaps: no edit-before-approve, resolved history or stale-section count; operator queue controls stay on `/dashboard/review?legacy=1` |
 | `/reviews` Reviews and replies | Google listing: Reviews, `/workspace/reviews` | **Ready** (`w2/owner-surfaces-a`). Reviews, existing replies, Strelva's waiting draft, reply through `/api/workspace/reviews/reply` (same governed path as `/api/reviews/reply`, plus `requireTenantAccess`), review request link | Parity gaps: no reply-voice settings or AI draft button; no copy buttons; reads the tenant review store, not Publishing's listing receipts |
-| `/settings` | Business details, `/workspace/business-details`, with a section for every old `#anchor` linking on to People and access, account, plan/ownership and the website | **Ready** (`w2/owner-surfaces-a`). Owner (or a Strelva operator as admin) edits name, phone, public email, description and the owner recipient in the business record, revision-checked | Parity gaps: no branding, site basics, navigation, connected services or domain editing; tenant profile fields don't change; billing still has no `workspaceId` |
+| `/settings` | Business details, `/workspace/business-details`, with a section for every old `#anchor` linking on to People and access, account, plan/ownership and the website | **Stay** (Oct 6: the home is built on `w2/owner-surfaces-a`, but `/dashboard/settings` keeps serving until branding, site basics and domains are editable here). Owner (or a Strelva operator as admin) edits name, phone, public email, description and the owner recipient in the business record, revision-checked | Parity gaps: no branding, site basics, navigation, connected services or domain editing; tenant profile fields don't change; billing still has no `workspaceId` |
 | `/store` (gldf) | **Frozen** on `/dashboard`; the website System shows a Store *Connection* (systems catalog §3.2, decision 9.4) | Frozen | None at 1.0.0 |
 | `[...notFound]` | Home | n/a | Map · S |
 
