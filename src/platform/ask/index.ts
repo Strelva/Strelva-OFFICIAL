@@ -5,6 +5,7 @@ export * from "./resolution";
 export * from "./ports";
 export * from "./tools";
 export * from "./turn";
+export * from "./history";
 
 /**
  * Ask Strelva has its own off-by-default flag, on top of the workspace and
