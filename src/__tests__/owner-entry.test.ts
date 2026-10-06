@@ -147,7 +147,7 @@ describe("routing a /dashboard request", () => {
   });
 
   it("renders a page that stays, with a way back to the workspace", () => {
-    for (const path of ["/dashboard", "/dashboard/reports", "/dashboard/review", "/dashboard/site", "/dashboard/content"]) {
+    for (const path of ["/dashboard", "/dashboard/review", "/dashboard/site", "/dashboard/content"]) {
       const routing = routeDashboardRequest({ decision: moved, pathWithSearch: path });
       expect(routing.kind, path).toBe("render-with-back");
       if (routing.kind === "render-with-back") expect(routing.homeHref).toBe(`/workspace?workspaceId=${WS}`);

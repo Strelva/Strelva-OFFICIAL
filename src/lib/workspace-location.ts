@@ -11,6 +11,15 @@ const INQUIRY_VIEWS = new Set(["home", "new", "shape", "work", "plan", "preview"
 export function workspaceReturnTarget(value: string | null): string | null {
   if (value === "/workspace/account?continue=public") return value;
   if (value?.startsWith("/workspace/delivery/") && /^\/workspace\/delivery\/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value)) return value;
+  if (value?.startsWith("/workspace/recaps?")) {
+    const target = new URL(value, "https://workspace.invalid");
+    const workspaceId = target.searchParams.get("workspaceId");
+    const period = target.searchParams.get("period");
+    const allowed = [...target.searchParams.keys()].every((key) => key === "workspaceId" || key === "period");
+    if (target.hash || target.pathname !== "/workspace/recaps" || !allowed || target.searchParams.getAll("workspaceId").length !== 1
+      || !workspaceId || !UUID.test(workspaceId) || target.searchParams.getAll("period").length > 1 || (period !== null && period !== "week" && period !== "month")) return null;
+    return `${target.pathname}?${target.searchParams}`;
+  }
   if (value?.startsWith("/workspace/business/new?") || value?.startsWith("/workspace/delivery?")) {
     const target = new URL(value, "https://workspace.invalid");
     if (target.hash || target.searchParams.size !== 1) return null;

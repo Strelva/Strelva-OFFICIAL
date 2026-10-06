@@ -109,8 +109,9 @@ export const DASHBOARD_DISPOSITIONS: readonly DashboardDisposition[] = [
     note: "Part of Bookings; waits on the one booking store.", target: (c) => workspaceHome(c.workspaceId, { view: "scheduling" }) },
   { route: "/ownership", home: "Business details, ownership", state: "retire", retiresTo: "/settings", use: "always",
     target: (c) => workspaceHome(c.workspaceId, { view: "settings" }) },
-  { route: "/reports", home: "Home, Recent: weekly and monthly recaps", state: "stay", use: "always",
-    note: "No recap view in the workspace yet.", target: home },
+  { route: "/reports", home: "Recaps, under Home's Recent (/workspace/recaps)", state: "ready", use: "always",
+    // `?view=monthly` on the old page keeps its meaning.
+    target: (c) => `/workspace/recaps?${new URLSearchParams({ workspaceId: c.workspaceId, ...(c.search.get("view") === "monthly" ? { period: "month" } : c.search.get("view") === "weekly" ? { period: "week" } : {}) })}` },
   { route: "/analytics", home: "Website System, results and health", state: "stay", use: "always",
     note: "No results panel on the Website System yet.", target: websiteSystemHome },
   { route: "/review", home: "Needs you", state: "stay", use: "always",

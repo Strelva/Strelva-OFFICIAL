@@ -221,6 +221,28 @@ begin
 end;
 $$;
 
+-- The managed sites linked to a business, for a direct member of that
+-- business. Workspace places that read tenant-side data (recaps first) go
+-- through this link, never through a tenant membership. An agency or a
+-- stranger is refused; another business's tenants never appear.
+create function public.read_workspace_tenant_links(p_workspace_id uuid, p_user_id uuid, p_verified_email text) returns jsonb
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+begin
+  if p_workspace_id is null or p_user_id is null or not exists (select 1 from public.users
+      where id = p_user_id and lower(email) = lower(btrim(coalesce(p_verified_email, ''))) and verified_at is not null)
+    or not exists (select 1 from public.workspace_memberships m join public.workspaces w on w.id = m.workspace_id
+      where m.workspace_id = p_workspace_id and m.user_id = p_user_id and w.kind = 'customer') then
+    raise exception 'workspace_access_denied';
+  end if;
+  return coalesce((select jsonb_agg(jsonb_build_object('tenantId', t.id, 'tenantStableId', t.stable_id, 'linkedAt', l.linked_at)
+      order by l.linked_at, l.id)
+    from public.tenant_workspace_links l join public.tenants t on t.stable_id = l.tenant_stable_id
+    where l.workspace_id = p_workspace_id), '[]'::jsonb);
+end;
+$$;
+
+revoke all on function public.read_workspace_tenant_links(uuid, uuid, text) from public, anon, authenticated;
+grant execute on function public.read_workspace_tenant_links(uuid, uuid, text) to service_role;
 revoke all on function public.workspace_release_flag_names() from public, anon, authenticated;
 revoke all on function public.workspace_release_flag_change_immutable() from public, anon, authenticated, service_role;
 revoke all on function public.workspace_release_assert_operator(text) from public, anon, authenticated, service_role;

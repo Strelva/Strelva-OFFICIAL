@@ -90,11 +90,12 @@ const VALIDATION: Record<string, string> = {
   workspace_release_limit_invalid: "Ask for between 1 and 200 changes.",
 };
 
-async function call<T>(name: string, args: Record<string, unknown>, schema: z.ZodType<T>, fallback: string): Promise<T> {
+/** Shared by readers in this migration family (release flags, linked sites). */
+export async function callReleaseFlagsRpc<T>(name: string, args: Record<string, unknown>, schema: z.ZodType<T>, fallback: string): Promise<T> {
   const { data, error } = await db().rpc(name, args);
   if (error) {
     const detail = `${error.code ?? ""} ${error.message ?? ""}`;
-    if (detail.includes("workspace_release_operator_required")) throw new WorkspaceAccessError();
+    if (detail.includes("workspace_release_operator_required") || detail.includes("workspace_access_denied")) throw new WorkspaceAccessError();
     if (detail.includes("workspace_release_revision_conflict")) throw new ReleaseFlagConflictError();
     for (const [code, message] of Object.entries(VALIDATION)) if (detail.includes(code)) throw new ReleaseFlagValidationError(code, message);
     throw new WorkspaceStoreError(fallback);
@@ -114,7 +115,7 @@ export async function readWorkspaceReleaseFlags(workspaceId: string, options: { 
   const now = options.now ?? Date.now();
   const hit = cache.get(id);
   if (!options.fresh && hit && now - hit.at >= 0 && now - hit.at < RELEASE_FLAG_CACHE_MS) return hit.value;
-  const value = await call("read_workspace_release_flags", { p_workspace_id: id }, workspaceReleaseFlagsSchema, "The release flags could not be read.");
+  const value = await callReleaseFlagsRpc("read_workspace_release_flags", { p_workspace_id: id }, workspaceReleaseFlagsSchema, "The release flags could not be read.");
   cache.set(id, { at: now, value });
   return value;
 }
@@ -156,7 +157,7 @@ export async function setWorkspaceReleaseFlag(input: {
   operatorEmail: string; workspaceId: string; flag: ReleaseFlag; state: ReleaseFlagRowState | "unset"; reason: string; expectedRevision: number;
 }): Promise<WorkspaceReleaseFlags> {
   if (!RELEASE_FLAGS.includes(input.flag)) throw new ReleaseFlagValidationError("workspace_release_flag_unknown", VALIDATION.workspace_release_flag_unknown!);
-  const value = await call("set_workspace_release_flag", {
+  const value = await callReleaseFlagsRpc("set_workspace_release_flag", {
     p_operator_email: operatorEmail(input.operatorEmail),
     p_workspace_id: uuid.parse(input.workspaceId),
     p_flag: input.flag,
@@ -171,7 +172,7 @@ export async function setWorkspaceReleaseFlag(input: {
 export async function setWorkspaceReleaseTester(input: {
   operatorEmail: string; workspaceId: string; testerEmail: string; present: boolean; reason: string;
 }): Promise<WorkspaceReleaseFlags> {
-  const value = await call("set_workspace_release_tester", {
+  const value = await callReleaseFlagsRpc("set_workspace_release_tester", {
     p_operator_email: operatorEmail(input.operatorEmail),
     p_workspace_id: uuid.parse(input.workspaceId),
     p_tester_email: z.string().email().parse(input.testerEmail.trim().toLowerCase()),
@@ -183,14 +184,14 @@ export async function setWorkspaceReleaseTester(input: {
 }
 
 export async function readWorkspaceReleaseFlagHistory(operator: string, workspaceId: string, limit = 20): Promise<ReleaseFlagChange[]> {
-  return call("read_workspace_release_flag_history", {
+  return callReleaseFlagsRpc("read_workspace_release_flag_history", {
     p_operator_email: operatorEmail(operator), p_workspace_id: uuid.parse(workspaceId), p_limit: z.number().int().min(1).max(200).parse(limit),
   }, z.array(releaseFlagChangeSchema), "The release flag history could not be read.");
 }
 
 /** Never cached: membership must be current for every redirect. */
 export async function resolveTenantOwnerEntry(tenantId: string, actor: WorkspaceActor): Promise<OwnerEntryResolution> {
-  return call("resolve_tenant_owner_entry", {
+  return callReleaseFlagsRpc("resolve_tenant_owner_entry", {
     p_tenant_id: z.string().min(1).max(120).parse(tenantId),
     p_user_id: uuid.parse(actor.userId),
     p_verified_email: z.string().email().parse(actor.verifiedEmail.trim().toLowerCase()),

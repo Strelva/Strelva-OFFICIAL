@@ -136,6 +136,17 @@ select pg_temp.rf_assert(not (public.resolve_tenant_owner_entry('rf-harbor', '7f
 select pg_temp.rf_assert(public.set_workspace_release_tester('rf-operator@example.test', '7f000000-0000-4000-8000-000000000010', 'rf-tester@example.test', false, 'Preview over')
   -> 'testers' = '[]'::jsonb, 'tester removed');
 
+-- Linked sites for a workspace member: only that business's tenants.
+select pg_temp.rf_assert(not has_function_privilege('authenticated', 'public.read_workspace_tenant_links(uuid,uuid,text)', 'EXECUTE')
+  and has_function_privilege('service_role', 'public.read_workspace_tenant_links(uuid,uuid,text)', 'EXECUTE'), 'only service_role reads links');
+select pg_temp.rf_assert(public.read_workspace_tenant_links('7f000000-0000-4000-8000-000000000010', '7f000000-0000-4000-8000-000000000003', 'rf-member@example.test') #>> '{0,tenantId}' = 'rf-lakeshore'
+  and jsonb_array_length(public.read_workspace_tenant_links('7f000000-0000-4000-8000-000000000010', '7f000000-0000-4000-8000-000000000003', 'rf-member@example.test')) = 1,
+  'member reads exactly their business''s linked site');
+select pg_temp.rf_expect($$select public.read_workspace_tenant_links('7f000000-0000-4000-8000-000000000011', '7f000000-0000-4000-8000-000000000002', 'rf-owner@example.test')$$, '%workspace_access_denied%');
+select pg_temp.rf_expect($$select public.read_workspace_tenant_links('7f000000-0000-4000-8000-000000000010', '7f000000-0000-4000-8000-000000000002', 'rf-member@example.test')$$, '%workspace_access_denied%');
+select pg_temp.rf_expect($$select public.read_workspace_tenant_links('7f000000-0000-4000-8000-000000000010', '7f000000-0000-4000-8000-000000000006', 'rf-unverified@example.test')$$, '%workspace_access_denied%');
+select pg_temp.rf_expect($$select public.read_workspace_tenant_links('7f000000-0000-4000-8000-000000000010', '7f000000-0000-4000-8000-000000000005', 'rf-tester@example.test')$$, '%workspace_access_denied%');
+
 -- Unset removes the row and records it; rollback from on to off is one call.
 select pg_temp.rf_assert(public.set_workspace_release_flag('rf-operator@example.test', '7f000000-0000-4000-8000-000000000010', 'owner_entry', 'off', 'Store page broke', 2)
   #>> '{flags,owner_entry,state}' = 'off', 'rolled back to off');

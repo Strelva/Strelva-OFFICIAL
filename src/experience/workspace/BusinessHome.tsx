@@ -182,6 +182,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
       {showRequests ? <><section className={styles.section} aria-labelledby="home-handled">
         <header className={styles.sectionHeader}><h2 id="home-handled"><CheckCircle2 size={18} aria-hidden="true" />Strelva handled</h2></header>
         {busy || deliveryPending ? <p role="status" className={styles.muted}>Checking what finished…</p> : handled.length ? <ul className={styles.list}>{handled.map(row => requestRow(row))}</ul> : <p className={styles.muted}>Nothing finished yet. When Strelva or your agency finishes something, it appears here with what changed.</p>}
+        {current?.kind === "customer" && sites.length ? <a className={styles.textAction} href={`${appBase}/workspace/recaps?workspaceId=${encodeURIComponent(snapshot.workspaceId)}`}>Weekly and monthly recaps<ArrowRight size={16} aria-hidden="true" /></a> : null}
       </section>
 
       <section className={styles.section} aria-labelledby="home-progress">
