@@ -21,7 +21,9 @@ select pg_temp.sy_assert(
   and not has_function_privilege('authenticated', 'public.create_business_system(uuid,uuid,text,jsonb,uuid,text)', 'EXECUTE')
   and not has_function_privilege('authenticated', 'public.connect_system(uuid,uuid,text,jsonb,uuid,text)', 'EXECUTE')
   and not has_function_privilege('anon', 'public.read_existing_business_systems(uuid,uuid,text)', 'EXECUTE')
-  and not has_function_privilege('service_role', 'public.system_load(uuid,uuid,boolean)', 'EXECUTE')
+  and not has_function_privilege('service_role', 'public.system_load(uuid,uuid,boolean,uuid[])', 'EXECUTE')
+  and not has_function_privilege('service_role', 'public.system_actor_scope(uuid,uuid,text,boolean)', 'EXECUTE')
+  and not has_function_privilege('service_role', 'public.business_record_agency_work_ids(uuid,uuid,text,boolean)', 'EXECUTE')
   and not has_function_privilege('service_role', 'public.system_json(public.systems)', 'EXECUTE')
   and has_function_privilege('service_role', 'public.read_business_systems(uuid,uuid,text)', 'EXECUTE')
   and has_function_privilege('service_role', 'public.create_business_system(uuid,uuid,text,jsonb,uuid,text)', 'EXECUTE')
@@ -378,6 +380,163 @@ select pg_temp.sy_assert((select lifecycle from public.systems where id = (selec
 select pg_temp.sy_assert(not exists (
   select 1 from public.systems s join public.saved_product_work w on s.origin_kind = 'saved_work' and s.origin_ref = w.id::text
   where w.product_id = 'scheduling' and s.lifecycle in ('live','paused') and (s.lifecycle = 'paused') <> (w.payload ? 'pause')), 'no booking System disagrees with its schedule');
+
+-- Agency scope. An agency is not a member of the business; it reaches only
+-- the Systems tied to the exact work it was delegated or assigned. Direct
+-- members keep the whole business.
+insert into public.users(id, email, verified_at) values
+  ('5e000000-0000-4000-8000-000000000005', 'sy-agency@example.test', now()),
+  ('5e000000-0000-4000-8000-000000000006', 'sy-delegate@example.test', now()),
+  ('5e000000-0000-4000-8000-000000000007', 'sy-expired@example.test', now());
+insert into public.workspaces(id, kind, name, created_by) values
+  ('5e000000-0000-4000-8000-000000000015', 'agency', 'Assigned Agency', '5e000000-0000-4000-8000-000000000005'),
+  ('5e000000-0000-4000-8000-000000000016', 'agency', 'Delegated Agency', '5e000000-0000-4000-8000-000000000006'),
+  ('5e000000-0000-4000-8000-000000000017', 'agency', 'Expired Agency', '5e000000-0000-4000-8000-000000000007');
+insert into public.workspace_memberships(workspace_id, user_id, role, created_by) values
+  ('5e000000-0000-4000-8000-000000000015', '5e000000-0000-4000-8000-000000000005', 'owner', '5e000000-0000-4000-8000-000000000005'),
+  ('5e000000-0000-4000-8000-000000000016', '5e000000-0000-4000-8000-000000000006', 'owner', '5e000000-0000-4000-8000-000000000006'),
+  ('5e000000-0000-4000-8000-000000000017', '5e000000-0000-4000-8000-000000000007', 'owner', '5e000000-0000-4000-8000-000000000007');
+-- An approved responsibility whose steps are the website (a2) and the Orders
+-- tracker (a3), assigned to the agency with an accepted provider delivery.
+insert into public.saved_product_work(id, workspace_id, product_id, resource_kind, title, payload, created_by) values
+  ('5e000000-0000-4000-8000-0000000001a1', '5e000000-0000-4000-8000-000000000010', 'operations', 'responsibility', 'Run the site',
+   '{"ownerId":"5e000000-0000-4000-8000-000000000001","approvedBy":"5e000000-0000-4000-8000-000000000001","approvedAt":"2026-10-01T12:00:00Z",
+     "steps":[{"id":"site","workId":"5e000000-0000-4000-8000-0000000000a2"},{"id":"orders","workId":"5e000000-0000-4000-8000-0000000000a3"}]}',
+   '5e000000-0000-4000-8000-000000000001'),
+  ('5e000000-0000-4000-8000-0000000001a2', '5e000000-0000-4000-8000-000000000010', 'operations', 'responsibility', 'Old engagement',
+   '{"ownerId":"5e000000-0000-4000-8000-000000000001","approvedBy":"5e000000-0000-4000-8000-000000000001","approvedAt":"2026-09-01T12:00:00Z",
+     "steps":[{"id":"orders","workId":"5e000000-0000-4000-8000-0000000000a3"}]}',
+   '5e000000-0000-4000-8000-000000000001');
+insert into public.operational_assignments(id, workspace_id, work_id, sponsor_id, sponsor_email, assignee_user_id, assignee_email, assignee_kind,
+    assignee_workspace_id, offer_key, work_scope, status, offered_at, accepted_at, expires_at) values
+  ('5e000000-0000-4000-8000-0000000001b1', '5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-0000000001a1',
+   '5e000000-0000-4000-8000-000000000001', 'sy-owner@example.test', '5e000000-0000-4000-8000-000000000005', 'sy-agency@example.test', 'agency',
+   '5e000000-0000-4000-8000-000000000015', 'sy-offer', '{}', 'accepted', clock_timestamp(), clock_timestamp(), clock_timestamp() + interval '7 days'),
+  ('5e000000-0000-4000-8000-0000000001b2', '5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-0000000001a2',
+   '5e000000-0000-4000-8000-000000000001', 'sy-owner@example.test', '5e000000-0000-4000-8000-000000000007', 'sy-expired@example.test', 'agency',
+   '5e000000-0000-4000-8000-000000000017', 'sy-offer-old', '{}', 'accepted', clock_timestamp() - interval '30 days', clock_timestamp() - interval '29 days',
+   clock_timestamp() - interval '1 day');
+insert into public.offering_installations(id, business_workspace_id, definition_id, definition_version, native_resources, responsibility,
+    accepted_scope, surface_ids, idempotency_key, command_digest, installed_by, updated_by) values
+  ('5e000000-0000-4000-8000-0000000001c1', '5e000000-0000-4000-8000-000000000010', 'systems_agency_fixture', '1.0.0',
+   '[{"id":"5e000000-0000-4000-8000-0000000000a2"},{"id":"5e000000-0000-4000-8000-0000000000a3"}]',
+   '{"kind":"provider_requested","providerKind":"agency","agencyWorkspaceId":"5e000000-0000-4000-8000-000000000015"}',
+   array['operate'], array['workspace'], 'sy-install', repeat('a', 64), '5e000000-0000-4000-8000-000000000001', '5e000000-0000-4000-8000-000000000001'),
+  ('5e000000-0000-4000-8000-0000000001c2', '5e000000-0000-4000-8000-000000000010', 'systems_agency_fixture_old', '1.0.0',
+   '[{"id":"5e000000-0000-4000-8000-0000000000a3"}]',
+   '{"kind":"provider_requested","providerKind":"agency","agencyWorkspaceId":"5e000000-0000-4000-8000-000000000017"}',
+   array['operate'], array['workspace'], 'sy-install-old', repeat('a', 64), '5e000000-0000-4000-8000-000000000001', '5e000000-0000-4000-8000-000000000001');
+insert into public.offering_provider_deliveries(id, business_workspace_id, installation_id, assignment_id, status, scope, idempotency_key,
+    command_digest, requested_by, expires_at, accepted_by, accepted_at, history) values
+  ('5e000000-0000-4000-8000-0000000001d1', '5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-0000000001c1',
+   '5e000000-0000-4000-8000-0000000001b1', 'accepted', array['operate'], 'sy-delivery', repeat('a', 64),
+   '5e000000-0000-4000-8000-000000000001', clock_timestamp() + interval '7 days', '5e000000-0000-4000-8000-000000000005', clock_timestamp(), '[]'),
+  ('5e000000-0000-4000-8000-0000000001d2', '5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-0000000001c2',
+   '5e000000-0000-4000-8000-0000000001b2', 'accepted', array['operate'], 'sy-delivery-old', repeat('a', 64),
+   '5e000000-0000-4000-8000-000000000001', clock_timestamp() + interval '7 days', '5e000000-0000-4000-8000-000000000007', clock_timestamp(), '[]');
+-- A read-only delegation of the Fittings schedule (f1), and a public booking grant on it.
+insert into public.workspace_delegations(customer_workspace_id, customer_work_id, agency_workspace_id, granted_by, accepted_by) values
+  ('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-0000000000f1', '5e000000-0000-4000-8000-000000000016',
+   '5e000000-0000-4000-8000-000000000001', '5e000000-0000-4000-8000-000000000006');
+insert into public.public_website_booking_grants(tenant_stable_id, business_workspace_id, work_id, capability_id, capability_version,
+    inquiry_capability_id, inquiry_version, provider, display_name, time_zone, published_by) values
+  ('5e000000-0000-4000-8000-0000000000b2', '5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-0000000000f1', 'fittings', 1,
+   'contact', 1, 'google', 'Fittings', 'America/New_York', '5e000000-0000-4000-8000-000000000001');
+-- Stored Systems the owner adopts: Orders (a3), the native site's tenant (b1),
+-- and two connections from Orders, one to the site and one to the proposal.
+insert into sy_ids select 'orders', (public.create_business_system('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000001',
+  'sy-owner@example.test', '{"name":"Orders","kind":"tracker","origin":{"kind":"saved_work","ref":"5e000000-0000-4000-8000-0000000000a3"}}',
+  '5e000000-0000-4000-8000-0000000002c1', repeat('1', 64))->>'id')::uuid;
+insert into sy_ids select 'site', (public.create_business_system('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000001',
+  'sy-owner@example.test', '{"name":"Juniper site","kind":"website","origin":{"kind":"tenant","ref":"5e000000-0000-4000-8000-0000000000b1"}}',
+  '5e000000-0000-4000-8000-0000000002c2', repeat('1', 64))->>'id')::uuid;
+insert into sy_ids select 'orders_to_site', (public.connect_system('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000001', 'sy-owner@example.test',
+  jsonb_build_object('source', jsonb_build_object('businessId', '5e000000-0000-4000-8000-000000000010', 'systemId', (select id from sy_ids where name = 'orders')),
+    'kind', 'appear', 'target', jsonb_build_object('type', 'system', 'system', jsonb_build_object('businessId', '5e000000-0000-4000-8000-000000000010',
+    'systemId', (select id from sy_ids where name = 'site')))), '5e000000-0000-4000-8000-0000000002c3', repeat('1', 64))->>'id')::uuid;
+insert into sy_ids select 'orders_to_proposal', (public.connect_system('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000001', 'sy-owner@example.test',
+  jsonb_build_object('source', jsonb_build_object('businessId', '5e000000-0000-4000-8000-000000000010', 'systemId', (select id from sy_ids where name = 'orders')),
+    'kind', 'read', 'target', jsonb_build_object('type', 'system', 'system', jsonb_build_object('businessId', '5e000000-0000-4000-8000-000000000010',
+    'systemId', (select id from sy_ids where name = 'proposal')))), '5e000000-0000-4000-8000-0000000002c4', repeat('1', 64))->>'id')::uuid;
+
+-- A direct member still sees the whole business.
+do $$ declare e jsonb; g jsonb; begin
+  e := public.read_existing_business_systems('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000002', 'sy-member@example.test');
+  perform pg_temp.sy_assert(e->>'scope' = 'business', 'member scope is the business');
+  perform pg_temp.sy_assert((select array_agg(x->>'id' order by x->>'id') from jsonb_array_elements(e->'savedWork') x)
+    = array['5e000000-0000-4000-8000-0000000000a2', '5e000000-0000-4000-8000-0000000000a3', '5e000000-0000-4000-8000-0000000000a6',
+      '5e000000-0000-4000-8000-0000000000f1'], 'member sees every saved work row the projection maps');
+  perform pg_temp.sy_assert(jsonb_array_length(e->'inquiryWorkspaces') >= 1 and jsonb_array_length(e->'bookingGrants') = 1
+    and jsonb_array_length(e->'calendarConnections') = 1 and jsonb_array_length(e->'managedWebsites') >= 2, 'member sees inquiries, grants, calendars and sites');
+  g := public.read_business_systems('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000002', 'sy-member@example.test');
+  perform pg_temp.sy_assert(exists (select 1 from jsonb_array_elements(g->'systems') x where (x->>'id')::uuid = (select id from sy_ids where name = 'proposal'))
+    and exists (select 1 from jsonb_array_elements(g->'connections') x where (x->>'id')::uuid = (select id from sy_ids where name = 'orders_to_proposal')),
+    'member sees the proposal and every connection');
+end $$;
+
+-- The assigned agency sees exactly its assigned work: the site (a2, with its
+-- tenant b1) and Orders (a3). Not the other sites, inquiries, the booking
+-- grant on undelegated work, the calendar connection or other stored Systems.
+do $$ declare e jsonb; g jsonb; begin
+  e := public.read_existing_business_systems('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000005', 'sy-agency@example.test');
+  perform pg_temp.sy_assert(e->>'scope' = 'assigned', 'agency scope is its assigned work');
+  perform pg_temp.sy_assert((select array_agg(x->>'id' order by x->>'id') from jsonb_array_elements(e->'savedWork') x)
+    = array['5e000000-0000-4000-8000-0000000000a2', '5e000000-0000-4000-8000-0000000000a3'], 'agency sees only its assigned saved work');
+  perform pg_temp.sy_assert((select array_agg(x->>'tenantStableId') from jsonb_array_elements(e->'managedWebsites') x)
+    = array['5e000000-0000-4000-8000-0000000000b1'], 'agency sees only the site its work hosts');
+  perform pg_temp.sy_assert(jsonb_array_length(e->'inquiryWorkspaces') = 0, 'agency sees no inquiry handling');
+  perform pg_temp.sy_assert(jsonb_array_length(e->'bookingGrants') = 0, 'agency sees no booking grant on undelegated work');
+  perform pg_temp.sy_assert(jsonb_array_length(e->'calendarConnections') = 0, 'agency sees no calendar connection');
+  g := public.read_business_systems('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000005', 'sy-agency@example.test');
+  perform pg_temp.sy_assert((select array_agg((x->>'id')::uuid order by x->>'id') from jsonb_array_elements(g->'systems') x)
+    = (select array_agg(id order by id::text) from sy_ids where name in ('orders', 'site')), 'agency sees only the Systems of its work');
+  perform pg_temp.sy_assert((select array_agg((x->>'id')::uuid) from jsonb_array_elements(g->'connections') x)
+    = array[(select id from sy_ids where name = 'orders_to_site')], 'agency sees only connections inside its scope');
+end $$;
+select pg_temp.sy_expect(format($$select public.read_business_system('5e000000-0000-4000-8000-000000000010','5e000000-0000-4000-8000-000000000005','sy-agency@example.test',%L)$$, (select id from sy_ids where name = 'proposal')), 'system_not_found');
+select pg_temp.sy_expect(format($$select public.read_business_system('5e000000-0000-4000-8000-000000000010','5e000000-0000-4000-8000-000000000005','sy-agency@example.test',%L)$$, (select id from sy_ids where name = 'booking')), 'system_not_found');
+select pg_temp.sy_assert(public.read_business_system('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000005', 'sy-agency@example.test',
+  (select id from sy_ids where name = 'orders'))->'system'->>'name' = 'Orders', 'agency opens its own System');
+-- It writes only inside that work.
+select pg_temp.sy_assert(public.update_business_system('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000005', 'sy-agency@example.test',
+  (select id from sy_ids where name = 'orders'), 1, '{"purpose":"Track catering orders"}')->>'purpose' = 'Track catering orders', 'agency updates its assigned System');
+select pg_temp.sy_expect(format($$select public.update_business_system('5e000000-0000-4000-8000-000000000010','5e000000-0000-4000-8000-000000000005','sy-agency@example.test',%L,%s,'{"name":"Taken"}')$$,
+  (select id from sy_ids where name = 'proposal'), (select change_number from public.systems where id = (select id from sy_ids where name = 'proposal'))), 'system_not_found');
+select pg_temp.sy_expect($$select public.create_business_system('5e000000-0000-4000-8000-000000000010','5e000000-0000-4000-8000-000000000005','sy-agency@example.test','{"name":"Loose","kind":"report"}','5e000000-0000-4000-8000-0000000002c5',repeat('1',64))$$, 'business_record_access_denied');
+select pg_temp.sy_expect($$select public.create_business_system('5e000000-0000-4000-8000-000000000010','5e000000-0000-4000-8000-000000000005','sy-agency@example.test','{"name":"A plan","kind":"plan","origin":{"kind":"saved_work","ref":"5e000000-0000-4000-8000-0000000000a4"}}','5e000000-0000-4000-8000-0000000002c6',repeat('1',64))$$, 'business_record_access_denied');
+select pg_temp.sy_expect(format($$select public.connect_system('5e000000-0000-4000-8000-000000000010','5e000000-0000-4000-8000-000000000005','sy-agency@example.test',%L,'5e000000-0000-4000-8000-0000000002c7',repeat('1',64))$$,
+  jsonb_build_object('source', jsonb_build_object('businessId', '5e000000-0000-4000-8000-000000000010', 'systemId', (select id from sy_ids where name = 'orders')),
+    'kind', 'trigger', 'target', jsonb_build_object('type', 'system', 'system', jsonb_build_object('businessId', '5e000000-0000-4000-8000-000000000010',
+    'systemId', (select id from sy_ids where name = 'booking'))))), 'system_connection_target_missing');
+select pg_temp.sy_expect(format($$select public.set_system_connection_state('5e000000-0000-4000-8000-000000000010','5e000000-0000-4000-8000-000000000005','sy-agency@example.test',%L,'disconnected')$$,
+  (select id from sy_ids where name = 'orders_to_proposal')), 'system_not_found');
+
+-- A read-only delegation of one schedule shows that schedule's System and its
+-- booking grant, and nothing else; it never writes.
+do $$ declare e jsonb; g jsonb; begin
+  e := public.read_existing_business_systems('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000006', 'sy-delegate@example.test');
+  perform pg_temp.sy_assert((select array_agg(x->>'id') from jsonb_array_elements(e->'savedWork') x)
+    = array['5e000000-0000-4000-8000-0000000000f1'], 'delegate sees only the delegated schedule');
+  perform pg_temp.sy_assert((select array_agg(x->>'workId') from jsonb_array_elements(e->'bookingGrants') x)
+    = array['5e000000-0000-4000-8000-0000000000f1'], 'delegate sees the booking grant on its schedule');
+  perform pg_temp.sy_assert(jsonb_array_length(e->'managedWebsites') = 0 and jsonb_array_length(e->'inquiryWorkspaces') = 0
+    and jsonb_array_length(e->'calendarConnections') = 0, 'delegate sees no sites, inquiries or calendars');
+  g := public.read_business_systems('5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000006', 'sy-delegate@example.test');
+  perform pg_temp.sy_assert((select array_agg((x->>'id')::uuid) from jsonb_array_elements(g->'systems') x)
+    = array[(select id from sy_ids where name = 'booking')], 'delegate sees only the delegated work''s System');
+end $$;
+select pg_temp.sy_expect(format($$select public.update_business_system('5e000000-0000-4000-8000-000000000010','5e000000-0000-4000-8000-000000000006','sy-delegate@example.test',%L,%s,'{"name":"Taken"}')$$,
+  (select id from sy_ids where name = 'booking'), (select change_number from public.systems where id = (select id from sy_ids where name = 'booking'))), 'business_record_access_denied');
+
+-- An expired assignment, a stranger and an agency of another business are refused.
+select pg_temp.sy_expect($$select public.read_existing_business_systems('5e000000-0000-4000-8000-000000000010','5e000000-0000-4000-8000-000000000007','sy-expired@example.test')$$, 'business_record_access_denied');
+select pg_temp.sy_expect($$select public.read_business_systems('5e000000-0000-4000-8000-000000000010','5e000000-0000-4000-8000-000000000007','sy-expired@example.test')$$, 'business_record_access_denied');
+select pg_temp.sy_expect($$select public.read_existing_business_systems('5e000000-0000-4000-8000-000000000010','5e000000-0000-4000-8000-000000000003','sy-stranger@example.test')$$, 'business_record_access_denied');
+select pg_temp.sy_expect($$select public.read_existing_business_systems('5e000000-0000-4000-8000-000000000011','5e000000-0000-4000-8000-000000000005','sy-agency@example.test')$$, 'business_record_access_denied');
+-- Revoking the delegation closes the view.
+update public.workspace_delegations set status = 'revoked', revoked_at = now(), revoked_by = '5e000000-0000-4000-8000-000000000001'
+  where customer_work_id = '5e000000-0000-4000-8000-0000000000f1';
+select pg_temp.sy_expect($$select public.read_business_systems('5e000000-0000-4000-8000-000000000010','5e000000-0000-4000-8000-000000000006','sy-delegate@example.test')$$, 'business_record_access_denied');
 
 -- After exit, writes stop and reads continue.
 select public.create_business_system('5e000000-0000-4000-8000-000000000013', '5e000000-0000-4000-8000-000000000001', 'sy-owner@example.test',

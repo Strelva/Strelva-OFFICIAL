@@ -42,9 +42,19 @@ import type { SystemStore } from "./store";
 
 export type SystemAccess = "owner" | "admin" | "member" | "agency";
 
+/** What an agency may reach in one business: Systems adopted from this
+ * saved work, or from the website tenants that work hosts. */
+export interface AgencySystemScope {
+  savedWorkIds: readonly string[];
+  tenantStableIds?: readonly string[];
+}
+
 export interface MemorySystemStoreOptions {
   /** Who may do what in which business. Return null for no access. */
   access: (actor: WorkspaceActor, businessId: string) => SystemAccess | null;
+  /** For an `agency` actor: the exact work it was delegated (read) or
+   * assigned (read and write). Absent or empty means no access, as in SQL. */
+  agencyScope?: (actor: WorkspaceActor, businessId: string, write: boolean) => AgencySystemScope;
   /** Businesses whose exit completed: reads continue, writes stop. */
   stopped?: (businessId: string) => boolean;
   now?: () => string;
@@ -64,18 +74,39 @@ export function createMemorySystemStore(options: MemorySystemStoreOptions): Syst
 
   const key = (ref: SystemRef) => `${ref.businessId}:${ref.systemId}`;
 
-  function assertAccess(actor: WorkspaceActor, businessId: string, write: boolean): SystemAccess {
+  /** Null scope: a direct member, the whole business. */
+  type Scope = AgencySystemScope | null;
+
+  function assertAccess(actor: WorkspaceActor, businessId: string, write: boolean): Scope {
     const access = options.access(actor, businessId);
     if (!access || (write && !WRITERS.includes(access))) throw new WorkspaceAccessError();
     if (write && options.stopped?.(businessId)) {
       throw new SystemRuleError("system_business_stopped", "New work is stopped for this business.");
     }
-    return access;
+    if (access !== "agency") return null;
+    const scope = options.agencyScope?.(actor, businessId, write);
+    if (!scope?.savedWorkIds.length) throw new WorkspaceAccessError();
+    return scope;
   }
 
-  function load(ref: SystemRef): System {
+  function inScope(system: Pick<System, "origin">, scope: Scope): boolean {
+    if (!scope) return true;
+    if (system.origin?.kind === "saved_work") return scope.savedWorkIds.includes(system.origin.ref);
+    if (system.origin?.kind === "tenant") return (scope.tenantStableIds ?? []).includes(system.origin.ref);
+    return false;
+  }
+
+  function connectionInScope(connection: SystemConnection, businessId: string, scope: Scope): boolean {
+    if (!scope) return true;
+    const sourceOk = connection.businessId !== businessId || inScope(systems.get(key(connection.source)) ?? { origin: null }, scope);
+    const target = connection.target.type === "system" ? connection.target.system : null;
+    const targetOk = !target || target.businessId !== businessId || inScope(systems.get(key(target)) ?? { origin: null }, scope);
+    return sourceOk && targetOk;
+  }
+
+  function load(ref: SystemRef, scope: Scope = null): System {
     const system = systems.get(key(ref));
-    if (!system) throw new WorkspaceAccessError();
+    if (!system || !inScope(system, scope)) throw new WorkspaceAccessError();
     return system;
   }
 
@@ -112,21 +143,22 @@ export function createMemorySystemStore(options: MemorySystemStoreOptions): Syst
 
   return {
     async readGraph(actor, businessId) {
-      assertAccess(actor, businessId, false);
+      const scope = assertAccess(actor, businessId, false);
       const graph: SystemGraph = {
         businessId,
-        systems: [...systems.values()].filter((system) => system.businessId === businessId)
+        systems: [...systems.values()].filter((system) => system.businessId === businessId && inScope(system, scope))
           .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)),
-        connections: [...connections.values()].filter((connection) => connection.businessId === businessId
-          || (connection.target.type === "system" && connection.target.system.businessId === businessId)),
+        connections: [...connections.values()].filter((connection) => (connection.businessId === businessId
+          || (connection.target.type === "system" && connection.target.system.businessId === businessId))
+          && connectionInScope(connection, businessId, scope)),
       };
       return structuredClone(graph);
     },
 
     async readSystem(actor, ref) {
-      assertAccess(actor, ref.businessId, false);
+      const scope = assertAccess(actor, ref.businessId, false);
       const detail: SystemDetail = {
-        system: load(ref),
+        system: load(ref, scope),
         revisions: revisions.get(key(ref)) ?? [],
         outputs: outputs.get(key(ref)) ?? [],
       };
@@ -135,7 +167,9 @@ export function createMemorySystemStore(options: MemorySystemStoreOptions): Syst
 
     async createSystem(actor, businessId, rawInput: CreateSystemInput, commandId) {
       const input = createSystemInputSchema.parse(rawInput);
-      assertAccess(actor, businessId, true);
+      const scope = assertAccess(actor, businessId, true);
+      // An agency creates a System only from its own work.
+      if (scope && !inScope({ origin: input.origin ?? null }, scope)) throw new WorkspaceAccessError();
       return once(actor, businessId, commandId, { kind: "create", input }, () => {
         if (input.origin && [...systems.values()].some((system) => system.businessId === businessId
           && system.origin?.kind === input.origin?.kind && system.origin?.ref === input.origin?.ref)) {
@@ -153,8 +187,7 @@ export function createMemorySystemStore(options: MemorySystemStoreOptions): Syst
 
     async updateSystem(actor, ref, expectedChange, rawPatch: UpdateSystemInput) {
       const patch = updateSystemInputSchema.parse(rawPatch);
-      assertAccess(actor, ref.businessId, true);
-      const system = load(ref);
+      const system = load(ref, assertAccess(actor, ref.businessId, true));
       expectChange(system, expectedChange);
       const next = applySystemUpdate(system, patch, now());
       systems.set(key(ref), next);
@@ -164,9 +197,10 @@ export function createMemorySystemStore(options: MemorySystemStoreOptions): Syst
     async recordRevision(actor, ref, expectedChange, rawInput: RecordRevisionInput, commandId, options) {
       const input = recordRevisionInputSchema.parse(rawInput);
       const activate = options?.activate ?? true;
-      assertAccess(actor, ref.businessId, true);
+      const scope = assertAccess(actor, ref.businessId, true);
+      load(ref, scope);
       return once(actor, ref.businessId, commandId, { kind: "revision", ref, expectedChange, input, activate }, () => {
-        const system = load(ref);
+        const system = load(ref, scope);
         if (activate || expectedChange !== null) expectChange(system, expectedChange ?? -1);
         const at = now();
         const existing = revisions.get(key(ref)) ?? [];
@@ -185,8 +219,7 @@ export function createMemorySystemStore(options: MemorySystemStoreOptions): Syst
     },
 
     async setCurrentRevision(actor, ref, revisionId, expectedCurrentRevisionId) {
-      assertAccess(actor, ref.businessId, true);
-      const system = load(ref);
+      const system = load(ref, assertAccess(actor, ref.businessId, true));
       const revision = (revisions.get(key(ref)) ?? []).find((item) => item.id === revisionId);
       if (!revision) throw new WorkspaceAccessError();
       const next = applyCurrentRevisionSwap(system, revision, expectedCurrentRevisionId, now());
@@ -199,8 +232,7 @@ export function createMemorySystemStore(options: MemorySystemStoreOptions): Syst
 
     async transitionLifecycle(actor, ref, expectedChange, rawTo: SystemLifecycle) {
       const to = systemLifecycleSchema.parse(rawTo);
-      assertAccess(actor, ref.businessId, true);
-      const system = load(ref);
+      const system = load(ref, assertAccess(actor, ref.businessId, true));
       expectChange(system, expectedChange);
       const next = applyLifecycleTransition(system, to, now());
       systems.set(key(ref), next);
@@ -209,9 +241,10 @@ export function createMemorySystemStore(options: MemorySystemStoreOptions): Syst
 
     async issueOutput(actor, ref, rawInput: IssueOutputInput, commandId) {
       const input = issueOutputInputSchema.parse(rawInput);
-      assertAccess(actor, ref.businessId, true);
+      const scope = assertAccess(actor, ref.businessId, true);
+      load(ref, scope);
       return once(actor, ref.businessId, commandId, { kind: "output", ref, input }, () => {
-        const system = load(ref);
+        const system = load(ref, scope);
         const revision = outputRevisionFor(system);
         const output: SystemOutput = {
           id: randomUUID(), businessId: ref.businessId, systemId: ref.systemId, revision,
@@ -223,8 +256,7 @@ export function createMemorySystemStore(options: MemorySystemStoreOptions): Syst
     },
 
     async acceptOutput(actor, ref, outputId) {
-      assertAccess(actor, ref.businessId, true);
-      load(ref);
+      load(ref, assertAccess(actor, ref.businessId, true));
       const list = outputs.get(key(ref)) ?? [];
       const index = list.findIndex((output) => output.id === outputId);
       if (index < 0) throw new WorkspaceAccessError();
@@ -236,18 +268,19 @@ export function createMemorySystemStore(options: MemorySystemStoreOptions): Syst
     async connect(actor, rawInput: ConnectInput, commandId) {
       const input = connectInputSchema.parse(rawInput);
       const businessId = input.source.businessId;
-      assertAccess(actor, businessId, true);
-      load(input.source);
+      const scope = assertAccess(actor, businessId, true);
+      load(input.source, scope);
       if (input.target.type === "system") {
         const target = input.target.system;
+        let targetScope = scope;
         if (target.businessId !== businessId && input.kind === "share") {
           // An explicit share needs authority on both sides.
-          assertAccess(actor, target.businessId, true);
+          targetScope = assertAccess(actor, target.businessId, true);
         }
-        if (!systems.has(key(target))) {
-          if (target.businessId === businessId || input.kind === "share") {
-            throw new SystemRuleError("system_connection_target_missing", "The target System does not exist.");
-          }
+        // A target outside the actor's scope reads as missing, as in SQL.
+        const existingTarget = systems.get(key(target));
+        if ((target.businessId === businessId || input.kind === "share") && (!existingTarget || !inScope(existingTarget, targetScope))) {
+          throw new SystemRuleError("system_connection_target_missing", "The target System does not exist.");
         }
       }
       return once(actor, businessId, commandId, { kind: "connect", input }, () => {
@@ -271,8 +304,9 @@ export function createMemorySystemStore(options: MemorySystemStoreOptions): Syst
 
     async setConnectionState(actor, businessId, connectionId, rawState: ConnectionState) {
       const state = connectionStateSchema.parse(rawState);
-      assertAccess(actor, businessId, false);
-      const connection = connections.get(connectionId);
+      const scope = assertAccess(actor, businessId, false);
+      const found = connections.get(connectionId);
+      const connection = found && connectionInScope(found, businessId, scope) ? found : undefined;
       // The source business acts on its connections; the target business of
       // a share may only revoke it.
       const targetBusiness = connection?.target.type === "system" ? connection.target.system.businessId : null;
@@ -285,7 +319,9 @@ export function createMemorySystemStore(options: MemorySystemStoreOptions): Syst
       // businesses, the target, so a user removed from either side cannot
       // reconnect.
       const required = state === "disconnected" ? [businessId] : [connection.businessId, targetBusiness];
-      for (const id of new Set(required)) if (id) assertAccess(actor, id, true);
+      for (const id of new Set(required)) {
+        if (id && !connectionInScope(connection, id, assertAccess(actor, id, true))) throw new WorkspaceAccessError();
+      }
       if (state === "connected" && connection.state === "disconnected") {
         // Reconnecting rechecks loop rules against what exists now.
         assertConnectionAllowed(

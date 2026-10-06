@@ -212,6 +212,27 @@ select pg_temp.br_assert((public.patch_business_record('be000000-0000-4000-8000-
   '{"facts":{"phone":{"value":"716-555-0160"}}}', 'be000000-0000-4000-8000-000000000056', repeat('b', 64))->>'revision') = '7', 'agency writes with agency provenance');
 select pg_temp.br_assert((select actor_kind = 'agency' and source = 'agency' from public.business_record_revisions where workspace_id = 'be000000-0000-4000-8000-000000000010' and command_id = 'be000000-0000-4000-8000-000000000056'), 'agency revision attributed');
 select pg_temp.br_expect($$select public.read_business_record('be000000-0000-4000-8000-000000000011','be000000-0000-4000-8000-000000000005','br-agency@example.test')$$, 'business_record_access_denied');
+-- The agency reads the profile, never the contact book: no contact count, no
+-- contacts, no revision that touched a contact, and no undo of one.
+select pg_temp.br_assert((public.read_business_record('be000000-0000-4000-8000-000000000010', 'be000000-0000-4000-8000-000000000005', 'br-agency@example.test')->'contactCount') = 'null'::jsonb,
+  'agency gets no contact count');
+select pg_temp.br_assert(jsonb_typeof(public.read_business_record('be000000-0000-4000-8000-000000000010', 'be000000-0000-4000-8000-000000000002', 'br-member@example.test')->'contactCount') = 'number',
+  'member still gets the contact count');
+select pg_temp.br_expect($$select public.read_business_contacts('be000000-0000-4000-8000-000000000010','be000000-0000-4000-8000-000000000005','br-agency@example.test',10)$$, 'business_record_access_denied');
+select pg_temp.br_assert(jsonb_typeof(public.read_business_contacts('be000000-0000-4000-8000-000000000010', 'be000000-0000-4000-8000-000000000002', 'br-member@example.test', 10)) = 'array',
+  'member still reads contacts');
+do $$ declare agency_history jsonb; member_history jsonb; begin
+  agency_history := public.read_business_record_history('be000000-0000-4000-8000-000000000010', 'be000000-0000-4000-8000-000000000005', 'br-agency@example.test', 200);
+  member_history := public.read_business_record_history('be000000-0000-4000-8000-000000000010', 'be000000-0000-4000-8000-000000000002', 'br-member@example.test', 200);
+  perform pg_temp.br_assert(exists (select 1 from jsonb_array_elements(member_history) r, jsonb_array_elements(r->'changes') c where c->>'entity' = 'contact'),
+    'member history includes contact revisions');
+  perform pg_temp.br_assert(not exists (select 1 from jsonb_array_elements(agency_history) r, jsonb_array_elements(r->'changes') c where c->>'entity' = 'contact'),
+    'agency history has no contact revisions');
+  perform pg_temp.br_assert(jsonb_array_length(agency_history) > 0 and jsonb_array_length(agency_history) < jsonb_array_length(member_history),
+    'agency still sees profile history');
+end $$;
+select pg_temp.br_expect(format($$select public.undo_business_record_revision('be000000-0000-4000-8000-000000000010','be000000-0000-4000-8000-000000000005','br-agency@example.test','agency',%s,'be000000-0000-4000-8000-000000000057',repeat('b',64))$$,
+  (select (value->>'sequence')::bigint from br_contacts)), 'business_record_revision_not_found');
 update public.operational_assignments set status = 'revoked', revoked_at = clock_timestamp(), revoked_by = 'be000000-0000-4000-8000-000000000001'
   where id = 'be000000-0000-4000-8000-000000000051';
 select pg_temp.br_expect($$select public.read_business_record('be000000-0000-4000-8000-000000000010','be000000-0000-4000-8000-000000000005','br-agency@example.test')$$, 'business_record_access_denied');

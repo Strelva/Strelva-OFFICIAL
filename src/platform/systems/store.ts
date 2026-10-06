@@ -19,8 +19,11 @@ import type {
 /**
  * The System repository. `businessId` is the customer workspace id. Every
  * call is made on behalf of an actor and rechecks that actor's access to the
- * business at call time: any member reads; owner, admin or an accepted agency
- * delivery writes (the business record's access rule). Writes stop after a
+ * business at call time: any direct member reads everything; owner or admin
+ * writes. An agency reaches only Systems adopted from the exact work it was
+ * delegated (read) or assigned with an accepted delivery (read and write),
+ * or the website tenant that work hosts; anything else reads as missing
+ * (system_actor_scope in 20261004120000_systems.sql). Writes stop after a
  * workspace exit.
  *
  * Create, revision, output and connect calls carry a command id. Repeating a

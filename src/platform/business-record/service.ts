@@ -84,12 +84,14 @@ export async function upsertBusinessContacts(
   }, businessRecordWriteResultSchema, "The contacts could not be saved.");
 }
 
+/** Direct members only; an agency is refused (contacts are not its work). */
 export async function readBusinessContacts(actor: WorkspaceActor, workspace: string, limit = 100): Promise<BusinessContact[]> {
   return callBusinessRecord("read_business_contacts", {
     p_workspace_id: workspaceId.parse(workspace), ...actorArgs(actor), p_limit: z.number().int().min(1).max(500).parse(limit),
   }, z.array(businessContactSchema), "The contacts could not be loaded.");
 }
 
+/** An agency sees only revisions that touched no contact; it cannot undo the others. */
 export async function readBusinessRecordHistory(actor: WorkspaceActor, workspace: string, limit = 50): Promise<BusinessRecordRevision[]> {
   return callBusinessRecord("read_business_record_history", {
     p_workspace_id: workspaceId.parse(workspace), ...actorArgs(actor), p_limit: z.number().int().min(1).max(200).parse(limit),

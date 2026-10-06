@@ -37,6 +37,14 @@ import type { SystemStore } from "./store";
  * offering_website_bindings row is read only for a tenant with no link.
  * Inquiry workspaces are listed only for tenants this business holds.
  *
+ * Scope. A direct member reads the whole business (`scope: "business"`). An
+ * agency reads only the exact work it was delegated or assigned
+ * (`scope: "assigned"`): the SQL reader returns that work, the website
+ * tenants it stands for and its booking grants, and nothing that belongs to
+ * the business as a whole (inquiry handling, calendar connections, other
+ * sites). The projection applies the same rule again, so it never derives a
+ * System or Connection from anything outside that work.
+ *
  * Not mapped, on purpose: plans, investigations, responsibilities, learning
  * items and onboarding cases are work or records inside a System, not
  * Systems themselves (RULE_SYSTEM_OUTPUT_IDENTITY boundary). Retired
@@ -84,6 +92,9 @@ export const existingManagedWebsiteSchema = z.object({
 
 export const existingSystemsSnapshotSchema = z.object({
   businessId: z.string().uuid(),
+  /** What the reader may see: the whole business, or only assigned work.
+   * read_existing_business_systems always sends it; fixtures may omit it. */
+  scope: z.enum(["business", "assigned"]).optional().transform((value) => value ?? "business"),
   savedWork: z.array(existingSavedWorkSchema),
   managedWebsites: z.array(existingManagedWebsiteSchema),
   inquiryWorkspaces: z.array(z.object({
@@ -104,6 +115,22 @@ export const existingSystemsSnapshotSchema = z.object({
 export type ExistingSystemsSnapshot = z.input<typeof existingSystemsSnapshotSchema>;
 type Snapshot = z.output<typeof existingSystemsSnapshotSchema>;
 type SavedWork = Snapshot["savedWork"][number];
+
+/** An assigned (agency) snapshot keeps only what its own work stands for:
+ * the sites that work hosts and the booking grants of that work. Inquiry
+ * handling and calendar connections belong to the business, so they go. */
+function withinScope(snapshot: Snapshot): Snapshot {
+  if (snapshot.scope === "business") return snapshot;
+  const workIds = new Set(snapshot.savedWork.map((work) => work.id));
+  const hosted = new Set(snapshot.savedWork.flatMap((work) => work.hostedTenantStableId ? [work.hostedTenantStableId] : []));
+  return {
+    ...snapshot,
+    managedWebsites: snapshot.managedWebsites.filter((site) => hosted.has(site.tenantStableId)),
+    inquiryWorkspaces: [],
+    bookingGrants: snapshot.bookingGrants.filter((grant) => workIds.has(grant.workId)),
+    calendarConnections: [],
+  };
+}
 
 /** A System as a business sees it, with where it came from and, for an
  * existing thing, the plain reason for its lifecycle. */
@@ -209,7 +236,7 @@ const calendarState = (status: string): ConnectionState =>
 /** Pure projection of a snapshot. Deterministic: the same snapshot always
  * yields the same ids, order and states. */
 export function systemsFromExisting(raw: ExistingSystemsSnapshot): BusinessSystems {
-  const snapshot = existingSystemsSnapshotSchema.parse(raw);
+  const snapshot = withinScope(existingSystemsSnapshotSchema.parse(raw));
   const { businessId } = snapshot;
   const systems: SystemListing[] = [];
   const connections: ConnectionListing[] = [];
