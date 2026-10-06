@@ -88,6 +88,14 @@ describe("website rebuild service lifecycle and durable recovery", () => {
     const h = harness(); const first = await h.create(); const again = await h.create(); expect(again.workId).toBe(first.workId); expect(h.pipeline).toHaveBeenCalledTimes(1); expect(h.rateLimited).toHaveBeenCalledTimes(1);
     await expect(h.create({ ...brief, description: "Different owner inputs." })).rejects.toBeInstanceOf(WorkspaceConflictError);
   });
+  it("launch preserves the customer's approval instead of re-approving as the launcher (audit finding 6)", async () => {
+    const h = harness(); const reviewed = await h.create();
+    const approve = vi.spyOn(h.documents, "approve");
+    const approved = await h.service.approve(actor,reviewed.workId,selection(reviewed)); expect(approve).toHaveBeenCalledTimes(1);
+    const published = await h.service.launch(actor,approved.workId,selection(approved));
+    expect(published.rebuild.status).toBe("published"); expect(approve).toHaveBeenCalledTimes(1);
+    expect(h.documents.reserveHostedTenant).toHaveBeenCalledTimes(1);
+  });
   it("does not publish a preview before approval", async () => { const h = harness(); const record = await h.create(); await expect(h.service.launch(actor,record.workId,selection(record))).rejects.toBeInstanceOf(WorkspaceConflictError); expect(h.documents.reserveHostedTenant).not.toHaveBeenCalled(); expect(h.documents.publish).not.toHaveBeenCalled(); });
   it.each(["work","document","hash"])("rejects a stale %s selection before approving", async kind => { const h = harness(); const record = await h.create(); const input = selection(record); if (kind === "work") input.expectedRevision--; if (kind === "document") input.candidateRevision++; if (kind === "hash") input.candidateContentHash = "f".repeat(64); await expect(h.service.approve(actor,record.workId,input)).rejects.toBeInstanceOf(WorkspaceConflictError); expect(h.documents.publish).not.toHaveBeenCalled(); });
   it("requires the owner's confirmation of a supported high-risk claim", async () => {

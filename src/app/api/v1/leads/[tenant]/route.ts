@@ -13,7 +13,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
 import { readOptionalJsonObject } from "@/lib/request-body";
 import { isTenantId } from "@/lib/scaffold-contracts";
-import { captureLead, recordLead } from "@/lib/leads";
+import { captureLead } from "@/lib/leads";
 import { scoreLeadSpam } from "@/lib/lead-spam";
 import { recordSpam } from "@/lib/spam-pit";
 import {
@@ -255,7 +255,13 @@ export async function POST(
     }
 
     if (!name) return corsJson({ error: "name is required" }, 400);
-    await recordLead(tenant, { name, email, message, source });
+    // Claim receipt only when a store holds the lead: Redis, or the Postgres
+    // copy when Redis is absent. Owner notification is unchanged (captureLead
+    // notifies exactly as recordLead did).
+    const outcome = await captureLead(tenant, { name, email, message, source });
+    if (outcome.status === "unavailable" && !outcome.mirrored) {
+      return corsJson({ error: "Lead storage is temporarily unavailable.", code: "lead_storage_unavailable" }, 503);
+    }
     return corsJson({ ok: true }, 200);
   } catch (err) {
     console.error("[v1 leads POST]", tenant, err);

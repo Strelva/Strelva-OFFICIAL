@@ -163,6 +163,24 @@ describe("POST /api/v1/leads/[tenant] dual-write", () => {
     expect((rpc.mock.calls[0]![1] as { p_lead: { name: string } }).p_lead.name).toBe("Ada Rivera");
   });
 
+  // Audit finding 5 (2026-10-05): with Redis gone, the beacon must not claim
+  // receipt unless the Postgres copy actually holds the lead.
+  it("Redis gone and the Postgres copy fails: 503, never a 200 receipt", async () => {
+    redisAvailable = false;
+    useDb(async () => ({ data: null, error: { message: "connection refused" } }));
+    const res = await post("mclears-cottage", submission);
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "Lead storage is temporarily unavailable.", code: "lead_storage_unavailable" });
+  });
+
+  it("Redis gone and the Postgres copy is not configured: 503, never a 200 receipt", async () => {
+    redisAvailable = false;
+    setLeadMirrorDb(null);
+    const res = await post("mclears-cottage", submission);
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ code: "lead_storage_unavailable" });
+  });
+
   it("a missing name is still a 400 and writes nothing", async () => {
     const res = await post("mclears-cottage", { email: "ada@example.test" });
     expect(res.status).toBe(400);

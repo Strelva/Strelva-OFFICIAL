@@ -62,7 +62,8 @@ export interface RecordLeadInput {
 export type RecordLeadResult =
   | { status: "captured"; lead: LeadRecord }
   | { status: "duplicate"; lead?: LeadRecord }
-  | { status: "unavailable" };
+  /** `mirrored` is true only when the Postgres copy confirmed the lead. */
+  | { status: "unavailable"; mirrored?: boolean };
 
 function leadsKey(tenant: string): string {
   return `leads:${tenant}`;
@@ -152,8 +153,8 @@ export async function captureLead(
   // Without Redis the lead still reaches Postgres; callers see "unavailable"
   // exactly as before.
   if (!redis) {
-    await mirrorLead(tenant, lead, hash);
-    return { status: "unavailable" };
+    const mirrored = await mirrorLead(tenant, lead, hash);
+    return { status: "unavailable", mirrored: mirrored.status === "recorded" || mirrored.status === "exists" || mirrored.status === "duplicate" };
   }
 
   // Best-effort double-submit guard (a refresh/double-click), 5-minute window.
