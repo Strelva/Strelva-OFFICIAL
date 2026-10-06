@@ -8,6 +8,7 @@
  *   npx tsx scripts/booking-store-move.ts backfill --apply          # local database only
  *   npx tsx scripts/booking-store-move.ts backfill --apply --i-have-jacobs-yes   # production, Jacob's call
  *   npx tsx scripts/booking-store-move.ts parity                    # compare and record (local only)
+ *   npx tsx scripts/booking-store-move.ts schedules [--apply]       # workspace schedule reservations without a receipt
  *
  * A dry run reads legacy bookings, settings and API receipts and writes
  * nothing; against production it needs Jacob's yes because it reads client
@@ -19,8 +20,8 @@
  */
 import { getSupabase } from "../src/lib/db/client";
 import { getAllTenants } from "../src/lib/tenants";
-import { backfillTenantBookings, checkTenantBookingParity } from "../src/platform/bookings/move";
-import { legacyBookingPorts } from "../src/platform/bookings/legacy-ports";
+import { backfillScheduleReservations, backfillTenantBookings, checkTenantBookingParity } from "../src/platform/bookings/move";
+import { legacyBookingPorts, scheduleReservationPorts } from "../src/platform/bookings/legacy-ports";
 import { parseBookingMoveArgs, runBookingMove } from "./booking-store-move-plan";
 
 async function tenants(): Promise<string[]> {
@@ -37,6 +38,7 @@ async function main() {
     tenants,
     backfill: (tenant, apply) => backfillTenantBookings(tenant, { apply, ports: legacyBookingPorts }),
     parity: (tenant) => checkTenantBookingParity(tenant, { ports: legacyBookingPorts }),
+    schedules: (apply) => backfillScheduleReservations({ apply, ports: scheduleReservationPorts }),
     log: options.json ? () => undefined : (line) => console.log(line),
   });
   if (options.json) console.log(JSON.stringify(outcome, null, 2));

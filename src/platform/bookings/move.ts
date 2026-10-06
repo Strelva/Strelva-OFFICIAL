@@ -1,7 +1,8 @@
 /**
  * Moving today's bookings into the one store (bookings spec, "Moving today's
  * bookings"): backfill (step 4, dry run by default), the 7-day compare
- * (step 5) and the repair of queued dual-writes (step 3).
+ * (step 5), the repair of queued dual-writes (step 3), and the copy of
+ * schedule reservations that have no public receipt.
  *
  * Reads go through injected ports so the move is tested without a database;
  * scripts/booking-store-move.ts supplies the real ones and refuses a
@@ -24,6 +25,7 @@ import {
   readBookingContext,
   readTenantBookings,
   recordBooking,
+  recordWorkspaceBooking,
   upsertBookingSettings,
   type BookingStoreDb,
   type StoreBooking,
@@ -274,6 +276,86 @@ export async function repairPendingBookings(options: { ports: LegacyBookingPorts
     }
   }
   report.remaining = Number(await redis.zcard(BOOKING_STORE_PENDING_KEY));
+  return report;
+}
+
+// --- Schedule reservations made in the workspace (no public receipt) ---------------
+
+export interface ScheduleReservation {
+  requestId: string;
+  title: string;
+  start: string;
+  end: string;
+  status: "reserved" | "cancelled" | "writing" | "unknown" | "accepted";
+}
+
+export interface WorkspaceSchedule {
+  workspaceId: string;
+  workId: string;
+  /** The time zone to show local dates in: the schedule's booking grant, else the record's hours, else UTC. */
+  timeZone: string;
+  reservations: ScheduleReservation[];
+  /** calendar_request_id of every public receipt on this schedule: those are copied with the tenant's receipts. */
+  receiptRequestIds: ReadonlySet<string>;
+}
+
+export interface ScheduleReservationPorts {
+  schedules(): Promise<WorkspaceSchedule[]>;
+}
+
+export interface ScheduleBackfillReport {
+  apply: boolean;
+  schedules: number;
+  reservations: number;
+  /** Already copied with a tenant's public receipts. */
+  withReceipt: number;
+  written: number;
+  unchanged: number;
+  conflicts: string[];
+  failed: Array<{ ref: string; reason: string }>;
+}
+
+/**
+ * Copy every schedule reservation that has no public receipt (made in the
+ * workspace by the owner) into the one store, on the calendar of the tenant
+ * the schedule is published to, else the workspace's own. A dry run writes
+ * nothing. Idempotent: reruns are `unchanged`. Any status other than
+ * cancelled holds the time (a provider write in flight still holds it).
+ */
+export async function backfillScheduleReservations(options: { apply: boolean; ports: ScheduleReservationPorts; db?: BookingStoreDb | null }): Promise<ScheduleBackfillReport> {
+  const db = options.db === undefined ? bookingStoreDb() : options.db;
+  const schedules = await options.ports.schedules();
+  const report: ScheduleBackfillReport = {
+    apply: options.apply, schedules: schedules.length, reservations: 0, withReceipt: 0, written: 0, unchanged: 0, conflicts: [], failed: [],
+  };
+  if (options.apply && !db) throw new Error("booking_store_db_unconfigured");
+  for (const schedule of schedules) {
+    for (const reservation of schedule.reservations) {
+      if (schedule.receiptRequestIds.has(reservation.requestId)) {
+        report.withReceipt++;
+        continue;
+      }
+      report.reservations++;
+      if (!options.apply) continue;
+      const ref = `${schedule.workId}:${reservation.requestId}`;
+      try {
+        const result = await recordWorkspaceBooking(schedule.workspaceId, {
+          workId: schedule.workId,
+          requestId: reservation.requestId,
+          status: reservation.status === "cancelled" ? "cancelled" : "confirmed",
+          title: reservation.title.slice(0, 160),
+          start: new Date(reservation.start).toISOString(),
+          end: new Date(reservation.end).toISOString(),
+          timeZone: schedule.timeZone,
+        }, "backfill", db);
+        if (result.status === "conflict") report.conflicts.push(ref);
+        else if (result.status === "unchanged") report.unchanged++;
+        else report.written++;
+      } catch (error) {
+        report.failed.push({ ref, reason: error instanceof Error ? error.message : String(error) });
+      }
+    }
+  }
   return report;
 }
 

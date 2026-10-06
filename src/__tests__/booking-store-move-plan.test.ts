@@ -50,4 +50,20 @@ describe("booking store move", () => {
     const outcome = await runBookingMove({ ...parseBookingMoveArgs(["parity"]), databaseUrl: LOCAL }, deps());
     expect(outcome.totals.outOfParity).toBe(1);
   });
+
+  it("schedules runs once for every workspace schedule, under the same production rules", async () => {
+    const schedules = vi.fn(async (apply: boolean) => ({
+      apply, schedules: 2, reservations: 3, withReceipt: 1, written: apply ? 2 : 0, unchanged: 0, conflicts: apply ? ["w:r3"] : [], failed: [],
+    }));
+    const d = { ...deps(), schedules };
+    const dry = await runBookingMove({ ...parseBookingMoveArgs(["schedules"]), databaseUrl: LOCAL }, d);
+    expect(dry.schedules).toMatchObject({ reservations: 3, written: 0 });
+    expect(d.backfill).not.toHaveBeenCalled();
+    expect(d.log).toHaveBeenCalledWith(expect.stringContaining("would copy 3 schedule reservations without a receipt from 2 schedules (1 come with a tenant's receipts)"));
+    const applied = await runBookingMove({ ...parseBookingMoveArgs(["schedules", "--apply"]), databaseUrl: LOCAL }, d);
+    expect(applied.totals).toMatchObject({ written: 2, conflicts: 1 });
+    await expect(runBookingMove({ ...parseBookingMoveArgs(["schedules"]), databaseUrl: PROD }, d)).rejects.toThrow("Jacob's yes");
+    await expect(runBookingMove({ ...parseBookingMoveArgs(["schedules", "--apply"]), databaseUrl: PROD }, d)).rejects.toThrow("Jacob's yes");
+    await expect(runBookingMove({ ...parseBookingMoveArgs(["schedules"]), databaseUrl: LOCAL }, deps())).rejects.toThrow("not available");
+  });
 });
