@@ -47,8 +47,10 @@ export function BookingActions({ workspaceId, tenantId, bookingId, status, clien
 
   // A request is the owner's call, made in Needs you, not here.
   if (status === "cancelled" || status === "requested") return null;
+  // The week view only cancels; a checked-in booking there has nothing to do.
+  if (status === "completed" && view !== "day") return null;
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
+    <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
       {view === "day" && status === "confirmed" ? (
         <Button size="sm" variant="secondary" loading={busy === "completed"} disabled={Boolean(busy)} onClick={() => change("completed")}>
           Check in
@@ -70,7 +72,7 @@ export function BookingActions({ workspaceId, tenantId, bookingId, status, clien
           <Button size="sm" variant="ghost" disabled={Boolean(busy)} onClick={() => setConfirming(true)}>Cancel</Button>
         )
       ) : null}
-      {error ? <p role="alert" className="w-full text-right text-sm text-critical">{error}</p> : null}
+      {error ? <p role="alert" className="w-full text-sm text-critical sm:text-right">{error}</p> : null}
     </div>
   );
 }
