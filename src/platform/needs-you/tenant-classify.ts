@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import type { UnifiedEvent } from "@/lib/types";
 import type { ChangeKind, ChangeOrigin, Route } from "./contracts";
 import type { EvaluationInput } from "./evaluator";
+import { commitmentSignals } from "./inquiry-policy";
 
 export interface TenantEventClassification {
   kind: ChangeKind;
@@ -43,7 +44,12 @@ export function classifyTenantEvent(event: UnifiedEvent): TenantEventClassificat
   if (kind === "offboarding_handoff_request") return { kind: "exit", origin: "owner_interpreted", signals: {} };
   if (kind === "inquiry_capability_publish") return { kind: "system.go_live", origin, signals: {} };
   if (kind === "inquiry_capability_undo") return { kind: "system.change_live", origin, signals: {} };
-  if (kind === INQUIRY_MESSAGE_REVIEW_KIND) return { kind: "customer.message", origin: "strelva", signals: {} };
+  if (kind === INQUIRY_MESSAGE_REVIEW_KIND) {
+    // A drafted reply that quotes a price, names a time or makes a promise is
+    // a commitment: always the owner's call (inquiry 1.0 delta, C6).
+    const draft = [m.subject, m.messageBody].filter((v): v is string => typeof v === "string").join("\n");
+    return { kind: commitmentSignals(draft).length ? "customer.commitment" : "customer.message", origin: "strelva", signals: {} };
+  }
   if (event.type === "change_request") return { kind: "request.scope", origin: "owner_interpreted", signals: {} };
   if (kind === "agent_preview") {
     const reason = typeof m.governanceReason === "string" ? m.governanceReason : "";

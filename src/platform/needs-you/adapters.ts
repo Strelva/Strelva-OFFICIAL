@@ -97,9 +97,13 @@ export function tenantEventItem(event: UnifiedEvent): ProposedItem | null {
   const kind: ChangeKind = classification.kind === "review.reply" && typeof rating === "number" && rating <= 2 ? "review.reply_critical" : classification.kind;
   if (kind === "suggestion" || kind === "health.owner_action") return null;
   const [approveEffect, notYetEffect] = effects(kind);
+  // A commitment (a price, a date, a promise) is always the owner's, owner only,
+  // even when Strelva was reviewing the draft (inquiry 1.0 delta, C6).
+  const commitment = kind === "customer.commitment";
+  const route = commitment ? "owner_decides" : observed;
   return {
     kind,
-    route: observed,
+    route,
     title: event.title.slice(0, 200).trim() || "A change is waiting",
     detail: event.body ? event.body.slice(0, 600) : null,
     approveEffect,
@@ -107,10 +111,10 @@ export function tenantEventItem(event: UnifiedEvent): ProposedItem | null {
     sourceLifecycle: "tenant_event",
     sourceId: `${event.tenantId}:${event.id}`,
     revisionHash: tenantEventRevision(event),
-    urgent: observed === "owner_decides" && urgentFor(kind),
+    urgent: route === "owner_decides" && urgentFor(kind),
     // The chase clock starts when Needs you first sees the ask, not when the
     // tenant event was written, so an older pending ask does not lapse at once.
-    adminMayDecide: !OWNER_ONLY_KINDS.has(kind),
+    adminMayDecide: !commitment && !OWNER_ONLY_KINDS.has(kind),
   };
 }
 
