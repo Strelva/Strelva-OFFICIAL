@@ -61,12 +61,55 @@ function WaitingRow({ item }: { item: WebsiteWaitingItem }) {
   </li>;
 }
 
+const ACTIVITY_WORDS: Record<string, [string, string]> = {
+  visit: ["visit", "visits"], call_click: ["call tap", "call taps"], email_click: ["email tap", "email taps"],
+  booking_click: ["booking tap", "booking taps"], directions_click: ["directions tap", "directions taps"], form_submit: ["form sent", "forms sent"],
+};
+
+/** A connected site: prove the host, then what it reports and the inquiries it sent. Strelva never edits its pages. */
+function ConnectedSitePanel({ workspaceId, systemId, site, readOnly }: { workspaceId: string; systemId: string; site: NonNullable<WebsiteSystemDetail["connectedSite"]>; readOnly: boolean }) {
+  const request = useWorkspaceRequest();
+  const [verified, setVerified] = useState(site.verified);
+  const [checking, setChecking] = useState(false);
+  const [message, setMessage] = useState<{ tone: "status" | "alert"; text: string } | null>(null);
+  async function check() {
+    setChecking(true); setMessage(null);
+    try {
+      const response = await request("/api/workspace/connected-sites", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "verify", workspaceId, siteId: site.siteId }) });
+      const body = await response.json().catch(() => null) as { site?: { verifiedAt: string | null }; error?: string } | null;
+      if (response.ok && body?.site?.verifiedAt) { setVerified(true); setMessage({ tone: "status", text: `${site.siteHost} is proven to be yours. Strelva now takes its inquiries.` }); }
+      else setMessage({ tone: "alert", text: body?.error || "We couldn't check the site just now. Nothing changed." });
+    } catch {
+      setMessage({ tone: "alert", text: "We couldn't reach Strelva just now. Nothing changed." });
+    } finally {
+      setChecking(false);
+    }
+  }
+  const counts = Object.entries(site.activity).filter(([kind]) => ACTIVITY_WORDS[kind]).map(([kind, n]) => `${n} ${ACTIVITY_WORDS[kind]![n === 1 ? 0 : 1]}`);
+  return <Panel id={`${systemId}-connected`} title="Connected site" count={site.inquiries.length} intro="Your site stays where it is. Strelva fills in your confirmed details, takes its inquiries and counts visits. It never edits your pages.">
+    {!verified ? <div className="mt-3 grid gap-2 text-sm">
+      {site.install && !readOnly ? <>
+        <p>1. Add these two lines to every page of {site.siteHost} (most builders call this “custom code” or “header code”).</p>
+        <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-gray-bg p-3 text-xs" aria-label="Lines to add to your site">{[site.install.meta, site.install.script].filter(Boolean).join("\n")}</pre>
+        <p>2. Publish the site, then check. Strelva reads the live page to confirm it&rsquo;s yours.</p>
+        <button type="button" className="justify-self-start underline" disabled={checking} onClick={() => void check()}>{checking ? "Checking…" : "Check now"}</button>
+      </> : <p className="text-gray-muted">An owner or admin of this business can finish connecting it.</p>}
+    </div> : <p className="mt-3 text-sm">{counts.length ? `Last 30 days: ${counts.join(", ")}.` : "No visits reported yet. They show here once people use the site."}{site.lastEventAt ? ` Last seen ${when(site.lastEventAt)}.` : ""}</p>}
+    {message ? <p role={message.tone} className="mt-2 text-sm">{message.text}</p> : null}
+    {site.inquiries.length ? <ul className={styles.panelList} aria-label={`Inquiries from ${site.siteHost}`}>{site.inquiries.map(item => <li key={item.id}>
+      <span>{item.name}</span>
+      {item.message ? <small>{item.message.slice(0, 160)}</small> : null}
+      <small>{item.email ? `${item.email} · ` : ""}<time dateTime={item.capturedAt}>{when(item.capturedAt)}</time></small>
+    </li>)}</ul> : verified ? <p className="mt-2 text-xs text-gray-muted">No inquiries yet.</p> : null}
+  </Panel>;
+}
+
 /**
  * Domains, Waiting on you, Requests and History for a website System. Every
  * list comes from the store that owns it (website-detail-server.ts); a list
  * that could not be read says so instead of reading as empty.
  */
-export function WebsiteSystemPanels({ systemId, state, onAsk, readOnly }: { systemId: string; state: WebsiteDetailState; onAsk: (request: string) => void; readOnly: boolean }) {
+export function WebsiteSystemPanels({ workspaceId, systemId, state, onAsk, readOnly }: { workspaceId: string; systemId: string; state: WebsiteDetailState; onAsk: (request: string) => void; readOnly: boolean }) {
   if (state.status === "loading") return <section className={styles.panel} aria-busy="true" aria-label="Website details"><p role="status">Loading domains, requests and history…</p></section>;
   if (state.status === "error") return <section className={styles.panel} aria-label="Website details"><p role="alert">{state.message} The site itself is unchanged.</p></section>;
   const { detail } = state;
@@ -76,6 +119,7 @@ export function WebsiteSystemPanels({ systemId, state, onAsk, readOnly }: { syst
   const requestsMissing = ["Requests and pending changes", "Service requests"].filter(name => unavailable.has(name));
   const historyMissing = ["Content history", "Saved copies", "Site revisions", "Site replacements"].filter(name => unavailable.has(name));
   return <>
+    {detail.connectedSite ? <ConnectedSitePanel workspaceId={workspaceId} systemId={systemId} site={detail.connectedSite} readOnly={readOnly} /> : null}
     <Panel id={`${systemId}-domains`} title="Domains" count={detail.domains.length} intro="Where the site answers, and whether each address is verified.">
       {detail.domains.length ? <ul className={styles.panelList} aria-label="Domains">{detail.domains.map(domain => <li key={domain.hostname} data-domain-state={domain.state}>
         <span>{domain.hostname}</span>

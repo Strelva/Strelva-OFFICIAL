@@ -61,6 +61,8 @@ export const SYSTEM_ORIGIN_KINDS = [
   "google_location",
   /** tenants.stable_id: the newsletter a managed tenant sends to its subscribers. */
   "tenant_newsletter",
+  /** connected_sites.id: a website the business already runs elsewhere, connected by script. */
+  "connected_site",
 ] as const;
 export const systemOriginSchema = z.object({
   kind: z.enum(SYSTEM_ORIGIN_KINDS),

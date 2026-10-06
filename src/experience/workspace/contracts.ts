@@ -236,6 +236,8 @@ export interface WorkspaceSystemEntry {
   health: { status: HealthStatus; summary: string; lastVerifiedAt: string | null };
   /** A Bookings System's day and week views on the managed site (wellness schedule, roster). */
   views?: Array<"schedule" | "roster">;
+  /** A website the business runs elsewhere, connected by script. Additive. */
+  connectedSite?: { siteUrl: string; siteHost: string; verified: boolean; lastEventAt: string | null };
 }
 
 export interface WorkspaceSystemConnection {

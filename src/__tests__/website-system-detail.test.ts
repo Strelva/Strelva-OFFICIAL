@@ -75,6 +75,7 @@ function sources(overrides: Partial<WebsiteDetailSources> = {}): WebsiteDetailSo
     ]),
     documents: { list: vi.fn(async () => []), receipts: vi.fn(async () => []), linkedPublications: vi.fn(async () => []) } as unknown as WebsiteDetailSources["documents"],
     rebuild: vi.fn(async () => null),
+    connectedSites: () => null,
     ...overrides,
   };
 }

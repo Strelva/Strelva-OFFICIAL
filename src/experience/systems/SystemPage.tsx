@@ -112,7 +112,7 @@ export function SystemPage(props: SystemPageProps) {
       </section>
 
       <aside className={styles.aside} aria-label={`About ${system.name}`}>
-        {system.kind === "website" && websiteDetail ? <WebsiteSystemPanels systemId={system.id} state={websiteDetail} onAsk={onAsk} readOnly={readOnly} /> : null}
+        {system.kind === "website" && websiteDetail ? <WebsiteSystemPanels workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} onAsk={onAsk} readOnly={readOnly} /> : null}
         <ConnectionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} />
         <PartsPanel system={system} />
         <PossibilitiesPanel system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} />

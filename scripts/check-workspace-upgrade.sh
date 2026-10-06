@@ -224,5 +224,8 @@ psql "${psql_args[@]}" --file="$repo_root/tests/workspace-account-bindings-schem
 # manage_published_website_tenant; website-documents-schema above proves the
 # original contract against the replacements.
 psql "${psql_args[@]}" --file="$repo_root/tests/website-linked-publication-schema.sql"
+# 20261008151000 widens tenant_leads, tenant_client_records and
+# system_origin_kinds; their earlier contracts ran above against it.
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

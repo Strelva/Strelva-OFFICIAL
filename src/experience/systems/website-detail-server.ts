@@ -32,6 +32,7 @@ import { needsYouReleaseEnabled, needsYouService } from "@/platform/needs-you/se
 import { PostgresServiceRequestStore } from "@/platform/service-requests";
 import { websiteDocumentStore } from "@/products/websites/document-store";
 import { websiteRebuildReleaseEnabled } from "@/products/websites/rebuild-release";
+import { connectedSitesReleaseEnabled, readConnectedSites, type ConnectedSitesOverview } from "@/products/connected-sites/server";
 import { buildWebsiteSystemDetail, type WebsiteDetailInputs, type WebsiteDomainItem, type WebsiteSystemDetail } from "./website-detail";
 
 export interface WebsiteDetailSources {
@@ -45,6 +46,8 @@ export interface WebsiteDetailSources {
   serviceRequests: (actor: WorkspaceActor, businessId: string) => Promise<Array<{ id: string; status: string; outcome: string; createdAt: string; context: Record<string, unknown>; deliveryCommitment?: { status: string } | null }>>;
   documents: Pick<typeof websiteDocumentStore, "list" | "receipts" | "linkedPublications">;
   rebuild: (actor: WorkspaceActor, workId: string) => Promise<{ rebuild: { status: string; candidate: { revision: number } | null; history: Array<{ at: string }> } } | null>;
+  /** Null while STRELVA_CONNECTED_SITES_RELEASE is off. */
+  connectedSites: (actor: WorkspaceActor, businessId: string) => Promise<ConnectedSitesOverview> | null;
 }
 
 const liveSources: WebsiteDetailSources = {
@@ -62,6 +65,7 @@ const liveSources: WebsiteDetailSources = {
     const { readWebsiteRebuild } = await import("@/products/websites/rebuild-service");
     return readWebsiteRebuild(actor, workId);
   },
+  connectedSites: (actor, businessId) => connectedSitesReleaseEnabled() ? readConnectedSites(actor, businessId) : null,
 };
 
 const DOMAIN_STATES = new Set(["verified", "pending", "misconfigured", "conflict", "error", "not_claimed"]);
@@ -72,11 +76,18 @@ async function read<T>(label: string, unavailable: string[], fallback: T, run: (
 
 /** Null when the System is not a website this actor can see in this business. */
 export async function readWebsiteSystemDetail(actor: WorkspaceActor, businessId: string, systemId: string, sources: WebsiteDetailSources = liveSources): Promise<WebsiteSystemDetail | null> {
-  const listing = await sources.listSystems(actor, businessId, { store: createSupabaseSystemStore() });
+  const connectedRead = sources.connectedSites(actor, businessId);
+  const connected = connectedRead ? await connectedRead.catch(() => null) : null;
+  const listing = await sources.listSystems(actor, businessId, {
+    store: createSupabaseSystemStore(),
+    ...(connected ? { connectedSites: async () => connected.sites.map(item => ({ id: item.id, label: item.label, siteUrl: item.siteUrl, siteHost: item.siteHost, status: item.status, verifiedAt: item.verifiedAt, lastEventAt: item.lastEventAt, createdAt: item.createdAt, updatedAt: item.updatedAt })) } : {}),
+  });
   const site = listing.systems.find(item => item.system.id === systemId);
   if (!site || site.system.kind !== "website") return null;
   const { tenantId, savedWorkId } = site.references;
   const unavailable: string[] = [];
+  if (connectedRead && !connected) unavailable.push("Connected site");
+  const connectedSite = site.references.connectedSiteId ? connected?.sites.find(item => item.id === site.references.connectedSiteId) : undefined;
   const workspaceHref = (workId: string) => `/workspace?${new URLSearchParams({ workspaceId: businessId, view: "websites", work: workId })}`;
 
   const [domainRows, events, drafts, versions, snapshots, decisions, services, documents, linked, rebuild] = await Promise.all([
@@ -100,7 +111,12 @@ export async function readWebsiteSystemDetail(actor: WorkspaceActor, businessId:
     savedWorkId ? read("Site review", unavailable, null, () => sources.rebuild(actor, savedWorkId)) : Promise.resolve(null),
   ]);
 
-  const domains: WebsiteDomainItem[] = (domainRows?.rows ?? []).map(row => ({
+  const connectedDomains: WebsiteDomainItem[] = connectedSite ? [{
+    hostname: connectedSite.siteHost, state: connectedSite.verifiedAt ? "verified" : "pending",
+    label: connectedSite.verifiedAt ? "Proven to be this business's" : "Waiting for proof it's yours",
+    lastCheckedAt: connectedSite.verifiedAt, whoCanChange: "Your site's builder; Strelva never changes it.",
+  }] : [];
+  const domains: WebsiteDomainItem[] = connectedDomains.length ? connectedDomains : (domainRows?.rows ?? []).map(row => ({
     hostname: row.domain,
     state: (DOMAIN_STATES.has(row.verification.status) ? row.verification.status : "pending") as WebsiteDomainItem["state"],
     label: row.verification.label,
@@ -134,6 +150,13 @@ export async function readWebsiteSystemDetail(actor: WorkspaceActor, businessId:
     snapshots,
     documentRevisions: (documents?.rows ?? []).map(row => ({ revision: row.revision, contentHash: row.contentHash, createdAt: row.createdAt, createdBy: row.createdBy, published: published.has(`${row.revision}:${row.contentHash}`) })),
     linkedPublications: linked,
+    ...(connectedSite ? { connectedSite: {
+      siteId: connectedSite.id, siteHost: connectedSite.siteHost, verified: connectedSite.verifiedAt !== null,
+      install: connectedSite.verifiedAt || !connectedSite.verificationToken ? null : connectedSite.snippet,
+      lastEventAt: connectedSite.lastEventAt, activity: connectedSite.activity,
+      inquiries: (connected?.inquiries ?? []).filter(item => item.siteId === connectedSite.id).slice(0, 10)
+        .map(item => ({ id: item.id, name: item.name, email: item.email, message: item.message, capturedAt: item.capturedAt })),
+    } } : {}),
     unavailable,
   });
 }

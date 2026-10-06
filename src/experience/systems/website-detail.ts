@@ -52,8 +52,22 @@ export interface WebsiteHistoryItem {
   undo: string | null;
 }
 
+/** A connected site's own block: proof of the host, install lines, reporting and inquiries. */
+export interface ConnectedSiteDetail {
+  siteId: string;
+  siteHost: string;
+  verified: boolean;
+  /** The lines to paste, for managers until the host is proven. */
+  install: { script: string; meta: string | null } | null;
+  lastEventAt: string | null;
+  /** Last 30 days, by kind (visit, call_click, ...). */
+  activity: Record<string, number>;
+  inquiries: Array<{ id: string; name: string; email: string | null; message: string | null; capturedAt: string }>;
+}
+
 export interface WebsiteSystemDetail {
   systemId: string;
+  connectedSite?: ConnectedSiteDetail;
   domains: WebsiteDomainItem[];
   waiting: WebsiteWaitingItem[];
   requests: WebsiteRequestItem[];
@@ -85,6 +99,7 @@ export interface WebsiteDetailInputs {
   snapshots: SnapshotRow[];
   documentRevisions: DocumentRevisionRow[];
   linkedPublications: LinkedPublicationRow[];
+  connectedSite?: ConnectedSiteDetail;
   unavailable: string[];
 }
 
@@ -148,5 +163,8 @@ export function buildWebsiteSystemDetail(input: WebsiteDetailInputs): WebsiteSys
       title: row.title, undo: "Strelva can redeploy the previous version." })),
   ]).slice(0, 50);
 
-  return { systemId: input.systemId, domains: input.domains, waiting, requests, history, unavailable: [...new Set(input.unavailable)] };
+  if (input.connectedSite && !input.connectedSite.verified) {
+    waiting.unshift({ id: `connect:${input.connectedSite.siteId}`, kind: "decision", title: `Prove ${input.connectedSite.siteHost} is yours`, detail: "Add the two lines below to your site, publish it, then check. Nothing is collected until then.", at: null, href: null });
+  }
+  return { systemId: input.systemId, ...(input.connectedSite ? { connectedSite: input.connectedSite } : {}), domains: input.domains, waiting, requests, history, unavailable: [...new Set(input.unavailable)] };
 }
