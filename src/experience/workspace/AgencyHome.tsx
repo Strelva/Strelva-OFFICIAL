@@ -65,7 +65,7 @@ export function AgencyHome({
   const lastOffset = Math.max(0, Math.floor((total - 1) / MAX_AGENCY_CLIENT_LOADS) * MAX_AGENCY_CLIENT_LOADS);
   const offset = page.workspaceId === snapshot.workspaceId ? Math.min(page.offset, lastOffset) : 0;
   const selection = useMemo(() => agencyClientTargets(snapshot, MAX_AGENCY_CLIENT_LOADS, offset), [snapshot, offset]);
-  const targetSignature = selection.targets.map((target) => `${target.id}:${target.workIds.join(",")}`).join("|");
+  const targetSignature = selection.targets.map((target) => `${target.id}:${target.operated ? "operated" : target.workIds.join(",")}`).join("|");
   const [refresh, setRefresh] = useState(0);
   const [clients, setClients] = useState<ClientState>(() => selection.targets.length ? { status: "loading" } : {
     status: "ready",

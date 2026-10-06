@@ -113,6 +113,14 @@ export interface WorkspaceDelegation {
   canRevoke: boolean;
 }
 
+/** A business this agency operates (provider of record). A label, not access:
+ * the server lists only businesses the actor already belongs to. */
+export interface WorkspaceProvidedClient {
+  customerWorkspaceId: string;
+  name: string;
+  startedAt: string;
+}
+
 export interface WorkspaceProduct {
   id: string;
   name: string;
@@ -138,6 +146,10 @@ export interface WorkspaceSnapshot {
   managedWorkUnavailable?: boolean;
   handoffs: WorkspaceHandoff[];
   delegations: WorkspaceDelegation[];
+  /** Businesses the selected agency operates that the actor can open as a
+   * member (workspace_providers intersected with membership). Absent when
+   * not an agency, or when the provider list could not be read. Additive. */
+  providedClients?: WorkspaceProvidedClient[];
   products: WorkspaceProduct[];
   /** The business's Systems from the spine, with health and Possibilities.
    * Absent for personal and agency workspaces. Additive. */

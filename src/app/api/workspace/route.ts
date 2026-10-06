@@ -31,6 +31,7 @@ import { parseTrackerWorkPayload, presentTrackerHandoffPreview } from "@/product
 import { presentWorkspaceWork } from "@/experience/workspace/result";
 import { readWorkspaceSystems } from "@/experience/systems/server";
 import { systemsReleaseEnabled } from "@/platform/systems-release";
+import { listProvidedClients } from "@/platform/workspaces/business-ownership";
 import type { ManagedWork, WorkspaceDelegation, WorkspaceProduct, WorkspaceSnapshot, WorkspaceWork } from "@/experience/workspace/contracts";
 
 export const dynamic = "force-dynamic";
@@ -252,6 +253,14 @@ export async function GET(request: Request) {
       ? await listAgencyHandoffs(current, selected.id) : [];
     const agencyDelegations = selected.kind === "agency" && selected.access === "member"
       ? await listAgencyDelegations(current, selected.id) : [];
+    // The provider mark grants nothing: the list is only businesses the actor
+    // already belongs to. A failed read (or the migration not yet applied)
+    // leaves the agency home on delegations alone, as before.
+    const providedClients = selected.kind === "agency" && selected.access === "member"
+      ? await Promise.resolve().then(() => listProvidedClients(current, selected.id))
+        .then((rows) => rows.map(({ customerWorkspaceId, name, startedAt }) => ({ customerWorkspaceId, name, startedAt })))
+        .catch(() => undefined)
+      : undefined;
     const customerDelegations = selected.access === "member" && (selected.role === "owner" || selected.role === "admin")
       ? (await Promise.all(work.map((item) => listWorkDelegations(current, item.id)))).flat() : [];
     // Systems are business-level: the spine projection, its health and any
@@ -288,6 +297,7 @@ export async function GET(request: Request) {
       ...(managedPresence.unavailable ? { managedWorkUnavailable: true } : {}),
       handoffs: handoffs.map(({ id, sourceWorkId, recipientEmail, status, expiresAt, createdAt }) => ({ id, sourceWorkId, recipientEmail, status, expiresAt, createdAt })),
       delegations: [...agencyDelegations.map((value) => presentDelegation(value, false)), ...customerDelegations.map((value) => presentDelegation(value, true))],
+      ...(providedClients ? { providedClients } : {}),
       products,
       ...(systems ? { systems } : {}),
       releases: { systems: systemsReleased },
