@@ -188,6 +188,8 @@ export async function POST(request: Request) {
           whatChanged,
           siteUrl,
           rollingOut: revalidationFailed,
+          // Client email is tenant-aware: the per-client override must apply here too.
+          tenantId: tenant,
           logPrefix: "[admin/drafts]",
         });
       }

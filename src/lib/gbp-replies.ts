@@ -258,6 +258,7 @@ async function _emitFailure(
       status: "pending",
       metadata: {
         kind: "review_reply_verify_failed",
+        reviewAudience: "operator",
         reviewId,
         checkedAt,
         evidence,
