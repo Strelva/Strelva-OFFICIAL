@@ -14,6 +14,11 @@ const REASON_WORDS: Record<(typeof STRELVA_REASONS)[number], string> = {
   inquiry_promote: "Inquiry policy promotion",
 };
 
+/** The operator's words: "You decide" in the owner's screen is "Owner decides" here. */
+function routeLabel(route: LadderRoute): string {
+  return route === "owner_decides" ? "Owner decides" : ROUTE_WORDS[route].label;
+}
+
 const selectClass = "w-full rounded-md bg-gray-bg border border-glass-border px-3 py-2 text-sm text-warm-white focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:opacity-50";
 
 /**
@@ -64,20 +69,20 @@ export function OperatorPolicyEditor({ workspaceId, view: initial }: { workspace
               <tr key={item.kind} className="align-top">
                 <th scope="row" className="px-[18px] py-2.5 font-normal">
                   <span className="block text-warm-white">{item.label}</span>
-                  <span className="block font-mono text-[11px] text-gray-faint">{item.kind} · floor {ROUTE_WORDS[item.floor].label.toLowerCase()}</span>
+                  <span className="block font-mono text-[11px] text-gray-faint">{item.kind} · floor {routeLabel(item.floor).toLowerCase()}</span>
                   {notice?.kind === item.kind ? <span role="status" className={`mt-1 block text-[11.5px] ${notice.ok ? "text-positive" : "text-critical"}`}>{notice.text}</span> : null}
                 </th>
                 <td className="px-2 py-2.5">
                   {item.fixed ? <span className="text-gray-muted">Always the owner&apos;s (fixed rule)</span> : <div className="flex flex-wrap items-center gap-2">
                     <select aria-label={`Strelva's route for ${item.label}`} className={`${selectClass} min-w-[13rem] flex-1`} value={item.strelvaRoute} disabled={pending}
                       onChange={event => save(item, event.target.value as LadderRoute)}>
-                      {item.strelvaChoices.map(route => <option key={route} value={route}>{ROUTE_WORDS[route].label}</option>)}
+                      {item.strelvaChoices.map(route => <option key={route} value={route}>{routeLabel(route)}</option>)}
                     </select>
                     {!item.strelvaIsDefault ? <Button size="sm" variant="ghost" disabled={pending} onClick={() => save(item, null)} aria-label={`Reset Strelva's route for ${item.label} to the default`}>Reset</Button> : null}
                   </div>}
                 </td>
-                <td className="px-2 py-2.5 text-gray-muted">{item.ownerRoute ? ROUTE_WORDS[item.ownerRoute].label : "No setting"}</td>
-                <td className="px-[18px] py-2.5 text-warm-white">{ROUTE_WORDS[item.route].label}</td>
+                <td className="whitespace-nowrap px-2 py-2.5 text-gray-muted">{item.ownerRoute ? routeLabel(item.ownerRoute) : "No setting"}</td>
+                <td className="px-[18px] py-2.5 text-warm-white">{routeLabel(item.route)}</td>
               </tr>
             ))}
           </tbody>

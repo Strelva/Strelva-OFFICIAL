@@ -58,7 +58,6 @@ export function DecisionPolicySettings({ workspaceId }: { workspaceId: string })
     transport(`/api/workspace/needs-you/policy?workspaceId=${encodeURIComponent(workspaceId)}`, { cache: "no-store", signal: abort.signal }).then(async response => {
       const body: unknown = await response.json().catch(() => null);
       if (abort.signal.aborted) return;
-      if (response.status === 503 && !isView(body)) { setState({ status: "disabled" }); return; }
       if (!response.ok || !isView(body)) { setState({ status: "error", message: errorText(body, "Who decides could not be loaded. Nothing about it changed.") }); return; }
       setState({ status: "ready", role: body.role, view: body.view });
     }).catch(() => {
@@ -149,18 +148,18 @@ function PolicyRow({ item, canChange, busy, locked, notice, onChange }: {
   onChange: (item: PolicyKindView, change: Change, done: string) => void;
 }) {
   const strelva = ROUTE_WORDS[item.strelvaRoute].label;
-  const options = item.ownerChoices.map(route => ({ value: route, label: route === item.ownerChoices[0] ? `${ROUTE_WORDS[route].label} (Strelva's default)` : ROUTE_WORDS[route].label }));
-  return <li className="grid gap-3 px-2 py-4 sm:grid-cols-[minmax(0,1fr)_minmax(14rem,18rem)] sm:items-start">
+  const options = item.ownerChoices.map(route => ({ value: route, label: route === item.ownerChoices[0] ? `${ROUTE_WORDS[route].label} (default)` : ROUTE_WORDS[route].label }));
+  return <li className="grid gap-3 px-2 py-4 sm:grid-cols-[minmax(0,1fr)_minmax(14rem,20rem)] sm:items-start">
     <div className="min-w-0">
       <strong className="block text-sm font-medium text-warm-black">{item.label}</strong>
       <small className="mt-1 block text-xs leading-relaxed text-gray-muted">{item.example}</small>
       {!canChange || item.ownerChoices.length < 2 ? <small className="mt-1 block text-xs leading-relaxed text-warm-black">{ROUTE_WORDS[item.route].label}. {ROUTE_WORDS[item.route].detail}</small> : null}
-      {item.ownerRoute ? <small className="mt-1 block text-xs leading-relaxed text-gray-muted">Your setting. Strelva&apos;s default is &ldquo;{strelva}&rdquo;.</small> : null}
+      {item.ownerRoute ? <small className="mt-1 block text-xs leading-relaxed text-gray-muted">{canChange ? "Your setting." : "The owner's setting."} Strelva&apos;s default is &ldquo;{strelva}&rdquo;.</small> : null}
       {notice ? <small role="status" className={`mt-1 block text-xs leading-relaxed ${notice.tone === "error" ? "text-critical" : "text-accent-text"}`}>{notice.text}</small> : null}
     </div>
     {canChange && item.ownerChoices.length > 1 ? <div className="grid gap-2">
       <SelectInput
-        label={`Who decides: ${item.label}`}
+        aria-label={`Who decides: ${item.label}`}
         value={item.route}
         options={options}
         disabled={locked}
