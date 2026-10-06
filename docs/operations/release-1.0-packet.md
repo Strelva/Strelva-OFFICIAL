@@ -4,6 +4,11 @@ Created: 2026-10-06 against `integrate/reborn-1.0` at `9e0bd441`.
 Updated: 2026-10-06 on `w2/release-hardening`: findings 3, 5, 6, 8, 10 and
 11 are fixed in code and proven locally (tests and SQL checks), never in
 production. Two migrations were added (34 unapplied in total).
+Updated: 2026-10-06 on `w4/journey-gaps` against `integrate/reborn-1.0` at
+`30dcba1b` (waves 1–3 merged): 14 more migrations (48 unapplied, two new
+batches 5 and 6), 11 new flags, two new crons, two new guarded scripts, and
+the snapshot reads the new facts. Findings 12–15 are new. Wave 4's own
+migrations go in batch 7.
 Status: prepared, nothing executed. Every step below is a separate yes.
 
 This is every production step Strelva `1.0.0` needs, in order, written so
@@ -66,7 +71,7 @@ disagree, the checklist's stop conditions win.
    `--separate-business` (migration `20261008160000`, batch 4) converts a
    linked-account site into its own business instead. Ask the owner before
    converting either site (section 4).
-9. **No rollback SQL exists for any of the 32 migrations**, and production had
+9. **No rollback SQL exists for any of the 48 migrations**, and production had
    PITR off and no listed backups on Sept 21. A tested dump comes first.
 10. **Fixed: client-records parity runs itself.** A daily cron
     (`client-records-parity`, 05:40 UTC) compares Redis with Postgres and
@@ -81,6 +86,36 @@ disagree, the checklist's stop conditions win.
     run by default (tenant ids, column and key names only, never a value),
     writes only with `--apply`, and refuses a non-local Supabase or Redis
     without the yes, dry run included. Neither is part of 1.0.
+12. **The booking store needs an extension.** `20261008141000_booking_store`
+    runs `create extension if not exists btree_gist` for its one-slot
+    exclusion constraint. Check before batch 6:
+    `select name, installed_version from pg_available_extensions where name='btree_gist';`
+    One row means it can be created. No row: stop.
+13. **Batch 6 changes `tenant_leads` while leads are being written.** Since
+    `0.2.1`, every captured lead is copied into `tenant_leads`.
+    `20261008151000_connected_sites` swaps two checks, drops a `NOT NULL` and
+    adds a foreign-key column and two unique indexes on it, with no
+    `lock_timeout`. `20261009113000_inquiry_records` adds four columns
+    (constant defaults, no rewrite), a check, a foreign key to
+    `business_contacts` and an index (it has `lock_timeout 3s`). A blocked
+    copy waits or fails into the pending queue, so no visitor sees it. Push
+    at the quietest hour anyway.
+14. **Booking parity has no cron.** Leads record their own daily parity in
+    `lead-mirror-reconcile` while `STRELVA_LEADS_READ` is `compare` or
+    `postgres`, and the client stores have `client-records-parity`. Bookings
+    don't: `STRELVA_BOOKING_STORE_READ=postgres` serves the store only after
+    7 days in a row of `booking-store-move.ts parity` results, and each run
+    against production is a yes (S12). That means seven daily runs. Until
+    then `postgres` behaves as `compare`.
+15. **The Needs you chase now reaches owners who never sign in.**
+    `20261009100000_strelva_service_actor` lets the hourly `needs-you` cron
+    open workspace items for a business Strelva runs (converted, or provided
+    by Strelva's agency), as "Strelva (system)", logged in
+    `strelva_service_actions`. It never decides; deciding still needs the
+    owner's signed link or session. The `workspace-work` cron resumes an
+    approved Make real activation the same way. The chase stays a
+    heartbeat until `STRELVA_NEEDS_YOU_RELEASE=1`; a resume only happens
+    for an activation an owner approved under Systems.
 
 ## The whole order
 
@@ -92,7 +127,7 @@ disagree, the checklist's stop conditions win.
 | 3 | Deploy `0.2.1` from `main` (lead dual-write) | deploy | `strelva-reborn.md` |
 | 4 | Lead backfill | data | 3 · S1 |
 | 5 | Preview environment (optional, recommended before batch 2) | new env | 5 |
-| 6 | Batches 1 to 4 | migration ×4 | 1 |
+| 6 | Batches 1 to 7 (7 is wave 4's) | migration ×7 | 1 |
 | 7 | Deploy the 1.0 candidate with every new flag unset | deploy | 2 |
 | 8 | Copy report and analytics state; client-records dual-write, backfill, parity | data | 3 · S2–S3 |
 | 9 | Confirm `SECRETS_ENC_KEY` | env read | 2 |
@@ -102,11 +137,15 @@ disagree, the checklist's stop conditions win.
 | 13 | Flags in order | env ×N | 2 |
 | 14 | Stripe `workspaceId` metadata | Stripe | 3 · S7 |
 | 15 | Google binding copy, verify, then read flag | data + Google | 3 · S8 |
-| 16 | Owner invites, then email on per client | email | 3 · S6, 2 |
-| 17 | Release cut `1.0.0` with marketing | release | `VERSIONING.md` |
+| 16 | Needs you policy seeding per converted tenant | data | 3 · S11 |
+| 17 | Booking store: dual-write, backfill, 7 days of parity, then reads | env + data | 3 · S12, 2 |
+| 18 | Lead reads: compare, 7 days of parity, then Postgres reads, then authority | env ×3 | 2 |
+| 19 | Owner invites, then email on per client | email | 3 · S6, 2 |
+| 20 | Release cut `1.0.0` with marketing | release | `VERSIONING.md` |
 
 Steps 8 and 9 can run in parallel with 10. Nothing from step 12 on starts
-before step 6 is complete.
+before step 6 is complete. Steps 17 and 18 can start any time after step 7
+(leads after S1), in parallel with conversions.
 
 ---
 
@@ -162,13 +201,19 @@ It answers the open production facts the specs list:
 | `unified_events` dual-write lands | money-and-data §10 | `postgres.unifiedEvents` (24h, 7d, latest) |
 | Governed-work tables live | needs-you §10 | `postgres.governedWork` plus the two `GOVERNED_WORK_*` flags |
 | Which list of active tenants is current (`smokin-buddha`) | systems-catalog §10 | `postgres.activeTenants` |
+| The July org layer is applied (`accounts` exists) | this packet, batch 4 | `migrations.sentinels["20260729180000"]` |
+| Each wave 2–3 migration applied or not (one table each) | this packet, batches 5–6 | `migrations.sentinels` (`20261008110000` … `20261009113000`) |
+| How big the booking backfill is | bookings spec, "Moving today's bookings" | `postgres.bookings` (legacy `bookings` total and per active tenant, `public_website_bookings` receipts) |
+| Booking config, overrides, slot locks and queued store writes in Redis | bookings spec | `redis.families` (`reb:booking:config:*`, `reb:booking:overrides:*`, `reb:booking:slot:*`, `reb:booking-store:pending`) |
+| The 11 wave 2–3 flags (all expected absent) | section 2 | `env.flags` |
 
 Out of scope: gldf's own Supabase project (paused on Sept 30), Stripe,
 Vercel logs, Google, approve-link counts.
 
 **Stop if** the snapshot shows any migration applied that the repo lacks,
-any 1.0 table already present, or a tenant count that differs from 14/12
-without an explanation.
+any 1.0 table already present, the `20260729180000` sentinel (`accounts`)
+missing, any wave 2–3 flag already set, or a tenant count that differs from
+14/12 without an explanation.
 
 ---
 
@@ -185,13 +230,28 @@ them, applied 2026-07-30 per
 [persistence boundaries](../architecture/persistence-boundaries.md): dormant,
 nothing reads its tables. Batch 4 is the first thing to use them.
 
-### What is unapplied: 34 files
+### The July org layer (applied, not pushed)
 
-`9e0bd441` holds 117 migrations; `w2/release-hardening` adds two
-(`20261008160000` in batch 4, `20261008161000` in batch 3), so 119. The 34
-below are not in production. Digest is the first 12 hex characters of
-SHA-256 at `9e0bd441` (the two new files at `w2/release-hardening`). Re-hash
-before each push and stop on any difference.
+**`20260729180000_org_layer_phase0_accounts`** · `7e0010ec36a4`
+- Changes (applied 2026-07-30): `accounts`, `account_memberships`,
+  `subscriptions`, `subscription_items`, and `tenants.account_id`. Dormant;
+  nothing reads them until batch 4.
+- Depends on: nothing unapplied. Batch 4 (`20261007180000`) depends on it.
+- Rollback: none for 1.0. `rollback-org-layer-phase0.sql` drops `accounts`
+  with cascade and must never run once batch 4 is in.
+- Verify (step 0): the snapshot's `20260729180000` sentinel is `present`, and
+  `supabase migration list --linked` lists it. Either missing: stop; nothing
+  in this packet is pushed until it is explained.
+
+### What is unapplied: 48 files
+
+`9e0bd441` held 117 migrations; `w2/release-hardening` added two
+(`20261008160000` in batch 4, `20261008161000` in batch 3); waves 2–3 added
+14 more (batches 5 and 6). `30dcba1b` holds 133: the 85 applied plus the 48
+below. Digest is the first 12 hex characters of SHA-256; every one of the
+48 was re-hashed at `30dcba1b` and the 34 older ones are unchanged. Re-hash
+before each push and stop on any difference. Wave 4's migrations
+(`20261009130000`–`20261009135900`) are batch 7 and come on top.
 
 ### Before batch 0: a backup you have restored
 
@@ -225,12 +285,12 @@ shasum -a 256 "$DIR"/supabase/migrations/202609281* "$DIR"/supabase/migrations/2
 
 npx supabase --workdir "$DIR" link --project-ref zthifbnrtsirdekzzlxs
 npx supabase --workdir "$DIR" db push --linked --dry-run                 # batch 0
-npx supabase --workdir "$DIR" db push --linked --dry-run --include-all   # batches 1-4
+npx supabase --workdir "$DIR" db push --linked --dry-run --include-all   # batches 1-7
 # On the yes: the same command without --dry-run. Then the batch's verify queries.
 ```
 
-The applied-file filter returns exactly 85 files at `9e0bd441` (checked
-locally). The `--workdir`, `--include-all` and `--dry-run` flags were not run
+The applied-file filter returns exactly 85 files at `9e0bd441` and at
+`30dcba1b` (checked locally). The `--workdir`, `--include-all` and `--dry-run` flags were not run
 from this branch; confirm them with `npx supabase db push --help` on the CLI
 version used.
 
@@ -253,6 +313,14 @@ After each batch:
 | 2 | `20261001120000`, `20261001130000`, `20261001140000`, `20261004120000`, `20261007100000`, `20261007101000` | Yes: wraps three live functions, adds a column to `domain_claims`, a trigger on `saved_product_work`, RESTRICT FKs to `tenants` | Websites v2 and the Systems spine |
 | 3 | `20261007110000`, `20261007120000`, `20261007130000`, `20261007150000`, `20261007150100`, `20261007150200`, `20261007160000`, `20261007160100`, `20261007170000`, `20261007181000`, `20261007183000`, `20261007192000`, `20261008161000` | Yes: column + check on `workspace_invitations`, an AFTER DELETE trigger on `tenants`, replaces `accept_workspace_invitation` | Ownership, Needs you, flags (incl. agency rows), Versions, operator queue, Google bindings, client records |
 | 4 | `20261007155000`, `20261007180000`, `20261007182000`, `20261007190000`, `20261007190100`, `20261007190200`, `20261007192100`, `20261008160000` | Yes, the heaviest: non-concurrent index, FK swap that locks `tenants`, revokes, constraint swaps, replaced live functions, small backfills | Each statement reviewed for locks; grants captured first |
+| 5 | `20261008110000`, `20261008111000`, `20261008123000`, `20261008124000`, `20261008130000`, `20261008131000`, `20261008140000` | No Sept 30 objects. Triggers on batch 1–2 tables (`systems`, `tenant_workspace_links`), wraps `tenant_unlink_plan`, replaces `workspace_release_flag_names` | Ask history, website change receipts, listing read-back queue, Needs you policy imports, Possibilities, Make real live, lead reads |
+| 6 | `20261008141000`, `20261008150000`, `20261008150100`, `20261008151000`, `20261009100000`, `20261009110000`, `20261009113000` | Yes: `btree_gist` extension, a column + FK and an index on live `public_website_bookings`; checks, columns and indexes on `tenant_leads` (written since `0.2.1`); a column + trigger on `owner_decisions`; replaces batch 1–5 functions | Booking store and lifecycle, linked-tenant publishing, domain approvals, connected sites, the Strelva service actor, inquiry records |
+| 7 | `20261009130000`–`20261009135900` | Filled in by `w4/journey-gaps` (below) | Wave 4 journey gaps |
+
+Batches 5 and 6 are in filename order; batch 6 depends on batch 5
+(`20261009100000` keeps every flag name `20261008131000` adds;
+`20261009113000` replaces functions `20261008140000` creates). Splitting
+them puts every change to a live or already-written table in one push.
 
 Each batch depends only on earlier batches. The Sept 30 app must keep
 working on every batch. That is Gate 2 step 4, rehearsed locally by
@@ -579,6 +647,202 @@ Push at the quietest hour. Most of these files have no `lock_timeout`.
 - Verify: `select proname, position('separateBusiness' in prosrc) > 0 from pg_proc where proname in ('convert_tenant_to_business','business_billing_on_link');` → both `t`
 
 **After batch 4:** `select count(*) from supabase_migrations.schema_migrations where version >= '20260928130000';` → `34`
+
+#### Batch 5
+
+Every file is additive. Nothing here touches a Sept 30 table or function.
+
+**`20261008110000_ask_conversations`** · `daa05fc3df79`
+- Changes: `ask_conversations`, `ask_messages`; `append_ask_message`,
+  `list_ask_conversations`, `read_ask_conversation`, `ask_history_actor_role`.
+  `lock_timeout 3s`.
+- Depends on: none unapplied (`workspaces`, `users` only).
+- Rollback: drop the 4 functions, then `ask_messages`, `ask_conversations`. Loses Ask history.
+- Verify: `select to_regclass('public.ask_conversations'), to_regclass('public.ask_messages'), has_table_privilege('authenticated','public.ask_messages','select');` → `…, …, f`
+
+**`20261008111000_website_change_receipts`** · `76383b48111a`
+- Changes: append-only `website_change_receipts` (FK to live
+  `service_requests`, no change to it); `record_website_change_receipt`,
+  `list_website_change_requests`, `website_change_actor_role`. `lock_timeout 3s`.
+- Depends on: none unapplied.
+- Rollback: drop the 3 functions and the table. Loses receipts.
+- Verify: `select to_regclass('public.website_change_receipts');`
+
+**`20261008123000_listing_readback_queue`** · `1566ab25d9e5`
+- Changes: read-only `read_google_listing_readback_failures` for `/admin/queue`.
+- Depends on: `20261007160000` (`operator_queue_assert_operator`),
+  `20261007170000` (`google_listing_receipts`).
+- Rollback: drop it.
+- Verify: `select count(*) from pg_proc where proname='read_google_listing_readback_failures';` → `1`
+
+**`20261008124000_needs_you_policy_settings`** · `d377b485506f`
+- Changes: immutable `decision_policy_tenant_imports` (one receipt per
+  tenant and kind, written by S11); `needs_you_tenant_link`,
+  `read_tenant_decision_routes`, `set_tenant_decision_route`,
+  `list_owner_decisions_not_told`, `list_decision_policy_businesses`. Replaces nothing.
+- Depends on: `20261007120000` (`decision_policies`, `owner_decisions`),
+  `20261002120000` (`tenant_workspace_links`).
+- Rollback: drop the functions, trigger and table. Once S11 has run, the
+  moved kinds' authority falls back to Redis (`reb:content-autonomy`,
+  `reb:reply-voice`), which S11 never changes.
+- Verify: `select to_regclass('public.decision_policy_tenant_imports'), (select count(*) from pg_trigger where tgname='decision_policy_tenant_imports_immutable');` → `…, 1`
+
+**`20261008130000_system_possibilities`** · `47c86d063608`
+- Changes: `system_possibilities`, `system_possibility_pins`,
+  append-only `system_possibility_events`, immutable
+  `system_revision_contents`; 23 functions (the new `tenant_unlink_plan`
+  among them) incl. `save_system_possibility`,
+  `adopt_converted_tenant_systems`, `pause_tenant_systems`. Triggers
+  `systems_possibilities_follow_revision` (after update of
+  `current_revision_id` on `systems`) and `tenant_workspace_links_adopt_systems`
+  (after insert on `tenant_workspace_links`, so each conversion from now on
+  adopts its site as a live System at revision 1). Renames
+  `tenant_unlink_plan(uuid)` (from `20261007110000`) to
+  `tenant_unlink_plan_before_systems` and wraps it. No backfill: a link
+  made before this batch adopts nothing. Production has no links before
+  step 12, so none is needed.
+- Depends on: `20261004120000`, `20261002120000`, `20261007110000`, `20261007120000`.
+- Rollback: drop both triggers and the 23 functions (the wrapper
+  included), rename `tenant_unlink_plan_before_systems` back and
+  re-grant execute to service_role; drop events, pins, possibilities,
+  revision contents. Adopted `systems` rows stay (they are ordinary Systems).
+- Verify: `select to_regclass('public.system_possibilities'), to_regprocedure('public.tenant_unlink_plan_before_systems(uuid)') is not null, (select count(*) from pg_trigger where tgname in ('systems_possibilities_follow_revision','tenant_workspace_links_adopt_systems'));` → `…, t, 2`
+
+**`20261008131000_make_real_live`** · `d8dfd70362db`
+- Changes: replaces `workspace_release_flag_names()` (from `20261007130000`)
+  to add five `make_real_live:<channel>` keys; adds
+  `due_make_real_activations`, `read_ready_system_possibilities`.
+- Depends on: `20261007130000`, `20261008130000` (hard: `system_possibilities`).
+- Rollback: restore `workspace_release_flag_names()` from `20261007130000`
+  (rows already set on the new keys stay readable, can't change); drop the two.
+- Verify: `select 'make_real_live:booking_page' = any(public.workspace_release_flag_names());` → `t`
+
+**`20261008140000_tenant_lead_reads`** · `5cdabdf1ca0b`
+- Changes: `read_tenant_lead`, `read_tenant_lead_digests` over `tenant_leads`
+  (the `STRELVA_LEADS_READ` switch and its parity check).
+- Depends on: `20261005090000`.
+- Rollback: drop both (after rolling back `20261009113000`, which replaces them).
+- Verify: `select count(*) from pg_proc where proname in ('read_tenant_lead','read_tenant_lead_digests');` → `2`
+
+**After batch 5:** the same count → `41`
+
+#### Batch 6
+
+Check `btree_gist` is available first (finding 12). Push at the quietest
+hour: three files here have no `lock_timeout` and touch tables that are
+written today (finding 13).
+
+**`20261008141000_booking_store`** · `6c6a33fe69e3`
+- Changes: `create extension if not exists btree_gist`;
+  `booking_settings`, `business_bookings` (exclusion constraint
+  `business_bookings_one_slot`), immutable `business_booking_history`;
+  11 functions incl. `record_tenant_booking`, `read_tenant_bookings`,
+  `decide_workspace_booking_request`. Live `public_website_bookings` gains
+  nullable `booking_id uuid references business_bookings on delete set null`
+  (ACCESS EXCLUSIVE for the catalog change, no rewrite, no `lock_timeout`).
+  The legacy `bookings` table is not touched.
+- Depends on: `20261002120000` (`business_contacts`, `business_services`,
+  `tenant_workspace_links`), `20261004120000` (`systems`).
+- Rollback: roll back `20261009110000` first;
+  `alter table public.public_website_bookings drop column booking_id;` drop
+  the functions and the three tables. Leave the extension. Bookings written
+  since stay in the legacy stores (the dual-write never stops them).
+- Verify: `select to_regclass('public.business_bookings'), (select count(*) from information_schema.columns where table_name='public_website_bookings' and column_name='booking_id'), (select count(*) from pg_extension where extname='btree_gist');` → `…, 1, 1`
+
+**`20261008150000_website_linked_tenant_publication`** · `b52c753a4d2a`
+- Changes: immutable `website_linked_publications`; replaces
+  `reserve_website_hosted_tenant` (latest from `20261007101000`) and
+  `manage_published_website_tenant` (from `20261001120000`); adds
+  `publish_website_document_to_linked_tenant`, `read_website_current_tenant`,
+  `read_website_linked_publications`, `website_business_template`. Nothing
+  changes at apply; publishing writes `tenants.delivery_model` only when called.
+- Depends on: `20261001120000`, `20261002120000`, `20261007101000`.
+- Rollback: restore `reserve_website_hosted_tenant` from `20261007101000`
+  and `manage_published_website_tenant` from `20261001120000`; drop the new
+  functions and table. A tenant already republished keeps
+  `delivery_model='platform_template'`; the row records the prior model.
+- Verify: `select to_regclass('public.website_linked_publications'), to_regprocedure('public.read_website_current_tenant(uuid,uuid,uuid,text)') is not null;`
+
+**`20261008150100_website_domain_owner_approval`** · `872d95f7907b`
+- Changes: immutable `website_domain_approvals`;
+  `approve_website_domain_change`, `authorize_website_domain_change`,
+  `read_website_domain_approvals`. `manage_published_website_tenant` stays
+  owner-only.
+- Depends on: `20261001120000`.
+- Rollback: drop the functions and table.
+- Verify: `select to_regclass('public.website_domain_approvals');`
+
+**`20261008151000_connected_sites`** · `f9d54f4c426a`
+- Changes: `connected_sites`, append-only `connected_site_events`; 17 new
+  functions. `tenant_leads` and `tenant_client_records` each: `tenant_stable_id`
+  drops `NOT NULL`, new `connected_site_id` FK (on delete cascade), a
+  one-origin check, the `recorded_via` check swapped to allow
+  `connected_site`, a partial unique index. Replaces `system_origin_kinds()`
+  (latest from `20261007170000`; keeps every kind, adds `connected_site`).
+  No `lock_timeout`.
+- Depends on: `20261005090000`, `20261007181000`, `20261004120000`,
+  `20261002120000`, `20261007170000`.
+- Rollback: roll back `20261009113000` first (its `recorded_via` check names
+  `connected_site`); delete rows with `connected_site_id` set; drop the
+  indexes, checks and columns; restore both old `recorded_via` checks and
+  `NOT NULL` (from `20261005090000` and `20261007181000`); restore
+  `system_origin_kinds()` from `20261007170000`; drop the functions and both tables.
+- Verify: `select to_regclass('public.connected_sites'), (select count(*) from information_schema.columns where table_name in ('tenant_leads','tenant_client_records') and column_name='connected_site_id'), 'connected_site' = any(public.system_origin_kinds());` → `…, 2, t`
+
+**`20261009100000_strelva_service_actor`** · `2e80eabbbd08`
+- Changes: append-only `strelva_service_actions`; `owner_decisions` gains
+  `opened_by text` (null or `strelva_system`) and a before-update guard
+  trigger; replaces `owner_decision_json` (from `20261007120000`) and
+  `workspace_release_flag_names()` (keeps the `20261008131000` keys, adds
+  `connected_sites`); adds `strelva_runs_business`, `strelva_service_reader`,
+  `strelva_service_session`, `open_owner_decision_as_service`,
+  `record_strelva_service_action`, `due_make_real_activations_for_service`.
+  `lock_timeout 3s`.
+- Depends on: `20261007120000`, `20261007110000`, `20261007130000`,
+  `20261002120000`, `20261008131000`.
+- Rollback: restore `owner_decision_json` from `20261007120000` and
+  `workspace_release_flag_names()` from `20261008131000`; drop the trigger,
+  `owner_decisions.opened_by`, the new functions and the table.
+- Verify: `select to_regclass('public.strelva_service_actions'), (select count(*) from information_schema.columns where table_name='owner_decisions' and column_name='opened_by'), 'connected_sites' = any(public.workspace_release_flag_names());` → `…, 1, t`
+
+**`20261009110000_booking_lifecycle`** · `a873c16d81b5`
+- Changes: `business_booking_messages` (send log, unique booking + kind);
+  `claim_booking_messages`, `finish_booking_message`, `expire_booking_holds`,
+  `lapse_booking_requests`, `read_workspace_booking`,
+  `read_public_booking_by_manage_token`, `record_workspace_booking`,
+  `set_tenant_booking_hours`. Non-concurrent index
+  `public_website_bookings_manage_token_idx` on live `public_website_bookings`
+  (small table), two partial indexes on `business_bookings`. No `lock_timeout`.
+- Depends on: `20261008141000`, `20261004120000`, `20261002120000`.
+- Rollback: drop the functions, the three indexes and the table. Unsent
+  reminders are simply not sent.
+- Verify: `select to_regclass('public.business_booking_messages'), to_regclass('public.public_website_bookings_manage_token_idx');`
+
+**`20261009113000_inquiry_records`** · `18a6a41549fe`
+- Changes: `tenant_leads` gains `intake_state` (default `kept`),
+  `held_reason`, `intake_state_at`, `contact_id` (FK `business_contacts`, on
+  delete set null), the `recorded_via` check swapped again (adds
+  `spam_hold`), check `tenant_leads_spam_hold_held`, index
+  `tenant_leads_workspace_state_idx`; append-only `inquiry_events`; 10 new
+  functions incl. `hold_tenant_lead_as_spam`, `read_workspace_leads`,
+  `decide_held_workspace_lead`; replaces `read_tenant_leads` (latest
+  `20261007110000`), `read_tenant_lead`, `read_tenant_lead_digests`
+  (`20261008140000`) with the same signatures. `lock_timeout 3s`.
+- Depends on: `20261005090000`, `20261008140000`, `20261008151000`
+  (the check keeps `connected_site`), `20261002120000`.
+- Rollback: restore the three read functions from `20261007110000` and
+  `20261008140000`; delete `spam_hold` rows; drop `inquiry_events`, the new
+  functions, index, checks and columns; restore the `recorded_via` check from
+  `20261008151000`.
+- Verify: `select (select count(*) from information_schema.columns where table_name='tenant_leads' and column_name in ('intake_state','contact_id')), to_regclass('public.inquiry_events');` → `2, …`
+
+**After batch 6:** the same count → `48`
+
+#### Batch 7: Wave 4 journey gaps (`w4/journey-gaps`)
+
+Placeholder. Migrations in `20261009130000`–`20261009135900` are added by
+`w4/journey-gaps` and listed here by that branch with the same fields.
+Until then this batch is empty and nothing in it is pushed.
 
 ---
 
