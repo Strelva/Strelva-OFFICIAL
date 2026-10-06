@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Measure the code-side Strelva Reborn (1.0.0) exit criteria from the working tree.
+ * Measure the code-side Strelva Reborn exit criteria from the working tree.
  * Reads files only: no network, environment, database or production access.
  * Data and customer criteria (clients converted, flags on) live in
  * docs/product/strelva-reborn.md and need production evidence, not this script.

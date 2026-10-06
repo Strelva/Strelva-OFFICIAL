@@ -6,8 +6,8 @@ Component checkpoint reviewed on this date; earlier product evidence retains its
 own dates.
 Kind: product
 
-Next release: **Strelva Reborn** (`1.0.0`), every client in a business
-workspace. See the [release entry point](./docs/product/strelva-reborn.md). The earlier
+Next releases: **Strelva Reborn**, shipped as `0.x` steps starting with `0.2.1`,
+until every client is in a business workspace. See the [release entry point](./docs/product/strelva-reborn.md). The earlier
 [strelvav2](./docs/product/strelvav2.md) release shipped the workspace on Sept 30.
 This branch is for internal work and is not approved for production.
 
