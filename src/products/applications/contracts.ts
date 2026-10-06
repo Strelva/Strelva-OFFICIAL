@@ -5,6 +5,14 @@ import { applicationDateOnlySchema } from "./date-only";
 /** Bounded-work compatibility keeps a clear failure at these finite limits. */
 export const APPLICATION_RECORD_LIMIT = 1_000;
 export const APPLICATION_VERSION_HISTORY_LIMIT = 100;
+/**
+ * Candidate versions and the compatibility list of releases keep only the
+ * latest entries. Every candidate version is archived in
+ * `application_candidate_versions` and every release stays in
+ * `application_releases`, so an application takes any number of changes.
+ * `APPLICATION_VERSION_HISTORY_LIMIT` remains the parse bound for older rows.
+ */
+export const APPLICATION_RECENT_VERSIONS = 50;
 export const APPLICATION_SELECT_OPTION_LIMIT = 20;
 export const APPLICATION_SELECT_OPTION_LENGTH_LIMIT = 80;
 export const APPLICATION_RECORD_HISTORY_LIMIT = 100;
@@ -24,6 +32,10 @@ const fieldSchema = z.discriminatedUnion("type", [
   z.object({ ...fieldBase, type: z.literal("number") }).strict(),
   z.object({ ...fieldBase, type: z.literal("boolean") }).strict(),
   z.object({ ...fieldBase, type: z.literal("date") }).strict(),
+  // Links into the business record (STRELVA_SYSTEMS_RELEASE). The record
+  // stores the business_contacts or business_people id, never a copied name.
+  z.object({ ...fieldBase, type: z.literal("contact") }).strict(),
+  z.object({ ...fieldBase, type: z.literal("assigned_person") }).strict(),
   z.object({
     ...fieldBase,
     type: z.literal("select"),
@@ -54,6 +66,9 @@ export const applicationSpecSchema = z.object({
       ctx.addIssue({ code: "custom", message: "Select options must be unique", path: ["fields", index, "options"] });
     }
   });
+  if (spec.fields.filter((field) => field.type === "assigned_person").length > 1) {
+    ctx.addIssue({ code: "custom", message: "A tool can name one assigned person", path: ["fields"] });
+  }
   if (spec.components.some((component) => component.fields.some((id) => !ids.has(id)))) {
     ctx.addIssue({ code: "custom", message: "Components may only reference declared fields", path: ["components"] });
   }
@@ -169,10 +184,25 @@ export const applicationRollbackInputSchema = z.object({
   version: z.number().int().positive(),
 }).strict();
 
+/** Field types that point at the business record instead of holding a value. */
+export const APPLICATION_LINK_FIELD_TYPES = ["contact", "assigned_person"] as const;
+
+/**
+ * What the submitter typed for a link field. A contact is found or created by
+ * email or phone; an assigned person is found on staff by email. A plain text
+ * value in `record.values` (an email or a phone) is read the same way.
+ */
+export const applicationLinkInputSchema = z.object({
+  name: z.string().trim().min(1).max(160).optional(),
+  email: z.string().trim().max(254).optional(),
+  phone: z.string().trim().max(40).optional(),
+}).strict();
+
 export const applicationSubmitInputSchema = z.object({
   expectedReleaseVersion: z.number().int().positive(),
   expectedRecordsRevision: expectedRevision,
   record: recordSchema,
+  links: z.record(fieldId, applicationLinkInputSchema).optional(),
 }).strict();
 
 export const applicationDateValueSchema = applicationDateOnlySchema;

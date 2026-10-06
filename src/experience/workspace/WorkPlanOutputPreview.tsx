@@ -70,7 +70,7 @@ export function WorkPlanOutputPreview({ onOpenWork, workspaceId, planWorkId, pla
   if (!draft || !allowed) return <p className="text-sm text-gray-muted">This part needs further preparation before it can run.</p>;
   const resultName = draft.kind === "document" ? "document" : draft.kind === "application" ? "app" : "tracker";
   if (execution) return <section className="mt-3 space-y-3 text-sm" aria-label="Creation receipt">
-    <p role="status">{draft.kind === "document" ? "Private document" : draft.kind === "application" ? "Application" : "Tracker"} created in this workspace.</p>
+    <p role="status">{draft.kind === "document" ? "Private document" : draft.kind === "application" ? "Application" : "Internal tool"} created in this workspace.</p>
     <p className="text-gray-muted">Created {new Date(execution.receipt.completedAt).toLocaleString()}.{draft.kind === "application" ? " Open it to review and publish when ready." : " No message was sent or website published."}</p>
     {onOpenWork ? <Button type="button" onClick={() => onOpenWork(execution.nativeWorkId, execution.nativeProductId)}>Open {resultName}</Button> : <a className="inline-flex min-h-11 items-center underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&work=${encodeURIComponent(execution.nativeWorkId)}`}>Open {resultName}</a>}
   </section>;

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionUser } from "@/lib/db/server-client";
-import { WorkspaceAccessError, WorkspaceConflictError } from "./types";
+import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceMakeSystemsError } from "./types";
 export const workspaceJson = (value: unknown, status = 200) => NextResponse.json(value, { status, headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer" } });
 export async function workspaceHttpActor() {
   const user = await getSessionUser();
@@ -55,6 +55,8 @@ export async function readWorkspaceBody(request: Request, maximum = 150000): Pro
   try { return JSON.parse(raw.toString("utf8")); } catch { throw new z.ZodError([]); }
 }
 export function workspaceHttpFailure(error: unknown) {
+  // Owners, admins and members can file the tool as a Request instead.
+  if (error instanceof WorkspaceMakeSystemsError) return workspaceJson({ error: error.message, code: error.code }, 403);
   if (error instanceof WorkspaceAccessError) return workspaceJson({ error: "This work is unavailable to your account." }, 403);
   if (error instanceof WorkspaceConflictError) return workspaceJson({ error: error.message }, 409);
   if (isWorkspaceBodyTooLarge(error)) return workspaceJson({ error: "This request is too large." }, 413);

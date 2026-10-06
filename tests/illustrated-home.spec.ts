@@ -102,13 +102,21 @@ test("Home keeps decisions, allowance, business switching and site assignment re
 
 test("the same navigation remains across primary surfaces and utilities", async ({ page }, info) => {
   await page.goto("/preview/strelva?scenario=free");
-  for (const label of ["Home", "Customers", "Requests", "Running", "All apps and files", "Business details", "People & access", "Help"]) {
+  for (const label of ["Home", "Requests", "Running", "All apps and files", "Business details", "People & access", "Help"]) {
     await navigation(page).getByRole("link", { name: label, exact: true }).click();
     await expect(navigation(page).getByRole("link", { name: label, exact: true })).toHaveAttribute("aria-current", "page");
-    for (const name of ["Home", "Customers", "Requests", "Running", "Business details", "People & access"]) await expect(navigation(page).getByRole("link", { name, exact: true })).toBeVisible();
+    for (const name of ["Home", "Requests", "Running", "Business details", "People & access"]) await expect(navigation(page).getByRole("link", { name, exact: true })).toBeVisible();
   }
+  await expect(navigation(page).getByRole("link", { name: "Customers", exact: true })).toHaveCount(0);
   await navigation(page).getByRole("link", { name: "Business details", exact: true }).click();
   await page.screenshot({ path: info.outputPath("desktop-settings.png"), fullPage: true });
+});
+
+test("the retired Customers address opens Home and drops the old view", async ({ page }) => {
+  await page.goto("/preview/strelva?scenario=free&view=customers");
+  await expect(navigation(page).getByRole("link", { name: "Home", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByRole("heading", { name: "Customers", exact: true })).toHaveCount(0);
+  await expect(page).not.toHaveURL(/view=customers/);
 });
 
 test("mobile navigation traps focus and opens search without background interaction", async ({ page }, info) => {

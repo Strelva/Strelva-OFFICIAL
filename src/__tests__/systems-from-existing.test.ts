@@ -47,7 +47,6 @@ describe("systems from existing things", () => {
       ["Juniper site", "website", "live"],
       ["Tastings", "booking", "live"],
       ["Orders", "internal_app", "live"],
-      ["Document", "document", "draft"],
       ["Juniper Catering", "website", "live"],
       ["Juniper Catering inquiries", "inquiry", "live"],
     ]);
@@ -157,7 +156,7 @@ describe("systems from existing things", () => {
     expect(website).toHaveLength(1);
     expect(website[0]).toMatchObject({ provenance: "stored", system: { name: "Juniper website" } });
     expect(listed.systems.map(({ system }) => system.name)).toContain("Catering proposal");
-    expect(listed.systems).toHaveLength(7);
+    expect(listed.systems).toHaveLength(6);
   });
 
   it("keeps one website System under one id as a managed site converts", async () => {

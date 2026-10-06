@@ -17,12 +17,10 @@ contracts, not a user-facing light/dark preference or an OS theme switch.
 | Status meanings | [status-colors.ts](../../src/lib/status-colors.ts) | Positive, warning, critical, informational, neutral states |
 | Retained marketing | `.marketing-root` in globals | Retained marketing surfaces in this repository |
 | Client sites | [design-tokens.ts](../../src/lib/design-tokens.ts), template scopes and each client repository | Client-specific branding |
-| Historical delivery previews | `src/experience/delivery/*.module.css` | Locally scoped older interface studies |
 
 The production marketing repository and client repositories own their own
 palettes. Do not apply dashboard color changes to them. The historical delivery
-previews retain their local palette; they are not the current workspace's color
-source.
+previews (`src/experience/delivery`) were deleted on October 6, 2026.
 
 ## Choose the role
 

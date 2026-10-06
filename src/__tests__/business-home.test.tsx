@@ -113,7 +113,8 @@ describe("business home", () => {
     expect(html).toContain("Open AI check");
     expect(html).toContain("aria-label=\"Website and apps\"");
     expect(html).toContain(">alder.example<");
-    expect(html).toContain(">Customers<");
+    // The Customers page is retired in both states (October 6).
+    expect(html).not.toContain(">Customers<");
   });
 
   it("keeps intent primary while putting saved work and next actions in front of category counts", () => {

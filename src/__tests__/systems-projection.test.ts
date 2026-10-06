@@ -34,7 +34,7 @@ function existing(overrides: Partial<ExistingSystemsSnapshot> = {}): ExistingSys
 
 const candidate = (extra: Partial<WebsiteRebuildCandidate> = {}): WebsiteRebuildCandidate => ({
   workId: REBUILD, title: "attymooney.com rebuild", sourceHost: "attymooney.com", tenantId: null, ready: true,
-  summary: "Rebuilt.", evidence: "12 of 12 public pages carried over.", previewHref: `/api/websites/${REBUILD}/preview`, candidateRevision: 2, candidateContentHash: null, ...extra,
+  summary: "Rebuilt.", evidence: "12 of 12 public pages carried over.", previewHref: `/api/websites/${REBUILD}/preview`, candidateRevision: 2, candidateContentHash: null, origin: "rebuild", ...extra,
 });
 
 const ago = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();

@@ -14,7 +14,7 @@ async function actor() {
 function failed(error: unknown) {
   if (error instanceof WorkspaceAccessError) return json({ error: "This document is unavailable to your account." }, 403);
   if (error instanceof WorkspaceConflictError) return json({ error: "This document changed or cannot accept this change. Reload it before continuing." }, 409);
-  if (error instanceof z.ZodError) return json({ error: "Check the document title and text. Documents support up to 50,000 characters and 200 revisions." }, 400);
+  if (error instanceof z.ZodError) return json({ error: "Check the document title and text. Documents support up to 50,000 characters." }, 400);
   return json({ error: "Document storage is unavailable. Your change has not been confirmed." }, 503);
 }
 export async function GET(request: Request) {

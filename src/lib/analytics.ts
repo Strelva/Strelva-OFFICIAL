@@ -3,8 +3,10 @@
  *
  * Two things live here:
  *  1. Per-tenant analytics config (which GSC property + GA4 property to read),
- *     stored in Redis at `analytics:cfg:{tenantId}`, degrading to sensible
- *     defaults (GSC property derived from the tenant's siteUrl) without Redis.
+ *     stored in Postgres `tenant_analytics_config` and still written to the
+ *     original Redis key `analytics:cfg:{tenantId}`, which is the read
+ *     fallback when Postgres has no row. Degrades to sensible defaults (GSC
+ *     property derived from the tenant's siteUrl) when neither has a value.
  *  2. Fail-soft performance reads for both surfaces. Every read returns a
  *     status ("ok" | "unconfigured" | "unavailable") and never throws:
  *       - "unconfigured" when the tenant has no property to read,
@@ -30,6 +32,7 @@
  */
 
 import { getRedis } from "./redis";
+import { callRedisMoveRpc, postgresNotInPlay } from "./storage/redis-move";
 import { getTenantConfig } from "./tenants";
 import { getAccessToken, getServiceAccountCredential, queryGscTotals } from "./search-console";
 import { getGoogleAccessToken, getGoogleScopeGrants } from "./google-token";
@@ -137,7 +140,29 @@ export function deriveScDomain(siteUrl?: string | null): string | null {
   }
 }
 
+function nullableString(value: unknown): string | null {
+  return typeof value === "string" && value ? value : null;
+}
+
+/**
+ * Stored config: Postgres `tenant_analytics_config` first (Systems catalog
+ * section 5), then the original `analytics:cfg:{tenant}` key when Postgres has
+ * no row, is not configured, lacks the migration, or fails.
+ */
 async function readStored(tenantId: string): Promise<StoredConfig | null> {
+  const pg = await callRedisMoveRpc("read_tenant_analytics_config", { p_tenant_id: tenantId });
+  if (pg.ok && pg.data && typeof pg.data === "object") {
+    const row = pg.data as Record<string, unknown>;
+    return {
+      gscProperty: nullableString(row.gscProperty),
+      ga4PropertyId: nullableString(row.ga4PropertyId),
+      updatedAt: nullableString(row.updatedAt),
+    };
+  }
+  return readRedisStored(tenantId);
+}
+
+async function readRedisStored(tenantId: string): Promise<StoredConfig | null> {
   const redis = getRedis();
   if (!redis) return null;
   try {
@@ -183,6 +208,16 @@ export async function setAnalyticsConfig(
     updatedAt: new Date().toISOString(),
   };
 
+  // Postgres first. If it is in play and the write fails, stop before Redis so
+  // a stale Postgres row can never hide the newer Redis value; the caller sees
+  // the failure. Without Postgres this writes Redis alone, as before.
+  const pg = await callRedisMoveRpc("write_tenant_analytics_config", { p_tenant_id: tenantId, p_config: next, p_via: "dual_write" });
+  if (!pg.ok && !postgresNotInPlay(pg)) {
+    throw new Error(`Analytics config could not be saved (${pg.reason}).`);
+  }
+
+  // The Redis key is still written so a rollback to the Redis-only code reads
+  // the current config. It is never renamed or deleted.
   const redis = getRedis();
   if (redis) {
     try {

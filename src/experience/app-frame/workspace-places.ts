@@ -12,25 +12,26 @@
  * (`view=system&system=<id>`); the full list keeps its old `apps` address.
  * The on-screen word lives in `SYSTEMS_LABEL` so the brand call stays one edit.
  * October 5: Customers left the navigation. The page only listed where people
- * reach the business, not customers; `view=customers` still opens it for
- * existing links.
- * All of October 4 and 5 is behind STRELVA_SYSTEMS_RELEASE. Off, the list is
- * called "Apps" and Customers stays in the navigation, as before.
+ * reach the business, not customers.
+ * October 6: the Customers page is retired in both states (systems-catalog
+ * spec §9.6). Only its old address survives: `view=customers` opens Home, and
+ * the workspace rewrites the URL. Contacts live in the business record.
+ * The rest of October 4 and 5 is behind STRELVA_SYSTEMS_RELEASE. Off, the list
+ * is called "Apps", as before.
  * Every caller that needs to know which place a view belongs to, what it is
  * called, or how to link to it asks this module instead of keeping its own
  * mapping.
  */
 import { SYSTEMS_LABEL } from "@/experience/systems/model";
 
-export type StrelvaSection = "home" | "customers" | "requests" | "ongoing" | "apps" | "work" | "access" | "settings" | "products" | "help" | "account" | "system";
+export type StrelvaSection = "home" | "requests" | "ongoing" | "apps" | "work" | "access" | "settings" | "products" | "help" | "account" | "system";
 
 const APP_VIEWS: ReadonlySet<StrelvaSection> = new Set(["apps", "work", "products"]);
-const DIRECT_VIEWS: ReadonlySet<string> = new Set(["customers", "requests", "apps", "work", "ongoing", "products", "access", "settings", "help", "system"]);
+const DIRECT_VIEWS: ReadonlySet<string> = new Set(["requests", "apps", "work", "ongoing", "products", "access", "settings", "help", "system"]);
 const WORK_DETAIL_VIEWS: ReadonlySet<string> = new Set(["tracker", "inquiries", "document", "plan"]);
 
 const TITLES: Record<StrelvaSection, string> = {
   home: "Home",
-  customers: "Customers",
   requests: "Requests",
   ongoing: "Running",
   apps: SYSTEMS_LABEL,
@@ -46,6 +47,14 @@ const TITLES: Record<StrelvaSection, string> = {
 /** The sidebar place that owns a section. Every view of the app list counts as Apps. */
 export function placeForSection(section: StrelvaSection | undefined): StrelvaSection | undefined {
   return section && APP_VIEWS.has(section) ? "apps" : section;
+}
+
+/** Views whose page is retired. Their old address still resolves, to Home. */
+const RETIRED_VIEWS: ReadonlySet<string> = new Set(["customers"]);
+
+/** True when a `view` URL value names a retired page that now opens Home. */
+export function isRetiredView(view: string | null | undefined): boolean {
+  return !!view && RETIRED_VIEWS.has(view);
 }
 
 /** Reads a `view` URL value, including links written before these places. */

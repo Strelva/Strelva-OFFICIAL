@@ -38,10 +38,18 @@ function displayValue(value: string | number | boolean | undefined): string {
   return String(value);
 }
 
-function fieldInputType(type: "text" | "number" | "boolean" | "date"): "text" | "number" | "date" {
+function fieldInputType(type: "text" | "number" | "boolean" | "date" | "contact" | "assigned_person"): "text" | "number" | "date" | "email" {
   if (type === "number") return "number";
   if (type === "date") return "date";
+  if (type === "assigned_person") return "email";
   return "text";
+}
+
+/** Link fields take what a person knows: an email or phone, a staff email. */
+function fieldPlaceholder(type: string): string | undefined {
+  if (type === "contact") return "Email or phone";
+  if (type === "assigned_person") return "Staff member's email";
+  return undefined;
 }
 
 function nextIdempotencyKey(): string {
@@ -173,6 +181,7 @@ export function ApplicationUseRenderer({
                     label={`${field.label}${field.required ? " *" : ""}`}
                     aria-label={field.label}
                     type={fieldInputType(field.type)}
+                    placeholder={fieldPlaceholder(field.type)}
                     inputMode={field.type === "number" ? "decimal" : undefined}
                     value={value === undefined ? "" : String(value)}
                     required={field.required}

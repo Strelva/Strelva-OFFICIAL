@@ -39,7 +39,7 @@ describe("workspace role x permission table", () => {
 
   it("names every permission the SQL helper accepts and no others", () => {
     const migration = readFileSync(
-      path.join(process.cwd(), "supabase/migrations/20261005120000_workspace_authority_helpers.sql"),
+      path.join(process.cwd(), "supabase/migrations/20261007192000_make_systems_authority.sql"),
       "utf8",
     );
     const body = migration.split("create or replace function public.workspace_role_allows")[1]!.split("$$;")[0]!;

@@ -6,6 +6,7 @@ import {
   WORKSPACE_EXIT_STOPPED_MESSAGE,
   type WorkspaceActor,
 } from "./types";
+import { assertCanMakeSystems } from "./repository";
 
 type DbRow = Record<string, unknown>;
 type DbError = { code?: string; message?: string } | null;
@@ -130,6 +131,9 @@ function rpcArgs(input: PersistWorkPlanOutputInput): Record<string, unknown> {
 export async function persistWorkPlanOutput(input: PersistWorkPlanOutputInput): Promise<PersistedWorkPlanOutput> {
   const client = getSupabase();
   if (!client) throw new WorkspaceStoreError("Workspace storage is not configured");
+  // A plan that makes an internal tool is the Make path: operator or
+  // delegated agency only. Other outputs (documents, trackers) are unchanged.
+  if (input.nativeProductId === "applications") await assertCanMakeSystems(input.actor, input.workspaceId);
   const rpc = client as unknown as {
     rpc(name: string, args: Record<string, unknown>): Promise<{ data: DbRow[] | null; error: DbError }>;
   };

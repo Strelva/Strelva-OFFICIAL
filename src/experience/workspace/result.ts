@@ -128,7 +128,7 @@ export function presentWorkspaceWork(work: SavedWork, options: WorkspacePresenta
   if (work.productId === "tracker" && work.resourceKind === "tracker") {
     const tracker = parseTrackerWorkPayload(work.payload);
     return { id: work.id, workspaceId: work.workspaceId, productId: work.productId, resourceKind: work.resourceKind,
-      title: work.title?.trim() || tracker?.title || "Tracker", payload: null, input: {}, createdAt: work.createdAt,
+      title: work.title?.trim() || tracker?.title || "Internal tool", payload: null, input: {}, createdAt: work.createdAt,
       ...(work.sourceWorkId ? { sourceWorkId: work.sourceWorkId } : {}),
       ...(!tracker ? { unavailableReason: "This tracker could not be read. Its saved content has not changed." } : {}),
     };

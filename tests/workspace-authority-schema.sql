@@ -56,6 +56,7 @@ insert into authority_fixture(role, permission, allowed) values
 ('owner','sponsor_assignment',true),
 ('owner','exit_workspace',true),
 ('owner','manage_members',true),
+('owner','make_systems',false),
 ('admin','create_work',true),
 ('admin','create_handoff',true),
 ('admin','record_calendar_receipt',true),
@@ -69,6 +70,7 @@ insert into authority_fixture(role, permission, allowed) values
 ('admin','sponsor_assignment',false),
 ('admin','exit_workspace',false),
 ('admin','manage_members',false),
+('admin','make_systems',false),
 ('member','create_work',true),
 ('member','create_handoff',true),
 ('member','record_calendar_receipt',true),
@@ -81,7 +83,8 @@ insert into authority_fixture(role, permission, allowed) values
 ('member','invite_members',false),
 ('member','sponsor_assignment',false),
 ('member','exit_workspace',false),
-('member','manage_members',false)
+('member','manage_members',false),
+('member','make_systems',false)
 -- authority-fixture:end
 ;
 
@@ -93,8 +96,8 @@ select pg_temp.assert_true(
   'workspace_role_allows matches the role x permission fixture'
 );
 select pg_temp.assert_true(
-  (select count(*) from authority_fixture) = 39,
-  'fixture covers 3 roles x 13 permissions'
+  (select count(*) from authority_fixture) = 42,
+  'fixture covers 3 roles x 14 permissions'
 );
 select pg_temp.assert_true(
   public.workspace_role_allows(null, 'create_work') is not true

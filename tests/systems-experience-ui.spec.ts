@@ -170,7 +170,8 @@ test("with Systems off, Home is the pre-Systems workspace and System links open 
   await expect(page.getByRole("region", { name: "Recent", exact: true })).toBeVisible();
   const navigation = page.getByRole("complementary", { name: "Strelva navigation" });
   await expect(navigation.getByRole("region", { name: "Website and apps", exact: true })).toBeVisible();
-  await expect(navigation.getByRole("link", { name: "Customers", exact: true })).toBeVisible();
+  // The Customers page is retired in both states (October 6).
+  await expect(navigation.getByRole("link", { name: "Customers", exact: true })).toHaveCount(0);
   await expect(navigation.getByRole("link", { name: "All apps and files", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /Make real|Compare/ })).toHaveCount(0);
 

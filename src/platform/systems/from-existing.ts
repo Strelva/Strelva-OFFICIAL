@@ -47,7 +47,10 @@ import type { SystemStore } from "./store";
  *
  * Not mapped, on purpose: plans, investigations, responsibilities, learning
  * items and onboarding cases are work or records inside a System, not
- * Systems themselves (RULE_SYSTEM_OUTPUT_IDENTITY boundary). Retired
+ * Systems themselves (RULE_SYSTEM_OUTPUT_IDENTITY boundary). Private
+ * documents are supporting files under the business ("All apps and files"),
+ * not Systems, at 1.0.0 (docs/product/specs/systems-catalog.md 3.5). A saved
+ * check is evidence in the health of the System it watches (3.6). Retired
  * applications are omitted.
  */
 
@@ -160,8 +163,9 @@ const SAVED_WORK_KINDS: Record<string, { kind: SystemKind; fallbackName: string 
   "custom-applications/custom-application": { kind: "internal_app", fallbackName: "Custom app" },
   "scheduling/schedule": { kind: "booking", fallbackName: "Bookings" },
   "inquiry/inquiry_capability": { kind: "inquiry", fallbackName: "Inquiries" },
-  "documents/document": { kind: "document", fallbackName: "Document" },
-  "tracker/tracker": { kind: "tracker", fallbackName: "Tracker" },
+  // A tracker is an internal tool that started from a list or CSV: the same
+  // System kind as an application, with its own engine and data kept.
+  "tracker/tracker": { kind: "internal_app", fallbackName: "Internal tool" },
 };
 
 function savedWorkLifecycle(work: SavedWork, snapshot: Snapshot): { lifecycle: SystemLifecycle; basis: string } | null {
@@ -362,6 +366,96 @@ export function mergeBusinessSystems(graph: SystemGraph, existing: BusinessSyste
     target: c.target.type === "system" ? { ...c.target, system: { ...c.target.system, systemId: rename(c.target.system.systemId) } } : c.target,
   } })).filter(({ connection: c }) => !storedKeys.has(`${c.source.systemId}:${c.kind}:${JSON.stringify(c.target)}`));
   return { businessId: existing.businessId, systems, connections: [...storedConnections, ...derived] };
+}
+
+/**
+ * What the tenant side says about a managed site this business holds, read
+ * on the server from the tenant's own config (never copied into the
+ * workspace). Absent means unknown, and nothing is added for it.
+ */
+export interface TenantSiteFacts {
+  /** `tenants.features` as stored (legacy aliases allowed). */
+  features: readonly string[];
+  /** Public hostname of the live site, when the tenant records one. */
+  domain?: string | null;
+}
+
+/** Feature ids that mean the client runs its own checkout. */
+const CLIENT_CHECKOUT_FEATURES = new Set(["commerce", "shop", "products"]);
+/** Wellness surfaces that are views of the Bookings System, not Systems. */
+const BOOKING_VIEW_FEATURES = ["schedule", "roster"] as const;
+export type BookingView = (typeof BOOKING_VIEW_FEATURES)[number];
+
+/** The Store Connection's contract, in the words a customer reads. */
+export function clientStorePurpose(domain: string | null): string {
+  const where = domain ? `Store on ${domain}` : "Store on the site";
+  return `${where} · runs in the client's own checkout. Strelva has no authority there: the client's Stripe is the source of truth, and Strelva does not read it.`;
+}
+
+/** Projection-only identity for a managed site's tenant booking widget. */
+export function tenantBookingsSystemId(businessId: string, tenantStableId: string): string {
+  return uuidFromSeed(`system:${businessId}:tenant_bookings:${tenantStableId}`);
+}
+
+export interface TenantSurfaceListing extends BusinessSystems {
+  /** Day and week views of a Bookings System, by System id. */
+  bookingViews: Map<string, BookingView[]>;
+}
+
+/**
+ * Adds what the tenant side runs beside a managed website, without copying
+ * it (docs/product/specs/systems-catalog.md 3.2, 3.3):
+ *
+ * - A client checkout (`commerce`) is a Store Connection on the website
+ *   System: it appears with the site, Strelva has no authority, the client's
+ *   Stripe is the source of truth and Strelva does not read it. Never a
+ *   System, never a write.
+ * - Wellness schedule and roster are the Bookings System's day and week
+ *   views. When a Bookings System already appears on that site they attach to
+ *   it. Otherwise the site's own booking widget is shown as a Bookings System
+ *   that appears on the site. Its id is projection-only (origin null) until
+ *   the bookings spec gives the one booking store a stored origin; Make real
+ *   never targets it. Members stay frozen and are not shown.
+ */
+export function withTenantSurfaces(listing: BusinessSystems, facts: ReadonlyMap<string, TenantSiteFacts>): TenantSurfaceListing {
+  const systems = [...listing.systems];
+  const connections = [...listing.connections];
+  const bookingViews = new Map<string, BookingView[]>();
+  const websites = listing.systems.filter((item) => item.system.kind === "website" && item.references.tenantId);
+  for (const site of websites) {
+    const fact = facts.get(site.references.tenantId!);
+    if (!fact) continue;
+    const features = new Set(fact.features);
+    if ([...features].some((feature) => CLIENT_CHECKOUT_FEATURES.has(feature))) {
+      connections.push({ provenance: "existing", connection: existingConnection(site.system, "appear",
+        { type: "api", api: `client-checkout:${site.references.tenantId}` }, "connected", clientStorePurpose(fact.domain ?? null)) });
+    }
+    const views = BOOKING_VIEW_FEATURES.filter((feature) => features.has(feature));
+    if (!views.length || !site.references.tenantStableId) continue;
+    const onSite = listing.connections.find(({ connection }) => connection.kind === "appear"
+      && connection.target.type === "system" && connection.target.system.systemId === site.system.id
+      && listing.systems.some((item) => item.system.id === connection.source.systemId && item.system.kind === "booking"));
+    if (onSite) {
+      const id = onSite.connection.source.systemId;
+      bookingViews.set(id, [...new Set([...(bookingViews.get(id) ?? []), ...views])]);
+      continue;
+    }
+    const system: System = {
+      id: tenantBookingsSystemId(listing.businessId, site.references.tenantStableId),
+      businessId: listing.businessId, name: `${site.system.name} bookings`.slice(0, 160), purpose: null, kind: "booking",
+      lifecycle: site.system.lifecycle, currentRevision: null, origin: null, changeNumber: 1,
+      createdAt: site.system.createdAt, updatedAt: site.system.updatedAt,
+    };
+    systems.push({
+      system, provenance: "existing",
+      basis: "Bookings taken by the site's booking widget. The schedule and roster are its day and week views.",
+      references: { savedWorkId: null, tenantStableId: site.references.tenantStableId, tenantId: site.references.tenantId },
+    });
+    connections.push({ provenance: "existing", connection: existingConnection(system, "appear",
+      { type: "system", system: { businessId: listing.businessId, systemId: site.system.id } }, "connected", "Booking on the site") });
+    bookingViews.set(system.id, views);
+  }
+  return { businessId: listing.businessId, systems, connections, bookingViews };
 }
 
 /** Reads what the business already has (actor-checked, read-only). */

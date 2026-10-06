@@ -94,6 +94,8 @@ const fieldSchema = z.discriminatedUnion("type", [
   z.object({ ...useFieldBase, type: z.literal("number") }),
   z.object({ ...useFieldBase, type: z.literal("boolean") }),
   z.object({ ...useFieldBase, type: z.literal("date") }),
+  z.object({ ...useFieldBase, type: z.literal("contact") }),
+  z.object({ ...useFieldBase, type: z.literal("assigned_person") }),
   z.object({
     ...useFieldBase,
     type: z.literal("select"),
@@ -149,7 +151,7 @@ export interface ApplicationUseSnapshot {
   releaseVersion: number;
   views: Array<{
     kind: ApplicationViewKind;
-    fields: Array<{ id: string; label: string; type: "text" | "number" | "boolean" | "date" | "select"; required: boolean; options?: string[] }>;
+    fields: Array<{ id: string; label: string; type: "text" | "number" | "boolean" | "date" | "select" | "contact" | "assigned_person"; required: boolean; options?: string[] }>;
   }>;
   records: Array<{ id: string; values: Record<string, string | number | boolean>; revision?: number }>;
   access: {

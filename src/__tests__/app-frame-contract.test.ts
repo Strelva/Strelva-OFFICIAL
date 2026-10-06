@@ -54,10 +54,12 @@ describe("shared app frame accessibility contract", () => {
       signOut: createElement("button", { type: "button" }, "Sign out"),
       children: createElement("p", null, "Workspace"),
     };
-    // Before Systems (STRELVA_SYSTEMS_RELEASE off, the default) Customers is a place and the list is "All apps and files".
+    // Before Systems (STRELVA_SYSTEMS_RELEASE off, the default) the list is "All apps and files".
+    // The Customers page is retired in both states (October 6); its old address opens Home.
     const before = renderToStaticMarkup(createElement(StrelvaShell, shellProps));
-    for (const label of [">Customers<", "All apps and files"]) expect(before).toContain(label);
-    expect(before).toContain('href="/workspace?view=customers"');
+    expect(before).toContain("All apps and files");
+    expect(before).not.toContain(">Customers<");
+    expect(before).not.toContain('href="/workspace?view=customers"');
     expect(before).not.toContain("All systems and files");
     const html = renderToStaticMarkup(createElement(StrelvaShell, { ...shellProps, systemsReleased: true }));
 
@@ -67,7 +69,7 @@ describe("shared app frame accessibility contract", () => {
     for (const label of [">Home<", ">Requests<", ">Running<", ">Business details<", "People &amp; access", "Ask Strelva", "Search", "Help", "All systems and files"]) {
       expect(html).toContain(label);
     }
-    // With Systems, Customers left the navigation (October 5): the page listed links, not customers. view=customers still opens.
+    // With Systems, Customers left the navigation (October 5) and the page is retired (October 6). view=customers opens Home.
     for (const retired of [">Today<", ">Routines<", ">Business profile<", ">Work<", ">Ongoing<", ">Customers<"]) expect(html).not.toContain(retired);
     expect(html).not.toContain('href="/workspace?view=customers"');
     expect(html).toContain('href="/workspace?view=requests"');
