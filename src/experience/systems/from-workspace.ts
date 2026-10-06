@@ -16,7 +16,7 @@
 import type { OfferingInstallation } from "@/platform/offerings";
 import type { ManagedWork, WorkspaceSnapshot, WorkspaceSystemEntry, WorkspaceSystems, WorkspaceWork } from "@/experience/workspace/contracts";
 import { sameAppHref } from "@/experience/workspace/workspace-discovery";
-import { systemsReleased, type SystemConnection, type SystemKind, type SystemPossibility, type SystemSurface, type SystemVersion, type SystemView } from "./model";
+import { systemsReleased, type SystemConnection, type SystemHistoryRow, type SystemKind, type SystemPossibility, type SystemSurface, type SystemVersion, type SystemView } from "./model";
 
 export interface SystemsInput {
   snapshot: Pick<WorkspaceSnapshot, "workspaceId" | "workspaces" | "work" | "delegations" | "systems" | "releases">;
@@ -211,8 +211,26 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
       ...(possibility.evidence ? { evidence: possibility.evidence } : {}),
       ...(possibility.previewHref && sameAppHref(possibility.previewHref) ? { previewSrc: sameAppHref(possibility.previewHref) || undefined } : {}),
       openHref: `/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&view=websites&work=${encodeURIComponent(possibility.workId)}`,
+      ...(possibility.staleReason ? { staleReason: possibility.staleReason } : {}),
     };
     for (const id of view.affects) byId.get(id)!.possibilities.push(view);
+  }
+
+  // Make real in progress or partly live, on every System it changes.
+  for (const activation of ready?.activations ?? []) {
+    const view = { id: activation.id, title: activation.title, headline: activation.headline, partlyLive: activation.partlyLive, done: activation.done, total: activation.total, lines: activation.lines };
+    for (const id of activation.affects) {
+      const system = byId.get(id);
+      if (system) system.activations = [...(system.activations ?? []), view];
+    }
+  }
+  // History: the System's own changes and Strelva handled receipts for it, newest first, last five.
+  const history = new Map<string, SystemHistoryRow[]>();
+  for (const row of ready?.history ?? []) history.set(row.systemId, [...(history.get(row.systemId) ?? []), { id: row.id, sentence: row.sentence, at: row.at }]);
+  for (const receipt of ready?.handled ?? []) if (receipt.systemId) history.set(receipt.systemId, [...(history.get(receipt.systemId) ?? []), { id: receipt.id, sentence: receipt.sentence, at: receipt.at }]);
+  for (const [id, rows] of history) {
+    const system = byId.get(id);
+    if (system) system.history = rows.sort((a, b) => Date.parse(b.at) - Date.parse(a.at)).slice(0, 5);
   }
 
   // Several websites under one business with no stored Versions yet are

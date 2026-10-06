@@ -65,6 +65,26 @@ export interface SystemPossibility {
   previewSrc?: string;
   /** Where the alternative can be opened and used in full. */
   openHref?: string;
+  /** Why it went back to Exploring, in plain words. */
+  staleReason?: string;
+}
+
+/** Make real that is running or partly live, as the System page and In progress read it. */
+export interface SystemActivation {
+  id: string;
+  title: string;
+  headline: string;
+  partlyLive: boolean;
+  done: number;
+  total: number;
+  lines: ReadonlyArray<{ label: string; state: string; detail: string | null }>;
+}
+
+/** One past change to a System. Never called a Version. */
+export interface SystemHistoryRow {
+  id: string;
+  sentence: string;
+  at: string;
 }
 
 export interface SystemVersion {
@@ -112,7 +132,19 @@ export interface SystemView {
   parts?: ReadonlyArray<{ label: string; published: number; drafts: number }>;
   /** In-context offers, e.g. connecting Google for this website. */
   offers?: ReadonlyArray<{ kind: "connect_google"; label: string }>;
+  /** Make real in progress or partly live that changes this System. */
+  activations?: SystemActivation[];
+  /** The last changes, newest first: revisions and Strelva handled receipts. */
+  history?: SystemHistoryRow[];
 }
+
+/** What a paused System still does (ADR 0011 rule 5). */
+export const PAUSED_KEEPS: Partial<Record<SystemKind, string>> = {
+  bookings: "Paused. Bookings already made are kept.",
+  inquiries: "Paused. Inquiries already received are kept.",
+  website: "Paused. Its pages and history are kept.",
+  newsletter: "Paused. Subscribers are kept.",
+};
 
 export interface NeedsYouItem {
   id: string;
@@ -171,6 +203,8 @@ export function systemHref(base: string, workspaceId: string, systemId: string):
 
 export type MakeRealOutcome =
   | { kind: "result"; result: WorkspaceMakeRealResult }
+  /** Live Make real started (or why not): the result settles on the page as it runs. */
+  | { kind: "live"; headline: string; started: boolean }
   | { kind: "permission"; message: string }
   | { kind: "error"; message: string };
 

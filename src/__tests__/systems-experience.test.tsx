@@ -133,6 +133,26 @@ describe("Systems read adapter over the spine projection", () => {
   });
 });
 
+describe("stored Make real on the System views", () => {
+  it("puts each activation on every System it changes, and History newest first with receipts for that System", () => {
+    const { systems } = readBusinessSystems({ snapshot: snapshot([], projection({ ...mooney,
+      activations: [{ id: "a1", possibilityId: "p1", title: "A rebuilt attymooney.com", status: "needs_attention", headline: "Partly live", partlyLive: true, done: 3, total: 5, affects: [SITE, INBOX], lines: [] }],
+      history: [
+        { id: "r1", systemId: SITE, sentence: "Strelva started running it", at: "2026-10-01T12:00:00Z" },
+        { id: "r2", systemId: SITE, sentence: "Website content changed", at: "2026-10-03T12:00:00Z" },
+      ],
+      handled: [{ id: "h1", systemId: SITE, sentence: "Strelva: Publish the rebuilt attymooney.com", at: "2026-10-05T12:00:00Z", undo: "Undo from History" }],
+      possibilities: [{ ...mooney.possibilities[0]!, id: "p1", stored: true, status: "exploring", staleReason: "attymooney.com changed since this was built." }],
+    })), sites: [mooneySite] });
+    const site = systems.find(item => item.id === SITE)!;
+    expect(site.activations).toEqual([expect.objectContaining({ id: "a1", headline: "Partly live" })]);
+    expect(systems.find(item => item.id === INBOX)!.activations).toHaveLength(1);
+    expect(systems.find(item => item.id === INTAKE_SYSTEM)!.activations).toBeUndefined();
+    expect(site.history!.map(row => row.sentence)).toEqual(["Strelva: Publish the rebuilt attymooney.com", "Website content changed", "Strelva started running it"]);
+    expect(site.possibilities[0]!.staleReason).toBe("attymooney.com changed since this was built.");
+  });
+});
+
 describe("Make real and the System page", () => {
   const site: SystemView = {
     id: SITE, kind: "website", name: "attymooney.com", detail: "The Mooney Firm", lifecycle: "live",
@@ -154,10 +174,56 @@ describe("Make real and the System page", () => {
     const html = render();
     expect(html).toContain("<h1");
     expect(html).toContain('title="attymooney.com as visitors see it"');
-    for (const heading of ["Connections", "Possibilities", "Versions", "Make real", "Compare", "Website controls", "Ask for a change"]) expect(html).toContain(heading);
+    for (const heading of ["Possibilities", "Make real", "Compare", "Website controls", "Ask for a change"]) expect(html).toContain(heading);
     expect(html).toContain("Live");
     expect(html).toContain("Unknown. Nothing has checked this yet.");
     expect(html).not.toContain("Not checked here yet");
+  });
+
+  it("draws no empty panel, and with nothing beside the thing shows one line under it", () => {
+    const html = render();
+    for (const empty of [">Connections<", ">Versions<", ">History<", ">Making it live<", "Nothing else is connected to it yet", "It runs in one context today"]) expect(html).not.toContain(empty);
+    expect(html).not.toContain("Ask what else attymooney.com could become.");
+    const bare = render({ system: { ...site, possibilities: [] } });
+    expect(bare).not.toContain(">Possibilities<");
+    expect(bare).not.toContain("<aside");
+    expect(bare).toContain("Ask what else attymooney.com could become.");
+  });
+
+  it("folds working Connections into one line and shows anything not working in full", () => {
+    const html = render({ system: { ...site, connections: [
+      { id: "c1", kind: "appear", target: "Inquiries", sentence: "Inquiries arrive from the website.", status: "connected" },
+      { id: "c2", kind: "read", target: "Business record", sentence: "Reads the business hours.", status: "connected" },
+      { id: "c3", kind: "act", target: "Google", sentence: "Posts to Google.", status: "not_connected" },
+    ] } });
+    expect(html).toContain("Works with 2 things");
+    expect(html).toMatch(/Posts to Google\.[^]*Not connected/);
+    expect(html.indexOf("Posts to Google.")).toBeLessThan(html.indexOf("Works with 2 things"));
+  });
+
+  it("shows Make real in progress step by step, then History, in the spec's order", () => {
+    const html = render({ system: { ...site,
+      activations: [{ id: "a1", title: "Consult booking", headline: "Partly live", partlyLive: true, done: 3, total: 4, lines: [
+        { label: "Publish the booking page", state: "Done", detail: null },
+        { label: "Add the booking link on Google", state: "Waiting", detail: "Google hasn't approved Strelva's access yet." },
+      ] }],
+      history: [{ id: "h1", sentence: "Strelva started running it", at: "2026-10-01T12:00:00Z" }],
+    } });
+    expect(html).toContain("Making it live");
+    expect(html).toContain("Partly live");
+    expect(html).toContain("Waiting: Google hasn&#x27;t approved Strelva&#x27;s access yet.");
+    expect(html).toContain("History");
+    expect(html).toContain("Strelva started running it");
+    expect(html).not.toMatch(/>Version[^s]/);
+    const order = ["Making it live", ">Possibilities<", ">History<"].map((text) => html.indexOf(text));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+  });
+
+  it("says what keeps working while paused, and a stale possibility says why", () => {
+    const html = render({ system: { ...site, kind: "bookings", lifecycle: "paused", surface: { kind: "work", workId: "w", productId: "unknown" },
+      possibilities: [{ ...site.possibilities[0]!, status: "exploring", staleReason: "attymooney.com changed since this was built." }] } });
+    expect(html).toContain("Paused. Bookings already made are kept.");
+    expect(html).toContain("attymooney.com changed since this was built. Strelva is refreshing it.");
   });
 
   it("gives a non-owner a visible permission state on Make real", () => {

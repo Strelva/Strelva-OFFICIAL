@@ -143,6 +143,24 @@ describe("business home", () => {
     expect(html).not.toContain("$0");
   });
 
+  it("with Systems released, Strelva handled is the receipt feed and In progress lists Make real", () => {
+    const base = snapshot([work("Opening checklist")]);
+    const props = { sites: [], unassignedSites: [], siteAssignmentsKnown: true, offerings: offeringState, busy: false,
+      onOpen: noop, onStart: noop, onRequest: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account", systemsReleased: true };
+    const html = renderToStaticMarkup(createElement(BusinessHome, { ...props, snapshot: { ...base, systems: {
+      status: "ready", systems: [], connections: [], possibilities: [],
+      handled: [{ id: "h1", systemId: null, sentence: "Strelva: Publish the booking page", at: "2026-10-05T12:00:00Z", undo: "Undo from History" }],
+      activations: [{ id: "a1", possibilityId: "p1", title: "Consult booking", status: "in_progress", headline: "Making consult booking live: 2 of 4 done", partlyLive: false, done: 2, total: 4, affects: [], lines: [] },
+        { id: "a2", possibilityId: "p2", title: "Rebuilt site", status: "needs_attention", headline: "Partly live", partlyLive: true, done: 3, total: 5, affects: [], lines: [] }],
+    } } }));
+    expect(html).toContain("Strelva: Publish the booking page");
+    expect(html).toContain("Undo from History");
+    expect(html).toContain("Making consult booking live: 2 of 4 done");
+    expect(html).toContain("Rebuilt site: Partly live");
+    const quiet = renderToStaticMarkup(createElement(BusinessHome, { ...props, snapshot: base }));
+    expect(quiet).toContain("Nothing this week.");
+  });
+
   it("keeps a personal workspace to what it can use: no business request lists, saved work still one click away", () => {
     const html = renderToStaticMarkup(createElement(BusinessHome, {
       snapshot: { ...snapshot([work("Opening checklist")]), workspaces: [{ id: "business-1", kind: "personal", name: "Alex’s work" }] },

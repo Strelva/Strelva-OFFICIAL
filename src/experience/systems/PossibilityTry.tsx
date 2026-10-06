@@ -44,7 +44,7 @@ export function PossibilityTry({ state }: { state: PossibilityTryState }) {
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
-  return <main className="mx-auto w-full max-w-xl px-4 py-10 sm:py-16">{children}</main>;
+  return <div data-dashboard className="min-h-screen bg-surface-base text-gray-fg"><main className="mx-auto w-full max-w-xl px-4 py-10 sm:py-16">{children}</main></div>;
 }
 
 function TestSubmission() {
@@ -53,14 +53,14 @@ function TestSubmission() {
     event.preventDefault();
     setSent(true);
   }
-  return <section className="mt-6 rounded-lg border border-gray-200 p-4" aria-labelledby="try-form">
+  return <section className="mt-6 rounded-lg border border-gray-border p-4" aria-labelledby="try-form">
     <h2 id="try-form" className="text-sm font-semibold">Try it as a visitor</h2>
     {sent
       ? <p role="status" className="mt-3 text-sm">Test submission, nobody was told. It is not kept as a real record.</p>
       : <form className="mt-3 space-y-3" onSubmit={submit}>
-        <label className="block text-sm">Name<input name="name" autoComplete="off" className="mt-1 block w-full rounded border border-gray-300 px-3 py-2" /></label>
-        <label className="block text-sm">Email<input name="email" type="email" autoComplete="off" className="mt-1 block w-full rounded border border-gray-300 px-3 py-2" /></label>
-        <label className="block text-sm">Message<textarea name="message" rows={3} className="mt-1 block w-full rounded border border-gray-300 px-3 py-2" /></label>
+        <label className="block text-sm">Name<input name="name" autoComplete="off" className="mt-1 block w-full rounded border border-gray-border bg-surface-inset px-3 py-2 text-gray-fg" /></label>
+        <label className="block text-sm">Email<input name="email" type="email" autoComplete="off" className="mt-1 block w-full rounded border border-gray-border bg-surface-inset px-3 py-2 text-gray-fg" /></label>
+        <label className="block text-sm">Message<textarea name="message" rows={3} className="mt-1 block w-full rounded border border-gray-border bg-surface-inset px-3 py-2 text-gray-fg" /></label>
         <Button type="submit" size="sm">Send a test</Button>
         <p className="text-xs text-gray-muted">This is a test. It goes nowhere.</p>
       </form>}

@@ -7,13 +7,14 @@ import { previewSystems } from "@/experience/workspace/preview/systems-projectio
 import { systemsReleaseEnabled } from "@/platform/systems-release";
 import { previewPublishingMode } from "@/experience/workspace/preview/publishing-fixture";
 import { publishingReleaseEnabled } from "@/products/publishing/server";
+import { previewMakeRealMode } from "@/experience/workspace/preview/make-real-fixture";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Strelva · Local interface preview", robots: { index: false, follow: false } };
 
-export default async function StrelvaPreviewPage({ searchParams }: { searchParams: Promise<{ scenario?: string; previewSetup?: string; systems?: string; needsYou?: string; publishing?: string }> }) {
+export default async function StrelvaPreviewPage({ searchParams }: { searchParams: Promise<{ scenario?: string; previewSetup?: string; systems?: string; needsYou?: string; publishing?: string; makeReal?: string }> }) {
   if (!strelvaUiPreviewEnabled()) notFound();
-  const { scenario, previewSetup, systems: systemsParam, needsYou, publishing: publishingParam } = await searchParams;
+  const { scenario, previewSetup, systems: systemsParam, needsYou, publishing: publishingParam, makeReal } = await searchParams;
   const selected = previewScenario(scenario);
   // STRELVA_SYSTEMS_RELEASE decides, as on the workspace route. This
   // fixture-only page may override it with `systems=on|off` so both states
@@ -22,7 +23,9 @@ export default async function StrelvaPreviewPage({ searchParams }: { searchParam
   // The Systems projection runs on the server, as it does for the workspace route.
   const systems = await previewSystems(selected, { installedStaffRequest: previewSetup === "staff-request", seededRequests: previewSetup === "requests", systems: released,
     // STRELVA_PUBLISHING_RELEASE decides; `publishing=on|off|pending|disconnected|none` overrides here only.
-    publishing: previewPublishingMode(publishingParam, publishingReleaseEnabled()) });
+    publishing: previewPublishingMode(publishingParam, publishingReleaseEnabled()),
+    // Fixture-only: `makeReal=partly|live` shows the spec's walk-through (Make real in progress, History, Strelva handled).
+    makeReal: previewMakeRealMode(makeReal) });
   // Needs you on Home is fixture-only here: `needsYou=on` shows the policy model's Home.
   return <WorkspacePreview scenario={selected} systems={systems} needsYou={needsYou === "on"} />;
 }
