@@ -318,6 +318,34 @@
   color: var(--warm-black);
 }
 
+/* Home's "From your site" (SiteSummarySection). */
+.siteSummary + .siteSummary {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--gray-border);
+}
+
+.siteSummary h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+}
+
+.siteSummary .list {
+  margin-top: 8px;
+}
+
+.siteSummary .list .muted {
+  padding: 8px 0;
+}
+
+.siteLinks {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 20px;
+}
+
 .details {
   padding: 12px 0;
   border-top: 1px solid var(--gray-border);

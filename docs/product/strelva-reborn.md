@@ -336,7 +336,10 @@ Neither is used by any journey today.
 - [ ] Each `/dashboard` page has a workspace home or redirects to one. Of 22
       pages: 3 have a home, 4 partial, 4 retire, the rest need building.
       *Partial: 25 page files mapped (2 ready incl. `/reports` → Recaps,
-      4 retire, 2 frozen, 17 stay) on `build/owner-entry` · L*
+      4 retire, 2 frozen, 17 stay) on `build/owner-entry` · L. Local Oct 6
+      (`w2/owner-surfaces-a`): 8 ready, adding `/`, `/review` (both only
+      while Needs you is on), `/leads`, `/reviews`, `/analytics` and
+      `/settings`; 11 stay. Parity gaps listed per page in the spec §5.*
 - [x] `/dashboard` and `/client/{tenant}/dashboard` stay permanent redirects;
       gldf and rohlax repos hard-code them and are not changed.
       *Built locally on `build/owner-entry`: 307 only for a member of the

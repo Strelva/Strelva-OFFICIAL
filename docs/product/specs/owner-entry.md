@@ -25,6 +25,21 @@ and `scripts/business-ownership.ts`. The operator button on
 `/admin/clients/[id]` is not built; the script is the only way to issue one.
 Requirement 10 (magic-link claim) and the rest are not built.
 
+Built and proven locally on `w2/owner-surfaces-a` (Oct 6): workspace homes
+for `/`, `/review`, `/leads`, `/reviews`, `/analytics` (and `/health`) and
+`/settings` (and `/ownership`), each marked `ready` with its parity gaps in
+`dispositions.ts`. Every home reads through `tenant_workspace_links`
+(`read_workspace_tenant_links`, direct members only) and then applies the
+`/dashboard` tenant check (`hasDashboardViewAccess`) per linked site; a site
+that fails it is named and not read
+(`src/platform/owner-entry/linked-sites.ts`). The homes open only where
+owner entry is on for the workspace and viewer. `/` and `/review` redirect
+only while `STRELVA_NEEDS_YOU_RELEASE` is on. Proof:
+`src/__tests__/owner-entry-homes{,-routes,-ui}.test.ts(x)` and fixture
+renders at desktop and 390px (`/preview/strelva/places`,
+`/preview/strelva?scenario=mooney&needsYou=on`). Not proven: an
+authenticated journey against a real linked tenant.
+
 Covers Reborn section 6 and the 1.0.0 line "Owners sign in on their client
 admin host and land in their workspace; old `/dashboard` links redirect."
 Depends on the [needs-you spec](./needs-you.md) for how owner decisions reach
@@ -211,6 +226,12 @@ entry carries its reason. gldf still waits on `/`, `/review` (needs-you spec)
 and `/site` (editing still opens `/dashboard/site`, so a redirect would loop).
 rohlax still waits on `/schedule` and `/roster` (the one booking store).
 
+*As built on `w2/owner-surfaces-a` (2026-10-06):* **8 ready** (adds `/`,
+`/review`, `/leads`, `/reviews`, `/analytics`, `/settings`), **4 retire**
+(`/health`, `/ownership` now land on ready homes), **2 frozen**, **11 stay**.
+gldf now waits only on `/site`; rohlax on `/site`, `/schedule` and
+`/roster`. The rows below say where each landed and what it doesn't do yet.
+
 The nav that owners see comes from `getDashboardSurfaces`
 (`src/lib/dashboard-surfaces.ts`). It shows Today, Ask Strelva, Website,
 Google Business, Analytics, Reports and Reviews, plus Schedule, Members and
@@ -220,7 +241,7 @@ The other pages are reached from inside those.
 
 | `/dashboard` page | Lands in the workspace | Today | Work needed |
 | --- | --- | --- | --- |
-| `/` Today | Home: Needs you, Strelva handled, In progress, Recent | Partial. `BusinessHome` is in production but reads no tenant data. Today's queue, "Who reached out", stats and activity are Redis and tenant-side | Home reads the linked tenant's pending approvals, leads and activity through the link (needs-you spec) · M |
+| `/` Today | Home: Needs you, **From your site** (visits, customer actions, who reached out, Strelva's work, links to the places below), Strelva handled, In progress, Recent | **Ready** while Needs you is on (`w2/owner-surfaces-a`). Approvals come through Needs you's tenant-event adapter; the rest from `/api/workspace/site-summary` | Parity gaps: no onboarding checklist or wizard, day-one cards, retention panel or "Do this next"; no sparklines; no Edit site / View live site buttons on Home |
 | `/chat` Ask Strelva | Ask Strelva on Home and on each System | None. 0% in the workspace | Reborn §4 Ask Strelva: ~24 tools from `api/agent/route.ts` into `agent-shared.ts`, workspace route resolves workspace → link → tenant · L |
 | `/site` Website editor | Website System ("greatlakesdriedfruit.com") | Partial. `SystemPage.tsx` shows name, domain, live link, health and preview (local, Systems flag). Editing is link-out only | Edits for existing sites from the System page, native or embedded · S to link, L native |
 | `/content` | Website System | Retire. Redirects to `/site` today | Map to the Website System · S |
@@ -233,16 +254,16 @@ The other pages are reached from inside those.
 | `/integrations` Connections | Connections on each System, plus account grants under Business details | Partial. `ConnectionsPanel` on `SystemPage` (local) doesn't read Redis `connections:{tenant}:{provider}` | Project tenant connections as System Connections · M |
 | `/sources` | Same as `/integrations` | Retire. Redirects to `/integrations` | Map · S |
 | `/sources/[id]` Connection detail | That Connection on its System | None | Connection detail view · S–M |
-| `/leads` | Inquiries System | Partial. ~35%, `STRELVA_INQUIRIES_RELEASE` off, leads Redis-authoritative | Inquiries spec · M |
+| `/leads` | Inquiries, `/workspace/inquiries` | **Ready** (`w2/owner-surfaces-a`). Every linked site's leads from Redis via `src/lib/leads.ts`, newest first, reply by email, 30-day count | Parity gaps: the `tenant_leads` mirror isn't read (Redis outage shows "couldn't be read"); not the inquiries spec's System page (status, assignee, follow-ups) |
 | `/members` (wellness) | **Frozen** on `/dashboard` (rewards frozen, systems catalog §3.2–3.3) | Frozen | None at 1.0.0 |
 | `/roster` (wellness) | Bookings System, day roster | None | Day roster (Reborn §4 Bookings) · in L |
 | `/schedule` (wellness) | Bookings System | Partial. Workspace scheduling is ~25% and uses a different store from the tenant widget | One booking store (Reborn §2) · L |
 | `/ownership` | Business menu: Business details → ownership, plus `/workspace/export` and `/workspace/exit` | Retire. Redirects to `/settings#ownership` today. Export and exit exist in production | Map to the exit and ownership section · S |
 | `/reports` Weekly and monthly recaps | `/workspace/recaps`, linked from Home (`?view=monthly` → `period=month`) | **Ready** (branch `build/owner-entry`). Reads every linked site's recaps through the tenant link | Crons resolving the recipient through the link is the systems-catalog stream's |
-| `/analytics` Live traffic, milestone, AI visibility | Website System, results and health | None | Results panel on the Website System · M |
-| `/review` Approval queue | Needs you | Partial. Needs-you UI is local with no real policy source; the queue is Redis events | Needs-you spec · L |
-| `/reviews` Reviews and replies | Publishing System (reviews), *acts on* Google | None | Reborn §4 Publishing · L |
-| `/settings` | Split. *Business* (profile) → Business details on the business record. *Branding* and *site config* → Website System. *Dependencies* → Connections. *Shortcuts* and *ownership* → business menu. *Account* → `/workspace/account`. *Domains* → Website System *appears on* Connection. *Plan* → business menu billing | Partial. `WorkspaceBusinessSettings` and `/workspace/account` exist in production. Business details doesn't edit the business record. Billing has no `workspaceId` in Stripe | Business record editing (business-record spec), domain view (Reborn §5), billing that follows the client (Reborn §3) · L |
+| `/analytics` Live traffic, milestone, AI visibility | Website results and health, `/workspace/results` (`?range=` kept) | **Ready** (`w2/owner-surfaces-a`). Same reads as the old page; Search Console and GA4 through `tenant_analytics_config`; latest scan as site health | Parity gaps: site health is the scan summary, not the interactive audit card; no custom date picker; no Ask Strelva hand-offs; not yet a panel on the Website System page |
+| `/review` Approval queue | Needs you, on Home | **Ready** while Needs you is on (`w2/owner-surfaces-a`) | Parity gaps: no edit-before-approve, resolved history or stale-section count; operator queue controls stay on `/dashboard/review?legacy=1` |
+| `/reviews` Reviews and replies | Google listing: Reviews, `/workspace/reviews` | **Ready** (`w2/owner-surfaces-a`). Reviews, existing replies, Strelva's waiting draft, reply through `/api/workspace/reviews/reply` (same governed path as `/api/reviews/reply`, plus `requireTenantAccess`), review request link | Parity gaps: no reply-voice settings or AI draft button; no copy buttons; reads the tenant review store, not Publishing's listing receipts |
+| `/settings` | Business details, `/workspace/business-details`, with a section for every old `#anchor` linking on to People and access, account, plan/ownership and the website | **Ready** (`w2/owner-surfaces-a`). Owner (or a Strelva operator as admin) edits name, phone, public email, description and the owner recipient in the business record, revision-checked | Parity gaps: no branding, site basics, navigation, connected services or domain editing; tenant profile fields don't change; billing still has no `workspaceId` |
 | `/store` (gldf) | **Frozen** on `/dashboard`; the website System shows a Store *Connection* (systems catalog §3.2, decision 9.4) | Frozen | None at 1.0.0 |
 | `[...notFound]` | Home | n/a | Map · S |
 
