@@ -1,7 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import {
   adminClient, bookingStatus, cleanup, convertTenant, decideByLink, decision, decisions, fixtureTenant, journeyEnvironment,
-  makeOperator, oneTapLink, openLink, person, requestBooking, runNeedsYouChase,
+  makeOperator, oneTapLink, openLink, person, requestBooking, reviewedRebuild, runNeedsYouChase,
 } from "./support/journeys";
 
 // "Clients who never log in keep working." The owner on record has no
@@ -77,11 +78,62 @@ test("an owner who never signs in decides a booking request by email link only",
   }
 });
 
-// Make real for an owner who never signs in. The make_real source needs a
-// member actor (needsMemberActor: true): an owner link resolves only through
-// needs_you_owner_actor, a verified owner *member*, so without an account the
-// decision answers "Sign in to decide this". Only stored Possibilities with a
-// live channel on (STRELVA_MAKE_REAL_LIVE) are proposed without a session at
-// all. Missing piece: the spec decision on whether an account-less owner can
-// approve Make real by link (owner-entry open decision 6).
-test.fixme("an owner without an account approves Make real by email link", async () => {});
+// Make real for an owner who never signs in (owner-entry decision 6): the
+// signed link decides the plan. Strelva (system) reads and runs it under a
+// make_real_link session bound to the item and the owner recipient
+// (20261009131000_make_real_owner_link.sql); the owner's link stays the
+// approver of record, and the plan fingerprint is checked again at decision
+// time. The result is honest: it ran on an isolated copy.
+test("an owner without an account approves Make real by email link", async ({ browser, request }, testInfo) => {
+  const admin = adminClient();
+  const operator = await person(browser, admin, "j10-email-makereal-operator");
+  let tenantId = "";
+  let businessId = "";
+  try {
+    await makeOperator(admin, operator);
+    const ownerEmail = `local-j10-makereal-never-signs-in-${Date.now()}@example.test`;
+    const tenant = await fixtureTenant(admin, { siteName: "Harbor Pilates", ownerEmail, ownerName: "Mara Quinn" });
+    tenantId = tenant.tenantId;
+    businessId = convertTenant(tenantId, operator.email);
+    expect((await admin.from("users").select("id").eq("email", ownerEmail)).data).toEqual([]);
+
+    // Strelva rebuilt the site; the reviewed rebuild is a Ready Possibility.
+    const workId = randomUUID();
+    const work = await admin.from("saved_product_work").insert({
+      id: workId, workspace_id: businessId, product_id: "websites", resource_kind: "website", title: "Harbor rebuild", created_by: operator.userId,
+      payload: reviewedRebuild(workId, tenantId, operator.userId),
+    }).select("id").single();
+    expect(work.error).toBeNull();
+
+    // The hourly chase opens the Make real ask as Strelva (system); nobody signed in.
+    expect((await runNeedsYouChase({ request })).failed).toBe(0);
+    const open = (await decisions(admin, businessId, operator, false)).find((row) => row.sourceLifecycle === "make_real" && row.sourceId.startsWith(`website-rebuild:${workId}@`));
+    expect(open?.state).toBe("open");
+
+    // GET never decides; a link for anyone else is refused; neither starts anything.
+    const prefetch = await openLink(browser, oneTapLink(open!, ownerEmail, "approve"));
+    await expect(prefetch.getByRole("button", { name: "Confirm — approve" })).toBeVisible();
+    await prefetch.context().close();
+    const tampered = await decideByLink(browser, oneTapLink(open!, "someone-else@example.test", "approve"), /Confirm — approve/);
+    await expect(tampered.getByRole("heading", { name: "This link isn't for this account" })).toBeVisible();
+    await tampered.context().close();
+    expect((await decision(admin, businessId, open!.id)).state).toBe("open");
+
+    // The owner approves from the email. No session, no account.
+    const approved = await decideByLink(browser, oneTapLink(open!, ownerEmail, "approve"), /Confirm — approve/);
+    await expect(approved.getByRole("heading", { name: "Approved" })).toBeVisible();
+    await approved.screenshot({ path: testInfo.outputPath("email-only-make-real-approved-390.png"), fullPage: true });
+    await approved.context().close();
+    const decided = await decision(admin, businessId, open!.id);
+    expect(decided).toMatchObject({ state: "approved", outcome: "done", decidedByKind: "owner_link" });
+    expect(decided.outcomeReason).toContain("isolated copy");
+    expect((await admin.from("users").select("id").eq("email", ownerEmail)).data).toEqual([]);
+
+    // Replaying the link is already handled; nothing runs twice.
+    const replayed = await openLink(browser, oneTapLink(open!, ownerEmail, "approve"));
+    await expect(replayed.getByRole("heading", { name: "Already handled" })).toBeVisible();
+    await replayed.context().close();
+  } finally {
+    await cleanup(admin, { tenantIds: tenantId ? [tenantId] : [], workspaceIds: businessId ? [businessId] : [], operatorEmail: operator.email, people: [operator] });
+  }
+});

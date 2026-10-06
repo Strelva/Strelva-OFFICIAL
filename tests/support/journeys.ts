@@ -16,6 +16,7 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { buildWorkspaceApproveUrl } from "@/lib/approve-link";
+import { siteDocumentHash, siteDocumentSchema } from "@/products/websites/site-document";
 import { localEnvironment } from "./local-auth";
 
 export type Admin = SupabaseClient;
@@ -170,6 +171,66 @@ export async function requestBooking(admin: Admin, tenantId: string, input: { na
   expect(body.status).toBe("recorded");
   expect(body.booking.status).toBe("requested");
   return body.booking;
+}
+
+/** A reviewed website rebuild of the converted site: the Ready Possibility Make real decides on. */
+export function reviewedRebuild(workId: string, tenantId: string, createdBy: string) {
+  const at = new Date().toISOString();
+  const document = siteDocumentSchema.parse({
+    version: 2, siteName: "Harbor", theme: { palette: "light", typeScale: "standard" },
+    pages: [{ path: "/", title: "Harbor", description: "", root: "hero" }],
+    nodes: { hero: { id: "hero", type: "Hero", variant: "statement", props: { title: "Harbor Pilates" }, children: [], factIds: [] } },
+    facts: {}, assets: {}, redirects: [], provenance: { composer: "rules" },
+  });
+  return {
+    version: 2, revision: 3, title: "Harbor rebuild", input: { requestId: `request-${randomUUID().slice(0, 8)}`, url: "https://harbor.example.test/" }, status: "review_ready",
+    stages: [], checkpoint: null, sourceAudit: null, audit: null,
+    pageMapping: [{ sourceUrl: "https://harbor.example.test/", targetPath: "/", carriedOver: true }],
+    candidate: { revision: 2, contentHash: siteDocumentHash(document), document, previewHref: `/api/websites/${workId}/preview` },
+    approvedCandidateRevision: null, tenantId, launch: { receipt: null, readBack: null }, lastError: null, createdBy, createdAt: at, history: [],
+  };
+}
+
+/** The tenant's own site host: <tenant>.localhost on the app's port (the visitor's side). */
+export function tenantHost(tenantId: string): string {
+  const env = journeyEnvironment();
+  return `${env.protocol}//${tenantId}.localhost:${env.port}`;
+}
+
+/**
+ * The one booking store serving a tenant's visitor routes, as after the
+ * bookings move (spec steps 3-5): a service on the site, request-mode
+ * settings with bookable hours, and seven clean days of booking parity so
+ * `STRELVA_BOOKING_STORE_READ=postgres` takes effect. The parity table has no
+ * RPC for past days, so it is written with psql on the disposable database
+ * (STRELVA_LOCAL_DB_URL, loopback only). Needs CONTENT_SOURCE=postgres and
+ * STRELVA_BOOKING_STORE_READ=postgres on the app server.
+ */
+export async function serveBookingsFromTheStore(admin: Admin, tenantId: string, service: { id: string; name: string }) {
+  for (const name of ["STRELVA_BOOKING_STORE_READ", "CONTENT_SOURCE"] as const) {
+    if (process.env[name] !== "postgres") throw new Error(`Set ${name}=postgres for the app server and this runner.`);
+  }
+  const dbUrl = process.env.STRELVA_LOCAL_DB_URL || "";
+  if (!dbUrl || !["localhost", "127.0.0.1"].includes(new URL(dbUrl).hostname)) throw new Error("Set STRELVA_LOCAL_DB_URL to the disposable database (loopback only).");
+  const content = await admin.from("content").upsert({ tenant_id: tenantId, section: "services", data: { services: [{ id: service.id, name: service.name, duration: "60" }] } }, { onConflict: "tenant_id,section" });
+  expect(content.error).toBeNull();
+  const week = [0, 1, 2, 3, 4, 5, 6].map((day) => ({ day, opens: "09:00", closes: "17:00" }));
+  const settings = await admin.rpc("upsert_tenant_booking_settings", {
+    p_tenant_id: tenantId, p_via: "native",
+    p_settings: { mode: "request", bufferMinutes: 0, minNoticeMinutes: 0, maxAdvanceDays: 60, defaultLengthMinutes: 60, timezone: "America/New_York", bookableHours: week },
+  });
+  expect(settings.error).toBeNull();
+  const stable = await admin.from("tenants").select("stable_id").eq("id", tenantId).single();
+  expect(stable.error).toBeNull();
+  const stableId = String(stable.data!.stable_id);
+  if (!/^[0-9a-f-]{36}$/.test(stableId)) throw new Error("The fixture tenant has no stable id.");
+  execFileSync("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-q", "-c",
+    `insert into public.tenant_client_record_parity(store, tenant_stable_id, checked_on, ok, redis_count, postgres_count, missing, mismatched)
+       select 'bookings', '${stableId}'::uuid, (clock_timestamp() at time zone 'UTC')::date - d, true, 0, 0, 0, 0
+       from generate_series(0, 7) d on conflict do nothing`], { stdio: ["ignore", "pipe", "pipe"], timeout: 30_000 });
+  const streak = await admin.rpc("client_record_parity_streak", { p_store: "bookings" });
+  expect(streak.error).toBeNull();
+  expect(Number((streak.data as { days: number }).days)).toBeGreaterThanOrEqual(7);
 }
 
 export async function bookingStatus(admin: Admin, tenantId: string, bookingId: string): Promise<string | null> {

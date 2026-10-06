@@ -489,8 +489,8 @@ CLI was available on October 6. They are also not in the `authenticated-journeys
 | `tests/owner-journey-1-0-authenticated-local.spec.ts` | The operator converts a fixture tenant, designates Strelva's agency workspace and invites the owner. The owner accepts the signed link, lands in the workspace on `admin.<tenant>.localhost` and sees Systems and Needs you. The owner approves a booking by one-tap link with no session; a link for another recipient is refused. Then the owner undoes a Strelva-handled change. |
 | `tests/operator-queue-authenticated-local.spec.ts` | The operator takes an owner's request in `/admin/queue` and closes it with 12 minutes, at 1440 and 390. A non-operator is refused. |
 | `tests/make-real-authenticated-local.spec.ts` | Make real on a website Possibility through Needs you. The result is partial and isolated, and the live site is unchanged. A member is refused. |
-| `tests/booking-approval-authenticated-local.spec.ts` | Booking requests become Needs you decisions. Approve, pressed from the keyboard, confirms one; Not yet declines the other. Runs at 1440 and 390. |
-| `tests/email-only-owner-authenticated-local.spec.ts` | An owner with no account decides by email link only, after the hourly chase opens the ask. GET changes nothing, and a tampered recipient is refused. |
+| `tests/booking-approval-authenticated-local.spec.ts` | Booking requests become Needs you decisions. Approve, pressed from the keyboard, confirms one; Not yet declines the other. Runs at 1440 and 390. A visitor's request on the tenant host, with no Redis, reaches Needs you and is confirmed. |
+| `tests/email-only-owner-authenticated-local.spec.ts` | An owner with no account decides by email link only, after the hourly chase opens the ask. GET changes nothing, and a tampered recipient is refused. The same owner approves Make real by email link. |
 
 Shared steps live in `tests/support/journeys.ts`. Operator steps run the real
 operator scripts (`convert-tenant-to-workspace`, `business-ownership`) with
@@ -498,14 +498,22 @@ operator scripts (`convert-tenant-to-workspace`, `business-ownership`) with
 stays off, so the chase records deliveries as suppressed. The specs rebuild the
 email's one-tap link with the same signer (`buildWorkspaceApproveUrl`).
 
-Three steps are `test.fixme`, each naming the missing piece:
+The three steps that were `test.fixme` are real tests since `w4/journey-gaps`
+(October 6). Like the rest, they have not yet run against a stack:
 
-- Strelva handled doesn't list approved decisions with an undo.
-  `read_strelva_handled` returns only expired decisions.
-- The visitor's `/api/booking` request on the tenant host needs Redis and
-  parity history, so the specs seed through `record_tenant_booking` instead.
-- An owner with no account can't use Make real. The `make_real` source
-  requires a member (owner-entry decision 6).
+- Strelva handled lists the approved booking decision, says Strelva confirmed
+  it, and says why it isn't a one-tap undo
+  (`20261009130000_strelva_handled_decisions.sql`).
+- A visitor's request-mode booking goes through `/api/booking` on
+  `<tenant>.localhost` with the one store serving and no Redis. The step
+  seeds seven days of booking parity with `psql` on the disposable database
+  (`STRELVA_LOCAL_DB_URL`, exported by `prepare-launch-auth-stack.sh`), so it
+  needs `psql` on the runner and `STRELVA_BOOKING_STORE_READ=postgres` and
+  `CONTENT_SOURCE=postgres` on the app server. The server caches the parity
+  streak for five minutes, so run it on a fresh server.
+- An owner with no account approves Make real by email link
+  (`20261009131000_make_real_owner_link.sql`). The chase opens the ask as
+  Strelva (system), and the result says it ran on an isolated copy.
 
 Strelva's agency designation is permanent: the table refuses update and
 delete. Run these specs only on a disposable stack. A rerun replays the
@@ -528,7 +536,8 @@ set -a; source "$STRELVA_PROOF_TMP/env"; set +a
 
 # 2. Flags and local-only secrets, shared by the app and the runner.
 export STRELVA_LOCAL_AUTH_PROOF=1 STRELVA_WORKSPACE_RELEASE=1 STRELVA_SYSTEMS_RELEASE=1 \
-  STRELVA_NEEDS_YOU_RELEASE=1 STRELVA_OWNER_ENTRY=1 STRELVA_BOOKING_STORE_WRITE=1
+  STRELVA_NEEDS_YOU_RELEASE=1 STRELVA_OWNER_ENTRY=1 STRELVA_BOOKING_STORE_WRITE=1 \
+  STRELVA_BOOKING_STORE_READ=postgres CONTENT_SOURCE=postgres
 export APPROVE_LINK_SECRET="$(openssl rand -hex 32)" CRON_SECRET="$(openssl rand -hex 32)"
 export REB_DEV_UNGATED_ACCESS=0 SCAFFOLD_DEV_UNGATED_ACCESS=0 EMAIL_SENDING_ENABLED=false \
   CUSTOMER_EMAIL_ENABLED=false OPERATOR_EMAILS_ENABLED=false PROSPECT_EMAILS_ENABLED=false

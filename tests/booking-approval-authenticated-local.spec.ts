@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { adminClient, bookingStatus, cleanup, convertedBusinessWithOwner, decisions, journeyEnvironment, noHorizontalOverflow, requestBooking } from "./support/journeys";
+import { adminClient, bookingStatus, cleanup, convertedBusinessWithOwner, decisions, journeyEnvironment, noHorizontalOverflow, requestBooking, serveBookingsFromTheStore, tenantHost } from "./support/journeys";
 
 // A booking request reaches the owner as a Needs you decision and the owner's
 // Approve confirms it in the one booking store; Not yet declines another and
@@ -63,11 +63,55 @@ for (const width of [1440, 390]) {
 }
 
 // The visitor's own hop: a request-mode booking taken through the tenant's
-// public route (POST /api/booking on <tenant>.localhost). That route claims
-// the slot in Redis first (createBookingAtomic) and serves the one store only
-// after seven days of parity (STRELVA_BOOKING_STORE_READ=postgres +
-// client_record_parity_streak), and the disposable stack has neither Redis
-// nor a parity history. The journey above seeds the request through
-// record_tenant_booking, the same function the dual write calls.
-// Missing piece: a local Redis (or an in-memory slot claim) in the auth stack.
-test.fixme("a visitor's request-mode booking on the tenant site reaches Needs you", async () => {});
+// public route (POST /api/booking on <tenant>.localhost), with the one store
+// serving and no Redis in the stack. The store's exclusion constraint guards
+// the slot; the rate limit falls back to a per-instance count only because
+// the store serves (src/app/api/booking/route.ts).
+test("a visitor's request-mode booking on the tenant site reaches Needs you", async ({ browser }, testInfo) => {
+  const admin = adminClient();
+  let setup: Awaited<ReturnType<typeof convertedBusinessWithOwner>> | null = null;
+  try {
+    setup = await convertedBusinessWithOwner(browser, admin, "j10-visitor");
+    const { owner, businessId, tenantId } = setup;
+    await serveBookingsFromTheStore(admin, tenantId, { id: "consultation", name: "Consultation" });
+
+    // The visitor, on the tenant's own site, with no session.
+    const visitor = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const site = await visitor.newPage();
+    const origin = tenantHost(tenantId);
+    const day = new Date();
+    day.setUTCDate(day.getUTCDate() + 10);
+    const date = day.toISOString().slice(0, 10);
+    const offered = await site.goto(`${origin}/api/booking/availability?date=${date}&serviceId=consultation`);
+    expect(offered?.status()).toBe(200);
+    const slots = ((await offered!.json()) as { slots: string[] }).slots;
+    expect(slots.length).toBeGreaterThan(0);
+    const booked = await site.evaluate(async (input) => {
+      const response = await fetch("/api/booking", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) });
+      return { status: response.status, body: await response.json() };
+    }, { serviceId: "consultation", date, startTime: slots[0]!, clientName: "Jo Visitor", clientEmail: "jo.visitor@example.test" });
+    expect(booked.status, JSON.stringify(booked.body)).toBe(200);
+    expect(booked.body).toMatchObject({ success: true, requested: true, confirmationSent: false });
+    // The same time again is refused by the store, not double-held.
+    const again = await site.evaluate(async (input) => (await fetch("/api/booking", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(input) })).status,
+      { serviceId: "consultation", date, startTime: slots[0]!, clientName: "Second Visitor", clientEmail: "second@example.test" });
+    expect(again).toBe(409);
+    await visitor.close();
+
+    // The owner sees it in Needs you and approves it; the store confirms it.
+    const home = await owner.context.newPage();
+    await home.setViewportSize({ width: 1440, height: 900 });
+    await home.goto(`/workspace?workspaceId=${businessId}`);
+    const needsYou = home.getByRole("region", { name: "Needs you" });
+    await expect(needsYou.getByText(/^Booking request: Jo Visitor/)).toBeVisible();
+    await home.screenshot({ path: testInfo.outputPath("visitor-request-needs-you-1440.png"), fullPage: true });
+    const item = (await decisions(admin, businessId, owner, false)).find((row) => row.sourceLifecycle === "booking_request" && row.title.startsWith("Booking request: Jo Visitor"));
+    expect(item?.state).toBe("open");
+    const decided = home.waitForResponse((r) => new URL(r.url()).pathname === "/api/workspace/needs-you" && r.request().method() === "POST");
+    await needsYou.getByRole("button", { name: /^Approve: Booking request: Jo Visitor/ }).click();
+    expect((await (await decided).json()).status).toBe("done");
+    await expect.poll(() => bookingStatus(admin, tenantId, item!.sourceId)).toBe("confirmed");
+  } finally {
+    if (setup) await cleanup(admin, { tenantIds: [setup.tenantId], workspaceIds: [setup.businessId], operatorEmail: setup.operator.email, people: [setup.operator, setup.owner] });
+  }
+});

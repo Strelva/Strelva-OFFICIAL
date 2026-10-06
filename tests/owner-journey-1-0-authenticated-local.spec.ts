@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
-  adminClient, adminHost, bookingStatus, cleanup, convertTenant, decideByLink, decision, decisions, designateAgency,
+  adminClient, adminHost, bookingStatus, cleanup, convertTenant, convertedBusinessWithOwner, decideByLink, decision, decisions, designateAgency,
   fixtureTenant, inviteOwner, journeyEnvironment, makeOperator, noHorizontalOverflow, oneTapLink, openLink, person, requestBooking, type Person,
 } from "./support/journeys";
 
@@ -129,11 +129,42 @@ test("operator converts and invites; the owner accepts, lands on the admin host 
   }
 });
 
-// The decision itself under Strelva handled. read_strelva_handled
-// (supabase/migrations/20261007120000_needs_you.sql) lists business record
-// revisions, website document receipts, policy history and only *expired*
-// owner decisions; an approved decision and the booking it confirmed are not
-// receipts there, so Home cannot show "Strelva confirmed Dana Reed's booking"
-// with undo. Missing piece: a handled receipt (and its undo or "why not") for
-// approved owner decisions, e.g. a booking_history source in read_strelva_handled.
-test.fixme("Strelva handled lists the approved booking decision with its undo state", async () => {});
+// The decision itself under Strelva handled
+// (20261009130000_strelva_handled_decisions.sql): after the owner approves a
+// booking request by one-tap link, Home says Strelva confirmed it, and says
+// honestly why it isn't a one-tap undo (a confirmed booking is moved or
+// cancelled in Bookings, and the customer is told).
+test("Strelva handled lists the approved booking decision with its undo state", async ({ browser }, testInfo) => {
+  const admin = adminClient();
+  let setup: Awaited<ReturnType<typeof convertedBusinessWithOwner>> | null = null;
+  try {
+    setup = await convertedBusinessWithOwner(browser, admin, "j10-handled");
+    const { owner, businessId, tenantId } = setup;
+    const booking = await requestBooking(admin, tenantId, { name: "Dana Reed", email: "dana@example.test", daysAhead: 9, hour: 15 });
+
+    const home = await owner.context.newPage();
+    await home.setViewportSize({ width: 1440, height: 900 });
+    await home.goto(`/workspace?workspaceId=${businessId}`);
+    await expect(home.getByRole("region", { name: "Needs you" }).getByText(/^Booking request: Dana Reed/)).toBeVisible();
+    const open = (await decisions(admin, businessId, owner, false)).find((row) => row.sourceLifecycle === "booking_request" && row.sourceId === booking.id);
+    expect(open?.state).toBe("open");
+
+    const approved = await decideByLink(browser, oneTapLink(open!, owner.email, "approve"), /Confirm — approve/);
+    await expect(approved.getByRole("heading", { name: "Approved" })).toBeVisible();
+    await approved.context().close();
+    expect(await bookingStatus(admin, tenantId, booking.id)).toBe("confirmed");
+
+    await home.reload();
+    const handled = home.getByRole("region", { name: "Strelva handled" });
+    const receipt = handled.getByRole("listitem").filter({ hasText: /Strelva confirmed the booking you approved: Dana Reed/ });
+    await expect(receipt).toHaveCount(1);
+    await expect(receipt.getByText("A confirmed booking isn't undone in one tap. Move or cancel it in Bookings, and the customer is told.")).toBeVisible();
+    await expect(receipt.getByRole("button", { name: /^Undo/ })).toHaveCount(0);
+    await home.screenshot({ path: testInfo.outputPath("handled-approved-booking-1440.png"), fullPage: true });
+    await home.setViewportSize({ width: 390, height: 844 });
+    await noHorizontalOverflow(home);
+    await home.screenshot({ path: testInfo.outputPath("handled-approved-booking-390.png"), fullPage: true });
+  } finally {
+    if (setup) await cleanup(admin, { tenantIds: [setup.tenantId], workspaceIds: [setup.businessId], operatorEmail: setup.operator.email, people: [setup.operator, setup.owner] });
+  }
+});

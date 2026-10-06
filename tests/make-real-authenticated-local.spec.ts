@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
-import { siteDocumentHash, siteDocumentSchema } from "@/products/websites/site-document";
-import { adminClient, cleanup, convertedBusinessWithOwner, decisions, journeyEnvironment, noHorizontalOverflow, person, type Person } from "./support/journeys";
+import { adminClient, cleanup, convertedBusinessWithOwner, decisions, journeyEnvironment, noHorizontalOverflow, person, reviewedRebuild, type Person } from "./support/journeys";
 
 // Make real on a website Possibility, through Needs you, on real local Auth
 // and Postgres. A reviewed rebuild of the converted site is the Ready
@@ -12,23 +11,6 @@ import { adminClient, cleanup, convertedBusinessWithOwner, decisions, journeyEnv
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Supabase Auth and Postgres (see docs/operations/testing-and-ci.md).");
 test.beforeAll(() => { journeyEnvironment(); });
 test.setTimeout(300_000);
-
-function reviewedRebuild(workId: string, tenantId: string, ownerId: string) {
-  const at = new Date().toISOString();
-  const document = siteDocumentSchema.parse({
-    version: 2, siteName: "Harbor", theme: { palette: "light", typeScale: "standard" },
-    pages: [{ path: "/", title: "Harbor", description: "", root: "hero" }],
-    nodes: { hero: { id: "hero", type: "Hero", variant: "statement", props: { title: "Harbor Pilates" }, children: [], factIds: [] } },
-    facts: {}, assets: {}, redirects: [], provenance: { composer: "rules" },
-  });
-  return {
-    version: 2, revision: 3, title: "Harbor rebuild", input: { requestId: `request-${randomUUID().slice(0, 8)}`, url: "https://harbor.example.test/" }, status: "review_ready",
-    stages: [], checkpoint: null, sourceAudit: null, audit: null,
-    pageMapping: [{ sourceUrl: "https://harbor.example.test/", targetPath: "/", carriedOver: true }],
-    candidate: { revision: 2, contentHash: siteDocumentHash(document), document, previewHref: `/api/websites/${workId}/preview` },
-    approvedCandidateRevision: null, tenantId, launch: { receipt: null, readBack: null }, lastError: null, createdBy: ownerId, createdAt: at, history: [],
-  };
-}
 
 test("the owner makes a website Possibility real through Needs you and sees a partial, honest result", async ({ browser }, testInfo) => {
   const admin = adminClient();
