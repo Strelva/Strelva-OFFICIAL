@@ -58,7 +58,7 @@ describe("the Google listing System", () => {
 
   it("offers Connect Google for a site with no grant, instead of an empty listing", () => {
     const out = addPublishingSystems(base, snapshot(), { now: NOW });
-    expect(out.offers).toEqual([expect.objectContaining({ kind: "connect_google", label: "Connect Google to manage Mooney Uptown on Google" })]);
+    expect(out.offers).toEqual([expect.objectContaining({ kind: "connect_google", label: "Mooney Uptown has no Google account connected yet" })]);
     const none = addPublishingSystems(base, snapshot({ bindings: [] }), { now: NOW });
     expect(none.listing.systems.some((item) => item.system.kind === "listing")).toBe(false);
     expect(none.offers).toHaveLength(2);

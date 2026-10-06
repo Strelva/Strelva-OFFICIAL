@@ -73,7 +73,7 @@ export interface ListingSummary {
   locationId: string;
   health: ListingHealth;
   healthMessage: string;
-  recentReceipts: Array<Pick<ListingReceipt, "id" | "action" | "status" | "createdAt" | "targetRef">>;
+  recentReceipts: Array<Pick<ListingReceipt, "id" | "action" | "status" | "createdAt" | "targetRef" | "error">>;
 }
 
 export interface PublishingProjection {
@@ -167,14 +167,14 @@ export function addPublishingSystems(base: BusinessSystems, rawSnapshot: Publish
       systemId: listingSystem.id, bindingId: binding.id, locationId: location.locationId, health: verdict.health, healthMessage: verdict.message,
       recentReceipts: receipts.slice(0, 10).map((receipt) => ({
         id: receipt.id, action: receipt.action as ListingReceipt["action"], status: receipt.status as ListingReceipt["status"],
-        createdAt: receipt.createdAt, targetRef: receipt.targetRef,
+        createdAt: receipt.createdAt, targetRef: receipt.targetRef, error: receipt.error,
       })),
     });
   }
 
   for (const [stableId, website] of websitesByTenant) {
     if (snapshot.scope === "business" && !boundTenants.has(stableId)) {
-      offers.push({ kind: "connect_google", systemId: website.system.id, label: `Connect Google to manage ${website.system.name} on Google` });
+      offers.push({ kind: "connect_google", systemId: website.system.id, label: `${website.system.name} has no Google account connected yet` });
     }
   }
 

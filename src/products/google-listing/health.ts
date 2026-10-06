@@ -13,7 +13,7 @@ const ACCESS_PENDING = "Google API access is still pending";
 
 const MESSAGES: Record<ListingHealth, string> = {
   ok: "Google listing read recently.",
-  google_disconnected: "Google disconnected. The owner needs to reconnect.",
+  google_disconnected: "Google disconnected. Reconnect Google so replies and changes can go out.",
   scope_missing: "Reconnect Google to let Strelva post.",
   api_access_pending: "Google access pending. Replies and changes wait until Google approves.",
   edits_pending: "Google is reviewing a change.",

@@ -57,13 +57,14 @@ describe("publishing in the workspace", () => {
   it("offers Connect Google in context when there is no grant", async () => {
     const all = views(await project("none"));
     expect(all.some((item) => item.kind === "listing")).toBe(false);
-    expect(all.find((item) => item.kind === "website")?.offers).toEqual([{ kind: "connect_google", label: "Connect Google to manage The Mooney Firm on Google" }]);
+    expect(all.find((item) => item.kind === "website")?.offers).toEqual([{ kind: "connect_google", label: "The Mooney Firm has no Google account connected yet" }]);
   });
 
   it("names access pending and disconnected as health, keeping the listing Live", async () => {
     const pending = views(await project("pending")).find((item) => item.kind === "listing")!;
     expect(pending.lifecycle).toBe("live");
     expect(pending.surface).toMatchObject({ healthMessage: "Google access pending. Replies and changes wait until Google approves." });
+    expect(pending.surface.kind === "listing" && pending.surface.receipts[0]?.headline).toBe("Waiting for Google to approve access. Nothing was sent yet.");
     const dead = views(await project("disconnected")).find((item) => item.kind === "listing")!;
     expect(dead.lifecycle).toBe("live");
     expect(dead.health.state).toBe("blocked");

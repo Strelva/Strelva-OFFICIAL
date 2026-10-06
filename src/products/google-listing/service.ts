@@ -80,8 +80,11 @@ export function routeReviewReply(mode: "off" | "approve" | "auto", rating: numbe
 }
 
 /** The customer-facing line for a receipt. Strelva acts; no AI words. */
-export function receiptHeadline(receipt: Pick<ListingReceipt, "status" | "action">, subject?: string): string {
+export function receiptHeadline(receipt: Pick<ListingReceipt, "status" | "action"> & { error?: string | null }, subject?: string): string {
   const who = subject ? `${subject}'s review` : "a review";
+  if (receipt.status === "failed" && receipt.error?.startsWith("Google API access is still pending")) {
+    return "Waiting for Google to approve access. Nothing was sent yet.";
+  }
   if (receipt.status === "failed") return "Google didn't take this change. Nothing changed on Google.";
   if (receipt.status === "undone") return "Strelva undid this change on Google.";
   if (receipt.status === "posted_unverified") return "Posted. Google hasn't shown it yet.";
