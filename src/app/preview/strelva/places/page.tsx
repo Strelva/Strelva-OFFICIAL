@@ -51,9 +51,10 @@ function record(access: BusinessRecord["access"]): BusinessRecord {
   };
 }
 
-export default async function PlacesPreviewPage({ searchParams }: { searchParams: Promise<{ place?: string; state?: string; result?: string }> }) {
+export default async function PlacesPreviewPage({ searchParams }: { searchParams: Promise<{ place?: string; state?: string; result?: string; held?: string }> }) {
   if (!strelvaUiPreviewEnabled()) notFound();
-  const { place, state, result } = await searchParams;
+  const params = await searchParams;
+  const { place, state, result } = params;
 
   if (place === "reviews") {
     const site = { tenantId: "juniper", siteName: "Juniper Bakery", googleConnected: true, googlePlaceId: "ChIJ-fictional-juniper", replyMode: "auto" as const, unavailable: false, reviews: [
@@ -82,7 +83,17 @@ export default async function PlacesPreviewPage({ searchParams }: { searchParams
     { id: "l3", name: "Priya S.", email: "priya@example.test", message: "Could you do a 3-tier cake for 60 people on Nov 14?", source: "contact-form", fields: [["Event date", "2026-11-14"], ["Guests", "60"]] as Array<[string, string]>, createdAt: "2026-10-05T14:10:00Z" },
     { id: "l2", name: "Tom R.", email: "tom@example.test", message: "Do you deliver catering trays to offices downtown?", source: "quote", fields: [], createdAt: "2026-10-03T09:30:00Z" },
     { id: "l1", name: "Someone", email: null, message: "Are you open on Thanksgiving?", source: null, fields: [], createdAt: "2026-08-20T09:30:00Z" },
+    // Released from held messages (STRELVA_INQUIRY_RECORDS): can be put back.
+    { id: "lead_spam_x", releasedRowId: "5e000000-0000-4000-8000-0000000000d3", name: "Marta K.", email: "marta@example.test", message: "Wholesale bread for our café, 40 loaves a week?", source: "contact-form", fields: [], createdAt: "2026-10-04T07:15:00Z" },
   ];
-  const site = { tenantId: "juniper", siteName: "Juniper Bakery", leads, lastThirtyDays: 2, unavailable: false };
-  return <WorkspaceInquiries workspaceId={WORKSPACE} state={frame(state, { sites: [site], denied: [] }, { sites: [{ ...site, leads: [], lastThirtyDays: 0 }], denied: [] }, { sites: [{ ...site, leads: [], unavailable: true }], denied: [] }, { sites: [site], denied: DENIED })} />;
+  const site = { tenantId: "juniper", siteName: "Juniper Bakery", leads, lastThirtyDays: 3, unavailable: false };
+  // Held spam for review: `held=1` shows two items, `held=error` a list that failed.
+  const held = params.held === "1"
+    ? { items: [
+      { rowId: "5e000000-0000-4000-8000-0000000000d1", tenantId: "juniper", name: "SEO Experts Pro", email: "rank@example.test", message: "We can get you to #1 on Google in 7 days, reply for pricing!!!", reason: "canned-message,email-name-mismatch", createdAt: "2026-10-05T03:12:00Z" },
+      { rowId: "5e000000-0000-4000-8000-0000000000d2", tenantId: "juniper", name: "Ana", email: "ana@example.test", message: "hi do u do gluten free", reason: "content-score", createdAt: "2026-10-04T22:40:00Z" },
+    ], unavailable: false }
+    : params.held === "error" ? { items: [], unavailable: true } : undefined;
+  const withHeld = <T extends object>(data: T) => (held ? { ...data, held } : data);
+  return <WorkspaceInquiries workspaceId={WORKSPACE} state={frame(state, withHeld({ sites: [site], denied: [] }), withHeld({ sites: [{ ...site, leads: [], lastThirtyDays: 0 }], denied: [] }), { sites: [{ ...site, leads: [], unavailable: true }], denied: [] }, { sites: [site], denied: DENIED })} />;
 }
