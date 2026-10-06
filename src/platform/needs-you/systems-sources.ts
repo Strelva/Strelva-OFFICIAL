@@ -21,6 +21,7 @@ import { createNeedsYouService, type DecideStatus, type NeedsYouDeps } from "./s
 import type { WorkspaceMakeRealResult } from "@/experience/workspace/contracts";
 import { makeRealAdapter, needsYouMakeRealApprovals, type ReadyPlan } from "./sources/make-real";
 import { versionReleaseAdapter, type PendingVersionRelease } from "./sources/version-release";
+import { recordServiceAction } from "./service-actor";
 
 function systemsOn(workspaceId: string, actor: WorkspaceActor): Promise<boolean> {
   return systemsReleaseEnabledForWorkspace(workspaceId, { operator: false, tester: false, userId: actor.userId }).catch(() => false);
@@ -80,6 +81,8 @@ function makeRealSource(store: NeedsYouStore, onResult?: (result: WorkspaceMakeR
     readyPlans: async (actor, workspaceId) => readyMakeRealPlans(await liveDeps(actor, workspaceId)),
     livePlans: liveReadyPlans,
     policies: (actor, workspaceId) => store.policies(actor, workspaceId),
+    // The one logged run for an owner with no account (owner-entry decision 6).
+    recordLinkRun: (session, subject, detail) => recordServiceAction(session, "run", subject, detail),
     async start(actor, workspaceId, possibilityId, approvalId) {
       const live = (await liveReadyPlans(workspaceId)).find((plan) => plan.possibilityId === possibilityId);
       if (live) {

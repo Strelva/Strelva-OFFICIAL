@@ -18,7 +18,7 @@ import {
   type PolicySetting,
   type ProposedItem,
 } from "./contracts";
-import { parseServiceSession, type ServiceSession } from "./service-actor";
+import { parseServiceSession, startMakeRealLinkSession, type ServiceSession } from "./service-actor";
 
 type DbError = { message?: string; code?: string } | null;
 export type NeedsYouDb = { rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data: unknown; error: DbError }> };
@@ -111,6 +111,12 @@ export interface NeedsYouStore {
   serviceSession?(workspaceId: string): Promise<ServiceSession | null>;
   /** Open an item under that session; it is marked and logged as opened by Strelva (system). */
   openAsService?(workspaceId: string, sessionId: string, item: ProposedItem): Promise<OwnerDecision>;
+  /**
+   * Strelva (system) for one Make real decision an owner with no account
+   * decides by signed link: a `make_real_link` session bound in SQL to that
+   * open item and the owner recipient, or null (20261009131000).
+   */
+  linkSession?(workspaceId: string, itemId: string, recipient: string): Promise<ServiceSession | null>;
   policies(actor: WorkspaceActor, workspaceId: string): Promise<PolicySetting[]>;
   setPolicy(actor: WorkspaceActor, input: { workspaceId: string; layer: PolicyLayer; systemId: string | null; kind: string; route: LadderRoute | null; reason: string | null; expectedVersion: number }): Promise<PolicyState>;
   handled(actor: WorkspaceActor, workspaceId: string, since: string | null): Promise<Record<string, unknown>[]>;
@@ -135,6 +141,7 @@ export const PostgresNeedsYouStore: NeedsYouStore = {
   ownerActor: (workspaceId, recipient) => call("needs_you_owner_actor", { p_workspace_id: workspaceId, p_recipient: recipient }, z.object({ userId: z.string().uuid(), verifiedEmail: z.string() }).nullable(), "The owner could not be confirmed."),
   serviceSession: async (workspaceId) => parseServiceSession(await call("strelva_service_reader", { p_workspace_id: workspaceId, p_purpose: "needs_you_sync" }, z.unknown(), "Strelva's service session could not start.")),
   openAsService: (workspaceId, sessionId, item) => call("open_owner_decision_as_service", { p_workspace_id: workspaceId, p_session_id: sessionId, p_item: item }, ownerDecisionSchema, "The Needs you item could not be opened."),
+  linkSession: (workspaceId, itemId, recipient) => startMakeRealLinkSession(workspaceId, itemId, recipient),
   policies: async (actor, workspaceId) => (await call("read_decision_policies", { p_workspace_id: workspaceId, ...actorArgs(actor) }, z.object({ settings: z.array(policyRowSchema.passthrough()) }).passthrough(), "The policy could not be read."))
     .settings.flatMap(row => row.kind === "suggestion" || row.kind === "health.owner_action" ? [] : [{ layer: row.layer, systemId: row.systemId, kind: row.kind, route: row.route } as PolicySetting]),
   setPolicy: (actor, input) => call("set_decision_policy", {

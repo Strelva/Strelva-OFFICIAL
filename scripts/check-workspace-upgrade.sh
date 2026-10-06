@@ -241,5 +241,10 @@ psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
 # 20261009100000 (Strelva service actor) replaces owner_decision_json and
 # workspace_release_flag_names(); its contract holds after the full ordered upgrade.
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
+# 20261009130000 replaces read_strelva_handled and 20261009131000 replaces
+# record_strelva_service_action; both contracts hold after the full upgrade.
+psql "${psql_args[@]}" --file="$repo_root/tests/strelva-handled-decisions-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

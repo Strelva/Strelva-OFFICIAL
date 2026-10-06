@@ -630,7 +630,8 @@ describe("Make real through Needs you", () => {
       enabled: async () => true, readyPlans: async () => [], livePlans: async () => [liveReadyPlan(p, new Map())], policies: async () => [],
       start: (actor, ws, possibilityId, approvalId) => startLiveApproved({ startApproved }, { actor, workspaceId: ws, possibilityId, approvalId, title: "x" }),
     });
-    const item = { id: randomUUID(), sourceId: makeRealSourceId(p.id, p.candidateRevision), title: "Make it live: x" } as OwnerDecision;
+    // The item carries the plan fingerprint as its revision, as every opened Make real item does.
+    const item = { id: randomUUID(), sourceId: makeRealSourceId(p.id, p.candidateRevision), revisionHash: liveReadyPlan(p, new Map()).fingerprint, title: "Make it live: x" } as OwnerDecision;
     await expect(adapter.resolve({ workspaceId: BIZ }, item, "not_yet", { kind: "session", actor: OWNER })).resolves.toMatchObject({ outcome: "done" });
     // A lapse changes nothing, like Not yet.
     await expect(adapter.resolve({ workspaceId: BIZ }, item, "approve", { kind: "expiry" })).resolves.toMatchObject({ outcome: "done" });

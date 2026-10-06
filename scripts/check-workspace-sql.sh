@@ -634,6 +634,16 @@ psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql
 psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
+# Journey gaps (wave 4): Strelva handled lists decided owner decisions
+# (replaces read_strelva_handled), and Make real by signed owner link for an
+# owner with no account (replaces record_strelva_service_action). The Needs
+# you and service actor contracts rerun against the replacements.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009130000_strelva_handled_decisions.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/strelva-handled-decisions-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009131000_make_real_owner_link.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
 # The real Make real runner, checkpointing through these RPCs (psql-backed port).
 STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run src/__tests__/make-real-activation-repository.test.ts

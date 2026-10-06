@@ -32,7 +32,13 @@ export interface AdapterContext {
 }
 
 export type ResolveBy =
-  | { kind: "owner_link"; recipient: string; actor: WorkspaceActor | null }
+  /**
+   * `service` is set only for a lifecycle that runs an owner's link decision
+   * without an owner account (`ownerLinkWithoutAccount`): `actor` is then
+   * Strelva (system)'s identity under a `make_real_link` session bound to
+   * this item, and the owner stays the approver of record.
+   */
+  | { kind: "owner_link"; recipient: string; actor: WorkspaceActor | null; service?: ServiceSession }
   | { kind: "session"; actor: WorkspaceActor }
   | { kind: "expiry" };
 
@@ -46,6 +52,12 @@ export interface SourceAdapter {
   lifecycle: SourceLifecycle;
   /** Resolving needs a member identity (a workspace RPC), not just the owner recipient. */
   needsMemberActor: boolean;
+  /**
+   * An owner with no account may still decide this by signed link: Strelva
+   * (system) reads and runs it under a session bound to the item
+   * (owner-entry decision 6; Make real only). Never for access, money or exit.
+   */
+  ownerLinkWithoutAccount?: boolean;
   /** Pending asks for this business. `complete: false` means some sources could not be read. */
   propose(ctx: AdapterContext): Promise<{ items: ProposedItem[]; complete: boolean }>;
   /** The source's current revision, or null when it is no longer waiting on anyone. */

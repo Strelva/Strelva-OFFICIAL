@@ -9,6 +9,7 @@ import { buildWorkspaceApproveUrl, type WorkspaceApproveLinkClaims } from "@/lib
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { nextChaseStep, type Decision, type OwnerDecision } from "./contracts";
 import type { AdapterContext, ResolveBy, SourceAdapter } from "./adapters";
+import { ServiceSessionRefusedError, type ServiceSession } from "./service-actor";
 import { NeedsYouRefusedError, type DeliveryRow, type NeedsYouStore } from "./repository";
 
 export interface NeedsYouDeps {
@@ -148,11 +149,28 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     if (!adapter) return { status: "failed", item };
 
     let memberActor: WorkspaceActor | null = input.by.kind === "session" ? input.by.actor : null;
+    let linkService: ServiceSession | null = null;
     if (input.by.kind === "owner_link") {
       // A link never performs access, money or exit.
       if (item.signInRequired) return { status: "sign_in", item };
       if (adapter.needsMemberActor) {
         memberActor = await deps.store.ownerActor(input.workspaceId, input.by.recipient).catch(() => null);
+        // An owner with no account (owner-entry decision 6): Strelva (system)
+        // reads and runs this one item, bound to it and to the owner recipient.
+        if (!memberActor && adapter.ownerLinkWithoutAccount && deps.store.linkSession) {
+          let session: ServiceSession | null = null;
+          try {
+            session = await deps.store.linkSession(input.workspaceId, item.id, input.by.recipient);
+          } catch (error) {
+            // A link for anyone but the owner on record is refused like any other link.
+            if (error instanceof ServiceSessionRefusedError && error.code === "owner_decision_recipient_not_owner") return { status: "not_owner", item };
+            session = null;
+          }
+          if (session && session.workspaceId === input.workspaceId && session.purpose === "make_real_link") {
+            linkService = session;
+            memberActor = session.actor;
+          }
+        }
         if (!memberActor) return { status: "sign_in", item };
       }
     }
@@ -183,7 +201,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     if (claimed.status !== "claimed") return { status: claimed.status, item: claimed.item };
 
     const by: ResolveBy = input.by.kind === "owner_link"
-      ? { kind: "owner_link", recipient: input.by.recipient, actor: memberActor }
+      ? { kind: "owner_link", recipient: input.by.recipient, actor: memberActor, ...(linkService ? { service: linkService } : {}) }
       : { kind: "session", actor: input.by.actor };
     const outcome = await adapter.resolve(ctx, claimed.item, input.decision, by).catch(() => ({ outcome: "failed" as const, reason: "resolver_threw" }));
     const finished = await deps.store.finish(input.workspaceId, item.id, outcome.outcome, outcome.reason ?? null, "receiptRef" in outcome ? outcome.receiptRef ?? null : null);

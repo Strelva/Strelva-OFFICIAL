@@ -16,6 +16,11 @@
  * - `make_real_resume`: continue an activation the owner already approved.
  *   The owner stays approver of record; the approval is rechecked before
  *   every step.
+ * - `make_real_link`: run ONE Make real plan the owner approved by signed
+ *   email link when the owner has no account (owner-entry decision 6). Bound
+ *   in SQL to that open decision and the owner recipient; it logs one `run`,
+ *   and only after the link approved the decision
+ *   (20261009131000_make_real_owner_link.sql).
  *
  * Only for a business Strelva runs (converted, or provided by Strelva's
  * agency). Anything else gets no session.
@@ -25,7 +30,7 @@ import { getSupabase } from "@/lib/db/client";
 import { WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 
 export const STRELVA_SYSTEM_LABEL = "Strelva (system)" as const;
-export type ServicePurpose = "needs_you_sync" | "make_real_resume";
+export type ServicePurpose = "needs_you_sync" | "make_real_resume" | "make_real_link";
 
 export interface ServiceSession {
   kind: "strelva_system";
@@ -41,7 +46,7 @@ export interface ServiceSession {
 const sessionSchema = z.object({
   sessionId: z.string().uuid(),
   workspaceId: z.string().uuid(),
-  purpose: z.enum(["needs_you_sync", "make_real_resume"]),
+  purpose: z.enum(["needs_you_sync", "make_real_resume", "make_real_link"]),
   label: z.literal(STRELVA_SYSTEM_LABEL),
   role: z.enum(["owner", "admin"]),
   userId: z.string().uuid(),
@@ -71,7 +76,7 @@ function db(): Rpc {
 }
 
 /** Start a logged session for one business, or null when Strelva doesn't run it or it has no verified owner or admin. */
-export async function startServiceSession(workspaceId: string, purpose: ServicePurpose): Promise<ServiceSession | null> {
+export async function startServiceSession(workspaceId: string, purpose: Exclude<ServicePurpose, "make_real_link">): Promise<ServiceSession | null> {
   const { data, error } = await db().rpc("strelva_service_reader", { p_workspace_id: z.string().uuid().parse(workspaceId), p_purpose: purpose });
   if (error) throw new WorkspaceStoreError("Strelva's service session could not start.");
   const session = parseServiceSession(data);
@@ -79,10 +84,39 @@ export async function startServiceSession(workspaceId: string, purpose: ServiceP
   return session;
 }
 
-/** Log one Make real step taken under a `make_real_resume` session. */
+const LINK_REFUSALS = ["owner_decision_recipient_not_owner", "strelva_service_owner_has_account", "strelva_service_access_denied"] as const;
+/** The database refused a link session, for a reason the link page can name. */
+export class ServiceSessionRefusedError extends WorkspaceStoreError {
+  constructor(readonly code: (typeof LINK_REFUSALS)[number]) {
+    super("Strelva's service session was refused.");
+  }
+}
+
+/**
+ * A `make_real_link` session for one open Make real decision, when the signed
+ * link's recipient is the owner on record and has no account. Null when
+ * Strelva doesn't run the business or it has no verified owner or admin to
+ * read as. Refused (thrown) for anything else.
+ */
+export async function startMakeRealLinkSession(workspaceId: string, decisionId: string, recipient: string): Promise<ServiceSession | null> {
+  const { data, error } = await db().rpc("strelva_make_real_link_session", {
+    p_workspace_id: z.string().uuid().parse(workspaceId), p_decision_id: z.string().uuid().parse(decisionId), p_recipient: recipient,
+  });
+  if (error) {
+    const code = LINK_REFUSALS.find((name) => error.message?.includes(name));
+    if (code) throw new ServiceSessionRefusedError(code);
+    throw new WorkspaceStoreError("Strelva's service session could not start.");
+  }
+  const session = parseServiceSession(data);
+  if (session && (session.workspaceId !== workspaceId || session.purpose !== "make_real_link")) throw new WorkspaceStoreError("Strelva's service session was for another business.");
+  return session;
+}
+
+/** Log one Make real step taken under a `make_real_resume` session, or the one run of a `make_real_link` session. */
 export type ServiceAction = "resume" | "run" | "reconcile" | "rollback";
 export async function recordServiceAction(session: ServiceSession, action: ServiceAction, subject: string, detail?: string): Promise<void> {
-  if (session.purpose !== "make_real_resume") throw new WorkspaceStoreError("That session can't run Make real.");
+  const allowed = session.purpose === "make_real_resume" || (session.purpose === "make_real_link" && action === "run");
+  if (!allowed) throw new WorkspaceStoreError("That session can't run Make real.");
   const { error } = await db().rpc("record_strelva_service_action", {
     p_workspace_id: session.workspaceId, p_session_id: session.sessionId, p_action: action, p_subject: subject.slice(0, 300), p_detail: detail ? detail.slice(0, 500) : null,
   });

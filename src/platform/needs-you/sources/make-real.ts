@@ -18,6 +18,7 @@
  * nothing live changes. The outcome says so instead of claiming it went live.
  */
 import type { WorkspaceActor } from "@/platform/workspaces/types";
+import type { ServiceSession } from "../service-actor";
 import { createNeedsYouApprovalRecords, makeRealSourceId, splitMakeRealSource, type ApprovalRecordsPort } from "@/platform/make-real/approvals";
 import { evaluateRoute } from "../evaluator";
 import type { OwnerDecision, PolicySetting, ProposedItem } from "../contracts";
@@ -80,6 +81,12 @@ export interface MakeRealSourcePorts {
   policies(actor: WorkspaceActor, workspaceId: string): Promise<PolicySetting[]>;
   /** Make real's own resolver, started with the owner's plan approval. Null: the plan is no longer this business's. */
   start(actor: WorkspaceActor, workspaceId: string, possibilityId: string, approvalId: string): Promise<MakeRealRunResult | null>;
+  /**
+   * Logs Strelva (system)'s one run under a `make_real_link` session before
+   * Make real starts (record_strelva_service_action). Without it, a link
+   * decision from an owner with no account runs nothing.
+   */
+  recordLinkRun?(session: ServiceSession, subject: string, detail: string): Promise<void>;
 }
 
 export { makeRealSourceId };
@@ -118,6 +125,10 @@ export function makeRealAdapter(ports: MakeRealSourcePorts): SourceAdapter {
   return {
     lifecycle: "make_real",
     needsMemberActor: true,
+    // Owner-entry decision 6: a signed link decides a Make real plan even when
+    // the owner has no account. Strelva (system) reads and runs it, bound to
+    // the item; the owner stays the approver of record.
+    ownerLinkWithoutAccount: Boolean(ports.recordLinkRun),
     async propose(ctx) {
       if (!ctx.actor && !ports.livePlans) return { items: [], complete: false };
       try {
@@ -146,6 +157,31 @@ export function makeRealAdapter(ports: MakeRealSourcePorts): SourceAdapter {
       if (!actor) return { outcome: "failed", reason: "owner_not_member" };
       const source = splitSource(item.sourceId);
       if (!source) return { outcome: "failed", reason: "source_invalid" };
+      const service = by.kind === "owner_link" ? by.service ?? null : null;
+      if (service && (service.purpose !== "make_real_link" || service.workspaceId !== ctx.workspaceId)) {
+        return { outcome: "failed", reason: "service_session_invalid: nothing ran" };
+      }
+      // The plan fingerprint is re-checked at decision time, after the claim:
+      // a candidate that changed since the link was sent runs nothing.
+      let current: ReadyPlan | undefined;
+      try {
+        current = (await plans(actor, ctx.workspaceId)).find((plan) => plan.possibilityId === source.possibilityId);
+      } catch {
+        return { outcome: "failed", reason: "plan_unreadable: nothing ran" };
+      }
+      if (!current || current.candidateRevision !== source.candidateRevision || current.fingerprint !== item.revisionHash) {
+        return { outcome: "failed", reason: "plan_changed: the plan changed after it was sent, so nothing ran" };
+      }
+      if (service) {
+        // Logged before it runs: nothing runs as Strelva (system) unrecorded.
+        try {
+          if (!ports.recordLinkRun) throw new Error("no log");
+          await ports.recordLinkRun(service, `possibility:${source.possibilityId}@${source.candidateRevision}`.slice(0, 300),
+            `Make real started by Strelva (system) on the owner's link approval (${item.id}).`);
+        } catch {
+          return { outcome: "failed", reason: "service_log_failed: Strelva couldn't log the run, so nothing ran" };
+        }
+      }
       let result: MakeRealRunResult | null;
       try {
         result = await ports.start(actor, ctx.workspaceId, source.possibilityId, item.id);
