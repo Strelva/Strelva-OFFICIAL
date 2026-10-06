@@ -144,7 +144,7 @@ export type DeliveryState = (typeof DELIVERY_STATES)[number];
 export type Decision = "approve" | "not_yet";
 
 /** The source lifecycles an adapter can resolve. Each keeps its own resolver. */
-export const SOURCE_LIFECYCLES = ["tenant_event", "service_request", "provider_delivery"] as const;
+export const SOURCE_LIFECYCLES = ["tenant_event", "service_request", "provider_delivery", "booking_request"] as const;
 export type SourceLifecycle = (typeof SOURCE_LIFECYCLES)[number];
 
 const isoSchema = z.string().min(1);

@@ -161,6 +161,7 @@ language sql stable set search_path = public, pg_temp as $$
     'id', b.id,
     'calendarKey', b.calendar_key,
     'tenantStableId', b.tenant_stable_id,
+    'tenantId', (select t.id from public.tenants t where t.stable_id = b.tenant_stable_id),
     'workspaceId', b.workspace_id,
     'systemId', b.system_id,
     'status', b.status,

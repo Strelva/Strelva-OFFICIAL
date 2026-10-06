@@ -5,6 +5,7 @@ import { getTenantConfig } from "@/lib/tenants";
 import { isRateLimitedAsync, rateLimitKey } from "@/lib/rate-limit";
 import { readJsonObject } from "@/lib/request-body";
 import { sendBookingConfirmation } from "@/lib/delivery-email";
+import { notifyOwnerOfBooking } from "@/platform/bookings/notices";
 
 function isValidDate(value: unknown): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -84,17 +85,29 @@ export async function POST(request: Request) {
     );
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 409 });
+      // Only the one booking store (reads flipped) returns a code: a paused
+      // bookings System, or a service the business record no longer offers.
+      if (result.code === "invalid_service") return NextResponse.json({ error: "Invalid service" }, { status: 400 });
+      return NextResponse.json({ error: result.error, ...(result.code === "paused" ? { paused: true } : {}) }, { status: 409 });
     }
+    const requested = result.requested === true;
+    // With reads on the one store, the name comes from the business record.
+    const bookedService = result.booking.serviceName;
 
     await logActivity(
       {
-        text: `New booking: ${service.name} on ${date} at ${startTime} for ${clientName}`,
+        text: `${requested ? "New booking request" : "New booking"}: ${bookedService} on ${date} at ${startTime} for ${clientName}`,
         time: new Date().toISOString(),
         type: "booking",
       },
       tenant
     );
+    // "New booking" to the owner recipient (off unless STRELVA_BOOKING_OWNER_NOTICE=1).
+    // A request reaches the owner as a Needs you item instead.
+    await notifyOwnerOfBooking(tenant, result.booking);
+
+    // A request isn't confirmed yet, so no confirmation goes out.
+    if (requested) return NextResponse.json({ success: true, booking: result.booking, confirmationSent: false, requested: true });
 
     // Confirm to the customer. Fail-soft: the booking already committed, so an email
     // failure must never surface as an error. Gated by CUSTOMER_EMAIL_ENABLED (default
@@ -106,7 +119,7 @@ export async function POST(request: Request) {
       confirmationSent = await sendBookingConfirmation({
         to: clientEmail,
         clientName,
-        serviceName: service.name,
+        serviceName: bookedService,
         date,
         time: startTime,
         businessName: config?.siteName ?? "",

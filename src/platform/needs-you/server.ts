@@ -8,6 +8,10 @@ import type { HandledReceipt } from "./contracts";
 import { handledFromStore, handledFromTenantEvent, mergeHandled } from "./handled";
 import { PostgresNeedsYouStore, type NeedsYouStore } from "./repository";
 import { createNeedsYouService } from "./service";
+import { bookingRequestAdapter } from "@/platform/bookings/needs-you-adapter";
+import { decideBookingRequest, readWorkspaceBookingRequests } from "@/platform/bookings/store";
+import { bookingStoreWriteEnabled } from "@/platform/bookings/flags";
+import { updateBooking as updateLegacyBookingStatus } from "@/lib/storage/booking-store";
 
 export { needsYouReleaseEnabled } from "./release";
 
@@ -35,6 +39,17 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
       serviceRequestAdapter({
         list: (actor, businessId) => PostgresServiceRequestStore.list(actor, { businessId }),
         change: (actor, input) => commitments.execute(actor, { action: "delivery_commitment", ...input }),
+      }),
+      // Booking requests in the one booking store (empty until request mode is used).
+      bookingRequestAdapter({
+        // Nothing to read until the store receives writes (and its migration exists).
+        requests: async (workspaceId) => (bookingStoreWriteEnabled() ? readWorkspaceBookingRequests(workspaceId) : []),
+        decide: (workspaceId, bookingId, decision, actor) => decideBookingRequest(workspaceId, bookingId, decision, actor),
+        afterDecision: async (booking) => {
+          if (booking.legacyId && booking.tenantId) {
+            await updateLegacyBookingStatus(booking.legacyId, { status: booking.status === "confirmed" ? "confirmed" : "cancelled" }, booking.tenantId);
+          }
+        },
       }),
     ],
   });
