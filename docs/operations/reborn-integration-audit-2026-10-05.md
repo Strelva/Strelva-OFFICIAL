@@ -79,6 +79,18 @@ recorded here.
 
 ## Open release findings
 
+**Local fix status (Oct 7, branch `build/safety-batch`, not deployed):**
+1 atomic `deprovision_tenant_rows` plus a refusal before any delete
+(`20261007100000`); 2 per-page expansion bound in the schema, patches and
+renderer; 3 the audit reads every hop through a pinned, validated transport;
+4 one pinned lookup that answers `all:true` (images, crawler, public text);
+5 the legacy lead beacon answers 503 `lead_storage_unavailable` unless a store
+holds the lead; 6 scoped provider launch on an owner's approval, and launch no
+longer re-approves (`20261007101000`); 7 a managed relationship routes new
+website work to Strelva without special wording; 9 the report link uses the
+workspace query route. Finding 8 remains open. Each fix has a test that failed
+first; SQL is proven on the isolated local cluster only.
+
 These findings were independently reviewed against actual source. Severity ranks
 the consequence if the affected path is activated; it does not assert a production
 incident. The website rebuild remains release-gated.
