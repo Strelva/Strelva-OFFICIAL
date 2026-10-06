@@ -129,3 +129,16 @@ describe("poll-google-reviews mirror-failure cursor", () => {
     expect(persistedIds).not.toContain("r1");
   });
 });
+
+describe("poll-google-reviews account path", () => {
+  it("does not double the accounts/ prefix stored in google-meta", async () => {
+    mockGetRedis.mockReturnValue({
+      get: vi.fn(async (key: string) => (key === "google-meta:t1" ? { accountId: "accounts/111", locationId: "333" } : null)),
+      set: vi.fn().mockResolvedValue(undefined),
+    });
+    await GET(authenticatedCronRequest());
+    const urls = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.map(([url]) => String(url));
+    expect(urls).toContain("https://mybusiness.googleapis.com/v4/accounts/111/locations/333/reviews");
+    expect(urls.some((url) => url.includes("accounts/accounts/"))).toBe(false);
+  });
+});

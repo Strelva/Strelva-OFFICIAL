@@ -35,7 +35,10 @@ import {
 } from "@/platform/system-health";
 import { prepareIsolatedPossibility, type IsolatedSandbox } from "@/platform/make-real/sandbox";
 import { bareHostname, websiteRebuildCandidate, type WebsiteRebuildCandidate } from "@/products/websites/index";
-import type { WorkspaceMakeRealResult, WorkspaceSystems } from "@/experience/workspace/contracts";
+import type { WorkspaceMakeRealResult, WorkspacePublishing, WorkspaceSystems } from "@/experience/workspace/contracts";
+import { addPublishingSystems, type PublishingProjection } from "@/products/publishing/projection";
+import { publishingReleaseEnabled, readPublishingExtras, readPublishingSnapshot } from "@/products/publishing/server";
+import { receiptHeadline } from "@/products/google-listing/service";
 
 export interface SystemsProjectionInput {
   listing: BusinessSystems;
@@ -47,6 +50,38 @@ export interface SystemsProjectionInput {
   now: number;
   /** Day and week views of a Bookings System (wellness schedule, roster), by System id. */
   bookingViews?: ReadonlyMap<string, readonly BookingView[]>;
+  /** Set while STRELVA_PUBLISHING_RELEASE is on. Null: the read failed. */
+  publishing?: Omit<PublishingProjection, "listing" | "observations"> | null;
+}
+
+/** The browser-safe publishing block. Receipts become sentences here. */
+export function publishingView(publishing: SystemsProjectionInput["publishing"]): WorkspacePublishing | undefined {
+  if (publishing === undefined) return undefined;
+  if (publishing === null) return { status: "unavailable", listings: [], websiteParts: {}, offers: [] };
+  return {
+    status: "ready",
+    listings: publishing.listings.map((item) => ({
+      systemId: item.systemId, health: item.health, healthMessage: item.healthMessage,
+      receipts: item.recentReceipts.map((receipt) => ({ id: receipt.id, headline: receiptHeadline(receipt), status: receipt.status, at: receipt.createdAt })),
+    })),
+    websiteParts: Object.fromEntries(Object.entries(publishing.websiteParts).map(([id, parts]) => [id, parts.map(({ type, label, published, drafts }) => ({ type, label, published, drafts }))])),
+    offers: publishing.offers.map((offer) => ({ ...offer })),
+  };
+}
+
+/** Adds the listing and newsletter Systems and website parts to a listing.
+ * A failed read leaves the listing as it was and says publishing is unavailable. */
+export async function withPublishing(
+  listing: BusinessSystems, actor: WorkspaceActor, now: number,
+  read: { snapshot: typeof readPublishingSnapshot; extras: typeof readPublishingExtras } = { snapshot: readPublishingSnapshot, extras: readPublishingExtras },
+): Promise<{ listing: BusinessSystems; observations: Observation[]; publishing: SystemsProjectionInput["publishing"] }> {
+  try {
+    const [snapshot, extras] = await Promise.all([read.snapshot(actor, listing.businessId), read.extras(listing)]);
+    const { listing: next, observations, ...publishing } = addPublishingSystems(listing, snapshot, { ...extras, now });
+    return { listing: next, observations, publishing };
+  } catch {
+    return { listing, observations: [], publishing: null };
+  }
 }
 
 const RANK: Record<HealthStatus, number> = { healthy: 0, unknown: 1, degraded: 2, blocked: 3 };
@@ -164,6 +199,7 @@ export async function projectWorkspaceSystems(input: SystemsProjectionInput): Pr
         purpose: connection.purpose,
       };
     }),
+    ...(input.publishing !== undefined ? { publishing: publishingView(input.publishing) } : {}),
     possibilities: possibilities.map(({ candidate, sandbox, affects }) => ({
       id: sandbox.possibility.id,
       title: sandbox.possibility.title,
@@ -244,15 +280,18 @@ export function savedCheckEvidence(listing: BusinessSystems, siteDomains: Readon
 async function liveProjectionInput(deps: LiveSystemsDeps): Promise<SystemsProjectionInput> {
   const now = deps.now ?? Date.now();
   const spine = await listBusinessSystems(deps.actor, deps.businessId, { store: createSupabaseSystemStore() });
-  const { bookingViews, ...listing } = withTenantSurfaces(spine, await readTenantSiteFacts(spine, deps.siteDomains));
+  const { bookingViews, ...surfaced } = withTenantSurfaces(spine, await readTenantSiteFacts(spine, deps.siteDomains));
+  const published = publishingReleaseEnabled() ? await withPublishing(surfaced, deps.actor, now) : null;
+  const listing = published?.listing ?? surfaced;
   return {
     listing,
     siteDomains: deps.siteDomains,
     candidates: deps.savedWork.flatMap((work) => websiteRebuildCandidate(work) ?? []),
-    observations: [...await readSystemsEvidence(listing, now), ...savedCheckEvidence(listing, deps.siteDomains, deps.savedWork)],
+    observations: [...await readSystemsEvidence(listing, now), ...savedCheckEvidence(listing, deps.siteDomains, deps.savedWork), ...(published?.observations ?? [])],
     actorId: deps.actor.userId,
     now,
     bookingViews,
+    ...(published ? { publishing: published.publishing } : {}),
   };
 }
 

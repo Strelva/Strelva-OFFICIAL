@@ -278,7 +278,10 @@ are untouched.
 - [ ] **Publishing.** Reviews and replies, Google Business, and blog and
       collections run from the workspace. Tenant Google tokens move to
       workspace connections through `crypto/secrets.ts` without re-consent.
-      *Not started · L–XL*
+      *Partial: built locally on `build/publishing` behind
+      `STRELVA_GOOGLE_BINDINGS` and `STRELVA_PUBLISHING_RELEASE` (bindings,
+      copy script, listing System, receipts and undo with a mocked Google).
+      Approve path, reconnect link and the production copy remain · L–XL*
 - [ ] **Internal apps.** App building is agency or Strelva only (today any
       member can create through `applications/server.ts` and
       `custom-applications/lifecycle.ts`). *Not started · S*
@@ -372,7 +375,8 @@ Neither is used by any journey today.
       `20261007140000_model_call_log.sql`, lint rule against direct calls.
 - [ ] `src/lib/newsletter.ts` sends through `email/send.ts`;
       `src/lib/public-continuation.ts` encrypts through `crypto/secrets.ts`.
-      *Not started · S*
+      *Partial: the newsletter half is built locally on `build/publishing` ·
+      S*
 - [ ] `src/lib/db/database.types.ts` is regenerated; it's missing the Oct 1
       website tables, so `deprovision-coverage.test.ts` can't see them.
       *Not started · S*

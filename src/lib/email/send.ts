@@ -132,6 +132,74 @@ export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendE
   return { status: "accepted", providerMessageId: result.data.id, acceptedAt: new Date().toISOString() };
 }
 
+/** The one domain for client-branded mail (AGENTS.md "Email domains"). Never a
+ * per-client domain, never the root domain. */
+export const CLIENT_MAIL_DOMAIN = "mail.strelva.com";
+
+export interface BatchMessage {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  headers?: Record<string, string>;
+}
+
+export interface SendBatchInput {
+  audience: EmailAudience;
+  tenantId?: string;
+  fromName: string;
+  /** Must be on updates.strelva.com or mail.strelva.com. */
+  fromAddress: string;
+  replyTo?: string;
+  /** At most 100 messages, the provider's batch limit. */
+  messages: BatchMessage[];
+  /** Provider idempotency key. A retry with the same key never re-delivers. */
+  idempotencyKey?: string;
+}
+
+export type SendBatchResult =
+  | { status: "accepted"; count: number; providerMessageIds: string[]; acceptedAt: string }
+  | { status: "suppressed"; reason: string };
+
+const ALLOWED_FROM_DOMAINS = ["updates.strelva.com", CLIENT_MAIL_DOMAIN];
+
+/**
+ * A batch through the same transport boundary and audience gate as
+ * sendEmailWithReceipt. Used for newsletters (audience `customer`). Throws on
+ * a provider failure so the caller can record which batch failed.
+ */
+export async function sendBatchWithReceipt(input: SendBatchInput): Promise<SendBatchResult> {
+  if (!input.messages.length) return { status: "accepted", count: 0, providerMessageIds: [], acceptedAt: new Date().toISOString() };
+  if (input.messages.length > 100) throw new Error("A batch holds at most 100 messages.");
+  const domain = input.fromAddress.split("@")[1]?.toLowerCase();
+  if (!domain || !ALLOWED_FROM_DOMAINS.includes(domain)) throw new Error(`Refusing to send from ${domain ?? "an invalid address"}.`);
+  if (!(await audienceEnabled({ audience: input.audience, tenantId: input.tenantId, subject: "", to: [], html: "", text: "" }))) {
+    console.warn(`[email] ${input.audience} email disabled — skipped batch`);
+    return { status: "suppressed", reason: "email_suppressed_or_unconfigured" };
+  }
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return { status: "suppressed", reason: "email_suppressed_or_unconfigured" };
+
+  const { Resend } = await import("resend");
+  const resend = new Resend(apiKey);
+  const replyTo = input.replyTo || process.env.REPLY_TO_EMAIL || "hello@strelva.com";
+  const payload = input.messages.map((message) => ({
+    from: `${input.fromName} <${input.fromAddress}>`,
+    replyTo,
+    to: message.to,
+    subject: message.subject,
+    html: message.html,
+    text: message.text,
+    ...(message.headers ? { headers: message.headers } : {}),
+  }));
+  const result = input.idempotencyKey
+    ? await resend.batch.send(payload, { idempotencyKey: input.idempotencyKey })
+    : await resend.batch.send(payload);
+  if (result.error) throw new Error(result.error.message || "Resend rejected the batch.");
+  const ids = (result.data?.data ?? []).map((item) => item.id).filter((id): id is string => typeof id === "string");
+  return { status: "accepted", count: input.messages.length, providerMessageIds: ids, acceptedAt: new Date().toISOString() };
+}
+
 /** Compatibility wrapper used by existing transactional senders. */
 export async function sendEmail(input: SendEmailInput): Promise<boolean> {
   const result = await sendEmailWithReceipt(input);

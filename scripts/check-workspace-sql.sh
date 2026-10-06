@@ -531,6 +531,10 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007182000_wor
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-export-v3-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007183000_business_outcomes.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/business-outcomes-schema.sql"
+# Publishing: the business-level Google grant, its locations and a receipt
+# for every Google write. After Systems, because it extends the origin kinds.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007170000_workspace_account_bindings.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-account-bindings-schema.sql"
 
 
 # Make real activations persisted as operations/activation saved work.

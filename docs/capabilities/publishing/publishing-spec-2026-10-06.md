@@ -1,6 +1,9 @@
 # Publishing at 1.0.0: reviews, Google, blog and newsletter
 
-Status: draft spec, 2026-10-06. Not built, not approved. For Jacob's review.
+Status: draft spec, 2026-10-06, built locally on branch `build/publishing`
+(2026-10-06). Not approved, not deployed, no migration applied, no Google
+call made. Proven locally with mocked Google and a throwaway Postgres; see
+"Built locally" at the end.
 
 Publishing here means four jobs: replying to reviews, keeping the Google
 Business Profile right (hours, info, posts), publishing blog and collection
@@ -100,8 +103,10 @@ Each behavior is testable on a Strelva-owned test business.
 2. A converted tenant with no Google connection shows no listing System. It
    offers "Connect Google" in context, not an empty page.
 3. New Google reviews become review records on the listing System within one
-   poll cycle. The poller paginates; today it does not
-   (`docs/archive/audit-2026-07-30-deep-audit.md`).
+   poll cycle. The poller already paginates (`fetchGoogleReviews`); the July
+   audit's note is out of date. It did build its reviews URL as
+   `accounts/accounts/{id}` from the `accounts/{id}` that `google-meta`
+   stores, so it likely never read a review; fixed on `build/publishing`.
 4. Every new review gets a drafted reply unless the mode is `off`
    (`src/lib/reviews/auto-reply.ts` modes `off`, `approve`, `auto`).
 5. In `approve` mode the owner gets an approve-link email per reply, or one
@@ -211,8 +216,11 @@ read-back is recorded on its own and never retried as a write.
 - `google_locations` binding detail: `account_id`, `location_id` per listing
   System or Version. Today this lives only in Redis `google-meta:{tenant}`.
 - `listing` System kind and its projection from existing tenants.
-- Receipts and undo snapshots for Google writes in the governed-work tables
-  (`src/lib/governed-work/`), keyed to the workspace.
+- Receipts and undo snapshots for Google writes, keyed to the workspace.
+  Built as `google_listing_receipts`, a per-source receipt store like
+  `workspace_calendar_event_receipts`, not in the governed-work tables (that
+  migration is unapplied shadow state, and the needs-you spec projects one
+  receipt feed over per-source stores).
 - A batch send in `src/lib/email/send.ts` (audience `customer`), with
   idempotency key per batch carried over from `newsletter.ts`, and RFC 8058
   one-click unsubscribe headers. Today `newsletter.ts` only sends a
@@ -459,3 +467,30 @@ never claims it is.
 - Setting the profile's booking link, until API access is granted (bookings
   spec).
 - Yelp replies and Instagram posting.
+
+## Built locally (2026-10-06, `build/publishing`)
+
+Local proof only. Nothing here was run against production, Google or live
+email. Working defaults from section 9 were followed (decision 1a, 5 forced to
+`mail.strelva.com`); decisions 2, 3 and 4 are not built.
+
+| Part | Where | Proof |
+| --- | --- | --- |
+| `workspace_account_bindings`, `workspace_google_locations`, `google_listing_receipts`, service-role RPCs, two new System origins | `supabase/migrations/20261007170000_workspace_account_bindings.sql` | `tests/workspace-account-bindings-schema.sql` in `check:workspace-sql`: plaintext refused by CHECK and RPC, cross-business grant/receipt denied, copy never overwrites, rotated token kept, accepted receipts only move forward, auto policy only for 3+ star replies |
+| Token adapter: binding first, Redis fallback (counted), dual-write on reconnect, encryption guard | `src/lib/google-access.ts`, `src/platform/account-bindings/` | `google-access.test.ts`. Every caller moved: `google-token.ts`, `google-resources.ts`, `gbp-replies.ts` (duplicate refresh removed), `gbp-management.ts`, the poller, the OAuth callback. Behind `STRELVA_GOOGLE_BINDINGS=1`; off is Redis-only, as before |
+| Copy script (steps 1 to 4) | `scripts/copy-google-bindings.ts`, `scripts/google-binding-copy.ts` | `google-binding-copy.test.ts`: dry run counts only; `--apply` refuses without `SECRETS_ENC_KEY` and on a non-local DB without `--i-have-jacobs-yes`; `--verify-google` always needs that yes |
+| Google listing System: replies, withdraw, hours and info from the record, posts, receipts with read-back, undo | `src/products/google-listing/` | `google-listing-service.test.ts` against a fake Google client |
+| 1 and 2 star replies go to the owner in `auto` mode | `src/lib/reviews/auto-reply-rule.ts`, poller, backlog, auto-post cron, receipt CHECK | `review-auto-post.test.ts` |
+| Listing and newsletter Systems, blog and collections as website parts, Connect Google offer | `src/products/publishing/`, `src/experience/systems/` | `publishing-projection.test.ts`, `publishing-experience.test.tsx`; rendered in `/preview/strelva?scenario=mooney&systems=on&publishing=on|pending|disconnected|none` at 1280 and 390 px. Behind `STRELVA_PUBLISHING_RELEASE=1` |
+| Newsletter through `email/send.ts` from `mail.strelva.com`, RFC 8058 one-click unsubscribe | `src/lib/newsletter.ts`, `sendBatchWithReceipt`, `/api/newsletter/unsubscribe` | `newsletter-send-path.test.ts` |
+
+Not built: the signed reconnect link (item 14); wiring the tenant approve
+path (`event-actions.ts`) to write `google_listing_receipts` (the old
+`publishReviewReply` path still posts approved replies); digest emails
+(decision 4); one approval for record plus Google (decision 3, needs Jacob's
+yes); a review-sync job into the workspace; Versions for a second location.
+
+Behavior changes to know before deploy: the newsletter now uses the
+`customer` email gate (`CUSTOMER_EMAIL_ENABLED`) instead of the client gate,
+sends from `newsletter@mail.strelva.com` even when a tenant has a
+`resendDomain`, and keeps sending later batches after one fails.

@@ -107,6 +107,7 @@ export function SystemPage(props: SystemPageProps) {
 
       <aside className={styles.aside} aria-label={`About ${system.name}`}>
         <ConnectionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} />
+        <PartsPanel system={system} />
         <PossibilitiesPanel system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} />
         <VersionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} />
         {system.audits?.length ? <AuditsPanel system={system} workspaceId={props.workspaceId} appBase={props.appBase || ""} /> : null}
@@ -135,6 +136,8 @@ function SystemSurface({ system, workspaceId, readOnly, useReadOnly = readOnly, 
     const adapter = inquiryAdapter?.tenantId === system.surface.tenantId ? inquiryAdapter.adapter : undefined;
     return <InquiryServerWorkspaceExperience tenantId={system.surface.tenantId} adapter={adapter} initialView="home" basePath="/workspace" routePrefix="inquiry" />;
   }
+  if (system.surface.kind === "listing") return <ListingSurface surface={system.surface} />;
+  if (system.surface.kind === "newsletter") return <div className="p-6"><h2 className="text-sm font-semibold">Newsletter</h2><p className="mt-2 text-sm text-gray-muted">{system.surface.audience}</p><p className="mt-2 text-sm text-gray-muted">Strelva drafts each issue. It sends only after the owner approves, from mail.strelva.com, to active subscribers. Each send says how many the mail provider accepted.</p></div>;
   if (system.surface.kind !== "work") return null;
   const { workId, productId } = system.surface;
   if (productId === "applications" || productId === "scheduling") return <BoundedWorkExperience key={workId} workspaceId={workspaceId} workId={workId} productId={productId} sources={[...sources]} readOnly={useReadOnly} canManage={!readOnly} workspaceStopped={workspaceStopped} calendarRecoveryAllowed={calendarRecoveryAllowed} onSaved={noop} />;
@@ -149,6 +152,31 @@ function SystemSurface({ system, workspaceId, readOnly, useReadOnly = readOnly, 
   </div>;
   if (productId === "unknown") return <p className="p-6 text-sm text-gray-muted">There is nothing to open for this system here yet. Its record and status are beside it.</p>;
   return <p className="p-6 text-sm text-gray-muted">This system opens in its own view. <Link className="underline" href={`/workspace?workspaceId=${encodeURIComponent(workspaceId)}&work=${encodeURIComponent(workId)}`}>Open it</Link></p>;
+}
+
+/** The listing's own surface: its health in words and Strelva handled. */
+function ListingSurface({ surface }: { surface: Extract<SystemView["surface"], { kind: "listing" }> }) {
+  const when = (at: string) => {
+    const date = new Date(at);
+    return Number.isNaN(date.getTime()) ? "" : date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  };
+  return <div className="p-6">
+    <p role={surface.unavailable ? "alert" : "status"} className="text-sm">{surface.healthMessage}</p>
+    <h2 className="mt-6 text-sm font-semibold">Strelva handled</h2>
+    {surface.receipts.length ? <ul className={styles.panelList} aria-label="What Strelva did on Google">
+      {surface.receipts.map(receipt => <li key={receipt.id}><span>{receipt.headline}</span><small>{when(receipt.at)}</small></li>)}
+    </ul> : <p className="mt-2 text-sm text-gray-muted">Nothing yet. Replies, hours and posts Strelva sends to Google show here, each with what changed and how to undo it.</p>}
+  </div>;
+}
+
+function PartsPanel({ system }: { system: SystemView }) {
+  if (!system.parts?.length) return null;
+  return <Panel id={`${system.id}-parts`} title="On this site" count={system.parts.length} intro="Content that lives on this website.">
+    <ul className={styles.panelList}>{system.parts.map(part => <li key={part.label}>
+      <span>{part.label}</span>
+      <small>{part.published} published{part.drafts ? ` · ${part.drafts} draft${part.drafts === 1 ? "" : "s"} waiting` : ""}</small>
+    </li>)}</ul>
+  </Panel>;
 }
 
 function Panel({ id, title, count, intro, children }: { id: string; title: string; count: number; intro: string; children: ReactNode }) {
@@ -170,6 +198,7 @@ function ConnectionsPanel({ system, systemHref, onOpenSystem }: { system: System
       <span>{connection.sentence}</span>
       <small>{(connection.direction === "in" ? INCOMING_CONNECTION_LABEL : CONNECTION_KIND_LABEL)[connection.kind]} <SystemLink id={connection.systemId} label={connection.target} systemHref={systemHref} onOpenSystem={onOpenSystem} />{connection.status === "connected" ? "" : connection.status === "not_connected" ? " · Not connected" : " · Not confirmed"}</small>
     </li>)}</ul> : <p className="mt-3">Nothing else is connected to it yet.</p>}
+    {system.offers?.map(offer => <p key={offer.kind} className="mt-3">{offer.label}. <Link className="underline" href="/dashboard/google">Connect Google</Link></p>)}
   </Panel>;
 }
 

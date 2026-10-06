@@ -185,6 +185,9 @@ export interface WorkspaceSystems {
    * same-business sources are already left out of `systems`.
    */
   versions?: WorkspaceSystemVersion[];
+  /** Google listing, newsletter and website parts. Present only while
+   * STRELVA_PUBLISHING_RELEASE is on. Additive. */
+  publishing?: WorkspacePublishing;
 }
 
 export interface WorkspaceSystemVersion {
@@ -200,6 +203,22 @@ export interface WorkspaceSystemVersion {
   declined: number[];
   /** Other Versions of the same source in this business (another location). */
   siblings: Array<{ id: string; systemId: string; context: { kind: string; label: string } }>;
+}
+
+export interface WorkspacePublishing {
+  /** `unavailable`: the publishing read failed; nothing about it is claimed. */
+  status: "ready" | "unavailable";
+  listings: Array<{
+    systemId: string;
+    health: string;
+    healthMessage: string;
+    /** Strelva handled: newest first, in the customer's words. */
+    receipts: Array<{ id: string; headline: string; status: string; at: string }>;
+  }>;
+  /** Blog and collections, as parts of the website System they appear on. */
+  websiteParts: Record<string, Array<{ type: string; label: string; published: number; drafts: number }>>;
+  /** In context, e.g. "Connect Google" on a website with no grant. */
+  offers: Array<{ kind: "connect_google"; systemId: string; label: string }>;
 }
 
 export interface WorkspaceSystemEntry {
