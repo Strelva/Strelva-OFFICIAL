@@ -417,7 +417,23 @@ export function planWorkspaceStart(requestOrInput: string | WorkspaceStartInput,
   if (routes.length > 1) return helpPlan(request, context, routes);
   const route = routes[0] || classify(request);
   if (!route) return helpPlan(request, context);
+  return routePlan(request, context, route);
+}
 
+/**
+ * "Make it yourself instead": the second choice on a managed website request.
+ * Returns the self-service website plan for the same request, or null where
+ * the plan offered no self-service route (read-only, flow not mounted, or the
+ * product is not available). Nothing has been sent either way.
+ */
+export function selfServiceWorkspaceStartPlan(plan: WorkspaceStartPlan): WorkspaceStartPlan | null {
+  if (plan.deliveryMode !== "service" || plan.selfServiceRoute !== "websites") return null;
+  const context = plan.context || {};
+  const next = routePlan(plan.request, context, plan.selfServiceRoute);
+  return next.status === "ready" ? next : null;
+}
+
+function routePlan(request: string, context: WorkspaceStartContext, route: Exclude<WorkspaceStartRoute, "help">): WorkspaceStartPlan {
   const copy = ROUTE_COPY[route];
   const parts = partsFor(route, request);
   const reason = blockedReason(context, route);
