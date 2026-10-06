@@ -18,6 +18,8 @@ import { getRedis } from "@/lib/redis";
 import type { TenantConfig } from "@/lib/types";
 import { clearTenantDomainClaims } from "@/lib/domains";
 import { deleteVercelProject, isVercelConfigured } from "@/lib/vercel";
+import { authoritativePatterns } from "@/lib/tenant-rename";
+import { getAccountForTenant, unlinkTenant } from "@/lib/accounts";
 
 // Real tenants that must never be torn down by accident. A backstop only —
 // the live "has paid" guard is the primary defense (this set drifts stale).
@@ -115,7 +117,19 @@ async function deleteRows(table: string, tenantId: string): Promise<void> {
  *  position. A bare "id appears anywhere" match would delete OTHER tenants' keys
  *  for an unlucky id. Wildcards are SCANned; exact keys checked with EXISTS. */
 export function tenantRedisPatterns(tenantId: string, ownerEmail?: string): string[] {
+  // Client data that Redis holds as the only copy (leads, orders, threads,
+  // connections with encrypted secrets, booking config, rewards, settings,
+  // spam held for review) is the same registry a rename moves, so the two
+  // can't drift. The operator's own CRM record about this client is Strelva's
+  // data, not the client's, and stays.
+  const clientData = authoritativePatterns(tenantId).filter(
+    (pattern) => pattern !== `crm:${tenantId}` && pattern !== `reb:crm-lock:${tenantId}`,
+  );
   const p = [
+    ...clientData,
+    `events:${tenantId}`, // event index; its id-keyed blobs are found by value below
+    `account-of:${tenantId}`, // multi-site grouping reverse lookup
+    `calendly-meta:${tenantId}`,
     `reb:content:${tenantId}:*`,
     `reb:chat:${tenantId}:*`,
     `reb:rewards:${tenantId}:*`,
@@ -140,7 +154,21 @@ export function tenantRedisPatterns(tenantId: string, ownerEmail?: string): stri
     `reb:inquiry-reply-target:*`,
   ];
   if (ownerEmail) p.push(`reb:invites:${ownerEmail.toLowerCase()}`);
-  return p;
+  return [...new Set(p)];
+}
+
+/** Event blobs are keyed by event id, not tenant. The tenant's index names
+ *  them; a blob is only taken when it still says it belongs to this tenant. */
+export async function findTenantEventBlobKeys(tenantId: string): Promise<string[]> {
+  const redis = getRedis();
+  if (!redis) return [];
+  const ids = ((await redis.zrange<string[]>(`events:${tenantId}`, 0, -1)) ?? []).map(String);
+  const found: string[] = [];
+  for (const id of ids) {
+    const blob = await redis.get<{ tenantId?: unknown }>(`event:${id}`);
+    if (blob && typeof blob === "object" && blob.tenantId === tenantId) found.push(`event:${id}`);
+  }
+  return found;
 }
 
 export async function findTenantRedisKeys(patterns: string[], tenantId?: string): Promise<string[]> {
@@ -242,11 +270,18 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
 
   // Redis: per-tenant keys (pinned patterns) + global cache busts.
   const redis = getRedis();
-  const tenantKeys = await findTenantRedisKeys(
-    tenantRedisPatterns(tenantId, tenant?.ownerEmail ?? undefined),
-    tenantId,
-  );
-  if (executed && redis && tenantKeys.length) await redis.del(...tenantKeys);
+  const tenantKeys = [
+    ...(await findTenantEventBlobKeys(tenantId)),
+    ...(await findTenantRedisKeys(tenantRedisPatterns(tenantId, tenant?.ownerEmail ?? undefined), tenantId)),
+  ];
+  // The multi-site account blob is shared with other sites: take this site out
+  // of it (and its line item) rather than deleting it.
+  const account = await getAccountForTenant(tenantId).catch(() => null);
+  if (account) {
+    if (executed) await unlinkTenant(account.id, tenantId);
+    summary.redis!.push({ target: `account:${account.id}`, found: 1, deleted: executed, detail: "site removed from the account grouping" });
+  }
+  for (let i = 0; executed && redis && i < tenantKeys.length; i += 500) await redis.del(...tenantKeys.slice(i, i + 500));
   for (const k of tenantKeys) summary.redis!.push({ target: k, found: 1, deleted: executed });
 
   // Domain claims live in one shared map — clear just this tenant's entries.
