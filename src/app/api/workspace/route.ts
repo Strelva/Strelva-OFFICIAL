@@ -34,6 +34,7 @@ import { systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
 import { listProvidedClients } from "@/platform/workspaces/business-ownership";
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
 import { askReleaseMayBeOn } from "@/platform/ask/release";
+import { connectedSitesReleasedFor } from "@/products/connected-sites/server";
 import type { ManagedWork, WorkspaceDelegation, WorkspaceProduct, WorkspaceSnapshot, WorkspaceWork } from "@/experience/workspace/contracts";
 
 export const dynamic = "force-dynamic";
@@ -280,6 +281,8 @@ export async function GET(request: Request) {
       canWrite: selected.access === "member" && (selected.role === "owner" || selected.role === "admin"),
       siteDomains: new Map(managedPresence.managedWork.flatMap((site) => site.domain ? [[site.id, site.domain] as const] : [])),
     }) : undefined;
+    const connectedSitesReleased = systemsReleased && selected.kind === "customer" && selected.access === "member"
+      ? await connectedSitesReleasedFor(current, selected.id).catch(() => false) : false;
     const homeFinderPreview = resolveHomeFinderPreviewHref();
     const products: WorkspaceProduct[] = listWorkspaceDiscoveryProducts().map((product): WorkspaceProduct => ({ id: product.id, name: product.name, description: product.promise,
       availability: workspaceAvailability(product),
@@ -309,7 +312,7 @@ export async function GET(request: Request) {
       ...(providedClients ? { providedClients } : {}),
       products,
       ...(systems ? { systems } : {}),
-      releases: { systems: systemsReleased, needsYou: needsYouReleaseEnabled(), ask: askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, websiteRebuild: websiteRebuildReleased },
+      releases: { systems: systemsReleased, needsYou: needsYouReleaseEnabled(), ask: askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
     };
     return json(snapshot);
   } catch (error) { return failed(error); }
