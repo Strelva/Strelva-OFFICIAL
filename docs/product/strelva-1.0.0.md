@@ -62,8 +62,8 @@ business, monitoring, and at least the best competitor's bar.
 | System | Must do at launch | Today |
 | --- | --- | --- |
 | **Website** | Live site in the workspace with domain, health and history; edits and publishing for existing sites; connected sites (bring a site made elsewhere via `connect.js`) | Tenant sites live; workspace view ~30%; connected sites on `feat/connected-sites`, unmerged; rebuild flag off |
-| **Inquiries** | Every lead kept, spam review, reply from the workspace, owner notified | Leads Redis-only (fix on `reborn-stop-losing-data`); product ~35%, flag off |
-| **Bookings** | Weekly hours, services, buffers, confirmations, reminders, one booking store, pause | ~25%; schedule caps at ~125 bookings; two stores |
+| **Inquiries** | Every lead kept, spam review, reply from the workspace, owner notified | Postgres copy of every lead built locally, not applied; read switch, 7-day parity and Postgres-first capture built locally behind off switches (`w2/bookings-inquiries`); product ~35%, flag off |
+| **Bookings** | Weekly hours, services, buffers, confirmations, reminders, one booking store, pause | ~45%; one booking store, hours and services from the record, pause, owner notice, request mode and day/week views built locally behind off switches (`w2/bookings-inquiries`); no reminders or manage links |
 | **Publishing** | Review replies, Google Business Profile, blog and newsletter, all through approval and receipts | 0% in the workspace; GBP writes depend on Google approval |
 | **Internal tools** | Agency/Strelva build from a sentence (work plan → app draft); records link to business contacts; notify on submit | Native apps shipped, unused; drafting flag off; ~10% |
 | **Store, rewards, newsletter, wellness** | Existing client features keep working inside the workspace | Tenant-side only |
