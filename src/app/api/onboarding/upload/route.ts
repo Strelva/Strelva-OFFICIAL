@@ -5,7 +5,7 @@ import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError } from "@/platform/workspaces/types";
 import { readBoundedBody, isWorkspaceBodyTooLarge } from "@/platform/workspaces/http";
 import { OnboardingConflictError, OnboardingUnavailableError, uploadOnboardingFile } from "@/products/onboarding/server";
-import { MAX_ONBOARDING_UPLOAD_REQUEST_BYTES } from "@/products/onboarding/limits";
+import { MAX_ONBOARDING_UPLOAD_REQUEST_BYTES } from "@/products/onboarding/contracts";
 
 export const dynamic = "force-dynamic";
 

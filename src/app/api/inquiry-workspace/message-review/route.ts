@@ -8,7 +8,7 @@ import {
   prepareInquiryMessageReview,
 } from "@/products/inquiries";
 import { INQUIRY_WORKSPACE_EXIT_CODE, resolveInquiryWorkspace } from "@/products/inquiries/server";
-import { classifyInquiryMessageOutcome } from "@/products/inquiries/message-outcome";
+import { classifyInquiryMessageOutcome } from "@/products/inquiries/contracts";
 import type {
   InquiryMessageReviewAction,
   InquiryMessageReviewOutcome,

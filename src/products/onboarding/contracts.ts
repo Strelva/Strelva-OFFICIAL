@@ -154,3 +154,4 @@ export interface OnboardingAttachableDocument {
   revision: number;
   updatedAt: string;
 }
+export { MAX_ONBOARDING_FILE_BYTES, MAX_ONBOARDING_UPLOAD_REQUEST_BYTES } from "./limits";

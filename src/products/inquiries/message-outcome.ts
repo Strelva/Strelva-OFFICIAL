@@ -11,7 +11,8 @@
  * Type-only imports keep this module safe for client components.
  */
 
-import type { InquiryDeliveryProviderOutcome } from "./delivery-types";
+/** What a provider later reported about an accepted message. */
+export type InquiryDeliveryProviderOutcome = "delivered" | "bounced" | "deferred" | "failed" | "suppressed";
 
 export type InquiryMessageDelivery =
   /** Never accepted: rejected, blocked, or not attempted. */

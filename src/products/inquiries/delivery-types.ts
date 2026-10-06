@@ -6,6 +6,7 @@ import type {
   ReceiptActor,
 } from "./contracts";
 import type { EmailOptions } from "@/lib/email/layout";
+import type { InquiryDeliveryProviderOutcome } from "./message-outcome";
 import type { EmailAudience } from "@/lib/email/send";
 
 export type InquiryDeliveryAction = "reply" | "send_message" | "owner_notification" | "schedule_follow_up";
@@ -171,13 +172,12 @@ export interface InquiryDeliveryCheckpoint {
   verificationReason?: string;
   failureReason?: string;
   retryable?: boolean;
-  providerOutcome?: "delivered" | "bounced" | "deferred" | "failed" | "suppressed";
+  providerOutcome?: InquiryDeliveryProviderOutcome;
   providerEventId?: string;
   /** Provider event time used to ignore stale webhook retries. */
   providerEventAt?: string;
 }
 
-export type InquiryDeliveryProviderOutcome = NonNullable<InquiryDeliveryCheckpoint["providerOutcome"]>;
 
 export interface InquiryDeliveryProviderEventInput {
   tenantId: string;
@@ -410,3 +410,4 @@ export interface ResponsibilityDeliveryGate {
   approval?: InquiryDeliveryApproval;
   reason?: string;
 }
+export type { InquiryDeliveryProviderOutcome } from "./message-outcome";

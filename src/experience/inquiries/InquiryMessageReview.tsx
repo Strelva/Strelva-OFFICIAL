@@ -8,7 +8,7 @@ import type {
   InquiryMessageReviewPreview,
   InquiryMessageReviewRequest,
 } from "./message-review-contract";
-import { classifyInquiryMessageOutcome } from "@/products/inquiries/message-outcome";
+import { classifyInquiryMessageOutcome } from "@/products/inquiries/contracts";
 import styles from "./message-review.module.css";
 
 export type {
