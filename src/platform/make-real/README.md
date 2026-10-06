@@ -5,8 +5,12 @@ stage candidates, perform outside effects, switch live revision pointers,
 connect, then run the declared operating checks. Each step records its own
 outcome. Nothing is atomic across providers, and the activation says so.
 
-Today the step log is in memory (`createInMemoryActivationRepository`). Every
-proof runs against isolated fake providers.
+The step log can now live in Postgres: `createSupabaseActivationRepository`
+(`supabase-repository.ts`) stores each activation as `operations/activation`
+saved work through the RPCs in `20261007155000_make_real_activations.sql`
+(local only, not applied anywhere else). Nothing uses it in a live path yet:
+the route below and every proof still use `createInMemoryActivationRepository`
+and isolated fake providers.
 
 The workspace reaches it through one route, `POST /api/workspace/systems/make-real`
 (owners only), which runs `sandbox.ts`: an in-memory copy of the affected
@@ -41,8 +45,8 @@ the SystemStore or a live site.
 ## Decision: one execution engine (October 5, 2026)
 
 `src/platform/work-execution` already persists step progress in Postgres. Make
-real must run on it, not beside it. This note records the gap and the plan. The
-port isn't built yet.
+real must run on it, not beside it. This note records the gap, the plan and
+what has been built so far (end of this section).
 
 **What work-execution provides**
 (`engine.ts`, `runtime.ts`, `repository.ts`, `update_work_responsibility` in
@@ -101,4 +105,63 @@ Jacob's yes.
 5. Delete the in-memory repository from production exports and keep it for
    tests only.
 
-Until step 3, an activation doesn't survive a process restart.
+### What was built (October 6, 2026) and what wasn't
+
+Steps 1 and 2 were built beside `update_work_responsibility`, not inside it.
+That RPC is already wrapped by the standing-execution migration (renamed to
+`update_work_responsibility_unchecked`, plus a claim lock and trigger), and
+every live responsibility payload depends on its checks. So
+`20261007155000_make_real_activations.sql` adds its own RPCs for the
+`operations/activation` resource kind and leaves responsibilities untouched:
+
+- `create_make_real_activation`, `save_make_real_activation`,
+  `read_make_real_activation`. Service role only, security definer, actor
+  rechecked on every call. A verified direct owner or admin of the customer
+  workspace writes; any direct member reads. Agencies are refused for now,
+  because an activation can touch every System in the business and agency
+  scope is per saved work.
+- The same rules as responsibilities, plus Make real's own. Compare-and-set
+  on `revision`. History grows by exactly one event, written by the caller
+  (so approvers and reconcilers other than the starter can write). A step's
+  identity never changes. A completed step never changes, except that a
+  `rollback_step` event may move it to `restored` (internal step) or
+  `compensated` (accepted effect), or record why it couldn't be undone.
+  Restored and compensated are final. An accepted effect keeps its receipt and
+  read-back. `unknown` leaves only through `reconcile`. No step starts after
+  rollback begins. `rolled_back` needs no step running or unknown, and
+  `made_real` needs every step completed and every check passed. Both are
+  closed.
+- A guard trigger refuses any other write to an activation row, including the
+  generic `save_workspace_work`. The existing workspace-exit guard still
+  applies: no new activation and no step start after a completed exit.
+
+Step 3 was built as a repository swap rather than an `ExecutionAdapter`.
+`createSupabaseActivationRepository(actor, db?)` implements
+`ActivationRepository`, so `createMakeReal` keeps its API. It's bound to one
+actor, and maps stale revisions to `WorkspaceConflictError`, access to
+`WorkspaceAccessError` and rule violations to `WorkspaceStoreError`.
+
+Proof (local only): `tests/make-real-activations-schema.sql`, and
+`src/__tests__/make-real-activation-repository.test.ts`. That test runs the
+real runner (made real, and roll back with compensation) through the real
+RPCs on the `check:workspace-sql` cluster, and gets the same step log as the
+in-memory repository.
+
+Still not done:
+
+- No live caller. `/api/workspace/systems/make-real` stays on the in-memory
+  sandbox, and nothing constructs the Postgres repository outside tests.
+- The migration hasn't been applied to any shared database. That needs
+  Jacob's yes.
+- Step 4: `due_workspace_work` doesn't pick up `in_progress` activations, so
+  an interrupted activation resumes only when someone calls `resume`.
+- The runner isn't an `ExecutionAdapter`, and leases aren't the
+  work-execution engine's leases.
+- Step 5: the in-memory repository is still exported, because the sandbox
+  uses it.
+- Workspace screens that treat every `operations` row as a responsibility
+  (for example `WorkspaceOngoing`) would mis-open an activation row. Filter
+  on `resourceKind` before activations reach a live workspace.
+
+Until a live caller uses the Postgres repository, an activation doesn't
+survive a process restart.
