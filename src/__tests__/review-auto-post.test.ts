@@ -28,7 +28,7 @@ vi.mock("@/lib/events", () => ({
   updateEvent: (...a: unknown[]) => mockUpdateEvent(...a),
   addEvent: (...a: unknown[]) => mockAddEvent(...a),
 }));
-vi.mock("@/lib/event-actions", () => ({ resolveEventAction: (...a: unknown[]) => mockResolveEventAction(...a) }));
+vi.mock("@/lib/event-actions", () => ({ AUTO_REPLY_ACTOR: "auto-reply-policy", resolveEventAction: (...a: unknown[]) => mockResolveEventAction(...a) }));
 vi.mock("@/lib/reviews/reply-voice", () => ({ getReplyVoice: (...a: unknown[]) => mockGetReplyVoice(...a) }));
 vi.mock("@/lib/reviews", () => ({ getReviews: (...a: unknown[]) => mockGetReviews(...a) }));
 vi.mock("@/lib/review-replies", () => ({
@@ -74,7 +74,7 @@ describe("runDueAutoPosts", () => {
   it("posts a draft whose window has elapsed", async () => {
     mockGetEvents.mockResolvedValue([draft({ autoPostAt: new Date(NOW - 60_000).toISOString() })]);
     const res = await runDueAutoPosts(NOW);
-    expect(mockResolveEventAction).toHaveBeenCalledWith("acme", "e1", "approved");
+    expect(mockResolveEventAction).toHaveBeenCalledWith("acme", "e1", "approved", "auto-reply-policy");
     expect(res.posted).toBe(1);
   });
 

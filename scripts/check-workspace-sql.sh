@@ -544,6 +544,10 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007160000_ope
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007160100_business_effort_tenant_links.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/business-effort-minutes-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/operator-queue-schema.sql"
+# Listing writes whose read-back failed, for /admin/queue (after both the
+# listing receipts and the operator queue).
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008123000_listing_readback_queue.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/listing-readback-queue-schema.sql"
 
 
 # Make real activations persisted as operations/activation saved work.
