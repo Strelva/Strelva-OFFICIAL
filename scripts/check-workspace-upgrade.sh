@@ -249,6 +249,5 @@ psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
 # 20261009140000 replaces workspace_release_flag_names() with the full list
 # plus make_real_owner_link.
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-flag-schema.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
