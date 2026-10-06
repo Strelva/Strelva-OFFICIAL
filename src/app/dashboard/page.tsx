@@ -22,8 +22,12 @@ import { selectStrelvaWork } from "@/lib/activity-feed";
 import { RetentionPanel } from "@/components/dashboard/RetentionPanel";
 import { OnboardingChecklist } from "@/components/dashboard/OnboardingChecklist";
 import { OnboardingWizard } from "@/components/dashboard/OnboardingWizard";
+import { getTenantFromHeaders } from "@/lib/tenant";
+import { redirectIfDashboardPageMoved } from "@/platform/owner-entry/server";
 
 async function DashboardHome() {
+  // Moved to workspace Home where owner entry and Needs you are on; covers a soft navigation.
+  await redirectIfDashboardPageMoved(await getTenantFromHeaders(), "/");
   const { tenant, clientFallbackRoot } = await requireDashboardView();
   const isOperator = await isSuperAdmin();
 

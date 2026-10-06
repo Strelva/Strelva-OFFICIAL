@@ -1,8 +1,8 @@
 import { workspaceReturnTarget } from "@/lib/workspace-location";
-import { releaseFlagEnvMode, resolveReleaseFlag, type ReleaseEnvironment, type ReleaseFlag } from "@/platform/release-flags/resolve";
+import { releaseFlagEnvMode, resolveReleaseFlag, type ReleaseEnvironment } from "@/platform/release-flags/resolve";
 import { ownerEntryPossible } from "./env";
 import type { OwnerEntryResolution } from "@/platform/release-flags/store";
-import { effectiveDisposition, routeForDashboardPath, workspaceHome, type DispositionState } from "./dispositions";
+import { effectiveDisposition, routeForDashboardPath, workspaceHome, type DispositionGate, type DispositionState } from "./dispositions";
 
 /**
  * Owner entry (owner-entry spec §3.1, §3.3, §3.4, §4). Pure decisions; the
@@ -52,7 +52,7 @@ export type DashboardRouting =
 export function routeDashboardRequest(input: {
   decision: OwnerEntryDecision;
   pathWithSearch: string;
-  flagOn?: (flag: ReleaseFlag) => boolean;
+  flagOn?: (flag: DispositionGate) => boolean;
 }): DashboardRouting {
   const { decision } = input;
   if (decision.kind !== "workspace") return { kind: "render" };

@@ -4,10 +4,10 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/db/server-client";
 import { withClientFallbackRoot } from "@/lib/client-fallback";
 import { resolveTenantOwnerEntry, workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
-import type { ReleaseFlag } from "@/platform/release-flags/resolve";
+import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
 import { decideOwnerEntry, entryDestination, routeDashboardRequest, type DashboardRouting, type OwnerEntryDecision } from "./decision";
 import { ownerEntryPossible } from "./env";
-import { effectiveDisposition, routeForDashboardPath } from "./dispositions";
+import { effectiveDisposition, routeForDashboardPath, type DispositionGate } from "./dispositions";
 
 /**
  * The trusted path the proxy saw for a `/dashboard` request, query included.
@@ -37,9 +37,11 @@ export async function dashboardRoutingFor(tenant: string, pathWithSearch?: strin
   if (decision.kind !== "workspace") return { kind: "render" };
   const path = pathWithSearch ?? (await headers()).get(DASHBOARD_PATH_HEADER) ?? "/dashboard";
   const entry = effectiveDisposition(routeForDashboardPath(new URL(path, "https://dashboard.invalid").pathname));
-  const flags = new Map<ReleaseFlag, boolean>();
+  const flags = new Map<DispositionGate, boolean>();
   for (const flag of entry.requires ?? []) {
-    flags.set(flag, await workspaceReleaseFlagEnabled(flag, decision.workspaceId, { operator: decision.operator, tester: decision.tester }).catch(() => false));
+    flags.set(flag, flag === "needs_you"
+      ? needsYouReleaseEnabled()
+      : await workspaceReleaseFlagEnabled(flag, decision.workspaceId, { operator: decision.operator, tester: decision.tester }).catch(() => false));
   }
   return routeDashboardRequest({ decision, pathWithSearch: path, flagOn: (flag) => flags.get(flag) === true });
 }

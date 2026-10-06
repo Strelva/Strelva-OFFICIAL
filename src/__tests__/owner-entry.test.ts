@@ -97,7 +97,8 @@ describe("dashboard disposition map", () => {
 
   it("blocks owner entry on while any used page still stays, and ignores frozen and unused pages", () => {
     const blocking = pagesBlockingOwnerEntry(new Set(["always"])).map((entry) => entry.route);
-    expect(blocking).toContain("/");
+    expect(blocking).toContain("/site");
+    expect(blocking).not.toContain("/");
     expect(blocking).not.toContain("/store");
     expect(blocking).not.toContain("/schedule");
     expect(pagesBlockingOwnerEntry(new Set(["always", "wellness"])).map((entry) => entry.route)).toContain("/schedule");
