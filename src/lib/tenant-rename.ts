@@ -18,6 +18,45 @@ import { getRedis } from "./redis";
 import { getSupabase } from "./db/client";
 import { RESERVED_SUBDOMAINS } from "./tenant-host";
 import type { UnifiedEvent } from "./types";
+import { LEAD_MIRROR_PENDING_KEY, LEAD_MIRROR_LAST_FAILURE_KEY } from "./lead-mirror";
+
+/** Move a pending lead and its queue identity in one transaction. A worker
+ * that already read the old member can only remove that old member; the new
+ * member always points at a readable lead. RENAME keeps the lead's TTL. */
+export const REKEY_LEAD_MIRROR_LUA = `
+local rows = redis.call('ZRANGE', KEYS[1], 0, -1, 'WITHSCORES')
+local moved = 0
+local prefix = ARGV[1] .. ':'
+for i = 1, #rows, 2 do
+  local member = rows[i]
+  if string.sub(member, 1, #prefix) == prefix then
+    local id = string.sub(member, #prefix + 1)
+    local oldKey = 'lead:' .. ARGV[1] .. ':' .. id
+    local newKey = 'lead:' .. ARGV[2] .. ':' .. id
+    if redis.call('EXISTS', oldKey) == 1 then redis.call('RENAME', oldKey, newKey) end
+    if redis.call('EXISTS', newKey) == 1 then
+      local nextMember = ARGV[2] .. ':' .. id
+      local nextScore = redis.call('ZSCORE', KEYS[1], nextMember)
+      if not nextScore or tonumber(rows[i+1]) < tonumber(nextScore) then
+        redis.call('ZADD', KEYS[1], rows[i+1], nextMember)
+      end
+      redis.call('ZREM', KEYS[1], member)
+      moved = moved + 1
+    end
+  end
+end
+local rewritten = 0
+local diagnostic = redis.call('GET', KEYS[2])
+if diagnostic then
+  local ok, value = pcall(cjson.decode, diagnostic)
+  if ok and type(value) == 'table' and value.tenant == ARGV[1] then
+    value.tenant = ARGV[2]
+    redis.call('SET', KEYS[2], cjson.encode(value))
+    rewritten = 1
+  end
+end
+return {moved, rewritten}
+`;
 
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,40})$/;
 
@@ -111,6 +150,20 @@ export async function rekeyTenantRedis(oldSlug: string, newSlug: string): Promis
   const out = { movedKeys: 0, rewrittenBlobs: 0, redisErrors: [] as string[] };
   if (!redis) return out;
 
+  // Global lead-mirror members embed the slug in their value, rather than
+  // their key. Move them before the generic lead-key pass, atomically with
+  // their payloads, so interrupted renames remain safe for the repair worker.
+  try {
+    const [moved, rewritten] = await redis.eval<[string, string], [number, number]>(REKEY_LEAD_MIRROR_LUA,
+      [LEAD_MIRROR_PENDING_KEY, LEAD_MIRROR_LAST_FAILURE_KEY], [oldSlug, newSlug]);
+    out.movedKeys += Number(moved);
+    out.rewrittenBlobs += Number(rewritten);
+  } catch (err) {
+    out.redisErrors.push(`lead-mirror: ${err instanceof Error ? err.message : String(err)}`);
+    // Do not move lead payloads without their queue identities. Recovery can
+    // rerun the same rename; every other authoritative family still proceeds.
+  }
+
   // 1) Event queue: rename the tenant zset, then rewrite each event blob's tenantId
   //    (getEvent/resolveEventAction compare event.tenantId, so a stale slug there
   //    would make the whole queue read as "wrong_tenant"). Blobs are keyed by id
@@ -180,6 +233,8 @@ export async function rekeyTenantRedis(oldSlug: string, newSlug: string): Promis
   // 2) Generic authoritative prefixes: SCAN → copy value (rewriting an embedded
   //    tenant field) to the rekeyed key → delete the old key.
   for (const pattern of authoritativePatterns(oldSlug)) {
+    // A failed atomic queue migration must retain its source lead records.
+    if (pattern === `lead:${oldSlug}:*` && out.redisErrors.some(error => error.startsWith("lead-mirror:"))) continue;
     try {
       let cursor = "0";
       do {

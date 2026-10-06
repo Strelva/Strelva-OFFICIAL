@@ -8,8 +8,8 @@
  *
  * Two rules, enforced here so callers can't get them wrong:
  *  1. Bounded. A write that hasn't answered in LEAD_MIRROR_TIMEOUT_MS is
- *     abandoned (and aborted), so a slow or down database adds at most that
- *     much to a visitor's form submission.
+ *     abandoned (and aborted). Failure reporting has its own short bound,
+ *     including Redis writes and alert deduplication.
  *  2. Never throws. A failure is recorded in Redis (`reb:lead-mirror:pending`,
  *     `reb:lead-mirror:last-failure`), paged once an hour per reason, shown in
  *     the operator console, and retried by the lead-mirror-reconcile cron.
@@ -23,6 +23,7 @@ import { getRedis } from "./redis";
 import { alertOnce } from "./monitoring";
 
 export const LEAD_MIRROR_TIMEOUT_MS = 1500;
+export const LEAD_MIRROR_FAILURE_TIMEOUT_MS = 250;
 export const LEAD_MIRROR_PENDING_KEY = "reb:lead-mirror:pending";
 export const LEAD_MIRROR_LAST_FAILURE_KEY = "reb:lead-mirror:last-failure";
 const PENDING_KEEP = 5000;
@@ -142,19 +143,31 @@ export async function recordLeadMirrorFailure(
   const failure: LeadMirrorFailure = { at: new Date().toISOString(), tenant, leadId, reason };
   console.error("[lead-mirror] lead not copied to Postgres", failure);
   const redis = getRedis();
-  if (redis) {
+  let expired = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const remember = async () => {
+    if (!redis) return;
     try {
       await redis.zadd(LEAD_MIRROR_PENDING_KEY, { nx: true }, { score: Date.now(), member: pendingMember(tenant, leadId) });
+      if (expired) return;
       await redis.zremrangebyrank(LEAD_MIRROR_PENDING_KEY, 0, -(PENDING_KEEP + 1));
+      if (expired) return;
       await redis.set(LEAD_MIRROR_LAST_FAILURE_KEY, failure);
     } catch (err) {
       console.error("[lead-mirror] could not record the failure", err);
     }
-  }
+  };
+  // Report and remember independently: a stalled queue write must not prevent
+  // the operator alert from being attempted. Neither blocks visitor intake.
   try {
-    await alertOnce("lead_mirror_failed", "high", { reason }, 3600);
-  } catch {
-    // alerting is best-effort
+    await Promise.race([
+      Promise.allSettled([remember(), alertOnce("lead_mirror_failed", "high", { reason }, 3600)]),
+      new Promise<void>(resolve => {
+        timer = setTimeout(() => { expired = true; resolve(); }, LEAD_MIRROR_FAILURE_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 

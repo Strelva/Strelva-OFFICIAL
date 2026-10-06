@@ -113,7 +113,7 @@ M one to three days, L three to seven, XL more.
       serving reads until cutover. *Done locally Oct 5, not applied or
       deployed:* `20261005090000_tenant_leads.sql` (`tenant_leads` keyed by
       `stable_id`, nullable `workspace_id`, RLS on, two service-role RPCs),
-      `src/lib/lead-mirror.ts` (1.5 s bound, never fails the submission,
+      `src/lib/lead-mirror.ts` (1.5 s database bound plus 250 ms for failure reporting, never fails the submission,
       failures pending in Redis, paged, retried hourly by
       `lead-mirror-reconcile`), `scripts/backfill-tenant-leads.ts` (dry run by
       default). Operators see client leads at `/admin/client-leads` and on each
