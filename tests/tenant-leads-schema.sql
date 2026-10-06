@@ -1,6 +1,6 @@
 \set ON_ERROR_STOP on
 -- Client lead store (20261005090000_tenant_leads.sql). Fictional tenants only.
--- Runs in the focused workspace cluster (after the business record migration)
+-- Runs in the focused workspace cluster (after the business record migration, when present)
 -- and in the full upgrade cluster (applied before the October 1 migrations,
 -- the order production may use).
 begin;
@@ -84,7 +84,7 @@ do $$
 declare v_ws uuid := 'cf000000-0000-4000-8000-0000000000e1';
 begin
   if to_regclass('public.tenant_workspace_links') is null then
-    raise notice 'tenant_workspace_links absent; conversion attach is checked in the focused cluster';
+    raise notice 'tenant_workspace_links absent; conversion attach is checked only where the business record migration exists';
     return;
   end if;
   insert into public.users(id, email, verified_at) values ('cf000000-0000-4000-8000-0000000000e0', 'lead-operator@strelva.example.test', now());
