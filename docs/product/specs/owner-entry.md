@@ -1,6 +1,12 @@
 # Owner entry and the move off /dashboard
 
-Status: draft spec, 2026-10-06. Not built, not approved. For Jacob's review.
+Status: draft spec, 2026-10-06. Not approved. For Jacob's review.
+Built and proven locally on `build/business-ownership` (Oct 6): requirements
+8 and 9 (operator owner invitation, both memberships in one transaction) in
+`20261007110000_business_ownership.sql`, `src/platform/workspaces/business-ownership.ts`
+and `scripts/business-ownership.ts`. The operator button on
+`/admin/clients/[id]` is not built; the script is the only way to issue one.
+Requirement 10 (magic-link claim) and the rest are not built.
 
 Covers Reborn section 6 and the 1.0.0 line "Owners sign in on their client
 admin host and land in their workspace; old `/dashboard` links redirect."

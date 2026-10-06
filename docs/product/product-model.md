@@ -163,7 +163,9 @@ turned up problems no single plan had. Each is from code reading unless marked.
    Fix once, not three times: an operator-issued owner invitation
    ([owner-entry](./specs/owner-entry.md)), a `workspace_providers` mark that
    grants nothing ([agency-and-versions](./specs/agency-and-versions.md)), and
-   the one owner-recipient rule from Reborn §1 for every notice.
+   the one owner-recipient rule from Reborn §1 for every notice. *Built and
+   proven locally Oct 6 on `build/business-ownership`; nothing applied to
+   production.*
 2. **Owner-only actions need email.** Make real, publish and launch require
    `owner`. For owners who never sign in, that only works through signed
    one-tap links bound to the item and recipient

@@ -1,6 +1,11 @@
 # The rest of the Systems a business starts with
 
-Status: draft spec, 2026-10-06. Not built, not approved. For Jacob's review.
+Status: draft spec, 2026-10-06. Not approved. For Jacob's review.
+§3.4 items 3 and 4 (one recipient resolver for `weekly-report`,
+`monthly-report` and `runWebsiteMonthlyReports`) built and proven locally on
+`build/business-ownership` (Oct 6). The hosted path still needs a current
+owner to read the report; a converted business without one is reported as
+"no owner has accepted this business yet".
 
 This spec covers everything in [Strelva 1.0.0](../strelva-1.0.0.md) §2 other
 than the website, inquiries, bookings and publishing: internal tools, store,

@@ -1,6 +1,12 @@
 # The agency surface and Versions
 
-Status: draft spec, 2026-10-06. Not built, not approved. For Jacob's review.
+Status: draft spec, 2026-10-06. Not approved. For Jacob's review.
+Built and proven locally on `build/business-ownership` (Oct 6): decision 1A's
+`workspace_providers` mark (grants nothing), set by conversion once Strelva's
+agency workspace is designated, and the agency home listing operated clients
+the actor already belongs to (`providedClients`). Still per-client fetches
+under `MAX_AGENCY_CLIENT_LOADS`; the batched read, Versions migration and the
+rest are not built.
 
 Base: branch `reborn-1.0-model` at `db9566a8`. Every path below was read on
 that branch. Nothing here was run against production.

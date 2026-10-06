@@ -1,6 +1,12 @@
 # Money and the client's data
 
-Status: draft spec, 2026-10-06. Not built, not approved. For Jacob's review.
+Status: draft spec, 2026-10-06. Not approved. For Jacob's review.
+Decision 5 built and proven locally on `build/business-ownership` (Oct 6):
+`tenant_leads` no longer cascade with the tenant row; a deprovisioned
+client's leads in no business are kept 365 days, then purged by the hourly
+`lead-mirror-reconcile` cron with a `tenant_lead_purges` receipt. The 365 is
+the working default; Jacob can change it in one function
+(`tenant_lead_retention`).
 
 Four parts: (a) billing follows the client into the workspace, (b) no client
 data is held only in Redis, (c) export and exit carry everything, (d) the
