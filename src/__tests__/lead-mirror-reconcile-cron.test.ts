@@ -7,7 +7,10 @@ const mocks = vi.hoisted(() => ({
   denied: vi.fn(),
   purge: vi.fn(),
   parity: vi.fn(),
+  bookingRepair: vi.fn(),
 }));
+vi.mock("@/platform/bookings/move", () => ({ repairPendingBookings: mocks.bookingRepair }));
+vi.mock("@/platform/bookings/legacy-ports", () => ({ legacyBookingPorts: {} }));
 vi.mock("@/lib/client-leads", () => ({ reconcileLeadMirror: mocks.reconcile, runLeadReadParity: mocks.parity }));
 vi.mock("@/lib/lead-mirror", () => ({ purgeExpiredTenantLeads: mocks.purge }));
 vi.mock("@/lib/heartbeat", () => ({ recordHeartbeat: mocks.heartbeat }));
@@ -22,6 +25,26 @@ beforeEach(() => {
   mocks.denied.mockReturnValue(null);
   mocks.purge.mockResolvedValue({ status: "purged", purged: 0, tenants: 0 });
   mocks.parity.mockResolvedValue({ ran: false, checked: 0, inParity: 0, outOfParity: [], failed: [] });
+  mocks.bookingRepair.mockResolvedValue({ checked: 0, repaired: 0, failed: 0, dropped: 0, remaining: 0 });
+});
+
+describe("one booking store repair in the reconcile cron", () => {
+  it("replays queued booking copies and pages on a backlog", async () => {
+    mocks.reconcile.mockResolvedValue({ checked: 0, repaired: 0, failed: 0, missing: 0, remaining: 0 });
+    mocks.bookingRepair.mockResolvedValue({ checked: 3, repaired: 1, failed: 2, dropped: 0, remaining: 2 });
+    const res = await GET(new Request("http://localhost/api/cron/lead-mirror-reconcile"));
+    expect(res.status).toBe(200);
+    expect((await res.json()).bookingStore).toMatchObject({ repaired: 1, remaining: 2 });
+    expect(mocks.alertOnce).toHaveBeenCalledWith("booking_store_backlog", "high", { remaining: 2, failed: 2 }, 6 * 3600);
+  });
+
+  it("a repair that throws never fails the cron", async () => {
+    mocks.reconcile.mockResolvedValue({ checked: 0, repaired: 0, failed: 0, missing: 0, remaining: 0 });
+    mocks.bookingRepair.mockRejectedValue(new Error("redis down"));
+    const res = await GET(new Request("http://localhost/api/cron/lead-mirror-reconcile"));
+    expect(res.status).toBe(200);
+    expect((await res.json()).bookingStore).toMatchObject({ failed: 1, error: "redis down" });
+  });
 });
 
 describe("lead read parity in the reconcile cron", () => {

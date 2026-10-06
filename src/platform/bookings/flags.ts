@@ -17,7 +17,6 @@
  *   STRELVA_BOOKING_OWNER_NOTICE=1  the "New booking" owner email, through the
  *                                   owner-recipient rule.
  */
-import { dualWritePgEnabled } from "@/lib/db/dual-write";
 import { bookingStoreDb, type BookingStoreDb } from "./store";
 
 export type BookingReadMode = "legacy" | "compare" | "postgres";
@@ -28,7 +27,9 @@ const STREAK_CACHE_MS = 5 * 60 * 1000;
 type Env = Partial<Record<string, string | undefined>>;
 
 export function bookingStoreWriteEnabled(env: Env = process.env): boolean {
-  return env.STRELVA_BOOKING_STORE_WRITE?.trim() === "1" && dualWritePgEnabled();
+  // DUAL_WRITE_PG=0 is the kill switch for every Postgres mirror (src/lib/db/dual-write.ts).
+  const killed = env.DUAL_WRITE_PG === "0" || env.DUAL_WRITE_PG === "false";
+  return env.STRELVA_BOOKING_STORE_WRITE?.trim() === "1" && !killed;
 }
 
 export function bookingReadMode(env: Env = process.env): BookingReadMode {
