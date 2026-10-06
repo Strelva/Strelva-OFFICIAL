@@ -46,6 +46,15 @@ stays gated.
   Make real item per rebuild (live plan wins). The leftover SMS check
   (`staleSmsApprovals`, `ClearSmsButton`, `/api/admin/ops/clear-stale-sms`) is
   gone.
+- **Built locally on `w4/journey-gaps` (2026-10-06), same flags:** Strelva
+  handled lists decided items (approved and Not yet, not only lapses) with
+  an honest undo state per lifecycle; none is one tap, each says why
+  (migration `20261009130000`). Open decision 1 (a) is applied to Make real:
+  an owner with no account approves a Make real plan by signed link; Strelva
+  (system) reads and runs that one item under a `make_real_link` session
+  bound to it and to the owner recipient, logs the run before it starts, and
+  rechecks the plan fingerprint at decision time (migration
+  `20261009131000`). Access, money and exit still need a sign-in.
 - **Not built:** operational assignment offers (nothing waits on the owner
   today; it needs a new proposed-assignment record) and exit/export (no
   pending state; the adapter proposes nothing); per-System policy overrides

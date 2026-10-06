@@ -465,6 +465,11 @@ last-owner guard in both stores.
    need an email path. If the needs-you spec chooses signed email actions,
    owner entry needs nothing more. If it doesn't, a business with no
    signed-in owner can't Make real at all. Name it in the needs-you spec.
+   *Working default built locally Oct 6 on `w4/journey-gaps`: a signed
+   one-tap link decides a Make real plan for an owner with no account,
+   through Needs you, with the plan fingerprint rechecked at decision time
+   (migration `20261009131000`, not applied). Publish and launch keep their
+   own items; access, money and exit still need a sign-in.*
    Nothing in the repo sends SMS. Adding it would be a new provider and a
    new dependency.
 7. **If 1.0.0 means only existing clients (assumption 1 changes),** the

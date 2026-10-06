@@ -321,8 +321,10 @@ are untouched.
       with the reason), the 15-minute hold sweep, the `/b/[token]` manage
       page (change time, cancel), calendar busy times on the tenant routes,
       booking-only hours from the bookings screen, and Calendly imports and
-      cancels end to end through the signed webhook. Customer cancellation
-      email, agent bookings and MCP are not built · M*
+      cancels end to end through the signed webhook. Built locally Oct 6 on
+      `w4/journey-gaps`: once the store serves, a visitor's booking works
+      with Redis absent or down, and says when nothing was booked. Customer
+      cancellation email, agent bookings and MCP are not built · M*
 - [ ] **Inquiries.** `STRELVA_INQUIRIES_RELEASE` on, spam review in the
       workspace, owner notification. Existing leads already project in.
       *~45%: spam review on the workspace Inquiries page (owner or Strelva
@@ -374,7 +376,9 @@ Neither is used by any journey today.
       inbox). *Not started · L*
 - [ ] Every outside write leaves a receipt with read-back and undo. Google
       Business, Stripe and domain removal have no undo; Vercel domains are
-      never removed. *Partial · L*
+      never removed. *Partial · L. Built locally Oct 6 on `w4/journey-gaps`:
+      every decided Needs you item is a Strelva handled receipt that says why
+      it can't be undone in one tap (migration `20261009130000`, not applied)*
 - [ ] Site health and domain checks cover every site. `website-health` skips
       custom-repo client sites; domain verification skips non-workspace
       tenants. *Partial · S*

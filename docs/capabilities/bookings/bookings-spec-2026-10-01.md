@@ -104,6 +104,19 @@ config save, while dual-writing, overwrites hours edited on the bookings
 screen. Production steps (migration, each switch, live email) need Jacob's
 yes.
 
+**Built locally October 6 (wave 4, branch `w4/journey-gaps`, code only).**
+Once the one store serves (`STRELVA_BOOKING_STORE_READ=postgres` after the
+parity streak), the visitor's `POST /api/booking` no longer needs Redis: the
+store's exclusion constraint guards the slot, the legacy Redis slot lock is
+best effort, and the rate limit falls back to a per-instance count when Redis
+is absent or down. When nothing can store or guard the booking (store
+unreachable and no Redis; or Redis down on legacy reads), the visitor gets a
+503 that says nothing was booked, never a 500 or a false success. A failing
+activity log or owner notice after the booking is stored no longer fails it.
+Proof: `booking-without-redis` (9 tests; 8 fail without the change) and the
+booking suites above unchanged; the tenant-host journey step in
+`tests/booking-approval-authenticated-local.spec.ts` (not yet run on a stack).
+
 **October 6 update.** This spec now sits inside the 1.0.0 model: bookings is
 a **System** that reads the business record. The new section
 [Bookings in the 1.0.0 model](#bookings-in-the-100-model) says how. Every
