@@ -13,6 +13,7 @@
 import { getRedis } from "./redis";
 import { mirrorClientRecord } from "@/platform/client-records/mirror";
 import { readThroughFlag } from "@/platform/client-records/move";
+import { holdSpamForReview } from "./inquiry-records";
 
 const SPAM_TTL_SECONDS = 30 * 24 * 60 * 60;
 const SPAM_KEEP = 1000;
@@ -93,6 +94,10 @@ export async function recordSpam(tenant: string, input: RecordSpamInput): Promis
   await redis.zremrangebyrank(indexKey(tenant), 0, -(SPAM_KEEP + 1));
   // Postgres copy so a false positive outlives the 30-day TTL. Never throws.
   await mirrorClientRecord("spam_held", tenant, { recordId: record.id, payload: JSON.parse(JSON.stringify(record)), capturedAt: record.createdAt });
+  // Held for review in tenant_leads (inquiry 1.0 delta, C8), so the owner can
+  // release a false positive from the Inquiries page. Off unless
+  // STRELVA_INQUIRY_RECORDS=1; never throws.
+  await holdSpamForReview(tenant, record);
   return record;
 }
 

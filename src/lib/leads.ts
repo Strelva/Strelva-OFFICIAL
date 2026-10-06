@@ -25,6 +25,7 @@ import { getTenantConfig } from "./tenants";
 import { getTenantDashboardUrl } from "./tenant-urls";
 import { sendNewLeadEmail } from "./delivery-email";
 import { mirrorLead, type LeadMirrorResult } from "./lead-mirror";
+import { followUpLeadCapture } from "./inquiry-records";
 import {
   compareLeadLists,
   leadAuthorityIsPostgres,
@@ -219,10 +220,19 @@ export async function captureLead(
   // never throw; the email goes only for genuinely new leads (the dedup guard
   // above already returned on a re-submission).
   await Promise.all([
-    mirrorLead(tenant, lead, hash),
+    mirrorLead(tenant, lead, hash).then((kept) => followUpKept(tenant, lead.id, kept)),
     options.notifyOwner !== false ? notifyOwnerOfLead(tenant, lead) : Promise.resolve(),
   ]);
   return { status: "captured", lead };
+}
+
+/**
+ * Once Postgres holds a new lead: its `captured` event and, in a converted
+ * business, the sender as a contact (inquiry 1.0 delta, C9). Off unless
+ * STRELVA_INQUIRY_RECORDS=1; bounded and never throws.
+ */
+async function followUpKept(tenant: string, leadId: string, kept: LeadMirrorResult): Promise<void> {
+  if (kept.status === "recorded" || kept.status === "exists") await followUpLeadCapture(tenant, leadId);
 }
 
 function mirrorKept(result: LeadMirrorResult): boolean {
@@ -257,6 +267,7 @@ async function capturePostgresFirst(
   }
 
   const pgKept = mirrorKept(kept);
+  await followUpKept(tenant, lead.id, kept);
   let cached = false;
   if (redis) {
     try {
