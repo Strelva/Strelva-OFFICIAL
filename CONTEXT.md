@@ -91,6 +91,8 @@ authority and production restrictions remain unchanged.
 
 ## Language
 
+Workspace terms beyond these live in [GLOSSARY.md](./GLOSSARY.md).
+
 **Business:** The customer organization whose work and records must remain
 separate from other businesses. A business is not a website tenant, payer or
 agency merely because the same person can access them.

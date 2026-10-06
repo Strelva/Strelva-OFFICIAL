@@ -218,6 +218,38 @@ describe("default inquiry follow-up status projection", () => {
     expect(mail.send).toHaveBeenCalledTimes(1);
   });
 
+  it("follows the newest created responsibility even when an older paused one sorts first", async () => {
+    const state = followUpState();
+    const current = state.responsibilities[0]!;
+    state.responsibilities.unshift({
+      ...current,
+      id: "responsibility-older",
+      status: "paused",
+      createdAt: "2026-09-01T00:00:00.000Z",
+      updatedAt: SWEEP_AT,
+    });
+    const mail = transport();
+    const result = await runSweep(state, mail);
+    expect(result.attempted).toBe(1);
+    expect(mail.send).toHaveBeenCalledTimes(1);
+  });
+
+  // The same table runs against message review approval and the receive seam.
+  it.each([
+    ["draft", false],
+    ["live_unverified", true],
+    ["live", true],
+    ["paused", false],
+    ["failed", false],
+  ] as const)("sends a due follow-up for a %s inquiry intake only with live intent (%s)", async (status, current) => {
+    const state = followUpState();
+    state.capabilities[0]!.status = status;
+    const mail = transport();
+    const result = await runSweep(state, mail);
+    expect(result.attempted).toBe(current ? 1 : 0);
+    expect(mail.send).toHaveBeenCalledTimes(current ? 1 : 0);
+  });
+
   it("rechecks canonical and overlay status after candidate discovery", async () => {
     const repository = createInMemoryInquiryRepository();
     const initial = followUpState();

@@ -142,10 +142,24 @@ export async function claimEventAction(
  * event. If the subsequent resolve loses its lock or the process dies, the
  * marker survives so claimEventAction refuses a retry (which would duplicate the
  * write). No-op if the execution attempt no longer matches (best-effort).
+ *
+ * `acceptance` keeps what the provider accepted (its message id, time and the
+ * delivery attempt) on the event, so reconciliation can finish from this copy
+ * when the delivery's own marker could not be written.
  */
-export async function markExecutionExternalAccepted(id: string): Promise<void> {
+export async function markExecutionExternalAccepted(
+  id: string,
+  acceptance?: { providerMessageId?: string; acceptedAt?: string; deliveryAttemptId?: string },
+): Promise<void> {
   const redis = getRedis();
   if (!redis) return;
+  const evidence = acceptance && (acceptance.providerMessageId || acceptance.acceptedAt || acceptance.deliveryAttemptId)
+    ? {
+        ...(acceptance.providerMessageId ? { providerMessageId: acceptance.providerMessageId.slice(0, 240) } : {}),
+        ...(acceptance.acceptedAt ? { acceptedAt: acceptance.acceptedAt.slice(0, 80) } : {}),
+        ...(acceptance.deliveryAttemptId ? { deliveryAttemptId: acceptance.deliveryAttemptId.slice(0, 240) } : {}),
+      }
+    : null;
   await updateEvent(id, (event) => {
     const execution = event.metadata?.execution;
     if (!execution || execution.state !== "processing") return event;
@@ -153,7 +167,7 @@ export async function markExecutionExternalAccepted(id: string): Promise<void> {
       ...event,
       metadata: {
         ...event.metadata,
-        execution: { ...execution, state: "external_accepted" },
+        execution: { ...execution, state: "external_accepted", ...(evidence ? { acceptance: evidence } : {}) },
       },
     };
   }).catch(() => {});

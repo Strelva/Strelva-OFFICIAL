@@ -272,7 +272,20 @@ async function executeResolvedEventAction(
     // before any receipt or event-resolution work. A receipt persistence blip
     // therefore leaves a recoverable, blocking event instead of enabling a
     // second provider call.
-    if (execution.accepted) await markExecutionExternalAccepted(eventId);
+    // The provider id travels with the marker as a second copy, so a lost
+    // delivery checkpoint write can still be reconciled without a resend.
+    if (execution.accepted) {
+      await markExecutionExternalAccepted(
+        eventId,
+        execution.providerMessageId || execution.acceptedAt
+          ? {
+              providerMessageId: execution.providerMessageId,
+              acceptedAt: execution.acceptedAt,
+              deliveryAttemptId: execution.deliveryAttemptId,
+            }
+          : undefined,
+      );
+    }
     if (!execution.accepted) return { changed: false, reason: execution.reason || "delivery_unavailable" };
     if (!execution.safeToResolve || !execution.receiptPersisted) {
       return { changed: false, reason: execution.reason || "responsibility_receipt_reconciliation_required" };

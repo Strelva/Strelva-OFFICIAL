@@ -310,6 +310,8 @@ function parseCheckpoint(raw: unknown, tenantId: string, inquiryId: string, acti
     attemptId: row.attemptId,
     attempts: row.attempts,
     startedAt: row.startedAt,
+    // Older checkpoints have no digest. Leave it absent rather than guessing.
+    ...(typeof row.messageDigest === "string" && row.messageDigest ? { messageDigest: row.messageDigest.slice(0, 128) } : {}),
     ...(typeof row.acceptedAt === "string" ? { acceptedAt: row.acceptedAt } : {}),
     ...(typeof row.providerMessageId === "string" ? { providerMessageId: row.providerMessageId } : {}),
     ...(typeof row.replyTo === "string" ? { replyTo: row.replyTo.slice(0, 320).toLowerCase() } : {}),
@@ -425,6 +427,7 @@ export function createRedisInquiryDeliveryStore(
           attemptId,
           attempts: (existing?.attempts || 0) + 1,
           startedAt: input.now,
+          ...(input.messageDigest ? { messageDigest: input.messageDigest.slice(0, 128) } : {}),
         };
         await redis.set(stateKey, checkpoint, { ex: DELIVERY_TTL_SECONDS });
         return { acquired: true, attemptId, checkpoint };
@@ -706,7 +709,16 @@ export function createMemoryInquiryDeliveryStore(): InquiryDeliveryStore {
       budgets.set(budgetKeyValue, used + 1);
       const attemptId = randomUUID();
       claims.set(stateKey, attemptId);
-      const checkpoint: InquiryDeliveryCheckpoint = { inquiryId: input.inquiryId, tenantId: input.tenantId, action: input.action, status: "sending", attemptId, attempts: (existing?.attempts || 0) + 1, startedAt: input.now };
+      const checkpoint: InquiryDeliveryCheckpoint = {
+        inquiryId: input.inquiryId,
+        tenantId: input.tenantId,
+        action: input.action,
+        status: "sending",
+        attemptId,
+        attempts: (existing?.attempts || 0) + 1,
+        startedAt: input.now,
+        ...(input.messageDigest ? { messageDigest: input.messageDigest.slice(0, 128) } : {}),
+      };
       checkpoints.set(stateKey, checkpoint);
       return { acquired: true, attemptId, checkpoint };
     },

@@ -42,6 +42,7 @@ import { listPatternInstallations } from "./inquiry-pattern-updates";
 import { explainWhyWithDelivery, projectInquiryDeliveryTimeline, withoutInquiryDeliveryProjection } from "./delivery-surface";
 import { placeholderInquiryRecords, projectedInquiryRecords } from "./record-projection";
 import { assertInquiryWorkspaceOpen } from "./workspace-exit";
+import { currentResponsibility } from "./currentness";
 
 export { recordedInquiryAssignee, recordedInquiryStatus } from "./record-projection";
 
@@ -800,7 +801,7 @@ export async function executeInquirySurface(input: {
     case "pause":
     case "resume": {
       const target = engine.getWork(action.requestId);
-      const policy = engine._state().responsibilities.find((item) => item.capabilityId === target.capabilityId);
+      const policy = currentResponsibility(engine._state().responsibilities, target.capabilityId);
       if (!policy) throw new InquiryValidationError("This capability has no standing responsibility.");
       if (action.kind === "pause") engine.pauseResponsibility(policy.id, actorId);
       else engine.resumeResponsibility(policy.id, actorId);

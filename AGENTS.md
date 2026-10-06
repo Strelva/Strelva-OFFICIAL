@@ -170,6 +170,7 @@ Postgres, or bypass mode changes what a green run means.
 | --- | --- |
 | Capabilities: status, code, specs, flags | [docs/capabilities/README.md](./docs/capabilities/README.md) |
 | Code layers and platform | [docs/architecture/README.md](./docs/architecture/README.md) |
+| Workspace domain terms | [GLOSSARY.md](./GLOSSARY.md), under [product-ontology](./docs/architecture/product-ontology.md) |
 | Data authority and retention | [docs/architecture/persistence-boundaries.md](./docs/architecture/persistence-boundaries.md) |
 | CI and test modes | [docs/operations/testing-and-ci.md](./docs/operations/testing-and-ci.md) |
 | Client dashboard | [docs/architecture/client-dashboard-ia.md](./docs/architecture/client-dashboard-ia.md) |

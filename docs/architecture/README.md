@@ -62,6 +62,8 @@ src/proxy.ts     request gating
 | [persistence-boundaries](./persistence-boundaries.md) | Which store is authoritative for what; Redis exceptions; retention |
 | [auth-tenancy](./auth-tenancy.md) | Supabase Auth, routing, memberships, tenant checks |
 | [product-ontology](./product-ontology.md) | Domain vocabulary and maturity words (read by `ontology-contracts.test.ts`) |
+| [GLOSSARY](../../GLOSSARY.md) | Workspace terms the ontology does not define |
+| [deepening-2026-10-05](./deepening-2026-10-05/README.md) | Nine proposed deep modules for the workspace and inquiry code, with defects found and fixed |
 | [custom-repo-delivery-model](./custom-repo-delivery-model.md) | Client-repo topology and the versioned storefront contract |
 | [client-repo-build-standard](./client-repo-build-standard.md) | How client repos consume `/api/v1` |
 | [feature-management](./feature-management.md) | Tenant feature registry and core lock |

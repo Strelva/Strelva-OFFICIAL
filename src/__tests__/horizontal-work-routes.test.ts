@@ -91,6 +91,13 @@ function databaseBoundary() {
     failNextCommit(message: string) { rpcError = message; },
     from,
     async rpc(name: string, args: Record<string, unknown>) {
+      // Mirrors public.save_workspace_work: membership is re-checked inside the write.
+      if (name === "save_workspace_work") {
+        const member = (tables.workspace_memberships ?? []).some((row) => row.workspace_id === args.p_workspace_id && row.user_id === args.p_user_id);
+        if (!member) return { data: null, error: { message: "workspace_membership_required" } };
+        const saved = await from("saved_product_work").insert({ workspace_id: args.p_workspace_id, product_id: args.p_product_id, resource_kind: args.p_resource_kind, title: args.p_title, payload: args.p_payload, input: args.p_input, source_work_id: args.p_source_work_id, created_by: args.p_user_id }).select().single();
+        return { data: saved.data ? [saved.data] : null, error: saved.error };
+      }
       if (rpcError) { const error = rpcError; rpcError = null; return { data: null, error: { message: error } }; }
       if (name === "work_allowance_execution_command") {
         // This fixture has legacy accepted job budgets but no configured period
@@ -251,7 +258,7 @@ describe("horizontal work HTTP authority and execution", () => {
       expect((await handler(post(path, {}, { origin: "https://other.test" }))).status).toBe(403);
       expect((await handler(post(path, {}, { "content-type": "text/plain" }))).status).toBe(415);
       expect((await handler(post(path, { action: "run", workId: workspaceId, actorId: outsider.id }))).status).toBe(400);
-      expect((await handler(post(path, { text: "x".repeat(151000) }))).status).toBe(400);
+      expect((await handler(post(path, { text: "x".repeat(151000) }))).status).toBe(413);
     }
   });
 

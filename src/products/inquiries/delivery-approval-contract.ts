@@ -1,5 +1,6 @@
 import type { InquiryDeliveryResult } from "./delivery-types";
 import type { InquiryDeliveryAction, InquiryDeliveryStatus } from "./delivery-types";
+import type { InquiryMessageDelivery } from "./message-outcome";
 
 /** The only outbound actions exposed by the per-message review boundary. */
 export type InquiryMessageReviewAction = Extract<
@@ -47,18 +48,41 @@ export interface InquiryMessageReviewOutcome {
   verificationEvidence?: string[];
   /** False for an accepted or ambiguous provider write. */
   retryable: boolean;
+  /** What happened to the message after the provider took it (see message-outcome.ts). */
+  delivery?: InquiryMessageDelivery;
+  /** The owner may prepare a new review. Only a rejected message allows one. */
+  retryAllowed?: boolean;
 }
+
+/**
+ * `different_message_sent`: the provider already accepted a different message
+ * for this inquiry and purpose. The reviewed message was not sent, never will
+ * be under this purpose, and earns no message receipt.
+ */
+export type InquiryMessageReviewExecutionStatus = InquiryDeliveryResult["status"] | "different_message_sent";
 
 export interface InquiryMessageReviewExecution {
   accepted: boolean;
   safeToResolve: boolean;
   receiptPersisted: boolean;
   verified: boolean;
-  status: InquiryDeliveryResult["status"];
+  status: InquiryMessageReviewExecutionStatus;
   reason?: string;
   acceptedAt?: string;
   providerMessageId?: string;
+  /** The delivery send attempt the provider accepted, for reconciliation. */
+  deliveryAttemptId?: string;
   verificationEvidence?: string[];
+}
+
+/**
+ * A second copy of an accepted send, kept on the governed event. Reconciliation
+ * uses it when the delivery checkpoint could not record the acceptance.
+ */
+export interface InquiryMessageAcceptanceEvidence {
+  providerMessageId?: string;
+  acceptedAt?: string;
+  deliveryAttemptId?: string;
 }
 
 export interface InquiryMessageReviewReconciliation {
@@ -66,6 +90,6 @@ export interface InquiryMessageReviewReconciliation {
   safeToResolve: boolean;
   receiptPersisted: boolean;
   verified: boolean;
-  status: InquiryDeliveryResult["status"];
+  status: InquiryMessageReviewExecutionStatus;
   reason?: string;
 }

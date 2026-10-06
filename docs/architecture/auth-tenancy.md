@@ -76,6 +76,12 @@ the exact permission guard covers the same tenant, but never omit both.
 Super-admin routes re-check super-admin state at the route or layout boundary.
 The bare admin host rewrite is not sufficient authorization by itself.
 
+Workspaces have no super-admin bypass. Tenant permission checks let
+`super_admin` through (`src/lib/auth.ts`); no workspace check does, on purpose.
+Strelva staff act in a workspace only through a membership or an Assignment, so
+the business owns its records and every staff action leaves the same trail as
+anyone else's. Do not add a staff shortcut to workspace permissions.
+
 ## Service-role and RLS boundary
 
 The server uses a Supabase service-role client for control-plane repositories.

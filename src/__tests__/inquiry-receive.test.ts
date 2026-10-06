@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { InquiryEngine } from "@/products/inquiries/inquiry-engine";
-import { recordInquiryEvidence, stateForReceive } from "@/products/inquiries/receive";
+import { evaluateInquiryResponsibility, recordInquiryEvidence, stateForReceive } from "@/products/inquiries/receive";
 import { createInMemoryInquiryRepository } from "@/products/inquiries/repository";
+import { createMemoryInquiryCaptureRepairStore } from "@/products/inquiries/reconciliation";
 
 const TENANT = "acme";
 const BUSINESS = "acme-business";
@@ -108,6 +109,86 @@ describe("canonical inquiry receive seam", () => {
       repository,
     });
     expect(second).toMatchObject({ status: "already_recorded", receiptId: first.receiptId });
+  });
+
+  // The same table runs against message review approval and the follow-up sweep.
+  it.each([
+    ["draft", false],
+    ["live_unverified", true],
+    ["live", true],
+    ["paused", false],
+    ["failed", false],
+  ] as const)("records an inquiry for a %s inquiry intake only with live intent (%s)", async (status, current) => {
+    const repository = createInMemoryInquiryRepository();
+    const state = snapshot().state;
+    state.capabilities[0]!.status = status;
+    await repository.compareAndSwap({ tenantId: TENANT, businessId: BUSINESS, expectedRevision: null, state });
+    const result = await recordInquiryEvidence({
+      tenantId: TENANT,
+      businessId: BUSINESS,
+      inquiryId: `lead_${status}`,
+      capabilityId: CAPABILITY,
+      expectedCapabilityVersion: 2,
+      fields,
+      receivedAt: RECEIVED_AT,
+      repository,
+      repairQueue: createMemoryInquiryCaptureRepairStore(),
+    });
+    expect(result.status).toBe(current ? "recorded" : "stale");
+  });
+
+  it.each([
+    ["a republished intake", (state: ReturnType<typeof snapshot>["state"]) => { state.capabilities[0]!.live!.version = 3; }, "inquiry_capability_changed"],
+    ["a paused intake", (state: ReturnType<typeof snapshot>["state"]) => { state.capabilities[0]!.status = "paused"; }, "inquiry_capability_unavailable"],
+  ] as const)("queues a receipt repair when a submission meets %s", async (_label, change, reason) => {
+    const repository = createInMemoryInquiryRepository();
+    const state = snapshot().state;
+    change(state);
+    await repository.compareAndSwap({ tenantId: TENANT, businessId: BUSINESS, expectedRevision: null, state });
+    const queue = createMemoryInquiryCaptureRepairStore();
+    const result = await recordInquiryEvidence({
+      tenantId: TENANT,
+      businessId: BUSINESS,
+      inquiryId: "lead_stale",
+      capabilityId: CAPABILITY,
+      expectedCapabilityVersion: 2,
+      fields,
+      receivedAt: RECEIVED_AT,
+      repository,
+      repairQueue: queue,
+    });
+    expect(result).toEqual({ status: "stale", reason });
+    expect(await queue.listDue({ tenantId: TENANT, now: RECEIVED_AT, limit: 10 })).toMatchObject([{
+      tenantId: TENANT,
+      businessId: BUSINESS,
+      inquiryId: "lead_stale",
+      capabilityId: CAPABILITY,
+      capabilityVersion: 2,
+      lastError: reason,
+    }]);
+  });
+
+  it("evaluates the newest created responsibility even when an older one sorts first", () => {
+    const workspace = snapshot();
+    const engine = new InquiryEngine({ businessId: BUSINESS, state: workspace.state, now: () => RECEIVED_AT });
+    const base = {
+      capabilityId: CAPABILITY,
+      actorId: "owner-1",
+      title: "Handle inquiries",
+      scope: "Reply to inquiries.",
+      allowedActions: ["reply" as const],
+      escalation: { primary: "owner@acme.test", secondary: null },
+      hours: { timezone: "UTC", days: [0, 1, 2, 3, 4, 5, 6], start: "00:00", end: "23:59" },
+    };
+    const older = engine.createResponsibility({ ...base, now: "2026-09-01T00:00:00.000Z" });
+    engine.createResponsibility({ ...base, now: "2026-09-05T00:00:00.000Z" });
+    // Pausing touches the older policy last, and it now sorts first.
+    engine.pauseResponsibility(older.id, "owner-1", "2026-09-10T00:00:00.000Z");
+    const state = engine.snapshot();
+    state.responsibilities.reverse();
+    const evaluation = evaluateInquiryResponsibility({ ...workspace, state: { ...state, inquiries: [] } }, CAPABILITY, "reply", "This reply is from Strelva.", RECEIVED_AT);
+    expect(evaluation?.reason).not.toBe("This responsibility is paused.");
+    expect(evaluation?.decision).toBe("approval_required");
   });
 
   it("rejects a changed select option before writing a receipt", async () => {

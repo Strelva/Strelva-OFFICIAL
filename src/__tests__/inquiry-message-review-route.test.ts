@@ -159,6 +159,8 @@ describe("authenticated inquiry message review route", () => {
       status: "accepted_unverified",
       reason: "provider read-back unavailable",
       retryable: false,
+      delivery: "unconfirmed",
+      retryAllowed: false,
     } });
     expect(mocks.approve).toHaveBeenCalledWith({
       tenantId: "tenant-a",

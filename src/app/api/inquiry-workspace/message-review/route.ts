@@ -8,6 +8,7 @@ import {
   prepareInquiryMessageReview,
 } from "@/products/inquiries";
 import { INQUIRY_WORKSPACE_EXIT_CODE, resolveInquiryWorkspace } from "@/products/inquiries/server";
+import { classifyInquiryMessageOutcome } from "@/products/inquiries/contracts";
 import type {
   InquiryMessageReviewAction,
   InquiryMessageReviewOutcome,
@@ -138,8 +139,8 @@ function errorDetails(error: unknown): { code: string; message: string; status: 
 
 function safeOutcome(outcome: InquiryMessageReviewOutcome, inquiryId: string, action: InquiryMessageReviewOutcome["action"]): InquiryMessageReviewOutcome | null {
   if (outcome.inquiryId !== inquiryId || outcome.action !== action || !OUTCOME_STATUSES.has(outcome.status) || typeof outcome.retryable !== "boolean") return null;
-  const providerAccepted = ["accepted", "verified", "delivered", "accepted_unverified", "reconciliation_required"].includes(outcome.status);
-  return { ...outcome, retryable: providerAccepted ? false : outcome.retryable };
+  const { delivery, retryAllowed } = classifyInquiryMessageOutcome(outcome);
+  return { ...outcome, delivery, retryAllowed, retryable: retryAllowed ? outcome.retryable : false };
 }
 
 function safeReview(review: InquiryMessageReviewPreview, inquiryId: string, action: InquiryMessageReviewAction): InquiryMessageReviewPreview | null {

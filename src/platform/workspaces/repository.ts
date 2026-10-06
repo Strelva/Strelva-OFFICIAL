@@ -19,6 +19,7 @@ import {
   type WorkspaceKind,
   type WorkspaceRole,
 } from "./types";
+import { rolesAllowing, type WorkspacePermission } from "./permissions";
 
 const MAX_WORK_PER_WORKSPACE = 500;
 const MAX_PENDING_HANDOFFS = 50;
@@ -34,6 +35,9 @@ const ACCESS_FAILURES = [
   "handoff_recipient_mismatch",
   "handoff_destination_membership_required",
   "verified_identity_required",
+  // Raised by public.workspace_require inside the write RPCs.
+  "workspace_membership_required",
+  "workspace_permission_denied",
 ] as const;
 const CONFLICT_FAILURES = [
   "handoff_expired",
@@ -65,6 +69,19 @@ function db(): WorkspaceDb {
   const client = getSupabase();
   if (!client) throw new WorkspaceStoreError("Workspace storage is not configured");
   return client as unknown as WorkspaceDb;
+}
+
+/** Untyped RPC access for the authority-checked write functions. */
+function rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: DbFailure }> {
+  const client = db() as unknown as {
+    rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: DbFailure }>;
+  };
+  return client.rpc(name, args);
+}
+
+function firstRow(data: unknown): DbRow | null {
+  const row = Array.isArray(data) ? data[0] : data;
+  return row && typeof row === "object" ? row as DbRow : null;
 }
 
 function actor(input: WorkspaceActor): WorkspaceActor {
@@ -182,6 +199,12 @@ async function requireMember(userId: string, workspaceId: string, roles?: Worksp
   const role = await directRole(userId, workspaceId);
   if (!role || (roles && !roles.includes(role))) throw new WorkspaceAccessError();
   return role;
+}
+
+/** First gate. The write RPCs re-check the same permission in SQL, under a
+ * FOR SHARE lock on the membership row, inside the write's transaction. */
+async function requirePermission(userId: string, workspaceId: string, permission: WorkspacePermission): Promise<WorkspaceRole> {
+  return requireMember(userId, workspaceId, rolesAllowing(permission));
 }
 
 export async function listWorkspaces(input: WorkspaceActor): Promise<Workspace[]> {
@@ -315,7 +338,7 @@ export async function getWork(input: WorkspaceActor, id: string): Promise<SavedW
 
 export async function assertCanSaveWork(input: WorkspaceActor, workspaceId: string): Promise<void> {
   const a = actor(input);
-  await requireMember(a.userId, workspaceId);
+  await requirePermission(a.userId, workspaceId, "create_work");
   const { count, error } = await db().from("saved_product_work")
     .select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId);
   if (error) workspaceDbFailure(error, "Saved work storage is unavailable");
@@ -331,21 +354,21 @@ export async function assertWorkspaceMember(input: WorkspaceActor, workspaceId: 
 export async function saveWork(input: WorkspaceActor, workspaceId: string, work: SaveWorkInput): Promise<SavedWork> {
   const a = actor(input);
   await assertCanSaveWork(a, workspaceId);
-  const client = db();
   const title = work.title?.trim().slice(0, 160) || null;
-  const { data, error } = await client.from("saved_product_work").insert({
-    workspace_id: workspaceId,
-    product_id: cleanProductId(work.productId, "productId"),
-    resource_kind: cleanProductId(work.resourceKind, "resourceKind"),
-    title,
-    payload: work.payload,
-    input: work.input ?? null,
-    source_work_id: work.sourceWorkId ?? null,
-    created_by: a.userId,
-  }).select("*").single();
+  const { data, error } = await rpc("save_workspace_work", {
+    p_workspace_id: workspaceId,
+    p_user_id: a.userId,
+    p_product_id: cleanProductId(work.productId, "productId"),
+    p_resource_kind: cleanProductId(work.resourceKind, "resourceKind"),
+    p_title: title,
+    p_payload: work.payload,
+    p_input: work.input ?? null,
+    p_source_work_id: work.sourceWorkId ?? null,
+  });
   if (error) workspaceDbFailure(error, "Work was not saved");
-  if (!data) throw new WorkspaceStoreError("Work was not saved");
-  return mapWork(data as DbRow);
+  const row = firstRow(data);
+  if (!row) throw new WorkspaceStoreError("Work was not saved");
+  return mapWork(row);
 }
 
 function hashToken(token: string): string {
@@ -359,10 +382,10 @@ export async function createHandoff(input: WorkspaceActor, workId: string, recip
   if (work.productId === "applications" || work.resourceKind === "application") {
     throw new WorkspaceConflictError("Applications must use their definition install path before they can be handed off.");
   }
-  const role = await requireMember(a.userId, work.workspaceId);
+  await requirePermission(a.userId, work.workspaceId, "create_handoff");
   const { data: workspace, error: workspaceError } = await db().from("workspaces")
     .select("kind").eq("id", work.workspaceId).single();
-  if (workspaceError || asString((workspace as DbRow).kind) !== "agency" || !["owner", "admin", "member"].includes(role)) {
+  if (workspaceError || asString((workspace as DbRow).kind) !== "agency") {
     throw new WorkspaceAccessError("Only agency work can be handed off");
   }
   const { count, error: countError } = await db().from("workspace_handoffs")
@@ -371,18 +394,20 @@ export async function createHandoff(input: WorkspaceActor, workId: string, recip
   if (countError) workspaceDbFailure(countError, "Handoff storage is unavailable");
   if ((count ?? 0) >= MAX_PENDING_HANDOFFS) throw new WorkspaceConflictError("Pending handoff limit reached");
   const token = randomBytes(32).toString("base64url");
-  const { data, error } = await db().from("workspace_handoffs").insert({
-    agency_workspace_id: work.workspaceId,
-    source_work_id: work.id,
-    recipient_email: cleanEmail(recipientEmail),
-    token_hash: hashToken(token),
-    status: "pending",
-    expires_at: new Date(Date.now() + HANDOFF_LIFETIME_MS).toISOString(),
-    created_by: a.userId,
-  }).select("*").single();
+  const { data, error } = await rpc("create_workspace_handoff", {
+    p_user_id: a.userId,
+    p_source_work_id: work.id,
+    p_recipient_email: cleanEmail(recipientEmail),
+    p_token_hash: hashToken(token),
+    p_expires_at: new Date(Date.now() + HANDOFF_LIFETIME_MS).toISOString(),
+  });
+  if (error?.message?.includes("handoff_agency_only")) {
+    throw new WorkspaceAccessError("Only agency work can be handed off");
+  }
   if (error) workspaceDbFailure(error, "Handoff was not created");
-  if (!data) throw new WorkspaceStoreError("Handoff was not created");
-  return { handoff: mapHandoff(data as DbRow), token };
+  const row = firstRow(data);
+  if (!row) throw new WorkspaceStoreError("Handoff was not created");
+  return { handoff: mapHandoff(row), token };
 }
 
 async function handoffByToken(input: WorkspaceActor, token: string): Promise<DbRow> {
@@ -453,13 +478,14 @@ export async function revokeHandoff(input: WorkspaceActor, id: string): Promise<
     .select("agency_workspace_id,status").eq("id", id).maybeSingle();
   if (error) workspaceDbFailure(error, "Handoff is unavailable");
   if (!data) return false;
-  await requireMember(a.userId, asString((data as DbRow).agency_workspace_id), ["owner", "admin"]);
+  await requirePermission(a.userId, asString((data as DbRow).agency_workspace_id), "manage_handoffs");
   if (asString((data as DbRow).status) !== "pending") return false;
-  const { data: updated, error: updateError } = await db().from("workspace_handoffs")
-    .update({ status: "revoked", revoked_at: new Date().toISOString(), revoked_by: a.userId })
-    .eq("id", id).eq("status", "pending").select("id");
-  if (updateError) workspaceDbFailure(updateError, "Handoff could not be revoked");
-  return Boolean(updated?.length);
+  const { data: revoked, error: revokeError } = await rpc("revoke_workspace_handoff", {
+    p_handoff_id: id,
+    p_user_id: a.userId,
+  });
+  if (revokeError) workspaceDbFailure(revokeError, "Handoff could not be revoked");
+  return revoked === true;
 }
 
 export async function listAgencyHandoffs(input: WorkspaceActor, agencyWorkspaceId: string): Promise<Handoff[]> {
@@ -484,7 +510,7 @@ export async function listWorkDelegations(input: WorkspaceActor, workId: string)
   const a = actor(input);
   const work = await getWork(a, workId);
   if (!work) return [];
-  await requireMember(a.userId, work.workspaceId, ["owner", "admin"]);
+  await requirePermission(a.userId, work.workspaceId, "manage_delegations");
   const { data, error } = await db().from("workspace_delegations")
     .select("*").eq("customer_work_id", workId).order("created_at", { ascending: false });
   if (error) workspaceDbFailure(error, "Work delegations are unavailable");
@@ -498,13 +524,14 @@ export async function revokeDelegation(input: WorkspaceActor, delegationId: stri
   if (error) workspaceDbFailure(error, "Delegation is unavailable");
   if (!data) return false;
   const delegation = mapDelegation(data as DbRow);
-  await requireMember(a.userId, delegation.customerWorkspaceId, ["owner", "admin"]);
+  await requirePermission(a.userId, delegation.customerWorkspaceId, "manage_delegations");
   if (delegation.status !== "active") return false;
-  const { data: updated, error: updateError } = await db().from("workspace_delegations")
-    .update({ status: "revoked", revoked_at: new Date().toISOString(), revoked_by: a.userId })
-    .eq("id", delegationId).eq("status", "active").select("id");
-  if (updateError) workspaceDbFailure(updateError, "Delegation could not be revoked");
-  return Boolean(updated?.length);
+  const { data: revoked, error: revokeError } = await rpc("revoke_workspace_delegation", {
+    p_delegation_id: delegationId,
+    p_user_id: a.userId,
+  });
+  if (revokeError) workspaceDbFailure(revokeError, "Delegation could not be revoked");
+  return revoked === true;
 }
 
 /** Only the initiating person can resume an incomplete assessment. */

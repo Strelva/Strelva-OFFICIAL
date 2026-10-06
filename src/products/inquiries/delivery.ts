@@ -62,6 +62,8 @@ export { createMemoryInquiryDeliveryStore, createRedisInquiryDeliveryStore } fro
 
 const MAX_ATTEMPTS = 5;
 const MAX_HOURS = 24 * 30;
+/** Bounded retries for the accepted marker after the provider took a message. */
+const ACCEPTANCE_WRITE_ATTEMPTS = 3;
 
 export const DEFAULT_INQUIRY_ROUTING_POLICY: InquiryRoutingPolicy = Object.freeze({
   version: "inquiry-delivery-v1",
@@ -787,6 +789,7 @@ export async function deliverInquiryAction(
       maxAttempts: actionPolicy.maxAttempts,
       now: now.toISOString(),
       budget: { ...budget, now: now.toISOString() },
+      messageDigest,
     });
   } catch {
     return { ...evaluated, status: "unavailable", reason: "durable_delivery_state_unavailable", retryable: false };
@@ -854,13 +857,36 @@ export async function deliverInquiryAction(
       return { ...evaluated, status: "reconciliation_required", reason: sent.reason, attemptId, retryable: false };
     }
     const acceptedAt = sent.acceptedAt || now.toISOString();
-    try {
-      // This marker is the duplicate barrier. It is written before read-back.
-      await store.markAccepted({ tenantId: inquiry.tenantId, inquiryId: inquiry.id, action, attemptId, acceptedAt, providerMessageId: sent.providerMessageId, replyTo: message.replyTo });
-    } catch {
-      // The provider may already have accepted the message. Keep the sending
-      // checkpoint wedged behind reconciliation and never claim retryability.
-      return { ...evaluated, status: "reconciliation_required", reason: "provider_accepted_marker_unavailable", attemptId, acceptedAt, retryable: false };
+    // This marker is the duplicate barrier and the only place the provider id
+    // is indexed for provider reports. It is written before read-back, and a
+    // transient store error gets bounded retries before we give up on it.
+    let acceptanceRecorded = false;
+    for (let write = 0; write < ACCEPTANCE_WRITE_ATTEMPTS && !acceptanceRecorded; write += 1) {
+      try {
+        await store.markAccepted({ tenantId: inquiry.tenantId, inquiryId: inquiry.id, action, attemptId, acceptedAt, providerMessageId: sent.providerMessageId, replyTo: message.replyTo });
+        acceptanceRecorded = true;
+      } catch {
+        // A concurrent writer may have recorded it, or the store is down.
+        const current = await store.getCheckpoint({ tenantId: inquiry.tenantId, inquiryId: inquiry.id, action }).catch(() => null);
+        if (current?.attemptId === attemptId && current.status !== "sending") acceptanceRecorded = true;
+        else if (current && current.attemptId !== attemptId) break;
+      }
+    }
+    if (!acceptanceRecorded) {
+      // The provider accepted the message. The sending checkpoint stays wedged
+      // behind reconciliation (never retryable), and the result carries the
+      // provider id and attempt so the caller can keep a second copy that
+      // reconciliation can finish from.
+      await appendTimelineSafe(store, timelineFor(inquiry, action, "notification_accepted", `provider accepted${sent.providerMessageId ? ` ${sent.providerMessageId}` : ""}; acceptance marker unavailable`, "accepted", acceptedAt));
+      return {
+        ...evaluated,
+        status: "reconciliation_required",
+        reason: "provider_accepted_marker_unavailable",
+        attemptId,
+        acceptedAt,
+        ...(sent.providerMessageId ? { providerMessageId: sent.providerMessageId } : {}),
+        retryable: false,
+      };
     }
     await appendTimelineSafe(store, timelineFor(inquiry, action, "notification_accepted", "provider accepted", "accepted", acceptedAt));
     let verification: InquiryVerificationResult;

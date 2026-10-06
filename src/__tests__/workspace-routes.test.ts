@@ -256,6 +256,18 @@ describe("release-one private workspace routes", () => {
     expect(output).not.toHaveProperty("shareUrl");
     expect(output.work.id).toBe(workId);
   });
+  it("presents newly saved work with the same access the workspace listing uses", async () => {
+    mocks.list.mockResolvedValue([{ ...workspace, kind: "business", role: "member" }]);
+    const assessed = await POST(request({ action: "assess", workspaceId, business: "Example" }));
+    expect(assessed.status).toBe(201);
+    expect((await assessed.json()).work.assessment.access).toBe("member");
+    const imported = await POST(request({ action: "save_public_result", workspaceId, resultId: "scan_abc123" }));
+    expect((await imported.json()).work.assessment.access).toBe("member");
+
+    mocks.list.mockResolvedValue([workspace]);
+    const personal = await POST(request({ action: "assess", workspaceId, business: "Example" }));
+    expect((await personal.json()).work.assessment.access).toBe("owned");
+  });
   it("imports a retained public result only through the explicit private-copy action", async () => {
     const response = await POST(request({ action: "save_public_result", workspaceId, resultId: "scan_abc123" }));
     expect(response.status).toBe(201);

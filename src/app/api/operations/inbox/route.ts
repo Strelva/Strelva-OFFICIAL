@@ -22,11 +22,11 @@ async function actor() {
 
 export async function GET(request: Request) {
   if (!workspaceReleaseEnabled()) return json({ error: "Workspaces are not enabled." }, 503);
-  const current = await actor();
-  if (!current) return json({ error: "Sign in with a confirmed email." }, 401);
   const view = new URL(request.url).searchParams.get("view") ?? "inbox";
-  if (view !== "inbox" && view !== "internal") return json({ error: "This inbox view is unavailable." }, 400);
   try {
+    const current = await actor();
+    if (!current) return json({ error: "Sign in with a confirmed email." }, 401);
+    if (view !== "inbox" && view !== "internal") return json({ error: "This inbox view is unavailable." }, 400);
     if (view === "internal") {
       if (!(await isSuperAdminUser(current.userId))) return json({ error: "This internal work view is unavailable to your account." }, 403);
       const [exceptions, inbox] = await Promise.all([

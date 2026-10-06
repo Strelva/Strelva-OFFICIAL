@@ -8,7 +8,7 @@ import { TrackerConflictError, TrackerValidationError } from "@/products/tracker
 import { z } from "zod";
 
 export const dynamic = "force-dynamic";
-const json = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
+const json = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "no-referrer" } });
 async function actor() {
   const user = await getSessionUser();
   return user?.email && user.email_confirmed_at ? { userId: user.id, verifiedEmail: user.email.trim().toLowerCase() } : null;

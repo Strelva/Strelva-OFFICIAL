@@ -9,7 +9,7 @@ import type { InquirySurfaceAdapter, InquirySurfaceSnapshot, InquiryView } from 
 import type { WorkspaceSnapshot, WorkspaceWork } from "./contracts";
 import { discoveryProducts, sameAppHref, type ManagedWorkSummary } from "./workspace-discovery";
 import { WorkspaceTemplateLibrary } from "./WorkspaceTemplateLibrary";
-import { WorkspaceIntent, retainRequestIntent } from "./WorkspaceIntent";
+import { WorkspaceIntent, retainRequestIntent, routeConsumer } from "./WorkspaceIntent";
 import { readRequestDraft, requestDraftKey, writeRequestDraft } from "./request-draft";
 import { WorkspaceHelp } from "./WorkspaceHelp";
 import { WorkspaceStart } from "./WorkspaceStart";
@@ -19,13 +19,14 @@ import { WorkspaceBusinessSettings } from "./WorkspaceBusinessSettings";
 import { WorkspaceRequests } from "./WorkspaceRequests";
 import { WebsiteAssignmentHandoff } from "./WorkspaceOfferings";
 import { workspaceWorkLabel } from "./work-label";
-import { workspaceExitBlocksChanges, workspaceExitIsStopped } from "./workspace-exit-ui";
+import { newWorkBlockedMessage, workspaceExitBlocksChanges, workspaceExitIsStopped } from "./workspace-exit-ui";
 import {
   WorkspaceOfferingDirectory,
   boundManagedWebsiteIds,
   useWorkspaceOfferings,
 } from "./WorkspaceOfferings";
 import type { WorkspaceStartContext, WorkspaceStartContinuation, WorkspaceStartTemplate, WorkspaceStartWebsiteHandoff } from "./workspace-start";
+import { viewForWork } from "./workspace-selection";
 import styles from "./workspace-surface.module.css";
 
 export interface WorkspaceInquiryTarget {
@@ -219,7 +220,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     const selected = snapshot.work.find((work) => work.id === id);
     const url = new URL(window.location.href); url.searchParams.set("work", id); url.searchParams.set("workspaceId", workspaceIdForNavigation());
     clearEmbeddedParams(url);
-    url.searchParams.set("view", selected?.productId === "operations" ? "ongoing" : selected?.productId === "tracker" ? "tracker" : selected?.productId === "documents" ? "document" : selected?.productId === "work_plans" ? "plan" : "work");
+    url.searchParams.set("view", viewForWork(selected?.productId));
     window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   }
 
@@ -259,6 +260,14 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     setRequestRoute(route);
     try { retainRequestIntent(window.sessionStorage, draftKey, request, route); } catch { /* In-memory request remains available. */ }
     try { writeRequestDraft(window.sessionStorage, draftKey, request); } catch { /* In-memory request remains usable. */ }
+  }
+
+  /** A product saved work from the routed request: drop the in-memory copy so it never pre-fills again. */
+  function spendRequest(consumer: string) {
+    if (routeConsumer(requestRoute) !== consumer) return;
+    setRequestText("");
+    setRequestRoute("start");
+    setRequestCurrent(true);
   }
 
   function openRequest(request: string) {
@@ -305,6 +314,16 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     url.searchParams.set("view", "products");
     url.searchParams.delete("work");
     if (id) url.searchParams.set("offering", id); else url.searchParams.delete("offering");
+    window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+
+  /** Opening a product leaves the offering: push a new entry so Back returns to the offering. */
+  function openProduct(id: string) {
+    setOfferingId(null);
+    setProductId(id);
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("offering")) return;
+    url.searchParams.delete("offering");
     window.history.pushState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   }
 
@@ -408,16 +427,16 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
       return <><h2>{product.name}</h2><p>{product.description}</p><button className={styles.primaryAction} type="button" disabled={workspaceMutationReadOnly || product.availability !== "available" || !onHorizontal} onClick={() => startProduct(id)}>Get started<ArrowRight size={17} /></button></>;
     }
     if (product.id === "ai_visibility") {
-      return <><h2>Understand what AI can find.</h2><p>Check a business, inspect the evidence, and keep the assessment in your work. Share a copy when you want someone else to use it.</p><p>This is an assessment at a point in time. It does not activate monitoring or change your website.</p><button className={styles.primaryAction} type="button" disabled={workspaceMutationReadOnly || product.availability !== "available"} onClick={() => onNew()}>Check a business<ArrowRight size={17} /></button>{workspaceMutationReadOnly && <p>{workspaceExitUnavailable ? "Workspace status is temporarily unavailable, so new work is paused." : workspaceStopped ? "Work in this workspace has stopped." : "Switch to a workspace you own to create an assessment."}</p>}</>;
+      return <><h2>Understand what AI can find.</h2><p>Check a business, inspect the evidence, and keep the assessment in your work. Share a copy when you want someone else to use it.</p><p>This is an assessment at a point in time. It does not activate monitoring or change your website.</p><button className={styles.primaryAction} type="button" disabled={workspaceMutationReadOnly || product.availability !== "available"} onClick={() => onNew()}>Check a business<ArrowRight size={17} /></button>{workspaceMutationReadOnly && <p>{newWorkBlockedMessage({ exitUnavailable: workspaceExitUnavailable, stopped: workspaceStopped, workspaceName: current?.name || "This business" }, "an assessment")}</p>}</>;
     }
     if (product.id === "inquiries") {
       return <><h2>Keep customer requests moving.</h2><p>Start with one request in a selected business scope. Review its shape, result, and receipt in one inspectable thread.</p>{inquiryBusinesses.length > 0 ? <div className={styles.productChoices}>{inquiryBusinesses.map((business) => <button key={business.id} type="button" className={styles.secondaryAction} disabled={workspaceMutationReadOnly} onClick={() => openInquiry(business.id)}><MessageSquareText size={17} />Open {business.title}<ArrowRight size={17} /></button>)}</div> : <p>No business scopes are available to this account yet.</p>}</>;
     }
     if (product.id === "tracker") {
-      return <><h2>Turn a CSV into working data.</h2><p>Import a small CSV, review the proposed fields, and keep the resulting tracker in this workspace.</p><button className={styles.primaryAction} type="button" disabled={workspaceMutationReadOnly || product.availability !== "available" || !onTracker} onClick={() => onTracker?.()}>Start a tracker<ArrowRight size={17} /></button>{workspaceMutationReadOnly && <p>{workspaceExitUnavailable ? "Workspace status is temporarily unavailable, so new work is paused." : workspaceStopped ? "Work in this workspace has stopped." : "Switch to a workspace you own to create a tracker."}</p>}</>;
+      return <><h2>Turn a CSV into working data.</h2><p>Import a small CSV, review the proposed fields, and keep the resulting tracker in this workspace.</p><button className={styles.primaryAction} type="button" disabled={workspaceMutationReadOnly || product.availability !== "available" || !onTracker} onClick={() => onTracker?.()}>Start a tracker<ArrowRight size={17} /></button>{workspaceMutationReadOnly && <p>{newWorkBlockedMessage({ exitUnavailable: workspaceExitUnavailable, stopped: workspaceStopped, workspaceName: current?.name || "This business" }, "a tracker")}</p>}</>;
     }
     if (product.id === "documents") {
-      return <><h2>Keep a useful document close.</h2><p>Write a procedure, proposal, or working note, review it before saving, and keep a history you can inspect or undo.</p><button className={styles.primaryAction} type="button" disabled={workspaceMutationReadOnly || product.availability !== "available" || !onDocument} onClick={() => onDocument?.()}>Start a document<ArrowRight size={17} /></button>{workspaceMutationReadOnly && <p>{workspaceExitUnavailable ? "Workspace status is temporarily unavailable, so new work is paused." : workspaceStopped ? "Work in this workspace has stopped." : "Switch to a workspace you own to create a document."}</p>}</>;
+      return <><h2>Keep a useful document close.</h2><p>Write a procedure, proposal, or working note, review it before saving, and keep a history you can inspect or undo.</p><button className={styles.primaryAction} type="button" disabled={workspaceMutationReadOnly || product.availability !== "available" || !onDocument} onClick={() => onDocument?.()}>Start a document<ArrowRight size={17} /></button>{workspaceMutationReadOnly && <p>{newWorkBlockedMessage({ exitUnavailable: workspaceExitUnavailable, stopped: workspaceStopped, workspaceName: current?.name || "This business" }, "a document")}</p>}</>;
     }
     if (product.id === "managed_presence") {
       return <><h2>Your website, with the work around it.</h2><p>Open your website to work with its content, review changes, and see the connected information available for your business.</p>{sites.length ? workList(0) : <p>No managed website is connected to this account. You can ask Strelva about a build or an existing site.</p>}<button type="button" className={styles.secondaryAction} onClick={() => navigate("help")}>Talk about your website<ArrowRight size={17} /></button></>;
@@ -425,7 +444,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     return <><h2>Try the search before you connect it.</h2><p>Home Finder is a brokerage-branded home search. This preview uses synthetic listings and never sends or stores buyer inquiries.</p>{product.previewHref ? <a className={styles.primaryAction} href={product.previewHref} target="_blank" rel="noreferrer">Try Home Finder<ArrowRight size={17} /></a> : <p>Its synthetic preview is not available from this environment yet.</p>}<p>A live installation needs brokerage approval, permitted listing data, and verified inquiry delivery.</p><button type="button" className={styles.secondaryAction} onClick={() => navigate("help", "I’d like early access to Home Finder. Please tell me what enabling a live brokerage installation would require.")}>Ask about early access<ArrowRight size={17} /></button></>;
   }
 
-  if (home && !startOpen && section === "home" && current?.kind !== "agency" && !workspaceExitBlocks) return <WorkspaceIntent request={requestText} current={requestCurrent} route={requestRoute} draftKey={draftKey}><BusinessHome
+  if (home && !startOpen && section === "home" && current?.kind !== "agency" && !workspaceExitBlocks) return <WorkspaceIntent request={requestText} current={requestCurrent} route={requestRoute} draftKey={draftKey} onSpent={spendRequest}><BusinessHome
     snapshot={snapshot} sites={assignedSites} unassignedSites={unassignedSites} siteAssignmentsKnown={siteAssignmentsKnown} offerings={offerings.state} busy={busy} notice={notice} managedWorkUnavailable={managedWorkUnavailable}
     appBase={appBase} accountHref={`${appBase || ""}/workspace/account`} signOut={signOut}
     onNavigate={navigate}
@@ -446,7 +465,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     ...snapshot.work.map(work => ({ id: work.id, title: work.title, detail: workspaceWorkLabel(work), href: `${appBase || ""}/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&work=${encodeURIComponent(work.id)}`, onOpen: () => openWork(work.id) })),
     ...assignedSites.map(site => ({ id: `site-${site.id}`, title: site.title, detail: "Managed website", href: site.href })),
   ];
-  return <WorkspaceIntent request={requestText} current={requestCurrent} route={requestRoute} draftKey={draftKey}><StrelvaShell appBase={appBase} signOut={signOut}
+  return <WorkspaceIntent request={requestText} current={requestCurrent} route={requestRoute} draftKey={draftKey} onSpent={spendRequest}><StrelvaShell appBase={appBase} signOut={signOut}
     workspaceId={snapshot.workspaceId} searchItems={searchItems} searchScopeName={current?.name || "Your work"} recentWork={searchItems.filter(item => !item.id.startsWith("site-"))} pinned={pinnedSites}
     active={agency ? "access" : home ? startOpen ? undefined : section : workingSection}
     title={!home ? inquiry ? "Inquiry work" : tracker !== undefined ? "Tracker" : plan !== undefined ? "Work plan" : document !== undefined ? "Document" : agency ? sectionTitle("access") : workingTitle || (selectedWork ? "Your work" : "New assessment") : startOpen ? "New" : sectionTitle(section)}
@@ -460,7 +479,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
     <div ref={scrollRef} className={styles.scroll} aria-busy={busy || undefined}>
       {!home ? <div className={styles.detail}>{atSectionRoot ? null : <button type="button" className={styles.back} onClick={() => navigate(workingSection)}><ArrowLeft size={16} />Back to {sectionTitle(workingSection)}</button>}{sourcePlanHref ? <Link className={styles.textAction} href={sourcePlanHref}><FileSearch size={15} aria-hidden="true" />View plan and creation receipt<ArrowRight size={15} aria-hidden="true" /></Link> : null}{inquiry ? <InquiryServerWorkspaceExperience tenantId={inquiry.tenantId} adapter={inquiry.adapter} initialSnapshot={inquiry.initialSnapshot} initialView={inquiry.initialView} initialRequestId={inquiry.initialRequestId} initialInquiryId={inquiry.initialInquiryId} initialRequestText={inquiry.initialRequestText} basePath="/workspace" routePrefix="inquiry" /> : tracker !== undefined ? tracker : plan !== undefined ? plan : document !== undefined ? document : children}</div> : workspaceExitBlocks && section !== "work" ? stoppedHome : startOpen ? <WorkspaceStart key={`${snapshot.workspaceId}:${startSession}`} context={startContext} initialRequest={startDraft} draftKey={draftKey} onDraftChange={rememberRequest} onTemplates={() => navigate("products")} websiteHandoff={websiteHandoff} onWebsiteHandoffBack={() => setWebsiteHandoff(null)} onContinue={continueStart} onHelp={(request) => { rememberRequest(request, "help"); navigate("help", request); }} onPlan={onPlan ? request => { rememberRequest(request, "plan"); onPlan(request); } : undefined} /> : section === "home" && current?.kind === "agency" ? <AgencyHome snapshot={snapshot} busy={busy} onWorkspace={onWorkspace} onOpenWork={openWork} onOpenClientWork={onOpenClientWork} onStart={openStart} /> : section === "settings" ? <WorkspaceBusinessSettings workspace={current} sites={assignedSites} unassignedSites={unassignedSites} offerings={offerings.state} onWebsiteCommand={offerings.websiteCommand} onRetryWebsiteAssignments={offerings.reload} siteAssignmentState={siteAssignmentState} managedWorkUnavailable={managedWorkUnavailable} accountHref={`${appBase || ""}/workspace/account`} /> : section === "help" ? <WorkspaceHelp key={helpRequest} workspaceName={current?.name} workspaceId={canSaveServiceRequest ? snapshot.workspaceId : undefined} providerOptions={serviceRequestProviders} hasManagedService={assignedSites.length > 0} onAgency={onAgency} initialRequest={helpRequest} /> : section === "products" ? <div className={styles.page}>
         {appsTabs("get")}
-        {offeringId ? <WorkspaceOfferingDirectory state={offerings.state} businessName={current?.name || "This business"} work={snapshot.work} managedSites={sites} products={products} selectedId={offeringId} onSelect={openOffering} onOpenWork={openWork} onOpenProduct={(id) => { setOfferingId(null); setProductId(id); }} onRequestSetup={(entry) => navigate("help", `I want setup help for ${entry.offering?.name ?? entry.title} for ${current?.name ?? "this business"}. ${entry.offering?.installationNote || entry.product?.description || entry.description}`)} onRetryConflict={offerings.retryConflict} onRetry={offerings.reload} onCommand={offerings.command} onWebsiteCommand={offerings.websiteCommand} /> : product ? <>
+        {offeringId ? <WorkspaceOfferingDirectory state={offerings.state} businessName={current?.name || "This business"} work={snapshot.work} managedSites={sites} products={products} selectedId={offeringId} onSelect={openOffering} onOpenWork={openWork} onOpenProduct={openProduct} onRequestSetup={(entry) => navigate("help", `I want setup help for ${entry.offering?.name ?? entry.title} for ${current?.name ?? "this business"}. ${entry.offering?.installationNote || entry.product?.description || entry.description}`)} onRetryConflict={offerings.retryConflict} onRetry={offerings.reload} onCommand={offerings.command} onWebsiteCommand={offerings.websiteCommand} /> : product ? <>
           <button type="button" className={styles.back} onClick={() => setProductId(null)}><ArrowLeft size={16} />All products</button>
           <header className={styles.pageHeader}><p className={styles.eyebrow}>{product.id === "homefinder" ? "Preview · early access" : product.availability === "available" ? "Available to use" : product.availability === "managed" ? "Managed service" : "Not available yet"}</p><h1 ref={productHeadingRef} tabIndex={-1}>{product.name}</h1><p>{product.description}</p></header>
           <div className={styles.productBody}>
@@ -469,7 +488,7 @@ export function WorkspaceLayout({ appBase, signOut, snapshot, managedWork = [], 
         </> : <>
           <WorkspaceTemplateLibrary key={`${snapshot.actor.email}:${snapshot.workspaceId}`} workspaceId={snapshot.workspaceId} actorEmail={snapshot.actor.email} businessName={current?.name || "Your business"} canCreate={!workspaceMutationReadOnly && Boolean(onHorizontal) && products.some(item => item.id === "applications" && item.availability === "available")} onRequest={openRequest} onCreated={onCreatedApp} />
           <details open={moreToolsOpen} onToggle={event => setMoreToolsOpen(event.currentTarget.open)} className="mt-8 border-t border-gray-border pt-4"><summary className="cursor-pointer py-4 text-base font-medium">More tools and managed services</summary>
-          <WorkspaceOfferingDirectory state={offerings.state} businessName={current?.name || "This business"} work={snapshot.work} managedSites={sites} products={products} selectedId={null} onSelect={openOffering} onOpenWork={openWork} onOpenProduct={(id) => { setOfferingId(null); setProductId(id); }} onRequestSetup={(entry) => navigate("help", `I want setup help for ${entry.offering?.name ?? entry.title} for ${current?.name ?? "this business"}. ${entry.offering?.installationNote || entry.product?.description || entry.description}`)} onRetryConflict={offerings.retryConflict} onRetry={offerings.reload} onCommand={offerings.command} onWebsiteCommand={offerings.websiteCommand} />
+          <WorkspaceOfferingDirectory state={offerings.state} businessName={current?.name || "This business"} work={snapshot.work} managedSites={sites} products={products} selectedId={null} onSelect={openOffering} onOpenWork={openWork} onOpenProduct={openProduct} onRequestSetup={(entry) => navigate("help", `I want setup help for ${entry.offering?.name ?? entry.title} for ${current?.name ?? "this business"}. ${entry.offering?.installationNote || entry.product?.description || entry.description}`)} onRetryConflict={offerings.retryConflict} onRetry={offerings.reload} onCommand={offerings.command} onWebsiteCommand={offerings.websiteCommand} />
           </details>
           <div className={styles.invitation}><h2>Website health</h2><p>Check SEO, speed, security, and accessibility, then export the report.</p><Link className={styles.textAction} href="/audit">Open website audit<ArrowRight size={16} /></Link></div>
           <div className={styles.invitation}><h2>Something missing?</h2><p>Tell us what you want to do, what you use today, and where it falls short.</p><button type="button" className={styles.textAction} onClick={() => navigate("help")}>Tell us what you need<ArrowRight size={16} /></button></div>
