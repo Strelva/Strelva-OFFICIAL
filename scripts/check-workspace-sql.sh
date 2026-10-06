@@ -463,6 +463,10 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007180000_bus
 psql "${psql_args[@]}" --file="$repo_root/tests/business-billing-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007181000_tenant_client_records.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-client-records-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007182000_workspace_export_v3.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-export-v3-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007183000_business_outcomes.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-outcomes-schema.sql"
 
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
