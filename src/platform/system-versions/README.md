@@ -106,8 +106,12 @@ added beside them; nothing is renamed:
 
 ## Not built yet
 
-- The release port is not wired to Needs you or the workspace-keyed approve
-  link; nothing calls the gate in a live path.
+- The release port is wired to Needs you
+  (`src/platform/needs-you/sources/version-release.ts`): a Version with an
+  unreleased working definition opens one `system.change_live` item, and
+  Approve (Home, session or the workspace-keyed email link) releases through
+  the gate, which re-reads that item. No screen offers "release" outside
+  Needs you yet. Proven locally with the in-memory store only.
 - Offering installations and inquiry pattern installations are still read
   through `mapping.ts`, not stored as Version rows.
 - Collection/franchise Versions across several Systems.

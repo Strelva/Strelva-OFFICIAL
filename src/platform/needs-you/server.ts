@@ -8,6 +8,7 @@ import type { HandledReceipt } from "./contracts";
 import { handledFromStore, handledFromTenantEvent, mergeHandled } from "./handled";
 import { PostgresNeedsYouStore, type NeedsYouStore } from "./repository";
 import { createNeedsYouService } from "./service";
+import { systemsSourceAdapters } from "./systems-sources";
 
 export { needsYouReleaseEnabled } from "./release";
 
@@ -36,6 +37,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
         list: (actor, businessId) => PostgresServiceRequestStore.list(actor, { businessId }),
         change: (actor, input) => commitments.execute(actor, { action: "delivery_commitment", ...input }),
       }),
+      ...systemsSourceAdapters(store),
     ],
   });
 }
