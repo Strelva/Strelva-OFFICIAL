@@ -454,6 +454,15 @@ psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 # against the real workspace, website, tenant-link and calendar tables.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261004120000_systems.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/systems-schema.sql"
+# Human minutes per business, then the operator queue (marks and the
+# outside-write receipt ledger) and minutes resolved through the conversion
+# link. Fictional rows only; each test rolls back.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260928130000_business_effort_minutes.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-effort-minutes-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007160000_operator_queue.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007160100_business_effort_tenant_links.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-effort-minutes-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-queue-schema.sql"
 
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
