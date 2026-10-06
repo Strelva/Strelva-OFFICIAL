@@ -52,6 +52,7 @@ export function useNeedsYou(workspaceId: string | undefined) {
   const [attempt, setAttempt] = useState(0);
   const [pending, setPending] = useState<string | null>(null);
   const [notices, setNotices] = useState<Record<string, ItemNotice>>({});
+  const [receiptNotices, setReceiptNotices] = useState<Record<string, ItemNotice>>({});
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -80,10 +81,11 @@ export function useNeedsYou(workspaceId: string | undefined) {
       });
       const body = (await response.json().catch(() => null)) as { status?: string } | null;
       const notice = (body?.status && DECIDE_COPY[body.status]) || { tone: "error" as const, text: "That didn't go through. Nothing changed." };
-      setNotices(current => ({ ...current, [item.id]: decision === "not_yet" && notice.tone === "done" ? { tone: "done", text: "Not yet. Nothing changed." } : notice }));
+      const text = decision === "not_yet" && notice.tone === "done" ? "Not yet. Nothing changed." : notice.text;
+      setNotices(current => ({ ...current, [item.id]: { tone: notice.tone, text: `${item.title}: ${text}` } }));
       refresh();
     } catch {
-      setNotices(current => ({ ...current, [item.id]: { tone: "error", text: "That didn't go through. Nothing changed." } }));
+      setNotices(current => ({ ...current, [item.id]: { tone: "error", text: `${item.title}: that didn't go through. Nothing changed.` } }));
     } finally {
       setPending(null);
     }
@@ -98,15 +100,15 @@ export function useNeedsYou(workspaceId: string | undefined) {
         body: JSON.stringify({ workspaceId, receiptId: receipt.id }),
       });
       const body = (await response.json().catch(() => null)) as { error?: string } | null;
-      setNotices(current => ({ ...current, [receipt.id]: response.ok ? { tone: "done", text: "Undone." } : { tone: "error", text: body?.error || "That couldn't be undone. Nothing changed." } }));
+      setReceiptNotices(current => ({ ...current, [receipt.id]: response.ok ? { tone: "done", text: "Undone." } : { tone: "error", text: body?.error || "That couldn't be undone. Nothing changed." } }));
       refresh();
     } catch {
-      setNotices(current => ({ ...current, [receipt.id]: { tone: "error", text: "That couldn't be undone. Nothing changed." } }));
+      setReceiptNotices(current => ({ ...current, [receipt.id]: { tone: "error", text: "That couldn't be undone. Nothing changed." } }));
     } finally {
       setPending(null);
     }
   }, [workspaceId, pending, transport, refresh]);
 
   const state: NeedsYouState = !workspaceId ? { status: "disabled" } : result?.workspaceId === workspaceId ? result.state : { status: "loading" };
-  return { state, refresh, decide, undo, pending, notices };
+  return { state, refresh, decide, undo, pending, notices, receiptNotices };
 }

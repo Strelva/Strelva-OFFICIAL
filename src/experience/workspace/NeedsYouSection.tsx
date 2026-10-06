@@ -92,7 +92,7 @@ export function StrelvaHandledSection({ state, pending, notices, onUndo, fallbac
             <strong>{receipt.sentence}</strong>
             <small>{when(receipt.at)}{receipt.changed ? ` · ${receipt.changed}` : ""}{receipt.evidence ? receipt.evidence.readBack === "verified" ? " · Confirmed live" : receipt.evidence.readBack === "not_verified" ? " · Done, not yet confirmed" : " · Accepted" : ""}</small>
             {receipt.undo.state === "undo_needs_review" || receipt.undo.state === "not_undoable" ? <small>{receipt.undo.reason}</small> : receipt.undo.state === "undone" ? <small>Undone.</small> : null}
-            {notice ? <small role="status" className={notice.tone === "error" ? styles.decisionError : undefined}>{notice.text}</small> : null}
+            {notice && receipt.undo.state !== "undone" ? <small role="status" className={notice.tone === "error" ? styles.decisionError : undefined}>{notice.text}</small> : null}
           </div>
           {receipt.undo.state === "undo" && canUndo ? <div className={styles.decisionActions}><Button size="sm" variant="ghost" loading={pending === receipt.id} disabled={Boolean(pending)} onClick={() => onUndo(receipt)} aria-label={`Undo: ${receipt.sentence}`}>Undo</Button></div> : null}
         </li>;

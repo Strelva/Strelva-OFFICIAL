@@ -189,7 +189,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
           </div>
       </section> : null}
 
-      {needsYouReleased ? <StrelvaHandledSection state={needsYou.state} pending={needsYou.pending} notices={needsYou.notices} onUndo={needsYou.undo}
+      {needsYouReleased ? <StrelvaHandledSection state={needsYou.state} pending={needsYou.pending} notices={needsYou.receiptNotices} onUndo={needsYou.undo}
         fallback={handled.length ? <ul className={styles.list}>{handled.map(row => requestRow(row))}</ul> : undefined} /> : null}
       {showRequests ? <>{needsYouReleased ? null : <section className={styles.section} aria-labelledby="home-handled">
         <header className={styles.sectionHeader}><h2 id="home-handled"><CheckCircle2 size={18} aria-hidden="true" />Strelva handled</h2></header>
