@@ -20,6 +20,9 @@ const ROWS: BookingRow[] = [
   { id: "bk_6", date: "2026-11-07", startTime: "11:00", endTime: "12:30", clientName: "Mia Chen", clientEmail: "mia@example.test", clientPhone: "", serviceName: "Massage, 90 min", status: "confirmed" },
 ];
 
+/** Opening hours from the fictional business record: Tuesday to Saturday. */
+const OPENING = [2, 3, 4, 5].map((day) => ({ day, opens: "09:00", closes: "19:00" })).concat([{ day: 6, opens: "09:00", closes: "17:00" }]);
+
 export default async function BookingsPreviewPage({ searchParams }: { searchParams: Promise<{ state?: string; view?: string }> }) {
   if (!strelvaUiPreviewEnabled()) notFound();
   const { state: name, view: viewParam } = await searchParams;
@@ -37,6 +40,10 @@ export default async function BookingsPreviewPage({ searchParams }: { searchPara
     : name === "unlinked" ? ready([])
     : name === "unavailable" ? ready([{ ...site, bookings: [], unavailable: true }])
     : name === "two-sites" ? ready([site, { ...site, tenantId: "twintrees-b", siteName: "Twin Trees Spa", bookings: site.bookings.slice(0, 2) }])
+    // Booking-only hours (owner or admin, one store in use): narrowed, following opening hours, or no record hours yet.
+    : name === "hours" ? ready([{ ...site, hours: { record: OPENING, bookable: [{ day: 2, opens: "10:00", closes: "14:00" }, { day: 3, opens: "10:00", closes: "18:00" }, { day: 4, opens: "10:00", closes: "18:00" }, { day: 5, opens: "10:00", closes: "18:00" }, { day: 6, opens: "10:00", closes: "16:00" }] } }])
+    : name === "hours-open" ? ready([{ ...site, hours: { record: OPENING, bookable: null } }])
+    : name === "hours-norecord" ? ready([{ ...site, hours: { record: null, bookable: null } }])
     : ready([site]);
   return <WorkspaceBookings workspaceId={WORKSPACE} state={state} view={view} />;
 }

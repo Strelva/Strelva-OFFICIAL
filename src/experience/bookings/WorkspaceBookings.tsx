@@ -2,14 +2,16 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { addDays, type BookingRow, type BookingView, type SiteBookings, type WorkspaceBookings as Bookings } from "@/products/bookings/server";
 import { BookingActions } from "./BookingActions";
+import { BookingHoursEditor } from "./BookingHoursEditor";
 
 /**
  * The bookings System's day and week views (systems catalog §3.3). The day
  * view is the wellness roster (/dashboard/roster): today's appointments with
  * check-in. The week view is the schedule (/dashboard/schedule): seven days
- * of bookings. Hours and services are set on the business record and by
- * Strelva, so neither view edits them. Server-rendered; the view, the date and
- * the week are plain links.
+ * of bookings. Opening hours and services are set on the business record and
+ * by Strelva; an owner or admin can only narrow when each site takes bookings
+ * (BookingHoursEditor). Server-rendered; the view, the date and the week are
+ * plain links.
  */
 
 export type WorkspaceBookingsState =
@@ -105,6 +107,11 @@ function SiteSection({ site, bookings, workspaceId, many }: { site: SiteBookings
               <DayList site={site} date={date} workspaceId={workspaceId} view={bookings.view} />
             </div>
           ))}
+          {site.hours ? (
+            <div className="mt-6">
+              <BookingHoursEditor workspaceId={workspaceId} tenantId={site.tenantId} siteName={site.siteName} hours={site.hours} />
+            </div>
+          ) : null}
         </Card>
       )}
     </section>
