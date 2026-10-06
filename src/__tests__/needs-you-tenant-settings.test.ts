@@ -6,6 +6,7 @@ import {
   contentAutonomyFromRoute,
   planContentAutonomy,
   planReplyMode,
+  planTenantSeed,
   readTenantPolicyRoute,
   replyModeFromRoute,
   writeTenantPolicySetting,
@@ -172,6 +173,33 @@ describe("reply mode with decision_policies", () => {
   it("falls back to Redis when Postgres fails", async () => {
     redis.set("reb:reply-voice:gldf", { mode: "approve", guidance: "", templates: [], updatedAt: null });
     expect((await getReplyVoice("gldf", { enabled: true, port: fakePort({ failRead: true }).port })).mode).toBe("approve");
+  });
+});
+
+describe("seed plan", () => {
+  const fresh = (): TenantRoutes => ({
+    workspaceId: WORKSPACE, imported: [],
+    routes: {
+      "copy.routine": { route: "strelva_reviews", strelvaRoute: "strelva_reviews", ownerRoute: null },
+      "review.reply": { route: "handle_after_notice", strelvaRoute: "handle_after_notice", ownerRoute: null },
+    },
+  });
+
+  it("matches the parity seed and lists what it doesn't carry over", () => {
+    const steps = planTenantSeed({ contentAutonomy: "auto", replyMode: "approve" }, fresh());
+    expect(steps).toEqual([
+      { kind: "copy.routine", route: null, todayValue: "auto", notMigrated: expect.stringMatching(/recorded/) },
+      { kind: "review.reply", route: "owner_decides", todayValue: "approve", notMigrated: null },
+    ]);
+    const seeded = seedPolicyFromTenant({ tenantId: "t", contentAutonomy: "auto", replyMode: "approve", autoApproveThreshold: 0 });
+    expect(seeded.notMigrated).toHaveLength(1);
+    expect(seeded.policies.map(row => [row.kind, row.route])).toEqual(steps.filter(step => step.route).map(step => [step.kind, step.route]));
+  });
+
+  it("skips kinds already moved and keeps off out of the routes", () => {
+    expect(planTenantSeed({ contentAutonomy: "approve", replyMode: "off" }, { ...fresh(), imported: ["copy.routine"] }))
+      .toEqual([{ kind: "review.reply", route: null, todayValue: "off", notMigrated: null }]);
+    expect(planTenantSeed({ contentAutonomy: "approve", replyMode: "auto" }, { ...fresh(), imported: ["copy.routine", "review.reply"] })).toEqual([]);
   });
 });
 

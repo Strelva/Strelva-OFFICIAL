@@ -147,6 +147,33 @@ export function planReplyMode(mode: ReplyRouteMode, layer: TenantPolicyLayer): P
   return { route: mode === "approve" ? "owner_decides" : null, notMigrated: null };
 }
 
+// Seed ------------------------------------------------------------------------
+
+export interface SeedStep {
+  kind: TenantPolicyKind;
+  route: LadderRoute | null;
+  todayValue: string;
+  notMigrated: string | null;
+}
+
+/**
+ * The seed for one linked tenant: today's Redis values as owner-layer writes,
+ * exactly as `seedPolicyFromTenant` reads them, skipping kinds already moved.
+ * Reply "off" moves as Strelva's default route; it stays "off" in Redis.
+ */
+export function planTenantSeed(today: { contentAutonomy: ContentAutonomyMode; replyMode: "off" | "approve" | "auto" }, routes: TenantRoutes): SeedStep[] {
+  const steps: SeedStep[] = [];
+  if (!routes.imported.includes("copy.routine")) {
+    const plan = planContentAutonomy(today.contentAutonomy, "owner", routes.routes["copy.routine"]);
+    steps.push({ kind: "copy.routine", route: plan.route, todayValue: today.contentAutonomy, notMigrated: plan.notMigrated });
+  }
+  if (!routes.imported.includes("review.reply")) {
+    const route = today.replyMode === "off" ? routes.routes["review.reply"].ownerRoute : planReplyMode(today.replyMode, "owner").route;
+    steps.push({ kind: "review.reply", route, todayValue: today.replyMode, notMigrated: null });
+  }
+  return steps;
+}
+
 // Read and write with fallback ------------------------------------------------------
 
 export interface BridgeOptions {
