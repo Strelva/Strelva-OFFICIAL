@@ -129,7 +129,9 @@ describe("workspace start planner", () => {
     const unavailableSite = planWorkspaceStart("Make our website work better.", context({ managedWorkUnavailable: true, managedSites: [] }));
     expect(unavailableSite).toMatchObject({ route: "website", status: "blocked" });
     expect(unavailableSite.reason).toContain("temporarily unavailable");
-    expect(planWorkspaceStart("Create my website.", context()).route).toBe("websites");
+    // A managed client's new-website request goes to Strelva; a self-serve workspace creates it.
+    expect(planWorkspaceStart("Create my website.", context())).toMatchObject({ route: "help", deliveryMode: "service" });
+    expect(planWorkspaceStart("Create my website.", context({ managedSites: [] })).route).toBe("websites");
   });
 
   it("routes unknown intent to scoped help", () => {

@@ -36,6 +36,11 @@ export interface WorkspaceStartContext {
   trackerTemplates?: readonly WorkspaceStartTemplate[];
   /** Discovery can be partially unavailable even when saved work is readable. */
   managedWorkUnavailable?: boolean;
+  /**
+   * The workspace has an accepted managed service relationship. When omitted it
+   * is inferred from a connected managed website plus managed availability.
+   */
+  managedRelationship?: boolean;
   /** Layout supplies the callbacks that are actually mounted in this route. */
   native?: Partial<Record<WorkspaceStartRoute, boolean>>;
 }
@@ -66,6 +71,8 @@ export interface WorkspaceStartPlan {
   helpRequest?: string;
   /** A provider request opens review, never a self-service generator or delivery promise. */
   deliveryMode?: "service";
+  /** Offered second on a managed service request, only where the owner can make Systems. */
+  selfServiceRoute?: "websites";
   /** Native routes found in the request, in the order they were mentioned. */
   matchedRoutes?: readonly Exclude<WorkspaceStartRoute, "help">[];
   needsSelection?: "business" | "site";
@@ -337,10 +344,30 @@ function helpPlan(request: string, context: WorkspaceStartContext, routes: reado
   };
 }
 
+function requestsSelfService(request: string): boolean {
+  return /\b(?:do not|don['’]t|not|never)\b[^.!?;\n]{0,60}\b(?:strelva|agency|24[- ]hour|24 hours?)\b|\b(?:myself|ourselves|self[- ]service)\b/i.test(request);
+}
+
+function hasManagedRelationship(context: WorkspaceStartContext): boolean {
+  if (context.managedRelationship !== undefined) return context.managedRelationship;
+  return Boolean(context.managedSites?.length) && productFor(context, "website")?.availability === "managed";
+}
+
+/**
+ * New website work in a managed workspace: a new site or page, or a redo of the
+ * existing one. Ordinary edits to the connected site stay on the change flow.
+ */
+function requestsManagedWebsiteWork(request: string): boolean {
+  if (/\b(?:new|another)\s+(?:website|web site|site|landing page|page)\b/i.test(request)) return true;
+  if (/\b(?:redo|rebuild|redesign|remake|replace|start over)\b[^.!?;\n]{0,40}\b(?:website|web site|site)\b/i.test(request)) return true;
+  if (/\badd\b[^.!?;\n]{0,40}\bpages?\b/i.test(request)) return true;
+  return matchedRoutes(request).includes("websites");
+}
+
 function requestsWebsiteService(request: string): boolean {
   if (!/\b(?:website|web site|landing page)\b/i.test(request)) return false;
   // Negated or explicitly self-service requests stay on the existing planning path.
-  if (/\b(?:do not|don['’]t|not|never)\b[^.!?;\n]{0,60}\b(?:strelva|agency|24[- ]hour|24 hours?)\b|\b(?:myself|ourselves|self[- ]service)\b/i.test(request)) return false;
+  if (requestsSelfService(request)) return false;
   if (/\bstrelva\b[^.!?;\n]{0,40}\b(?:do not|don['’]t|not|never|cannot|can['’]t)\b[^.!?;\n]{0,30}\b(?:build|create|make|design|deliver)\b/i.test(request)) return false;
   const providerFirst = /\bstrelva[\s,]*(?:(?:can|could|would|will)\s+(?:you\s+)?)?(?:please\s+)?(?:build|create|make|design|deliver)\b/i.test(request);
   return providerFirst || /\b(?:have|hire|ask|pay|get|want|need|like)\b[^.!?;\n]{0,40}\bstrelva\b[^.!?;\n]{0,40}\b(?:build|create|make|design|deliver)\b|\b(?:agency[- ]built|done[- ]for[- ](?:me|us|you)|24[- ]hour|24 hours?)\b/i.test(request);
@@ -360,6 +387,7 @@ function websiteServicePlan(request: string, context: WorkspaceStartContext): Wo
     status: reason ? "blocked" : "help",
     reason,
     canContinue: !reason,
+    ...(!context.readOnly && supportedFlowMounted(context, "websites") && hasAvailableProduct(context, "websites") ? { selfServiceRoute: "websites" as const } : {}),
   };
 }
 
@@ -381,6 +409,9 @@ export function planWorkspaceStart(requestOrInput: string | WorkspaceStartInput,
   const context = typeof requestOrInput === "string" ? suppliedContext : requestOrInput.context || suppliedContext;
   if (!request) return emptyPlan();
   if (requestsWebsiteService(request)) return websiteServicePlan(request, context);
+  // The accepted managed relationship chooses the default: no special wording
+  // such as "hire Strelva" is needed (audit 2026-10-05, finding 7).
+  if (hasManagedRelationship(context) && !requestsSelfService(request) && requestsManagedWebsiteWork(request)) return websiteServicePlan(request, context);
 
   const routes = matchedRoutes(request);
   if (routes.length > 1) return helpPlan(request, context, routes);
