@@ -235,7 +235,7 @@ export async function startWorkspaceExportV3(
 
 /** Writes the parts and completes the build. Returns the one-time token;
  *  only its sha256 is stored. Any failure fails the build (no partial ready). */
-export async function writeWorkspaceExportBuild(buildId: string, body: string, rpc: V3Rpc): Promise<{ status: "ready"; token: string } | { status: "failed"; reason: string }> {
+export async function writeWorkspaceExportBuild(buildId: string, body: string, rpc: V3Rpc, onToken?: (token: string) => void): Promise<{ status: "ready"; token: string } | { status: "failed"; reason: string }> {
   const fail = async (reason: string) => {
     await rpc("fail_workspace_export_build", { p_build_id: buildId, p_failure: reason }).catch(() => undefined);
     return { status: "failed" as const, reason };
@@ -249,6 +249,7 @@ export async function writeWorkspaceExportBuild(buildId: string, body: string, r
     }
     const document = JSON.parse(body) as V3Document;
     const token = randomBytes(32).toString("base64url");
+    onToken?.(token);
     const counts = Object.fromEntries(document.manifest.included.map((c) => [c.category, c.count]));
     const completed = await rpc("complete_workspace_export_build", {
       p_build_id: buildId, p_manifest: document.manifest, p_token_hash: createHash("sha256").update(token).digest("hex"), p_category_counts: counts,

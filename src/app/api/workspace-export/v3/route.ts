@@ -1,4 +1,6 @@
 import { after } from "next/server";
+import { exportRecoveryEnabled, enqueueExportRecovery, runExportRecovery } from "@/platform/workspace-exports/recovery";
+import { exportRecoveryDependencies } from "@/server/workspace-export-recovery";
 import { collectTenantMedia } from "@/lib/media-store";
 import { getSupabase } from "@/platform/infra/db/client";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
@@ -30,6 +32,11 @@ export async function POST(request: Request) {
     const body = await readWorkspaceBody(request, 1_000) as { workspaceId?: unknown };
     const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId : "";
     const baseUrl = new URL(request.url).origin;
+    if (exportRecoveryEnabled()) {
+      const queued = await enqueueExportRecovery(actor, workspaceId, rpc);
+      after(async () => { await runExportRecovery(exportRecoveryDependencies(baseUrl), queued.buildId); });
+      return workspaceJson({ status: "building", ...queued, message: "Your export is queued. You can download it here when ready; email delivery follows your business’s settings." }, 202);
+    }
     const outcome = await startWorkspaceExportV3(actor, workspaceId, {
       rpc,
       snapshot: exportWorkspaceArchive,
