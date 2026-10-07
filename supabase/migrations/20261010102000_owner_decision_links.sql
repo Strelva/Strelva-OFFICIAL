@@ -24,12 +24,16 @@ revoke all on public.owner_decision_link_sessions from public, anon, authenticat
 create trigger owner_decision_link_sessions_immutable before update or delete on public.owner_decision_link_sessions
   for each row execute function public.strelva_service_actions_immutable();
 
-create or replace function public.workspace_release_flag_names() returns text[]
-language sql immutable set search_path=public,pg_temp as $$
-  select array['owner_entry','inquiries','website_rebuild','systems',
-    'make_real_live:hosted_website','make_real_live:tenant_content','make_real_live:inquiry_form',
-    'make_real_live:booking_page','make_real_live:internal_app','connected_sites','make_real_owner_link','owner_decision_links']::text[]
-$$;
+-- Append this stream's keys to the current list; never restate other streams' keys (#253).
+do $migration$
+declare previous text[];
+begin
+  previous := public.workspace_release_flag_names();
+  select array_agg(distinct key order by key) into previous from unnest(previous || array['owner_decision_links']) key;
+  execute format('create or replace function public.workspace_release_flag_names() returns text[] language sql immutable set search_path = public, pg_temp as %L',
+    format('select %L::text[]', previous::text));
+end;
+$migration$;
 revoke all on function public.workspace_release_flag_names() from public,anon,authenticated;
 
 create function public.strelva_owner_decision_link_session(p_workspace_id uuid,p_decision_id uuid,p_revision_hash text,p_recipient text) returns jsonb
