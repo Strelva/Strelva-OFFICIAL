@@ -275,3 +275,10 @@ psql "${psql_args[@]}" --file="$repo_root/tests/native-publishing-targets-schema
 psql "${psql_args[@]}" --file="$repo_root/tests/business-booking-email-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
+
+
+# #261 Team authority, atomic staffing, membership cleanup and invitation acceptance.
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-team-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011160000_agency_team.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011160000_agency_team.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-team-schema.sql"
