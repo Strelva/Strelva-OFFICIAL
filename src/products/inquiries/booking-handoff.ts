@@ -29,7 +29,7 @@ export interface InquiryBookingDependencies {
   secret(): string;
 }
 const defaults: InquiryBookingDependencies = {
-  enabled: inquiryBookingHandoffEnabled, released: inquiryReleaseEnabledForTenant, workspaceReleased: inquiryReleaseEnabledForWorkspace, rpc: inquiryRecordsRpc,
+  enabled: inquiryBookingHandoffEnabled, released: (tenantId) => inquiryReleaseEnabledForTenant(tenantId), workspaceReleased: (workspaceId) => inquiryReleaseEnabledForWorkspace(workspaceId), rpc: inquiryRecordsRpc,
   bookings: readTenantBookings,
   nativeBookings: async (workspaceId, range) => {
     const raw = await inquiryRecordsRpc("read_inquiry_workspace_bookings", { p_workspace_id: workspaceId, p_from: range.from, p_to: range.to });
