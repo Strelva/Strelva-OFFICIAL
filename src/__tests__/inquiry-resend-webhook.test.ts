@@ -15,7 +15,10 @@ vi.mock("resend", () => ({
 }));
 vi.mock("@/products/inquiries/reconciliation", () => ({ reconcileInquiryProviderEvent: mocks.reconcile }));
 
-vi.mock("@/products/inquiries/workspace-replies", () => ({ reconcileWorkspaceInquiryProviderEvent: mocks.workspace }));
+vi.mock("@/products/inquiries/workspace-replies", () => ({
+  reconcileWorkspaceInquiryProviderEvent: mocks.workspace,
+  workspaceInquiryRepliesEnabled: () => false,
+}));
 vi.mock("@/products/connected-sites/server", () => ({ reconcileConnectedInquiryOwnerNotice: mocks.connected }));
 
 vi.mock("@/platform/needs-you", () => ({ reconcileInquiryDecisionNotice: mocks.decision }));
