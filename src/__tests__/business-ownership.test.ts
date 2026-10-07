@@ -111,6 +111,12 @@ describe("listProvidedClients", () => {
     rpc.mockImplementation(async () => ({ data: null, error: { message: "workspace_provider_access_denied" } }));
     await expect(listProvidedClients({ userId: OPERATOR_ID, verifiedEmail: "ops@strelva.example" }, WS)).rejects.toBeInstanceOf(WorkspaceAccessError);
   });
+
+  it("parses an owner-chosen provider reached through a staffed provider seat (batch 7A)", async () => {
+    rpc.mockImplementation(async () => ({ data: [{ customerWorkspaceId: WS, name: "Northside client", role: "admin", access: "provider_seat", source: "business_choice", startedAt: "2026-10-09T12:00:00.000Z" }], error: null }));
+    await expect(listProvidedClients({ userId: OPERATOR_ID, verifiedEmail: "ops@strelva.example" }, WS))
+      .resolves.toEqual([expect.objectContaining({ access: "provider_seat", source: "business_choice" })]);
+  });
 });
 
 describe("scripts/business-ownership.ts", () => {
