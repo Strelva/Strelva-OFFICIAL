@@ -37,7 +37,7 @@ export type ManageBookingState =
       slotsUnavailable: boolean;
       /** The business is not taking new times (paused); cancelling still works. */
       changesClosed: boolean;
-      notice?: "cancelled" | "rescheduled" | "pending";
+      notice?: "cancelled" | "rescheduled" | "pending" | "confirmed";
       error?: string;
     };
 
@@ -45,7 +45,7 @@ export const MANAGE_TOKEN = /^[A-Za-z0-9._~-]{8,256}$/;
 const CHANGE_WINDOW_DAYS = 14;
 const MAX_SLOTS = 60;
 
-type Schedule = { version: number; timeZone: string; slots: Array<{ id: string; start: string; end: string }> };
+type Schedule = { paused?: boolean; version: number; timeZone: string; slots: Array<{ id: string; start: string; end: string }> };
 type Receipt = { status: "pending" | "confirmed" | "cancelled" };
 
 export interface ManageDeps {
@@ -125,8 +125,8 @@ export async function loadManageState(
   const booking = managedView(reservation);
   // The link expires once the booking has ended.
   if (Date.parse(reservation.end) <= deps.now() || (reservation.status === "held" && (!reservation.confirmUntil || Date.parse(reservation.confirmUntil) <= deps.now()))) return { kind: "ended", booking };
-  const notice: "cancelled" | "rescheduled" | "pending" | undefined =
-    query.done === "cancelled" || query.done === "rescheduled" || query.done === "pending" ? query.done : undefined;
+  const notice: "cancelled" | "rescheduled" | "pending" | "confirmed" | undefined =
+    query.done === "cancelled" || query.done === "rescheduled" || query.done === "pending" || query.done === "confirmed" ? query.done : undefined;
   const base = { kind: "ready" as const, booking, ...(notice ? { notice } : {}), ...(query.error ? { error: manageErrorMessage(query.error) } : {}) };
   if (reservation.status === "held") return { ...base, days: [], slotsUnavailable: false, changesClosed: true };
   if (reservation.status === "cancelled") return { ...base, days: [], slotsUnavailable: false, changesClosed: false };
@@ -143,6 +143,7 @@ export async function loadManageState(
     if (errorCode(error) === "conflict" || errorCode(error) === "not_found") return { ...base, days: [], slotsUnavailable: false, changesClosed: true };
     return { ...base, days: [], slotsUnavailable: true, changesClosed: false };
   }
+  if (schedule.paused) return { ...base, days: [], slotsUnavailable: false, changesClosed: true };
   const days: Array<{ day: string; slots: Array<{ id: string; time: string }> }> = [];
   const slots = schedule.slots
     .filter((slot) => Date.parse(slot.start) > now && Date.parse(slot.start) !== Date.parse(reservation.start))
@@ -157,7 +158,7 @@ export async function loadManageState(
   return { ...base, days, slotsUnavailable: false, changesClosed: false };
 }
 
-export type ManageActionResult = { done: "cancelled" | "rescheduled" | "pending" } | { error: string };
+export type ManageActionResult = { done: "cancelled" | "rescheduled" | "pending" | "confirmed" } | { error: string };
 
 /** One change from the manage page. Never throws; the page shows the outcome. */
 export async function actOnManageLink(token: string, form: { action: string | null; slotId: string | null }, deps: ManageDeps): Promise<ManageActionResult> {
@@ -167,8 +168,9 @@ export async function actOnManageLink(token: string, form: { action: string | nu
   const ids = { tenantId: reservation.tenantId, reservationId: reservation.reservationId, managementToken: token };
   try {
     if (form.action === "confirm" && reservation.confirmationRequired && deps.confirm) {
+      if (!reservation.confirmUntil || Date.parse(reservation.confirmUntil) <= deps.now()) return { error: "not_found" };
       const receipt = await deps.confirm(token);
-      return { done: receipt.status === "confirmed" ? "rescheduled" : "pending" };
+      return { done: receipt.status === "confirmed" ? "confirmed" : "pending" };
     }
     if (reservation.status === "held") return { error: "invalid" };
     if (form.action === "cancel") {

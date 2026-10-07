@@ -157,7 +157,6 @@ export interface SendBatchInput {
   messages: BatchMessage[];
   /** Provider idempotency key. A retry with the same key never re-delivers. */
   idempotencyKey?: string;
-  attachments?: Array<{ filename: string; content: string }>;
 }
 
 export type SendBatchResult =

@@ -30,6 +30,7 @@ import {
   type BookingStoreDb,
   type StoreBooking,
   type StoreBookingInput,
+  storeBookingToLegacy,
 } from "./store";
 import { BOOKING_STORE_PENDING_KEY, compareBookingLists, parseBookingPendingMember, type SiteService } from "./tenant";
 
@@ -182,28 +183,42 @@ export async function checkTenantBookingParity(
   diff.mismatched.push(...diff.storeOnly.map((id) => `store_only:${id}`));
   const today = options.today ?? new Intl.DateTimeFormat("en-CA", { timeZone: legacy.config.timezone }).format(new Date());
   const slotDifferences: BookingParityReport["slotDifferences"] = [];
+  // Native agent/inquiry/owner records have no legacy source row. They are
+  // expected additional obligations, and block both compared slot projections.
+  const native = store.filter(b => ["agent", "inquiry", "owner"].includes(b.origin));
+  const augmentedLegacy = [...bookings, ...native.filter(b => ["held", "requested", "confirmed"].includes(b.status)).flatMap(b => {
+    const converted = storeBookingToLegacy(b);
+    return converted ? [{ ...converted, status: "confirmed" as const }] : [];
+  })];
+  let explainedExactly = true;
   const bookable = services.filter((s) => !s.comingSoon);
   for (let i = 0; i < (options.days ?? 60); i++) {
     const date = addDays(today, i);
     for (const service of bookable) {
-      const fromLegacy = legacySlots(legacy.config, legacy.overrides, bookings, services, date, service.id);
+      const fromLegacy = legacySlots(legacy.config, legacy.overrides, augmentedLegacy, services, date, service.id);
       const resolved = resolveService(context, service.id, service);
       const fromStore = resolved.bookable ? storeSlotsForDate(context, date, resolved.durationMinutes, storeBookingsOn(store, date)) : [];
-      if (fromLegacy.join(",") !== fromStore.join(",")) slotDifferences.push({ date, serviceId: service.id, legacy: fromLegacy, store: fromStore });
+      if (fromLegacy.join(",") !== fromStore.join(",")) {
+        // Only changes derived from record facts explain drift. Native numeric
+        // settings (buffer, notice, cap) cannot hide behind a narrowed weekday.
+        const expected = resolved.bookable ? storeSlotsForDate({ ...context, settings: legacyConfigToSettings(legacy.config, legacy.overrides) }, date, resolved.durationMinutes, storeBookingsOn(store, date)) : [];
+        if (expected.join(",") !== fromStore.join(",")) explainedExactly = false;
+        slotDifferences.push({ date, serviceId: service.id, legacy: fromLegacy, store: fromStore });
+      }
     }
   }
   // Differences are explained only when the record's hours (not the store's
   // copy of the legacy data) are what narrowed them: every store slot is also
   // a legacy slot, and the record has hours the legacy schedule exceeds.
   const narrowed = Boolean(context.hours) && (hoursOutsideRecord(context).length > 0 || timeZoneOf(context) !== legacy.config.timezone);
-  const slotDifferencesExplained = slotDifferences.length > 0 && narrowed
+  const slotDifferencesExplained = slotDifferences.length > 0 && narrowed && explainedExactly
     && slotDifferences.every((d) => d.store.every((slot) => d.legacy.includes(slot)));
   const unexplainedSlots = slotDifferencesExplained ? 0 : slotDifferences.length;
   const report: BookingParityReport = {
     tenant,
     ok: diff.missingFromStore.length === 0 && diff.mismatched.length === 0 && unexplainedSlots === 0,
     legacyCount: bookings.length + receipts.length,
-    storeCount: store.filter((b) => b.legacyId || b.publicReservationId).length,
+    storeCount: store.filter((b) => (b.legacyId && !["agent", "inquiry", "owner"].includes(b.origin)) || b.publicReservationId).length,
     missing: diff.missingFromStore,
     mismatched: diff.mismatched,
     slotDifferences,

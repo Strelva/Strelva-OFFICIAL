@@ -1,0 +1,16 @@
+
+> strelva@0.2.0 test /Users/jacobrhinehart/Desktop/strelva/REB-w6-bookings
+> vitest run
+
+
+ RUN  v4.1.11 /Users/jacobrhinehart/Desktop/strelva/REB-w6-bookings
+
+(node:73005) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ src/__tests__/billing-webhook-mode-guard.test.ts (26 tests | 4 failed) 17509ms
+     × ignores a live-mode event in a test-mode deploy without mutating tenant data 5031ms
+     × subscription mode flips subscriptionStatus to active and records subscription id 5065ms
+     × falls back to client_reference_id when a reusable Payment Link has no tenantId metadata 5021ms
+     × payment mode does NOT flip subscription status and records a build_payment event 2277ms
+ ❯ src/__tests__/booking-one-store.test.ts (29 tests | 1 failed | 1 skipped) 7731ms
+     × day and week views read identical bookings from the legacy store and the one store 5107ms

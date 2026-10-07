@@ -142,11 +142,15 @@ export async function POST(request: Request) {
     ));
     if (bookingMessagesEnabled() && await bookingReadSource() === "postgres") {
       const saved = (await readTenantBookings(tenant).catch(() => [])).find(b => b.legacyId === result.booking.id);
+      let confirmationSent = false;
       if (saved) {
         await afterStored("manage link", () => issueNativeAccess(tenant, saved.id));
-        await afterStored("booking messages", () => deliverBookingUpdates(saved.id));
+        await afterStored("booking messages", async () => {
+          const messages = await deliverBookingUpdates(saved.id);
+          confirmationSent = !requested && messages.customerSent > 0;
+        });
       }
-      return NextResponse.json({ success: true, booking: result.booking, confirmationSent: false, ...(requested ? { requested: true } : {}) });
+      return NextResponse.json({ success: true, booking: result.booking, confirmationSent, ...(requested ? { requested: true } : {}) });
     }
     // "New booking" to the owner recipient (off unless STRELVA_BOOKING_OWNER_NOTICE=1).
     // A request reaches the owner as a Needs you item instead.

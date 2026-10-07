@@ -1,0 +1,209 @@
+\set ON_ERROR_STOP on
+-- Real PostgreSQL proof for native manage links, agent holds and lifecycle
+-- message claims. Fictional tenants only; all fixtures roll back. No sends.
+begin;
+create or replace function pg_temp.ba_assert(condition boolean, message text) returns void language plpgsql as $$
+begin if condition is not true then raise exception 'booking agent assertion failed: %', message; end if; end; $$;
+create or replace function pg_temp.ba_expect(statement text, expected text) returns void language plpgsql as $$
+begin
+  begin execute statement;
+  exception when others then
+    if sqlerrm <> expected then raise exception 'expected % but got %', expected, sqlerrm; end if;
+    return;
+  end;
+  raise exception 'expected % but statement succeeded: %', expected, statement;
+end; $$;
+create or replace function pg_temp.ba_booking(p_ref text, p_offset integer, p_patch jsonb default '{}') returns jsonb language sql as $$
+  select jsonb_build_object('legacyId', p_ref, 'status', 'held', 'origin', 'agent', 'serviceName', 'Consultation',
+    'start', now() + make_interval(days => p_offset), 'end', now() + make_interval(days => p_offset, mins => 30),
+    'bufferMinutes', 15, 'timeZone', 'America/New_York', 'requestFingerprint', repeat('a', 64),
+    'customer', jsonb_build_object('name', 'Dana Reed', 'email', 'dana@example.test')) || p_patch
+$$;
+create or replace function pg_temp.ba_access(p_seed integer) returns jsonb language sql as $$
+  select jsonb_build_object('manageHash', lpad(to_hex(p_seed * 3), 64, '0'), 'manageCiphertext', 'encrypted-manage-fixture',
+    'confirmHash', lpad(to_hex(p_seed * 3 + 1), 64, '0'), 'confirmCiphertext', 'encrypted-confirm-fixture',
+    'statusHash', lpad(to_hex(p_seed * 3 + 2), 64, '0'), 'statusCiphertext', 'encrypted-status-fixture', 'agentName', 'Fixture assistant')
+$$;
+create or replace function pg_temp.ba_id(p_ref text) returns uuid language sql as $$
+  select id from public.business_bookings where legacy_id = p_ref and tenant_slug_at_booking = 'ba-site'
+$$;
+
+insert into public.users(id, email, verified_at) values
+  ('ca000000-0000-4000-8000-0000000000e1', 'ba-operator@strelva.example.test', now());
+insert into public.super_admins(user_id, email) values ('ca000000-0000-4000-8000-0000000000e1', 'ba-operator@strelva.example.test');
+insert into public.tenants(id, stable_id, site_name, active) values
+  ('ba-site', 'ca000000-0000-4000-8000-0000000000b1', 'Agent Fixture Firm', true),
+  ('ba-other', 'ca000000-0000-4000-8000-0000000000b2', 'Other Agent Fixture', true);
+create temporary table ba_ws(name text primary key, id uuid) on commit drop;
+insert into ba_ws select 'site', (public.convert_tenant_to_business('ba-operator@strelva.example.test', 'ba-site',
+  '{"tenantId":"ba-site","tenantStableId":"ca000000-0000-4000-8000-0000000000b1","workspaceName":"Agent Fixture Firm","billing":null,"account":null,"patch":{},"contacts":[]}',
+  'ca000000-0000-4000-8000-0000000000c1', repeat('e', 64))->>'workspaceId')::uuid;
+insert into ba_ws select 'other', (public.convert_tenant_to_business('ba-operator@strelva.example.test', 'ba-other',
+  '{"tenantId":"ba-other","tenantStableId":"ca000000-0000-4000-8000-0000000000b2","workspaceName":"Other Agent Fixture","billing":null,"account":null,"patch":{},"contacts":[]}',
+  'ca000000-0000-4000-8000-0000000000c2', repeat('f', 64))->>'workspaceId')::uuid;
+insert into public.booking_settings(calendar_key, tenant_stable_id, workspace_id, mode, recorded_via)
+  values ('ca000000-0000-4000-8000-0000000000b1', 'ca000000-0000-4000-8000-0000000000b1', (select id from ba_ws where name = 'site'), 'instant', 'native');
+
+-- Tables have no bypass grants, and only the service role can invoke RPCs.
+select pg_temp.ba_assert((select bool_and(relrowsecurity) from pg_class where oid in (
+  'public.business_booking_access'::regclass, 'public.business_booking_updates'::regclass,
+  'public.business_booking_update_epoch'::regclass)), 'new tables use RLS');
+do $$
+declare v_table text; v_role text; v_function text;
+begin
+  foreach v_table in array array['business_booking_access','business_booking_updates','business_booking_update_epoch'] loop
+    foreach v_role in array array['anon','authenticated','service_role'] loop
+      perform pg_temp.ba_assert(not has_table_privilege(v_role, 'public.' || v_table, 'SELECT,INSERT,UPDATE,DELETE'),
+        v_role || ' has no direct access to ' || v_table);
+    end loop;
+  end loop;
+  foreach v_function in array array['issue_booking_access(text,text,jsonb)','hold_agent_booking(text,jsonb,jsonb)',
+    'read_native_booking_access(text,text)','confirm_agent_booking(text,boolean)','change_native_booking(text,jsonb)',
+    'claim_booking_updates(uuid,boolean,boolean,integer)','finish_booking_update(uuid,text,text,text)'] loop
+    perform pg_temp.ba_assert(not has_function_privilege('anon', 'public.' || v_function, 'EXECUTE')
+      and not has_function_privilege('authenticated', 'public.' || v_function, 'EXECUTE')
+      and has_function_privilege('service_role', 'public.' || v_function, 'EXECUTE'), 'restricted RPC ' || v_function);
+  end loop;
+end $$;
+set local role authenticated;
+select pg_temp.ba_expect('select * from public.business_booking_access', 'permission denied for table business_booking_access');
+select pg_temp.ba_expect($$select public.read_native_booking_access(repeat('0',64), 'manage')$$,
+  'permission denied for function read_native_booking_access');
+reset role;
+
+-- One durable hold, stable idempotency and original tokens on retry.
+select pg_temp.ba_assert(public.hold_agent_booking('ba-site', pg_temp.ba_booking('ba_main', 2), pg_temp.ba_access(1))->>'status' = 'recorded', 'hold created');
+select pg_temp.ba_assert((select status = 'held' and origin = 'agent' and buffer_minutes = 15
+  from public.business_bookings where id = pg_temp.ba_id('ba_main')), 'held in the one booking store');
+select pg_temp.ba_assert((select r->>'status' = 'unchanged' and r#>>'{access,manage_hash}' = pg_temp.ba_access(1)->>'manageHash'
+  from (select public.hold_agent_booking('ba-site', pg_temp.ba_booking('ba_main', 2), pg_temp.ba_access(2)) r) x), 'retry retains original access');
+select pg_temp.ba_assert((select count(*) from public.business_booking_history where booking_id = pg_temp.ba_id('ba_main')) = 1, 'retry adds no history');
+select pg_temp.ba_expect($$select public.hold_agent_booking('ba-site', pg_temp.ba_booking('ba_main',2,
+  jsonb_build_object('requestFingerprint',repeat('b',64))), pg_temp.ba_access(2))$$, 'booking_request_conflict');
+select pg_temp.ba_assert(public.hold_agent_booking('ba-site', pg_temp.ba_booking('ba_overlap', 2,
+  jsonb_build_object('start', now() + interval '2 days 35 minutes', 'end', now() + interval '2 days 65 minutes')), pg_temp.ba_access(2))->>'status' = 'conflict', 'buffer excludes another hold');
+select pg_temp.ba_assert(not exists(select 1 from public.business_bookings where legacy_id = 'ba_overlap')
+  and (select count(*) from public.business_booking_access) = 1, 'conflict leaves no hold or access');
+select pg_temp.ba_expect($$select public.hold_agent_booking('missing-fixture',pg_temp.ba_booking('missing',3),pg_temp.ba_access(2))$$, 'booking_unknown_tenant');
+select pg_temp.ba_expect($$select public.hold_agent_booking('ba-site',pg_temp.ba_booking('invalid',3,'{"status":"confirmed"}'),pg_temp.ba_access(2))$$, 'booking_invalid');
+
+-- GET/read lookup is side-effect free. Tokens cannot substitute for each other
+-- and neither hashes nor encrypted credentials are returned by public reads.
+create temporary table ba_snapshot on commit drop as select
+  (select jsonb_agg(to_jsonb(b) order by b.id) from public.business_bookings b) as bookings,
+  (select jsonb_agg(to_jsonb(a) order by a.booking_id) from public.business_booking_access a) as access,
+  (select jsonb_agg(to_jsonb(h) order by h.id) from public.business_booking_history h) as history;
+select pg_temp.ba_assert((select r->>'status' = 'held' and (r->>'confirmationRequired')::boolean
+  and r->>'agentName' = 'Fixture assistant' and not (r ?| array['manageHash','manageCiphertext','confirmHash','confirmCiphertext','statusHash','statusCiphertext'])
+  from (select public.read_native_booking_access(pg_temp.ba_access(1)->>'confirmHash','confirm') r) x), 'GET previews confirmation without secrets');
+select pg_temp.ba_assert(public.read_native_booking_access(pg_temp.ba_access(1)->>'manageHash','manage')->>'status' = 'held', 'manage read');
+select pg_temp.ba_assert(public.read_native_booking_access(pg_temp.ba_access(1)->>'statusHash','status')->>'status' = 'held', 'status read');
+select pg_temp.ba_assert(public.read_native_booking_access(pg_temp.ba_access(1)->>'statusHash','manage') is null
+  and public.read_native_booking_access(pg_temp.ba_access(1)->>'confirmHash','manage') is null
+  and public.read_native_booking_access(pg_temp.ba_access(1)->>'manageHash','confirm') is null
+  and public.read_native_booking_access('malformed','confirm') is null
+  and public.read_native_booking_access(null,'confirm') is null, 'read token purposes separated');
+select pg_temp.ba_expect($$select public.confirm_agent_booking(pg_temp.ba_access(1)->>'manageHash',false)$$,'booking_not_found');
+select pg_temp.ba_expect($$select public.confirm_agent_booking(pg_temp.ba_access(1)->>'statusHash',false)$$,'booking_not_found');
+select pg_temp.ba_expect($$select public.change_native_booking(pg_temp.ba_access(1)->>'confirmHash','{"action":"cancel"}')$$,'booking_not_found');
+select pg_temp.ba_expect($$select public.change_native_booking(pg_temp.ba_access(1)->>'statusHash','{"action":"cancel"}')$$,'booking_not_found');
+select pg_temp.ba_assert((select bookings = (select jsonb_agg(to_jsonb(b) order by b.id) from public.business_bookings b)
+  and access = (select jsonb_agg(to_jsonb(a) order by a.booking_id) from public.business_booking_access a)
+  and history = (select jsonb_agg(to_jsonb(h) order by h.id) from public.business_booking_history h) from ba_snapshot), 'reads and rejected credentials wrote nothing');
+
+-- POST confirmation consumes once. Force-request keeps agent confirmation from
+-- silently bypassing an owner decision even with instant tenant settings.
+select pg_temp.ba_assert(public.confirm_agent_booking(pg_temp.ba_access(1)->>'confirmHash',false)#>>'{booking,status}' = 'confirmed', 'POST confirms');
+select pg_temp.ba_assert(public.confirm_agent_booking(pg_temp.ba_access(1)->>'confirmHash',false)->>'status' = 'unchanged', 'POST retry unchanged');
+select pg_temp.ba_assert((select count(*) from public.business_booking_history where booking_id = pg_temp.ba_id('ba_main')
+  and from_status = 'held' and to_status = 'confirmed' and actor = 'visitor') = 1, 'confirmation history once');
+select pg_temp.ba_assert((select confirmed_at is not null from public.business_booking_access where booking_id = pg_temp.ba_id('ba_main')), 'confirmation consumed');
+select public.hold_agent_booking('ba-site',pg_temp.ba_booking('ba_request',3),pg_temp.ba_access(2));
+select pg_temp.ba_assert(public.confirm_agent_booking(pg_temp.ba_access(2)->>'confirmHash',true)#>>'{booking,status}' = 'requested','forced owner request');
+update public.booking_settings set mode = 'request' where calendar_key = 'ca000000-0000-4000-8000-0000000000b1';
+select public.hold_agent_booking('ba-site',pg_temp.ba_booking('ba_mode',4),pg_temp.ba_access(3));
+select pg_temp.ba_assert(public.confirm_agent_booking(pg_temp.ba_access(3)->>'confirmHash',false)#>>'{booking,status}' = 'requested','tenant request mode');
+update public.booking_settings set mode = 'instant' where calendar_key = 'ca000000-0000-4000-8000-0000000000b1';
+
+-- Expired holds cannot confirm, and retrying the request never reopens them.
+select public.hold_agent_booking('ba-site',pg_temp.ba_booking('ba_expired',5,jsonb_build_object('createdAt',now()-interval '16 minutes')),pg_temp.ba_access(4));
+select pg_temp.ba_expect($$select public.confirm_agent_booking(pg_temp.ba_access(4)->>'confirmHash',false)$$,'booking_hold_expired');
+select pg_temp.ba_assert((public.expire_booking_holds(clock_timestamp())->>'expired')::integer = 1,'expired hold released');
+select pg_temp.ba_assert(public.hold_agent_booking('ba-site',pg_temp.ba_booking('ba_expired',5),pg_temp.ba_access(40))#>>'{booking,status}' = 'cancelled','retry cannot resurrect expired hold');
+select pg_temp.ba_expect($$select public.confirm_agent_booking(pg_temp.ba_access(4)->>'confirmHash',false)$$,'booking_hold_expired');
+select pg_temp.ba_assert(public.hold_agent_booking('ba-site',pg_temp.ba_booking('ba_retake',5),pg_temp.ba_access(5))->>'status' = 'recorded','expired slot reusable');
+
+-- Pause blocks new work and reschedules while preserving confirmation and
+-- cancellation for commitments already made.
+do $$
+declare v_ws uuid := (select id from ba_ws where name='site'); v_sys uuid := gen_random_uuid(); v_rev uuid := gen_random_uuid();
+begin
+  insert into public.systems(id,business_workspace_id,name,kind,command_id,command_digest,created_by,updated_by)
+    values(v_sys,v_ws,'Bookings','booking',gen_random_uuid(),repeat('c',64),'ca000000-0000-4000-8000-0000000000e1','ca000000-0000-4000-8000-0000000000e1');
+  insert into public.system_revisions(id,system_id,business_workspace_id,number,implementation,command_id,command_digest,created_by)
+    values(v_rev,v_sys,v_ws,1,'{"kind":"schedule","ref":"work:fixture"}',gen_random_uuid(),repeat('d',64),'ca000000-0000-4000-8000-0000000000e1');
+  update public.systems set current_revision_id=v_rev,current_revision_number=1,lifecycle='paused' where id=v_sys;
+end $$;
+select pg_temp.ba_expect($$select public.hold_agent_booking('ba-site',pg_temp.ba_booking('ba_paused',6),pg_temp.ba_access(6))$$,'booking_paused');
+select pg_temp.ba_assert(public.confirm_agent_booking(pg_temp.ba_access(5)->>'confirmHash',false)#>>'{booking,status}' = 'confirmed','existing hold confirms while paused');
+select pg_temp.ba_expect($$select public.change_native_booking(pg_temp.ba_access(5)->>'manageHash',jsonb_build_object('action','reschedule',
+  'start',now()+interval '6 days','end',now()+interval '6 days 30 minutes','forceRequest',false))$$,'booking_paused');
+select pg_temp.ba_assert(public.change_native_booking(pg_temp.ba_access(5)->>'manageHash','{"action":"cancel"}')->>'status' = 'cancelled','existing booking cancels while paused');
+select public.change_native_booking(pg_temp.ba_access(5)->>'manageHash','{"action":"cancel"}');
+select pg_temp.ba_assert((select count(*) from public.business_booking_history where booking_id=pg_temp.ba_id('ba_retake') and to_status='cancelled') = 1,'cancel retry history once');
+update public.systems set lifecycle='live' where business_workspace_id=(select id from ba_ws where name='site') and kind='booking';
+select pg_temp.ba_expect($$select public.change_native_booking(pg_temp.ba_access(1)->>'manageHash',jsonb_build_object('action','reschedule',
+  'start',now()+interval '3 days','end',now()+interval '3 days 30 minutes','forceRequest',false))$$,'booking_slot_taken');
+select pg_temp.ba_assert((select start_at = now()+interval '2 days' and end_at = now()+interval '2 days 30 minutes'
+  and status = 'confirmed' from public.business_bookings where id=pg_temp.ba_id('ba_main')),'failed reschedule retains original slot');
+
+-- Ten holds per tenant per hour, including cancelled/expired attempts. A
+-- different tenant can use the same id/slot and its own hourly allowance.
+do $$
+declare v_count integer := (select count(*) from public.business_bookings where calendar_key='ca000000-0000-4000-8000-0000000000b1' and origin='agent'); v_i integer;
+begin
+  for v_i in v_count+1..10 loop
+    perform pg_temp.ba_assert(public.hold_agent_booking('ba-site',pg_temp.ba_booking('ba_cap_'||v_i,10+v_i),pg_temp.ba_access(10+v_i))->>'status'='recorded','allow holds up to tenant cap');
+  end loop;
+end $$;
+select pg_temp.ba_expect($$select public.hold_agent_booking('ba-site',pg_temp.ba_booking('ba_cap_11',30),pg_temp.ba_access(30))$$,'booking_agent_limit');
+select pg_temp.ba_assert(public.hold_agent_booking('ba-site',pg_temp.ba_booking('ba_main',2),pg_temp.ba_access(31))->>'status'='unchanged','retry still works at cap');
+select pg_temp.ba_assert(public.hold_agent_booking('ba-other',pg_temp.ba_booking('ba_main',2),pg_temp.ba_access(32))->>'status'='recorded','other tenant has independent cap and calendar');
+select pg_temp.ba_assert(public.read_workspace_booking((select id from ba_ws where name='other'),pg_temp.ba_id('ba_main')) is null,'cross-workspace read refused');
+
+-- Lifecycle claims are one attempt per event/audience; owner and agent flags
+-- gate eligibility, and failed/suppressed delivery never becomes retryable.
+create temporary table ba_claim on commit drop as select value as c from jsonb_array_elements(
+  public.claim_booking_updates(pg_temp.ba_id('ba_main'),false,false,50));
+select pg_temp.ba_assert((select count(*) from ba_claim)=1 and (select c->>'audience' from ba_claim)='customer','customer confirmation claimed');
+select pg_temp.ba_assert(public.claim_booking_updates(pg_temp.ba_id('ba_main'),false,false,50)='[]'::jsonb,'customer event claimed once');
+select public.finish_booking_update((select (c->>'messageId')::uuid from ba_claim),'suppressed',null,'email gate off');
+select public.finish_booking_update((select (c->>'messageId')::uuid from ba_claim),'sent','should-not-overwrite',null);
+select pg_temp.ba_assert((select status='suppressed' and provider_message_id is null from public.business_booking_updates
+  where id=(select (c->>'messageId')::uuid from ba_claim)),'terminal delivery result retained');
+select pg_temp.ba_assert(jsonb_array_length(public.claim_booking_updates(pg_temp.ba_id('ba_main'),true,false,50))=1,'owner confirmation only with flag');
+select pg_temp.ba_assert(public.claim_booking_updates(pg_temp.ba_id('ba_main'),true,true,50)='[]'::jsonb,'owner and customer claimed once; old held status skipped');
+select pg_temp.ba_assert(public.claim_booking_updates(pg_temp.ba_id('ba_cap_10'),true,false,50)='[]'::jsonb,'agent held notification disabled');
+select pg_temp.ba_assert(jsonb_array_length(public.claim_booking_updates(pg_temp.ba_id('ba_cap_10'),false,true,50))=1,'agent held confirmation enabled');
+select pg_temp.ba_assert(public.claim_booking_updates(pg_temp.ba_id('ba_cap_10'),true,true,50)='[]'::jsonb,'held never notifies owner and customer claimed once');
+select pg_temp.ba_assert(jsonb_array_length(public.claim_booking_updates(pg_temp.ba_id('ba_retake'),true,true,50))=2,'cancellation current event to customer and owner');
+select pg_temp.ba_expect($$select public.claim_booking_updates(null,true,true,0)$$,'booking_invalid');
+select pg_temp.ba_expect($$select public.claim_booking_updates(null,true,true,201)$$,'booking_invalid');
+select pg_temp.ba_expect($$select public.finish_booking_update(gen_random_uuid(),'claimed',null,null)$$,'booking_invalid');
+
+-- Historical events, backfills, imports, elapsed appointments and automatic
+-- request lapse never turn into new lifecycle mail after migration.
+select public.record_tenant_booking('ba-site',pg_temp.ba_booking('ba_history',40,'{"status":"confirmed","origin":"site"}'),'native');
+delete from public.business_booking_history where booking_id=pg_temp.ba_id('ba_history');
+insert into public.business_booking_history(booking_id,actor,to_status,at)
+  values(pg_temp.ba_id('ba_history'),'visitor','confirmed',(select starts_at-interval '1 second' from public.business_booking_update_epoch));
+select pg_temp.ba_assert(public.claim_booking_updates(pg_temp.ba_id('ba_history'),true,true,50)='[]'::jsonb,'pre-migration history excluded');
+select public.record_tenant_booking('ba-site',pg_temp.ba_booking('ba_backfill',41,'{"status":"confirmed","origin":"site"}'),'backfill');
+select pg_temp.ba_assert(public.claim_booking_updates(pg_temp.ba_id('ba_backfill'),true,true,50)='[]'::jsonb,'backfill excluded');
+select public.record_tenant_booking('ba-site',pg_temp.ba_booking('ba_import',42,'{"status":"confirmed","origin":"import","externalSource":"calendly","externalRef":"https://api.calendly.com/invitees/fixture"}'),'import');
+select pg_temp.ba_assert(public.claim_booking_updates(pg_temp.ba_id('ba_import'),true,true,50)='[]'::jsonb,'import excluded');
+select public.record_tenant_booking('ba-site',pg_temp.ba_booking('ba_past',-1,'{"status":"confirmed","origin":"site"}'),'native');
+select pg_temp.ba_assert(public.claim_booking_updates(pg_temp.ba_id('ba_past'),true,true,50)='[]'::jsonb,'past booking excluded');
+select public.record_tenant_booking('ba-site',pg_temp.ba_booking('ba_lapse',43,'{"status":"declined","origin":"site","reason":"Expired without owner response"}'),'native');
+select pg_temp.ba_assert(public.claim_booking_updates(pg_temp.ba_id('ba_lapse'),true,true,50)='[]'::jsonb,'request expiry lifecycle mail excluded');
+rollback;

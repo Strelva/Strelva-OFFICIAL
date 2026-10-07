@@ -77,7 +77,7 @@ export async function nativeSlots(tenant: string, serviceId: string, from: strin
       slots.push({ id: start, start, end, calendarChecked: !calendar.connected || calendar.checked });
     }
   }
-  return { version: ctx.settings?.revision ?? 1, timeZone: zone, slots: slots.slice(0, 500) };
+  return { version: ctx.settings?.revision ?? 1, timeZone: zone, paused: ctx.paused, slots: slots.slice(0, 500) };
 }
 
 export function newBookingAccess(agentName?: string) {
@@ -98,6 +98,11 @@ export async function issueNativeAccess(tenant: string, ref: string) {
 export async function requestAgentBooking(tenant: string, raw: unknown) {
   await requireAgentBookings();
   const input = agentBookingSchema.parse(raw);
+  const { bookingCustomerEmailAllowed } = await import("./updates");
+  const { bookingMessagesEnabled, bookingManagePageEnabled, bookingRemindersEnabled } = await import("./flags");
+  if (!bookingMessagesEnabled() || !bookingManagePageEnabled() || !bookingRemindersEnabled() || !await bookingCustomerEmailAllowed(tenant)) {
+    throw new PublicBookingError("unavailable", "Customer confirmation is not available for this business.");
+  }
   const ctx = await context(tenant);
   const service = ctx.services.find(s => s.active && (s.externalRef === input.serviceId || s.id === input.serviceId));
   if (!service) throw new PublicBookingError("not_found", "This service is unavailable.");
@@ -137,6 +142,9 @@ export async function confirmAgent(hash: string) {
   if (!booking?.tenantId) throw new PublicBookingError("not_found", "This booking link has expired.");
   const ctx = await context(booking.tenantId);
   const calendar = await readCalendarBusy(ctx, booking.localDate, booking.timeZone);
+  if (calendar.connected && calendar.checked && calendar.busy.some(b => Date.parse(booking.start) < Date.parse(b.end) && Date.parse(booking.end) > Date.parse(b.start))) {
+    throw new PublicBookingError("conflict", "That time is now busy. Let this hold expire and choose another time.");
+  }
   const result = await nativeRpc("confirm_agent_booking", { p_hash: hash, p_force_request: calendar.connected && !calendar.checked }) as { booking: unknown };
   return parseStoreBooking(result.booking)!;
 }

@@ -258,7 +258,7 @@ export function compareBookingLists(legacy: readonly Booking[], store: readonly 
     if (!asLegacy || legacyBookingDigest(asLegacy) !== legacyBookingDigest({ ...booking, serviceName: booking.serviceName || "Appointment" })) mismatched.push(booking.id);
   }
   const legacyIds = new Set(legacy.map((b) => b.id));
-  const storeOnly = store.filter((b) => b.legacyId && !legacyIds.has(b.legacyId)).map((b) => b.legacyId!);
+  const storeOnly = store.filter((b) => b.legacyId && b.origin !== "agent" && b.origin !== "inquiry" && b.origin !== "owner" && !legacyIds.has(b.legacyId)).map((b) => b.legacyId!);
   return { missingFromStore, mismatched, storeOnly };
 }
 

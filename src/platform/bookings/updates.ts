@@ -43,7 +43,7 @@ const ports: BookingUpdatePorts = {
 };
 
 export async function deliverBookingUpdates(bookingId: string | null = null, deps: BookingUpdatePorts = ports) {
-  const summary = { sent: 0, suppressed: 0, failed: 0 };
+  const summary = { sent: 0, customerSent: 0, suppressed: 0, failed: 0 };
   if (!bookingMessagesEnabled()) return summary;
   const rows = await deps.claim(bookingId, bookingOwnerNoticeEnabled(), bookingAgentsEnabled());
   if (!Array.isArray(rows)) throw new Error("booking_updates_malformed");
@@ -80,7 +80,7 @@ export async function deliverBookingUpdates(bookingId: string | null = null, dep
           ...(url ? { button: { label: state === "held" ? "Review and confirm" : "Change or cancel", url } } : {}) },
         ...(state === "confirmed" && row.audience === "customer" ? { attachments: [{ filename: "booking.ics", content: Buffer.from(calendarFile(booking, business.name, business.address ?? "")).toString("base64") }] } : {}),
       });
-      if (result.status === "accepted") { summary.sent++; await finish("sent", result.providerMessageId); }
+      if (result.status === "accepted") { summary.sent++; if (row.audience === "customer") summary.customerSent++; await finish("sent", result.providerMessageId); }
       else { summary.suppressed++; await finish("suppressed", null, result.reason); }
     } catch {
       summary.failed++; await finish("failed", null, "send_or_business_read_failed");

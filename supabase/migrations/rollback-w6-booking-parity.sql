@@ -1,6 +1,7 @@
 begin;
 set local lock_timeout = '2s';
 drop function if exists public.record_booking_parity_batch(jsonb);
+drop function if exists public.booking_parity_streak();
 create or replace function public.upsert_tenant_booking_settings(p_tenant_id text, p_settings jsonb, p_via text) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare

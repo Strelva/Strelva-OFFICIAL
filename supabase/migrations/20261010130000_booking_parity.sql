@@ -29,6 +29,28 @@ $$;
 revoke all on function public.record_booking_parity_batch(jsonb) from public, anon, authenticated;
 grant execute on function public.record_booking_parity_batch(jsonb) to service_role;
 
+-- Unlike the shared ledger helper, each day must cover every current tenant.
+-- Individual CLI checks cannot unlock reads with partial green days.
+create function public.booking_parity_streak() returns jsonb
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+declare v_day date := (clock_timestamp() at time zone 'UTC')::date; v_days integer := 0; v_ok boolean;
+begin
+  if not exists(select 1 from public.tenants) then return jsonb_build_object('days',0); end if;
+  if not exists(select 1 from public.tenant_client_record_parity where store='bookings' and checked_on=v_day) then v_day := v_day - 1; end if;
+  loop
+    select not exists(select 1 from public.tenants t where not exists(
+      select 1 from public.tenant_client_record_parity p where p.store='bookings' and p.tenant_stable_id=t.stable_id
+        and p.checked_on=v_day and p.ok)) into v_ok;
+    exit when v_ok is distinct from true;
+    v_days := v_days + 1; v_day := v_day - 1;
+    exit when v_days >= 366;
+  end loop;
+  return jsonb_build_object('store','bookings','days',v_days);
+end;
+$$;
+revoke all on function public.booking_parity_streak() from public, anon, authenticated;
+grant execute on function public.booking_parity_streak() to service_role;
+
 create or replace function public.upsert_tenant_booking_settings(p_tenant_id text, p_settings jsonb, p_via text) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare

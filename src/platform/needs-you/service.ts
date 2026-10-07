@@ -3,6 +3,7 @@
  * own resolver, chase them by email, and lapse them. Every dependency is a
  * port so the whole flow runs in tests without Redis, Postgres or Resend.
  */
+import { bookingRemindersEnabled } from "@/platform/bookings/flags";
 import type { SendEmailInput, SendEmailResult } from "@/platform/infra/email/send";
 import type { EmailDecision, EmailOptions } from "@/platform/infra/email/layout";
 import { buildWorkspaceApproveUrl, type WorkspaceApproveLinkClaims } from "@/lib/approve-link";
@@ -295,7 +296,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
       for (const row of items) {
         // Bookings own the 24 h / 72 h clock; the generic day 3/7/14
         // clock must never send another chase or expire an existing booking.
-        const step = row.sourceLifecycle === "booking_request" ? "none" : nextChaseStep(row, now);
+        const step = row.sourceLifecycle === "booking_request" && bookingRemindersEnabled() ? "none" : nextChaseStep(row, now);
         if (step === "lapse") {
           try {
             const expired = await deps.store.expire(workspaceId, row.id);

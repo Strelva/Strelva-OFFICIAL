@@ -73,8 +73,8 @@ export function ManageBooking({ state, actionUrl }: { state: ManageBookingState;
     return (
       <Shell>
         <p className="text-xs font-medium uppercase tracking-[0.14em] text-gray-muted">{booking.siteName || "Your booking"}</p>
-        <h1 className="mt-3 font-display text-[32px] font-medium leading-tight">This booking has passed</h1>
-        <p className="mt-3 text-base leading-7 text-gray-muted">The link stops working once the appointment is over. To book again, visit the business&apos;s website.</p>
+        <h1 className="mt-3 font-display text-[32px] font-medium leading-tight">This booking link has expired</h1>
+        <p className="mt-3 text-base leading-7 text-gray-muted">The appointment has ended or the confirmation window has closed. To book again, visit the business&apos;s website.</p>
         <Summary booking={booking} />
       </Shell>
     );
@@ -85,7 +85,9 @@ export function ManageBooking({ state, actionUrl }: { state: ManageBookingState;
       <p className="text-xs font-medium uppercase tracking-[0.14em] text-gray-muted">{booking.siteName || "Your booking"}</p>
       <h1 className="mt-3 font-display text-[32px] font-medium leading-tight">{cancelled ? "Your booking is cancelled" : "Your booking"}</h1>
 
-      {state.notice === "rescheduled" ? (
+      {state.notice === "confirmed" ? (
+        <p role="status" className="mt-4 rounded-lg bg-gray-bg px-4 py-3 text-sm">Your booking is confirmed.</p>
+      ) : state.notice === "rescheduled" ? (
         <p role="status" className="mt-4 rounded-lg bg-gray-bg px-4 py-3 text-sm">Your new time is booked. A confirmation is on its way when email is on for this business.</p>
       ) : state.notice === "pending" ? (
         <p role="status" className="mt-4 rounded-lg bg-gray-bg px-4 py-3 text-sm">Your request is waiting for confirmation. This time is not confirmed yet.</p>

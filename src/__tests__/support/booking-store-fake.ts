@@ -148,6 +148,7 @@ export function fakeBookingStore() {
             row.status = to;
             return { data: { status: "decided", booking: json(row) }, error: null };
           }
+          case "booking_parity_streak":
           case "client_record_parity_streak":
             return { data: { store: args.p_store, days: state.streakDays }, error: null };
           case "record_client_record_parity":
