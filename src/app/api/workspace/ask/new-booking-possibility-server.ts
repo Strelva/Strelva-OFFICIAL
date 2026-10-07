@@ -6,7 +6,7 @@ import { systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
 import { WorkspaceConflictError } from "@/platform/workspaces/types";
 
 export async function askBookingPreparationEnabled(actor: WorkspaceActor, workspaceId: string) {
-  return askReleaseMayBeOn() && await systemsReleaseEnabledForWorkspace(workspaceId, { userId: actor.userId });
+  return askReleaseMayBeOn() && await systemsReleaseEnabledForWorkspace(workspaceId, { operator: false, tester: false, userId: actor.userId });
 }
 
 /** A genuinely new schedule and service. Existing website behavior is kept. */

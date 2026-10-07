@@ -134,7 +134,7 @@ it("opens a durable same-System Possibility, reaches Ready only for a current ex
   const p = (await repository.get(workspaceId,opened.id))!;
   expect(p.introduces).toEqual([]);expect(p.changes[0]!.baseline.revisionId).toBe(revisionId);expect(p.status).toBe("exploring");
   const live = { current: async () => ({revisionId,number:1,content:{native:{kind:"inquiry_config",ref:`${originId}@${f.snapshot.revision}`}}}) };
-  const deps={repo:repository as unknown as Parameters<typeof syncAskInquiryFollowUpPossibilities>[0]["repo"],live,actorId:actor.userId,at,stored:[{possibility:p,sourceRef:null}],canWrite:true,current:async()=>true};
+  const deps={repo:repository as unknown as Parameters<typeof syncAskInquiryFollowUpPossibilities>[0]["repo"],live,actorId:actor.userId,at,stored:[{possibility:p,sourceRef:null,lastActivityAt:p.updatedAt}],canWrite:true,current:async()=>true};
   const rows=await syncAskInquiryFollowUpPossibilities(deps);expect(rows[0]!.possibility.status).toBe("ready");
   vi.stubEnv("APPROVE_LINK_SECRET","fictional-test-secret-for-signed-preview-123456789");
   const token=signPossibilityPreviewToken({workspaceId,possibilityId:p.id,candidateRevision:p.candidateRevision},Date.parse(at));
