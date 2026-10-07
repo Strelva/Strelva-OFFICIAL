@@ -1,4 +1,5 @@
--- Run only after reverting the coverage UI/measure and pausing effort writes.
+-- Pause effort writes before rollback; restore the old code only after success.
+-- If zero logs exist, keep the forward schema and a reader that accepts zero.
 -- Refuse rollback once explicit zero logs exist: never destroy the ledger to
 -- restore the old constraint. Keep the forward migration in that case.
 begin;

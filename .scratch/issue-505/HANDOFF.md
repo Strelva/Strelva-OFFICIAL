@@ -43,5 +43,15 @@ operator/design docs. Repository.ts is untouched.
 
 Remaining proof: deployment, production-scale RPC latency and completeness of
 operator-entered logs. No production, external provider or billing actions.
-Next: finish verification on the rebased integration tree, push and open the
-#505 PR; orchestrator reviews/integrates and schedules any authorized rollout.
+Final verification on integration base `7223fc5c` (October 7):
+- `pnpm exec vitest run src/__tests__/business-effort-measure.test.ts src/__tests__/business-effort-service.test.ts src/__tests__/business-effort-ui.test.tsx src/__tests__/business-effort-actions.test.ts --maxWorkers=2`: 4 files / 61 tests passed.
+- `pnpm typecheck`, `pnpm lint`, `pnpm check:boundaries`: exit 0.
+- `PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-sql`:
+  exit 0; includes coverage, rollback/reapply and zero-log rollback refusal.
+- `PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-upgrade`:
+  exit 0; full-schema upgrade rehearsal and reader authority regression passed.
+- `git diff --check`: exit 0. Rebased preview still renders all 3 businesses,
+  logged zeros, missing periods and the same denominator.
+
+Next: push/open #505 PR. Orchestrator reviews/integrates and schedules any
+explicitly authorized rollout. No further product decision needed for this fix.
