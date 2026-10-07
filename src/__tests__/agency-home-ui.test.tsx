@@ -167,3 +167,13 @@ describe("agency home on the batched read", () => {
     expect(request.mock.calls.some(([input]) => String(input).startsWith("/api/workspace/agency-library"))).toBe(false);
   });
 });
+
+
+it("opens agent bookings for the selected client without nesting a link in the client button", async () => {
+  const request = router({ clients: () => Response.json(page([row(1, { agentBookings: true }), row(2)])) });
+  const { node } = await render(request);
+  const links = [...node.querySelectorAll<HTMLAnchorElement>('a[href*="/workspace/bookings"]')];
+  expect(links).toHaveLength(1);
+  expect(links[0]?.getAttribute("href")).toBe(`/workspace/bookings?workspaceId=${row(1).workspaceId}&view=week&source=agent`);
+  expect(links[0]?.closest("button")).toBeNull();
+});

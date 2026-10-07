@@ -46,6 +46,10 @@ select pg_temp.nw_expect($q$select public.read_provider_booking_evidence('ea0000
 select pg_temp.nw_expect($q$select public.read_provider_booking_evidence('ea000000-0000-4000-8000-000000000011','ea000000-0000-4000-8000-000000000003','agent-visible-outsider@example.test',current_date,'week')$q$,'business_record_access_denied');
 select pg_temp.nw_expect($q$select public.read_provider_booking_evidence('ea000000-0000-4000-8000-000000000010','ea000000-0000-4000-8000-000000000003','agent-visible-outsider@example.test',current_date,'month')$q$,'booking_invalid');
 select pg_temp.nw_expect($q$select public.mark_workspace_booking_no_show('ea000000-0000-4000-8000-000000000010','ea000000-0000-4000-8000-000000000003','agent-visible-outsider@example.test','workspace:ea000000-0000-4000-8000-000000000010','visible-agent')$q$,'workspace_access_denied');
+-- A work grant cannot authorize bookings when the granted System is unrelated.
+update public.systems set kind='inquiry' where origin_ref='ea000000-0000-4000-8000-000000000050';
+select pg_temp.nw_expect('select pg_temp.av_read()','workspace_access_denied');
+update public.systems set kind='booking' where origin_ref='ea000000-0000-4000-8000-000000000050';
 update public.workspace_delegations set status='revoked',revoked_at=now() where customer_work_id='ea000000-0000-4000-8000-000000000050';
 select pg_temp.nw_expect('select pg_temp.av_read()','business_record_access_denied');
 select pg_temp.nw_assert(not has_function_privilege('anon','public.read_provider_booking_evidence(uuid,uuid,text,date,text)','EXECUTE') and not has_function_privilege('authenticated','public.read_agent_booking_proof(text,timestamptz,timestamptz)','EXECUTE'),'server-only reads');

@@ -10,8 +10,9 @@ export async function readProviderBookings(actor: WorkspaceActor, workspaceId: s
   const db = bookingStoreDb();
   if (!db) throw new BookingStoreError("unconfigured");
   const date = options.date && /^\d{4}-\d{2}-\d{2}$/.test(options.date) ? options.date : null;
-  const response = await db.rpc("read_provider_booking_evidence", { p_workspace_id: workspaceId, p_user_id: actor.userId,
+  const call = db.rpc("read_provider_booking_evidence", { p_workspace_id: workspaceId, p_user_id: actor.userId,
     p_verified_email: actor.verifiedEmail.trim().toLowerCase(), p_date: date, p_view: options.view });
+  const response = await (call.abortSignal ? call.abortSignal(AbortSignal.timeout(2000)) : call);
   if (response.error?.message?.includes("business_record_access_denied") || response.error?.message?.includes("workspace_access_denied")) throw new WorkspaceAccessError();
   if (response.error) throw new BookingStoreError("failed");
   const data = responseSchema.parse(response.data);

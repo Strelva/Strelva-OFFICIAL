@@ -40,7 +40,7 @@ export default async function BookingsPreviewPage({ searchParams }: { searchPara
       ...(name === "agent-provider" ? { readOnly: true } : {}),
       sites: [{ ...site, bookings: site.bookings.map((booking, index) => ({ ...booking,
         ...(name !== "agent-off" && [1, 2].includes(index) ? { agentName: index === 1 ? "Claude" : "ChatGPT" } : {}),
-        evidence: { history: [{ kind: "change" as const, actor: "visitor" as const, from: null, to: booking.status, reason: "Customer confirmed their choice", at: "2026-11-01T13:00:00Z" }], historyTruncated: false, calendar: null, outsideRecordHours: false, canMarkNoShow: false }
+        ...(name !== "agent-provider" ? { evidence: { history: [{ kind: "change" as const, actor: "visitor" as const, from: null, to: booking.status, reason: "Customer confirmed their choice", at: "2026-11-01T13:00:00Z" }], historyTruncated: false, calendar: null, outsideRecordHours: false, canMarkNoShow: false } } : {})
       })) }] } }
     : name === "native" ? ready([{ ...site, tenantId: `workspace:${WORKSPACE}`, siteName: "Bookings", manual: true, evidence: { calendarHealth: "not_connected", paused: false, truncated: false } }], true)
     : name === "native-empty" ? ready([], true)

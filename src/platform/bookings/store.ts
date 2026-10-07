@@ -463,6 +463,7 @@ export async function readWorkspaceBooking(
 }
 
 export interface ManagedReservation {
+  agentSource?: string;
   tenantId: string;
   siteName: string;
   reservationId: string;

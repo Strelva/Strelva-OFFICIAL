@@ -159,6 +159,7 @@ function SiteSection({ site, bookings, workspaceId, many }: { site: SiteBookings
 export function WorkspaceBookings({ workspaceId, state, view }: { workspaceId: string; state: WorkspaceBookingsState; view: BookingView }) {
   const homeHref = `/workspace?workspaceId=${encodeURIComponent(workspaceId)}`;
   const ready = state.kind === "ready" ? state.bookings : null;
+  const agentCount = ready?.sites.reduce((n, s) => n + s.bookings.filter(b => b.agentName).length, 0) ?? 0;
   const step = view === "day" ? 1 : 7;
   const heading = ready
     ? view === "day" ? dayLabel(ready.from) : `Week of ${dayLabel(ready.from, "short")}`
@@ -170,7 +171,7 @@ export function WorkspaceBookings({ workspaceId, state, view }: { workspaceId: s
         <p className="mt-10 text-xs font-medium uppercase tracking-[0.14em] text-gray-muted">Bookings</p>
         <h1 className="mt-3 font-display text-[34px] font-medium leading-tight sm:text-[40px]">{heading}</h1>
         <p className="mt-3 max-w-2xl text-base leading-7 text-gray-muted">
-          {view === "day" ? "Who's coming in, in order. Check people in as they arrive." : ready?.native ? "Every booking this week, kept in this business’s Bookings System." : "Every booking this week, from your website and the tools it connects to."}
+          {view === "day" ? ready?.readOnly ? "Shared appointments, in order. The owner decides booking requests." : "Who's coming in, in order. Check people in as they arrive." : ready?.native ? "Every booking this week, kept in this business’s Bookings System." : "Every booking this week, from your website and the tools it connects to."}
         </p>
 
         {state.kind === "permission" ? (
@@ -206,10 +207,10 @@ export function WorkspaceBookings({ workspaceId, state, view }: { workspaceId: s
               </nav>
             </div>
             {ready!.agentVisibility ? <nav aria-label="Booking source" className="mt-4 flex flex-wrap gap-3 text-sm">
-              {(["all", "agent"] as const).map(source => <a key={source} href={href(workspaceId, view, ready!.from, source)} aria-current={(ready!.source ?? "all") === source ? "page" : undefined} className="inline-flex min-h-11 items-center rounded-md px-3 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2">{source === "all" ? "All bookings" : "Booked through agents"}</a>)}
+              {(["all", "agent"] as const).map(source => <a key={source} href={href(workspaceId, view, ready!.from, source)} aria-current={(ready!.source ?? "all") === source ? "page" : undefined} className={`inline-flex min-h-11 items-center rounded-md px-3 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 ${(ready!.source ?? "all") === source ? "bg-gray-bg font-medium" : "text-gray-muted"}`}>{source === "all" ? "All bookings" : "Booked through agents"}</a>)}
             </nav> : null}
             {ready!.readOnly ? <p className="mt-4 text-sm text-gray-muted">Shared bookings · read only. The owner decides booking requests.</p> : null}
-            {ready!.agentVisibility && view === "week" ? <p className="mt-4 text-sm text-gray-muted">{ready!.sites.some(s => s.unavailable || s.evidence?.truncated) ? "Agent request count is unavailable for this week." : `${ready!.sites.reduce((n, s) => n + s.bookings.filter(b => b.agentName).length, 0)} agent requests for this week. Requests are not confirmed bookings.`}</p> : null}
+            {ready!.agentVisibility && view === "week" ? <p className="mt-4 text-sm text-gray-muted">{ready!.sites.some(s => s.unavailable || s.evidence?.truncated) ? "Agent request count is unavailable for this week." : `${agentCount} agent ${agentCount === 1 ? "request" : "requests"} for this week. Requests are not confirmed bookings.`}</p> : null}
             {ready!.sites.length === 0 ? (
               <Card padding="lg" className="mt-6">
                 <h2 className="text-lg font-medium">{ready!.native ? "Your Bookings System is not set up yet" : "No booking site is connected to this business yet"}</h2>

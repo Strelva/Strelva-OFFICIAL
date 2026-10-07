@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { bookingAgentVisibilityEnabled } from "@/platform/bookings/flags";
+import { bookingAgentVisibilityEnabled, resetBookingFlagCache } from "@/platform/bookings/flags";
 import { bookingAgentLabel } from "@/platform/bookings/agent-source";
 import { agentRequestProofLine, readAgentRequestProof } from "@/platform/bookings/agent-proof";
 import { bookingRequestAdapter, bookingRequestItem } from "@/platform/bookings/needs-you-adapter";
@@ -9,6 +9,7 @@ import { parseStoreBooking, setBookingStoreDb, type StoreBooking } from "@/platf
 import { createNeedsYouService } from "@/platform/needs-you/service";
 import { handledFromStore } from "@/platform/needs-you/handled";
 import { needsYouMemoryStore } from "./support/needs-you-memory";
+import { ManageBooking } from "@/experience/bookings/ManageBooking";
 import { WorkspaceBookings } from "@/experience/bookings/WorkspaceBookings";
 import { readWorkspaceBookings, type BookingDependencies } from "@/products/bookings/server";
 import { readProviderBookings } from "@/products/bookings/provider";
@@ -27,7 +28,7 @@ const booking: StoreBooking = { id: "b1", calendarKey: WS, tenantStableId: null,
 const deps: BookingDependencies = { config: vi.fn(), bookings: vi.fn(), siteName: vi.fn(), readSource: async () => "postgres",
   context: async () => ({ tenantStableId: null, workspaceId: WS, systemId: "system", paused: false, hours: null, phone: null, services: [], settings: null }),
   evidence: async () => ({ calendarHealth: "not_connected", truncated: false, bookings: [{ booking, history: [], historyTruncated: false, calendar: null }] }) };
-afterEach(() => { vi.unstubAllEnvs(); setBookingStoreDb(null); setReleaseFlagsDb(null); });
+afterEach(() => { vi.unstubAllEnvs(); setBookingStoreDb(null); setReleaseFlagsDb(null); resetBookingFlagCache(); });
 
 it("is default off and normalizes only a recorded agent origin", () => {
   expect(bookingAgentVisibilityEnabled({})).toBe(false);
@@ -103,7 +104,7 @@ describe("owner and provider presentation", () => {
  const render = (readOnly = false, source: "all" | "agent" = "all") => renderToStaticMarkup(createElement(WorkspaceBookings, { workspaceId: WS, view: "week", state: { kind: "ready", bookings: { view: "week", from: "2026-11-02", to: "2026-11-08", agentVisibility: true, readOnly, source, sites: [site] } } }));
  it("escapes attribution, filters agents and preserves source/date in navigation", () => {
    const html = render(false, "agent"); expect(html).toContain("Booked through Claude &lt;script&gt;"); expect(html).not.toContain("Site customer");
-   expect(html).toContain("1 agent requests for this week"); expect(html).toContain("source=agent"); expect(html).toContain("date=2026-10-26");
+   expect(html).toContain("1 agent request for this week"); expect(html).toContain("source=agent"); expect(html).toContain("date=2026-10-26");
  });
  it("provider detail names the source and removes every mutation", () => {
    const html = render(true); expect(html).toContain("Booking details"); expect(html).toContain("Agent names are supplied at booking");
@@ -113,4 +114,22 @@ describe("owner and provider presentation", () => {
    const href = `/workspace/bookings?workspaceId=${WS}&view=week&date=2026-11-06&source=agent`;
    expect(workspaceReturnTarget(href)).toBe(href); expect(workspaceReturnTarget(href + "&source=all")).toBeNull(); expect(workspaceReturnTarget(href.replace("source=agent", "source=anything"))).toBeNull();
  });
+});
+
+it("reads an accurate weekly count and omits unavailable proof without sending", async () => {
+ vi.stubEnv("STRELVA_BOOKING_AGENT_VISIBILITY","1"); vi.stubEnv("STRELVA_BOOKING_STORE_WRITE","1"); vi.stubEnv("STRELVA_BOOKING_STORE_READ","postgres");
+ const rpc=vi.fn(async (name:string) => ({ data:name==="booking_parity_streak" ? {days:7} : 3, error:null })); setBookingStoreDb({rpc}); resetBookingFlagCache();
+ expect(await readAgentRequestProof("fixture","2026-11-02T00:00:00Z","2026-11-08T23:59:59Z")).toBe("3 agent requests");
+ expect(rpc).toHaveBeenLastCalledWith("read_agent_booking_proof",{p_tenant_id:"fixture",p_from:"2026-11-02T00:00:00Z",p_to:"2026-11-08T23:59:59Z"});
+ setBookingStoreDb({rpc:async()=>({data:null,error:{message:"unavailable"}})});
+ expect(await readAgentRequestProof("fixture","2026-11-02","2026-11-08")).toBeNull();
+});
+
+
+it("names the source in customer receipts without confusing a request with confirmation", () => {
+  const receipt = { siteName: "Fixture", title: "Consultation", day: "Friday", time: "10:00", timeZoneLabel: "UTC", status: "pending" as const, confirmationRequired: true };
+  const render = (agentSource?: string) => renderToStaticMarkup(createElement(ManageBooking, { actionUrl: "/b/fixture", state: { kind: "ready", booking: { ...receipt, ...(agentSource ? { agentSource } : {}) }, days: [], slotsUnavailable: false, changesClosed: true } }));
+  expect(render("Booked through Claude <script>")).toContain("Booked through Claude &lt;script&gt;");
+  expect(render("Booked through Claude")).toContain("Waiting for the business to confirm");
+  expect(render()).not.toContain(">Source<");
 });

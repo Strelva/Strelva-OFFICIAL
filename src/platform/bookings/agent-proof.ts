@@ -10,7 +10,8 @@ export async function readAgentRequestProof(tenantId: string, from: string, to: 
   if (!bookingAgentVisibilityEnabled() || await bookingReadSource() !== "postgres") return null;
   const db = bookingStoreDb();
   if (!db) return null;
-  const result = await db.rpc("read_agent_booking_proof", { p_tenant_id: tenantId, p_from: from, p_to: to });
+  const call = db.rpc("read_agent_booking_proof", { p_tenant_id: tenantId, p_from: from, p_to: to });
+  const result = await (call.abortSignal ? call.abortSignal(AbortSignal.timeout(2000)) : call);
   if (result.error || typeof result.data !== "number" || !Number.isSafeInteger(result.data) || result.data < 0) return null;
   return agentRequestProofLine(result.data);
 }
