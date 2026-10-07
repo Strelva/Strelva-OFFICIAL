@@ -43,6 +43,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Python local tooling caches
+__pycache__/
+*.py[cod]
+
 # content
 /public/uploads/
 .claude/sessions/
