@@ -776,6 +776,12 @@ psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-w6-booking-native-workspace.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135956_booking_native_workspace.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.sql"
+# #304 read-only visibility: forward, rollback and reapply.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011140000_agent_booking_visibility.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-visibility-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011140000_agent_booking_visibility.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011140000_agent_booking_visibility.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-visibility-schema.sql"
 # Every stream's release flag key survives the last literal redefinition (#253).
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 

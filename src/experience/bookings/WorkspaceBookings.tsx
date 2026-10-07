@@ -45,13 +45,14 @@ function timeLabel(time: string): string {
   return `${(h % 12) || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 }
 
-function href(workspaceId: string, view: BookingView, date?: string): string {
+function href(workspaceId: string, view: BookingView, date?: string, source?: "all" | "agent"): string {
   const params = new URLSearchParams({ workspaceId, view });
   if (date) params.set("date", date);
+  if (source === "agent") params.set("source", source);
   return `/workspace/bookings?${params}`;
 }
 
-function BookingItem({ booking, site, workspaceId, view }: { booking: BookingRow; site: SiteBookings; workspaceId: string; view: BookingView }) {
+function BookingItem({ booking, site, workspaceId, view, readOnly }: { booking: BookingRow; site: SiteBookings; workspaceId: string; view: BookingView; readOnly?: boolean }) {
   const muted = booking.status === "cancelled" || booking.status === "declined";
   return (
     <li className="flex flex-col gap-3 border-t border-gray-border py-4 first:border-t-0 sm:flex-row sm:items-start sm:justify-between">
@@ -63,6 +64,7 @@ function BookingItem({ booking, site, workspaceId, view }: { booking: BookingRow
           <span aria-hidden="true"> · </span>
           <span>{STATUS[booking.status]}</span>
         </p>
+        {booking.agentName ? <div className="mt-2 max-w-prose break-words"><span className="inline-block max-w-full rounded-full bg-gray-bg px-3 py-1 text-sm text-warm-black">Booked through {booking.agentName}</span></div> : null}
         {booking.notes ? <p className="mt-2 max-w-prose text-sm leading-6 text-gray-muted">{booking.notes}</p> : null}
         {booking.intake?.length ? <dl className="mt-2 max-w-prose space-y-2 text-sm leading-6 text-gray-muted">{booking.intake.map((entry, index) => <div key={index}><dt className="font-medium">{entry.label}</dt><dd className="whitespace-pre-wrap">{entry.answer}</dd></div>)}</dl> : null}
         {booking.clientPhone || booking.clientEmail ? (
@@ -73,6 +75,7 @@ function BookingItem({ booking, site, workspaceId, view }: { booking: BookingRow
           </p>
         ) : null}
       </div>
+      {readOnly && !booking.evidence ? <details className="text-sm"><summary className="inline-flex min-h-11 cursor-pointer items-center font-medium focus-visible:outline-2 focus-visible:outline-offset-2">Booking details</summary><p className="mt-2 text-gray-muted">{booking.agentName ? `Booked through ${booking.agentName}. Agent names are supplied at booking.` : "No agent source recorded."}</p></details> : null}
       {booking.evidence ? (
         <div className="min-w-0 sm:max-w-[260px]">
           {booking.evidence.outsideRecordHours && (booking.status === "confirmed" || booking.status === "requested") ? <p className="text-sm leading-6 text-critical">Outside the business&apos;s current opening hours. This booking is kept; review it with the customer.</p> : null}
@@ -80,6 +83,7 @@ function BookingItem({ booking, site, workspaceId, view }: { booking: BookingRow
           {!booking.evidence.calendar && booking.status === "confirmed" && site.evidence?.calendarHealth === "connected" ? <p className="text-sm leading-6 text-gray-muted">No calendar copy has been verified yet. The booking is kept.</p> : null}
           <details className="mt-2 text-sm">
             <summary className="inline-flex min-h-11 cursor-pointer items-center rounded-md font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2">Booking history</summary>
+            {booking.agentName ? <p className="mt-2 text-gray-muted">Booked through {booking.agentName}. Agent names are supplied at booking.</p> : null}
             {booking.evidence.history.length === 0 ? <p className="mt-2 text-gray-muted">No history is recorded yet.</p> : <ol className="mt-2 space-y-2">{booking.evidence.history.map((entry, index) => (
               <li key={index} className="text-gray-muted">
                 <p>{entry.kind === "change" ? `${entry.reason ?? STATUS[entry.to]} · ${entry.actor === "visitor" ? "Customer" : entry.actor === "strelva" ? "Strelva" : entry.actor.charAt(0).toUpperCase() + entry.actor.slice(1)}` : `${entry.reminder === "reminder_24h" ? "24-hour reminder" : entry.reminder === "reminder_2h" ? "2-hour reminder" : entry.reminder === "request_owner_reminder" ? "Owner reminder" : "Request expiry notice"} · ${entry.status === "sent" ? "Accepted by email provider" : entry.status === "claimed" ? "Delivery not confirmed" : entry.status === "suppressed" ? "Not sent: email is disabled" : entry.status === "skipped" ? "Not sent" : "Delivery failed"}`}</p>
@@ -90,20 +94,21 @@ function BookingItem({ booking, site, workspaceId, view }: { booking: BookingRow
           </details>
         </div>
       ) : null}
-      <BookingActions canMarkNoShow={booking.evidence?.canMarkNoShow} workspaceId={workspaceId} tenantId={site.tenantId} bookingId={booking.id} status={booking.status} clientName={booking.clientName} view={view} />
+      {!readOnly ? <BookingActions canMarkNoShow={booking.evidence?.canMarkNoShow} workspaceId={workspaceId} tenantId={site.tenantId} bookingId={booking.id} status={booking.status} clientName={booking.clientName} view={view} /> : null}
     </li>
   );
 }
 
-function DayList({ site, date, workspaceId, view }: { site: SiteBookings; date: string; workspaceId: string; view: BookingView }) {
+function DayList({ site, date, workspaceId, view, readOnly }: { site: SiteBookings; date: string; workspaceId: string; view: BookingView; readOnly?: boolean }) {
   const rows = site.bookings.filter((b) => b.date === date);
   if (rows.length === 0) return <p className="py-3 text-sm text-gray-muted">{view === "day" ? "No appointments this day." : "No bookings."}</p>;
-  return <ul>{rows.map((booking) => <BookingItem key={booking.id} booking={booking} site={site} workspaceId={workspaceId} view={view} />)}</ul>;
+  return <ul>{rows.map((booking) => <BookingItem key={booking.id} booking={booking} site={site} workspaceId={workspaceId} view={view} readOnly={readOnly} />)}</ul>;
 }
 
 function SiteSection({ site, bookings, workspaceId, many }: { site: SiteBookings; bookings: Bookings; workspaceId: string; many: boolean }) {
   const days = bookings.view === "day" ? [bookings.from] : Array.from({ length: 7 }, (_, i) => addDays(bookings.from, i));
-  const active = site.bookings.filter((b) => !["cancelled", "declined", "no_show", "held"].includes(b.status));
+  const shown = bookings.source === "agent" ? { ...site, bookings: site.bookings.filter(b => b.agentName) } : site;
+  const active = shown.bookings.filter((b) => !["cancelled", "declined", "no_show", "held"].includes(b.status));
   const checkedIn = active.filter((b) => b.status === "completed").length;
   return (
     <section className="mt-8" aria-labelledby={`site-${site.tenantId}`}>
@@ -123,7 +128,7 @@ function SiteSection({ site, bookings, workspaceId, many }: { site: SiteBookings
             </details> : null}
             {site.evidence.truncated ? <p role="status">Showing the first 500 bookings in this date range. Open the day view to narrow the list.</p> : null}
           </div> : null}
-          {site.manual ? <ManualBookingForm workspaceId={workspaceId} tenantId={site.tenantId} /> : null}
+          {site.manual && !bookings.readOnly ? <ManualBookingForm workspaceId={workspaceId} tenantId={site.tenantId} /> : null}
           {bookings.view === "day" ? (
             <p className="text-sm text-gray-muted">
               {active.length === 0 ? "Nothing booked." : `${active.length} ${active.length === 1 ? "appointment" : "appointments"} · ${checkedIn} checked in`}
@@ -137,10 +142,10 @@ function SiteSection({ site, bookings, workspaceId, many }: { site: SiteBookings
                   {date === site.today ? <span className="ml-2 text-xs font-normal text-gray-muted">Today</span> : null}
                 </h3>
               ) : null}
-              <DayList site={site} date={date} workspaceId={workspaceId} view={bookings.view} />
+              <DayList readOnly={bookings.readOnly} site={shown} date={date} workspaceId={workspaceId} view={bookings.view} />
             </div>
           ))}
-          {site.hours ? (
+          {site.hours && !bookings.readOnly ? (
             <div className="mt-6">
               <BookingHoursEditor workspaceId={workspaceId} tenantId={site.tenantId} siteName={site.siteName} hours={site.hours} />
             </div>
@@ -184,22 +189,27 @@ export function WorkspaceBookings({ workspaceId, state, view }: { workspaceId: s
             <div className="mt-8 flex flex-wrap items-center gap-3">
               <nav aria-label="Bookings view" className="inline-flex rounded-lg border border-gray-border p-0.5">
                 {(["day", "week"] as const).map((value) => (
-                  <a key={value} href={href(workspaceId, value, ready!.from)} aria-current={view === value ? "page" : undefined}
+                  <a key={value} href={href(workspaceId, value, ready!.from, ready!.source)} aria-current={view === value ? "page" : undefined}
                     className={`inline-flex items-center max-sm:min-h-11 rounded-md px-3 py-1.5 text-sm font-medium ${view === value ? "bg-warm-black text-warm-white" : "text-gray-muted hover:text-warm-black"}`}>
                     {value === "day" ? "Day" : "Week"}
                   </a>
                 ))}
               </nav>
               <nav aria-label={view === "day" ? "Change day" : "Change week"} className="flex items-center gap-1 text-sm">
-                <a className="inline-flex items-center max-sm:min-h-11 rounded-md px-2 py-1.5 text-gray-muted hover:bg-gray-bg hover:text-warm-black" href={href(workspaceId, view, addDays(ready!.from, -step))}>
+                <a className="inline-flex items-center max-sm:min-h-11 rounded-md px-2 py-1.5 text-gray-muted hover:bg-gray-bg hover:text-warm-black" href={href(workspaceId, view, addDays(ready!.from, -step), ready!.source)}>
                   {view === "day" ? "Previous day" : "Previous week"}
                 </a>
-                <a className="inline-flex items-center max-sm:min-h-11 rounded-md px-2 py-1.5 text-gray-muted hover:bg-gray-bg hover:text-warm-black" href={href(workspaceId, view)}>Today</a>
-                <a className="inline-flex items-center max-sm:min-h-11 rounded-md px-2 py-1.5 text-gray-muted hover:bg-gray-bg hover:text-warm-black" href={href(workspaceId, view, addDays(ready!.from, step))}>
+                <a className="inline-flex items-center max-sm:min-h-11 rounded-md px-2 py-1.5 text-gray-muted hover:bg-gray-bg hover:text-warm-black" href={href(workspaceId, view, undefined, ready!.source)}>Today</a>
+                <a className="inline-flex items-center max-sm:min-h-11 rounded-md px-2 py-1.5 text-gray-muted hover:bg-gray-bg hover:text-warm-black" href={href(workspaceId, view, addDays(ready!.from, step), ready!.source)}>
                   {view === "day" ? "Next day" : "Next week"}
                 </a>
               </nav>
             </div>
+            {ready!.agentVisibility ? <nav aria-label="Booking source" className="mt-4 flex flex-wrap gap-3 text-sm">
+              {(["all", "agent"] as const).map(source => <a key={source} href={href(workspaceId, view, ready!.from, source)} aria-current={(ready!.source ?? "all") === source ? "page" : undefined} className="inline-flex min-h-11 items-center rounded-md px-3 underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2">{source === "all" ? "All bookings" : "Booked through agents"}</a>)}
+            </nav> : null}
+            {ready!.readOnly ? <p className="mt-4 text-sm text-gray-muted">Shared bookings · read only. The owner decides booking requests.</p> : null}
+            {ready!.agentVisibility && view === "week" ? <p className="mt-4 text-sm text-gray-muted">{ready!.sites.some(s => s.unavailable || s.evidence?.truncated) ? "Agent request count is unavailable for this week." : `${ready!.sites.reduce((n, s) => n + s.bookings.filter(b => b.agentName).length, 0)} agent requests for this week. Requests are not confirmed bookings.`}</p> : null}
             {ready!.sites.length === 0 ? (
               <Card padding="lg" className="mt-6">
                 <h2 className="text-lg font-medium">{ready!.native ? "Your Bookings System is not set up yet" : "No booking site is connected to this business yet"}</h2>

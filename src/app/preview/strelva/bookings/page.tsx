@@ -23,9 +23,9 @@ const ROWS: BookingRow[] = [
 /** Opening hours from the fictional business record: Tuesday to Saturday. */
 const OPENING = [2, 3, 4, 5].map((day) => ({ day, opens: "09:00", closes: "19:00" })).concat([{ day: 6, opens: "09:00", closes: "17:00" }]);
 
-export default async function BookingsPreviewPage({ searchParams }: { searchParams: Promise<{ state?: string; view?: string }> }) {
+export default async function BookingsPreviewPage({ searchParams }: { searchParams: Promise<{ state?: string; view?: string; source?: string }> }) {
   if (!strelvaUiPreviewEnabled()) notFound();
-  const { state: name, view: viewParam } = await searchParams;
+  const { state: name, view: viewParam, source } = await searchParams;
   const view = viewParam === "day" ? "day" : "week";
   const range = view === "day" ? { from: "2026-11-06", to: "2026-11-06" } : { from: "2026-11-02", to: "2026-11-08" };
   const site: SiteBookings = {
@@ -35,6 +35,13 @@ export default async function BookingsPreviewPage({ searchParams }: { searchPara
   const ready = (sites: SiteBookings[], native = false): WorkspaceBookingsState => ({ kind: "ready", bookings: { view, ...range, sites, ...(native ? { native: true } : {}) } });
   if (name === "loading") return <WorkspaceBookingsLoading />;
   const state: WorkspaceBookingsState = name === "permission" ? { kind: "permission" }
+    : name === "agent-owner" || name === "agent-provider" || name === "agent-off" ? { kind: "ready", bookings: { view, ...range,
+      ...(name !== "agent-off" ? { agentVisibility: true, source: source === "agent" ? "agent" as const : "all" as const } : {}),
+      ...(name === "agent-provider" ? { readOnly: true } : {}),
+      sites: [{ ...site, bookings: site.bookings.map((booking, index) => ({ ...booking,
+        ...(name !== "agent-off" && [1, 2].includes(index) ? { agentName: index === 1 ? "Claude" : "ChatGPT" } : {}),
+        evidence: { history: [{ kind: "change" as const, actor: "visitor" as const, from: null, to: booking.status, reason: "Customer confirmed their choice", at: "2026-11-01T13:00:00Z" }], historyTruncated: false, calendar: null, outsideRecordHours: false, canMarkNoShow: false }
+      })) }] } }
     : name === "native" ? ready([{ ...site, tenantId: `workspace:${WORKSPACE}`, siteName: "Bookings", manual: true, evidence: { calendarHealth: "not_connected", paused: false, truncated: false } }], true)
     : name === "native-empty" ? ready([], true)
     : name === "error" ? { kind: "error" }
