@@ -77,7 +77,9 @@ export function adminHost(tenantId: string): string {
  * redirect to where it ends, which is what Vercel's absolute redirects give.
  */
 export async function serveAdminHostsAsOnVercel(context: BrowserContext) {
-  const bound = new URL(journeyEnvironment().app).origin;
+  // Host routing also belongs to the flags-off regression; it does not need
+  // any 1.0 release enabled.
+  const bound = new URL(localEnvironment().app).origin;
   await context.route((url) => /^admin\.[a-z0-9-]+\.localhost$/.test(url.hostname), async (route) => {
     const request = route.request();
     let current = new URL(request.url());

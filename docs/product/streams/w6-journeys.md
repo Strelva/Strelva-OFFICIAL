@@ -1,9 +1,11 @@
 # W6 stream: journeys
 
-Status: in progress (round 5, Oct 7 2026). Branch `w6/journeys`, rebased onto
-`integrate/reborn-1.0` @ 0479cdab (the Oct 6 workspace redesign is in it).
-This branch changes no product code: `git diff integrate/reborn-1.0 -- src supabase`
-is empty, so a run on this branch is the run on `integrate/reborn-1.0`.
+Status: baselines recorded locally (Oct 7 2026); journeys remain red. Branch
+`w6/journeys`, based on `integrate/reborn-1.0` @ 0479cdab (the Oct 6 workspace
+redesign is in it). Runtime and migrations match that base; the branch changes
+only the journey harness, tests and handoff. This is local browser/database
+evidence, not a production or release-readiness claim. Refs #336; reader fix
+is owned separately by #252 (`a1/readers-fix`).
 
 ## Goal
 The 1.0 signed-in journeys run and pass locally, end to end, against a
@@ -63,8 +65,9 @@ disposable local Supabase, with flags on and with flags off. One command:
    - `20261007182000`: `export_workspace_v3_category`.
    - Websites (`20261008150000`, `20261008150100`): `read_website_current_tenant`,
      `read_website_linked_publications`, `read_website_domain_approvals`.
-   **Fix (owning streams, before the batches are applied):** declare each
-   reader VOLATILE. `scripts/journeys-proposed-fixes.sql` has the exact
+   **Fix (separate #252 stream):** declare each reader VOLATILE in an
+   additive migration; checksum-pinned release migrations must remain unchanged.
+   `scripts/journeys-proposed-fixes.sql` has the exact
    statements; `pnpm check:journeys --with-proposed-fixes` applies them to the
    disposable database only. `pnpm check:readonly-rpcs <db-url>` guards the class.
 2. **The redesign renamed Needs you verbs** (`needs-you-presentation.ts`):
@@ -79,8 +82,111 @@ disposable local Supabase, with flags on and with flags off. One command:
    product code is unchanged.
 
 ## Baseline on integrate/reborn-1.0
-Pending the full run (flags on, then flags off).
+
+Measured October 7, 2026, using runtime/migrations at `0479cdab`, journey
+branch input `bf5d8fd3`, and the harness corrections below. Docker 29.6.2,
+local Supabase CLI **2.117.0 via npx** (Homebrew has 2.120.0), real Supabase
+Auth/Postgres, Chromium desktop project, one worker, zero retries. Flags-on
+specs also check 1440px and 390px layouts; email-only owners have no account.
+No real email, hosted database, provider write or deployment was used.
+
+Both retained disposable stacks were stopped after the runs.
+
+The fresh initial compound run hit `ENOSPC` while Turbopack compiled invitation
+acceptance. Its flags-on phase was interrupted (12 skipped), so it is **not** a
+product baseline. Once disk space recovered, all 12 flags-on tests executed.
+Plain on and on+fixes reused the same isolated database; flags off was run
+against a separate fresh, unmodified database. Raw local logs and traces stay
+in `test-results/journeys-baselines/` and `test-results/journeys-{on,off}/`;
+[retained summaries](./w6-journeys-baselines-2026-10-07.json) contain the final
+per-test status and failure assertions without local credentials.
+
+- **Flags on, plain:** `pnpm check:journeys --reuse <local-stack> --only on`.
+  **8 passed, 4 failed**, no skipped/flaky tests; exit 1. The RPC guard reports
+  the ten known STABLE readers. Browser failures: visitor booking, inquiry
+  release marker, and operator queue at both widths.
+- **Flags on, proposed local SQL:** `pnpm check:journeys --reuse <local-stack>
+  --only on --with-proposed-fixes`. **10 passed, 2 failed**, no skipped/flaky
+  tests; exit 1. RPC guard: **786 public functions checked; none reach a row
+  lock**. Both operator queue journeys now pass. Only the visitor booking and
+  inquiry release-marker failures remain. No migration or reader implementation
+  was edited in this branch.
+- **Flags off, unmodified schema:** `pnpm check:journeys --only off
+  --keep-stack`, then `pnpm check:journeys --reuse <fresh-unmodified-local-stack>
+  --only off` after harness corrections. **3 passed, 5 failed**, no skipped/flaky
+  tests; exit 1. The dark-surface regression, onboarding and service requests
+  pass. All five failures are the existing application/launch maker guard
+  described below. The RPC guard independently reports the original ten
+  readers; flags-off testing does not certify those readers.
+
+### Failures beyond #252
+
+1. **Anonymous visitor booking is sent to sign-in.** The tenant-host
+   `/api/booking/availability` navigation follows a sign-in redirect and returns
+   HTML (200), so the JSON assertion fails. `src/proxy.ts` does not exempt
+   `/api/booking` from public-host auth gating. The full visitor capture,
+   duplicate-slot refusal and owner confirmation sequence remains unproven.
+2. **Released inquiry loses its visible receipt and hold control.** Release
+   succeeds, the database is updated, and the message appears among normal
+   inquiries, but the card lacks “Released from held messages.” and its
+   return-to-held control. `WorkspaceInquiries.tsx` renders both only when
+   `releasedRowId` exists. Both plain and proposed-fixes runs reproduce it;
+   the marker/read path needs investigation by the inquiries owner.
+3. **Five existing flags-off native-tool journeys fail the maker guard.**
+   Three application-use tests and both launch-business widths receive
+   `403 {code: "make_systems_required", error: "Ask Strelva to build this."}`
+   where the old fixtures expect 201. Reconcile those fixtures with the
+   current `make_systems` authority contract; do not weaken the product guard
+   to make these tests green.
+
+### Harness corrections and verification
+
+- The result gate now requires all **12 on / 8 off** tests, including both
+  operator widths, all three booking cases, and all three application-use
+  cases. Added positive profile checks and a missing-test rejection for every
+  required spec, even when summary counts claim success.
+- The admin-host shim uses the generic local environment, allowing flags-off
+  routing without requiring flags on. The flags-off UI assertion targets the
+  visible Current workspace selector, its business ID and selected label,
+  instead of a hidden option. The Oct 6 frame intentionally keeps “Needs you”
+  and “Strelva handled” headings with flags off; the test checks their legacy
+  fallback content, no 1.0 action buttons, and no decision-feed reads instead
+  of incorrectly requiring those headings to disappear. APIRequestContext
+  connects to loopback with the admin Host header because its DNS does not resolve `*.localhost`. The
+  no-decisions assertion uses the authorized RPC: `owner_decisions` denies
+  direct service-role table reads by design.
+- `pnpm typecheck`: **passed (exit 0)**.
+- `pnpm lint`: **passed (exit 0)**.
+- `pnpm exec vitest run src/__tests__/launch-browser-results.test.ts
+  src/__tests__/owner-journey-copy.test.ts
+  src/__tests__/inquiry-preview-journey.test.ts --maxWorkers=2`:
+  **3 files / 42 tests passed**. The brief's `pnpm test -- <paths>` forwards
+  the delimiter to Vitest and starts the whole suite with this pnpm version;
+  that accidental invocation was stopped, and the explicit filtered command
+  above completed. No whole-suite pass is claimed.
+- `pnpm check:boundaries`: **failed (exit 1)** on eight existing imports in
+  `src/experience/workspace/outcomes/`: `AiMirror`, `LocationHeatmap`,
+  `LoopRibbon`, `PriceSheet`, `RatingTrend`, `ReplyPattern`,
+  `SundayPictureText` → `@/lib/motion`; `ai-mirror` →
+  `@/lib/ai-visibility-scorecard`. These files match the tested base `0479cdab`.
+- Shell syntax and Node syntax checks for the journey runner, stack preparation,
+  result gate and RPC guard: **passed**. `git diff --check`: **passed**.
+- SQL suite was not rerun: this branch changes no schema; all migrations were
+  applied successfully to the disposable databases.
 
 ## Next action
-Finish the flags-on run (plain, then `--with-proposed-fixes`), run flags off,
-record both baselines here, then the brief's verification commands.
+
+During these runs, the integration branch advanced to `115448a9`: #487
+(reader fix) and #491 (boundary fix) were merged there. This worktree was kept
+on the requested baseline; its recorded failures do not describe that newer
+tip.
+
+Orchestrator: integrate this test/evidence PR after review, then reconcile the
+three remaining failure groups with their owning streams and release-readiness
+record. #252's additive reader migration landed through #487; rerun plain
+`pnpm check:journeys` on the updated integration branch. A green run still needs
+all 12 on and 8 off tests without skips or retries, plus the boundary
+check rerun after #491. Local proof does not authorize deployment.
+Strategic/release state reconciliation is deferred to the orchestrator because
+this sub-agent is confined to the supplied worktree. No release, commercial,
+or production state was changed.

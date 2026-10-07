@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { buildWorkspaceApproveUrl } from "@/lib/approve-link";
-import { adminClient, cleanup, convertTenant, fixtureTenant, makeOperator, person, type Person } from "./support/journeys";
+import { adminClient, cleanup, convertTenant, decisions, fixtureTenant, makeOperator, person, type Person } from "./support/journeys";
 import { localEnvironment } from "./support/local-auth";
 
 // The 1.0 flags off, on real local Auth and Postgres: a converted business
-// with a signed-in owner sees the workspace exactly as before 1.0. Needs you,
-// Make real, Systems, owner entry, the one-tap links and the chase all stay
-// dark. pnpm check:journeys runs this on an app server with only
+// with a signed-in owner sees the unreleased workspace behavior. The 1.0
+// decision feed, Make real, Systems, owner entry, one-tap links and chase stay
+// dark; the redesigned frame keeps its fallback headings. The runner has only
 // STRELVA_WORKSPACE_RELEASE on.
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Supabase Auth and Postgres (see docs/operations/testing-and-ci.md).");
 test.beforeAll(() => {
@@ -54,15 +54,27 @@ test("with every 1.0 flag off, a converted business's owner sees the workspace a
     expect(makeReal.status()).toBe(503);
     expect(await makeReal.json()).toMatchObject({ error: expect.stringMatching(/not enabled/) });
 
-    // Home renders the pre-1.0 workspace: no Needs you, no Systems.
+    // The redesigned frame keeps the headings with legacy fallback content,
+    // while the 1.0 decision feed is never requested and no actions appear.
     const home = await owner.context.newPage();
+    const decisionReads: string[] = [];
+    home.on("request", (read) => {
+      if (new URL(read.url()).pathname === "/api/workspace/needs-you") decisionReads.push(read.url());
+    });
     await home.goto(`/workspace?workspaceId=${businessId}`);
-    await expect(home.getByText("Quiet Harbor").first()).toBeVisible({ timeout: 60_000 });
-    await expect(home.getByRole("heading", { name: /needs you/i })).toHaveCount(0);
-    await expect(home.getByRole("heading", { name: /strelva handled/i })).toHaveCount(0);
+    const currentWorkspace = home.getByRole("combobox", { name: "Current workspace" });
+    await expect(currentWorkspace).toBeVisible();
+    await expect(currentWorkspace).toHaveValue(businessId);
+    await expect(currentWorkspace.locator("option:checked")).toHaveText("Quiet Harbor");
+    await expect(home.getByRole("region", { name: "Needs you" }).getByText("Nothing needs a decision right now.")).toBeVisible();
+    await expect(home.getByRole("region", { name: "Strelva handled" }).getByText("Nothing finished yet.", { exact: false })).toBeVisible();
+    await expect(home.getByRole("button", { name: /^(?:Confirm|Approve|Not yet|Make it live|Undo):/ })).toHaveCount(0);
+    expect(decisionReads).toEqual([]);
 
     // Owner entry off: the client's admin host still sends a signed-in owner to /dashboard.
-    const entry = await request.get(`${adminOrigin}/auth/entry`, { maxRedirects: 0 });
+    // APIRequestContext's DNS does not resolve *.localhost. Preserve the
+    // client's Host header while connecting to the loopback app.
+    const entry = await request.get(`${env.app}/auth/entry`, { headers: { host: new URL(adminOrigin).host }, maxRedirects: 0 });
     expect(entry.status()).toBe(307);
     expect(new URL(entry.headers().location!, adminOrigin).pathname).toBe("/dashboard");
 
@@ -77,9 +89,8 @@ test("with every 1.0 flag off, a converted business's owner sees the workspace a
     const chase = await request.get("/api/cron/needs-you", { headers: { authorization: `Bearer ${process.env.CRON_SECRET}` } });
     expect(chase.status()).toBe(200);
     expect(await chase.json()).toMatchObject({ status: "disabled" });
-    const opened = await admin.from("owner_decisions").select("id").eq("workspace_id", businessId);
-    expect(opened.error).toBeNull();
-    expect(opened.data).toEqual([]);
+    // owner_decisions is RPC-only, including for the service-role client.
+    expect(await decisions(admin, businessId, operator)).toEqual([]);
   } finally {
     await cleanup(admin, { tenantIds: tenantId ? [tenantId] : [], workspaceIds: businessId ? [businessId] : [], operatorEmail: operator.email, people: [operator, ...(owner ? [owner] : [])] });
   }

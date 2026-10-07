@@ -14,14 +14,20 @@ const profiles = {
   marketing: [["marketing-launch-authenticated-local.spec.ts", 6]],
   "journeys-on": [
     ["owner-journey-1-0-authenticated-local.spec.ts", 2],
-    ["operator-queue-authenticated-local.spec.ts", 1],
+    ["operator-queue-authenticated-local.spec.ts", 2],
     ["make-real-authenticated-local.spec.ts", 1],
-    ["booking-approval-authenticated-local.spec.ts", 2],
+    ["booking-approval-authenticated-local.spec.ts", 3],
     ["email-only-owner-authenticated-local.spec.ts", 2],
     ["versions-authenticated-local.spec.ts", 1],
     ["inquiries-1-0-authenticated-local.spec.ts", 1],
   ],
-  "journeys-off": [["release-1-0-flags-off-authenticated-local.spec.ts", 1], ...core],
+  "journeys-off": [
+    ["release-1-0-flags-off-authenticated-local.spec.ts", 1],
+    ["launch-business-authenticated-local.spec.ts", 2],
+    ["application-use-authenticated-local.spec.ts", 3],
+    ["onboarding-authenticated-local.spec.ts", 1],
+    ["service-request-authenticated-local.spec.ts", 1],
+  ],
 };
 if (!profiles[profile]) throw new Error("Unknown launch verification profile.");
 const result = JSON.parse(readFileSync(report, "utf8"));
