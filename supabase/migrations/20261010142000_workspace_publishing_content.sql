@@ -68,13 +68,14 @@ create function public.publish_workspace_collection(p_input jsonb)
 returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
 declare
   v_workspace uuid := (p_input->>'workspaceId')::uuid;
+  v_status text := coalesce(p_input->>'status','published');
   v_tenant text := p_input->>'tenantId'; v_type text := p_input->>'type'; v_slug text := p_input->>'slug';
   v_key text := 'workspace-collection:' || (p_input->>'eventId');
   v_current public.collection_entries%rowtype; v_receipt jsonb; v_baseline jsonb;
 begin
   perform public.publishing_require_tenant(v_workspace,v_tenant);
   if public.workspace_exit_completed(v_workspace) or exists(select 1 from public.systems where id=(p_input->>'systemId')::uuid and lifecycle='paused') then raise exception 'publishing_paused'; end if;
-  if v_type not in ('blog','video','product') or v_slug !~ '^[a-z0-9-]{1,80}$' or jsonb_typeof(p_input->'data')<>'object'
+  if v_status not in ('draft','published') or v_type not in ('blog','video','product') or v_slug !~ '^[a-z0-9-]{1,80}$' or jsonb_typeof(p_input->'data')<>'object'
     or octet_length((p_input->'data')::text)>14000 then raise exception 'publishing_entry_invalid'; end if;
   perform pg_advisory_xact_lock(hashtextextended('collection:'||v_tenant||':'||v_type||':'||v_slug,0));
   select public.outside_write_receipt_row(id) into v_receipt from public.outside_write_receipts where command_key=v_key;
@@ -89,17 +90,17 @@ begin
   if v_current.id is null then
     -- A concurrent legacy insert wins and aborts this transaction rather than
     -- being overwritten by an upsert after an empty baseline read.
-    insert into public.collection_entries(tenant_id,type,slug,status,data) values(v_tenant,v_type,v_slug,'published',p_input->'data');
+    insert into public.collection_entries(tenant_id,type,slug,status,data) values(v_tenant,v_type,v_slug,v_status,p_input->'data');
   else
-    update public.collection_entries set status='published',data=p_input->'data',updated_at=clock_timestamp() where id=v_current.id;
+    update public.collection_entries set status=v_status,data=p_input->'data',updated_at=clock_timestamp() where id=v_current.id;
   end if;
   v_receipt := public.record_outside_write_receipt(jsonb_build_object(
     'commandKey',v_key,'tenantId',v_tenant,'workspaceId',v_workspace,'systemId',p_input->>'systemId',
-    'provider','strelva_content','writeKind','content_publish','subject','Published '||v_type||': '||v_slug,
-    'request',jsonb_build_object('type',v_type,'slug',v_slug,'data',p_input->'data','draftHash',p_input->>'draftHash','approvalRef',p_input->>'eventId'),
+    'provider','strelva_content','writeKind','content_publish','subject',case when v_status='published' then 'Published ' else 'Unpublished ' end||v_type||': '||v_slug,
+    'request',jsonb_build_object('type',v_type,'slug',v_slug,'data',p_input->'data','status',v_status,'draftHash',p_input->>'draftHash','approvalRef',p_input->>'eventId'),
     'beforeState',v_baseline,'acceptance','accepted','providerRef','/api/v1/collections/'||v_tenant||'/'||v_type||'/'||v_slug,
     'readback','matched','readbackDetail','Published collection snapshot saved in the website content store. Live site rendering has not been checked.',
-    'undo','not_available','undoLabel','Prepare a new approval to restore the prior entry.','actor',p_input->>'actor'));
+    'undo','not_available','undoLabel','Restore or unpublish through a new approval.','actor',p_input->>'actor'));
   return jsonb_build_object('receiptId',v_receipt->>'id','verified',true);
 end; $$;
 

@@ -42,10 +42,13 @@ export interface ListingContext {
   client: GoogleListingClient;
   receipts: ListingReceiptStore;
   /** SSRF guard for URLs Google will fetch. Defaults to the audit check. */
+  onWriteAccepted?: () => Promise<void>;
+  onWriteUnconfirmed?: () => Promise<void>;
   checkUrl?: (url: string) => Promise<void>;
 }
 
 export type ListingWriteOutcome =
+  | { status: "write_unconfirmed"; receipt: ListingReceipt; message: string }
   | { status: "posted" | "posted_unverified" | "held_by_google"; receipt: ListingReceipt; message: string }
   | { status: "failed"; receipt: ListingReceipt; message: string; accessPending: boolean }
   | { status: "refused"; reason: ListingRefusal; message: string };
@@ -90,7 +93,7 @@ export function receiptHeadline(receipt: Pick<ListingReceipt, "status" | "action
   if (receipt.status === "undone") return "Strelva undid this change on Google.";
   if (receipt.status === "posted_unverified") return "Posted. Google hasn't shown it yet.";
   if (receipt.status === "held_by_google") return "Google is reviewing this change.";
-  if (receipt.status === "posting") return "Sending to Google.";
+  if (receipt.status === "posting") return "Google write in progress or unconfirmed. Check Google before trying again; Strelva will not repeat it.";
   switch (receipt.action) {
     case "reply_post": return `Strelva replied to ${who} on Google.`;
     case "reply_update": return `Strelva updated the reply to ${who} on Google.`;
@@ -137,14 +140,20 @@ async function governedWrite<T>(ctx: ListingContext, plan: WritePlan<T>): Promis
   if (replayed) {
     // An earlier attempt stopped mid-way. Google may or may not have it; we
     // never send it again. Record what is known and let a person decide.
-    const settled = await ctx.receipts.settle(receipt.id, ctx.workspaceId, {
-      status: "failed", error: "An earlier attempt did not finish. Nothing was sent again; check Google before retrying.",
-    });
-    return { status: "failed", receipt: settled, message: receiptHeadline(settled), accessPending: false };
+    return { status: "write_unconfirmed", receipt, message: receiptHeadline(receipt) };
   }
 
-  const written = await plan.write();
+  let written: GoogleResult<T>;
+  try { written = await plan.write(); }
+  catch {
+    await ctx.onWriteUnconfirmed?.();
+    return { status: "write_unconfirmed", receipt, message: receiptHeadline(receipt) };
+  }
   if (!written.ok) {
+    if (written.status === 0 || written.status >= 500) {
+      await ctx.onWriteUnconfirmed?.();
+      return { status: "write_unconfirmed", receipt, message: receiptHeadline(receipt) };
+    }
     const accessPending = written.kind === "setup_pending";
     const settled = await ctx.receipts.settle(receipt.id, ctx.workspaceId, {
       status: "failed",
@@ -157,6 +166,7 @@ async function governedWrite<T>(ctx: ListingContext, plan: WritePlan<T>): Promis
     };
   }
 
+  await ctx.onWriteAccepted?.();
   // Google took it. From here the approval is done and nothing is retried.
   let readback: Awaited<ReturnType<WritePlan<T>["verify"]>>;
   try {
@@ -368,7 +378,7 @@ export async function undoListingChange(ctx: ListingContext, input: {
   const paused = checkRefusal(ctx);
   if (paused) return paused;
   const original = await ctx.receipts.get(input.receiptId, ctx.workspaceId);
-  if (!original || !original.undo || !["posted", "posted_unverified", "held_by_google"].includes(original.status)) return refused("not_undoable");
+  if (!original || original.locationId !== ctx.location.locationId || original.bindingId !== ctx.bindingId || !original.undo || !["posted", "posted_unverified", "held_by_google"].includes(original.status)) return refused("not_undoable");
   const undo = original.undo;
   const common = { targetRef: original.targetRef, authority: input.authority, undoesReceiptId: original.id, idempotencyKey: `undo:${original.id}` };
   switch (undo.kind) {

@@ -20,12 +20,12 @@ describe("record changes and Google policy", () => {
   it("default policy creates separate approvals per location and never writes", async () => {
     const d = deps(); const result = await changeRecordWithGoogle(actor, workspaceId, 1, patch, { source: "owner", commandId }, d);
     expect(result.google.map(effect => effect.status)).toEqual(["needs_approval", "needs_approval"]);
-    expect(d.prepare).toHaveBeenCalledWith(actor, { workspaceId, tenantId: "mooney", locationId: "second", kind: "info", commandId });
+    expect(d.prepare).toHaveBeenCalledWith(actor, { workspaceId, tenantId: "mooney", locationId: "second", kind: "info", commandId, expectedRecordRevision: 2 });
     expect(d.approve).not.toHaveBeenCalled();
   });
   it("activated policy approves the exact drafts and retains the saved record after partial Google failure", async () => {
     const d = deps(); d.policy = vi.fn(async () => true); d.approve = vi.fn().mockResolvedValueOnce({ changed: true }).mockResolvedValueOnce({ changed: false, reason: "Google access pending" });
-    const result = await changeRecordWithGoogle(actor, workspaceId, 1, patch, { source: "owner", commandId }, d);
+    const result = await changeRecordWithGoogle(actor, workspaceId, 1, patch, { source: "owner", commandId, googleApprovalDisclosed: true }, d);
     expect(result.record).toEqual(saved); expect(result.google.map(effect => effect.status)).toEqual(["posted", "failed"]);
     expect(d.approve).toHaveBeenCalledWith("mooney", "draft", actor.userId);
   });

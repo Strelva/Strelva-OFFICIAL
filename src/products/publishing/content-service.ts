@@ -14,7 +14,7 @@ export const COLLECTION_PUBLISH = "workspace_collection_publish";
 export const NEWSLETTER_ISSUE = "workspace_newsletter_issue";
 const collectionType = z.enum(["blog", "video", "product"]);
 export const contentDraftSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("collection"), type: collectionType, slug: z.string().regex(/^[a-z0-9-]{1,80}$/).optional(), data: z.record(z.string(), z.unknown()) }).strict(),
+  z.object({ kind: z.literal("collection"), type: collectionType, slug: z.string().regex(/^[a-z0-9-]{1,80}$/).optional(), status: z.enum(["draft", "published"]).optional(), data: z.record(z.string(), z.unknown()) }).strict(),
   z.object({ kind: z.literal("newsletter"), subject: z.string().trim().min(1).max(200), body: z.string().trim().min(1).max(12000) }).strict(),
 ]);
 export type ContentDraft = z.infer<typeof contentDraftSchema>;
@@ -63,8 +63,8 @@ export async function prepareContentDraft(target: ContentTarget, raw: unknown, p
     const slug = draft.slug ?? String(data[COLLECTION_TYPES[draft.type].titleField]).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
     z.string().regex(/^[a-z0-9-]{1,80}$/).parse(slug);
     const before = contentBaseline(await ports.entry(target.tenantId, draft.type, slug));
-    payload = { type: draft.type, slug, data, before, baselineHash: contentFingerprint(before) };
-    title = `Publish ${COLLECTION_TYPES[draft.type].label.toLowerCase()}: ${String(data[COLLECTION_TYPES[draft.type].titleField]).slice(0, 160)}`;
+    payload = { type: draft.type, slug, data, before, baselineHash: contentFingerprint(before), ...(draft.status ? { status: draft.status } : {}) };
+    title = `${draft.status === "draft" ? "Unpublish" : "Publish"} ${COLLECTION_TYPES[draft.type].label.toLowerCase()}: ${String(data[COLLECTION_TYPES[draft.type].titleField]).slice(0, 160)}`;
     body = JSON.stringify(data, null, 2);
   } else {
     payload = { subject: draft.subject, body: draft.body };
@@ -96,13 +96,13 @@ export async function executePublishingEvent(input: { tenantId: string; event: U
       const result = await ports.approveIssue({ ...shared, ...draft });
       return { accepted: true, reason: "newsletter_sending_paused", ...result };
     }
-    const parsed = z.object({ type: collectionType, slug: z.string().regex(/^[a-z0-9-]{1,80}$/), data: z.record(z.string(), z.unknown()), before: z.unknown(), baselineHash: z.string() }).parse(publishing);
+    const parsed = z.object({ type: collectionType, slug: z.string().regex(/^[a-z0-9-]{1,80}$/), data: z.record(z.string(), z.unknown()), before: z.unknown(), baselineHash: z.string(), status: z.enum(["draft", "published"]).optional() }).parse(publishing);
     const data = validateEntryData(parsed.type, parsed.data);
     if (!data.success) return { accepted: false, reason: "publishing_invalid" };
     // SQL also compares the baseline under a transaction lock. This read makes
     // stale failures legible; it is never the race protection on its own.
     const current = contentBaseline(await ports.entry(input.tenantId, parsed.type, parsed.slug));
-    if (contentFingerprint(current) !== parsed.baselineHash && contentFingerprint(current) !== contentFingerprint({ status: "published", data: data.data })) return { accepted: false, reason: "publishing_stale" };
+    if (contentFingerprint(current) !== parsed.baselineHash && contentFingerprint(current) !== contentFingerprint({ status: parsed.status ?? "published", data: data.data })) return { accepted: false, reason: "publishing_stale" };
     const result = await ports.publish({ ...shared, ...parsed, data: data.data });
     return { accepted: true, ...result };
   } catch { return { accepted: false, reason: "publishing_storage_unconfirmed" }; }
@@ -132,4 +132,14 @@ async function readCollectionReceipts(target: ContentTarget): Promise<unknown[]>
   const { data, error } = await (db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> }).rpc("read_workspace_collection_receipts", { p_workspace_id: target.workspaceId, p_tenant_id: target.tenantId, p_system_id: target.systemId });
   if (error || !Array.isArray(data)) throw new Error("Publishing receipts could not be loaded.");
   return data;
+}
+
+/** Undo is a fresh, baseline-bound owner approval. Existing published content
+ * stays live while a restore is reviewed; a first publication can be unpublished. */
+export async function prepareContentRestore(target: ContentTarget, receiptId: string): Promise<UnifiedEvent> {
+  const receipt = z.object({ id: z.string().uuid(), request: z.object({ type: collectionType, slug: z.string(), data: z.record(z.string(), z.unknown()) }),
+    beforeState: z.object({ status: z.enum(["draft", "published"]), data: z.record(z.string(), z.unknown()) }).nullable() }).parse(
+      (await readCollectionReceipts(target)).find(row => (row as { id?: string }).id === receiptId));
+  return prepareContentDraft(target, { kind: "collection", type: receipt.request.type, slug: receipt.request.slug,
+    data: receipt.beforeState?.data ?? receipt.request.data, status: receipt.beforeState?.status ?? "draft" });
 }

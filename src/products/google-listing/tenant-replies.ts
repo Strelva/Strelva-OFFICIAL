@@ -4,6 +4,7 @@ import type { ListingAuthority, ListingReceipt } from "./contracts";
 import { GBP_MANAGE_SCOPE } from "./health";
 import type { ListingReceiptStore } from "./receipts";
 import { postReviewReply } from "./service";
+import { paceGoogleWrites } from "./pacing";
 
 /**
  * A tenant's approved review reply, posted through the Google listing System.
@@ -23,6 +24,7 @@ import { postReviewReply } from "./service";
 export type TenantReplyRoute = { kind: "legacy"; reason: "release_off" | "unlinked" | "link_unreadable" } | { kind: "listing"; workspaceId: string };
 
 export type TenantReplyResult =
+  | { status: "write_unconfirmed"; reason: string; receipt: ListingReceipt }
   /** Google took it and it read back. */
   | { status: "posted"; receipt: ListingReceipt }
   /** Google took it; the read-back failed or Google holds it for review. Done; never retried. */
@@ -41,6 +43,7 @@ export interface TenantReplyDeps {
   location(tenantId: string, grant: GoogleGrant): Promise<GoogleLocationRef | null>;
   accessToken(grant: GoogleGrant): Promise<string | null>;
   client(accessToken: string): GoogleListingClient;
+  pace?(client: GoogleListingClient, workspaceId: string, locationId: string): GoogleListingClient;
   receipts(): ListingReceiptStore;
   notify(text: string): void;
   control?(workspaceId: string, locationId: string): Promise<{ paused: boolean }>;
@@ -94,7 +97,8 @@ export async function postTenantReviewReply(input: {
 
   // Track whether Google took the reply, so a failure after acceptance is
   // never reported as "nothing sent".
-  const base = deps.client(token);
+  const rawClient = deps.client(token);
+  const base = deps.pace ? deps.pace(rawClient, input.workspaceId, locationId) : rawClient;
   let accepted = false;
   const client: GoogleListingClient = {
     ...base,
@@ -111,6 +115,8 @@ export async function postTenantReviewReply(input: {
       location: { accountId: located.accountId, locationId },
       lifecycle: control?.paused ? "paused" : "live",
       client,
+      onWriteAccepted: async () => (await (await import("@/platform/infra/tenant-publishing")).tenantPublishingPorts()).markExecutionExternalAccepted(input.eventId),
+      onWriteUnconfirmed: async () => (await (await import("@/platform/infra/tenant-publishing")).tenantPublishingPorts()).markExecutionExternalUnconfirmed(input.eventId),
       receipts: deps.receipts(),
     }, {
       reviewId: input.reviewId,
@@ -118,6 +124,7 @@ export async function postTenantReviewReply(input: {
       authority: input.authority,
       idempotencyKey: `review-reply:${input.eventId}:${input.attemptId}`.slice(0, 256),
     });
+    if (outcome.status === "write_unconfirmed") return { status: "write_unconfirmed", reason: outcome.message, receipt: outcome.receipt };
     if (outcome.status === "refused") {
       if (outcome.reason === "api_access_pending") {
         await deps.noteAccess?.(input.workspaceId, locationId, true);
@@ -158,11 +165,15 @@ export async function defaultTenantReplyDeps(): Promise<TenantReplyDeps> {
   ]);
   return {
     releaseEnabled: () => publishingReleaseEnabled(),
-    bindingTarget: (tenantId) => bindings.readBindingTarget(tenantId),
+    bindingTarget: async (tenantId) => {
+      const { tenantReleaseFlagEnabled } = await import("@/platform/release-flags/store");
+      return await tenantReleaseFlagEnabled("publishing", tenantId) ? bindings.readBindingTarget(tenantId) : null;
+    },
     grant: (tenantId) => access.getGoogleGrant(tenantId),
     location: (tenantId, grant) => access.getGoogleLocation(tenantId, grant),
     accessToken: (grant) => access.getValidGoogleAccessToken(grant),
     client: (token) => createHttpGoogleListingClient(token),
+    pace: (client, workspaceId, locationId) => paceGoogleWrites(client, workspaceId, locationId),
     receipts: () => createSupabaseReceiptStore(),
     control: async (workspaceId, locationId) => (await import("./controls")).readListingControl(workspaceId, locationId),
     noteAccess: async (workspaceId, locationId, pending) => (await import("./controls")).noteListingAccess(workspaceId, locationId, pending),

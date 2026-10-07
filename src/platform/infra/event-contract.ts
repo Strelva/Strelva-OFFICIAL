@@ -14,7 +14,7 @@ export interface UnifiedEvent {
       // event may not have resolved (lost lock / Redis blip). It is a BLOCKING
       // state — claimEventAction refuses to re-grant so a retry can't duplicate
       // the write; an operator reconciles instead.
-      state: "processing" | "external_accepted" | "completed" | "failed";
+      state: "processing" | "external_accepted" | "external_unconfirmed" | "completed" | "failed";
       action: "approved" | "dismissed";
       actor: string;
       attemptId: string;

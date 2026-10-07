@@ -3,7 +3,7 @@ import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
 import { publishingEnabledForWorkspace } from "@/products/publishing/server";
 import { contentTarget } from "@/products/publishing/server";
-import { prepareContentDraft, readContentWorkspace } from "@/products/publishing/server";
+import { prepareContentDraft, readContentWorkspace, prepareContentRestore } from "@/products/publishing/server";
 import { getEventRaw } from "@/lib/events";
 import { resolveEventAction } from "@/lib/event-actions";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
@@ -11,7 +11,7 @@ import { workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWrite
 
 export const dynamic = "force-dynamic";
 const scopeSchema = z.object({ workspaceId: z.string().uuid(), systemId: z.string().uuid() });
-const commandSchema = scopeSchema.extend({ action: z.enum(["compose", "approve", "not_yet"]), draft: z.unknown().optional(), eventId: z.string().max(120).optional() }).strict();
+const commandSchema = scopeSchema.extend({ action: z.enum(["compose", "restore", "approve", "not_yet"]), draft: z.unknown().optional(), eventId: z.string().max(120).optional(), receiptId: z.string().uuid().optional() }).strict();
 async function context(scope: z.infer<typeof scopeSchema>, write = false) {
   const actor = await workspaceHttpActor();
   if (!actor) return { error: workspaceJson({ error: "Sign in with a confirmed email to continue." }, 401) } as const;
@@ -35,6 +35,7 @@ export async function POST(request: Request) {
     const command = commandSchema.parse(await readWorkspaceBody(request, 24000));
     const ctx = await context(command, true); if (ctx.error) return ctx.error;
     if (command.action === "compose") return workspaceJson({ draft: await prepareContentDraft(ctx.target, command.draft) }, 201);
+    if (command.action === "restore") return workspaceJson({ draft: await prepareContentRestore(ctx.target, z.string().uuid().parse(command.receiptId)) }, 201);
     if (!ctx.target.canApprove) return workspaceJson({ error: "This issue needs the business owner's approval." }, 403);
     const event = command.eventId ? await getEventRaw(command.eventId) : null;
     if (!event || event.tenantId !== ctx.target.tenantId || event.metadata?.businessId !== command.workspaceId || event.metadata?.systemId !== command.systemId) return workspaceJson({ error: "This draft is unavailable here." }, 404);

@@ -24,3 +24,23 @@ export async function contentTarget(actor: WorkspaceActor, workspaceId: string, 
   if (write && (!canCompose || stopped || paused)) throw new WorkspaceConflictError("Publishing is paused or unavailable to your account.");
   return { actor, workspaceId, systemId, tenantId: item.references.tenantId, kind: item.system.kind as ContentTarget["kind"], canCompose: canCompose && !stopped && !paused, canApprove: canApprove && !stopped && !paused, paused };
 }
+
+/** A tenant authoring tool keeps its legacy draft path unless this business
+ * opted in. Once opted in, revisions stay proposals and cannot unpublish the
+ * current entry while Strelva is merely preparing words for the owner. */
+export async function prepareTenantCollectionDraft(input: { tenantId: string; actor: WorkspaceActor | null; draft: unknown }): Promise<{ eventId: string; slug: string } | null> {
+  const { tenantReleaseFlagEnabled } = await import("@/platform/release-flags/store");
+  const { releaseFlagMayBeOn } = await import("@/platform/release-flags/resolve");
+  if (!releaseFlagMayBeOn("publishing") || !(await tenantReleaseFlagEnabled("publishing", input.tenantId))) return null;
+  if (!input.actor) throw new WorkspaceAccessError("A verified business member must prepare this publishing draft.");
+  const { readBindingTarget } = await import("@/platform/account-bindings/store");
+  const link = await readBindingTarget(input.tenantId);
+  if (!link) throw new WorkspaceAccessError("This site is not linked to a business.");
+  const base = await listBusinessSystems(input.actor, link.workspaceId, { store: createSupabaseSystemStore() });
+  const website = base.systems.find(item => item.system.kind === "website" && item.references.tenantId === input.tenantId);
+  if (!website) throw new WorkspaceAccessError("This website System is unavailable.");
+  const target = await contentTarget(input.actor, link.workspaceId, website.system.id, true);
+  const { prepareContentDraft } = await import("./content-service");
+  const event = await prepareContentDraft(target, input.draft);
+  return { eventId: event.id, slug: String((event.metadata?.publishing as { slug: string }).slug) };
+}

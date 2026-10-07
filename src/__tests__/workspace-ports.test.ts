@@ -44,7 +44,7 @@ describe("workspace ports", () => {
       businessBilling: ["businessBillingCheckoutMetadata"],
       inquiries: ["isInquiryMessageReviewEvent", "authorizeInquiryMessageReviewActor", "executeInquiryMessageReview", "reconcileInquiryMessageReview", "executeInquiryPublication"],
       tenantReviewReplies: ["defaultTenantReplyDeps", "routeTenantReviewReply", "postTenantReviewReply"],
-      publishingContent: ["executePublishingEvent"],
+      publishingContent: ["executePublishingEvent", "authorizePublishingEvent", "prepareTenantCollectionDraft"],
       websites: ["websiteRebuildReleaseMayBeOn", "websiteRebuildReleasedFor", "websiteDocumentStore", "readWebsiteRebuild", "readSiteNodes", "patchWebsiteRebuild"],
     };
     expect(Object.keys(ports).sort()).toEqual(Object.keys(expected).sort());

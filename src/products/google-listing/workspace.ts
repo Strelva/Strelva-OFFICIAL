@@ -1,3 +1,4 @@
+import { paceGoogleWrites } from "./pacing";
 import { z } from "zod";
 import { tenantPublishingPorts } from "@/platform/infra/tenant-publishing";
 import type { UnifiedEvent } from "@/platform/infra/event-contract";
@@ -37,6 +38,7 @@ export async function prepareGoogleListingDraft(actor: WorkspaceActor, raw: z.in
   if (!binding) throw new Error("This Google listing does not belong to this website.");
   if ((await readListingControl(input.workspaceId, input.locationId)).paused) throw new Error("The Google listing is paused.");
   const record = await readBusinessRecord(actor, input.workspaceId);
+  if (input.expectedRecordRevision !== undefined && record.revision !== input.expectedRecordRevision) throw new Error("Your record changed before this Google draft could be prepared. Nothing was approved on Google.");
   let draft: z.infer<typeof draftSchema>;
   if (input.kind === "post") draft = { action: "post", post: postInputSchema.parse(input.post) };
   else if (input.kind === "hours") draft = { action: "hours", hours: factValueSchemas.hours.parse(record.facts.hours?.value) };
@@ -87,7 +89,7 @@ export async function tenantListingContext(tenantId: string, workspaceId: string
   const control = await readListingControl(workspaceId, locationId);
   const token = await deps.accessToken(grant);
   if (!token) throw new Error("Reconnect Google to continue.");
-  return { workspaceId, bindingId: grant.bindingId ?? null, lifecycle: control.paused ? "paused" : "live", location: { accountId: location.accountId, locationId }, client: deps.client(token), receipts: deps.receipts() };
+  return { workspaceId, bindingId: grant.bindingId ?? null, lifecycle: control.paused ? "paused" : "live", location: { accountId: location.accountId, locationId }, client: paceGoogleWrites(deps.client(token), workspaceId, locationId), receipts: deps.receipts() };
 }
 
 export type GoogleExecutionResult = { accepted: boolean; verified?: boolean; receiptId?: string; reason?: string };
@@ -106,6 +108,8 @@ export async function executeGoogleListingEvent(input: { tenantId: string; event
     if (error || data !== true) return { accepted: false, reason: "Your business details changed. Prepare a fresh Google draft." };
   }
   const ctx = await tenantListingContext(input.tenantId, metadata.workspaceId, metadata.locationId);
+  ctx.onWriteAccepted = async () => (await tenantPublishingPorts()).markExecutionExternalAccepted(input.event.id);
+  ctx.onWriteUnconfirmed = async () => (await tenantPublishingPorts()).markExecutionExternalUnconfirmed(input.event.id);
   let accepted = false;
   const base = ctx.client;
   ctx.client = { ...base, patchLocation: async (...args) => { const result = await base.patchLocation(...args); if (result.ok) accepted = true; return result; }, createPost: async (...args) => { const result = await base.createPost(...args); if (result.ok) accepted = true; return result; } };
@@ -114,6 +118,7 @@ export async function executeGoogleListingEvent(input: { tenantId: string; event
     const idempotencyKey = `google-draft:${input.event.id}:${input.attemptId}`;
     const draft = metadata.draft;
     const outcome = draft.action === "hours" ? await syncHoursFromRecord(ctx, { hours: draft.hours, authority, idempotencyKey }) : draft.action === "info" ? await syncInfoFromRecord(ctx, { record: draft.record, authority, idempotencyKey }) : await createListingPost(ctx, { post: draft.post, authority, idempotencyKey });
+    if (outcome.status === "write_unconfirmed") return { accepted: false, reason: "google_write_unconfirmed", receiptId: outcome.receipt.id };
     if (outcome.status === "refused" && outcome.reason === "nothing_to_change") return { accepted: true, verified: true, reason: "already_on_google" };
     await noteListingAccess(ctx.workspaceId, ctx.location.locationId, outcome.status === "failed" ? outcome.accessPending : outcome.status === "refused" && outcome.reason === "api_access_pending");
     if (outcome.status === "refused") return { accepted: false, reason: outcome.reason };
@@ -147,5 +152,10 @@ export async function changeWorkspaceGoogleReply(actor: WorkspaceActor, input: {
   if (!(await publishingEnabledForWorkspace(input.workspaceId, actor)) || !(await readLinkedSite(actor, input.workspaceId, input.tenantId)) || !(await hasTenantPermission(input.tenantId, "publishing:manage"))) throw new Error("Only an authorized owner can change a Google reply.");
   const ctx = await tenantListingContext(input.tenantId, input.workspaceId, input.locationId);
   const authority = { kind: "owner_approval" as const, actor: actor.userId };
-  return input.withdraw ? withdrawReviewReply(ctx, { reviewId: input.reviewId, authority }) : postReviewReply(ctx, { reviewId: input.reviewId, text: input.text ?? "", authority });
+  const outcome = await (input.withdraw ? withdrawReviewReply(ctx, { reviewId: input.reviewId, authority }) : postReviewReply(ctx, { reviewId: input.reviewId, text: input.text ?? "", authority }));
+  if (["posted", "posted_unverified", "held_by_google"].includes(outcome.status)) {
+    try { await (await tenantPublishingPorts()).mirrorPublishedReviewReply(input.tenantId, input.reviewId, input.withdraw ? null : input.text ?? ""); }
+    catch { outcome.message += " Google accepted it; the workspace review copy needs reconciliation."; }
+  }
+  return outcome;
 }

@@ -144,8 +144,7 @@ export function addPublishingSystems(base: BusinessSystems, rawSnapshot: Publish
     if (website && (binding.scopes === null || binding.scopes.includes(GSC_READ_SCOPE) || binding.scopes.includes(GA4_READ_SCOPE))) {
       connections.push({ provenance: "existing", connection: connection(website.system, "read", target, bindingState(binding.status), "Search Console and Analytics from Google") });
     }
-    const location = binding.locations.find((item) => item.isPrimary) ?? binding.locations[0];
-    if (!location) continue;
+    for (const location of binding.locations) {
     const listingSystem = system(businessId, { kind: "google_location", ref: `${binding.id}:${location.locationId}` }, {
       name: location.title ?? (website ? `${website.system.name} on Google` : "Google listing"),
       kind: "listing", lifecycle: snapshot.controls?.find((control) => control.locationId === location.locationId)?.paused ? "paused" : "live", createdAt: binding.createdAt, updatedAt: binding.updatedAt,
@@ -172,6 +171,7 @@ export function addPublishingSystems(base: BusinessSystems, rawSnapshot: Publish
         createdAt: receipt.createdAt, targetRef: receipt.targetRef, error: receipt.error,
       })),
     });
+    }
   }
 
   for (const [stableId, website] of websitesByTenant) {

@@ -98,3 +98,7 @@ export const executePublishingEvent = async (...args: Parameters<typeof import("
 export { recordGoogleApprovalCopy } from "./record-changes";
 export * from "./reconnect";
 export { reconnectPage } from "./reconnect-page";
+
+export const prepareContentRestore = async (...args: Parameters<typeof import("./content-service").prepareContentRestore>) => (await import("./content-service")).prepareContentRestore(...args);
+
+export const prepareTenantCollectionDraft = async (...args: Parameters<typeof import("./content-server").prepareTenantCollectionDraft>) => (await import("./content-server")).prepareTenantCollectionDraft(...args);

@@ -92,6 +92,7 @@ export function WorkspaceBusinessDetails({ workspaceId, state, result, field, ac
               <form action={action} className="grid gap-4">
                 <input type="hidden" name="workspaceId" value={workspaceId} />
                 <input type="hidden" name="revision" value={data.record.revision} />
+                {data.googleApprovalCopy ? <input type="hidden" name="googleApprovalDisclosed" value="1" /> : null}
                 <Field name="display_name" value={detailText(data.record, "display_name")} readOnly={readOnly} />
                 <Field name="phone" type="tel" value={detailText(data.record, "phone")} readOnly={readOnly} />
                 <Field name="email" type="email" value={detailText(data.record, "email")} readOnly={readOnly} />

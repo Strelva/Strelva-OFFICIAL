@@ -51,7 +51,7 @@ export interface GoogleListingClient {
  * not enabled is "access pending", not a failure the owner must fix. */
 export function classifyGoogleFailure(status: number, body: string): GoogleFailureKind {
   const lower = body.toLowerCase();
-  if ((status === 403 || status === 429) && ["accessnotconfigured", "service_disabled", "has not been used in project", "business profile api", "quota"].some((needle) => lower.includes(needle))) {
+  if ((status === 403 || status === 429) && ["accessnotconfigured", "service_disabled", "has not been used in project", "quota limit: 0", "limit of 0", "quota of 0", "quota is 0"].some((needle) => lower.includes(needle))) {
     return "setup_pending";
   }
   if (status === 429 || lower.includes("resource_exhausted")) return "rate_limited";

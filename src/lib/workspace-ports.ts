@@ -240,6 +240,9 @@ export interface WebsitesPort {
 }
 
 export interface PublishingContentPort {
+  authorizePublishingEvent(input: { tenantId: string; event: UnifiedEvent; actorId: string }): Promise<{ allowed: boolean; reason?: string }>;
+  prepareTenantCollectionDraft(input: { tenantId: string; actor: VerifiedActor | null; draft: unknown }): Promise<{ eventId: string; slug: string } | null>;
+
   executePublishingEvent(input: { tenantId: string; event: UnifiedEvent; actorId: string; attemptId: string }): Promise<null | { accepted: boolean; reason?: string; receiptId?: string; verified?: boolean }>;
 }
 

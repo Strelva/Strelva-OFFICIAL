@@ -125,4 +125,4 @@ export const listingControlSchema = z.object({
 });
 export type ListingControl = z.infer<typeof listingControlSchema>;
 
-export const googleDraftInputSchema = z.object({ workspaceId: z.string().uuid(), tenantId: z.string().min(1).max(120), locationId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/), kind: z.enum(["hours", "info", "post"]), post: postInputSchema.optional(), commandId: z.string().uuid().optional() }).strict();
+export const googleDraftInputSchema = z.object({ workspaceId: z.string().uuid(), tenantId: z.string().min(1).max(120), locationId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/), kind: z.enum(["hours", "info", "post"]), post: postInputSchema.optional(), commandId: z.string().uuid().optional(), expectedRecordRevision: z.number().int().nonnegative().optional() }).strict();

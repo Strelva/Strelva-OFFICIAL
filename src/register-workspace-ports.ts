@@ -12,6 +12,8 @@ const ports: WorkspacePorts = workspacePortLoaders;
 registerWorkspacePorts(ports);
 
 registerTenantPublishingPorts(async () => ({
+  markExecutionExternalAccepted: async (...args) => (await import("@/lib/events")).markExecutionExternalAccepted(...args),
+  markExecutionExternalUnconfirmed: async (...args) => (await import("@/lib/events")).markExecutionExternalUnconfirmed(...args),
   addEvent: async (...args) => (await import("@/lib/events")).addEvent(...args),
   getEventRaw: async (...args) => (await import("@/lib/events")).getEventRaw(...args),
   getEvents: async (...args) => (await import("@/lib/events")).getEvents(...args),
@@ -19,5 +21,6 @@ registerTenantPublishingPorts(async () => ({
   getEntry: async (...args) => (await import("@/lib/cms/collections-service")).getEntry(...args),
   listEntriesForType: async (...args) => (await import("@/lib/cms/collections-service")).listEntriesForType(...args),
   resolveEventAction: async (...args) => (await import("@/lib/event-actions")).resolveEventAction(...args),
+  mirrorPublishedReviewReply: async (...args) => (await import("@/lib/reviews")).mirrorPublishedReviewReply(...args),
   recordGoogleConnection: async (...args) => (await import("@/lib/google-access")).recordGoogleConnection(...args),
 }));

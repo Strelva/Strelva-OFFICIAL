@@ -10,22 +10,22 @@ export interface ContentWorkspaceData {
   content: { entries: Array<{ type: string; entries: Entry[] }>; drafts: Draft[]; outputs: Issue[]; receipts?: Array<{ id: string; subject: string; createdAt: string; providerRef: string | null; request: Record<string, unknown>; beforeState: unknown; actor: string; readbackDetail: string | null; undoLabel: string }>; sendingEnabled: false };
   permissions: { canCompose: boolean; canApprove: boolean };
 }
-export function ContentWorkspace({ workspaceId, systemId, kind, readOnly = false, initial }: { workspaceId: string; systemId: string; kind: "website" | "newsletter"; readOnly?: boolean; initial?: ContentWorkspaceData }) {
+export function ContentWorkspace({ workspaceId, systemId, kind, readOnly = false, initial, request = fetch }: { workspaceId: string; systemId: string; kind: "website" | "newsletter"; readOnly?: boolean; initial?: ContentWorkspaceData; request?: typeof fetch }) {
   const [loaded, setLoaded] = useState(initial); const [loading, setLoading] = useState(!initial); const [error, setError] = useState(""); const [busy, setBusy] = useState(false);
   const [type, setType] = useState("blog"); const [slug, setSlug] = useState(""); const [fields, setFields] = useState<Record<string, string>>({}); const [composing, setComposing] = useState(false);
   const [message, setMessage] = useState("");
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/workspace/publishing/content?${new URLSearchParams({ workspaceId, systemId })}`, { cache: "no-store" });
+      const response = await request(`/api/workspace/publishing/content?${new URLSearchParams({ workspaceId, systemId })}`, { cache: "no-store" });
       const data = await response.json(); if (!response.ok) throw new Error(data.error || "Publishing could not be loaded.");
       setLoaded(data); setError("");
     } catch (e) { setError(e instanceof Error ? e.message : "Publishing could not be loaded."); }
     finally { setLoading(false); }
-  }, [workspaceId, systemId]);
+  }, [workspaceId, systemId, request]);
   useEffect(() => { if (!initial) void load(); }, [initial, load]);
   const canCompose = !readOnly && loaded?.permissions.canCompose; const canApprove = !readOnly && loaded?.permissions.canApprove;
-  async function command(action: "compose" | "approve" | "not_yet", eventId?: string) {
+  async function command(action: "compose" | "restore" | "approve" | "not_yet", eventId?: string, receiptId?: string) {
     setBusy(true); setError(""); setMessage("");
     try {
       let draft: unknown;
@@ -39,9 +39,9 @@ export function ContentWorkspace({ workspaceId, systemId, kind, readOnly = false
           draft = { kind: "collection", type, ...(slug ? { slug } : {}), data };
         }
       }
-      const response = await fetch("/api/workspace/publishing/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, systemId, action, ...(draft ? { draft } : {}), ...(eventId ? { eventId } : {}) }) });
+      const response = await request("/api/workspace/publishing/content", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, systemId, action, ...(draft ? { draft } : {}), ...(eventId ? { eventId } : {}), ...(receiptId ? { receiptId } : {}) }) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error || data.result?.reason || "This change could not be confirmed. Reload before trying again.");
-      if (action === "compose") { setComposing(false); setFields({}); setSlug(""); setMessage("Saved for the owner's review. Nothing has been published or sent."); }
+      if (action === "compose" || action === "restore") { setComposing(false); setFields({}); setSlug(""); setMessage("Saved for the owner's review. Nothing has been published or sent."); }
       else setMessage(kind === "newsletter" && action === "approve" ? "Issue approved. Sending is paused; no email was sent." : action === "not_yet" ? "Draft declined. Nothing changed." : "Published to your website's content store. Check your site to confirm how it appears.");
       await load();
     } catch (e) { setError(e instanceof Error ? e.message : "This change could not be confirmed."); }
@@ -69,7 +69,7 @@ export function ContentWorkspace({ workspaceId, systemId, kind, readOnly = false
     </form> : null}
     {loaded?.content.entries.map(group => group.entries.length ? <div key={group.type}><h3 className="text-sm font-semibold">{group.type === "blog" ? "Blog posts" : group.type === "video" ? "Videos" : "Product catalog"}</h3><ul className="mt-2 grid gap-3">{group.entries.map(entry => <li key={entry.slug} className="text-sm"><span>{String(entry.data.title || entry.data.name || entry.slug)} · {entry.status}</span>{canCompose ? <Button variant="ghost" onClick={() => { setType(group.type); setSlug(entry.slug); setFields(Object.fromEntries(Object.entries(entry.data).map(([key, value]) => [key, key === "priceCents" ? String(Number(value) / 100) : Array.isArray(value) ? value.join(key === "images" ? "\n" : ", ") : String(value)]))); if (entry.data.priceCents !== undefined) setFields(old => ({ ...old, price: String(Number(entry.data.priceCents) / 100) })); setComposing(true); }}>Draft revision</Button> : null}</li>)}</ul></div> : null)}
     {loaded?.content.drafts.filter(draft => draft.status === "pending" || draft.status === "dismissed").map(draft => <article key={draft.id} className="grid gap-2 border-t border-gray-border pt-4"><h3 className="text-sm font-semibold">{draft.title}</h3><p className="text-sm text-gray-muted">{draft.status === "pending" ? "Needs approval" : draft.status === "dismissed" ? "Declined" : kind === "newsletter" ? "Approved · sending paused" : "Approved · published to the content store"}</p><details><summary className="cursor-pointer text-sm">Review exact content</summary><div className="mt-2 whitespace-pre-wrap break-words text-sm">{kind === "newsletter" ? draft.body : Object.entries((draft.metadata?.publishing?.data || {}) as Record<string, unknown>).map(([key, value]) => <p key={key}><strong>{key}: </strong>{Array.isArray(value) ? value.join(", ") : String(value)}</p>)}</div></details>{canApprove && draft.status === "pending" ? <div className="flex flex-wrap gap-2"><Button disabled={busy} onClick={() => void command("approve", draft.id)}>{kind === "newsletter" ? "Approve issue" : "Approve and publish"}</Button><Button variant="ghost" disabled={busy} onClick={() => void command("not_yet", draft.id)}>Not yet</Button></div> : null}</article>)}
-    {loaded?.content.receipts?.map(receipt => <article key={receipt.id} className="grid gap-2 border-t border-gray-border pt-4"><h3 className="text-sm font-semibold">{receipt.subject}</h3><p className="text-sm text-gray-muted">{receipt.readbackDetail}</p><p className="text-sm text-gray-muted">Approved by {receipt.actor}. {receipt.undoLabel}</p>{receipt.providerRef ? <a className="text-sm underline" href={receipt.providerRef} target="_blank" rel="noopener noreferrer">Open published content</a> : null}<details><summary className="cursor-pointer text-sm">Before and after</summary><p className="mt-2 whitespace-pre-wrap break-words text-sm">Before: {JSON.stringify(receipt.beforeState)}{ "\n" }After: {JSON.stringify(receipt.request.data)}</p></details></article>)}
+    {loaded?.content.receipts?.map(receipt => <article key={receipt.id} className="grid gap-2 border-t border-gray-border pt-4"><h3 className="text-sm font-semibold">{receipt.subject}</h3><p className="text-sm text-gray-muted">{receipt.readbackDetail}</p><p className="text-sm text-gray-muted">Approved by {receipt.actor}. {receipt.undoLabel}</p>{canCompose ? <Button variant="secondary" disabled={busy} onClick={() => void command("restore", undefined, receipt.id)}>Prepare restore or unpublish</Button> : null}{receipt.providerRef ? <a className="text-sm underline" href={receipt.providerRef} target="_blank" rel="noopener noreferrer">Open published content</a> : null}<details><summary className="cursor-pointer text-sm">Before and after</summary><p className="mt-2 whitespace-pre-wrap break-words text-sm">Before: {JSON.stringify(receipt.beforeState)}{ "\n" }After: {JSON.stringify(receipt.request.data)}</p></details></article>)}
     {loaded?.content.outputs.map(issue => <article key={issue.id} className="grid gap-2 border-t border-gray-border pt-4"><h3 className="text-sm font-semibold">{issue.subject}</h3><p className="text-sm text-gray-muted">Approved {new Date(issue.approved_at).toLocaleDateString()}. Sending paused. Provider accepted: {issue.accepted_count}. Suppressed while paused: {issue.suppressed_count}. Failures: {issue.failure_count}. Delivered: unknown.</p><details><summary className="cursor-pointer text-sm">Approved issue</summary><p className="mt-2 whitespace-pre-wrap break-words text-sm">{issue.body}</p></details></article>)}
   </section>;
 }

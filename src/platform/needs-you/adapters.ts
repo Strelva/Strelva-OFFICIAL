@@ -118,7 +118,11 @@ export function tenantEventItem(event: UnifiedEvent): ProposedItem | null {
   const rating = classification.signals?.reviewRating;
   const kind: ChangeKind = classification.kind === "review.reply" && typeof rating === "number" && rating <= 2 ? "review.reply_critical" : classification.kind;
   if (kind === "suggestion" || kind === "health.owner_action") return null;
-  const [approveEffect, notYetEffect] = effects(kind);
+  const [approveEffect, notYetEffect] = event.metadata?.kind === "workspace_newsletter_issue"
+    ? ["Keep this approved issue and its receipt. Sending is paused; no email sends.", "Keep the draft. Nothing sends."]
+    : event.metadata?.kind === "workspace_google_listing_draft"
+      ? ["Apply these exact words or business facts to this Google listing. Google may hold the change for review.", "Keep the draft. Nothing changes on Google."]
+      : effects(kind);
   // A commitment (a price, a date, a promise) is always the owner's, owner only,
   // even when Strelva was reviewing the draft (inquiry 1.0 delta, C6).
   const commitment = kind === "customer.commitment";
@@ -136,7 +140,7 @@ export function tenantEventItem(event: UnifiedEvent): ProposedItem | null {
     urgent: route === "owner_decides" && urgentFor(kind),
     // The chase clock starts when Needs you first sees the ask, not when the
     // tenant event was written, so an older pending ask does not lapse at once.
-    adminMayDecide: !commitment && !OWNER_ONLY_KINDS.has(kind),
+    adminMayDecide: !commitment && !String(event.metadata?.kind).startsWith("workspace_") && !OWNER_ONLY_KINDS.has(kind),
   };
 }
 
