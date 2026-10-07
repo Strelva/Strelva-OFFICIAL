@@ -29,7 +29,7 @@ import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
 import { WebsiteEntry } from "@/experience/websites/WebsiteEntry";
 import { managedSiteNavigation, websiteEntryPath } from "@/experience/websites/site-navigation";
-import { websiteRebuildReleasedFor } from "@/products/websites/rebuild-release";
+import { websiteRebuildReleasedFor } from "@/products/websites/index";
 import { listWebsiteRebuilds } from "@/products/websites/index";
 import { parseRebuildView } from "@/experience/websites/rebuild-transport";
 import { connectedSitesReleasedFor, readConnectedSites } from "@/products/connected-sites/server";

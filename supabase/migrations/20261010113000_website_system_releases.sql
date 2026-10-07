@@ -1,6 +1,7 @@
 -- Website release snapshots and stable connected-site rebuild lineage.
 -- No provider writes, tenant changes or public contract changes. Server calls
 -- are gated by STRELVA_SYSTEMS_RELEASE (off by default).
+begin;
 set local lock_timeout = '3s';
 
 create table public.website_rebuild_origins (
@@ -274,3 +275,5 @@ begin
   return n;
 end;
 $$;
+
+commit;

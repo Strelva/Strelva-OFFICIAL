@@ -116,6 +116,9 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261009100000": "strelva_service_actions",
   "20261009110000": "business_booking_messages",
   "20261009113000": "inquiry_events",
+  "20261010110000": "website_cutover_undos",
+  "20261010113000": "website_rebuild_origins",
+  "20261010114000": "website_domain_requests",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */
@@ -174,6 +177,7 @@ export const FLAG_ENV = [
   "STRELVA_BOOKING_CALENDAR_BUSY",
   "STRELVA_MAKE_REAL_LIVE",
   "STRELVA_CONNECTED_SITES_RELEASE",
+  "STRELVA_WEBSITE_DOMAIN_EMAIL_ENABLED",
   "STRELVA_MAKE_REAL_OWNER_LINK_RELEASE",
   "REB_DEV_UNGATED_ACCESS",
 ] as const;

@@ -421,3 +421,6 @@ export const websiteRebuildDomain = websiteRebuildService.domain;
 export const initializeRebuildHandoff = websiteRebuildService.initializeHandoff;
 export const connectWebsiteRebuildCapabilities = websiteRebuildService.connectCapabilities;
 export const listWebsiteRebuildCapabilityOptions = websiteRebuildService.capabilityOptions;
+
+export { readPublishedWebsiteContent } from "./site-health";
+export const approveWebsiteDomainRequest: typeof import("./domain-requests").websiteDomainRequestService.approve = (...args) => import("./domain-requests").then(module => module.websiteDomainRequestService.approve(...args));

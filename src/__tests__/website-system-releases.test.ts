@@ -41,7 +41,7 @@ describe("website release reconciliation", () => {
   it("fails closed on access denial and malformed storage results", async () => {
     dependencies.released.mockResolvedValue(true);
     dependencies.rpc.mockResolvedValueOnce({ error: { message: "business_record_access_denied" }, data: null });
-    await expect(reconcileWebsiteSystemReleases(actor, businessId, target)).rejects.toThrow("unavailable to your account");
+    await expect(reconcileWebsiteSystemReleases(actor, businessId, target)).rejects.toThrow("Workspace access denied");
     dependencies.rpc.mockResolvedValueOnce({ error: null, data: "2" });
     await expect(reconcileWebsiteSystemReleases(actor, businessId, target)).rejects.toThrow("could not be confirmed");
   });

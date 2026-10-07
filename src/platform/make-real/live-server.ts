@@ -66,7 +66,7 @@ export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string) 
       publicReadBack: async (tenantId, section, expected) => {
         const tenant = await getTenantConfig(tenantId);
         if (!tenant) return { ok: false, detail: "The published site's address is unavailable." };
-        return (await import("@/products/websites/content-readback")).readPublishedWebsiteContent({ tenant, section, expected });
+        return (await import("@/products/websites/rebuild-service")).readPublishedWebsiteContent({ tenant, section, expected });
       },
       restore: (section, versionId, tenantId) => restoreVersion(section as ContentSection, versionId, tenantId, "ai"),
     }, ctx),

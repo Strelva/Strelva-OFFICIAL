@@ -92,10 +92,12 @@ export function deliverySourceAdapters(): SourceAdapter[] {
       async list(workspaceId) {
         const release = await import("@/products/websites/rebuild-release");
         if (!release.websiteRebuildReleaseMayBeOn() || !(await release.websiteRebuildReleaseEnabledForWorkspace(workspaceId))) return [];
-        return (await import("@/products/websites/domain-requests")).websiteDomainRequestStore.list(workspaceId);
+        return (await import("./website-domain-store")).websiteDomainRequestStore.list(workspaceId);
       },
       async approve(request, decisionId) {
-        return (await import("@/products/websites/domain-requests")).websiteDomainRequestService.approve(request, decisionId);
+        const service = await websites();
+        if (!service) throw new WorkspaceConflictError("Website rebuilds are not enabled.");
+        return service.approveWebsiteDomainRequest(request, decisionId);
       },
     })] : []),
     providerDeliveryAdapter({

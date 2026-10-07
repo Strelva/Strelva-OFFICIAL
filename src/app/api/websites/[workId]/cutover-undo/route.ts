@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { workspaceJson } from "@/platform/workspaces/http";
-import { websiteDocumentStore } from "@/products/websites/document-store";
+import { websiteDocumentStore } from "@/products/websites/index";
 import { readWebsiteRebuild } from "@/products/websites/index";
 import { systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
 import { rebuildHttp } from "../../rebuild-http";

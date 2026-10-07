@@ -34,7 +34,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
     sendEmail: sendEmailWithReceipt,
     emailAllowed: async row => {
       if (row.sourceLifecycle !== "website_domain") return true;
-      const domains = await import("@/products/websites/domain-requests");
+      const domains = await import("./sources/website-domain-store");
       const request = (await domains.websiteDomainRequestStore.list(row.workspaceId)).find(request => request.id === row.sourceId);
       return domains.websiteDomainEmailAllowed(request?.tenantId);
     },

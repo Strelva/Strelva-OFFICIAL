@@ -35,7 +35,7 @@ export async function GET(request:Request){
   }}:{})});processed=result.processed;failed=result.failed;
   // New owner receipts are isolated behind the rebuild release; the checker
   // reads provider state and never retries an attachment.
-  const proposals=alerting?await (await import("@/products/websites/domain-requests")).reconcileWebsiteDomainRequests():null;
+  const proposals=alerting?await (await import("@/products/websites/index")).reconcileWebsiteDomainRequests():null;
   failed+=proposals?.failed??0;ok=failed===0;return NextResponse.json({...result,...(proposals?{domainRequests:proposals}:{}),mode:alerting?"alerting":"report_only"},{status:failed?207:200});
  }catch{failed=Math.max(1,failed);return NextResponse.json({error:"Website domain verification could not be confirmed."},{status:503});}
  finally{await recordHeartbeat("website-domain-verification",{ok,processed,failed,durationMs:Date.now()-started});}

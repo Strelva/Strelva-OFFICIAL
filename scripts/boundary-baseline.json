@@ -409,8 +409,6 @@
     "src/experience/systems/server.ts -> @/products/investigations/system-health :: Import a product through its index, contracts, server, or client entry point.",
     "src/experience/systems/server.ts -> @/products/publishing/projection :: Import a product through its index, contracts, server, or client entry point.",
     "src/experience/systems/website-detail-server.ts -> @/products/websites/document-store :: Import a product through its index, contracts, server, or client entry point.",
-    "src/experience/systems/website-detail-server.ts -> @/products/websites/rebuild-release :: Import a product through its index, contracts, server, or client entry point.",
-    "src/experience/systems/website-detail-server.ts -> @/products/websites/rebuild-service :: Import a product through its index, contracts, server, or client entry point.",
     "src/experience/workspace/preview/publishing-fixture.ts -> @/products/publishing/projection :: Import a product through its index, contracts, server, or client entry point.",
     "src/experience/workspace/preview/systems-projection.ts -> @/products/publishing/projection :: Import a product through its index, contracts, server, or client entry point.",
     "src/platform/bookings/calendar-busy.ts -> @/products/scheduling/server :: Platform modules cannot depend on routes, products, or the experience layer.",

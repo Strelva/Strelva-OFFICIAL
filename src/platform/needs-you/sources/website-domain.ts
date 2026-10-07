@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { WebsiteDomainRequest } from "@/products/websites/domain-requests";
+import type { WebsiteDomainRequest } from "./website-domain-store";
 import type { SourceAdapter } from "../adapters";
 import type { ProposedItem } from "../contracts";
 

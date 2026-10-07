@@ -31,9 +31,9 @@ import { tenantEventItem } from "@/platform/needs-you/adapters";
 import { needsYouReleaseEnabled, needsYouService } from "@/platform/needs-you/server";
 import { PostgresServiceRequestStore } from "@/platform/service-requests";
 import { websiteDocumentStore } from "@/products/websites/document-store";
-import { websiteRebuildReleaseEnabled } from "@/products/websites/rebuild-release";
-import { createSiteChangeStore } from "@/products/websites/site-changes";
-import { reconcileWebsiteSystemReleases } from "@/products/websites/system-releases";
+import { websiteRebuildReleaseEnabled } from "@/products/websites/index";
+import { createSiteChangeStore } from "@/products/websites/index";
+import { reconcileWebsiteSystemReleases } from "@/products/websites/index";
 import { connectedSitesReleaseEnabled, connectedSitesReleasedFor, readConnectedSites, type ConnectedSitesOverview } from "@/products/connected-sites/server";
 import { buildWebsiteSystemDetail, type WebsiteDetailInputs, type WebsiteDomainItem, type WebsiteSystemDetail } from "./website-detail";
 
@@ -68,7 +68,7 @@ const liveSources: WebsiteDetailSources = {
   reconcileReleases: reconcileWebsiteSystemReleases,
   rebuild: async (actor, workId) => {
     if (!websiteRebuildReleaseEnabled()) return null;
-    const { readWebsiteRebuild } = await import("@/products/websites/rebuild-service");
+    const { readWebsiteRebuild } = await import("@/products/websites/index");
     return readWebsiteRebuild(actor, workId);
   },
   connectedSites: (actor, businessId) => connectedSitesReleaseEnabled()

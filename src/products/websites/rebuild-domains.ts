@@ -55,3 +55,9 @@ export async function changeHostedDomain(tenantId: string, raw: unknown, options
   if (!result.ok) throw new WorkspaceConflictError(result.error);
   return readHostedDomains(tenantId);
 }
+
+export function validateHostedDomain(raw: string): string {
+  const hostname = normalizeCustomDomain(raw);
+  if (!hostname || !isValidDomain(hostname)) throw new WorkspaceConflictError("Enter a valid domain you control.");
+  return hostname;
+}

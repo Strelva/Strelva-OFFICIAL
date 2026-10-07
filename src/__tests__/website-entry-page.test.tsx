@@ -15,7 +15,7 @@ vi.mock("@/platform/ask/release", () => ({ askReleaseMayBeOn: () => false }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: f.config }));
 vi.mock("@/lib/website-page-data", () => ({ loadSiteEditorData: f.editor, loadBrandKitSettings: vi.fn(), loadCollectionsData: vi.fn(), loadGoogleBusinessData: vi.fn(), siteFrameFor: () => ({ siteUrl: "https://synthetic.example.test", previewUrl: "", siteModel: "food-brand", liveSyncEnabled: false, autoPublish: false }) }));
 vi.mock("@/products/websites/server", () => ({ resolveWorkspaceSite: f.resolve }));
-vi.mock("@/products/websites/index", () => ({ listWebsiteRebuilds: f.records }));
+vi.mock("@/products/websites/index", () => ({ listWebsiteRebuilds: f.records, websiteRebuildReleasedFor: f.rebuild }));
 vi.mock("@/products/websites/rebuild-release", () => ({ websiteRebuildReleasedFor: f.rebuild }));
 vi.mock("@/products/connected-sites/server", () => ({ connectedSitesReleasedFor: f.connected, readConnectedSites: f.sites }));
 vi.mock("@/experience/app-frame/StrelvaShell", () => ({ StrelvaShell: ({ children }: { children: React.ReactNode }) => createElement("main", {}, children) }));
@@ -45,13 +45,13 @@ describe("website entry page authorization and release boundaries", () => {
   });
   it("requires Systems, active membership, and verified sign-in before reading either path", async () => {
     f.systems.mockResolvedValue(false); await expect(render({ entry: "rebuild" })).rejects.toThrow("redirect:/workspace?");
-    f.systems.mockResolvedValue(true); f.workspace.mockResolvedValue([]); expect(await render({ entry: "connect" })).toContain("isn't available to your account");
+    f.systems.mockResolvedValue(true); f.workspace.mockResolvedValue([]); expect(await render({ entry: "connect" })).toContain("isn&#x27;t available to your account");
     f.session.mockResolvedValue(null); await expect(render({ entry: "rebuild", workId: SYSTEM })).rejects.toThrow(`redirect:/sign-in?next=${encodeURIComponent(`/workspace/site?workspaceId=${WS}&entry=rebuild&workId=${SYSTEM}`)}`);
     expect(f.sites).not.toHaveBeenCalled(); expect(f.records).not.toHaveBeenCalled();
   });
   it("shows a retryable read failure without offering creation from a failed list", async () => {
     f.records.mockRejectedValue(new Error("Database unavailable"));
-    const html = await render({ entry: "rebuild" }); expect(html).toContain("couldn't be loaded just now"); expect(html).not.toContain("Build a private preview");
+    const html = await render({ entry: "rebuild" }); expect(html).toContain("couldn&#x27;t be loaded just now"); expect(html).not.toContain("Build a private preview");
   });
   it("maps native owner editor deep links to Requests before loading editable content", async () => {
     const html = await render({ system: SYSTEM, tab: "edit" });

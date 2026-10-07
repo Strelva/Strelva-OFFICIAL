@@ -183,7 +183,7 @@ export async function POST() {
         const viewer = await currentReleaseViewer();
         if (await tenantReleaseFlagEnabled("systems", tenant, viewer) && await tenantReleaseFlagEnabled("make_real_live:tenant_content", tenant, viewer)) {
           const [{ getTenantConfig }, { readPublishedWebsiteContent }] = await Promise.all([
-            import("@/lib/tenants"), import("@/products/websites/content-readback"),
+            import("@/lib/tenants"), import("@/products/websites/index"),
           ]);
           const config = await getTenantConfig(tenant);
           readBack = { ...await readPublishedWebsiteContent({
