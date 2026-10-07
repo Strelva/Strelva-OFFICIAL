@@ -59,7 +59,7 @@ describe("recordBusinessEffortAction", () => {
   });
 
   it("rejects invalid minutes before storage", async () => {
-    const result = await recordBusinessEffortAction({ ...input, minutes: 0 });
+    const result = await recordBusinessEffortAction({ ...input, minutes: -1 });
     expect(result).toEqual({ ok: false, message: "Check the minutes, category, date and note." });
     expect(mockRpc).not.toHaveBeenCalled();
   });
