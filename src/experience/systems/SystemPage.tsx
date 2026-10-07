@@ -132,11 +132,10 @@ export function SystemPage(props: SystemPageProps) {
         {filesRequests && askingChange ? <WebsiteChangeAsk workspaceId={props.workspaceId} systemId={system.id} siteName={system.name} onFiled={() => setDetailVersion(version => version + 1)} onClose={() => setAskingChange(false)} /> : null}
         {system.kind === "website" && websiteDetail ? <WebsiteSystemPanels workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} onAsk={onAsk} onAskChange={filesRequests ? () => setAskingChange(true) : undefined} readOnly={readOnly} /> : null}
         {system.activations?.length ? <ActivationsPanel system={system} /> : null}
-        {system.possibilities.length ? <PossibilitiesPanel system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} /> : null}
+        {system.possibilities.length || system.storedVersionId ? <PossibilitiesPanel system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} /> : null}
         {system.connections.length || system.offers?.length || siteHref ? <ConnectionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} siteHref={siteHref} /> : null}
         <PartsPanel system={system} />
         {system.versions.length ? <VersionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} /> : null}
-        {system.storedVersionId ? <Panel id={`${system.id}-improvements`} title="Shared improvements" count={1} intro="Review changes from the source. Preparing a draft leaves the current release in place."><SystemVersionImprovements key={`${props.workspaceId}:${system.id}`} workspaceId={props.workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={readOnly} /></Panel> : null}
         {system.storedVersionId ? <Panel id={`${system.id}-version-draft`} title="Version draft" count={1} intro="Local changes, accounts and earlier releases belong to this business."><SystemVersionManagement key={`${props.workspaceId}:${system.id}`} workspaceId={props.workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={readOnly} /></Panel> : null}
         {system.history?.length ? <HistoryPanel system={system} /> : null}
         {system.audits?.length ? <AuditsPanel system={system} workspaceId={props.workspaceId} appBase={props.appBase || ""} /> : null}
@@ -148,7 +147,7 @@ export function SystemPage(props: SystemPageProps) {
 
 /** Spec behavior 11-12: an empty block is not drawn; nothing at all is one line under the surface. */
 export function hasContext(system: SystemView): boolean {
-  return Boolean(system.activations?.length || system.possibilities.length || system.connections.length || system.offers?.length
+  return Boolean(system.storedVersionId || system.activations?.length || system.possibilities.length || system.connections.length || system.offers?.length
     || system.parts?.length || system.versions.length || system.history?.length || system.audits?.length);
 }
 
@@ -301,6 +300,7 @@ function PossibilitiesPanel({ system, systems, workspaceId, readOnly, readOnlyRe
   const request = useWorkspaceRequest();
   const [outcome, setOutcome] = useState<{ id: string; outcome: MakeRealOutcome } | null>(null);
   const [running, setRunning] = useState<string | null>(null);
+  const [versionCount, setVersionCount] = useState(0);
   async function makeReal(possibility: SystemPossibility) {
     setRunning(possibility.id);
     setOutcome(null);
@@ -308,7 +308,7 @@ function PossibilitiesPanel({ system, systems, workspaceId, readOnly, readOnlyRe
     setOutcome({ id: possibility.id, outcome: next });
     setRunning(null);
   }
-  return <Panel id={`${system.id}-possibilities`} title="Possibilities" count={system.possibilities.length} intro="Alternatives you can open and compare before anything changes.">
+  return <Panel id={`${system.id}-possibilities`} title="Possibilities" count={system.possibilities.length + versionCount} intro="Alternatives you can open and compare before anything changes.">
     {system.possibilities.length ? <ul className={styles.panelList}>{system.possibilities.map(possibility => {
       const scope = possibilityScope(possibility, systems);
       const blockedReason = !canMakeReal ? makeRealReason || "Only an owner of this business can make a possibility real." : possibility.status !== "ready" ? "Still being explored. It can be made real once it is ready." : undefined;
@@ -326,7 +326,8 @@ function PossibilitiesPanel({ system, systems, workspaceId, readOnly, readOnlyRe
         {!canMakeReal ? <small>{blockedReason}</small> : null}
         {outcome?.id === possibility.id ? <MakeRealState outcome={outcome.outcome} onAsk={onAsk} title={possibility.title} /> : null}
       </li>;
-    })}</ul> : <p className="mt-3">No alternatives are being explored. <button type="button" className="underline" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else it could become</button></p>}
+    })}</ul> : system.storedVersionId ? null : <p className="mt-3">No alternatives are being explored. <button type="button" className="underline" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else it could become</button></p>}
+    {system.storedVersionId ? <SystemVersionImprovements key={`${workspaceId}:${system.id}:${system.storedVersionId}`} workspaceId={workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={readOnly} canMakeReal={canMakeReal} onCount={setVersionCount} /> : null}
   </Panel>;
 }
 

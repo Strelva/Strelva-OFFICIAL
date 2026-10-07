@@ -11,6 +11,7 @@ import { withNeedsYouPreview } from "./needs-you-fixture";
 import { previewWebsiteDetail, previewWebsiteDetailMode, type PreviewWebsiteDetailMode } from "./website-detail-fixture";
 import type { PreviewSystems } from "./systems-projection";
 import { agencyPreviewState, withAgencyPreview } from "./agency-fixture";
+import { versionPreviewState, withVersionPreview } from "./version-fixture";
 import { withAskPreview, type AskPreviewMode } from "./ask-fixture";
 import styles from "./preview.module.css";
 
@@ -86,7 +87,8 @@ export function WorkspacePreview({ scenario, systems, needsYou = false, ask = nu
   }, []);
   const [agencyState] = useState(() => agencyPreviewState(searchParams.get("agency")));
   const [websiteDetail] = useState(() => previewWebsiteDetailMode(searchParams.get("websiteDetail")));
-  const request = useMemo(() => withAskPreview(withNeedsYouPreview(withAgencyPreview(withSystems(createPreviewRequest(scenario, { installedStaffRequest, seededRequests }), systems, websiteDetail), scenario, agencyState), scenario, needsYou), ask), [agencyState, installedStaffRequest, seededRequests, scenario, systems, needsYou, ask, websiteDetail]);
+  const [versionState] = useState(() => versionPreviewState(searchParams.get("version")));
+  const request = useMemo(() => withAskPreview(withVersionPreview(withNeedsYouPreview(withAgencyPreview(withSystems(createPreviewRequest(scenario, { installedStaffRequest, seededRequests }), systems, websiteDetail), scenario, agencyState), scenario, needsYou), systems, versionState), ask), [agencyState, installedStaffRequest, seededRequests, scenario, systems, needsYou, ask, websiteDetail, versionState]);
   useEffect(() => {
     if (!installedStaffRequest) return;
     const url = new URL(window.location.href);

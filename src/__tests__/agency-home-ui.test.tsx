@@ -161,6 +161,8 @@ describe("agency home on the batched read", () => {
     expect(node.textContent).toContain("“We'll call you within one business day”");
     expect(node.textContent).toContain("“Someone will reply by the end of the next business day.”");
     expect(node.textContent).toContain("Needs Google Calendar connected first");
+    const conflictLink = [...node.querySelectorAll("a")].find(link => link.textContent === "Open The Mooney Firm’s System")!;
+    expect(conflictLink.getAttribute("href")).toBe(`/workspace?view=system&system=${uuid("52000000", 2)}&workspaceId=${uuid("c0000000", 2)}`);
     await act(async () => { button(node, "Review all").click(); });
     await settle();
     expect(bodies).toEqual([{ action: "review_all", workspaceId: AGENCY, sourceSystemId: library.sources[0]!.systemId, revision: 4, versionIds: ["ready-1"] }]);

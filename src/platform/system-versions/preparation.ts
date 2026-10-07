@@ -9,6 +9,7 @@ import { changedPaths, jsonEqual } from "./compare";
 import { applyOverrides } from "./service";
 import type { VersionLineage } from "./types";
 import { mapVersionsError, versionsDb, type VersionsDb } from "./supabase-store";
+import { requireVersionRuntime } from "./native-runtime";
 
 const receiptSchema = z.object({ receiptId: z.string().uuid(), decisionId: z.string().uuid(), workspaceId: z.string().uuid(), versionId: z.string().uuid(), rowRevision: z.number().int().positive() }).strict();
 export type VersionPreparationReceipt = z.infer<typeof receiptSchema>;
@@ -18,6 +19,7 @@ export async function prepareVersionRelease(actor: WorkspaceActor, lineage: Vers
   const working = applyOverrides(lineage.baseline.definition, lineage.overrides);
   const latest = lineage.releases.at(-1);
   if (latest && jsonEqual(latest.definition, working)) return null;
+  await requireVersionRuntime(actor, lineage, deps.db ?? versionsDb());
   const decisions = deps.decisions ?? PostgresNeedsYouStore;
   // Unreadable policy is a failed preparation, never an invented permission.
   const policies = await decisions.policies(actor, lineage.version.businessId);

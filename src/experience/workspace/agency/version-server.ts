@@ -1,6 +1,7 @@
 import { createSystemVersions, VersionAccessError, VersionStaleError, VersionValidationError, type VersionConflictResolution, type JsonValue, type SystemRevisionRef, type VersionContext } from "@/platform/system-versions";
 import { createSupabaseConnectionOwnership, createSupabaseVersionStore, readVersionActor, versionsDb, type VersionsDb } from "@/platform/system-versions/supabase-store";
 import { prepareVersionRelease } from "@/platform/system-versions/preparation";
+import { projectVersionPossibilities } from "@/platform/system-versions/possibilities";
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
 import { WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { requireAgencyAuthoring } from "./authoring-server";
@@ -8,6 +9,7 @@ import { readAgencyLibrary } from "../agency-server";
 import { createSupabaseSystemStore } from "@/platform/systems";
 import { z } from "zod";
 import { mapVersionsError } from "@/platform/system-versions/supabase-store";
+import { createApplicationDraft } from "@/products/applications/server";
 
 /** The System id, never a caller-chosen client id, resolves its lineage. Every
  * native store read rechecks the same business scope in Postgres. */
@@ -23,7 +25,9 @@ export async function readSystemVersion(actor: WorkspaceActor, workspaceId: stri
   return { workspaceId, systemId, versionId: lineage.id, rowRevision: lineage.rowRevision,
     label: lineage.context.label, baselineRevision: lineage.baseline.revision, currentRelease: lineage.currentRelease,
     workingDefinition: view.workingDefinition, overrides: view.overrides, bindings: view.bindings ?? [], releases: view.releases, source: view.source,
-    offers, canManage: versionActor.memberships.some(membership => membership.businessId === workspaceId && (membership.role === "owner" || membership.role === "admin")),
+    offers, ...projectVersionPossibilities(lineage, offers, "The source System"),
+    canMakeReal: versionActor.memberships.some(membership => membership.businessId === workspaceId && membership.role === "owner"),
+    canManage: versionActor.memberships.some(membership => membership.businessId === workspaceId && (membership.role === "owner" || membership.role === "admin")),
   };
 }
 
@@ -51,14 +55,23 @@ export async function createBusinessVersion(actor: WorkspaceActor, input: { agen
   const versionActor = await readVersionActor(actor, db);
   const sourceSystem = await createSupabaseSystemStore(db).readSystem(actor, { businessId: input.source.businessId, systemId: input.source.systemId });
   const base = createSupabaseVersionStore(db);
-  const services = createSystemVersions({ store: base, connections: createSupabaseConnectionOwnership(db) });
-  // This action deliberately shares the definition with this business. The
-  // same native service still enforces source and descendant ownership.
-  if (input.source.businessId !== input.workspaceId) await services.shareSource(versionActor, input.source, input.workspaceId);
+  const revision = await base.getRevision(versionActor, input.source, input.source.number);
+  if (!revision || revision.source.revisionId !== input.source.revisionId) throw new VersionValidationError("This source revision changed. Reload the source before creating a Version.");
+  if (sourceSystem.system.kind !== "internal_app" || revision.definition.kind !== "internal_app") throw new VersionValidationError("This source cannot create a running Version automatically. Custom-repo website changes need an operator-prepared Possibility.");
+  if (Object.keys(revision.definition).some(key => !["kind", "title", "fields", "components"].includes(key))) throw new VersionValidationError("The reusable application shape cannot include records, accounts, grants or maintenance authority.");
+  const { kind: _kind, ...definition } = revision.definition;
+  const nativePayload = createApplicationDraft({ ...definition, maintenanceOwner: actor.userId }, actor);
   const atomicDb: VersionsDb = { rpc(name, args) {
-    return name === "create_system_version" ? db.rpc("create_version_system_command", { ...args, p_name: input.name, p_kind: sourceSystem.system.kind, p_command_id: input.commandId }) : db.rpc(name, args);
+    return name === "create_system_version" ? db.rpc("create_version_system_command", { ...args, p_name: input.name, p_kind: sourceSystem.system.kind, p_command_id: input.commandId, p_native_payload: nativePayload }) : db.rpc(name, args);
   } };
-  const versions = createSystemVersions({ store: createSupabaseVersionStore(atomicDb), connections: createSupabaseConnectionOwnership(db) });
+  const atomicStore = createSupabaseVersionStore(atomicDb);
+  const versions = createSystemVersions({ store: { ...atomicStore, async getSource(actor, source) {
+    const record = await atomicStore.getSource(actor, source);
+    // The authorized creation command shares this source only if the entire
+    // native artifact and lineage commit. The RPC repeats authority checks.
+    return record && source.businessId === input.source.businessId && source.systemId === input.source.systemId
+      ? { ...record, sharedWith: [...new Set([...record.sharedWith, input.workspaceId])] } : record;
+  } }, connections: createSupabaseConnectionOwnership(db) });
   const lineage = await versions.createVersion(versionActor, { source: input.source, version: { businessId: input.workspaceId, systemId: input.commandId }, context: input.context });
   return { workspaceId: input.workspaceId, systemId: lineage.version.systemId, versionId: lineage.id, rowRevision: lineage.rowRevision, outcome: "created" as const };
 }

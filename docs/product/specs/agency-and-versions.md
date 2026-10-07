@@ -24,6 +24,62 @@ the actor already belongs to (`providedClients`). The batched read on `build/ver
 Base: branch `reborn-1.0-model` at `db9566a8`. Every path below was read on
 that branch. Nothing here was run against production.
 
+## Wave 6 implementation checkpoint — October 7, 2026
+
+Built locally on `w6/agency-operator`; production remains untouched by this
+stream. The earlier status paragraphs below describe the October 6 baseline.
+They are retained as history, not the current implementation inventory.
+
+| Launch requirement | Local implementation and proof |
+| --- | --- |
+| 1–3: all clients in one scoped read, cursor above 100, named partial failure | `agency_client_overview`/`agency_client_overview_v2`, strict server response parsing, Clients view; `agency-versions-server`, `agency-home-ui`, `w6-agency-operator-overview` suites. The 50-client UI case renders all rows from one request; it is not a production latency claim. |
+| 4: one Queue with owner asks, improvements and health | Agency view consumes the released operator Queue while retaining scoped Version and owner-decision rows. Incomplete sources are named; missing/stale health is Not verified. `w6-agency-operator-overview` covers inaccessible businesses, delegated scope, operator refusal and source failure. |
+| 5–6: Library and Team | Source revisions, per-Version conflicts/missing accounts/declines and team reach are read and rendered. Library now links directly to the client's Version System. |
+| 7–8: Build and Package | Existing funded work-plan execution creates an owned Draft System. Package extracts the reusable app definition or Version draft, rejects private records/accounts/secrets, and records a command receipt for lost-reply retries. `w6-agency-authoring` tests accepted-but-unconfirmed publication and altered retries. |
+| 9: bulk review | Selected ready Versions get separate business preparations/receipts; conflicted/missing-account Versions are skipped. The release and Needs you gates are checked per business; adopting never moves Live. `w6-version-decisions` and `agency-home-ui` cover this boundary. |
+| 10–13: create, override, bind, release | A native internal-app source creates an empty, separately owned executable application and canonical System in one command with its source share and lineage. Local overrides remain drafts; an approved, exactly prepared Version row updates, rehearses and publishes that destination runtime in the same transaction as its immutable release and spine pointer. Records remain owned by the destination. Unsupported automated runtime kinds fail explicitly; custom-repo website Versions require operator-prepared native Possibilities. `w6-version-native-create`, `w6-version-native-runtime`, `tests/w6-version-native-applications.sql` and rollback proof exercise these boundaries. |
+| 14–17: compare, resolve, decline, separate adoption from Live | Source improvements project into the normal Possibilities vocabulary with current/candidate definitions and path conflicts. Adoption prepares the existing Version-release Needs you item; Make real decides that exact pinned item, with no duplicate approval path. Later revision comparison, decline reasons, CAS writes and lost preparation retries remain. `w6-version-possibilities`, its rendered UI tests, and `w6-version-decisions` prove these boundaries. Restore from History changes only the working draft and requires its own release decision. |
+| 18: source author sees no implicit client data | Version service and Postgres reads require the client's grant. Only its business owner can grant or revoke lineage/data access; migration `20261010163200` also blocks direct service-role saves and disables direct access to the private save implementation. The shared store contract tests owner allowance, admin denial, unchanged admin draft access, revoked grants and binding secrecy. |
+| 19: Twin Trees first real set | Mapping and isolated two-location tests exist. Production setup remains blocked on the owner's one-business/two-business answer; custom-repo improvements remain operator-prepared work. No real Version set is claimed. |
+| 20: System Versions panel | Stored lineage, source/context/history, shared improvement controls, account binding, local draft changes and restoration are rendered on the owning System. `w6-version-management-ui` covers loading, unavailable, read-only, no-op release and foreign/malformed/stale acknowledgment. |
+
+Round 5 initial focused proof: six test files, **39 passed / 11 skipped**.
+The native runtime follow-up passed four focused files with **45 passed**;
+Native application SQL and the retained-fixture rollback/reapply roundtrip
+passed in the throwaway local PostgreSQL cluster: actual Live runtime and
+canonical System lifecycle, destination records, pinned approved decisions,
+forged/stale rejection, private ACLs and preparation receipts were checked.
+The final integrated SQL and repository checks remain with the coordinator. The skipped
+cases require the local PostgreSQL harness and are included by
+`pnpm check:workspace-sql`; the coordinator records that run and the full
+repository checks in the [stream handoff](../streams/w6-agency-operator.md).
+A first typecheck found a missing internal Library callback prop and a widened
+grant fixture literal; both were corrected. Focused lint then passed.
+
+Rendered locally in the collaborative browser at `localhost:3046`, using the
+existing preview: 1280×800 Library with five ready, one conflict and one missing
+account; 390×844 Version comparison with keep-local preparation and an honest
+Nothing went live acknowledgment. Version loading, error, read-only and empty
+states were inspected at 390px, without document horizontal overflow. The
+follow-up Possibilities bridge passed **7/7 local Playwright cases** at 1280px
+and 390px, including an isolated native application submission, exact prepared
+Make real, and mobile loading/error/read-only/empty/missing-account states;
+screenshots are retained in `.scratch/w6-round5/version-possibilities-*.png`. These
+are fictional local fixtures, not customer/provider operation. Preview query
+`version=full|loading|error|read-only|empty|missing-account` selects the Version
+state; `agency` retains the existing client/Library states. New fixtures send
+nothing and use no provider credentials.
+
+Remaining production/operating proof: apply and verify the Versions, authoring,
+management, owner-grant and native-application migrations with rollback files; convert clients and
+establish Strelva's provider marks under approval; resolve Twin Trees ownership;
+exercise a real owner email approval and read-back/restore on a Strelva-owned
+two-location test business; measure human minutes before/after bulk review.
+No operator-time savings, owner engagement or successful production migration
+is claimed. Workspace email approval routing and the one owner-recipient rule
+are coordinated by the owner-ask/agency-operator integration, not a separate
+agency mail implementation.
+
 ## 1. The moment
 
 It's Monday. Jacob opens Strelva as Strelva, the agency that runs every

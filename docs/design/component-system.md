@@ -479,6 +479,8 @@ starting implementation.
 | Card | [Card.tsx](../../src/components/ui/Card.tsx) | Default solid surface; padding none/sm/md/lg. md is 24 px padding/radius; sm is 16/16; lg is 32/24. `interactive` changes hover styling only, not semantics. |
 | Toggle | [Toggle.tsx](../../src/components/ui/Toggle.tsx) | Controlled checked/onChange, required accessible label, optional disabled, 44 px minimum hit height. |
 | Agency client and Queue rows | [AgencyViews.tsx](../../src/experience/workspace/agency/AgencyViews.tsx) | Existing row controls and tokens; released operator overview adds a separate health label beside lifecycle, scoped links into the client's System, and a named incomplete-source alert. Missing or stale health says Not verified. The old overview remains when the operator release flag is off. |
+| Version Possibilities | [SystemVersionImprovements.tsx](../../src/experience/systems/SystemVersionImprovements.tsx), [SystemPage.tsx](../../src/experience/systems/SystemPage.tsx) | Version improvements and unreleased alternatives share the existing Possibilities panel. Native disclosure compares current and alternative definitions; closed native app candidates reuse ApplicationDraftPreview with isolated test records. Conflicts show both values, and shared fields/buttons prepare a draft. Make real approves the existing exact `version_release` Needs you item; only the business owner can decide. Row revision pins invalidate edited candidates. Failed, foreign, stale and uncertain acknowledgments stay visible, and retries retain the same decision command. Local DOM tests cover these states. After the collaborative host disconnected, the existing headless Playwright runner verified 1280px/390px preparation and same-decision Make real, isolated native-app submission, keyboard focus, no page overflow, and mobile loading/error/empty/read-only/missing-account fixtures. These are fictional local records; no authenticated provider or production proof. |
+| Operator queue | [QueueBoard.tsx](../../src/app/admin/queue/QueueBoard.tsx), [QueueSourceActions.tsx](../../src/app/admin/queue/QueueSourceActions.tsx), [QueueLoadState.tsx](../../src/app/admin/queue/QueueLoadState.tsx) | Composes console Chips/Panels and shared Button/fields; row and source buttons use the shared 48px large control size, links and checkbox labels have 48px touch areas. Owner decisions offer only Stop chasing in the operator close form. The real loading, unavailable and permission states share the preview specimens at `/preview/strelva/operator-queue?scenario=loading`, `error`, or `denied`. |
 | AtmosphericCard | [AtmosphericCard.tsx](../../src/components/ui/atmosphere/AtmosphericCard.tsx) | Semantic section, ref forwarding, theme light/dark, numeric composition variant 0–5, contentClassName, optional controlled paused/onPausedChange. |
 | AtmosphericCardHeader / Detail / Footer | [AtmosphericCardParts.tsx](../../src/components/ui/atmosphere/AtmosphericCardParts.tsx) | Content slots inheriting card roles. Header accepts an optional decorative icon; caller supplies heading semantics. Detail is optional, never automatic filler. |
 | GooeyDisclosure | [GooeyDisclosure.tsx](../../src/components/ui/motion/GooeyDisclosure.tsx) | Controlled `open`, required `id`, children and optional className. Spring height, sharp content, inert when closed, reduced-motion support. |
@@ -586,3 +588,15 @@ private previews are noindexed. The static export includes the immutable
 document, each page, redirect mappings, image bytes and file checksums. No new
 renderer dependencies were added. Local automated and rendered verification is
 recorded with the website rebuild delivery evidence.
+
+## Business portability
+
+`WorkspaceExport` and `WorkspaceExit` compose shared Button, Card and fields.
+Export schema 3 exposes background preparation, an authenticated ready download,
+and retained failure/expiry messages; the bounded legacy export remains with
+schema 3 off. Exit keeps loading, error/retry, permission refusal and retained
+billing/provider/site handoff obligations explicit. Optional request injection
+uses the existing fetch default and permits fictional local review without
+provider writes. `/preview/strelva/portability?surface=export|exit&state=ready|loading|error|permission|empty|completed`
+is gated by development and `STRELVA_UI_PREVIEW=1`; fixtures prove presentation,
+not export completeness or production handoff.
