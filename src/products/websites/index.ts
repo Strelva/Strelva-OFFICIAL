@@ -49,6 +49,8 @@ export const runWebsiteMonthlyReports: typeof import("./site-report").runWebsite
 export { generateWebsiteDraft, websiteDraftPreviewHtml } from "./generation";
 
 export * from "./rebuild-providers";
+export { askPageSetSchema, composeAskPageSet } from "./ask-page-set";
+export const prepareAskPageSet: typeof import("./ask-page-set").prepareAskPageSet = (...args) => import("./ask-page-set").then(module => module.prepareAskPageSet(...args));
 export * from "./rebuild-benchmark";
 
 export const readAgencyWebsiteDocument: typeof import("./agency-document-service").readAgencyWebsiteDocument = (...args) => import("./agency-document-service").then(module => module.readAgencyWebsiteDocument(...args));

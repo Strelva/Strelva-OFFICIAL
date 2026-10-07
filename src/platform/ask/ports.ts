@@ -1,6 +1,6 @@
 import type { UnifiedEvent } from "@/lib/types";
 import { observedTenantRoute } from "@/platform/needs-you/tenant-classify";
-import { createPossibility, type PossibilityRepository } from "@/platform/possibilities";
+import { createPossibility, type DeclaredEffect, type PossibilityRepository } from "@/platform/possibilities";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { AskChangeKind, AskChangeOrigin, AskNeedsYouRoute, AskedOnBehalf } from "./contracts";
 import type { AskAuthoritySnapshot } from "./authority";
@@ -220,6 +220,10 @@ export interface AskPossibilityInput {
   introduces: { key: string; name: string; purpose: string; summary: string } | null;
   /** A change to an existing System: summary only; the candidate is built later. */
   check: string;
+  words?: string;
+  origin?: AskChangeOrigin;
+  askedOnBehalf?: AskedOnBehalf | null;
+  candidate?: { kind: "website-pages"; pages: Array<{ path: string; title: string; description: string; paragraphs: string[] }> };
 }
 
 export interface AskOpenedPossibility {
@@ -227,6 +231,8 @@ export interface AskOpenedPossibility {
   status: "exploring";
   /** False when the repository does not survive a deploy (in-memory today). */
   durable: boolean;
+  previewHref?: string;
+  reviewStatus?: "needs_you" | "pending_sync";
 }
 
 export interface AskPossibilityPort {
@@ -240,12 +246,22 @@ export interface AskPossibilityPort {
  * can be opened here today: a change to an existing System needs a pinned
  * baseline revision, which managed websites do not have yet.
  */
-export function createPossibilityAdapter(repository: PossibilityRepository, options: { durable: boolean; newId?: () => string; now?: () => string }): AskPossibilityPort {
+export class AskPossibilityUnsupportedError extends Error {}
+export class AskPreparedPossibilityError extends Error {
+  constructor(public readonly draftId: string | null) { super("A native draft was prepared, but the Possibility could not finish saving. No live change was made."); }
+}
+
+export function createPossibilityAdapter(repository: PossibilityRepository, options: {
+  durable: boolean; newId?: () => string; now?: () => string;
+  prepare?: (actor: WorkspaceActor, input: AskPossibilityInput, possibilityId: string) => Promise<{ content: Record<string, unknown>; effects: DeclaredEffect[]; previewHref: string }>;
+}): AskPossibilityPort {
   const newId = options.newId ?? (() => crypto.randomUUID());
   const now = options.now ?? (() => new Date().toISOString());
   return {
     async open(actor, input) {
-      if (!input.introduces) throw new Error("possibility_needs_baseline");
+      if (!input.introduces || !input.candidate || !options.prepare) throw new AskPossibilityUnsupportedError("This alternative needs a supported working candidate or a pinned existing System baseline.");
+      const id = newId();
+      const prepared = await options.prepare(actor, input, id);
       const possibility = createPossibility({
         title: input.title,
         intent: input.intent,
@@ -253,12 +269,14 @@ export function createPossibilityAdapter(repository: PossibilityRepository, opti
           key: input.introduces.key,
           name: input.introduces.name,
           purpose: input.introduces.purpose,
-          candidate: { summary: input.introduces.summary, content: {} },
+          candidate: { summary: input.introduces.summary, content: prepared.content },
         }],
         checks: [{ id: "owner-tries-it", description: input.check }],
-      }, { id: newId(), businessId: input.workspaceId, actorId: actor.userId, at: now() });
-      await repository.create(possibility);
-      return { id: possibility.id, status: "exploring", durable: options.durable };
+        effects: prepared.effects,
+      }, { id, businessId: input.workspaceId, actorId: actor.userId, at: now() });
+      try { await repository.create(possibility); }
+      catch { throw new AskPreparedPossibilityError(typeof prepared.content.rebuildWorkId === "string" ? prepared.content.rebuildWorkId : null); }
+      return { id: possibility.id, status: "exploring", durable: options.durable, previewHref: prepared.previewHref };
     },
     async list(workspaceId) {
       return (await repository.list(workspaceId)).map((p) => ({ id: p.id, title: p.title, status: p.status }));

@@ -7,7 +7,6 @@ import { systemsReleasedFor } from "@/platform/systems-release";
 import {
   AskConversationNotFoundError,
   askReleaseMayBeOn,
-  createPossibilityAdapter,
   createNeedsYouAskAdapter,
   createServiceRequestAdapter,
   createSupabaseAskHistory,
@@ -19,7 +18,7 @@ import {
 import { loadTenantAskTools, tenantGoogleWriteGranted } from "@/platform/ask/tenant-tools-adapter";
 import { createAskWorkspaceDraftPort } from "./workspace-drafts-server";
 import { streamModelText } from "@/platform/infra/model-calls";
-import { createSupabasePossibilityRepository } from "@/platform/possibilities/supabase-repository";
+import { createAskPossibilityPort } from "./possibilities-server";
 import { PostgresServiceRequestStore, ServiceRequestService } from "@/platform/service-requests";
 import { readExistingSystemsSnapshot } from "@/platform/systems/from-existing";
 import { readWorkspaceExit } from "@/platform/workspace-exit";
@@ -113,7 +112,9 @@ export async function POST(request: Request) {
       needsYou: needsYou.port,
       workspaceDrafts: createAskWorkspaceDraftPort({ sync: (current, workspaceId) => needsYouService().sync({ actor: current, workspaceId }), needsYouStore }),
       requests,
-      possibilities: createPossibilityAdapter(createSupabasePossibilityRepository(actor), { durable: true }),
+      possibilities: createAskPossibilityPort(actor, {
+        ...(needsYouReleaseEnabled() ? { sync: (current, workspaceId) => needsYouService().sync({ actor: current, workspaceId }) } : {}),
+      }),
       async stream(input, consume, emitted) {
         await streamModelText(
           { purpose: "ask", ...input.context },

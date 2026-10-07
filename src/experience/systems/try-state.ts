@@ -1,5 +1,7 @@
 import { verifyPossibilityPreviewToken } from "@/platform/possibilities/preview-link";
 import type { PossibilityTryState } from "./PossibilityTry";
+import { siteDocumentSchema } from "@/products/websites/client";
+import { siteDocumentHash } from "@/products/websites/index";
 
 /**
  * The state of a signed "Try it" link (systems-experience spec behavior 19).
@@ -12,7 +14,7 @@ export async function possibilityTryState(token: string, deps: {
   read(claims: { businessId: string; possibilityId: string; candidateRevision: number }): Promise<{
     title: string; intent: string;
     changes: Array<{ candidate: { summary: string; content: Record<string, unknown> } }>;
-    introduces: Array<{ name: string }>;
+    introduces: Array<{ name: string; candidate?: { content: Record<string, unknown> } }>;
     effects: Array<{ channel?: string }>;
   } | null>;
 }, now = Date.now()): Promise<PossibilityTryState | null> {
@@ -21,6 +23,11 @@ export async function possibilityTryState(token: string, deps: {
   if (!(await deps.enabled(claims.workspaceId).catch(() => false))) return null;
   const p = await deps.read({ businessId: claims.workspaceId, possibilityId: claims.possibilityId, candidateRevision: claims.candidateRevision }).catch(() => null);
   if (!p) return { kind: "changed" };
+  const website = p.introduces.find(intro => intro.candidate?.content.kind === "ask-website-pages");
+  const document = siteDocumentSchema.safeParse(website?.candidate?.content.document);
+  if (website && !document.success) return { kind: "changed" };
+  if (website && document.success && (siteDocumentHash(document.data) !== website.candidate?.content.candidateContentHash
+    || document.data.capabilities || Object.values(document.data.nodes).some(node => node.type === "Booking" || node.type === "InquiryForm"))) return { kind: "changed" };
   return {
     kind: "ready",
     view: {
@@ -28,9 +35,10 @@ export async function possibilityTryState(token: string, deps: {
       intent: p.intent,
       changes: p.changes.map((change) => change.candidate.summary.replace(/^the /, "The ")),
       introduces: p.introduces.map((intro) => intro.name),
-      takesSubmissions: p.introduces.length > 0
+      ...(document.success ? { websiteDocument: document.data } : {}),
+      takesSubmissions: !document.success && (p.introduces.length > 0
         || p.effects.some((effect) => effect.channel === "inquiry_form" || effect.channel === "booking_page")
-        || p.changes.some((change) => "form" in change.candidate.content),
+        || p.changes.some((change) => "form" in change.candidate.content)),
     },
   };
 }

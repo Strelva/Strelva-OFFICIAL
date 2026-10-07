@@ -5,6 +5,7 @@ import type { WorkspaceActor, WorkspaceRole } from "@/platform/workspaces/types"
 import { authorizeAskTool, type AskAuthoritySnapshot } from "./authority";
 import { ASK_TOOL_CATALOG, type AskChangeKind, type AskChangeOrigin, type AskToolId, type AskedOnBehalf, type AskResultKind } from "./contracts";
 import type { AskAuthorityReader, AskNeedsYouRouting, AskPossibilityPort, AskRequestPort, NeedsYouPort } from "./ports";
+import { AskPossibilityUnsupportedError, AskPreparedPossibilityError } from "./ports";
 
 /**
  * The 18 Ask Strelva tools (spec section 5, Tool inventory). Each one is a
@@ -321,7 +322,7 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
       }),
     }),
     open_possibility: tool({
-      description: "Open a Possibility: a working alternative beside a System, for asks bigger than an edit (a new flow such as consult booking, a new page set). Nothing live changes; Make real runs later through approvals. Give a short kebab-case key (e.g. consult-booking) and a name for the new System it introduces.",
+      description: "Prepare a real new informational website/page set as an isolated Possibility. Supply candidate kind website-pages with complete page copy and a home page. All copy needs owner review; Make real goes through Needs you. Booking, intake, apps, changes to existing Systems, or alternatives without this supported candidate are filed honestly as Requests at Asked. Never substitute informational pages for a requested working flow.",
       inputSchema: z.object({
         title: z.string().min(1).max(160),
         intent: z.string().min(1).max(2_000),
@@ -329,6 +330,13 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
         newSystemName: z.string().min(1).max(120),
         purpose: z.string().min(1).max(500),
         summary: z.string().min(1).max(500),
+        candidate: z.object({
+          kind: z.literal("website-pages"),
+          pages: z.array(z.object({
+            path: z.string().min(1).max(80), title: z.string().min(1).max(70),
+            description: z.string().max(160), paragraphs: z.array(z.string().min(1).max(600)).min(1).max(8),
+          }).strict()).min(1).max(6),
+        }).strict().optional(),
       }),
       execute: (input) => guarded("open_possibility", async () => {
         try {
@@ -336,12 +344,27 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
             workspaceId: ctx.workspaceId, systemId: ctx.systemId, title: input.title, intent: input.intent,
             introduces: { key: input.newSystemKey, name: input.newSystemName, purpose: input.purpose, summary: input.summary },
             check: "The owner opens it and tries it before choosing Make real.",
+            candidate: input.candidate,
+            words: ctx.lastUserText, origin: ctx.origin, askedOnBehalf: ctx.askedOnBehalf,
           });
           ctx.onReceipt({ kind: "possibility", toolId: "open_possibility", status: "opened", ids: [opened.id], summary: `${input.title} · Draft` });
-          return { success: true, possibilityId: opened.id, status: "Draft", agentResultStatus: "drafted", message: `Opened "${input.title}" as a Possibility. Nothing live changed; it waits until someone opens it and chooses Make real.` };
-        } catch {
-          ctx.onReceipt({ kind: "possibility", toolId: "open_possibility", status: "failed", ids: [], summary: "Could not open the Possibility." });
-          return { success: false, error: "I couldn't open that Possibility. Nothing changed.", agentResultStatus: "failed" };
+          return { success: true, possibilityId: opened.id, previewHref: opened.previewHref, reviewStatus: opened.reviewStatus, status: "Draft", agentResultStatus: "drafted", message: `Prepared "${input.title}" as a working page-set Possibility. Open the preview to navigate its pages. ${opened.reviewStatus === "needs_you" ? "Copy is handed to Needs you for owner review." : "Copy still needs owner review; the saved draft is waiting for Needs you synchronization."} Nothing live changed.` };
+        } catch (error) {
+          if (error instanceof AskPossibilityUnsupportedError) {
+            try {
+              requestCount += 1;
+              const filed = await ctx.requests.file(ctx.actor, {
+                workspaceId: ctx.workspaceId, systemId: ctx.systemId, words: ctx.lastUserText || input.intent,
+                outcome: input.intent, read: [error.message], askedOnBehalf: ctx.askedOnBehalf, topic: input.title,
+                idempotencyKey: `ask:${ctx.turnId}:${requestCount}`,
+              });
+              ctx.onReceipt({ kind: "request", toolId: "open_possibility", status: "filed", ids: [filed.id], summary: input.intent.slice(0, 300) });
+              return { success: true, requestId: filed.id, agentResultStatus: "queued", message: "This needs work beyond the supported working page-set candidate. Filed your original ask for Strelva at Asked. Scope and timing still need agreement; no working flow or live change is claimed." };
+            } catch { /* Report the failed filing below. */ }
+          }
+          const draftId = error instanceof AskPreparedPossibilityError ? error.draftId : null;
+          ctx.onReceipt({ kind: "possibility", toolId: "open_possibility", status: "failed", ids: draftId ? [draftId] : [], summary: draftId ? "A native draft was saved, but the Possibility could not finish saving. No live change was made." : "Could not finish the Possibility. No live change was made." });
+          return { success: false, draftWorkId: draftId, error: draftId ? "I saved a native draft but couldn't finish the Possibility. Reopen the saved draft to continue. No live change was made." : "I couldn't finish that Possibility. No live change was made.", agentResultStatus: "failed" };
         }
       }),
     }),

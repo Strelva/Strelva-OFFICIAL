@@ -32,7 +32,7 @@ import { createIsolatedAdapter } from "@/platform/make-real/isolated-adapters";
 import { customerActivationView } from "@/platform/make-real/view";
 import type { BusinessSystems, SystemListing } from "@/platform/systems/from-existing";
 import type { SystemRevision } from "@/platform/systems/contracts";
-import type { WebsiteRebuildCandidate } from "@/products/websites/index";
+import { siteDocumentSchema, unresolvedSiteFacts, type WebsiteRebuildCandidate, type WebsiteRebuildRecord } from "@/products/websites/index";
 import type {
   WorkspaceSystemActivation,
   WorkspaceSystemHistoryRow,
@@ -150,6 +150,44 @@ export async function syncRebuildPossibilities(deps: {
   return stored;
 }
 
+/** Native Ask drafts keep their exact content/hash pin as the owner reviews copy. */
+export async function syncAskPageSetPossibilities(deps: {
+  repo: SupabasePossibilityRepository; live: LiveSystemsReader; actorId: string; at: string;
+  stored: ListedPossibility[]; canWrite: boolean;
+  read(workId: string): Promise<WebsiteRebuildRecord>;
+}): Promise<ListedPossibility[]> {
+  if (!deps.canWrite) return deps.stored;
+  const rows = [...deps.stored];
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index]!;
+    let p = row.possibility;
+    const intro = p.introduces.find(item => item.candidate.content.kind === "ask-website-pages");
+    const workId = intro?.candidate.content.rebuildWorkId;
+    if (!intro || typeof workId !== "string" || p.activationId || !["exploring", "ready"].includes(p.status)) continue;
+    try {
+      const record = await deps.read(workId);
+      const candidate = record.rebuild.candidate;
+      if (record.workspaceId !== p.businessId || !candidate || record.rebuild.status === "published") continue;
+      const content = { ...intro.candidate.content, candidateRevision: candidate.revision, candidateContentHash: candidate.contentHash, document: candidate.document };
+      if (canonicalJson(content) !== canonicalJson(intro.candidate.content)) {
+        const revised = reviseCandidate(p, {
+          introduces: p.introduces.map(item => item.key === intro.key ? { ...item, candidate: { ...item.candidate, content } } : item),
+          effects: p.effects.map(effect => effect.channel === "hosted_website" && effect.request.workId === workId ? { ...effect, request: { workId, candidateRevision: candidate.revision, candidateContentHash: candidate.contentHash } } : effect),
+        }, p.revision, deps.actorId, deps.at);
+        await deps.repo.save(revised, p.revision);
+        p = revised;
+      }
+      const checked = siteDocumentSchema.parse(candidate.document);
+      const reviewed = ["review_ready", "approved"].includes(record.rebuild.status)
+        && unresolvedSiteFacts(checked).length === 0
+        && Object.values(checked.nodes).every(node => !node.verification?.needsReview);
+      if (p.status === "exploring" && reviewed) p = await prepare(p, true, deps);
+      rows[index] = { ...row, possibility: p };
+    } catch { /* Unreadable or concurrent candidates stay held for review. */ }
+  }
+  return rows;
+}
+
 function lastStale(p: Possibility): string | null {
   const last = [...p.history].reverse().find((h) => h.kind === "stale" || h.kind === "ready" || h.kind === "revise");
   return p.status === "exploring" && last?.kind === "stale" ? last.detail ?? "A System it changes moved since it was built." : null;
@@ -159,14 +197,16 @@ function lastStale(p: Possibility): string | null {
 export function storedPossibilityViews(stored: readonly ListedPossibility[], candidates: readonly WebsiteRebuildCandidate[], summaries: { evidence: (workId: string) => string | null } = { evidence: () => null }): WorkspaceSystemPossibility[] {
   return stored.flatMap(({ possibility: p, sourceRef }) => {
     if (p.status !== "exploring" && p.status !== "ready") return [];
-    const workId = sourceRef?.startsWith(REBUILD_SOURCE_PREFIX) ? sourceRef.slice(REBUILD_SOURCE_PREFIX.length) : null;
+    const askContent = p.introduces.find(intro => intro.candidate.content.kind === "ask-website-pages")?.candidate.content;
+    const workId = sourceRef?.startsWith(REBUILD_SOURCE_PREFIX) ? sourceRef.slice(REBUILD_SOURCE_PREFIX.length)
+      : typeof askContent?.rebuildWorkId === "string" ? askContent.rebuildWorkId : null;
     const candidate = workId ? candidates.find((item) => item.workId === workId) : undefined;
     return [{
       id: p.id,
       title: p.title,
       summary: candidate?.summary ?? p.intent,
       status: p.status,
-      affects: p.changes.map((c) => c.baseline.systemId),
+      affects: [...p.changes.map((c) => c.baseline.systemId), ...(typeof askContent?.contextSystemId === "string" ? [askContent.contextSystemId] : [])],
       evidence: candidate?.evidence ?? (workId ? summaries.evidence(workId) : null),
       previewHref: candidate?.previewHref ?? null,
       workId: workId ?? p.id,

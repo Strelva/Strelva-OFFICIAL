@@ -366,7 +366,7 @@ describe("startAskTurn", () => {
     expect(ASK_TOOL_IDS.some((id) => /publish|send|approve/.test(id))).toBe(false);
   });
 
-  it("opens a Possibility beside the site and says nothing live changed", async () => {
+  it("files original booking words at Asked instead of claiming a working summary-only Possibility", async () => {
     const h = harness({
       script: async function* (tools) {
         const output = await tools.open_possibility!.execute({
@@ -378,9 +378,10 @@ describe("startAskTurn", () => {
       },
     });
     const result = await run(h.deps, "We now do estate planning consults. Add it and let people book one.");
-    expect(result.text).toContain("Nothing live changed");
-    expect(await h.repository.list(WS)).toEqual([expect.objectContaining({ id: "poss-1", status: "exploring", title: "Consult booking" })]);
-    expect(result.result).toMatchObject({ ask: { kind: "possibility", items: [{ kind: "possibility", status: "opened", ids: ["poss-1"] }] } });
+    expect(result.text).toContain("Filed your original ask");
+    expect(await h.repository.list(WS)).toEqual([]);
+    expect(h.filed[0]).toMatchObject({ words: "We now do estate planning consults. Add it and let people book one.", outcome: "Let people book an estate planning consult" });
+    expect(result.result).toMatchObject({ ask: { kind: "request", items: [{ kind: "request", status: "filed", ids: ["req-1"] }] } });
   });
 
   it("asks which site in a two-site business instead of guessing", async () => {

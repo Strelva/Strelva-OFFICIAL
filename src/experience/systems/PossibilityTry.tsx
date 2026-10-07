@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
+import { SiteDocumentTry, type SiteDocument } from "@/products/websites/client";
 
 export interface PossibilityTryView {
   title: string;
@@ -12,6 +13,7 @@ export interface PossibilityTryView {
   introduces: string[];
   /** Whether the candidate takes submissions (a form or a booking page). */
   takesSubmissions: boolean;
+  websiteDocument?: SiteDocument;
 }
 
 export type PossibilityTryState =
@@ -38,13 +40,14 @@ export function PossibilityTry({ state }: { state: PossibilityTryState }) {
         {view.introduces.map((line) => <li key={`new-${line}`}>New: {line}</li>)}
       </ul>
     </section> : null}
-    {view.takesSubmissions ? <TestSubmission /> : null}
+    {view.websiteDocument ? <div className="mt-6"><SiteDocumentTry document={view.websiteDocument} /></div> : null}
+    {view.takesSubmissions && !view.websiteDocument ? <TestSubmission /> : null}
     <p className="mt-8 text-xs text-gray-muted">Nothing here changes your live site, sends a message or books anything. Make it live from the email when you are ready.</p>
   </Shell>;
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
-  return <div data-dashboard className="min-h-screen bg-surface-base text-gray-fg"><main className="mx-auto w-full max-w-xl px-4 py-10 sm:py-16">{children}</main></div>;
+  return <div data-dashboard className="min-h-screen bg-surface-base text-gray-fg"><main className="mx-auto w-full max-w-5xl px-4 py-10 sm:py-16">{children}</main></div>;
 }
 
 function TestSubmission() {
