@@ -589,8 +589,8 @@ recorded with the website rebuild delivery evidence.
 
 ### Booking conflict choices and intake
 
-The native visitor form in `custom-repo-starter/StrelvaBookingForm.tsx` and its
-exported `website-generation/capability-runtime.mjs` preserve visitor input when
+The native visitor form in [StrelvaBookingForm](../../custom-repo-starter/StrelvaBookingForm.tsx) and its
+[exported runtime](../../custom-repo-starter/website-generation/capability-runtime.mjs) preserve visitor input when
 a time is taken. Store-served conflict responses offer at most three fresh slots;
 the forms replace stale choices and keep reserve/change disabled when there are
 none. The existing legacy BookingWidget shows the suggested local times in its
