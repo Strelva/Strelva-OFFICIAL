@@ -621,6 +621,11 @@ psql "${psql_args[@]}" --file="$repo_root/tests/website-linked-publication-schem
 # facts from the business record, inquiries in tenant_leads, spam in the
 # spam pit, domain-ownership proof, and the connected_site System origin.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008151000_connected_sites.sql"
+# The new public reader replaces the historical looser connected-site filter.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012110000_business_pages.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012110000_business_pages.sql"
+psql "${psql_args[@]}" -Atc "select to_regclass('public.business_pages') is null and to_regprocedure('public.business_confirmed_public_facts(uuid)') is null" | grep -qx t
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012110000_business_pages.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-client-records-schema.sql"
@@ -915,6 +920,17 @@ for policy_guard_phase in current history; do
   fi
 done
 printf 'Policy rollback guards preserved current terms and undone history.\n'
+# Public policy output after the policy projection exists; saved pages block rollback.
+psql "${psql_args[@]}" --file="$repo_root/tests/business-pages-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-pages-rollback-schema.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012110000_business_pages.sql" >"$cluster_root/business-pages-rollback-refusal.log" 2>&1; then
+  printf 'Business page rollback discarded saved publication settings.\n' >&2
+  exit 1
+fi
+grep -q 'business_pages_rollback_requires_data_preservation' "$cluster_root/business-pages-rollback-refusal.log"
+psql "${psql_args[@]}" -Atc "select exists(select 1 from public.business_pages where handle='rollback-fixture') and to_regprocedure('public.business_confirmed_public_facts(uuid)') is not null" | grep -qx t
+printf 'Business page rollback preserved saved publication settings.\n'
+
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

@@ -5,6 +5,7 @@
  * calls recheck the key, the proven host and the Origin.
  */
 import { z } from "zod";
+import { businessRecordSchema, type BusinessRecord } from "@/platform/business-record/contracts";
 import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { connectedSiteSchema, resolvedConnectedSiteSchema, type ConnectedInquiry, type ConnectedSite, type ResolvedConnectedSite } from "./contracts";
@@ -32,7 +33,7 @@ export interface ConnectedSitesStore {
   inquiries(actor: WorkspaceActor, workspaceId: string, limit: number): Promise<ConnectedInquiry[]>;
   activity(actor: WorkspaceActor, workspaceId: string, days: number): Promise<Record<string, Record<string, number>>>;
   resolve(publicKey: string): Promise<ResolvedConnectedSite | null>;
-  context(publicKey: string): Promise<{ revision: number; facts: Record<string, unknown>; services: Array<{ name: string; description: string | null; priceText: string | null }>; site: { captureForms: boolean; injectSchema: boolean } } | null>;
+  context(publicKey: string): Promise<{ policyFacts?: BusinessRecord["facts"]; revision: number; facts: Record<string, unknown>; services: Array<{ name: string; description: string | null; priceText: string | null }>; site: { captureForms: boolean; injectSchema: boolean } } | null>;
   recordEvents(publicKey: string, origin: string | null, events: StoredEvent[]): Promise<number>;
   recordInquiry(publicKey: string, origin: string | null, lead: StoredLead): Promise<{ status: "recorded" | "exists" | "duplicate"; id: string; workspaceId: string }>;
   recordSpam(publicKey: string, origin: string | null, input: { recordId: string; payload: Record<string, unknown>; payloadHash: string; capturedAt: string }): Promise<{ status: "recorded" | "exists" }>;
@@ -78,7 +79,7 @@ export function createConnectedSitesStore(db?: ConnectedSitesRpc): ConnectedSite
       const data = await rpc("read_connected_site_context", { p_public_key: publicKey });
       if (!data) return null;
       return z.object({
-        revision: z.number(), facts: z.record(z.string(), z.unknown()),
+        revision: z.number(), facts: z.record(z.string(), z.unknown()), policyFacts: businessRecordSchema.shape.facts.optional(),
         services: z.array(z.object({ name: z.string(), description: z.string().nullable(), priceText: z.string().nullable() })),
         site: z.object({ captureForms: z.boolean(), injectSchema: z.boolean() }),
       }).parse(data);
