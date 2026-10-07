@@ -172,6 +172,8 @@ async function oneStoreScenario(world: World) {
   expect(slots).toEqual(expect.arrayContaining(["09:00", "09:30", "10:30", "11:30", "14:30"]));
   const refused = await postBooking(bookingRequest("11:00", "Late Comer"));
   expect(refused.status).toBe(409);
+  const guidance = await refused.json(); expect(guidance.nextSlots).toHaveLength(3); expect(guidance.timeZone).toBe("America/New_York");
+  expect(guidance.nextSlots.every((s: { start: string }) => !["2026-11-06T15:00:00.000Z", "2026-11-06T16:00:00.000Z"].includes(s.start))).toBe(true);
   expect(legacyRows(world.tenant)).toHaveLength(1);
 
   // 5. Even a direct claim on an overlapping time is refused by the store.

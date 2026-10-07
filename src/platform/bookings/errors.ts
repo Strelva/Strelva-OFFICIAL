@@ -5,3 +5,6 @@ export class PublicBookingError extends Error {
   }
 }
 
+export function pausedBookingMessage(phone: string | null): string {
+  return phone ? `Bookings are paused right now. Call ${phone} to reach the business.` : "Bookings are paused right now. Contact the business directly.";
+}

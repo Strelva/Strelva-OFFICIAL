@@ -3,7 +3,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StrelvaBookingForm, StrelvaConnectedBookingForm } from "../StrelvaBookingForm";
-import { bookingRequestStorageKey, clearBookingRequestDraft, createBookingRequestId } from "../booking-client";
+import { PublicBookingConflictError, bookingRequestStorageKey, clearBookingRequestDraft, createBookingRequestId } from "../booking-client";
 import type { PublicBookingReceipt, PublicBookingSchedule } from "../booking-client";
 
 const schedule: PublicBookingSchedule = {
@@ -239,5 +239,24 @@ describe("native booking form", () => {
     });
     expect(container.textContent).toContain("secure");
     expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe("fresh conflict choices", () => {
+  it("replaces stale slots, preserves visitor fields and retries the suggested slot", async () => {
+    const nextSlots = [{ id: "slot-next-abcdefgh", start: "2026-10-02T13:00:00Z", end: "2026-10-02T14:00:00Z" }];
+    const onReserve = vi.fn().mockRejectedValueOnce(new PublicBookingConflictError("That time was taken.", nextSlots, schedule.timeZone)).mockResolvedValueOnce({ ...receipt, ...nextSlots[0] });
+    await renderForm({ onReserve });
+    const name = container.querySelector<HTMLInputElement>('input[name="name"]')!;
+    const email = container.querySelector<HTMLInputElement>('input[name="email"]')!;
+    await act(async () => { setValue(name, "Avery Buyer"); setValue(email, "avery@example.test"); });
+    const form = container.querySelector<HTMLFormElement>('form[aria-label="Reserve a time"]')!;
+    await act(async () => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    expect(container.querySelectorAll("option")).toHaveLength(1);
+    expect(container.querySelector<HTMLSelectElement>("select")!.value).toBe(nextSlots[0]!.id);
+    expect(container.textContent).toContain("The next available times"); expect(name.value).toBe("Avery Buyer");
+    await act(async () => form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    expect(onReserve.mock.calls[1]).toEqual([nextSlots[0], { name: "Avery Buyer", email: "avery@example.test" }]);
   });
 });

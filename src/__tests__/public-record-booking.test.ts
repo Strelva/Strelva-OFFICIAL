@@ -91,7 +91,8 @@ describe("record-served public visitor bookings", () => {
     expect(changed.status).toBe("pending"); expect(store.rows[0]!.start).toBe(changed.start);
     store.tenants.get(tenant)!.paused = true;
     expect((await api.read({ tenantId: tenant, capabilityId: "consultation" })).slots).toEqual([]);
-    await expect(api.change({ tenantId: tenant, capabilityId: "consultation", capabilityVersion: 1, reservationId: receipt.reservationId, managementToken: receipt.managementToken, slotId: available.slots[0]!.id })).rejects.toMatchObject({ code: "conflict" });
+    await expect(api.reserve({ tenantId: tenant, capabilityId: "consultation", capabilityVersion: 1, slotId: available.slots[0]!.id, visitor: { name: "Ada", email: "ada@example.test" }, requestId: "paused-request-".repeat(3) })).rejects.toMatchObject({ code: "conflict", message: "Bookings are paused right now. Call 555-0100 to reach the business." });
+    await expect(api.change({ tenantId: tenant, capabilityId: "consultation", capabilityVersion: 1, reservationId: receipt.reservationId, managementToken: receipt.managementToken, slotId: available.slots[0]!.id })).rejects.toMatchObject({ code: "conflict", message: "Bookings are paused right now. Call 555-0100 to reach the business. You can still cancel your reservation." });
     expect((await api.cancel({ tenantId: tenant, reservationId: receipt.reservationId, managementToken: receipt.managementToken })).status).toBe("cancelled");
     expect(store.rows[0]!.status).toBe("cancelled");
   });

@@ -3,6 +3,9 @@ import { fakeBookingStore } from "./support/booking-store-fake";
 import { recordBooking, readTenantBookings, setBookingStoreDb, type StoreBooking } from "@/platform/bookings/store";
 import { setCalendarBusyPorts } from "@/platform/bookings/calendar-busy";
 import { nextOpenTimes } from "@/platform/bookings/lifecycle-ports";
+import { bookingConflictAlternatives, nativeBookingAlternatives } from "@/platform/bookings/conflicts";
+import { PublicBookingError } from "@/platform/bookings/errors";
+import { resetBookingFlagCache } from "@/platform/bookings/flags";
 import { changeNativeBooking, nativeSlots } from "@/platform/bookings/native";
 
 let store: ReturnType<typeof fakeBookingStore>;
@@ -33,7 +36,26 @@ beforeEach(async () => {
   } });
   setCalendarBusyPorts(null);
 });
-afterEach(() => { vi.unstubAllEnvs(); vi.useRealTimers(); setBookingStoreDb(undefined); setCalendarBusyPorts(undefined); });
+afterEach(() => { vi.unstubAllEnvs(); resetBookingFlagCache(); vi.useRealTimers(); setBookingStoreDb(undefined); setCalendarBusyPorts(undefined); });
+
+describe("fresh conflict alternatives", () => {
+  it("returns at most three current provider-free slots only after the read gate", async () => {
+    const read = vi.fn(() => nativeBookingAlternatives(tenant, "consult"));
+    const error = new PublicBookingError("conflict", "Taken");
+    vi.stubEnv("STRELVA_BOOKING_STORE_READ", "");
+    expect(await bookingConflictAlternatives(error, read)).toEqual({}); expect(read).not.toHaveBeenCalled();
+    vi.stubEnv("STRELVA_BOOKING_STORE_WRITE", "1"); vi.stubEnv("STRELVA_BOOKING_STORE_READ", "postgres"); store.state.streakDays = 7; resetBookingFlagCache();
+    setCalendarBusyPorts({ connection: async () => ({ provider: "google", status: "connected" }), busy: async () => [{ start: "2026-11-06T15:30:00Z", end: "2026-11-06T16:45:00Z" }] });
+    const alternatives = await bookingConflictAlternatives(error, read);
+    expect(alternatives.timeZone).toBe("America/New_York"); expect(alternatives.nextSlots).toHaveLength(3);
+    expect(alternatives.nextSlots?.[0]).toEqual({ id: "2026-11-06T17:00:00.000Z", start: "2026-11-06T17:00:00.000Z", end: "2026-11-06T18:15:00.000Z" });
+    expect(await bookingConflictAlternatives(new PublicBookingError("invalid", "Invalid"), read)).toEqual({});
+    store.tenants.get(tenant)!.paused = true;
+    expect((await bookingConflictAlternatives(error, read)).nextSlots).toEqual([]);
+    store.state.down = true;
+    expect(await bookingConflictAlternatives(error, read)).toEqual({});
+  });
+});
 
 describe("booking changes follow the current service contract", () => {
   it("reschedules a formerly 30-minute booking to the service's current 75-minute slot", async () => {
@@ -57,7 +79,8 @@ describe("booking changes follow the current service contract", () => {
     expect(changes).toEqual([]); expect((await readTenantBookings(tenant))[0]).toMatchObject({ start: booking.start, end: booking.end, status: "confirmed" });
   });
   it("pause and unavailable storage produce no alternative times", async () => {
-    store.tenants.get(tenant)!.paused = true;
+    store.tenants.get(tenant)!.paused = true; store.tenants.get(tenant)!.phone = "716-555-0100";
+    await expect(changeNativeBooking("manage-hash", "reschedule", "2026-11-06T15:30:00Z")).rejects.toMatchObject({ code: "conflict", message: "Bookings are paused right now. Call 716-555-0100 to reach the business." });
     expect(await nextOpenTimes(booking, now)).toEqual([]);
     store.tenants.get(tenant)!.paused = false; store.state.down = true;
     expect(await nextOpenTimes(booking, now)).toEqual([]);

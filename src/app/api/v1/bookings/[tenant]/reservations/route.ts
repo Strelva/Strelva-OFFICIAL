@@ -1,9 +1,10 @@
+import { bookingAlternativeRange, nativeBookingAlternatives } from "@/platform/bookings/conflicts";
 import { agentBookingSchema, agentReceipt, requestAgentBooking } from "@/platform/bookings/native";
 import { deliverBookingUpdates } from "@/platform/bookings/updates";
 import { isTenantId } from "@/lib/scaffold-contracts";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { publicBookingVisitorSchema } from "@/products/scheduling/server";
-import { bookingError, bookingJson, bookingOptions, bookingService, bodyObject, stringValue } from "../../_shared";
+import { bookingConflictError, bookingJson, bookingOptions, bookingService, bodyObject, stringValue } from "../../_shared";
 
 function integerValue(value: unknown): number | undefined {
   return Number.isSafeInteger(value) && Number(value) > 0 ? Number(value) : undefined;
@@ -31,7 +32,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       const result = await requestAgentBooking(tenant, parsed.data);
       await deliverBookingUpdates(result.booking.id).catch(() => undefined);
       return bookingJson(agentReceipt(result), result.created ? 201 : 200);
-    } catch (error) { return bookingError(error); }
+    } catch (error) { return bookingConflictError(error, () => nativeBookingAlternatives(tenant, parsed.data.serviceId)); }
   }
   const capabilityId = stringValue(body.capabilityId, 200);
   const capabilityVersion = integerValue(body.capabilityVersion);
@@ -51,6 +52,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
       ...(requestId ? { requestId } : {}),
     }), 201);
   } catch (error) {
-    return bookingError(error);
+    return bookingConflictError(error, () => bookingService().read({ tenantId: tenant, capabilityId, range: bookingAlternativeRange() }));
   }
 }
