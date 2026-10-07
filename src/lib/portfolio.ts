@@ -24,6 +24,7 @@ import {
   type LaunchReadinessStatus,
 } from "./launch-readiness";
 import { getTenantDeliveryModel } from "./custom-repos";
+import { workspacePorts } from "./workspace-ports";
 
 /**
  * Monthly recurring revenue in dollars, from the operator-set billing type.
@@ -43,6 +44,18 @@ export function computeMrrDollars(
   }>,
 ): number {
   return tenants.reduce((sum, tenant) => sum + billingMonthlyCents(tenant) / 100, 0);
+}
+/** Flagged business billing read; existing tenant calculation is unchanged off. */
+export async function computeBusinessMrrDollars(tenants: Parameters<typeof computeMrrDollars>[0]): Promise<number> {
+  if (process.env.STRELVA_BUSINESS_BILLING !== "1") return computeMrrDollars(tenants);
+  try {
+    const rows = await (await workspacePorts().businessBilling()).readBusinessPortfolioMrr(tenants.map(t => t.id));
+    if (!rows) return computeMrrDollars(tenants);
+    const linked = new Set(rows.flatMap(row => row.tenantIds));
+    const unique = new Map(rows.map(row => [row.workspaceId, row.monthlyCents]));
+    return [...unique.values()].reduce((sum, amount) => sum + amount / 100, 0)
+      + computeMrrDollars(tenants.filter(tenant => !linked.has(tenant.id)));
+  } catch { return computeMrrDollars(tenants); }
 }
 import { buildOpsReport, type OpsReport } from "./ops";
 import { getRedis } from "@/platform/infra/redis";
@@ -150,7 +163,7 @@ export async function buildPortfolioSnapshot(): Promise<PortfolioSnapshot> {
     tenantCount: TENANTS.length,
     activeTenantCount: TENANTS.filter((t) => t.active).length,
     archivedTenantCount,
-    mrr: computeMrrDollars(TENANTS),
+    mrr: await computeBusinessMrrDollars(TENANTS),
     launchReadyCount: tenants.filter((t) => t.launchStatus === "ready").length,
     launchWatchCount: tenants.filter((t) => t.launchStatus === "watch").length,
     launchBlockedCount: tenants.filter((t) => t.launchStatus === "blocked").length,

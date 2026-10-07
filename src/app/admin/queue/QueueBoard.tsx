@@ -11,7 +11,8 @@ import {
   type OperatorQueue, type QueueBusiness, type QueueItem, type QueuePriority,
 } from "@/platform/operator-queue/contracts";
 import { prefillMinutes } from "@/platform/operator-queue/rules";
-import { closeQueueItemAction, markQueueItemAction, type QueueActionResult } from "./actions";
+import { closeQueueItemAction, markQueueItemAction, resolveQueueDraftsAction, type QueueActionResult } from "./actions";
+import { QueueEventDetail, hasQueueEventDetail } from "@/components/dashboard/QueueEventDetail";
 
 type Tone = "good" | "warn" | "crit" | "neutral" | "accent";
 const PRIORITY_TONE: Record<QueuePriority, Tone> = { P1: "crit", P2: "warn", P3: "accent", P4: "neutral" };
@@ -64,8 +65,8 @@ function useFocusedTime(open: boolean) {
 
 function newId() { return crypto.randomUUID(); }
 
-function Row({ item, me, operators, now, onResult }: {
-  item: QueueItem; me: string; operators: OperatorQueue["operators"]; now: number; onResult: (result: QueueActionResult) => void;
+function Row({ item, me, operators, now, onResult, actionsEnabled }: {
+  item: QueueItem; me: string; operators: OperatorQueue["operators"]; now: number; onResult: (result: QueueActionResult) => void; actionsEnabled: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -105,7 +106,7 @@ function Row({ item, me, operators, now, onResult }: {
     const sendMinutes = logMinutes && /^\d+$/.test(minutes) && value >= 1;
     start(async () => {
       const result = await closeQueueItemAction({
-        commandId: closeId, key: item.key, state: closeState, reason: reason.trim() || (closeState === "done" ? "Handled" : "Not needed"),
+        commandId: closeId, key: item.key, state: closeState, reason: reason.trim() || (actionsEnabled ? "" : closeState === "done" ? "Handled" : "Not needed"),
         minutes: sendMinutes ? { entryId, minutes: value } : null,
       });
       onResult(result);
@@ -151,6 +152,13 @@ function Row({ item, me, operators, now, onResult }: {
 
       {open && (
         <div className="mt-3 rounded-xl border border-glass-border bg-white/[0.02] p-3">
+          {actionsEnabled && item.kind === "draft_review" && item.review && hasQueueEventDetail(item.review) && <QueueEventDetail event={item.review} />}
+          {actionsEnabled && item.kind === "draft_review" && item.move === "strelva" && <div className="mb-3 flex flex-wrap gap-2">
+            {(["approve", "skip", "escalate"] as const).map((action) => <Button key={action} size="sm" disabled={pending} onClick={() => start(async () => {
+              const result = await resolveQueueDraftsAction({ keys: [item.key], action });
+              onResult(result); router.refresh();
+            })}>{action === "approve" ? "Approve" : action === "skip" ? "Skip" : "Ask the owner"}</Button>)}
+          </div>}
           <div className="flex flex-wrap gap-1.5">
             <Button size="sm" variant="ghost" disabled={pending} onClick={() => mark(item.pinned ? "unpin" : "pin")}>{item.pinned ? "Unpin" : "Pin for a day"}</Button>
             <Button size="sm" variant="ghost" disabled={pending || item.priority === "P1"} title={item.priority === "P1" ? "Harm-now items can't be snoozed" : undefined} onClick={() => setPanel("snooze")}>Snooze</Button>
@@ -199,7 +207,7 @@ function Row({ item, me, operators, now, onResult }: {
             <SelectInput label="Outcome" value={closeState} onChange={(event) => setCloseState(event.target.value as "done" | "dismissed")}
               options={[{ value: "done", label: "Done" }, { value: "dismissed", label: "Dismissed" }]} />
             <div className="min-w-[180px] flex-1">
-              <TextInput label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={280} placeholder={closeState === "done" ? "Handled" : "Not needed"} />
+              <TextInput label="Reason" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={280} required={actionsEnabled} placeholder={closeState === "done" ? "What happened?" : "Why is it not needed?"} />
             </div>
           </div>
           <div className="mt-3 flex flex-wrap items-end gap-2">
@@ -225,7 +233,7 @@ function Row({ item, me, operators, now, onResult }: {
   );
 }
 
-export function QueueBoard({ queue, me }: { queue: OperatorQueue; me: string }) {
+export function QueueBoard({ queue, me, actionsEnabled = false }: { queue: OperatorQueue; me: string; actionsEnabled?: boolean }) {
   const [message, setMessage] = useState<QueueActionResult | null>(null);
   const [showParked, setShowParked] = useState(false);
   const now = Date.parse(queue.generatedAt);
@@ -238,7 +246,7 @@ export function QueueBoard({ queue, me }: { queue: OperatorQueue; me: string }) 
     group.items.push(item);
     groups.set(key, group);
   }
-  const rowProps = { me, operators: queue.operators, now, onResult: setMessage };
+  const rowProps = { me, operators: queue.operators, now, onResult: setMessage, actionsEnabled };
 
   return (
     <div className="space-y-4">
@@ -270,6 +278,7 @@ export function QueueBoard({ queue, me }: { queue: OperatorQueue; me: string }) 
             <h2 className="text-[13.5px] font-semibold tracking-[-0.01em] text-warm-white">{group.name}</h2>
             <span className="text-[11px] font-mono text-gray-faint tabular-nums">{group.items.length}</span>
           </div>
+          {actionsEnabled && <BulkDraftReview items={group.items} onResult={setMessage} />}
           <ul className="divide-y divide-glass-border border-t border-glass-border">{group.items.map((item) => <Row key={item.key} item={item} {...rowProps} />)}</ul>
         </section>
       ))}
@@ -300,6 +309,29 @@ export function QueueBoard({ queue, me }: { queue: OperatorQueue; me: string }) 
       )}
     </div>
   );
+}
+
+/** Review the actual proposed changes before a per-business bulk approval. */
+function BulkDraftReview({ items, onResult }: { items: QueueItem[]; onResult: (result: QueueActionResult) => void }) {
+  const drafts = items.filter((item) => item.kind === "draft_review" && item.move === "strelva" && item.review);
+  const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [pending, start] = useTransition();
+  const router = useRouter();
+  if (drafts.length < 2) return null;
+  return <div className="border-t border-glass-border p-4">
+    <Button size="sm" variant="secondary" onClick={() => setOpen(!open)} aria-expanded={open}>Review {drafts.length} drafts together</Button>
+    {open && <div className="mt-3 space-y-3">
+      {drafts.map((item) => <div key={item.key} className="space-y-2">
+        <label className="flex items-center gap-2 text-[13px] text-warm-white"><input type="checkbox" checked={selected.includes(item.key)} disabled={pending} onChange={(event) => setSelected((keys) => event.target.checked ? [...keys, item.key] : keys.filter((key) => key !== item.key))} />{item.title}</label>
+        {item.review && <QueueEventDetail event={item.review} />}
+      </div>)}
+      <Button size="sm" loading={pending} disabled={pending || !selected.length} onClick={() => start(async () => {
+        const result = await resolveQueueDraftsAction({ keys: selected, action: "approve" }); onResult(result);
+        setSelected((keys) => keys.filter((key) => !result.results.some((row) => row.key === key && row.changed))); router.refresh();
+      })}>Approve {selected.length} reviewed drafts</Button>
+    </div>}
+  </div>;
 }
 
 function ParkedAction({ item, onResult }: { item: QueueItem; onResult: (result: QueueActionResult) => void }) {

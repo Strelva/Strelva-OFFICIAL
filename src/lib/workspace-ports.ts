@@ -26,7 +26,7 @@ export interface VerifiedActor {
 
 // ── Client records (src/platform/client-records) ──────────────────────────────
 
-export type ClientRecordStoreName = "spam_held" | "inquiry_timeline" | "inquiry_reply" | "booking_config" | "account_grouping";
+export type ClientRecordStoreName = "spam_held" | "inquiry_timeline" | "inquiry_reply" | "booking_config" | "account_grouping" | "orders" | "provider_connections" | "provider_metadata" | "reward_members" | "reward_transactions" | "threads" | "tenant_settings";
 
 export interface ClientRecordCopy {
   recordId: string;
@@ -95,6 +95,16 @@ export type OutsideWriteAcceptance = "accepted" | "rejected" | "unknown";
 export type ReadbackCheck = { result: "matched" | "differs" | "failed"; detail: string };
 
 export interface OutsideWriteReceiptsPort {
+  beginGoogleWrite(input: { commandKey: string; tenantId: string; writeKind: "gbp_hours" | "gbp_post" | "gbp_photo"; request: Record<string, unknown> }): Promise<{ claimed: boolean; attemptId: string; acceptance: "pending" | OutsideWriteAcceptance; receipt?: { providerRef: string | null; readback: string } | null }>;
+  completeGoogleWrite(attemptId: string, input: Parameters<OutsideWriteReceiptsPort["recordGoogleWrite"]>[0]): Promise<{ id: string }>;
+  recordReadback(receiptId: string, readback: "matched" | "differs" | "failed" | "not_possible", detail: string): Promise<unknown>;
+  /** Legacy Google writes join the same ledger when the operator release is on. */
+  recordGoogleWrite(input: {
+    commandKey: string; tenantId: string; writeKind: "gbp_hours" | "gbp_post" | "gbp_photo";
+    subject: string; request: Record<string, unknown>; beforeState?: unknown;
+    acceptance: OutsideWriteAcceptance; acceptanceDetail?: string; providerRef?: string;
+    readback?: "pending" | "matched" | "differs" | "failed" | "not_possible"; readbackDetail?: string; actor: string;
+  }): Promise<unknown>;
   /** A Google review reply, after publish and its immediate read-back. Never throws on storage failure. */
   recordReviewReply(input: {
     tenantId: string; reviewId: string; replyText: string; actor: string;
@@ -123,9 +133,22 @@ export interface TenantOwnerRecipientRow {
   workspaceId: string | null;
 }
 
+/** Public confirmed facts only; the SQL reader never returns owner contacts. */
+export interface TenantBusinessContext {
+  revision: number;
+  facts: {
+    display_name?: string; legal_name?: string; description?: string; phone?: string; email?: string;
+    address?: { formatted?: string; line1?: string; line2?: string; city?: string; region?: string; postalCode?: string; country?: string };
+    hours?: { timezone: string; weekly: Array<{ day: number; opens: string; closes: string }> };
+    links?: Array<{ kind: string; url: string }>;
+  };
+  services: Array<{ id: string; name: string; description: string | null; priceText: string | null }>;
+}
+
 export interface BusinessRecordPort {
   /** The owner-recipient rule for one tenant. Server-only; sends nothing. */
   resolveTenantOwnerRecipient(tenantId: string): Promise<TenantOwnerRecipientRow | null>;
+  readTenantBusinessContext(tenantId: string): Promise<TenantBusinessContext | null>;
 }
 
 // ── Google account bindings (src/platform/account-bindings) ────────────────────
@@ -175,6 +198,7 @@ export interface GoogleBindingsPort {
 export interface BusinessBillingPort {
   /** `workspaceId` for checkout metadata when the tenant is a converted business (STRELVA_BUSINESS_BILLING). */
   businessBillingCheckoutMetadata(tenantId: string): Promise<Record<string, string>>;
+  readBusinessPortfolioMrr(tenantIds: string[]): Promise<Array<{ workspaceId: string; monthlyCents: number; tenantIds: string[] }> | null>;
 }
 
 // ── Inquiries (src/products/inquiries) ─────────────────────────────────────────

@@ -15,7 +15,8 @@
  */
 
 import { createHash } from "node:crypto";
-import { ownerNoticeEmail } from "@/lib/owner-recipient";
+import { ownerNoticeEmail, businessRecordReadsEnabled } from "@/lib/owner-recipient";
+import { readReleasedTenantBusinessContext } from "@/platform/business-record/public-reader";
 
 import type { InquiryTimelineEventType, ResponsibilityAction, ResponsibilityEvaluation, ResponsibilityPolicy } from "@/products/inquiries/contracts";
 import type { LeadRecord } from "@/lib/leads";
@@ -244,11 +245,13 @@ export async function resolveInquiryRoute(
   // email address, retain the tenant owner fallback for the legacy notice.
   // Without a configured destination, the one owner-recipient rule decides
   // (src/lib/owner-recipient.ts); it falls back to the tenant's owner_email.
-  const ownerEmail = validEmail(inquiry.staffDestination)
-    || (tenant ? validEmail(await ownerNoticeEmail(tenant)) : null);
+  const ownerEmail = businessRecordReadsEnabled()
+    ? validEmail(await ownerNoticeEmail({ id: inquiry.tenantId, ownerEmail: tenant?.ownerEmail }))
+    : validEmail(inquiry.staffDestination) || (tenant ? validEmail(await ownerNoticeEmail(tenant)) : null);
+  const context = await readReleasedTenantBusinessContext(inquiry.tenantId);
   return {
     tenantId: inquiry.tenantId,
-    businessName: inquiryBusinessName(inquiry, tenant?.siteName),
+    businessName: context?.facts.display_name || context?.facts.legal_name || inquiryBusinessName(inquiry, tenant?.siteName),
     customerEmail: validEmail(inquiry.email),
     ownerEmail,
     ownerNotification: policy.ownerNotification,

@@ -6,6 +6,7 @@
  * Index key: threads:{tenant}:index (sorted set by updatedAt)
  */
 
+import { mirrorRecord, removeRecord, readRecord, readRecords } from "./client-records";
 import { promises as fs } from "fs";
 import path from "path";
 import { getRedis } from "@/platform/infra/redis";
@@ -57,6 +58,9 @@ async function writeDevThreads(
  * List all threads for a tenant, sorted by updatedAt desc.
  */
 export async function listThreads(tenant: string): Promise<Thread[]> {
+  return readRecords("threads", tenant, () => listRedisThreads(tenant));
+}
+async function listRedisThreads(tenant: string): Promise<Thread[]> {
   const redis = getRedis();
 
   if (redis) {
@@ -95,6 +99,9 @@ export async function getThread(
   tenant: string,
   threadId: string
 ): Promise<Thread | null> {
+  return readRecord("threads", tenant, threadId, () => getRedisThread(tenant, threadId));
+}
+async function getRedisThread(tenant: string, threadId: string): Promise<Thread | null> {
   const redis = getRedis();
 
   if (redis) {
@@ -137,6 +144,7 @@ export async function createThread(
         member: thread.id,
       });
       await redis.zremrangebyrank(indexKey(tenant), 0, -(THREAD_KEEP + 1));
+      await mirrorRecord("threads", tenant, thread.id, thread, thread.updatedAt);
       return thread;
     } catch {
       // Redis failed, fall through to dev file
@@ -178,6 +186,7 @@ export async function updateThread(
         member: threadId,
       });
       await redis.zremrangebyrank(indexKey(tenant), 0, -(THREAD_KEEP + 1));
+      await mirrorRecord("threads", tenant, threadId, updated, updated.updatedAt);
       return updated;
     } catch {
       // Redis failed, fall through to dev file
@@ -204,6 +213,7 @@ export async function deleteThread(
     try {
       await redis.del(threadKey(tenant, threadId));
       await redis.zrem(indexKey(tenant), threadId);
+      await removeRecord("threads", tenant, threadId);
       return;
     } catch {
       // Redis failed, fall through to dev file

@@ -60,7 +60,7 @@ describe("export schema 3", () => {
     const included = doc.manifest.included.map((c) => c.category);
     for (const category of V3_CATEGORIES.filter((c) => c !== "reviews")) expect(included).toContain(category);
     expect(included).toContain("workspace_snapshot_schema_2");
-    expect(doc.manifest.unavailable.map((c) => c.category)).toEqual(expect.arrayContaining(["orders", "rewards_members_and_transactions", "reviews"]));
+    expect(doc.manifest.unavailable.map((c) => c.category)).toEqual(expect.arrayContaining(["calendly_bookings_not_imported", "reviews"]));
     expect(doc.manifest.omitted.map((c) => c.category)).toEqual(expect.arrayContaining(["credentials", "provider_connection_secrets", "card_data"]));
     // Nothing silently dropped: every category is included or unavailable.
     const listed = new Set([...included, ...doc.manifest.unavailable.map((c) => c.category)]);

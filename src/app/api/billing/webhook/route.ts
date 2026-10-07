@@ -1,3 +1,4 @@
+import { releasedOwnerNoticeEmail } from "@/lib/owner-recipient";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import {
@@ -707,7 +708,8 @@ export async function POST(req: Request) {
         // streak on the PRESERVED first-failure timestamp, so Stripe's multiple failed-retry
         // webhooks send exactly one email; the marker is released on a suppressed/failed send
         // so it still reaches the owner the day client email is switched on. Fail-soft.
-        if (invoiceTenantId && existing?.ownerEmail) {
+        const payerEmail = invoiceTenantId ? await releasedOwnerNoticeEmail({ id: invoiceTenantId, ownerEmail: existing?.ownerEmail }) : null;
+        if (invoiceTenantId && payerEmail) {
           try {
             const redis = getRedis();
             const dedupeKey = `reb:past-due-email-sent:${invoiceTenantId}:${pastDueSince}`;
@@ -723,8 +725,8 @@ export async function POST(req: Request) {
               let ok = false;
               try {
                 ok = await sendPaymentPastDueEmail({
-                  email: existing.ownerEmail,
-                  businessName: existing.siteName || invoiceTenantId,
+                  email: payerEmail,
+                  businessName: existing?.siteName || invoiceTenantId,
                   dashboardUrl: buildTenantAdminUrl(invoiceTenantId),
                   tenantId: invoiceTenantId,
                   logPrefix: "[billing webhook]",

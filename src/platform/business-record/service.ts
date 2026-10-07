@@ -157,3 +157,16 @@ export async function unlinkTenantFromBusiness(operatorEmail: string, command: T
     p_command_digest: z.string().regex(/^[0-9a-f]{64}$/).parse(command.digest),
   }, tenantUnlinkReceiptSchema, "The tenant unlink failed.");
 }
+
+/** Server-only public projection for a linked tenant. No contacts or secrets. */
+export async function readTenantBusinessContext(tenantId: string) {
+  const facts = z.object({
+    display_name: z.string().optional(), legal_name: z.string().optional(), description: z.string().optional(),
+    phone: z.string().optional(), email: z.string().email().optional(),
+    address: z.object({ formatted: z.string().optional(), line1: z.string().optional(), line2: z.string().optional(), city: z.string().optional(), region: z.string().optional(), postalCode: z.string().optional(), country: z.string().optional() }).optional(),
+    hours: z.object({ timezone: z.string(), weekly: z.array(z.object({ day: z.number().int().min(0).max(6), opens: z.string(), closes: z.string() })) }).optional(),
+    links: z.array(z.object({ kind: z.string(), url: z.string().url() })).optional(),
+  });
+  const schema = z.object({ revision: z.number().int().nonnegative(), facts, services: z.array(z.object({ id: z.string().uuid(), name: z.string(), description: z.string().nullable(), priceText: z.string().nullable() })) });
+  return callBusinessRecord("read_tenant_business_context", { p_tenant_id: z.string().min(1).max(120).parse(tenantId) }, schema.nullable(), "Business facts could not be loaded.");
+}

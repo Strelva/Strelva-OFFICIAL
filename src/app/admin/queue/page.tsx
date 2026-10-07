@@ -22,7 +22,7 @@ export default async function QueuePage() {
   const [load, notTold] = await Promise.all([loadOperatorQueue(), loadOwnerNotTold()]);
   if (load.state === "ready") {
     return <>
-      <QueueView queue={load.queue} me={load.me} />
+      <QueueView queue={load.queue} me={load.me} actionsEnabled={load.actionsEnabled} />
       <div className="mx-auto mt-4 max-w-[920px]"><OwnerNotToldPanel load={notTold} /></div>
     </>;
   }

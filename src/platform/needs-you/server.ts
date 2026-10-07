@@ -1,3 +1,5 @@
+import { withCanonicalApprovalStore } from "@/platform/approval-store";
+import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { getEventRaw, getEvents } from "@/lib/events";
 import { resolveEventAction } from "@/lib/event-actions";
 import { sendEmailWithReceipt } from "@/platform/infra/email/send";
@@ -59,7 +61,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
           }
         },
       }),
-    ],
+    ].map(adapter => withCanonicalApprovalStore(adapter, { store, enabled: businessId => workspaceReleaseFlagEnabled("approval_store", businessId) })),
   });
 }
 

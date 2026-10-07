@@ -25,6 +25,11 @@ const calendarDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }, "Use a real calendar date.");
 
+const queueEffortSchema = z.object({
+  kind: z.string().min(1).max(50), sourceRef: z.string().min(1).max(500),
+  systemId: z.string().uuid().nullable(), systemLabel: z.string().min(1).max(300).nullable(),
+}).strict();
+
 export const businessEffortEntrySchema = z.object({
   id: z.string().uuid(),
   businessId: z.string().uuid(),
@@ -32,6 +37,7 @@ export const businessEffortEntrySchema = z.object({
   category: z.enum(BUSINESS_EFFORT_CATEGORIES),
   occurredOn: calendarDate,
   note: z.string().nullable(),
+  queue: queueEffortSchema.optional(),
   recordedBy: z.string().uuid(),
   recordedAt: z.string(),
   void: z.object({ reason: z.string(), voidedBy: z.string().uuid(), voidedAt: z.string() }).strict().nullable(),
@@ -53,6 +59,7 @@ export const recordBusinessEffortSchema = z.object({
   category: z.enum(BUSINESS_EFFORT_CATEGORIES),
   occurredOn: calendarDate,
   note: z.string().trim().max(MAX_EFFORT_TEXT).optional().transform((value) => value || undefined),
+  queue: queueEffortSchema.optional(),
 }).strict();
 export type RecordBusinessEffortInput = z.input<typeof recordBusinessEffortSchema>;
 export type RecordBusinessEffortCommand = z.output<typeof recordBusinessEffortSchema>;

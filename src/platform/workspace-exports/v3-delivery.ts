@@ -28,7 +28,7 @@ export async function deliverWorkspaceExportLink(input: {
       preheader: "One download with your business's records. The link works for 7 days.",
       heading: "Your export is ready",
       paragraphs: [
-        "This is everything Strelva holds for your business, in one download. The link works for 7 days.",
+        "Your business records are ready in one download. The manifest lists included and unavailable categories. The link works for 7 days.",
         "Passwords, tokens and card details are never included.",
       ],
       bullets: input.manifest.included.map((c) => ({ title: c.category.replace(/_/g, " "), text: `${c.count}` })),

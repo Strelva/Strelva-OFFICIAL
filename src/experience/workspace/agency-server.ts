@@ -14,6 +14,9 @@
  *   here: going live is a separate release through the release gate.
  */
 import { z } from "zod";
+import { prepareVersionRelease, type VersionPreparationReceipt } from "@/platform/system-versions/preparation";
+import type { VersionLineage } from "@/platform/system-versions";
+import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
 import { createSystemVersions, improvementState, type VersionActor } from "@/platform/system-versions";
 import {
   createSupabaseConnectionOwnership,
@@ -137,6 +140,7 @@ export async function reviewAllImprovements(
   actor: WorkspaceActor,
   input: { agencyWorkspaceId: string; sourceSystemId: string; revision: number; versionIds: string[] },
   db: VersionsDb = versionsDb(),
+  prepare: ((actor: WorkspaceActor, lineage: VersionLineage) => Promise<VersionPreparationReceipt | null>) | null = needsYouReleaseEnabled() ? (actor, lineage) => prepareVersionRelease(actor, lineage, { db }) : null,
 ): Promise<AgencyBulkReviewResult> {
   const sources = await readSources(actor, input.agencyWorkspaceId, db);
   const source = sources.find((item) => item.systemId === input.sourceSystemId);
@@ -156,7 +160,13 @@ export async function reviewAllImprovements(
     try {
       // One business, one decision: each Version is prepared on its own.
       const comparison = await versions.compareImprovement(versionActor, versionId, input.revision);
-      if (comparison.status === "up_to_date") { results.push({ ...named, outcome: "skipped_up_to_date", detail: "Already includes this revision." }); continue; }
+      if (comparison.status === "up_to_date") {
+        // A reply lost after adoption can resume the decision/receipt without adopting twice.
+        const existing = await store.getLineage(versionActor, versionId);
+        const receipt = prepare && existing ? await prepare(actor, existing) : null;
+        results.push(receipt ? { ...named, outcome: "prepared", detail: "The draft and its release decision are ready. Nothing went live.", ...receipt } : { ...named, outcome: "skipped_up_to_date", detail: "Already includes this revision." });
+        continue;
+      }
       if (comparison.conflicts.length) {
         results.push({ ...named, outcome: "skipped_conflicts", detail: `Needs a choice on ${comparison.conflicts.length} change${comparison.conflicts.length === 1 ? "" : "s"}.` });
         continue;
@@ -167,8 +177,9 @@ export async function reviewAllImprovements(
       }
       const lineage = await store.getLineage(versionActor, versionId);
       if (!lineage) throw new Error("This Version is unavailable.");
-      await versions.adoptImprovement(versionActor, versionId, { revision: input.revision, expectedRowRevision: lineage.rowRevision });
-      results.push({ ...named, outcome: "prepared", detail: `Ready for ${item.clientName} to approve. Nothing is live yet.` });
+      const adopted = await versions.adoptImprovement(versionActor, versionId, { revision: input.revision, expectedRowRevision: lineage.rowRevision });
+      const receipt = prepare ? await prepare(actor, adopted) : null;
+      results.push({ ...named, outcome: "prepared", detail: receipt ? `Ready for ${item.clientName}'s release decision. Nothing is live yet.` : "The working definition is prepared. Needs you is off; no release decision was opened.", ...(receipt ?? {}) });
     } catch (error) {
       results.push({ ...named, outcome: "failed", detail: error instanceof Error ? error.message.slice(0, 300) : "Could not prepare." });
     }

@@ -7,6 +7,7 @@
  * catches that and falls through to the legacy GLDF call.
  */
 
+import { mirrorRecord, readRecord, readRecords } from "../client-records";
 import { getKv, keys, KvNotConfiguredError } from "./kv";
 import { DEFAULT_REWARDS_CONFIG } from "./types";
 import type {
@@ -108,14 +109,14 @@ export async function saveMember(tenant: string, member: Member): Promise<void> 
   const normalized: Member = { ...member, email };
   await kv.hset(keys.member(tenant, email), memberToHash(normalized));
   await kv.sadd(keys.membersSet(tenant), email);
+  await mirrorRecord("reward_members", tenant, email, memberToHash(normalized));
 }
 
 export async function getMember(
   tenant: string,
   email: string
 ): Promise<Member | null> {
-  const kv = assertKv();
-  const data = await kv.hgetall<Record<string, unknown>>(keys.member(tenant, email));
+  const data = await readRecord<Record<string, unknown>>("reward_members", tenant, email.trim().toLowerCase(), () => assertKv().hgetall<Record<string, unknown>>(keys.member(tenant, email)));
   if (!data) return null;
   return hashToMember(data);
 }
@@ -199,10 +200,21 @@ export async function adjustStars(
     await kv.hset(memberKey, { tier });
   }
 
-  return { ...existing, starsAvailable, starsLifetime, tier };
+  const updated = { ...existing, starsAvailable, starsLifetime, tier };
+  // Snapshot the hash after all atomic increments, never overwrite Postgres
+  // with an older balance assembled from this request's pre-mutation read.
+  const latest = await kv.hgetall<Record<string, unknown>>(memberKey);
+  if (latest) {
+    const payload = Object.fromEntries(Object.entries(latest).map(([k, v]) => [k, typeof v === "string" ? v : JSON.stringify(v)]));
+    await mirrorRecord("reward_members", tenant, normalizedEmail, payload);
+  }
+  return updated;
 }
 
 export async function listMembers(tenant: string): Promise<Member[]> {
+  return (await readRecords<Record<string, unknown>>("reward_members", tenant, () => listRedisMembers(tenant))).map(hashToMember).filter((m): m is Member => m !== null);
+}
+async function listRedisMembers(tenant: string): Promise<Record<string, unknown>[]> {
   const kv = assertKv();
   const emails = await kv.smembers(keys.membersSet(tenant));
   if (!emails || emails.length === 0) return [];
@@ -213,11 +225,10 @@ export async function listMembers(tenant: string): Promise<Member[]> {
     )
   );
 
-  const out: Member[] = [];
+  const out: Record<string, unknown>[] = [];
   for (const data of results) {
     if (!data) continue;
-    const m = hashToMember(data);
-    if (m) out.push(m);
+    if (hashToMember(data)) out.push(data);
   }
   return out;
 }
@@ -238,6 +249,8 @@ export async function logTransaction(
     timestamp: new Date().toISOString(),
   };
   await kv.lpush(keys.txns(tenant, email), JSON.stringify(txn));
+  const normalizedEmail = email.trim().toLowerCase();
+  await mirrorRecord("reward_transactions", tenant, txn.id, { ...txn, email: normalizedEmail }, txn.timestamp);
   return txn;
 }
 
@@ -246,6 +259,10 @@ export async function getTransactions(
   email: string,
   limit = 50
 ): Promise<StarsTransaction[]> {
+  const rows = await readRecords<StarsTransaction & { email?: string }>("reward_transactions", tenant, () => getRedisTransactions(tenant, email, limit));
+  return rows.filter((t) => t.email === undefined || t.email === email.trim().toLowerCase()).slice(0, limit).map((row) => ({ id: row.id, type: row.type, amount: row.amount, reason: row.reason, timestamp: row.timestamp }));
+}
+async function getRedisTransactions(tenant: string, email: string, limit: number): Promise<StarsTransaction[]> {
   const kv = assertKv();
   const raw = await kv.lrange(keys.txns(tenant, email), 0, limit - 1);
   if (!raw) return [];

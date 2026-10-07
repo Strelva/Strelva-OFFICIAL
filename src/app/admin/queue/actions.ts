@@ -20,8 +20,46 @@ import { markQueueItem, readOperatorQueue } from "@/platform/operator-queue/serv
 import { EFFORT_CATEGORY_BY_KIND } from "@/platform/operator-queue/rules";
 import { PostgresBusinessEffortStore, recordBusinessEffort } from "@/platform/business-effort";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
+import { operatorQueueReleaseEnabled } from "@/platform/operator-queue/release";
+import { getEventRaw } from "@/lib/events";
+import { resolveEventAction, escalateEventToOwner } from "@/lib/event-actions";
+import { isPortfolioApprovable } from "../actions/portfolio-actions";
 
 export type QueueActionResult = { ok: boolean; message: string };
+
+/** Derive all source identities server-side. Owner calls are never approved
+ * by an operator, and every effect uses the existing governed dispatcher. */
+export async function resolveQueueDraftsAction(input: { keys: string[]; action: "approve" | "skip" | "escalate" }): Promise<QueueActionResult & { results: { key: string; changed: boolean; reason?: string }[] }> {
+  const results: { key: string; changed: boolean; reason?: string }[] = [];
+  if (!operatorQueueReleaseEnabled()) return { ok: false, message: "Queue actions are not enabled.", results };
+  try {
+    const actor = await operator();
+    if (!actor) throw new OperatorQueueAccessError();
+    if (!["approve", "skip", "escalate"].includes(input.action) || !Array.isArray(input.keys) || input.keys.length > 100) throw new OperatorQueueValidationError();
+    const find = await finder(actor);
+    for (const key of [...new Set(input.keys)]) {
+      try {
+        const item = await find(key);
+        const tenantId = item?.business.kind === "workspace" || item?.business.kind === "tenant" ? item.business.tenantId : null;
+        if (!item || item.kind !== "draft_review" || item.move !== "strelva" || !tenantId || !item.sourceRef.startsWith("event:")) {
+          results.push({ key, changed: false, reason: "Only Strelva drafts can be decided here." }); continue;
+        }
+        const eventId = item.sourceRef.slice(6);
+        const event = await getEventRaw(eventId);
+        if (!event || event.tenantId !== tenantId || event.metadata?.reviewAudience === "owner" || !isPortfolioApprovable(event)) {
+          results.push({ key, changed: false, reason: "The draft changed or needs the owner's decision." }); continue;
+        }
+        const result = input.action === "escalate"
+          ? await escalateEventToOwner(tenantId, eventId)
+          : await resolveEventAction(tenantId, eventId, input.action === "approve" ? "approved" : "dismissed");
+        results.push({ key, ...result });
+      } catch { results.push({ key, changed: false, reason: "This draft could not be handled. Its current state must be checked." }); }
+    }
+    revalidatePath("/admin/queue"); revalidatePath("/admin");
+    const changed = results.filter((result) => result.changed).length;
+    return { ok: results.length > 0 && changed === results.length, message: `${changed} of ${results.length} handled.${changed < results.length ? " Some drafts still need attention." : ""}`, results };
+  } catch (error) { return { ...failure(error), results }; }
+}
 
 async function operator(): Promise<QueueActor | null> {
   if (!(await isSuperAdmin())) return null;
@@ -58,6 +96,7 @@ export async function markQueueItemAction(input: { commandId: string; key: strin
     if (!actor) throw new OperatorQueueAccessError();
     await markQueueItem(actor, input, await finder(actor));
     revalidatePath("/admin/queue");
+    revalidatePath("/admin");
     return { ok: true, message: DONE_MESSAGES[input.action] ?? "Saved." };
   } catch (error) {
     return failure(error);
@@ -80,11 +119,17 @@ export async function closeQueueItemAction(input: {
     if (!actor) throw new OperatorQueueAccessError();
     const find = await finder(actor);
     item = await find(input.key);
+    if (operatorQueueReleaseEnabled()) {
+      if (input.minutes && (!Number.isInteger(input.minutes.minutes) || input.minutes.minutes < 1 || input.minutes.minutes > 1440 || !/^[0-9a-f-]{36}$/i.test(input.minutes.entryId))) throw new OperatorQueueValidationError("Check the minutes before closing this item.");
+      if (!input.reason.trim()) throw new OperatorQueueValidationError("Say what happened before closing this item.");
+      if (item?.move === "owner" && input.state === "done") throw new OperatorQueueValidationError("The owner must make this decision. You can record a note or stop chasing it.");
+    }
     await markQueueItem(actor, { commandId: input.commandId, key: input.key, action: "close", payload: { state: input.state, reason: input.reason } }, async () => item);
   } catch (error) {
     return failure(error);
   }
   revalidatePath("/admin/queue");
+  revalidatePath("/admin");
   if (!input.minutes || !item) return { ok: true, message: "Closed." };
   if (item.business.kind !== "workspace") {
     return { ok: true, message: "Closed. Minutes were not logged: this business is not yet a workspace." };
@@ -95,6 +140,7 @@ export async function closeQueueItemAction(input: {
       entryId: input.minutes.entryId, businessId: item.business.workspaceId, minutes: input.minutes.minutes,
       category: EFFORT_CATEGORY_BY_KIND[item.kind], occurredOn: new Date().toISOString().slice(0, 10),
       note: `Queue: ${item.title}`.slice(0, 280),
+      ...(operatorQueueReleaseEnabled() ? { queue: { kind: item.kind, sourceRef: item.sourceRef, systemId: item.system?.id ?? null, systemLabel: item.system?.label ?? null } } : {}),
     });
     revalidatePath("/admin/work");
     return { ok: true, message: `Closed. Logged ${input.minutes.minutes} minute${input.minutes.minutes === 1 ? "" : "s"}.` };

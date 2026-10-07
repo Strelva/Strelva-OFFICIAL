@@ -56,15 +56,12 @@ export const WORKSPACE_OWNED_TENANT_TABLES = [
   "website_document_publications", "website_hosted_tenant_reservations",
 ] as const;
 
-// Tables with a tenant_id that the sweep does NOT cover yet, found when
-// database.types.ts was regenerated from every migration (Strelva Reborn
-// section 7, 2026-10-06). None has a foreign key to `tenants`, so their rows
-// outlive a deprovisioned tenant. Whether each is purged, kept as a receipt
-// (outside_write_receipts) or settled through its workspace (the agency draft
-// tables) is an open decision for Jacob; this list changes nothing at run
-// time. It only shrinks; deprovision-coverage.test.ts still fails on any new
-// tenant_id table.
-export const TENANT_TABLES_SWEEP_UNDECIDED = [
+// Finding 19 resolved in Wave 6: preserve the five tables as historical
+// receipts. STRELVA_TENANT_RECEIPT_RETENTION=1 selects the atomic adapter
+// that records counts and expires draft grants; off uses the original RPC.
+// Retention is indefinite pending an explicit later deletion policy/yes.
+export const TENANT_TABLES_SWEEP_UNDECIDED = [] as const;
+export const TENANT_TABLES_RETAINED_AS_RECEIPTS = [
   "agency_managed_website_draft_grants", "agency_managed_website_draft_preparations",
   "agency_managed_website_draft_revisions", "outside_write_receipts", "report_snapshots",
 ] as const;
@@ -153,7 +150,7 @@ export async function pauseStoredSystems(tenantId: string): Promise<{ ok: true; 
 async function deleteTenantRowsAtomically(tenantId: string): Promise<Record<string, number>> {
   const call = rpc();
   if (!call) return {};
-  const { data, error } = await call("deprovision_tenant_rows", { p_tenant_id: tenantId });
+  const { data, error } = await call(process.env.STRELVA_TENANT_RECEIPT_RETENTION === "1" ? "deprovision_tenant_rows_retained" : "deprovision_tenant_rows", { p_tenant_id: tenantId });
   if (error) throw new Error(`deprovision_tenant_rows: ${error.message}`);
   return Object.fromEntries(Object.entries((data ?? {}) as Record<string, unknown>).map(([table, n]) => [table, Number(n)]));
 }
@@ -175,6 +172,7 @@ export function tenantRedisPatterns(tenantId: string, ownerEmail?: string): stri
     `events:${tenantId}`, // event index; its id-keyed blobs are found by value below
     `account-of:${tenantId}`, // multi-site grouping reverse lookup
     `calendly-meta:${tenantId}`,
+    `reb:client-records:pending-payload:*|${tenantId}|*`,
     `reb:content:${tenantId}:*`,
     `reb:chat:${tenantId}:*`,
     `reb:rewards:${tenantId}:*`,
@@ -337,6 +335,12 @@ export async function runDeprovision(opts: DeprovisionOptions): Promise<Deprovis
     summary.postgres!.push({ target: "systems", found: paused.ok ? paused.count : "?", deleted: false, detail: paused.ok ? "stored Systems paused; records kept" : `stored Systems not paused: ${paused.error}` });
   } else {
     summary.postgres!.push({ target: "systems", found: "?", deleted: false, detail: "would pause any stored Systems (dry run)" });
+  }
+  if (process.env.STRELVA_TENANT_RECEIPT_RETENTION === "1") {
+    for (const table of TENANT_TABLES_RETAINED_AS_RECEIPTS) {
+      summary.postgres!.push({ target: table, found: await countRows(table, tenantId), deleted: false,
+        detail: "kept as historical receipts; outstanding draft grants expire on teardown" });
+    }
   }
   const removed = executed ? await deleteTenantRowsAtomically(tenantId) : {};
   for (const [table, n] of found) {

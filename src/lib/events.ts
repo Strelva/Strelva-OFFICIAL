@@ -284,7 +284,7 @@ export async function addEvent(
  */
 export async function getEventsRaw(
   tenantId: string,
-  opts?: { status?: string; limit?: number; requireStore?: boolean }
+  opts?: { status?: string; limit?: number; requireStore?: boolean; all?: boolean }
 ): Promise<UnifiedEvent[]> {
   const redis = getRedis();
   if (!redis) {
@@ -298,7 +298,7 @@ export async function getEventsRaw(
   // dashboard feed, but it means a status-filtered read can miss matching
   // events older than that window. Callers that must not miss an old match
   // (e.g. getOpenChangeRequest gating) pass a large `limit` to widen it.
-  const raw = await redis.zrange(eventsKey(tenantId), 0, limit * 2, {
+  const raw = await redis.zrange(eventsKey(tenantId), 0, opts?.all ? -1 : limit * 2, {
     rev: true,
   });
 
@@ -321,7 +321,7 @@ export async function getEventsRaw(
     if (!event) continue;
     if (!opts?.status || event.status === opts.status) {
       events.push(event);
-      if (events.length >= limit) break;
+      if (!opts?.all && events.length >= limit) break;
     }
   }
 

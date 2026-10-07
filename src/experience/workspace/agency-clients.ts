@@ -142,6 +142,9 @@ export const agencyBulkReviewResultSchema = z.object({
     clientName: z.string().min(1).max(120),
     outcome: z.enum(["prepared", "skipped_conflicts", "skipped_missing_accounts", "skipped_up_to_date", "failed"]),
     detail: z.string().max(500),
+    receiptId: uuid.optional(),
+    decisionId: uuid.optional(),
+    rowRevision: z.number().int().positive().optional(),
   }).strict()).max(1000),
 }).strict();
 export type AgencyBulkReviewResult = z.infer<typeof agencyBulkReviewResultSchema>;

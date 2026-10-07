@@ -88,6 +88,28 @@ export async function insertReceipt(receipt: Record<string, unknown>): Promise<O
   return parse(outsideWriteReceiptSchema, await rpc("record_outside_write_receipt", { p_receipt: receipt }));
 }
 
+const googleAttemptSchema = z.object({
+  claimed: z.boolean(), attemptId: z.string().uuid(), acceptance: z.enum(["pending", "accepted", "rejected", "unknown"]),
+  receipt: outsideWriteReceiptSchema.nullable(),
+});
+
+/** Reserve before provider dispatch. Uncertain or accepted attempts never dispatch again. */
+export async function beginGoogleWrite(input: { commandKey: string; tenantId: string; writeKind: string; request: Record<string, unknown> }) {
+  return parse(googleAttemptSchema, await rpc("begin_operator_google_write", { p_command: input }));
+}
+
+/** Receipt and attempt settlement share one transaction. */
+export async function completeGoogleWrite(attemptId: string, receipt: Record<string, unknown>): Promise<OutsideWriteReceipt> {
+  return parse(outsideWriteReceiptSchema, await rpc("complete_operator_google_write", { p_attempt_id: attemptId, p_receipt: receipt }));
+}
+
+export async function readGoogleWriteUncertainty(actor: QueueActor) {
+  return parse(z.array(z.object({
+    id: z.string().uuid(), tenantId: z.string(), writeKind: z.string(), acceptance: z.string(),
+    startedAt: z.string(), receiptId: z.string().uuid().nullable(), readback: z.string().nullable(),
+  })), await rpc("read_operator_google_uncertainty", identity(actor)));
+}
+
 /** Server-side: the read-back, recorded once. Never re-sends the write. */
 export async function insertReadback(receiptId: string, readback: "matched" | "differs" | "failed" | "not_possible", detail: string | null): Promise<OutsideWriteReceipt> {
   return parse(outsideWriteReceiptSchema, await rpc("record_outside_write_readback", {

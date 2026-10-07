@@ -17,6 +17,7 @@ import {
   type AgencyLoadedPage,
 } from "./agency-home";
 import { AgencyClientList, AgencyClientsError, AgencyClientsLoading, AgencyQueueList, AgencyTeamList } from "./agency/AgencyViews";
+import { AgencyAuthoring } from "./agency/AgencyAuthoring";
 import { AgencyLibraryView } from "./agency/AgencyLibraryView";
 
 type ClientsState =
@@ -24,7 +25,7 @@ type ClientsState =
   | { status: "error" }
   | { status: "ready"; pages: AgencyLoadedPage[]; loadingMore: boolean; moreError: boolean; retrying: ReadonlySet<number> };
 
-type AgencyView = "clients" | "queue" | "library" | "team";
+type AgencyView = "clients" | "queue" | "library" | "team" | "build" | "package";
 
 function workLabel(work: WorkspaceWork, systemsReleased: boolean): string {
   if (work.productId === "applications") return systemsReleased ? "Internal tool" : "Application";
@@ -332,6 +333,7 @@ export function AgencyHome({
           { value: "queue", label: "Queue", ...tab("queue") },
           { value: "library", label: "Library", ...tab("library") },
           { value: "team", label: "Team", ...tab("team") },
+          ...(current?.role === "owner" || current?.role === "admin" ? [{ value: "build", label: "Build", ...tab("build") }, { value: "package", label: "Package", ...tab("package") }] : []),
         ]}
       />
       {clients.status === "ready" ? <button type="button" className="inline-flex min-h-11 items-center gap-2 text-[13px] text-gray-muted underline-offset-4 hover:text-warm-black hover:underline" onClick={retry}><RefreshCw size={14} aria-hidden="true" />Refresh</button> : null}
@@ -361,6 +363,7 @@ export function AgencyHome({
       {accessNote}
     </TabsPanel>
 
+    {(view === "build" || view === "package") && (current?.role === "owner" || current?.role === "admin") ? <TabsPanel id={tab(view).panelId} tabId={tab(view).id} active className="mt-6"><AgencyAuthoring request={request} snapshot={snapshot} clients={combined?.clients ?? []} kind={view} onOpenClientWork={onOpenClientWork} /></TabsPanel> : null}
     {privateWork}
     {creditSection}
   </div>;

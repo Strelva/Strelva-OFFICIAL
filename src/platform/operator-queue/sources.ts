@@ -18,7 +18,8 @@ import type { UnifiedEvent } from "@/lib/types";
 import type { QueueActor, QueueContext, QueueItemRaw, QueueKind } from "./contracts";
 import type { SourceRead } from "./project";
 import { readSiteHealth } from "./site-health-store";
-import { readListingReadbackFailures, type ListingReadbackFailure } from "./store";
+import { readGoogleWriteUncertainty, readListingReadbackFailures, type ListingReadbackFailure } from "./store";
+import { operatorQueueReleaseEnabled } from "./release";
 import { EVENT_RETENTION_DAYS, DOMAIN_VERIFICATION_ESCALATION_DAYS } from "./rules";
 
 /**
@@ -65,7 +66,7 @@ export async function readEventKinds(tenants: QueueTenant[], context: QueueConte
   await Promise.all(tenants.map(async (tenant) => {
     let events: UnifiedEvent[];
     try {
-      events = await getEventsRaw(tenant.id, { limit: EVENT_WINDOW, requireStore: true });
+      events = await getEventsRaw(tenant.id, { limit: EVENT_WINDOW, requireStore: true, ...(operatorQueueReleaseEnabled() ? { all: true } : {}) });
     } catch {
       failed.push(tenant.id);
       return;
@@ -93,6 +94,7 @@ export async function readEventKinds(tenants: QueueTenant[], context: QueueConte
         title: event.title || "Draft to review", openedAt: event.createdAt,
         facts: { expiresAt: new Date(Date.parse(event.createdAt) + EVENT_RETENTION_DAYS * DAY).toISOString() },
         href: kind === "owner_pending" ? clientHref(event.tenantId, "needs-you") : "/admin/actions",
+        ...(kind === "draft_review" ? { review: { type: event.type, metadata: event.metadata } } : {}),
       };
       if (event.status === "pending") {
         (kind === "owner_pending" ? owner : drafts).push(base);
@@ -424,6 +426,14 @@ export async function readAllSources(input: { tenants: QueueTenant[]; context: Q
     guard("prospect_lead", "Strelva sales leads", () => readProspectLeads(now)),
     Promise.resolve([readbackFailureItems(context)]),
     guard("readback_failed", "Google listing receipts", () => readListingReadbackSource(actor)),
+    ...(operatorQueueReleaseEnabled() ? [guard("readback_failed", "Google write attempts", async () => ({
+      kind: "readback_failed", source: "Google write attempts", ok: true,
+      rows: (await readGoogleWriteUncertainty(actor)).map((attempt) => ({
+        kind: "readback_failed", sourceRef: `google-attempt:${attempt.id}`, tenantId: attempt.tenantId, workspaceId: null,
+        title: attempt.acceptance === "accepted" ? `${attempt.writeKind}: Google accepted, read-back not confirmed` : `${attempt.writeKind}: Google acceptance uncertain; do not resend`,
+        openedAt: attempt.startedAt, receiptIds: attempt.receiptId ? [attempt.receiptId] : [], href: clientHref(attempt.tenantId, "receipts"),
+      })),
+    }))] : []),
   ]);
   return groups.flat();
 }

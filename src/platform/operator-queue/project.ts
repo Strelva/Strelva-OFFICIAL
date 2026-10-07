@@ -126,6 +126,7 @@ export function projectQueue(input: ProjectInput): OperatorQueue {
         closed: mark?.closedState && mark.closedAt
           ? { state: mark.closedState, reason: mark.closedReason, receiptId: mark.closedReceiptId, at: mark.closedAt } : null,
         closedElsewhere,
+        ...(raw.review ? { review: raw.review } : {}),
       };
       if (item.closed || closedElsewhere) {
         count.closed += 1;

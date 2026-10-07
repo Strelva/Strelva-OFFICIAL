@@ -1,3 +1,4 @@
+import { releasedOwnerNoticeEmail } from "@/lib/owner-recipient";
 import { NextResponse } from "next/server";
 import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
@@ -58,7 +59,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     );
   }
 
-  const email = config.ownerEmail?.trim();
+  const email = (await releasedOwnerNoticeEmail(config))?.trim();
   if (!email) {
     return NextResponse.json(
       { error: "This client has no owner email on file. Add one before sending." },

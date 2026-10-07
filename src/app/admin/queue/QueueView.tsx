@@ -6,7 +6,7 @@ import { QueueBoard } from "./QueueBoard";
  * The queue page body: header, board, and the per-source counts the two-week
  * parity check compares. Shared by /admin/queue and its local fixture preview.
  */
-export function QueueView({ queue, me }: { queue: OperatorQueue; me: string }) {
+export function QueueView({ queue, me, actionsEnabled = false }: { queue: OperatorQueue; me: string; actionsEnabled?: boolean }) {
   const open = queue.items.length;
   const late = queue.items.filter((item) => item.late).length;
   return (
@@ -21,7 +21,7 @@ export function QueueView({ queue, me }: { queue: OperatorQueue; me: string }) {
         <span className="text-[11px] font-mono text-gray-faint">Read {new Date(queue.generatedAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</span>
       </header>
 
-      <QueueBoard queue={queue} me={me} />
+      <QueueBoard queue={queue} me={me} actionsEnabled={actionsEnabled} />
 
       <Panel title="Per-source counts" trailing={<PanelCount>{queue.complete ? "all sources read" : `${queue.gaps.length} not read`}</PanelCount>}>
         <div className="overflow-x-auto">

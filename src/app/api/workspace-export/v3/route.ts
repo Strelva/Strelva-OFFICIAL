@@ -1,4 +1,5 @@
 import { after } from "next/server";
+import { collectTenantMedia } from "@/lib/media-store";
 import { getSupabase } from "@/platform/infra/db/client";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { exportWorkspace } from "@/platform/workspace-exports/repository";
@@ -31,6 +32,14 @@ export async function POST(request: Request) {
     const outcome = await startWorkspaceExportV3(actor, workspaceId, {
       rpc,
       snapshot: exportWorkspace,
+      assets: async (tenantIds) => {
+        if (!process.env.BLOB_READ_WRITE_TOKEN) return { items: [], unavailable: [{ category: "assets_manifest", reason: "The media store is not configured; URLs referenced in content remain in the content export." }] };
+        const rows = await Promise.all(tenantIds.map(async tenantId => ({ tenantId, ...await collectTenantMedia(tenantId) })));
+        return {
+          items: rows.flatMap(row => row.assets.map(asset => ({ tenantId: row.tenantId, ...asset }))),
+          unavailable: rows.filter(row => row.degraded).map(row => ({ category: `assets_manifest:${row.tenantId}`, reason: "The media provider could not be read completely. Request this site's manifest again." })),
+        };
+      },
       schedule: (task) => after(task),
       deliver: async (input) => { await deliverWorkspaceExportLink({ ...input, baseUrl }); },
       onFailure: ({ buildId, reason }) => { alert("workspace_export_build_failed", "high", { buildId, workspaceId, reason }); },

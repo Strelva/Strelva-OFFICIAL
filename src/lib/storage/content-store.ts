@@ -4,6 +4,7 @@
  */
 
 import type { ContentSection, ContentMap } from "../types";
+import { contentWithBusinessRecord, readReleasedTenantBusinessContext } from "../business-record-reader";
 import { defaults } from "../defaults";
 import { sanityImageUrl } from "../sanity";
 import { DEFAULT_TENANT, readDevContent, writeDevContent } from "./core";
@@ -108,7 +109,7 @@ export function transformSanityImages<K extends ContentSection>(
   return data as unknown as ContentMap[K];
 }
 
-export async function getContent<K extends ContentSection>(
+async function readContent<K extends ContentSection>(
   section: K,
   tenant: string = DEFAULT_TENANT,
   options?: { preview?: boolean }
@@ -152,6 +153,13 @@ export async function getContent<K extends ContentSection>(
     await setCachedContent(section, tenant, data);
   }
   return data;
+}
+
+/** Public facts are read after the cache, so an owner edit never sticks behind it. */
+export async function getContent<K extends ContentSection>(section: K, tenant = DEFAULT_TENANT, options?: { preview?: boolean }): Promise<ContentMap[K]> {
+  const data = await readContent(section, tenant, options);
+  if (options?.preview || !["contact", "settings", "services"].includes(section)) return data;
+  return contentWithBusinessRecord(section, data, await readReleasedTenantBusinessContext(tenant));
 }
 
 /**

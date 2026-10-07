@@ -43,6 +43,16 @@ export const workspaceExitResourceSchema = z.object({
   status: z.enum(["successor_named", "stopped"]),
 }).strict();
 
+export const workspaceExitHandoffSchema = z.object({
+  businessRecordRetained: z.literal(true),
+  dataDeleted: z.literal(false),
+  sites: z.array(z.object({
+    tenantId: z.string(), tenantStableId: uuid, siteName: z.string(),
+    steps: z.array(z.object({ kind: z.enum(["export", "files", "billing", "domain"]), status: z.literal("pending"), detail: z.string() }).strict()),
+  }).strict()),
+  systems: z.array(z.object({ id: uuid, name: z.string(), lifecycle: z.enum(["draft", "live", "paused"]) }).strict()),
+}).strict();
+
 export const workspaceExitStateSchema = z.object({
   id: uuid,
   workspaceId: uuid,
@@ -59,6 +69,7 @@ export const workspaceExitStateSchema = z.object({
   summary: workspaceExitSummarySchema,
   retainedObligations: z.array(workspaceExitObligationSchema).max(1_000),
   resources: z.array(workspaceExitResourceSchema).max(500),
+  handoff: workspaceExitHandoffSchema.optional(),
 }).strict();
 export type WorkspaceExitState = z.infer<typeof workspaceExitStateSchema>;
 
@@ -70,6 +81,7 @@ export const workspaceExitSuccessorSchema = z.object({
 export const workspaceExitOptionsSchema = z.object({
   state: workspaceExitStateSchema.nullable(),
   successors: z.array(workspaceExitSuccessorSchema).max(500),
+  handoff: workspaceExitHandoffSchema.optional(),
 }).strict();
 export type WorkspaceExitOptions = z.infer<typeof workspaceExitOptionsSchema>;
 

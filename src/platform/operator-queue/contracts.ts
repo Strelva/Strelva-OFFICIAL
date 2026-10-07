@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { UnifiedEvent } from "@/lib/types";
 
 /**
  * One place to operate (docs/product/specs/operator.md). Shared shapes for the
@@ -78,6 +79,7 @@ export interface QueueItemRaw {
   facts?: QueueFacts;
   href: string;
   receiptIds?: string[];
+  review?: Pick<UnifiedEvent, "type" | "metadata">;
 }
 
 export interface QueueFacts {
@@ -148,6 +150,7 @@ export interface QueueItem {
   receiptIds: string[];
   closed: { state: "done" | "dismissed"; reason: string | null; receiptId: string | null; at: string } | null;
   closedElsewhere: { by: string; at: string } | null;
+  review?: Pick<UnifiedEvent, "type" | "metadata">;
 }
 
 /** A source that could not be read. The list is then marked incomplete. */

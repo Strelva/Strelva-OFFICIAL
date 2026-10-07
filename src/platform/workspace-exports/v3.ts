@@ -22,9 +22,11 @@ export const V3_PAGE_SIZE = 1000;
 
 export const V3_CATEGORIES = [
   "business_record", "systems", "linked_sites", "leads", "spam_held", "inquiry_timelines", "inquiry_first_replies",
-  "booking_config", "bookings", "reviews", "content", "billing",
+  "booking_config", "bookings", "reviews", "content", "billing", "orders", "reward_members", "reward_transactions",
+  "threads", "tenant_settings", "provider_metadata", "system_history", "system_connections", "system_outputs", "versions",
+  "saved_system_work", "native_records", "website_documents", "business_bookings", "booking_settings", "inquiry_events",
 ] as const;
-export type V3Category = (typeof V3_CATEGORIES)[number];
+export type V3Category = (typeof V3_CATEGORIES)[number] | "assets_manifest";
 
 export const V3_OMITTED = [
   { category: "credentials", reason: "Passwords, API keys and OAuth tokens are never exported." },
@@ -35,11 +37,11 @@ export const V3_OMITTED = [
 ] as const;
 
 export const V3_UNAVAILABLE = [
-  { category: "orders", reason: "Store orders are still held only in Redis (90 days). They move to Postgres before they can be exported in full." },
-  { category: "rewards_members_and_transactions", reason: "Rewards members and points are still held only in Redis." },
-  { category: "assets_manifest", reason: "A list of the site's images and files is not built yet." },
-  { category: "calendly_bookings", reason: "Calendly bookings live in Calendly; only bookings Strelva recorded are included." },
+  { category: "calendly_bookings_not_imported", reason: "Bookings not imported into Strelva must be exported from Calendly." },
 ] as const;
+
+export type V3Assets = (tenantIds: string[]) => Promise<{ items: unknown[]; unavailable: { category: string; reason: string }[] }>;
+
 
 export type V3Rpc = (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message?: string } | null }>;
 
@@ -95,6 +97,7 @@ export async function collectWorkspaceExportV3(
   rpc: V3Rpc,
   snapshot: (actor: WorkspaceActor, workspaceId: string) => Promise<WorkspaceExportSnapshot>,
   now: () => Date = () => new Date(),
+  assets?: V3Assets,
 ): Promise<V3Document> {
   const role = await rpc("workspace_export_v3_role", { p_workspace_id: workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail });
   if (role.error) throw rpcError(role.error.message);
@@ -124,6 +127,20 @@ export async function collectWorkspaceExportV3(
     data[category] = items;
     included.push({ category, count: items.length });
   }
+  if (assets) {
+    const tenantIds = (data.linked_sites ?? []).flatMap(row => {
+      const id = row && typeof row === "object" ? (row as { tenantId?: unknown }).tenantId : null;
+      return typeof id === "string" ? [id] : [];
+    });
+    try {
+      const manifest = await assets(tenantIds);
+      data.assets_manifest = manifest.items;
+      included.push({ category: "assets_manifest", count: manifest.items.length });
+      unavailable.push(...manifest.unavailable);
+    } catch {
+      unavailable.push({ category: "assets_manifest", reason: "The media provider could not be read. Request the asset manifest again." });
+    }
+  } else unavailable.push({ category: "assets_manifest", reason: "The asset manifest reader is unavailable." });
   let workspaceSnapshot: WorkspaceExportSnapshot | null = null;
   if (requesterRole === "owner") {
     workspaceSnapshot = await snapshot(actor, workspaceId);
@@ -170,13 +187,14 @@ export async function startWorkspaceExportV3(
   deps: {
     rpc: V3Rpc;
     snapshot: (actor: WorkspaceActor, workspaceId: string) => Promise<WorkspaceExportSnapshot>;
+    assets?: V3Assets;
     schedule: (task: () => Promise<void>) => void;
     /** Sends the download link to the recipient the database chose. */
     deliver: (input: { buildId: string; token: string; deliverTo: string; workspaceId: string; manifest: V3Manifest }) => Promise<void>;
     onFailure?: (input: { buildId: string; reason: string }) => Promise<void> | void;
   },
 ): Promise<V3ExportOutcome> {
-  const document = await collectWorkspaceExportV3(actor, workspaceId, deps.rpc, deps.snapshot);
+  const document = await collectWorkspaceExportV3(actor, workspaceId, deps.rpc, deps.snapshot, undefined, deps.assets);
   const body = JSON.stringify(document);
   const byteSize = Buffer.byteLength(body);
   if (document.manifest.requesterRole === "owner" && byteSize <= V3_INLINE_MAXIMUM_BYTES) {
