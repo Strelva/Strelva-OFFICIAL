@@ -498,7 +498,7 @@ async function executeResolvedEventAction(
         acceptedUnverified = posted.status === "posted_unverified" || posted.status === "held_by_google" || posted.status === "accepted_unrecorded";
       } else {
         const { publishReviewReply } = await import("./gbp-replies");
-        const result = await publishReviewReply(tenantId, reviewId, replyText, { actor: `approved event ${eventId}` });
+        const result = await publishReviewReply(tenantId, reviewId, replyText, { actor: `approved event ${eventId}`, ...(process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1" ? { commandKey: `approval:${eventId}` } : {}) });
         if (!result.published) return { changed: false, reason: "review_reply_failed" };
       }
       // Reply accepted by Google — mark acceptance before resolving so a lost

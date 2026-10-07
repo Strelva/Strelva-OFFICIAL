@@ -26,7 +26,7 @@ export interface VerifiedActor {
 
 // ── Client records (src/platform/client-records) ──────────────────────────────
 
-export type ClientRecordStoreName = "spam_held" | "inquiry_timeline" | "inquiry_reply" | "booking_config" | "account_grouping" | "orders" | "provider_connections" | "provider_metadata" | "reward_members" | "reward_transactions" | "threads" | "tenant_settings";
+export type ClientRecordStoreName = "spam_held" | "inquiry_timeline" | "inquiry_reply" | "inquiry_delivery" | "booking_config" | "account_grouping" | "orders" | "provider_connections" | "provider_metadata" | "reward_members" | "reward_transactions" | "threads" | "tenant_settings";
 
 export interface ClientRecordCopy {
   recordId: string;
@@ -95,12 +95,12 @@ export type OutsideWriteAcceptance = "accepted" | "rejected" | "unknown";
 export type ReadbackCheck = { result: "matched" | "differs" | "failed"; detail: string };
 
 export interface OutsideWriteReceiptsPort {
-  beginGoogleWrite(input: { commandKey: string; tenantId: string; writeKind: "gbp_hours" | "gbp_post" | "gbp_photo"; request: Record<string, unknown> }): Promise<{ claimed: boolean; attemptId: string; acceptance: "pending" | OutsideWriteAcceptance; receipt?: { providerRef: string | null; readback: string } | null }>;
+  beginGoogleWrite(input: { commandKey: string; tenantId: string; writeKind: "gbp_hours" | "gbp_post" | "gbp_photo" | "review_reply"; request: Record<string, unknown> }): Promise<{ claimed: boolean; attemptId: string; acceptance: "pending" | OutsideWriteAcceptance; receipt?: { providerRef: string | null; readback: string } | null }>;
   completeGoogleWrite(attemptId: string, input: Parameters<OutsideWriteReceiptsPort["recordGoogleWrite"]>[0]): Promise<{ id: string }>;
   recordReadback(receiptId: string, readback: "matched" | "differs" | "failed" | "not_possible", detail: string): Promise<unknown>;
   /** Legacy Google writes join the same ledger when the operator release is on. */
   recordGoogleWrite(input: {
-    commandKey: string; tenantId: string; writeKind: "gbp_hours" | "gbp_post" | "gbp_photo";
+    commandKey: string; tenantId: string; writeKind: "gbp_hours" | "gbp_post" | "gbp_photo" | "review_reply";
     subject: string; request: Record<string, unknown>; beforeState?: unknown;
     acceptance: OutsideWriteAcceptance; acceptanceDetail?: string; providerRef?: string;
     readback?: "pending" | "matched" | "differs" | "failed" | "not_possible"; readbackDetail?: string; actor: string;
