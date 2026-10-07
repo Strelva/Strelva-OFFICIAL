@@ -30,6 +30,24 @@ export type DbFilter =
 export type DbCount = { ok: true; count: number } | { ok: false; missing: boolean; reason: string };
 export type DbRows<T> = { ok: true; rows: T[] } | { ok: false; missing: boolean; reason: string };
 
+export const missingTable = (error: { message?: string; code?: string }) =>
+  error.code === "42P01" || error.code === "PGRST205" || /does not exist|could not find the table/i.test(error.message ?? "");
+
+export type CountResponse = { count: number | null; error: { message?: string; code?: string } | null; status?: number };
+
+/**
+ * A head-only count carries no response body, so a missing table can come back
+ * with no error at all: status 404 and a null count. Only a real count is
+ * "present"; a 404 or a null count never is.
+ */
+export function countResult({ count, error, status }: CountResponse): DbCount {
+  if (status === 404) return { ok: false, missing: true, reason: error?.message || "404: table not found" };
+  if (error) return { ok: false, missing: missingTable(error), reason: error.message || error.code || "unknown" };
+  if (count === null || count === undefined) return { ok: false, missing: false, reason: `no count returned (status ${status ?? "unknown"})` };
+  return { ok: true, count };
+}
+
+
 /** Postgres, read side only. Implemented with head counts and selects. */
 export interface ReadOnlyDb {
   count(table: string, filters?: DbFilter[]): Promise<DbCount>;
@@ -120,6 +138,8 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261010161000": "operator_google_write_attempts",
   "20261010161100": "operator_queue_effort_context",
   "20261010162100": "tenant_deprovision_retention_receipts",
+  "20261010165600": "workspace_exit_handoff_receipts",
+  "20261010165700": "workspace_export_recovery",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */

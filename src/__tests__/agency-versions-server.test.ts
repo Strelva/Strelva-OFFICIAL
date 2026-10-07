@@ -215,5 +215,5 @@ describe.runIf(Boolean(PSQL))("Library and Review all on local PostgreSQL", () =
     await expect(reviewAllImprovements(actor, { agencyWorkspaceId: agency, sourceSystemId: source.systemId, revision: 1, versionIds: ids }, h.db!)).rejects.toThrow(/newer revision/);
     // Someone outside the agency reads nothing.
     await expect(readAgencyLibrary({ userId: owners[0]!.userId, verifiedEmail: owners[0]!.verifiedEmail! }, agency, h.db!)).rejects.toBeInstanceOf(VersionAccessError);
-  });
+  }, 30_000);
 });

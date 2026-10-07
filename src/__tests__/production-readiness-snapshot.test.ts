@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   assertNoSensitiveOutput,
+  countResult,
   formatReport,
   MIGRATION_SENTINELS,
   parseSnapshotArgs,
@@ -281,3 +282,13 @@ describe("production readiness snapshot", () => {
   });
 });
 
+
+
+describe("head-only table counts", () => {
+  it("accepts a real zero but never treats an absent count as a present table", () => {
+    expect(countResult({ count: 0, error: null, status: 200 })).toEqual({ ok: true, count: 0 });
+    expect(countResult({ count: null, error: null, status: 204 })).toMatchObject({ ok: false, missing: false });
+    expect(countResult({ count: null, error: null, status: 404 })).toMatchObject({ ok: false, missing: true });
+    expect(countResult({ count: null, error: { code: "PGRST205", message: "missing table" } })).toMatchObject({ ok: false, missing: true });
+  });
+});
