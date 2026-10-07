@@ -93,6 +93,19 @@ resolve older font-selection guidance in favor of the recorded Geist/custom-logo
 decision. This is structural documentation work; component implementation and
 adoption gaps remain in the foundation inventory.
 
+## Agency Team implementation, October 7, 2026
+
+Branch `a1/agency-team` prepares #261 locally: workspace/Systems-gated Team
+management uses existing invitation records and acceptance, extends agency
+admin sponsorship only for staff invitations, protects owner/self memberships,
+and assigns staff through 7A's SQL command in an atomic bulk wrapper. Removal
+uses the 7A membership-deletion trigger; rejoining restores no staff rows.
+Browser evidence uses fictional responses; permission, cleanup and rollback
+proof use isolated PostgreSQL. This is not deployed or adopted. Per-client
+permissions remain the 7A provider-seat policy; #241 is still a production
+decision. [The handoff](./docs/product/streams/a1-agency-team.md) owns commands,
+limits, touched shared files and the next integration action.
+
 ## Current product work
 
 Jacob's October 1 direction makes managed delivery the default for managed

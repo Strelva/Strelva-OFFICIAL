@@ -75,13 +75,13 @@ insert into public.workspace_memberships(workspace_id,user_id,role,created_by) v
  ('5e000000-0000-4000-8000-000000000020','5e000000-0000-4000-8000-000000000003','member','5e000000-0000-4000-8000-000000000002');
 select pg_temp.team_assert(not exists(select 1 from public.agency_client_staff where user_id='5e000000-0000-4000-8000-000000000003' and status='active'),'rejoin restores no assignments');
 -- Admin invitations reuse ordinary invitation tokens and acceptance. No owner elevation.
-select public.create_workspace_invitation('5e000000-0000-4000-8000-000000000020','5e000000-0000-4000-8000-000000000004','ps-a-unstaffed@agency-a.example.test','ps-stranger@example.test','member',repeat('a',64),now()+interval '1 day');
+select public.create_workspace_invitation('5e000000-0000-4000-8000-000000000020','5e000000-0000-4000-8000-000000000004','ps-a-unstaffed@agency-a.example.test','ps-stranger@example.test','member',repeat(md5('agency-team-261-a'),2),now()+interval '1 day');
 select pg_temp.team_assert(jsonb_array_length(pg_temp.team_read(4)->'invitations')=1 and pg_temp.team_read(3)->'invitations'='[]'::jsonb,'pending invites private to managers');
-select pg_temp.team_assert((select applied_role='member' from public.accept_workspace_invitation(repeat('a',64),'5e000000-0000-4000-8000-000000000006','ps-stranger@example.test')),'admin-sponsored acceptance');
-select pg_temp.team_expect($$select public.create_workspace_invitation('5e000000-0000-4000-8000-000000000020','5e000000-0000-4000-8000-000000000004','ps-a-unstaffed@agency-a.example.test','nobody@example.test','owner',repeat('b',64),now()+interval '1 day')$$,'workspace_invitation_owner_required');
-select public.create_workspace_invitation('5e000000-0000-4000-8000-000000000020','5e000000-0000-4000-8000-000000000004','ps-a-unstaffed@agency-a.example.test','ps-a-staff@agency-a.example.test','admin',repeat('c',64),now()+interval '1 day');
+select pg_temp.team_assert((select applied_role='member' from public.accept_workspace_invitation(repeat(md5('agency-team-261-a'),2),'5e000000-0000-4000-8000-000000000006','ps-stranger@example.test')),'admin-sponsored acceptance');
+select pg_temp.team_expect($$select public.create_workspace_invitation('5e000000-0000-4000-8000-000000000020','5e000000-0000-4000-8000-000000000004','ps-a-unstaffed@agency-a.example.test','nobody@example.test','owner',repeat(md5('agency-team-261-b'),2),now()+interval '1 day')$$,'workspace_invitation_owner_required');
+select public.create_workspace_invitation('5e000000-0000-4000-8000-000000000020','5e000000-0000-4000-8000-000000000004','ps-a-unstaffed@agency-a.example.test','ps-a-staff@agency-a.example.test','admin',repeat(md5('agency-team-261-c'),2),now()+interval '1 day');
 update public.workspace_memberships set role='member' where user_id='5e000000-0000-4000-8000-000000000004';
-select pg_temp.team_expect($$select * from public.accept_workspace_invitation(repeat('c',64),'5e000000-0000-4000-8000-000000000003','ps-a-staff@agency-a.example.test')$$,'workspace_invitation_sponsor_invalid');
+select pg_temp.team_expect($$select * from public.accept_workspace_invitation(repeat(md5('agency-team-261-c'),2),'5e000000-0000-4000-8000-000000000003','ps-a-staff@agency-a.example.test')$$,'workspace_invitation_sponsor_invalid');
 update public.workspace_memberships set role='admin' where user_id='5e000000-0000-4000-8000-000000000004';
-select pg_temp.team_assert(public.revoke_workspace_invitation((select id from public.workspace_invitations where token_hash=repeat('c',64)),'5e000000-0000-4000-8000-000000000004','ps-a-unstaffed@agency-a.example.test')='revoked','admin revokes staff invitation');
+select pg_temp.team_assert(public.revoke_workspace_invitation((select id from public.workspace_invitations where token_hash=repeat(md5('agency-team-261-c'),2)),'5e000000-0000-4000-8000-000000000004','ps-a-unstaffed@agency-a.example.test')='revoked','admin revokes staff invitation');
 rollback;

@@ -34,10 +34,21 @@ export async function readAgencyTeam(actor: WorkspaceActor, workspaceId: string,
 export async function manageAgencyTeam(actor: WorkspaceActor, input: AgencyTeamAction, db = teamDb()) {
   const args = actorArgs(actor, input.workspaceId);
   if (input.action === "assign") {
-    return call(db, "bulk_set_agency_client_staff", { ...args, p_staff_user_ids: input.userIds, p_workspace_ids: input.clientIds, p_active: input.active });
+    const value = await call(db, "bulk_set_agency_client_staff", { ...args, p_staff_user_ids: input.userIds, p_workspace_ids: input.clientIds, p_active: input.active });
+    const result = z.object({ results: z.array(z.object({
+      agencyWorkspaceId: z.string().uuid(), customerWorkspaceId: z.string().uuid(), userId: z.string().uuid(), active: z.boolean(), changed: z.boolean(),
+    }).strict()) }).strict().safeParse(value);
+    const expected = new Set(input.userIds.flatMap(userId => input.clientIds.map(clientId => `${userId}:${clientId}`)));
+    if (!result.success || result.data.results.length !== expected.size || result.data.results.some(row =>
+      row.agencyWorkspaceId !== input.workspaceId || row.active !== input.active || !expected.delete(`${row.userId}:${row.customerWorkspaceId}`))) {
+      throw new WorkspaceStoreError("The assignment response was malformed.");
+    }
+    return result.data;
   }
   if (input.action === "remove" || input.action === "set_role") {
-    return call(db, "manage_agency_team_member", { ...args, p_staff_user_id: input.userId, p_role: input.action === "remove" ? null : input.role });
+    const value = await call(db, "manage_agency_team_member", { ...args, p_staff_user_id: input.userId, p_role: input.action === "remove" ? null : input.role });
+    if (!z.object({ ok: z.literal(true) }).strict().safeParse(value).success) throw new WorkspaceStoreError("The membership response was malformed.");
+    return value;
   }
   // The same invitation service/token/acceptance as People & access. Reading
   // current authority here also prevents an invitation ID from another agency.

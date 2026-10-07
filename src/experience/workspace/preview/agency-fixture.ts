@@ -1,3 +1,4 @@
+import { withAgencyTeamPreview } from "./agency-team-fixture";
 /**
  * Local fixture for the agency home's batched read (`agency-clients.ts`).
  *
@@ -171,7 +172,7 @@ export function withAgencyPreview(base: typeof fetch, scenario: string, state: A
   // Dev StrictMode reads twice on mount; McClear’s loads from the first retry on.
   // Dev StrictMode reads twice on mount, so McClear's loads from the first Retry on.
   let clientReads = 0;
-  return async (input, init) => {
+  return withAgencyTeamPreview(async (input, init) => {
     const raw = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const url = new URL(raw, "http://preview.invalid");
     const method = init?.method || "GET";
@@ -213,5 +214,5 @@ export function withAgencyPreview(base: typeof fetch, scenario: string, state: A
     if (state !== "delegated" || url.pathname !== "/api/workspace" || method !== "GET" || !response.ok) return response;
     const snapshot = await response.json() as { workspaces?: Array<{ kind: string; access?: string; role?: string }> };
     return json({ ...snapshot, workspaces: snapshot.workspaces?.map((workspace) => workspace.kind === "agency" ? { ...workspace, access: "delegated_read", role: undefined } : workspace) });
-  };
+  }, state);
 }

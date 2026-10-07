@@ -31,7 +31,11 @@ export function AgencyTeamView({ workspaceId }: { workspaceId: string }) {
     const controller = new AbortController();
     void teamRequest(request, workspaceId, undefined, controller.signal).then(value => {
       const team = parseAgencyTeam(value, workspaceId);
-      if (!controller.signal.aborted) { setStored({ attempt, team }); setStale(false); }
+      if (!controller.signal.aborted) {
+        setStored({ attempt, team }); setStale(false);
+        setSelectedStaff(values => values.filter(id => team.members.some(member => member.userId === id)));
+        setSelectedClients(values => values.filter(id => team.clients.some(client => client.customerWorkspaceId === id)));
+      }
     }).catch(() => {
       if (!controller.signal.aborted) setStored({ attempt, error: "Team could not be loaded. Access has not changed." });
     });
@@ -52,7 +56,10 @@ export function AgencyTeamView({ workspaceId }: { workspaceId: string }) {
       }
       setMessage(success); setRemoving(null);
       try {
-        setStored({ attempt, team: parseAgencyTeam(await teamRequest(request, workspaceId), workspaceId) });
+        const refreshed = parseAgencyTeam(await teamRequest(request, workspaceId), workspaceId);
+        setStored({ attempt, team: refreshed });
+        setSelectedStaff(values => values.filter(id => refreshed.members.some(member => member.userId === id)));
+        setSelectedClients(values => values.filter(id => refreshed.clients.some(client => client.customerWorkspaceId === id)));
       } catch { setStale(true); setError("The change was confirmed, but the updated team could not be loaded. Reload before making another change."); }
     } catch (error) {
       setStale(true);
@@ -67,7 +74,7 @@ export function AgencyTeamView({ workspaceId }: { workspaceId: string }) {
 
   return <div aria-busy={busy || undefined} className="space-y-6">
     <div className="flex flex-wrap items-start justify-between gap-4">
-      <p className={`${note} max-w-xl`}>Assigned staff can act as client operators while the agency has an active provider seat and they remain on this team. The client controls the seat’s permissions.</p>
+      <p className={`${note} max-w-xl`}>Assigned staff with a confirmed email can act as client operators while the agency has an active provider seat and they remain on this team. Clients can end the agency’s access.</p>
       <Button variant="secondary" size="sm" disabled={busy} onClick={reload}>Reload team</Button>
     </div>
     {!team.canManage ? <p className={note}>Only agency owners and admins can invite people or change client assignments.</p> : null}

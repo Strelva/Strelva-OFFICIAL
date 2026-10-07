@@ -2,15 +2,26 @@
 
 [Internal 1.0 draft](../README.md). Give each person access to the clients they serve.
 
-## At 1.0
+## Prepared for 1.0
 
-1. Invite the person to your agency. [NOT BUILT — tracked in #261]
-2. Assign their clients and role for each client. [NOT BUILT — tracked in #261]
-3. Check their access from their account. Remove an assignment when their work
-   ends. [NOT BUILT — tracked in #261]
+1. An agency owner or admin opens **Team**, enters the person's email and agency
+   role, and creates an invitation. Share the private link; this action does not
+   send email. The person accepts using the invited, confirmed email.
+2. Open that person's **Client assignments** and choose their clients. Only
+   clients with an active provider seat appear. Use **Assign several people or
+   clients** to add or remove up to 200 assignments in one transaction.
+3. Team lists each person's assigned clients. Remove a client assignment when
+   their work ends. **Remove staff** asks for confirmation and ends all their
+   agency client assignments. Rejoining does not restore those assignments.
 
-The current **Team** tab lists members and roles. It does not manage client
-assignments. Existing workspace invitations are not proof of per-client access.
-Do not give staff business-owner access to work around the missing flow.
+Owners and admins can change Member/Admin agency roles. Owner memberships and
+your own membership are protected in this surface. Agency roles do not select
+different permissions per client: assigned staff use the existing provider-seat
+operator role. Direct customer membership and separately granted work retain
+their own authority. Do not grant business-owner access to staff as a workaround.
+
+This is locally tested implementation on `a1/agency-team`, behind the workspace
+and Systems release flags. It is not deployed or proof of actual staff use.
+After a failed or unconfirmed change, reload Team before changing it again.
 
 Client contact and inquiry access also depends on the decision in #241.
