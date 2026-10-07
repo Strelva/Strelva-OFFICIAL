@@ -522,7 +522,7 @@ if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
   # The same Version store contract the in-memory store passes, run through
   # createSupabaseVersionStore against this cluster (psql-backed RPC port).
   STRELVA_VERSIONS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
-    pnpm --dir "$repo_root" exec vitest run src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
+    pnpm --dir "$repo_root" exec vitest run --maxWorkers=1 --testTimeout=30000 src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
 fi
 # Needs you and Strelva handled: decision policy, owner decisions and the
 # handled read model, on the same fictional cluster (needs the business record,
@@ -654,10 +654,25 @@ psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql
 # Wave 6 catalog: additive submit/contact RPCs, report receipts, newsletter
 # projection and delegated Make authority. Run after all required flag names,
 # business ownership, Systems and work-plan functions exist.
+# Match the retained tenant newsletter table from 20260618224329. This
+# isolated workspace fixture does not apply the complete legacy schema.
+psql "${psql_args[@]}" <<'SQL'
+create table public.newsletter_subscribers (
+  tenant_id text not null references public.tenants(id) on delete cascade,
+  email text not null, name text,
+  subscribed_at timestamptz not null default now(),
+  status text not null default 'active',
+  primary key (tenant_id, email)
+);
+SQL
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010150000_internal_tool_submit_notices.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-submit-notices-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010150100_internal_tool_use_links.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-use-links-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010150200_internal_tool_notice_delivery.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-notice-delivery-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010150300_catalog_tool_evidence.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/catalog-tool-evidence-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010152000_catalog_report_receipts.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/catalog-reports-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010153000_newsletter_contacts.sql"

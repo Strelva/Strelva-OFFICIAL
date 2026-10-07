@@ -21,7 +21,10 @@ vi.mock("@/products/applications/repository", async (importOriginal) => {
     async rpc(name: string, args: Record<string, unknown>) {
       boundary.calls.push({ name, args });
       const respond = boundary.responses[name];
-      return respond ? respond(args) : { data: null, error: null };
+      if (respond) return respond(args);
+      if (name === "lease_internal_tool_notice") return { data: { noticeId, workspaceId, lease: noticeId, delivery: args.p_delivery }, error: null };
+      if (name === "finish_internal_tool_notice_delivery") return { data: true, error: null };
+      return { data: null, error: null };
     },
     from() { throw new Error("not used"); },
   };
@@ -73,7 +76,10 @@ const db = {
   async rpc(name: string, args: Record<string, unknown>) {
     boundary.calls.push({ name, args });
     const respond = boundary.responses[name];
-    return respond ? respond(args) : { data: null, error: null };
+    if (respond) return respond(args);
+      if (name === "lease_internal_tool_notice") return { data: { noticeId, workspaceId, lease: noticeId, delivery: args.p_delivery }, error: null };
+      if (name === "finish_internal_tool_notice_delivery") return { data: true, error: null };
+      return { data: null, error: null };
   },
 };
 const resolved = () => ({ data: { client: { id: contactId, created: true, conflict: false }, handler: { id: personId, created: false, conflict: false } }, error: null });
@@ -179,8 +185,8 @@ describe("the assigned-person email", () => {
       audience: "client", to: "sam@leslie.example.test", subject: "New client intake: Brightline Co",
       idempotencyKey: `internal-tool-notice:${noticeId}`,
     }));
-    expect(boundary.calls.map((call) => call.name)).toEqual(["claim_internal_tool_submit_notice", "finish_internal_tool_notice"]);
-    expect(boundary.calls[1]!.args).toEqual({ p_notice_id: noticeId, p_workspace_id: workspaceId, p_status: "sent", p_detail: null, p_provider_message_id: "provider-1" });
+    expect(boundary.calls.map((call) => call.name)).toEqual(["claim_internal_tool_submit_notice", "lease_internal_tool_notice", "finish_internal_tool_notice_delivery"]);
+    expect(boundary.calls[2]!.args).toEqual({ p_notice_id: noticeId, p_workspace_id: workspaceId, p_status: "sent", p_lease: noticeId, p_provider_message_id: "provider-1" });
   });
 
   it("records a suppression receipt while client email is paused", async () => {
@@ -189,7 +195,7 @@ describe("the assigned-person email", () => {
     boundary.responses.claim_internal_tool_submit_notice = claimed;
     const result = await notifyAssignedPerson(db, staff, { workspaceId, workId, toolTitle: spec.title, spec, record }, { send: sendEmailWithReceipt });
     expect(result.status).toBe("suppressed");
-    expect(boundary.calls[1]!.args).toMatchObject({ p_status: "suppressed", p_detail: "email_suppressed_or_unconfigured" });
+    expect(boundary.calls[2]!.args).toMatchObject({ p_status: "suppressed" });
   });
 
   it("records a failure receipt when the provider throws, without failing the submit", async () => {
@@ -198,7 +204,7 @@ describe("the assigned-person email", () => {
     const send = vi.fn(async () => { throw new Error("provider down"); });
     const result = await notifyAssignedPerson(db, staff, { workspaceId, workId, toolTitle: spec.title, spec, record }, { send });
     expect(result).toEqual({ status: "failed", noticeId });
-    expect(boundary.calls[1]!.args).toMatchObject({ p_status: "failed", p_detail: "provider down" });
+    expect(boundary.calls[2]!.args).toMatchObject({ p_status: "failed" });
   });
 
   it("never sends twice for the same record and skips a person with no email", async () => {
@@ -283,7 +289,7 @@ describe("member submit of a live tool", () => {
       expectedReleaseVersion: 1, expectedRecordsRevision: 0,
       record: { id: "r1", values: { business: "Brightline", client: "owner@brightline.example.test", handler: "sam@leslie.example.test" } },
     });
-    expect(boundary.calls.map((call) => call.name)).toEqual(["resolve_internal_tool_links", "submit_application_record", "claim_internal_tool_submit_notice", "finish_internal_tool_notice"]);
+    expect(boundary.calls.map((call) => call.name)).toEqual(["resolve_internal_tool_links", "submit_application_record", "claim_internal_tool_submit_notice", "lease_internal_tool_notice", "finish_internal_tool_notice_delivery"]);
     expect(boundary.calls[1]!.args.p_values).toEqual({ business: "Brightline", client: contactId, handler: personId });
     expect(result).toMatchObject({ linkResult: { notice: "suppressed", contactConflicts: [] } });
   });

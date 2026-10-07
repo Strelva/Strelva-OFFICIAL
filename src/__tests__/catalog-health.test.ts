@@ -33,5 +33,7 @@ describe("website traffic and Search Console health", () => {
     expect(projection.systems[0]!.health.signals).toContain("Traffic trend is unavailable; this is not zero visits.");
     expect(projection.connections).toContainEqual(expect.objectContaining({ sourceId: id, kind: "read", targetLabel: "Google Search Console", state: "stale", purpose: expect.stringContaining("Source of truth: Google. Freshness: daily, 07:00 UTC.") }));
     expect(projection.systems[0]!.lifecycle).toBe("live");
+    const stale = await projectWorkspaceSystems({ listing, siteDomains: new Map(), candidates: [], observations: [searchConsoleObservation(id, { status: "available", checkedAt: "2026-10-01T00:00:00Z", unreachableSince: null, clicks: 10, impressions: 100 })], actorId: "actor", now });
+    expect(stale.connections[0]!.state).toBe("stale");
   });
 });

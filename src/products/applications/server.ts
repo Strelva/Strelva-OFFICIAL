@@ -23,6 +23,8 @@ import {
   withMemoryLane,
 } from "./repository";
 
+export { toolNoticesMayBeOn, retryToolNotices } from "./notice-delivery";
+
 export {
   applicationCandidateSchema,
   applicationCommandSchema,

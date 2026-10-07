@@ -43,6 +43,7 @@ describe("catalog report release and receipts", () => {
     rpc.mockImplementation(async (name: string) => ({ error: name === "record_catalog_report_receipt" ? { message: "database unavailable" } : null, data: name === "resolve_billing_workspace" ? { workspaceId } : { workspaceId, flags: {}, testers: [] } }));
     expect(await recordCatalogReport(receipt)).toBe(false);
     expect(rpc.mock.calls.filter(([name]) => name === "record_catalog_report_receipt")).toHaveLength(1);
+    expect(await recordCatalogReport({ ...receipt, recipient: "invalid legacy owner address" })).toBe(false);
   });
   it("reads history using the verified workspace actor and preserves failures", async () => {
     expect(await readCatalogReportHandled(actor, workspaceId, at)).toEqual([handledReport(receipt)]);

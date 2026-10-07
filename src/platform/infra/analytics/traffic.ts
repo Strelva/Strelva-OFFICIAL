@@ -10,6 +10,7 @@ export async function readDailyTraffic(tenantId: string, days = 30): Promise<Dai
   const { data, error } = await db.from("site_metrics").select("day,count")
     .eq("tenant_id", tenantId).eq("metric", "page-view").gte("day", dates[0]!).order("day");
   if (error || !data) throw new Error("Traffic could not be read");
+  if (!data.length) return [];
   const byDay = new Map(data.map(row => [row.day, row.count]));
   return dates.map(date => ({ date, pageViews: byDay.get(date) ?? 0 }));
 }

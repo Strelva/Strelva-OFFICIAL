@@ -12,6 +12,8 @@ import { LEAD_MIRROR_PENDING_KEY, parsePendingMember } from "@/lib/lead-mirror";
 import { getDeliveryLeads } from "@/lib/access-request-delivery";
 import { getAllLeadWorkflow } from "@/lib/lead-workflow";
 import { readCatalogReportFailures } from "@/platform/catalog-reports/operator-source";
+import { readToolNoticeFailures } from "@/platform/catalog-reports/tool-notices";
+import { readToolContactConflicts } from "@/platform/catalog-reports/tool-history";
 import { isCustomChangeRequestMetadata } from "@/lib/custom-repos";
 import { listOperationalExceptions } from "@/products/operations/inbox";
 import { PostgresServiceRequestStore } from "@/platform/service-requests";
@@ -416,6 +418,8 @@ export async function readAllSources(input: { tenants: QueueTenant[]; context: Q
     guard("maintenance_digest", "Maintenance digests", readMaintenanceDigests),
     guard("ops_alert", "Operations alerts", readOpsAlerts),
     guard("ops_alert", "Report delivery", () => readCatalogReportFailures(actor)),
+    guard("ops_alert", "Internal tool notifications", () => readToolNoticeFailures(actor)),
+    guard("ops_alert", "Internal tool contact links", () => readToolContactConflicts(actor)),
     guard("domain_alert", "Domain monitor", readDomainAlerts),
     guard("domain_unverified", "Domain claims", () => readUnverifiedDomains(tenants, now)),
     guard("site_health", "Site health", () => readSiteHealthItems(context, byId)),

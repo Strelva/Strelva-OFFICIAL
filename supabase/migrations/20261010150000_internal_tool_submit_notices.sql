@@ -63,9 +63,9 @@ begin
   select t.id into linked_tenant from public.tenant_workspace_links l join public.tenants t on t.stable_id = l.tenant_stable_id
     where l.workspace_id = p_workspace_id order by l.linked_at, l.id limit 1;
   insert into public.internal_tool_notices(workspace_id, work_id, record_id, field_id, person_id, recipient_email, status, detail, created_by)
-    values (p_workspace_id, p_work_id, record_row.record_id, coalesce(p_field_id, 'owner'), person.id, owner_contact->>'email',
-      case when owner_contact is null then 'skipped' else 'pending' end,
-      case when owner_contact is null then 'owner_recipient_unavailable' end, p_user_id)
+    values (p_workspace_id, p_work_id, record_row.record_id, coalesce(p_field_id, 'owner'), person.id, coalesce(owner_contact->>'email', person.email),
+      case when coalesce(owner_contact->>'email', person.email) is null then 'skipped' else 'pending' end,
+      case when coalesce(owner_contact->>'email', person.email) is null then 'owner_and_assignee_unavailable' end, p_user_id)
     on conflict (work_id, record_id) do nothing returning * into notice;
   if notice.id is null then
     select * into notice from public.internal_tool_notices where work_id = p_work_id and record_id = record_row.record_id;

@@ -34,7 +34,7 @@ async function makerPlanRpc(name: string, actor: WorkspaceActor, workspaceId: st
   if (error) throw new WorkspaceStoreError("The work plan could not be confirmed");
   const row = data?.[0];
   if (!row) return null;
-  return { id: String(row.id), workspaceId: String(row.workspace_id), productId: String(row.product_id), resourceKind: String(row.resource_kind), title: typeof row.title === "string" ? row.title : null, payload: row.payload, input: row.input, sourceWorkId: typeof row.source_work_id === "string" ? row.source_work_id : null, createdBy: String(row.created_by), createdAt: String(row.created_at), updatedAt: String(row.updated_at) };
+  return { id: String(row.id), workspaceId: String(row.workspace_id), productId: String(row.product_id), resourceKind: String(row.resource_kind), title: typeof row.title === "string" ? row.title : undefined, payload: row.payload, input: row.input, sourceWorkId: typeof row.source_work_id === "string" ? row.source_work_id : undefined, createdBy: String(row.created_by), createdAt: String(row.created_at), updatedAt: String(row.updated_at) };
 }
 
 /** Maker plan storage rechecks identity, delegation, capacity and exit inside SQL. */

@@ -38,7 +38,7 @@ begin
     join public.tenant_workspace_links l on l.tenant_stable_id = t.stable_id
     join public.workspaces w on w.id = l.workspace_id
     where t.id = p_tenant_id and l.workspace_id = p_workspace_id
-      and w.kind = 'customer' and w.exited_at is null
+      and w.kind = 'customer' and not public.workspace_exit_completed(w.id)
     for share of l;
   if v_stable is null then raise exception 'newsletter_contact_link_denied'; end if;
   return v_stable;

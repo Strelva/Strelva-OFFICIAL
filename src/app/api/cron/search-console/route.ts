@@ -28,7 +28,8 @@ export async function GET(request: Request) {
       const catalog = catalogReportsMayBeOn() && await tenantReleaseFlagEnabled("catalog_reports", tenant.id).catch(() => false);
       const read = catalog ? await fetchSearchDataWithStatus(tenant.siteUrl!, 7, tenant) : null;
       const data = read?.data ?? await fetchSearchData(tenant.siteUrl!);
-      if (read) await recordSearchConnection(tenant.id, read.status, read.status === "available" ? { clicks: data.totalClicks, impressions: data.totalImpressions } : null);
+      if (read) await recordSearchConnection(tenant.id, read.status, read.status === "available" ? { clicks: data.totalClicks, impressions: data.totalImpressions } : null)
+        .catch(() => console.error("[search-console] reachability receipt unavailable", { tenantId: tenant.id }));
       await setSearchData(tenant.id, data);
 
       if (data.queries.length > 0) {

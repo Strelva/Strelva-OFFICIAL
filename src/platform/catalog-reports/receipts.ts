@@ -25,15 +25,15 @@ export type CatalogReportReceipt = z.infer<typeof receiptSchema>;
  * receipt write never retries an already accepted provider send. */
 export async function recordCatalogReport(raw: ReportOutcome): Promise<boolean> {
   if (!catalogReportsMayBeOn()) return false;
-  const input = reportOutcomeSchema.parse(raw);
-  if (!(await tenantReleaseFlagEnabled("catalog_reports", input.tenantId).catch(() => false))) return false;
   try {
+    const input = reportOutcomeSchema.parse(raw);
+    if (!(await tenantReleaseFlagEnabled("catalog_reports", input.tenantId).catch(() => false))) return false;
     return await callReleaseFlagsRpc("record_catalog_report_receipt", {
       p_tenant_id: input.tenantId, p_kind: input.kind, p_period: input.period, p_status: input.status,
       p_recipient: input.recipient, p_reason: input.reason, p_provider_message_id: input.providerMessageId,
     }, z.boolean(), "The report receipt could not be recorded.");
   } catch (error) {
-    console.error("[catalog-reports] receipt write failed", { tenantId: input.tenantId, status: input.status, error: error instanceof Error ? error.message : "unavailable" });
+    console.error("[catalog-reports] receipt write failed", { tenantId: raw.tenantId, status: raw.status, error: error instanceof z.ZodError ? "invalid receipt" : "storage unavailable" });
     return false;
   }
 }

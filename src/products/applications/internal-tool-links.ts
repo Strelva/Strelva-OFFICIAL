@@ -1,8 +1,7 @@
+import { deliverToolNotice } from "./notice-delivery";
 import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import { sendEmailWithReceipt, type SendEmailInput, type SendEmailResult } from "@/platform/infra/email/send";
 import { systemsReleaseEnabled, systemsReleaseMayBeOn, systemsReleasedFor } from "@/platform/systems-release";
-import { customerEmailEnabled, emailSendingEnabled } from "@/platform/infra/email/enabled";
-import { getClientEmailOverride } from "@/platform/infra/email/client-override";
 import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { releaseViewerFor } from "@/platform/release-flags/viewer";
 import { releaseFlagMayBeOn, workspaceReleaseOn } from "@/platform/release-flags/resolve";
@@ -196,9 +195,9 @@ export async function notifyAssignedPerson(
   input: { workspaceId: string; workId: string; toolTitle: string; spec: ApplicationSpec; record: ApplicationRecord },
   deps: { send: (input: SendEmailInput) => Promise<SendEmailResult> } = { send: sendEmailWithReceipt },
 ): Promise<{ status: AssignedPersonNoticeStatus; noticeId?: string }> {
-  if (!(await internalToolNoticesReleasedFor(actor, input.workspaceId))) return { status: "none" };
   const field = linkFields(input.spec).find((item) => item.type === "assigned_person");
   try {
+    if (!(await internalToolNoticesReleasedFor(actor, input.workspaceId))) return { status: "none" };
     const claim = await db.rpc("claim_internal_tool_submit_notice", {
       p_workspace_id: input.workspaceId,
       p_work_id: input.workId,
@@ -227,40 +226,13 @@ export async function notifyAssignedPerson(
         button: { label: "Sign in to open it", url: toolSignInUrl(input.workspaceId, input.workId) },
       },
     };
-    let status: "sent" | "suppressed" | "failed";
-    let detail: string | null = null;
-    let providerMessageId: string | null = null;
-    try {
-      // Unlike legacy client sends, this new sender requires EVERY global
-      // gate. A tenant's "on" override cannot bypass a paused rollout.
-      const suppressed = !emailSendingEnabled() || !customerEmailEnabled()
-        || (claimed.tenantId && await getClientEmailOverride(claimed.tenantId) === "off");
-      const recipients = [...new Set([claimed.recipientEmail, claimed.assignedEmail].filter((value): value is string => Boolean(value)))];
-      const result: SendEmailResult = suppressed
-        ? { status: "suppressed", reason: "email_suppressed_or_unconfigured" }
-        : await deps.send({
-        audience: "client",
-        ...(claimed.tenantId ? { tenantId: claimed.tenantId } : {}),
-        to: recipients.length === 1 ? recipients[0]! : recipients,
-        subject: email.subject,
-        options: email.options,
-        idempotencyKey: `internal-tool-notice:${claimed.noticeId}`,
-        tags: { kind: "internal_tool_notice" },
-      });
-      if (result.status === "accepted") { status = "sent"; providerMessageId = result.providerMessageId; }
-      else { status = "suppressed"; detail = result.reason; }
-    } catch (error) {
-      status = "failed";
-      detail = oneLine(error instanceof Error ? error.message : "send failed", 300);
-    }
-    const finish = await db.rpc("finish_internal_tool_notice", {
-      p_notice_id: claimed.noticeId,
-      p_workspace_id: input.workspaceId,
-      p_status: status,
-      p_detail: detail,
-      p_provider_message_id: providerMessageId,
-    });
-    if (finish.error) console.error("[internal-tool-notice] receipt not recorded", { noticeId: claimed.noticeId, status });
+    const recipients = [...new Set([claimed.recipientEmail, claimed.assignedEmail].filter((value): value is string => Boolean(value)))];
+    const status = await deliverToolNotice(db, claimed.noticeId, input.workspaceId, {
+      audience: "client", ...(claimed.tenantId ? { tenantId: claimed.tenantId } : {}),
+      to: recipients.length === 1 ? recipients[0]! : recipients,
+      subject: email.subject, options: email.options,
+      idempotencyKey: `internal-tool-notice:${claimed.noticeId}`, tags: { kind: "internal_tool_notice" },
+    }, deps.send);
     return { status, noticeId: claimed.noticeId };
   } catch (error) {
     console.error("[internal-tool-notice] notice not claimed", { workId: input.workId, error: error instanceof Error ? error.message : "unknown" });
