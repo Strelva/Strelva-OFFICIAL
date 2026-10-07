@@ -1,3 +1,5 @@
+import type { TenantBusinessContext } from "@/platform/business-record/public-reader";
+import { siteWithBusinessRecord } from "./business-record";
 import { createElement, type CSSProperties, type ReactNode } from "react";
 import Image from "next/image";
 import { siteDocumentSchema, siteDocumentHash, type SiteDocument } from "./site-document";
@@ -13,6 +15,7 @@ export interface SiteRendererProps {
   preview?: boolean;
   tenant?: string;
   contentHash?: string;
+  businessContext?: TenantBusinessContext | null;
   /** Serve visitor tools under this current tenant slug (after a rename). The
    * page still emits the issued document's hash. */
   capabilityTenant?: string;
@@ -20,10 +23,12 @@ export interface SiteRendererProps {
 }
 
 /** Dependency-free catalog renderer behind the replaceable SiteRenderer boundary. */
-export function SiteRenderer({ document: input, path = "/", preview = false, tenant, contentHash, capabilityTenant, businessFacts }: SiteRendererProps) {
+export function SiteRenderer({ document: input, path = "/", preview = false, tenant, contentHash, capabilityTenant, businessFacts, businessContext }: SiteRendererProps) {
   const issued = siteDocumentSchema.parse(input);
   const documentHash = siteDocumentHash(issued);
-  const projected = preview ? issued : projectWebsiteBusinessFacts(issued, businessFacts ?? null);
+  // A document bound to the record uses its typed projection (approved copy when
+  // unavailable); an unbound document takes the released record overlay.
+  const projected = preview ? issued : issued.businessRecord ? projectWebsiteBusinessFacts(issued, businessFacts ?? null) : siteWithBusinessRecord(issued, businessContext ?? null);
   const document = capabilityTenant && projected.capabilities && capabilityTenant === tenant ? { ...projected, capabilities: { ...projected.capabilities, tenant: capabilityTenant } } : projected;
   const faqSchema = preview ? null : siteFaqJsonLd(document, path);
   if (contentHash && contentHash !== documentHash) throw new Error("The rendered website document does not match its approved hash.");

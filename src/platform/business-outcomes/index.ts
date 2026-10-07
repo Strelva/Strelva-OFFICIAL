@@ -56,30 +56,38 @@ export function formatOutcomeLine(outcome: BusinessOutcomeMonth): OutcomeLine {
     sentences.push(`${plural(outcome.visits.value, "visit", "visits")}.`);
     figures.push({ label: "visits", value: outcome.visits.value, kind: "counted" });
   }
-  const inquiries = outcome.inquiries.value ?? 0;
-  figures.push({ label: "inquiries", value: inquiries, kind: "counted" });
-  let inquiry = plural(inquiries, "inquiry", "inquiries");
-  if (inquiries > 0 && outcome.answered.withinDay !== null && outcome.answered.value !== null) {
-    // The new cohort includes all first replies and their times. Older month
-    // payloads retain the existing sentence verbatim while the flag is off.
-    const measured = outcome.answered.averageReplySeconds !== undefined && outcome.answered.medianReplySeconds !== undefined;
-    inquiry += measured
-      ? `; ${outcome.answered.value.toLocaleString("en-US")} answered, ${outcome.answered.withinDay.toLocaleString("en-US")} within a day`
-      : `; ${outcome.answered.withinDay.toLocaleString("en-US")} answered within a day`;
-    figures.push({ label: "answered within a day", value: outcome.answered.withinDay, kind: "linked" });
+  const inquiries = outcome.inquiries.value;
+  if (inquiries !== null) {
+    figures.push({ label: "inquiries", value: inquiries, kind: "counted" });
+    let inquiry = plural(inquiries, "inquiry", "inquiries");
+    if (inquiries > 0 && outcome.answered.withinDay !== null && outcome.answered.value !== null) {
+      // The new cohort includes all first replies and their times. Older month
+      // payloads retain the existing sentence verbatim while the flag is off.
+      const measured = outcome.answered.averageReplySeconds !== undefined && outcome.answered.medianReplySeconds !== undefined;
+      inquiry += measured
+        ? `; ${outcome.answered.value.toLocaleString("en-US")} answered, ${outcome.answered.withinDay.toLocaleString("en-US")} within a day`
+        : `; ${outcome.answered.withinDay.toLocaleString("en-US")} answered within a day`;
+      figures.push({ label: "answered within a day", value: outcome.answered.withinDay, kind: "linked" });
+    }
+    sentences.push(`${inquiry}.`);
+    if (outcome.answered.averageReplySeconds != null && outcome.answered.medianReplySeconds != null) {
+      sentences.push(`First reply: ${inquiryReplyDuration(outcome.answered.averageReplySeconds)} average; ${inquiryReplyDuration(outcome.answered.medianReplySeconds)} median. Replies count when the email provider accepts them.`);
+    }
+  } else {
+    sentences.push(outcome.inquiries.reason ? `Inquiries unavailable: ${outcome.inquiries.reason}` : "Inquiries unavailable.");
   }
-  sentences.push(`${inquiry}.`);
-  if (outcome.answered.averageReplySeconds != null && outcome.answered.medianReplySeconds != null) {
-    sentences.push(`First reply: ${inquiryReplyDuration(outcome.answered.averageReplySeconds)} average; ${inquiryReplyDuration(outcome.answered.medianReplySeconds)} median. Replies count when the email provider accepts them.`);
+  const bookings = outcome.bookings.value;
+  if (bookings !== null) {
+    figures.push({ label: "bookings", value: bookings, kind: "counted" });
+    let booking = plural(bookings, "booking", "bookings");
+    if (bookings > 0 && outcome.bookingsFromInquiry.value !== null) {
+      booking += `, ${outcome.bookingsFromInquiry.value.toLocaleString("en-US")} of them from a website inquiry`;
+      figures.push({ label: "bookings from a website inquiry", value: outcome.bookingsFromInquiry.value, kind: "linked" });
+    }
+    sentences.push(`${booking}.`);
+  } else {
+    sentences.push(outcome.bookings.reason ? `Bookings unavailable: ${outcome.bookings.reason}` : "Bookings unavailable.");
   }
-  const bookings = outcome.bookings.value ?? 0;
-  figures.push({ label: "bookings", value: bookings, kind: "counted" });
-  let booking = plural(bookings, "booking", "bookings");
-  if (bookings > 0 && outcome.bookingsFromInquiry.value !== null) {
-    booking += `, ${outcome.bookingsFromInquiry.value.toLocaleString("en-US")} of them from a website inquiry`;
-    figures.push({ label: "bookings from a website inquiry", value: outcome.bookingsFromInquiry.value, kind: "linked" });
-  }
-  sentences.push(`${booking}.`);
   if (outcome.reviews.value !== null) {
     sentences.push(`${plural(outcome.reviews.value, "new review", "new reviews")}.`);
     figures.push({ label: "new reviews", value: outcome.reviews.value, kind: "counted" });

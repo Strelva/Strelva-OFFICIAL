@@ -1,12 +1,16 @@
 # One place to operate
 
-Status: draft spec, 2026-10-06. Not approved. Built locally on branch
-`build/operator`, proven local only: health and domain crons over every site,
-the 15-source projection (`src/platform/operator-queue/`), marks and receipts
-migrations (not applied anywhere), `/admin/queue` beside today's `/admin`,
-receipts on review replies and domain add / claim removal, one domain view,
-close-with-minutes, and the agency Queue view model (no route). Not in
-production; the §9 clocks are proposals in `rules.ts` `PROPOSED_CLOCKS`.
+Status: locally implemented for wave 6 on `w6/agency-operator`, October 7,
+2026. Not deployed. The operator rollout is selected by
+`STRELVA_OPERATOR_QUEUE_RELEASE=1`, default off: `/admin` becomes the queue,
+expanded checks cover custom-repo sites, and native source actions, strict
+source reads and per-business lead counts become available. With the flag off,
+the old `/admin` remains and health/domain crons keep their hosted-only rebuild
+gate. The earlier operator migrations and the wave 6 additions are local only.
+The §9 clocks remain proposals in `rules.ts` `PROPOSED_CLOCKS`; no working-hour
+promise or owner-chase send is activated. See the local evidence mapping at
+the end and [the stream handoff](../streams/w6-agency-operator.md) for full
+verification and rollout prerequisites.
 
 Strelva's main delivery cost is operator time. Today that time is spread over
 six queues in two stores and fifteen `/admin` pages, and some live sites are
@@ -383,3 +387,29 @@ Inferences, to check:
   weeks and count items per kind per business.
 - Whether minutes per business are dominated by a few clients (gldf, custom
   repos). Unknown until #205 data exists for one full month.
+
+## Wave 6 local implementation and evidence
+
+The table maps launch behavior to implementation and local proof. Synthetic
+fixtures establish behavior under those inputs; they do not establish a live
+client conversion, provider access, operating parity or measured economics.
+
+| Launch behavior | Implementation and local evidence |
+| --- | --- |
+| §3.1–2 Complete list and one shape | `operator-queue/sources.ts`, `project.ts`, `contracts.ts`. Projection parity covers all 15 kinds; omitted kinds are explicit gaps. Enabled reads consume all events, assignment offers, exception pages and receipt sources; Postgres drafts use their creation time, Redis digests and ops failures use strict reads. `operator-queue-projection`, `operator-queue-source-integrity`, `operational-inbox-query` tests cover missing, failed and later pages. |
+| §3.3–4 Priority, due time and age | `rules.ts`; projection tests prove harm, owner calls, expiring drafts, pin/snooze and due ordering. Proposed acknowledgement and chase numbers remain configuration, not approved service terms. |
+| §3.5 Assignment | `store.ts`, operator marks RPC and `queue/actions.ts`; operator/auth schema and action tests reject non-operators and stale/P1 snoozes. Assignment never grants source authority. |
+| §3.6–7 Receipts and undo | Outside-write ledger plus existing native ledgers. Legacy Google writes reserve dispatch before calling Google; accepted or uncertain effects cannot be re-sent. Tenant content publication records its receipt atomically. Review reply, Google write, domain, content receipt and listing readback tests cover acceptance, rejection, uncertain dispatch and unavailable receipt storage. Existing website revision restore remains the hosted undo path; domain undo removes only Strelva's claim. |
+| §3.8 Work from the queue | `QueueBoard`, `QueueSourceActions`, server-derived identities in `source-actions.ts`; draft review/bulk partial results, triage/quote, lead repair, checks and reviewed-revision service acceptance reuse governed source paths. Action tests refuse owner decisions, cross-business targets, stale revisions and unconfirmed lead copies. Hosted rechecks read and save the exact current publication even without a tenant-workspace link. |
+| §3.9–10 Every-site health and domains | Existing crons gain operator rollout guards. Enabled coverage checks all nine synthetic custom-repo sites with rebuild off; no evidence is unknown. Stale cached healthy results and sites absent from a snapshot appear as unknown queue items. Flags-off tests preserve skipped responses and hosted-only behavior. Provider reads, failed probes and failed health storage are covered by cron tests. |
+| §3.11 One domain projection | `domain-view.ts`, `domain-view-loader.ts` combine hydrated claims, registration state and monitor observations for linked sites; projection and loader tests cover registration states, unknown monitor data and unavailable claims. |
+| §3.12 Client leads visible | Existing `/admin/client-leads`; `lead-counts.ts` reads only ids, deduplicates Postgres/Redis and combines linked sites by business. Queue rows show seven-day counts, and the business summary shows pending copies; an unread store produces unknown counts. Lead-count tests cover shared businesses, 501 records and store/page failures. Lead contents remain outside the list. |
+| §3.13 Human minutes | Close action writes marks, then business effort with source kind and System attribution; failed minutes are reported after a successful close. Action tests cover invalid minutes, absent workspace and storage failure. `/admin/work` remains the effort report. |
+| §3.14 Owner reach | Marks and `OwnerNotToldPanel` distinguish told, not told and paused email; projection tests cover paused email. The shared owner-recipient rule belongs to this stream's business-record work and remains behind its own default-off gates. |
+| Interface and authority states | Real route/loading state and local preview share `QueueLoadState`. Queue buttons use shared 48px controls, links have 48px targets. Root stream inspected desktop 1280px/mobile 390px, empty/incomplete/loading/error/denied states and visible keyboard focus; fixture actions refuse without a real operator session. Authenticated local journey remains a separate proof from the fixture preview. |
+
+Production still requires applying the migrations, explicit flag/deploy approval,
+read-only count parity for 14 days, a real governed write with provider read-back,
+and a month of minutes across live clients. Owner email stays paused until its
+separate sending gates are explicitly enabled. No queue action grants permission
+for Stripe, DNS, deployment, provider writes or production data fixes.

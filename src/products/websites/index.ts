@@ -16,6 +16,7 @@ export const renderHostedPage: typeof import("./hosted-public").renderHostedPage
 export * from "./site-seo";
 export * from "./site-routing";
 export * from "./site-health";
+export { currentHostedUrl } from "./hosted-routing";
 export * from "./domain-verification";
 export * from "./site-sharing";
 export type { WebsiteMonthlyReport } from "./site-report";

@@ -28,7 +28,7 @@ vi.mock("@/platform/infra/db/client", () => ({
       db.rpcs.push({ name, args });
       if (name === "tenant_teardown_blockers") return { data: [db.blockers], error: null };
       if (name === "assert_tenant_inquiry_export") return db.teardownError ? { data: null, error: db.teardownError } : { data: null, error: null };
-      if (name === "deprovision_tenant_rows" || name === "deprovision_tenant_rows_after_inquiry_export") return db.teardownError ? { data: null, error: db.teardownError } : { data: { memberships: 1, tenants: 1 }, error: null };
+      if (name === "deprovision_tenant_rows" || name === "deprovision_tenant_rows_after_inquiry_export" || name === "deprovision_tenant_rows_retained" || name === "deprovision_tenant_rows_retained_after_inquiry_export") return db.teardownError ? { data: null, error: db.teardownError } : { data: { memberships: 1, tenants: 1 }, error: null };
       if (name === "pause_tenant_systems") return db.pauseError ? { data: null, error: db.pauseError } : { data: 2, error: null };
       return { data: null, error: { message: `unexpected rpc ${name}` } };
     },
@@ -41,10 +41,12 @@ vi.mock("@/lib/vercel", () => vercel);
 import { runDeprovision, TENANT_SCOPED_TABLES } from "@/lib/deprovision";
 
 beforeEach(() => {
+  vi.stubEnv("STRELVA_TENANT_RECEIPT_RETENTION", "0");
   db.deletes.length = 0; db.rpcs.length = 0; db.counts = { memberships: 1, tenants: 1 };
   db.blockers = { publications: 0, reservations: 0 }; db.teardownError = null; db.pauseError = null;
   redis.del.mockClear(); vercel.deleteVercelProject.mockClear();
 });
+afterEach(() => vi.unstubAllEnvs());
 
 afterEach(() => vi.unstubAllEnvs());
 describe("atomic hosted-tenant deprovision", () => {
@@ -60,6 +62,35 @@ describe("atomic hosted-tenant deprovision", () => {
     await runDeprovision({ tenantId: "fictional-free", tenant: null, dryRun: false });
     expect(db.rpcs.map(row => row.name)).toContain("deprovision_tenant_rows_after_inquiry_export");
     expect(db.rpcs.map(row => row.name)).not.toContain("deprovision_tenant_rows");
+  });
+  it("authority plus retention uses the one combined export-checked, receipt-retaining wrapper", async () => {
+    vi.stubEnv("DUAL_WRITE_PG", "1"); vi.stubEnv("STRELVA_LEADS_AUTHORITY", "postgres"); vi.stubEnv("STRELVA_TENANT_RECEIPT_RETENTION", "1");
+    await runDeprovision({ tenantId: "fictional-free", tenant: null, dryRun: false });
+    expect(db.rpcs.filter(call => call.name.startsWith("deprovision_"))).toEqual([{ name: "deprovision_tenant_rows_retained_after_inquiry_export", args: { p_tenant_id: "fictional-free" } }]);
+  });
+  it("retention off uses the exact legacy teardown and does not add receipt summaries", async () => {
+    const result = await runDeprovision({ tenantId: "fictional-free", tenant: null, dryRun: false });
+    expect(db.rpcs.filter(call => call.name.startsWith("deprovision_"))).toEqual([{ name: "deprovision_tenant_rows", args: { p_tenant_id: "fictional-free" } }]);
+    expect(result.summary.postgres!.some(row => row.target === "report_snapshots")).toBe(false);
+  });
+
+  it("retention on reports kept rows and calls only the atomic retention adapter", async () => {
+    vi.stubEnv("STRELVA_TENANT_RECEIPT_RETENTION", "1");
+    db.counts.report_snapshots = 4;
+    const result = await runDeprovision({ tenantId: "fictional-free", tenant: null, dryRun: false });
+    expect(db.rpcs.filter(call => call.name.startsWith("deprovision_"))).toEqual([{ name: "deprovision_tenant_rows_retained", args: { p_tenant_id: "fictional-free" } }]);
+    expect(result.summary.postgres).toEqual(expect.arrayContaining([expect.objectContaining({ target: "report_snapshots", found: 4, deleted: false })]));
+    db.rpcs.length = 0;
+    await runDeprovision({ tenantId: "fictional-free", tenant: null, dryRun: true });
+    expect(db.rpcs.some(call => call.name.startsWith("deprovision_"))).toBe(false);
+  });
+
+  it("failed retention teardown leaves Redis and Vercel untouched", async () => {
+    vi.stubEnv("STRELVA_TENANT_RECEIPT_RETENTION", "1");
+    db.teardownError = { message: "retention receipt insert failed" };
+    await expect(runDeprovision({ tenantId: "fictional-free", tenant: null, dryRun: false })).rejects.toThrow("retention receipt insert failed");
+    expect(redis.del).not.toHaveBeenCalled();
+    expect(vercel.deleteVercelProject).not.toHaveBeenCalled();
   });
   it("refuses a tenant a workspace website still holds before deleting anything", async () => {
     db.blockers = { publications: 1, reservations: 1 };

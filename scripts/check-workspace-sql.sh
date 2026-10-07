@@ -537,6 +537,7 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007150100_age
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007150200_platform_agency_workspace.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/system-versions-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-client-overview-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163200_version_owner_grants.sql"
 if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
   # The same Version store contract the in-memory store passes, run through
   # createSupabaseVersionStore against this cluster (psql-backed RPC port).
@@ -767,6 +768,49 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010155000_fai
 psql "${psql_args[@]}" --file="$repo_root/tests/failed-system-plan-request-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 
+# Wave 6 agency, operator, durable client records and portability.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010160000_agency_authoring.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-agency-authoring.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163000_agency_operator_overview.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-agency-operator-overview.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163100_version_management.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-management.sql"
+STRELVA_VERSIONS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
+  pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163300_version_native_applications.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-native-applications.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163400_version_sibling_changes.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-sibling-changes.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010161000_operator_google_attempts.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010161100_operator_effort_context.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-google-attempts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010161200_operator_content_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-content-receipts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010161300_review_reply_reservations.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-review-reply-reservations.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010161400_operator_complete_sources.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-operator-complete-sources.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010162000_complete_client_record_stores.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-client-record-stores.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010162200_inquiry_delivery_records.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-inquiry-delivery-records.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260802120000_report_snapshots.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010162100_tenant_receipt_retention.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-tenant-retention.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010164000_finite_job_adapters.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/finite-job-adapters-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165500_business_portability.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-business-portability.sql"
+# Roundtrip before later export/exit extensions replace these wrappers.
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-business-portability-rollback.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165800_unbounded_export_archive.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-unbounded-export-archive.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165900_export_build_access.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-export-build-access.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165600_exit_handoff_evidence.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-exit-handoff-evidence.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165700_export_recovery.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-export-recovery.sql"
 # The real Make real runner, checkpointing through these RPCs (psql-backed port).
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125910_inquiry_decision_notice_claims.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-decision-notice-claims-schema.sql"
@@ -816,6 +860,9 @@ psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-w6-booking-native-workspace.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135956_booking_native_workspace.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.sql"
+# Wave 6: confirmed shared business facts, never private owner contact data.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165000_tenant_business_context.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-business-context-schema.sql"
 
 # The one booking store through both real route families (legacy /api/booking
 # and the public booking service) against the real booking functions. Last,
@@ -833,6 +880,16 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010102100_web
 psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-links-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010104000_owner_decision_website_preview.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-website-preview-schema.sql"
+# Retain a fictional native Version, then prove rollback leaves the business's
+# live application, destination records and preparation receipts intact.
+psql "${psql_args[@]}" --set=native_keep_fixture=true --file="$repo_root/tests/w6-version-native-applications.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261010163300-version-native-applications.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-native-rollback.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163300_version_native_applications.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-native-rollforward.sql"
+# Integration: Postgres lead authority plus receipt retention share one teardown wrapper.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010170000_deprovision_retained_after_inquiry_export.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/deprovision-retained-after-inquiry-export-schema.sql"
 # Every stream's release flag key survives every redefinition, in any apply order (#253).
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \

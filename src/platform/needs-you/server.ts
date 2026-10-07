@@ -1,3 +1,5 @@
+import { withCanonicalApprovalStore } from "@/platform/approval-store";
+import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { businessRecordDraftAdapter } from "./sources/business-record-draft";
 import { PostgresBusinessFactDraftStore } from "@/platform/ask/workspace-drafts-repository";
 import { askReleaseMayBeOn } from "@/platform/ask/release";
@@ -93,7 +95,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
           }
         },
       }),
-    ],
+    ].map(adapter => withCanonicalApprovalStore(adapter, { store, enabled: businessId => workspaceReleaseFlagEnabled("approval_store", businessId) })),
   });
 }
 

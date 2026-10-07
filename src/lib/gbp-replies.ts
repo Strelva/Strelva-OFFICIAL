@@ -11,6 +11,7 @@
  * that as an error event + Slack ping rather than silently failing.
  */
 
+import { createHash } from "node:crypto";
 import { addEvent } from "./events";
 import { sendSlackNotification } from "./slack";
 import { getGoogleGrant, getGoogleLocation, getValidGoogleAccessToken } from "./google-access";
@@ -122,7 +123,7 @@ export async function publishReviewReply(
   tenantId: string,
   reviewId: string,
   replyText: string,
-  options: { actor?: string } = {}
+  options: { actor?: string; commandKey?: string } = {}
 ): Promise<PublishReplyResult> {
   const actor = options.actor ?? "strelva";
   const checkedAt = new Date().toISOString();
@@ -160,6 +161,10 @@ export async function publishReviewReply(
   }
 
   const replyUrl = reviewReplyUrl(meta.accountId, meta.locationId, reviewId);
+
+  if (process.env.STRELVA_OPERATOR_QUEUE_RELEASE === "1") {
+    return publishReceiptedReply({ tenantId, reviewId, replyText, actor, commandKey: options.commandKey, accessToken, replyUrl });
+  }
 
   // ── Publish ────────────────────────────────────────────────────────────────
   let publishResult: { ok: boolean; status: number; body: string };
@@ -226,6 +231,59 @@ export async function publishReviewReply(
   await recordReviewReplyReceipt({ tenantId, reviewId, replyText, actor, outcome: { kind: "accepted", verified, readbackError } });
 
   return { published: true, verified, evidence };
+}
+
+
+/** The dispatch reservation survives crashes and blocks accepted or uncertain retries. */
+async function publishReceiptedReply(input: {
+  tenantId: string; reviewId: string; replyText: string; actor: string;
+  commandKey?: string; accessToken: string; replyUrl: string;
+}): Promise<PublishReplyResult> {
+  const { tenantId, reviewId, replyText, actor, accessToken, replyUrl } = input;
+  const commandKey = input.commandKey ?? `review-reply:${createHash("sha256").update(JSON.stringify([tenantId, reviewId, replyText])).digest("hex")}`;
+  const request = { reviewId, reply: replyText };
+  let port: OutsideWriteReceiptsPort;
+  let attemptId: string;
+  try {
+    port = await workspacePorts().outsideWriteReceipts();
+    const claim = await port.beginGoogleWrite({ commandKey, tenantId, writeKind: "review_reply", request });
+    if (!claim.claimed) return {
+      published: claim.acceptance === "accepted", verified: claim.receipt?.readback === "matched",
+      evidence: claim.acceptance === "accepted" ? "Google already accepted this approval. It was not resent." : "Google acceptance uncertain. Reconcile the attempt; do not resend.",
+    };
+    attemptId = claim.attemptId;
+  } catch {
+    return { published: false, verified: false, evidence: "Receipt storage is unavailable. Nothing sent to Google." };
+  }
+  // reviews.get reads the review resource; updateReply writes its /reply child.
+  const readUrl = replyUrl.replace(/\/reply$/, "");
+  const beforeState = await getReply(accessToken, readUrl);
+  const base = { commandKey, tenantId, writeKind: "review_reply" as const, request, beforeState,
+    subject: "Reply to a Google review", actor };
+  let response: Response;
+  try {
+    response = await fetch(replyUrl, { method: "PUT", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ comment: replyText }) });
+  } catch {
+    try { await port.completeGoogleWrite(attemptId, { ...base, acceptance: "unknown", acceptanceDetail: "No response from Google. Reconcile before any new approval." }); } catch { /* Pending attempt blocks replay. */ }
+    return { published: false, verified: false, evidence: "Google acceptance uncertain. Do not resend." };
+  }
+  if (!response.ok) {
+    try { await port.completeGoogleWrite(attemptId, { ...base, acceptance: "rejected", acceptanceDetail: `Google answered ${response.status}.` }); } catch { /* Pending attempt blocks replay. */ }
+    return { published: false, verified: false, evidence: `Google rejected the reply (${response.status}).` };
+  }
+  // Acceptance is saved before parsing or verification. A failed settlement leaves
+  // the pending reservation and must still return accepted to the approval path.
+  let receiptId: string | undefined;
+  try { receiptId = (await port.completeGoogleWrite(attemptId, { ...base, acceptance: "accepted", providerRef: readUrl, readback: "pending" })).id; } catch { /* Never resend accepted writes. */ }
+  const live = await getReply(accessToken, readUrl);
+  const normalize = (value: string) => value.replace(/\s+/g, " ").trim();
+  const readback = live ? normalize(live.comment) === normalize(replyText) ? "matched" : "differs" : "failed";
+  let evidence = `Google accepted the reply; read-back ${readback}.`;
+  if (receiptId) {
+    try { await port.recordReadback(receiptId, readback, evidence); } catch { evidence += " Read-back evidence could not be saved; receipt remains pending."; }
+  } else evidence += " Receipt settlement failed; reconcile the durable attempt.";
+  if (readback !== "matched") await _emitFailure(tenantId, reviewId, evidence, new Date().toISOString());
+  return { published: true, verified: readback === "matched", evidence };
 }
 
 async function _emitFailure(

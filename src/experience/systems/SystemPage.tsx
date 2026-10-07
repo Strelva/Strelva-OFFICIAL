@@ -29,6 +29,8 @@ import { SystemPanel as Panel } from "./SystemPanel";
 import { WebsiteSystemPanels, WebsiteHistoryPanel, hasWebsiteDetail, useWebsiteSystemDetail, type WebsiteDetailState } from "./WebsiteSystemPanels";
 import { WebsiteChangeAsk } from "./WebsiteChangeAsk";
 import { websiteDomainConnections } from "./website-detail";
+import { SystemVersionImprovements } from "./SystemVersionImprovements";
+import { SystemVersionManagement } from "./SystemVersionManagement";
 import styles from "./systems.module.css";
 
 export interface SystemPageProps {
@@ -138,10 +140,11 @@ export function SystemPage(props: SystemPageProps) {
         {filesRequests && askingChange ? <WebsiteChangeAsk workspaceId={props.workspaceId} systemId={system.id} siteName={system.name} onFiled={() => setDetailVersion(version => version + 1)} onClose={() => setAskingChange(false)} /> : null}
         {system.kind === "website" && websiteDetail ? <WebsiteSystemPanels workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} onAsk={onAsk} onAskChange={filesRequests ? () => setAskingChange(true) : undefined} readOnly={readOnly} includeHistory={false} /> : null}
         {system.activations?.length ? <ActivationsPanel system={system} /> : null}
-        {system.possibilities.length ? <PossibilitiesPanel system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} /> : null}
+        {system.possibilities.length || system.storedVersionId ? <PossibilitiesPanel system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} /> : null}
         {system.connections.length || system.offers?.length || siteHref || (websiteDetail?.status === "ready" && websiteDetail.detail.domains.length) ? <ConnectionsPanel system={system.kind === "website" && websiteDetail?.status === "ready" ? { ...system, connections: [...system.connections, ...websiteDomainConnections(websiteDetail.detail)] } : system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} siteHref={siteHref} /> : null}
         <PartsPanel system={system} />
         {system.versions.length ? <VersionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} /> : null}
+        {system.storedVersionId ? <Panel id={`${system.id}-version-draft`} title="Version draft" count={1} intro="Local changes, accounts and earlier releases belong to this business."><SystemVersionManagement key={`${props.workspaceId}:${system.id}`} workspaceId={props.workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={readOnly} /></Panel> : null}
         {system.kind === "website" && websiteDetail?.status === "ready" ? <WebsiteHistoryPanel workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} systemHistory={system.history} canRestore={!readOnly && (props.operator || (props.canMakeReal ?? true))} appBase={props.appBase} onPrepared={() => setDetailVersion(version => version + 1)} onAskRestore={filesRequests ? () => setAskingChange(true) : undefined} />
           : system.history?.length ? <HistoryPanel system={system} /> : null}
         {system.audits?.length ? <AuditsPanel system={system} workspaceId={props.workspaceId} appBase={props.appBase || ""} /> : null}
@@ -153,7 +156,7 @@ export function SystemPage(props: SystemPageProps) {
 
 /** Spec behavior 11-12: an empty block is not drawn; nothing at all is one line under the surface. */
 export function hasContext(system: SystemView): boolean {
-  return Boolean(system.activations?.length || system.possibilities.length || system.connections.length || system.offers?.length
+  return Boolean(system.storedVersionId || system.activations?.length || system.possibilities.length || system.connections.length || system.offers?.length
     || system.parts?.length || system.versions.length || system.history?.length || system.audits?.length);
 }
 
@@ -309,6 +312,7 @@ function PossibilitiesPanel({ system, systems, workspaceId, readOnly, readOnlyRe
   const request = useWorkspaceRequest();
   const [outcome, setOutcome] = useState<{ id: string; outcome: MakeRealOutcome } | null>(null);
   const [running, setRunning] = useState<string | null>(null);
+  const [versionCount, setVersionCount] = useState(0);
   async function makeReal(possibility: SystemPossibility) {
     setRunning(possibility.id);
     setOutcome(null);
@@ -316,7 +320,7 @@ function PossibilitiesPanel({ system, systems, workspaceId, readOnly, readOnlyRe
     setOutcome({ id: possibility.id, outcome: next });
     setRunning(null);
   }
-  return <Panel id={`${system.id}-possibilities`} title="Possibilities" count={system.possibilities.length} intro="Alternatives you can open and compare before anything changes.">
+  return <Panel id={`${system.id}-possibilities`} title="Possibilities" count={system.possibilities.length + versionCount} intro="Alternatives you can open and compare before anything changes.">
     {system.possibilities.length ? <ul className={styles.panelList}>{system.possibilities.map(possibility => {
       const scope = possibilityScope(possibility, systems);
       const blockedReason = !canMakeReal ? makeRealReason || "Only an owner of this business can make a possibility real." : possibility.status !== "ready" ? "Still being explored. It can be made real once it is ready." : undefined;
@@ -334,7 +338,8 @@ function PossibilitiesPanel({ system, systems, workspaceId, readOnly, readOnlyRe
         {!canMakeReal ? <small>{blockedReason}</small> : null}
         {outcome?.id === possibility.id ? <MakeRealState outcome={outcome.outcome} onAsk={onAsk} title={possibility.title} /> : null}
       </li>;
-    })}</ul> : <p className="mt-3">No alternatives are being explored. <button type="button" className="underline" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else it could become</button></p>}
+    })}</ul> : system.storedVersionId ? null : <p className="mt-3">No alternatives are being explored. <button type="button" className="underline" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else it could become</button></p>}
+    {system.storedVersionId ? <SystemVersionImprovements key={`${workspaceId}:${system.id}:${system.storedVersionId}`} workspaceId={workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={readOnly} canMakeReal={canMakeReal} onCount={setVersionCount} /> : null}
   </Panel>;
 }
 
@@ -355,6 +360,17 @@ function VersionsPanel({ system, systemHref, onOpenSystem }: { system: SystemVie
       <span>{version.relation === "source" ? "Source · " : ""}<SystemLink id={version.systemId} label={version.title} systemHref={systemHref} onOpenSystem={onOpenSystem} /></span>
       <small>{version.context}</small>
       <small>{version.lineage}</small>
+      {version.relation === "version" ? version.comparison?.state === "ready" ? version.comparison.changes.length ? <details className="min-w-0 w-full">
+        <summary className="cursor-pointer py-3">What changed here · {version.comparison.changes.length}</summary>
+        <p className="mb-3 text-gray-muted">Local draft changes over this Version’s source baseline.</p>
+        <ul className="space-y-4">{version.comparison.changes.map(change => <li key={change.path} className="min-w-0">
+          <p className="font-medium break-words">{change.path}</p>
+          <dl className="mt-2 grid min-w-0 gap-3 sm:grid-cols-2">
+            <div className="min-w-0"><dt className="text-gray-muted">Source baseline</dt><dd className="mt-1 whitespace-pre-wrap break-words">{!change.beforePresent ? "Not present" : typeof change.before === "string" ? change.before : JSON.stringify(change.before, null, 2)}</dd></div>
+            <div className="min-w-0"><dt className="text-gray-muted">This Version</dt><dd className="mt-1 whitespace-pre-wrap break-words">{!change.afterPresent ? "Removed" : typeof change.after === "string" ? change.after : JSON.stringify(change.after, null, 2)}</dd></div>
+          </dl>
+        </li>)}</ul>
+      </details> : <small>No local definition changes.</small> : <small>Definition changes: Not verified.</small> : null}
     </li>)}</ul> : <p className="mt-3">It runs in one context today.</p>}
   </Panel>;
 }

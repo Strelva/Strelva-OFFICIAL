@@ -78,6 +78,19 @@ function router(handlers: { clients?: () => Response | Promise<Response>; librar
 }
 
 describe("agency home on the batched read", () => {
+  it("shows health independently of lifecycle and names incomplete Queue sources", async () => {
+    const request = router({ clients: () => Response.json(page([row(1, { systems: [{ id: uuid("51000000", 1), name: "Client website", kind: "website", lifecycle: "live", versionContext: null,
+      health: { status: "blocked", summary: "Domain is down", lastVerifiedAt: "2026-10-07T12:00:00.000Z" } }] })], {
+      queueComplete: false, queueGaps: ["Owner approvals: unavailable"], queue: [{ id: "decision:1", kind: "owner_email", workspaceId: uuid("c0000000", 1), clientName: "Client 1",
+        title: "Owner email bounced: new booking flow", systemId: uuid("51000000", 1), workId: null, since: "2026-10-07T12:00:00.000Z" }],
+    })) });
+    const { node } = await render(request);
+    expect(node.textContent).toContain("Client website · Live · Blocked");
+    await act(async () => button(node, "Queue").click());
+    expect(node.textContent).toContain("Owner email bounced: new booking flow");
+    expect(node.querySelector('[role="alert"]')?.textContent).toContain("This Queue is incomplete");
+    expect(node.querySelector('[role="alert"]')?.textContent).toContain("Owner approvals: unavailable");
+  });
   it("loads 50 clients with one request and renders every row", async () => {
     const request = router({ clients: () => Response.json(page(Array.from({ length: 50 }, (_, index) => row(index + 1)))) });
     const { node } = await render(request);
@@ -148,6 +161,8 @@ describe("agency home on the batched read", () => {
     expect(node.textContent).toContain("“We'll call you within one business day”");
     expect(node.textContent).toContain("“Someone will reply by the end of the next business day.”");
     expect(node.textContent).toContain("Needs Google Calendar connected first");
+    const conflictLink = [...node.querySelectorAll("a")].find(link => link.textContent === "Open The Mooney Firm’s System")!;
+    expect(conflictLink.getAttribute("href")).toBe(`/workspace?view=system&system=${uuid("52000000", 2)}&workspaceId=${uuid("c0000000", 2)}`);
     await act(async () => { button(node, "Review all").click(); });
     await settle();
     expect(bodies).toEqual([{ action: "review_all", workspaceId: AGENCY, sourceSystemId: library.sources[0]!.systemId, revision: 4, versionIds: ["ready-1"] }]);

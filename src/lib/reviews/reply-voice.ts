@@ -11,6 +11,7 @@
  * Degrades to a safe default (mode "approve", no templates) without Redis.
  */
 
+import { mirrorRecord, readSetting } from "../client-records";
 import { getRedis } from "@/platform/infra/redis";
 // The policy bridge (src/platform/needs-you/tenant-settings.ts) through the
 // port src/lib declares (Strelva Reborn section 7).
@@ -57,7 +58,7 @@ function key(tenantId: string): string {
  * and templates.
  */
 export async function getReplyVoice(tenantId: string, options: BridgeOptions = {}): Promise<ReplyVoice> {
-  const voice = await readRedisVoice(tenantId);
+  const voice = await readSetting(tenantId, "reply_voice", () => readRedisVoice(tenantId), defaultReplyVoice());
   if (voice.mode === "off") return voice;
   const policy = await workspacePorts().tenantPolicy();
   const route = await policy.readTenantPolicyRoute(tenantId, "review.reply", options);
@@ -139,7 +140,10 @@ async function saveRedisVoice(
     templates.push({ key: k, example });
   }
   const voice: ReplyVoice = { mode, guidance, templates, updatedAt: new Date().toISOString() };
-  if (redis) await redis.set(key(tenantId), voice);
+  if (redis) {
+    await redis.set(key(tenantId), voice);
+    await mirrorRecord("tenant_settings", tenantId, "reply_voice", { value: voice });
+  }
   return voice;
 }
 

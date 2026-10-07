@@ -11,7 +11,9 @@ import {
   createSupabaseVersionStore,
   readBusinessVersions,
   readVersionActor,
+  versionsDb,
 } from "@/platform/system-versions/supabase-store";
+import { readVersionRuntime, requireVersionRuntime } from "@/platform/system-versions/native-runtime";
 import { listWork } from "@/platform/workspaces";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { listManagedPresenceWork } from "@/products/managed-presence/server";
@@ -50,6 +52,7 @@ async function pendingVersionReleases(actor: WorkspaceActor, workspaceId: string
     const view = await versions.readVersion(versionActor, item.id);
     const latest = row.releases.at(-1);
     if (latest && jsonEqual(latest.definition, view.workingDefinition)) continue;
+    if (!(await readVersionRuntime(actor, row, versionsDb()))) continue;
     pending.push({
       versionId: item.id,
       systemId: item.systemId,
@@ -136,11 +139,15 @@ export function systemsSourceAdapters(store: NeedsYouStore): SourceAdapter[] {
       read: (workspaceId, itemId) => store.read(workspaceId, itemId),
       async release(actor, input) {
         const store = createSupabaseVersionStore();
+        const versionActor = await readVersionActor(actor);
+        const lineage = await store.getLineage(versionActor, input.versionId);
+        if (!lineage) throw new Error("This Version is unavailable.");
+        await requireVersionRuntime(actor, lineage, versionsDb());
         const gate = createVersionReleaseGate({
           versions: createSystemVersions({ store, connections: createSupabaseConnectionOwnership() }),
           approvals: input.approvals,
         });
-        const released = await gate.release(await readVersionActor(actor), input.versionId, { expectedRowRevision: input.expectedRowRevision });
+        const released = await gate.release(versionActor, input.versionId, { expectedRowRevision: input.expectedRowRevision });
         return { releaseNumber: released.lineage.currentRelease };
       },
     }),

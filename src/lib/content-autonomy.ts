@@ -18,6 +18,7 @@
  * hours, address, phone, email) NEVER auto-publish, on any mode. "auto" buys faster
  * routine copy edits, never money/contact details.
  */
+import { mirrorRecord, readSetting } from "./client-records";
 import { getRedis } from "@/platform/infra/redis";
 // The policy bridge (src/platform/needs-you/tenant-settings.ts) through the
 // port src/lib declares (Strelva Reborn section 7).
@@ -47,14 +48,17 @@ export async function getContentAutonomy(tenantId: string, options: BridgeOption
   const policy = await workspacePorts().tenantPolicy();
   const route = await policy.readTenantPolicyRoute(tenantId, "copy.routine", options);
   if (route) return policy.contentAutonomyFromRoute(route);
-  return readRedis(tenantId);
+  return readSetting(tenantId, "content_autonomy", () => readRedis(tenantId), DEFAULT_CONTENT_AUTONOMY);
 }
 
 /** Redis only, as before. Callers that know who is saving use saveContentAutonomySetting. */
 export async function saveContentAutonomy(tenantId: string, mode: ContentAutonomy): Promise<ContentAutonomy> {
   const value: ContentAutonomy = mode === "auto" ? "auto" : "approve";
   const redis = getRedis();
-  if (redis) await redis.set(key(tenantId), value);
+  if (redis) {
+    await redis.set(key(tenantId), value);
+    await mirrorRecord("tenant_settings", tenantId, "content_autonomy", { value });
+  }
   return value;
 }
 

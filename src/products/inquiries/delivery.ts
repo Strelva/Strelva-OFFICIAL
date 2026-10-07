@@ -14,7 +14,8 @@
  * "delivered" unless a transport supplies verification evidence.
  */
 
-import { ownerNoticeEmail } from "@/lib/owner-recipient";
+import { ownerNoticeEmail, businessRecordReadsEnabled } from "@/lib/owner-recipient";
+import { readReleasedTenantBusinessContext } from "@/platform/business-record/public-reader";
 
 import type { InquiryTimelineEventType, ResponsibilityAction, ResponsibilityEvaluation, ResponsibilityPolicy } from "@/products/inquiries/contracts";
 import type { LeadRecord } from "@/lib/leads";
@@ -227,12 +228,18 @@ export async function resolveInquiryRoute(
   // email address, retain the tenant owner fallback for the legacy notice.
   // Without a configured destination, the one owner-recipient rule decides
   // (src/lib/owner-recipient.ts); it falls back to the tenant's owner_email.
+  // A destination wins only as a current business person when inquiry facts
+  // are on. With record reads on, a bare legacy staff address yields to the
+  // business record's owner.
   const business = inquiry.staffDestination ? await readInquiryBusinessContext(inquiry.tenantId) : null;
-  const ownerEmail = validEmail(business ? inquiryPersonEmail(business, inquiry.staffDestination) : inquiry.staffDestination)
-    || (tenant ? validEmail(await ownerNoticeEmail(tenant)) : null);
+  const staff = business ? inquiryPersonEmail(business, inquiry.staffDestination) : businessRecordReadsEnabled() ? null : inquiry.staffDestination;
+  const ownerEmail = validEmail(staff) || (businessRecordReadsEnabled()
+    ? validEmail(await ownerNoticeEmail({ id: inquiry.tenantId, ownerEmail: tenant?.ownerEmail }))
+    : tenant ? validEmail(await ownerNoticeEmail(tenant)) : null);
+  const context = await readReleasedTenantBusinessContext(inquiry.tenantId);
   return {
     tenantId: inquiry.tenantId,
-    businessName: inquiryBusinessName(inquiry, tenant?.siteName),
+    businessName: context?.facts.display_name || context?.facts.legal_name || inquiryBusinessName(inquiry, tenant?.siteName),
     customerEmail: validEmail(inquiry.email),
     ownerEmail,
     ownerNotification: policy.ownerNotification,
