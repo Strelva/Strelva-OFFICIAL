@@ -42,8 +42,11 @@
 begin;
 set local lock_timeout = '3s';
 
+-- No foreign keys to workspaces: tenant_unlink_plan counts every table that
+-- references a workspace as use, and this is conversion machinery that goes
+-- with the business (workspaces_forget_owner_recipient below).
 create table public.business_owner_recipient_trust (
-  workspace_id uuid primary key references public.workspaces(id) on delete cascade,
+  workspace_id uuid primary key,
   email text not null check (email = lower(btrim(email)) and public.business_record_email_valid(email)),
   name text check (name is null or char_length(name) between 1 and 160),
   -- Provenance of the fact it came from; resolve_business_owner_recipient returns it.
@@ -61,7 +64,7 @@ create table public.business_owner_recipient_trust (
 
 create table public.business_owner_recipient_events (
   id bigint generated always as identity primary key,
-  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  workspace_id uuid not null,
   -- written: an owner_recipient change in the working record (null email: removed).
   -- trusted: the address owner links go to from now on.
   event text not null check (event in ('written','trusted')),
@@ -83,7 +86,7 @@ create index business_owner_recipient_events_workspace_idx on public.business_ow
 
 create table public.owner_decision_link_bindings (
   decision_id uuid not null references public.owner_decisions(id) on delete cascade,
-  workspace_id uuid not null references public.workspaces(id) on delete cascade,
+  workspace_id uuid not null,
   recipient text not null check (recipient = lower(btrim(recipient)) and char_length(recipient) <= 320),
   bound_at timestamptz not null default clock_timestamp(),
   primary key (decision_id, recipient)
@@ -107,6 +110,18 @@ end;
 $$;
 create trigger business_owner_recipient_events_immutable before update or delete on public.business_owner_recipient_events
   for each row execute function public.business_owner_recipient_events_immutable();
+
+-- The address and its log go when the business goes.
+create function public.business_owner_recipient_forget() returns trigger
+language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  delete from public.business_owner_recipient_events where workspace_id = old.id;
+  delete from public.business_owner_recipient_trust where workspace_id = old.id;
+  return null;
+end;
+$$;
+create trigger workspaces_forget_owner_recipient after delete on public.workspaces
+  for each row execute function public.business_owner_recipient_forget();
 
 -- Today's trusted address, by the 20261011133700 rule, plus the import it
 -- came from when a provider has since overwritten it. A provider-written
@@ -405,7 +420,7 @@ begin
 end;
 $$;
 
-revoke all on function public.business_owner_recipient_events_immutable(), public.business_owner_recipient_actor_kind(uuid, text, uuid),
+revoke all on function public.business_owner_recipient_events_immutable(), public.business_owner_recipient_forget(), public.business_owner_recipient_actor_kind(uuid, text, uuid),
   public.business_owner_recipient_set_trust(uuid, text, text, text, boolean, text, uuid, uuid, bigint, text, text),
   public.business_owner_recipient_trust_conversion(), public.business_owner_recipient_trust_confirmed(),
   public.business_owner_recipient_log_write()

@@ -252,7 +252,15 @@ begin
   perform pg_temp.rt_error(format('select public.claim_owner_decision(%L,%L,%L,%L,%L,null,null,%L)', none_ws, item, repeat('3', 64), 'approve', 'owner_link',
     'rt-operator@strelva.example.test'), 'owner_decision_recipient_not_owner');
 
-  -- 9. The log is append-only.
+  -- 9. Unlinking a business's only site deletes the business; its trust row and log go with it.
+  perform pg_temp.rt_assert((public.preview_tenant_unlink('rt-operator@strelva.example.test', 'rt-quiet')->'plan'->>'deleteWorkspace')::boolean,
+    'trust is conversion machinery, not use that keeps a business');
+  perform public.unlink_tenant_from_business('rt-operator@strelva.example.test', 'rt-quiet', quiet_ws, '52400000-0000-4000-8000-0000000000c9', repeat('a', 64));
+  perform pg_temp.rt_assert(not exists (select 1 from public.workspaces where id = quiet_ws)
+    and not exists (select 1 from public.business_owner_recipient_trust where workspace_id = quiet_ws)
+    and not exists (select 1 from public.business_owner_recipient_events where workspace_id = quiet_ws), 'a deleted business forgets its owner address');
+
+  -- 10. The log is append-only.
   perform pg_temp.rt_error(format('update public.business_owner_recipient_events set email = %L where workspace_id = %L', 'x@example.test', ws), 'business_record_history_immutable');
   perform pg_temp.rt_error(format('delete from public.business_owner_recipient_events where workspace_id = %L', ws), 'business_record_history_immutable');
 end $$;

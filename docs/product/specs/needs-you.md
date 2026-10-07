@@ -175,9 +175,8 @@ nothing that wasn't theirs did.
    a business's pending changes form one `business_facts` item
    (`fact.inferred`, `owner_decides`, admins never decide).
    `confirm_business_facts` applies it only for the owner's session or a
-   signed link to a trusted recipient: the confirmed `owner_recipient`, else
-   the imported one, else `tenants.owner_email`. A recipient a provider wrote
-   is itself pending and never approves.
+   signed link to the trusted owner address (rule 8). A recipient a provider
+   wrote is itself pending and never approves.
 6. **Needs you items are one shape.** Each item has the business, System,
    change kind, a plain title, what happens on Approve, what happens on Not
    yet, its source lifecycle and source id, a revision hash, when it opened,
@@ -189,8 +188,21 @@ nothing that wasn't theirs did.
    on). Needs you records the decision and its outcome. It doesn't make a
    second write path.
 8. **Email reaches the owner without sign-in.** Every `owner_decides` item
-   reaches the business's owner recipient (`resolve_business_owner_recipient`:
-   the `owner_recipient` fact, falling back to `tenants.owner_email`) by email.
+   reaches the business's **trusted owner address**
+   (`resolve_business_owner_recipient`) by email.
+   *Built (#524, ADR 0012):* an address is trusted only when it was imported
+   at conversion (the site's imported `owner_recipient`, else its
+   `owner_email`) into a business with none yet, or the owner set it: their
+   own write, or their Approve on the business details item, which goes to
+   the previously trusted address or their session. An address an operator,
+   any agency (Strelva's included) or an admin writes is pending and receives
+   nothing. Editing `tenants.owner_email` after conversion moves nothing.
+   Every change is logged with its actor (`business_owner_recipient_events`).
+   A link decides only if it was sent to that item while its address was
+   trusted, and the address is still trusted
+   (`owner_decision_link_bindings`, checked in `claim_owner_decision`). With
+   no trusted address nothing is sent; the item is recorded as not sent
+   (`no_trusted_owner_recipient`) and the operator queue shows it.
    - **Urgent kinds** go at once, one email per item. Urgent means a customer
      is waiting: an inquiry reply, a review reply in `approve` mode.
    - **Everything else** goes in one morning email per business that has
@@ -504,7 +516,8 @@ yes to email.
 | Failure | What the person sees | Recovery |
 | --- | --- | --- |
 | Email gate off or override off | Owner: nothing. Operator: "Owner not told" on the item | Operator decides whether to call; item still expires on day 14 |
-| Email bounces | Operator: "Email bounced" | Fix `owner_recipient` in the business record; resend |
+| Email bounces | Operator: "Email bounced" | The owner sets a new address (signed in), or approves one an operator proposes from the last trusted address |
+| No trusted owner address | Operator: "Not sent: no trusted owner address" | An address an operator adds waits; the owner signs in to set it |
 | Link expired or item changed | "This changed since we emailed you" / "This link expired", with Open | Owner opens the latest in the workspace or the next morning email |
 | Owner no longer owner | "This link isn't for this account" | Nothing acts |
 | Resolve fails at the provider | "Strelva couldn't finish this. We're on it." | Item stays pending (source rule); operator queue P1/P2 |

@@ -1,7 +1,9 @@
 /**
  * Who an owner notice goes to: the one owner-recipient rule (Strelva Reborn §1).
  *
- *   1. the linked business record's owner contact (`owner_recipient` fact);
+ *   1. the linked business's trusted owner address, when the record holds it
+ *      (imported at conversion or set by the owner; an `owner_recipient` an
+ *      operator or agency wrote is pending and never used, #524);
  *   2. this tenant's own `owner_email` (every unconverted tenant lands here,
  *      so live clients see exactly today's recipient);
  *   3. the business's earliest linked site's `owner_email`.

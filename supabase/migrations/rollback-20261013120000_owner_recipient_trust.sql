@@ -172,6 +172,8 @@ drop function public.business_owner_recipient_trust_confirmed();
 drop function public.business_owner_recipient_trust_conversion();
 drop function public.business_owner_recipient_set_trust(uuid, text, text, text, boolean, text, uuid, uuid, bigint, text, text);
 drop function public.business_owner_recipient_actor_kind(uuid, text, uuid);
+drop trigger workspaces_forget_owner_recipient on public.workspaces;
+drop function public.business_owner_recipient_forget();
 drop table public.owner_decision_link_bindings;
 drop table public.business_owner_recipient_events;
 drop function public.business_owner_recipient_events_immutable();
