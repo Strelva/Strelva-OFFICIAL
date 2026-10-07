@@ -8,4 +8,7 @@ drop function public.read_native_workspace_google_binding(uuid),public.read_nati
 drop function public.native_publishing_require_system(uuid,uuid,text);
 alter table public.workspace_newsletter_issues alter column tenant_id set not null;
 drop table public.workspace_collection_entries;
+drop function public.workspace_newsletter_sender(text,uuid,jsonb);
+alter function public.workspace_newsletter_sender_legacy_target(text,uuid,jsonb) rename to workspace_newsletter_sender;
+grant execute on function public.workspace_newsletter_sender(text,uuid,jsonb) to service_role;
 commit;

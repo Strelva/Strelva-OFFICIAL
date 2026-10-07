@@ -79,6 +79,33 @@ begin
 end; $$;
 
 alter table public.workspace_newsletter_issues alter column tenant_id drop not null;
+-- Retain the integrated sender implementation under a private helper. Its
+-- audience, unsubscribe and mail gates are tenant-only. Native approval must
+-- never enter its bounded queue or acquire a delivery claim.
+alter function public.workspace_newsletter_sender(text,uuid,jsonb) rename to workspace_newsletter_sender_legacy_target;
+revoke all on function public.workspace_newsletter_sender_legacy_target(text,uuid,jsonb) from public,anon,authenticated,service_role;
+create function public.workspace_newsletter_sender(p_action text,p_id uuid default null,p_input jsonb default '{}')
+returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
+begin
+  if p_action='list' then
+    return coalesce((select jsonb_agg(id) from (select n.id from public.workspace_newsletter_issues n
+      where n.tenant_id is not null
+      and not public.workspace_exit_completed(n.workspace_id)
+      and not exists(select 1 from public.systems s where s.id=n.system_id and s.lifecycle='paused')
+      and (not exists(select 1 from public.workspace_newsletter_deliveries d where d.issue_id=n.id)
+        or exists(select 1 from public.workspace_newsletter_batches x where x.issue_id=n.id
+          and (x.state='pending' or x.state='gated' and x.next_attempt_at<=clock_timestamp() or x.state='claimed' and x.claim_until<=clock_timestamp())))
+      order by n.approved_at,n.id limit 20) q),'[]');
+  elsif p_action='claim' and exists(select 1 from public.workspace_newsletter_issues where id=p_id and tenant_id is null) then
+    return null;
+  elsif p_action='begin' and exists(select 1 from public.workspace_newsletter_batches b join public.workspace_newsletter_issues i on i.id=b.issue_id where b.id=p_id and i.tenant_id is null) then
+    return null;
+  end if;
+  return public.workspace_newsletter_sender_legacy_target(p_action,p_id,p_input);
+end; $$;
+revoke all on function public.workspace_newsletter_sender(text,uuid,jsonb) from public,anon,authenticated;
+grant execute on function public.workspace_newsletter_sender(text,uuid,jsonb) to service_role;
+
 create function public.approve_native_workspace_newsletter_issue(p_input jsonb)
 returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
 declare v_row public.workspace_newsletter_issues%rowtype; v_workspace uuid := (p_input->>'workspaceId')::uuid; v_system uuid := (p_input->>'systemId')::uuid;

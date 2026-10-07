@@ -43,6 +43,11 @@ select pg_temp.np_assert((select tenant_id is null and state='approved_sending_p
 select pg_temp.np_expect($$update public.workspace_newsletter_issues set body='changed' where event_id='evt-native-newsletter'$$,'newsletter_issue_is_immutable');
 select pg_temp.np_assert(jsonb_array_length(public.read_native_workspace_newsletter_issues('af100000-0000-4000-8000-000000000010','af100000-0000-4000-8000-000000000021'))=1,'native issue read-back');
 select pg_temp.np_expect($$select public.read_native_workspace_newsletter_issues('af100000-0000-4000-8000-000000000011','af100000-0000-4000-8000-000000000021')$$,'publishing_system_not_owned');
+-- Native issues remain off even if the independent tenant sender is enabled.
+select pg_temp.np_assert(not has_function_privilege('service_role','public.workspace_newsletter_sender_legacy_target(text,uuid,jsonb)','execute'),'private sender helper cannot bypass native exclusion');
+select pg_temp.np_assert(not (public.workspace_newsletter_sender('list') ? (select id::text from public.workspace_newsletter_issues where event_id='evt-native-newsletter')),'native issue excluded before sender queue limit');
+select pg_temp.np_assert(public.workspace_newsletter_sender('claim',(select id from public.workspace_newsletter_issues where event_id='evt-native-newsletter')) is null,'native issue cannot acquire a sending claim');
+select pg_temp.np_assert(not exists(select 1 from public.workspace_newsletter_deliveries d join public.workspace_newsletter_issues i on i.id=d.issue_id where i.tenant_id is null),'native approval starts no delivery');
 -- Native grant is workspace-owned, with no linked tenant and no Redis fallback.
 select public.upsert_workspace_account_binding(jsonb_build_object('workspaceId','af100000-0000-4000-8000-000000000010','provider','google','originTenantStableId',null,'scopes','[]'::jsonb,'refreshTokenCiphertext','enc:v1:YQ==:Yg==:Yw==','accessTokenCiphertext','enc:v1:YQ==:Yg==:Yw==','status','connected'),'oauth');
 select pg_temp.np_assert(public.read_native_workspace_google_binding('af100000-0000-4000-8000-000000000010')->>'originTenantId' is null and public.read_native_workspace_google_binding('af100000-0000-4000-8000-000000000010')->>'workspaceId'='af100000-0000-4000-8000-000000000010','native binding resolved');

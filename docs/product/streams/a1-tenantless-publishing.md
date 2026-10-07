@@ -10,7 +10,9 @@ A native website System can compose, review, publish, read its receipt, and
 prepare a baseline-bound restore without a linked tenant. Its content lives in
 `workspace_collection_entries`, keyed by business and System. Native newsletter
 Systems use the existing immutable issue store, with no tenant reference and
-sending paused. Content-store confirmation does not prove external website rendering.
+sending paused. The integrated tenant newsletter sender excludes native issues
+before its queue limit and rejects native claims; its tenant mail path is preserved.
+Content-store confirmation does not prove external website rendering.
 
 A native Google grant (the existing workspace binding with no origin tenant)
 can author hours, info and post drafts through the existing event approval,
@@ -51,7 +53,7 @@ uninvoked on production or real businesses.
 
 ## Prepared migrations
 
-- `20261011100000_native_publishing_targets.sql`: native collection storage,
+- `20261011102000_native_publishing_targets.sql`: native collection storage,
   System ownership checks, existing-ledger content receipts, native immutable
   newsletter issues, native Google binding read.
 - `20261011101000_business_booking_email.sql`: per-business switch and immutable
@@ -78,7 +80,7 @@ Browser evidence uses the existing local fictional HTTP-double page at
 receipt at 390 px, read-only and storage-error states with no horizontal overflow.
 It proves rendered controls and copy, not authenticated storage or real providers.
 
-Outstanding proof: integration with round 2, real authenticated owner sessions,
+Outstanding proof: real authenticated owner sessions,
 production migration rehearsal against the actual release schema, real Google
 profile writes/read-back/undo, native website rendering and live mail. Keep every
 release/send gate off during integration. Production activation requires Jacob's
@@ -86,5 +88,6 @@ explicit authority; no decision is needed for the local implementation.
 
 The integrating coordinator owns project-model/overhang/vault propagation.
 This delegated implementation supplies the evidence delta; it makes no commercial
-or production claim. Next action: integrate this PR, resolve SQL harness/readiness
-manifest overlap, and rerun the combined checks before any rollout decision.
+or production claim. Newsletter sender overlap and migration timestamp collision were resolved locally;
+the shared SQL harness and readiness manifest preserve both streams. Next action:
+integrate this PR and rehearse the combined release before any rollout decision.
