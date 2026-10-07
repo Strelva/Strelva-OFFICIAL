@@ -2,7 +2,6 @@ import { z } from "zod";
 import type { DeclaredEffect, MakeRealChannel, Reversibility } from "@/platform/possibilities/contracts";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { EffectAdapter, EffectPerformResult } from "./ports";
-import { askBookingPublicationPinSchema } from "@/products/scheduling/contracts";
 
 /**
  * LIVE effect adapters (systems-experience spec section 5). Each one wraps the
@@ -302,7 +301,6 @@ export const bookingPageRequestSchema = z.object({
   provider: z.enum(["outlook", "google"]),
   displayName: z.string().min(1).max(160),
   timeZone: z.string().min(1).max(128),
-  askService: askBookingPublicationPinSchema.optional(),
 }).strict();
 
 type GrantRow = Record<string, unknown>;
@@ -310,7 +308,6 @@ export interface BookingPagePorts {
   publish(actor: WorkspaceActor, input: z.infer<typeof bookingPageRequestSchema>): Promise<GrantRow>;
   list(actor: WorkspaceActor, businessId: string): Promise<GrantRow | GrantRow[]>;
   revoke(actor: WorkspaceActor, input: { businessId: string; grantId: string; reason: string }): Promise<unknown>;
-  matchesAskPublication?(grantId: string, pin: z.infer<typeof askBookingPublicationPinSchema>): Promise<boolean>;
 }
 
 export function createBookingPageAdapter(ports: BookingPagePorts, ctx: LiveChannelContext): EffectAdapter {
@@ -333,7 +330,6 @@ export function createBookingPageAdapter(ports: BookingPagePorts, ctx: LiveChann
       if (!req) return null;
       const grant = (await rows(businessId)).find((row) => row.capability_id === req.capabilityId && row.capability_version === req.capabilityVersion
         && row.work_id === req.workId && row.status === "published");
-      if (grant && typeof grant.id === "string" && req.askService && (!ports.matchesAskPublication || !await ports.matchesAskPublication(grant.id, req.askService))) return { found: false };
       return grant && typeof grant.id === "string" ? { found: true, providerRef: ref(businessId, grant.id) } : { found: false };
     },
     async readBack({ providerRef }) {

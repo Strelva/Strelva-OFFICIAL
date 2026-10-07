@@ -31,5 +31,3 @@ export const scheduleCommandSchema = z.discriminatedUnion("kind", [
 // controls. Provider internals remain inside this product's calendar folder.
 export * from "./calendar/contracts";
 export * from "./public-booking-contracts";
-
-export * from "./ask-service-contracts";

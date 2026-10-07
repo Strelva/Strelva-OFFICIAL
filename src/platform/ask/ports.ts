@@ -4,7 +4,6 @@ import { createPossibility, type DeclaredEffect, type SystemChange, type Possibi
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { AskChangeKind, AskChangeOrigin, AskNeedsYouRoute, AskedOnBehalf } from "./contracts";
 import type { AskAuthoritySnapshot } from "./authority";
-import type { AskBookingService } from "@/products/scheduling/contracts";
 
 /**
  * Ports Ask Strelva depends on. Each has a narrow interface so this module
@@ -224,7 +223,7 @@ export interface AskPossibilityInput {
   words?: string;
   origin?: AskChangeOrigin;
   askedOnBehalf?: AskedOnBehalf | null;
-  candidate?: AskBookingService | { kind: "website-pages"; pages: Array<{ path: string; title: string; description: string; paragraphs: string[] }> }
+  candidate?: { kind: "website-pages"; pages: Array<{ path: string; title: string; description: string; paragraphs: string[] }> }
     | { kind: "existing-website-pages"; mode: "section" | "page-set" | "rebuild"; pages: Array<{ path: string; title: string; description: string; paragraphs: string[] }> }
     | { kind: "inquiry-follow-up-rule"; capabilityId?: string; afterMinutes: number; maxAttempts: number; messageTemplate: string }
     | { kind: "existing-booking-page"; path: string; title: string; description: string; bookingGrantId?: string };
@@ -285,7 +284,7 @@ export function createPossibilityAdapter(repository: PossibilityRepository, opti
         effects: prepared.effects,
       }, { id, businessId: input.workspaceId, actorId: actor.userId, at: now() });
       try { await repository.create(possibility); }
-      catch { throw new AskPreparedPossibilityError(typeof prepared.content.rebuildWorkId === "string" ? prepared.content.rebuildWorkId : typeof prepared.content.scheduleWorkId === "string" ? prepared.content.scheduleWorkId : null); }
+      catch { throw new AskPreparedPossibilityError(typeof prepared.content.rebuildWorkId === "string" ? prepared.content.rebuildWorkId : null); }
       return { id: possibility.id, status: "exploring", durable: options.durable, previewHref: prepared.previewHref, candidateRevision: possibility.candidateRevision };
     },
     async list(workspaceId) {

@@ -179,6 +179,3 @@ export {
   publicBookingRangeSchema,
   publicBookingVisitorSchema,
 } from "./public-booking";
-
-export { prepareAskBookingService, verifyAskBookingService, readAskBookingBinding, scheduleContentHash } from "./ask-service";
-export { matchesPublishedAskBookingService, readPublishedAskBookingPage, readWorkspaceBookingPageLinks } from "./public-booking-server";

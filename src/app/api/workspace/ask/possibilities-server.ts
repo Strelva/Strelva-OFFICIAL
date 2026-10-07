@@ -6,14 +6,12 @@ import type { PossibilityRepository } from "@/platform/possibilities";
 import { prepareExistingAskBookingPage } from "./booking-possibility-server";
 import { prepareExistingAskWebsitePages } from "./existing-website-possibility-server";
 import { prepareAskInquiryFollowUp } from "./inquiry-follow-up-possibility-server";
-import { prepareNewAskBookingService } from "./new-booking-possibility-server";
 import { possibilityPreviewPath } from "@/platform/possibilities/preview-link";
 
 export function createAskPossibilityPort(actor: WorkspaceActor, dependencies: {
   repository?: PossibilityRepository; prepare?: typeof prepareAskPageSet; released?: typeof websiteRebuildReleasedFor;
   sync?: (actor: WorkspaceActor, workspaceId: string) => Promise<{ complete: boolean }>;
   booking?: typeof prepareExistingAskBookingPage;
-  newBooking?: typeof prepareNewAskBookingService;
   existingWebsite?: typeof prepareExistingAskWebsitePages;
   inquiryFollowUp?: typeof prepareAskInquiryFollowUp;
 } = {}) {
@@ -22,7 +20,6 @@ export function createAskPossibilityPort(actor: WorkspaceActor, dependencies: {
     async prepare(currentActor, input, id) {
       if (input.candidate?.kind === "inquiry-follow-up-rule") return (dependencies.inquiryFollowUp ?? prepareAskInquiryFollowUp)(currentActor, input, id);
       if (!input.candidate) throw new AskPossibilityUnsupportedError("This alternative has no supported page-set candidate.");
-      if (input.candidate.kind === "new-booking-service") return (dependencies.newBooking ?? prepareNewAskBookingService)(currentActor, input, id);
       if (!await (dependencies.released ?? websiteRebuildReleasedFor)(currentActor, input.workspaceId)) throw new AskPossibilityUnsupportedError("Working page-set preparation is not enabled for this business.");
       if (input.candidate.kind === "existing-website-pages") return (dependencies.existingWebsite ?? prepareExistingAskWebsitePages)(currentActor, input);
       if (input.candidate.kind === "existing-booking-page") return (dependencies.booking ?? prepareExistingAskBookingPage)(currentActor, input);

@@ -3,7 +3,7 @@ import type { PossibilityTryState } from "./PossibilityTry";
 import { siteDocumentSchema } from "@/products/websites/client";
 import { siteDocumentHash } from "@/products/websites/index";
 import { followUpTryView } from "@/products/inquiries/server";
-import { askBookingServiceSchema, askBookingBindingSchema, publicBookingScheduleSchema } from "@/products/scheduling/contracts";
+import { publicBookingScheduleSchema } from "@/products/scheduling/contracts";
 
 /**
  * The state of a signed "Try it" link (systems-experience spec behavior 19).
@@ -17,7 +17,7 @@ export async function possibilityTryState(token: string, deps: {
     title: string; intent: string;
     changes: Array<{ candidate: { summary: string; content: Record<string, unknown> } }>;
     introduces: Array<{ name: string; candidate?: { content: Record<string, unknown> } }>;
-    effects: Array<{ channel?: string; request?: Record<string, unknown> }>;
+    effects: Array<{ channel?: string }>;
   } | null>;
 }, now = Date.now()): Promise<PossibilityTryState | null> {
   const claims = verifyPossibilityPreviewToken(token, now);
@@ -28,16 +28,6 @@ export async function possibilityTryState(token: string, deps: {
   const inquiry = p.changes.find(item => item.candidate.content.kind === "ask-inquiry-follow-up")?.candidate.content;
   const inquiryFollowUp = inquiry ? followUpTryView(inquiry.selection, inquiry.draft, inquiry.rehearsal) : null;
   if (inquiry && !inquiryFollowUp) return { kind: "changed" };
-  const newBooking = p.introduces.find(item => item.candidate?.content.kind === "ask-new-booking-service")?.candidate?.content;
-  const service = askBookingServiceSchema.safeParse(newBooking?.service);
-  const serviceSchedule = publicBookingScheduleSchema.safeParse(newBooking?.bookingSchedule);
-  const serviceBinding = askBookingBindingSchema.safeParse(newBooking?.binding);
-  const serviceEffect = p.effects.find(effect => effect.channel === "booking_page");
-  if (newBooking && (!service.success || !serviceSchedule.success || !serviceBinding.success
-    || serviceBinding.data.workspaceId !== claims.workspaceId || serviceBinding.data.provider !== service.data.provider || serviceBinding.data.timeZone !== service.data.timeZone
-    || serviceSchedule.data.name !== service.data.serviceName || serviceSchedule.data.provider !== service.data.provider || serviceSchedule.data.timeZone !== service.data.timeZone
-    || serviceSchedule.data.version !== 1 || serviceEffect?.request?.workId !== newBooking.scheduleWorkId || serviceEffect?.request?.capabilityId !== serviceSchedule.data.capabilityId
-    || JSON.stringify(serviceSchedule.data.slots.map(({ start, end }) => ({ start, end }))) !== JSON.stringify(service.data.availability))) return { kind: "changed" };
   const website = [...p.introduces, ...p.changes].find(item => ["ask-website-pages", "ask-existing-booking-page", "ask-existing-website-pages"].includes(String(item.candidate?.content.kind)));
   const existingWebsite = website?.candidate?.content.kind === "ask-existing-website-pages";
   const booking = website?.candidate?.content.kind === "ask-existing-booking-page";
@@ -56,11 +46,10 @@ export async function possibilityTryState(token: string, deps: {
       intent: p.intent,
       changes: p.changes.map((change) => change.candidate.summary.replace(/^the /, "The ")),
       introduces: p.introduces.map((intro) => intro.name),
-      ...(newBooking && service.success && serviceSchedule.success ? { newBookingService: { service: service.data, schedule: serviceSchedule.data } } : {}),
       ...(document.success ? { websiteDocument: document.data } : {}),
       ...(booking && bookingSchedule.success && typeof bookingPath === "string" ? { bookingSchedule: bookingSchedule.data, bookingPath } : {}),
       ...(inquiryFollowUp ? { inquiryFollowUp } : {}),
-      takesSubmissions: !newBooking && !inquiryFollowUp && !document.success && (p.introduces.length > 0
+      takesSubmissions: !inquiryFollowUp && !document.success && (p.introduces.length > 0
         || p.effects.some((effect) => effect.channel === "inquiry_form" || effect.channel === "booking_page")
         || p.changes.some((change) => "form" in change.candidate.content)),
     },

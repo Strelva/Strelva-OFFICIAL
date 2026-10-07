@@ -3,7 +3,6 @@ import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { assertWorkspaceMember } from "@/platform/workspaces/repository";
 import { publicBookingProviderSchema } from "./public-booking";
-import { askBookingPublicationPinSchema } from "./ask-service-contracts";
 
 const grantInputSchema = z.object({
   businessId: z.string().uuid(),
@@ -16,7 +15,6 @@ const grantInputSchema = z.object({
   provider: publicBookingProviderSchema,
   displayName: z.string().trim().min(1).max(160),
   timeZone: z.string().trim().min(1).max(128),
-  askService: askBookingPublicationPinSchema.optional(),
 }).strict();
 export type PublicBookingGrantInput = z.infer<typeof grantInputSchema>;
 
@@ -46,7 +44,7 @@ function oneResultData(result: DbResult): Record<string, unknown> {
 
 export async function publishPublicWebsiteBookingGrant(actor: WorkspaceActor, raw: PublicBookingGrantInput) {
   const input = grantInputSchema.parse(raw);
-  const result = await rpc().rpc(input.askService ? "publish_ask_booking_service_grant" : "publish_public_website_booking_grant", {
+  const result = await rpc().rpc("publish_public_website_booking_grant", {
     p_business_id: input.businessId,
     p_user_id: actor.userId,
     p_verified_email: actor.verifiedEmail,
@@ -59,7 +57,6 @@ export async function publishPublicWebsiteBookingGrant(actor: WorkspaceActor, ra
     p_provider: input.provider,
     p_display_name: input.displayName,
     p_time_zone: input.timeZone,
-    ...(input.askService ? { p_expected_schedule: input.askService.expectedSchedule, p_proposal: input.askService.proposal, p_calendar_connection_id: input.askService.calendarConnectionId, p_calendar_updated_at: input.askService.calendarUpdatedAt } : {}),
   });
   return oneResultData(result);
 }

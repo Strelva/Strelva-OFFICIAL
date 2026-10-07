@@ -12,5 +12,3 @@ export const publicBookingScheduleSchema = z.object({
   provider: calendarProviderSchema, timeZone: z.string().trim().min(1).max(128),
   slots: z.array(publicBookingSlotSchema).max(500),
 }).strict();
-
-export type PublicBookingSchedule = z.infer<typeof publicBookingScheduleSchema>;

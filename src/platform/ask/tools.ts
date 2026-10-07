@@ -1,4 +1,3 @@
-import { askBookingServiceSchema } from "@/products/scheduling/contracts";
 import { askBusinessFactInputSchema, type AskWorkspaceDraftPort } from "./workspace-drafts";
 import { tool, type Tool } from "ai";
 import { z } from "zod";
@@ -323,7 +322,7 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
       }),
     }),
     open_possibility: tool({
-      description: "Prepare a real isolated Possibility: inquiry-follow-up-rule changes only timing, attempts and complete Strelva-disclosed wording for one existing live inquiry rule, preserving form, routing, email consent and responsibility; it needs a persisted exact native baseline and passes a real isolated rehearsal. website-pages creates a new informational website with complete page copy/home page; existing-website-pages prepares a section, page set or informational rebuild of an unchanged published native website with its real stored System baseline, preserving existing routes and executable pages; existing-booking-page adds a visitor page for this native site's already configured booking service, requiring a real stored baseline and current same-site booking/inquiry/calendar Connections. new-booking-service prepares a genuinely new schedule and service with explicit proposed duration, IANA time zone and future times, one current own published inquiry form and connected calendar. It never claims the proposed times are provider availability and never publishes, books or sends in chat. The owner reviews the full proposal in Needs you. All copy needs owner review; Make real goes through Needs you. Unsupported flows and missing baselines/Connections are Requests at Asked. Never substitute informational pages for a working flow.",
+      description: "Prepare a real isolated Possibility: inquiry-follow-up-rule changes only timing, attempts and complete Strelva-disclosed wording for one existing live inquiry rule, preserving form, routing, email consent and responsibility; it needs a persisted exact native baseline and passes a real isolated rehearsal. website-pages creates a new informational website with complete page copy/home page; existing-website-pages prepares a section, page set or informational rebuild of an unchanged published native website with its real stored System baseline, preserving existing routes and executable pages; existing-booking-page adds a visitor page for this native site's already configured booking service, requiring a real stored baseline and current same-site booking/inquiry/calendar Connections. It cannot create or change a booking service, schedule, duration or availability. All copy needs owner review; Make real goes through Needs you. Unsupported flows and missing baselines/Connections are Requests at Asked. Never substitute informational pages for a working flow.",
       inputSchema: z.object({
         title: z.string().min(1).max(160),
         intent: z.string().min(1).max(2_000),
@@ -347,9 +346,9 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
         }).strict(), z.object({
           kind: z.literal("existing-booking-page"), path: z.string().min(1).max(80),
           title: z.string().min(1).max(70), description: z.string().max(160), bookingGrantId: z.string().uuid().optional(),
-        }).strict(), askBookingServiceSchema]).optional(),
+        }).strict()]).optional(),
       }).superRefine((input, ctx) => {
-        if (["website-pages", "new-booking-service"].includes(input.candidate?.kind ?? "") && (!input.newSystemKey || !input.newSystemName || !input.purpose)) ctx.addIssue({ code: "custom", path: ["newSystemKey"], message: "A new System needs its own key, name and purpose." });
+        if (input.candidate?.kind === "website-pages" && (!input.newSystemKey || !input.newSystemName || !input.purpose)) ctx.addIssue({ code: "custom", path: ["newSystemKey"], message: "A new System needs its own key, name and purpose." });
       }),
       execute: (input) => guarded("open_possibility", async () => {
         try {
@@ -361,7 +360,6 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
             words: ctx.lastUserText, origin: ctx.origin, askedOnBehalf: ctx.askedOnBehalf,
           });
           ctx.onReceipt({ kind: "possibility", toolId: "open_possibility", status: "opened", ids: [opened.id], summary: `${input.title} · Draft` });
-          if (input.candidate?.kind === "new-booking-service") return { success: true, possibilityId: opened.id, previewHref: opened.previewHref, tryHref: opened.tryHref, reviewStatus: opened.reviewStatus, status: "Draft", agentResultStatus: "drafted", message: `Prepared a new booking service with its own isolated native schedule. Try shows the exact proposed service, duration, time zone and times; test submissions stay local. The owner must review the complete proposal in Needs you before it can accept bookings. Nothing live changed, no reservation was made and no message was sent.` };
           if (input.candidate?.kind === "inquiry-follow-up-rule") return { success: true, possibilityId: opened.id, previewHref: opened.previewHref, tryHref: opened.tryHref, reviewStatus: opened.reviewStatus, status: "Draft", agentResultStatus: "drafted", message: `Prepared the exact follow-up rule and passed its isolated native rehearsal. Try shows the full wording, timing, attempts and test results. ${opened.reviewStatus === "needs_you" ? "The owner's decision is in Needs you." : "The saved alternative is waiting for Needs you synchronization."} Nothing live changed and no message was sent.` };
           return { success: true, possibilityId: opened.id, previewHref: opened.previewHref, tryHref: opened.tryHref, reviewStatus: opened.reviewStatus, status: "Draft", agentResultStatus: "drafted", message: `Prepared "${input.title}" as a working ${input.candidate?.kind === "existing-booking-page" ? "booking-page Possibility for this site's existing configured service" : "page-set Possibility"}. ${input.candidate?.kind === "existing-booking-page" ? "Try it uses configured test times; no real booking is made." : "Open the preview to navigate its pages."} ${opened.reviewStatus === "needs_you" ? "Copy is handed to Needs you for owner review." : "Copy still needs owner review; the saved draft is waiting for Needs you synchronization."} Nothing live changed.` };
         } catch (error) {

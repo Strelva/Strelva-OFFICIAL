@@ -1,7 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
-import { canonicalJson } from "@/platform/business-record/tenant-import";
-import type { AskBookingPublicationPin } from "./ask-service-contracts";
 import { getSupabase } from "@/platform/infra/db/client";
 import { getTenantConfig } from "@/lib/tenants";
 import { captureLead } from "@/lib/leads";
@@ -20,18 +18,11 @@ import {
   readWorkspaceProviderAvailability,
   readWorkspaceExitCompleted,
   readWorkspaceSchedule,
-  listWorkspaceCalendarConnections,
 } from "./server";
 import { scheduleSchema } from "./contracts";
 import { createPublicBookingService, PublicBookingError, type PublicBookingBinding, type PublicBookingCalendar, type PublicBookingInquiryCapture, type PublicBookingRange } from "./public-booking";
 import { postgresPublicBookingTokenStore } from "./public-booking-store";
 import { publicBookingStoreHook, subtractStoreBookings } from "@/platform/bookings/public-api";
-
-/** Minimal existing tenant boundary; no provider or credential reads. */
-export async function readPublicBookingTenant(tenantId: string) {
-  const tenant = await getTenantConfig(tenantId);
-  return tenant ? { active: tenant.active, stableId: tenant.stableId } : null;
-}
 
 type DbRow = Record<string, unknown>;
 type DbResult = { data: unknown; error: { code?: unknown; message?: unknown } | null };
@@ -80,7 +71,7 @@ function minMax(values: readonly { start: string; end: string }[]): { start: str
   };
 }
 
-async function ownerFor(workspaceId: string, workId: string, askPublisher?: string): Promise<WorkspaceActor> {
+async function ownerFor(workspaceId: string, workId: string): Promise<WorkspaceActor> {
   const workResult = await db().from("saved_product_work")
     .select("id,workspace_id,product_id,resource_kind,created_by")
     .eq("id", workId)
@@ -89,7 +80,7 @@ async function ownerFor(workspaceId: string, workId: string, askPublisher?: stri
   if (workResult.error || !workResult.data || typeof workResult.data !== "object") throw new Error("Public booking schedule is unavailable.");
   const work = workResult.data as DbRow;
   if (text(work, "product_id") !== "scheduling" || text(work, "resource_kind") !== "schedule") throw new Error("Public booking schedule is unavailable.");
-  const userId = askPublisher ?? requiredText(work, "created_by");
+  const userId = requiredText(work, "created_by");
   const userResult = await db().from("users").select("id,email,verified_at").eq("id", userId).maybeSingle();
   if (userResult.error || !userResult.data || typeof userResult.data !== "object") throw new Error("Public booking owner is unavailable.");
   const user = userResult.data as DbRow;
@@ -118,8 +109,7 @@ export async function resolvePublishedPublicBooking(input: {
   const grant = grantResult.data as DbRow;
   const workspaceId = requiredText(grant, "business_workspace_id");
   const workId = requiredText(grant, "work_id");
-  const askReceipt = /^ask-[a-f0-9]{32}$/.test(input.capabilityId) ? await readAskBookingPublication(requiredText(grant, "id")) : null;
-  const owner = await ownerFor(workspaceId, workId, askReceipt && askReceipt.work_id === workId && askReceipt.business_workspace_id === workspaceId ? requiredText(grant, "published_by") : undefined);
+  const owner = await ownerFor(workspaceId, workId);
   let inspection: Awaited<ReturnType<PostgresOfferingStore["inspect"]>>;
   try {
     inspection = await new PostgresOfferingStore().inspect(owner, workspaceId);
@@ -310,69 +300,4 @@ export function createPublicWebsiteBookingService() {
     store: publicBookingStoreHook(),
     createRequestId: () => `public-${randomUUID()}`,
   });
-}
-
-
-/** Only the transaction-created receipt marks a new Ask service. Missing
- * schema/marker never changes a legacy grant's creator-based authority. */
-async function readAskBookingPublication(grantId: string): Promise<DbRow | null> {
-  const result = await db().from("ask_booking_service_publications").select("grant_id,business_workspace_id,work_id,proposal,schedule_payload,calendar_connection_id,calendar_updated_at,published_by").eq("grant_id", grantId).maybeSingle();
-  return !result.error && result.data && typeof result.data === "object" ? result.data as DbRow : null;
-}
-
-export async function matchesPublishedAskBookingService(grantId: string, pin: AskBookingPublicationPin): Promise<boolean> {
-  const receipt = await readAskBookingPublication(grantId);
-  return Boolean(receipt && canonicalJson(receipt.proposal) === canonicalJson(pin.proposal)
-    && canonicalJson(receipt.schedule_payload) === canonicalJson(pin.expectedSchedule)
-    && receipt.calendar_connection_id === pin.calendarConnectionId
-    && Date.parse(text(receipt, "calendar_updated_at")) === Date.parse(pin.calendarUpdatedAt));
-}
-
-/** Read the public page's client parameters without contacting a provider.
- * The actual public API still rechecks availability and authority each time. */
-export async function readPublishedAskBookingPage(input: { tenantId: string; capabilityId: string }) {
-  if (!/^ask-[a-f0-9]{32}$/.test(input.capabilityId)) return null;
-  const tenant = await getTenantConfig(input.tenantId);
-  if (!tenant?.active || !tenant.stableId) return null;
-  const result = await db().from("public_website_booking_grants").select("*").eq("tenant_stable_id", tenant.stableId).eq("capability_id", input.capabilityId).eq("status", "published").maybeSingle();
-  if (result.error || !result.data || typeof result.data !== "object") return null;
-  const grant = result.data as DbRow;
-  const receipt = await readAskBookingPublication(requiredText(grant, "id"));
-  const workspaceId = requiredText(grant, "business_workspace_id");
-  const workId = requiredText(grant, "work_id");
-  if (!receipt || receipt.work_id !== workId || receipt.business_workspace_id !== workspaceId) return null;
-  const owner = await ownerFor(workspaceId, workId, requiredText(grant, "published_by"));
-  const inspection = await new PostgresOfferingStore().inspect(owner, workspaceId);
-  if (!inspection.websiteBindings.some(site => site.businessId === workspaceId && site.tenantId === input.tenantId && site.status === "active" && site.tenantActive && site.actorHasTenantAccess) || await readWorkspaceExitCompleted(workspaceId)) return null;
-  const work = await readWorkspaceSchedule(owner, workId);
-  if (work.workspaceId !== workspaceId || work.payload.pause) return null;
-  const calendar = (await listWorkspaceCalendarConnections(owner, workspaceId)).find(item => item.id === receipt.calendar_connection_id && item.provider === grant.provider && item.status === "connected" && item.timeZone === grant.time_zone);
-  if (!calendar) return null;
-  const inquiry = await getInquiryRepository().getSnapshot(input.tenantId, workspaceId);
-  const capability = inquiry?.state.capabilities.find(item => item.businessId === workspaceId && item.id === grant.inquiry_capability_id);
-  const published = capability ? projectPublishedInquiry(capability) : null;
-  if (!published || published.version !== numberValue(grant, "inquiry_version")) return null;
-  const configured = minMax(work.payload.availability.filter(slot => Date.parse(slot.end) > Date.now()));
-  const from = configured?.start ?? new Date().toISOString();
-  const to = configured?.end ?? new Date(Date.parse(from) + 30*24*60*60*1000).toISOString();
-  return { workspaceId, workId, tenantId: input.tenantId, capabilityId: input.capabilityId, version: numberValue(grant, "capability_version"), name: requiredText(grant, "display_name"), timeZone: requiredText(grant, "time_zone"), range: { from, to } };
-}
-
-/** Owner page links use the current tenant slug, never a stored stale slug. */
-export async function readWorkspaceBookingPageLinks(actor: WorkspaceActor, businessId: string): Promise<Map<string, string>> {
-  const inspection = await new PostgresOfferingStore().inspect(actor, businessId);
-  const sites = inspection.websiteBindings.filter(site => site.businessId === businessId && site.status === "active" && site.tenantActive && site.actorHasTenantAccess);
-  const result = await db().from("public_website_booking_grants").select("id,tenant_stable_id,business_workspace_id,work_id,capability_id,status").eq("business_workspace_id", businessId).eq("status", "published");
-  if (result.error || !Array.isArray(result.data)) return new Map();
-  const links = new Map<string, string>();
-  for (const grant of result.data as DbRow[]) {
-    if (!/^ask-[a-f0-9]{32}$/.test(text(grant, "capability_id"))) continue;
-    for (const site of sites) {
-      const tenant = await getTenantConfig(site.tenantId);
-      if (tenant?.stableId !== grant.tenant_stable_id) continue;
-      const page = await readPublishedAskBookingPage({ tenantId: site.tenantId, capabilityId: text(grant, "capability_id") }).catch(() => null);
-      if (page && page.workspaceId === businessId && page.workId === grant.work_id) links.set(page.workId, `/book/${encodeURIComponent(page.tenantId)}/${encodeURIComponent(page.capabilityId)}`);
-    }
-  }
-  return links;
 }

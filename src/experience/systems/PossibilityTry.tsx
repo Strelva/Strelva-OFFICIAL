@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { BookingServiceTry } from "./BookingServiceTry";
-import type { AskBookingService } from "@/products/scheduling/contracts";
 import { Button } from "@/components/ui/Button";
 import { SiteDocumentTry, type SiteDocument } from "@/products/websites/client";
 import type { PublicBookingSchedule } from "../../../custom-repo-starter/booking-client";
@@ -19,7 +17,6 @@ export interface PossibilityTryView {
   websiteDocument?: SiteDocument;
   bookingSchedule?: PublicBookingSchedule;
   bookingPath?: string;
-  newBookingService?: { service: AskBookingService; schedule: PublicBookingSchedule };
   inquiryFollowUp?: {
     afterMinutes: number;
     maxAttempts: number;
@@ -53,10 +50,9 @@ export function PossibilityTry({ state }: { state: PossibilityTryState }) {
         {view.introduces.map((line) => <li key={`new-${line}`}>New: {line}</li>)}
       </ul>
     </section> : null}
-    {view.newBookingService ? <BookingServiceTry service={view.newBookingService.service} schedule={view.newBookingService.schedule} /> : null}
     {view.websiteDocument ? <div className="mt-6"><SiteDocumentTry document={view.websiteDocument} bookingSchedule={view.bookingSchedule} bookingPath={view.bookingPath} /></div> : null}
     {view.inquiryFollowUp ? <InquiryFollowUpTry proposal={view.inquiryFollowUp} /> : null}
-    {view.takesSubmissions && !view.websiteDocument && !view.newBookingService ? <TestSubmission /> : null}
+    {view.takesSubmissions && !view.websiteDocument ? <TestSubmission /> : null}
     <p className="mt-8 text-xs text-gray-muted">Nothing here changes your live site, sends a message or books anything. Make it live from the email when you are ready.</p>
   </Shell>;
 }
