@@ -13,6 +13,7 @@ import {
 import { prefillMinutes } from "@/platform/operator-queue/rules";
 import { closeQueueItemAction, markQueueItemAction, resolveQueueDraftsAction, type QueueActionResult } from "./actions";
 import { QueueEventDetail, hasQueueEventDetail } from "@/components/dashboard/QueueEventDetail";
+import { QueueSourceActions } from "./QueueSourceActions";
 
 type Tone = "good" | "warn" | "crit" | "neutral" | "accent";
 const PRIORITY_TONE: Record<QueuePriority, Tone> = { P1: "crit", P2: "warn", P3: "accent", P4: "neutral" };
@@ -152,6 +153,7 @@ function Row({ item, me, operators, now, onResult, actionsEnabled }: {
 
       {open && (
         <div className="mt-3 rounded-xl border border-glass-border bg-white/[0.02] p-3">
+          {actionsEnabled && <QueueSourceActions item={item} onResult={onResult} />}
           {actionsEnabled && item.kind === "draft_review" && item.review && hasQueueEventDetail(item.review) && <QueueEventDetail event={item.review} />}
           {actionsEnabled && item.kind === "draft_review" && item.move === "strelva" && <div className="mb-3 flex flex-wrap gap-2">
             {(["approve", "skip", "escalate"] as const).map((action) => <Button key={action} size="sm" disabled={pending} onClick={() => start(async () => {
