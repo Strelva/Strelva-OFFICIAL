@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   actor: vi.fn(),
@@ -28,8 +28,28 @@ import { GET, POST } from "@/app/api/workspace/calendar-connections/route";
 
 const actor = { userId: "11111111-1111-4111-8111-111111111111", verifiedEmail: "owner@example.test" };
 const workspaceId = "33333333-3333-4333-8333-333333333333";
+beforeEach(() => { vi.clearAllMocks(); vi.stubEnv("STRELVA_BOOKING_CALENDAR_REVOKE", "0"); });
+afterEach(() => vi.unstubAllEnvs());
 
 describe("calendar connection HTTP boundary", () => {
+  it.each([{ provider: "outlook", flag: "0", followUp: false }, { provider: "google", flag: "0", followUp: false }, { provider: "google", flag: "1", followUp: false }, { provider: "outlook", flag: "1", followUp: true }])("returns consent guidance only for Outlook with revoke enabled: $provider / $flag", async ({ provider, flag, followUp }) => {
+    vi.stubEnv("STRELVA_BOOKING_CALENDAR_REVOKE", flag);
+    mocks.actor.mockResolvedValue(actor); mocks.revoke.mockResolvedValue(true);
+    const result = await POST(new Request("https://workspace.test/api/workspace/calendar-connections", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "disconnect", workspaceId, provider }) }));
+    expect(result.status).toBe(200);
+    if (!followUp) expect(await result.clone().text()).toBe('{"disconnected":true}');
+    const value = await result.json();
+    if (followUp) expect(value).toMatchObject({ disconnected: true, providerConsentAction: { href: "https://myapps.microsoft.com", message: expect.stringContaining("Microsoft calendar consent has not been removed") } });
+    else expect(value).toEqual({ disconnected: true });
+    expect(mocks.revoke).toHaveBeenCalledWith(actor, workspaceId, provider);
+  });
+
+  it("does not return a success receipt when provider revocation fails", async () => {
+    vi.stubEnv("STRELVA_BOOKING_CALENDAR_REVOKE", "1"); mocks.actor.mockResolvedValue(actor);
+    mocks.revoke.mockRejectedValueOnce(new Error("Google could not revoke calendar consent."));
+    const result = await POST(new Request("https://workspace.test/api/workspace/calendar-connections", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "disconnect", workspaceId, provider: "google" }) }));
+    expect(result.status).toBe(503); expect(await result.json()).toEqual({ error: "fixture failure" });
+  });
   it("returns metadata only and keeps provider credentials outside the projection", async () => {
     mocks.actor.mockResolvedValue(actor);
     mocks.list.mockResolvedValue([{ provider: "outlook", status: "connected", calendarId: "calendar-1", calendarName: "Operations", timeZone: "America/New_York" }]);

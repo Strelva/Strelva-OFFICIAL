@@ -29,6 +29,7 @@ import type { EmailAudience } from "@/platform/infra/email/send";
 import {
   actorForAction,
   createInquiryDeliveryMessage,
+  prepareInquiryDeliveryMessage,
   deliveryActionLabel,
   getInquiryReplyTrackingAddress,
   inquiryBusinessName,
@@ -201,6 +202,7 @@ export function getInquiryDeliveryMessageDigest(message: InquiryDeliveryMessage)
     audience: message.audience,
     to: message.to,
     replyTo: message.replyTo ?? null,
+    ...(message.fromName ? { fromName: message.fromName } : {}),
     tags: message.tags ?? null,
     subject: message.subject,
     options: message.options,
@@ -210,7 +212,7 @@ export function getInquiryDeliveryMessageDigest(message: InquiryDeliveryMessage)
 }
 
 /** Build the exact message that an approval UI must display and hash. */
-export { createInquiryDeliveryMessage, getInquiryReplyTrackingAddress };
+export { createInquiryDeliveryMessage, prepareInquiryDeliveryMessage, getInquiryReplyTrackingAddress };
 
 export function inquirySubmissionFromLead(tenantId: string, lead: LeadRecord): InquiryDeliverySubmission {
   return {
@@ -596,7 +598,7 @@ export async function deliverInquiryAction(
   if (route.tenantId !== inquiry.tenantId) {
     return { inquiryId: inquiry.id, tenantId: inquiry.tenantId, action, status: "unavailable", reason: "recipient_route_tenant_mismatch", retryable: false };
   }
-  const message = createInquiryDeliveryMessage(inquiry, route, action);
+  const message = await prepareInquiryDeliveryMessage(inquiry, route, action);
   if (!message) {
     await appendTimelineSafe(store, timelineFor(inquiry, action, blockedTimelineType(action), "recipient unavailable", "blocked", now.toISOString()));
     return { inquiryId: inquiry.id, tenantId: inquiry.tenantId, action, status: "unavailable", reason: "recipient_unavailable", retryable: false };

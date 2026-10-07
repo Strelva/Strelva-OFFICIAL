@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard, readWorkspaceBody } from "@/platform/workspaces/http";
-import { calendarConnectionInputSchema, calendarProviderSchema } from "@/products/scheduling/contracts";
+import { calendarConnectionInputSchema, calendarProviderSchema, outlookCalendarConsentAction } from "@/products/scheduling/contracts";
 import { configureWorkspaceCalendarConnection, listWorkspaceCalendarConnections, listWorkspaceProviderCalendars, revokeWorkspaceCalendarConnection } from "@/products/scheduling/server";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +36,9 @@ export async function POST(request: Request) {
       return workspaceJson({ connection: await configureWorkspaceCalendarConnection(actor, input.workspaceId, input.connection) });
     }
     await revokeWorkspaceCalendarConnection(actor, input.workspaceId, input.provider);
-    return workspaceJson({ disconnected: true });
+    return workspaceJson({ disconnected: true,
+      ...(input.provider === "outlook" && process.env.STRELVA_BOOKING_CALENDAR_REVOKE === "1" ? { providerConsentAction: outlookCalendarConsentAction } : {}),
+    });
   } catch (error) {
     return workspaceHttpFailure(error);
   }

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { SelectInput, TextInput } from "@/components/ui/TextInput";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
-import type { CalendarConnection, CalendarProvider, CalendarReminderPolicy } from "@/products/scheduling/contracts";
+import { calendarProviderConsentActionSchema, type CalendarProviderConsentAction, type CalendarConnection, type CalendarProvider, type CalendarReminderPolicy } from "@/products/scheduling/contracts";
 import type { ProviderCalendar } from "@/products/scheduling/server";
 
 type ConnectionResponse = { connections: CalendarConnection[] };
@@ -41,6 +41,7 @@ export function CalendarConnectionPanel({ workspaceId, disabled = false, onChang
   const [loading, setLoading] = useState(false);
   const [loadingCalendars, setLoadingCalendars] = useState<CalendarProvider | null>(null);
   const [error, setError] = useState("");
+  const [providerConsentAction, setProviderConsentAction] = useState<CalendarProviderConsentAction | null>(null);
   const [draft, setDraft] = useState<{ provider: CalendarProvider; calendarId: string; calendarName: string; timeZone: string; reminderPolicy: CalendarReminderPolicy } | null>(null);
 
   const load = useCallback(async () => {
@@ -48,6 +49,7 @@ export function CalendarConnectionPanel({ workspaceId, disabled = false, onChang
     try {
       const result = await body<ConnectionResponse>(await request(`/api/workspace/calendar-connections?workspaceId=${encodeURIComponent(workspaceId)}`, { cache: "no-store" }), "Calendar connections could not be loaded.");
       setConnections(result.connections || []);
+      if (result.connections?.some(connection => connection.provider === "outlook" && connection.status !== "revoked")) setProviderConsentAction(null);
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Calendar connections could not be loaded."); }
     finally { setLoading(false); }
   }, [request, workspaceId]);
@@ -82,7 +84,11 @@ export function CalendarConnectionPanel({ workspaceId, disabled = false, onChang
   async function disconnect(provider: CalendarProvider) {
     setLoading(true); setError("");
     try {
-      await body<{ disconnected: boolean }>(await request("/api/workspace/calendar-connections", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "disconnect", workspaceId, provider }) }), "Calendar could not be disconnected.");
+      const result = await body<{ disconnected: boolean; providerConsentAction?: unknown }>(await request("/api/workspace/calendar-connections", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "disconnect", workspaceId, provider }) }), "Calendar could not be disconnected.");
+      if (provider === "outlook") {
+        const action = calendarProviderConsentActionSchema.safeParse(result.providerConsentAction);
+        setProviderConsentAction(result.disconnected && action.success ? action.data : null);
+      }
       await load(); onChanged?.();
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Calendar could not be disconnected."); }
     finally { setLoading(false); }
@@ -99,6 +105,7 @@ export function CalendarConnectionPanel({ workspaceId, disabled = false, onChang
           <div><h3 className="font-medium">{providerLabel(provider)}</h3><p className="text-sm text-gray-muted">{statusLabel(connection)}</p></div>
           {connection?.status === "connected" ? <dl className="space-y-1 text-sm"><div><dt className="inline text-gray-muted">Calendar: </dt><dd className="inline">{connection.calendarName}</dd></div><div><dt className="inline text-gray-muted">Timezone: </dt><dd className="inline">{connection.timeZone}</dd></div><div><dt className="inline text-gray-muted">Reminders: </dt><dd className="inline">{connection.reminderPolicy.mode === "off" ? "Off" : connection.reminderPolicy.mode === "provider_default" ? "Provider default" : `${connection.reminderPolicy.minutes} minutes before`}</dd></div></dl> : null}
           {connection?.lastError ? <p className="text-sm text-critical">{connection.lastError}</p> : null}
+          {provider === "outlook" && providerConsentAction ? <div role="status" className="space-y-2 text-sm leading-6 text-gray-muted"><p>{providerConsentAction.message}</p><a className="inline-flex min-h-11 items-center text-warm-black underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-text" href={providerConsentAction.href} target="_blank" rel="noopener noreferrer">{providerConsentAction.label}<span className="sr-only"> (opens in a new tab)</span></a></div> : null}
           <div className="flex flex-wrap gap-2">
             {connection?.status === "connected" || connection?.status === "authorized" || connection?.status === "error" ? <Button type="button" variant="secondary" disabled={disabled || loadingCalendars === provider} onClick={() => void discover(provider)}>{loadingCalendars === provider ? "Finding calendars…" : "Choose calendar"}</Button> : <Button type="button" disabled={disabled} onClick={() => window.location.assign(new URL(`/api/workspace/calendar-connections/oauth/${provider}?workspaceId=${encodeURIComponent(workspaceId)}`, window.location.origin).toString())}>Connect {providerLabel(provider)}</Button>}
             {connection && connection.status !== "revoked" ? <Button type="button" variant="secondary" disabled={disabled || loading} onClick={() => void disconnect(provider)}>Disconnect</Button> : null}

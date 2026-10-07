@@ -1,0 +1,32 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+const mocks=vi.hoisted(()=>({ db:vi.fn(), allowed:vi.fn(async()=>true), reserve:vi.fn(async()=>({status:"confirmed",reservationId:"legacy"})), limit:vi.fn(async()=>false) }));
+vi.mock("@/platform/bookings/store", async original => ({ ...await original<typeof import("@/platform/bookings/store")>(), bookingStoreDb:mocks.db }));
+vi.mock("@/platform/bookings/updates",()=>({bookingCustomerEmailAllowed:mocks.allowed,deliverBookingUpdates:vi.fn(async()=>({sent:0,customerSent:0,suppressed:0,failed:0}))}));
+vi.mock("@/platform/infra/rate-limit",()=>({isRateLimitedAsync:mocks.limit,rateLimitKey:()=>"fixture"}));
+vi.mock("@/app/api/v1/bookings/_shared",async original=>({...await original<typeof import("@/app/api/v1/bookings/_shared")>(),bookingService:()=>({reserve:mocks.reserve})}));
+import { newBookingAccess, tokenHash, requireAgentBookings, requestAgentBooking, agentReceipt } from "@/platform/bookings/native";
+import { decryptSecret } from "@/platform/infra/crypto/secrets";
+import { resetBookingFlagCache, bookingAgentsEnabled } from "@/platform/bookings/flags";
+import { POST } from "@/app/api/v1/bookings/[tenant]/reservations/route";
+import { POST as mcp } from "@/app/api/mcp/bookings/[tenant]/route";
+import { GET as openapi } from "@/app/api/v1/bookings/openapi.json/route";
+const params={params:Promise.resolve({tenant:"fixture"})};
+beforeEach(()=>{vi.clearAllMocks(); resetBookingFlagCache(); vi.stubEnv("STRELVA_BOOKING_AGENTS","0");vi.stubEnv("STRELVA_BOOKING_STORE_WRITE","0");vi.stubEnv("STRELVA_BOOKING_STORE_READ","legacy");vi.stubEnv("SECRETS_ENC_KEY","11".repeat(32));});
+afterEach(()=>vi.unstubAllEnvs());
+describe("agent confirmation and flags-off contract",()=>{
+ it("keeps OpenAPI off and documents bounded intake for enabled agent requests",async()=>{
+  expect(openapi().status).toBe(503);expect(mocks.db).not.toHaveBeenCalled();
+  vi.stubEnv("STRELVA_BOOKING_AGENTS","1");vi.stubEnv("STRELVA_BOOKING_STORE_WRITE","1");
+  const response=openapi();expect(response.status).toBe(200);
+  const document=await response.json();
+  expect(document.paths["/api/v1/bookings/{tenant}/reservations"].post.requestBody.content["application/json"].schema.properties.intakeAnswers)
+   .toMatchObject({type:"object",maxProperties:8,additionalProperties:{type:"string",maxLength:2000}});
+ });
+ it("defaults off without store/parity I/O",async()=>{expect(bookingAgentsEnabled({})).toBe(false);await expect(requireAgentBookings()).rejects.toMatchObject({code:"unavailable"});expect(mocks.db).not.toHaveBeenCalled();});
+ it("separates unpredictable manage, confirmation and status bearer tokens; stores encrypted tokens",()=>{const access=newBookingAccess("Fixture assistant");const tokens=[access.manageCiphertext,access.confirmCiphertext!,access.statusCiphertext!].map(decryptSecret);expect(new Set(tokens).size).toBe(3);for(const token of tokens)expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);expect(access.manageHash).toBe(tokenHash(tokens[0]!));expect(access.confirmHash).toBe(tokenHash(tokens[1]!));expect(access.statusHash).toBe(tokenHash(tokens[2]!));expect(access.manageCiphertext).not.toContain(tokens[0]!);});
+ it("refuses plaintext fallback if token encryption is absent",()=>{vi.stubEnv("SECRETS_ENC_KEY","");expect(()=>newBookingAccess()).toThrow("encryption");});
+ it.each(["STRELVA_BOOKING_MESSAGES","STRELVA_BOOKING_MANAGE_PAGE","STRELVA_BOOKING_REMINDERS","email"])("refuses to hold before customer confirmation is available: %s",async disabled=>{vi.stubEnv("STRELVA_BOOKING_AGENTS","1");vi.stubEnv("STRELVA_BOOKING_STORE_WRITE","1");vi.stubEnv("STRELVA_BOOKING_STORE_READ","postgres");for(const flag of ["STRELVA_BOOKING_MESSAGES","STRELVA_BOOKING_MANAGE_PAGE","STRELVA_BOOKING_REMINDERS"])vi.stubEnv(flag,"1");const rpc=vi.fn(async(_name: string, _args: unknown)=>({data:{days:7},error:null}));mocks.db.mockReturnValue({rpc});mocks.allowed.mockResolvedValue(disabled!=="email");if(disabled!=="email")vi.stubEnv(disabled,"0");await expect(requestAgentBooking("fixture",{origin:"agent",serviceId:"svc",start:"2026-11-03T15:00:00Z",requestId:"request_123",agent:{name:"Assistant"},customer:{name:"Dana",email:"dana@example.test"}})).rejects.toMatchObject({code:"unavailable"});expect(rpc.mock.calls.map(c=>c[0])).toEqual(["booking_parity_streak"]);});
+ it("keeps existing reservation requests on their original service while all new flags are off",async()=>{const response=await POST(new Request("http://localhost/api/v1/bookings/fixture/reservations",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({capabilityId:"cap1",capabilityVersion:1,slotId:"slot1",visitor:{name:"Dana",email:"dana@example.test"}})}),params);expect(response.status).toBe(201);expect(await response.json()).toEqual({status:"confirmed",reservationId:"legacy"});expect(mocks.reserve).toHaveBeenCalledOnce();expect(mocks.db).not.toHaveBeenCalled();});
+ it("does not expose an agent confirmation or management credential in its receipt",()=>{expect(agentReceipt({booking:{id:"b1",status:"held",start:"start",end:"end"} as never,statusToken:"status-only",confirmationRequired:true})).toEqual({reservationId:"b1",status:"held",start:"start",end:"end",statusToken:"status-only",confirmationRequired:true});});
+ it("keeps MCP unavailable with flags off and rejects cross-origin requests",async()=>{const request=(origin?:string)=>new Request("http://localhost/api/mcp/bookings/fixture",{method:"POST",headers:{"content-type":"application/json",...(origin?{origin}:{})},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"initialize"})});expect((await mcp(request(),params)).status).toBe(503);expect((await mcp(request("https://other.example"),params)).status).toBe(403);expect(mocks.db).not.toHaveBeenCalled();});
+});

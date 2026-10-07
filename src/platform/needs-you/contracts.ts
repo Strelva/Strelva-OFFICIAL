@@ -164,6 +164,7 @@ export const SOURCE_LIFECYCLES = [
   "make_real",
   "version_release",
   "booking_request",
+  "booking_settings",
 ] as const;
 export type SourceLifecycle = (typeof SOURCE_LIFECYCLES)[number];
 

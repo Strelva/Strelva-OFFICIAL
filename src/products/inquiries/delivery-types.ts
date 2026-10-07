@@ -110,6 +110,7 @@ export interface InquiryDeliveryMessage {
   audience: EmailAudience;
   to: string;
   replyTo?: string;
+  fromName?: string;
   subject: string;
   options: EmailOptions;
   /** Non-sensitive provider metadata used to correlate signed delivery events. */

@@ -3,7 +3,10 @@
  * calls to its service-role functions. Nothing here decides which store a
  * route reads; see flags.ts and src/lib/storage/booking-store.ts.
  */
+import { bookingServicePoliciesEnabled, bookingServicePolicySchema, type BookingServicePolicy } from "./service-policy-schema";
+import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
+import { bookingRecordFallbackEnabled, cacheBookingRecord, cachedBookingRecord } from "./record-fallback";
 
 export const BOOKING_STORE_TIMEOUT_MS = 2000;
 
@@ -41,6 +44,7 @@ export interface StoreBooking {
   inquiryId: string | null;
   legacyId: string | null;
   publicReservationId: string | null;
+  requestFingerprint?: string | null;
   externalSource: string | null;
   externalRef: string | null;
   recordedVia: string;
@@ -102,13 +106,15 @@ export interface RecordService {
 
 /** Everything a booking route needs about the business, read at use. */
 export interface BookingContext {
-  tenantStableId: string;
+  tenantStableId: string | null;
+  calendarKey?: string;
   workspaceId: string | null;
   systemId: string | null;
   paused: boolean;
   hours: RecordHours | null;
   phone: string | null;
   services: RecordService[];
+  servicePolicies?: BookingServicePolicy[];
   settings: BookingSettings | null;
 }
 
@@ -215,6 +221,7 @@ export function parseStoreBooking(raw: unknown): StoreBooking | null {
     inquiryId: text(r.inquiryId),
     legacyId: text(r.legacyId),
     publicReservationId: text(r.publicReservationId),
+    ...(text(r.requestFingerprint) ? { requestFingerprint: text(r.requestFingerprint)! } : {}),
     externalSource: text(r.externalSource),
     externalRef: text(r.externalRef),
     recordedVia: String(r.recordedVia ?? ""),
@@ -241,6 +248,10 @@ function parseSettings(raw: unknown): BookingSettings | null {
   };
 }
 
+function zPolicies(raw: unknown): BookingServicePolicy[] {
+  return raw == null ? [] : z.array(bookingServicePolicySchema).parse(raw);
+}
+
 function parseHours(raw: unknown): RecordHours | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
@@ -253,11 +264,27 @@ function parseHours(raw: unknown): RecordHours | null {
 }
 
 export async function readBookingContext(tenant: string, db?: BookingStoreDb | null): Promise<BookingContext | null> {
-  const data = await call<Record<string, unknown> | null>("read_tenant_booking_context", { p_tenant_id: tenant }, db);
-  if (!data || typeof data !== "object" || typeof data.tenantStableId !== "string") return null;
+  let data: Record<string, unknown> | null;
+  try {
+    data = await call<Record<string, unknown> | null>("read_tenant_booking_context", { p_tenant_id: tenant }, db);
+  } catch (error) {
+    if (!bookingRecordFallbackEnabled()) throw error;
+    // The cached record never supplies identity, lifecycle or settings. If
+    // these fresh store reads also fail, availability remains closed.
+    const policy = await call<Record<string, unknown> | null>("read_tenant_booking_policy", { p_tenant_id: tenant }, db);
+    if (!policy || (typeof policy.tenantStableId !== "string" && !(policy.tenantStableId == null && typeof policy.calendarKey === "string" && typeof policy.workspaceId === "string"))) throw error;
+    const cached = await cachedBookingRecord(tenant, {
+      tenantStableId: text(policy.tenantStableId), ...(typeof policy.calendarKey === "string" ? { calendarKey: policy.calendarKey } : {}), workspaceId: text(policy.workspaceId), systemId: text(policy.systemId),
+      paused: policy.paused === true, settings: parseSettings(policy.settings),
+      ...(bookingServicePoliciesEnabled() ? { servicePolicies: zPolicies(policy.servicePolicies) } : {}),
+    });
+    if (!cached) throw error;
+    return cached;
+  }
+  if (!data || typeof data !== "object" || (typeof data.tenantStableId !== "string" && !(data.tenantStableId == null && typeof data.calendarKey === "string" && typeof data.workspaceId === "string"))) return null;
   const services = Array.isArray(data.services) ? data.services : [];
-  return {
-    tenantStableId: data.tenantStableId,
+  const context: BookingContext = {
+    tenantStableId: text(data.tenantStableId), ...(typeof data.calendarKey === "string" ? { calendarKey: data.calendarKey } : {}),
     workspaceId: text(data.workspaceId),
     systemId: text(data.systemId),
     paused: data.paused === true,
@@ -274,7 +301,10 @@ export async function readBookingContext(tenant: string, db?: BookingStoreDb | n
         externalRef: text(s.externalRef),
       })),
     settings: parseSettings(data.settings),
+    ...(bookingServicePoliciesEnabled() ? { servicePolicies: zPolicies(data.servicePolicies) } : {}),
   };
+  if (bookingRecordFallbackEnabled()) await cacheBookingRecord(context);
+  return context;
 }
 
 export type RecordBookingResult =
@@ -439,7 +469,9 @@ export interface ManagedReservation {
   start: string;
   end: string;
   timeZone: string;
-  status: "pending" | "confirmed" | "cancelled";
+  status: "pending" | "confirmed" | "cancelled" | "held";
+  confirmationRequired?: boolean;
+  confirmUntil?: string | null;
 }
 
 /** The receipt a manage link's token belongs to, found by the token's hash alone. */
@@ -500,4 +532,10 @@ export async function setTenantBookingHours(
   const data = await call<{ status?: string; revision?: unknown }>("set_tenant_booking_hours", { p_workspace_id: workspaceId, p_tenant_id: tenant, p_hours: hours }, db);
   if (data?.status !== "updated") throw new BookingStoreError("failed", "booking_store_unexpected_response");
   return { revision: Number(data.revision) || 0 };
+}
+
+/** Bounded cron recovery for real website-optional booking Systems. */
+export async function readNativeBookingWorkspaces(db?: BookingStoreDb | null): Promise<string[]> {
+  const rows = await call<unknown>("read_native_booking_workspaces", {}, db);
+  return z.array(z.string().uuid()).max(500).parse(rows);
 }

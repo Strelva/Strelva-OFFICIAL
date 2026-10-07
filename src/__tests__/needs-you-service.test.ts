@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { UnifiedEvent } from "@/lib/types";
 import type { SendEmailInput, SendEmailResult } from "@/platform/infra/email/send";
 import type { ServiceRequest } from "@/platform/service-requests/types";
@@ -105,6 +105,8 @@ function service(adapters?: SourceAdapter[]) {
     ],
   });
 }
+
+afterEach(() => vi.unstubAllEnvs());
 
 beforeEach(() => {
   process.env.APPROVE_LINK_SECRET = "needs-you-test-secret";
@@ -332,5 +334,59 @@ describe("the chase", () => {
     expect(summary.ownerNotTold).toBe(1);
     expect(sendEmail).not.toHaveBeenCalled();
     expect([...mem.items.values()][0]!.deliveries[0]).toMatchObject({ status: "suppressed", reason: "no_owner_recipient" });
+  });
+});
+
+
+describe("booking request clock ownership", () => {
+  async function setup() {
+    const row = await mem.store.open(WS, { kind: "customer.commitment", route: "owner_decides", title: "Consultation request", approveEffect: "Confirm", notYetEffect: "Decline", sourceLifecycle: "booking_request", sourceId: "booking-clock", revisionHash: "revision", urgent: true, adminMayDecide: false });
+    const resolve = vi.fn(async () => ({ outcome: "done" as const }));
+    const adapter: SourceAdapter = { lifecycle: "booking_request", needsMemberActor: false, propose: async () => ({ items: [], complete: true }), currentRevision: async () => "revision", resolve };
+    return { row, resolve, svc: service([adapter]) };
+  }
+  it("delivers only the newly captured booking and leaves unrelated work for the cron", async () => {
+    vi.stubEnv("STRELVA_BOOKING_OWNER_NOTICE","1");
+    const { row, svc } = await setup();
+    const other = await mem.store.open(WS, { kind:"structure", route:"owner_decides", title:"Unrelated publish", approveEffect:"Publish", notYetEffect:"Keep draft", sourceLifecycle:"website_document", sourceId:"other", revisionHash:"other", urgent:true, adminMayDecide:false });
+    expect((await svc.notifyBookingRequest(WS,row.id)).urgent).toBe(1);
+    expect(sendEmail).toHaveBeenCalledOnce();
+    expect(sendEmail.mock.calls[0]?.[0].tags).toMatchObject({lifecycle:"booking_request",kind:"urgent"});
+    expect(mem.items.get(other.id)?.deliveryState).toBe("not_sent");
+    expect((await svc.notifyBookingRequest(WS,row.id)).urgent).toBe(0);
+  });
+  it("leaves day 3/7/14 to the booking clock when reminders are armed", async () => {
+    vi.stubEnv("STRELVA_BOOKING_STORE_WRITE", "1"); vi.stubEnv("STRELVA_BOOKING_REMINDERS", "1"); vi.stubEnv("STRELVA_BOOKING_OWNER_NOTICE", "1");
+    const { row, resolve, svc } = await setup();
+    await svc.chase(); sendEmail.mockClear();
+    for (const day of [3,7,14]) { clock.now = Date.parse(row.openedAt) + day * DAY; const result = await svc.chase(); expect(result.lapsed).toBe(0); expect(result.reminded).toBe(0); }
+    expect(sendEmail).not.toHaveBeenCalled(); expect(resolve).not.toHaveBeenCalled();
+    expect(mem.items.get(row.id)?.state).toBe("open");
+  });
+  it("keeps the prior generic clock with booking reminders off", async () => {
+    vi.stubEnv("STRELVA_BOOKING_REMINDERS", "0"); vi.stubEnv("STRELVA_BOOKING_OWNER_NOTICE", "1");
+    const { row, resolve, svc } = await setup(); clock.now = Date.parse(row.openedAt) + 14 * DAY;
+    expect((await svc.chase()).lapsed).toBe(1); expect(resolve).toHaveBeenCalledOnce();
+  });
+  it("does not email booking asks while owner notices are off", async () => {
+    vi.stubEnv("STRELVA_BOOKING_OWNER_NOTICE", "0");
+    const { svc } = await setup(); expect((await svc.chase()).urgent).toBe(0); expect(sendEmail).not.toHaveBeenCalled();
+  });
+});
+
+describe("booking calendar health alongside Needs You decisions", () => {
+  it("checks each linked business once and counts owner-not-told without opening a decision", async () => {
+    const bookingCalendarHealth = vi.fn(async () => ({ digests: 0, ownerNotTold: 1, failed: 0, complete: true }));
+    const svc = createNeedsYouService({ store: mem.store, adapters: [], sendEmail, now: () => clock.now, appOrigin: "https://app.example.test", bookingCalendarHealth });
+    const result = await svc.chase();
+    expect(bookingCalendarHealth).toHaveBeenCalledTimes(1);
+    expect(bookingCalendarHealth).toHaveBeenCalledWith(WS, { now: clock.now, appOrigin: "https://app.example.test", sendEmail });
+    expect(result.ownerNotTold).toBe(1);
+    expect(mem.items.size).toBe(0);
+  });
+  it("calendar source failure keeps the hourly chase honest without aborting its decision work", async () => {
+    const bookingCalendarHealth = vi.fn(async () => { throw new Error("health source down"); });
+    const svc = createNeedsYouService({ store: mem.store, adapters: [], sendEmail, now: () => clock.now, appOrigin: "https://app.example.test", bookingCalendarHealth });
+    expect(await svc.chase()).toMatchObject({failed:1,digests:0});
   });
 });

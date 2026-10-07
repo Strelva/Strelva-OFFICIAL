@@ -8,6 +8,7 @@
  *
  * Part of the public /api/v1/* contract — change only additively or via a v2.
  */
+import { captureInquiryBookingOffer } from "@/platform/bookings/inquiry-offers";
 import { NextResponse } from "next/server";
 import { getTenantConfig } from "@/lib/tenants";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
@@ -251,8 +252,10 @@ export async function POST(
         if (evidence.status === "rejected") return corsJson({ error: evidence.reason }, 400);
         if (evidence.status === "unavailable") return corsJson({ error: "Inquiry provenance is temporarily unavailable." }, 503);
       }
-      if (captured.status === "duplicate") return corsJson({ ok: true, duplicate: true }, 200);
-      return corsJson({ ok: true }, 200);
+      const bookingOffer = durableLead?.email ? await captureInquiryBookingOffer({ tenantId: tenant, inquiryId: durableLead.id, customer: { name: durableLead.name, email: durableLead.email } }) : null;
+      const receipt = bookingOffer ? { bookingOffer: { serviceName: bookingOffer.serviceName, timeZone: bookingOffer.timeZone, slots: bookingOffer.slots, url: bookingOffer.url } } : {};
+      if (captured.status === "duplicate") return corsJson({ ok: true, duplicate: true, ...receipt }, 200);
+      return corsJson({ ok: true, ...receipt }, 200);
     }
 
     if (!name) return corsJson({ error: "name is required" }, 400);

@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(request: Request, { params }: { params: Promise<{ token: string }> }): Promise<Response> {
   if (!bookingManagePageEnabled()) return new NextResponse("Not found", { status: 404 });
+  if (request.headers.get("origin") !== new URL(request.url).origin || request.headers.get("sec-fetch-site") === "cross-site") return new NextResponse("Open the booking link directly.", { status: 403 });
   const { token } = await params;
   const page = new URL(`/b/${encodeURIComponent(token)}`, request.url);
   if (await isRateLimitedAsync(rateLimitKey(request, "booking-manage"), 10)) {

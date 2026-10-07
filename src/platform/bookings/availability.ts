@@ -175,9 +175,14 @@ export function storeSlotsForDate(context: BookingContext, date: string, duratio
       maxAdvanceBooking: settings.maxAdvanceDays,
       requirePayment: false,
     };
-    for (const slot of generateSlots(config, date, durationMinutes, asLegacy, [])) slots.add(slot);
+    for (const slot of generateSlots(config, date, durationMinutes, context.servicePolicies ? [] : asLegacy, [])) slots.add(slot);
   }
-  return [...slots].sort();
+  return [...slots].sort().filter(time => {
+    if (!context.servicePolicies) return true;
+    const start=Date.parse(zonedLocalToUtc(date,time,timeZoneOf(context)));
+    const end=start+(durationMinutes+settings.bufferMinutes)*60000;
+    return !blocking.some(booking=>start < Date.parse(booking.end)+booking.bufferMinutes*60000 && end > Date.parse(booking.start));
+  });
 }
 
 /** The legacy BookingConfig a store-served dashboard shows: first open range per weekday. */

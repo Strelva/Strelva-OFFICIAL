@@ -1,10 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SendEmailInput } from "@/platform/infra/email/send";
 import { runBookingLifecycle, type BookingLifecyclePorts } from "@/platform/bookings/lifecycle";
 import { customerReminderEmail, ownerRequestReminderEmail, requestLapsedEmail } from "@/platform/bookings/emails";
 import { bookingRequestAdapter, bookingRequestGoneReason } from "@/platform/bookings/needs-you-adapter";
 import { bookingRemindersEnabled } from "@/platform/bookings/flags";
 import type { StoreBooking } from "@/platform/bookings/store";
+
+beforeEach(() => vi.stubEnv("STRELVA_BOOKING_OWNER_NOTICE", "1"));
+afterEach(() => vi.unstubAllEnvs());
 
 const NOW = new Date("2026-11-02T12:00:00.000Z");
 
@@ -149,7 +152,7 @@ describe("booking lifecycle run", () => {
     });
     await runBookingLifecycle(p, { now: NOW });
     expect(sent[0]!.options?.bullets).toBeUndefined();
-    expect(sent[0]!.options?.paragraphs?.[1]).toBe("Pick another time on the website, or reply to this email to reach the business.");
+    expect(sent[0]!.options?.paragraphs?.[1]).toBe("Reply to this email to ask the business for another time.");
     expect(sent[0]!.fromName).toBe("Strelva");
   });
 });
@@ -196,5 +199,16 @@ describe("booking reminders switch", () => {
     expect(bookingRemindersEnabled({ STRELVA_BOOKING_REMINDERS: "1" })).toBe(false);
     expect(bookingRemindersEnabled({ STRELVA_BOOKING_REMINDERS: "1", STRELVA_BOOKING_STORE_WRITE: "1" })).toBe(true);
     expect(bookingRemindersEnabled({ STRELVA_BOOKING_REMINDERS: "1", STRELVA_BOOKING_STORE_WRITE: "1", DUAL_WRITE_PG: "0" })).toBe(false);
+  });
+});
+
+
+describe("owner reminder release boundary", () => {
+  it("does not send or read a recipient when owner notices are off", async () => {
+    vi.stubEnv("STRELVA_BOOKING_OWNER_NOTICE", "0");
+    const { p, sent, finished } = ports({ claim: vi.fn(async () => [{ messageId: "owner-off", kind: "request_owner_reminder" as const, booking: booking({ status: "requested" }) }]) });
+    const result = await runBookingLifecycle(p, { now: NOW });
+    expect(result.skipped).toBe(1); expect(sent).toEqual([]);
+    expect(finished).toContainEqual(["owner-off", "skipped", null, "owner_notice_off"]);
   });
 });

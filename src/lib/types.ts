@@ -394,6 +394,7 @@ export interface Booking {
   clientEmail: string;
   clientPhone: string;
   notes?: string;
+  intakeAnswers?: Record<string,string>;
   /** `requested`: request mode on the one booking store; the owner approves through Needs you. */
   status: "confirmed" | "cancelled" | "completed" | "requested";
   createdAt: string;

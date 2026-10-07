@@ -61,3 +61,25 @@ describe("workspace calendar OAuth", () => {
     vi.unstubAllEnvs();
   });
 });
+
+
+describe("booking calendar least privilege and disconnect", () => {
+  it("keeps scopes unchanged off and uses only event/busy/list scopes when enabled", async () => {
+    const { calendarOAuthConfiguration } = await import("@/products/scheduling/calendar/oauth");
+    vi.stubEnv("GOOGLE_CALENDAR_CLIENT_ID","fixture-client");
+    vi.stubEnv("STRELVA_BOOKING_CALENDAR_SCOPES","0");
+    expect(calendarOAuthConfiguration("google","https://app.example")?.scopes).toEqual(["https://www.googleapis.com/auth/calendar"]);
+    vi.stubEnv("STRELVA_BOOKING_CALENDAR_SCOPES","1");
+    expect(calendarOAuthConfiguration("google","https://app.example")?.scopes).toEqual(["https://www.googleapis.com/auth/calendar.events","https://www.googleapis.com/auth/calendar.events.freebusy","https://www.googleapis.com/auth/calendar.calendarlist.readonly"]);
+    vi.unstubAllEnvs();
+  });
+  it("revokes Google consent and surfaces rejection without using Microsoft's account-wide revocation", async () => {
+    const { revokeCalendarOAuthToken } = await import("@/products/scheduling/calendar/oauth");
+    const fetcher = vi.fn(async () => new Response(null,{status:200}));
+    await revokeCalendarOAuthToken("google","fixture-token",fetcher);
+    expect(fetcher).toHaveBeenCalledWith("https://oauth2.googleapis.com/revoke",expect.objectContaining({method:"POST",body:"token=fixture-token"}));
+    fetcher.mockResolvedValueOnce(new Response(null,{status:503}));
+    await expect(revokeCalendarOAuthToken("google","fixture-token",fetcher)).rejects.toMatchObject({code:"provider"});
+    fetcher.mockClear(); await revokeCalendarOAuthToken("outlook","fixture-token",fetcher); expect(fetcher).not.toHaveBeenCalled();
+  });
+});

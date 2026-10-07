@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { encryptSecret } from "@/platform/infra/crypto/secrets";
 
 type Row = Record<string, unknown>;
 type RpcCall = { name: string; args: Row };
@@ -121,6 +122,7 @@ beforeEach(() => {
     workspace_calendar_connections: [],
   };
 });
+afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe("saveWork", () => {
   it("writes through save_workspace_work for a member and names the actor", async () => {
@@ -213,6 +215,16 @@ describe("revokeHandoff and revokeDelegation", () => {
 });
 
 describe("calendar connection writes", () => {
+  it("does not wipe stored Google tokens when provider consent revocation fails", async () => {
+    vi.stubEnv("STRELVA_BOOKING_CALENDAR_REVOKE", "1");
+    const token = encryptSecret("fictional-refresh-token");
+    boundary.tables.workspace_calendar_connections = [{ id: "77777777-7777-4777-8777-777777777777", workspace_id: BUSINESS, provider: "google", calendar_id: "primary", calendar_name: "Bookings", time_zone: "America/New_York", status: "connected", scopes: ["calendar"], reminder_policy: { mode: "off" }, token_expires_at: null, last_checked_at: null, last_error: null, created_at: "2026-10-05T12:00:00Z", updated_at: "2026-10-05T12:00:00Z", refresh_token_ciphertext: token }];
+    const fetcher = vi.fn().mockResolvedValue(new Response("failure", { status: 503 })); vi.stubGlobal("fetch", fetcher);
+    await expect(revokeWorkspaceCalendarConnection(as(OWNER), BUSINESS, "google")).rejects.toMatchObject({ code: "provider" });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(boundary.calls).toEqual([]);
+    expect(boundary.tables.workspace_calendar_connections[0]?.refresh_token_ciphertext).toBe(token);
+  });
   it("save, mark and revoke through manage_calendar RPCs with ciphertext only", async () => {
     const saved = await saveWorkspaceCalendarConnection(as(ADMIN), BUSINESS, connectionInput, { accessToken: "plain-access", refreshToken: "plain-refresh", scopes: ["calendar"] });
     await markWorkspaceCalendarConnectionError(as(OWNER), BUSINESS, "google", "x".repeat(1200));

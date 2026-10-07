@@ -1,0 +1,242 @@
+{
+  "date": "2026-10-07",
+  "browser": "installedPlaywright Chromium; all external requestsblocked",
+  "transport": "CalendarDisconnectPreview injected WorkspaceRequest returns syntheticlocal Response only. Microsoft consentlink inspected, neveropened.",
+  "modeLimit": "on/off simulate response envelopes; route tests separatelyprove serverflag gate",
+  "sources": [
+    {
+      "title": "Microsoftconsentremoval userguide",
+      "url": "https://support.microsoft.com/en-us/accounts-billing/work-school/edit-or-revoke-application-permissions-in-the-my-apps-portal"
+    }
+  ],
+  "captures": [
+    {
+      "state": "on",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Fictional calendar connection. No provider or account change is sent.\n\nCalendar connections\n\nChoose one calendar for this workspace. Reminders follow the connected calendar; Strelva does not send separate reminders.\n\nMicrosoft Outlook\n\nDisconnected\n\nStrelva is disconnected. Microsoft calendar consent has not been removed. Remove Strelva's permissions in Microsoft My Apps. If your organization granted consent, ask its administrator to remove it.\n\nRemove Strelva consent in Microsoft My Apps\n(opens in a new tab)\nConnect Microsoft Outlook\nGoogle Calendar\n\nNot connected\n\nConnect Google Calendar",
+        "statuses": [
+          "Strelva is disconnected. Microsoft calendar consent has not been removed. Remove Strelva's permissions in Microsoft My Apps. If your organization granted consent, ask its administrator to remove it.\n\nRemove Strelva consent in Microsoft My Apps\n(opens in a new tab)"
+        ],
+        "alerts": [],
+        "links": [
+          {
+            "name": "Remove Strelva consent in Microsoft My Apps\n(opens in a new tab)",
+            "href": "https://myapps.microsoft.com/",
+            "target": "_blank",
+            "rel": "noopener noreferrer",
+            "height": 44
+          }
+        ]
+      },
+      "focus": {
+        "tag": "A",
+        "outline": "rgb(124, 154, 142) dashed 2px",
+        "href": "https://myapps.microsoft.com/"
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": true,
+        "path": "calendar-consent-1280.png"
+      }
+    },
+    {
+      "state": "off",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Fictional calendar connection. No provider or account change is sent.\n\nCalendar connections\n\nChoose one calendar for this workspace. Reminders follow the connected calendar; Strelva does not send separate reminders.\n\nMicrosoft Outlook\n\nDisconnected\n\nConnect Microsoft Outlook\nGoogle Calendar\n\nNot connected\n\nConnect Google Calendar",
+        "statuses": [],
+        "alerts": [],
+        "links": []
+      },
+      "focus": null,
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "google-error",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Fictional calendar connection. No provider or account change is sent.\n\nCalendar connections\n\nChoose one calendar for this workspace. Reminders follow the connected calendar; Strelva does not send separate reminders.\n\nGoogle could not revoke calendar consent. Try disconnecting again.\n\nReload calendar connections\nMicrosoft Outlook\n\nNot connected\n\nConnect Microsoft Outlook\nGoogle Calendar\n\nConnected\n\nCalendar: Consultation calendar\nTimezone: America/New_York\nReminders: Off\nChoose calendar\nDisconnect",
+        "statuses": [],
+        "alerts": [
+          "Google could not revoke calendar consent. Try disconnecting again.\n\nReload calendar connections"
+        ],
+        "links": []
+      },
+      "focus": null,
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "reload-error",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Fictional calendar connection. No provider or account change is sent.\n\nCalendar connections\n\nChoose one calendar for this workspace. Reminders follow the connected calendar; Strelva does not send separate reminders.\n\nConnections could not be reloaded. Strelva disconnected successfully.\n\nReload calendar connections\nMicrosoft Outlook\n\nConnected\n\nCalendar: Consultation calendar\nTimezone: America/New_York\nReminders: Off\n\nStrelva is disconnected. Microsoft calendar consent has not been removed. Remove Strelva's permissions in Microsoft My Apps. If your organization granted consent, ask its administrator to remove it.\n\nRemove Strelva consent in Microsoft My Apps\n(opens in a new tab)\nChoose calendar\nDisconnect\nGoogle Calendar\n\nNot connected\n\nConnect Google Calendar",
+        "statuses": [
+          "Strelva is disconnected. Microsoft calendar consent has not been removed. Remove Strelva's permissions in Microsoft My Apps. If your organization granted consent, ask its administrator to remove it.\n\nRemove Strelva consent in Microsoft My Apps\n(opens in a new tab)"
+        ],
+        "alerts": [
+          "Connections could not be reloaded. Strelva disconnected successfully.\n\nReload calendar connections"
+        ],
+        "links": [
+          {
+            "name": "Remove Strelva consent in Microsoft My Apps\n(opens in a new tab)",
+            "href": "https://myapps.microsoft.com/",
+            "target": "_blank",
+            "rel": "noopener noreferrer",
+            "height": 44
+          }
+        ]
+      },
+      "focus": null,
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "loading",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Fictional calendar connection. No provider or account change is sent.\n\nCalendar connections\n\nChoose one calendar for this workspace. Reminders follow the connected calendar; Strelva does not send separate reminders.\n\nMicrosoft Outlook\n\nNot connected\n\nConnect Microsoft Outlook\nGoogle Calendar\n\nNot connected\n\nConnect Google Calendar",
+        "statuses": [],
+        "alerts": [],
+        "links": []
+      },
+      "focus": null,
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "on",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Fictional calendar connection. No provider or account change is sent.\n\nCalendar connections\n\nChoose one calendar for this workspace. Reminders follow the connected calendar; Strelva does not send separate reminders.\n\nMicrosoft Outlook\n\nDisconnected\n\nStrelva is disconnected. Microsoft calendar consent has not been removed. Remove Strelva's permissions in Microsoft My Apps. If your organization granted consent, ask its administrator to remove it.\n\nRemove Strelva consent in Microsoft My Apps\n(opens in a new tab)\nConnect Microsoft Outlook\nGoogle Calendar\n\nNot connected\n\nConnect Google Calendar",
+        "statuses": [
+          "Strelva is disconnected. Microsoft calendar consent has not been removed. Remove Strelva's permissions in Microsoft My Apps. If your organization granted consent, ask its administrator to remove it.\n\nRemove Strelva consent in Microsoft My Apps\n(opens in a new tab)"
+        ],
+        "alerts": [],
+        "links": [
+          {
+            "name": "Remove Strelva consent in Microsoft My Apps\n(opens in a new tab)",
+            "href": "https://myapps.microsoft.com/",
+            "target": "_blank",
+            "rel": "noopener noreferrer",
+            "height": 44
+          }
+        ]
+      },
+      "focus": {
+        "tag": "A",
+        "outline": "rgb(124, 154, 142) dashed 2px",
+        "href": "https://myapps.microsoft.com/"
+      },
+      "screenshot": {
+        "captured": true,
+        "retained": true,
+        "path": "calendar-consent-390.png"
+      }
+    },
+    {
+      "state": "off",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Fictional calendar connection. No provider or account change is sent.\n\nCalendar connections\n\nChoose one calendar for this workspace. Reminders follow the connected calendar; Strelva does not send separate reminders.\n\nMicrosoft Outlook\n\nDisconnected\n\nConnect Microsoft Outlook\nGoogle Calendar\n\nNot connected\n\nConnect Google Calendar",
+        "statuses": [],
+        "alerts": [],
+        "links": []
+      },
+      "focus": null,
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "google-error",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Fictional calendar connection. No provider or account change is sent.\n\nCalendar connections\n\nChoose one calendar for this workspace. Reminders follow the connected calendar; Strelva does not send separate reminders.\n\nGoogle could not revoke calendar consent. Try disconnecting again.\n\nReload calendar connections\nMicrosoft Outlook\n\nNot connected\n\nConnect Microsoft Outlook\nGoogle Calendar\n\nConnected\n\nCalendar: Consultation calendar\nTimezone: America/New_York\nReminders: Off\nChoose calendar\nDisconnect",
+        "statuses": [],
+        "alerts": [
+          "Google could not revoke calendar consent. Try disconnecting again.\n\nReload calendar connections"
+        ],
+        "links": []
+      },
+      "focus": null,
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "reload-error",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Fictional calendar connection. No provider or account change is sent.\n\nCalendar connections\n\nChoose one calendar for this workspace. Reminders follow the connected calendar; Strelva does not send separate reminders.\n\nConnections could not be reloaded. Strelva disconnected successfully.\n\nReload calendar connections\nMicrosoft Outlook\n\nConnected\n\nCalendar: Consultation calendar\nTimezone: America/New_York\nReminders: Off\n\nStrelva is disconnected. Microsoft calendar consent has not been removed. Remove Strelva's permissions in Microsoft My Apps. If your organization granted consent, ask its administrator to remove it.\n\nRemove Strelva consent in Microsoft My Apps\n(opens in a new tab)\nChoose calendar\nDisconnect\nGoogle Calendar\n\nNot connected\n\nConnect Google Calendar",
+        "statuses": [
+          "Strelva is disconnected. Microsoft calendar consent has not been removed. Remove Strelva's permissions in Microsoft My Apps. If your organization granted consent, ask its administrator to remove it.\n\nRemove Strelva consent in Microsoft My Apps\n(opens in a new tab)"
+        ],
+        "alerts": [
+          "Connections could not be reloaded. Strelva disconnected successfully.\n\nReload calendar connections"
+        ],
+        "links": [
+          {
+            "name": "Remove Strelva consent in Microsoft My Apps\n(opens in a new tab)",
+            "href": "https://myapps.microsoft.com/",
+            "target": "_blank",
+            "rel": "noopener noreferrer",
+            "height": 44
+          }
+        ]
+      },
+      "focus": null,
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    },
+    {
+      "state": "loading",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Fictional calendar connection. No provider or account change is sent.\n\nCalendar connections\n\nChoose one calendar for this workspace. Reminders follow the connected calendar; Strelva does not send separate reminders.\n\nMicrosoft Outlook\n\nNot connected\n\nConnect Microsoft Outlook\nGoogle Calendar\n\nNot connected\n\nConnect Google Calendar",
+        "statuses": [],
+        "alerts": [],
+        "links": []
+      },
+      "focus": null,
+      "screenshot": {
+        "captured": false,
+        "retained": false
+      }
+    }
+  ]
+}

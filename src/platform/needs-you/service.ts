@@ -3,6 +3,7 @@
  * own resolver, chase them by email, and lapse them. Every dependency is a
  * port so the whole flow runs in tests without Redis, Postgres or Resend.
  */
+import { bookingRemindersEnabled, bookingOwnerNoticeEnabled } from "@/platform/bookings/flags";
 import type { SendEmailInput, SendEmailResult } from "@/platform/infra/email/send";
 import type { EmailDecision, EmailOptions } from "@/platform/infra/email/layout";
 import { buildWorkspaceApproveUrl, type WorkspaceApproveLinkClaims } from "@/lib/approve-link";
@@ -24,6 +25,9 @@ export interface NeedsYouDeps {
   /** Optional channel-specific release/send policy; false leaves the item
    * waiting without consuming its delivery state. */
   canDeliver?(row: DeliveryRow): Promise<boolean>;
+  /** Booking calendar health is an owner action, separate from decisions. */
+  bookingWorkspaces?(): Promise<string[]>;
+  bookingCalendarHealth?(workspaceId: string, input: { now: number; appOrigin: string; sendEmail: NeedsYouDeps["sendEmail"] }): Promise<{ digests: number; ownerNotTold: number; failed: number; complete: boolean }>;
 }
 
 export type DecideStatus =
@@ -274,7 +278,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
         subject: kind === "urgent" ? `${first.businessName}: a customer is waiting on you` : options.heading,
         options,
         idempotencyKey: `needs-you:${kind}:${rows.map(row => row.id).sort().join(",")}`.slice(0, 256),
-        tags: { stream: "needs_you", kind },
+        tags: { stream: "needs_you", kind, ...(rows.every(row => row.sourceLifecycle === "booking_request") ? { lifecycle: "booking_request", bookingWorkspaceId: first.workspaceId } : {}) },
       });
     } catch (error) {
       reason = error instanceof Error ? error.message.slice(0, 200) : "send_failed";
@@ -297,8 +301,13 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     // signs in: workspace sources are read as Strelva (system).
     const sessions = new Map<string, AdapterContext>();
     const linked = await deps.store.linkedTenants(null).catch(() => []);
-    for (const workspaceId of new Set(linked.map(link => link.workspaceId))) {
+    const native = await deps.bookingWorkspaces?.().catch(() => { summary.failed += 1; return []; }) ?? [];
+    for (const workspaceId of new Set([...linked.map(link => link.workspaceId), ...native])) {
       await sync(await cronContext(workspaceId, sessions)).catch(() => { summary.failed += 1; });
+      if (deps.bookingCalendarHealth) {
+        const health = await deps.bookingCalendarHealth(workspaceId, { now, appOrigin: deps.appOrigin, sendEmail: deps.sendEmail }).catch(() => ({ digests: 0, ownerNotTold: 0, failed: 1, complete: false }));
+        summary.digests += health.digests; summary.ownerNotTold += health.ownerNotTold; summary.failed += health.failed;
+      }
     }
     const rows = await deps.store.dueForDelivery(500);
     const byBusiness = new Map<string, DeliveryRow[]>();
@@ -310,7 +319,9 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
       const remind1: DeliveryRow[] = [];
       const remind2: DeliveryRow[] = [];
       for (const row of items) {
-        const step = nextChaseStep(row, now);
+        // Bookings own the 24 h / 72 h clock; the generic day 3/7/14
+        // clock must never send another chase or expire an existing booking.
+        const step = row.sourceLifecycle === "booking_request" && bookingRemindersEnabled() ? "none" : nextChaseStep(row, now);
         if (step === "lapse") {
           try {
             const expired = await deps.store.expire(workspaceId, row.id);
@@ -332,6 +343,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
           const fresh = await reconcile(readCtx, row);
           if (fresh === "gone" || fresh === "changed") continue;
         }
+        if (row.sourceLifecycle === "booking_request" && !bookingOwnerNoticeEnabled()) continue;
         if (deps.canDeliver && !(await deps.canDeliver(row))) { summary.ownerNotTold += 1; continue; }
         if (row.urgent && row.deliveryState === "not_sent") {
           await deliver("urgent", [row], summary);
@@ -350,7 +362,17 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     return summary;
   }
 
-  return { sync, list, decide, chase };
+  /** One newly captured booking reaches its owner now, without chasing other work. */
+  async function notifyBookingRequest(workspaceId: string, itemId: string): Promise<ChaseSummary> {
+    const summary: ChaseSummary = { lapsed: 0, reminded: 0, digests: 0, urgent: 0, ownerNotTold: 0, failed: 0 };
+    if (!bookingOwnerNoticeEnabled()) return summary;
+    const row = (await deps.store.dueForDelivery(500)).find(item => item.workspaceId === workspaceId && item.id === itemId && item.sourceLifecycle === "booking_request" && item.state === "open" && item.urgent && item.deliveryState === "not_sent");
+    if (!row || await reconcile({ workspaceId }, row) !== "current") return summary;
+    await deliver("urgent", [row], summary); summary.urgent = 1;
+    return summary;
+  }
+
+  return { sync, list, decide, chase, notifyBookingRequest };
 }
 
 export type NeedsYouService = ReturnType<typeof createNeedsYouService>;

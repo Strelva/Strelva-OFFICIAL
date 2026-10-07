@@ -40,6 +40,7 @@ export type SendEmailInput = RenderedEmail & {
   tags?: Record<string, string>;
   /** Provider idempotency key for sends that must be safe across retries. */
   idempotencyKey?: string;
+  attachments?: Array<{ filename: string; content: string }>;
 };
 
 export type SendEmailResult =
@@ -114,6 +115,7 @@ export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendE
     subject: input.subject,
     html,
     text,
+    ...(input.attachments ? { attachments: input.attachments } : {}),
     ...(input.tags
       ? {
           tags: Object.entries(input.tags)
