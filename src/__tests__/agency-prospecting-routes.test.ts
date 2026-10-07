@@ -110,6 +110,16 @@ describe("agency lead routing", () => {
     expect((await lead(request("/api/audit/lead", { name: "Jacob", email: "jacob@fixture.test", url: "fixture.example", agency: "northside" }))).status).toBe(503);
     expect(mocks.email).not.toHaveBeenCalled(); expect(mocks.slack).not.toHaveBeenCalled();
   });
+  it("returns the retained report when agency reply routing becomes unavailable after capture", async () => {
+    mocks.rpc.mockImplementation(async (name: string) => {
+      if (name === "agency_prospecting_profile" && mocks.rpc.mock.calls.filter(([call]) => call === name).length > 1) return { data: null, error: { message: "Sender lookup unavailable" } };
+      return { data: name === "agency_prospecting_profile" ? [{ workspace_id: agency.workspaceId, slug: agency.slug, name: agency.name, contact_url: agency.contactUrl, contact_email: "north@agency.test" }] : null, error: null };
+    });
+    const response = await lead(request("/api/audit/lead", { name: "Jacob", email: "jacob@fixture.test", url: "fixture.example", agency: "northside" }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ reportId: "a".repeat(32), emailed: false });
+    expect(mocks.email).not.toHaveBeenCalled(); expect(mocks.slack).not.toHaveBeenCalled();
+  });
   it("unattributed audit still uses the existing Strelva notification/report path", async () => {
     const response = await lead(request("/api/audit/lead", { name: "Jacob", email: "jacob@fixture.test", url: "fixture.example" }));
     expect(response.status).toBe(200); expect(mocks.slack).toHaveBeenCalledOnce(); expect(mocks.rpc).not.toHaveBeenCalled();

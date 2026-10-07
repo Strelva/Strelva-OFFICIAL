@@ -99,9 +99,16 @@ export async function POST(request: NextRequest) {
     });
 
     // Prospect email — real send only when client email is switched on.
-    const emailed = reportUrl
-      ? await sendAuditReportEmail({ lead, result, reportUrl, ...(agency ? { replyTo: await agencyReplyTo(agency) } : {}) })
-      : false;
+    let emailed = false;
+    if (reportUrl) {
+      try {
+        const replyTo = agency ? await agencyReplyTo(agency) : undefined;
+        emailed = await sendAuditReportEmail({ lead, result, reportUrl, ...(agency ? { replyTo } : {}) });
+      } catch {
+        // The prospect/report already committed. A sender lookup failure must
+        // not invite another lead submission or route replies to Strelva.
+      }
+    }
 
     return NextResponse.json({
       ...(agency ? { agency } : {}),

@@ -106,3 +106,14 @@ Next: integrate the PR; reconcile shared proxy, email layout, workspace
 contracts, readiness sentinels and SQL-gate edits with other agency streams.
 Keep the flag off until #264 profile configuration and the release gate have
 been reviewed. Larger prospect-to-client work (#259) is not activated here.
+
+Final targeted verification after rebasing onto integrate (October 7): 144 tests
+passed across 15 files, including new acquisition/member UI tests and existing
+AI visibility, audit, email, middleware and agency-home regressions. Typecheck
+and boundaries passed. The initial upgrade rehearsal correctly rejected the new
+RLS security-definer helper under the exposure gate; the gate now allows only its
+exact JWT-bound signature and verifies its authenticated-only execute grant.
+Initial strict type checking also found unchecked indexing in test assertions;
+those assertions were corrected. These failures were resolved locally, not
+waived. The first cold browser navigation timed out during compilation; the
+loaded page was subsequently inspected successfully.
