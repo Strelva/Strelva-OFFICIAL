@@ -251,3 +251,8 @@ psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-flag-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
+
+# Wave 6 inquiry contracts against the complete upgrade.
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-workspace-replies-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-context-notices-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-inquiry-records-schema.sql"

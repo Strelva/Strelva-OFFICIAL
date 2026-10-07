@@ -61,3 +61,7 @@ export type {
   InquiryMessageReviewDependencies,
   InquiryMessageReviewEventMetadata,
 } from "./delivery-approval";
+
+export { replyFromWorkspace, workspaceInquiryRepliesEnabled, workspaceReplyInput } from "./workspace-replies";
+export type { WorkspaceReplyOutcome, WorkspaceReplyStatus } from "./workspace-replies";
+export { notifyInquiryOwner, repairInquiryOwnerNotice } from "./owner-notice";

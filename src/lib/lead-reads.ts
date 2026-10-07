@@ -18,6 +18,7 @@
 import { leadMirrorDb, LEAD_MIRROR_TIMEOUT_MS, type LeadMirrorDb } from "./lead-mirror";
 import { dualWritePgEnabled } from "@/platform/infra/db/dual-write";
 import { alertOnce } from "@/platform/infra/monitoring";
+import { getRedis } from "@/platform/infra/redis";
 
 export type LeadReadMode = "redis" | "compare" | "postgres";
 export const LEAD_PARITY_STORE = "tenant_leads";
@@ -108,6 +109,11 @@ export async function leadReadSource(options: { db?: LeadMirrorDb | null; env?: 
   }
 }
 
+/** A workspace can read without Redis only after the Postgres cutover has passed parity. */
+export async function leadReadStoreReady(): Promise<boolean> {
+  return getRedis() !== null || await leadReadSource() === "postgres";
+}
+
 type PgLeadItem = {
   leadId?: unknown;
   name?: unknown;
@@ -122,7 +128,7 @@ type PgLeadItem = {
 
 /** `tenant_leads` item → LeadRecord: lead_id → id, captured_at → createdAt. Nulls are omitted, as Redis omits them. */
 export function leadFromPostgres(item: PgLeadItem): StoredLead | null {
-  if (typeof item.leadId !== "string" || typeof item.capturedAt !== "string" || typeof item.name !== "string") return null;
+  if (typeof item.leadId !== "string" || typeof item.capturedAt !== "string" || typeof item.name !== "string" || !Number.isFinite(Date.parse(item.capturedAt))) return null;
   const fields = item.fields && typeof item.fields === "object" && !Array.isArray(item.fields)
     ? Object.fromEntries(Object.entries(item.fields as Record<string, unknown>).filter(([, v]) => typeof v === "string")) as Record<string, string>
     : undefined;
@@ -141,13 +147,29 @@ export function leadFromPostgres(item: PgLeadItem): StoredLead | null {
 }
 
 /** Newest first. Throws on any failure; callers fall back to Redis. */
-export async function readPostgresLeads(tenant: string, limit: number, db?: LeadMirrorDb | null): Promise<StoredLead[]> {
+export async function readPostgresLeads(tenant: string, limit: number, db?: LeadMirrorDb | null, before: string | null = null): Promise<StoredLead[]> {
   const client = database(db);
   if (!client) throw new Error("lead_read_unconfigured");
-  const { data, error } = await rpc(client, "read_tenant_leads", { p_tenant_id: tenant, p_limit: Math.max(1, Math.min(limit, 500)), p_before: null });
+  const { data, error } = await rpc(client, "read_tenant_leads", { p_tenant_id: tenant, p_limit: Math.max(1, Math.min(limit, 500)), p_before: before });
   if (error) throw new Error(`lead_read_failed: ${error.message ?? error.code ?? "error"}`);
   if (!Array.isArray(data)) throw new Error("lead_read_malformed");
-  return data.map((row) => leadFromPostgres(row as PgLeadItem)).filter((lead): lead is StoredLead => Boolean(lead));
+  const leads = data.map((row) => leadFromPostgres(row as PgLeadItem));
+  if (leads.some((lead) => lead === null)) throw new Error("lead_read_malformed");
+  return leads as StoredLead[];
+}
+
+/** Exact durable page: the lead id breaks ties between submissions captured together. */
+export async function readPostgresLeadPage(tenant: string, limit: number, before: string | null = null, beforeId: string | null = null, db?: LeadMirrorDb | null): Promise<StoredLead[]> {
+  const client = database(db);
+  if (!client) throw new Error("lead_read_unconfigured");
+  const { data, error } = await rpc(client, "read_tenant_leads_page", {
+    p_tenant_id: tenant, p_limit: Math.max(1, Math.min(limit, 500)), p_before: before, p_before_id: beforeId,
+  });
+  if (error) throw new Error(`lead_read_failed: ${error.message ?? error.code ?? "error"}`);
+  if (!Array.isArray(data)) throw new Error("lead_read_malformed");
+  const leads = data.map((row) => leadFromPostgres(row as PgLeadItem));
+  if (leads.some((lead) => lead === null)) throw new Error("lead_read_malformed");
+  return leads as StoredLead[];
 }
 
 /** One lead by id, or null when Postgres has none. Throws on failure. */
@@ -157,7 +179,21 @@ export async function readPostgresLead(tenant: string, id: string, db?: LeadMirr
   const { data, error } = await rpc(client, "read_tenant_lead", { p_tenant_id: tenant, p_lead_id: id });
   if (error) throw new Error(`lead_read_failed: ${error.message ?? error.code ?? "error"}`);
   if (data === null || data === undefined) return null;
-  return leadFromPostgres(data as PgLeadItem);
+  const lead = leadFromPostgres(data as PgLeadItem);
+  if (!lead) throw new Error("lead_read_malformed");
+  return lead;
+}
+
+export async function readPostgresLeadSummary(tenant: string, since: string, db?: LeadMirrorDb | null): Promise<{ count: number; recent: StoredLead[] }> {
+  const client = database(db);
+  if (!client) throw new Error("lead_read_unconfigured");
+  const { data, error } = await rpc(client, "read_tenant_lead_summary", { p_tenant_id: tenant, p_since: since });
+  if (error) throw new Error(`lead_read_failed: ${error.message ?? error.code ?? "error"}`);
+  const summary = data as { count?: unknown; recent?: unknown } | null;
+  if (!summary || !Number.isSafeInteger(summary.count) || Number(summary.count) < 0 || !Array.isArray(summary.recent)) throw new Error("lead_read_malformed");
+  const recent = summary.recent.map((row) => leadFromPostgres(row as PgLeadItem));
+  if (recent.some((lead) => lead === null)) throw new Error("lead_read_malformed");
+  return { count: Number(summary.count), recent: recent as StoredLead[] };
 }
 
 export interface LeadListDifference {
@@ -167,15 +203,17 @@ export interface LeadListDifference {
   missingFromRedis: string[];
   /** In Postgres, older than anything Redis returned. Explained: Redis expired or trimmed it. */
   postgresOlder: number;
+  /** Matching ids whose submitted fields differ. */
+  mismatched?: string[];
 }
 
 /**
  * Compares two newest-first reads of the same tenant. Each read may be cut by
  * its limit, so only the time window both lists cover is compared.
  */
-export function compareLeadLists(redis: readonly StoredLead[], postgres: readonly StoredLead[]): LeadListDifference {
+export function compareLeadLists(redis: readonly StoredLead[], postgres: readonly StoredLead[], hash?: (lead: StoredLead) => string, now = Date.now()): LeadListDifference {
   const oldest = (list: readonly StoredLead[]) => list.reduce((min, lead) => Math.min(min, Date.parse(lead.createdAt)), Number.POSITIVE_INFINITY);
-  const floor = Math.max(redis.length ? oldest(redis) : Number.POSITIVE_INFINITY, postgres.length ? oldest(postgres) : Number.NEGATIVE_INFINITY);
+  const floor = Math.max(redis.length ? oldest(redis) : now - LEAD_REDIS_WINDOW_MS, postgres.length ? oldest(postgres) : Number.NEGATIVE_INFINITY);
   const redisIds = new Set(redis.map((lead) => lead.id));
   const pgIds = new Set(postgres.map((lead) => lead.id));
   const inWindow = (lead: StoredLead) => Date.parse(lead.createdAt) >= floor;
@@ -183,21 +221,24 @@ export function compareLeadLists(redis: readonly StoredLead[], postgres: readonl
     missingFromPostgres: redis.filter((lead) => inWindow(lead) && !pgIds.has(lead.id)).map((lead) => lead.id),
     missingFromRedis: postgres.filter((lead) => inWindow(lead) && !redisIds.has(lead.id)).map((lead) => lead.id),
     postgresOlder: postgres.filter((lead) => !inWindow(lead) && !redisIds.has(lead.id)).length,
+    ...(hash ? { mismatched: redis.filter((lead) => {
+      const other = postgres.find((row) => row.id === lead.id);
+      return other !== undefined && hash(lead) !== hash(other);
+    }).map((lead) => lead.id) } : {}),
   };
 }
 
 /** Logs a compare-mode difference. Never throws. */
 export async function reportLeadReadDifference(tenant: string, reader: "list" | "by_id", difference: LeadListDifference): Promise<void> {
-  if (!difference.missingFromPostgres.length && !difference.missingFromRedis.length) return;
+  if (!difference.missingFromPostgres.length && !difference.missingFromRedis.length && !difference.mismatched?.length) return;
   console.warn("[lead-reads] Redis and Postgres differ", {
     tenant,
     reader,
     missingFromPostgres: difference.missingFromPostgres.slice(0, 20),
     missingFromRedis: difference.missingFromRedis.slice(0, 20),
+    mismatched: difference.mismatched?.slice(0, 20) ?? [],
   });
-  if (difference.missingFromPostgres.length) {
-    await alertOnce("lead_read_parity_miss", "high", { tenant, reader, missing: difference.missingFromPostgres.length }, 3600).catch(() => undefined);
-  }
+  await alertOnce("lead_read_parity_miss", "high", { tenant, reader, missing: difference.missingFromPostgres.length, missingFromRedis: difference.missingFromRedis.length, mismatched: difference.mismatched?.length ?? 0 }, 3600).catch(() => undefined);
 }
 
 export interface LeadParityReport {
@@ -235,7 +276,8 @@ export async function checkLeadParity(
   const since = new Date((options.now ?? Date.now()) - LEAD_REDIS_WINDOW_MS - 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await rpc(db, "read_tenant_lead_digests", { p_tenant_id: tenant, p_since: since }, 4000);
   if (error) throw new Error(`lead_parity_digests_failed: ${error.message ?? error.code ?? "error"}`);
-  const digests = (data && typeof data === "object" && !Array.isArray(data) ? data : {}) as Record<string, string>;
+  if (!data || typeof data !== "object" || Array.isArray(data) || Object.values(data).some((value) => typeof value !== "string")) throw new Error("lead_parity_malformed");
+  const digests = data as Record<string, string>;
   const missing: string[] = [];
   const mismatched: string[] = [];
   for (const lead of options.redisLeads) {

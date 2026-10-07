@@ -1,0 +1,29 @@
+(node:7237) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+ RUN  v4.1.11 /Users/jacobrhinehart/Desktop/strelva/REB-w6-inquiries
+
+ ❯ src/__tests__/inquiry-needs-you-and-held.test.tsx (10 tests | 1 failed) 6732ms
+     × renders held items with Release and It's spam, and released ones with Move back 6194ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/__tests__/inquiry-needs-you-and-held.test.tsx > held spam on the workspace Inquiries page > renders held items with Release and It's spam, and released ones with Move back
+Error: Test timed out in 5000ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/__tests__/inquiry-needs-you-and-held.test.tsx:97:3
+     95|   });
+     96|
+     97|   it("renders held items with Release and It's spam, and released ones…
+       |   ^
+     98|     const html = renderToStaticMarkup(<WorkspaceInquiries workspaceId=…
+     99|       denied: [],
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 20 passed (21)
+   Start at  23:06:22
+   Duration  132.18s (transform 78.33s, setup 6.41s, import 119.80s, tests 6.77s, environment 0ms)
+

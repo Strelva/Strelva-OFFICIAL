@@ -18,7 +18,7 @@ vi.mock("@/lib/owner-recipient", () => ({ ownerNoticeEmail: async (t: { ownerEma
 
 import { captureLead, getLeadById, getLeads, getLeadSummary, leadSubmissionHash, type LeadRecord } from "@/lib/leads";
 import { LEAD_MIRROR_PENDING_KEY, setLeadMirrorDb, type LeadMirrorDb } from "@/lib/lead-mirror";
-import { compareLeadLists, leadFromPostgres, leadReadSource, resetLeadReadCache } from "@/lib/lead-reads";
+import { compareLeadLists, leadFromPostgres, leadReadSource, leadReadStoreReady, resetLeadReadCache } from "@/lib/lead-reads";
 import { runLeadReadParity } from "@/lib/client-leads";
 
 type Row = { tenant: string; leadId: string; hash: string; lead: Record<string, unknown>; capturedAt: string };
@@ -55,11 +55,16 @@ const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
     rows.push({ tenant, leadId: String(lead.leadId), hash: String(lead.submissionHash), lead, capturedAt: String(lead.capturedAt) });
     return { data: { status: "recorded", id: lead.leadId, workspaceId: null }, error: null };
   }
-  if (name === "read_tenant_leads") {
-    const list = rows.filter((r) => r.tenant === args.p_tenant_id)
-      .sort((a, b) => Date.parse(b.capturedAt) - Date.parse(a.capturedAt))
+  if (name === "read_tenant_leads" || name === "read_tenant_leads_page") {
+    const list = rows.filter((r) => r.tenant === args.p_tenant_id && (!args.p_before || Date.parse(r.capturedAt) < Date.parse(String(args.p_before)) || (args.p_before_id && r.capturedAt === args.p_before && r.leadId < String(args.p_before_id))))
+      .sort((a, b) => Date.parse(b.capturedAt) - Date.parse(a.capturedAt) || (a.leadId < b.leadId ? 1 : -1))
       .slice(0, Number(args.p_limit));
     return { data: list.map(pgItem), error: null };
+  }
+  if (name === "read_tenant_lead_summary") {
+    const list = rows.filter((row) => row.tenant === args.p_tenant_id && Date.parse(row.capturedAt) >= Date.parse(String(args.p_since)))
+      .sort((a, b) => Date.parse(b.capturedAt) - Date.parse(a.capturedAt));
+    return { data: { count: list.length, recent: list.slice(0, 5).map(pgItem) }, error: null };
   }
   if (name === "read_tenant_lead") {
     const row = rows.find((r) => r.tenant === args.p_tenant_id && r.leadId === args.p_lead_id);
@@ -162,9 +167,27 @@ describe("compare mode", () => {
   it("does not report a Postgres lead older than Redis's window (explained: Redis expired it)", async () => {
     redisOnlyLead("t1", "lead_both", "2026-10-05T10:00:00.000Z", "Both");
     pgOnlyLead("t1", "lead_both", "2026-10-05T10:00:00.000Z", "Both");
+    rows[0]!.lead.message = "hi";
     pgOnlyLead("t1", "lead_ancient", "2026-01-01T10:00:00.000Z");
     expect((await getLeads("t1")).map((l) => l.id)).toEqual(["lead_both"]);
     expect(mocks.alertOnce).not.toHaveBeenCalled();
+  });
+
+  it("detects a recent Postgres-only lead even when Redis is empty", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-06T00:00:00Z"));
+    pgOnlyLead("t1", "lead_missing_cache", "2026-10-05T10:00:00.000Z");
+    expect(await getLeads("t1")).toEqual([]);
+    expect(mocks.alertOnce).toHaveBeenCalledWith("lead_read_parity_miss", "high", expect.objectContaining({ missingFromRedis: 1 }), 3600);
+  });
+
+  it("detects different submission fields for the same lead id", async () => {
+    redisOnlyLead("t1", "lead_changed", "2026-10-05T10:00:00.000Z", "Original");
+    pgOnlyLead("t1", "lead_changed", "2026-10-05T10:00:00.000Z", "Changed");
+    await getLeads("t1");
+    expect(mocks.alertOnce).toHaveBeenCalledWith("lead_read_parity_miss", "high", expect.objectContaining({ mismatched: 1 }), 3600);
+    mocks.alertOnce.mockClear();
+    await getLeadById("t1", "lead_changed");
+    expect(mocks.alertOnce).toHaveBeenCalledWith("lead_read_parity_miss", "high", expect.objectContaining({ reader: "by_id", mismatched: 1 }), 3600);
   });
 
   it("a Postgres failure still serves Redis", async () => {
@@ -230,6 +253,49 @@ describe("postgres mode (flipped reads)", () => {
     vi.useRealTimers();
   });
 
+  it("counts every recent Postgres lead beyond the Redis retention cap", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-06T00:00:00Z"));
+    for (let index = 0; index < 650; index++) pgOnlyLead("t1", `lead_${index}`, "2026-10-05T10:00:00.000Z");
+    const summary = await getLeadSummary("t1", 30);
+    expect(summary.count).toBe(650);
+    expect(summary.recent).toHaveLength(5);
+  });
+
+  it("pages to older durable records with the existing timestamp cursor", async () => {
+    pgOnlyLead("t1", "lead_new", "2026-10-05T10:00:00.000Z");
+    pgOnlyLead("t1", "lead_old", "2026-01-01T10:00:00.000Z");
+    expect((await getLeads("t1", 1, "2026-10-05T10:00:00.000Z")).map((lead) => lead.id)).toEqual(["lead_old"]);
+    expect(rpc).toHaveBeenCalledWith("read_tenant_leads_page", expect.objectContaining({ p_before: "2026-10-05T10:00:00.000Z" }));
+  });
+
+  it("does not skip submissions sharing the page boundary timestamp", async () => {
+    const at = "2026-10-05T10:00:00.000Z";
+    pgOnlyLead("t1", "lead_c", at);
+    pgOnlyLead("t1", "lead_b", at);
+    pgOnlyLead("t1", "lead_a", at);
+    const first = await getLeads("t1", 2);
+    expect(first.map((lead) => lead.id)).toEqual(["lead_c", "lead_b"]);
+    const second = await getLeads("t1", 2, first.at(-1)!.createdAt, first.at(-1)!.id);
+    expect(second.map((lead) => lead.id)).toEqual(["lead_a"]);
+  });
+
+  it("exposes read readiness without Redis only after the parity gate passes", async () => {
+    redisAvailable = false;
+    expect(await leadReadStoreReady()).toBe(true);
+    resetLeadReadCache();
+    streakDays = 6;
+    expect(await leadReadStoreReady()).toBe(false);
+    vi.stubEnv("STRELVA_LEADS_READ", "redis");
+    expect(await leadReadStoreReady()).toBe(false);
+  });
+
+  it("does not mistake both unreachable read stores for an empty inbox", async () => {
+    await leadReadSource();
+    redisAvailable = false;
+    pgDown = true;
+    await expect(getLeads("t1")).rejects.toThrow("lead_read_unavailable");
+  });
+
   it("rollback: switching back to redis serves Redis again; both stores kept every write", async () => {
     const captured = await captureLead("t1", { name: "Dana", email: "dana@example.test", message: "Party for 30" });
     expect(captured.status).toBe("captured");
@@ -275,6 +341,25 @@ describe("Postgres authority on capture", () => {
     const id = (result as { lead: LeadRecord }).lead.id;
     expect(redis.store.get(`lead:t1:${id}`)).toMatchObject({ name: "Dana" });
     expect(redis.zsets.get(LEAD_MIRROR_PENDING_KEY)?.has(`t1:${id}`)).toBe(true);
+  });
+
+  it("Postgres down retry uses the Redis duplicate guard and keeps one pending original", async () => {
+    pgDown = true;
+    const first = await captureLead("t1", { name: "Dana", message: "Party for 30" });
+    const second = await captureLead("t1", { name: "Dana", message: "Party for 30" });
+    expect(first.status).toBe("captured");
+    expect(second).toMatchObject({ status: "duplicate", lead: { id: (first as { lead: LeadRecord }).lead.id } });
+    expect(redis.zsets.get("leads:t1")?.size).toBe(1);
+    expect(redis.zsets.get(LEAD_MIRROR_PENDING_KEY)?.size).toBe(1);
+    expect(mocks.sendNewLeadEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads the Postgres duplicate when no Redis cache is configured", async () => {
+    redisAvailable = false;
+    const first = await captureLead("t1", { name: "Dana", message: "Party for 30" });
+    const second = await captureLead("t1", { name: "Dana", message: "Party for 30" });
+    expect(first.status).toBe("captured");
+    expect(second).toMatchObject({ status: "duplicate", lead: { id: (first as { lead: LeadRecord }).lead.id } });
   });
 
   it("Redis down after Postgres kept the lead: the visitor still succeeds", async () => {

@@ -43,6 +43,7 @@ export const workspacePortLoaders = {
   inquiries: async () => {
     const index = await import("@/products/inquiries");
     return {
+      notifyInquiryOwner: index.notifyInquiryOwner,
       isInquiryMessageReviewEvent: index.isInquiryMessageReviewEvent,
       authorizeInquiryMessageReviewActor: index.authorizeInquiryMessageReviewActor,
       executeInquiryMessageReview: index.executeInquiryMessageReview,

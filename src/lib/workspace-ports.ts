@@ -188,6 +188,7 @@ export interface InquiryReviewOutcome {
 }
 
 export interface InquiriesPort {
+  notifyInquiryOwner(input: { tenantId: string; lead: import("./leads").LeadRecord }): Promise<unknown>;
   isInquiryMessageReviewEvent(event: UnifiedEvent): boolean;
   authorizeInquiryMessageReviewActor(input: { tenantId: string; event: UnifiedEvent; actorId: string }): Promise<{ allowed: boolean; reason?: string }>;
   executeInquiryMessageReview(input: { tenantId: string; eventId: string; event: UnifiedEvent; actorId: string }): Promise<InquiryReviewOutcome & {

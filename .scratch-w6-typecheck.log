@@ -1,0 +1,7 @@
+
+> strelva@0.2.0 typecheck /Users/jacobrhinehart/Desktop/strelva/REB-w6-inquiries
+> next typegen && tsc --noEmit
+
+[@sentry/nextjs] DEPRECATION WARNING: disableLogger is deprecated and will be removed in a future version. Use webpack.treeshake.removeDebugLogging instead. (Not supported with Turbopack.)
+Generating route types...
+✓ Types generated successfully

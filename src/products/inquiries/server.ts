@@ -1,5 +1,5 @@
 import { addEvent, resolveEvent } from "@/lib/events";
-import { getLeads, type LeadRecord } from "@/lib/leads";
+import { getLeads, leadReadStoreReady, type LeadRecord } from "@/lib/leads";
 import { getRedis } from "@/platform/infra/redis";
 import { getConnections } from "@/lib/connections";
 import { getTenantRole, roleHasPermission, type ClientRole, type TenantPermission } from "@/platform/infra/auth";
@@ -65,7 +65,7 @@ export { recordInquiryEvidence } from "./receive";
 export { evaluateInquiryResponsibility, evaluateInquiryFollowUpResponsibility } from "./receive";
 export type { RecordInquiryEvidenceInput, RecordInquiryEvidenceResult } from "./receive";
 
-/** Customer records are a live Redis projection, never a Postgres fallback. */
+/** Customer records follow the gated shared lead read source. */
 export interface InquiryWorkspaceRead {
   tenantId: string;
   businessId: string;
@@ -83,20 +83,23 @@ export interface ReadInquiryWorkspaceInput {
 }
 
 /**
- * Read the durable capability state and Redis-authoritative inquiry records.
- * Missing Redis is explicit, so an outage can never render as an empty CRM.
+ * Read the durable capability state and the selected inquiry record store.
+ * Missing stores are explicit, so an outage can never render as an empty inbox.
  */
 export async function readInquiryWorkspace(input: ReadInquiryWorkspaceInput): Promise<InquiryWorkspaceRead> {
   const businessId = input.businessId ?? input.tenantId;
   const repository = input.repository ?? getInquiryRepository();
   const snapshot = await repository.getSnapshot(input.tenantId, businessId);
   const recordOverlays = await repository.getRecordOverlays(input.tenantId, businessId);
-  const redis = getRedis();
-  if (!redis) {
+  if (!(await leadReadStoreReady())) {
     return { tenantId: input.tenantId, businessId, snapshot, records: null, recordsAvailable: false, recordOverlays };
   }
-  const records = await getLeads(input.tenantId, Math.max(1, Math.min(input.leadLimit ?? 50, 500)));
-  return { tenantId: input.tenantId, businessId, snapshot, records, recordsAvailable: true, recordOverlays };
+  try {
+    const records = await getLeads(input.tenantId, Math.max(1, Math.min(input.leadLimit ?? 50, 500)));
+    return { tenantId: input.tenantId, businessId, snapshot, records, recordsAvailable: true, recordOverlays };
+  } catch {
+    return { tenantId: input.tenantId, businessId, snapshot, records: null, recordsAvailable: false, recordOverlays };
+  }
 }
 
 /** Save the engine snapshot with an explicit optimistic-concurrency revision. */
@@ -929,3 +932,5 @@ export async function executeInquirySurface(input: {
 }
 
 export { inquiryEconomicsAuthority } from "./economics";
+
+export { replyFromWorkspace, workspaceInquiryRepliesEnabled, workspaceReplyInput } from "./workspace-replies";

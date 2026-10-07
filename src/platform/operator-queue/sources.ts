@@ -20,6 +20,7 @@ import type { SourceRead } from "./project";
 import { readSiteHealth } from "./site-health-store";
 import { readListingReadbackFailures, type ListingReadbackFailure } from "./store";
 import { EVENT_RETENTION_DAYS, DOMAIN_VERIFICATION_ESCALATION_DAYS } from "./rules";
+import { readInquiryOwnerNoticeIssues } from "./inquiry-owner-notices";
 
 /**
  * Readers for every source in spec §3.1. Each reader returns its rows or names
@@ -414,6 +415,7 @@ export async function readAllSources(input: { tenants: QueueTenant[]; context: Q
     guard("site_draft", "Site drafts", () => readSiteDrafts(tenants, now)),
     guard("maintenance_digest", "Maintenance digests", readMaintenanceDigests),
     guard("ops_alert", "Operations alerts", readOpsAlerts),
+    ...(process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" ? [guard("ops_alert", "Inquiry owner notices", () => readInquiryOwnerNoticeIssues(tenants.map(tenant => tenant.id)))] : []),
     guard("domain_alert", "Domain monitor", readDomainAlerts),
     guard("domain_unverified", "Domain claims", () => readUnverifiedDomains(tenants, now)),
     guard("site_health", "Site health", () => readSiteHealthItems(context, byId)),

@@ -20,11 +20,12 @@
  *     the mirror's pending queue, and the visitor still succeeds.
  */
 import { ownerNoticeEmail } from "./owner-recipient";
+import { workspacePorts } from "./workspace-ports";
 import { getRedis } from "@/platform/infra/redis";
 import { getTenantConfig } from "./tenants";
 import { getTenantDashboardUrl } from "./tenant-urls";
 import { sendNewLeadEmail } from "./delivery-email";
-import { mirrorLead, type LeadMirrorResult } from "./lead-mirror";
+import { mirrorLead, clearLeadMirrorPending, type LeadMirrorResult } from "./lead-mirror";
 import { followUpLeadCapture } from "./inquiry-records";
 import {
   compareLeadLists,
@@ -32,8 +33,12 @@ import {
   leadReadSource,
   readPostgresLead,
   readPostgresLeads,
+  readPostgresLeadPage,
+  readPostgresLeadSummary,
   reportLeadReadDifference,
 } from "./lead-reads";
+
+export { leadReadSource, leadReadStoreReady } from "./lead-reads";
 
 const LEAD_TTL_SECONDS = 90 * 24 * 60 * 60;
 const LEAD_KEEP = 500;
@@ -196,7 +201,12 @@ export async function captureLead(
       : null;
     // A retry also repairs a Postgres copy the first attempt couldn't write;
     // the store treats the same lead id as a no-op.
-    if (duplicate) await mirrorLead(tenant, duplicate, hash);
+    if (duplicate) {
+      await mirrorLead(tenant, duplicate, hash);
+      // A failed Postgres-first attempt may have queued the generated retry
+      // id before Redis identified the accepted original submission.
+      if (leadAuthorityIsPostgres()) await clearLeadMirrorPending(tenant, lead.id);
+    }
     return duplicate ? { status: "duplicate", lead: duplicate } : { status: "duplicate" };
   }
 
@@ -258,11 +268,12 @@ async function capturePostgresFirst(
   options: RecordLeadOptions,
 ): Promise<RecordLeadResult | null> {
   const kept = await mirrorLead(tenant, lead, hash);
-  if (kept.status === "skipped") return null;
+  // Redis retains its NX double-submit guard while Postgres cannot decide.
+  if (kept.status === "skipped" || kept.status === "failed") return null;
   const redis = getRedis();
   if (kept.status === "duplicate") {
     const marker = kept.leadId ?? (redis ? await redis.get<string>(`lead-dedup:${tenant}:${hash}`).catch(() => null) : null);
-    const existing = marker && marker !== "1" ? await getLeadById(tenant, marker).catch(() => null) : null;
+    const existing = marker && marker !== "1" ? await readPostgresLead(tenant, marker).catch(() => null) : null;
     return existing ? { status: "duplicate", lead: existing } : { status: "duplicate" };
   }
 
@@ -297,6 +308,10 @@ async function capturePostgresFirst(
  */
 async function notifyOwnerOfLead(tenant: string, lead: LeadRecord): Promise<void> {
   try {
+    if (process.env.STRELVA_INQUIRY_OWNER_NOTICES?.trim() === "1") {
+      await (await workspacePorts().inquiries()).notifyInquiryOwner({ tenantId: tenant, lead });
+      return;
+    }
     const config = await getTenantConfig(tenant);
     if (!config) return;
     // One owner-recipient rule for every owner notice (src/lib/owner-recipient.ts).
@@ -336,35 +351,43 @@ export async function getRedisLeadById(tenant: string, id: string): Promise<Lead
 function mergeNewestFirst(primary: LeadRecord[], extra: LeadRecord[], limit: number): LeadRecord[] {
   const seen = new Set(primary.map((lead) => lead.id));
   return [...primary, ...extra.filter((lead) => !seen.has(lead.id))]
-    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0))
     .slice(0, limit);
 }
 
 /** Most recent leads, newest first, from the read source in force (src/lib/lead-reads.ts). */
-export async function getLeads(tenant: string, limit = 50): Promise<LeadRecord[]> {
+export async function getLeads(tenant: string, limit = 50, before: string | null = null, beforeId: string | null = null): Promise<LeadRecord[]> {
   const source = await leadReadSource();
-  if (source === "redis") return getRedisLeads(tenant, limit);
+  // The cursor is additive and affects only the opted-in durable read path.
+  const redisPage = async () => {
+    const leads = await getRedisLeads(tenant, before && source !== "redis" ? LEAD_KEEP : limit);
+    return before && source !== "redis" ? leads.filter((lead) => (Date.parse(lead.createdAt) < Date.parse(before) || (beforeId !== null && Date.parse(lead.createdAt) === Date.parse(before) && lead.id < beforeId))).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0)).slice(0, limit) : leads;
+  };
+  if (source === "redis") return redisPage();
   if (source === "compare") {
     const [redisLeads, pgLeads] = await Promise.all([
-      getRedisLeads(tenant, limit),
-      readPostgresLeads(tenant, limit).catch((err: unknown) => {
+      redisPage(),
+      readPostgresLeads(tenant, limit, undefined, before).catch((err: unknown) => {
         console.warn(`[lead-reads] compare read failed for ${tenant}:`, err instanceof Error ? err.message : err);
         return null;
       }),
     ]);
-    if (pgLeads) await reportLeadReadDifference(tenant, "list", compareLeadLists(redisLeads, pgLeads));
+    if (pgLeads) await reportLeadReadDifference(tenant, "list", compareLeadLists(redisLeads, pgLeads, leadSubmissionHash));
     return redisLeads;
   }
   // Postgres serves. Redis is read beside it so a lead whose Postgres copy is
   // still pending is never hidden, and a Redis outage no longer fails the read.
   const [pgLeads, redisLeads] = await Promise.all([
-    readPostgresLeads(tenant, limit).catch((err: unknown) => {
+    readPostgresLeadPage(tenant, limit, before, beforeId).catch((err: unknown) => {
       console.error(`[lead-reads] Postgres read failed for ${tenant}; serving Redis:`, err instanceof Error ? err.message : err);
       return null;
     }),
-    getRedisLeads(tenant, limit).catch(() => null),
+    getRedis() ? redisPage().catch(() => null) : Promise.resolve(null),
   ]);
-  if (!pgLeads) return redisLeads ?? getRedisLeads(tenant, limit);
+  if (!pgLeads) {
+    if (redisLeads) return redisLeads;
+    throw new Error("lead_read_unavailable");
+  }
   return mergeNewestFirst(pgLeads, redisLeads ?? [], limit);
 }
 
@@ -378,8 +401,8 @@ export async function getLeadById(tenant: string, id: string): Promise<LeadRecor
       getRedisLeadById(tenant, id),
       readPostgresLead(tenant, id).catch(() => undefined),
     ]);
-    if (redisLead && pgLead === null) {
-      await reportLeadReadDifference(tenant, "by_id", { missingFromPostgres: [id], missingFromRedis: [], postgresOlder: 0 });
+    if (pgLead !== undefined) {
+      await reportLeadReadDifference(tenant, "by_id", compareLeadLists(redisLead ? [redisLead] : [], pgLead ? [pgLead] : [], leadSubmissionHash));
     }
     return redisLead;
   }
@@ -392,6 +415,13 @@ export async function getLeadById(tenant: string, id: string): Promise<LeadRecor
 
 /** Count of leads in the window + the most recent few, for the Today feed. */
 export async function getLeadSummary(tenant: string, sinceDays = 30): Promise<LeadSummary> {
+  if (await leadReadSource() === "postgres") {
+    try {
+      return await readPostgresLeadSummary(tenant, new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString());
+    } catch (error) {
+      console.error(`[lead-reads] Postgres summary failed for ${tenant}; serving cached records:`, error instanceof Error ? error.message : error);
+    }
+  }
   const leads = await getLeads(tenant, LEAD_KEEP);
   const cutoff = Date.now() - sinceDays * 24 * 60 * 60 * 1000;
   const recent = leads.filter((l) => new Date(l.createdAt).getTime() >= cutoff);

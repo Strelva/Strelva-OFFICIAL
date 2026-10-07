@@ -15,7 +15,7 @@ export interface BusinessOutcomeMonth {
   sites: number | null;
   visits: OutcomeFigure;
   inquiries: OutcomeFigure;
-  answered: OutcomeFigure & { withinDay: number | null };
+  answered: OutcomeFigure & { withinDay: number | null; averageReplySeconds?: number | null; medianReplySeconds?: number | null };
   bookings: OutcomeFigure & { native: number; legacy: number | null };
   bookingsFromInquiry: OutcomeFigure & { joins: string[] };
   reviews: OutcomeFigure;
@@ -29,7 +29,7 @@ export class BusinessOutcomeError extends Error {
 
 export async function readBusinessOutcomeMonth(actor: WorkspaceActor, workspaceId: string, month: string, rpc: OutcomeRpc): Promise<BusinessOutcomeMonth> {
   if (!/^\d{4}-\d{2}$/.test(month)) throw new BusinessOutcomeError("invalid");
-  const { data, error } = await rpc("business_outcome_month", { p_workspace_id: workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail, p_month: `${month}-01` });
+  const { data, error } = await rpc(process.env.STRELVA_INQUIRY_OUTCOMES === "1" ? "business_outcome_month_inquiries" : "business_outcome_month", { p_workspace_id: workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail, p_month: `${month}-01` });
   if (error) throw new BusinessOutcomeError(error.message?.includes("business_outcome_denied") ? "denied" : error.message?.includes("invalid") ? "invalid" : "unavailable");
   return data as BusinessOutcomeMonth;
 }
@@ -76,4 +76,18 @@ export function formatOutcomeLine(outcome: BusinessOutcomeMonth): OutcomeLine {
     figures.push({ label: "new reviews", value: outcome.reviews.value, kind: "counted" });
   }
   return { text: sentences.join(" "), figures };
+}
+
+/** Weekly proof uses a half-open intake cohort, never a proxy from visits. */
+export interface BusinessInquiryOutcomes {
+  workspaceId: string; from: string; to: string;
+  inquiries: number; answered: number; withinDay: number; unanswered: number;
+  averageReplySeconds: number | null; medianReplySeconds: number | null; evidence: string;
+}
+export async function readBusinessInquiryOutcomes(actor: WorkspaceActor, workspaceId: string, from: string, to: string, rpc: OutcomeRpc): Promise<BusinessInquiryOutcomes> {
+  if (process.env.STRELVA_INQUIRY_OUTCOMES !== "1") throw new BusinessOutcomeError("unavailable");
+  if (!Number.isFinite(Date.parse(from)) || !Number.isFinite(Date.parse(to)) || Date.parse(from) >= Date.parse(to)) throw new BusinessOutcomeError("invalid");
+  const { data, error } = await rpc("business_inquiry_outcomes", { p_workspace_id: workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail, p_from: from, p_to: to });
+  if (error) throw new BusinessOutcomeError(error.message?.includes("denied") ? "denied" : "unavailable");
+  return data as BusinessInquiryOutcomes;
 }

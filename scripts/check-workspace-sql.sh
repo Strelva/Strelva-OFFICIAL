@@ -625,6 +625,14 @@ psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-records-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-lead-reads-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
+# Wave 6 inquiry closure: additive replies, exact outcome proof, notice context and connected spam review.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010120000_inquiry_workspace_replies.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010121000_inquiry_outcome_proof.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-workspace-replies-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010123000_inquiry_context_notices.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-context-notices-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010124000_connected_inquiry_records.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-inquiry-records-schema.sql"
 # Strelva (system): the audited service actor for the needs-you and
 # workspace-work crons, and the connected_sites flag row. Replaces
 # owner_decision_json and workspace_release_flag_names(); the Needs you,

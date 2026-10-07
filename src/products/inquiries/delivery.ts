@@ -19,6 +19,7 @@ import { ownerNoticeEmail } from "@/lib/owner-recipient";
 
 import type { InquiryTimelineEventType, ResponsibilityAction, ResponsibilityEvaluation, ResponsibilityPolicy } from "@/products/inquiries/contracts";
 import type { LeadRecord } from "@/lib/leads";
+export type { LeadRecord } from "@/lib/leads";
 import { getTenantConfig } from "@/lib/tenants";
 import { addTenantActivity } from "@/lib/tenant-crm";
 import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
@@ -26,6 +27,7 @@ import { createEmailInquiryTransport } from "./delivery-email";
 import { createRedisInquiryDeliveryStore } from "./delivery-store";
 import { INQUIRY_WORKSPACE_EXIT_CODE, isInquiryWorkspaceExited } from "./workspace-exit";
 import type { EmailAudience } from "@/platform/infra/email/send";
+import { inquiryBusinessFactsEnabled, inquiryPersonEmail, inquiryWithinBusinessHours, readInquiryBusinessContext } from "./business-context";
 import {
   actorForAction,
   createInquiryDeliveryMessage,
@@ -244,7 +246,8 @@ export async function resolveInquiryRoute(
   // email address, retain the tenant owner fallback for the legacy notice.
   // Without a configured destination, the one owner-recipient rule decides
   // (src/lib/owner-recipient.ts); it falls back to the tenant's owner_email.
-  const ownerEmail = validEmail(inquiry.staffDestination)
+  const business = inquiry.staffDestination ? await readInquiryBusinessContext(inquiry.tenantId) : null;
+  const ownerEmail = validEmail(business ? inquiryPersonEmail(business, inquiry.staffDestination) : inquiry.staffDestination)
     || (tenant ? validEmail(await ownerNoticeEmail(tenant)) : null);
   return {
     tenantId: inquiry.tenantId,
@@ -715,6 +718,12 @@ export async function deliverInquiryAction(
   // Exit blocks a new claim, while the checkpoint branches above remain
   // available to verify or reconcile an already accepted or ambiguous write.
   try {
+    if (action !== "owner_notification" && inquiryBusinessFactsEnabled()) {
+      const business = await readInquiryBusinessContext(inquiry.tenantId);
+      if (business && !inquiryWithinBusinessHours(business, now)) {
+        return { ...evaluated, status: "paused", reason: "outside_business_hours", retryable: false };
+      }
+    }
     const exited = await (deps.isWorkspaceExited ?? ((tenantId: string) => isInquiryWorkspaceExited({ tenantId })))(inquiry.tenantId);
     if (exited) {
       const reason = INQUIRY_WORKSPACE_EXIT_CODE;
