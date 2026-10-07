@@ -56,6 +56,7 @@ export function providerDeliveryAdapter(ports: ProviderDeliveryPorts): SourceAda
   return {
     lifecycle: "provider_delivery",
     needsMemberActor: true,
+    ownerLinkWithoutAccount: true,
     propose: (ctx) => proposeAsMember(ctx, async actor => {
       const items: ProposedItem[] = [];
       for (const delivery of await ports.list(actor, ctx.workspaceId)) {

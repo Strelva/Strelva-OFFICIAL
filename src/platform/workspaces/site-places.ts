@@ -13,7 +13,7 @@
  * Pure. Navigation hints only; every page and API authorizes on its own.
  */
 
-export const SITE_TABS = ["edit", "photos", "look", "collections", "history", "connections", "google", "source", "request"] as const;
+export const SITE_TABS = ["edit", "photos", "look", "collections", "history", "connections", "google", "source", "request", "store", "members"] as const;
 export type SiteTab = (typeof SITE_TABS)[number];
 
 export const SITE_TAB_LABEL: Record<SiteTab, string> = {
@@ -26,6 +26,8 @@ export const SITE_TAB_LABEL: Record<SiteTab, string> = {
   google: "Google Business",
   source: "Connection",
   request: "Ask for a change",
+  store: "Store",
+  members: "Members",
 };
 
 /** Tabs a site that Strelva edits natively shows, in order. `source` opens from Connections. */
@@ -85,6 +87,8 @@ export function sitePlaceForDashboardPath(path: string): { tab: SiteTab; source?
   const url = new URL(path, "https://dashboard.invalid");
   const route = url.pathname.replace(/\/+$/, "");
   if (route === "/dashboard/site" || route === "/dashboard/content") return { tab: "edit" };
+  if (route === "/dashboard/store") return { tab: "store" };
+  if (route === "/dashboard/members") return { tab: "members" };
   if (route === "/dashboard/assets") return { tab: "photos" };
   if (route === "/dashboard/brand-kit") return { tab: "look" };
   if (route === "/dashboard/collections") return { tab: "collections" };

@@ -1,0 +1,52 @@
+Lockfile is up to date, resolution step is skipped
+Progress: resolved 1, reused 0, downloaded 0, added 0
+Packages: +739
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Progress: resolved 739, reused 739, downloaded 0, added 300
+Progress: resolved 739, reused 739, downloaded 0, added 735
+Progress: resolved 739, reused 739, downloaded 0, added 738
+Progress: resolved 739, reused 739, downloaded 0, added 739, done
+
+dependencies:
++ @ai-sdk/anthropic 3.0.78
++ @ai-sdk/google 3.0.43
++ @ai-sdk/openai 3.0.64
++ @sanity/image-url 2.1.0
++ @sentry/nextjs 10.51.0
++ @studio-freight/lenis 1.0.42
++ @supabase/ssr 0.12.0
++ @supabase/supabase-js 2.108.2
++ @upstash/redis 1.37.0
++ @vercel/analytics 2.0.1
++ @vercel/blob 2.3.3
++ ai 6.0.116
++ cheerio 1.2.0
++ gsap 3.14.2
++ isomorphic-dompurify 2.36.0
++ lucide-react 0.577.0
++ motion 13.3.0
++ next 16.3.6
++ react 19.2.4
++ react-dom 19.2.4
++ react-markdown 10.1.0
++ resend 6.9.4
++ stripe 21.0.1
++ zod 4.3.6
+
+devDependencies:
++ @playwright/test 1.59.1
++ @tailwindcss/postcss 4.2.4
++ @types/node 25.6.2
++ @types/react 19.2.14
++ @types/react-dom 19.2.3
++ @vitest/coverage-v8 4.1.11
++ eslint 9.39.4
++ eslint-config-next 16.3.6
++ tailwindcss 4.2.4
++ tsx 4.21.0
++ typescript 5.9.3
++ vitest 4.1.11
+
+. prepare$ git config core.hooksPath .githooks || true
+. prepare: Done
+Done in 3.6s using pnpm v10.34.5

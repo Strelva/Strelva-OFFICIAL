@@ -1,3 +1,4 @@
+import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 /**
  * One-click approve-from-email (with a confirm step).
  *
@@ -212,7 +213,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   const tenant = await getTenantConfig(claims.tenantId).catch(() => null);
   const businessName = tenant?.siteName || "your site";
-  const dashboardUrl = tenant ? getTenantDashboardUrl(tenant, "/dashboard") : undefined;
+  const dashboardUrl = tenant ? await ownerNoticeUrl(tenant, "/dashboard", getTenantDashboardUrl(tenant, "/dashboard")) : undefined;
   const isApprove = claims.action === "approve";
 
   return confirmPage({
@@ -245,7 +246,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const tenant = await getTenantConfig(claims.tenantId).catch(() => null);
   const businessName = tenant?.siteName || "your site";
-  const dashboardUrl = tenant ? getTenantDashboardUrl(tenant, "/dashboard") : undefined;
+  const dashboardUrl = tenant ? await ownerNoticeUrl(tenant, "/dashboard", getTenantDashboardUrl(tenant, "/dashboard")) : undefined;
   const workflowAction = claims.action === "approve" ? "approved" : "dismissed";
 
   let result: { changed: boolean; reason?: string };

@@ -56,6 +56,7 @@ export function workResponsibilityAdapter(ports: WorkResponsibilityPorts): Sourc
   return {
     lifecycle: "work_responsibility",
     needsMemberActor: true,
+    ownerLinkWithoutAccount: true,
     propose: (ctx) => proposeAsMember(ctx, async actor =>
       (await ports.list(actor, ctx.workspaceId)).filter(row => row.workspaceId === ctx.workspaceId).flatMap(row => workResponsibilityItem(row) ?? [])),
     async currentRevision(ctx, sourceId) {

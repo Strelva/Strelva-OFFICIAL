@@ -35,7 +35,7 @@ export type ResolveBy =
   /**
    * `service` is set only for a lifecycle that runs an owner's link decision
    * without an owner account (`ownerLinkWithoutAccount`): `actor` is then
-   * Strelva (system)'s identity under a `make_real_link` session bound to
+   * Strelva (system)'s identity under an item-bound link session bound to
    * this item, and the owner stays the approver of record.
    */
   | { kind: "owner_link"; recipient: string; actor: WorkspaceActor | null; service?: ServiceSession }
@@ -55,7 +55,7 @@ export interface SourceAdapter {
   /**
    * An owner with no account may still decide this by signed link: Strelva
    * (system) reads and runs it under a session bound to the item
-   * (owner-entry decision 6; Make real only). Never for access, money or exit.
+   * (owner-entry decision 6). Never for access, money or exit.
    */
   ownerLinkWithoutAccount?: boolean;
   /** Pending asks for this business. `complete: false` means some sources could not be read. */
@@ -236,6 +236,7 @@ export function serviceRequestAdapter(ports: ServiceRequestPorts): SourceAdapter
   return {
     lifecycle: "service_request",
     needsMemberActor: true,
+    ownerLinkWithoutAccount: true,
     async propose(ctx) {
       if (!ctx.actor) return { items: [], complete: false };
       try {

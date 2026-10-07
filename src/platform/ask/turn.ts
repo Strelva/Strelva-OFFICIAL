@@ -1,3 +1,4 @@
+import type { AskWorkspaceDraftPort } from "./workspace-drafts";
 import type { ModelMessage, Tool } from "ai";
 import { z } from "zod";
 import { agentResultFromToolOutput, buildAgentResultContract, type AgentActionResult } from "@/lib/agent-results";
@@ -62,6 +63,7 @@ export interface AskTurnDeps {
   needsYou: NeedsYouPort;
   requests: AskRequestPort;
   possibilities: AskPossibilityPort;
+  workspaceDrafts?: AskWorkspaceDraftPort;
   /** Runs the model (through the one model-call helper) and feeds parts to `consume`. */
   stream(input: {
     system: string;
@@ -265,7 +267,7 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
           workspaceId: request.workspaceId, systemId, tenantId: site?.tenantId ?? null, actor, role,
           origin: deps.isOperator ? "operator" : "owner_interpreted", askedOnBehalf: request.askedOnBehalf ?? null,
           lastUserText, turnId: deps.newTurnId(), tenantTools: tenant?.tools ?? null, authority,
-          needsYou: deps.needsYou, requests: deps.requests, possibilities: deps.possibilities, onReceipt,
+          workspaceDrafts: deps.workspaceDrafts, needsYou: deps.needsYou, requests: deps.requests, possibilities: deps.possibilities, onReceipt,
         });
         const system = systemPrompt({
           businessName: site?.name ?? "this business", target, managed,

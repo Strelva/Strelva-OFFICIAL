@@ -49,6 +49,7 @@ export function metadataFromEvent(event: UnifiedEvent): InquiryMessageReviewEven
       expiresAt: row.expiresAt === null ? null : text(row.expiresAt, "Expiry", 80),
       reviewTokenHash: text(row.reviewTokenHash, "Review token", 128),
       reviewAudience: "owner",
+      ...(row.authoredReply === undefined ? {} : { authoredReply: text(row.authoredReply, "Reply body", 4096) }),
     };
     if (!/^[a-f0-9]{64}$/.test(metadata.messageDigest) || !/^[a-f0-9]{64}$/.test(metadata.reviewTokenHash)) return null;
     return metadata;
@@ -71,6 +72,7 @@ export function previewFromEvent(event: UnifiedEvent, metadata: InquiryMessageRe
   if (hash(token) !== metadata.reviewTokenHash) throwCode("review_revoked", "This message review is no longer valid.");
   return {
     reviewToken: token,
+    ...(metadata.authoredReply === undefined ? {} : { eventId: event.id }),
     inquiryId: metadata.inquiryId,
     action: metadata.action,
     recipient: metadata.recipient,

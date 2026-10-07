@@ -5,7 +5,7 @@ import { boundedStore, type BoundedStore } from "@/platform/bounded-work/reposit
 import { listWork } from "@/platform/workspaces/repository";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type SavedWork, type WorkspaceActor, type AcceptedHandoff } from "@/platform/workspaces/types";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
-import { websiteDocumentStore, invalidatePublishedSiteDocument, type WebsiteDocumentStore, type WebsiteDocumentRevision } from "./document-store";
+import { websiteDocumentStore, createWebsiteDocumentStore, invalidatePublishedSiteDocument, type OwnerLinkWebsiteSession, type WebsiteDocumentStore, type WebsiteDocumentRevision } from "./document-store";
 import { siteDocumentHash, siteDocumentSchema, catalogNodeSchema, unresolvedSiteFacts, type SiteDocument } from "./site-document";
 import { runWebsiteRebuild, isHighRiskWebsiteClaim, type RebuildCheckpoint, type RebuildOptions, type WebsiteRebuildInput } from "./rebuild-pipeline";
 import { normalizeRebuildUrl } from "./rebuild-crawl";
@@ -418,3 +418,8 @@ export const websiteRebuildDomain = websiteRebuildService.domain;
 export const initializeRebuildHandoff = websiteRebuildService.initializeHandoff;
 export const connectWebsiteRebuildCapabilities = websiteRebuildService.connectCapabilities;
 export const listWebsiteRebuildCapabilityOptions = websiteRebuildService.capabilityOptions;
+
+/** Owner-link launch uses the same lifecycle, with only reserve/publish RPCs specialized. */
+export function launchWebsiteRebuildByOwnerLink(actor: WorkspaceActor, workId: string, raw: unknown, session: OwnerLinkWebsiteSession) {
+  return createWebsiteRebuildService(boundedStore, { documents: createWebsiteDocumentStore(undefined, session) }).launch(actor, workId, raw);
+}

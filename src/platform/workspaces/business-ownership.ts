@@ -229,3 +229,11 @@ export async function listProvidedClients(actor: WorkspaceActor, agencyWorkspace
     p_agency_workspace_id: uuid.parse(agencyWorkspaceId),
   }, z.array(providedClientSchema), "Operated businesses could not be loaded.");
 }
+
+/** Claim only an existing operator-issued invitation for this verified identity and trusted tenant. */
+export async function claimPendingBusinessOwner(actor: WorkspaceActor, tenantId: string): Promise<string | null> {
+  return call("claim_pending_business_owner", {
+    p_actor_id: uuid.parse(actor.userId), p_verified_email: email.parse(actor.verifiedEmail),
+    p_tenant_id: z.string().regex(/^[a-z0-9-]+$/).parse(tenantId),
+  }, uuid.nullable(), "The pending owner invitation could not be claimed.");
+}

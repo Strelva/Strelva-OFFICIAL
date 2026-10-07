@@ -34,7 +34,7 @@ export const workspacePortLoaders = {
     };
   },
 
-  businessRecord: () => import("@/platform/business-record/service"),
+  businessRecord: async () => ({ ...await import("@/platform/business-record/service"), ...await import("@/platform/owner-entry/email-links") }),
 
   googleBindings: () => import("@/platform/account-bindings/store"),
 

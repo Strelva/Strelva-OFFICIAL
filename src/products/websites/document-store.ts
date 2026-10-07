@@ -70,10 +70,19 @@ function documentRow(raw: Record<string,unknown>): WebsiteDocumentRevision {
   if (siteDocumentHash(document) !== contentHash) throw new WorkspaceStoreError("The stored website document does not match its immutable hash.");
   return { workspaceId: String(raw.workspace_id), workId: String(raw.website_work_id), revision: revision.parse(Number(raw.revision)), contentHash, document, createdBy: String(raw.created_by), createdAt: String(raw.created_at), ...(typeof raw.tenant_id === "string" ? { tenantId: raw.tenant_id } : {}), ...(raw.receipt ? { receipt: websiteLaunchReceiptSchema.parse(raw.receipt) } : {}) };
 }
-export function createWebsiteDocumentStore(db?: WebsiteDocumentRpc): WebsiteDocumentStore {
+export interface OwnerLinkWebsiteSession { sessionId: string; workspaceId: string; decisionId: string; revisionHash: string; recipient: string; userId: string }
+
+export function createWebsiteDocumentStore(db?: WebsiteDocumentRpc, ownerLink?: OwnerLinkWebsiteSession): WebsiteDocumentStore {
   async function rpc(name: string, args: Record<string,unknown>): Promise<Record<string,unknown>[]> {
     const client = db ?? getSupabase() as unknown as WebsiteDocumentRpc | null;
     if (!client) throw new WorkspaceStoreError("Website document storage is unavailable.");
+    // Only reserve and publish admit an owner-link capability. All reads,
+    // candidate edits and unrelated actions keep their original RPCs.
+    if (ownerLink && ["reserve_website_hosted_tenant", "publish_website_document"].includes(name)) {
+      if (args.p_workspace_id !== ownerLink.workspaceId || args.p_user_id !== ownerLink.userId) throw new WorkspaceAccessError();
+      name = name === "reserve_website_hosted_tenant" ? "reserve_website_by_owner_link" : "publish_website_by_owner_link";
+      args = { ...args, p_session_id: id.parse(ownerLink.sessionId), p_decision_id: id.parse(ownerLink.decisionId), p_revision_hash: hash.parse(ownerLink.revisionHash), p_recipient: z.string().email().parse(ownerLink.recipient) };
+    }
     const result = await client.rpc(name,args);
     if (result.error) {
       if (result.error.message.includes("workspace_access_denied") || result.error.message.includes("website_tenant_access_denied") || result.error.message.includes("website_tenant_not_linked") || result.error.message.includes("agency_managed_website_draft_denied")) throw new WorkspaceAccessError();

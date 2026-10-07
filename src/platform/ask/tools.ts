@@ -1,3 +1,4 @@
+import { askBusinessFactInputSchema, type AskWorkspaceDraftPort } from "./workspace-drafts";
 import { tool, type Tool } from "ai";
 import { z } from "zod";
 import type { WorkspaceActor, WorkspaceRole } from "@/platform/workspaces/types";
@@ -46,6 +47,7 @@ export interface AskToolsContext {
   needsYou: NeedsYouPort;
   requests: AskRequestPort;
   possibilities: AskPossibilityPort;
+  workspaceDrafts?: AskWorkspaceDraftPort;
   onReceipt: (item: AskReceiptItem) => void;
 }
 
@@ -105,10 +107,17 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
       ctx.onReceipt({ kind: "draft", toolId, status: "drafted", ids: [], summary: String(output.message ?? summary) });
       return output;
     }
-    const routing = await ctx.needsYou.submit({
-      workspaceId: ctx.workspaceId, systemId: ctx.systemId, tenantId: ctx.tenantId, toolId, kind,
-      origin: ctx.origin, askedOnBehalf: ctx.askedOnBehalf, summary, eventIds: ids,
-    });
+    let routing: AskNeedsYouRouting;
+    try {
+      routing = await ctx.needsYou.submit({
+        workspaceId: ctx.workspaceId, systemId: ctx.systemId, tenantId: ctx.tenantId, toolId, kind,
+        origin: ctx.origin, askedOnBehalf: ctx.askedOnBehalf, summary, eventIds: ids,
+      });
+    } catch {
+      ctx.onReceipt({ kind: "draft", toolId, status: "queued", ids, summary: `${summary}: saved, Needs you could not sync.` });
+      return { ...output, eventIds: ids, agentResultStatus: "queued", needsYouSyncPending: true,
+        nextStep: "The draft is saved in the review queue, but Needs you couldn't sync. Nothing was approved or sent. Reload Needs you before retrying." };
+    }
     ctx.onReceipt({ kind: "draft", toolId, status: "queued", ids, summary, needsYou: routing });
     return {
       ...output,
@@ -123,14 +132,17 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
     read_system: tool({
       description: "Read the website System: its pages and nodes (view site), a legacy section (section), the content outline (content), photos (photos), a preview link (preview), blog/video/product entries (entries), newsletter subscribers (subscribers), or open Possibilities and suggestions (possibilities).",
       inputSchema: z.object({
-        view: z.enum(["site", "section", "content", "photos", "preview", "entries", "subscribers", "possibilities"]),
+        view: z.enum(["site", "section", "content", "photos", "preview", "entries", "subscribers", "possibilities", "business_record", "inquiries", "bookings"]),
         section: z.string().max(64).optional(),
         path: z.string().max(512).optional(),
         type: z.enum(["blog", "video", "product"]).optional(),
         status: z.enum(["draft", "published"]).optional(),
       }),
-      execute: (input) => guarded("read_system", async () => {
+      execute: (input) => guarded("read_system", async (snapshot) => {
         switch (input.view) {
+          case "inquiries": return snapshot.inquiriesEnabled && ctx.workspaceDrafts?.readInquiries ? { inquiries: await ctx.workspaceDrafts.readInquiries(ctx.actor, ctx.workspaceId) } : refused("not_available", "Inquiries aren't enabled for this business.");
+          case "bookings": return ctx.workspaceDrafts?.readBookings ? { bookings: await ctx.workspaceDrafts.readBookings(ctx.actor, ctx.workspaceId) } : refused("not_available", "Bookings are unavailable here.");
+          case "business_record": return ctx.workspaceDrafts ? ctx.workspaceDrafts.readBusiness(ctx.actor, ctx.workspaceId) : refused("not_available", "The business record is unavailable here.");
           case "site": return callTenant(ctx, "read_site", input.path ? { path: input.path } : {});
           case "section": return callTenant(ctx, "read_section", { section: input.section });
           case "content": return callTenant(ctx, "show_content", {});
@@ -246,24 +258,20 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
       execute: (input) => guarded("add_gbp_photo", async () => draft("add_gbp_photo", "google.photo", "Google Business photo", await callTenant(ctx, "upload_gbp_photo", input))),
     }),
     draft_business_fact_change: tool({
-      description: "Propose a change to the business record: hours, services, people, closures. Hours and other high-risk facts always need the owner's yes. It is filed for Strelva to make, and nothing changes until then.",
-      inputSchema: z.object({ fact: z.enum(["hours", "services", "people", "closure", "contact", "other"]), change: z.string().min(1).max(2_000) }),
+      description: "Draft an exact typed business record patch. Read the record first to obtain expectedRevision. Hours, prices, contacts and every interpreted fact need a separate Needs you decision. Changes larger than 600 characters must be split into small drafts. Nothing is changed in chat.",
+      inputSchema: askBusinessFactInputSchema,
       execute: (input) => guarded("draft_business_fact_change", async () => {
-        // The business record has no draft store yet; the change is filed as
-        // a Request with the exact words so nothing is lost and nothing is
-        // claimed as done. Strelva makes it through the record and Needs you.
+        if (!ctx.workspaceDrafts) return refused("not_available", "Business record drafts aren't available here yet. I can file a Request instead.");
         requestCount += 1;
         try {
-          const filed = await ctx.requests.file(ctx.actor, {
-            workspaceId: ctx.workspaceId, systemId: ctx.systemId, words: ctx.lastUserText || input.change,
-            outcome: `Business record change (${input.fact}): ${input.change}`, read: [], askedOnBehalf: ctx.askedOnBehalf,
-            topic: `business_record.${input.fact}`, idempotencyKey: `ask:${ctx.turnId}:${requestCount}`,
+          const saved = await ctx.workspaceDrafts.businessFact(ctx.actor, {
+            ...input, workspaceId: ctx.workspaceId, systemId: ctx.systemId, idempotencyKey: `ask:${ctx.turnId}:fact:${requestCount}`,
           });
-          ctx.onReceipt({ kind: "request", toolId: "draft_business_fact_change", status: "filed", ids: [filed.id], summary: `${input.fact}: ${input.change}`.slice(0, 300) });
-          return { success: true, requestId: filed.id, agentResultStatus: "queued", message: "I filed that change for Strelva. Nothing on your site or listing changed yet, and high-risk facts like hours still need your yes." };
+          ctx.onReceipt({ kind: "draft", toolId: "draft_business_fact_change", status: "queued", ids: [saved.draftId], summary: input.summary, needsYou: saved.routing });
+          return { success: true, draftId: saved.draftId, needsYou: saved.routing, needsYouSyncPending: saved.decisionSyncPending ?? false, agentResultStatus: "queued", message: saved.decisionSyncPending ? "The exact change is saved, but Needs you couldn't sync. Your business record wasn't changed. Reload Needs you before retrying." : "The exact change is saved for a decision in Needs you. Your business record, website and listing haven't changed." };
         } catch {
-          ctx.onReceipt({ kind: "request", toolId: "draft_business_fact_change", status: "failed", ids: [], summary: "Could not file the change." });
-          return { success: false, error: "I couldn't file that. Nothing was sent.", agentResultStatus: "failed" };
+          ctx.onReceipt({ kind: "draft", toolId: "draft_business_fact_change", status: "failed", ids: [], summary: "The business change could not be queued." });
+          return { success: false, error: "I couldn't queue that decision. Your business record wasn't changed. Reload Needs you before trying again; a saved draft may still be waiting.", agentResultStatus: "failed" };
         }
       }),
     }),
@@ -273,9 +281,18 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
       execute: (input) => guarded("draft_review_reply", async () => draft("draft_review_reply", "review.reply", "Review reply", await callTenant(ctx, "reply_to_review", input))),
     }),
     draft_inquiry_reply: tool({
-      description: "Draft a reply to an inquiry. Not available yet; offer a Request instead.",
-      inputSchema: z.object({ inquiryId: z.string().max(200), replyText: z.string().max(4096) }),
-      execute: () => guarded("draft_inquiry_reply", async () => refused("not_available", "Inquiry replies aren't available here yet. I can file a Request for Strelva instead.")),
+      description: "Draft an exact reply to an inquiry using the inquiry responsibility and message review policy. Read the inquiry first. This never sends or approves; the decision is in Needs you.",
+      inputSchema: z.object({ inquiryId: z.string().min(1).max(200), replyText: z.string().trim().min(1).max(4096) }),
+      execute: (input) => guarded("draft_inquiry_reply", async () => {
+        if (!ctx.workspaceDrafts || !ctx.tenantId) return refused("not_available", "Inquiry replies aren't available here yet. I can file a Request instead.");
+        try {
+          const saved = await ctx.workspaceDrafts.inquiryReply(ctx.actor, { ...input, workspaceId: ctx.workspaceId, tenantId: ctx.tenantId });
+          return await draft("draft_inquiry_reply", "customer.message", "Inquiry reply", { success: true, eventIds: saved.eventIds, agentResultStatus: "queued" });
+        } catch {
+          ctx.onReceipt({ kind: "draft", toolId: "draft_inquiry_reply", status: "failed", ids: [], summary: "The inquiry reply could not be queued." });
+          return { success: false, error: "I couldn't queue that reply. Nothing was sent. Reload Needs you before trying again; a saved draft may still be waiting.", agentResultStatus: "failed" };
+        }
+      }),
     }),
     create_request: tool({
       description: "File a Request to Strelva for work the tools can't do: a new page set, a booking page, custom features (cart, checkout, rewards, popups, chat), design changes, a new site or internal tool. It enters Requests at Asked; scope and deadline are agreed later, so never say it is accepted.",

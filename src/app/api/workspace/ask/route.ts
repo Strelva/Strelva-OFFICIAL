@@ -17,25 +17,21 @@ import {
   type AskTurnDeps,
 } from "@/platform/ask";
 import { loadTenantAskTools, tenantGoogleWriteGranted } from "@/platform/ask/tenant-tools-adapter";
+import { createAskWorkspaceDraftPort } from "./workspace-drafts-server";
 import { streamModelText } from "@/platform/infra/model-calls";
-import { createInMemoryPossibilityRepository } from "@/platform/possibilities";
+import { createSupabasePossibilityRepository } from "@/platform/possibilities/supabase-repository";
 import { PostgresServiceRequestStore, ServiceRequestService } from "@/platform/service-requests";
 import { readExistingSystemsSnapshot } from "@/platform/systems/from-existing";
 import { readWorkspaceExit } from "@/platform/workspace-exit";
 import { listWorkspaces } from "@/platform/workspaces";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
-import { getEventRaw } from "@/lib/events";
+import { getEventRaw, updateEvent } from "@/lib/events";
+import { classifyTenantEvent } from "@/platform/needs-you/tenant-classify";
+import { evaluateRoute } from "@/platform/needs-you/evaluator";
 import { needsYouReleaseEnabled, needsYouService, needsYouStore } from "@/platform/needs-you/server";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
 
 export const dynamic = "force-dynamic";
-
-/**
- * Possibilities have only an in-memory repository today
- * (docs/product/specs/ask-strelva.md section 5, "New"). One opened here lasts
- * until the server restarts; the receipt marks it `durable: false`.
- */
-const possibilityRepository = createInMemoryPossibilityRepository();
 
 /**
  * With STRELVA_NEEDS_YOU_RELEASE on, Ask hands every draft to the real Needs
@@ -51,6 +47,25 @@ function askNeedsYou(actor: WorkspaceActor): { port: NeedsYouPort; path: string 
     port: createNeedsYouAskAdapter({
       fallback,
       linkedTenants: async (workspaceId) => (await needsYouStore.linkedTenants(workspaceId)).map((link) => link.tenantId),
+      async prepare(draft) {
+        const policies = await needsYouStore.policies(actor, draft.workspaceId);
+        for (const eventId of draft.eventIds) {
+          const updated = await updateEvent(eventId, (event) => {
+            if (event.tenantId !== draft.tenantId || event.status !== "pending") return event;
+            const classification = classifyTenantEvent(event);
+            if (!classification) return event;
+            const origin = draft.askedOnBehalf ? "owner_interpreted" : draft.origin;
+            const policy = evaluateRoute({ ...classification, origin, systemId: draft.systemId, policies });
+            // Ask only proposes. A policy that could handle routine work still
+            // goes to Strelva's review here; chat never becomes its own publisher.
+            const route = policy.route === "owner_decides" ? "owner_decides" : "strelva_reviews";
+            return { ...event, metadata: { ...event.metadata, reviewAudience: route === "owner_decides" ? "owner" : "operator",
+              askStrelva: { workspaceId: draft.workspaceId, systemId: draft.systemId, toolId: draft.toolId,
+                origin, askedOnBehalf: draft.askedOnBehalf, evaluatedRoute: policy.route, policyRule: policy.rule } } };
+          });
+          if (!updated.changed || updated.event?.tenantId !== draft.tenantId) throw new Error("The draft's decision could not be registered. It stays in the review queue.");
+        }
+      },
       sync: (workspaceId) => service.sync({ workspaceId, actor }),
       openItems: (workspaceId) => needsYouStore.list(actor, workspaceId, false),
       readEvent: getEventRaw,
@@ -96,8 +111,9 @@ export async function POST(request: Request) {
       inquiriesEnabled: async (workspaceId) => inquiryReleaseEnabledForWorkspace(workspaceId, await releaseViewerFor(actor)),
       released: (current, workspaceId) => systemsReleasedFor(current, workspaceId),
       needsYou: needsYou.port,
+      workspaceDrafts: createAskWorkspaceDraftPort({ sync: (current, workspaceId) => needsYouService().sync({ actor: current, workspaceId }), needsYouStore }),
       requests,
-      possibilities: createPossibilityAdapter(possibilityRepository, { durable: false }),
+      possibilities: createPossibilityAdapter(createSupabasePossibilityRepository(actor), { durable: true }),
       async stream(input, consume, emitted) {
         await streamModelText(
           { purpose: "ask", ...input.context },

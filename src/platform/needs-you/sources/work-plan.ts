@@ -90,6 +90,7 @@ export function workPlanAdapter(ports: WorkPlanPorts): SourceAdapter {
   return {
     lifecycle: "work_plan",
     needsMemberActor: true,
+    ownerLinkWithoutAccount: true,
     async propose(ctx) {
       if (!ctx.actor) return { items: [], complete: false };
       try {

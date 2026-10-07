@@ -157,16 +157,21 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
         memberActor = await deps.store.ownerActor(input.workspaceId, input.by.recipient).catch(() => null);
         // An owner with no account (owner-entry decision 6): Strelva (system)
         // reads and runs this one item, bound to it and to the owner recipient.
-        if (!memberActor && adapter.ownerLinkWithoutAccount && deps.store.linkSession) {
+        if (!memberActor && adapter.ownerLinkWithoutAccount && (deps.store.linkSession || deps.store.ownerLinkSession)) {
           let session: ServiceSession | null = null;
           try {
-            session = await deps.store.linkSession(input.workspaceId, item.id, input.by.recipient);
+            session = item.sourceLifecycle === "make_real"
+              ? await deps.store.linkSession?.(input.workspaceId, item.id, input.by.recipient) ?? null
+              : await deps.store.ownerLinkSession?.(input.workspaceId, item.id, input.revision, input.by.recipient) ?? null;
           } catch (error) {
             // A link for anyone but the owner on record is refused like any other link.
             if (error instanceof ServiceSessionRefusedError && error.code === "owner_decision_recipient_not_owner") return { status: "not_owner", item };
             session = null;
           }
-          if (session && session.workspaceId === input.workspaceId && session.purpose === "make_real_link") {
+          const bound = session?.purpose === "owner_decision_link" && session.decisionId === item.id
+            && session.revisionHash === input.revision && session.recipient === input.by.recipient.trim().toLowerCase()
+            && Boolean(deps.store.authorizeOwnerLinkRun);
+          if (session && session.workspaceId === input.workspaceId && (item.sourceLifecycle === "make_real" ? session.purpose === "make_real_link" : bound)) {
             linkService = session;
             memberActor = session.actor;
           }
@@ -200,6 +205,12 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     }
     if (claimed.status !== "claimed") return { status: claimed.status, item: claimed.item };
 
+    if (linkService?.purpose === "owner_decision_link") {
+      try { await deps.store.authorizeOwnerLinkRun!(linkService); } catch {
+        const finished = await deps.store.finish(input.workspaceId, item.id, "failed", "link_authority_changed", null);
+        return { status: "failed", item: finished };
+      }
+    }
     const by: ResolveBy = input.by.kind === "owner_link"
       ? { kind: "owner_link", recipient: input.by.recipient, actor: memberActor, ...(linkService ? { service: linkService } : {}) }
       : { kind: "session", actor: input.by.actor };

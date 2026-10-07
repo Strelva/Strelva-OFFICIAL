@@ -105,6 +105,8 @@ export interface InquiryMessageReviewDependencies {
   resolveAction?: ResolveApprovalAction;
   emailReady?: (tenantId: string) => Promise<boolean>;
   allowExternalSends?: boolean;
+  /** Ask validates workspace draft authority here; never used by execution. */
+  authorizeDraft?: (actorId: string, businessId: string) => Promise<boolean>;
   /** Test/host seam for the durable workspace exit authority. */
   isWorkspaceExited?: (tenantId: string) => Promise<boolean>;
 }
@@ -125,6 +127,7 @@ interface ReviewContext {
   evaluation: ResponsibilityEvaluation;
   deliveryEvaluation: InquiryDeliveryResult;
   status: InquiryRecordStatus;
+  authoredReply?: string;
 }
 
 async function repositoryFor(deps: InquiryMessageReviewDependencies): Promise<import("./repository").InquiryRepository> {
@@ -236,6 +239,8 @@ async function buildContext(input: {
   action: InquiryMessageReviewAction;
   actorId: string;
   responsibilityId?: string;
+  authoredReply?: string;
+  draftActorAllowed?: boolean;
   expectedResponsibilityRevision?: string;
   expectedPolicyVersion?: string;
   deps: InquiryMessageReviewDependencies;
@@ -249,7 +254,7 @@ async function buildContext(input: {
   await readyForEmail(input.tenantId, definition, input.deps);
   const responsibility = responsibilityFor(snapshot.state, capability.id, input.responsibilityId);
   if (responsibility.businessId !== input.businessId) throwCode("permission_denied", "This responsibility belongs to another business.");
-  assertResponsibilitySponsor(responsibility, input.actorId);
+  if (!input.draftActorAllowed) assertResponsibilitySponsor(responsibility, input.actorId);
   if (input.expectedResponsibilityRevision && responsibility.updatedAt !== input.expectedResponsibilityRevision) {
     throwCode("policy_changed", "The current responsibility policy changed. Prepare a fresh review.");
   }
@@ -267,6 +272,11 @@ async function buildContext(input: {
   }
   const message = createInquiryDeliveryMessage(inquiry, route, input.action);
   if (!message) throwCode("recipient_unavailable", "A permitted inquiry recipient is not configured.");
+  if (input.authoredReply !== undefined) {
+    if (input.action !== "reply") throwCode("message_mismatch", "Authored copy is only available for inquiry replies.");
+    const authoredReply = text(input.authoredReply, "Reply body", 4096);
+    message.options = { heading: "A reply from your business", paragraphs: [authoredReply], footerNote: "Sent by Strelva for the business named above" };
+  }
   const messageBody = renderInquiryMessage(message).text;
   const messageDigest = getInquiryDeliveryMessageDigest(message);
   const record = recordFromLead(snapshot.state, capability, lead, status);
@@ -305,6 +315,7 @@ async function buildContext(input: {
     evaluation,
     deliveryEvaluation,
     status,
+    ...(input.authoredReply === undefined ? {} : { authoredReply: text(input.authoredReply, "Reply body", 4096) }),
   };
 }
 
@@ -335,6 +346,7 @@ function metadataFor(
     preparedAt: now.toISOString(),
     expiresAt: context.deliveryEvaluation.expiresAt ?? null,
     reviewAudience: "owner",
+    ...(context.authoredReply === undefined ? {} : { authoredReply: context.authoredReply }),
   };
 }
 
@@ -359,7 +371,9 @@ export async function prepareInquiryMessageReviewWithDependencies(
   const action = reviewAction(input.action);
   const now = dependency(deps.now, () => new Date())();
   const tenantId = text(input.tenantId, "Tenant id", 80);
-  const context = await buildContext({ tenantId, businessId, inquiryId, action, actorId, deps, now });
+  const draftActorAllowed = input.authoredReply !== undefined && deps.authorizeDraft
+    ? await deps.authorizeDraft(actorId, businessId) : false;
+  const context = await buildContext({ tenantId, businessId, inquiryId, action, actorId, authoredReply: input.authoredReply, draftActorAllowed, deps, now });
   const baseMetadata = metadataFor(context, actorId, now);
   const reviewToken = tokenFor(baseMetadata, actorId);
   const metadata: InquiryMessageReviewEventMetadata = { ...baseMetadata, reviewTokenHash: hash(reviewToken) };
@@ -685,6 +699,7 @@ export async function executeInquiryMessageReview(
       businessId: metadata.businessId,
       inquiryId: metadata.inquiryId,
       action: metadata.action,
+      authoredReply: metadata.authoredReply,
       actorId: input.actorId,
       responsibilityId: metadata.responsibilityId,
       expectedResponsibilityRevision: metadata.responsibilityRevision,
@@ -733,6 +748,7 @@ export async function executeInquiryMessageReview(
           businessId: metadata.businessId,
           inquiryId: metadata.inquiryId,
           action: metadata.action,
+          authoredReply: metadata.authoredReply,
           actorId: input.actorId,
           responsibilityId: metadata.responsibilityId,
           expectedResponsibilityRevision: metadata.responsibilityRevision,
@@ -755,6 +771,7 @@ export async function executeInquiryMessageReview(
           businessId: metadata.businessId,
           inquiryId: metadata.inquiryId,
           action: metadata.action,
+          authoredReply: metadata.authoredReply,
           actorId: input.actorId,
           responsibilityId: metadata.responsibilityId,
           expectedResponsibilityRevision: metadata.responsibilityRevision,
@@ -858,6 +875,7 @@ export async function authorizeInquiryMessageReviewActor(input: {
       businessId: metadata.businessId,
       inquiryId: metadata.inquiryId,
       action: metadata.action,
+      authoredReply: metadata.authoredReply,
       actorId: input.actorId,
       responsibilityId: metadata.responsibilityId,
       expectedResponsibilityRevision: metadata.responsibilityRevision,
@@ -946,6 +964,7 @@ export async function reconcileInquiryMessageReview(input: {
       businessId: metadata.businessId,
       inquiryId: metadata.inquiryId,
       action: metadata.action,
+      authoredReply: metadata.authoredReply,
       actorId: input.actorId,
       responsibilityId: metadata.responsibilityId,
       deps: { ...deps, emailReady: async () => true },

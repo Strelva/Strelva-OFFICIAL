@@ -52,6 +52,7 @@ export interface InquiryMessageReviewEventMetadata {
   expiresAt: string | null;
   reviewTokenHash: string;
   reviewAudience: "owner";
+  authoredReply?: string;
 }
 
 export function dependency<T>(value: T | undefined, fallback: T): T {
@@ -120,6 +121,7 @@ export function tokenFor(metadata: Omit<InquiryMessageReviewEventMetadata, "revi
     messageDigest: metadata.messageDigest,
     preparedAt: metadata.preparedAt,
     expiresAt: metadata.expiresAt,
+    ...(metadata.authoredReply === undefined ? {} : { authoredReply: metadata.authoredReply }),
   })).digest("hex");
 }
 

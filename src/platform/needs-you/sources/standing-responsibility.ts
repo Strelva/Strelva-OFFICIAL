@@ -52,6 +52,7 @@ export function standingResponsibilityAdapter(ports: StandingResponsibilityPorts
   return {
     lifecycle: "standing_responsibility",
     needsMemberActor: true,
+    ownerLinkWithoutAccount: true,
     propose: (ctx) => proposeAsMember(ctx, async actor =>
       (await ports.list(actor, ctx.workspaceId)).filter(row => row.workspaceId === ctx.workspaceId).flatMap(row => standingResponsibilityItem(row) ?? [])),
     async currentRevision(ctx, sourceId) {

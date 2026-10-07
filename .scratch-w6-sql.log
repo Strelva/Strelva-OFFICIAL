@@ -1,0 +1,228 @@
+
+> strelva@0.2.0 check:workspace-sql /Users/jacobrhinehart/Desktop/strelva/REB-w6-owner-ask
+> bash scripts/check-workspace-sql.sh
+
+CREATE ROLE
+CREATE ROLE
+CREATE ROLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+REVOKE
+REVOKE
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+INSERT 0 4
+INSERT 0 2
+INSERT 0 3
+INSERT 0 8
+DO
+DO
+DO
+DO
+DO
+DO
+DO
+DO
+BEGIN
+SET
+              handoff_id              |        customer_workspace_id         |           customer_work_id           | delegation_id | already_accepted 
+--------------------------------------+--------------------------------------+--------------------------------------+---------------+------------------
+ 50000000-0000-4000-8000-000000000007 | cdfb636c-7e62-42f8-8cb9-b4948abddce8 | aeaac49d-8351-499f-880a-8393c259f0ad |               | f
+(1 row)
+
+RESET
+ assert_true 
+-------------
+ 
+(1 row)
+
+ROLLBACK
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+             result             
+--------------------------------
+ workspace schema checks passed
+(1 row)
+
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+DO
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+DO
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+REVOKE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+REVOKE
+GRANT
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+INSERT 0 2
+INSERT 0 1
+DO
+               result                
+-------------------------------------
+ work economics schema checks passed
+(1 row)
+

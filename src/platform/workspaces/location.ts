@@ -29,7 +29,7 @@ export function workspaceReturnTarget(value: string | null): string | null {
     const params = target.searchParams;
     const workspaceId = params.get("workspaceId");
     const allowed = place[1] === "results" ? ["workspaceId", "range", "from", "to"] : ["workspaceId"];
-    if (target.hash || [...params.keys()].some((key) => !allowed.includes(key) || params.getAll(key).length !== 1)
+    if ((target.hash && !((place[1] === "results" && target.hash === "#site-health") || (place[1] === "business-details" && target.hash === "#ownership"))) || [...params.keys()].some((key) => !allowed.includes(key) || params.getAll(key).length !== 1)
       || !workspaceId || !UUID.test(workspaceId)) return null;
     const range = params.get("range");
     if (range !== null && !["live", "week", "month", "custom"].includes(range)) return null;
@@ -37,7 +37,7 @@ export function workspaceReturnTarget(value: string | null): string | null {
       const date = params.get(key);
       if (date !== null && (range !== "custom" || !/^\d{4}-\d{2}-\d{2}$/.test(date))) return null;
     }
-    return `${target.pathname}?${params}`;
+    return `${target.pathname}?${params}${target.hash}`;
   }
   // A managed website's own pages (editor, photos, look, history, connections).
   if (value?.startsWith("/workspace/site?")) return workspaceSiteTarget(value);

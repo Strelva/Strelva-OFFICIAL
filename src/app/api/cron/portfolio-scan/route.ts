@@ -1,3 +1,4 @@
+import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 import { ownerNoticeEmail } from "@/lib/owner-recipient";
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/platform/infra/heartbeat";
@@ -95,7 +96,7 @@ export async function GET(request: Request) {
       currentGrade: s.grade,
       previousScore: prior.overallScore,
       currentScore: s.score,
-      healthUrl: getTenantDashboardUrl(tenant, "/dashboard/health"),
+      healthUrl: await ownerNoticeUrl(tenant, "/dashboard/health", getTenantDashboardUrl(tenant, "/dashboard/health")),
       // Opt in to the CRM comms log so a real health-drop alert accrues on the timeline.
       tenantId: tenant.id,
       logPrefix: "[cron portfolio-scan]",

@@ -1,3 +1,4 @@
+import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 import { NextResponse } from "next/server";
 import { isSuperAdmin, getActorContext } from "@/platform/infra/auth";
 import { getTenantConfig } from "@/lib/tenants";
@@ -68,7 +69,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const businessName = config.siteName;
   const ownerName = config.ownerName?.trim() || undefined;
-  const dashboardUrl = getTenantDashboardUrl(config);
+  const dashboardUrl = await ownerNoticeUrl(config, "/dashboard", getTenantDashboardUrl(config));
 
   let sent = false;
   if (type === "welcome") {

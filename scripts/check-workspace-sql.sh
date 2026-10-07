@@ -659,6 +659,14 @@ STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$
 # because it commits its fictional rows.
 STRELVA_BOOKINGS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run src/__tests__/booking-one-store.test.ts
+# Wave 6 owner entry and Ask (isolated local proof; explicit rollbacks are never applied here).
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010100000_owner_invitation_claim.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-invitation-claim-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010103000_ask_business_fact_drafts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/ask-business-fact-drafts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010102000_owner_decision_links.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010102100_website_owner_link_launch.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-links-schema.sql"
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 

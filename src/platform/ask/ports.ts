@@ -76,6 +76,8 @@ export interface AskNeedsYouItem {
 export interface NeedsYouAskDeps {
   /** Tenants linked to this business (needs_you_linked_tenants). */
   linkedTenants(workspaceId: string): Promise<string[]>;
+  /** Record Ask origin and the real policy route before the tenant source opens an item. */
+  prepare?(draft: AskDraft): Promise<void>;
   /** Open items for every pending ask the adapters can read (Needs you `sync`). */
   sync(workspaceId: string): Promise<unknown>;
   /** Open items, every route (the store's list, not the owner view). */
@@ -110,6 +112,7 @@ export function createNeedsYouAskAdapter(deps: NeedsYouAskDeps): NeedsYouPort {
       if (!draft.tenantId) return deps.fallback.submit(draft);
       const linked = await deps.linkedTenants(draft.workspaceId).catch(() => null);
       if (!linked || !linked.includes(draft.tenantId)) return deps.fallback.submit(draft);
+      await deps.prepare?.(draft);
       await deps.sync(draft.workspaceId);
       const items = await deps.openItems(draft.workspaceId);
       let route: AskNeedsYouRoute = "never";

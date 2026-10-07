@@ -1,3 +1,4 @@
+import { ownerNoticeUrl } from "@/lib/owner-notice-url";
 import { runWebsiteMonthlyReports } from "@/products/websites/index";
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/platform/infra/heartbeat";
@@ -97,7 +98,7 @@ export async function GET(request: Request) {
 
       const heading = buildMonthlyHeading(recap);
       const paragraphs = recapParagraphs(recap.summary);
-      const dashboardUrl = getTenantDashboardUrl(tenant, "/dashboard/reports");
+      const dashboardUrl = await ownerNoticeUrl(tenant, "/dashboard/reports", getTenantDashboardUrl(tenant, "/dashboard/reports"));
 
       const html = renderEmailHtml({
         preheader: paragraphs[0],

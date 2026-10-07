@@ -18,6 +18,7 @@ import type { WebsiteRebuildRecord } from "@/products/websites/rebuild-contracts
 import { unresolvedSiteFacts } from "@/products/websites/site-document-schema";
 import { OWNER_ONLY_KINDS, type ChangeKind, type ProposedItem } from "../contracts";
 import type { SourceAdapter } from "../adapters";
+import type { ServiceSession } from "../service-actor";
 import { itemTitle, memberActor, proposeAsMember, revisionOf, splitSource, unchangedOutcome, workspaceHref } from "./shared";
 
 export interface WebsiteSelection { expectedRevision: number; candidateRevision: number; candidateContentHash: string }
@@ -26,6 +27,7 @@ export interface WebsiteDocumentPorts {
   list(actor: WorkspaceActor, workspaceId: string): Promise<WebsiteRebuildRecord[]>;
   approve(actor: WorkspaceActor, workId: string, selection: WebsiteSelection): Promise<WebsiteRebuildRecord>;
   launch(actor: WorkspaceActor, workId: string, selection: WebsiteSelection): Promise<WebsiteRebuildRecord>;
+  launchByOwnerLink?(actor: WorkspaceActor, workId: string, selection: WebsiteSelection, session: ServiceSession): Promise<WebsiteRebuildRecord>;
 }
 
 type Stage = "approve" | "launch";
@@ -88,6 +90,7 @@ export function websiteDocumentAdapter(ports: WebsiteDocumentPorts): SourceAdapt
   return {
     lifecycle: "website_document",
     needsMemberActor: true,
+    ownerLinkWithoutAccount: true,
     propose: (ctx) => proposeAsMember(ctx, async actor =>
       (await ports.list(actor, ctx.workspaceId)).filter(row => row.workspaceId === ctx.workspaceId).flatMap(row => websiteDocumentItem(row) ?? [])),
     async currentRevision(ctx, sourceId) {
@@ -108,7 +111,13 @@ export function websiteDocumentAdapter(ports: WebsiteDocumentPorts): SourceAdapt
           const saved = await ports.approve(actor, found.record.workId, selection(found.record));
           return { outcome: "done", receiptRef: `website_document:${saved.workId}:approved:${saved.rebuild.approvedCandidateRevision ?? ""}` };
         }
-        const launched = await ports.launch(actor, found.record.workId, selection(found.record));
+        const service = by.kind === "owner_link" ? by.service : null;
+        const launched = service?.purpose === "owner_decision_link"
+          ? await (async () => {
+            if (!ports.launchByOwnerLink) throw new Error("owner_link_launch_unavailable");
+            return ports.launchByOwnerLink(actor, found.record.workId, selection(found.record), service);
+          })()
+          : await ports.launch(actor, found.record.workId, selection(found.record));
         const receipt = launched.rebuild.launch.receipt;
         const receiptRef = receipt ? `website_document:${launched.workId}:${receipt.receiptId}` : `website_document:${launched.workId}`;
         if (launched.rebuild.status !== "published" || !receipt) return { outcome: "failed", reason: "not_published" };
