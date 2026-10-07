@@ -22,9 +22,11 @@ for (const width of [1280, 390, 320]) {
   test(`both website entry paths and retained failure at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto("/preview/strelva/website-entry", { waitUntil: "domcontentloaded" });
+    await expect(page.locator('[data-website-entry-ready="true"]')).toBeVisible();
     await page.getByRole("link", { name: "Connect your existing website" }).click();
     await expect(page.getByRole("button", { name: "Get my two lines" })).toBeVisible();
     await page.getByRole("link", { name: "Prepare a new website" }).click();
+    await expect(page.locator('[data-website-entry-ready="true"]')).toBeVisible();
     await expect(page.getByRole("textbox", { name: "Your current website" })).toBeVisible();
     await page.getByRole("button", { name: "No site yet? Describe your business" }).click();
     await expect(page.getByRole("textbox", { name: "Describe your business" })).toBeVisible();
@@ -34,6 +36,7 @@ for (const width of [1280, 390, 320]) {
     await expect(page.getByRole("region", { name: "Private website preview" })).toBeVisible();
     await evidence(page, `entry-review-${width}`);
     await page.goto("/preview/strelva/website-entry?entry=rebuild&state=error", { waitUntil: "domcontentloaded" });
+    await expect(page.locator('[data-website-entry-ready="true"]')).toBeVisible();
     await page.getByRole("textbox", { name: "Your current website" }).fill("https://fictional.example.test");
     await page.getByRole("button", { name: "Build a private preview" }).click();
     await expect(page.getByRole("alert").first()).toContainText("Your address is kept");
