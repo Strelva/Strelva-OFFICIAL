@@ -52,7 +52,10 @@ for (const width of [1440, 390]) {
       // Both asks leave Needs you; the bookings page shows the confirmed one.
       await home.reload();
       await expect(home.getByRole("region", { name: "Needs you" }).getByText(/^Booking request:/)).toHaveCount(0);
-      await home.goto(`/workspace/bookings?workspaceId=${businessId}&view=week`);
+      // The week view opens on the current week; Sam's booking is ten days out.
+      const keepDay = new Date();
+      keepDay.setUTCDate(keepDay.getUTCDate() + 10);
+      await home.goto(`/workspace/bookings?workspaceId=${businessId}&view=week&date=${keepDay.toISOString().slice(0, 10)}`);
       await expect(home.getByText("Sam Lee").first()).toBeVisible();
       await noHorizontalOverflow(home);
       await home.screenshot({ path: testInfo.outputPath(`bookings-after-${width}.png`), fullPage: true });

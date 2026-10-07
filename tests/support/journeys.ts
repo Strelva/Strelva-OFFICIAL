@@ -30,6 +30,8 @@ export const JOURNEY_SERVER_FLAGS = [
   "STRELVA_NEEDS_YOU_RELEASE",
   "STRELVA_OWNER_ENTRY",
   "STRELVA_BOOKING_STORE_WRITE",
+  // Make real approved by email link for an owner with no account (20261009140000).
+  "STRELVA_MAKE_REAL_OWNER_LINK_RELEASE",
 ] as const;
 
 export function journeyEnvironment() {

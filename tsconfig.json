@@ -55,7 +55,9 @@
     ".next-visible-review/types/**/*.ts",
     ".next-visible-review/dev/types/**/*.ts",
     ".next-navcheck/types/**/*.ts",
-    ".next-navcheck/dev/types/**/*.ts"
+    ".next-navcheck/dev/types/**/*.ts",
+    ".next-journeys/types/**/*.ts",
+    ".next-journeys/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

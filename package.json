@@ -36,6 +36,7 @@
     "check:workspace-target": "node scripts/check-workspace-target.mjs",
     "test:workspace-target": "node --test scripts/tests/workspace-target.node-test.mjs",
     "check:release-one": "bash scripts/check-release-one.sh",
+    "check:journeys": "bash scripts/check-journeys.sh",
     "smoke:workspace": "STRELVA_WORKSPACE_RELEASE=1 playwright test tests/workspace-release.spec.ts",
     "audit:full": "npx tsx --env-file-if-exists=.env.local scripts/full-audit.ts",
     "check:prod": "tsx scripts/production-checklist.ts",
