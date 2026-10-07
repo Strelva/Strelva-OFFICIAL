@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { ArrowUp, CircleAlert, History, Loader2, Plus } from "lucide-react";
+import { SelectInput } from "@/components/ui/TextInput";
 import { ConversationStreamDecoder } from "@/experience/conversation/stream";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import {
@@ -23,6 +24,8 @@ export interface AskStrelvaProps {
   readOnlyReason?: string;
   /** Embedded beside another surface (the site editor): no page heading. */
   compact?: boolean;
+  /** Fixture initial value; the server confirms operator authority before enabling this. */
+  canAskOnBehalf?: boolean;
   /** Lets a caller supply transport (the local preview). Defaults to the workspace request. */
   request?: typeof fetch;
 }
@@ -35,9 +38,11 @@ type HistoryState = "loading" | "ready" | "unavailable" | "off";
  * shows what it actually did: answered, drafted (not live), opened a
  * Possibility, or filed a Request. Nothing typed here approves anything.
  */
-export function AskStrelva({ workspaceId, businessName, systemId = null, systemName, initialText = "", readOnly = false, readOnlyReason, compact = false, request: requestOverride }: AskStrelvaProps) {
+export function AskStrelva({ workspaceId, businessName, systemId = null, systemName, initialText = "", readOnly = false, readOnlyReason, compact = false, canAskOnBehalf: initialCanAskOnBehalf = false, request: requestOverride }: AskStrelvaProps) {
   const contextRequest = useWorkspaceRequest();
   const request = requestOverride ?? contextRequest;
+  const [canAskOnBehalf, setCanAskOnBehalf] = useState(initialCanAskOnBehalf);
+  const [askedOnBehalf, setAskedOnBehalf] = useState<"email" | "phone" | "">("");
   const [conversations, setConversations] = useState<AskConversationSummaryView[]>([]);
   const [historyState, setHistoryState] = useState<HistoryState>("loading");
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -60,7 +65,8 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
       const response = await request(`/api/workspace/ask?${params}`, { cache: "no-store" });
       if (response.status === 503) { setHistoryState("off"); return; }
       if (!response.ok) { setHistoryState("unavailable"); return; }
-      const body = await response.json() as { conversations?: AskConversationSummaryView[] };
+      const body = await response.json() as { conversations?: AskConversationSummaryView[]; canAskOnBehalf?: boolean };
+      setCanAskOnBehalf(body.canAskOnBehalf === true);
       setConversations(Array.isArray(body.conversations) ? body.conversations : []);
       setHistoryState("ready");
     } catch {
@@ -106,7 +112,7 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
     event?.preventDefault();
     const text = input.trim();
     if (!text || streaming || readOnly || !conversationMine) return;
-    const userMessage: AskMessageView = { id: `local-${Date.now()}`, role: "user", content: text, result: null };
+    const userMessage: AskMessageView = { id: `local-${Date.now()}`, role: "user", content: text, result: null, askedOnBehalf: canAskOnBehalf && askedOnBehalf ? askedOnBehalf : null };
     const replyId = `reply-${Date.now()}`;
     const prior = messages.filter((message) => message.content.trim()).slice(-38).map((message) => ({ role: message.role, content: message.content.slice(0, 20_000) }));
     setMessages((current) => [...current, userMessage, { id: replyId, role: "assistant", content: "", result: null, pending: true }]);
@@ -123,6 +129,7 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
           workspaceId,
           ...(conversationSystemId ? { systemId: conversationSystemId } : {}),
           ...(conversationId ? { conversationId } : {}),
+          ...(canAskOnBehalf && askedOnBehalf ? { askedOnBehalf } : {}),
           messages: [...prior, { role: "user", content: text }],
         }),
       });
@@ -213,6 +220,10 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
     {error ? <p role="alert" className={styles.error}><CircleAlert size={16} aria-hidden="true" />{error}</p> : null}
     {unsaved ? <p role="status" className={styles.note}>Part of this conversation couldn&apos;t be saved. What Strelva drafted or filed is unaffected.</p> : null}
 
+    {canAskOnBehalf ? <SelectInput label="Who asked for this?" value={askedOnBehalf} disabled={streaming || Boolean(blockedReason)}
+      options={[{ value: "", label: "I am asking" }, { value: "email", label: "The owner, by email" }, { value: "phone", label: "The owner, by phone" }]}
+      onChange={(event) => setAskedOnBehalf(event.target.value as "email" | "phone" | "")}
+      helperText="The owner still decides in Needs you." /> : null}
     <form className={styles.composer} onSubmit={(event) => void send(event)}>
       <label htmlFor="ask-strelva-input" className="sr-only">Ask Strelva about {place}</label>
       <textarea id="ask-strelva-input" ref={inputRef} value={input} rows={2} maxLength={20_000} disabled={Boolean(blockedReason)} placeholder={blockedReason ?? `Ask about ${place}`} onChange={(event) => setInput(event.target.value)} onKeyDown={onKeyDown} />

@@ -6,7 +6,7 @@ import { listWork } from "@/platform/workspaces/repository";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type SavedWork, type WorkspaceActor, type AcceptedHandoff } from "@/platform/workspaces/types";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { websiteDocumentStore, createWebsiteDocumentStore, invalidatePublishedSiteDocument, type OwnerLinkWebsiteSession, type WebsiteDocumentStore, type WebsiteDocumentRevision } from "./document-store";
-import { siteDocumentHash, siteDocumentSchema, catalogNodeSchema, unresolvedSiteFacts, type SiteDocument } from "./site-document";
+import { siteDocumentHash, siteDocumentSchema, siteIdSchema, catalogNodeSchema, unresolvedSiteFacts, type SiteDocument } from "./site-document";
 import { runWebsiteRebuild, isHighRiskWebsiteClaim, type RebuildCheckpoint, type RebuildOptions, type WebsiteRebuildInput } from "./rebuild-pipeline";
 import { normalizeRebuildUrl } from "./rebuild-crawl";
 import { prepareSitePatch, prepareSiteUndo } from "./site-operations";
@@ -256,6 +256,22 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     await documents.approve(actor,{ workspaceId: loaded.work.workspaceId, workId, revision: candidate.revision, contentHash: candidate.contentHash });
     return present(await update(actor,loaded,"rebuild_approved",{ status: "approved", approvedCandidateRevision: candidate.revision, lastError: null }));
   }
+  /** Confirm one exact node's displayed copy. Facts and publication remain separate decisions. */
+  async function resolveCopyReview(actor: WorkspaceActor, workId: string, rawNodeId: string, raw: unknown) {
+    const nodeId = siteIdSchema.parse(rawNodeId);
+    const loaded = await load(actor,workId);
+    const { candidate } = exact(loaded,raw);
+    if (loaded.rebuild.status !== "review_ready") throw new WorkspaceConflictError("Open the current review-ready website preview before confirming copy.");
+    await store.member(actor,loaded.work.workspaceId);
+    await documents.manage(actor,{ workspaceId: loaded.work.workspaceId, workId });
+    const document = structuredClone(candidate.document);
+    const node = document.nodes[nodeId];
+    if (!node || !node.verification?.needsReview) throw new WorkspaceConflictError("This website copy is no longer waiting on confirmation.");
+    const unresolved = new Set(unresolvedSiteFacts(document));
+    if (node.factIds.some(factId => !document.facts[factId] || unresolved.has(factId))) throw new WorkspaceConflictError("Confirm this copy's unresolved facts before reviewing the copy.");
+    node.verification = { ...node.verification, supported: true, confidence: 1, needsReview: false };
+    return present(await saveCandidate(actor,loaded,siteDocumentSchema.parse(document),"copy_review_confirmed"));
+  }
   async function launch(actor: WorkspaceActor, workId: string, raw: unknown) {
     let loaded = await load(actor,workId); const { candidate } = exact(loaded,raw);
     if (loaded.rebuild.launch.receipt?.status === "published" && loaded.rebuild.launch.receipt.artifactHash === candidate.contentHash && loaded.rebuild.launch.receipt.candidateRevision === candidate.revision) return present(loaded.rebuild.status === "published" ? loaded : await update(actor,loaded,"publish_reconciled",{ status:"published" }));
@@ -401,7 +417,7 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     return present(await saveCandidate(actor,{ ...loaded,rebuild },siteDocumentSchema.parse(document),"visitor_tools_connected"));
   }
   async function capabilityOptions(actor: WorkspaceActor,workId: string) { const loaded = await load(actor,workId); return listPublishedWebsiteCapabilityOptions(actor,loaded.work.workspaceId,workId); }
-  return { create, read, list, retry, resolveFact, approve, launch, publishOntoLinkedTenant, patch, undo, domain, initializeHandoff, connectCapabilities, capabilityOptions };
+  return { create, read, list, retry, resolveFact, resolveCopyReview, approve, launch, publishOntoLinkedTenant, patch, undo, domain, initializeHandoff, connectCapabilities, capabilityOptions };
 }
 export const websiteRebuildService = createWebsiteRebuildService();
 export const createWebsiteRebuild = websiteRebuildService.create;
@@ -409,6 +425,7 @@ export const readWebsiteRebuild = websiteRebuildService.read;
 export const listWebsiteRebuilds = websiteRebuildService.list;
 export const retryWebsiteRebuild = websiteRebuildService.retry;
 export const resolveWebsiteRebuildFact = websiteRebuildService.resolveFact;
+export const resolveWebsiteRebuildCopyReview = websiteRebuildService.resolveCopyReview;
 export const approveWebsiteRebuild = websiteRebuildService.approve;
 export const launchWebsiteRebuild = websiteRebuildService.launch;
 export const patchWebsiteRebuild = websiteRebuildService.patch;

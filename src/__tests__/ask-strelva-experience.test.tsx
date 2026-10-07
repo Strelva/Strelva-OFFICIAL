@@ -73,6 +73,16 @@ describe("Ask Strelva in the workspace", () => {
     expect(html).not.toMatch(/\b(AI|agent|automation|workflow)\b/);
   });
 
+  it("lets an operator record email or phone origin without moving the decision into chat", () => {
+    const html = renderToStaticMarkup(createElement(AskStrelva, { workspaceId: WS, businessName: "The Mooney Firm", canAskOnBehalf: true }));
+    expect(html).toContain("Who asked for this?");
+    expect(html).toContain("The owner, by email");
+    expect(html).toContain("The owner, by phone");
+    expect(html).toContain("The owner still decides in Needs you.");
+    const owner = renderToStaticMarkup(createElement(AskStrelva, { workspaceId: WS, businessName: "The Mooney Firm" }));
+    expect(owner).not.toContain("Who asked for this?");
+  });
+
   it("disables asking with the reason when the person can't ask", () => {
     const html = renderToStaticMarkup(createElement(AskStrelva, { workspaceId: WS, businessName: "The Mooney Firm", readOnly: true, readOnlyReason: "Work in this workspace has stopped.", request: (async () => new Response("{}")) as typeof fetch }));
     expect(html).toContain('placeholder="Work in this workspace has stopped."');

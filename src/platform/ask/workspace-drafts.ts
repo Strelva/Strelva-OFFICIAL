@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { businessRecordPatchSchema, type BusinessRecordPatch } from "@/platform/business-record/contracts";
+import type { ServiceSession } from "@/platform/needs-you/service-actor";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { AskNeedsYouRouting } from "./ports";
 
@@ -15,18 +16,20 @@ export const businessFactDraftSchema = z.object({
   id: z.string().uuid(), workspaceId: z.string().uuid(), systemId: z.string().uuid().nullable(),
   expectedRevision: z.number().int().min(0), patch: businessRecordPatchSchema,
   summary: z.string(), status: z.enum(["pending", "approved", "declined"]),
+  askedOnBehalf: z.enum(["email", "phone"]).nullable().optional(),
   createdAt: z.string(), receipt: z.object({ sequence: z.number().int().positive(), revision: z.number().int().min(0) }).nullable(),
 });
 export type BusinessFactDraft = z.infer<typeof businessFactDraftSchema>;
 
 export interface BusinessFactDraftStore {
-  save(actor: WorkspaceActor, input: AskBusinessFactInput & { workspaceId: string; systemId: string | null; idempotencyKey: string }): Promise<BusinessFactDraft>;
+  save(actor: WorkspaceActor, input: AskBusinessFactInput & { workspaceId: string; systemId: string | null; askedOnBehalf?: "email" | "phone" | null; idempotencyKey: string }): Promise<BusinessFactDraft>;
   list(actor: WorkspaceActor, workspaceId: string): Promise<BusinessFactDraft[]>;
+  resolveOwnerLink?(actor: WorkspaceActor, workspaceId: string, draftId: string, decision: "approve" | "not_yet", session: ServiceSession): Promise<BusinessFactDraft>;
   resolve(actor: WorkspaceActor, workspaceId: string, draftId: string, decision: "approve" | "not_yet"): Promise<BusinessFactDraft>;
 }
 
 export interface AskWorkspaceDraftPort {
-  businessFact(actor: WorkspaceActor, input: AskBusinessFactInput & { workspaceId: string; systemId: string | null; idempotencyKey: string }): Promise<{ draftId: string; routing: AskNeedsYouRouting; decisionSyncPending?: boolean }>;
+  businessFact(actor: WorkspaceActor, input: AskBusinessFactInput & { workspaceId: string; systemId: string | null; askedOnBehalf?: "email" | "phone" | null; idempotencyKey: string }): Promise<{ draftId: string; routing: AskNeedsYouRouting; decisionSyncPending?: boolean }>;
   inquiryReply(actor: WorkspaceActor, input: { workspaceId: string; tenantId: string; inquiryId: string; replyText: string }): Promise<{ eventIds: string[] }>;
   readInquiries?(actor: WorkspaceActor, workspaceId: string): Promise<unknown>;
   readBookings?(actor: WorkspaceActor, workspaceId: string): Promise<unknown>;

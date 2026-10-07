@@ -77,7 +77,7 @@ function eventIdsOf(output: Output): string[] {
 export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
   let requestCount = 0;
 
-  async function guarded(toolId: AskToolId, run: (snapshot: AskAuthoritySnapshot) => Promise<Output>): Promise<Output> {
+  async function guarded(toolId: AskToolId, run: (snapshot: AskAuthoritySnapshot) => Promise<Output>, scope: "tenant" | "workspace" = "tenant"): Promise<Output> {
     let snapshot: AskAuthoritySnapshot;
     try {
       snapshot = await ctx.authority.read();
@@ -85,7 +85,7 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
       ctx.onReceipt({ kind: "refusal", toolId, status: "refused", ids: [], summary: "Access could not be confirmed." });
       return refused("authority_unavailable", "I couldn't confirm your access just now. Nothing was changed.");
     }
-    const decision = authorizeAskTool(toolId, snapshot);
+    const decision = authorizeAskTool(toolId, snapshot, scope);
     if (!decision.allowed) {
       if (ASK_TOOL_CATALOG[toolId].authority === "draft") {
         ctx.onReceipt({ kind: "refusal", toolId, status: "refused", ids: [], summary: decision.message });
@@ -130,7 +130,7 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
 
   const tools: Record<AskToolId, Tool> = {
     read_system: tool({
-      description: "Read the website System: its pages and nodes (view site), a legacy section (section), the content outline (content), photos (photos), a preview link (preview), blog/video/product entries (entries), newsletter subscribers (subscribers), or open Possibilities and suggestions (possibilities).",
+      description: "Read the business record, inquiries, this week’s bookings, or the website System: its pages and nodes (view site), a legacy section (section), the content outline (content), photos (photos), a preview link (preview), blog/video/product entries (entries), newsletter subscribers (subscribers), or open Possibilities and suggestions (possibilities).",
       inputSchema: z.object({
         view: z.enum(["site", "section", "content", "photos", "preview", "entries", "subscribers", "possibilities", "business_record", "inquiries", "bookings"]),
         section: z.string().max(64).optional(),
@@ -163,7 +163,7 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
             return { possibilities, suggestions: (suggestions as Output).suggestions ?? [] };
           }
         }
-      }),
+      }, ["business_record", "inquiries", "bookings"].includes(input.view) ? "workspace" : "tenant"),
     }),
     read_performance: tool({
       description: "Read website traffic: totals and trend (metrics), why traffic changed (traffic), or the weekly report card (report).",
@@ -174,7 +174,14 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
     read_history: tool({
       description: "Read recent changes and what Strelva handled on the site, optionally for one section.",
       inputSchema: z.object({ section: z.string().max(64).optional() }),
-      execute: (input) => guarded("read_history", async () => callTenant(ctx, "get_activity", input.section ? { section: input.section } : {})),
+      execute: (input) => guarded("read_history", async () => {
+        const output = await callTenant(ctx, "get_activity", input.section ? { section: input.section } : {});
+        return { ...output, activity: Array.isArray(output.activity) ? output.activity.map(row => {
+          if (!row || typeof row !== "object") return row;
+          const entry = row as Record<string, unknown>;
+          return { ...entry, ...(typeof entry.text === "string" ? { text: entry.text.replace(/^AI (?=saved|updated|created|drafted|replied|changed)/, "Strelva ") } : {}) };
+        }) : output.activity };
+      }),
     }),
     read_connections: tool({
       description: "Read this System's Connections: what is connected and what each adds.",
@@ -265,7 +272,7 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
         requestCount += 1;
         try {
           const saved = await ctx.workspaceDrafts.businessFact(ctx.actor, {
-            ...input, workspaceId: ctx.workspaceId, systemId: ctx.systemId, idempotencyKey: `ask:${ctx.turnId}:fact:${requestCount}`,
+            ...input, workspaceId: ctx.workspaceId, systemId: ctx.systemId, askedOnBehalf: ctx.askedOnBehalf, idempotencyKey: `ask:${ctx.turnId}:fact:${requestCount}`,
           });
           ctx.onReceipt({ kind: "draft", toolId: "draft_business_fact_change", status: "queued", ids: [saved.draftId], summary: input.summary, needsYou: saved.routing });
           return { success: true, draftId: saved.draftId, needsYou: saved.routing, needsYouSyncPending: saved.decisionSyncPending ?? false, agentResultStatus: "queued", message: saved.decisionSyncPending ? "The exact change is saved, but Needs you couldn't sync. Your business record wasn't changed. Reload Needs you before retrying." : "The exact change is saved for a decision in Needs you. Your business record, website and listing haven't changed." };

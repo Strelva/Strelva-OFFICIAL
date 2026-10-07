@@ -72,6 +72,7 @@ export function workResponsibilityAdapter(ports: WorkResponsibilityPorts): Sourc
       try {
         const record = await find(actor, ctx.workspaceId, item.sourceId);
         if (!record) return { outcome: "done", reason: "already_resolved" };
+        if (workRevision(record) !== item.revisionHash) return { outcome: "failed", reason: "source_changed" };
         if (record.payload.ownerId !== actor.userId) return { outcome: "failed", reason: "not_creator" };
         const approved = await ports.approve(actor, record.id, record.payload.revision);
         if (!approved.payload.approvedAt) return { outcome: "failed", reason: "not_approved" };

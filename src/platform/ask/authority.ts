@@ -45,7 +45,7 @@ const deny = (reason: AskDenialReason, message: string): AskAuthorityDecision =>
  * The one authority rule for Ask Strelva tools. Pure: the same snapshot always
  * gives the same answer, so the authority matrix test covers it completely.
  */
-export function authorizeAskTool(toolId: AskToolId, snapshot: AskAuthoritySnapshot): AskAuthorityDecision {
+export function authorizeAskTool(toolId: AskToolId, snapshot: AskAuthoritySnapshot, scope: "tenant" | "workspace" = "tenant"): AskAuthorityDecision {
   const tool = ASK_TOOL_CATALOG[toolId];
   if (!tool) return deny("not_available", "That isn't something I can do here.");
   if (!snapshot.role) return deny("no_access", "This business is unavailable to your account.");
@@ -59,7 +59,8 @@ export function authorizeAskTool(toolId: AskToolId, snapshot: AskAuthoritySnapsh
       return deny("workspace_stopped", "New work is stopped for this business, or its state couldn't be confirmed. Nothing changed.");
     }
   }
-  if (tool.needsTenant) {
+  if (scope === "workspace" && toolId !== "read_system") return deny("not_available", "That tool needs its connected site.");
+  if (tool.needsTenant && scope !== "workspace") {
     if (!snapshot.site || snapshot.site.state === "unlinked") {
       return deny("site_not_connected", "This site isn't connected to this workspace. I can file a Request for Strelva instead.");
     }

@@ -9,6 +9,7 @@ create table public.ask_business_record_drafts (
   patch jsonb not null check (jsonb_typeof(patch) = 'object' and patch <> '{}'::jsonb),
   summary text not null check (char_length(summary) between 1 and 200 and summary = btrim(summary)),
   idempotency_key text not null check (char_length(idempotency_key) between 1 and 200),
+  asked_on_behalf text check (asked_on_behalf in ('email','phone')),
   created_by uuid not null references public.users(id),
   created_at timestamptz not null default clock_timestamp(),
   status text not null default 'pending' check (status in ('pending','approved','declined')),
@@ -23,11 +24,11 @@ create function public.ask_business_draft_json(p public.ask_business_record_draf
 language sql stable security definer set search_path = public, pg_temp as $$
 select jsonb_build_object('id',p.id,'workspaceId',p.workspace_id,'systemId',p.system_id,
  'expectedRevision',p.expected_revision,'patch',p.patch,'summary',p.summary,'status',p.status,
- 'createdAt',p.created_at,'receipt',p.receipt);
+ 'askedOnBehalf',p.asked_on_behalf,'createdAt',p.created_at,'receipt',p.receipt);
 $$;
 
 create function public.save_ask_business_draft(p_workspace_id uuid,p_user_id uuid,p_verified_email text,
- p_system_id uuid,p_expected_revision bigint,p_patch jsonb,p_summary text,p_idempotency_key text) returns jsonb
+ p_system_id uuid,p_expected_revision bigint,p_patch jsonb,p_summary text,p_idempotency_key text,p_asked_on_behalf text default null) returns jsonb
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare d public.ask_business_record_drafts%rowtype; r bigint; actor_role text;
 begin
@@ -39,18 +40,20 @@ begin
  if p_patch is null or jsonb_typeof(p_patch) <> 'object' or p_patch = '{}'::jsonb
    or (p_patch - array['facts','services','people']::text[]) <> '{}'::jsonb
    or length(p_patch::text) > 900 then raise exception 'business_record_patch_invalid'; end if;
+ if p_asked_on_behalf is not null and (p_asked_on_behalf not in ('email','phone') or not exists(select 1 from public.super_admins where user_id=p_user_id and revoked_at is null))
+ then raise exception 'business_record_access_denied'; end if;
  if p_system_id is not null and not exists(select 1 from public.systems where id=p_system_id and business_workspace_id=p_workspace_id)
  then raise exception 'business_record_access_denied'; end if;
  select * into d from public.ask_business_record_drafts where workspace_id=p_workspace_id and idempotency_key=p_idempotency_key for update;
  if found then
    if d.patch <> p_patch or d.expected_revision <> p_expected_revision or d.summary <> p_summary
-     or d.system_id is distinct from p_system_id or d.created_by <> p_user_id then raise exception 'business_record_idempotency_conflict'; end if;
+     or d.asked_on_behalf is distinct from p_asked_on_behalf or d.system_id is distinct from p_system_id or d.created_by <> p_user_id then raise exception 'business_record_idempotency_conflict'; end if;
    return public.ask_business_draft_json(d);
  end if;
  select revision into r from public.business_records where workspace_id=p_workspace_id for update;
  if p_expected_revision is null or coalesce(r,0) <> p_expected_revision then raise exception 'business_record_revision_conflict'; end if;
- insert into public.ask_business_record_drafts(workspace_id,system_id,expected_revision,patch,summary,idempotency_key,created_by)
- values(p_workspace_id,p_system_id,p_expected_revision,p_patch,p_summary,p_idempotency_key,p_user_id) returning * into d;
+ insert into public.ask_business_record_drafts(workspace_id,system_id,expected_revision,patch,summary,idempotency_key,asked_on_behalf,created_by)
+ values(p_workspace_id,p_system_id,p_expected_revision,p_patch,p_summary,p_idempotency_key,p_asked_on_behalf,p_user_id) returning * into d;
  return public.ask_business_draft_json(d);
 end;
 $$;
@@ -78,7 +81,7 @@ begin
  if d.status <> 'pending' then return public.ask_business_draft_json(d); end if;
  if p_decision = 'approve' then
    result := public.patch_business_record(p_workspace_id,p_user_id,p_verified_email,'agent',d.expected_revision,d.patch,d.id,
-     encode(digest(convert_to(d.patch::text || ':' || d.expected_revision::text,'UTF8'),'sha256'),'hex'));
+     encode(sha256(convert_to(d.patch::text || ':' || d.expected_revision::text,'UTF8')),'hex'));
    update public.ask_business_record_drafts set status='approved',receipt=jsonb_build_object('sequence',result->'sequence','revision',result->'revision')
      where id=d.id returning * into d;
  else
@@ -88,10 +91,10 @@ begin
 end;
 $$;
 revoke all on function public.ask_business_draft_json(public.ask_business_record_drafts) from public,anon,authenticated,service_role;
-revoke all on function public.save_ask_business_draft(uuid,uuid,text,uuid,bigint,jsonb,text,text) from public,anon,authenticated;
+revoke all on function public.save_ask_business_draft(uuid,uuid,text,uuid,bigint,jsonb,text,text,text) from public,anon,authenticated;
 revoke all on function public.list_ask_business_drafts(uuid,uuid,text) from public,anon,authenticated;
 revoke all on function public.resolve_ask_business_draft(uuid,uuid,text,uuid,text) from public,anon,authenticated;
-grant execute on function public.save_ask_business_draft(uuid,uuid,text,uuid,bigint,jsonb,text,text) to service_role;
+grant execute on function public.save_ask_business_draft(uuid,uuid,text,uuid,bigint,jsonb,text,text,text) to service_role;
 grant execute on function public.list_ask_business_drafts(uuid,uuid,text) to service_role;
 grant execute on function public.resolve_ask_business_draft(uuid,uuid,text,uuid,text) to service_role;
 commit;

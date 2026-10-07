@@ -39,7 +39,11 @@ export function businessRecordDraftAdapter(store: BusinessFactDraftStore): Sourc
         const draft = (await store.list(actor, ctx.workspaceId)).find(row => row.id === item.sourceId && row.workspaceId === ctx.workspaceId);
         if (!draft || draft.status !== "pending") return { outcome: "done", reason: "already_resolved" };
         if (businessFactDraftRevision(draft) !== item.revisionHash) return { outcome: "failed", reason: "source_changed" };
-        const saved = await store.resolve(actor, ctx.workspaceId, draft.id, decision);
+        const session = by.kind === "owner_link" ? by.serviceSession : undefined;
+        if (session?.purpose === "owner_decision_link" && !store.resolveOwnerLink) return { outcome: "failed", reason: "signed_draft_writer_unavailable" };
+        const saved = session?.purpose === "owner_decision_link"
+          ? await store.resolveOwnerLink!(actor, ctx.workspaceId, draft.id, decision, session)
+          : await store.resolve(actor, ctx.workspaceId, draft.id, decision);
         if (decision === "not_yet") return saved.status === "declined" ? { outcome: "done", reason: "Not yet" } : { outcome: "failed", reason: "draft_not_declined" };
         if (saved.status !== "approved" || !saved.receipt) return { outcome: "failed", reason: "draft_not_applied" };
         return { outcome: "done", receiptRef: `business_record:${ctx.workspaceId}:${saved.receipt.sequence}` };

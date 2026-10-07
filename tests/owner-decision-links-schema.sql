@@ -27,7 +27,7 @@ begin
   insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values(ws,actor,'admin',actor);
   insert into public.tenants(id,site_name,owner_email,template,industry) values('ol-existing-fixture','Existing Owner Link','ol-owner@example.test','professional','consulting');
   insert into public.tenant_workspace_links(tenant_stable_id,tenant_slug_at_link,workspace_id,linked_by,command_id,command_digest,receipt)
-    select stable_id,id,ws,actor,gen_random_uuid(),h,'{}'::jsonb from public.tenants where id='ol-existing-fixture';
+    select t.stable_id,t.id,ws,actor,gen_random_uuid(),h,'{}'::jsonb from public.tenants t where t.id='ol-existing-fixture';
   select * into work from public.claim_website_rebuild(ws,actor,'ol-operator@example.test','ol-request-one','ol-example.test','{"url":"https://ol-example.test"}',
     jsonb_build_object('version',2,'revision',0,'title','Owner link fixture','status','building','createdBy',actor,'createdAt','2026-10-08T10:00:00Z','history','[]'::jsonb));
   perform public.append_website_document(ws,work.id,actor,'ol-operator@example.test',0,h,doc);
@@ -59,11 +59,11 @@ begin
   perform public.publish_website_by_owner_link(ws,work.id,actor,'ol-operator@example.test',1,h,reserved,rec,sid,id,revision_hash,'ol-owner@example.test');
   perform pg_temp.ol_assert((select count(*) from public.website_document_receipts where website_work_id=work.id)=1,'accepted write is never duplicated');
   -- Any owner-recipient change after claim revokes the capability immediately.
-  update public.tenants set owner_email='changed@example.test' where id='ol-existing-fixture';
+  update public.tenants t set owner_email='changed@example.test' where t.id='ol-existing-fixture';
   -- Recipient resolver prefers the first linked tenant; set both to remove ambiguity.
-  update public.tenants set owner_email='changed@example.test' where id=reserved;
+  update public.tenants t set owner_email='changed@example.test' where t.id=reserved;
   perform pg_temp.ol_expect(format('select public.publish_website_by_owner_link(%L,%L,%L,%L,1,%L,%L,%L,%L,%L,%L,%L)',ws,work.id,actor,'ol-operator@example.test',h,reserved,rec,sid,id,revision_hash,'ol-owner@example.test'),'owner_decision_recipient_not_owner');
-  update public.tenants set owner_email='ol-owner@example.test' where id in ('ol-existing-fixture',reserved);
+  update public.tenants t set owner_email='ol-owner@example.test' where t.id in ('ol-existing-fixture',reserved);
   delete from public.workspace_memberships where workspace_id=ws and user_id=actor;
   perform pg_temp.ol_expect(format('select public.publish_website_by_owner_link(%L,%L,%L,%L,1,%L,%L,%L,%L,%L,%L,%L)',ws,work.id,actor,'ol-operator@example.test',h,reserved,rec,sid,id,revision_hash,'ol-owner@example.test'),'strelva_service_access_denied');
   insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values(ws,actor,'admin',actor);

@@ -14,7 +14,7 @@ select public.convert_tenant_to_business('claim-operator@example.test','claim-si
  'ca000000-0000-4000-8000-000000000010',repeat('c',64));
 select public.create_operator_owner_invitation('claim-operator@example.test',
  (select workspace_id from public.tenant_workspace_links where tenant_slug_at_link='claim-site'),
- 'claim-owner@example.test',repeat('d',64),now()+interval '14 days');
+ 'claim-owner@example.test',encode(sha256(convert_to('owner-invitation-claim-fixture','UTF8')),'hex'),now()+interval '14 days');
 select pg_temp.claim_assert(public.claim_pending_business_owner('ca000000-0000-4000-8000-000000000003','claim-other@example.test','claim-site') is null,'address match alone grants nothing');
 select pg_temp.claim_assert(public.claim_pending_business_owner('ca000000-0000-4000-8000-000000000002','claim-owner@example.test','claim-other-site') is null,'invitation scoped to trusted tenant');
 select pg_temp.claim_assert(public.claim_pending_business_owner('ca000000-0000-4000-8000-000000000002','CLAIM-OWNER@example.test','claim-site') =

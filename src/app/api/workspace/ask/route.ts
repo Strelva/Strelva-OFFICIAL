@@ -168,7 +168,8 @@ export async function GET(request: Request) {
     if (!(await systemsReleasedFor(actor, workspaceId))) return workspaceJson({ error: "Ask Strelva is not enabled." }, 503);
     const history = createSupabaseAskHistory();
     if (conversationId) return workspaceJson({ conversation: await history.read(actor, { workspaceId, conversationId, limit: 100 }) });
-    return workspaceJson({ conversations: await history.list(actor, { workspaceId, systemId, limit: 20 }) });
+    const conversations = await history.list(actor, { workspaceId, systemId, limit: 20 });
+    return workspaceJson({ conversations, canAskOnBehalf: await isSuperAdmin() });
   } catch (error) {
     if (error instanceof AskConversationNotFoundError) return workspaceJson({ error: error.message }, 404);
     return workspaceHttpFailure(error);

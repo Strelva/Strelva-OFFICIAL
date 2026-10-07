@@ -20,7 +20,7 @@ export function createAskWorkspaceDraftPort(deps: {
       if (!await inquiryReleaseEnabledForWorkspace(workspaceId, await releaseViewerFor(actor))) throw new Error("inquiry_not_released");
       return readWorkspaceInquiryLeads(actor, workspaceId, { limit: 30 });
     },
-    readBookings: (actor, workspaceId) => readWorkspaceBookings(actor, workspaceId, { view: "upcoming" }),
+    readBookings: (actor, workspaceId) => readWorkspaceBookings(actor, workspaceId, { view: "week" }),
     async businessFact(actor, input) {
       if (!needsYouReleaseEnabled()) throw new Error("needs_you_not_released");
       const patch = businessFactDraftPatch(input.patch);

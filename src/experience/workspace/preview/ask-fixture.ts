@@ -44,7 +44,7 @@ function scripted(text: string, systemId: string | null, saved: boolean): string
   return ["__TOOL__Reading your site...\n", "From your business record, updated Oct 3: you're open Monday to Friday, 9 to 5, ", "and Saturday 10 to 2.", result({ kind: "answer", items: [] })];
 }
 
-export function withAskPreview(base: typeof fetch, mode: AskPreviewMode | null): typeof fetch {
+export function withAskPreview(base: typeof fetch, mode: AskPreviewMode | null, canAskOnBehalf = false): typeof fetch {
   if (!mode) return base;
   const stored: Array<{ id: string; role: "user" | "assistant"; content: string; result: unknown; askedOnBehalf: null }> = [
     { id: "m1", role: "user", content: "What are our hours on the site?", result: null, askedOnBehalf: null },
@@ -60,7 +60,7 @@ export function withAskPreview(base: typeof fetch, mode: AskPreviewMode | null):
       if (method === "GET") {
         if (mode === "unsaved") return json({ error: "The operation could not be confirmed." }, 503);
         if (url.searchParams.get("conversationId")) return json({ conversation: { id: CONVERSATION, systemId: null, title: "What are our hours on the site?", mine: true, updatedAt: "2026-10-05T15:00:00Z", messages: stored } });
-        return json({ conversations: [{ id: CONVERSATION, systemId: null, title: "What are our hours on the site?", messageCount: stored.length, mine: true, createdAt: "2026-10-05T15:00:00Z", updatedAt: "2026-10-05T15:00:00Z" }] });
+        return json({ canAskOnBehalf, conversations: [{ id: CONVERSATION, systemId: null, title: "What are our hours on the site?", messageCount: stored.length, mine: true, createdAt: "2026-10-05T15:00:00Z", updatedAt: "2026-10-05T15:00:00Z" }] });
       }
       if (mode === "error") return json({ error: "Strelva can't answer right now. Nothing was changed." }, 502);
       const body = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as { systemId?: string; messages?: Array<{ content: string }> };

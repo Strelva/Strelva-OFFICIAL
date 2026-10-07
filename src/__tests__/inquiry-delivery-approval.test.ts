@@ -677,22 +677,22 @@ describe("Ask-authored inquiry replies", () => {
   it("persists the exact reply, reports its event ID and sends nothing during prepare", async () => {
     const { events, base } = await fixture();
     const send = vi.fn();
-    const preview = await prepareInquiryMessageReviewWithDependencies({ tenantId: TENANT, businessId: BUSINESS, inquiryId: INQUIRY, action: "reply", actorId: ACTOR, authoredReply: "Thank you, Ada. Our team will review this." }, { ...base, transport: { send } });
-    expect(preview.eventId).toBe(events[0].id);
+    const preview = await prepareInquiryMessageReviewWithDependencies({ tenantId: TENANT, businessId: BUSINESS, inquiryId: INQUIRY, action: "reply", actorId: ACTOR, authoredReply: "Thank you, Ada. Our team will review this." }, { ...base, transport: { send, verify: vi.fn() } });
+    expect(preview.eventId).toBe(events[0]!.id);
     expect(preview.body).toContain("Thank you, Ada. Our team will review this.");
-    expect(getInquiryMessageReviewMetadata(events[0])?.authoredReply).toBe("Thank you, Ada. Our team will review this.");
+    expect(getInquiryMessageReviewMetadata(events[0]!)?.authoredReply).toBe("Thank you, Ada. Our team will review this.");
     expect(send).not.toHaveBeenCalled();
   });
   it("draft authority never becomes responsibility approval authority", async () => {
     const { events, base } = await fixture();
     const send = vi.fn();
     await prepareInquiryMessageReviewWithDependencies({ tenantId: TENANT, businessId: BUSINESS, inquiryId: INQUIRY, action: "reply", actorId: "member-drafter", authoredReply: "Thanks, Ada." }, { ...base, authorizeDraft: async () => true });
-    expect(await executeInquiryMessageReview({ tenantId: TENANT, event: events[0], actorId: "member-drafter", deps: { ...base, transport: { send }, allowExternalSends: true } })).toMatchObject({ accepted: false, reason: "permission_denied" });
+    expect(await executeInquiryMessageReview({ tenantId: TENANT, eventId: events[0]!.id, event: events[0]!, actorId: "member-drafter", deps: { ...base, transport: { send, verify: vi.fn() }, allowExternalSends: true } })).toMatchObject({ accepted: false, reason: "permission_denied" });
     expect(send).not.toHaveBeenCalled();
   });
   it("an authored reply persistence error leaves no approval event and no send", async () => {
     const { events, base } = await fixture(); const send = vi.fn();
-    await expect(prepareInquiryMessageReviewWithDependencies({ tenantId: TENANT, businessId: BUSINESS, inquiryId: INQUIRY, action: "reply", actorId: ACTOR, authoredReply: "Thanks, Ada." }, { ...base, addApprovalEvent: async () => { throw new Error("persistence unavailable"); }, transport: { send } })).rejects.toThrow("persistence unavailable");
+    await expect(prepareInquiryMessageReviewWithDependencies({ tenantId: TENANT, businessId: BUSINESS, inquiryId: INQUIRY, action: "reply", actorId: ACTOR, authoredReply: "Thanks, Ada." }, { ...base, addApprovalEvent: async () => { throw new Error("persistence unavailable"); }, transport: { send, verify: vi.fn() } })).rejects.toThrow("persistence unavailable");
     expect(events).toHaveLength(0); expect(send).not.toHaveBeenCalled();
   });
   it("cross-workspace inquiry refuses before creating a draft", async () => {
@@ -706,14 +706,14 @@ describe("Ask-authored reply binding at the provider boundary", () => {
   it("execution sends the authored copy, not the template", async () => {
     const { events, base } = await fixture(); const mail = transport();
     await prepareInquiryMessageReviewWithDependencies({ tenantId: TENANT, businessId: BUSINESS, inquiryId: INQUIRY, action: "reply", actorId: ACTOR, authoredReply: "Thank you, Ada. Please describe what you need." }, base);
-    expect(await executeInquiryMessageReview({ tenantId: TENANT, eventId: events[0].id, event: events[0], actorId: ACTOR, deps: { ...base, transport: mail } })).toMatchObject({ accepted: true, status: "verified" });
+    expect(await executeInquiryMessageReview({ tenantId: TENANT, eventId: events[0]!.id, event: events[0]!, actorId: ACTOR, deps: { ...base, transport: mail } })).toMatchObject({ accepted: true, status: "verified" });
     expect(mail.send).toHaveBeenCalledWith(expect.objectContaining({ options: expect.objectContaining({ paragraphs: ["Thank you, Ada. Please describe what you need."] }) }));
   });
   it("tampered authored text is refused before send", async () => {
     const { events, base } = await fixture(); const mail = transport();
     await prepareInquiryMessageReviewWithDependencies({ tenantId: TENANT, businessId: BUSINESS, inquiryId: INQUIRY, action: "reply", actorId: ACTOR, authoredReply: "Thanks, Ada." }, base);
-    events[0].metadata = { ...events[0].metadata, authoredReply: "We guarantee a price of $10." };
-    expect(await executeInquiryMessageReview({ tenantId: TENANT, eventId: events[0].id, event: events[0], actorId: ACTOR, deps: { ...base, transport: mail } })).toMatchObject({ accepted: false, reason: "message_mismatch" });
+    events[0]!.metadata = { ...events[0]!.metadata, authoredReply: "We guarantee a price of $10." };
+    expect(await executeInquiryMessageReview({ tenantId: TENANT, eventId: events[0]!.id, event: events[0]!, actorId: ACTOR, deps: { ...base, transport: mail } })).toMatchObject({ accepted: false, reason: "message_mismatch" });
     expect(mail.send).not.toHaveBeenCalled();
   });
 });

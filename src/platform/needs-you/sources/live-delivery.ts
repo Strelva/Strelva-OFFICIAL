@@ -80,6 +80,16 @@ export function deliverySourceAdapters(): SourceAdapter[] {
         if (!service) throw new WorkspaceConflictError("Website rebuilds are not enabled.");
         return service.approveWebsiteRebuild(actor, workId, selection);
       },
+      async confirmFact(actor, workId, factId, selection) {
+        const service = await websites();
+        if (!service) throw new WorkspaceConflictError("Website rebuilds are not enabled.");
+        return service.resolveWebsiteRebuildFact(actor, workId, factId, { ...selection, action: "confirm" });
+      },
+      async confirmCopy(actor, workId, nodeId, selection) {
+        const service = await websites();
+        if (!service) throw new WorkspaceConflictError("Website rebuilds are not enabled.");
+        return service.resolveWebsiteRebuildCopyReview(actor, workId, nodeId, selection);
+      },
       async launchByOwnerLink(actor, workId, selection, session) {
         const service = await websites();
         if (!service || session.purpose !== "owner_decision_link" || !session.decisionId || !session.revisionHash || !session.recipient) throw new WorkspaceConflictError("Website owner links are unavailable.");

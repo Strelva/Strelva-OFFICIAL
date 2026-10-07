@@ -116,6 +116,8 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261009100000": "strelva_service_actions",
   "20261009110000": "business_booking_messages",
   "20261009113000": "inquiry_events",
+  "20261010102000": "owner_decision_link_sessions",
+  "20261010103000": "ask_business_record_drafts",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */

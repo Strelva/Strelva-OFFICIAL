@@ -70,7 +70,7 @@ describe("Ask exact workspace drafts", () => {
 
 describe("business draft Needs you resolution", () => {
   const item = { ...businessFactDraftItem(saved), id: ID, workspaceId: WS } as OwnerDecision;
-  function store(): BusinessFactDraftStore { return { save: vi.fn(), list: vi.fn(async () => [saved]), resolve: vi.fn(async () => ({ ...saved, status: "approved", receipt: { sequence: 4, revision: 4 } })) }; }
+  function store(): BusinessFactDraftStore { return { save: vi.fn(), list: vi.fn(async () => [saved]), resolve: vi.fn(async () => ({ ...saved, status: "approved" as const, receipt: { sequence: 4, revision: 4 } })) }; }
   it("links a durable source and applies only through its resolver", async () => {
     const persistence = store(); const adapter = businessRecordDraftAdapter(persistence);
     expect((await adapter.propose({ workspaceId: WS, actor })).items).toEqual([businessFactDraftItem(saved)]);

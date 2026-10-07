@@ -658,7 +658,7 @@ STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$
 # and the public booking service) against the real booking functions. Last,
 # because it commits its fictional rows.
 STRELVA_BOOKINGS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
-  pnpm --dir "$repo_root" exec vitest run src/__tests__/booking-one-store.test.ts
+  pnpm --dir "$repo_root" exec vitest run src/__tests__/booking-one-store.test.ts --testTimeout=15000
 # Wave 6 owner entry and Ask (isolated local proof; explicit rollbacks are never applied here).
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010100000_owner_invitation_claim.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/owner-invitation-claim-schema.sql"

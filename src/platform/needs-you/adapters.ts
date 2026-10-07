@@ -259,6 +259,7 @@ export function serviceRequestAdapter(ports: ServiceRequestPorts): SourceAdapter
       try {
         const request = await find(actor, ctx.workspaceId, item.sourceId);
         if (!request) return { outcome: "done", reason: "already_resolved" };
+        if (serviceRevision(request) !== item.revisionHash) return { outcome: "failed", reason: "source_changed" };
         const stage = serviceStage(request);
         const updated = await ports.change(actor, {
           requestId: request.id,
