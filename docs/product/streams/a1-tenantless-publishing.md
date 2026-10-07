@@ -68,7 +68,9 @@ column, corrected to the canonical `verified_at`.
 
 ## Verification and continuation
 
-Final results are recorded in the PR. Logs and failure history are retained in
+Final results are recorded in
+[PR #531](https://github.com/Strelva/Strelva-OFFICIAL/pull/531). Logs and failure
+history are retained in
 `.scratch/a1-tenantless/`. Targeted proof covers native scope/owner checks,
 flags off, baseline-bound drafting, atomic publication and receipt failure,
 restore, replay, paused recovery, immutable issues, native grant isolation/token
@@ -88,6 +90,14 @@ explicit authority; no decision is needed for the local implementation.
 
 The integrating coordinator owns project-model/overhang/vault propagation.
 This delegated implementation supplies the evidence delta; it makes no commercial
-or production claim. Newsletter sender overlap and migration timestamp collision were resolved locally;
+or production claim.
+
+The first CI run exposed an outdated forward-migration checker: it recognized only
+three manual SQL helpers despite the integrated rollback history. Its explicit
+allowlist now includes all current helpers (including these two rollbacks);
+unregistered SQL and rollback filenames still fail closed. Node inventory tests
+cover the repository history and reject unknown helpers.
+
+Newsletter sender overlap and migration timestamp collision were resolved locally;
 the shared SQL harness and readiness manifest preserve both streams. Next action:
 integrate this PR and rehearse the combined release before any rollout decision.
