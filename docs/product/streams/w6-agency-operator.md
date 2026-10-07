@@ -3,7 +3,7 @@
 Branch: `w6/agency-operator`. Worktree: `REB-w6-agency-operator`.
 Comparison base: `7b7b4d3f`. Round 6 (October 7, 2026) resumed the saved
 round-5 checkpoint `056206eb`, parked its unfinished scope, merged
-`integrate/reborn-1.0` @ `0479cdab`, and reran every required check on the
+`integrate/reborn-1.0` @ `1060551c`, and reran every required check on the
 merged tree. All evidence below is local. No production access, provider write,
 client notification or new dependency occurred.
 
@@ -24,6 +24,15 @@ client notification or new dependency occurred.
 - **Merged `integrate/reborn-1.0`.** Three conflicts, all unions: preview
   params (`sibling` + `outcomes`, `version` + `outcomes`) and both head-only
   count test blocks, which the merged `countResult` satisfies.
+- **Kept the export reader VOLATILE after #252.** Integration's
+  `20261009150000_reader_rpc_volatility` makes `export_workspace_v3_category`
+  VOLATILE because PostgREST runs STABLE RPCs read-only and its locks then fail
+  with 25006. This stream's later `165500_business_portability` renames that
+  reader and recreated it as a STABLE wrapper, which would have brought the bug
+  back in production order. The wrapper is now VOLATILE and
+  `tests/w6-business-portability.sql` asserts both functions stay VOLATILE. No
+  other new STABLE function in this stream locks, writes or calls one of the
+  ten #252 readers (scripted scan of every `2026101016*` migration).
 - **File inventory corrected** from 283 to 293 paths (sibling-changes migration,
   rollback, SQL/UI tests and six source files were missing).
 
@@ -70,11 +79,11 @@ Round 6 results. Logs are in `.scratch/w6-round6/` (uncommitted).
 
 | Check | Result |
 | --- | --- |
-| `pnpm typecheck` | Passed before and after the integration merge. |
+| `pnpm typecheck` | Passed before and after the integration merge. The second merge (`1060551c`, #252) changed only SQL, scripts and docs, so the TypeScript results below were not rerun after it. |
 | `pnpm lint` (full aggregate) | Passed before and after the merge (exit 0, no findings). |
-| `pnpm check:boundaries` | Passed on the stream before the merge: baseline unchanged, 204 workspace→lib imports in 93 files, 46 older imports. **Fails after the merge** on 8 imports in `src/experience/workspace/outcomes/*` (`@/lib/motion`, `@/lib/ai-visibility-scorecard`). Those files, the checker and the baseline are byte-identical to `integrate/reborn-1.0` @ `0479cdab`, so the integration tip fails identically. Owned by the workspace-1.0 merge, not this stream. |
+| `pnpm check:boundaries` | Passed on the stream before the merge: baseline unchanged, 204 workspace→lib imports in 93 files, 46 older imports. **Fails after the merge** on 8 imports in `src/experience/workspace/outcomes/*` (`@/lib/motion`, `@/lib/ai-visibility-scorecard`). Those files, the checker and the baseline are byte-identical to `integrate/reborn-1.0` @ `1060551c`, so the integration tip fails identically. Owned by the workspace-1.0 merge, not this stream. |
 | `pnpm test --maxWorkers=2 --testTimeout=30000` (merged) | Passed: **727 files passed / 1 skipped; 6,529 tests passed / 38 skipped** (728 files, 6,567 tests), 100.5 s. |
-| `LC_ALL=C PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-sql` | Passed: workspace, customer-mapping and inquiry clusters, including native publish/rollback/roll-forward, sibling changes, portability rollback, exit evidence and the Postgres-backed Version store contract (vitest 29 + 8 + 29 + 10 + 29 tests). Run before the merge; the merge changed no migration, SQL test or harness file (only five Playwright specs). |
+| `LC_ALL=C PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-sql` | Passed before the merges and again on the final merged tree with the VOLATILE fix: workspace, customer-mapping and inquiry clusters, including native publish/rollback/roll-forward, sibling changes, portability rollback and volatility assertion, exit evidence, #252's reader RPC regression (10 signatures, 11 locking paths), and the Postgres-backed Version store contract (vitest 29 + 8 + 29 + 10 + 29 tests). |
 | `pnpm check:custom-repos` (merged) | Passed: **196/196**. |
 | `NODE_ENV=production pnpm build` (merged) | Passed: compiled, typechecked and completed static generation (exit 0). |
 

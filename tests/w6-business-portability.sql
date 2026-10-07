@@ -102,4 +102,8 @@ select pg_temp.w6_assert((select count(*) from public.tenant_client_records wher
 select pg_temp.w6_assert(public.complete_workspace_exit_with_handoff((select id from w6_workspace),'e6000000-0000-4000-8000-000000000002','w6-port-owner@example.test','pause','keep','{"kind":"stop"}','owner-exit',repeat('c',64),null)->>'replayed'='true','same exit idempotent');
 select pg_temp.w6_assert(not has_function_privilege('authenticated','public.read_business_portfolio_billing(text[])','execute')
  and not has_function_privilege('service_role','public.export_workspace_v3_category_before_w6(uuid,uuid,text,text,integer,integer)','execute'),'only public guarded RPCs exposed');
+select pg_temp.w6_assert((select bool_and(provolatile='v') from pg_proc where oid in
+ ('public.export_workspace_v3_category(uuid,uuid,text,text,integer,integer)'::regprocedure,
+  'public.export_workspace_v3_category_before_w6(uuid,uuid,text,text,integer,integer)'::regprocedure)),
+ 'export reader and its wrapped reader stay VOLATILE so PostgREST runs them read-write');
 rollback;

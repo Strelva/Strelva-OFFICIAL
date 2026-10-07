@@ -127,9 +127,11 @@ language sql immutable set search_path = public, pg_temp as $$
 $$;
 
 -- Fixed table/column allowlist; no caller-selected identifier reaches EXECUTE.
+-- VOLATILE like the reader it wraps (20261009150000, #252): PostgREST runs
+-- STABLE RPCs READ ONLY, where the wrapped reader's locks fail with 25006.
 create function public.export_workspace_v3_category(
   p_workspace_id uuid, p_user_id uuid, p_verified_email text, p_category text, p_offset integer, p_limit integer
-) returns jsonb language plpgsql stable security definer set search_path = public, pg_temp as $$
+) returns jsonb language plpgsql volatile security definer set search_path = public, pg_temp as $$
 declare
   v_limit integer := least(greatest(coalesce(p_limit, 500), 1), 2000);
   v_offset integer := greatest(coalesce(p_offset, 0), 0);
