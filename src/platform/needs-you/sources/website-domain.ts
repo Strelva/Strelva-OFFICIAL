@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { WebsiteDomainRequest } from "./website-domain-store";
+import { WebsiteDomainEffectUnconfirmedError, type WebsiteDomainRequest } from "./website-domain-store";
 import type { SourceAdapter } from "../adapters";
 import type { ProposedItem } from "../contracts";
 
@@ -35,9 +35,12 @@ export function websiteDomainAdapter(ports: WebsiteDomainPorts): SourceAdapter {
         // SQL consumes the already-claimed Needs you decision and rechecks its
         // owner, hostname, DNS snapshot and published revision before writes.
         const saved = await ports.approve(row, item.id);
-        return saved.result?.status === "verified" && saved.result.routing === "verified" ? { outcome: "done", receiptRef: `website_domain:${saved.id}` }
-          : { outcome: "done_unverified", reason: "Domain attached; DNS or public-site verification is still pending.", receiptRef: `website_domain:${saved.id}` };
-      } catch { return { outcome: "failed", reason: "domain_approval_or_attachment_failed" }; }
+        return saved.result?.status === "verified" && saved.result.routing === "verified" && (!saved.result.registrationAttempt || saved.result.registrationAttempt === "confirmed") ? { outcome: "done", receiptRef: `website_domain:${saved.id}` }
+          : { outcome: "done_unverified", reason: saved.result?.registrationAttempt === "unknown" ? "The domain attachment's acceptance is unknown. Strelva will inspect it without attaching it again." : "Domain attached; DNS or public-site verification is still pending.", receiptRef: `website_domain:${saved.id}` };
+      } catch (error) {
+        if (error instanceof WebsiteDomainEffectUnconfirmedError) return { outcome: "done_unverified", reason: error.message, receiptRef: `website_domain:${row.id}` };
+        return { outcome: "failed", reason: "domain_approval_or_attachment_failed" };
+      }
     },
   };
 }

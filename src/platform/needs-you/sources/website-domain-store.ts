@@ -6,7 +6,18 @@ import { customerEmailEnabled, emailSendingEnabled } from "@/platform/infra/emai
 import { getClientEmailOverride } from "@/platform/infra/email/client-override";
 
 const recordSchema = z.object({ type: z.string().min(1).max(40), name: z.string().min(1).max(253), value: z.string().min(1).max(1000) }).strict();
-const domainResultSchema = z.object({ hostname: z.string(), status: z.string(), checkedAt: z.string(), records: z.array(recordSchema), error: z.string().optional(), routing: z.enum(["verified", "unverified"]).optional() });
+const domainResultSchema = z.object({ hostname: z.string(), status: z.string(), checkedAt: z.string(), records: z.array(recordSchema), error: z.string().optional(), routing: z.enum(["verified", "unverified"]).optional(), registrationAttempt: z.enum(["not_submitted", "unknown", "confirmed", "rejected"]).optional() });
+/** A decided domain action must not become a retryable failed write when its
+ * submission may have reached the provider. The durable claim is the evidence;
+ * unknown never means the domain was attached. */
+export class WebsiteDomainEffectUnconfirmedError extends WorkspaceStoreError {
+  constructor(readonly registrationAttempt: "confirmed" | "unknown", readonly receiptUnavailable = false) {
+    super(registrationAttempt === "confirmed"
+      ? `The hosting provider accepted this domain attachment; ${receiptUnavailable ? "the owner receipt could not be saved" : "DNS or public-site verification is unavailable"}. Strelva will check it without attaching it again.`
+      : `Strelva could not confirm whether the hosting provider accepted this domain attachment${receiptUnavailable ? ", and the owner receipt could not be saved" : ""}. Strelva will check it without attaching it again.`);
+    this.name = "WebsiteDomainEffectUnconfirmedError";
+  }
+}
 export const websiteDomainRequestSchema = z.object({
   id: z.string().uuid(), workspaceId: z.string().uuid(), workId: z.string().uuid(), tenantId: z.string().nullable(),
   systemId: z.string().uuid().optional(),

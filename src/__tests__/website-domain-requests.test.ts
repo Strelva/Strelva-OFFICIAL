@@ -3,6 +3,7 @@ import { createWebsiteDomainRequestService, createWebsiteDomainRequestStore, web
 import { websiteDomainAdapter, websiteDomainItem } from "@/platform/needs-you/sources/website-domain";
 import { createNeedsYouService } from "@/platform/needs-you/service";
 import { needsYouMemoryStore } from "./support/needs-you-memory";
+import { WebsiteDomainEffectUnconfirmedError } from "@/platform/needs-you/sources/website-domain-store";
 const override = vi.hoisted(() => vi.fn());
 vi.mock("@/platform/infra/email/client-override", () => ({ getClientEmailOverride: override }));
 const WS = "aaaaaaaa-0000-4000-8000-000000000001";
@@ -17,7 +18,7 @@ function ports() {
   const request = row();
   const store = {list:vi.fn().mockResolvedValue([request]),prepare:vi.fn(),approve:vi.fn().mockImplementation(async(r:WebsiteDomainRequest,id:string)=>({...r,decisionId:id})),authorize:vi.fn().mockResolvedValue(request),record:vi.fn().mockImplementation(async(r:WebsiteDomainRequest,result:WebsiteDomainRequest["result"])=>({...r,result}))};
   const domain = {hostname:request.hostname,status:"pending",checkedAt:new Date(now).toISOString(),records:request.records};
-  const change = vi.fn().mockResolvedValue({domain,domains:[domain]});
+  const change = vi.fn().mockResolvedValue({domain,domains:[domain],registrationAttempt:"confirmed"});
   const read = vi.fn().mockResolvedValue({domain,domains:[domain]});
   const enabled = vi.fn().mockResolvedValue(true);
   return {request,store,change,read,enabled};
@@ -78,6 +79,41 @@ describe("website domain owner proposals",()=>{
     const saved=await createWebsiteDomainRequestService({...p,checkRouting}).approve(p.request,REQUEST);
     expect(saved.result).toMatchObject({status:"verified",routing:"unverified"});
     expect(p.change).toHaveBeenCalledOnce();expect(p.store.record).toHaveBeenCalledOnce();
+  });
+  it.each(["confirmed","unknown"] as const)("records %s attachment when the subsequent provider read fails and never attaches during reconciliation",async registrationAttempt=>{
+    const p=ports();p.change.mockRejectedValue(new WebsiteDomainEffectUnconfirmedError(registrationAttempt));
+    const saved=await createWebsiteDomainRequestService(p).approve(p.request,REQUEST);
+    expect(saved.result).toMatchObject({registrationAttempt,status:"pending",routing:"unverified"});
+    expect(saved.result?.error).toContain(registrationAttempt==="confirmed"?"provider accepted":"could not confirm whether");
+    await createWebsiteDomainRequestService(p).reconcile({...saved,decisionId:REQUEST});
+    expect(p.change).toHaveBeenCalledOnce();expect(p.read).toHaveBeenCalledOnce();
+  });
+  it.each(["confirmed","unknown"] as const)("finishes the owner decision as unverified after %s attachment and failed receipt storage",async registrationAttempt=>{
+    const p=ports();
+    p.change.mockRejectedValue(new WebsiteDomainEffectUnconfirmedError(registrationAttempt));p.store.record.mockRejectedValue(new Error("Receipt storage down"));
+    const adapter=websiteDomainAdapter({list:async()=>[p.request],approve:createWebsiteDomainRequestService(p).approve,now:()=>now});
+    const memory=needsYouMemoryStore({clock:{now},roles:{[OWNER.userId]:"owner"}});
+    const service=createNeedsYouService({store:memory.store,adapters:[adapter],sendEmail:vi.fn(),appOrigin:"https://app.example.test",now:()=>now});
+    const item=(await service.list(OWNER,WS)).items[0]!;
+    const input={workspaceId:WS,itemId:item.id,revision:item.revisionHash,decision:"approve" as const,by:{kind:"owner_link" as const,recipient:"owner@example.test"}};
+    const result=await service.decide(input);
+    expect(result.status).toBe("done_unverified");expect(result.item?.outcomeReason).toContain("owner receipt could not be saved");
+    expect(result.item?.outcomeReason).toContain(registrationAttempt==="confirmed"?"provider accepted":"could not confirm whether");
+    expect((await service.decide(input)).status).toBe("already_handled");expect(p.change).toHaveBeenCalledOnce();
+  });
+  it("does not report an accepted successful attachment as failed when receipt storage is unavailable",async()=>{
+    const p=ports();p.store.record.mockRejectedValue(new Error("Receipt storage down"));
+    await expect(createWebsiteDomainRequestService(p).approve(p.request,REQUEST)).rejects.toMatchObject({registrationAttempt:"confirmed",receiptUnavailable:true});
+    expect(p.change).toHaveBeenCalledOnce();
+  });
+  it.each(["not_submitted","rejected"] as const)("reports %s attachment as failed instead of claiming an outside change",async registrationAttempt=>{
+    const p=ports();p.change.mockResolvedValue({domain:null,domains:[],registrationAttempt});
+    const adapter=websiteDomainAdapter({list:async()=>[p.request],approve:createWebsiteDomainRequestService(p).approve,now:()=>now});
+    const memory=needsYouMemoryStore({clock:{now},roles:{[OWNER.userId]:"owner"}});
+    const service=createNeedsYouService({store:memory.store,adapters:[adapter],sendEmail:vi.fn(),appOrigin:"https://app.example.test",now:()=>now});
+    const item=(await service.list(OWNER,WS)).items[0]!;
+    expect((await service.decide({workspaceId:WS,itemId:item.id,revision:item.revisionHash,decision:"approve",by:{kind:"session",actor:OWNER}})).status).toBe("failed");
+    expect(p.store.record).not.toHaveBeenCalled();expect(p.change).toHaveBeenCalledOnce();
   });
   it("domain emails need their separate opt-in plus both global gates and the tenant override",async()=>{
     vi.stubEnv("STRELVA_WEBSITE_DOMAIN_EMAIL_ENABLED","1");vi.stubEnv("EMAIL_SENDING_ENABLED","true");vi.stubEnv("CUSTOMER_EMAIL_ENABLED","true");expect(await websiteDomainEmailAllowed("fictional")).toBe(true);

@@ -7,7 +7,7 @@ import { checkWebsiteHealth } from "./site-health";
 import { websiteDocumentStore } from "./document-store";
 import { websiteRebuildReleasedFor, websiteRebuildReleaseEnabledForWorkspace } from "./rebuild-release";
 
-import { createWebsiteDomainRequestStore, websiteDomainRequestStore, websiteDomainEmailAllowed, type WebsiteDomainRequest } from "@/platform/needs-you/sources/website-domain-store";
+import { createWebsiteDomainRequestStore, websiteDomainRequestStore, websiteDomainEmailAllowed, WebsiteDomainEffectUnconfirmedError, type WebsiteDomainRequest } from "@/platform/needs-you/sources/website-domain-store";
 export { createWebsiteDomainRequestStore, websiteDomainRequestStore, websiteDomainEmailAllowed, websiteDomainRequestSchema, type WebsiteDomainRequest } from "@/platform/needs-you/sources/website-domain-store";
 
 export interface WebsiteDomainRequestPorts {
@@ -19,7 +19,7 @@ export interface WebsiteDomainRequestPorts {
 }
 export function createWebsiteDomainRequestService(ports: WebsiteDomainRequestPorts) {
   async function routing(request: WebsiteDomainRequest, result: NonNullable<WebsiteDomainRequest["result"]>) {
-    if (!ports.checkRouting || result.status !== "verified") return result;
+    if (!ports.checkRouting || result.status !== "verified" || (result.registrationAttempt && result.registrationAttempt !== "confirmed")) return result;
     // The attachment was accepted. Read-back failure cannot erase its receipt.
     let verified = false;
     try { verified = await ports.checkRouting(request); } catch { /* Saved as unverified. */ }
@@ -30,11 +30,22 @@ export function createWebsiteDomainRequestService(ports: WebsiteDomainRequestPor
     const authorize = async () => { await ports.store.authorize(request); };
     const current = await ports.store.authorize(request);
     if (!current.tenantId) throw new WorkspaceAccessError();
-    const changed = await ports.change(current.tenantId, { domain: current.hostname, action: "attach" }, { authorizeWrite: authorize });
-    const result = changed.domains.find(domain => domain.hostname === current.hostname);
-    if (!result) throw new WorkspaceStoreError("The domain was submitted, but its status could not be read. Reopen the saved proposal.");
+    let result: NonNullable<WebsiteDomainRequest["result"]>;
+    try {
+      const changed = await ports.change(current.tenantId, { domain: current.hostname, action: "attach" }, { authorizeWrite: authorize });
+      const observed = changed.domains.find(domain => domain.hostname === current.hostname);
+      if (changed.registrationAttempt === "rejected" || changed.registrationAttempt === "not_submitted") throw new WorkspaceConflictError("The domain attachment was not accepted. Strelva must check the provider refusal before preparing another proposal.");
+      if (!observed) throw new WebsiteDomainEffectUnconfirmedError(changed.registrationAttempt === "confirmed" ? "confirmed" : "unknown");
+      result = { ...observed, registrationAttempt: changed.registrationAttempt ?? (observed.status === "verified" ? "confirmed" : "unknown") };
+    } catch (error) {
+      if (!(error instanceof WebsiteDomainEffectUnconfirmedError)) throw error;
+      result = { hostname: current.hostname, status: "pending", checkedAt: new Date().toISOString(), records: current.records,
+        registrationAttempt: error.registrationAttempt, routing: "unverified", error: error.message };
+    }
     // Accepted provider effects remain recorded even if ownership changes afterward.
-    return ports.store.record(current, await routing(current, result));
+    const observed = await routing(current, result);
+    try { return await ports.store.record(current, observed); }
+    catch { throw new WebsiteDomainEffectUnconfirmedError(observed.registrationAttempt === "confirmed" ? "confirmed" : "unknown", true); }
   }
   async function approve(request: WebsiteDomainRequest, decisionId: string) {
     if (!(await ports.enabled(request.workspaceId))) throw new WorkspaceConflictError("Website domain proposals are not enabled.");
