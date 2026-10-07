@@ -784,6 +784,34 @@ psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.
 # because it commits its fictional rows.
 STRELVA_BOOKINGS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/booking-one-store.test.ts
+# Policy facts: confirmation/provenance/history/undo on the existing record RPC.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011120000_business_policies.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-policies-schema.sql"
+# Rollback before adoption and reapply preserve legacy service areas.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011120000_business_policies.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011120000_business_policies.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-policies-schema.sql"
+
+# Adoption is a stop point: rollback refuses both current facts and historical
+# policy terms, even after Undo. The real rollback file runs in both cases.
+psql "${psql_args[@]}" --set=check_history=0 --set=undo_terms=0 --file="$repo_root/tests/business-policies-rollback-schema.sql"
+for policy_guard_phase in current history; do
+  if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011120000_business_policies.sql" >"$cluster_root/policy-rollback-refusal.log" 2>&1; then
+    printf 'Policy rollback discarded %s terms.\n' "$policy_guard_phase" >&2
+    exit 1
+  fi
+  if ! grep -q 'business_policies_rollback_requires_data_preservation' "$cluster_root/policy-rollback-refusal.log"; then
+    cat "$cluster_root/policy-rollback-refusal.log" >&2
+    exit 1
+  fi
+  if [[ "$policy_guard_phase" == "current" ]]; then
+    psql "${psql_args[@]}" --set=check_history=0 --set=undo_terms=1 --file="$repo_root/tests/business-policies-rollback-schema.sql"
+  else
+    psql "${psql_args[@]}" --set=check_history=1 --set=undo_terms=0 --file="$repo_root/tests/business-policies-rollback-schema.sql"
+  fi
+done
+printf 'Policy rollback guards preserved current terms and undone history.\n'
+
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 
