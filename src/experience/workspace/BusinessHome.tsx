@@ -22,6 +22,8 @@ import { SiteSummarySection, useSiteSummary, type SiteSummaryState } from "./Sit
 import { workspaceHome } from "./workspace-home";
 import { businessRequestRows, deliveryProviderName, type BusinessRequestRow } from "./WorkspaceRequests";
 import { workspaceWorkLabel } from "./work-label";
+import { LoopRibbon } from "./outcomes/LoopRibbon";
+import { useHomeOutcomes } from "./outcomes/HomeOutcomes";
 import styles from "./business-home.module.css";
 
 interface Props {
@@ -139,6 +141,8 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
   const needsYouReleased = snapshot.releases?.needsYou === true && customer && !readOnly;
   const needsYou = useNeedsYou(needsYouReleased ? snapshot.workspaceId : undefined);
   // Owner entry: the linked site's numbers, inquiries and Strelva's work (the old Today page).
+  // Outcome loop: preview-only until the loop is joined on the server (null by default).
+  const outcomes = useHomeOutcomes();
   const siteSummary = useSiteSummary(customer && !readOnly ? snapshot.workspaceId : undefined);
   const minute = useSyncExternalStore(subscribeMinute, minuteNow, noMinute);
   const { greeting, line } = greetingFor(minute);
@@ -285,6 +289,7 @@ export function BusinessHome({ snapshot, sites, unassignedSites, siteAssignments
 
     {managedWorkUnavailable ? <p role="status" className={styles.notice}>Some websites could not be loaded. <a href={accountHref}>Check website access</a></p> : null}
 
+    {outcomes ? <LoopRibbon {...outcomes.loop} className={styles.outcome} /> : null}
     {customer ? <div className={styles.sides}>{working}{yourSide}</div> : <div className={styles.single}>
       {decisions}
       {showRequests ? working : null}

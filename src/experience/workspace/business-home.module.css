@@ -1170,3 +1170,8 @@ button.row:hover {
     transition: none;
   }
 }
+
+/* Outcome loop ribbon (preview-only today). */
+.outcome {
+  margin-bottom: 16px;
+}

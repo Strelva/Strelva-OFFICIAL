@@ -6,6 +6,8 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: () => undefined, r
 import { BusinessHome } from "@/experience/workspace/BusinessHome";
 import type { WorkspaceSnapshot, WorkspaceWork } from "@/experience/workspace/contracts";
 import type { WorkspaceOfferingState } from "@/experience/workspace/WorkspaceOfferings";
+import { HomeOutcomesProvider } from "@/experience/workspace/outcomes/HomeOutcomes";
+import { BAKERY_LOOP } from "@/experience/workspace/preview/outcomes-fixture";
 
 const offeringState: WorkspaceOfferingState = {
   status: "unavailable",
@@ -64,6 +66,15 @@ function renderHome(items: WorkspaceWork[] = [
 }
 
 describe("business home", () => {
+  it("shows the outcome loop only when a preview provides it", () => {
+    expect(renderHome()).not.toContain('data-outcome="loop"');
+    const props = { snapshot: snapshot([]), sites: [], unassignedSites: [], siteAssignmentsKnown: true, offerings: offeringState, busy: false,
+      onOpen: noop, onStart: noop, onRequest: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account" };
+    const html = renderToStaticMarkup(createElement(HomeOutcomesProvider, { value: { loop: BAKERY_LOOP } }, createElement(BusinessHome, props)));
+    expect(html).toContain('data-outcome="loop"');
+    expect(html).toContain("412 people found you. 9 became bookings.");
+  });
+
   it("presents the business's actual Systems and Needs you, and keeps Systems out of the files list", () => {
     const items = [work("Mediation intake", { productId: "applications" }), work("AI check", { productId: "ai_visibility" })];
     const html = renderToStaticMarkup(createElement(BusinessHome, {
