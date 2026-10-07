@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { strelvaUiPreviewEnabled } from "@/experience/workspace/preview/enabled";
 import { PossibilityTry, type PossibilityTryState } from "@/experience/systems/PossibilityTry";
-import { composeAskPageSet } from "@/products/websites/index";
+import { composeAskPageSet, existingWebsitePageOperations, prepareSitePatch } from "@/products/websites/index";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Try it interface fixture", robots: { index: false, follow: false } };
@@ -39,6 +39,15 @@ export default async function TryPreview({ searchParams }: { searchParams: Promi
     document.nodes.page_1!.children.push("booking");
     document.capabilities = { baseUrl: "https://example.invalid", tenant: "river-practice", booking: { capabilityId: "consult", version: 1, range: { from: "2026-10-10T13:00:00.000Z", to: "2026-10-10T15:00:00.000Z" } } };
     fixture.view = { title: "A booking page for River Practice", intent: "Fictional existing-site alternative with an interactive isolated booking test. Owner review still comes before Make real.", changes: ["The existing native site with one booking page"], introduces: [], takesSubmissions: false, websiteDocument: document, bookingPath: "/book", bookingSchedule: { schemaVersion: 1, capabilityId: "consult", version: 1, name: "Consulting session", provider: "google", timeZone: "America/New_York", slots: [{ id: "test-slot-one", start: "2026-10-10T13:00:00.000Z", end: "2026-10-10T14:00:00.000Z" }, { id: "test-slot-two", start: "2026-10-10T14:00:00.000Z", end: "2026-10-10T15:00:00.000Z" }] } };
+  }
+  if (["existing-pages", "existing-section", "existing-rebuild"].includes(state ?? "") && fixture.kind === "ready") {
+    const published = composeAskPageSet("River Practice", { kind: "website-pages", pages: [
+      { path: "/", title: "River Practice", description: "Fictional existing website", paragraphs: ["The existing home page stays live while this alternative is reviewed."] },
+    ] }).document;
+    const mode = state === "existing-section" ? "section" : state === "existing-rebuild" ? "rebuild" : "page-set";
+    const candidate = { kind: "existing-website-pages", mode, pages: [{ path: mode === "page-set" ? "/services" : "/", title: "Consulting", description: "Plan the next move for your business", paragraphs: ["Prepared consulting copy for the owner's review. This candidate has not changed the live website."] }] };
+    const prepared = await prepareSitePatch({ document: published, ops: existingWebsitePageOperations(published, candidate), forceReview: true });
+    fixture.view = { title: "An alternative for River Practice", intent: "A fictional native website alternative. Copy still needs owner review before Make real.", changes: ["The existing website with proposed consulting copy"], introduces: [], takesSubmissions: false, websiteDocument: prepared.document };
   }
   return <PossibilityTry state={fixture} />;
 }

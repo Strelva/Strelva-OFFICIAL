@@ -73,3 +73,23 @@ it("tries the real booking form locally and discards visitor information without
     await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals();
   }
 });
+
+
+it("keeps existing executable visitor Connections disabled in an informational alternative", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const fetch = vi.fn(); vi.stubGlobal("fetch", fetch);
+  const document = composeAskPageSet("Example", { kind: "website-pages", pages: [{ path: "/", title: "Home", description: "Home", paragraphs: ["A proposed informational rebuild."] }] }).document;
+  document.capabilities = { baseUrl: "https://app.example.test", tenant: "example", inquiry: { capabilityId: "contact", version: 2 } };
+  document.nodes.contact = { id: "contact", type: "InquiryForm", variant: "inline", props: { title: "Contact" }, children: [], factIds: [] };
+  document.nodes.page_0!.children.push("contact");
+  const container = window.document.createElement("div"); window.document.body.append(container);
+  const root = createRoot(container);
+  try {
+    await act(async () => root.render(createElement(SiteDocumentTry, { document })));
+    expect(container.textContent).toContain("Preview only. No requests are sent.");
+    expect(container.querySelector("form")).toBeNull();
+    expect(container.querySelectorAll("input:disabled")).toHaveLength(2);
+    expect(container.querySelector("button")?.disabled).toBe(true);
+    expect(fetch).not.toHaveBeenCalled();
+  } finally { await act(async () => root.unmount()); container.remove(); vi.unstubAllGlobals(); }
+});

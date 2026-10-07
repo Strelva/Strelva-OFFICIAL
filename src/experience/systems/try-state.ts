@@ -24,13 +24,14 @@ export async function possibilityTryState(token: string, deps: {
   if (!(await deps.enabled(claims.workspaceId).catch(() => false))) return null;
   const p = await deps.read({ businessId: claims.workspaceId, possibilityId: claims.possibilityId, candidateRevision: claims.candidateRevision }).catch(() => null);
   if (!p) return { kind: "changed" };
-  const website = [...p.introduces, ...p.changes].find(item => ["ask-website-pages", "ask-existing-booking-page"].includes(String(item.candidate?.content.kind)));
+  const website = [...p.introduces, ...p.changes].find(item => ["ask-website-pages", "ask-existing-booking-page", "ask-existing-website-pages"].includes(String(item.candidate?.content.kind)));
+  const existingWebsite = website?.candidate?.content.kind === "ask-existing-website-pages";
   const booking = website?.candidate?.content.kind === "ask-existing-booking-page";
   const document = siteDocumentSchema.safeParse(website?.candidate?.content.document);
   if (website && !document.success) return { kind: "changed" };
   const bookingSchedule = publicBookingScheduleSchema.safeParse(website?.candidate?.content.bookingSchedule);
   if (website && document.success && (siteDocumentHash(document.data) !== website.candidate?.content.candidateContentHash
-    || !booking && (document.data.capabilities || Object.values(document.data.nodes).some(node => node.type === "Booking" || node.type === "InquiryForm"))
+    || !booking && !existingWebsite && (document.data.capabilities || Object.values(document.data.nodes).some(node => node.type === "Booking" || node.type === "InquiryForm"))
     || booking && (!bookingSchedule.success || document.data.capabilities?.booking?.capabilityId !== bookingSchedule.data.capabilityId || document.data.capabilities.booking.version !== bookingSchedule.data.version))) return { kind: "changed" };
   const bookingPath = website?.candidate?.content.bookingPath;
   if (booking && (typeof bookingPath !== "string" || !document.success || !document.data.pages.some(page => page.path === bookingPath))) return { kind: "changed" };

@@ -163,7 +163,7 @@ export async function syncAskPageSetPossibilities(deps: {
   for (let index = 0; index < rows.length; index++) {
     const row = rows[index]!;
     let p = row.possibility;
-    const intro = [...p.introduces, ...p.changes].find(item => ["ask-website-pages", "ask-existing-booking-page"].includes(String(item.candidate.content.kind)));
+    const intro = [...p.introduces, ...p.changes].find(item => ["ask-website-pages", "ask-existing-booking-page", "ask-existing-website-pages"].includes(String(item.candidate.content.kind)));
     const workId = intro?.candidate.content.rebuildWorkId;
     if (!intro || typeof workId !== "string" || p.activationId || !["exploring", "ready"].includes(p.status)) continue;
     try {
@@ -207,7 +207,7 @@ function lastStale(p: Possibility): string | null {
 export function storedPossibilityViews(stored: readonly ListedPossibility[], candidates: readonly WebsiteRebuildCandidate[], summaries: { evidence: (workId: string) => string | null } = { evidence: () => null }): WorkspaceSystemPossibility[] {
   return stored.flatMap(({ possibility: p, sourceRef }) => {
     if (p.status !== "exploring" && p.status !== "ready") return [];
-    const askContent = [...p.introduces, ...p.changes].find(item => ["ask-website-pages", "ask-existing-booking-page"].includes(String(item.candidate.content.kind)))?.candidate.content;
+    const askContent = [...p.introduces, ...p.changes].find(item => ["ask-website-pages", "ask-existing-booking-page", "ask-existing-website-pages"].includes(String(item.candidate.content.kind)))?.candidate.content;
     const workId = sourceRef?.startsWith(REBUILD_SOURCE_PREFIX) ? sourceRef.slice(REBUILD_SOURCE_PREFIX.length)
       : typeof askContent?.rebuildWorkId === "string" ? askContent.rebuildWorkId : null;
     const candidate = workId ? candidates.find((item) => item.workId === workId) : undefined;

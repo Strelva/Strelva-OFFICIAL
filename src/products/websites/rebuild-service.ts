@@ -22,6 +22,7 @@ import { auditRebuildHtml } from "./rebuild-audit";
 import { renderSiteDocumentHtml } from "./site-export";
 import { ROOT_DOMAIN } from "@/platform/infra/brand";
 import { normalizeCustomDomain } from "@/lib/domains";
+import { askExistingPagesSchema, existingWebsitePageOperations } from "./ask-existing-pages";
 
 interface Loaded { work: SavedWork; rebuild: WebsiteRebuild }
 /** One part of a cutover onto an existing site, reported on its own. */
@@ -283,7 +284,7 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     if (loaded.rebuild.status !== "approved" || loaded.rebuild.approvedCandidateRevision !== candidate.revision) throw new WorkspaceConflictError("Approve the exact current preview before launching.");
     if (loaded.rebuild.publishedCapabilitySelection) {
       const resolver = dependencies.resolveCapabilities ?? resolvePublishedWebsiteCapabilities;
-      const projection = loaded.rebuild.history.some(entry => entry.kind === "ask_booking_page_prepared")
+      const projection = loaded.rebuild.history.some(entry => ["ask_booking_page_prepared", "ask_existing_pages_prepared"].includes(entry.kind))
         ? await resolver(actor,loaded.work.workspaceId,workId,loaded.rebuild.publishedCapabilitySelection,{ requireConnectedCalendar: true })
         : await resolver(actor,loaded.work.workspaceId,workId,loaded.rebuild.publishedCapabilitySelection);
       if (!projection || JSON.stringify(projection) !== JSON.stringify(candidate.document.capabilities)) throw new WorkspaceConflictError("The visitor form or booking connection changed. Reconnect it and approve the new preview before publishing.");
@@ -420,6 +421,22 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     return present(await saveCandidate(actor,{ ...loaded,rebuild },siteDocumentSchema.parse(document),"visitor_tools_connected"));
   }
   async function capabilityOptions(actor: WorkspaceActor,workId: string) { const loaded = await load(actor,workId); return listPublishedWebsiteCapabilityOptions(actor,loaded.work.workspaceId,workId); }
+  async function prepareExistingPages(actor: WorkspaceActor, workId: string, raw: unknown) {
+    const input = rebuildSelectionSchema.extend({ candidate: askExistingPagesSchema }).strict().parse(raw);
+    const loaded = await load(actor, workId);
+    const { candidate } = exact(loaded, { expectedRevision: input.expectedRevision, candidateRevision: input.candidateRevision, candidateContentHash: input.candidateContentHash });
+    await documents.manage(actor, { workspaceId: loaded.work.workspaceId, workId });
+    const tenantId = await routeTenant(actor, loaded);
+    const published = tenantId ? await documents.published(tenantId) : null;
+    if (loaded.rebuild.status !== "published" || !published || published.workspaceId !== loaded.work.workspaceId || published.workId !== workId || published.revision !== candidate.revision || published.contentHash !== candidate.contentHash || siteDocumentHash(published.document) !== candidate.contentHash) throw new WorkspaceConflictError("An alternative needs the unchanged published native website. Finish any existing draft first.");
+    if (candidate.document.capabilities) {
+      const projection = await (dependencies.resolveCapabilities ?? resolvePublishedWebsiteCapabilities)(actor, loaded.work.workspaceId, workId, loaded.rebuild.publishedCapabilitySelection, { requireConnectedCalendar: true });
+      if (!projection || JSON.stringify(projection) !== JSON.stringify(candidate.document.capabilities)) throw new WorkspaceConflictError("The website's executable connections changed. Reconnect them before preparing an alternative.");
+    }
+    const prepared = await prepareSitePatch({ document: candidate.document, ops: existingWebsitePageOperations(candidate.document, input.candidate), forceReview: true });
+    if (prepared.governance.action === "block") throw new WorkspaceConflictError(prepared.governance.reason);
+    return present(await saveCandidate(actor, loaded, prepared.document, "ask_existing_pages_prepared"));
+  }
   async function prepareBookingPage(actor: WorkspaceActor, workId: string, raw: unknown) {
     const input = rebuildSelectionSchema.extend({ selection: connectWebsiteCapabilitiesInputSchema.shape.selection.unwrap(), path: z.string().min(1).max(80), title: z.string().min(1).max(70), description: z.string().max(160) }).strict().parse(raw);
     const loaded = await load(actor, workId);
@@ -455,7 +472,7 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     prepared.document.capabilities = projection;
     return present(await saveCandidate(actor, { ...loaded, rebuild: { ...loaded.rebuild, publishedCapabilitySelection: input.selection } }, siteDocumentSchema.parse(prepared.document), "ask_booking_page_prepared"));
   }
-  return { create, read, list, retry, resolveFact, resolveCopyReview, approve, launch, publishOntoLinkedTenant, patch, undo, domain, initializeHandoff, connectCapabilities, capabilityOptions, prepareBookingPage };
+  return { create, read, list, retry, resolveFact, resolveCopyReview, approve, launch, publishOntoLinkedTenant, patch, undo, domain, initializeHandoff, connectCapabilities, capabilityOptions, prepareBookingPage, prepareExistingPages };
 }
 export const websiteRebuildService = createWebsiteRebuildService();
 export const createWebsiteRebuild = websiteRebuildService.create;
@@ -467,6 +484,7 @@ export const resolveWebsiteRebuildCopyReview = websiteRebuildService.resolveCopy
 export const approveWebsiteRebuild = websiteRebuildService.approve;
 export const launchWebsiteRebuild = websiteRebuildService.launch;
 export const patchWebsiteRebuild = websiteRebuildService.patch;
+export const prepareExistingWebsitePages = websiteRebuildService.prepareExistingPages;
 export const prepareWebsiteBookingPage = websiteRebuildService.prepareBookingPage;
 export const publishWebsiteRebuildOntoLinkedSite = websiteRebuildService.publishOntoLinkedTenant;
 export const undoWebsiteRebuild = websiteRebuildService.undo;

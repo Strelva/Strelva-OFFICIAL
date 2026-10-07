@@ -131,7 +131,7 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
 
   const tools: Record<AskToolId, Tool> = {
     read_system: tool({
-      description: "Read the business record, inquiries, this week’s bookings, or the website System: its pages and nodes (view site), a legacy section (section), the content outline (content), photos (photos), a preview link (preview), blog/video/product entries (entries), newsletter subscribers (subscribers), or open Possibilities and suggestions (possibilities).",
+      description: "Read the business record, recent/unanswered inquiries and confirmed bookings starting in the next 30 days, with pending/unknown evidence separate, or the website System: its pages and nodes (view site), a legacy section (section), the content outline (content), photos (photos), a preview link (preview), blog/video/product entries (entries), newsletter subscribers (subscribers), or open Possibilities and suggestions (possibilities).",
       inputSchema: z.object({
         view: z.enum(["site", "section", "content", "photos", "preview", "entries", "subscribers", "possibilities", "business_record", "inquiries", "bookings"]),
         section: z.string().max(64).optional(),
@@ -322,7 +322,7 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
       }),
     }),
     open_possibility: tool({
-      description: "Prepare a real isolated Possibility: website-pages creates a new informational website with complete page copy/home page; existing-booking-page adds a visitor page for this native site's already configured booking service, requiring a real stored baseline and current same-site booking/inquiry/calendar Connections. It cannot create or change a booking service, schedule, duration or availability. All copy needs owner review; Make real goes through Needs you. Unsupported flows and missing baselines/Connections are Requests at Asked. Never substitute informational pages for a working flow.",
+      description: "Prepare a real isolated Possibility: website-pages creates a new informational website with complete page copy/home page; existing-website-pages prepares a section, page set or informational rebuild of an unchanged published native website with its real stored System baseline, preserving existing routes and executable pages; existing-booking-page adds a visitor page for this native site's already configured booking service, requiring a real stored baseline and current same-site booking/inquiry/calendar Connections. It cannot create or change a booking service, schedule, duration or availability. All copy needs owner review; Make real goes through Needs you. Unsupported flows and missing baselines/Connections are Requests at Asked. Never substitute informational pages for a working flow.",
       inputSchema: z.object({
         title: z.string().min(1).max(160),
         intent: z.string().min(1).max(2_000),
@@ -336,6 +336,9 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
             path: z.string().min(1).max(80), title: z.string().min(1).max(70),
             description: z.string().max(160), paragraphs: z.array(z.string().min(1).max(600)).min(1).max(8),
           }).strict()).min(1).max(6),
+        }).strict(), z.object({
+          kind: z.literal("existing-website-pages"), mode: z.enum(["section", "page-set", "rebuild"]),
+          pages: z.array(z.object({ path: z.string().min(1).max(80), title: z.string().min(1).max(70), description: z.string().max(160), paragraphs: z.array(z.string().min(1).max(600)).min(1).max(8) }).strict()).min(1).max(6),
         }).strict(), z.object({
           kind: z.literal("existing-booking-page"), path: z.string().min(1).max(80),
           title: z.string().min(1).max(70), description: z.string().max(160), bookingGrantId: z.string().uuid().optional(),

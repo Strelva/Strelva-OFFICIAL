@@ -4,18 +4,21 @@ import { prepareAskPageSet, websiteRebuildReleasedFor } from "@/products/website
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { PossibilityRepository } from "@/platform/possibilities";
 import { prepareExistingAskBookingPage } from "./booking-possibility-server";
+import { prepareExistingAskWebsitePages } from "./existing-website-possibility-server";
 import { possibilityPreviewPath } from "@/platform/possibilities/preview-link";
 
 export function createAskPossibilityPort(actor: WorkspaceActor, dependencies: {
   repository?: PossibilityRepository; prepare?: typeof prepareAskPageSet; released?: typeof websiteRebuildReleasedFor;
   sync?: (actor: WorkspaceActor, workspaceId: string) => Promise<{ complete: boolean }>;
   booking?: typeof prepareExistingAskBookingPage;
+  existingWebsite?: typeof prepareExistingAskWebsitePages;
 } = {}) {
   const port = createPossibilityAdapter(dependencies.repository ?? createSupabasePossibilityRepository(actor), {
     durable: true,
     async prepare(currentActor, input, id) {
       if (!input.introduces || !input.candidate) throw new AskPossibilityUnsupportedError("This alternative has no supported page-set candidate.");
       if (!await (dependencies.released ?? websiteRebuildReleasedFor)(currentActor, input.workspaceId)) throw new AskPossibilityUnsupportedError("Working page-set preparation is not enabled for this business.");
+      if (input.candidate.kind === "existing-website-pages") return (dependencies.existingWebsite ?? prepareExistingAskWebsitePages)(currentActor, input);
       if (input.candidate.kind === "existing-booking-page") return (dependencies.booking ?? prepareExistingAskBookingPage)(currentActor, input);
       // These require executable Connections, not informational text or disabled buttons.
       if (/\b(book(?:ing)?|appointments?|intake|forms?|payments?|checkout|reservations?|applications?)\b/i.test(`${input.words ?? ""} ${input.intent} ${input.introduces.purpose}`)) {

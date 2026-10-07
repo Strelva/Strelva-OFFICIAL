@@ -224,6 +224,7 @@ export interface AskPossibilityInput {
   origin?: AskChangeOrigin;
   askedOnBehalf?: AskedOnBehalf | null;
   candidate?: { kind: "website-pages"; pages: Array<{ path: string; title: string; description: string; paragraphs: string[] }> }
+    | { kind: "existing-website-pages"; mode: "section" | "page-set" | "rebuild"; pages: Array<{ path: string; title: string; description: string; paragraphs: string[] }> }
     | { kind: "existing-booking-page"; path: string; title: string; description: string; bookingGrantId?: string };
 }
 

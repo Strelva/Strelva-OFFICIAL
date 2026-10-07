@@ -58,3 +58,6 @@ export const readAgencyWebsiteDocument: typeof import("./agency-document-service
 export const patchAgencyWebsiteDocument: typeof import("./agency-document-service").patchAgencyWebsiteDocument = (...args) => import("./agency-document-service").then(module => module.patchAgencyWebsiteDocument(...args));
 
 export const previewAgencyWebsiteDocument: typeof import("./agency-document-service").previewAgencyWebsiteDocument = (...args) => import("./agency-document-service").then(module => module.previewAgencyWebsiteDocument(...args));
+
+export { askExistingPagesSchema, existingWebsitePageOperations } from "./ask-existing-pages";
+export const prepareExistingWebsitePages: typeof import("./rebuild-service").prepareExistingWebsitePages = (...args) => import("./rebuild-service").then(module => module.prepareExistingWebsitePages(...args));
