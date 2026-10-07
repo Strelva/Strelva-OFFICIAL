@@ -108,17 +108,29 @@ bytes and a 16-hex SHA-256 hash).
   `edited` (changed by hand) or `missing`. connect.js already skips injecting
   when the page has its own business JSON-LD, so the two never double up.
 - **Confirmed** here means verified, or stated by the owner. Unverified
-  operator, agency, import and model values are not served. That is stricter
-  than `read_connected_site_context` (connect.js), which also serves
-  unverified operator facts.
+  operator, agency, import and model values are not served.
+  `read_connected_site_context` (connect.js) now uses the same SQL read.
+  Published policies (including service area) additionally require explicit
+  owner/operator verification under `selectPublishedBusinessPolicies`;
+  owner-stated but unverified terms stay unknown. No agency-confirmation
+  authority is added.
 - Storage: `20261012110000_business_pages.sql` (`business_pages`: handle and
   publish state; `business_confirmed_public_facts`; service-role RPCs).
-  Contract: `tests/business-pages-schema.sql`.
+  Contract: `tests/business-pages-schema.sql`. Rollback:
+  `rollback-20261012110000_business_pages.sql` restores the prior connected-site
+  reader and removes the page schema before adoption. It refuses any saved
+  page settings rather than discard handles/publication consent. SQL checks
+  prove rollback/reapply and refusal after adoption.
+- **Business policies** appear in the page, llms.txt, connected-site JSON-LD
+  and paste blocks through the canonical published-policy selector. Cancellation,
+  deposit, payment, age/waiver, booking and response terms use human-readable
+  text and schema.org `PropertyValue`; service area uses `areaServed` and payment
+  methods also use `paymentAccepted`. These facts describe terms, never booking
+  enforcement or deposit charging. Private actor/workspace IDs are omitted.
 
 ## Not done
 
 - WordPress plugin and Wix SEO API for the paste block (#502 follow-ups).
-- Policy facts in the page, llms.txt and JSON-LD wait on #305.
 - The page has no contact form; the branch's posted to the public connect
   inquiry route, which needs a verified host and Origin.
 

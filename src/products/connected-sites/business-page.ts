@@ -7,6 +7,7 @@
  * lives under `/biz/`.
  */
 import type { PublicFacts } from "./contracts";
+import { publishedPolicyRows } from "./published-policies";
 
 /** 3–48 characters: lowercase letters, digits and single hyphens, not at either end. */
 export const BUSINESS_HANDLE_PATTERN = /^(?!.*--)[a-z0-9][a-z0-9-]{1,46}[a-z0-9]$/;
@@ -97,6 +98,11 @@ export function businessFactSheet(facts: PublicFacts, pageUrl: string): string {
     for (const service of facts.services) {
       lines.push(`- ${oneLine(service.name)}${service.priceText ? ` (${oneLine(service.priceText)})` : ""}${service.description ? `: ${oneLine(service.description)}` : ""}`);
     }
+  }
+  const policies = publishedPolicyRows(facts.policies);
+  if (policies.length) {
+    lines.push("", "## Business policies", "", "These terms describe business policy; they do not establish automated booking enforcement or charging.", "");
+    for (const policy of policies) add(policy.label, policy.text);
   }
   if (facts.social_links?.length) {
     lines.push("", "## Elsewhere", "");

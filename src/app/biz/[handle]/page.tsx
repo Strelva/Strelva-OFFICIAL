@@ -14,7 +14,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { cache, type ReactNode } from "react";
 import { businessJsonLd } from "@/products/connected-sites/contracts";
-import { appOrigin, businessPageUrl, formatAddress, jsonLdScriptContent, loadPublishedBusinessPage, mapsUrl, weeklyHours } from "@/products/connected-sites/server";
+import { appOrigin, businessPageUrl, formatAddress, jsonLdScriptContent, loadPublishedBusinessPage, mapsUrl, publishedPolicyRows, weeklyHours } from "@/products/connected-sites/server";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +70,7 @@ export default async function BusinessPage({ params }: Params) {
   const ld = businessJsonLd(facts, url);
   const hours = weeklyHours(facts);
   const services = facts.services ?? [];
+  const policies = publishedPolicyRows(facts.policies);
   const areas = facts.service_area ?? [];
   const social = facts.social_links ?? [];
   const hasContact = Boolean(facts.phone || facts.email || facts.address || hours.length);
@@ -99,6 +100,15 @@ export default async function BusinessPage({ params }: Params) {
                 {service.description ? <p className="text-sm leading-5 text-gray-muted">{service.description}</p> : null}
               </li>)}
             </ul>
+          </Section> : null}
+          {policies.length ? <Section id="biz-policies" title="Business policies">
+            <dl className="grid gap-4">
+              {policies.map(policy => <div key={policy.key} className="grid gap-1">
+                <dt className="text-base font-medium leading-6">{policy.label}</dt>
+                <dd className="text-sm leading-5 text-gray-muted">{policy.text}</dd>
+              </div>)}
+            </dl>
+            <p className="text-xs leading-4 text-gray-muted">These terms describe business policy. They do not establish automated booking enforcement or charging.</p>
           </Section> : null}
           {areas.length ? <Section id="biz-area" title="Service area">
             <ul className="flex flex-wrap gap-2">

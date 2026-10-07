@@ -20,7 +20,7 @@ import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
 import {
   BEACON_EVENT_KINDS, PLATFORMS, SITE_KEY_PATTERN, VERIFICATION_META_NAME, beaconBatchSchema, businessJsonLd, contactFromFields,
-  defaultAllowedOrigins, normalizeOrigin, publicFactsFromRecord, publicInquirySchema, referrerHost, safePath, verificationProofs,
+  defaultAllowedOrigins, normalizeOrigin, publicFactsFromConfirmedRecord, publicInquirySchema, referrerHost, safePath, verificationProofs,
   type ConnectedInquiry, type ConnectedSite, type PublicContext, type ResolvedConnectedSite,
 } from "./contracts";
 import { ConnectedSiteInputError, connectedSitesStore, type ConnectedSitesStore } from "./store";
@@ -143,7 +143,7 @@ export async function resolvePublicSite(publicKey: string, store: ConnectedSites
 export async function readPublicContext(publicKey: string, site: ResolvedConnectedSite, store: ConnectedSitesStore = connectedSitesStore()): Promise<PublicContext | null> {
   const raw = await store.context(publicKey);
   if (!raw) return null;
-  const facts = publicFactsFromRecord({ facts: raw.facts, services: raw.services });
+  const facts = publicFactsFromConfirmedRecord(site.workspaceId, raw);
   return { revision: raw.revision, facts, jsonLd: raw.site.injectSchema ? businessJsonLd(facts, site.siteUrl) : null, site: raw.site };
 }
 
@@ -228,3 +228,5 @@ export { connectedInquiryEmail, notifyConnectedSiteInquiry } from "./notify";
 export { businessPagesReleaseEnabled, checkSchemaBlock, loadPublishedBusinessPage, readBusinessVisibility, setBusinessPage, type BusinessVisibility, type SchemaBlockCheck, type SchemaBlockTarget } from "./business-pages";
 export { BUSINESS_HANDLE_PATTERN, businessFactSheet, businessPageUrl, formatAddress, isBusinessHandle, mapsUrl, suggestBusinessHandle, weeklyHours, type PublishedBusinessPage } from "./business-page";
 export { jsonLdScriptContent, schemaBlock, schemaBlockStatus, type SchemaBlock, type SchemaBlockStatus } from "./schema-block";
+
+export { publishedPolicyRows } from "./published-policies";

@@ -9,7 +9,7 @@ vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: () => 
 vi.mock("@/platform/release-flags/store", () => ({ workspaceReleaseFlagEnabled: deps.flag }));
 vi.mock("@/products/websites/index", () => ({ getHostedSite: async () => deps.hosted }));
 
-import { setBusinessPagesStoreForTests } from "@/products/connected-sites/business-pages-store";
+import { createBusinessPagesStore, setBusinessPagesStoreForTests } from "@/products/connected-sites/business-pages-store";
 import { loadPublishedBusinessPage } from "@/products/connected-sites/business-pages";
 import BusinessPage, { generateMetadata } from "@/app/biz/[handle]/page";
 import { GET as getLlms } from "@/app/biz/[handle]/llms.txt/route";
@@ -30,6 +30,13 @@ const published = {
     links: [{ kind: "booking", url: "https://book.example/barber" }],
   },
   services: [{ name: "Haircut", description: null, priceText: "$30" }],
+  policyFacts: {
+    cancellation: { value: { summary: "Give 24 hours notice.", noticeHours: 24 }, source: "owner" as const, verified: true, updatedAt: "2026-10-03T12:00:00Z", updatedBy: BUSINESS },
+    deposit: { value: { required: false }, source: "operator" as const, verified: true, updatedAt: "2026-10-03T12:00:00Z", updatedBy: BUSINESS },
+    // Defense in depth: the selector refuses these even if a store returns them.
+    booking_rules: { value: { summary: "AGENCY_PRIVATE" }, source: "agency" as const, verified: false, updatedAt: "2026-10-03T12:00:00Z", updatedBy: BUSINESS },
+    response_time: { value: { maximumHours: 1, summary: "OWNER_UNCONFIRMED" }, source: "owner" as const, verified: false, updatedAt: "2026-10-03T12:00:00Z", updatedBy: BUSINESS },
+  },
 };
 let store: BusinessPagesStore;
 const params = (handle: string) => ({ params: Promise.resolve({ handle }) });
@@ -82,6 +89,20 @@ describe("GET /biz/{handle}/llms.txt", () => {
     expect(body).toContain("- Phone: 716-555-0100");
     expect(body).toContain("- Page: https://app.strelva.test/biz/fictional-barber");
     expect(body).toContain("- Haircut ($30)");
+    expect(body).toContain("Give 24 hours notice.");
+    expect(body).toContain("No deposit required.");
+    for (const secret of ["AGENCY_PRIVATE", "OWNER_UNCONFIRMED", "updatedBy", BUSINESS]) expect(body).not.toContain(secret);
+  });
+  it("retains policy provenance through the RPC adapter and removes private IDs from the public response", async () => {
+    const rpc = vi.fn(async () => ({ data: published, error: null }));
+    setBusinessPagesStoreForTests(createBusinessPagesStore({ rpc }));
+    const response = await get("fictional-barber");
+    expect(response.status).toBe(200);
+    const text = await response.text();
+    expect(text).toContain("No deposit required.");
+    expect(text).not.toContain(BUSINESS);
+    expect(text).not.toContain("OWNER_UNCONFIRMED");
+    expect(rpc).toHaveBeenCalledWith("read_published_business_page", { p_handle: "fictional-barber" });
   });
   it("is 404 for unknown, unpublished or off, and on a client site's host", async () => {
     expect((await get("someone-else")).status).toBe(404);
@@ -113,6 +134,13 @@ describe("/biz/{handle}", () => {
     const ld = JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)![1]!);
     expect(ld).toMatchObject({ "@type": "LocalBusiness", name: "Fictional Barber <Co>", url: "https://app.strelva.test/biz/fictional-barber", telephone: "716-555-0100" });
     expect(html).not.toContain("<Co>");
+    expect(html).toContain("Business policies");
+    expect(html).toContain("No deposit required.");
+    expect(ld.additionalProperty).toEqual(expect.arrayContaining([
+      expect.objectContaining({ propertyID: "strelva:policy:cancellation", value: "Give 24 hours notice. Notice: 24 hours." }),
+      expect.objectContaining({ propertyID: "strelva:policy:deposit", value: "No deposit required." }),
+    ]));
+    for (const secret of ["AGENCY_PRIVATE", "OWNER_UNCONFIRMED", "updatedBy", BUSINESS]) expect(html).not.toContain(secret);
   });
   it("names its canonical address from configuration, never the request host", async () => {
     deps.headers = new Headers({ host: "evil.example", "x-forwarded-host": "evil.example" });

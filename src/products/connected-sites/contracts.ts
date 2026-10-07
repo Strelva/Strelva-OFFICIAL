@@ -9,6 +9,9 @@
  * Contracts and pure helpers only. Storage is store.ts; behavior is server.ts.
  */
 import { z } from "zod";
+import type { BusinessRecord } from "@/platform/business-record/contracts";
+import { selectPublishedBusinessPolicies, type PublishedPolicies } from "@/platform/business-record/policies";
+import { publishedPolicyRows, PAYMENT_LABELS } from "./published-policies";
 
 export const SITE_KEY_PATTERN = /^sk_pub_[a-z0-9]{24}$/;
 export const VERIFICATION_TOKEN_PATTERN = /^[a-z0-9]{32}$/;
@@ -91,6 +94,7 @@ export interface ConnectedInquiry {
 // fills into `[data-strelva-fact]` elements, derived from the business record.
 
 export interface PublicFacts {
+  policies?: PublishedPolicies;
   name?: string;
   description?: string;
   phone?: string;
@@ -154,6 +158,20 @@ export function publicFactsFromRecord(raw: { facts: Record<string, unknown>; ser
   return out;
 }
 
+/** SQL has already enforced actor/publication access and excluded private facts.
+ * Policies still pass through the canonical confirmation selector. */
+export function publicFactsFromConfirmedRecord(workspaceId: string, raw: {
+  revision: number; facts: Record<string, unknown>;
+  services: Array<{ name: string; description?: string | null; priceText?: string | null }>;
+  policyFacts?: BusinessRecord["facts"];
+}): PublicFacts {
+  const facts = publicFactsFromRecord(raw);
+  const policies = selectPublishedBusinessPolicies({ workspaceId, revision: raw.revision, facts: raw.policyFacts ?? {} });
+  if (Object.keys(policies).length) facts.policies = policies;
+  if (policies.service_area) facts.service_area = policies.service_area.value;
+  return facts;
+}
+
 /**
  * schema.org LocalBusiness from confirmed facts only, or null without a name.
  * The one serializer: connect.js, the public business page and the static
@@ -180,6 +198,9 @@ export function businessJsonLd(facts: PublicFacts, siteUrl?: string | null): Rec
   if (facts.services?.length) {
     ld.makesOffer = facts.services.map(service => ({ "@type": "Offer", itemOffered: { "@type": "Service", name: service.name, ...(service.description ? { description: service.description } : {}) } }));
   }
+  const policies = publishedPolicyRows(facts.policies);
+  if (policies.length) ld.additionalProperty = policies.map(row => ({ "@type": "PropertyValue", propertyID: `strelva:policy:${row.key}`, name: row.label, value: row.text }));
+  if (facts.policies?.payment_methods) ld.paymentAccepted = facts.policies.payment_methods.value.map(method => PAYMENT_LABELS[method]).join(", ");
   return ld;
 }
 

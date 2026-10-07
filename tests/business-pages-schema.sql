@@ -41,17 +41,26 @@ begin
     (ws,'email','"guess@example.test"','operator',false,owner_id,'2026-10-05T12:00:00Z'),
     (ws,'description','"A guess the model made."','agent',false,owner_id,'2026-10-05T12:00:00Z'),
     (ws,'service_area','["Buffalo"]','agency',false,owner_id,'2026-10-05T12:00:00Z'),
+    (ws,'cancellation','{"summary":"Give 24 hours notice.","noticeHours":24}','owner',true,owner_id,'2026-10-02T12:00:00Z'),
+    (ws,'deposit','{"required":false}','operator',true,owner_id,'2026-10-02T12:00:00Z'),
+    (ws,'payment_methods','["cash"]','owner',false,owner_id,'2026-10-05T12:00:00Z'),
+    (ws,'booking_rules','{"summary":"Guessed booking terms."}','agency',false,owner_id,'2026-10-05T12:00:00Z'),
+    (ws,'response_time','{"maximumHours":2}','operator',false,owner_id,'2026-10-05T12:00:00Z'),
     (ws,'owner_recipient','{"email":"bp-owner@example.test"}','owner',true,owner_id,'2026-10-05T12:00:00Z');
   insert into public.business_services(workspace_id,name,price_text,source,verified,active,position,created_by,updated_by) values
     (ws,'Haircut','$30','owner',false,true,1,owner_id,owner_id),
     (ws,'Beard trim',null,'operator',true,true,0,owner_id,owner_id),
     (ws,'Guessed service',null,'agent',false,true,2,owner_id,owner_id),
     (ws,'Operator guess',null,'operator',false,true,3,owner_id,owner_id),
+    (ws,'Agency guess',null,'agency',false,true,3,owner_id,owner_id),
     (ws,'Retired service',null,'owner',false,false,4,owner_id,owner_id);
   update public.business_services set updated_at = '2026-10-03T12:00:00Z' where workspace_id = ws;
 
   facts := public.read_business_public_facts(ws,member_id,'bp-member@example.test');
   perform pg_temp.assert_true(facts->'facts' = '{"display_name":"Fictional Barber","phone":"716-555-0100"}'::jsonb,'only owner-stated or verified facts: '||(facts->'facts')::text);
+  perform pg_temp.assert_true(facts->'policyFacts'->'cancellation'->'value'->>'summary'='Give 24 hours notice.'
+    and facts->'policyFacts'->'deposit'->'value'->>'required'='false','explicitly confirmed policies are served');
+  perform pg_temp.assert_true(not (facts->'policyFacts' ?| array['payment_methods','booking_rules','response_time','service_area']),'unverified owner, operator and agency policies stay private');
   perform pg_temp.assert_true(jsonb_array_length(facts->'services')=2 and facts->'services'->0->>'name'='Beard trim' and facts->'services'->1->>'priceText'='$30','only confirmed active services, in position order: '||(facts->'services')::text);
   perform pg_temp.assert_true((facts->>'confirmedAt')::timestamptz = '2026-10-03T12:00:00Z','confirmedAt is the latest confirmed change, not a guess');
   perform pg_temp.expect_error(format('select public.read_business_public_facts(%L,%L,%L)',ws,other_owner,'bp-other@example.test'),'workspace_access_denied');
@@ -74,7 +83,7 @@ begin
   perform pg_temp.assert_true(public.read_business_page(ws,member_id,'bp-member@example.test')->>'handle'='fictional-barber','a member reads the settings');
 
   published := public.read_published_business_page('fictional-barber');
-  perform pg_temp.assert_true(published->>'workspaceId'=ws::text and published->'facts'=facts->'facts' and published->'services'=facts->'services','the public read serves the same confirmed facts');
+  perform pg_temp.assert_true(published->>'workspaceId'=ws::text and published->'facts'=facts->'facts' and published->'services'=facts->'services' and published->'policyFacts'=facts->'policyFacts','the public read serves the same confirmed facts');
   perform pg_temp.assert_true(not (published ? 'email') and not (published->'facts' ? 'owner_recipient'),'no recipient or guessed contact is public');
   perform pg_temp.assert_true(public.read_published_business_page('Fictional-Barber') is null and public.read_published_business_page('x') is null and public.read_published_business_page(null) is null,'only exact valid handles resolve');
 

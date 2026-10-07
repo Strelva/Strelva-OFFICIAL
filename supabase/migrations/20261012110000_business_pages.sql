@@ -15,8 +15,8 @@
 -- Confirmed means a person confirmed it: a fact or service marked verified
 -- (only owner or operator sources can be), or stated by the owner. An
 -- operator, agency, import or model value nobody confirmed is never served.
--- This is stricter than read_connected_site_context, which also serves
--- unverified operator facts; that function is left as it is.
+-- read_connected_site_context uses this same read, including the stricter
+-- published-policy contract: verified owner/operator terms only.
 --
 -- Access. The table is revoked; service-role security-definer functions only.
 -- Members of the customer business read the settings and the paste block;
@@ -27,8 +27,10 @@
 -- which PostgREST's READ ONLY transaction for STABLE functions refuses
 -- (20261009150000_reader_rpc_volatility).
 --
--- Rollback: drop the five functions below and public.business_pages.
+-- Rollback: rollback-20261012110000_business_pages.sql; refuses saved pages.
+-- Restore the prior connected-site reader before dropping the shared read.
 
+begin;
 set local lock_timeout = '3s';
 
 create table public.business_pages (
@@ -49,15 +51,23 @@ revoke all on table public.business_pages from public, anon, authenticated, serv
 create function public.business_confirmed_public_facts(p_workspace_id uuid) returns jsonb
 language sql stable security definer set search_path = public, pg_temp as $$
   with facts as (
-    select f.fact_key, f.value, f.updated_at from public.business_record_facts f
+    select f.fact_key, f.value, f.source, f.verified, f.updated_by, f.updated_at from public.business_record_facts f
     where f.workspace_id = p_workspace_id and f.fact_key <> 'owner_recipient' and (f.verified or f.source = 'owner')
+      and (f.fact_key not in ('cancellation','deposit','service_area','payment_methods','age_waiver','booking_rules','response_time')
+        or (f.verified and f.source in ('owner','operator')))
   ), services as (
     select s.name, s.description, s.price_text, s.position, s.id, s.updated_at from public.business_services s
     where s.workspace_id = p_workspace_id and s.active and (s.verified or s.source = 'owner')
   )
   select jsonb_build_object(
     'revision', coalesce((select r.revision from public.business_records r where r.workspace_id = p_workspace_id), 0),
-    'facts', coalesce((select jsonb_object_agg(fact_key, value) from facts), '{}'::jsonb),
+    'facts', coalesce((select jsonb_object_agg(fact_key, value) from facts
+      where fact_key not in ('cancellation','deposit','service_area','payment_methods','age_waiver','booking_rules','response_time')), '{}'::jsonb),
+    -- Provenance stays server-side; selectPublishedBusinessPolicies strips IDs.
+    'policyFacts', coalesce((select jsonb_object_agg(fact_key, jsonb_build_object(
+      'value', value, 'source', source, 'verified', verified, 'updatedBy', updated_by, 'updatedAt', updated_at)) from facts
+      where fact_key in ('cancellation','deposit','service_area','payment_methods','age_waiver','booking_rules','response_time')
+        and verified and source in ('owner','operator')), '{}'::jsonb),
     'services', coalesce((select jsonb_agg(jsonb_build_object('name', name, 'description', description, 'priceText', price_text) order by position, id) from services), '[]'::jsonb),
     'confirmedAt', (select max(updated_at) from (select updated_at from facts union all select updated_at from services) t))
 $$;
@@ -132,3 +142,17 @@ revoke all on function public.read_business_page(uuid, uuid, text), public.set_b
 grant execute on function public.read_business_page(uuid, uuid, text), public.set_business_page(uuid, uuid, text, text, boolean),
   public.read_business_public_facts(uuid, uuid, text), public.read_published_business_page(text)
   to service_role;
+
+-- Engineering decision for #521: connect.js uses exactly the same strict
+-- public facts and policies. No new agency-confirmation authority is added.
+create or replace function public.read_connected_site_context(p_public_key text) returns jsonb
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+declare v_site public.connected_sites;
+begin
+  select * into v_site from public.connected_sites where public_key = p_public_key and status = 'active';
+  if v_site.id is null then return null; end if;
+  return public.business_confirmed_public_facts(v_site.business_workspace_id)
+    || jsonb_build_object('site', jsonb_build_object('captureForms', v_site.capture_forms, 'injectSchema', v_site.inject_schema));
+end $$;
+
+commit;

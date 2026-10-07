@@ -4,6 +4,7 @@
  * actor on every workspace call and serves only confirmed facts.
  */
 import { z } from "zod";
+import { businessRecordSchema, type BusinessRecord } from "@/platform/business-record/contracts";
 import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { ConnectedSiteInputError, type ConnectedSitesRpc } from "./store";
@@ -11,6 +12,7 @@ import { ConnectedSiteInputError, type ConnectedSitesRpc } from "./store";
 export interface BusinessPageSettings { handle: string; published: boolean; publishedAt: string | null; updatedAt: string }
 export interface ConfirmedFactsRow {
   revision: number;
+  policyFacts?: BusinessRecord["facts"];
   facts: Record<string, unknown>;
   services: Array<{ name: string; description: string | null; priceText: string | null }>;
   confirmedAt: string | null;
@@ -29,6 +31,7 @@ const identity = (actor: WorkspaceActor) => ({ p_user_id: uuid.parse(actor.userI
 const settingsSchema = z.object({ handle: z.string(), published: z.boolean(), publishedAt: z.string().nullable(), updatedAt: z.string() });
 const factsSchema = z.object({
   revision: z.number(),
+  policyFacts: businessRecordSchema.shape.facts.optional(),
   facts: z.record(z.string(), z.unknown()),
   services: z.array(z.object({ name: z.string(), description: z.string().nullable(), priceText: z.string().nullable() })),
   confirmedAt: z.string().nullable(),

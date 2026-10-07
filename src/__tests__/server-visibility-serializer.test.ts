@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { businessFactSheet, isBusinessHandle, suggestBusinessHandle, weeklyHours } from "@/products/connected-sites/business-page";
-import { businessJsonLd, publicFactsFromRecord, type PublicFacts } from "@/products/connected-sites/contracts";
+import { businessJsonLd, publicFactsFromConfirmedRecord, publicFactsFromRecord, type PublicFacts } from "@/products/connected-sites/contracts";
 import { findSchemaBlocks, jsonLdScriptContent, schemaBlock, schemaBlockStatus, schemaContentHash } from "@/products/connected-sites/schema-block";
 
 const record = {
@@ -40,6 +40,33 @@ describe("the one JSON-LD serializer", () => {
     });
     expect(JSON.stringify(ld)).not.toContain("owner@example.test");
     expect(JSON.stringify(ld)).not.toContain("$30");
+  });
+
+  it("publishes all confirmed policy kinds, preserves explicit false and zero, and never supplies missing terms", () => {
+    const entry = (value: unknown) => ({ value, source: "operator" as const, verified: true, updatedAt: "2026-10-07T00:00:00Z", updatedBy: "76000000-0000-4000-8000-000000000001" });
+    const facts = publicFactsFromConfirmedRecord("76000000-0000-4000-8000-000000000002", { ...record, revision: 1, policyFacts: {
+      cancellation: entry({ summary: "Call us.", noticeHours: 0 }), deposit: entry({ required: true, percent: 20 }),
+      service_area: entry(["Buffalo"]), payment_methods: entry(["cash", "credit_card"]),
+      age_waiver: entry({ minimumAge: 0, waiverRequired: false, guardianRequired: false }),
+      booking_rules: entry({ summary: "Ask us.", reservationRequired: false, advanceNoticeHours: 0, maximumAdvanceDays: 30 }),
+      response_time: entry({ maximumHours: 24 }),
+    } });
+    const ld = businessJsonLd(facts)!;
+    expect(ld.areaServed).toEqual(["Buffalo"]);
+    expect(ld.paymentAccepted).toBe("Cash, Credit card");
+    const sheet = businessFactSheet(facts, "https://app.example/biz/barber");
+    for (const term of ["Notice: 0 hours.", "Deposit required.", "Amount: 20%.", "Cash, Credit card", "Minimum age: 0.", "No waiver required.", "No guardian required.", "No reservation required.", "Advance notice: 0 hours.", "Book up to 30 days ahead.", "Response within 24 hours."]) {
+      expect(sheet).toContain(term);
+      expect(JSON.stringify(ld)).toContain(term);
+    }
+    expect(JSON.stringify(facts)).not.toContain("updatedBy");
+    const fixed = { ...facts, policies: { deposit: { ...facts.policies!.deposit!, value: { required: true, amountCents: 1250, currency: "USD" } } } };
+    expect(businessFactSheet(fixed, "https://app.example")).toContain("Amount: USD 12.50.");
+    const unknown = publicFactsFromConfirmedRecord("76000000-0000-4000-8000-000000000002", { ...record, revision: 1 });
+    expect(businessFactSheet(unknown, "https://app.example")).not.toContain("Business policies");
+    expect(businessJsonLd(unknown)).not.toHaveProperty("additionalProperty");
+    const minimal = { ...facts, policies: { booking_rules: { ...facts.policies!.booking_rules!, value: { summary: "Ask us." } } } };
+    expect(businessFactSheet(minimal, "https://app.example")).not.toContain("No reservation required");
   });
 
   it("names no url when the block is for any site, and nothing at all without a confirmed name", () => {

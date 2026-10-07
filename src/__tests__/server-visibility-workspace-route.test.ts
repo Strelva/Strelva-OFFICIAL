@@ -108,6 +108,17 @@ describe("/api/workspace/connected-sites/visibility", () => {
     expect((await post({ action: "check", workspaceId: BUSINESS, siteId: "7c000000-0000-4000-8000-000000000009" })).status).toBe(409);
   });
 
+  it("marks a pasted block outdated when only a confirmed policy changes", async () => {
+    const policy = { value: { required: false }, source: "owner" as const, verified: true, updatedAt: "2026-10-03T12:00:00Z", updatedBy: BUSINESS };
+    (pages.confirmedFacts as ReturnType<typeof vi.fn>).mockResolvedValue({ ...confirmed, policyFacts: { deposit: policy } });
+    const { blocks } = await (await get()).json();
+    expect(blocks[0].block.content).toContain("No deposit required.");
+    (pages.confirmedFacts as ReturnType<typeof vi.fn>).mockResolvedValue({ ...confirmed, policyFacts: { deposit: { ...policy, value: { required: true } } } });
+    deps.fetchPage.mockResolvedValueOnce(`<html><head>${blocks[0].block.html}</head></html>`);
+    const response = await post({ action: "check", workspaceId: BUSINESS, siteId: SITE_ID });
+    expect((await response.json()).check.status).toBe("outdated");
+  });
+
   it("refuses without a session, for a business where connected sites are off, and when rate limited", async () => {
     deps.user = null;
     expect((await get()).status).toBe(401);

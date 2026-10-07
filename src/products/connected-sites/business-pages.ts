@@ -17,7 +17,7 @@ import { z } from "zod";
 import { WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { BUSINESS_HANDLE_PATTERN, businessPageUrl, type PublishedBusinessPage } from "./business-page";
 import { businessPagesStore, type BusinessPageSettings, type BusinessPagesStore } from "./business-pages-store";
-import { businessJsonLd, publicFactsFromRecord, type PublicFacts } from "./contracts";
+import { businessJsonLd, publicFactsFromConfirmedRecord, type PublicFacts } from "./contracts";
 import { schemaBlock, schemaBlockStatus, type SchemaBlock, type SchemaBlockStatus } from "./schema-block";
 import { appOrigin, connectedSitesPublicFor, connectedSitesReleaseEnabled, fetchLiveSitePage } from "./server";
 import { connectedSitesStore, type ConnectedSitesStore } from "./store";
@@ -35,7 +35,7 @@ export async function loadPublishedBusinessPage(handle: string, deps: { store?: 
   const row = await (deps.store ?? businessPagesStore()).published(normalized);
   if (!row) return null;
   if (!(await (deps.publicFor ?? connectedSitesPublicFor)(row.workspaceId).catch(() => false))) return null;
-  const facts = publicFactsFromRecord({ facts: row.facts, services: row.services });
+  const facts = publicFactsFromConfirmedRecord(row.workspaceId, row);
   if (!facts.name) return null;
   return { workspaceId: row.workspaceId, handle: row.handle, facts, confirmedAt: row.confirmedAt };
 }
@@ -73,7 +73,7 @@ export async function readBusinessVisibility(actor: WorkspaceActor, workspaceId:
     store.confirmedFacts(actor, workspaceId),
     (deps.sites ?? connectedSitesStore()).list(actor, workspaceId),
   ]);
-  const facts = publicFactsFromRecord({ facts: row.facts, services: row.services });
+  const facts = publicFactsFromConfirmedRecord(workspaceId, row);
   const generic = blockFor(facts, null);
   const blocks = generic ? [
     ...sites.filter(site => site.status === "active").map(site => ({ id: site.id, label: site.siteHost, url: site.siteUrl, checkable: true, block: blockFor(facts, site.siteUrl)! })),
@@ -104,7 +104,7 @@ export async function checkSchemaBlock(actor: WorkspaceActor, workspaceId: strin
   const site = (await sitesStore.list(actor, workspaceId)).find(item => item.id === siteId && item.status === "active");
   if (!site) throw new WorkspaceConflictError("This connected site is no longer active here. Reload and try again.");
   const row = await (deps.store ?? businessPagesStore()).confirmedFacts(actor, workspaceId);
-  const current = blockFor(publicFactsFromRecord({ facts: row.facts, services: row.services }), site.siteUrl);
+  const current = blockFor(publicFactsFromConfirmedRecord(workspaceId, row), site.siteUrl);
   if (!current) throw new WorkspaceConflictError("Confirm the business name first. There is nothing to check yet.");
   let html: string | null = null;
   try { html = await (deps.fetchPage ?? fetchLiveSitePage)(site.siteUrl); } catch { html = null; }
