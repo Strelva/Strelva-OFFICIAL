@@ -15,6 +15,7 @@
  *
  * Off unless STRELVA_BOOKING_CALENDAR_BUSY=1, and only on store-served reads.
  */
+import { isRateLimitedAsync } from "@/platform/infra/rate-limit";
 import { getRedis } from "@/platform/infra/redis";
 import { zonedLocalToUtc } from "./availability";
 import { bookingCalendarBusyEnabled } from "./flags";
@@ -82,6 +83,7 @@ export async function readCalendarBusy(context: BookingContext, date: string, ti
   const cached = await ports.cache?.get(key).catch(() => null);
   if (isBusyList(cached)) return { connected: true, checked: true, busy: cached };
   try {
+    if (await isRateLimitedAsync(`booking-busy-provider:${context.workspaceId}`, 120)) return { connected: true, checked: false, reason: "calendar_rate_limited" };
     const busy = await ports.busy(context.workspaceId, connection.provider, {
       start: zonedLocalToUtc(date, "00:00", timeZone),
       end: zonedLocalToUtc(nextDate(date), "00:00", timeZone),

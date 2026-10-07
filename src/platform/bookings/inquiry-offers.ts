@@ -87,6 +87,8 @@ export async function readInquiryBookingOffer(token: string): Promise<InquiryBoo
   return project(await nativeRpc("read_inquiry_booking_offer", { p_hash: tokenHash(token) }));
 }
 export async function chooseInquiryBookingOffer(token: string, start: string): Promise<StoreBooking> {
+  const { bookingCustomerEmailAllowed } = await import("./updates");
+  const { bookingMessagesEnabled, bookingManagePageEnabled } = await import("./flags");
   const offer = await readInquiryBookingOffer(token);
   if (!offer) throw new PublicBookingError("not_found", "This booking suggestion has expired.");
   const chosen = offer.slots.find(s => Date.parse(s.start) === Date.parse(start));
@@ -95,10 +97,11 @@ export async function chooseInquiryBookingOffer(token: string, start: string): P
   // the time. The locked RPC refuses any different choice after consumption.
   if (!offer.booked) {
     const raw = rawOfferSchema.parse(await nativeRpc("read_inquiry_booking_offer", { p_hash: tokenHash(token) }));
+    if (!bookingMessagesEnabled() || !bookingManagePageEnabled() || !await bookingCustomerEmailAllowed(raw.tenantId)) throw new PublicBookingError("unavailable", "Email confirmation is not available. Contact the business to book.");
     const current = await nativeSlots(raw.tenantId, offer.serviceId, chosen.start, new Date(Date.parse(chosen.end) + 1).toISOString());
     if (!current.slots.some(s => s.start === chosen.start)) throw new PublicBookingError("conflict", "That time has just been taken. Ask the business for new times.");
   }
-  const result = await nativeRpc("choose_inquiry_booking_offer", { p_hash: tokenHash(token), p_start: chosen.start, p_access: newBookingAccess() }) as { booking?: unknown };
+  const result = await nativeRpc("choose_inquiry_booking_offer", { p_hash: tokenHash(token), p_start: chosen.start, p_access: newBookingAccess("Website booking request") }) as { booking?: unknown };
   const booking = parseStoreBooking(result.booking);
   if (!booking) throw new PublicBookingError("unavailable", "The booking request receipt is unavailable.");
   return booking;

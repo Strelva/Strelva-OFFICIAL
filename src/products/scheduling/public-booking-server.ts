@@ -1,3 +1,5 @@
+import { publicBookingAdmission } from "@/platform/bookings/public-admission";
+import { cachedPublicCalendarRead } from "@/platform/bookings/public-read";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
@@ -159,12 +161,15 @@ export async function resolvePublishedPublicBooking(input: {
   const configuredRange = paused ? null : input.range
     ? { start: input.range.from, end: input.range.to }
     : minMax(schedule.availability);
+  if (configuredRange && Date.parse(configuredRange.end) - Date.parse(configuredRange.start) > 60 * 86400000) {
+    configuredRange.end = new Date(Date.parse(configuredRange.start) + 60 * 86400000).toISOString();
+  }
   const availability = configuredRange
-    ? await readWorkspaceProviderAvailability(owner, workspaceId, requiredText(grant, "provider") as "outlook" | "google", {
+    ? await cachedPublicCalendarRead([workspaceId, workId, requiredText(grant, "provider"), configuredRange.start, configuredRange.end, text(grant, "time_zone")], () => readWorkspaceProviderAvailability(owner, workspaceId, requiredText(grant, "provider") as "outlook" | "google", {
       start: configuredRange.start,
       end: configuredRange.end,
       timeZone: text(grant, "time_zone") || undefined,
-    })
+    }))
     : { busy: [] as Array<{ start: string; end: string }>, timeZone: text(grant, "time_zone") || "UTC" };
   const providerBusy = Array.isArray(availability.busy) ? availability.busy : [];
   const slots = (paused ? [] : schedule.availability)
@@ -327,6 +332,7 @@ export function createPublicWebsiteBookingService() {
     calendar: nativeCalendar(),
     tokens: postgresPublicBookingTokenStore,
     store: publicBookingStoreHook(),
+    admission: publicBookingAdmission,
     createRequestId: () => `public-${randomUUID()}`,
   });
 }
