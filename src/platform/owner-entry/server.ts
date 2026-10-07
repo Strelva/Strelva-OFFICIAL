@@ -29,7 +29,8 @@ export const ownerEntryForTenant = cache(async (tenant: string): Promise<OwnerEn
     const before = decideOwnerEntry({ resolution });
     // A verified address alone never grants ownership. This only accepts a
     // still-pending operator-issued invitation, through its existing transaction.
-    if (before.kind === "dashboard" && before.reason === "no_membership" && process.env.STRELVA_OWNER_INVITATION_CLAIM === "1") {
+    if (resolution?.role !== "owner" && (before.kind === "workspace" || before.reason === "no_membership")
+      && process.env.STRELVA_OWNER_INVITATION_CLAIM === "1") {
       if (await claimPendingBusinessOwner(actor, tenant)) resolution = await resolveTenantOwnerEntry(tenant, actor);
     }
     return decideOwnerEntry({ resolution });
@@ -73,4 +74,3 @@ export async function redirectIfDashboardPageMoved(tenant: string, route: string
 export async function ownerEntryLanding(tenant: string, clientFallbackRoot: string): Promise<string> {
   return entryDestination(await ownerEntryForTenant(tenant), withClientFallbackRoot(clientFallbackRoot, "/dashboard"));
 }
-
