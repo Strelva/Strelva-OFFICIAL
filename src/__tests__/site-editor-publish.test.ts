@@ -207,6 +207,7 @@ describe("site editor publish routes", () => {
     expect(await response.json()).toEqual({ success: true, publishedSections: ["hero"], publishedPageConfig: false, liveSite: { status: "revalidated" } });
     expect(mockTenantReleaseFlagEnabled).not.toHaveBeenCalled();expect(mockGetTenantConfig).toHaveBeenCalledOnce();expect(mockPublicReadBack).not.toHaveBeenCalled(); // Existing template-manifest routing reads the tenant.
     expect(mockSetContent).toHaveBeenCalledOnce();expect(mockRevalidateClientSite).toHaveBeenCalledOnce();
+    expect(mockAddEvent).not.toHaveBeenCalled();
   });
 
   it("POST /api/publish reads the public site only when this tenant's channel is enabled", async () => {
@@ -219,6 +220,7 @@ describe("site editor publish routes", () => {
     expect(mockPublicReadBack).toHaveBeenCalledOnce();
     expect(mockPublicReadBack).toHaveBeenCalledWith({ tenant: { id: "test-tenant", productionDomain: "example.test" }, section: "website", expected: { hero: HERO_DRAFT } });
     expect(mockLogAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ action: "content.public_read_back", metadata: expect.objectContaining({ ok: true }) }));
+    expect(mockAddEvent).not.toHaveBeenCalled();
     mockPublicReadBack.mockClear();mockTenantReleaseFlagEnabled.mockResolvedValue(false);
     expect(await (await POST()).json()).not.toHaveProperty("readBack");expect(mockPublicReadBack).not.toHaveBeenCalled();
   });
@@ -232,6 +234,40 @@ describe("site editor publish routes", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ success: true, liveSite: { status: "revalidated" }, readBack: { ok: false, status: "unverified" } });
     expect(mockSetContent).toHaveBeenCalledOnce();expect(mockAppendVersion).toHaveBeenCalledOnce();expect(mockRevalidateClientSite).toHaveBeenCalledOnce();expect(mockPublicReadBack).toHaveBeenCalledOnce();
+    expect(mockAddEvent).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ tenantId: "test-tenant", type: "change_verify_failed", status: "pending",
+      metadata: expect.objectContaining({ publicationAccepted: true, reviewAudience: "operator", sections: ["hero"], status: "unverified" }) }));
+  });
+
+  it("POST /api/publish escalates a markup mismatch even when observation bookkeeping fails", async () => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "1");vi.stubEnv("STRELVA_MAKE_REAL_LIVE", "1");
+    mockListDrafts.mockResolvedValue({ hero: true });mockGetDraftContent.mockResolvedValue(HERO_DRAFT);
+    mockPublicReadBack.mockResolvedValue({ ok: false, status: "mismatch", detail: "Published headline is missing." });
+    mockLogAuditEvent.mockImplementation(async (input: { action: string }) => { if (input.action === "content.public_read_back") throw Error("audit unavailable"); });
+    mockAddEvent.mockRejectedValue(Error("operator queue unavailable"));
+    const { POST } = await import("@/app/api/publish/route");
+    const response = await POST();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, readBack: { ok: false, status: "mismatch" } });
+    expect(mockAddEvent).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ body: "Published headline is missing.", type: "change_verify_failed" }));
+    expect(mockSetContent).toHaveBeenCalledOnce();expect(mockAppendVersion).toHaveBeenCalledOnce();expect(mockRevalidateClientSite).toHaveBeenCalledOnce();
+  });
+
+  it("POST /api/publish starts no observation or operator event without confirmed rollout authority", async () => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "1");vi.stubEnv("STRELVA_MAKE_REAL_LIVE", "1");
+    mockListDrafts.mockResolvedValue({ hero: true });mockGetDraftContent.mockResolvedValue(HERO_DRAFT);
+    mockTenantReleaseFlagEnabled.mockRejectedValue(Error("release store unavailable"));
+    const { POST } = await import("@/app/api/publish/route");
+    expect(await (await POST()).json()).toMatchObject({ success: true });
+    expect(mockPublicReadBack).not.toHaveBeenCalled();expect(mockAddEvent).not.toHaveBeenCalled();
+    expect(mockSetContent).toHaveBeenCalledOnce();
+  });
+
+  it("POST /api/publish creates no failed-publication event when no changes were published", async () => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "1");vi.stubEnv("STRELVA_MAKE_REAL_LIVE", "1");
+    mockPublicReadBack.mockResolvedValue({ ok: false, status: "unverified", detail: "No observable content values." });
+    const { POST } = await import("@/app/api/publish/route");
+    expect(await (await POST()).json()).toMatchObject({ success: true, publishedSections: [], publishedPageConfig: false });
+    expect(mockSetContent).not.toHaveBeenCalled();expect(mockAddEvent).not.toHaveBeenCalled();
   });
 
   it("POST /api/content/:section/versions restores history into a draft", async () => {
