@@ -33,6 +33,7 @@ begin
       and (h.to_status in ('requested','confirmed','cancelled','declined') or (p_agent and h.to_status='held' and b.origin='agent'))
       and coalesce(h.reason,'') not like 'Expired%'
       and coalesce(h.reason,'') not like 'Hold expired%'
+      and coalesce(h.reason,'') not like 'Public receipt was not saved%'
       and (a.audience = 'customer' or (p_owner and (h.to_status in ('cancelled','confirmed') or h.reason='Customer rescheduled')
         ))
       and not exists(select 1 from public.business_booking_updates u where u.history_id=h.id and u.audience=a.audience)

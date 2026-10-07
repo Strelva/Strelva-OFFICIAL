@@ -9,7 +9,7 @@ alter function public.record_tenant_booking(text,jsonb,text) rename to record_te
 revoke all on function public.record_tenant_booking_before_w6(text,jsonb,text) from public,anon,authenticated,service_role;
 create function public.record_tenant_booking(p_tenant_id text,p_booking jsonb,p_via text) returns jsonb
 language plpgsql security definer set search_path=public,pg_temp as $$
-declare v record; v_before public.business_bookings; v_result jsonb;
+declare v record; v_before public.business_bookings; v_result jsonb; v_row public.business_bookings;
 begin
  select * into v from public.booking_tenant(p_tenant_id);
  perform pg_advisory_xact_lock(hashtextextended(v.tenant_stable_id::text,9106));
@@ -17,15 +17,29 @@ begin
    (p_booking ? 'legacyId' and b.legacy_id=p_booking->>'legacyId') or
    (p_booking ? 'publicReservationId' and b.public_reservation_id::text=p_booking->>'publicReservationId') or
    (p_booking ? 'id' and b.id::text=p_booking->>'id'));
+ if v_before.public_reservation_id is not null and p_booking ? 'requestFingerprint'
+   and v_before.request_fingerprint is distinct from p_booking->>'requestFingerprint' then
+   raise exception 'booking_request_conflict';
+ end if;
+ if v_before.id is not null and (v_before.start_at is distinct from (p_booking->>'start')::timestamptz
+   or v_before.end_at is distinct from (p_booking->>'end')::timestamptz) then
+   p_booking := p_booking || jsonb_build_object('reason','Customer rescheduled');
+ end if;
  v_result := public.record_tenant_booking_before_w6(p_tenant_id,p_booking,p_via);
+ -- Native services may use the record UUID when no legacy external_ref exists.
+ -- Resolve both identifiers without changing an existing booking's snapshot.
+ if v_result#>>'{booking,id}' is not null then
+   update public.business_bookings b set business_service_id=s.id from public.business_services s
+     where b.id=(v_result#>>'{booking,id}')::uuid and b.business_service_id is null
+       and s.workspace_id=b.workspace_id and (s.external_ref=b.service_ref or s.id::text=b.service_ref);
+   select * into v_row from public.business_bookings where id=(v_result#>>'{booking,id}')::uuid;
+   v_result := v_result || jsonb_build_object('booking',public.booking_json(v_row));
+ end if;
  if v_before.id is not null and v_result->>'status'='updated' and
    (v_before.start_at is distinct from (v_result#>>'{booking,start}')::timestamptz or v_before.end_at is distinct from (v_result#>>'{booking,end}')::timestamptz) then
    if v_before.status=(v_result#>>'{booking,status}') then
      insert into public.business_booking_history(booking_id,actor,from_status,to_status,reason)
      values(v_before.id,case when p_via='backfill' then 'migration' else 'visitor' end,v_before.status,v_before.status,'Customer rescheduled');
-   else
-     update public.business_booking_history set reason='Customer rescheduled'
-       where id=(select id from public.business_booking_history where booking_id=v_before.id order by at desc,id desc limit 1);
    end if;
    if v_result#>>'{booking,status}'='requested' then
      update public.business_bookings set requested_at=clock_timestamp() where id=v_before.id;
@@ -54,10 +68,6 @@ begin
  select * into v_b from public.business_bookings where id=v_before.id;
  if p_change->>'action'='reschedule' and v_b.status='requested' then
    update public.business_bookings set requested_at=clock_timestamp() where id=v_b.id;
- end if;
- if p_change->>'action'='cancel' and v_before.status<>'cancelled' and v_before.start_at < clock_timestamp()+make_interval(hours=>coalesce((select cancellation_cutoff_hours from public.booking_settings where calendar_key=v_b.calendar_key),24)) then
-   update public.business_booking_history set reason='Customer cancelled after the cancellation cutoff'
-     where id=(select id from public.business_booking_history where booking_id=v_b.id order by at desc,id desc limit 1);
  end if;
  -- Only an actual widget row is mirrored. Native agent/inquiry records have no legacy row.
  if v_b.origin='site' and v_b.legacy_id is not null then
@@ -100,7 +110,7 @@ begin
       union all
       select b.id, 'request_owner_reminder', coalesce(b.requested_at,b.created_at)
         from public.business_bookings b
-        where b.status = 'requested' and b.public_reservation_id is null
+        where b.status = 'requested' and (b.public_reservation_id is null or b.service_ref is not null)
           and coalesce(b.requested_at,b.created_at) <= p_now - interval '24 hours' and coalesce(b.requested_at,b.created_at) > p_now - interval '72 hours'
     ) due
     where not exists (select 1 from public.business_booking_messages m where m.booking_id = due.booking_id and m.kind = due.kind)
@@ -135,7 +145,7 @@ begin
   if p_now is null or p_limit is null or p_limit < 1 or p_limit > 500 then raise exception 'booking_invalid'; end if;
   for v_row in
     select * from public.business_bookings
-      where status = 'requested' and public_reservation_id is null and coalesce(requested_at,created_at) <= p_now - interval '72 hours'
+      where status = 'requested' and (public_reservation_id is null or service_ref is not null) and coalesce(requested_at,created_at) <= p_now - interval '72 hours'
       order by coalesce(requested_at,created_at), id
       limit p_limit
       for update skip locked

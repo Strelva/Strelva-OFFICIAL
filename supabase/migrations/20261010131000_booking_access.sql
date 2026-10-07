@@ -119,12 +119,17 @@ begin
       then 'requested' else 'confirmed' end;
     begin
       update public.business_bookings set start_at=(p_change->>'start')::timestamptz, end_at=(p_change->>'end')::timestamptz,
-        block_end_at=(p_change->>'end')::timestamptz + make_interval(mins=>buffer_minutes), status=v_status, updated_at=clock_timestamp()
+        buffer_minutes=coalesce((v_ctx#>>'{settings,bufferMinutes}')::integer,buffer_minutes),
+        block_end_at=(p_change->>'end')::timestamptz + make_interval(mins=>coalesce((v_ctx#>>'{settings,bufferMinutes}')::integer,buffer_minutes)),
+        status=v_status, updated_at=clock_timestamp()
         where id=v_b.id returning * into v_b;
     exception when exclusion_violation then raise exception 'booking_slot_taken'; end;
   else raise exception 'booking_invalid'; end if;
   insert into public.business_booking_history(booking_id, actor, from_status, to_status, reason)
-    values(v_b.id,'visitor',v_before.status,v_b.status,case when p_change->>'action'='cancel' then 'Customer cancelled' else 'Customer rescheduled' end);
+    values(v_b.id,'visitor',v_before.status,v_b.status,case when p_change->>'action'='cancel' then
+      case when v_before.start_at < clock_timestamp()+make_interval(hours=>coalesce((select (to_jsonb(s)->>'cancellation_cutoff_hours')::integer from public.booking_settings s where calendar_key=v_b.calendar_key),24))
+        then 'Customer cancelled after the cancellation cutoff' else 'Customer cancelled' end
+      else 'Customer rescheduled' end);
   return public.booking_json(v_b);
 end;
 $$;

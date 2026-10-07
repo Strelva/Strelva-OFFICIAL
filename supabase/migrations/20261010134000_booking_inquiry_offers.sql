@@ -73,7 +73,7 @@ begin
   'legacyId','inquiry-offer-'||v_o.id::text,'status','requested','origin','inquiry','inquiryId',v_o.inquiry_id,
   'serviceRef',v_o.service_ref,'serviceName',v_o.service_name,'start',v_slot->>'start','end',v_slot->>'end',
   'bufferMinutes',v_o.buffer_minutes,'timeZone',v_o.timezone,'customer',v_o.customer,
-  'requestFingerprint',v_o.token_hash||':'||p_start::text),'native');
+  'requestFingerprint',encode(sha256(convert_to(v_o.token_hash||':'||p_start::text,'UTF8')),'hex')),'native');
  if v_result->>'status'='conflict' then raise exception 'booking_slot_taken'; end if;
  update public.booking_inquiry_offers set booking_id=(v_result#>>'{booking,id}')::uuid,selected_start=p_start where id=v_o.id;
  perform public.issue_booking_access(v_tenant,v_result#>>'{booking,id}',p_access);

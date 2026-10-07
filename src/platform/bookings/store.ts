@@ -4,6 +4,7 @@
  * route reads; see flags.ts and src/lib/storage/booking-store.ts.
  */
 import { getSupabase } from "@/platform/infra/db/client";
+import { bookingRecordFallbackEnabled, cacheBookingRecord, cachedBookingRecord } from "./record-fallback";
 
 export const BOOKING_STORE_TIMEOUT_MS = 2000;
 
@@ -41,6 +42,7 @@ export interface StoreBooking {
   inquiryId: string | null;
   legacyId: string | null;
   publicReservationId: string | null;
+  requestFingerprint?: string | null;
   externalSource: string | null;
   externalRef: string | null;
   recordedVia: string;
@@ -215,6 +217,7 @@ export function parseStoreBooking(raw: unknown): StoreBooking | null {
     inquiryId: text(r.inquiryId),
     legacyId: text(r.legacyId),
     publicReservationId: text(r.publicReservationId),
+    ...(text(r.requestFingerprint) ? { requestFingerprint: text(r.requestFingerprint)! } : {}),
     externalSource: text(r.externalSource),
     externalRef: text(r.externalRef),
     recordedVia: String(r.recordedVia ?? ""),
@@ -253,10 +256,25 @@ function parseHours(raw: unknown): RecordHours | null {
 }
 
 export async function readBookingContext(tenant: string, db?: BookingStoreDb | null): Promise<BookingContext | null> {
-  const data = await call<Record<string, unknown> | null>("read_tenant_booking_context", { p_tenant_id: tenant }, db);
+  let data: Record<string, unknown> | null;
+  try {
+    data = await call<Record<string, unknown> | null>("read_tenant_booking_context", { p_tenant_id: tenant }, db);
+  } catch (error) {
+    if (!bookingRecordFallbackEnabled()) throw error;
+    // The cached record never supplies identity, lifecycle or settings. If
+    // these fresh store reads also fail, availability remains closed.
+    const policy = await call<Record<string, unknown> | null>("read_tenant_booking_policy", { p_tenant_id: tenant }, db);
+    if (!policy || typeof policy.tenantStableId !== "string") throw error;
+    const cached = await cachedBookingRecord(tenant, {
+      tenantStableId: policy.tenantStableId, workspaceId: text(policy.workspaceId), systemId: text(policy.systemId),
+      paused: policy.paused === true, settings: parseSettings(policy.settings),
+    });
+    if (!cached) throw error;
+    return cached;
+  }
   if (!data || typeof data !== "object" || typeof data.tenantStableId !== "string") return null;
   const services = Array.isArray(data.services) ? data.services : [];
-  return {
+  const context: BookingContext = {
     tenantStableId: data.tenantStableId,
     workspaceId: text(data.workspaceId),
     systemId: text(data.systemId),
@@ -275,6 +293,8 @@ export async function readBookingContext(tenant: string, db?: BookingStoreDb | n
       })),
     settings: parseSettings(data.settings),
   };
+  if (bookingRecordFallbackEnabled()) await cacheBookingRecord(context);
+  return context;
 }
 
 export type RecordBookingResult =

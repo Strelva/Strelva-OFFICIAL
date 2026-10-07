@@ -2,6 +2,14 @@
 -- Real PostgreSQL proof for native manage links, agent holds and lifecycle
 -- message claims. Fictional tenants only; all fixtures roll back. No sends.
 begin;
+-- The isolated workspace cluster does not load the pre-workspace tenant
+-- schema. Match its legacy booking table for rollback-management proof.
+create table if not exists public.bookings (
+ id text primary key, tenant_id text not null references public.tenants(id) on delete cascade,
+ service_id text not null, service_name text not null, date date not null, start_time text not null, end_time text not null,
+ client_name text not null, client_email text not null, client_phone text not null, notes text,
+ status text not null, created_at timestamptz not null default now(), cancelled_at timestamptz
+);
 create or replace function pg_temp.ba_assert(condition boolean, message text) returns void language plpgsql as $$
 begin if condition is not true then raise exception 'booking agent assertion failed: %', message; end if; end; $$;
 create or replace function pg_temp.ba_expect(statement text, expected text) returns void language plpgsql as $$
@@ -142,7 +150,8 @@ begin
     values(v_sys,v_ws,'Bookings','booking',gen_random_uuid(),repeat('c',64),'ca000000-0000-4000-8000-0000000000e1','ca000000-0000-4000-8000-0000000000e1');
   insert into public.system_revisions(id,system_id,business_workspace_id,number,implementation,command_id,command_digest,created_by)
     values(v_rev,v_sys,v_ws,1,'{"kind":"schedule","ref":"work:fixture"}',gen_random_uuid(),repeat('d',64),'ca000000-0000-4000-8000-0000000000e1');
-  update public.systems set current_revision_id=v_rev,current_revision_number=1,lifecycle='paused' where id=v_sys;
+  update public.systems set current_revision_id=v_rev,current_revision_number=1,lifecycle='live' where id=v_sys;
+  update public.systems set lifecycle='paused' where id=v_sys;
 end $$;
 select pg_temp.ba_expect($$select public.hold_agent_booking('ba-site',pg_temp.ba_booking('ba_paused',6),pg_temp.ba_access(6))$$,'booking_paused');
 select pg_temp.ba_assert(public.confirm_agent_booking(pg_temp.ba_access(5)->>'confirmHash',false)#>>'{booking,status}' = 'confirmed','existing hold confirms while paused');
@@ -209,7 +218,7 @@ select pg_temp.ba_assert(public.claim_booking_updates(pg_temp.ba_id('ba_lapse'),
 
 -- Booking setup is tenant-bound, optimistic and owner-approved before instant.
 insert into public.users(id,email,verified_at) values('ca000000-0000-4000-8000-0000000000e2','ba-owner@example.test',now());
-insert into public.workspace_memberships(workspace_id,user_id,role) values((select id from ba_ws where name='site'),'ca000000-0000-4000-8000-0000000000e2','owner');
+insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values((select id from ba_ws where name='site'),'ca000000-0000-4000-8000-0000000000e2','owner','ca000000-0000-4000-8000-0000000000e1');
 select pg_temp.ba_expect($q$select public.read_booking_setup((select id from ba_ws where name='other'),'ba-site','ca000000-0000-4000-8000-0000000000e2','ba-owner@example.test')$q$,'booking_not_found');
 select pg_temp.ba_expect($q$select public.read_booking_setup((select id from ba_ws where name='site'),'ba-site','ca000000-0000-4000-8000-0000000000e2','wrong@example.test')$q$,'booking_settings_denied');
 create temporary table ba_setup on commit drop as select public.configure_booking_setup((select id from ba_ws where name='site'),'ba-site',
@@ -231,7 +240,7 @@ insert into public.workspace_calendar_connections(workspace_id,provider,calendar
 create temporary table ba_mirror on commit drop as select public.prepare_booking_calendar_mirror(pg_temp.ba_id('ba_main'),'ca000000-0000-4000-8000-0000000000a1') as r;
 select pg_temp.ba_assert((select r->>'provider'='google' and r->>'userId'='ca000000-0000-4000-8000-0000000000e2' from ba_mirror),'projection uses verified owner');
 select pg_temp.ba_assert(public.prepare_booking_calendar_mirror(pg_temp.ba_id('ba_main'),'ca000000-0000-4000-8000-0000000000a2') is null,'second mirror claimant refused');
-select public.finish_booking_calendar_mirror(pg_temp.ba_id('ba_main'),'ca000000-0000-4000-8000-0000000000a2','verified','wrong-event',null);
+select pg_temp.ba_expect($q$select public.finish_booking_calendar_mirror(pg_temp.ba_id('ba_main'),'ca000000-0000-4000-8000-0000000000a2','verified','wrong-event',null)$q$,'booking_calendar_claim_lost');
 select pg_temp.ba_assert((select external_event_id is null from public.business_booking_calendar_mirrors where booking_id=pg_temp.ba_id('ba_main')),'wrong lease cannot finish');
 select public.finish_booking_calendar_mirror(pg_temp.ba_id('ba_main'),'ca000000-0000-4000-8000-0000000000a1','verified','fixture-event',null);
 select pg_temp.ba_assert((select status='confirmed' from public.business_bookings where id=pg_temp.ba_id('ba_main')),'calendar evidence never changes booking authority');
@@ -269,9 +278,11 @@ select public.record_tenant_booking('ba-site',pg_temp.ba_booking('ba_widget_move
 select public.issue_booking_access('ba-site','ba_widget_move',pg_temp.ba_access(60));
 update public.booking_settings set mode='request' where calendar_key='ca000000-0000-4000-8000-0000000000b1';
 update public.business_bookings set created_at=clock_timestamp()-interval '4 days' where id=pg_temp.ba_id('ba_widget_move');
+update public.booking_settings set buffer_minutes=20 where tenant_stable_id='ca000000-0000-4000-8000-0000000000b1';
 select public.change_native_booking(lpad(to_hex(180),64,'0'),jsonb_build_object('action','reschedule','start',now()+interval '58 days','end',now()+interval '58 days 30 minutes','forceRequest',false));
+select pg_temp.ba_assert((select buffer_minutes=20 and block_end_at=end_at+interval '20 minutes' from public.business_bookings where id=pg_temp.ba_id('ba_widget_move')),'reschedule uses current buffer policy');
 select pg_temp.ba_assert((select requested_at>clock_timestamp()-interval '1 minute' from public.business_bookings where id=pg_temp.ba_id('ba_widget_move')),'reschedule starts fresh request clock');
-select pg_temp.ba_assert((select date=(now()+interval '58 days' at time zone 'America/New_York')::date and status='requested' from public.bookings where id='ba_widget_move'),'legacy management row matches native');
+select pg_temp.ba_assert((select date=((now()+interval '58 days') at time zone 'America/New_York')::date and status='requested' from public.bookings where id='ba_widget_move'),'legacy management row matches native');
 select public.lapse_booking_requests(clock_timestamp(),500);
 select pg_temp.ba_assert((select status='requested' from public.business_bookings where id=pg_temp.ba_id('ba_widget_move')),'old creation does not immediately lapse new request');
 select public.claim_booking_messages(clock_timestamp(),500);
@@ -281,5 +292,60 @@ select public.change_native_booking(lpad(to_hex(180),64,'0'),'{"action":"cancel"
 select pg_temp.ba_assert((select status='cancelled' and cancelled_at is not null from public.bookings where id='ba_widget_move'),'cancel mirrors legacy rollback row');
 select pg_temp.ba_assert(exists(select 1 from public.business_booking_history where booking_id=pg_temp.ba_id('ba_widget_move') and reason='Customer cancelled after the cancellation cutoff'),'late cancellation recorded without blocking');
 select pg_temp.ba_assert(not has_function_privilege('service_role','public.change_native_booking_before_w6(text,jsonb)','execute'),'native wrapper cannot be bypassed');
+
+-- Native public receipts retain bearer management while owner decisions and
+-- clock expiry follow the authoritative store, never provider read-back.
+insert into public.offering_website_bindings(business_workspace_id,tenant_stable_id,tenant_id_at_binding,
+ site_name_at_binding,idempotency_key,command_digest,created_by,updated_by)
+select id,'ca000000-0000-4000-8000-0000000000b1','ba-site','Agent Fixture Firm','ba-native-public',repeat('1',64),
+ 'ca000000-0000-4000-8000-0000000000e2','ca000000-0000-4000-8000-0000000000e2' from ba_ws where name='site'
+ and not exists(select 1 from public.offering_website_bindings where tenant_stable_id='ca000000-0000-4000-8000-0000000000b1' and status='active');
+insert into public.saved_product_work(id,workspace_id,product_id,resource_kind,title,payload,created_by)
+select 'ca000000-0000-4000-8000-0000000000f1',id,'scheduling','schedule','Public Consultation',
+ jsonb_build_object('version',1,'revision',0,'title','Public Consultation','createdBy','ca000000-0000-4000-8000-0000000000e2',
+ 'createdAt',now(),'history','[]'::jsonb,'availability','[]'::jsonb,'reservations','[]'::jsonb),
+ 'ca000000-0000-4000-8000-0000000000e2' from ba_ws where name='site';
+insert into public.public_website_booking_grants(id,tenant_stable_id,business_workspace_id,work_id,capability_id,
+ capability_version,inquiry_capability_id,inquiry_version,provider,display_name,time_zone,published_by)
+select 'ca000000-0000-4000-8000-0000000000f2','ca000000-0000-4000-8000-0000000000b1',id,'ca000000-0000-4000-8000-0000000000f1',
+ 'consultation',1,'inquiries',1,'google','Consultation','America/New_York','ca000000-0000-4000-8000-0000000000e2' from ba_ws where name='site';
+select public.record_tenant_booking('ba-site',pg_temp.ba_booking('ba_native_public',59,jsonb_build_object(
+ 'publicReservationId','ca000000-0000-4000-8000-0000000000f3','serviceRef','consultation','status','requested','origin','site')),'native');
+insert into public.public_website_bookings(id,grant_id,tenant_stable_id,tenant_id_at_reservation,business_workspace_id,work_id,
+ capability_id,capability_version,provider,inquiry_id,request_id_hash,request_fingerprint,slot_id,slot_start_at,slot_end_at,
+ calendar_request_id,management_token_hash,management_token_ciphertext,expected_revision,title,start_at,end_at,time_zone,status)
+select 'ca000000-0000-4000-8000-0000000000f3','ca000000-0000-4000-8000-0000000000f2','ca000000-0000-4000-8000-0000000000b1','ba-site',id,
+ 'ca000000-0000-4000-8000-0000000000f1','consultation',1,'google','fixture-public-inquiry',repeat('e',64),repeat('f',64),'fixture-native-slot',
+ now()+interval '59 days',now()+interval '59 days 30 minutes','fixture-native-request',repeat('2',64),'encrypted-native-public-manage',0,
+ 'Consultation',now()+interval '59 days',now()+interval '59 days 30 minutes','America/New_York','pending' from ba_ws where name='site';
+select pg_temp.ba_assert((select booking_id=pg_temp.ba_id('ba_native_public') from public.public_website_bookings
+ where id='ca000000-0000-4000-8000-0000000000f3'),'first receipt links prior store claim');
+select pg_temp.ba_expect($q$select public.record_tenant_booking('ba-site',pg_temp.ba_booking('ba_native_public',59,jsonb_build_object(
+ 'publicReservationId','ca000000-0000-4000-8000-0000000000f3','serviceRef','consultation','status','requested','origin','site','requestFingerprint',repeat('b',64))),'native')$q$,'booking_request_conflict');
+select pg_temp.ba_assert(not (public.release_public_record_booking_claim('ba-site','ca000000-0000-4000-8000-0000000000f3')->>'released')::boolean,'durable receipt cannot release a placed request');
+select public.decide_workspace_booking_request((select id from ba_ws where name='site'),pg_temp.ba_id('ba_native_public'),'approve','owner');
+select pg_temp.ba_assert((select status='confirmed' from public.public_website_bookings where id='ca000000-0000-4000-8000-0000000000f3'),'owner confirmation syncs receipt');
+update public.public_website_bookings set status='pending' where id='ca000000-0000-4000-8000-0000000000f3';
+select pg_temp.ba_assert((select status='confirmed' from public.public_website_bookings where id='ca000000-0000-4000-8000-0000000000f3'),'stale receipt cannot undo confirmation');
+update public.business_bookings set status='requested' where id=pg_temp.ba_id('ba_native_public');
+select pg_temp.ba_assert((select requested_at>now()-interval '1 minute' from public.business_bookings where id=pg_temp.ba_id('ba_native_public')),'new request has fresh clock');
+update public.business_bookings set requested_at=now()-interval '25 hours' where id=pg_temp.ba_id('ba_native_public');
+select public.claim_booking_messages(clock_timestamp(),500);
+select pg_temp.ba_assert(exists(select 1 from public.business_booking_messages where booking_id=pg_temp.ba_id('ba_native_public') and kind='request_owner_reminder'),'public request owner chase');
+select public.lapse_booking_requests(now()+interval '48 hours',500);
+select pg_temp.ba_assert((select status='declined' from public.business_bookings where id=pg_temp.ba_id('ba_native_public'))
+ and (select status='cancelled' from public.public_website_bookings where id='ca000000-0000-4000-8000-0000000000f3'),'public request lapse closes receipt');
+
+select public.record_tenant_booking('ba-site',pg_temp.ba_booking('ba_public_ghost',60,jsonb_build_object(
+ 'publicReservationId','ca000000-0000-4000-8000-0000000000f4','serviceRef','consultation','status','held','origin','site')),'native');
+select pg_temp.ba_assert(not (public.release_public_record_booking_claim('ba-other','ca000000-0000-4000-8000-0000000000f4')->>'released')::boolean,'other tenant cannot release a claim');
+select pg_temp.ba_assert((public.release_public_record_booking_claim('ba-site','ca000000-0000-4000-8000-0000000000f4')->>'released')::boolean,'unplaced claim releases');
+select pg_temp.ba_assert((select status='cancelled' from public.business_bookings where id=pg_temp.ba_id('ba_public_ghost')),'unplaced claim releases its slot');
+select pg_temp.ba_assert(public.claim_booking_updates(pg_temp.ba_id('ba_public_ghost'),true,true,100) = '[]'::jsonb,'unplaced claim never sends a cancellation');
+select pg_temp.ba_assert(not (public.release_public_record_booking_claim('ba-site','ca000000-0000-4000-8000-0000000000f4')->>'released')::boolean,'release replay changes nothing');
+select pg_temp.ba_assert(public.read_tenant_booking_policy('ba-site')->>'tenantStableId'='ca000000-0000-4000-8000-0000000000b1'
+ and not (public.read_tenant_booking_policy('ba-site') ? 'hours'),'fresh policy contains no record facts');
+select pg_temp.ba_assert(not has_function_privilege('authenticated','public.release_public_record_booking_claim(text,uuid)','execute')
+ and not has_function_privilege('anon','public.read_tenant_booking_policy(text)','execute'),'recovery and policy RPCs service-role only');
 
 rollback;

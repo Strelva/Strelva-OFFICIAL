@@ -26,7 +26,7 @@ declare b public.business_bookings; m public.business_booking_calendar_mirrors; 
 begin
   if p_token is null then raise exception 'booking_invalid'; end if;
   select * into b from public.business_bookings where id=p_booking_id for update;
-  if b.id is null or b.workspace_id is null or b.public_reservation_id is not null or b.origin='import'
+  if b.id is null or b.workspace_id is null or (b.public_reservation_id is not null and b.service_ref is null) or b.origin='import'
     or b.status not in ('confirmed','cancelled') then return null; end if;
   select * into m from public.business_booking_calendar_mirrors where booking_id=b.id for update;
   if m.claim_until > clock_timestamp() then return null; end if;
@@ -46,11 +46,11 @@ begin
   v_now := to_char(clock_timestamp() at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"');
   if m.booking_id is null then
     v_work := gen_random_uuid();
-    v_payload := jsonb_build_object('version',1,'revision',0,'title',left(b.service_name,160),'createdBy',v_user,
+    v_payload := jsonb_build_object('version',1,'revision',0,'title',left(b.service_name_at_booking,160),'createdBy',v_user,
       'createdAt',v_now,'history','[]'::jsonb,'availability',jsonb_build_array(jsonb_build_object('start',b.start_at,'end',b.end_at)),
-      'reservations',jsonb_build_array(jsonb_build_object('requestId',b.id,'title',left(b.service_name,160),'status','reserved','start',b.start_at,'end',b.end_at)));
+      'reservations',jsonb_build_array(jsonb_build_object('requestId',b.id,'title',left(b.service_name_at_booking,160),'status','reserved','start',b.start_at,'end',b.end_at)));
     insert into public.saved_product_work(id,workspace_id,product_id,resource_kind,title,payload,input,created_by)
-      values(v_work,b.workspace_id,'scheduling','booking_calendar_mirror',left(b.service_name,160),v_payload,
+      values(v_work,b.workspace_id,'scheduling','booking_calendar_mirror',left(b.service_name_at_booking,160),v_payload,
         jsonb_build_object('bookingId',b.id,'projection','provider_state_only'),v_user);
     insert into public.business_booking_calendar_mirrors(booking_id,work_id,provider,calendar_id,claim_token,claim_until)
       values(b.id,v_work,c.provider,c.calendar_id,p_token,clock_timestamp()+interval '5 minutes') returning * into m;
@@ -82,7 +82,7 @@ create function public.booking_calendar_mirror_candidates(p_limit integer) retur
 language sql stable security definer set search_path=public,pg_temp as $$
  select coalesce(jsonb_agg(id),'[]') from (
    select b.id from public.business_bookings b left join public.business_booking_calendar_mirrors m on m.booking_id=b.id
-   where b.workspace_id is not null and b.public_reservation_id is null and b.origin<>'import'
+   where b.workspace_id is not null and (b.public_reservation_id is null or b.service_ref is not null) and b.origin<>'import'
      and ((b.status='confirmed' and b.end_at>clock_timestamp()) or (b.status='cancelled' and m.booking_id is not null))
      and (m.claim_until is null or m.claim_until<=clock_timestamp())
      and (m.booking_id is null or m.updated_at<b.updated_at or m.status in ('unknown','failed','accepted'))
