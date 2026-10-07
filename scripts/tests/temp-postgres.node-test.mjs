@@ -14,6 +14,7 @@ for (const script of scripts) {
   for (const failure of ["initdb", "startup", "sql"]) {
     test(`${script}: ${failure} failure removes only its own cluster and stops its postmaster`, { skip: !available }, () => {
       const sandbox = mkdtempSync(join("/tmp", "strelva-cleanup-test-"));
+      const unrelatedData = join(sandbox, "tmp/strelva-unrelated-cluster/data");
       try {
         const bin = join(sandbox, "bin");
         const temporary = join(sandbox, "tmp");
@@ -22,6 +23,14 @@ for (const script of scripts) {
         const unrelated = join(temporary, "strelva-unrelated-cluster");
         mkdirSync(unrelated);
         writeFileSync(join(unrelated, "keep"), "another agent's cluster");
+        const liveUnrelated = script === "workspace-sql" && failure === "sql";
+        if (liveUnrelated) {
+          const options = { env: { ...process.env, LC_ALL: "C" }, encoding: "utf8" };
+          const initialized = spawnSync(join(postgres, "initdb"), ["-D", unrelatedData, "--locale=C", "--encoding=UTF8", "--auth=trust", "--no-instructions"], options);
+          assert.equal(initialized.status, 0, initialized.stderr);
+          const started = spawnSync(join(postgres, "pg_ctl"), ["-D", unrelatedData, "-l", join(unrelated, "postgres.log"), "-o", `-F -k '${unrelated}' -c listen_addresses='' -p ${65000 + process.pid % 400}`, "-w", "start"], options);
+          assert.equal(started.status, 0, started.stderr);
+        }
         writeFileSync(join(bin, "initdb"), `#!/usr/bin/env bash\n[[ "$LC_ALL" == C ]] || exit 99\n[[ "$TEST_FAILURE" != initdb ]] || exit 42\nexec "$POSTGRES_BIN/initdb" "$@"\n`, { mode: 0o700 });
         writeFileSync(join(bin, "pg_ctl"), `#!/usr/bin/env bash
 [[ "$LC_ALL" == C ]] || exit 99
@@ -45,12 +54,20 @@ exit "$status"
         assert.equal(result.status, 42, result.stderr);
         assert.deepEqual(readdirSync(temporary), ["strelva-unrelated-cluster"]);
         assert.equal(readFileSync(join(unrelated, "keep"), "utf8"), "another agent's cluster");
+        if (liveUnrelated) {
+          assert.equal(spawnSync(join(postgres, "pg_ctl"), ["-D", unrelatedData, "status"], { stdio: "ignore", env: { ...process.env, LC_ALL: "C" } }).status, 0);
+        }
         if (failure !== "initdb") {
           const pid = Number(readFileSync(join(sandbox, "pid"), "utf8"));
           assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
           assert.equal(existsSync(readFileSync(join(sandbox, "data"), "utf8").trim()), false);
         }
-      } finally { rmSync(sandbox, { recursive: true, force: true }); }
+      } finally {
+        if (existsSync(join(unrelatedData, "postmaster.pid"))) {
+          spawnSync(join(postgres, "pg_ctl"), ["-D", unrelatedData, "-m", "fast", "-w", "stop"], { stdio: "ignore", env: { ...process.env, LC_ALL: "C" } });
+        }
+        rmSync(sandbox, { recursive: true, force: true });
+      }
     });
   }
 }

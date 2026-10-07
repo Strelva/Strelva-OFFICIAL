@@ -21,7 +21,8 @@ locale internally. Branch: `a1/temp-cluster-cleanup`, base
   `strelva-workspace-sql.*` behind. The reproduction cleaned its own sandbox.
 - New Node regression suite: 15 passed, 0 failed, 0 skipped with PostgreSQL 18.
   Covers all four shell checks' initdb/startup/SQL failures, own PID shutdown,
-  preservation of another directory, shell signals, and release-safety failure
+  preservation of another directory and a separate live postmaster, shell signals,
+  and release-safety failure
   and signals. Tests also supply an invalid ambient locale.
 - `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm lint`,
   `pnpm check:boundaries`, shell syntax and `git diff --check`: passed.
@@ -32,16 +33,23 @@ locale internally. Branch: `a1/temp-cluster-cleanup`, base
   Direct `pnpm exec tsx scripts/check-release-safety.ts`: passed all batches,
   rollback guards, catalog/legacy checks and both dump/restore rehearsals.
 
-## Remaining verification
+## Repeat-run proof and handoff
 
-Two runs of both workspace commands are in progress. Global `$TMPDIR` snapshots
-include concurrent agents' directories and the rehearsal's intentional diagnostic
-logs, so a second proof uses an exclusively owned `$TMPDIR` under `/tmp`. Each
-command must exit 0 and leave zero new `strelva-*` entries or upgrade sockets.
-Evidence logs/JSON are local and ignored in this directory.
+Both workspace commands passed twice using the ordinary shared `$TMPDIR`, and
+both passed twice again with an exclusively owned `$TMPDIR` under `/tmp`.
+`LC_ALL` was unset and `LANG=invalid-locale` in both runs. The private proof
+reported **zero new `strelva-*` directories after all four commands**; both owned
+upgrade socket paths were verified absent. Global snapshots included concurrent
+agents' directories; those were left untouched. Evidence: `isolated-results.json`,
+`isolated-sockets.json`, `node-tests.log` and per-command logs here (ignored).
 
-Next: finish the isolated repeat-run proof, inspect final diff against the base,
-commit/push, open and link a PR against `integrate/reborn-1.0` with `Closes #500`.
-The release-readiness missing sentinel belongs to another stream; do not edit it
-for this cleanup fix. Shared conflict surfaces: the top/startup lines of four
-SQL shell scripts and the release-safety entry point/primitives.
+Issue #500 is done locally. No production verification or deployment is claimed.
+The combined release-safety gate still fails on the existing missing migration
+sentinel; its rehearsal passes directly. Forced stop failure was not injected;
+SIGKILL cannot run traps.
+
+Next: open the PR for `a1/temp-cluster-cleanup` against `integrate/reborn-1.0`, then
+orchestrator review/integration. The missing readiness sentinel belongs to another
+stream; do not edit it for this cleanup fix. Shared conflict surfaces: the
+top/startup lines of four SQL shell scripts and the release-safety entry
+point/primitives. SQL bodies and migrations were untouched.
