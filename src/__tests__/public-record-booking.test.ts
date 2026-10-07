@@ -10,19 +10,19 @@ import { createPublicBookingService, type PublicBookingBinding, type PublicBooki
 let store: ReturnType<typeof fakeBookingStore>;
 const tenant = "northstar";
 const from = "2026-11-06T00:00:00Z", to = "2026-11-07T00:00:00Z";
-async function binding(): Promise<PublicBookingBinding> {
-  const available = await recordPublicAvailability({ tenantId: tenant, capabilityId: "consultation", name: "Consultation", range: { from, to }, includeRevoked: true });
+async function binding(input?: { requestId?: string }): Promise<PublicBookingBinding> {
+  const available = await recordPublicAvailability({ tenantId: tenant, capabilityId: "consultation", name: "Consultation", range: { from, to }, includeRevoked: true, requestId: input?.requestId });
   return { ...available, tenantId: tenant, tenantStableId: "00000000-0000-4000-8000-000000000001", capabilityId: "consultation", version: 1,
     provider: "google", slots: available.slots.map(s => ({ id: `slot-${Date.parse(s.start)}`, start: s.start, end: s.end })), owner: { userId: "owner", verifiedEmail: "owner@example.test" }, workId: "schedule" };
 }
-function service() {
+function service(options: { failReceipt?: boolean; barrier?: () => Promise<void> } = {}) {
   const refs: PublicBookingReservationRef[] = [];
   const provider = vi.fn();
-  const api = createPublicBookingService({ resolve: binding, inquiries: { capture: vi.fn(async () => ({ inquiryId: "inquiry-1" })) },
+  const api = createPublicBookingService({ resolve: async input => { const result = await binding(input); await options.barrier?.(); return result; }, inquiries: { capture: vi.fn(async () => ({ inquiryId: "inquiry-1" })) },
     store: publicBookingStoreHook(), tokens: {
       findByRequest: async i => refs.find(r => r.requestId === i.requestId) ?? null,
       findByToken: async i => refs.find(r => r.managementToken === i.managementToken) ?? null,
-      save: async value => { const index = refs.findIndex(r => r.reservationId === value.reservationId); if (index < 0) refs.push(value); else refs[index] = value; return value; },
+      save: async value => { if (options.failReceipt) throw new Error("receipt store down"); store.publicReceipts.add(value.reservationId); const index = refs.findIndex(r => r.reservationId === value.reservationId); if (index < 0) refs.push(value); else refs[index] = value; return value; },
     }, calendar: {
       reserve: i => i.binding.recordBooking ? confirmPublicRecord(i.binding, i.reservationId) : provider(i),
       change: async i => (await changePublicRecord(i.binding, i.reservationId, i.start, i.end))!,
@@ -32,6 +32,7 @@ function service() {
 }
 beforeEach(() => {
   vi.useFakeTimers(); vi.setSystemTime(new Date("2026-11-01T12:00:00Z"));
+  vi.stubEnv("SECRETS_ENC_KEY", "ab".repeat(32));
   vi.stubEnv("STRELVA_BOOKING_STORE_WRITE", "1"); vi.stubEnv("STRELVA_BOOKING_STORE_READ", "postgres");
   vi.stubEnv("STRELVA_BOOKING_CALENDAR_BUSY", "1"); vi.stubEnv("STRELVA_BOOKING_MESSAGES", "0");
   store = fakeBookingStore(); store.state.streakDays = 7;
@@ -54,6 +55,10 @@ describe("record-served public visitor bookings", () => {
     expect(changed.slots.every(s => Date.parse(s.end) <= Date.parse("2026-11-06T17:00:00Z"))).toBe(true);
     store.tenants.get(tenant)!.services[0]!.active = false;
     await expect(recordPublicAvailability({ tenantId: tenant, capabilityId: "consultation", name: "Consultation", range: { from, to } })).rejects.toMatchObject({ code: "not_found" });
+  });
+  it("refuses an ambiguous display-name mapping rather than guessing another service", async () => {
+    store.tenants.get(tenant)!.services.push({ id: "other-service", externalRef: "other", name: "Consultation", durationMinutes: 45, active: true });
+    await expect(recordPublicAvailability({ tenantId: tenant, capabilityId: "old-grant", name: "Consultation", range: { from, to } })).rejects.toMatchObject({ code: "not_found" });
   });
   it("keeps request mode pending, stores the record buffer/service and dedupes without calendar writes", async () => {
     const { api, provider } = service(); const offered = await api.read({ tenantId: tenant, capabilityId: "consultation" });
@@ -89,6 +94,44 @@ describe("record-served public visitor bookings", () => {
     await expect(api.change({ tenantId: tenant, capabilityId: "consultation", capabilityVersion: 1, reservationId: receipt.reservationId, managementToken: receipt.managementToken, slotId: available.slots[0]!.id })).rejects.toMatchObject({ code: "conflict" });
     expect((await api.cancel({ tenantId: tenant, reservationId: receipt.reservationId, managementToken: receipt.managementToken })).status).toBe("cancelled");
     expect(store.rows[0]!.status).toBe("cancelled");
+  });
+  it("simultaneous identical requests return one receipt, token and booking", async () => {
+    let arrived = 0; let release!: () => void;
+    const bothResolved = new Promise<void>(r => { release = r; });
+    const { api } = service({ barrier: async () => { if (++arrived === 2) release(); await bothResolved; } });
+    const current = await binding();
+    const input = { tenantId: tenant, capabilityId: "consultation", capabilityVersion: 1, slotId: current.slots[0]!.id,
+      visitor: { name: "Dana", email: "dana@example.test" }, requestId: "simultaneous-request-".repeat(3) };
+    const [one, two] = await Promise.all([api.reserve(input), api.reserve(input)]);
+    expect(two).toEqual(one); expect(store.rows).toHaveLength(1); expect(store.rows[0]!.status).toBe("requested");
+  });
+  it("concurrent reuse with different customer details refuses the changed intent without rewriting the winner", async () => {
+    let arrived = 0; let release!: () => void;
+    const bothResolved = new Promise<void>(r => { release = r; });
+    const { api } = service({ barrier: async () => { if (++arrived === 2) release(); await bothResolved; } });
+    const current = await binding();
+    const input = { tenantId: tenant, capabilityId: "consultation", capabilityVersion: 1, slotId: current.slots[0]!.id,
+      visitor: { name: "Dana", email: "dana@example.test" }, requestId: "changed-request-".repeat(3) };
+    const results = await Promise.allSettled([api.reserve(input), api.reserve({ ...input, visitor: { name: "Ada", email: "ada@example.test" } })]);
+    expect(results.filter(r => r.status === "fulfilled")).toHaveLength(1);
+    const failed = results.find(r => r.status === "rejected");
+    expect(failed?.status === "rejected" && failed.reason).toMatchObject({ code: "conflict" });
+    expect(store.rows).toHaveLength(1); expect(store.rows[0]!.status).toBe("requested");
+  });
+  it("a failed receipt insert releases the held slot and never confirms it", async () => {
+    const { api } = service({ failReceipt: true }); const current = await binding();
+    await expect(api.reserve({ tenantId: tenant, capabilityId: "consultation", capabilityVersion: 1, slotId: current.slots[0]!.id,
+      visitor: { name: "Dana", email: "dana@example.test" }, requestId: "failed-receipt-".repeat(3) })).rejects.toMatchObject({ code: "unavailable" });
+    expect(store.rows[0]!.status).toBe("cancelled");
+    expect((await binding()).slots.some(s => s.id === current.slots[0]!.id)).toBe(true);
+  });
+  it("a losing receipt response cannot release the winner's durable receipt", async () => {
+    const { api } = service(); const current = await binding();
+    const result = await api.reserve({ tenantId: tenant, capabilityId: "consultation", capabilityVersion: 1, slotId: current.slots[0]!.id,
+      visitor: { name: "Dana", email: "dana@example.test" }, requestId: "durable-receipt-".repeat(3) });
+    const hook = publicBookingStoreHook()!;
+    await hook.release!(current, result.reservationId);
+    expect(store.rows[0]!.status).toBe("requested");
   });
   it("fails closed when the authoritative claim fails, before storing a receipt or touching a provider", async () => {
     const { api, refs, provider } = service(); const current = await binding();

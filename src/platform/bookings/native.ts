@@ -54,7 +54,7 @@ export async function nativeServices(tenant: string) {
 
 function addDays(day: string, n: number) { return new Date(Date.parse(`${day}T12:00:00Z`) + n * 86400000).toISOString().slice(0, 10); }
 
-export async function nativeSlots(tenant: string, serviceId: string, from: string, to: string) {
+export async function nativeSlots(tenant: string, serviceId: string, from: string, to: string, options: { excludePublicReservationId?: string } = {}) {
   const ctx = await context(tenant);
   const service = ctx.services.find(s => s.active && (s.id === serviceId || s.externalRef === serviceId));
   if (!service) throw new PublicBookingError("not_found", "This service is unavailable.");
@@ -63,7 +63,7 @@ export async function nativeSlots(tenant: string, serviceId: string, from: strin
   const zone = timeZoneOf(ctx);
   const format = new Intl.DateTimeFormat("en-CA", { timeZone: zone });
   const first = format.format(new Date(fromMs)), last = format.format(new Date(toMs));
-  const bookings = await readTenantBookings(tenant, { from: addDays(first, -1), to: addDays(last, 1) });
+  const bookings = (await readTenantBookings(tenant, { from: addDays(first, -1), to: addDays(last, 1) })).filter(b => !options.excludePublicReservationId || b.publicReservationId !== options.excludePublicReservationId);
   const minutes = service.durationMinutes ?? settingsOrDefault(ctx).defaultLengthMinutes;
   const slots: Array<{ id: string; start: string; end: string; calendarChecked: boolean }> = [];
   for (let date = first; date <= last; date = addDays(date, 1)) {

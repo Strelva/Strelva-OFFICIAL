@@ -12,11 +12,12 @@
 import { alertOnce } from "@/platform/infra/monitoring";
 import { getRedis } from "@/platform/infra/redis";
 import type { PublicBookingSlot, PublicBookingStatus, PublicBookingStoreHook } from "@/products/scheduling/public-booking";
+import { nativeRpc } from "./native";
 import { recordPublicSlot } from "./public-record";
 import { PublicBookingError } from "./errors";
 import { blocksTime } from "./availability";
 import { bookingMessagesEnabled, bookingReadSource, bookingStoreWriteEnabled } from "./flags";
-import { readTenantBookings, recordBooking, setBookingStatus, type StoreBookingStatus } from "./store";
+import { readTenantBookings, recordBooking, type StoreBookingStatus } from "./store";
 import { BOOKING_STORE_PENDING_KEY, bookingPendingMember } from "./tenant";
 
 const STATUS: Record<PublicBookingStatus, StoreBookingStatus> = { pending: "requested", confirmed: "confirmed", cancelled: "cancelled" };
@@ -35,7 +36,14 @@ export function publicBookingStoreHook(): PublicBookingStoreHook | undefined {
   return {
     async claim(input) {
       try {
-        const record = input.binding.recordBooking ? await recordPublicSlot(input.binding, input.start, input.end) : null;
+        if (input.binding.recordBooking) {
+          const existing = (await readTenantBookings(input.binding.tenantId)).find(b => b.publicReservationId === input.reservationId);
+          if (existing) {
+            if (existing.requestFingerprint !== input.requestFingerprint) throw new PublicBookingError("conflict", "This request was already used for different booking details.");
+            return "claimed";
+          }
+        }
+        const record = input.binding.recordBooking ? await recordPublicSlot(input.binding, input.start, input.end, input.reservationId) : null;
         const result = await recordBooking(input.binding.tenantId, {
           publicReservationId: input.reservationId,
           status: "requested",
@@ -49,7 +57,7 @@ export function publicBookingStoreHook(): PublicBookingStoreHook | undefined {
           ...(input.visitor.message ? { intakeAnswers: { message: input.visitor.message } } : {}),
           inquiryId: input.inquiryId,
           requestFingerprint: input.requestFingerprint,
-          ...(record ? { ...record, reason: record.status === "requested" ? "Owner confirmation requested" : "Instant booking" } : {}),
+          ...(record ? { ...record, status: "held", reason: "Public booking receipt pending" } : {}),
         }, "native");
         if (result.status !== "conflict") return "claimed";
         if ((await bookingReadSource()) === "postgres") return "conflict";
@@ -59,6 +67,7 @@ export function publicBookingStoreHook(): PublicBookingStoreHook | undefined {
       } catch (error) {
         if (input.binding.recordBooking) {
           if (error instanceof PublicBookingError) throw error;
+          if (error instanceof Error && error.message.includes("booking_request_conflict")) throw new PublicBookingError("conflict", "This request was already used for different booking details.");
           throw new PublicBookingError("unavailable", "Nothing was booked. Booking storage is unavailable.");
         }
         await queue(input.binding.tenantId, input.reservationId, error instanceof Error ? error.message : String(error));
@@ -67,8 +76,7 @@ export function publicBookingStoreHook(): PublicBookingStoreHook | undefined {
     },
     async release(binding, reservationId) {
       if (!binding.recordBooking) return;
-      const row = (await readTenantBookings(binding.tenantId)).find(b => b.publicReservationId === reservationId);
-      if (row) await setBookingStatus(binding.tenantId, row.id, "cancelled", "system", "Receipt unavailable; nothing booked");
+      await nativeRpc("release_public_record_booking_claim", { p_tenant_id: binding.tenantId, p_reservation_id: reservationId });
     },
     async settle(input) {
       if (input.binding.recordBooking) {

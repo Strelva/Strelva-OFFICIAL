@@ -97,6 +97,7 @@ export async function resolvePublishedPublicBooking(input: {
   capabilityId: string;
   range?: PublicBookingRange;
   includeRevoked?: boolean;
+  requestId?: string;
 }): Promise<PublicBookingBinding | null> {
   const config = await getTenantConfig(input.tenantId);
   if (!config?.active || !config.stableId) return null;

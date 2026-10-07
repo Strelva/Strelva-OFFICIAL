@@ -1,3 +1,4 @@
+import { publicRecordReservationId, publicRecordManagementToken } from "@/platform/bookings/public-request";
 import { PublicBookingError } from "@/platform/bookings/errors";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -252,7 +253,7 @@ export interface PublicBookingStoreHook {
 }
 
 export interface PublicBookingDependencies {
-  resolve(input: { tenantId: string; capabilityId: string; range?: PublicBookingRange; includeRevoked?: boolean }): Promise<PublicBookingBinding | null>;
+  resolve(input: { tenantId: string; capabilityId: string; range?: PublicBookingRange; includeRevoked?: boolean; requestId?: string }): Promise<PublicBookingBinding | null>;
   inquiries: PublicBookingInquiryCapture;
   calendar: PublicBookingCalendar;
   tokens: PublicBookingTokenStore;
@@ -368,7 +369,7 @@ function titleFor(binding: PublicBookingBinding): string {
   return binding.name.trim().slice(0, 160) || "Appointment";
 }
 
-async function resolveBinding(dependencies: PublicBookingDependencies, input: { tenantId: string; capabilityId: string; range?: PublicBookingRange; includeRevoked?: boolean }): Promise<PublicBookingBinding | null> {
+async function resolveBinding(dependencies: PublicBookingDependencies, input: { tenantId: string; capabilityId: string; range?: PublicBookingRange; includeRevoked?: boolean; requestId?: string }): Promise<PublicBookingBinding | null> {
   try {
     return await dependencies.resolve(input);
   } catch (error) {
@@ -440,7 +441,7 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
       return receipt(existing);
     }
 
-    const binding = await resolveBinding(dependencies, { tenantId: input.tenantId, capabilityId: input.capabilityId });
+    const binding = await resolveBinding(dependencies, { tenantId: input.tenantId, capabilityId: input.capabilityId, requestId: idempotencyRequestId });
     if (!binding) throw new PublicBookingError("not_found", "This booking capability is unavailable.");
     const safe = assertBinding(binding, input.tenantId, input.capabilityId);
     if (input.capabilityVersion !== safe.version) throw new PublicBookingError("conflict", "This booking changed. Reload the available times before reserving.");
@@ -471,7 +472,12 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
       throw new PublicBookingError("unavailable", "Your request could not be recorded. Try again or contact the business.");
     }
     const title = titleFor(safe);
-    const pendingReservationId = boundedToken(reservationId(), "The reservation id");
+    const pendingReservationId = safe.recordBooking
+      ? publicRecordReservationId(safe.tenantStableId ?? safe.tenantId, idempotencyRequestId)
+      : boundedToken(reservationId(), "The reservation id");
+    const pendingManagementToken = safe.recordBooking
+      ? publicRecordManagementToken(safe.tenantStableId ?? safe.tenantId, idempotencyRequestId)
+      : boundedToken(managementToken(), "The management token");
     if (dependencies.store) {
       const claim = await dependencies.store.claim({
         binding: safe, reservationId: pendingReservationId, requestFingerprint, title,
@@ -499,7 +505,7 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
       workspaceId: safe.workspaceId,
       workId: safe.workId,
       inquiryId: captured.inquiryId,
-      managementToken: boundedToken(managementToken(), "The management token"),
+      managementToken: pendingManagementToken,
       expectedRevision: 0,
       title,
       start: slot.start,
@@ -508,9 +514,11 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
       status: "pending",
     }).catch(async error => {
       await dependencies.store?.release?.(safe, pendingReservationId).catch(() => undefined);
+      if (safe.recordBooking) throw new PublicBookingError("unavailable", "Nothing was booked. Its receipt could not be saved. Try again or contact the business.");
       throw error;
     });
     if (pending.requestFingerprint !== requestFingerprint || pending.slotId !== slot.id) {
+      if (safe.recordBooking && pending.reservationId !== pendingReservationId) await dependencies.store?.release?.(safe, pendingReservationId);
       throw new PublicBookingError("conflict", "This booking request is already used for different booking details.");
     }
     // A concurrent request can win the durable unique request claim between

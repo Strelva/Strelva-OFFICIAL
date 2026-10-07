@@ -5,21 +5,23 @@ interface PublicBookingBinding { tenantId: string; workspaceId: string; recordBo
 interface PublicBookingCalendarConfirmation { verification: "pending"; status: "confirmed" | "cancelled" | "pending"; start: string; end: string; expectedRevision: number }
 import { PublicBookingError } from "./errors";
 import { settingsOrDefault, timeZoneOf } from "./availability";
+import { publicRecordReservationId } from "./public-request";
 import { nativeSlots } from "./native";
 import { readBookingContext, readTenantBookings, recordBooking, setBookingStatus } from "./store";
 
-export async function recordPublicAvailability(input: { tenantId: string; capabilityId: string; name: string; range?: PublicBookingRange; includeRevoked?: boolean }) {
+export async function recordPublicAvailability(input: { tenantId: string; capabilityId: string; name: string; range?: PublicBookingRange; includeRevoked?: boolean; requestId?: string }) {
   const context = await readBookingContext(input.tenantId);
   if (!context?.workspaceId) throw new PublicBookingError("unavailable", "Booking records are unavailable.");
   const active = context.services.filter(s => s.active);
+  const named = active.filter(s => s.name === input.name);
   const service = active.find(s => s.id === input.capabilityId || s.externalRef === input.capabilityId)
-    ?? active.find(s => s.name === input.name);
+    ?? (named.length === 1 ? named[0] : undefined);
   // A removed or ambiguous service never falls back to copied intervals.
   if (!service && !input.includeRevoked) throw new PublicBookingError("not_found", "This booking service is unavailable.");
   const settings = settingsOrDefault(context);
   const from = input.range?.from ?? new Date().toISOString();
   const to = input.range?.to ?? new Date(Date.parse(from) + Math.min(60, settings.maxAdvanceDays) * 86400000).toISOString();
-  const availability = service && !context.paused ? await nativeSlots(input.tenantId, service.externalRef ?? service.id, from, to) : { slots: [] };
+  const availability = service && !context.paused ? await nativeSlots(input.tenantId, service.externalRef ?? service.id, from, to, input.requestId ? { excludePublicReservationId: publicRecordReservationId(context.tenantStableId, input.requestId) } : {}) : { slots: [] };
   return { workspaceId: context.workspaceId, paused: context.paused, timeZone: timeZoneOf(context), name: service?.name ?? input.name,
     slots: availability.slots, recordBooking: {
       serviceRef: service?.externalRef ?? service?.id ?? "", bufferMinutes: settings.bufferMinutes, mode: settings.mode,
@@ -29,12 +31,12 @@ export async function recordPublicAvailability(input: { tenantId: string; capabi
 
 /** Recompute immediately before claiming/updating. The exclusion constraint
  * closes the final race; a storage failure never falls through to a calendar. */
-export async function recordPublicSlot(binding: PublicBookingBinding, start: string, end: string) {
+export async function recordPublicSlot(binding: PublicBookingBinding, start: string, end: string, excludePublicReservationId?: string) {
   const ref = binding.recordBooking?.serviceRef;
   if (!ref) throw new PublicBookingError("not_found", "This service is unavailable.");
   const context = await readBookingContext(binding.tenantId);
   if (!context || context.paused || context.workspaceId !== binding.workspaceId) throw new PublicBookingError("conflict", "This booking is not accepting new times.");
-  const offered = await nativeSlots(binding.tenantId, ref, start, new Date(Date.parse(end) + 1).toISOString());
+  const offered = await nativeSlots(binding.tenantId, ref, start, new Date(Date.parse(end) + 1).toISOString(), { excludePublicReservationId });
   const slot = offered.slots.find(s => Date.parse(s.start) === Date.parse(start) && Date.parse(s.end) === Date.parse(end));
   if (!slot) throw new PublicBookingError("conflict", "That time has just been taken. Choose another time.");
   const service = context.services.find(s => s.active && (s.id === ref || s.externalRef === ref));
@@ -76,5 +78,12 @@ export async function cancelPublicRecord(binding: PublicBookingBinding, reservat
   return confirmation(row.booking);
 }
 export async function confirmPublicRecord(binding: PublicBookingBinding, reservationId?: string) {
-  return confirmation(await readPublicRecord(binding, reservationId));
+  const prior = await readPublicRecord(binding, reservationId);
+  if (prior.status !== "held") return confirmation(prior);
+  const slot = await recordPublicSlot(binding, prior.start, prior.end, prior.publicReservationId!);
+  const result = await recordBooking(binding.tenantId, { publicReservationId: prior.publicReservationId!, origin: "site",
+    ...slot, start: prior.start, end: prior.end, customer: prior.customer,
+    reason: slot.status === "requested" ? "Owner confirmation requested" : "Instant booking" }, "native");
+  if (result.status === "conflict") throw new PublicBookingError("conflict", "That time has just been taken.");
+  return confirmation(result.booking);
 }
