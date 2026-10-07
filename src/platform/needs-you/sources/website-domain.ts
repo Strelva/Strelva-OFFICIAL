@@ -12,6 +12,7 @@ export function websiteDomainItem(request: WebsiteDomainRequest, now = Date.now(
   if (!request.current || request.decisionId || Date.parse(request.expiresAt) <= now) return null;
   return {
     kind: "system.go_live", route: "owner_decides", title: `Connect your website to ${request.hostname}`,
+    systemId: request.systemId ?? null,
     detail: request.records.map(record => `${record.type} ${record.name} → ${record.value}`).join("\n").slice(0, 1000),
     approveEffect: "Strelva attaches this exact domain to your published site. You or your registrar update these DNS records; routing waits for verification.",
     notYetEffect: "Nothing changes on your website or domain.", sourceLifecycle: "website_domain", sourceId: request.id,

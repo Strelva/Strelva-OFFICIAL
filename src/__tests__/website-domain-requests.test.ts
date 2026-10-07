@@ -25,6 +25,7 @@ function ports() {
 describe("website domain owner proposals",()=>{
   it("contains exact DNS records and remains owner-only",()=>{
     expect(websiteDomainItem(row(),now)).toMatchObject({kind:"system.go_live",route:"owner_decides",adminMayDecide:false,sourceLifecycle:"website_domain",detail:"A fictional.example.test → 203.0.113.10"});
+    expect(websiteDomainItem({...row(),systemId:REQUEST},now)?.systemId).toBe(REQUEST);
     expect(websiteDomainItem({...row(),current:false},now)).toBeNull();
     expect(websiteDomainItem({...row(),expiresAt:new Date(now).toISOString()},now)).toBeNull();
   });
@@ -69,6 +70,14 @@ describe("website domain owner proposals",()=>{
     const p=ports();const adapter=websiteDomainAdapter({list:async()=>[p.request],approve:createWebsiteDomainRequestService(p).approve,now:()=>now});
     const memory=needsYouMemoryStore({clock:{now},roles:{[OWNER.userId]:"owner"}});const service=createNeedsYouService({store:memory.store,adapters:[adapter],sendEmail:vi.fn(),appOrigin:"https://app.example.test",now:()=>now});
     const item=(await service.list(OWNER,WS)).items[0]!;expect((await service.decide({workspaceId:WS,itemId:item.id,revision:item.revisionHash,decision:"approve",by:{kind:"owner_link",recipient:"owner@example.test"}})).status).toBe("done_unverified");
+  });
+  it("keeps the accepted domain receipt when public routing cannot be checked",async()=>{
+    const p=ports();
+    p.change.mockResolvedValue({domain:null,domains:[{hostname:p.request.hostname,status:"verified",checkedAt:new Date(now).toISOString(),records:p.request.records}]});
+    const checkRouting=vi.fn().mockRejectedValue(new Error("read-back transport down"));
+    const saved=await createWebsiteDomainRequestService({...p,checkRouting}).approve(p.request,REQUEST);
+    expect(saved.result).toMatchObject({status:"verified",routing:"unverified"});
+    expect(p.change).toHaveBeenCalledOnce();expect(p.store.record).toHaveBeenCalledOnce();
   });
   it("domain emails need their separate opt-in plus both global gates and the tenant override",async()=>{
     vi.stubEnv("STRELVA_WEBSITE_DOMAIN_EMAIL_ENABLED","1");vi.stubEnv("EMAIL_SENDING_ENABLED","true");vi.stubEnv("CUSTOMER_EMAIL_ENABLED","true");expect(await websiteDomainEmailAllowed("fictional")).toBe(true);

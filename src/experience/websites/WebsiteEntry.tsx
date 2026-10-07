@@ -20,7 +20,7 @@ export function WebsiteEntry({ workspaceId, connectedEnabled, rebuildEnabled, pa
     setWorkId(id);
     window.history.replaceState(window.history.state, "", href("rebuild", id));
   };
-  return <div>
+  return <div className="text-warm-black">
     {connectedEnabled && rebuildEnabled || !path ? <nav aria-label="Website options" className="mx-auto grid w-full max-w-2xl gap-4 px-4 pt-10 md:px-8">
       {!path ? <><h1 className="font-display text-[32px] leading-10">Your website in Strelva</h1><p className="text-sm text-gray-muted">Connect the site you already have, or ask Strelva to prepare a new one. You review it before anything goes live.</p></> : null}
       {connectedEnabled ? <a className="text-sm underline underline-offset-4" href={href("connect")} aria-current={path === "connect" ? "page" : undefined}>Connect your existing website</a> : null}

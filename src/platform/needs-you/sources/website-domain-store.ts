@@ -9,6 +9,7 @@ const recordSchema = z.object({ type: z.string().min(1).max(40), name: z.string(
 const domainResultSchema = z.object({ hostname: z.string(), status: z.string(), checkedAt: z.string(), records: z.array(recordSchema), error: z.string().optional(), routing: z.enum(["verified", "unverified"]).optional() });
 export const websiteDomainRequestSchema = z.object({
   id: z.string().uuid(), workspaceId: z.string().uuid(), workId: z.string().uuid(), tenantId: z.string().nullable(),
+  systemId: z.string().uuid().optional(),
   publishedRevision: z.number().int().positive(), publishedHash: z.string().regex(/^[0-9a-f]{64}$/),
   hostname: z.string(), records: z.array(recordSchema).min(1).max(20), revisionHash: z.string().regex(/^[0-9a-f]{64}$/),
   createdAt: z.string(), expiresAt: z.string(), current: z.boolean(), decisionId: z.string().uuid().nullable(), result: domainResultSchema.nullable(),
@@ -50,4 +51,3 @@ export async function websiteDomainEmailAllowed(tenantId?: string | null): Promi
   return process.env.STRELVA_WEBSITE_DOMAIN_EMAIL_ENABLED === "1" && emailSendingEnabled() && customerEmailEnabled()
     && Boolean(tenantId) && await getClientEmailOverride(tenantId!) !== "off";
 }
-

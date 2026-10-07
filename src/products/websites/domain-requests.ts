@@ -19,9 +19,11 @@ export interface WebsiteDomainRequestPorts {
 }
 export function createWebsiteDomainRequestService(ports: WebsiteDomainRequestPorts) {
   async function routing(request: WebsiteDomainRequest, result: NonNullable<WebsiteDomainRequest["result"]>) {
-    return ports.checkRouting && result.status === "verified"
-      ? { ...result, routing: await ports.checkRouting(request) ? "verified" as const : "unverified" as const }
-      : result;
+    if (!ports.checkRouting || result.status !== "verified") return result;
+    // The attachment was accepted. Read-back failure cannot erase its receipt.
+    let verified = false;
+    try { verified = await ports.checkRouting(request); } catch { /* Saved as unverified. */ }
+    return { ...result, routing: verified ? "verified" as const : "unverified" as const };
   }
   async function apply(request: WebsiteDomainRequest) {
     if (!(await ports.enabled(request.workspaceId))) throw new WorkspaceConflictError("Website domain proposals are not enabled.");

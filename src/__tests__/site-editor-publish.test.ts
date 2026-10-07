@@ -29,7 +29,7 @@ const mockPublicReadBack = vi.fn();
 vi.mock("@/platform/release-flags/store", () => ({ tenantReleaseFlagEnabled: (...args: unknown[]) => mockTenantReleaseFlagEnabled(...args) }));
 vi.mock("@/platform/release-flags/viewer", () => ({ currentReleaseViewer: async () => ({ operator: false, tester: false }) }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: (...args: unknown[]) => mockGetTenantConfig(...args) }));
-vi.mock("@/products/websites/content-readback", () => ({ readPublishedWebsiteContent: (...args: unknown[]) => mockPublicReadBack(...args) }));
+vi.mock("@/products/websites/site-health", async (original) => ({ ...await original<typeof import("@/products/websites/site-health")>(), readPublishedWebsiteContent: (...args: unknown[]) => mockPublicReadBack(...args) }));
 
 vi.mock("next/headers", () => ({
   headers: vi.fn(() =>

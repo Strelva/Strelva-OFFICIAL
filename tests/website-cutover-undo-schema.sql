@@ -1,4 +1,13 @@
 \set ON_ERROR_STOP on
+create function pg_temp.assert_true(condition boolean,message text) returns void language plpgsql as $$
+begin if condition is not true then raise exception 'website cutover undo assertion: %',message; end if; end $$;
+create function pg_temp.expect_error(statement text,expected text) returns void language plpgsql as $$
+begin
+  begin execute statement; exception when others then
+    if position(expected in sqlerrm)=0 then raise exception 'expected %, got %',expected,sqlerrm; end if; return;
+  end;
+  raise exception 'statement unexpectedly succeeded: %',statement;
+end $$;
 -- Fictional linked-site fixture created by website-linked-publication-schema.sql.
 select pg_temp.assert_true(not has_function_privilege('authenticated','public.undo_website_linked_cutover(uuid,uuid,uuid,text,text,integer,text,uuid,boolean,boolean)','execute'),'undo RPC is service-role only');
 select pg_temp.assert_true(not has_table_privilege('service_role','public.website_cutover_undos','insert'),'undo receipts require authority RPC');

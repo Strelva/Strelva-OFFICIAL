@@ -28,6 +28,12 @@ create function public.website_domain_request_json(r public.website_domain_reque
 language sql stable set search_path=public,pg_temp as $$
  select jsonb_build_object('id',r.id,'workspaceId',r.workspace_id,'workId',r.website_work_id,
    'tenantId',(select id from public.tenants where stable_id=r.tenant_stable_id),
+   'systemId',case
+     when exists(select 1 from public.website_linked_publications where workspace_id=r.workspace_id and website_work_id=r.website_work_id)
+       then public.system_origin_id(r.workspace_id,'tenant',r.tenant_stable_id::text)
+     when public.website_rebuild_connected_origin(r.workspace_id,r.website_work_id) is not null
+       then public.system_origin_id(r.workspace_id,'connected_site',public.website_rebuild_connected_origin(r.workspace_id,r.website_work_id)::text)
+     else public.system_origin_id(r.workspace_id,'saved_work',r.website_work_id::text) end,
    'publishedRevision',r.published_revision,'publishedHash',r.published_hash,'hostname',r.hostname,
    'records',r.records,'revisionHash',r.revision_hash,'createdAt',r.created_at,'expiresAt',r.expires_at,
    'decisionId',r.decision_id,'result',r.result,'receiptEmail',r.receipt_email,

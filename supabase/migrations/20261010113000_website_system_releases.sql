@@ -21,7 +21,7 @@ language sql stable security definer set search_path=public,pg_temp as $$
     (select connected_site_id from public.website_rebuild_origins where workspace_id=p_workspace_id and website_work_id=p_work_id),
     (select c.id from public.saved_product_work w join public.connected_sites c
       on c.business_workspace_id=w.workspace_id
-      and c.site_host=lower(regexp_replace(split_part(split_part(w.input->>'url','://',2),'/',1), ':[0-9]+$', ''))
+      and c.site_host=lower(regexp_replace(split_part(split_part(coalesce(w.input->'intake'->>'url',w.input->>'url'),'://',2),'/',1), ':[0-9]+$', ''))
       where w.workspace_id=p_workspace_id and w.id=p_work_id and w.product_id='websites' and w.resource_kind='website'
         and c.verified_at is not null and c.status='active'
         and not exists(select 1 from public.website_linked_publications l where l.website_work_id=w.id)
