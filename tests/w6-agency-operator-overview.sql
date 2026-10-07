@@ -37,7 +37,7 @@ do $$ declare old jsonb; upgraded jsonb; row jsonb; begin
  row:=upgraded->'clients'->0;
  perform pg_temp.ao6_assert(old->'clients'->0->'needsYou'->>'count'='0','flags-off old projection is unchanged');
  perform pg_temp.ao6_assert(row->'needsYou'->>'count'='1','only real owner decisions count, not operator review');
- perform pg_temp.ao6_assert((row->'needsYou'->>'oldestAt')::timestamptz=now()-interval '3 days','oldest wait reads the real decision opening');
+ perform pg_temp.ao6_assert((row->'needsYou'->>'oldestAt')::timestamptz=date_trunc('milliseconds',now()-interval '3 days'),'oldest wait reads the real decision opening at the projection timestamp precision');
  perform pg_temp.ao6_assert(row->>'lastReceiptAt' is not null,'Google receipt appears in the client summary');
  perform pg_temp.ao6_assert(jsonb_array_length(upgraded->'queue')=1 and upgraded->'queue'->0->>'kind'='owner_email','one bounced owner decision is visible');
  perform pg_temp.ao6_assert(upgraded->'queue'->0->>'title'='Owner email bounced: Booking flow','bounced email is named');

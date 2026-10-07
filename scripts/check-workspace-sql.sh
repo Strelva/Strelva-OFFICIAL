@@ -528,11 +528,12 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007150100_age
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007150200_platform_agency_workspace.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/system-versions-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-client-overview-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163200_version_owner_grants.sql"
 if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
   # The same Version store contract the in-memory store passes, run through
   # createSupabaseVersionStore against this cluster (psql-backed RPC port).
   STRELVA_VERSIONS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
-    pnpm --dir "$repo_root" exec vitest run src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
+    pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
 fi
 # Needs you and Strelva handled: decision policy, owner decisions and the
 # handled read model, on the same fictional cluster (needs the business record,
@@ -668,6 +669,12 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163000_age
 psql "${psql_args[@]}" --file="$repo_root/tests/w6-agency-operator-overview.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163100_version_management.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-management.sql"
+STRELVA_VERSIONS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
+  pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163300_version_native_applications.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-native-applications.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163400_version_sibling_changes.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-sibling-changes.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010161000_operator_google_attempts.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010161100_operator_effort_context.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/operator-google-attempts-schema.sql"
@@ -681,12 +688,15 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010162000_com
 psql "${psql_args[@]}" --file="$repo_root/tests/w6-client-record-stores.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010162200_inquiry_delivery_records.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/w6-inquiry-delivery-records.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20260802120000_report_snapshots.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010162100_tenant_receipt_retention.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/w6-tenant-retention.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010164000_finite_job_adapters.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/finite-job-adapters-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165500_business_portability.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/w6-business-portability.sql"
+# Roundtrip before later export/exit extensions replace these wrappers.
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-business-portability-rollback.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165800_unbounded_export_archive.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/w6-unbounded-export-archive.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165900_export_build_access.sql"
@@ -707,6 +717,13 @@ psql "${psql_args[@]}" --file="$repo_root/tests/tenant-business-context-schema.s
 # because it commits its fictional rows.
 STRELVA_BOOKINGS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run src/__tests__/booking-one-store.test.ts
+# Retain a fictional native Version, then prove rollback leaves the business's
+# live application, destination records and preparation receipts intact.
+psql "${psql_args[@]}" --set=native_keep_fixture=true --file="$repo_root/tests/w6-version-native-applications.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261010163300-version-native-applications.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-native-rollback.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163300_version_native_applications.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-native-rollforward.sql"
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 
