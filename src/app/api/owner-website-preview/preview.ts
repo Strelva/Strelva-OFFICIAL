@@ -6,14 +6,10 @@ import { getSupabase } from "@/platform/infra/db/client";
 import { ownerEntryPossible } from "@/platform/owner-entry/env";
 import { releaseFlagMayBeOn } from "@/platform/release-flags/resolve";
 import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
-import { renderRebuildPreview } from "@/products/websites/rebuild-export";
-import { websiteRebuildSchema } from "@/products/websites/rebuild-contracts";
-import { safeSitePathSchema } from "@/products/websites/site-document-schema";
-import { escapeSiteHtml } from "@/products/websites/site-export";
+import { renderRebuildPreview, websiteRebuildSchema, safeSitePathSchema, escapeSiteHtml, type WebsiteRebuildRecord } from "@/products/websites/index";
 import { ownerDecisionSchema, type OwnerDecision } from "@/platform/needs-you/contracts";
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
 import { websiteDocumentCopyItems, websiteDocumentFactItems, websiteDocumentItem } from "@/platform/needs-you/sources/website-document";
-import type { WebsiteRebuildRecord } from "@/products/websites/rebuild-contracts";
 
 export const OWNER_WEBSITE_PREVIEW_PATH = "/api/owner-website-preview";
 
