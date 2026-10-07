@@ -47,6 +47,13 @@ select public.write_workspace_export_recovery(((select result from recovery_recl
 update public.workspace_export_recovery set lease_until=clock_timestamp()-interval '1 second';
 create temporary table delivery_claim as select public.claim_workspace_export_recovery(((select result from recovery_build)->>'buildId')::uuid) as result;
 select pg_temp.w6_assert((select result->>'stage' from delivery_claim)='delivery','ready archives retry email without rebuilding');
+select public.write_workspace_export_recovery(((select result from delivery_claim)->>'buildId')::uuid,((select result from delivery_claim)->>'leaseToken')::uuid,'reserve_delivery','{}');
+-- A crash after dispatch reservation is not proof that the provider rejected
+-- the email. Lease expiry must never make that archive sendable again.
+update public.workspace_export_recovery set lease_until=clock_timestamp()-interval '1 second' where build_id=((select result from delivery_claim)->>'buildId')::uuid;
+select pg_temp.w6_assert(public.claim_workspace_export_recovery(((select result from recovery_build)->>'buildId')::uuid) is null,'reserved dispatch cannot replay after crash');
+-- Restore the live fixture lease so its original worker can settle acceptance.
+update public.workspace_export_recovery set lease_until=clock_timestamp()+interval '10 minutes' where build_id=((select result from delivery_claim)->>'buildId')::uuid;
 select public.write_workspace_export_recovery(((select result from delivery_claim)->>'buildId')::uuid,((select result from delivery_claim)->>'leaseToken')::uuid,'delivered','{}');
 select pg_temp.w6_assert(public.claim_workspace_export_recovery(((select result from recovery_build)->>'buildId')::uuid) is null,'accepted delivery completes queue');
 select pg_temp.w6_assert((select token_ciphertext is null from public.workspace_export_recovery),'delivery drops credential copy');

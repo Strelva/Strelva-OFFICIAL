@@ -1,9 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { enqueueExportRecovery, runExportRecovery } from "@/platform/workspace-exports/recovery";
 import type { WorkspaceExportSnapshot } from "@/platform/workspace-exports/contracts";
 vi.mock("@/platform/infra/crypto/secrets", () => ({ encryptSecret: (v: string) => `enc:v1:${v}`, decryptSecret: (v: string) => { if (v === "enc:v1:corrupt") throw new Error("invalid ciphertext"); return v.replace("enc:v1:", ""); } }));
 const job = { buildId: "11111111-1111-4111-8111-111111111111", workspaceId: "22222222-2222-4222-8222-222222222222", userId: "33333333-3333-4333-8333-333333333333", verifiedEmail: "operator@example.test", deliverTo: "owner@example.test", leaseToken: "44444444-4444-4444-8444-444444444444", stage: "build", tokenCiphertext: null, tenantIds: [], manifest: null };
 beforeEach(() => { vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1"); vi.stubEnv("STRELVA_EXPORT_SCHEMA_3", "1"); vi.stubEnv("STRELVA_EXPORT_RECOVERY", "1"); });
+afterEach(() => vi.unstubAllEnvs());
 function deps(stage = "build") {
   const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
     if (name === "claim_workspace_export_recovery") return { data: { ...job, stage, tokenCiphertext: stage === "delivery" ? "enc:v1:download-token" : null, manifest: { included: [], omitted: [], unavailable: [] } }, error: null };
@@ -11,7 +12,7 @@ function deps(stage = "build") {
     if (name === "export_workspace_v3_category") return { data: { items: args.p_category === "linked_sites" ? [{ tenantId: "client-a" }] : [], next: null }, error: null };
     return { data: {}, error: null };
   });
-  return { rpc, snapshot: vi.fn(async () => ({ schemaVersion: 2 } as WorkspaceExportSnapshot)), deliver: vi.fn(async () => "accepted" as const), onFailure: vi.fn() };
+  return { rpc, snapshot: vi.fn(async () => ({ schemaVersion: 2 } as WorkspaceExportSnapshot)), deliver: vi.fn(async (): Promise<"accepted" | "suppressed"> => "accepted"), onFailure: vi.fn() };
 }
 describe("durable export recovery", () => {
   it("does no IO when recovery is off", async () => {
@@ -24,11 +25,32 @@ describe("durable export recovery", () => {
     expect(input.rpc).toHaveBeenCalledWith("write_workspace_export_recovery", expect.objectContaining({ p_lease_token: job.leaseToken, p_operation: "complete_workspace_export_build", p_args: expect.objectContaining({ tokenCiphertext: expect.stringMatching(/^enc:v1:/), tenantIds: ["client-a"] }) }));
     expect(input.rpc).toHaveBeenCalledWith("write_workspace_export_recovery", expect.objectContaining({ p_operation: "delivered" }));
   });
-  it("retries a failed email from the completed archive without collecting again", async () => {
-    const input = deps("delivery"); input.deliver.mockRejectedValue(new Error("provider unavailable"));
+  it("retries a suppressed email from the completed archive without collecting again", async () => {
+    const input = deps("delivery"); input.deliver.mockResolvedValue("suppressed");
     expect(await runExportRecovery(input)).toEqual({ processed: 1, failed: 1, delivered: false }); expect(input.snapshot).not.toHaveBeenCalled();
     expect(input.rpc).toHaveBeenCalledWith("write_workspace_export_recovery", expect.objectContaining({ p_operation: "delivery_failed" }));
     expect(input.onFailure).toHaveBeenCalledWith(job.buildId, "export_link_delivery_failed");
+  });
+  it("leaves an uncertain provider result unretryable after the durable dispatch reservation", async () => {
+    const input = deps("delivery"); input.deliver.mockRejectedValue(new Error("provider response lost"));
+    expect(await runExportRecovery(input)).toEqual({ processed: 1, failed: 1, delivered: false });
+    const operations = input.rpc.mock.calls.filter(call => call[0] === "write_workspace_export_recovery").map(call => call[1].p_operation);
+    expect(operations).toEqual(["reserve_delivery", "delivery_unknown"]);
+    expect(input.onFailure).toHaveBeenCalledWith(job.buildId, "export_link_delivery_unknown");
+  });
+  it.each(["error", "throw"])("provider acceptance is final when receipt settlement returns %s", async kind => {
+    const input = deps("delivery"); const original = input.rpc.getMockImplementation()!;
+    input.rpc.mockImplementation(async (name, args) => {
+      if (name === "write_workspace_export_recovery" && args.p_operation === "delivered") {
+        if (kind === "throw") throw new Error("receipt connection lost");
+        return { data: null, error: { message: "receipt storage unavailable" } } as never;
+      }
+      return original(name, args);
+    });
+    expect(await runExportRecovery(input)).toEqual({ processed: 1, failed: 1, delivered: true });
+    expect(input.deliver).toHaveBeenCalledOnce();
+    expect(input.rpc).not.toHaveBeenCalledWith("write_workspace_export_recovery", expect.objectContaining({ p_operation: "delivery_failed" }));
+    expect(input.onFailure).toHaveBeenCalledWith(job.buildId, "export_delivery_receipt_failed");
   });
   it("records unavailable delivery credentials without sending or exposing them", async () => {
     const input = deps("delivery"); const original = input.rpc.getMockImplementation()!;

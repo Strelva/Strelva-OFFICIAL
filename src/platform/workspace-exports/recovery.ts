@@ -73,15 +73,37 @@ export async function runExportRecovery(deps: ExportRecoveryDeps, buildId?: stri
       return { processed: 1, failed: 1, delivered: false };
     }
   }
+  // Persist the dispatch boundary before the provider call. A terminated
+  // worker or lost settlement remains unretryable until an operator resolves
+  // it; an archive lease alone cannot prove that no email was accepted.
   try {
-    const result = await deps.deliver({ buildId: job.buildId, workspaceId: job.workspaceId, token, deliverTo: job.deliverTo, manifest, tenantIds });
-    if (result !== "accepted") throw new Error("suppressed");
-    const finished = await write("delivered", {});
-    if (finished.error) throw new Error("receipt_failed");
-    return { processed: 1, failed: 0, delivered: true };
+    const reservation = await write("reserve_delivery", {});
+    if (reservation.error) throw new Error("reservation_failed");
   } catch {
-    await write("delivery_failed", {});
+    deps.onFailure?.(job.buildId, "export_delivery_reservation_failed");
+    return { processed: 1, failed: 1, delivered: false };
+  }
+  let result: "accepted" | "suppressed";
+  try {
+    result = await deps.deliver({ buildId: job.buildId, workspaceId: job.workspaceId, token, deliverTo: job.deliverTo, manifest, tenantIds });
+  } catch {
+    await write("delivery_unknown", {}).catch(() => undefined);
+    deps.onFailure?.(job.buildId, "export_link_delivery_unknown");
+    return { processed: 1, failed: 1, delivered: false };
+  }
+  if (result === "suppressed") {
+    await write("delivery_failed", {}).catch(() => undefined);
     deps.onFailure?.(job.buildId, "export_link_delivery_failed");
     return { processed: 1, failed: 1, delivered: false };
   }
+  try {
+    const finished = await write("delivered", {});
+    if (finished.error) throw new Error("receipt_failed");
+  } catch {
+    // Provider acceptance is final even if the local receipt cannot settle.
+    // The pre-dispatch reservation prevents automatic replay of this email.
+    deps.onFailure?.(job.buildId, "export_delivery_receipt_failed");
+    return { processed: 1, failed: 1, delivered: true };
+  }
+  return { processed: 1, failed: 0, delivered: true };
 }

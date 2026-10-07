@@ -8,6 +8,7 @@ create table public.workspace_export_recovery (
   lease_until timestamptz,
   attempts integer not null default 0 check(attempts between 0 and 3),
   delivery_attempts integer not null default 0 check(delivery_attempts between 0 and 3),
+  delivery_state text not null default 'pending' check(delivery_state in ('pending','dispatching','accepted','unknown')),
   token_ciphertext text check(token_ciphertext is null or token_ciphertext like 'enc:v1:%'),
   tenant_ids jsonb not null default '[]'::jsonb check(jsonb_typeof(tenant_ids)='array'),
   delivered_at timestamptz,
@@ -53,50 +54,50 @@ begin
 end $$;
 create function public.claim_workspace_export_recovery(p_build_id uuid default null)
 returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
-declare v public.workspace_export_recovery%rowtype; b public.workspace_export_builds%rowtype; v_token uuid;
+declare v public.workspace_export_recovery%rowtype; v_build public.workspace_export_builds%rowtype; v_token uuid;
 begin
   -- Terminal exhausted builds remain visible with an explicit failure.
-  update public.workspace_export_builds b set status='failed',failure='export_worker_attempts_exhausted',completed_at=clock_timestamp()
-    from public.workspace_export_recovery q where q.build_id=b.id and b.status='building' and q.attempts>=3
+  update public.workspace_export_builds build_row set status='failed',failure='export_worker_attempts_exhausted',completed_at=clock_timestamp()
+    from public.workspace_export_recovery q where q.build_id=build_row.id and build_row.status='building' and q.attempts>=3
       and (q.lease_until is null or q.lease_until<=clock_timestamp());
-  select q.* into v from public.workspace_export_recovery q join public.workspace_export_builds b on b.id=q.build_id
+  select q.* into v from public.workspace_export_recovery q join public.workspace_export_builds build_row on build_row.id=q.build_id
     where (p_build_id is null or q.build_id=p_build_id) and (q.lease_until is null or q.lease_until<=clock_timestamp())
-      and ((b.status='building' and q.attempts<3) or (b.status='ready' and q.delivered_at is null and q.delivery_attempts<3
-        and b.expires_at>clock_timestamp() and q.token_ciphertext is not null))
+      and ((build_row.status='building' and q.attempts<3) or (build_row.status='ready' and q.delivered_at is null and q.delivery_state='pending' and q.delivery_attempts<3
+        and build_row.expires_at>clock_timestamp() and q.token_ciphertext is not null))
     order by q.created_at for update of q skip locked limit 1;
   if not found then return null; end if;
-  select * into b from public.workspace_export_builds where id=v.build_id for update;
+  select * into v_build from public.workspace_export_builds where id=v.build_id for update;
   -- Revoked membership or changed/unverified requester email stops all recovery.
   begin
-    perform public.workspace_export_v3_role(b.workspace_id,b.requested_by,v.verified_email);
+    perform public.workspace_export_v3_role(v_build.workspace_id,v_build.requested_by,v.verified_email);
   exception when others then
     update public.workspace_export_builds set status='failed',failure='export_requester_access_revoked',completed_at=clock_timestamp()
-      where id=b.id and status='building';
+      where id=v_build.id and status='building';
     update public.workspace_export_recovery set delivery_attempts=3,token_ciphertext=null,
-      delivery_failure='export_requester_access_revoked' where build_id=b.id;
+      delivery_failure='export_requester_access_revoked' where build_id=v_build.id;
     return null;
   end;
-  b.deliver_to := public.resolve_business_owner_recipient(b.workspace_id)->>'email';
-  if b.deliver_to is null then
+  v_build.deliver_to := public.resolve_business_owner_recipient(v_build.workspace_id)->>'email';
+  if v_build.deliver_to is null then
     update public.workspace_export_builds set status='failed',failure='export_owner_recipient_missing',completed_at=clock_timestamp()
-      where id=b.id and status='building';
+      where id=v_build.id and status='building';
     update public.workspace_export_recovery set delivery_attempts=3,token_ciphertext=null,
-      delivery_failure='export_owner_recipient_missing' where build_id=b.id;
+      delivery_failure='export_owner_recipient_missing' where build_id=v_build.id;
     return null;
   end if;
-  update public.workspace_export_builds set deliver_to=b.deliver_to where id=b.id;
+  update public.workspace_export_builds set deliver_to=v_build.deliver_to where id=v_build.id;
   v_token := gen_random_uuid();
   update public.workspace_export_recovery set lease_token=v_token,lease_until=clock_timestamp()+interval '10 minutes',
-    attempts=attempts+case when b.status='building' then 1 else 0 end,
-    delivery_attempts=delivery_attempts+case when b.status='ready' then 1 else 0 end where build_id=v.build_id;
-  if b.status='building' then
-    delete from public.workspace_export_build_parts where build_id=b.id;
-    update public.workspace_export_builds set part_count=0,byte_size=0 where id=b.id;
+    attempts=attempts+case when v_build.status='building' then 1 else 0 end,
+    delivery_attempts=delivery_attempts+case when v_build.status='ready' then 1 else 0 end where build_id=v.build_id;
+  if v_build.status='building' then
+    delete from public.workspace_export_build_parts where build_id=v_build.id;
+    update public.workspace_export_builds set part_count=0,byte_size=0 where id=v_build.id;
   end if;
-  return jsonb_build_object('buildId',b.id,'workspaceId',b.workspace_id,'userId',b.requested_by,
-    'verifiedEmail',v.verified_email,'deliverTo',b.deliver_to,'requesterRole',b.requester_role,'leaseToken',v_token,
-    'stage',case when b.status='building' then 'build' else 'delivery' end,
-    'tokenCiphertext',v.token_ciphertext,'tenantIds',v.tenant_ids,'manifest',b.manifest);
+  return jsonb_build_object('buildId',v_build.id,'workspaceId',v_build.workspace_id,'userId',v_build.requested_by,
+    'verifiedEmail',v.verified_email,'deliverTo',v_build.deliver_to,'requesterRole',v_build.requester_role,'leaseToken',v_token,
+    'stage',case when v_build.status='building' then 'build' else 'delivery' end,
+    'tokenCiphertext',v.token_ciphertext,'tenantIds',v.tenant_ids,'manifest',v_build.manifest);
 end $$;
 create function public.write_workspace_export_recovery(p_build_id uuid,p_lease_token uuid,p_operation text,p_args jsonb)
 returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
@@ -118,11 +119,23 @@ begin
   elsif p_operation='fail_workspace_export_build' then
     perform public.fail_workspace_export_build(p_build_id,p_args->>'p_failure');
     update public.workspace_export_recovery set lease_token=null,lease_until=null where build_id=p_build_id;
+  elsif p_operation='reserve_delivery' then
+    if q.delivery_state<>'pending' or q.delivered_at is not null
+      or not exists(select 1 from public.workspace_export_builds where id=p_build_id and status='ready') then
+      raise exception 'workspace_export_delivery_already_reserved';
+    end if;
+    update public.workspace_export_recovery set delivery_state='dispatching',delivery_failure=null where build_id=p_build_id;
   elsif p_operation='delivered' then
+    if q.delivery_state<>'dispatching' then raise exception 'workspace_export_delivery_not_reserved'; end if;
     update public.workspace_export_recovery set delivered_at=clock_timestamp(),lease_token=null,lease_until=null,
-      token_ciphertext=null,delivery_failure=null where build_id=p_build_id;
+      token_ciphertext=null,delivery_failure=null,delivery_state='accepted' where build_id=p_build_id;
+  elsif p_operation='delivery_unknown' then
+    if q.delivery_state<>'dispatching' then raise exception 'workspace_export_delivery_not_reserved'; end if;
+    update public.workspace_export_recovery set delivery_state='unknown',delivery_failure='export_link_delivery_unknown'
+      where build_id=p_build_id;
   elsif p_operation='delivery_failed' then
-    update public.workspace_export_recovery set lease_until=clock_timestamp()+interval '10 minutes',delivery_failure='export_link_delivery_failed'
+    if q.delivery_state not in ('pending','dispatching') then raise exception 'workspace_export_delivery_not_reserved'; end if;
+    update public.workspace_export_recovery set lease_until=clock_timestamp()+interval '10 minutes',delivery_failure='export_link_delivery_failed',delivery_state='pending'
       where build_id=p_build_id;
   else raise exception 'workspace_export_invalid'; end if;
   return coalesce(v_result,'{}'::jsonb);
