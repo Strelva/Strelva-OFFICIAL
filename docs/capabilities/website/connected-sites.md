@@ -62,8 +62,8 @@ All `/api/v1/connect/*` routes are additive to the v1 contract.
   `/api/cron/connected-sites-purge` (bounded batches, heartbeat, off with the
   env switch).
 - Not carried over (still on the branch): assistant tokens and OAuth, MCP,
-  the `/b/{handle}` context page, response checks, platform detection in the
-  audit, the integrations folder.
+  response checks, platform detection in the audit, the integrations folder.
+  The `/b/{handle}` context page is ported as `/biz/{handle}` (below).
 
 ## Release gate
 
@@ -83,7 +83,44 @@ the env switch off and stores nothing.
 - Connected-site inquiries in `/workspace/inquiries`, one section per site; a
   failed read shows as unavailable, never as an empty inbox.
 
+## Server-rendered visibility (#309, #502, local)
+
+connect.js adds JSON-LD in the browser, and AI crawlers don't run JavaScript.
+Two server-side paths carry the same confirmed facts, through one serializer
+(`businessJsonLd`, then `schemaBlock`: sorted keys, `<>&` escaped, stable
+bytes and a 16-hex SHA-256 hash).
+
+- **Public business page** `/biz/{handle}` and `/biz/{handle}/llms.txt`.
+  Server components only; the page ships no JavaScript of its own. App host
+  only (a client site's host answers 404). `/b/[token]` is the booking manage
+  link, whose tokens a handle could equal, so the branch's `/b/{handle}` moved.
+  Off unless `STRELVA_BUSINESS_PAGES=1` on top of the connected sites gate,
+  the business's `connected_sites` row is open, and an owner or admin
+  published it. App-host robots already allow it (only `/dashboard/` and
+  `/api/` are disallowed); a test keeps it that way. Hosted (v2) sites'
+  robots now also allow `/api/v1/*/openapi.json` (the bookings agent
+  contract) past the `/api/` block; the app host and v1 output stay
+  byte-identical to their baseline, so the contract is still closed there.
+- **Static paste block** for any site, from the workspace (`/workspace/site`,
+  "Readable by AI assistants"): one block per active connected site (its
+  `url`), plus one without a `url` for any other site. **Check** reads the
+  live page (pinned fetch) and reports `current`, `outdated` (facts changed),
+  `edited` (changed by hand) or `missing`. connect.js already skips injecting
+  when the page has its own business JSON-LD, so the two never double up.
+- **Confirmed** here means verified, or stated by the owner. Unverified
+  operator, agency, import and model values are not served. That is stricter
+  than `read_connected_site_context` (connect.js), which also serves
+  unverified operator facts.
+- Storage: `20261012110000_business_pages.sql` (`business_pages`: handle and
+  publish state; `business_confirmed_public_facts`; service-role RPCs).
+  Contract: `tests/business-pages-schema.sql`.
+
 ## Not done
+
+- WordPress plugin and Wix SEO API for the paste block (#502 follow-ups).
+- Policy facts in the page, llms.txt and JSON-LD wait on #305.
+- The page has no contact form; the branch's posted to the public connect
+  inquiry route, which needs a verified host and Origin.
 
 - Installation on a real Wix or Squarespace site. Never run end to end on a
   builder.

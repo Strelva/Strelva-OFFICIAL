@@ -768,6 +768,10 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010155000_fai
 psql "${psql_args[@]}" --file="$repo_root/tests/failed-system-plan-request-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 
+# Public business pages (#309) and the confirmed facts behind them and the
+# static JSON-LD paste block (#502).
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012110000_business_pages.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-pages-schema.sql"
 # The real Make real runner, checkpointing through these RPCs (psql-backed port).
 STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/make-real-activation-repository.test.ts

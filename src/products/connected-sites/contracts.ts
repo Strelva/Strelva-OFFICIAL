@@ -154,10 +154,15 @@ export function publicFactsFromRecord(raw: { facts: Record<string, unknown>; ser
   return out;
 }
 
-/** schema.org LocalBusiness from confirmed facts only, or null without a name. */
-export function businessJsonLd(facts: PublicFacts, siteUrl: string): Record<string, unknown> | null {
+/**
+ * schema.org LocalBusiness from confirmed facts only, or null without a name.
+ * The one serializer: connect.js, the public business page and the static
+ * paste block all use it. Services become Offers of a Service; free-text
+ * prices stay out (a price must be a number in schema.org, and none is guessed).
+ */
+export function businessJsonLd(facts: PublicFacts, siteUrl?: string | null): Record<string, unknown> | null {
   if (!facts.name) return null;
-  const ld: Record<string, unknown> = { "@context": "https://schema.org", "@type": "LocalBusiness", name: facts.name, url: siteUrl };
+  const ld: Record<string, unknown> = { "@context": "https://schema.org", "@type": "LocalBusiness", name: facts.name, ...(siteUrl ? { url: siteUrl } : {}) };
   if (facts.description) ld.description = facts.description;
   if (facts.phone) ld.telephone = facts.phone;
   if (facts.email) ld.email = facts.email;
@@ -172,6 +177,9 @@ export function businessJsonLd(facts: PublicFacts, siteUrl: string): Record<stri
   }
   if (facts.social_links?.length) ld.sameAs = facts.social_links;
   if (facts.service_area?.length) ld.areaServed = facts.service_area;
+  if (facts.services?.length) {
+    ld.makesOffer = facts.services.map(service => ({ "@type": "Offer", itemOffered: { "@type": "Service", name: service.name, ...(service.description ? { description: service.description } : {}) } }));
+  }
   return ld;
 }
 
