@@ -89,13 +89,17 @@ export async function runQueueSourceAction(input: { key: string; action: QueueSo
       message = input.action === "accept_request" ? "Strelva accepted the request. Scope and deadline still need agreement." : "Strelva declined the request.";
     } else if ((input.action === "triage" || input.action === "quote") && item.kind === "change_request" && tenantId && item.sourceRef.startsWith("event:")) {
       const { getEventRaw } = await import("@/lib/events");
-      const { resolveEventAction } = await import("@/lib/event-actions");
+      const { decideTenantEventAsOperator, verifiedOperator } = await import("@/lib/operator-decisions");
       const { requireActiveSubscription } = await import("@/lib/subscription");
       const eventId = item.sourceRef.slice(6);
       const event = await getEventRaw(eventId);
       if (!event || event.tenantId !== tenantId || event.type !== "change_request" || event.status !== "pending") throw new Error("The change request changed. Refresh it.");
       if (await requireTenantPermission(tenantId, "publishing:manage") || await requireActiveSubscription(tenantId)) throw new Error("This account cannot advance the change request.");
-      const result = await resolveEventAction(tenantId, eventId, input.action === "triage" ? "triaged" : "quoted", actor.userId);
+      // Recorded as the operator, with audit rows around the step.
+      const operator = await verifiedOperator();
+      if (!operator || operator.userId !== actor.userId) throw new Error("Operators only.");
+      const step = input.action === "triage" ? "triaged" : "quoted";
+      const result = await decideTenantEventAsOperator(operator, { tenantId, eventId, action: step, auditAction: `queue.request.${step}`, accept: (current) => current.type === "change_request" });
       if (!result.changed) throw new Error(result.reason ?? "The request was not changed.");
       message = input.action === "triage" ? "Request triaged." : "Request moved to quote required. No price or payment was agreed.";
     } else throw new Error("This action does not match the queue item.");

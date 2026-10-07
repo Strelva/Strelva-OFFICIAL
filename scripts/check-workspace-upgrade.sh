@@ -246,6 +246,9 @@ psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-handled-decisions-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
+# 20261011153000 replaces claim_owner_decision: an operator's admin seat never
+# decides an owner item (#530).
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-owner-decisions-schema.sql"
 # 20261009140000 replaces workspace_release_flag_names() with the full list
 # plus make_real_owner_link.
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-flag-schema.sql"
