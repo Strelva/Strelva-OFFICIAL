@@ -26,6 +26,8 @@ select pg_temp.ask_assert(not has_function_privilege('authenticated','public.res
 do $$
 declare d jsonb; second jsonb; result jsonb; ws uuid := 'ad000000-0000-4000-8000-000000000010'; owner_id uuid := 'ad000000-0000-4000-8000-000000000001'; member_id uuid := 'ad000000-0000-4000-8000-000000000002';
 begin
+ perform pg_temp.ask_expect(format('select public.save_ask_business_draft(%L,%L,%L,null,0,%L,%L,%L)',ws,member_id,'ask-member@example.test',
+   '{"facts":{"owner_recipient":{"value":{"email":"other@example.test"}}}}','Change recipient','ask-recipient-refused'),'business_record_patch_invalid');
  d := public.save_ask_business_draft(ws,member_id,'ask-member@example.test',null,0,'{"facts":{"display_name":{"value":"Fictional Bakery"}}}', 'Change business name','ask-test-1');
  perform pg_temp.ask_assert(d->'patch'='{"facts":{"display_name":{"value":"Fictional Bakery"}}}'::jsonb and (d->>'expectedRevision')::int=0,'persist exact typed patch and baseline');
  perform pg_temp.ask_assert(not exists(select 1 from public.business_record_facts where workspace_id=ws),'draft does not mutate record');

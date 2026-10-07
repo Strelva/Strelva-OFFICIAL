@@ -1,5 +1,6 @@
 import { businessRecordDraftAdapter } from "./sources/business-record-draft";
 import { PostgresBusinessFactDraftStore } from "@/platform/ask/workspace-drafts-repository";
+import { askReleaseMayBeOn } from "@/platform/ask/release";
 import { getEventRaw, getEvents } from "@/lib/events";
 import { resolveEventAction } from "@/lib/event-actions";
 import { sendEmailWithReceipt } from "@/platform/infra/email/send";
@@ -45,7 +46,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
         list: (actor, businessId) => PostgresServiceRequestStore.list(actor, { businessId }),
         change: (actor, input) => commitments.execute(actor, { action: "delivery_commitment", ...input }),
       }),
-      businessRecordDraftAdapter(PostgresBusinessFactDraftStore),
+      businessRecordDraftAdapter(PostgresBusinessFactDraftStore, askReleaseMayBeOn),
       ...systemsSourceAdapters(store),
       ...deliverySourceAdapters(),
       ...productSourceAdapters(),

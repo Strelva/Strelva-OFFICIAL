@@ -39,7 +39,7 @@ begin
  if public.workspace_exit_completed(p_workspace_id) then raise exception 'workspace_exit_future_work_blocked'; end if;
  if p_patch is null or jsonb_typeof(p_patch) <> 'object' or p_patch = '{}'::jsonb
    or (p_patch - array['facts','services','people']::text[]) <> '{}'::jsonb
-   or length(p_patch::text) > 900 then raise exception 'business_record_patch_invalid'; end if;
+   or length(p_patch::text) > 900 or (p_patch->'facts') ? 'owner_recipient' then raise exception 'business_record_patch_invalid'; end if;
  if p_asked_on_behalf is not null and (p_asked_on_behalf not in ('email','phone') or not exists(select 1 from public.super_admins where user_id=p_user_id and revoked_at is null))
  then raise exception 'business_record_access_denied'; end if;
  if p_system_id is not null and not exists(select 1 from public.systems where id=p_system_id and business_workspace_id=p_workspace_id)
@@ -110,7 +110,7 @@ begin
  if session_row.on_behalf_user_id is distinct from p_user_id or item.source_lifecycle<>'business_record_draft'
    or item.source_id is distinct from p_draft_id::text or item.change_kind<>'fact.inferred'
    or p_decision is null or p_decision not in ('approve','not_yet')
-   or item.state is distinct from case p_decision when 'approve' then 'approved' else 'declined' end
+   or item.state is distinct from (case p_decision when 'approve' then 'approved' else 'declined' end)
    or not exists(select 1 from public.strelva_service_actions where session_id=p_session_id and action='run') then
    raise exception 'strelva_service_access_denied';
  end if;

@@ -85,8 +85,8 @@ language plpgsql security definer set search_path=public,pg_temp as $$
 declare session_row public.strelva_service_actions; link public.owner_decision_link_sessions; item public.owner_decisions; recipient jsonb;
 begin
   session_row:=public.strelva_service_session(p_workspace_id,p_session_id,'owner_decision_link');
-  select * into link from public.owner_decision_link_sessions where session_id=p_session_id and workspace_id=p_workspace_id
-    and decision_id=p_decision_id and revision_hash=p_revision_hash and recipient=lower(btrim(p_recipient));
+  select s.* into link from public.owner_decision_link_sessions s where s.session_id=p_session_id and s.workspace_id=p_workspace_id
+    and s.decision_id=p_decision_id and s.revision_hash=p_revision_hash and s.recipient=lower(btrim(p_recipient));
   if not found then raise exception 'strelva_service_access_denied'; end if;
   select * into item from public.owner_decisions where id=p_decision_id and workspace_id=p_workspace_id for update;
   if not found or item.revision_hash is distinct from p_revision_hash or item.state not in ('approved','declined')

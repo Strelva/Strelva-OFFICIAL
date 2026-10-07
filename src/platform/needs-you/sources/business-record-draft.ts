@@ -20,12 +20,13 @@ export function businessFactDraftItem(draft: BusinessFactDraft): ProposedItem | 
   };
 }
 
-export function businessRecordDraftAdapter(store: BusinessFactDraftStore): SourceAdapter {
+export function businessRecordDraftAdapter(store: BusinessFactDraftStore, enabled: () => boolean = () => true): SourceAdapter {
   return {
     lifecycle: "business_record_draft", needsMemberActor: true, ownerLinkWithoutAccount: true,
-    propose: ctx => proposeAsMember(ctx, async actor => (await store.list(actor, ctx.workspaceId))
-      .filter(row => row.workspaceId === ctx.workspaceId).flatMap(row => businessFactDraftItem(row) ?? [])),
+    propose: ctx => enabled() ? proposeAsMember(ctx, async actor => (await store.list(actor, ctx.workspaceId))
+      .filter(row => row.workspaceId === ctx.workspaceId).flatMap(row => businessFactDraftItem(row) ?? [])) : Promise.resolve({ items: [], complete: false }),
     async currentRevision(ctx, sourceId) {
+      if (!enabled()) throw new Error("ask_drafts_not_released");
       if (!ctx.actor) throw new Error("draft_actor_required");
       const draft = (await store.list(ctx.actor, ctx.workspaceId)).find(row => row.id === sourceId && row.workspaceId === ctx.workspaceId);
       return draft?.status === "pending" ? businessFactDraftRevision(draft) : null;
@@ -33,6 +34,7 @@ export function businessRecordDraftAdapter(store: BusinessFactDraftStore): Sourc
     async resolve(ctx, item, decision, by) {
       if (item.workspaceId !== ctx.workspaceId) return { outcome: "failed", reason: "workspace_mismatch" };
       if (by.kind === "expiry") return { outcome: "done", reason: "Expired, nothing changed" };
+      if (!enabled()) return { outcome: "failed", reason: "ask_drafts_not_released" };
       const actor = memberActor(by);
       if (!actor) return { outcome: "failed", reason: "owner_not_member" };
       try {
