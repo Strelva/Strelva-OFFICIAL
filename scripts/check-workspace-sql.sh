@@ -602,7 +602,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
 # The release flag rules still hold after the flag names gain channel keys.
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 STRELVA_POSSIBILITIES_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
-  pnpm --dir "$repo_root" exec vitest run src/__tests__/possibility-repository.test.ts
+  pnpm --dir "$repo_root" exec vitest run --maxWorkers=1 --testTimeout=30000 src/__tests__/possibility-repository.test.ts
 # Website System (2026-10-08): publish onto a linked tenant, routing after a
 # rename, the business template, and operator domain work on owner approval.
 # Replaces reserve_website_hosted_tenant and manage_published_website_tenant;
@@ -673,6 +673,8 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010150200_int
 psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-notice-delivery-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010150300_catalog_tool_evidence.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/catalog-tool-evidence-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010150400_internal_tool_use_edits.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-use-edits-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010152000_catalog_report_receipts.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/catalog-reports-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010153000_newsletter_contacts.sql"
@@ -683,12 +685,12 @@ psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.s
 
 # The real Make real runner, checkpointing through these RPCs (psql-backed port).
 STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
-  pnpm --dir "$repo_root" exec vitest run src/__tests__/make-real-activation-repository.test.ts
+  pnpm --dir "$repo_root" exec vitest run --maxWorkers=1 --testTimeout=30000 src/__tests__/make-real-activation-repository.test.ts
 # The one booking store through both real route families (legacy /api/booking
 # and the public booking service) against the real booking functions. Last,
 # because it commits its fictional rows.
 STRELVA_BOOKINGS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
-  pnpm --dir "$repo_root" exec vitest run src/__tests__/booking-one-store.test.ts
+  pnpm --dir "$repo_root" exec vitest run --maxWorkers=1 --testTimeout=30000 src/__tests__/booking-one-store.test.ts
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 

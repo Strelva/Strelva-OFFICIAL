@@ -52,6 +52,8 @@ function fieldPlaceholder(type: string): string | undefined {
   return undefined;
 }
 
+const LINK_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 function nextIdempotencyKey(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -129,6 +131,7 @@ export function ApplicationUseRenderer({
             <div className="grid gap-5 sm:grid-cols-2">
               {formView.fields.map(field => {
                 const value = draft.values[field.id];
+                const savedLink = (field.type === "contact" || field.type === "assigned_person") && typeof value === "string" && LINK_ID.test(value);
                 if (field.type === "boolean") {
                   return (
                     <fieldset key={field.id} className="space-y-2">
@@ -181,10 +184,11 @@ export function ApplicationUseRenderer({
                     label={`${field.label}${field.required ? " *" : ""}`}
                     aria-label={field.label}
                     type={fieldInputType(field.type)}
-                    placeholder={fieldPlaceholder(field.type)}
+                    placeholder={savedLink ? "Current link (unchanged)" : fieldPlaceholder(field.type)}
+                    helperText={savedLink ? (field.type === "assigned_person" ? "A staff member is already linked. Enter another staff email to change it." : "A contact is already linked. Enter another email or phone to change it.") : undefined}
                     inputMode={field.type === "number" ? "decimal" : undefined}
-                    value={value === undefined ? "" : String(value)}
-                    required={field.required}
+                    value={savedLink || value === undefined ? "" : String(value)}
+                    required={field.required && !savedLink}
                     disabled={busy}
                     onChange={event => updateValue(field.id, field.type === "number" ? (event.target.value === "" ? undefined : Number(event.target.value)) : event.target.value)}
                   />

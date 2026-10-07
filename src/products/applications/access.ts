@@ -234,6 +234,15 @@ function rpcFailure(
   if (/workspace_exit_resource_stopped/.test(detail)) {
     throw new ApplicationUseConflictError(WORKSPACE_EXIT_RESOURCES_STOPPED_MESSAGE);
   }
+  if (/application_record_person_unknown/.test(detail)) {
+    throw new ApplicationUseInputError("That email isn't on this business's staff.");
+  }
+  if (/application_record_link_denied/.test(detail)) {
+    throw new ApplicationUseInputError("Contacts and staff come from this business only.");
+  }
+  if (/workspace_exit_future_work_blocked/.test(detail)) {
+    throw new ApplicationUseConflictError("This business has stopped new work.");
+  }
   if (/application_use_invalid|application_record_invalid|application_schema_invalid/.test(detail)) {
     throw new ApplicationUseInputError(invalidMessage);
   }
@@ -480,7 +489,12 @@ export const postgresApplicationUsePersistence: ApplicationUsePersistence = {
     return saved;
   },
   async edit(actor, workId, input, access) {
-    const { data, error } = await db().rpc("edit_application_use_record", {
+    const client = db();
+    const spec = applicationSpecSchema.safeParse(systemsReleaseMayBeOn()
+      ? (await postgresApplicationUsePersistence.inspect(actor, workId)).releasedSpec : null);
+    const linked = spec.success && linkFields(spec.data).length > 0;
+    if (linked) assertLinkFieldsReleased(spec.data, await systemsReleasedFor(actor, access.workspaceId));
+    const { data, error } = await client.rpc(linked ? "edit_internal_tool_use_record" : "edit_application_use_record", {
       ...identity(actor),
       p_work_id: z.string().uuid().parse(workId),
       p_grant_id: z.string().uuid().parse(access.id),
