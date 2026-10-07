@@ -102,7 +102,7 @@ describe("workspace reply provider reconciliation", () => {
 });
 describe("inquiry outcome proof",()=>{
   it("weekly proof requires its off-by-default flag and passes authenticated business scope",async()=>{
-    const rpc=vi.fn(async()=>({data:{answered:2,averageReplySeconds:7200},error:null}));await expect(readBusinessInquiryOutcomes(actor,input.workspaceId,"2026-10-01","2026-10-08",rpc)).rejects.toThrow("unavailable");expect(rpc).not.toHaveBeenCalled();
+    const rpc=vi.fn(async()=>({data:{workspaceId:input.workspaceId,from:"2026-10-01",to:"2026-10-08",inquiries:3,answered:2,withinDay:2,unanswered:1,averageReplySeconds:7200,medianReplySeconds:7200},error:null}));await expect(readBusinessInquiryOutcomes(actor,input.workspaceId,"2026-10-01","2026-10-08",rpc)).rejects.toThrow("unavailable");expect(rpc).not.toHaveBeenCalled();
     vi.stubEnv("STRELVA_INQUIRY_OUTCOMES","1");expect(await readBusinessInquiryOutcomes(actor,input.workspaceId,"2026-10-01","2026-10-08",rpc)).toMatchObject({answered:2});expect(rpc).toHaveBeenCalledWith("business_inquiry_outcomes",expect.objectContaining({p_user_id:actor.userId,p_workspace_id:input.workspaceId}));
   });
   it("monthly report uses its existing RPC with flag off and exact inquiries RPC with flag on",async()=>{
