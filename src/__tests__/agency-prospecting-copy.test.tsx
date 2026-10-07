@@ -17,9 +17,9 @@ describe("agency copy across public artifacts", () => {
   it("neutralizes all advice fields only on attributed results, without mutating the scanner result", () => {
     const copy = attributedAudit(audit, agency);
     expect(JSON.stringify(copy)).not.toMatch(/[Aa]sk Strelva/);
-    expect(copy.categories[0].checks[0]).toMatchObject({ message: "Ask your web provider to add schema.", details: "Optional: ask your web provider to review it.", impact: "Ask your web provider to fix this." });
+    expect(copy.categories[0]?.checks[0]).toMatchObject({ message: "Ask your web provider to add schema.", details: "Optional: ask your web provider to review it.", impact: "Ask your web provider to fix this." });
     expect(attributedAudit(audit)).toBe(audit);
-    expect(audit.categories[0].checks[0].details).toContain("ask Strelva");
+    expect(audit.categories[0]?.checks[0]?.details).toContain("ask Strelva");
   });
   it("brands the audit report and CTA without implying the agency has agreed to do the work", () => {
     const html = renderAuditReport({ ...audit, agency });

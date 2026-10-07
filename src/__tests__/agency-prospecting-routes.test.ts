@@ -49,9 +49,9 @@ describe("agency public check attribution", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ agency, topFix: "Ask your web provider to add schema.", shareUrl: "https://app.strelva.com/ai-visibility/scan_abc123" });
     expect(mocks.rpc.mock.calls[0]).toEqual(["agency_prospecting_profile", { p_slug: "northside" }]);
-    expect(mocks.rpc.mock.calls[1][0]).toBe("agency_prospect_admit");
-    expect(mocks.rpc.mock.invocationCallOrder[1]).toBeLessThan(mocks.score.mock.invocationCallOrder[0]);
-    expect(mocks.saveResult.mock.calls[0][0].agency.workspaceId).toBe(agency.workspaceId);
+    expect(mocks.rpc.mock.calls[1]?.[0]).toBe("agency_prospect_admit");
+    expect((mocks.rpc.mock.invocationCallOrder[1] ?? Infinity)).toBeLessThan(mocks.score.mock.invocationCallOrder[0] ?? -Infinity);
+    expect(mocks.saveResult.mock.calls[0]?.[0]?.agency?.workspaceId).toBe(agency.workspaceId);
   });
   it("keeps flag-off public behavior and copy unchanged", async () => {
     vi.stubEnv("STRELVA_AGENCY_PROSPECTING_RELEASE", "0");
@@ -101,7 +101,7 @@ describe("agency lead routing", () => {
   it("audit persists agency leads, retains a neutral report, and emails with agency reply routing", async () => {
     const response = await lead(request("/api/audit/lead", { name: "Jacob", email: "jacob@fixture.test", url: "fixture.example", agency: "northside" }));
     expect(response.status).toBe(200); expect(mocks.slack).not.toHaveBeenCalled();
-    expect(mocks.saveReport.mock.calls[0][0]).toMatchObject({ agency, categories: [{ checks: [{ details: "Ask your web provider to add it.", impact: "Optional: ask your web provider to review." }] }] });
+    expect(mocks.saveReport.mock.calls[0]?.[0]).toMatchObject({ agency, categories: [{ checks: [{ details: "Ask your web provider to add it.", impact: "Optional: ask your web provider to review." }] }] });
     expect(mocks.rpc).toHaveBeenCalledWith("agency_prospect_capture", expect.objectContaining({ p_workspace_id: agency.workspaceId, p_source: "audit" }));
     expect(mocks.email).toHaveBeenCalledWith(expect.objectContaining({ replyTo: "north@agency.test", reportUrl: `https://app.strelva.com/audit/report/${"a".repeat(32)}`, result: expect.objectContaining({ agency }) }));
   });
@@ -113,8 +113,8 @@ describe("agency lead routing", () => {
   it("unattributed audit still uses the existing Strelva notification/report path", async () => {
     const response = await lead(request("/api/audit/lead", { name: "Jacob", email: "jacob@fixture.test", url: "fixture.example" }));
     expect(response.status).toBe(200); expect(mocks.slack).toHaveBeenCalledOnce(); expect(mocks.rpc).not.toHaveBeenCalled();
-    expect(mocks.email.mock.calls[0][0].reportUrl).toMatch(/^https:\/\/strelva.com\/audit\/report\//);
-    expect(mocks.saveReport.mock.calls[0][0].categories[0].checks[0].details).toBe("Ask Strelva to add it.");
+    expect(mocks.email.mock.calls[0]?.[0]?.reportUrl).toMatch(/^https:\/\/strelva.com\/audit\/report\//);
+    expect(mocks.saveReport.mock.calls[0]?.[0].categories[0].checks[0].details).toBe("Ask Strelva to add it.");
   });
 });
 
@@ -125,7 +125,7 @@ describe("audit cache and exports", () => {
     const response = await scan(request("/api/audit/scan", { url: "fixture.example", agency: "northside" }));
     expect(response.status).toBe(200); expect(mocks.audit).not.toHaveBeenCalled();
     expect(await response.json()).toMatchObject({ agency, categories: [{ checks: [{ details: "Ask your web provider to add it." }] }] });
-    expect(raw.categories[0].checks[0].details).toBe("Ask Strelva to add it.");
+    expect(raw.categories[0]?.checks[0]?.details).toBe("Ask Strelva to add it.");
   });
   it("ignores caller-forged branding on the pure export route", async () => {
     const response = await exportAudit(request("/api/audit/report", { url: "https://fixture.example", scannedAt: "2026-10-07", overallScore: 40, grade: "F", categories, agency }));
