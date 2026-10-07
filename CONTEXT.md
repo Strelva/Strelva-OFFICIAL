@@ -99,7 +99,9 @@ Branch `a1/agency-team` prepares #261 locally: workspace/Systems-gated Team
 management uses existing invitation records and acceptance, extends agency
 admin sponsorship only for staff invitations, protects owner/self memberships,
 and assigns staff through 7A's SQL command in an atomic bulk wrapper. Removal
-uses the 7A membership-deletion trigger; rejoining restores no staff rows.
+extends the 7A membership-deletion trigger to end staff rows and revoke
+offered/accepted agency work assignments with removal actor/time; rejoining
+restores neither.
 Browser evidence uses fictional responses; permission, cleanup and rollback
 proof use isolated PostgreSQL. This is not deployed or adopted. Per-client
 permissions remain the 7A provider-seat policy; #241 is still a production

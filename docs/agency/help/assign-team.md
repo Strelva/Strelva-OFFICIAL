@@ -12,12 +12,13 @@
    clients** to add or remove up to 200 assignments in one transaction.
 3. Team lists each person's assigned clients. Remove a client assignment when
    their work ends. **Remove staff** asks for confirmation and ends all their
-   agency client assignments. Rejoining does not restore those assignments.
+   client staff rows and revokes their agency work assignments. Rejoining does not
+   restore either.
 
 Owners and admins can change Member/Admin agency roles. Owner memberships and
 your own membership are protected in this surface. Agency roles do not select
 different permissions per client: assigned staff use the existing provider-seat
-operator role. Direct customer membership and separately granted work retain
+operator role. Direct customer membership and non-agency work grants retain
 their own authority. Do not grant business-owner access to staff as a workaround.
 
 This is locally tested implementation on `a1/agency-team`, behind the workspace
