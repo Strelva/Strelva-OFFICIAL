@@ -338,3 +338,5 @@ export async function changeWorkspaceBooking(
 }
 
 export { BookingSettingsError, bookingSettingsChange, bookingSettingsEnabled, changeBookingSettings, readBookingSettings, bookingSettingsAdapter } from "./settings";
+
+export { ownerCanProposeBookingTimes, readInquiryProposalOptions } from "./inquiry-proposals";

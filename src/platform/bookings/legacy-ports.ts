@@ -11,6 +11,9 @@ import { scheduleSchema } from "@/products/scheduling/contracts";
 import type { LegacyBookingPorts, ScheduleReservationPorts, WorkspaceSchedule } from "./move";
 import type { StoreBookingInput } from "./store";
 
+/** Legacy inquiry lookup reused by booking reply discovery and receipt imports. */
+export const readLegacyBookingInquiry = getLeadById;
+
 type ReceiptRow = {
   id: string;
   inquiry_id: string;

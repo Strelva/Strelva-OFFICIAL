@@ -1,6 +1,6 @@
 "use client";
 import { ProposeBookingTimes } from "./ProposeBookingTimes";
-import type { InquiryProposalOptions } from "@/products/bookings/inquiry-proposal-contracts";
+import type { InquiryProposalOptions } from "@/products/bookings/contracts";
 const OPTIONS: InquiryProposalOptions = {
   customer: { name: "Dana Reed", email: "dana@example.test" }, services: [{ id: "consultation", name: "Consultation", durationMinutes: 30 }], serviceId: "consultation", timeZone: "America/New_York", paused: false,
   slots: ["2026-11-06", "2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13"].flatMap((date) => [15, 17, 19].map((hour) => {

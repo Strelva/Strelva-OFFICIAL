@@ -7,7 +7,7 @@ import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJ
 import { assertWorkspaceCalendarManager } from "@/products/scheduling/server";
 import { bookingInquiryOffersEnabled, bookingOfferEmailOptions, prepareInquiryBookingOffer, requireInquiryBookingOffers } from "@/platform/bookings/inquiry-offers";
 import { bookingCustomerEmailAllowed } from "@/platform/bookings/updates";
-import { readInquiryProposalOptions } from "@/products/bookings/inquiry-proposals";
+import { readInquiryProposalOptions } from "@/products/bookings/server";
 import { PublicBookingError } from "@/platform/bookings/errors";
 import { readBookingContext } from "@/platform/bookings/store";
 const schema = z.object({ workspaceId: z.string().uuid(), tenantId: z.string().regex(/^[a-z0-9-]+$/), inquiryId: z.string().min(1).max(200), serviceId: z.string().min(1).max(200), starts: z.array(z.string().datetime({ offset: true })).min(1).max(3), expectedCustomerEmail: z.string().email().max(320).optional() }).strict();

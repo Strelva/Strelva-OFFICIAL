@@ -12,7 +12,7 @@ vi.mock("@/lib/leads", () => ({ getLeadById: m.inquiry }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: async () => m.limited }));
 vi.mock("@/platform/infra/email/send", () => ({ sendEmailWithReceipt: m.send }));
 vi.mock("@/platform/bookings/updates", () => ({ bookingCustomerEmailAllowed: async () => m.emailAllowed }));
-vi.mock("@/products/bookings/inquiry-proposals", () => ({ readInquiryProposalOptions: m.options }));
+vi.mock("@/products/bookings/server", () => ({ readInquiryProposalOptions: m.options }));
 vi.mock("@/platform/bookings/inquiry-offers", () => ({ bookingInquiryOffersEnabled: () => m.enabled, requireInquiryBookingOffers: m.requireOffers,
   prepareInquiryBookingOffer: m.prepare, bookingOfferEmailOptions: () => ({ rows: [{ label: "Consultation", value: "Nov 6, 10 AM" }], button: { label: "Choose a time", url: "https://example.test/book-inquiry/fictional" } }) }));
 import { GET, POST } from "@/app/api/workspace/bookings/propose-times/route";

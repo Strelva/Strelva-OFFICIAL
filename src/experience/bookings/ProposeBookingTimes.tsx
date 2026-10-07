@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { proposalOptionsSchema, type InquiryProposalOptions, type InquiryProposalDelivery } from "@/products/bookings/inquiry-proposal-contracts";
+import { proposalOptionsSchema, type InquiryProposalOptions, type InquiryProposalDelivery } from "@/products/bookings/contracts";
 
 type Phase = "idle" | "loading" | "ready" | "sending" | "permission" | "error" | InquiryProposalDelivery;
 type BookingProposalRequest = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;

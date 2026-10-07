@@ -1,4 +1,4 @@
-import { ownerCanProposeBookingTimes } from "@/products/bookings/inquiry-proposals";
+import { ownerCanProposeBookingTimes } from "@/products/bookings/server";
 import { getLeads, type LeadRecord } from "@/lib/leads";
 import { getRedis } from "@/platform/infra/redis";
 import { inquiryRecordsEnabled } from "@/lib/inquiry-records";
