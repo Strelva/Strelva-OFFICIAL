@@ -606,3 +606,10 @@ authority and uses an actor-bound retry identity. Flags off preserve the earlier
 unavailable response and planning prompt. Local route and SQL tests cover
 confirmed filing, storage failure, revocation and retry; this entry does not
 claim provider generation or production delivery.
+
+The standalone workspace planner receives the Systems release and Request
+navigation from `WorkspaceLayout`. A denied maker check shows an editable
+request with no planning budget or preparation controls; its action opens the
+existing Request form with those words. Real isolated local Auth covers owner
+filing and failed-provider recovery at 360px, and staff use at 1280 and 360px.
+The model and email providers are bounded local fixtures.

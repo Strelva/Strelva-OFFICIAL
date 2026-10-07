@@ -1,5 +1,4 @@
 import { WorkspaceMakeSystemsError } from "@/platform/workspaces/types";
-import { fileFailedSystemPlanRequest } from "@/products/work-plans/failure-request";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionUser } from "@/platform/infra/db/server-client";
@@ -13,6 +12,7 @@ import {
   WorkPlanUnavailableError,
   WorkPlanUnsupportedOperationError,
   createWorkPlan,
+  fileFailedSystemPlanRequest,
   createWorkPlanRequestSchema,
   listWorkPlanOutputs,
   presentWorkPlan,
