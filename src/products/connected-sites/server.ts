@@ -45,7 +45,8 @@ export function connectedSitesReleaseEnabled(): boolean {
  */
 export async function connectedSitesReleasedFor(actor: { userId: string }, workspaceId: string): Promise<boolean> {
   if (!connectedSitesReleaseEnabled()) return false;
-  if (!(await workspaceReleaseFlagEnabled("connected_sites", workspaceId, { operator: false, tester: false, userId: actor.userId }))) return false;
+  const { releaseViewerFor } = await import("@/platform/release-flags/viewer");
+  if (!(await workspaceReleaseFlagEnabled("connected_sites", workspaceId, await releaseViewerFor(actor)))) return false;
   const { systemsReleasedFor } = await import("@/platform/systems-release");
   return systemsReleasedFor(actor, workspaceId);
 }
