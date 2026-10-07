@@ -665,8 +665,10 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135000_boo
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135500_booking_receipt_history.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135900_booking_receipt_lifecycle.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135910_booking_owner_evidence.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135920_booking_service_policies.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-agent-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-owner-evidence-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-service-policy-schema.sql"
 
 # The one booking store through both real route families (legacy /api/booking
 # and the public booking service) against the real booking functions. Last,

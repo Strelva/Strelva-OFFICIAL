@@ -20,6 +20,8 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
   const [slots, setSlots] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [intake,setIntake]=useState<Array<{id:string;label:string;type:"text"|"textarea";required:boolean}>>([]);
+  const [intakeAnswers,setIntakeAnswers]=useState<Record<string,string>>({});
   const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "" });
   const [booking, setBooking] = useState<{ id: string; date: string; startTime: string; serviceName: string } | null>(null);
   const [confirmationSent, setConfirmationSent] = useState(false);
@@ -44,6 +46,7 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
       const res = await fetch(`/api/booking/availability?date=${date}&serviceId=${serviceId}`);
       const data = await res.json();
       setSlots(data.slots || []);
+      setIntake(Array.isArray(data.intake) ? data.intake : []);
       if (data.slots?.length === 0) {
         setError("No available times on this date. Try another day.");
       }
@@ -56,6 +59,7 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
 
   async function submitBooking() {
     if (!selectedService || !selectedDate || !selectedTime) return;
+    if (intake.some(question=>question.required && !intakeAnswers[question.id]?.trim())) {setError("Please answer the required questions.");return;}
     setLoading(true);
     setError("");
 
@@ -72,12 +76,21 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
           clientEmail: form.email,
           clientPhone: form.phone,
           notes: form.notes,
+          ...(intake.length ? {intakeAnswers} : {}),
         }),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || "Failed to book. Please try again.");
+        let alternatives = "";
+        if (res.status === 409 && Array.isArray(data.nextSlots) && data.nextSlots.length <= 3 && typeof data.timeZone === "string") {
+          try {
+            const formatter = new Intl.DateTimeFormat(undefined, { timeZone: data.timeZone, dateStyle: "medium", timeStyle: "short" });
+            const times = data.nextSlots.filter((slot: { start?: unknown }) => typeof slot.start === "string" && Number.isFinite(Date.parse(slot.start))).map((slot: { start: string }) => formatter.format(new Date(slot.start)));
+            alternatives = times.length ? ` Next available times: ${times.join("; ")}.` : " No alternative times are available right now.";
+          } catch { /* keep the original refusal if guidance is malformed */ }
+        }
+        setError((data.error || "Failed to book. Please try again.") + alternatives);
         return;
       }
 
@@ -112,6 +125,8 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
     setSelectedDate("");
     setSelectedTime("");
     setSlots([]);
+    setIntake([]);
+    setIntakeAnswers({});
     setForm({ name: "", email: "", phone: "", notes: "" });
     setBooking(null);
     setConfirmationSent(false);
@@ -324,6 +339,11 @@ export function BookingWidget({ services, bookingUrl, minPrice, reviewCount }: B
                       placeholder="(555) 555-5555"
                     />
                   </div>
+                  {intake.map(question=><div key={question.id}>
+                    <label htmlFor={`booking-intake-${question.id}`} className="text-xs font-medium" style={{color:"var(--bark)"}}>{question.label}{question.required ? "" : " (optional)"}</label>
+                    {question.type === "textarea" ? <textarea id={`booking-intake-${question.id}`} required={question.required} maxLength={2000} disabled={loading} value={intakeAnswers[question.id] ?? ""} onChange={event=>setIntakeAnswers(current=>({...current,[question.id]:event.target.value}))} className="w-full px-3 py-2 border rounded-md text-sm" />
+                      : <input id={`booking-intake-${question.id}`} required={question.required} maxLength={2000} disabled={loading} value={intakeAnswers[question.id] ?? ""} onChange={event=>setIntakeAnswers(current=>({...current,[question.id]:event.target.value}))} className="w-full px-3 py-2 border rounded-md text-sm" />}
+                  </div>)}
                   <div>
                     <label htmlFor="booking-notes" className="text-xs font-medium" style={{ color: "var(--bark)" }}>Notes</label>
                     <textarea

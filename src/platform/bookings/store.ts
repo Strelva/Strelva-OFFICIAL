@@ -3,6 +3,8 @@
  * calls to its service-role functions. Nothing here decides which store a
  * route reads; see flags.ts and src/lib/storage/booking-store.ts.
  */
+import { bookingServicePoliciesEnabled, bookingServicePolicySchema, type BookingServicePolicy } from "./service-policy-schema";
+import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import { bookingRecordFallbackEnabled, cacheBookingRecord, cachedBookingRecord } from "./record-fallback";
 
@@ -111,6 +113,7 @@ export interface BookingContext {
   hours: RecordHours | null;
   phone: string | null;
   services: RecordService[];
+  servicePolicies?: BookingServicePolicy[];
   settings: BookingSettings | null;
 }
 
@@ -244,6 +247,10 @@ function parseSettings(raw: unknown): BookingSettings | null {
   };
 }
 
+function zPolicies(raw: unknown): BookingServicePolicy[] {
+  return raw == null ? [] : z.array(bookingServicePolicySchema).parse(raw);
+}
+
 function parseHours(raw: unknown): RecordHours | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
@@ -268,6 +275,7 @@ export async function readBookingContext(tenant: string, db?: BookingStoreDb | n
     const cached = await cachedBookingRecord(tenant, {
       tenantStableId: policy.tenantStableId, workspaceId: text(policy.workspaceId), systemId: text(policy.systemId),
       paused: policy.paused === true, settings: parseSettings(policy.settings),
+      ...(bookingServicePoliciesEnabled() ? { servicePolicies: zPolicies(policy.servicePolicies) } : {}),
     });
     if (!cached) throw error;
     return cached;
@@ -292,6 +300,7 @@ export async function readBookingContext(tenant: string, db?: BookingStoreDb | n
         externalRef: text(s.externalRef),
       })),
     settings: parseSettings(data.settings),
+    ...(bookingServicePoliciesEnabled() ? { servicePolicies: zPolicies(data.servicePolicies) } : {}),
   };
   if (bookingRecordFallbackEnabled()) await cacheBookingRecord(context);
   return context;

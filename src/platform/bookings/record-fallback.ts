@@ -7,7 +7,7 @@ import type { BookingContext } from "./store";
 export const BOOKING_RECORD_CACHE_MS = 60 * 60 * 1000;
 type Facts = Pick<BookingContext, "hours" | "services" | "phone">;
 type Snapshot = { at: number; facts: Facts };
-type Policy = Pick<BookingContext, "tenantStableId" | "workspaceId" | "systemId" | "paused" | "settings">;
+type Policy = Pick<BookingContext, "tenantStableId" | "workspaceId" | "systemId" | "paused" | "settings" | "servicePolicies">;
 export interface BookingRecordFallbackPorts {
   now(): number;
   get(key: string): Promise<unknown>;

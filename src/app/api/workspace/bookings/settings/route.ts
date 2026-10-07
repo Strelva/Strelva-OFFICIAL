@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   try {
     const actor = await workspaceHttpActor();
     if (!actor) return workspaceJson({ error: "Sign in with a confirmed email to continue." }, 401);
-    const parsed = bookingSettingsChange.safeParse(await readWorkspaceBody(request, 8000));
+    const parsed = bookingSettingsChange.safeParse(await readWorkspaceBody(request, 100_000));
     if (!parsed.success) return workspaceJson({ error: "Check the booking mode, buffer, notice, horizon, cutoff and daily limit. Nothing changed." }, 400);
     if (await isRateLimitedWindowedAsync(`workspace:booking-settings:${actor.userId}`, 30, 60_000)) return workspaceJson({ error: "Please wait before trying again." }, 429);
     return workspaceJson(await changeBookingSettings(actor, parsed.data));

@@ -18,6 +18,7 @@ const tools = [
   { name: "request_booking", description: "Hold a time for 15 minutes. Only the customer email can confirm it; never report it as booked before confirmation.", inputSchema: schema({
     serviceId: string, start: string, requestId: string, agent: schema({ name: string }, ["name"]),
     customer: schema({ name: string, email: string, phone: string }, ["name", "email"]),
+    intakeAnswers: {type:"object",maxProperties:8,additionalProperties:{type:"string",maxLength:2000}},
   }, ["serviceId", "start", "requestId", "agent", "customer"]) },
   { name: "get_booking_status", description: "Status only, authorized by the opaque status token from request_booking.", inputSchema: schema({ statusToken: string }, ["statusToken"]) },
 ].map(t => ({ ...t, annotations: { readOnlyHint: t.name !== "request_booking", destructiveHint: false, idempotentHint: true, openWorldHint: true } }));

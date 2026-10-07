@@ -139,6 +139,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261010133000": "business_booking_calendar_mirrors",
   "20261010134000": "booking_inquiry_offers",
   "20261010135000": "booking_instant_policies",
+  "20261010135920": "booking_service_policies",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */

@@ -9,6 +9,8 @@
  * A store refusal for an overlapping slot is not retryable: it is a parity
  * difference, logged and paged, and the compare step must explain it.
  */
+import { contextForService, servicePolicy, validateBookingIntake } from "./service-policy";
+import { pausedBookingMessage } from "./errors";
 import { getRedis } from "@/platform/infra/redis";
 import { alertOnce } from "@/platform/infra/monitoring";
 import type { Booking, BookingConfig, DateOverride } from "@/lib/types";
@@ -158,9 +160,10 @@ export type SiteService = { id: string; name: string; duration?: string | number
 export async function storeAvailableSlots(tenant: string, date: string, serviceId: string, siteServices: SiteService[]): Promise<string[]> {
   const [ctx, bookings] = await Promise.all([context(tenant), readTenantBookings(tenant, { from: date, to: date })]);
   const siteService = siteServices.find((s) => s.id === serviceId && !s.comingSoon) ?? null;
-  const service = resolveService(ctx, serviceId, siteService);
-  if (!service.bookable) return [];
-  const slots = storeSlotsForDate(ctx, date, service.durationMinutes, bookings);
+  const effective = contextForService(ctx,serviceId);
+  const service = resolveService(effective, serviceId, siteService);
+  if (!service.bookable || !servicePolicy(ctx,serviceId).bookable) return [];
+  const slots = storeSlotsForDate(effective, date, service.durationMinutes, bookings);
   if (!slots.length) return slots;
   const calendar = await readCalendarBusy(ctx, date, timeZoneOf(ctx));
   return calendar.connected && calendar.checked ? withoutBusy(slots, date, service.durationMinutes, timeZoneOf(ctx), calendar.busy) : slots;
@@ -170,13 +173,9 @@ export async function storeAvailableSlots(tenant: string, date: string, serviceI
 
 export type StoreFirstResult =
   | { success: true; booking: Booking; requested: boolean; context: BookingContext }
-  | { success: false; code: "paused" | "taken" | "invalid_service"; error: string };
+  | { success: false; code: "paused" | "taken" | "invalid_service" | "invalid_intake"; error: string };
 
-export function pausedMessage(phone: string | null): string {
-  return phone
-    ? `Bookings are paused right now. Call ${phone} to reach the business.`
-    : "Bookings are paused right now. Contact the business directly.";
-}
+export const pausedMessage = pausedBookingMessage;
 
 const TAKEN = "This time slot is no longer available. Please choose another time.";
 
@@ -192,11 +191,13 @@ export async function claimStoreBooking(
   legacyId: string,
   siteServices: SiteService[],
 ): Promise<StoreFirstResult> {
-  const ctx = await context(tenant);
+  const ctx = contextForService(await context(tenant),draft.serviceId);
   if (ctx.paused) return { success: false, code: "paused", error: pausedMessage(ctx.phone) };
   const siteService = siteServices.find((s) => s.id === draft.serviceId && !s.comingSoon) ?? null;
   const service = resolveService(ctx, draft.serviceId, siteService);
-  if (!service.bookable) return { success: false, code: "invalid_service", error: "Invalid service" };
+  if (!service.bookable || !servicePolicy(ctx,draft.serviceId).bookable) return { success: false, code: "invalid_service", error: "Invalid service" };
+  let intakeAnswers: Record<string,string>;
+  try { intakeAnswers=validateBookingIntake(servicePolicy(ctx,draft.serviceId),draft.intakeAnswers); } catch(error) { return {success:false,code:"invalid_intake",error:error instanceof Error ? error.message : "Check your intake answers."}; }
   const sameDay = await readTenantBookings(tenant, { from: draft.date, to: draft.date });
   if (!storeSlotsForDate(ctx, draft.date, service.durationMinutes, sameDay).includes(draft.startTime)) {
     return { success: false, code: "taken", error: TAKEN };
@@ -221,7 +222,7 @@ export async function claimStoreBooking(
     bufferMinutes: settings.bufferMinutes,
     ...(unchecked ? { reason: "The calendar couldn't be checked, so the owner confirms this one" } : {}),
   });
-  const result = await recordBooking(tenant, { ...input, origin: "site", serviceName: service.name }, "native");
+  const result = await recordBooking(tenant, { ...input, intakeAnswers:{ ...input.intakeAnswers, ...intakeAnswers }, origin: "site", serviceName: service.name }, "native");
   if (result.status === "conflict") return { success: false, code: "taken", error: TAKEN };
   return { success: true, booking: { ...legacy, serviceName: service.name }, requested, context: ctx };
 }

@@ -11,6 +11,7 @@ import {
   readBookingStatus,
   readBookingRequestDraft,
   reserveBooking,
+  PublicBookingConflictError,
   sameBookingRequest,
   writeBookingRequestDraft,
   type PublicBookingRequestDraft,
@@ -130,9 +131,16 @@ export function StrelvaBookingForm({
   const [slotId, setSlotId] = useState(initialSlotId);
   const [name, setName] = useState(initialRequestDraft?.visitor.name ?? "");
   const [email, setEmail] = useState(initialRequestDraft?.visitor.email ?? "");
+  const [intakeAnswers,setIntakeAnswers]=useState<Record<string,string>>(initialRequestDraft?.visitor.intakeAnswers ?? {});
   const [message, setMessage] = useState(initialRequestDraft?.visitor.message ?? "");
+  const [alternatives, setAlternatives] = useState<PublicBookingConflictError | null>(null);
 
-  const slot = schedule.slots.find(value => value.id === slotId);
+  const slots = alternatives?.nextSlots ?? schedule.slots;
+  const slot = slots.find(value => value.id === slotId);
+  const timeZone = alternatives?.timeZone ?? schedule.timeZone;
+  function showConflict(error: unknown) {
+    if (error instanceof PublicBookingConflictError) { setAlternatives(error); setSlotId(error.nextSlots[0]?.id ?? ""); }
+  }
   const reservationLabel = receipt?.status === "confirmed"
     ? `${providerLabel(schedule.provider)} confirmed this reservation.`
     : receipt?.status === "cancelled"
@@ -147,13 +155,14 @@ export function StrelvaBookingForm({
     setPending(true);
     setStatus(null);
     try {
-      const next = await onReserve(slot, { name, email, ...(message.trim() ? { message } : {}) });
+      const next = await onReserve(slot, { name, email, ...(message.trim() ? { message } : {}), ...(schedule.intake ? {intakeAnswers} : {}) });
       setReceipt(next);
       setName("");
       setEmail("");
       setMessage("");
       setStatus({ kind: "success", text: next.status === "confirmed" ? "Your time is reserved." : "Your request was received for confirmation." });
     } catch (error) {
+      showConflict(error);
       setStatus({ kind: "error", text: error instanceof Error ? error.message : "Your booking was not confirmed. Please try again." });
     } finally { setPending(false); }
   }
@@ -168,6 +177,7 @@ export function StrelvaBookingForm({
       setReceipt(next);
       setStatus({ kind: "success", text: next.status === "confirmed" ? "Your reservation was changed." : "Your change is awaiting confirmation." });
     } catch (error) {
+      showConflict(error);
       setStatus({ kind: "error", text: error instanceof Error ? error.message : "Your booking was not changed. Please try again." });
     } finally { setPending(false); }
   }
@@ -209,15 +219,21 @@ export function StrelvaBookingForm({
       <form onSubmit={(event) => void submit(event)} aria-label="Reserve a time">
         <label htmlFor={`${prefix}-slot`}>Available time</label>
         <select id={`${prefix}-slot`} value={slotId} disabled={pending} onChange={event => setSlotId(event.target.value)}>
-          {schedule.slots.map(value => <option key={value.id} value={value.id}>{formatSlot(value, schedule.timeZone)}</option>)}
+          {slots.map(value => <option key={value.id} value={value.id}>{formatSlot(value, timeZone)}</option>)}
         </select>
+        {alternatives ? <p role="status">{slots.length ? "The next available times are shown above. Choose a time and try again." : "No alternative times are available right now. Contact the business directly."}</p> : null}
         <label htmlFor={`${prefix}-name`}>Name</label>
         <input id={`${prefix}-name`} name="name" value={name} required maxLength={160} disabled={pending} onChange={event => setName(event.target.value)} />
         <label htmlFor={`${prefix}-email`}>Email</label>
         <input id={`${prefix}-email`} name="email" type="email" value={email} required maxLength={320} disabled={pending} onChange={event => setEmail(event.target.value)} />
+        {schedule.intake?.map(question=><div key={question.id}>
+          <label htmlFor={`${prefix}-intake-${question.id}`}>{question.label}{question.required ? "" : " (optional)"}</label>
+          {question.type === "textarea" ? <textarea id={`${prefix}-intake-${question.id}`} value={intakeAnswers[question.id] ?? ""} required={question.required} maxLength={2000} disabled={pending} onChange={event=>setIntakeAnswers(current=>({...current,[question.id]:event.target.value}))} />
+            : <input id={`${prefix}-intake-${question.id}`} value={intakeAnswers[question.id] ?? ""} required={question.required} maxLength={2000} disabled={pending} onChange={event=>setIntakeAnswers(current=>({...current,[question.id]:event.target.value}))} />}
+        </div>)}
         <label htmlFor={`${prefix}-message`}>Note (optional)</label>
         <textarea id={`${prefix}-message`} name="message" value={message} maxLength={2000} disabled={pending} onChange={event => setMessage(event.target.value)} />
-        <button type="submit" disabled={pending || !onReserve}>{pending ? "Saving…" : submitLabel}</button>
+        <button type="submit" disabled={pending || !onReserve || !slot}>{pending ? "Saving…" : submitLabel}</button>
       </form>
       {receipt ? (
         <section aria-label="Booking receipt">
@@ -231,7 +247,7 @@ export function StrelvaBookingForm({
               ) : (
                 <>
                   <form onSubmit={(event) => void change(event)} aria-label="Change reservation">
-                    <button type="submit" disabled={pending || !onChange}>Change time</button>
+                    <button type="submit" disabled={pending || !onChange || !slot}>Change time</button>
                   </form>
                   <button type="button" disabled={pending || !onCancel} onClick={() => void cancel()}>Cancel reservation</button>
                 </>

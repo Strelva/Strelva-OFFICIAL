@@ -1,3 +1,4 @@
+import { intakeQuestionSchema, validateBookingIntake } from "@/platform/bookings/service-policy";
 import { publicRecordReservationId, publicRecordManagementToken } from "@/platform/bookings/public-request";
 import { PublicBookingError } from "@/platform/bookings/errors";
 import { createHash, randomUUID } from "node:crypto";
@@ -40,6 +41,7 @@ export const publicBookingVisitorSchema = z.object({
   name: z.string().trim().min(1).max(160),
   email: z.string().trim().email().max(320),
   message: z.string().trim().max(2_000).optional(),
+  intakeAnswers: z.record(z.string().max(80),z.string().max(2000)).optional(),
 }).strict();
 export type PublicBookingVisitor = z.infer<typeof publicBookingVisitorSchema>;
 
@@ -66,6 +68,7 @@ export function publicBookingRequestFingerprint(input: {
       name: input.visitor.name.trim(),
       email: input.visitor.email.trim().toLowerCase(),
       message: input.visitor.message?.trim() ?? "",
+      ...(input.visitor.intakeAnswers ? { intakeAnswers: Object.fromEntries(Object.entries(input.visitor.intakeAnswers).sort(([a],[b])=>a.localeCompare(b))) } : {}),
     },
   });
   return createHash("sha256").update(canonical, "utf8").digest("hex");
@@ -79,6 +82,7 @@ export const publicBookingScheduleSchema = z.object({
   provider: publicBookingProviderSchema,
   timeZone: z.string().trim().min(1).max(128),
   slots: z.array(publicBookingSlotSchema).max(500),
+  intake: z.array(intakeQuestionSchema).max(8).optional(),
 }).strict();
 export type PublicBookingSchedule = z.infer<typeof publicBookingScheduleSchema>;
 
@@ -122,7 +126,7 @@ export interface PublicBookingBinding {
   timeZone: string;
   slots: readonly PublicBookingSlot[];
   /** Store-served contract; absent on the unchanged legacy calendar path. */
-  recordBooking?: { serviceRef: string; bufferMinutes: number; mode: "request" | "instant"; uncheckedStarts: string[] };
+  recordBooking?: { pausedMessage?: string; serviceRef: string; bufferMinutes: number; mode: "request" | "instant"; uncheckedStarts: string[]; intake?: z.infer<typeof intakeQuestionSchema>[] };
   /** Customer workspace authority for the existing native calendar service. */
   owner: WorkspaceActor;
   workspaceId: string;
@@ -401,6 +405,7 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
       provider: safe.provider,
       timeZone: safe.timeZone,
       slots: rangeSlots(safe, range),
+      ...(safe.recordBooking?.intake ? { intake: safe.recordBooking.intake } : {}),
     });
   }
 
@@ -444,9 +449,13 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
     const binding = await resolveBinding(dependencies, { tenantId: input.tenantId, capabilityId: input.capabilityId, requestId: idempotencyRequestId });
     if (!binding) throw new PublicBookingError("not_found", "This booking capability is unavailable.");
     const safe = assertBinding(binding, input.tenantId, input.capabilityId);
+    if (safe.recordBooking?.intake) {
+      try { validateBookingIntake({ businessServiceId: safe.recordBooking.serviceRef, mode: safe.recordBooking.mode, bufferMinutes: safe.recordBooking.bufferMinutes, bookable: true, intake: safe.recordBooking.intake },visitor.intakeAnswers); }
+      catch(error) { throw new PublicBookingError("invalid",error instanceof Error ? error.message : "Check your intake answers."); }
+    }
     if (input.capabilityVersion !== safe.version) throw new PublicBookingError("conflict", "This booking changed. Reload the available times before reserving.");
     // Refuse before anything is recorded: no inquiry, no pending receipt.
-    if (safe.paused) throw new PublicBookingError("conflict", "This business is not taking new bookings right now.");
+    if (safe.paused) throw new PublicBookingError("conflict", safe.recordBooking?.pausedMessage ?? "This business is not taking new bookings right now.");
     const slot = slotFor(safe, input.slotId);
     const requestFingerprint = publicBookingRequestFingerprint({
       tenantId: input.tenantId,
@@ -569,6 +578,7 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
     const binding = await resolveBinding(dependencies, { tenantId: input.tenantId, capabilityId: ref.capabilityId, includeRevoked: true });
     if (!binding) throw new PublicBookingError("not_found", "This booking capability is unavailable.");
     const safe = assertBinding(binding, input.tenantId, ref.capabilityId);
+    if (safe.paused && safe.recordBooking?.pausedMessage) throw new PublicBookingError("conflict", `${safe.recordBooking.pausedMessage} You can still cancel your reservation.`);
     if (safe.status === "revoked" || safe.websiteBindingActive === false || safe.paused) throw new PublicBookingError("conflict", "This booking is no longer accepting changes. You can still cancel it.");
     if (input.capabilityVersion !== safe.version || ref.version !== safe.version) throw new PublicBookingError("conflict", "This booking changed. Reload the available times before changing it.");
     const slot = slotFor(safe, input.slotId);

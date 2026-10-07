@@ -586,3 +586,14 @@ private previews are noindexed. The static export includes the immutable
 document, each page, redirect mappings, image bytes and file checksums. No new
 renderer dependencies were added. Local automated and rendered verification is
 recorded with the website rebuild delivery evidence.
+
+### Booking conflict choices and intake
+
+The native visitor form in `custom-repo-starter/StrelvaBookingForm.tsx` and its
+exported `website-generation/capability-runtime.mjs` preserve visitor input when
+a time is taken. Store-served conflict responses offer at most three fresh slots;
+the forms replace stale choices and keep reserve/change disabled when there are
+none. The existing legacy BookingWidget shows the suggested local times in its
+error text. These controls appear only when the gated server supplies them.
+Optional service intake questions use the existing input/textarea controls,
+required semantics and eight-question limit; the flags-off flow keeps its fields.

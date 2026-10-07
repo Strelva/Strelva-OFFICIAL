@@ -26,7 +26,11 @@ async function jsonResponse(response, fallback) {
   try { body = await response.json(); } catch { /* use the stable fallback */ }
   if (!response.ok) {
     const error = record(body);
-    throw new Error(typeof error?.error === "string" ? error.error : fallback);
+    const failure = new Error(typeof error?.error === "string" ? error.error : fallback);
+    if (response.status === 409 && Array.isArray(error?.nextSlots) && error.nextSlots.length <= 3 && error.nextSlots.every(slot => record(slot) && TOKEN.test(text(slot.id)) && ISO.test(text(slot.start)) && ISO.test(text(slot.end)) && Date.parse(slot.end) > Date.parse(slot.start)) && text(error.timeZone)) {
+      try { new Intl.DateTimeFormat(undefined, { timeZone: error.timeZone }); failure.nextSlots = error.nextSlots.map(({ id, start, end }) => ({ id, start, end })); failure.timeZone = error.timeZone; } catch { /* malformed guidance never widens the offer */ }
+    }
+    throw failure;
   }
   if (!record(body)) throw new Error(fallback);
   return body;
@@ -53,6 +57,7 @@ function bookingSchedule(value, expected) {
   if (!item || item.schemaVersion !== 1 || item.capabilityId !== expected.capabilityId || item.version !== expected.version || !text(item.name) ||
     !["outlook", "google"].includes(item.provider) || !text(item.timeZone) || !Array.isArray(item.slots) || item.slots.length > 500) return null;
   if (!item.slots.every(slot => record(slot) && TOKEN.test(text(slot.id)) && ISO.test(text(slot.start)) && ISO.test(text(slot.end)) && Date.parse(slot.end) > Date.parse(slot.start))) return null;
+  if (item.intake !== undefined && (!Array.isArray(item.intake) || item.intake.length>8 || !item.intake.every(q=>record(q) && /^[A-Za-z0-9_-]{1,80}$/.test(text(q.id)) && text(q.label).length>0 && text(q.label).length<=200 && ["text","textarea"].includes(q.type) && typeof q.required==="boolean") || new Set(item.intake.map(q=>q.id)).size!==item.intake.length)) return null;
   return item;
 }
 
@@ -71,7 +76,7 @@ function visitor(value) {
   const email = text(item?.email).trim().toLowerCase().slice(0, 320);
   if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter your name and a valid email address.");
   const message = text(item?.message).trim().slice(0, 2_000);
-  return { name, email, ...(message ? { message } : {}) };
+  return { name, email, ...(message ? { message } : {}), ...(record(item?.intakeAnswers) ? {intakeAnswers:Object.fromEntries(Object.entries(item.intakeAnswers).sort(([a],[b])=>a.localeCompare(b)).map(([id,value])=>[id,text(value).slice(0,2000)]))} : {}) };
 }
 
 function requestId() {
@@ -269,10 +274,24 @@ function mountBooking(root, config, api) {
       if (currentSchedule.slots.some(slot => slot.id === selected)) slotSelect.value = selected;
     };
     renderSlots();
+    const showConflict = error => {
+      if (!Array.isArray(error?.nextSlots)) return;
+      currentSchedule = { ...currentSchedule, timeZone: error.timeZone, slots: error.nextSlots };
+      renderSlots();
+      reserve.disabled = !currentSchedule.slots.length;
+      result.textContent += currentSchedule.slots.length ? " The next available times are shown above. Choose a time and try again." : " No alternative times are available right now. Contact the business directly.";
+    };
     const name = element("input", undefined, { id: "strelva-booking-name", name: "name", required: "true", maxlength: "160" });
     const email = element("input", undefined, { id: "strelva-booking-email", name: "email", type: "email", required: "true", maxlength: "320" });
     const message = element("textarea", undefined, { id: "strelva-booking-message", name: "message", maxlength: "2000" });
     form.append(element("label", "Available time", { for: "strelva-booking-slot" }), slotSelect, element("label", "Name", { for: "strelva-booking-name" }), name, element("label", "Email", { for: "strelva-booking-email" }), email, element("label", "Note (optional)", { for: "strelva-booking-message" }), message);
+    const intakeInputs = new Map();
+    for (const question of schedule.intake ?? []) {
+      const id=`strelva-booking-intake-${question.id}`;
+      const input=element(question.type === "textarea" ? "textarea" : "input",undefined,{id,maxlength:"2000",...(question.required ? {required:"true"} : {})});
+      form.append(element("label",question.label+(question.required ? "" : " (optional)"),{for:id}),input);
+      intakeInputs.set(question.id,input);
+    }
     const reserve = element("button", "Reserve time", { type: "submit" }); form.append(reserve);
     const result = element("p", undefined, { role: "status" }); form.append(result); wrapper.append(form);
     const receiptRoot = element("section", undefined, { "aria-label": "Booking receipt" }); wrapper.append(receiptRoot);
@@ -299,12 +318,12 @@ function mountBooking(root, config, api) {
         return;
       }
       const change = element("button", "Change time", { type: "button" });
-      change.addEventListener("click", () => { change.disabled = true; void api.changeBooking(config, receipt, currentSchedule.slots.find(slot => slot.id === slotSelect.value)).then(next => { receipt = next; updateReceipt(); }, error => { result.textContent = error instanceof Error ? error.message : "Your booking was not changed. Please try again."; }).finally(() => { change.disabled = false; }); });
+      change.addEventListener("click", () => { change.disabled = true; void api.changeBooking(config, receipt, currentSchedule.slots.find(slot => slot.id === slotSelect.value)).then(next => { receipt = next; updateReceipt(); }, error => { result.textContent = error instanceof Error ? error.message : "Your booking was not changed. Please try again."; showConflict(error); }).finally(() => { change.disabled = !currentSchedule.slots.length; }); });
       const cancel = element("button", "Cancel reservation", { type: "button" });
       cancel.addEventListener("click", () => { cancel.disabled = true; void api.cancelBooking(config, receipt).then(next => { receipt = next; updateReceipt(); }, error => { result.textContent = error instanceof Error ? error.message : "Your booking was not cancelled. Please try again."; }).finally(() => { cancel.disabled = false; }); });
       receiptRoot.append(change, cancel);
     };
-    form.addEventListener("submit", event => { event.preventDefault(); reserve.disabled = true; result.textContent = ""; void api.reserveBooking(config, currentSchedule, currentSchedule.slots.find(slot => slot.id === slotSelect.value), { name: name.value, email: email.value, message: message.value }).then(next => { receipt = next; updateReceipt(); result.textContent = next.status === "confirmed" ? "Your time is reserved." : "Your request was received for confirmation."; form.reset(); }, error => { result.textContent = error instanceof Error ? error.message : "Your booking was not confirmed. Please try again."; }).finally(() => { reserve.disabled = false; }); });
+    form.addEventListener("submit", event => { event.preventDefault(); reserve.disabled = true; for(const input of intakeInputs.values()) input.disabled=true; result.textContent = ""; void api.reserveBooking(config, currentSchedule, currentSchedule.slots.find(slot => slot.id === slotSelect.value), { name: name.value, email: email.value, message: message.value, ...(schedule.intake ? {intakeAnswers:Object.fromEntries([...intakeInputs].map(([id,input])=>[id,input.value]))} : {}) }).then(next => { receipt = next; updateReceipt(); result.textContent = next.status === "confirmed" ? "Your time is reserved." : "Your request was received for confirmation."; form.reset(); }, error => { result.textContent = error instanceof Error ? error.message : "Your booking was not confirmed. Please try again."; showConflict(error); }).finally(() => { reserve.disabled = !currentSchedule.slots.length; for(const input of intakeInputs.values()) input.disabled=false; }); });
     root.replaceChildren(wrapper);
   }, error => status(root, error instanceof Error ? error.message : "Booking availability is unavailable."));
 }

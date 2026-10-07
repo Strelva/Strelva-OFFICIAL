@@ -3,7 +3,8 @@
 interface PublicBookingRange { from: string; to: string }
 interface PublicBookingBinding { tenantId: string; workspaceId: string; recordBooking?: { serviceRef: string } }
 interface PublicBookingCalendarConfirmation { verification: "pending"; status: "confirmed" | "cancelled" | "pending"; start: string; end: string; expectedRevision: number }
-import { PublicBookingError } from "./errors";
+import { contextForService, servicePolicy } from "./service-policy";
+import { PublicBookingError, pausedBookingMessage } from "./errors";
 import { settingsOrDefault, timeZoneOf } from "./availability";
 import { publicRecordReservationId } from "./public-request";
 import { nativeSlots } from "./native";
@@ -12,20 +13,21 @@ import { readBookingContext, readTenantBookings, recordBooking, setBookingStatus
 export async function recordPublicAvailability(input: { tenantId: string; capabilityId: string; name: string; range?: PublicBookingRange; includeRevoked?: boolean; requestId?: string }) {
   const context = await readBookingContext(input.tenantId);
   if (!context?.workspaceId) throw new PublicBookingError("unavailable", "Booking records are unavailable.");
-  const active = context.services.filter(s => s.active);
+  const active = context.services.filter(s => s.active && servicePolicy(context, s.id).bookable);
   const named = active.filter(s => s.name === input.name);
   const service = active.find(s => s.id === input.capabilityId || s.externalRef === input.capabilityId)
     ?? (named.length === 1 ? named[0] : undefined);
   // A removed or ambiguous service never falls back to copied intervals.
   if (!service && !input.includeRevoked) throw new PublicBookingError("not_found", "This booking service is unavailable.");
-  const settings = settingsOrDefault(context);
+  const settings = settingsOrDefault(contextForService(context, service?.id ?? input.capabilityId));
   const from = input.range?.from ?? new Date().toISOString();
   const to = input.range?.to ?? new Date(Date.parse(from) + Math.min(60, settings.maxAdvanceDays) * 86400000).toISOString();
   const availability = service && !context.paused ? await nativeSlots(input.tenantId, service.externalRef ?? service.id, from, to, input.requestId ? { excludePublicReservationId: publicRecordReservationId(context.tenantStableId, input.requestId) } : {}) : { slots: [] };
   return { workspaceId: context.workspaceId, paused: context.paused, timeZone: timeZoneOf(context), name: service?.name ?? input.name,
     slots: availability.slots, recordBooking: {
-      serviceRef: service?.externalRef ?? service?.id ?? "", bufferMinutes: settings.bufferMinutes, mode: settings.mode,
+      pausedMessage: pausedBookingMessage(context.phone), serviceRef: service?.externalRef ?? service?.id ?? "", bufferMinutes: settings.bufferMinutes, mode: settings.mode,
       uncheckedStarts: availability.slots.filter(s => !s.calendarChecked).map(s => s.start),
+      ...(context.servicePolicies && service ? { intake: servicePolicy(context,service.id).intake } : {}),
     } };
 }
 
@@ -35,13 +37,14 @@ export async function recordPublicSlot(binding: PublicBookingBinding, start: str
   const ref = binding.recordBooking?.serviceRef;
   if (!ref) throw new PublicBookingError("not_found", "This service is unavailable.");
   const context = await readBookingContext(binding.tenantId);
-  if (!context || context.paused || context.workspaceId !== binding.workspaceId) throw new PublicBookingError("conflict", "This booking is not accepting new times.");
+  if (!context || context.workspaceId !== binding.workspaceId) throw new PublicBookingError("conflict", "This booking is not accepting new times.");
+  if (context.paused) throw new PublicBookingError("conflict", pausedBookingMessage(context.phone));
   const offered = await nativeSlots(binding.tenantId, ref, start, new Date(Date.parse(end) + 1).toISOString(), { excludePublicReservationId });
   const slot = offered.slots.find(s => Date.parse(s.start) === Date.parse(start) && Date.parse(s.end) === Date.parse(end));
   if (!slot) throw new PublicBookingError("conflict", "That time has just been taken. Choose another time.");
   const service = context.services.find(s => s.active && (s.id === ref || s.externalRef === ref));
   if (!service) throw new PublicBookingError("not_found", "This service is unavailable.");
-  const settings = settingsOrDefault(context);
+  const settings = settingsOrDefault(contextForService(context, service.id));
   return { serviceRef: ref, serviceName: service.name, bufferMinutes: settings.bufferMinutes, timeZone: timeZoneOf(context),
     status: settings.mode === "request" || !slot.calendarChecked ? "requested" as const : "confirmed" as const };
 }

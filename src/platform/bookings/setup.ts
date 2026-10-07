@@ -1,6 +1,7 @@
 /** Booking-only setup. Instant mode is an owner-approved standing policy. */
 import { createHash } from "node:crypto";
 import { z } from "zod";
+import { bookingServicePolicySchema } from "./service-policy";
 import { bookingReadSource, bookingStoreWriteEnabled } from "@/platform/bookings/flags";
 import { bookingStoreDb } from "@/platform/bookings/store";
 import type { SourceAdapter } from "@/platform/needs-you/adapters";
@@ -9,6 +10,7 @@ import type { WorkspaceActor } from "@/platform/workspaces/types";
 
 export const bookingSettingsChange = z.object({
   workspaceId: z.string().uuid(), tenantId: z.string().min(1).max(80), expectedRevision: z.number().int().min(0),
+  services: z.array(bookingServicePolicySchema).max(100).optional().refine(rows => !rows || new Set(rows.map(row => row.businessServiceId)).size === rows.length, "Services must be unique."),
   mode: z.enum(["request", "instant"]), bufferMinutes: z.number().int().min(0).max(120),
   minNoticeMinutes: z.number().int().min(0).max(43_200), maxAdvanceDays: z.number().int().min(1).max(60),
   maxPerDay: z.number().int().min(1).max(1000).nullable(), cancellationCutoffHours: z.number().int().min(0).max(168),
@@ -51,11 +53,11 @@ export async function changeBookingSettings(actor: WorkspaceActor, input: Bookin
     p_user_id: actor.userId, p_email: actor.verifiedEmail, p_settings: parsed });
 }
 const policySchema = z.object({ id: z.string().uuid(), workspaceId: z.string().uuid(), tenantId: z.string(), revision: z.number().int(),
-  settingsRevision: z.number().int(), siteName: z.string(), status: z.enum(["proposed", "active", "declined"]) });
+  settingsRevision: z.number().int(), siteName: z.string(), serviceName: z.string().optional(), status: z.enum(["proposed", "active", "declined"]) });
 type InstantPolicy = z.infer<typeof policySchema>;
 function revision(policy: InstantPolicy) { return createHash("sha256").update(JSON.stringify([policy.id, policy.revision, policy.settingsRevision])).digest("hex"); }
 function item(policy: InstantPolicy): ProposedItem {
-  return { kind: "running.approve", route: "owner_decides", title: `Strelva confirms bookings for ${policy.siteName}`.slice(0, 200),
+  return { kind: "running.approve", route: "owner_decides", title: `Strelva confirms ${policy.serviceName ? policy.serviceName + " bookings" : "bookings"} for ${policy.siteName}`.slice(0, 200),
     detail: "Strelva confirms bookings in your open hours using the approved buffer, notice, horizon and daily limit. Calendar outages still require your decision.",
     approveEffect: "New bookings are confirmed automatically under these settings.", notYetEffect: "Bookings keep requiring your confirmation.",
     sourceLifecycle: "booking_settings", sourceId: policy.id, revisionHash: revision(policy), urgent: false, adminMayDecide: false,

@@ -1,15 +1,17 @@
 /** Native services and availability for agent discovery and customer management.
  * Every slot is recomputed from the record and guarded by the one store. */
+import { contextForService, servicePolicy, validateBookingIntake } from "./service-policy";
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { decryptSecret, encryptSecret } from "@/platform/infra/crypto/secrets";
-import { PublicBookingError } from "./errors";
+import { PublicBookingError, pausedBookingMessage } from "./errors";
 import { settingsOrDefault, storeSlotsForDate, timeZoneOf, zonedLocalToUtc } from "./availability";
 import { readCalendarBusy, withoutBusy } from "./calendar-busy";
 import { bookingAgentsEnabled, bookingReadSource } from "./flags";
 import { bookingStoreDb, parseStoreBooking, readBookingContext, readTenantBookings, type StoreBooking } from "./store";
 
 export const agentBookingSchema = z.object({
+  intakeAnswers: z.record(z.string().max(80), z.string().max(2000)).optional(),
   origin: z.literal("agent"), serviceId: z.string().min(1).max(200), start: z.string().datetime({ offset: true }),
   requestId: z.string().regex(/^[A-Za-z0-9_-]{8,80}$/),
   agent: z.object({ name: z.string().trim().min(1).max(120) }).strict(),
@@ -46,18 +48,20 @@ async function context(tenant: string) {
 export async function nativeServices(tenant: string) {
   const ctx = await context(tenant);
   const settings = settingsOrDefault(ctx);
-  return { timeZone: timeZoneOf(ctx), paused: ctx.paused, services: ctx.services.filter(s => s.active).map(s => ({
-    id: s.externalRef ?? s.id, name: s.name, durationMinutes: s.durationMinutes ?? settings.defaultLengthMinutes,
-    mode: settings.mode, bufferMinutes: settings.bufferMinutes,
+  return { timeZone: timeZoneOf(ctx), paused: ctx.paused, services: ctx.services.filter(s => s.active && servicePolicy(ctx, s.id).bookable).map(s => ({
+    id: s.externalRef ?? s.id, name: s.name, durationMinutes: s.durationMinutes ?? contextForService(ctx,s.id).settings?.defaultLengthMinutes ?? settings.defaultLengthMinutes,
+    mode: servicePolicy(ctx,s.id).mode, bufferMinutes: servicePolicy(ctx,s.id).bufferMinutes,
+    ...(ctx.servicePolicies ? { intake: servicePolicy(ctx,s.id).intake } : {}),
   })) };
 }
 
 function addDays(day: string, n: number) { return new Date(Date.parse(`${day}T12:00:00Z`) + n * 86400000).toISOString().slice(0, 10); }
 
 export async function nativeSlots(tenant: string, serviceId: string, from: string, to: string, options: { excludePublicReservationId?: string } = {}) {
-  const ctx = await context(tenant);
+  let ctx = await context(tenant);
   const service = ctx.services.find(s => s.active && (s.id === serviceId || s.externalRef === serviceId));
-  if (!service) throw new PublicBookingError("not_found", "This service is unavailable.");
+  if (!service || !servicePolicy(ctx,service.id).bookable) throw new PublicBookingError("not_found", "This service is unavailable.");
+  ctx = contextForService(ctx,service.id);
   const fromMs = Date.parse(from), toMs = Date.parse(to);
   if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || toMs <= fromMs || toMs - fromMs > 60 * 86400000) throw new PublicBookingError("invalid", "Choose a range of up to 60 days.");
   const zone = timeZoneOf(ctx);
@@ -104,6 +108,7 @@ export async function requestAgentBooking(tenant: string, raw: unknown) {
     throw new PublicBookingError("unavailable", "Customer confirmation is not available for this business.");
   }
   const ctx = await context(tenant);
+  if (ctx.paused) throw new PublicBookingError("conflict", pausedBookingMessage(ctx.phone));
   const service = ctx.services.find(s => s.active && (s.externalRef === input.serviceId || s.id === input.serviceId));
   if (!service) throw new PublicBookingError("not_found", "This service is unavailable.");
   const fingerprint = createHash("sha256").update(JSON.stringify(input)).digest("hex");
@@ -111,7 +116,11 @@ export async function requestAgentBooking(tenant: string, raw: unknown) {
   // Idempotent retries must survive their own occupied slot and never reopen
   // an expired hold. The atomic hold RPC verifies the original fingerprint.
   const existing = (await readTenantBookings(tenant)).find(b => b.legacyId === legacyId);
-  const duration = service.durationMinutes ?? settingsOrDefault(ctx).defaultLengthMinutes;
+  const policy = servicePolicy(ctx,service.id);
+  if (!policy.bookable) throw new PublicBookingError("not_found", "This service is unavailable.");
+  let intakeAnswers: Record<string,string>;
+  try { intakeAnswers = validateBookingIntake(policy,input.intakeAnswers); } catch(error) { throw new PublicBookingError("invalid",error instanceof Error ? error.message : "Check your intake answers."); }
+  const duration = service.durationMinutes ?? settingsOrDefault(contextForService(ctx,service.id)).defaultLengthMinutes;
   const end = new Date(Date.parse(input.start) + duration * 60000).toISOString();
   if (!existing) {
     const offered = await nativeSlots(tenant, input.serviceId, input.start, new Date(Date.parse(end) + 1).toISOString());
@@ -119,7 +128,7 @@ export async function requestAgentBooking(tenant: string, raw: unknown) {
   }
   const data = await nativeRpc("hold_agent_booking", { p_tenant_id: tenant, p_booking: {
     legacyId, status: "held", origin: "agent", serviceRef: input.serviceId, serviceName: service.name,
-    start: input.start, end, bufferMinutes: settingsOrDefault(ctx).bufferMinutes, timeZone: timeZoneOf(ctx),
+    start: input.start, end, bufferMinutes: policy.bufferMinutes, intakeAnswers, timeZone: timeZoneOf(ctx),
     customer: input.customer, requestFingerprint: fingerprint,
   }, p_access: newBookingAccess(input.agent.name) }) as { status: string; booking?: unknown; access?: Record<string, unknown> };
   if (data.status === "conflict") throw new PublicBookingError("conflict", "That time has just been taken. Choose another time.");
@@ -156,9 +165,10 @@ export async function changeNativeBooking(hash: string, action: "cancel" | "resc
   if (action === "reschedule") {
     if (!start || !booking.serviceRef) throw new PublicBookingError("invalid", "Choose an open time.");
     const current = await context(booking.tenantId);
+    if (current.paused) throw new PublicBookingError("conflict", pausedBookingMessage(current.phone));
     const service = current.services.find(s => s.active && (s.id === booking.serviceRef || s.externalRef === booking.serviceRef));
     if (!service) throw new PublicBookingError("not_found", "This service is unavailable.");
-    const minutes = service.durationMinutes ?? settingsOrDefault(current).defaultLengthMinutes;
+    const minutes = service.durationMinutes ?? settingsOrDefault(contextForService(current,service.id)).defaultLengthMinutes;
     const offered = await nativeSlots(booking.tenantId, booking.serviceRef, start, new Date(Date.parse(start) + (minutes + 1) * 60000).toISOString());
     const slot = offered.slots.find(s => Date.parse(s.start) === Date.parse(start));
     if (!slot) throw new PublicBookingError("conflict", "That time is unavailable.");

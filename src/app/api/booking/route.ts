@@ -1,3 +1,7 @@
+import { bookingServicePoliciesEnabled } from "@/platform/bookings/service-policy";
+import { z } from "zod";
+import { PublicBookingError } from "@/platform/bookings/errors";
+import { bookingConflictAlternatives, nativeBookingAlternatives } from "@/platform/bookings/conflicts";
 import { NextResponse } from "next/server";
 import { getContent, logActivity } from "@/lib/storage";
 import { createBookingAtomic } from "@/platform/bookings/legacy-store";
@@ -71,6 +75,8 @@ export async function POST(request: Request) {
     const clientEmail = cleanText(body.clientEmail, 320).toLowerCase();
     const clientPhone = cleanText(body.clientPhone, 80);
     const notes = cleanText(body.notes, 1000);
+    const intake = bookingServicePoliciesEnabled() ? z.record(z.string().max(80),z.string().max(2000)).safeParse(body.intakeAnswers ?? {}) : null;
+    if (intake && !intake.success) return NextResponse.json({error:"Check your intake answers."},{status:400});
 
     if (!serviceId || !date || !startTime || !clientName || !clientEmail) {
       return NextResponse.json(
@@ -116,6 +122,7 @@ export async function POST(request: Request) {
         clientEmail,
         clientPhone,
         notes: notes || undefined,
+        ...(intake?.success ? {intakeAnswers:intake.data} : {}),
       },
       tenant
     );
@@ -123,10 +130,12 @@ export async function POST(request: Request) {
     if (!result.success) {
       // Only the one booking store (reads flipped) returns a code: a paused
       // bookings System, or a service the business record no longer offers.
+      if (result.code === "invalid_intake") return NextResponse.json({error:result.error},{status:400});
       if (result.code === "invalid_service") return NextResponse.json({ error: "Invalid service" }, { status: 400 });
       // Nothing could be stored or guarded (store and Redis both unavailable): say so, never claim success.
       if (result.code === "unavailable") return NextResponse.json({ error: result.error }, { status: 503 });
-      return NextResponse.json({ error: result.error, ...(result.code === "paused" ? { paused: true } : {}) }, { status: 409 });
+      const alternatives = result.code === "paused" ? {} : await bookingConflictAlternatives(new PublicBookingError("conflict", result.error), () => nativeBookingAlternatives(tenant, serviceId));
+      return NextResponse.json({ error: result.error, ...alternatives, ...(result.code === "paused" ? { paused: true } : {}) }, { status: 409 });
     }
     const requested = result.requested === true;
     // With reads on the one store, the name comes from the business record.

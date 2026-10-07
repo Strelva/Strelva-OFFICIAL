@@ -54,7 +54,7 @@ export function publicBookingStoreHook(): PublicBookingStoreHook | undefined {
           bufferMinutes: 0,
           timeZone: input.binding.timeZone,
           customer: { name: input.visitor.name, email: input.visitor.email },
-          ...(input.visitor.message ? { intakeAnswers: { message: input.visitor.message } } : {}),
+          ...(input.visitor.intakeAnswers || input.visitor.message ? { intakeAnswers: { ...input.visitor.intakeAnswers, ...(input.visitor.message ? { message: input.visitor.message } : {}) } } : {}),
           inquiryId: input.inquiryId,
           requestFingerprint: input.requestFingerprint,
           ...(record ? { ...record, status: "held", reason: "Public booking receipt pending" } : {}),
