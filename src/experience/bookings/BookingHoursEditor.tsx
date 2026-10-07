@@ -127,7 +127,7 @@ export function BookingHoursEditor({ workspaceId, tenantId, siteName, hours }: {
           <p className="text-sm font-medium">Booking hours</p>
           <p className="mt-0.5 text-sm text-gray-muted">{summarizeBookingHours(hours)}</p>
         </div>
-        {!open ? <Button size="sm" variant="ghost" onClick={() => setOpen(true)} aria-label={`Change booking hours for ${siteName}`}>Change</Button> : null}
+        {!open ? <Button className="max-sm:min-h-11" size="sm" variant="ghost" onClick={() => setOpen(true)} aria-label={`Change booking hours for ${siteName}`}>Change</Button> : null}
       </div>
       {open ? (
         <form onSubmit={submit} className="mt-4">
@@ -171,9 +171,9 @@ export function BookingHoursEditor({ workspaceId, tenantId, siteName, hours }: {
           </ul>
           {error ? <p role="alert" className="mt-2 text-sm text-critical">{error}</p> : null}
           <div className="mt-4 flex flex-wrap gap-2">
-            <Button type="submit" size="sm" loading={saving} disabled={saving}>Save booking hours</Button>
-            {hours.bookable ? <Button type="button" size="sm" variant="ghost" disabled={saving} onClick={() => void save(null)}>Use opening hours</Button> : null}
-            <Button type="button" size="sm" variant="ghost" disabled={saving} onClick={() => { setOpen(false); setError(null); }}>Cancel</Button>
+            <Button type="submit" className="max-sm:min-h-11" size="sm" loading={saving} disabled={saving}>Save booking hours</Button>
+            {hours.bookable ? <Button type="button" className="max-sm:min-h-11" size="sm" variant="ghost" disabled={saving} onClick={() => void save(null)}>Use opening hours</Button> : null}
+            <Button type="button" className="max-sm:min-h-11" size="sm" variant="ghost" disabled={saving} onClick={() => { setOpen(false); setError(null); }}>Cancel</Button>
           </div>
         </form>
       ) : null}

@@ -1,0 +1,19 @@
+# Wave 6 booking interface evidence — October 7, 2026
+
+Local fixture proof for `w6/bookings`, served with `STRELVA_UI_PREVIEW=1 pnpm exec next dev --port 3026`. `lsof` verified the server's working directory was `/Users/jacobrhinehart/Desktop/strelva/REB-w6-bookings`. Port 3016 initially served the catalog worktree; those captures were discarded and are absent from this evidence.
+
+The T3 collaborative browser rendered at 1280px and 390px, plus representative 320px reflow. These are CSS viewport checks using a desktop user agent, not a physical phone. [Measurements and capture index](./evidence.json) retain measurements and visible-state excerpts from 68 captures. Eight representative screenshots are kept; the remaining captures were removed after inspection. Tall views have both initial and scrolled hours-editor captures; screenshots are viewport captures, not full-page exports.
+
+Covered fixtures:
+
+- `/preview/strelva/booking-manage`: ready, held, pending, paused, empty, error, unavailable, missing link, cancelled, rescheduled, taken and ended, at desktop and mobile widths. Held shows one confirmation action; paused/unavailable/empty preserve cancellation; error/missing/ended/cancelled states expose no mutation action.
+- `/preview/strelva/booking-inquiry`: ready, booked request, expired and taken at desktop/mobile; ready/taken at 320px. The request receipt explicitly says the business still needs to confirm.
+- `/preview/strelva/bookings`: week/day, loading, permission, error, empty, unlinked, unavailable, two sites, narrowed hours, opening hours and missing record hours. The hours editor was opened locally, with labelled 44px time inputs verified at 1280/390/320px. No save was sent.
+
+All measured views had `document.documentElement.scrollWidth === innerWidth`. Native radio keyboard checks used Tab followed by ArrowRight on the manage page and ArrowDown on the inquiry page: no time initially selected, next time selected by the arrow, and a visible 2px focus outline. The manage radio labels are 44px high.
+
+The review found compact owner controls at 32px and the inquiry submit at 40px in narrow non-coarse layouts. `BookingActions`, `BookingHoursEditor`, and `InquiryBookingOffer` now add `max-sm:min-h-11`, preserving desktop sizes. Browser rechecks measure 44px at both 390px and 320px; desktop remains 32px for compact owner controls and 40px for inquiry submit. Shared Button already expands on coarse pointers. Workspace navigation sizing is being handled by the owner-evidence piece.
+
+Focused regressions: four existing suites passed 36 tests (`booking-hours-edit`, `workspace-bookings`, `booking-manage-link`, `booking-inquiry-receipt`). Typecheck is recorded in the stream's final verification.
+
+Limits: this proves fixture rendering and local keyboard behavior. No form submitted a reservation, confirmation, cancellation, check-in, hours update or provider write. It does not prove authenticated permissions, live delivery, generated visitor forms, physical-device performance, screen-reader output, contrast across every state, or production behavior. The website rebuild fixture contains no booking connection; generated visitor evidence belongs to the separate public protocol verification. Later owner evidence additions require their own captures.

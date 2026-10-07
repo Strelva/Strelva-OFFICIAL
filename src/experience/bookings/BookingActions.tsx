@@ -16,6 +16,7 @@ export function BookingActions({ workspaceId, tenantId, bookingId, status, clien
   status: string;
   clientName: string;
   view: "day" | "week";
+  canMarkNoShow?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
@@ -52,12 +53,12 @@ export function BookingActions({ workspaceId, tenantId, bookingId, status, clien
   return (
     <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
       {view === "day" && status === "confirmed" ? (
-        <Button size="sm" variant="secondary" loading={busy === "completed"} disabled={Boolean(busy)} onClick={() => change("completed")}>
+        <Button className="max-sm:min-h-11" size="sm" variant="secondary" loading={busy === "completed"} disabled={Boolean(busy)} onClick={() => change("completed")}>
           Check in
         </Button>
       ) : null}
       {view === "day" && status === "completed" ? (
-        <Button size="sm" variant="ghost" loading={busy === "confirmed"} disabled={Boolean(busy)} onClick={() => change("confirmed")}>
+        <Button className="max-sm:min-h-11" size="sm" variant="ghost" loading={busy === "confirmed"} disabled={Boolean(busy)} onClick={() => change("confirmed")}>
           Undo check-in
         </Button>
       ) : null}
@@ -65,11 +66,11 @@ export function BookingActions({ workspaceId, tenantId, bookingId, status, clien
         confirming ? (
           <>
             <span className="text-sm text-gray-muted">Cancel {clientName}&apos;s booking?</span>
-            <Button size="sm" variant="danger" loading={busy === "cancelled"} disabled={Boolean(busy)} onClick={() => change("cancelled")}>Cancel booking</Button>
-            <Button size="sm" variant="ghost" disabled={Boolean(busy)} onClick={() => setConfirming(false)}>Keep it</Button>
+            <Button className="max-sm:min-h-11" size="sm" variant="danger" loading={busy === "cancelled"} disabled={Boolean(busy)} onClick={() => change("cancelled")}>Cancel booking</Button>
+            <Button className="max-sm:min-h-11" size="sm" variant="ghost" disabled={Boolean(busy)} onClick={() => setConfirming(false)}>Keep it</Button>
           </>
         ) : (
-          <Button size="sm" variant="ghost" disabled={Boolean(busy)} onClick={() => setConfirming(true)}>Cancel</Button>
+          <Button className="max-sm:min-h-11" size="sm" variant="ghost" disabled={Boolean(busy)} onClick={() => setConfirming(true)}>Cancel</Button>
         )
       ) : null}
       {error ? <p role="alert" className="w-full text-sm text-critical sm:text-right">{error}</p> : null}

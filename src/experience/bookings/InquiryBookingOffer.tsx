@@ -12,7 +12,7 @@ export function InquiryBookingOffer({ offer, actionUrl, error }: { offer: Offer 
       <fieldset><legend className="text-base font-medium">{offer.serviceName}</legend><p className="mt-2 text-sm text-gray-muted">Times in {offer.timeZone}</p>
         <div className="mt-4 grid gap-3">{offer.slots.map(slot => <label key={slot.start} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-gray-border p-3 focus-within:outline-2 focus-within:outline-accent"><input type="radio" name="start" value={slot.start} required className="h-4 w-4"/><span>{format!.format(new Date(slot.start))}</span></label>)}</div>
       </fieldset>
-      <Button type="submit" className="mt-6">Request this time</Button>
+      <Button type="submit" className="mt-6 max-sm:min-h-11">Request this time</Button>
     </form></Card> : null}
   </div></main>;
 }
