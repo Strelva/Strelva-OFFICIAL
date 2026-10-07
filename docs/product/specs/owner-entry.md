@@ -1,45 +1,37 @@
 # Owner entry and the move off /dashboard
 
-Status: draft spec, 2026-10-06. Partly built on branch `build/owner-entry`,
-proven locally only (not migrated, not deployed, every flag off):
+Status: implemented locally on `w6/owner-ask`, October 7, 2026. Not
+migrated or deployed; release and email flags remain off. Current proof and
+production stop points are in [the stream handoff](../streams/w6-owner-ask.md).
 
-- Built: per-workspace release flags (`workspace_release_flags`, testers,
-  immutable history; migration `20261007130000`), the env layering
-  (`0`/`workspace`/`1`) for all four flags, `STRELVA_OWNER_ENTRY`, operator
-  controls on `/admin/clients/[id]`, sign-in/sign-up/admin root through
-  `/auth/entry`, 307 redirects from `/dashboard` and
-  `/client/<tenant>/dashboard` only for a member of the destination,
-  "Back to <business>" on pages that haven't moved, `view=system` kept
-  after sign-in, the disposition map (§5) with a page-file test, and
-  `/dashboard/reports` → `/workspace/recaps` (ready).
-- Not built here: the owner invitation (requirements 8–10, another stream),
-  email links pointing at the new place (11), and the workspace homes of
-  every page still marked `stay` in §5.
-- Proof: `src/__tests__/{release-flags,owner-entry,owner-entry-routes,workspace-recaps}.test.ts(x)`,
-  `tests/workspace-release-flags-schema.sql` in `check:workspace-sql`.
+- All 25 dashboard page files have dispositions: 24 `ready`, and Settings
+  intentionally retained on `/dashboard`. Content, Sources, Health,
+  Ownership, Members and Store now have exact workspace destinations.
+  Store and Members reuse the existing evidence panels; checkout and
+  rewards behavior stay in the client site.
+- Every new redirect requires `STRELVA_OWNER_ENTRY`, linked workspace
+  membership and its destination's release gates. They remain reversible
+  307s; operators keep `?legacy=1`. Settings does not block owner entry.
+- The operator invitation panel and endpoint are built, separately gated
+  by `STRELVA_OWNER_INVITATIONS_RELEASE=0`. A verified magic-link entry
+  claims only a pending operator-issued invitation with
+  `STRELVA_OWNER_INVITATION_CLAIM=1`; the existing accept transaction grants
+  both memberships. Invitations remain deferred, and sends require the
+  existing global, customer and per-tenant email gates.
+- Reports, review alerts, health alerts, lead notices, lifecycle notices
+  and billing return links resolve the moved destination through a narrow
+  workspace port. Recipient ownership remains with the agency-operator
+  stream. Flag off: no new destination lookup, existing URLs and behavior.
+- Routine Needs you decisions can use signed email links for an owner
+  without an account, under `STRELVA_OWNER_DECISION_LINKS_RELEASE=0`.
+  Make real retains its separate owner-link gate. Access, money and exit
+  still require sign-in. Website facts, copy, preview approval and launch
+  bind the exact revision; no membership is synthesized.
 
-Built and proven locally on `build/business-ownership` (Oct 6): requirements
-8 and 9 (operator owner invitation, both memberships in one transaction) in
-`20261007110000_business_ownership.sql`, `src/platform/workspaces/business-ownership.ts`
-and `scripts/business-ownership.ts`. The operator button on
-`/admin/clients/[id]` is not built; the script is the only way to issue one.
-Requirement 10 (magic-link claim) and the rest are not built.
-
-Built and proven locally on `w2/owner-surfaces-a` (Oct 6): workspace homes
-for `/`, `/review`, `/leads`, `/reviews`, `/analytics` (and `/health`) and
-`/settings` (and `/ownership`), each with its parity gaps in `dispositions.ts`.
-All are `ready` except `/settings`, which stays on `/dashboard` (Oct 6) until
-owners can edit branding, site basics and domains in the workspace. Every home reads through `tenant_workspace_links`
-(`read_workspace_tenant_links`, direct members only) and then applies the
-`/dashboard` tenant check (`hasDashboardViewAccess`) per linked site; a site
-that fails it is named and not read
-(`src/platform/owner-entry/linked-sites.ts`). The homes open only where
-owner entry is on for the workspace and viewer. `/` and `/review` redirect
-only while `STRELVA_NEEDS_YOU_RELEASE` is on. Proof:
-`src/__tests__/owner-entry-homes{,-routes,-ui}.test.ts(x)` and fixture
-renders at desktop and 390px (`/preview/strelva/places`,
-`/preview/strelva?scenario=mooney&needsYou=on`). Not proven: an
-authenticated journey against a real linked tenant.
+Not proven here: authenticated admin-host entry and rollback on an isolated
+Supabase Auth stack, actual mail delivery, production migrations, live
+provider read-back, owner use or commercial results. Local render and SQL
+proof do not establish those.
 
 Covers Reborn section 6 and the 1.0.0 line "Owners sign in on their client
 admin host and land in their workspace; old `/dashboard` links redirect."
@@ -212,49 +204,15 @@ since the catalog gives those pages no workspace home at 1.0.0.
 
 ## 5. Every /dashboard page
 
-**Count.** `src/app/dashboard` holds 24 route pages plus the `[...notFound]`
-catch-all. Reborn says 22, split 3 with a home, 4 partial, 4 retire and the
-rest to build. This count gives **0 ready, 8 partial, 4 retire, 12 with no
-workspace home**. The 4 retire pages match: they're the redirect stubs.
-Reborn's "3 have a home" don't hold up when checked page by page. In each
-case the workspace place exists, but none of them reads the tenant's data
-yet.
-
-*As built on `build/owner-entry` (2026-10-06):* **2 ready** (`/reports`,
-`[...notFound]`), **4 retire**, **2 frozen** (`/store`, `/members`), **17
-stay**. *Then on `w2/owner-surfaces-b` (Oct 6, local):* **11 ready**:
-`/chat` → `view=ask` while `STRELVA_ASK_RELEASE` is on, and `/site`,
-`/assets`, `/brand-kit`, `/collections`, `/history`, `/integrations`,
-`/sources/[id]`, `/google` → `/workspace/site?…&tab=…` (the website
-System's own pages, reusing the dashboard's panels) where Systems are on
-for the workspace. **8 stay**. Not at parity yet, and why they are not
-`ready`: `/analytics` (no results panel), `/` and `/review` (Needs you),
-`/leads`, `/roster`, `/schedule`, `/reviews`, `/settings`. The map is `src/platform/owner-entry/dispositions.ts`; each `stay`
-entry carries its reason. gldf still waits on `/`, `/review` (needs-you spec)
-and `/site` (editing still opens `/dashboard/site`, so a redirect would loop).
-rohlax still waits on `/schedule` and `/roster` (the one booking store).
-
-*As built on `w2/owner-surfaces-a` (2026-10-06):* **8 ready** (adds `/`,
-`/review`, `/leads`, `/reviews`, `/analytics`, `/settings`), **4 retire**
-(`/health`, `/ownership` now land on ready homes), **2 frozen**, **11 stay**.
-gldf now waits only on `/site`; rohlax on `/site`, `/schedule` and
-`/roster`. The rows below say where each landed and what it doesn't do yet.
-
-*Both streams merged on `integrate/reborn-1.0` (2026-10-06, local):*
-**16 ready**: A's `/`, `/review` (gate `needs_you`), `/leads`, `/reviews`,
-`/analytics`, plus `/reports` and `[...notFound]`; B's `/chat` (gate `ask`)
-and the eight website pages (gate `systems`, per workspace). **4 retire**,
-**2 frozen**, **3 stay**: `/roster`, `/schedule`, and `/settings`, which was
-moved back to `stay` after A (it would take branding, site basics and domain
-editing away from owners). One gate type, `DispositionGate` =
-per-workspace release flag | `needs_you` | `ask`, decides when a ready page
-redirects. gldf waits on nothing but `/settings`; rohlax on `/settings`,
-`/schedule` and `/roster`.
-
-*Then with `w2/bookings-inquiries` merged:* `/roster` and `/schedule` are
-ready too (→ `/workspace/bookings?view=day|week`, gate `systems`):
-**18 ready**, 4 retire, 2 frozen, **1 stay** (`/settings`). Both gldf and
-rohlax now wait only on `/settings`.
+**Current count (October 7, `w6/owner-ask`).** 24 route pages plus
+`[...notFound]`: **24 ready, 1 intentionally retained Settings page**.
+The four former redirect stubs now redirect directly to their own workspace
+place. Store and Members move as existing read-only evidence Connections,
+without activating checkout, points, rewards or membership actions.
+`src/platform/owner-entry/dispositions.ts` owns the current map; tests compare
+it with the actual page files and verify sign-in-safe destinations and rollback.
+A client has no unsettled page blocker at launch; destination release gates
+still apply per page. Historical partial counts are superseded by this map.
 
 The nav that owners see comes from `getDashboardSurfaces`
 (`src/lib/dashboard-surfaces.ts`). It shows Today, Ask Strelva, Website,
@@ -266,36 +224,35 @@ The other pages are reached from inside those.
 | `/dashboard` page | Lands in the workspace | Today | Work needed |
 | --- | --- | --- | --- |
 | `/` Today | Home: Needs you, **From your site** (visits, customer actions, who reached out, Strelva's work, links to the places below), Strelva handled, In progress, Recent | **Ready** while Needs you is on (`w2/owner-surfaces-a`). Approvals come through Needs you's tenant-event adapter; the rest from `/api/workspace/site-summary` | Parity gaps: no onboarding checklist or wizard, day-one cards, retention panel or "Do this next"; no sparklines; no Edit site / View live site buttons on Home |
-| `/chat` Ask Strelva | Ask Strelva on Home and on each System | None. 0% in the workspace | Reborn §4 Ask Strelva: ~24 tools from `api/agent/route.ts` into `agent-shared.ts`, workspace route resolves workspace → link → tenant · L |
+| `/chat` Ask Strelva | Ask Strelva (`view=ask`) on Home and each System | **Ready** while Ask and Systems are released | No approvals in chat; workspace conversations start fresh |
 | `/site` Website editor | Website System ("greatlakesdriedfruit.com") | Partial. `SystemPage.tsx` shows name, domain, live link, health and preview (local, Systems flag). Editing is link-out only | Edits for existing sites from the System page, native or embedded · S to link, L native |
-| `/content` | Website System | Retire. Redirects to `/site` today | Map to the Website System · S |
+| `/content` | Website System, Edit | **Ready**, gate `systems` | Reuses the website editor |
 | `/assets` Photos | Website System, photos and files | None | Photo library on the Website System · M |
 | `/brand-kit` | Website System, look (fonts, colors) | None | Brand panel on the Website System · S–M |
 | `/collections` Blog and collections | Publishing System (blog), or Website System content | None. Publishing is 0% in the workspace | Part of Reborn §4 Publishing · L |
 | `/google` Google Business | Publishing System, plus an *acts on* Connection to the Google Business profile | None. Tenant tokens are Redis only | Token move through `crypto/secrets.ts` without re-consent, GBP panel · L–XL |
-| `/health` | Website System health | Retire. Redirects to `/analytics#site-health` | Map to Website System health (exists locally) · S |
+| `/health` | `/workspace/results#site-health` | **Ready** | Keeps valid analytics date parameters |
 | `/history` Site safety, request and check history | Website System, History | Partial. `website_documents` revisions have history; tenant `content_versions` and `site_snapshots` have no workspace view | History reads the tenant stores through the link · M |
 | `/integrations` Connections | Connections on each System, plus account grants under Business details | Partial. `ConnectionsPanel` on `SystemPage` (local) doesn't read Redis `connections:{tenant}:{provider}` | Project tenant connections as System Connections · M |
-| `/sources` | Same as `/integrations` | Retire. Redirects to `/integrations` | Map · S |
+| `/sources` | Website System, Connections | **Ready**, gate `systems` | Reuses existing Connections reads and controls |
 | `/sources/[id]` Connection detail | That Connection on its System | None | Connection detail view · S–M |
 | `/leads` | Inquiries, `/workspace/inquiries` | **Ready** (`w2/owner-surfaces-a`). Every linked site's leads from Redis via `src/lib/leads.ts`, newest first, reply by email, 30-day count | Parity gaps: the `tenant_leads` mirror isn't read (Redis outage shows "couldn't be read"); not the inquiries spec's System page (status, assignee, follow-ups) |
-| `/members` (wellness) | **Frozen** on `/dashboard` (rewards frozen, systems catalog §3.2–3.3) | Frozen | None at 1.0.0 |
+| `/members` (wellness) | Website Connection, Members | **Ready**, gates `owner_entry` and `systems` | Existing read-only members panel; rewards remain frozen |
 | `/roster` (wellness) | Bookings System, day roster | None | Day roster (Reborn §4 Bookings) · in L |
 | `/schedule` (wellness) | Bookings System | Partial. Workspace scheduling is ~25% and uses a different store from the tenant widget | One booking store (Reborn §2) · L |
-| `/ownership` | Business menu: Business details → ownership, plus `/workspace/export` and `/workspace/exit` | Retire. Redirects to `/settings#ownership` today. Export and exit exist in production | Map to the exit and ownership section · S |
+| `/ownership` | `/workspace/business-details#ownership` | **Ready** | Export and exit still require sign-in and their existing authority |
 | `/reports` Weekly and monthly recaps | `/workspace/recaps`, linked from Home (`?view=monthly` → `period=month`) | **Ready** (branch `build/owner-entry`). Reads every linked site's recaps through the tenant link | Crons resolving the recipient through the link is the systems-catalog stream's |
 | `/analytics` Live traffic, milestone, AI visibility | Website results and health, `/workspace/results` (`?range=` kept) | **Ready** (`w2/owner-surfaces-a`). Same reads as the old page; Search Console and GA4 through `tenant_analytics_config`; latest scan as site health | Parity gaps: site health is the scan summary, not the interactive audit card; no custom date picker; no Ask Strelva hand-offs; not yet a panel on the Website System page |
 | `/review` Approval queue | Needs you, on Home | **Ready** while Needs you is on (`w2/owner-surfaces-a`) | Parity gaps: no edit-before-approve, resolved history or stale-section count; operator queue controls stay on `/dashboard/review?legacy=1` |
 | `/reviews` Reviews and replies | Google listing: Reviews, `/workspace/reviews` | **Ready** (`w2/owner-surfaces-a`). Reviews, existing replies, Strelva's waiting draft, reply through `/api/workspace/reviews/reply` (same governed path as `/api/reviews/reply`, plus `requireTenantAccess`), review request link | Parity gaps: no reply-voice settings or AI draft button; no copy buttons; reads the tenant review store, not Publishing's listing receipts |
 | `/settings` | Business details, `/workspace/business-details`, with a section for every old `#anchor` linking on to People and access, account, plan/ownership and the website | **Stay** (Oct 6: the home is built on `w2/owner-surfaces-a`, but `/dashboard/settings` keeps serving until branding, site basics and domains are editable here). Owner (or a Strelva operator as admin) edits name, phone, public email, description and the owner recipient in the business record, revision-checked | Parity gaps: no branding, site basics, navigation, connected services or domain editing; tenant profile fields don't change; billing still has no `workspaceId` |
-| `/store` (gldf) | **Frozen** on `/dashboard`; the website System shows a Store *Connection* (systems catalog §3.2, decision 9.4) | Frozen | None at 1.0.0 |
+| `/store` (gldf) | Website Connection, Store | **Ready**, gates `owner_entry` and `systems` | Existing products, summary and orders panel; checkout unchanged |
 | `[...notFound]` | Home | n/a | Map · S |
 
-**Which pages block which client.** gldf can't move until `/store`,
-`/reports`, `/review`, `/` and `/site` are `ready`. Wellness clients
-(rohlax) need `/schedule`, `/members` and `/roster`. Which tenants use which
-pages comes from `tenants.features` and Redis connections. That's a
-read-only check that hasn't been run (see Unknowns).
+**Which pages block which client.** No remaining disposition blocks owner
+entry for the store, wellness, local or always-used groups. Settings is the
+explicit retained exception. Actual tenant feature use and release eligibility
+still need the authorized rollout inventory; code readiness grants no rollout.
 
 ## 6. Built on
 
@@ -436,47 +393,29 @@ last-owner guard in both stores.
   email received, accepted, admin host sign-in lands in the workspace, one
   flag rollback observed. Then gldf on Jacob's yes.
 
-## 10. Open decisions
+## 10. Decisions and launch defaults
 
-1. **Flip rule: all pages or page by page?** (a) Build every page the
-   client uses before turning owner entry on. (b) Mix: `ready` pages
-   redirect and the rest render `/dashboard` with a back link.
-   **Recommend (b) inside `operators` and (a) for `on`.** Operators can
-   live with mixed surfaces; owners shouldn't bounce between two apps.
-2. **Can a workspace row turn on a flag the env has off?** The client email
-   override does this today. **Recommend no.** Env off is the kill switch.
-   `workspace` mode gives the same per-client rollout without weakening it.
-3. **Who is the owner of a converted business?** (a) Operator-issued
-   invitation only (this spec). (b) Auto-grant on a verified email that
-   matches `owner_recipient`. **Recommend (a).** Owner carries payer and
-   exit authority, and email facts come from imports.
-4. **Strelva's role after the owner accepts.** It stays `admin` (simplest),
-   or becomes a provider relationship like an agency. **Recommend `admin` at
-   1.0.0.** Revisit with partner agencies.
-5. **Which host serves the workspace?** Session cookies are host-only (no
-   cookie `domain` is set in `src/lib/db/*-client.ts`). (a) Serve
-   `/workspace` on the admin host where the person signed in. (b) Always
-   send them to `app.strelva.com`, which means a second sign-in for
-   `admin.<tenant>.strelva.com`. **Recommend (a).** Custom admin domains
-   already authenticate on `app.strelva.com/client/<tenant>`, so they
-   land there.
-6. **Owners who never sign in, under assumption 6.** Owner-only actions
-   (Make real requires `owner` in `SystemPage`, plus publish and launch)
-   need an email path. If the needs-you spec chooses signed email actions,
-   owner entry needs nothing more. If it doesn't, a business with no
-   signed-in owner can't Make real at all. Name it in the needs-you spec.
-   *Working default built locally Oct 6 on `w4/journey-gaps`: a signed
-   one-tap link decides a Make real plan for an owner with no account,
-   through Needs you, with the plan fingerprint rechecked at decision time
-   (migration `20261009131000`, not applied). Publish and launch keep their
-   own items; access, money and exit still need a sign-in.*
-   Nothing in the repo sends SMS. Adding it would be a new provider and a
-   new dependency.
-7. **If 1.0.0 means only existing clients (assumption 1 changes),** the
-   operator invitation is the only owner path. If new businesses come in
-   through the same path, they create their own workspace and are `owner`
-   from the start (`/workspace/business/new`), so this spec only adds the
-   admin host landing for them.
+These close implementation choices for this stream. They grant no production,
+invitation, pricing or provider authority.
+
+1. **Flip rule:** operators can rehearse mixed surfaces; owner `on` requires
+   settled dispositions. Settings is the requested retained exception.
+2. **Env off is the kill switch.** A workspace row cannot override it;
+   `workspace` mode allows per-client rollout and rollback.
+3. **Ownership comes only from an operator-issued invitation.** Matching an
+   imported email never auto-grants owner authority. Magic-link claim accepts
+   that existing invitation and creates both memberships atomically.
+4. **Strelva stays admin** in converted businesses. The client's owner
+   authority is never borrowed by Ask or synthesized for email execution.
+5. **Same-host workspace entry.** It preserves host-only auth cookies;
+   custom-admin fallback keeps `/client/<tenant>` routing. Authenticated host
+   proof belongs to the isolated journey and rollout gates.
+6. **Owners can decide without signing in.** Routine decisions use a signed,
+   revision-bound owner link, with a separately gated, logged service executor.
+   Make real has its existing separate gate. Access, money and exit require
+   sign-in. No inbound email parser or SMS provider is added.
+7. **Existing converted clients use invitations.** Independent new businesses
+   retain their existing workspace-creation ownership path.
 
 ## 11. Unknowns
 

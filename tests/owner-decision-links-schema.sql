@@ -20,7 +20,7 @@ declare
   actor uuid:='b2000000-0000-4000-8000-000000000002';
   work public.saved_product_work; item jsonb; link jsonb; id uuid; sid uuid;
   doc jsonb:='{"version":2,"siteName":"Owner link fixture","nodes":{},"pages":[],"facts":{}}';
-  h text:=repeat('c',64); revision_hash text:=repeat('a',64); rec jsonb; published jsonb; reserved text; kind text;
+  h text:=repeat('c',64); revision_hash text:=repeat('a',64); rec jsonb; published jsonb; reserved text; kind text; draft jsonb; applied jsonb;
 begin
   insert into public.users(id,email,verified_at) values(actor,'ol-operator@example.test',now());
   insert into public.workspaces(id,kind,name,created_by) values(ws,'customer','Owner link business',actor);
@@ -69,6 +69,25 @@ begin
   insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values(ws,actor,'admin',actor);
   perform public.finish_owner_decision(ws,id,'done',null,'website:'||work.id);
   perform pg_temp.ol_expect(format('select public.publish_website_by_owner_link(%L,%L,%L,%L,1,%L,%L,%L,%L,%L,%L,%L)',ws,work.id,actor,'ol-operator@example.test',h,reserved,rec,sid,id,revision_hash,'ol-owner@example.test'),'strelva_service_access_denied');
+  -- The same account-free owner can decide an exact fact patch. This is the
+  -- real writer RPC, with no owner account or synthetic membership.
+  draft:=public.save_ask_business_draft(ws,actor,'ol-operator@example.test',null,0,
+    '{"facts":{"phone":{"value":"716-555-0111"}}}','Change phone','ol-fact-one');
+  item:=public.open_owner_decision(ws,jsonb_build_object('kind','fact.inferred','route','owner_decides','title','Change exact phone',
+    'approveEffect','Save phone.','notYetEffect','Nothing changes.','sourceLifecycle','business_record_draft','sourceId',draft->>'id','revisionHash',h));
+  id:=(item->>'id')::uuid;
+  link:=public.strelva_owner_decision_link_session(ws,id,h,'ol-owner@example.test'); sid:=(link->>'sessionId')::uuid;
+  perform pg_temp.ol_expect(format('select public.resolve_ask_business_draft_by_owner_link(%L,%L,%L,%L,%L,%L,%L,%L,%L)',ws,actor,'ol-operator@example.test',draft->>'id','approve',sid,id,h,'ol-owner@example.test'),'strelva_service_access_denied');
+  perform public.claim_owner_decision(ws,id,h,'approve','owner_link',null,null,'ol-owner@example.test');
+  perform public.authorize_owner_decision_link_run(ws,sid,id,h,'ol-owner@example.test');
+  perform pg_temp.ol_expect(format('select public.resolve_ask_business_draft_by_owner_link(%L,%L,%L,%L,%L,%L,%L,%L,%L)',ws,actor,'ol-operator@example.test',gen_random_uuid(),'approve',sid,id,h,'ol-owner@example.test'),'strelva_service_access_denied');
+  perform pg_temp.ol_expect(format('select public.resolve_ask_business_draft_by_owner_link(%L,%L,%L,%L,%L,%L,%L,%L,%L)',ws,actor,'ol-operator@example.test',draft->>'id','not_yet',sid,id,h,'ol-owner@example.test'),'strelva_service_access_denied');
+  applied:=public.resolve_ask_business_draft_by_owner_link(ws,actor,'ol-operator@example.test',(draft->>'id')::uuid,'approve',sid,id,h,'ol-owner@example.test');
+  perform pg_temp.ol_assert(applied->>'status'='approved' and applied->'receipt' is not null,'signed fact applied with receipt');
+  perform pg_temp.ol_assert((select value #>> '{}' from public.business_record_facts where workspace_id=ws and fact_key='phone')='716-555-0111','exact approved phone');
+  perform pg_temp.ol_assert(not exists(select 1 from public.workspace_memberships where workspace_id=ws and role='owner'),'fact approval grants no membership');
+  perform public.finish_owner_decision(ws,id,'done',null,'business_record:'||ws);
+  perform pg_temp.ol_expect(format('select public.resolve_ask_business_draft_by_owner_link(%L,%L,%L,%L,%L,%L,%L,%L,%L)',ws,actor,'ol-operator@example.test',draft->>'id','approve',sid,id,h,'ol-owner@example.test'),'strelva_service_access_denied');
   foreach kind in array array['money','access.grant','exit'] loop
     item:=public.open_owner_decision(ws,jsonb_build_object('kind',kind,'route','owner_decides','title','Sign-in boundary','approveEffect','A change.','notYetEffect','Nothing changes.',
       'sourceLifecycle','service_request','sourceId',kind,'revisionHash',h));

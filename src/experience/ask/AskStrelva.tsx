@@ -6,7 +6,7 @@ import { SelectInput } from "@/components/ui/TextInput";
 import { ConversationStreamDecoder } from "@/experience/conversation/stream";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
 import {
-  ASK_EXAMPLES, askErrorMessage, readAskResult, receiptLines, resultHeadline,
+  ASK_EXAMPLES, askErrorMessage, askHistoryFailure, readAskResult, receiptLines, resultHeadline,
   type AskConversationSummaryView, type AskMessageView, type AskTurnResult,
 } from "./ask-model";
 import styles from "./ask.module.css";
@@ -63,7 +63,7 @@ export function AskStrelva({ workspaceId, businessName, systemId = null, systemN
     if (systemId) params.set("systemId", systemId);
     try {
       const response = await request(`/api/workspace/ask?${params}`, { cache: "no-store" });
-      if (response.status === 503) { setHistoryState("off"); return; }
+      if (response.status === 503) { setHistoryState(askHistoryFailure(response.status, await response.json().catch(() => null))); return; }
       if (!response.ok) { setHistoryState("unavailable"); return; }
       const body = await response.json() as { conversations?: AskConversationSummaryView[]; canAskOnBehalf?: boolean };
       setCanAskOnBehalf(body.canAskOnBehalf === true);

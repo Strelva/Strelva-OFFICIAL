@@ -97,4 +97,25 @@ revoke all on function public.resolve_ask_business_draft(uuid,uuid,text,uuid,tex
 grant execute on function public.save_ask_business_draft(uuid,uuid,text,uuid,bigint,jsonb,text,text,text) to service_role;
 grant execute on function public.list_ask_business_drafts(uuid,uuid,text) to service_role;
 grant execute on function public.resolve_ask_business_draft(uuid,uuid,text,uuid,text) to service_role;
+
+-- A signed owner's exact decision is the authority; the existing admin
+-- remains the execution identity. No membership is created or elevated.
+create function public.resolve_ask_business_draft_by_owner_link(p_workspace_id uuid,p_user_id uuid,p_verified_email text,
+ p_draft_id uuid,p_decision text,p_session_id uuid,p_decision_id uuid,p_revision_hash text,p_recipient text) returns jsonb
+language plpgsql security definer set search_path=public,pg_temp as $$
+declare item public.owner_decisions; session_row public.strelva_service_actions;
+begin
+ item:=public.assert_owner_decision_link(p_workspace_id,p_session_id,p_decision_id,p_revision_hash,p_recipient);
+ session_row:=public.strelva_service_session(p_workspace_id,p_session_id,'owner_decision_link');
+ if session_row.on_behalf_user_id is distinct from p_user_id or item.source_lifecycle<>'business_record_draft'
+   or item.source_id is distinct from p_draft_id::text or item.change_kind<>'fact.inferred'
+   or p_decision is null or p_decision not in ('approve','not_yet')
+   or item.state is distinct from case p_decision when 'approve' then 'approved' else 'declined' end
+   or not exists(select 1 from public.strelva_service_actions where session_id=p_session_id and action='run') then
+   raise exception 'strelva_service_access_denied';
+ end if;
+ return public.resolve_ask_business_draft(p_workspace_id,p_user_id,p_verified_email,p_draft_id,p_decision);
+end $$;
+revoke all on function public.resolve_ask_business_draft_by_owner_link(uuid,uuid,text,uuid,text,uuid,uuid,text,text) from public,anon,authenticated;
+grant execute on function public.resolve_ask_business_draft_by_owner_link(uuid,uuid,text,uuid,text,uuid,uuid,text,text) to service_role;
 commit;

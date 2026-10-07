@@ -1,25 +1,29 @@
 # Ask Strelva in the workspace
 
-Status: draft spec, 2026-10-06, not approved. **Built and proven locally
-Oct 6 on branch `build/ask-strelva`, not deployed, flag off:** the one
-model-call helper (`src/platform/infra/model-calls.ts`, dated price table,
-cost log migration `20261007140000_model_call_log.sql`, lint rule) with all
-12 call sites on it; the chat route's inline tools moved into
-`src/lib/agent-shared.ts` (`buildTenantChatTools`); `POST /api/workspace/ask`
-behind `STRELVA_ASK_RELEASE` (plus the workspace and Systems releases) with
-per-call authority, resolution, the 18 tools, refusals, the managed default
-and a stub Needs you adapter. **Built and proven locally Oct 6 on
-`w2/owner-surfaces-b`, not migrated or deployed, flag off:** the chat UI
-in the workspace (`view=ask`, on Home, on each System page and beside the
-site editor; streaming, receipts for each of the four results, error,
-read-only and unsaved states) and workspace conversation history in
-Postgres (`20261008110000_ask_conversations.sql`, `GET /api/workspace/ask`);
-`/dashboard/chat` is `ready` while `STRELVA_ASK_RELEASE` is on. Not built:
-Postgres Possibilities (opened ones are in-memory), the real Needs you
-policy wiring, inquiry reply drafts, a business-record draft store (fact
-changes are filed as Requests), and copying old tenant chat threads (the
-workspace starts fresh; `/dashboard/chat` keeps them). See "Build notes" at
-the end.
+Status: implemented locally on `w6/owner-ask`, October 7, 2026. Not
+migrated or deployed; all release flags off. Proof and remaining stop points
+are in [the stream handoff](../streams/w6-owner-ask.md).
+
+The workspace route, 18-tool catalog, per-call authority, managed Requests,
+streamed receipts and saved conversations are built. Ask now hands drafts to
+the real Needs you policy and durable source adapters. Business facts use a
+typed, revision-pinned draft store; inquiry replies preserve the exact authored
+copy through the existing message approval, send receipt and read-back path.
+Ask never approves or performs an outside write. A failed decision sync reports
+the saved draft honestly and leaves it pending. Operators can record an owner
+ask by email or phone; the owner still decides.
+
+Possibilities use the existing Postgres repository. Ask can introduce a new
+System; changes to a projected managed System without a durable baseline remain
+Requests for Strelva to prepare. It does not invent a baseline or call a summary
+a working rebuilt site. The website builder owns the executable candidate.
+Model calls retain tokens and measured/estimated/unknown cost. An optional
+per-business daily log warning adds no billing, plan allowance or email send.
+
+Not proven: real model/provider quality and latency, authenticated admin-host
+journeys on an isolated Auth stack, live mail, publication/read-back/undo on a
+Strelva-owned business, actual cost per turn or owner adoption. Old tenant chat
+threads are retained on the legacy operator surface and are not copied.
 
 Ask Strelva is the one way in. A person in a business workspace says what they
 want in plain words. Strelva answers, drafts a change, opens a Possibility, or
@@ -443,32 +447,36 @@ newsletters have no undo; Ask Strelva says so before they go to approval.
   Needs you → email → Approve → published → read-back → receipt → undo, and
   one Request filed and seen in the operator queue. Needs Jacob's yes.
 
-## 9. Open decisions
+## 9. Decisions and launch defaults
 
-1. **Approve in the conversation?** Options: (a) never, link to the Needs you
-   item; (b) allow for the owner on low-risk copy. Recommend (a). (b) adds a
-   confirm step that injected text could imitate.
-2. **Does Ask Strelva count against the plan?** Options: (a) log cost only;
-   (b) draw from workspace allowances (`src/platform/work-economics`).
-   Recommend (a) for 1.0.0, with an operator alert above a per-business
-   threshold, until real cost per turn is measured. Price is open, so (b)
-   would set a number nobody has chosen.
-3. **Owners who never sign in.** Options: (a) operator asks on their behalf
-   from email or phone (works today, costs operator minutes); (b) inbound
-   email parsed into Requests (new; no inbound route exists); (c) SMS (no
-   sending code exists; only stale `sms:pending:*` cleanup in
-   `src/lib/ops.ts`). Recommend (a) at 1.0.0, with operator minutes per
-   business measured. Choose (b) if those minutes don't fit the price.
-4. **One active custom request at a time.** Today `request_custom_change`
-   blocks a second one (care-plan rule). Options: keep, or queue them visibly.
-   Recommend keep for managed clients, and show the waiting one's place.
-5. **Retire social drafts.** Recommend retire; no provider publishes them.
-6. **Website entry for a new business** (brief decision 3). Paste-URL rebuild
-   makes `open_possibility` offer a rebuild beside the site. Connected sites
-   make it offer section-level Possibilities only. The spec works either way.
-7. **Partner agencies** (brief decision 2). If they come in, an agency's
-   people get Draft through `workspace_delegations` and never Owner decision.
-   The authority table gains one row; nothing else changes.
+These close the code defaults, with production, pricing and spend still
+reserved for Jacob.
+
+1. **Never approve in conversation.** The model-free refusal and tool catalog
+   enforce this. Exact decisions happen in Needs you or a signed email link.
+2. **Log cost only.** No allowance or price is chosen. The optional
+   `STRELVA_ASK_COST_ALERT_USD` threshold warns in operator logs once when a
+   business's known daily cost crosses it; unknown costs are counted separately.
+   Unset threshold or Ask off makes the warning path do nothing.
+3. **Operator asks on behalf** from email or phone at launch. Origin is recorded
+   in the draft or Request, and only operators can set it. Owners without an
+   account can decide routine items by signed email link. Access, money and exit
+   require sign-in. Inbound email and SMS remain outside launch.
+4. **Requests are visible at Asked.** They enter the existing service-request
+   queue, with no acceptance or deadline promise. The old tenant care-plan
+   custom-change tool retains its one-active-request rule; this stream does not
+   silently apply that commercial limit to business Requests.
+5. **Social drafts are retired from Ask.** There is no publishing provider or
+   tool for them in the workspace catalog.
+6. **Managed build asks default to Requests.** Ask opens isolated new-System
+   Possibilities with the durable repository. The builder prepares a website
+   alternative and pins its baseline; Ask cannot directly rebuild a projected
+   website with no durable revision. New-business website entry remains owned
+   by the website stream and its approved scope.
+7. **Partner delegation confers no owner decision authority.** Ask requires
+   direct business membership. Agency staff who already hold admin/member
+   membership can draft; delegation-only Ask is unavailable. Adding broader
+   delegation is a separate authority change.
 
 ## 10. Unknowns
 
@@ -477,8 +485,8 @@ Facts:
 - `/api/agent` is gated on tenant `content:write` (editor) and production has
   0 tenant memberships, so today its users are Strelva operators. Use per
   client is unknown. `recordAgentToolCall` keeps a Redis counter; read it.
-- The chat route records no tokens or cost. Cost per Ask turn is unknown.
-- Possibilities have only an in-memory repository.
+- The model-call helper records tokens and cost; actual production cost per Ask turn is still unknown.
+- Ask uses the Postgres Possibility repository; provider rehearsal and adoption remain unproven.
 - Two link tables exist; `from-existing.ts` names `tenant_workspace_links`
   canonical. No production client is linked yet.
 
@@ -494,38 +502,26 @@ Inferences, to check:
   existing agent tests plus a fixed set of Mooney and gldf asks against both
   catalogs and compare.
 
-## Build notes (Oct 6, local)
+## Build notes (October 7, local)
 
-What the build found that differs from the text above:
-
-- **Two probes, not one.** `src/products/ai-visibility/score.ts` measures what
-  Gemini says ("Gemini named ..."), so it pins its model as a
-  `visibility_probe` like `ai-answers.ts`. Every other caller now gets the
-  configured model plus the fallback, where before six had no fallback.
-- **Flag.** Ask Strelva has its own flag, `STRELVA_ASK_RELEASE`, and also needs
-  `STRELVA_WORKSPACE_RELEASE` and `STRELVA_SYSTEMS_RELEASE`. Per-workspace flags
-  (Reborn §6) don't exist yet.
-- **Refusals and the managed default run before the model.** A model-free
-  classifier (`src/platform/ask/classify.ts`) answers refusals, "approve it",
-  and "build a new website / redo the site / add a booking page" (a Request in
-  a linked business, an offer to make it otherwise). Everything else goes to
-  the model.
-- **Drafts never auto-publish yet.** Until the Needs you policy is wired in,
-  the workspace route builds the tenant tools with `forceReview`, and the stub
-  adapter routes every draft to the owner through today's pending events
-  (`/dashboard/review`, `/api/approve`).
-- **Business record changes** are filed as a Request with the exact change,
-  because the record has no draft store. Nothing is described as done.
-- **Possibilities** can only introduce a new System from Ask (a change to an
-  existing System needs a pinned baseline revision managed sites don't have).
-  Keys are kebab-case.
-- **Activity text** like "AI saved a reply" is unchanged: the activity feed
-  filters on that text, so renaming it needs its own change. The chat failure
-  line now says "Strelva can't answer right now. Nothing was changed."
-
-Proof (local): `src/__tests__/model-calls.test.ts`,
-`model-call-sites.test.ts`, `ask-strelva.test.ts` (authority matrix of 18
-tools × 4 roles × 4 link states, re-check, resolution, managed default,
-refusals, injection, catalog parity), `ask-strelva-route.test.ts`, the
-existing agent tests, and `tests/model-call-log-schema.sql` in
-`check:workspace-sql`.
+- Ask requires workspace release, Ask release and Systems for the exact
+  workspace. Per-workspace release rows exist. Flag off returns before auth,
+  body reads, model calls, writes or decision sync.
+- Refusals and the managed default run before the model. All draft calls
+  recheck direct membership, workspace exit, tenant link and applicable grants.
+- Tenant tools remain forced to review. Needs you applies the policy and
+  routes owner decisions to Home; potential routine handling is held for
+  Strelva review rather than making chat a publisher.
+- Business fact drafts reject model-authored verification, preserve the record
+  revision and resolve atomically through the normal record writer. The signed
+  no-account path rechecks its exact decision and current recipient before
+  using the unchanged admin executor. Stale revisions change nothing.
+- Inquiry reply drafts reuse the governed message policy, recipient/draft
+  fingerprint, transport gates, irreversible-send receipt and read-back rules.
+  A provider-accepted send is never retried just because read-back failed.
+- Website fact/copy confirmation and preview approval are separate from launch.
+  Account-free launch requires its signed decision, exact approved document
+  hash/revision, existing executor and publication receipt. Access/money/exit
+  cannot use that capability.
+- Legacy tenant activity text stays unchanged where existing filters depend
+  on it. Workspace Ask labels and receipts use Strelva language.

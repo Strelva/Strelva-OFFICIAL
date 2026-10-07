@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { AskStrelva } from "@/experience/ask/AskStrelva";
-import { askErrorMessage, readAskResult, receiptLines, resultHeadline, sameAppPath } from "@/experience/ask/ask-model";
+import { askHistoryFailure, askErrorMessage, readAskResult, receiptLines, resultHeadline, sameAppPath } from "@/experience/ask/ask-model";
 import { workspaceReturnTarget } from "@/platform/workspaces/location";
 import { sectionFromView, sectionTitle } from "@/experience/app-frame/workspace-places";
 
@@ -88,4 +88,11 @@ describe("Ask Strelva in the workspace", () => {
     expect(html).toContain('placeholder="Work in this workspace has stopped."');
     expect(html).toMatch(/<textarea[^>]*disabled/);
   });
+});
+
+it("distinguishes a paused Ask release from unavailable conversation storage", () => {
+  expect(askHistoryFailure(503, { error: "Ask Strelva is not enabled." })).toBe("off");
+  expect(askHistoryFailure(503, { error: "The operation could not be confirmed." })).toBe("unavailable");
+  expect(askHistoryFailure(503, null)).toBe("unavailable");
+  expect(askHistoryFailure(403, { error: "Ask Strelva is not enabled." })).toBe("unavailable");
 });

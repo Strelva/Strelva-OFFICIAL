@@ -27,7 +27,7 @@ function streamOf(lines: string[], delayMs = 120): Response {
   }), { headers: { "Content-Type": "text/plain; charset=utf-8" } });
 }
 
-function scripted(text: string, systemId: string | null, saved: boolean): string[] {
+function scripted(text: string, workspaceId: string, systemId: string | null, saved: boolean): string[] {
   const words = text.toLowerCase();
   const result = (ask: Record<string, unknown>) => `\n__RESULT__${JSON.stringify({ status: "queued", ask: { systemId, conversationId: saved ? CONVERSATION : null, saved, ...ask } })}\n`;
   if (/approve|publish it|yes/.test(words)) {
@@ -39,7 +39,7 @@ function scripted(text: string, systemId: string | null, saved: boolean): string
   }
   if (/top|hero|holiday|change|add/.test(words)) {
     return ["__TOOL__Reading your site...\n", "Your homepage hero says \"Dried fruit, done right\".\n", "__TOOL__Drafting the change...\n", "I drafted the holiday gift boxes as the homepage hero until December 20. ", "It isn't live. Adding a dated promotion needs your yes, so it's in Needs you.",
-      result({ kind: "draft", items: [{ kind: "draft", toolId: "draft_website_change", status: "queued", ids: ["evt_hero_8812"], summary: "Homepage hero: holiday gift boxes until Dec 20", needsYou: { route: "owner_decides", itemRef: "evt_hero_8812", decideAt: "/dashboard/review" } }] })];
+      result({ kind: "draft", items: [{ kind: "draft", toolId: "draft_website_change", status: "queued", ids: ["evt_hero_8812"], summary: "Homepage hero: holiday gift boxes until Dec 20", needsYou: { route: "owner_decides", itemRef: "evt_hero_8812", decideAt: `/workspace?workspaceId=${encodeURIComponent(workspaceId)}` } }] })];
   }
   return ["__TOOL__Reading your site...\n", "From your business record, updated Oct 3: you're open Monday to Friday, 9 to 5, ", "and Saturday 10 to 2.", result({ kind: "answer", items: [] })];
 }
@@ -63,8 +63,8 @@ export function withAskPreview(base: typeof fetch, mode: AskPreviewMode | null, 
         return json({ canAskOnBehalf, conversations: [{ id: CONVERSATION, systemId: null, title: "What are our hours on the site?", messageCount: stored.length, mine: true, createdAt: "2026-10-05T15:00:00Z", updatedAt: "2026-10-05T15:00:00Z" }] });
       }
       if (mode === "error") return json({ error: "Strelva can't answer right now. Nothing was changed." }, 502);
-      const body = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as { systemId?: string; messages?: Array<{ content: string }> };
-      return streamOf(scripted(body.messages?.at(-1)?.content ?? "", body.systemId ?? null, mode !== "unsaved"));
+      const body = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as { workspaceId: string; systemId?: string; messages?: Array<{ content: string }> };
+      return streamOf(scripted(body.messages?.at(-1)?.content ?? "", body.workspaceId, body.systemId ?? null, mode !== "unsaved"));
     }
     const response = await base(input, init);
     if (url.pathname !== "/api/workspace" || method !== "GET" || !response.ok) return response;

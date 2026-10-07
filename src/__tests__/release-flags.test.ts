@@ -151,7 +151,7 @@ describe("per-workspace resolution through the store", () => {
       "connected_sites", "inquiries",
       "make_real_live:booking_page", "make_real_live:hosted_website", "make_real_live:inquiry_form",
       "make_real_live:internal_app", "make_real_live:tenant_content",
-      "make_real_owner_link", "owner_entry", "systems", "website_rebuild",
+      "make_real_owner_link", "owner_decision_links", "owner_entry", "systems", "website_rebuild",
     ]);
   });
 });
