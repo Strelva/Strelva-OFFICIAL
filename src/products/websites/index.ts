@@ -60,4 +60,3 @@ export { createSiteChangeStore } from "./site-changes";
 export { reconcileWebsiteSystemReleases } from "./system-releases";
 export const prepareWebsiteDomainRequest: typeof import("./domain-requests").prepareWebsiteDomainRequest = (...args) => import("./domain-requests").then(module => module.prepareWebsiteDomainRequest(...args));
 export const reconcileWebsiteDomainRequests: typeof import("./domain-requests").reconcileWebsiteDomainRequests = (...args) => import("./domain-requests").then(module => module.reconcileWebsiteDomainRequests(...args));
-export { prepareWebsiteContentRestore, websiteContentRestoreSchema } from "./history-restore";

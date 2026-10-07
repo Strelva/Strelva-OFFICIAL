@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createWebsiteContentRestoreService } from "@/products/websites/history-restore";
+import { createWebsiteContentRestoreService } from "@/app/api/workspace/systems/website/restore/service";
 
 const actor = { userId: "76000000-0000-4000-8000-000000000001", verifiedEmail: "owner@example.test" };
 const workspaceId = "76000000-0000-4000-8000-000000000002";
@@ -42,8 +42,8 @@ describe("saved copy restore Requests", () => {
       context: expect.objectContaining({ systemId, tenantStableId: workspaceId, restoreSnapshotId: "snap_one", restoreSnapshotCreatedAt: "2026-10-01T12:00:00Z" }),
       idempotencyKey: expect.stringMatching(/^restore-snapshot:[a-f0-9]{64}$/),
     }));
-    const command = ports.request.mock.calls[0][1];
-    await restore(actor, savedCopy);expect(ports.request.mock.calls[1][1]).toEqual(command);
+    const command = ports.request.mock.calls[0]![1];
+    await restore(actor, savedCopy);expect(ports.request.mock.calls[1]![1]).toEqual(command);
     expect(ports.apply).not.toHaveBeenCalled();expect(ports.undo).not.toHaveBeenCalled();
   });
   it("supports repository clients through the same reviewed Request delivery", async () => {

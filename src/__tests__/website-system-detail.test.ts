@@ -30,7 +30,7 @@ describe("website System page lists", () => {
     expect(detail.history[1]).toMatchObject({ title: "Restored an earlier homepage banner", by: "You" });
     expect(detail.history[2]).toMatchObject({ title: "Published site revision 2", by: "You" });
     expect(detail.history.filter(item => item.source !== "document").every(item => item.undo)).toBe(true);
-    expect(detail.history[2].undo).toBeNull();
+    expect(detail.history[2]?.undo).toBeNull();
     // Issued rows never change here: History only reads them.
     expect(detail.requests).toEqual([]);
   });

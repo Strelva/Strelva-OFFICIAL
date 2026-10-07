@@ -1,7 +1,7 @@
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
-import { prepareWebsiteContentRestore } from "@/products/websites/index";
+import { prepareWebsiteContentRestore } from "./service";
 
 export const dynamic = "force-dynamic";
 

@@ -14,13 +14,12 @@ import { requireTenantPermission } from "@/platform/infra/auth";
 import { requireActiveSubscription } from "@/lib/subscription";
 import { isSuperAdminUser } from "@/platform/infra/db/repositories";
 import { isContentSection } from "@/lib/types";
-import { siteEditingFor } from "./site-editing";
+import { siteEditingFor, siteChangeRequestCommand, type WebsiteRebuildRecord } from "@/products/websites/client";
 import { getSiteSnapshots } from "@/lib/storage/site-snapshot-store";
-import { websiteRebuildReleasedFor } from "./rebuild-release";
-import { websiteDocumentStore } from "./document-store";
-import { siteChangeRequestCommand } from "./site-change-model";
-import type { WebsiteRebuildRecord } from "./rebuild-contracts";
+import { websiteRebuildReleasedFor, websiteDocumentStore } from "@/products/websites/index";
 
+// App-edge composition: resolve workspace authority, then adapt the existing
+// tenant review stores. Neither product code nor src/lib imports this adapter.
 export const websiteContentRestoreSchema = z.object({
   workspaceId: z.string().uuid(), systemId: z.string().uuid(),
   section: z.string().refine(isContentSection), versionId: z.string().min(1).max(200),
@@ -51,8 +50,8 @@ const history = {
   snapshots: (tenantId: string) => getSiteSnapshots(tenantId, 60),
   rebuildReleased: websiteRebuildReleasedFor,
   document: (...args: Parameters<typeof websiteDocumentStore.read>) => websiteDocumentStore.read(...args),
-  rebuild: (actor: WorkspaceActor, workId: string) => import("./rebuild-service").then(module => module.readWebsiteRebuild(actor, workId)),
-  undo: (actor: WorkspaceActor, workId: string, input: unknown) => import("./rebuild-service").then(module => module.undoWebsiteRebuild(actor, workId, input)),
+  rebuild: (actor: WorkspaceActor, workId: string) => import("@/products/websites/index").then(module => module.readWebsiteRebuild(actor, workId)),
+  undo: (actor: WorkspaceActor, workId: string, input: unknown) => import("@/products/websites/index").then(module => module.undoWebsiteRebuild(actor, workId, input)),
   request: async (actor: WorkspaceActor, input: ReturnType<typeof siteChangeRequestCommand>) => {
     const { ServiceRequestService, PostgresServiceRequestStore } = await import("@/platform/service-requests");
     return new ServiceRequestService(PostgresServiceRequestStore).execute(actor, input);

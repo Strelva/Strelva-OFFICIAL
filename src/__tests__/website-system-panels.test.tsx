@@ -107,7 +107,7 @@ describe("website System page reads its lists from the server", () => {
   });
   it("shows an unconfirmed restore without allowing a blind retry", async () => {
     const request = vi.fn(async () => { throw new TypeError("offline"); });
-    const node = await history(restores[1], request as unknown as typeof fetch);
+    const node = await history(restores[1]!, request as unknown as typeof fetch);
     const button = [...node.querySelectorAll("button")].find(value => value.textContent === "Prepare restore")!;
     await act(async () => button.click());
     expect(node.querySelector("[role=alert]")?.textContent).toContain("Reload before trying again");expect(button.disabled).toBe(true);
