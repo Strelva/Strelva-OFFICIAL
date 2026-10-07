@@ -720,6 +720,29 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010152000_cat
 psql "${psql_args[@]}" --file="$repo_root/tests/catalog-reports-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010153000_newsletter_contacts.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-contacts-schema.sql"
+psql "${psql_args[@]}" <<'SQL'
+create schema auth;
+create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+-- Match the retained collection table; publishing outputs depend on it.
+create table public.collection_entries (
+ id uuid primary key default gen_random_uuid(),tenant_id text not null references public.tenants(id),
+ type text not null,slug text not null,status text not null default 'draft',data jsonb not null default '{}',
+ created_at timestamptz not null default now(),updated_at timestamptz not null default now(),unique(tenant_id,type,slug)
+);
+SQL
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010142000_workspace_publishing_content.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-publishing-content-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011100000_workspace_newsletter_sender.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-newsletter-sender-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-workspace-newsletter-sender.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011100000_workspace_newsletter_sender.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-newsletter-sender-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011100100_newsletter_backfill_identity.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-backfill-identity-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-newsletter-backfill-identity.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-contacts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011100100_newsletter_backfill_identity.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-backfill-identity-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010154000_system_work_plan_authority.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/system-work-plan-authority-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010155000_failed_system_plan_request.sql"
