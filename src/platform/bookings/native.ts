@@ -155,7 +155,10 @@ export async function changeNativeBooking(hash: string, action: "cancel" | "resc
   let change: Record<string, unknown> = { action };
   if (action === "reschedule") {
     if (!start || !booking.serviceRef) throw new PublicBookingError("invalid", "Choose an open time.");
-    const minutes = Math.round((Date.parse(booking.end) - Date.parse(booking.start)) / 60000);
+    const current = await context(booking.tenantId);
+    const service = current.services.find(s => s.active && (s.id === booking.serviceRef || s.externalRef === booking.serviceRef));
+    if (!service) throw new PublicBookingError("not_found", "This service is unavailable.");
+    const minutes = service.durationMinutes ?? settingsOrDefault(current).defaultLengthMinutes;
     const offered = await nativeSlots(booking.tenantId, booking.serviceRef, start, new Date(Date.parse(start) + (minutes + 1) * 60000).toISOString());
     const slot = offered.slots.find(s => Date.parse(s.start) === Date.parse(start));
     if (!slot) throw new PublicBookingError("conflict", "That time is unavailable.");

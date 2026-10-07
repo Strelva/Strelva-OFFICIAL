@@ -10,8 +10,7 @@ import { sendEmailWithReceipt } from "@/platform/infra/email/send";
 import { ownerNoticeEmail } from "@/lib/owner-recipient";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantPublicUrl } from "@/lib/tenant-urls";
-import { storeSlotsForDate } from "./availability";
-import { bookingWhen } from "./emails";
+import { nativeSlots } from "./native";
 import { bookingManagePageEnabled, bookingMessagesEnabled } from "./flags";
 import type { BookingLifecyclePorts } from "./lifecycle";
 import {
@@ -19,8 +18,6 @@ import {
   expireBookingHolds,
   finishBookingMessage,
   lapseBookingRequests,
-  readBookingContext,
-  readTenantBookings,
   bookingStoreDb,
   type StoreBooking,
 } from "./store";
@@ -29,31 +26,17 @@ export function bookingAppOrigin(): string {
   return (process.env.NEXT_PUBLIC_APP_URL || "https://app.strelva.com").replace(/\/$/, "");
 }
 
-function addDays(date: string, days: number): string {
-  const d = new Date(`${date}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
-
-/** The next open times for the same length on the same calendar, up to three, over the next two weeks. */
+/** Up to three currently offered times for the same active service. Removed
+ * services, pause and unavailable storage produce no proposals. Calendar busy
+ * times and current service length use exactly the public slot engine. */
 export async function nextOpenTimes(booking: StoreBooking, now: Date, count = 3): Promise<string[]> {
-  if (!booking.tenantId) return [];
-  const context = await readBookingContext(booking.tenantId);
-  if (!context || context.paused) return [];
-  const minutes = Math.max(5, Math.round((Date.parse(booking.end) - Date.parse(booking.start)) / 60_000));
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: booking.timeZone }).format(now);
-  const to = addDays(today, 14);
-  const bookings = await readTenantBookings(booking.tenantId, { from: today, to });
-  const labels: string[] = [];
-  for (let i = 0; i <= 14 && labels.length < count; i++) {
-    const date = addDays(today, i);
-    for (const start of storeSlotsForDate(context, date, minutes, bookings)) {
-      const when = bookingWhen({ localDate: date, localStart: start });
-      labels.push(`${when.day} at ${when.time}`);
-      if (labels.length >= count) break;
-    }
-  }
-  return labels;
+  if (!booking.tenantId || !booking.serviceRef || count <= 0) return [];
+  try {
+    const offered = await nativeSlots(booking.tenantId, booking.serviceRef, now.toISOString(), new Date(now.getTime() + 14 * 86400000).toISOString());
+    const day = new Intl.DateTimeFormat("en-US", { timeZone: offered.timeZone, weekday: "short", month: "short", day: "numeric" });
+    const time = new Intl.DateTimeFormat("en-US", { timeZone: offered.timeZone, hour: "numeric", minute: "2-digit" });
+    return offered.slots.slice(0, count).map(slot => `${day.format(new Date(slot.start))} at ${time.format(new Date(slot.start))} (${offered.timeZone})`);
+  } catch { return []; }
 }
 
 /** The customer's manage link for an API reservation (its token is stored encrypted for receipts). */
