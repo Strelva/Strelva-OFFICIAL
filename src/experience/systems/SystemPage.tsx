@@ -24,7 +24,7 @@ import {
 } from "./model";
 import { workspaceSiteHref } from "@/platform/workspaces/site-places";
 import { SystemPanel as Panel } from "./SystemPanel";
-import { WebsiteSystemPanels, useWebsiteSystemDetail, type WebsiteDetailState } from "./WebsiteSystemPanels";
+import { WebsiteSystemPanels, WebsiteHistoryPanel, hasWebsiteDetail, useWebsiteSystemDetail, type WebsiteDetailState } from "./WebsiteSystemPanels";
 import { WebsiteChangeAsk } from "./WebsiteChangeAsk";
 import styles from "./systems.module.css";
 
@@ -75,7 +75,7 @@ export function SystemPage(props: SystemPageProps) {
   if (loading && !system) return <div className={styles.page}>{back}<p role="status" className="mt-6 text-sm text-gray-muted">Opening this system…</p></div>;
   if (!system) return <div className={styles.page}>{back}<div className={styles.notFound}><h1 className="font-display">This system isn’t available here.</h1><p>It may belong to another business, or your access may have changed. Nothing about it was changed.</p></div></div>;
   // Website panels and the site's own editor links count as context too.
-  const showAside = hasContext(system) || Boolean(system.kind === "website" && websiteDetail) || Boolean(siteHref);
+  const showAside = hasContext(system) || (system.kind === "website" && hasWebsiteDetail(websiteDetail)) || Boolean(siteHref);
   const filesRequests = system.kind === "website" && system.surface.kind === "website" && Boolean(system.surface.editing) && !readOnly;
   function askForChange() {
     if (filesRequests) setAskingChange(true);
@@ -130,17 +130,18 @@ export function SystemPage(props: SystemPageProps) {
 
       {showAside ? <aside className={styles.aside} aria-label={`About ${system.name}`}>
         {filesRequests && askingChange ? <WebsiteChangeAsk workspaceId={props.workspaceId} systemId={system.id} siteName={system.name} onFiled={() => setDetailVersion(version => version + 1)} onClose={() => setAskingChange(false)} /> : null}
-        {system.kind === "website" && websiteDetail ? <WebsiteSystemPanels workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} onAsk={onAsk} onAskChange={filesRequests ? () => setAskingChange(true) : undefined} readOnly={readOnly} /> : null}
+        {system.kind === "website" && websiteDetail ? <WebsiteSystemPanels workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} onAsk={onAsk} onAskChange={filesRequests ? () => setAskingChange(true) : undefined} readOnly={readOnly} includeHistory={false} /> : null}
         {system.activations?.length ? <ActivationsPanel system={system} /> : null}
         {system.possibilities.length ? <PossibilitiesPanel system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} /> : null}
         {system.connections.length || system.offers?.length || siteHref ? <ConnectionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} siteHref={siteHref} /> : null}
         <PartsPanel system={system} />
         {system.versions.length ? <VersionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} /> : null}
-        {system.history?.length ? <HistoryPanel system={system} /> : null}
+        {system.kind === "website" && websiteDetail?.status === "ready" ? <WebsiteHistoryPanel workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} systemHistory={system.history} canRestore={!readOnly && (props.operator || (props.canMakeReal ?? true))} appBase={props.appBase} onPrepared={() => setDetailVersion(version => version + 1)} onAskRestore={filesRequests ? () => setAskingChange(true) : undefined} />
+          : system.history?.length ? <HistoryPanel system={system} /> : null}
         {system.audits?.length ? <AuditsPanel system={system} workspaceId={props.workspaceId} appBase={props.appBase || ""} /> : null}
       </aside> : null}
     </div>
-    {hasContext(system) ? null : <p className={styles.askMore}><button type="button" className="underline" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else {system.name} could become.</button></p>}
+    {showAside ? null : <p className={styles.askMore}><button type="button" className="underline" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else {system.name} could become.</button></p>}
   </div>;
 }
 

@@ -240,6 +240,8 @@ export function revisionHistory(systemId: string, revisions: readonly SystemRevi
         ? `Made live: ${r.summary ?? "a change"}`
         : `${IMPLEMENTATION_SENTENCE[r.implementation.kind] ?? r.summary ?? "Changed"}`,
     at: r.createdAt,
+    releaseRef: r.implementation.ref,
+    implementationKind: r.implementation.kind,
   }));
 }
 

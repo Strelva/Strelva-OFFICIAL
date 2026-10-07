@@ -153,6 +153,8 @@ export async function readWebsiteSystemDetail(actor: WorkspaceActor, businessId:
   return buildWebsiteSystemDetail({
     systemId,
     actorId: actor.userId,
+    workspaceId: businessId,
+    workId: savedWorkId,
     domains,
     decisions: decisionRows,
     draftSections: Object.entries(drafts).filter(([, present]) => present).map(([section]) => section),

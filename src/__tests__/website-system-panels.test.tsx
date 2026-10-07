@@ -30,12 +30,10 @@ describe("website System page: domains, Waiting on you, Requests and History", (
     expect(page).toContain("New office hours in the footer"); expect(page).toContain("Deploy · Strelva");
     expect(page).toContain("Saved copy"); expect(page).toContain("Content · You");
   });
-  it("says plainly when a list is empty", () => {
+  it("omits empty context blocks and keeps the one next-action link", () => {
     const page = html({ websiteDetail: { status: "ready", detail: previewWebsiteDetail(SITE, "empty") } });
-    expect(page).toContain("No domain is recorded for this site yet.");
-    expect(page).toContain("Nothing is waiting on you for this site.");
-    expect(page).toContain("No open requests.");
-    expect(page).toContain("No releases are recorded for this site yet.");
+    for (const heading of ["Domains", "Waiting on you", "Requests", "History"]) expect(page).not.toContain(`>${heading}<`);
+    expect(page).toContain("Ask what else attymooney.com could become.");
   });
   it("names a source it could not read rather than showing it as empty", () => {
     const page = html({ websiteDetail: { status: "ready", detail: previewWebsiteDetail(SITE, "partial") } });
@@ -51,7 +49,8 @@ describe("website System page: domains, Waiting on you, Requests and History", (
   });
   it("disables asking for a change when the page is read-only", () => {
     const page = html({ readOnly: true, websiteDetail: { status: "ready", detail: previewWebsiteDetail(SITE, "empty") } });
-    expect(page).toMatch(/<button type="button" class="underline" disabled="">Ask for a change<\/button>/);
+    const node = document.createElement("div");node.innerHTML = page;
+    expect([...node.querySelectorAll("button")].find(button => button.textContent === "Ask for a change")?.disabled).toBe(true);
   });
   it("does not show website lists on other kinds of System", () => {
     const tool: SystemView = { ...site, kind: "app", surface: { kind: "work", workId: "w", productId: "unknown" } };

@@ -230,7 +230,7 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
   }
   // History: the System's own changes and Strelva handled receipts for it, newest first, last five.
   const history = new Map<string, SystemHistoryRow[]>();
-  for (const row of ready?.history ?? []) history.set(row.systemId, [...(history.get(row.systemId) ?? []), { id: row.id, sentence: row.sentence, at: row.at }]);
+  for (const row of ready?.history ?? []) history.set(row.systemId, [...(history.get(row.systemId) ?? []), { id: row.id, sentence: row.sentence, at: row.at, releaseRef: row.releaseRef, implementationKind: row.implementationKind }]);
   for (const receipt of ready?.handled ?? []) if (receipt.systemId) history.set(receipt.systemId, [...(history.get(receipt.systemId) ?? []), { id: receipt.id, sentence: receipt.sentence, at: receipt.at }]);
   for (const [id, rows] of history) {
     const system = byId.get(id);

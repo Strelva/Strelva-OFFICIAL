@@ -85,6 +85,8 @@ export interface SystemHistoryRow {
   id: string;
   sentence: string;
   at: string;
+  releaseRef?: string;
+  implementationKind?: string;
 }
 
 export interface SystemVersion {

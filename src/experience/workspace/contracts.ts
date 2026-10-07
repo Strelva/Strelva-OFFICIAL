@@ -227,6 +227,8 @@ export interface WorkspaceSystemHistoryRow {
   /** "Strelva published the rebuilt site". Never called a Version. */
   sentence: string;
   at: string;
+  releaseRef?: string;
+  implementationKind?: string;
 }
 
 export interface WorkspaceSystemReceipt {
