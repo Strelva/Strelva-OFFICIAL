@@ -94,3 +94,66 @@ describe("BusinessHome with the Needs you release", () => {
     expect(html).toContain("Needs you");
   });
 });
+
+describe("Needs you, October 6 shapes", () => {
+  it("names the one primary action for the decision while its effect stays visible", async () => {
+    const { decisionPresentation, decisionCount } = await import("@/experience/workspace/needs-you-presentation");
+    expect(decisionPresentation(item()).verb).toBe("Approve");
+    expect(decisionPresentation(item()).amount).toBe("$150");
+    expect(decisionPresentation(item()).shape).toBe("price");
+    expect(decisionPresentation(item({ kind: "system.go_live", detail: null, sourceLifecycle: "website_document" }))).toMatchObject({ verb: "Make it live", shape: "live", source: "Website", amount: null });
+    expect(decisionPresentation(item({ kind: "google.post", detail: "\"Tip of the week\"" }))).toMatchObject({ verb: "Post it", shape: "message", source: "Google" });
+    expect(decisionPresentation(item({ sourceLifecycle: "booking_request", detail: "Thu 10:30" }))).toMatchObject({ verb: "Confirm", source: "Bookings" });
+    // A price only comes from the decision's own words.
+    expect(decisionPresentation(item({ title: "Reply to Jordan", detail: "Happy to help." })).amount).toBeNull();
+    expect(decisionCount(3)).toBe("Three decisions");
+    expect(decisionCount(1)).toBe("One decision");
+    expect(decisionCount(12)).toBe("12 decisions");
+  });
+
+  it("deals each decision as a card with its price, effects and actions", () => {
+    const html = renderToStaticMarkup(createElement(NeedsYouSection, { state: ready({ items: [item(), item({ id: "d0000000-0000-4000-8000-000000000002", kind: "system.go_live", title: "Put the booking page live", detail: null, openHref: "/workspace?view=apps" })] }), pending: null, notices: {}, onDecide: noop, onRetry: noop, variant: "deck" }));
+    expect(html).toContain("$150</p>");
+    expect(html).toContain('data-shape="price"');
+    expect(html).toContain('data-shape="live"');
+    expect(html).toContain('aria-label="Make it live: Put the booking page live"');
+    expect(html).toContain('aria-label="Not yet: Put the booking page live"');
+    expect(html).toContain("Approve: The reply sends. Not yet: Nothing sends.");
+  });
+
+  it("says so honestly when nothing needs the owner and the caller asks for an empty state", () => {
+    const html = renderToStaticMarkup(createElement(NeedsYouSection, { state: ready({ items: [] }), pending: null, notices: {}, onDecide: noop, onRetry: noop, empty: createElement("p", null, "Nothing needs you right now.") }));
+    expect(html).toContain("Nothing needs you right now.");
+    expect(html).not.toContain("Approve:");
+  });
+
+  it("tells a member the decisions wait on the owner", () => {
+    expect(needs(ready({ role: "member" }))).toContain("One decision waiting on the owner.");
+    expect(needs(ready())).toContain("One decision waiting on you.");
+  });
+});
+
+describe("The Needs you place", () => {
+  const snapshot = {
+    actor: { email: "owner@alder.example", localPreview: true },
+    workspaces: [{ id: "a0000000-0000-4000-8000-000000000001", kind: "customer", name: "Alder Workshop", role: "owner" }],
+    workspaceId: "a0000000-0000-4000-8000-000000000001", work: [], handoffs: [], delegations: [], products: [],
+    releases: { systems: false, needsYou: true },
+  } as unknown as WorkspaceSnapshot;
+  const props = { snapshot, sites: [], unassignedSites: [], siteAssignmentsKnown: true, offerings: { status: "unavailable" as const, reason: "x" }, busy: false,
+    onOpen: noop, onStart: noop, onRequest: noop, onNavigate: noop, onWorkspace: noop, onOfferings: noop, accountHref: "/workspace/account" };
+
+  it("opens as its own page with the place selected in the sidebar", () => {
+    const html = renderToStaticMarkup(createElement(BusinessHome, { ...props, view: "needs-you" }));
+    expect(html).toContain("<h1 class=\"font-display\">Needs you</h1>");
+    expect(html).toContain("Checking what needs you");
+    expect(html).toMatch(/aria-current="page" href="\/workspace\?view=needs-you&amp;workspaceId=/);
+    expect(html).not.toContain("Good morning");
+  });
+
+  it("is Home, with no Needs you place, while the release is off", () => {
+    const html = renderToStaticMarkup(createElement(BusinessHome, { ...props, snapshot: { ...snapshot, releases: { systems: false, needsYou: false } }, view: "needs-you" }));
+    expect(html).not.toContain("view=needs-you");
+    expect(html).toContain("id=\"business-start-title\"");
+  });
+});

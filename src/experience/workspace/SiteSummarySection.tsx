@@ -45,16 +45,19 @@ export function useSiteSummary(workspaceId: string | undefined) {
   return { state, retry };
 }
 
-function count(value: { total: number; thisWeek: number } | null, noun: string): string {
-  if (!value) return `${noun}: couldn't check`;
-  return `${value.total.toLocaleString("en-US")} ${noun} · ${value.thisWeek.toLocaleString("en-US")} this week`;
+function WeekNumber({ value, noun }: { value: { total: number; thisWeek: number } | null; noun: string }) {
+  if (!value) return <div className={styles.weekNumber}><dt>{noun}</dt><dd className={styles.weekUnknown}>Couldn&apos;t check</dd></div>;
+  return <div className={styles.weekNumber}><dt>{noun} this week</dt><dd>{value.thisWeek.toLocaleString("en-US")}</dd><small>{value.total.toLocaleString("en-US")} in all</small></div>;
 }
 
 function SiteBlock({ site, href, multiple }: { site: SiteSummary; href: (path: string) => string; multiple: boolean }) {
   return <div className={styles.siteSummary}>
     {multiple ? <h3>{site.siteName}</h3> : null}
-    <p className={styles.muted}>{count(site.visits, "people found you")}</p>
-    <p className={styles.muted}>{count(site.actions, "booked or called")}</p>
+    <dl className={styles.weekNumbers} aria-label={`${site.siteName} this week`}>
+      <WeekNumber value={site.visits} noun="People found you" />
+      <WeekNumber value={site.actions} noun="Booked or called" />
+      {site.leads ? <div className={styles.weekNumber}><dt>Reached out, last 30 days</dt><dd>{site.leads.count.toLocaleString("en-US")}</dd></div> : null}
+    </dl>
     <ul className={styles.list} aria-label={`Who reached out through ${site.siteName}`}>
       {site.leads === null ? <li><p className={styles.muted}>Who reached out couldn&apos;t be checked just now.</p></li>
         : site.leads.recent.length ? site.leads.recent.map((lead) => <li key={lead.id}><a className={styles.row} href={href("/workspace/inquiries")}><span><strong>{lead.name}</strong><small>{lead.message ?? "Reached out through your site"}</small></span><ArrowRight size={16} aria-hidden="true" /></a></li>)
@@ -70,8 +73,8 @@ export function SiteSummarySection({ state, workspaceId, appBase = "", onRetry }
   if (state.status === "disabled") return null;
   if (state.status === "ready" && state.data.sites.length === 0 && state.data.deniedSites.length === 0) return null;
   const href = (path: string) => `${appBase}${path}?workspaceId=${encodeURIComponent(workspaceId)}`;
-  return <section className={styles.section} aria-labelledby="home-site">
-    <header className={styles.sectionHeader}><h2 id="home-site"><Globe size={18} aria-hidden="true" />From your site</h2></header>
+  return <section className={styles.week} aria-labelledby="home-site">
+    <header className={styles.sectionHeader}><h2 id="home-site" className={styles.eyebrow}><Globe size={14} aria-hidden="true" />From your site</h2></header>
     {state.status === "loading" ? <p role="status" className={styles.muted}>Checking your site…</p> : null}
     {state.status === "error" ? <p role="status" className={styles.notice}>Your site&apos;s numbers couldn&apos;t be loaded. Nothing about them changed. <button type="button" onClick={onRetry}>Check again</button></p> : null}
     {state.status === "ready" ? <>

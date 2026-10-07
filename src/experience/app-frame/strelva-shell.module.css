@@ -4,6 +4,18 @@
   color-scheme: dark;
 }
 
+/* October 6, 2026: linen content in DM Sans beside the ink rail. */
+.root[data-workspace-theme="linen"] {
+  --font-body: var(--font-workspace, system-ui);
+  --font-display: var(--font-workspace, system-ui);
+  color-scheme: light;
+  font-family: var(--font-workspace, system-ui), system-ui, sans-serif;
+}
+
+.root[data-workspace-theme="linen"] .shell {
+  --app-navigation-width: 248px;
+}
+
 .shell {
   --app-navigation-width: 232px;
   position: relative;

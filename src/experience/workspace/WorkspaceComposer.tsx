@@ -18,6 +18,8 @@ export interface WorkspaceComposerProps {
   onEdited?: (request: string) => void;
   /** STRELVA_SYSTEMS_RELEASE. Off (the default): the pre-Systems "Get or build an app" label. */
   systemsReleased?: boolean;
+  /** `glass`: the compact frosted composer on Home's dusk band (October 6, 2026). */
+  tone?: "default" | "glass";
 }
 
 export function WorkspaceComposer(props: WorkspaceComposerProps) {
@@ -25,7 +27,7 @@ export function WorkspaceComposer(props: WorkspaceComposerProps) {
 }
 
 /** One request editor. Routing, permission and execution remain with its caller. */
-function ComposerSession({ initialRequest = "", draftKey, disabled = false, placeholder = "What do you want Strelva to make happen?", autoFocus = false, onSubmit, onTemplates, onChange, onEdited, systemsReleased = false }: WorkspaceComposerProps) {
+function ComposerSession({ initialRequest = "", draftKey, disabled = false, placeholder = "What do you want Strelva to make happen?", autoFocus = false, onSubmit, onTemplates, onChange, onEdited, systemsReleased = false, tone = "default" }: WorkspaceComposerProps) {
   const id = useId();
   const textarea = useRef<HTMLTextAreaElement>(null);
   const submitting = useRef(false);
@@ -77,17 +79,17 @@ function ComposerSession({ initialRequest = "", draftKey, disabled = false, plac
     finally { submitting.current = false; setPending(false); }
   }
 
-  return <div className={styles.wrap}>
+  return <div className={styles.wrap} data-tone={tone === "glass" ? "glass" : undefined}>
     <form className={styles.composer} onSubmit={event => void submit(event)} aria-label="Start new work" aria-busy={pending || undefined}>
       <label className={styles.srOnly} htmlFor={id}>What do you want to accomplish?</label>
-      <textarea ref={textarea} id={id} value={request} onChange={event => change(event.target.value)} disabled={disabled || pending} placeholder={placeholder} maxLength={3000} rows={3} aria-describedby={`${id}-hint${error ? ` ${id}-error` : ""}`} onKeyDown={event => {
+      <textarea ref={textarea} id={id} value={request} onChange={event => change(event.target.value)} disabled={disabled || pending} placeholder={placeholder} maxLength={3000} rows={tone === "glass" ? 1 : 3} aria-describedby={`${id}-hint${error ? ` ${id}-error` : ""}`} onKeyDown={event => {
         if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
           event.preventDefault();
           event.currentTarget.form?.requestSubmit();
         }
       }} />
       <div className={styles.tools}>
-        {onTemplates ? <Button type="button" variant="ghost" size="sm" onClick={onTemplates} disabled={pending}><LayoutGrid size={16} aria-hidden="true" />{systemsReleased ? "Browse ready-made systems" : "Get or build an app"}</Button> : <span />}
+        {onTemplates ? <Button type="button" variant="ghost" size="sm" onClick={onTemplates} disabled={pending} aria-label={tone === "glass" ? systemsReleased ? "Browse ready-made systems" : "Get or build an app" : undefined} title={tone === "glass" ? systemsReleased ? "Browse ready-made systems" : "Get or build an app" : undefined}><LayoutGrid size={16} aria-hidden="true" />{tone === "glass" ? null : systemsReleased ? "Browse ready-made systems" : "Get or build an app"}</Button> : <span />}
         <div className={styles.send}>
           {request ? <button type="button" className={styles.clear} onClick={() => change("")} disabled={pending}>Clear draft</button> : null}
           <Button type="submit" variant="contrast" size="sm" loading={pending} disabled={disabled || !request.trim()} aria-label="Continue with this request"><ArrowUp size={18} aria-hidden="true" /><span className={styles.srOnly}>Continue</span></Button>

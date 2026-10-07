@@ -130,7 +130,7 @@ async function mockWorkspace(page: Page, handler: (route: Route) => Promise<void
 }
 
 async function expectBusinessHome(page: Page) {
-  await expect(page.getByRole("heading", { name: "What should happen next?", exact: true })).toBeVisible();
+  await expect(page.locator("h1#business-start-title")).toBeVisible();
 }
 
 async function openWorkspaceHelp(page: Page) {

@@ -46,10 +46,54 @@ Their values can differ so both jobs remain readable. Information labels use
 `accent-text`, not the lighter solid accent. `control-thumb` supplies an unchecked
 switch thumb; checked switches pair `accent` with `on-accent`.
 
-Workspace `home-*` and `navigation-*` roles preserve the current dark illustration
-and navigation palettes. Category colors distinguish work types; they do not
+Workspace `home-*` and `navigation-*` roles carry the October 6, 2026 workspace
+(see below). Category colors distinguish work types; they do not
 encode success or permission. Their definitions live together, while components
 consume the role variables. Avoid copying raw values into another panel.
+
+## October 6, 2026: linen workspace and ink rail
+
+Jacob approved the Strelva 1.0 workspace direction on October 6, 2026 (design
+references in `../.scratch/1.0/ref/`; Home is `TskaH`, the Needs you deck
+`bWUbc`). It replaces the dark workspace content of September 15–17 inside
+the customer workspace only. The tenant dashboard, operator console, client
+sites and marketing keep their palettes.
+
+StrelvaShell sets `data-workspace-theme="linen"` (the default `theme`). Inside
+it the shared foundation roles resolve to linen, so components keep consuming
+`warm-black`, `gray-*`, `surface-*`, `accent` and the status roles:
+
+| Role | Linen value | Was (dark dashboard) |
+| --- | --- | --- |
+| `surface-base` (canvas) | linen `#F7F4EE` | `#0B0B0C` |
+| `surface` (cards) | `#FFFFFF`, hairline `gray-border` `#121A1612` | `#151515` |
+| `warm-black` (primary text) | ink `#121A16` | `#F4F4F5` |
+| `gray-muted` / `gray-subtle` | `#666E64` / `#6A7268` | `#858585` / `#999999` |
+| `accent` + `on-accent` (primary action) | moss `#3F5E43` with white (7.3:1) | light sage with dark ink |
+| `critical` | `#A3341F` | terra red |
+
+The ink rail (`navigation-*`): ground `#0F1714`, selected row `#1C2723`, ivory
+text `#ECE6D8`, headings `#8A9187`, count badge clay. Inside the linen scope the
+sidebar maps the shared tokens to these roles, so nested controls render on ink.
+
+`home-*` adds the 1.0 roles: moss and pale moss (`#EDF1EA`, `#ECE7DC` on linen),
+live `#5E8C55` (dots and bars; `home-live-text` `#4F7A47` for text), clay
+`#B4693F` for needs-you marks with pale `#F6EBE2` (`home-clay-text` `#9A5530`
+for text), aurora `#A9C49A` on ink, the ink-moss panel (`home-ink-overlay`
+`#0B110F` at 82% over `public/images/workspace/ink-moss.webp`, ivory text,
+glass chips `#FFFFFF14` with `#FFFFFF2E` edges and backdrop blur) and the dusk
+band (`public/images/workspace/dusk.webp` under a left-weighted ink scrim). The
+older `home-*` roles are remapped to their linen equivalents.
+
+Two values differ from the design file on purpose. The design's muted
+`#7D857A` and subtle `#9AA096` measure 3.5:1 and 2.4:1 on linen, so text uses
+`#666E64`/`#6A7268` (4.8:1 and 4.5:1); the design values remain as
+`home-subtle` and `home-faint` for marks that are not text. White on the clay
+badge is 4.2:1, so the badge fill is the darker `#A95F37`.
+
+The dusk band is only for Home's first screen. Ink-moss is only for what
+Strelva is doing or did. The workspace face is DM Sans, scoped by the same
+attribute; the rest of the app keeps Geist.
 
 ## Verification
 

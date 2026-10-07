@@ -382,3 +382,172 @@
   background: var(--gray-bg-hover);
   color: var(--gray-fg);
 }
+
+.badge {
+  display: inline-grid;
+  min-width: 20px;
+  height: 18px;
+  place-items: center;
+  margin-left: auto;
+  padding-inline: 6px;
+  border-radius: 999px;
+  background: var(--navigation-badge-bg, var(--accent));
+  color: var(--navigation-badge-text, var(--on-accent));
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+}
+
+/*
+ * October 6, 2026: the ink rail beside linen content. The rail keeps its
+ * shared-token markup; inside the linen workspace those tokens resolve to
+ * the navigation roles, so nested controls (sign out, workspace select)
+ * render on ink too.
+ */
+:global([data-workspace-theme="linen"]) .sidebar {
+  --warm-black: var(--navigation-text);
+  --gray-fg: var(--navigation-active-text);
+  --gray-muted: var(--navigation-nav-text);
+  --gray-subtle: var(--navigation-heading-text);
+  --gray-faint: var(--navigation-heading-text);
+  --gray-border: var(--navigation-border);
+  --gray-bg: var(--navigation-hover-bg);
+  --gray-bg-hover: var(--navigation-hover-bg);
+  --gray-bg-alt: var(--navigation-hover-bg);
+  --surface: var(--navigation-selected-bg);
+  --surface-inset: var(--navigation-bg);
+  --accent: var(--navigation-focus);
+  --on-accent: var(--navigation-avatar-text);
+  color-scheme: dark;
+  padding: 14px 10px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  border-right: 0;
+  background: var(--navigation-bg);
+  color: var(--navigation-text);
+}
+
+:global([data-workspace-theme="linen"]) .brand,
+:global([data-workspace-theme="linen"]) .brandMark {
+  color: var(--navigation-brand-text);
+}
+
+:global([data-workspace-theme="linen"]) .brandMark {
+  --m-accent: var(--navigation-accent);
+}
+
+:global([data-workspace-theme="linen"]) .businessContext select {
+  color: var(--navigation-text);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+:global([data-workspace-theme="linen"]) .businessContext select option {
+  background: var(--navigation-selected-bg);
+  color: var(--navigation-text);
+}
+
+:global([data-workspace-theme="linen"]) .navItem,
+:global([data-workspace-theme="linen"]) .newAction {
+  min-height: 34px;
+  gap: 11px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  color: var(--navigation-nav-text);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+:global([data-workspace-theme="linen"]) .navItem:hover {
+  background: var(--navigation-hover-bg);
+  color: var(--navigation-active-text);
+}
+
+:global([data-workspace-theme="linen"]) .navItem[aria-current="page"],
+:global([data-workspace-theme="linen"]) .recent .pinned[aria-current="page"],
+:global([data-workspace-theme="linen"]) .recent .allApps[aria-current="page"],
+:global([data-workspace-theme="linen"]) .account[aria-current="page"] {
+  background: var(--navigation-selected-bg);
+  color: var(--navigation-active-text);
+}
+
+:global([data-workspace-theme="linen"]) .newAction {
+  background: transparent;
+  color: var(--navigation-nav-text);
+  font-weight: 400;
+}
+
+:global([data-workspace-theme="linen"]) .newAction:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--navigation-hover-bg);
+}
+
+:global([data-workspace-theme="linen"]) .primary {
+  border-top: 0;
+}
+
+:global([data-workspace-theme="linen"]) .recent {
+  margin-top: 22px;
+}
+
+:global([data-workspace-theme="linen"]) .recent h2,
+:global([data-workspace-theme="linen"]) .contextual h2 {
+  padding: 0 10px 6px;
+  color: var(--navigation-heading-text);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+:global([data-workspace-theme="linen"]) .recent a,
+:global([data-workspace-theme="linen"]) .contextual a,
+:global([data-workspace-theme="linen"]) .contextual button {
+  min-height: 34px;
+  gap: 11px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  color: var(--navigation-nav-text);
+  font-size: 14px;
+}
+
+:global([data-workspace-theme="linen"]) .recent a:hover {
+  background: var(--navigation-hover-bg);
+  color: var(--navigation-active-text);
+}
+
+:global([data-workspace-theme="linen"]) .pinned svg {
+  color: var(--navigation-nav-text);
+}
+
+:global([data-workspace-theme="linen"]) .footer {
+  border-top: 0;
+}
+
+:global([data-workspace-theme="linen"]) .footer .navItem {
+  font-size: 13px;
+}
+
+:global([data-workspace-theme="linen"]) .avatar {
+  border: 0;
+  background: var(--navigation-avatar-bg);
+  color: var(--navigation-avatar-text);
+  font-weight: 600;
+}
+
+:global([data-workspace-theme="linen"]) .account strong {
+  color: var(--navigation-account-text);
+  font-size: 13px;
+}
+
+:global([data-workspace-theme="linen"]) .account small {
+  color: var(--navigation-account-detail);
+  font-size: 11px;
+}
+
+:global([data-workspace-theme="linen"]) .signOut,
+:global([data-workspace-theme="linen"]) .mobileClose {
+  color: var(--navigation-signout-text);
+}
+
+:global([data-workspace-theme="linen"]) .sidebar :is(a, button, select):focus-visible {
+  outline-color: var(--navigation-focus);
+}

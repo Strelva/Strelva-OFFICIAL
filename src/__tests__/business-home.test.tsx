@@ -72,11 +72,13 @@ describe("business home", () => {
       systems: [{ id: "work:Mediation intake", kind: "app", name: "Mediation intake", detail: "Used by your team", lifecycle: "live", health: { state: "unknown", summary: "Nothing has checked this yet." }, surface: { kind: "work", workId: "Mediation intake", productId: "applications" }, connections: [], possibilities: [], versions: [] }],
       files: [items[1]!], systemsReleased: true,
     }));
-    expect(html).toContain("<h1 class=\"font-display\">Alder Workshop</h1>");
-    expect(html).toContain("1 live");
+    // October 6: the dusk band greets the owner; the business is named on the line above.
+    expect(html).toContain("<h1 id=\"business-start-title\" class=\"font-display\">Welcome back.</h1>");
+    expect(html).toContain("Alder Workshop</p>");
+    expect(html).toContain("1 system live");
     expect(html.indexOf("Needs you")).toBeLessThan(html.indexOf("id=\"home-systems\""));
     expect(html).toContain("Open Mediation intake, Internal tool, Live, Unknown");
-    expect(html).toContain("What should happen next?");
+    expect(html).toContain("Ask Strelva for anything your business needs");
     expect(html).toContain("All systems and files");
     expect(html).not.toContain("Open Mediation intake\"");
     expect(html).toContain("Open AI check");
@@ -120,7 +122,7 @@ describe("business home", () => {
     }));
     // The greeting and composer lead, as before Systems; no business header or Systems list.
     expect(html).toContain("id=\"business-start-title\"");
-    expect(html.indexOf("What should happen next?")).toBeLessThan(html.indexOf("Needs you"));
+    expect(html.indexOf("Ask Strelva for anything your business needs")).toBeLessThan(html.indexOf("Needs you"));
     for (const gone of ["id=\"home-systems\"", "Systems", "All systems and files", "Files and results", "live ·", "Nothing is running yet.", "Internal tool, Live"]) expect(html).not.toContain(gone);
     // Every saved result, the managed website and apps are where they were.
     expect(html).toContain("2 saved results");

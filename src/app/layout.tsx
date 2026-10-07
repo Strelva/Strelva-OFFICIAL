@@ -1,11 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Geist } from "next/font/google";
+import { DM_Sans, Geist } from "next/font/google";
 import { PrivacyAwareAnalytics } from "@/components/PrivacyAwareAnalytics";
 import { BRAND_NAME, MARKETING_URL } from "@/platform/infra/brand";
 import "./globals.css";
 
 const geist = Geist({
   variable: "--font-body",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+// The workspace's interface face (October 6, 2026). Scoped by StrelvaShell's linen theme.
+const dmSans = DM_Sans({
+  variable: "--font-workspace",
   subsets: ["latin"],
   display: "swap",
 });
@@ -44,7 +51,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geist.variable} antialiased`}
+        className={`${geist.variable} ${dmSans.variable} antialiased`}
       >
         {children}
         <PrivacyAwareAnalytics />

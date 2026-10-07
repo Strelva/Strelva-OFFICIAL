@@ -50,6 +50,33 @@ design specification.
 
 ## Latest foundation decisions
 
+### October 6 workspace: linen beside an ink rail (Strelva 1.0)
+
+Jacob approved the Strelva 1.0 workspace designs on October 6, 2026 and asked
+for them in the real workspace. Phase 1 (theme, shell, Home, Needs you) is
+implemented; the palette and its contrast adjustments are in the
+[color system](./docs/design/color-system.md#october-6-2026-linen-workspace-and-ink-rail).
+
+- **Linen content, ink navigation.** White cards with hairlines on linen,
+  moss for the one primary action per decision, clay only for what needs the
+  owner, pills for buttons, DM Sans in the workspace. Light display numerals.
+- **Home is two sides under a dusk band.** The dusk band (greeting, the glass
+  ask, live chips from real data) is the first screen of the day. Below it,
+  "Strelva is working" on ink-moss (what is moving, with its steps, then what
+  Strelva handled) and "Your side" on linen (decisions as rows, the rule
+  behind them, the site's week).
+- **Needs you is a place.** With the Needs you release on, it has its own page:
+  a deck with one card per decision, shaped by what is being decided (a price,
+  a go-live, a reply), always with what happens either way.
+- **Nothing invented.** Chips, numbers and steps appear only when the snapshot
+  carries them. Week sparkbars and Square sales from the design are left out
+  until the product has those numbers.
+
+This supersedes the dark workspace content (September 15–17) and the October 4
+Home order inside the customer workspace. The October 2 and October 4 product
+rules (plain places, Strelva as the only actor, Systems first) still hold. The
+tenant dashboard keeps its dark foundation.
+
 ### October 4 product model: Systems first
 
 Jacob selected Systems, Connections, Possibilities and Versions on October 4,

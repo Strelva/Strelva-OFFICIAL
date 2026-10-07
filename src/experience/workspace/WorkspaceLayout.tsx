@@ -128,7 +128,11 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
   // STRELVA_ASK_RELEASE, as the server reported it. Off, `view=ask` opens Home
   // and "Ask Strelva" opens the composer, as before.
   const askReleased = systemsReleased && snapshot.releases?.ask === true;
-  const section: StrelvaSection = (requestedSection === "system" && !systemsReleased) || (requestedSection === "ask" && !askReleased) ? "home" : requestedSection;
+  // STRELVA_NEEDS_YOU_RELEASE, as the server reported it. Off, or outside a
+  // business the owner can decide for, `view=needs-you` opens Home.
+  const needsYouBusiness = snapshot.workspaces.find(item => item.id === snapshot.workspaceId);
+  const needsYouPlace = snapshot.releases?.needsYou === true && needsYouBusiness?.kind === "customer" && needsYouBusiness.access !== "delegated_read";
+  const section: StrelvaSection = (requestedSection === "system" && !systemsReleased) || (requestedSection === "ask" && !askReleased) || (requestedSection === "needs-you" && !needsYouPlace) ? "home" : requestedSection;
   const [askSeed, setAskSeed] = useState<{ text: string; session: number }>({ text: "", session: 0 });
   const sectionTitle = (value: StrelvaSection) => placeTitle(value, systemsReleased);
   const appsLabel = systemsReleased ? SYSTEMS_LABEL : "Apps";
@@ -512,7 +516,8 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
     return <><h2>Try the search before you connect it.</h2><p>Home Finder is a brokerage-branded home search. This preview uses synthetic listings and never sends or stores buyer inquiries.</p>{product.previewHref ? <a className={styles.primaryAction} href={product.previewHref} target="_blank" rel="noreferrer">Try Home Finder<ArrowRight size={17} /></a> : <p>Its synthetic preview is not available from this environment yet.</p>}<p>A live installation needs brokerage approval, permitted listing data, and verified inquiry delivery.</p><button type="button" className={styles.secondaryAction} onClick={() => navigate("help", "I’d like early access to Home Finder. Please tell me what enabling a live brokerage installation would require.")}>Ask about early access<ArrowRight size={17} /></button></>;
   }
 
-  if (home && !startOpen && section === "home" && current?.kind !== "agency" && !workspaceExitBlocks) return <WorkspaceIntent request={requestText} current={requestCurrent} route={requestRoute} draftKey={draftKey} onSpent={spendRequest}><BusinessHome
+  if (home && !startOpen && (section === "home" || section === "needs-you") && current?.kind !== "agency" && !workspaceExitBlocks) return <WorkspaceIntent request={requestText} current={requestCurrent} route={requestRoute} draftKey={draftKey} onSpent={spendRequest}><BusinessHome
+    view={section === "needs-you" ? "needs-you" : "home"}
     snapshot={snapshot} sites={assignedSites} unassignedSites={unassignedSites} siteAssignmentsKnown={siteAssignmentsKnown} offerings={offerings.state} busy={busy} notice={notice} managedWorkUnavailable={managedWorkUnavailable}
     appBase={appBase} accountHref={`${appBase || ""}/workspace/account`} signOut={signOut}
     onNavigate={navigate}
@@ -539,7 +544,7 @@ export function WorkspaceLayout({ rebuildEnabled, appBase, signOut, snapshot, ma
       : assignedSites.map(site => ({ id: `site-${site.id}`, title: site.title, detail: "Managed website", href: site.href }))),
   ];
   return <WorkspaceIntent request={requestText} current={requestCurrent} route={requestRoute} draftKey={draftKey} onSpent={spendRequest}><StrelvaShell appBase={appBase} signOut={signOut}
-    workspaceId={snapshot.workspaceId} searchItems={searchItems} searchScopeName={current?.name || "Your work"} recentWork={systemsReleased ? searchItems.filter(item => files.some(file => file.id === item.id)) : searchItems.filter(item => !item.id.startsWith("site-"))} pinned={pinnedSites} systemsReleased={systemsReleased}
+    workspaceId={snapshot.workspaceId} searchItems={searchItems} searchScopeName={current?.name || "Your work"} recentWork={systemsReleased ? searchItems.filter(item => files.some(file => file.id === item.id)) : searchItems.filter(item => !item.id.startsWith("site-"))} pinned={pinnedSites} systemsReleased={systemsReleased} needsYou={needsYouPlace ? { count: null } : undefined}
     active={agency ? "access" : home ? startOpen ? undefined : section : workingSection}
     title={home && section === "system" ? systems.find(item => item.id === systemId)?.name || "System" : !home ? inquiry ? "Inquiry work" : tracker !== undefined ? "Internal tool" : plan !== undefined ? "Work plan" : document !== undefined ? "Document" : agency ? sectionTitle("access") : workingTitle || (selectedWork ? "Your work" : "New assessment") : startOpen ? "New" : sectionTitle(section)}
     accountName={person} accountDetail={snapshot.actor.email}

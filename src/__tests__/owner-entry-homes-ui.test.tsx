@@ -136,8 +136,9 @@ describe("Home's From your site", () => {
       leads: { count: 1, recent: [{ id: "l1", name: "Dana", message: "Do you ship?", createdAt: "2026-10-01" }] },
       activity: [{ id: "a1", label: "Updated your hours on Google", detail: null, time: "2026-10-02" }],
     }] } } }));
-    expect(page).toContain("120 people found you · 12 this week");
-    expect(page).toContain("booked or called: couldn&#x27;t check");
+    expect(page).toContain("People found you this week</dt><dd>12</dd><small>120 in all</small>");
+    expect(page).toContain("Booked or called</dt><dd class=");
+    expect(page).toContain("Couldn&#x27;t check");
     expect(page).toContain("Dana");
     expect(page).toContain("Updated your hours on Google");
     for (const place of ["inquiries", "results", "reviews", "recaps"]) expect(page).toContain(`/workspace/${place}?workspaceId=${WS}`);

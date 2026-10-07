@@ -57,6 +57,7 @@ export function ConversationShell({
 
   return (
     <StrelvaShell
+      theme="dashboard"
       active="work"
       title={MANAGED_WEBSITES_LABEL}
       appBase={appBase}
