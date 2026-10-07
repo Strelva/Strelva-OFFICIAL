@@ -1,4 +1,5 @@
 import { getEventRaw, getEvents } from "@/lib/events";
+import { readCatalogReportHandled } from "@/platform/catalog-reports/receipts";
 import { resolveEventAction } from "@/lib/event-actions";
 import { sendEmailWithReceipt } from "@/platform/infra/email/send";
 import { DeliveryCommitmentService, PostgresServiceRequestStore, mutateServiceRequestCommitment } from "@/platform/service-requests";
@@ -72,5 +73,6 @@ export async function readStrelvaHandled(actor: WorkspaceActor, workspaceId: str
   const decided = decidedTenantEventIds(rows);
   const events = (await Promise.all(tenants.map(async link => (await getEvents(link.tenantId, { limit: 100 }).catch(() => []))
     .filter(event => !decided.has(`${link.tenantId}:${event.id}`))))).flat();
-  return mergeHandled([...rows.map(handledFromStore), ...events.map(handledFromTenantEvent)], since).slice(0, 50);
+  const reports = await readCatalogReportHandled(actor, workspaceId, new Date(since).toISOString());
+  return mergeHandled([...rows.map(handledFromStore), ...events.map(handledFromTenantEvent), ...reports], since).slice(0, 50);
 }

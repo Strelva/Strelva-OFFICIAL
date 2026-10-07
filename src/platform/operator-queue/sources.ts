@@ -11,6 +11,7 @@ import { listTenantDomainClaims } from "@/lib/domains";
 import { LEAD_MIRROR_PENDING_KEY, parsePendingMember } from "@/lib/lead-mirror";
 import { getDeliveryLeads } from "@/lib/access-request-delivery";
 import { getAllLeadWorkflow } from "@/lib/lead-workflow";
+import { readCatalogReportFailures } from "@/platform/catalog-reports/operator-source";
 import { isCustomChangeRequestMetadata } from "@/lib/custom-repos";
 import { listOperationalExceptions } from "@/products/operations/inbox";
 import { PostgresServiceRequestStore } from "@/platform/service-requests";
@@ -414,6 +415,7 @@ export async function readAllSources(input: { tenants: QueueTenant[]; context: Q
     guard("site_draft", "Site drafts", () => readSiteDrafts(tenants, now)),
     guard("maintenance_digest", "Maintenance digests", readMaintenanceDigests),
     guard("ops_alert", "Operations alerts", readOpsAlerts),
+    guard("ops_alert", "Report delivery", () => readCatalogReportFailures(actor)),
     guard("domain_alert", "Domain monitor", readDomainAlerts),
     guard("domain_unverified", "Domain claims", () => readUnverifiedDomains(tenants, now)),
     guard("site_health", "Site health", () => readSiteHealthItems(context, byId)),

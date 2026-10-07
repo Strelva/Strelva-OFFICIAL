@@ -13,6 +13,10 @@ import {
 } from "./contracts";
 import { isApplicationDateOnly } from "./date-only";
 
+import { systemsReleaseMayBeOn, systemsReleasedFor } from "@/platform/systems-release";
+import { assertLinkFieldsReleased, linkFields, notifyAssignedPerson } from "./internal-tool-links";
+import { applicationSpecSchema } from "./contracts";
+
 /**
  * Application use is a resource grant. It is deliberately separate from the
  * workspace membership and from the application design/release commands.
@@ -454,7 +458,13 @@ export const postgresApplicationUsePersistence: ApplicationUsePersistence = {
     rpcFailure(error);
   },
   async submit(actor, workId, input, access) {
-    const { data, error } = await db().rpc("submit_application_use_record_v2", {
+    const client = db();
+    const spec = applicationSpecSchema.safeParse(systemsReleaseMayBeOn()
+      ? (await postgresApplicationUsePersistence.inspect(actor, workId)).releasedSpec : null);
+    const linked = spec.success && linkFields(spec.data).length > 0;
+    const released = linked ? await systemsReleasedFor(actor, access.workspaceId) : false;
+    if (linked) assertLinkFieldsReleased(spec.data, released);
+    const { data, error } = await client.rpc(linked ? "submit_internal_tool_use_record" : "submit_application_use_record_v2", {
       ...identity(actor),
       p_work_id: z.string().uuid().parse(workId),
       p_grant_id: z.string().uuid().parse(access.id),
@@ -463,7 +473,11 @@ export const postgresApplicationUsePersistence: ApplicationUsePersistence = {
       p_idempotency_key: input.idempotencyKey,
     });
     rpcFailure(error, "Check the record fields and try again.");
-    return parseContext(data, workId);
+    const saved = parseContext(data, workId);
+    if (spec.success) await notifyAssignedPerson(client, actor, {
+      workspaceId: access.workspaceId, workId, toolTitle: spec.data.title, spec: spec.data, record: input.record,
+    });
+    return saved;
   },
   async edit(actor, workId, input, access) {
     const { data, error } = await db().rpc("edit_application_use_record", {

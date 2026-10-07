@@ -1,7 +1,11 @@
 import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import { sendEmailWithReceipt, type SendEmailInput, type SendEmailResult } from "@/platform/infra/email/send";
-import { systemsReleaseEnabled, systemsReleasedFor } from "@/platform/systems-release";
-import { workspaceReleaseOn } from "@/platform/release-flags/resolve";
+import { systemsReleaseEnabled, systemsReleaseMayBeOn, systemsReleasedFor } from "@/platform/systems-release";
+import { customerEmailEnabled, emailSendingEnabled } from "@/platform/infra/email/enabled";
+import { getClientEmailOverride } from "@/platform/infra/email/client-override";
+import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
+import { releaseViewerFor } from "@/platform/release-flags/viewer";
+import { releaseFlagMayBeOn, workspaceReleaseOn } from "@/platform/release-flags/resolve";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import type { ApplicationRecord, ApplicationSpec, applicationLinkInputSchema } from "./contracts";
 import type { z } from "zod";
@@ -12,7 +16,7 @@ import type { z } from "zod";
  *
  * A `contact` field becomes a business_contacts id and an `assigned_person`
  * field a business_people id before the record is saved. After the save, the
- * assigned person gets one email naming the tool, the record title and the
+ * owner and assigned person get one gated submission notice naming the tool, the record title and the
  * one missing item, with a sign-in link and nothing else from the record.
  * Every send, suppression or failure leaves a receipt in
  * internal_tool_notices. All of it sits behind STRELVA_SYSTEMS_RELEASE.
@@ -171,6 +175,14 @@ export function assignedPersonEmail(input: {
   };
 }
 
+/** Separate from Systems exposure: a rollout can enable tools silently. */
+export async function internalToolNoticesReleasedFor(actor: WorkspaceActor, workspaceId: string): Promise<boolean> {
+  if (!systemsReleaseMayBeOn() || !releaseFlagMayBeOn("internal_tool_notices")) return false;
+  const viewer = await releaseViewerFor(actor);
+  return await workspaceReleaseFlagEnabled("systems", workspaceId, viewer)
+    && await workspaceReleaseFlagEnabled("internal_tool_notices", workspaceId, viewer);
+}
+
 export type AssignedPersonNoticeStatus = "none" | "duplicate" | "skipped" | "sent" | "suppressed" | "failed";
 
 /**
@@ -184,38 +196,52 @@ export async function notifyAssignedPerson(
   input: { workspaceId: string; workId: string; toolTitle: string; spec: ApplicationSpec; record: ApplicationRecord },
   deps: { send: (input: SendEmailInput) => Promise<SendEmailResult> } = { send: sendEmailWithReceipt },
 ): Promise<{ status: AssignedPersonNoticeStatus; noticeId?: string }> {
+  if (!(await internalToolNoticesReleasedFor(actor, input.workspaceId))) return { status: "none" };
   const field = linkFields(input.spec).find((item) => item.type === "assigned_person");
-  const value = field ? input.record.values[field.id] : undefined;
-  if (!field || typeof value !== "string" || !LINK_ID.test(value)) return { status: "none" };
   try {
-    const claim = await db.rpc("claim_internal_tool_notice", {
+    const claim = await db.rpc("claim_internal_tool_submit_notice", {
       p_workspace_id: input.workspaceId,
       p_work_id: input.workId,
       p_record_id: input.record.id,
-      p_field_id: field.id,
+      p_field_id: field?.id ?? null,
       p_user_id: actor.userId,
       p_verified_email: actor.verifiedEmail,
     });
     if (claim.error) throw new Error(claim.error.message || "notice claim failed");
-    const claimed = (claim.data ?? {}) as { claimed?: boolean; noticeId?: string; status?: string; recipientEmail?: string; personName?: string };
+    const claimed = (claim.data ?? {}) as { claimed?: boolean; noticeId?: string; status?: string; recipientEmail?: string; personName?: string; assignedEmail?: string; tenantId?: string | null };
     if (!claimed.claimed || !claimed.noticeId || !claimed.recipientEmail) {
       return { status: claimed.status === "skipped" ? "skipped" : "duplicate", noticeId: claimed.noticeId };
     }
     const title = recordTitle(input.spec, input.record);
-    const email = assignedPersonEmail({
-      toolTitle: input.toolTitle,
-      title,
-      missing: missingItem(input.spec, input.record),
-      personName: claimed.personName ?? null,
-      signInUrl: toolSignInUrl(input.workspaceId, input.workId),
-    });
+    const missing = missingItem(input.spec, input.record);
+    const email = {
+      subject: oneLine(`${input.toolTitle}: ${title}`, 150),
+      options: {
+        heading: `New submission: ${title}`,
+        paragraphs: [
+          `A new record was submitted to ${oneLine(input.toolTitle, 80)}.`,
+          ...(claimed.personName ? [`Assigned to ${oneLine(claimed.personName, 80)}.`] : []),
+          missing ? `Still missing: ${missing}.` : "Next step: open it and confirm nothing is missing.",
+          "Sign in to see the full record. This email doesn't include its details.",
+        ],
+        button: { label: "Sign in to open it", url: toolSignInUrl(input.workspaceId, input.workId) },
+      },
+    };
     let status: "sent" | "suppressed" | "failed";
     let detail: string | null = null;
     let providerMessageId: string | null = null;
     try {
-      const result = await deps.send({
+      // Unlike legacy client sends, this new sender requires EVERY global
+      // gate. A tenant's "on" override cannot bypass a paused rollout.
+      const suppressed = !emailSendingEnabled() || !customerEmailEnabled()
+        || (claimed.tenantId && await getClientEmailOverride(claimed.tenantId) === "off");
+      const recipients = [...new Set([claimed.recipientEmail, claimed.assignedEmail].filter((value): value is string => Boolean(value)))];
+      const result: SendEmailResult = suppressed
+        ? { status: "suppressed", reason: "email_suppressed_or_unconfigured" }
+        : await deps.send({
         audience: "client",
-        to: claimed.recipientEmail,
+        ...(claimed.tenantId ? { tenantId: claimed.tenantId } : {}),
+        to: recipients.length === 1 ? recipients[0]! : recipients,
         subject: email.subject,
         options: email.options,
         idempotencyKey: `internal-tool-notice:${claimed.noticeId}`,

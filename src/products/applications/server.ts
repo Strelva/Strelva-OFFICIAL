@@ -290,7 +290,7 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
         p_verified_email: actor.verifiedEmail,
       }, "The application record could not be saved.");
       let notice: AssignedPersonNoticeStatus = "none";
-      if (linked) notice = (await notifyAssignedPerson(db, actor, { ...target, toolTitle: release.spec.title, spec: release.spec, record })).status;
+      notice = (await notifyAssignedPerson(db, actor, { ...target, toolTitle: release.spec.title, spec: release.spec, record })).status;
       const runtimeResult = await readRuntime(actor, id);
       return linked ? Object.assign(runtimeResult, { linkResult: { notice, contactConflicts: conflicts } }) : runtimeResult;
     }

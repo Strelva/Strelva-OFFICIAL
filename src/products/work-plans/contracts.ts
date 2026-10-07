@@ -183,6 +183,7 @@ export const createWorkPlanRequestSchema = z.object({
   /** A payer-created and accepted work-economics job is required for model generation. */
   planningEconomics: z.object({
     jobId: z.string().uuid(),
+    fundingWorkspaceId: z.string().uuid().optional(),
     executionKey: z.string().trim().min(1).max(100).regex(/^[A-Za-z0-9][A-Za-z0-9_.:-]*$/),
     maximumCents: z.number().int().nonnegative().max(1_000_000),
   }).strict().optional(),

@@ -177,7 +177,7 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
       detail: kind === "website" && entry.connectedSite ? "Connected site" : kind === "website" && domain ? entry.name : detailFor(kind, work, entry),
       ...(entry.basis ? { basis: entry.basis } : {}),
       lifecycle: stopped ? "paused" : entry.lifecycle,
-      health: { state: entry.health.status, summary: work?.unavailableReason || entry.health.summary, lastVerifiedAt: entry.health.lastVerifiedAt },
+      health: { state: entry.health.status, summary: work?.unavailableReason || entry.health.summary, lastVerifiedAt: entry.health.lastVerifiedAt, ...(entry.health.signals ? { signals: entry.health.signals } : {}) },
       surface: surface ?? { kind: "work", workId: entry.savedWorkId ?? entry.ref.systemId, productId: "unknown" },
       operatedBy: kind === "website" && site ? site.relationship === "enterprise" ? "Your enterprise team" : "Strelva" : provider(installation),
       ...(kind === "bookings" && entry.views?.length ? { views: bookingViews(entry.views, entry.tenantId ? siteById.get(entry.tenantId) : undefined) } : {}),

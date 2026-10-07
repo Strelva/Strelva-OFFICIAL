@@ -1,3 +1,8 @@
+import { systemsReleasedFor } from "@/platform/systems-release";
+import { assertCanMakeSystems } from "@/platform/workspaces/repository";
+import { workPlanFundingWorkspace } from "./funding";
+import { WorkspaceAccessError } from "@/platform/workspaces/types";
+import { saveMakerWorkPlan } from "./repository";
 import { executeBudgetedAction, recordTrustedProviderReceipt, type BudgetExecution } from "@/platform/work-economics";
 import { ProviderEvidenceUnavailableError } from "@/platform/work-economics/provider-evidence";
 import { assertCanSaveWork, saveWork, type PersistedWorkPlanOutput, type WorkspaceActor } from "@/platform/workspaces";
@@ -34,7 +39,17 @@ export async function createWorkPlan(input: {
   });
 
   // Membership and saved-work capacity are checked before the bounded model call.
-  await assertCanSaveWork(input.actor, request.workspaceId);
+  const systemsMaker = await systemsReleasedFor(input.actor, request.workspaceId);
+  const authorize = async () => {
+    if (systemsMaker) await assertCanMakeSystems(input.actor, request.workspaceId);
+    else await assertCanSaveWork(input.actor, request.workspaceId);
+  };
+  await authorize();
+  let fundingWorkspaceId = request.workspaceId;
+  if (request.planningEconomics && systemsMaker) {
+    fundingWorkspaceId = await workPlanFundingWorkspace(input.actor, request.workspaceId);
+    if (request.planningEconomics.fundingWorkspaceId !== undefined && request.planningEconomics.fundingWorkspaceId !== fundingWorkspaceId) throw new WorkspaceAccessError();
+  } else if (request.planningEconomics?.fundingWorkspaceId && request.planningEconomics.fundingWorkspaceId !== request.workspaceId) throw new WorkspaceAccessError();
   if (!planningEnabled()) throw new WorkPlanUnavailableError("Planning is not enabled");
   if (!input.generate && !request.planningEconomics) {
     // Preserve the existing unavailable state when no model is configured, but
@@ -71,7 +86,7 @@ export async function createWorkPlan(input: {
   if (request.planningEconomics) {
     const executionContext = {
       actor: input.actor,
-      expectedTarget: { workspaceId: request.workspaceId, workId: null },
+      expectedTarget: { workspaceId: fundingWorkspaceId, workId: null },
       jobId: request.planningEconomics.jobId,
       executionKey: request.planningEconomics.executionKey,
       maximumCents: request.planningEconomics.maximumCents,
@@ -83,9 +98,12 @@ export async function createWorkPlan(input: {
       executionKey: request.planningEconomics.executionKey,
       maximumCents: request.planningEconomics.maximumCents,
       kind: "model",
-      expectedTarget: { workspaceId: request.workspaceId, workId: null },
+      expectedTarget: { workspaceId: fundingWorkspaceId, workId: null },
     }, {
-      recheck: async () => { await assertCanSaveWork(input.actor, request.workspaceId); },
+      recheck: async () => {
+        await authorize();
+        if (systemsMaker && await workPlanFundingWorkspace(input.actor, request.workspaceId) !== fundingWorkspaceId) throw new WorkspaceAccessError();
+      },
       perform: async () => ({
         value: await (input.generate ?? defaultGenerate)({ ...generationInput, executionContext }),
         // Provider token usage is not a trusted dollar amount. Keep the accepted
@@ -133,7 +151,7 @@ export async function createWorkPlan(input: {
     createdAt,
     context,
   }, catalog);
-  const work = await saveWork(input.actor, request.workspaceId, {
+  const work = await (systemsMaker ? saveMakerWorkPlan : saveWork)(input.actor, request.workspaceId, {
     productId: WORK_PLAN_PRODUCT_ID,
     resourceKind: WORK_PLAN_RESOURCE_KIND,
     title: `Plan: ${request.userGoal}`.slice(0, 160),
