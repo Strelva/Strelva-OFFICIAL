@@ -166,7 +166,7 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
         lineage: `${stored.context.label} is adapted from ${sourceLabel}.${waiting ? " An improvement is waiting for a decision." : ""} Records and accounts stay here.` });
       for (const sibling of stored.siblings) {
         versions.push({ id: `${stored.id}->${sibling.id}`, relation: "version", context: sibling.context.label, title: sibling.context.label, systemId: sibling.systemId,
-          lineage: `Another Version of the same ${stored.source.hidden ? "setup" : "source"}, with its own accounts.` });
+          comparison: sibling.comparison, lineage: `Another Version of the same ${stored.source.hidden ? "setup" : "source"}, with its own accounts.` });
       }
     }
     return {

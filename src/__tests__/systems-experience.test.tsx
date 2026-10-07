@@ -116,7 +116,7 @@ describe("Systems read adapter over the spine projection", () => {
         { id: "v-c", systemId: SITE, source: { businessId: BUSINESS, systemId: "hidden", name: "Twin Trees website", hidden: true }, context: { kind: "location", label: "Camillus" },
           baselineRevision: 2, latestRevision: 2, currentRelease: 1, declined: [], siblings: [{ id: "v-f", systemId: INBOX, context: { kind: "location", label: "Fayetteville" } }] },
         { id: "v-f", systemId: INBOX, source: { businessId: BUSINESS, systemId: "hidden", name: "Twin Trees website", hidden: true }, context: { kind: "location", label: "Fayetteville" },
-          baselineRevision: 1, latestRevision: 2, currentRelease: 1, declined: [], siblings: [{ id: "v-c", systemId: SITE, context: { kind: "location", label: "Camillus" } }] },
+          baselineRevision: 1, latestRevision: 2, currentRelease: 1, declined: [], siblings: [{ id: "v-c", systemId: SITE, context: { kind: "location", label: "Camillus" }, comparison: { state: "ready", changes: [{ path: "hours", beforePresent: true, afterPresent: true, before: "Weekdays", after: "Weekdays and Saturdays" }, { path: "legacy", beforePresent: true, afterPresent: false, before: "Old field", after: null }] } }] },
       ],
     });
     const { systems } = readBusinessSystems({ snapshot: snapshot([], twin), sites: [
@@ -127,6 +127,10 @@ describe("Systems read adapter over the spine projection", () => {
     expect(fayetteville.versions[0]).toMatchObject({ relation: "source", context: "Fayetteville" });
     expect(fayetteville.versions[0]!.lineage).toContain("An improvement is waiting");
     expect(fayetteville.versions[1]).toMatchObject({ relation: "version", systemId: SITE, context: "Camillus" });
+    const rendered = renderToStaticMarkup(createElement(SystemPage, { system: fayetteville, systems, sources: [], onHome: () => {}, onAsk: () => {}, workspaceId: BUSINESS, readOnly: true, systemHref: id => `/workspace?view=system&system=${id}` }));
+    expect(rendered).toContain("What changed here"); expect(rendered).toContain("Weekdays and Saturdays");
+    expect(rendered).toContain("Source baseline"); expect(rendered).toContain("Removed");
+    expect(rendered).toContain("Camillus"); expect(rendered).not.toContain("fixture-sensitive-value");
     // Stored rows replace the synthetic "not linked yet" siblings.
     expect(JSON.stringify(systems)).not.toContain("not linked between them yet");
     expect(systems.find(item => item.id === SITE)!.versions[0]!.lineage).not.toContain("waiting");

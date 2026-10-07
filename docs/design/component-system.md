@@ -600,3 +600,6 @@ uses the existing fetch default and permits fictional local review without
 provider writes. `/preview/strelva/portability?surface=export|exit&state=ready|loading|error|permission|empty|completed`
 is gated by development and `STRELVA_UI_PREVIEW=1`; fixtures prove presentation,
 not export completeness or production handoff.
+
+
+October 7, 2026, local: the System Versions panel now shows each scoped sibling’s reusable definition changes in keyboard-native disclosures, with source-baseline and local values, removed-path labels, and explicit empty/Not verified states. Private records, bindings, grants, maintenance authority and secret-shaped content are omitted by the scoped PostgreSQL projection. `sibling=ready|empty|unavailable` selects fictional comparison states in the existing preview.

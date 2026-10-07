@@ -95,6 +95,7 @@ export interface SystemVersion {
   title: string;
   /** Lineage sentence. Say "not recorded" rather than inventing one. */
   lineage: string;
+  comparison?: { state: "ready" | "unavailable"; changes: Array<{ path: string; beforePresent: boolean; afterPresent: boolean; before: unknown; after: unknown }> };
   systemId?: string;
   href?: string;
 }

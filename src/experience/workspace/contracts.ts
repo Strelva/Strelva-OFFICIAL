@@ -250,7 +250,9 @@ export interface WorkspaceSystemVersion {
   /** Source revisions this business declined. */
   declined: number[];
   /** Other Versions of the same source in this business (another location). */
-  siblings: Array<{ id: string; systemId: string; context: { kind: string; label: string } }>;
+  siblings: Array<{ id: string; systemId: string; context: { kind: string; label: string };
+    comparison?: { state: "ready" | "unavailable"; changes: Array<{ path: string; beforePresent: boolean; afterPresent: boolean; before: unknown; after: unknown }> };
+  }>;
 }
 
 export interface WorkspacePublishing {

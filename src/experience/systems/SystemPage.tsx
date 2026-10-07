@@ -348,6 +348,17 @@ function VersionsPanel({ system, systemHref, onOpenSystem }: { system: SystemVie
       <span>{version.relation === "source" ? "Source · " : ""}<SystemLink id={version.systemId} label={version.title} systemHref={systemHref} onOpenSystem={onOpenSystem} /></span>
       <small>{version.context}</small>
       <small>{version.lineage}</small>
+      {version.relation === "version" ? version.comparison?.state === "ready" ? version.comparison.changes.length ? <details className="min-w-0 w-full">
+        <summary className="cursor-pointer py-3">What changed here · {version.comparison.changes.length}</summary>
+        <p className="mb-3 text-gray-muted">Local draft changes over this Version’s source baseline.</p>
+        <ul className="space-y-4">{version.comparison.changes.map(change => <li key={change.path} className="min-w-0">
+          <p className="font-medium break-words">{change.path}</p>
+          <dl className="mt-2 grid min-w-0 gap-3 sm:grid-cols-2">
+            <div className="min-w-0"><dt className="text-gray-muted">Source baseline</dt><dd className="mt-1 whitespace-pre-wrap break-words">{!change.beforePresent ? "Not present" : typeof change.before === "string" ? change.before : JSON.stringify(change.before, null, 2)}</dd></div>
+            <div className="min-w-0"><dt className="text-gray-muted">This Version</dt><dd className="mt-1 whitespace-pre-wrap break-words">{!change.afterPresent ? "Removed" : typeof change.after === "string" ? change.after : JSON.stringify(change.after, null, 2)}</dd></div>
+          </dl>
+        </li>)}</ul>
+      </details> : <small>No local definition changes.</small> : <small>Definition changes: Not verified.</small> : null}
     </li>)}</ul> : <p className="mt-3">It runs in one context today.</p>}
   </Panel>;
 }
