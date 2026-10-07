@@ -566,7 +566,10 @@ email/phone and assigned-person email fields. An existing linked ID stays in
 the correction draft while the field displays the authorized contact/staff name
 and email (or phone). Record lists use those same labels, projected only from
 the recipient's visible linked records and fields;
-typing a replacement changes the link. UUIDs never become invalid email input
+typing a replacement changes the link. Opening a labeled correction focuses its
+first field; Tab follows the existing form order. The gated `/preview/strelva/tool`
+fixture rehearses labeled records, corrections, read-only and empty states with
+no network or persistence. UUIDs never become invalid email input
 values. `DocumentExperience` reuses shared fields and Button for private files
 and read-only shares, with bounded recent receipts and opt-in keyset pagination,
 loading, persistent history error/retry, and cancellation on document change.

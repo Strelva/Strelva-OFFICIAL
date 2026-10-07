@@ -31,6 +31,7 @@ describe("correcting saved contact links", () => {
   it("keeps stored UUIDs out of email validation and preserves them on an unrelated correction", async () => {
     const onSubmit = vi.fn(); await act(async () => root.render(createElement(Harness, { onSubmit })));
     await act(async () => button("Edit record").click());
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Business");
     const staff = container.querySelector<HTMLInputElement>('input[aria-label="Staff"]')!;
     expect(staff.type).toBe("email"); expect(staff.value).toBe(""); expect(staff.required).toBe(false);
     expect(container.textContent).toContain("Currently linked: Sam Rivera · sam@example.test.");

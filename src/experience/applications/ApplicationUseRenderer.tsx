@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useId, useMemo } from "react";
+import { FormEvent, useEffect, useId, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/Button";
 import { TextInput } from "@/components/ui/TextInput";
 import type { ApplicationUseSnapshot, ApplicationViewKind } from "@/products/applications/client";
@@ -71,9 +71,15 @@ export function ApplicationUseRenderer({
   onSubmit,
 }: ApplicationUseRendererProps) {
   const instanceId = useId();
+  const formRef = useRef<HTMLFormElement>(null);
   const formView = snapshot.views.find(view => view.kind === "form");
   const editAllowed = snapshot.access.recordEdit === "own" || snapshot.access.recordEdit === "all";
   const editing = draft.editingRecordId !== undefined;
+  useEffect(() => {
+    if (snapshot.records.some(record => record.id === draft.editingRecordId && record.linkLabels)) {
+      formRef.current?.querySelector<HTMLInputElement>("input, select")?.focus();
+    }
+  }, [draft.editingRecordId, snapshot.records]);
   const recordViews = snapshot.views.filter(view => view.kind === "list" || view.kind === "detail" || view.kind === "document");
   const recordsHeading = recordViews.some(view => view.kind !== "document") ? "Records" : "Documents";
   const recordFields = useMemo(() => {
@@ -127,7 +133,7 @@ export function ApplicationUseRenderer({
             <h2 id={`${instanceId}-application-form-heading`} className="font-display text-2xl font-medium text-warm-black">{draft.editingRecordId ? "Correct a record" : viewLabel("form")}</h2>
             <p className="text-sm leading-6 text-gray-fg">{draft.editingRecordId ? "Save a correction to the record. If someone changed it first, your correction stays here so you can review it." : "Enter the details below. Keep this tab open if you need to retry."}</p>
           </div>
-          <form className="space-y-5" onSubmit={submit} aria-busy={busy}>
+          <form ref={formRef} className="space-y-5" onSubmit={submit} aria-busy={busy}>
             <div className="grid gap-5 sm:grid-cols-2">
               {formView.fields.map(field => {
                 const value = draft.values[field.id];
