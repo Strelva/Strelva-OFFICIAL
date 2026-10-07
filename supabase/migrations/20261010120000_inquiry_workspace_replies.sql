@@ -1,6 +1,7 @@
 -- Owner-authored workspace replies. New RPCs only; callers are off by default.
 -- Claims never expire back into sendable work: ambiguous provider acceptance
 -- needs reconciliation, never an automatic second send.
+begin;
 set local lock_timeout = '3s';
 
 create table public.inquiry_workspace_messages (
@@ -181,3 +182,4 @@ begin
 end $$;
 revoke all on function public.read_workspace_inquiry_leads_with_receipts(uuid,uuid,text,text[],integer,timestamptz) from public,anon,authenticated;
 grant execute on function public.read_workspace_inquiry_leads_with_receipts(uuid,uuid,text,text[],integer,timestamptz) to service_role;
+commit;

@@ -258,6 +258,15 @@ printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at
   "$cluster_socket" "$cluster_port"
 
 # Wave 6 inquiry contracts against the complete upgrade.
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-decision-notice-claims-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-decision-notice-events-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-lead-parity-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-member-replies-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-business-facts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-operator-authority-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-workspace-replies-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-context-notices-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-inquiry-records-schema.sql"
+
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-booking-handoff-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-operator-review-schema.sql"

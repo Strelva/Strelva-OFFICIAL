@@ -1,5 +1,6 @@
 -- Assigned/routed members may answer ordinary messages; commitments remain
 -- the owner's decision. New callers stay behind the existing reply switch.
+begin;
 set local lock_timeout = '3s';
 create function public.inquiry_reply_text_has_commitment(p_text text) returns boolean
 language sql immutable set search_path=public,pg_temp as $$
@@ -140,3 +141,4 @@ begin
       and (p_before is null or captured_at<p_before or (captured_at=p_before and p_before_id is not null and id<p_before_id))
       order by captured_at desc,id desc limit least(greatest(coalesce(p_limit,100),1),500)) l),'[]'::jsonb);
 end $$;
+commit;

@@ -1,5 +1,6 @@
 -- Immediate inquiry owner decisions and the chase share one durable send
 -- purpose. New callers are behind the inquiry owner-notice/Needs you gates.
+begin;
 set local lock_timeout = '3s';
 create table public.inquiry_decision_notice_claims (
   decision_id uuid primary key references public.owner_decisions(id),
@@ -72,3 +73,4 @@ language sql stable security definer set search_path=public,pg_temp as $$
 $$;
 revoke all on function public.authorize_inquiry_owner_link_decision(text,text,text,text) from public,anon,authenticated;
 grant execute on function public.authorize_inquiry_owner_link_decision(text,text,text,text) to service_role;
+commit;

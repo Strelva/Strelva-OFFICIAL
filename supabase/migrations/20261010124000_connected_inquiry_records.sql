@@ -1,6 +1,7 @@
 -- Connected-site inquiries use the shared durable review/contact/event record only
 -- through new v2 RPCs, selected by STRELVA_INQUIRY_RECORDS=1. Old connected
 -- capture, spam-pit and inbox RPCs are unchanged while the flag is off.
+begin;
 set local lock_timeout = '3s';
 
 alter table public.inquiry_events add column connected_site_id uuid;
@@ -236,3 +237,4 @@ revoke all on function public.record_connected_site_inquiry_v2(text,text,jsonb),
 grant execute on function public.record_connected_site_inquiry_v2(text,text,jsonb),
   public.record_connected_site_spam_v2(text,text,text,jsonb,text,timestamptz),
   public.read_connected_site_inquiries_v2(uuid,uuid,text,integer) to service_role;
+commit;

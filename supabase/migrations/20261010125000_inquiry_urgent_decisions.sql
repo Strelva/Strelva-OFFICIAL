@@ -1,5 +1,6 @@
 -- Exact source delivery for new inquiry decisions. No existing delivery read
 -- changes; callers are behind the off-by-default inquiry/Needs you gates.
+begin;
 set local lock_timeout = '3s';
 create function public.read_owner_decision_source_for_delivery(p_workspace_id uuid,p_lifecycle text,p_source_id text) returns jsonb
 language sql stable security definer set search_path = public,pg_temp as $$
@@ -14,3 +15,4 @@ language sql stable security definer set search_path = public,pg_temp as $$
 $$;
 revoke all on function public.read_owner_decision_source_for_delivery(uuid,text,text) from public,anon,authenticated;
 grant execute on function public.read_owner_decision_source_for_delivery(uuid,text,text) to service_role;
+commit;

@@ -1,5 +1,6 @@
 -- Lead cutover requires complete days across every tenant, and zero misses
 -- during a day. Other stores retain their existing parity behavior.
+begin;
 set local lock_timeout = '3s';
 create function public.record_tenant_lead_read_parity(
   p_tenant_id text,p_redis_count integer,p_postgres_count integer,p_missing integer,p_mismatched integer
@@ -45,3 +46,4 @@ revoke all on function public.record_tenant_lead_read_parity(text,integer,intege
   public.tenant_lead_read_parity_streak() from public,anon,authenticated;
 grant execute on function public.record_tenant_lead_read_parity(text,integer,integer,integer,integer),
   public.tenant_lead_read_parity_streak() to service_role;
+commit;

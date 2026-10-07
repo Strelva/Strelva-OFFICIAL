@@ -1,4 +1,5 @@
 -- New paged inbox. Existing reads stay untouched with the rollout off.
+begin;
 set local lock_timeout = '3s';
 create function public.read_workspace_inquiry_inbox_page(p_workspace_id uuid,p_user_id uuid,p_verified_email text,
  p_states text[],p_limit integer,p_before timestamptz,p_before_id uuid) returns jsonb
@@ -21,3 +22,4 @@ grant execute on function public.read_workspace_inquiry_inbox_page(uuid,uuid,tex
 alter table public.owner_decisions drop constraint owner_decisions_detail_check;
 alter table public.owner_decisions add constraint owner_decisions_detail_check check(detail is null or char_length(detail)<=8000) not valid;
 alter table public.owner_decisions validate constraint owner_decisions_detail_check;
+commit;

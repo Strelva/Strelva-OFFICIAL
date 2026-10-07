@@ -1,5 +1,6 @@
 -- Exact counts and first provider acceptance times, including connected sites.
 -- New functions only. STRELVA_INQUIRY_OUTCOMES selects them; default reads stay unchanged.
+begin;
 set local lock_timeout = '3s';
 create function public.inquiry_safe_timestamp(p_value text) returns timestamptz
 language plpgsql immutable set search_path = public,pg_temp as $$
@@ -89,3 +90,4 @@ begin
 end $$;
 revoke all on function public.read_tenant_leads_page(text,integer,timestamptz,text) from public,anon,authenticated;
 grant execute on function public.read_tenant_leads_page(text,integer,timestamptz,text) to service_role;
+commit;

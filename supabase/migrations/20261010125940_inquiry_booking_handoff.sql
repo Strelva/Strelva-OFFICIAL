@@ -1,4 +1,5 @@
 -- Inquiry → booking requests. Additive, callers off by default; no email or provider writes.
+begin;
 set local lock_timeout = '3s';
 create table public.inquiry_booking_offers (
   id uuid primary key default gen_random_uuid(),
@@ -211,3 +212,4 @@ revoke all on function public.resolve_workspace_inquiry_booking_lead(uuid,uuid,u
  public.prepare_inquiry_booking_offer(text,text,jsonb,uuid,jsonb,uuid,text),public.read_inquiry_booking_offer(uuid),public.choose_inquiry_booking_slot(uuid,integer) from public,anon,authenticated;
 grant execute on function public.resolve_workspace_inquiry_booking_lead(uuid,uuid,uuid,text),public.read_inquiry_booking_handoff(text,text,uuid,uuid,uuid,text),
  public.prepare_inquiry_booking_offer(text,text,jsonb,uuid,jsonb,uuid,text),public.read_inquiry_booking_offer(uuid),public.choose_inquiry_booking_slot(uuid,integer) to service_role;
+commit;

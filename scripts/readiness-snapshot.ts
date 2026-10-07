@@ -136,6 +136,12 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261009113000": "inquiry_events",
   "20261010120000": "inquiry_workspace_messages",
   "20261010125600": "inquiry_engine_reply_claims",
+  "20261010125800": "connected_inquiry_owner_notices",
+  "20261010125910": "inquiry_decision_notice_claims",
+  "20261010125915": "inquiry_decision_notice_events",
+  "20261010125930": "inquiry_business_fact_proposals",
+  "20261010125940": "inquiry_booking_offers",
+  "20261010125950": "connected_inquiry_owner_notice_repairs",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */
@@ -186,6 +192,11 @@ export const FLAG_ENV = [
   "STRELVA_LEADS_READ",
   "STRELVA_LEADS_AUTHORITY",
   "STRELVA_INQUIRY_RECORDS",
+  "STRELVA_INQUIRY_REPLIES",
+  "STRELVA_INQUIRY_OWNER_NOTICES",
+  "STRELVA_INQUIRY_BUSINESS_FACTS",
+  "STRELVA_INQUIRY_OUTCOMES",
+  "STRELVA_INQUIRY_BOOKING_HANDOFF",
   "STRELVA_BOOKING_STORE_WRITE",
   "STRELVA_BOOKING_STORE_READ",
   "STRELVA_BOOKING_OWNER_NOTICE",

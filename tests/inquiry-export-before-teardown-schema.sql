@@ -1,5 +1,5 @@
 begin;
-insert into public.users(id,email,verified_at) values('e6000000-0000-4000-8000-000000000001','export-owner@example.test',now());
+insert into public.users(id,email,verified_at) values('e6000000-0000-4000-8000-000000000001','inquiry-export-owner@example.test',now());
 insert into public.workspaces(id,kind,name,created_by) values('e6000000-0000-4000-8000-000000000002','customer','Export fixture','e6000000-0000-4000-8000-000000000001');
 insert into public.tenants(id,site_name) values('export-leads-fixture','Export leads fixture');
 insert into public.tenant_workspace_links(tenant_stable_id,tenant_slug_at_link,workspace_id,linked_by,command_id,command_digest,receipt) select stable_id,id,'e6000000-0000-4000-8000-000000000002','e6000000-0000-4000-8000-000000000001',gen_random_uuid(),repeat('a',64),'{}'::jsonb from public.tenants where id='export-leads-fixture';

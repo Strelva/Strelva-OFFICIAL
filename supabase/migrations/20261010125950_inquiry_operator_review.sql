@@ -1,5 +1,6 @@
 -- Operator review adds no workspace membership and sends no mail. Every RPC
 -- verifies a confirmed, active Strelva operator independently of the app.
+begin;
 set local lock_timeout = '3s';
 create function public.inquiry_assert_operator(p_user_id uuid,p_verified_email text) returns void
 language plpgsql stable security definer set search_path=public,pg_temp as $$
@@ -191,3 +192,4 @@ grant execute on function public.read_operator_held_inquiries(uuid,text,text,int
  public.claim_connected_inquiry_owner_notice_repair(uuid,text,uuid),public.verify_connected_inquiry_owner_notice_repair(uuid),
  public.finish_connected_inquiry_owner_notice_repair(uuid,text,text,timestamptz),
  public.record_connected_inquiry_owner_notice_repair_event(uuid,uuid,uuid,text,text,text,timestamptz,timestamptz,text[],text) to service_role;
+commit;

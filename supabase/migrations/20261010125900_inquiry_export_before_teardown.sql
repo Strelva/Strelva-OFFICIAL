@@ -1,5 +1,6 @@
 -- Authority cutover uses this additive teardown wrapper. The original RPC
 -- remains the flags-off path. Existing retained lead rows never cascade.
+begin;
 set local lock_timeout = '3s';
 create function public.assert_tenant_inquiry_export(p_tenant_id text) returns void
 language plpgsql security definer set search_path=public,pg_temp as $$
@@ -23,3 +24,4 @@ begin
 end $$;
 revoke all on function public.assert_tenant_inquiry_export(text),public.deprovision_tenant_rows_after_inquiry_export(text) from public,anon,authenticated;
 grant execute on function public.assert_tenant_inquiry_export(text),public.deprovision_tenant_rows_after_inquiry_export(text) to service_role;
+commit;

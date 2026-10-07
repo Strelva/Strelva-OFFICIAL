@@ -1,5 +1,6 @@
 -- Reused cohort for member reads and trusted report jobs; no identity invented
 -- for an owner who has never signed in. Only bounded service-role RPCs exposed.
+begin;
 set local lock_timeout = '3s';
 create function public.inquiry_outcome_cohort(p_workspace_id uuid,p_from timestamptz,p_to timestamptz) returns jsonb
 language plpgsql stable security definer set search_path = public,pg_temp as $$
@@ -53,3 +54,4 @@ begin
 end $$;
 revoke all on function public.business_inquiry_outcomes_for_tenant(text,timestamptz,timestamptz) from public,anon,authenticated;
 grant execute on function public.business_inquiry_outcomes_for_tenant(text,timestamptz,timestamptz) to service_role;
+commit;

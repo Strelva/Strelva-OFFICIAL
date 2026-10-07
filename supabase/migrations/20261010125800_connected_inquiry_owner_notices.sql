@@ -1,5 +1,6 @@
 -- Connected-site owner notices retain acceptance and delivery evidence without
 -- inventing a tenant. New callers require INQUIRY_RECORDS + OWNER_NOTICES.
+begin;
 set local lock_timeout = '3s';
 create table public.connected_inquiry_owner_notices (
   lead_row_id uuid primary key references public.tenant_leads(id),
@@ -95,3 +96,4 @@ revoke all on function public.claim_connected_inquiry_owner_notice(uuid,uuid,uui
  public.record_connected_inquiry_owner_notice_event(uuid,uuid,text,text,text,timestamptz,timestamptz,text[],text),public.list_connected_inquiry_owner_notices_not_told() from public,anon,authenticated;
 grant execute on function public.claim_connected_inquiry_owner_notice(uuid,uuid,uuid,text),public.finish_connected_inquiry_owner_notice(uuid,text,text,timestamptz),
  public.record_connected_inquiry_owner_notice_event(uuid,uuid,text,text,text,timestamptz,timestamptz,text[],text),public.list_connected_inquiry_owner_notices_not_told() to service_role;
+commit;

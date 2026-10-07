@@ -1,5 +1,6 @@
 -- Shared first-reply exclusion between owner-authored and governed replies.
 -- New engine callers are gated by STRELVA_INQUIRY_REPLIES + INQUIRY_RECORDS.
+begin;
 set local lock_timeout = '3s';
 
 create table public.inquiry_engine_reply_claims (
@@ -58,3 +59,4 @@ create trigger inquiry_workspace_reply_shared_purpose before insert on public.in
 revoke all on function public.guard_workspace_inquiry_reply_purpose() from public,anon,authenticated,service_role;
 revoke all on function public.claim_engine_inquiry_reply(text,text,uuid),public.release_rejected_engine_inquiry_reply(text,text,uuid) from public,anon,authenticated;
 grant execute on function public.claim_engine_inquiry_reply(text,text,uuid),public.release_rejected_engine_inquiry_reply(text,text,uuid) to service_role;
+commit;

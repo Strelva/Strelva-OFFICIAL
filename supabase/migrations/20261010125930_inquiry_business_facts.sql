@@ -1,5 +1,6 @@
 -- Website-derived suggestions are owner decisions, never accepted facts.
 -- Local preparation only. All RPCs remain service-role-only and app gated.
+begin;
 set local lock_timeout = '3s';
 create table public.inquiry_business_fact_proposals (
   id uuid primary key default gen_random_uuid(),
@@ -113,3 +114,4 @@ begin
 end; $$;
 revoke all on function public.stage_inquiry_business_fact(uuid,uuid,text,jsonb,text),public.read_inquiry_business_facts(uuid,uuid),public.inquiry_business_fact_revision(uuid,uuid),public.confirm_inquiry_business_fact(uuid,uuid,uuid,text),public.correct_inquiry_business_fact(uuid,uuid,text,jsonb) from public,anon,authenticated;
 grant execute on function public.stage_inquiry_business_fact(uuid,uuid,text,jsonb,text),public.read_inquiry_business_facts(uuid,uuid),public.inquiry_business_fact_revision(uuid,uuid),public.confirm_inquiry_business_fact(uuid,uuid,uuid,text),public.correct_inquiry_business_fact(uuid,uuid,text,jsonb) to service_role;
+commit;

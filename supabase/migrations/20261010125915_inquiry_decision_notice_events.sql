@@ -1,5 +1,6 @@
 -- Signed provider reports reconcile urgent owner decision mail independently
 -- of send retries. Existing flags select only the new exact-subject claim RPC.
+begin;
 set local lock_timeout = '3s';
 alter table public.inquiry_decision_notice_claims add column subject text, add column provider_event_at timestamptz;
 alter table public.inquiry_decision_notice_claims drop constraint inquiry_decision_notice_claims_status_check;
@@ -60,3 +61,4 @@ begin
 end $$;
 revoke all on function public.claim_inquiry_decision_notice_v2(uuid,uuid,text,text,text),public.record_inquiry_decision_notice_event(uuid,uuid,text,text,text,timestamptz,timestamptz,text[],text) from public,anon,authenticated;
 grant execute on function public.claim_inquiry_decision_notice_v2(uuid,uuid,text,text,text),public.record_inquiry_decision_notice_event(uuid,uuid,text,text,text,timestamptz,timestamptz,text[],text) to service_role;
+commit;

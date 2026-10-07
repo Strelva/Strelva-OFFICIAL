@@ -1,5 +1,6 @@
 -- Inquiry business facts are read at use. The operator notice list reads
 -- durable evidence only and never sends mail or creates approval authority.
+begin;
 set local lock_timeout = '3s';
 
 create function public.read_inquiry_business_context(p_tenant_id text) returns jsonb
@@ -60,3 +61,4 @@ end;
 $$;
 revoke all on function public.authorize_inquiry_owner_notice_repair(text,text,uuid,text) from public, anon, authenticated;
 grant execute on function public.authorize_inquiry_owner_notice_repair(text,text,uuid,text) to service_role;
+commit;

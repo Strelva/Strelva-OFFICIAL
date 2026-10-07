@@ -1,5 +1,6 @@
 -- Bound the cache merge to IDs genuinely waiting for their durable copy.
 -- Includes held records: cache fallback cannot undo a durable spam decision.
+begin;
 set local lock_timeout = '3s';
 create function public.read_tenant_lead_presence(p_tenant_id text,p_lead_ids text[]) returns jsonb
 language plpgsql stable security definer set search_path = public,pg_temp as $$
@@ -13,3 +14,4 @@ end $$;
 revoke all on function public.read_tenant_lead_presence(text,text[]) from public,anon,authenticated;
 grant execute on function public.read_tenant_lead_presence(text,text[]) to service_role;
 comment on table public.tenant_leads is 'Durable inquiry store. Redis is a cache only when the guarded read and authority switches are enabled.';
+commit;
