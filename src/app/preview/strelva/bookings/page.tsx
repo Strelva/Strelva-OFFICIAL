@@ -41,6 +41,14 @@ export default async function BookingsPreviewPage({ searchParams }: { searchPara
     : name === "unavailable" ? ready([{ ...site, bookings: [], unavailable: true }])
     : name === "two-sites" ? ready([site, { ...site, tenantId: "twintrees-b", siteName: "Twin Trees Spa", bookings: site.bookings.slice(0, 2) }])
     // Booking-only hours (owner or admin, one store in use): narrowed, following opening hours, or no record hours yet.
+    : name === "owner-evidence" ? ready([{ ...site, evidence: { calendarHealth: "reconnect", paused: false, truncated: false }, bookings: site.bookings.map((booking, index) => ({ ...booking,
+      ...(index === 0 ? { status: "no_show" as const } : {}),
+      evidence: { outsideRecordHours: index === 1, canMarkNoShow: index === 1, historyTruncated: false,
+        calendar: index === 1 ? { status: "failed" as const, updatedAt: "2026-11-06T12:00:00Z" } : null,
+        history: [{ kind: "change" as const, actor: "visitor" as const, from: null, to: "requested" as const, reason: null, at: "2026-11-01T13:00:00Z" },
+          { kind: "change" as const, actor: "owner" as const, from: "requested" as const, to: "confirmed" as const, reason: "Owner approved", at: "2026-11-01T14:00:00Z" },
+          { kind: "reminder" as const, reminder: "reminder_24h" as const, status: "suppressed" as const, at: "2026-11-05T14:00:00Z" }] }
+    })) }])
     : name === "hours" ? ready([{ ...site, hours: { record: OPENING, bookable: [{ day: 2, opens: "10:00", closes: "14:00" }, { day: 3, opens: "10:00", closes: "18:00" }, { day: 4, opens: "10:00", closes: "18:00" }, { day: 5, opens: "10:00", closes: "18:00" }, { day: 6, opens: "10:00", closes: "16:00" }] } }])
     : name === "hours-open" ? ready([{ ...site, hours: { record: OPENING, bookable: null } }])
     : name === "hours-norecord" ? ready([{ ...site, hours: { record: null, bookable: null } }])

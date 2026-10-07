@@ -6,8 +6,10 @@ import { getTenantSiteName } from "@/lib/tenant-display";
 import type { Booking, BookingConfig } from "@/lib/types";
 import { callReleaseFlagsRpc } from "@/platform/release-flags/store";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
-import { bookingStoreWriteEnabled } from "@/platform/bookings/flags";
-import { BookingStoreError, readBookingContext, setTenantBookingHours } from "@/platform/bookings/store";
+import { bookingReadSource, bookingStoreWriteEnabled } from "@/platform/bookings/flags";
+import { BookingStoreError, readBookingContext, setTenantBookingHours, type StoreBooking, type StoreBookingStatus, type BookingContext } from "@/platform/bookings/store";
+import { readOwnerBookingEvidence, markOwnerBookingNoShow, type OwnerBookingEvidence, type BookingHistoryEntry } from "@/platform/bookings/owner-evidence";
+import { openRanges, settingsOrDefault } from "@/platform/bookings/availability";
 import { assertWorkspaceCalendarManager } from "@/products/scheduling/server";
 
 /**
@@ -32,7 +34,8 @@ export interface BookingRow {
   clientPhone: string;
   serviceName: string;
   notes?: string;
-  status: Booking["status"];
+  status: StoreBookingStatus;
+  evidence?: { history: BookingHistoryEntry[]; historyTruncated: boolean; calendar: OwnerBookingEvidence["bookings"][number]["calendar"]; outsideRecordHours: boolean | null; canMarkNoShow: boolean };
 }
 
 export interface SiteBookings {
@@ -51,6 +54,7 @@ export interface SiteBookings {
    * narrowing (null means bookable whenever the business is open).
    */
   hours?: BookingHoursView;
+  evidence?: { calendarHealth: OwnerBookingEvidence["calendarHealth"]; truncated: boolean; paused: boolean };
 }
 
 export interface BookingHoursView {
@@ -77,6 +81,9 @@ export interface BookingDependencies {
   hours?: (tenantId: string) => Promise<BookingHoursView | null>;
   /** Whether this person may change what the business accepts (owner or admin). */
   canManage?: (actor: WorkspaceActor, workspaceId: string) => Promise<boolean>;
+  readSource?: typeof bookingReadSource;
+  evidence?: typeof readOwnerBookingEvidence;
+  context?: typeof readBookingContext;
 }
 
 async function storeHours(tenantId: string): Promise<BookingHoursView | null> {
@@ -101,6 +108,9 @@ const defaults: BookingDependencies = {
   siteName: async (tenantId) => getTenantSiteName(tenantId, (await getTenantConfig(tenantId).catch(() => null)) ?? undefined),
   hours: storeHours,
   canManage: canManageBookings,
+  readSource: bookingReadSource,
+  evidence: readOwnerBookingEvidence,
+  context: readBookingContext,
 };
 
 export function addDays(date: string, days: number): string {
@@ -126,6 +136,25 @@ function row(b: Booking): BookingRow {
     id: b.id, date: b.date, startTime: b.startTime, endTime: b.endTime, clientName: b.clientName, clientEmail: b.clientEmail,
     clientPhone: b.clientPhone, serviceName: b.serviceName, ...(b.notes ? { notes: b.notes } : {}), status: b.status,
   };
+}
+
+export function bookingOutsideRecordHours(booking: StoreBooking, context: BookingContext): boolean | null {
+  if (!context.hours) return null;
+  const local = (instant: string) => {
+    const parts = new Intl.DateTimeFormat("en-US", { timeZone: context.hours!.timezone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(instant));
+    const value = (key: string) => parts.find((part) => part.type === key)?.value;
+    return { date: `${value("year")}-${value("month")}-${value("day")}`, time: `${value("hour")}:${value("minute")}` };
+  };
+  const start = local(booking.start), end = local(booking.end);
+  if (start.date !== end.date || start.time >= end.time) return true;
+  const ranges = openRanges({ ...context, settings: { ...settingsOrDefault(context), bookableHours: null, bookableOverrides: null } }, start.date);
+  return !ranges.some((range) => range.opens <= start.time && range.closes >= end.time);
+}
+
+function storeRow(b: StoreBooking): BookingRow {
+  return { id: b.legacyId ?? b.id, date: b.localDate, startTime: b.localStart, endTime: b.localEnd,
+    clientName: b.customer.name, clientEmail: b.customer.email ?? "", clientPhone: b.customer.phone ?? "",
+    serviceName: b.serviceName, status: b.status, ...(b.intakeAnswers.notes ? { notes: b.intakeAnswers.notes } : {}) };
 }
 
 async function linkedTenants(actor: WorkspaceActor, workspaceId: string): Promise<string[]> {
@@ -155,9 +184,24 @@ export async function readWorkspaceBookings(
   // One date for the page: the asked-for date, else the first site's local today.
   const anchor = options.date && isoDate.test(options.date) ? options.date : (sites[0]?.today ?? zonedTodayIso("America/New_York", options.now));
   const range = bookingRange(options.view, anchor);
+  const storeServes = dependencies.evidence && (await (dependencies.readSource ?? bookingReadSource)()) === "postgres";
   await Promise.all(sites.map(async (site) => {
     if (site.unavailable) return;
     try {
+      if (storeServes) {
+        const [evidence, context] = await Promise.all([
+          dependencies.evidence!(actor, workspaceId, site.tenantId, range),
+          (dependencies.context ?? readBookingContext)(site.tenantId),
+        ]);
+        if (!context) throw new BookingStoreError("failed");
+        site.evidence = { calendarHealth: evidence.calendarHealth, truncated: evidence.truncated, paused: context.paused };
+        site.bookings = evidence.bookings.map(({ booking, history, historyTruncated, calendar }) => {
+          return { ...storeRow(booking), evidence: { history, historyTruncated, calendar,
+            outsideRecordHours: bookingOutsideRecordHours(booking, context),
+            canMarkNoShow: booking.status === "confirmed" && Date.parse(booking.end) <= (options.now ?? new Date()).getTime() } };
+        });
+        return;
+      }
       const bookings = await dependencies.bookings(site.tenantId, range);
       site.bookings = bookings
         .filter((b) => b.date >= range.from && b.date <= range.to)
@@ -235,7 +279,7 @@ export const bookingStatusChange = z.object({
   workspaceId: z.string().uuid(),
   tenantId: z.string().min(1).max(80),
   bookingId: z.string().min(1).max(120),
-  status: z.enum(["completed", "confirmed", "cancelled"]),
+  status: z.enum(["completed", "confirmed", "cancelled", "no_show"]),
 }).strict();
 export type BookingStatusChange = z.infer<typeof bookingStatusChange>;
 
@@ -266,10 +310,21 @@ export async function changeWorkspaceBooking(
     linked?: (actor: WorkspaceActor, workspaceId: string) => Promise<string[]>;
     read?: (tenantId: string) => Promise<Booking[]>;
     update?: typeof updateBooking;
+    readSource?: typeof bookingReadSource;
+    markNoShow?: typeof markOwnerBookingNoShow;
   } = {},
 ): Promise<BookingRow> {
   const tenants = await (dependencies.linked ?? linkedTenants)(actor, input.workspaceId);
   if (!tenants.includes(input.tenantId)) throw new BookingNotFoundError();
+  if (input.status === "no_show") {
+    if ((await (dependencies.readSource ?? bookingReadSource)()) !== "postgres") throw new BookingNotFoundError();
+    try {
+      return storeRow(await (dependencies.markNoShow ?? markOwnerBookingNoShow)(actor, input.workspaceId, input.tenantId, input.bookingId));
+    } catch (error) {
+      if (error instanceof BookingStoreError && error.code === "not_found") throw new BookingNotFoundError();
+      throw error;
+    }
+  }
   const current = (await (dependencies.read ?? ((tenantId: string) => getBookings(tenantId)))(input.tenantId)).find((b) => b.id === input.bookingId);
   if (!current) throw new BookingNotFoundError();
   // Approving or declining a request is a Needs you decision, never a list action.

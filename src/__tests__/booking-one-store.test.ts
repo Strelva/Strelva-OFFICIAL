@@ -257,7 +257,7 @@ function fakeWorld(overrides: Partial<FakeTenant> = {}) {
 describe("one booking store, both route families (in-memory store)", () => {
   it("the real public and widget routes follow changed Friday facts and share request commitments", async () => {
     const { world } = fakeWorld(); env("postgres");
-    vi.stubEnv("STRELVA_BOOKING_MESSAGES", "0"); vi.stubEnv("STRELVA_BOOKING_CALENDAR_BUSY", "0");
+    vi.stubEnv("STRELVA_BOOKING_MESSAGES", "0"); vi.stubEnv("STRELVA_BOOKING_CALENDAR_BUSY", "0"); vi.stubEnv("SECRETS_ENC_KEY", "ab".repeat(32));
     await upsertBookingSettings(world.tenant, { ...STORE_SETTINGS, mode: "request", bufferMinutes: 15 }, "native", world.db);
     const tokens = new Map<string, PublicBookingReservationRef>();
     const service = createPublicBookingService({
@@ -723,8 +723,9 @@ describe("the wellness schedule and roster show the same bookings before and aft
       const listAfter = await getBookings("t1");
 
       expect(dayBefore.sites[0]!.bookings.map((b) => [b.clientName, b.startTime, b.status])).toEqual([["Dana Reed", "10:00", "confirmed"], ["Sam Lee", "10:45", "completed"], ["Ana Ruiz", "11:30", "confirmed"]]);
-      expect(dayAfter.sites[0]!.bookings).toEqual(dayBefore.sites[0]!.bookings);
-      expect(weekAfter.sites[0]!.bookings).toEqual(weekBefore.sites[0]!.bookings);
+      expect(dayAfter.sites[0]!.bookings.map(({ evidence: _evidence, ...booking }) => booking)).toEqual(dayBefore.sites[0]!.bookings);
+      expect(dayAfter.sites[0]!.bookings.every((booking) => booking.evidence?.history.length)).toBe(true);
+      expect(weekAfter.sites[0]!.bookings.map(({ evidence: _evidence, ...booking }) => booking)).toEqual(weekBefore.sites[0]!.bookings);
       const sortKey = (b: Booking) => `${b.date} ${b.startTime}`;
       expect([...listAfter].sort((a, b) => sortKey(a).localeCompare(sortKey(b)))).toEqual([...listBefore].sort((a, b) => sortKey(a).localeCompare(sortKey(b))));
     } finally {

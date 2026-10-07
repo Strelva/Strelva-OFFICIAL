@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { addDays, type BookingRow, type BookingView, type SiteBookings, type WorkspaceBookings as Bookings } from "@/products/bookings/server";
 import { BookingActions } from "./BookingActions";
+import { CalendarConnectionPanel } from "@/experience/scheduling/CalendarConnectionPanel";
 import { BookingHoursEditor } from "./BookingHoursEditor";
 
 /**
@@ -24,6 +25,9 @@ const STATUS: Record<BookingRow["status"], string> = {
   completed: "Checked in",
   cancelled: "Cancelled",
   requested: "Waiting for the owner",
+  held: "Waiting for customer confirmation",
+  declined: "Declined",
+  no_show: "No-show",
 };
 
 function dayLabel(date: string, style: "long" | "short" = "long"): string {
@@ -47,7 +51,7 @@ function href(workspaceId: string, view: BookingView, date?: string): string {
 }
 
 function BookingItem({ booking, site, workspaceId, view }: { booking: BookingRow; site: SiteBookings; workspaceId: string; view: BookingView }) {
-  const muted = booking.status === "cancelled";
+  const muted = booking.status === "cancelled" || booking.status === "declined";
   return (
     <li className="flex flex-col gap-3 border-t border-gray-border py-4 first:border-t-0 sm:flex-row sm:items-start sm:justify-between">
       <div className={muted ? "text-gray-muted" : undefined}>
@@ -67,7 +71,24 @@ function BookingItem({ booking, site, workspaceId, view }: { booking: BookingRow
           </p>
         ) : null}
       </div>
-      <BookingActions workspaceId={workspaceId} tenantId={site.tenantId} bookingId={booking.id} status={booking.status} clientName={booking.clientName} view={view} />
+      {booking.evidence ? (
+        <div className="min-w-0 sm:max-w-[260px]">
+          {booking.evidence.outsideRecordHours && (booking.status === "confirmed" || booking.status === "requested") ? <p className="text-sm leading-6 text-critical">Outside the business&apos;s current opening hours. This booking is kept; review it with the customer.</p> : null}
+          {booking.evidence.calendar && booking.evidence.calendar.status !== "skipped" ? <p className="text-sm leading-6 text-gray-muted">{booking.evidence.calendar.status === "verified" ? "Calendar copy verified." : "Not on your calendar yet. The booking is kept; the calendar copy needs review."}</p> : null}
+          {!booking.evidence.calendar && booking.status === "confirmed" && site.evidence?.calendarHealth === "connected" ? <p className="text-sm leading-6 text-gray-muted">No calendar copy has been verified yet. The booking is kept.</p> : null}
+          <details className="mt-2 text-sm">
+            <summary className="inline-flex min-h-11 cursor-pointer items-center rounded-md font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2">Booking history</summary>
+            {booking.evidence.history.length === 0 ? <p className="mt-2 text-gray-muted">No history is recorded yet.</p> : <ol className="mt-2 space-y-2">{booking.evidence.history.map((entry, index) => (
+              <li key={index} className="text-gray-muted">
+                <p>{entry.kind === "change" ? `${entry.reason ?? STATUS[entry.to]} · ${entry.actor === "visitor" ? "Customer" : entry.actor === "strelva" ? "Strelva" : entry.actor.charAt(0).toUpperCase() + entry.actor.slice(1)}` : `${entry.reminder === "reminder_24h" ? "24-hour reminder" : entry.reminder === "reminder_2h" ? "2-hour reminder" : entry.reminder === "request_owner_reminder" ? "Owner reminder" : "Request expiry notice"} · ${entry.status === "sent" ? "Accepted by email provider" : entry.status === "claimed" ? "Delivery not confirmed" : entry.status === "suppressed" ? "Not sent: email is disabled" : entry.status === "skipped" ? "Not sent" : "Delivery failed"}`}</p>
+                <time dateTime={entry.at}>{new Date(entry.at).toLocaleString("en-US", { timeZone: site.timezone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" })}</time>
+              </li>
+            ))}</ol>}
+            {booking.evidence.historyTruncated ? <p className="mt-2 text-gray-muted">Showing the latest 50 history entries.</p> : null}
+          </details>
+        </div>
+      ) : null}
+      <BookingActions canMarkNoShow={booking.evidence?.canMarkNoShow} workspaceId={workspaceId} tenantId={site.tenantId} bookingId={booking.id} status={booking.status} clientName={booking.clientName} view={view} />
     </li>
   );
 }
@@ -80,7 +101,7 @@ function DayList({ site, date, workspaceId, view }: { site: SiteBookings; date: 
 
 function SiteSection({ site, bookings, workspaceId, many }: { site: SiteBookings; bookings: Bookings; workspaceId: string; many: boolean }) {
   const days = bookings.view === "day" ? [bookings.from] : Array.from({ length: 7 }, (_, i) => addDays(bookings.from, i));
-  const active = site.bookings.filter((b) => b.status !== "cancelled");
+  const active = site.bookings.filter((b) => !["cancelled", "declined", "no_show", "held"].includes(b.status));
   const checkedIn = active.filter((b) => b.status === "completed").length;
   return (
     <section className="mt-8" aria-labelledby={`site-${site.tenantId}`}>
@@ -91,6 +112,15 @@ function SiteSection({ site, bookings, workspaceId, many }: { site: SiteBookings
         </Card>
       ) : (
         <Card padding="lg">
+          {site.evidence ? <div className="mb-4 space-y-2 text-sm leading-6 text-gray-muted">
+            {site.evidence.paused ? <p>Bookings are paused. Existing bookings and customer manage links stay available.</p> : null}
+            {site.evidence.calendarHealth === "reconnect" ? <p>Reconnect your calendar. Bookings are kept, and new bookings can still be requested.</p> : site.evidence.calendarHealth === "setup" ? <p>Your calendar needs setup. Bookings work while it is disconnected.</p> : site.evidence.calendarHealth === "not_connected" ? <p>No calendar is connected. Your booking records are kept here.</p> : null}
+            {site.hours && site.evidence.calendarHealth !== "connected" ? <details>
+              <summary className="inline-flex min-h-11 cursor-pointer items-center font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2">Reconnect or choose a calendar</summary>
+              <CalendarConnectionPanel workspaceId={workspaceId} />
+            </details> : null}
+            {site.evidence.truncated ? <p role="status">Showing the first 500 bookings in this date range. Open the day view to narrow the list.</p> : null}
+          </div> : null}
           {bookings.view === "day" ? (
             <p className="text-sm text-gray-muted">
               {active.length === 0 ? "Nothing booked." : `${active.length} ${active.length === 1 ? "appointment" : "appointments"} · ${checkedIn} checked in`}
@@ -152,17 +182,17 @@ export function WorkspaceBookings({ workspaceId, state, view }: { workspaceId: s
               <nav aria-label="Bookings view" className="inline-flex rounded-lg border border-gray-border p-0.5">
                 {(["day", "week"] as const).map((value) => (
                   <a key={value} href={href(workspaceId, value, ready!.from)} aria-current={view === value ? "page" : undefined}
-                    className={`rounded-md px-3 py-1.5 text-sm font-medium ${view === value ? "bg-warm-black text-warm-white" : "text-gray-muted hover:text-warm-black"}`}>
+                    className={`inline-flex items-center max-sm:min-h-11 rounded-md px-3 py-1.5 text-sm font-medium ${view === value ? "bg-warm-black text-warm-white" : "text-gray-muted hover:text-warm-black"}`}>
                     {value === "day" ? "Day" : "Week"}
                   </a>
                 ))}
               </nav>
               <nav aria-label={view === "day" ? "Change day" : "Change week"} className="flex items-center gap-1 text-sm">
-                <a className="rounded-md px-2 py-1.5 text-gray-muted hover:bg-gray-bg hover:text-warm-black" href={href(workspaceId, view, addDays(ready!.from, -step))}>
+                <a className="inline-flex items-center max-sm:min-h-11 rounded-md px-2 py-1.5 text-gray-muted hover:bg-gray-bg hover:text-warm-black" href={href(workspaceId, view, addDays(ready!.from, -step))}>
                   {view === "day" ? "Previous day" : "Previous week"}
                 </a>
-                <a className="rounded-md px-2 py-1.5 text-gray-muted hover:bg-gray-bg hover:text-warm-black" href={href(workspaceId, view)}>Today</a>
-                <a className="rounded-md px-2 py-1.5 text-gray-muted hover:bg-gray-bg hover:text-warm-black" href={href(workspaceId, view, addDays(ready!.from, step))}>
+                <a className="inline-flex items-center max-sm:min-h-11 rounded-md px-2 py-1.5 text-gray-muted hover:bg-gray-bg hover:text-warm-black" href={href(workspaceId, view)}>Today</a>
+                <a className="inline-flex items-center max-sm:min-h-11 rounded-md px-2 py-1.5 text-gray-muted hover:bg-gray-bg hover:text-warm-black" href={href(workspaceId, view, addDays(ready!.from, step))}>
                   {view === "day" ? "Next day" : "Next week"}
                 </a>
               </nav>
