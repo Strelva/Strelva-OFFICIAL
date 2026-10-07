@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { reconcileInquiryProviderEvent } from "@/products/inquiries";
+import { reconcileInquiryProviderEvent, reconcileWorkspaceInquiryProviderEvent } from "@/products/inquiries";
 
 export const dynamic = "force-dynamic";
 export const MAX_RESEND_WEBHOOK_BODY_BYTES = 1024 * 1024;
@@ -70,7 +70,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "Invalid webhook signature" }, { status: 401 });
   }
 
-  const result = await reconcileInquiryProviderEvent({ event, eventId });
+  const workspaceResult = await reconcileWorkspaceInquiryProviderEvent({ event, eventId });
+  const result = workspaceResult.status === "ignored"
+    ? await reconcileInquiryProviderEvent({ event, eventId })
+    : workspaceResult;
   if (result.status === "unavailable") {
     return NextResponse.json({ received: false, status: result.status, reason: result.reason }, { status: 503 });
   }

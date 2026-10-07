@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   verify: vi.fn(),
   reconcile: vi.fn(),
+  workspace: vi.fn(),
 }));
 
 vi.mock("resend", () => ({
@@ -12,6 +13,8 @@ vi.mock("resend", () => ({
 }));
 vi.mock("@/products/inquiries/reconciliation", () => ({ reconcileInquiryProviderEvent: mocks.reconcile }));
 
+vi.mock("@/products/inquiries/workspace-replies", () => ({ reconcileWorkspaceInquiryProviderEvent: mocks.workspace }));
+
 import { POST } from "@/app/api/webhooks/resend/route";
 import { MAX_RESEND_WEBHOOK_BODY_BYTES } from "@/app/api/webhooks/resend/route";
 
@@ -20,6 +23,7 @@ beforeEach(() => {
   vi.stubEnv("RESEND_WEBHOOK_SECRET", "whsec_test");
   mocks.verify.mockReturnValue({ type: "email.delivered", data: { email_id: "provider-1" } });
   mocks.reconcile.mockResolvedValue({ status: "recorded" });
+  mocks.workspace.mockResolvedValue({ status: "ignored" });
 });
 
 afterEach(() => vi.unstubAllEnvs());
@@ -73,6 +77,27 @@ describe("Resend inquiry webhook", () => {
       headers: { "svix-id": "evt-1", "svix-timestamp": "1720000000", "svix-signature": "v1,test" },
     }));
     expect(response.status).toBe(503);
+  });
+
+  it("routes signed workspace receipts directly and never asks the Redis reconciler", async () => {
+    mocks.workspace.mockResolvedValue({ status: "recorded" });
+    const response = await POST(new Request("https://app.strelva.test/api/webhooks/resend", {
+      method: "POST", body: "{}",
+      headers: { "svix-id": "evt-workspace", "svix-timestamp": "1720000000", "svix-signature": "v1,test" },
+    }));
+    expect(response.status).toBe(200);
+    expect(mocks.workspace).toHaveBeenCalledWith({ event: expect.anything(), eventId: "evt-workspace" });
+    expect(mocks.reconcile).not.toHaveBeenCalled();
+  });
+
+  it("keeps failed workspace persistence retryable without another send", async () => {
+    mocks.workspace.mockResolvedValue({ status: "unavailable", reason: "DB unavailable" });
+    const response = await POST(new Request("https://app.strelva.test/api/webhooks/resend", {
+      method: "POST", body: "{}",
+      headers: { "svix-id": "evt-workspace", "svix-timestamp": "1720000000", "svix-signature": "v1,test" },
+    }));
+    expect(response.status).toBe(503);
+    expect(mocks.reconcile).not.toHaveBeenCalled();
   });
 
   it("rejects a bad provider signature without parsing or reconciling", async () => {

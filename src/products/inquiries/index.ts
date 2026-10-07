@@ -1,5 +1,7 @@
 /** Public product entry point for inquiry operations used by routes and jobs. */
 
+export { reconcileWorkspaceInquiryProviderEvent } from "./workspace-replies";
+
 export { inquiryOutcomeProofEnabled, readTenantInquiryOutcomeProof } from "./outcome-proof";
 
 export { runDueInquiryFollowUps } from "./follow-up-cron";
