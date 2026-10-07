@@ -1,16 +1,16 @@
 # Publishing at 1.0.0: reviews, Google, blog and newsletter
 
-Status: draft spec, 2026-10-06, built locally on branch `build/publishing`
-(2026-10-06). Not approved, not deployed, no migration applied, no Google
-call made. Proven locally with mocked Google and a throwaway Postgres; see
-"Built locally" at the end.
+Status: draft spec; workspace implementation extended on `w6/publishing`,
+2026-10-07. Local Google doubles, isolated SQL and desktop/mobile fixtures;
+no production deployment, migration, Google write or live email in this stream.
+See the Wave 6 status below and [stream handoff](../../product/streams/w6-publishing.md).
 
 Publishing here means four jobs: replying to reviews, keeping the Google
 Business Profile right (hours, info, posts), publishing blog and collection
-entries, and sending a newsletter. All four run from the workspace, through
-approval, and leave a receipt. Today all four are tenant-side only
-(`src/lib/capabilities.ts` ids `blog`, `reviews`, `google_business`, `email`).
-The workspace has none of them.
+entries, and sending a newsletter. At launch, all four run from the workspace, through
+approval, and leave a receipt. The original tenant stores remain shared with
+the workspace behind the publishing release gate. Newsletter workspace issues
+are approved immutable snapshots with sending paused; approval sends no email.
 
 ## 1. The moment
 
@@ -506,3 +506,39 @@ records in `outside_write_receipts`. Neither path calls the other's writer
 listing System, it switches ledgers rather than writing both. The poller URL
 fix, v1 `locations/{id}` parsing and the 1–2 star rule are unchanged by the
 merge. See `docs/architecture/persistence-boundaries.md`.
+
+## Wave 6 implementation status (2026-10-07)
+
+This supersedes the October 6 "Not built" list for the behaviors below. The
+final local verification and preserved failures live in the stream handoff.
+
+| Launch behaviors from section 3 | Implementation and local evidence |
+| --- | --- |
+| 1–2: named listing, no-grant connection offer, separate health/lifecycle | Existing projection plus persisted listing pause/access controls; `publishing-projection`, `publishing-experience`, `publishing-poll-health` tests |
+| 3–6, 15: review sync/draft/approve/auto and shared tenant state | Existing poll/draft crons and shared review store, pause-aware drafting, listing reply execution/receipt through the existing event claim; `review-reply-listing-path`, `review-auto-post`, `publishing-pacing` tests. New decision notices remain off by default |
+| 7: edit/withdraw published replies | Workspace owner actions keep previous text and undo; each reply command has identity, so identical text may be restored after withdrawal. Provider uncertainty blocks retry; `publishing-google-execution`, `google-listing-service` tests |
+| 8–9: hours/special hours and phone/website/description | Owner record fields and revision-bound Google drafts; field removal produces an exact clear; record commit survives each location's failure. Default is separate Google approvals. Optional combined consent requires both its own release gate and the visible disclosure; `publishing-record-changes`, `publishing-record-route` tests |
+| 10, 13: posts, governed writes, read-back and undo | STANDARD/EVENT/OFFER forms, date/CTA validation, profile pacing, immutable receipts, accepted/unconfirmed outcomes, stable approval receipt identity. Only durable definitive rejection permits another dispatch; accepted and uncertain retries block, including event-marker failures; Google service/execution tests |
+| 11: blog/collection compose, approve, publish, restore | Website System content workspace and one shared store; SQL commits publication and receipt atomically, refuses stale writes and recovers a receipt without replacing later edits. Restore/unpublish is a fresh review; content-service tests and `workspace-publishing-content-schema.sql` |
+| 12: newsletter approval and receipts | Immutable approved issue and paused receipt with provider-accepted zero, paused suppression count and delivery unknown; SQL proves replay and immutability. Approved history survives audience zero or audience-read failure. Sending these issued workspace snapshots is deliberately not wired; existing legacy newsletter sending remains separate |
+| 14: reconnect without a workspace session | Signed expiring owner link, explicit GET confirmation, browser/state-bound OAuth, single use, live owner/binding recheck, dual-write token restoration, one outage notice claim; reconnect unit and SQL tests. Notice transport remains behind all email/release/tenant gates |
+
+Four additive migrations and rollbacks are prepared in the assigned range:
+`20261010140000`, `20261010141000`, `20261010142000`, `20261010143000`.
+No new cron or dependency. Existing Needs you chase owns publishing decision
+and reconnect notices. `STRELVA_PUBLISHING_RELEASE`,
+`STRELVA_RECORD_GOOGLE_APPROVAL_POLICY` and `STRELVA_PUBLISHING_NOTICES_SEND`
+default off. No flag was enabled.
+
+**Not launch-complete.** Workspace newsletter snapshots have no delivery
+executor, and sending remains paused. Native businesses with no linked tenant
+do not yet have these tenant-backed authoring paths. Multiple Google locations
+project as separate Systems; Version lineage is not added by this stream.
+These are code/product scope limits, not production verification claims.
+
+Production still must establish Google API quota/access, verified OAuth status
+and scopes, encryption configuration, binding-copy counts, an eligible test
+profile, real provider writes/read-back/undo, mail domain/consent readiness,
+authenticated client parity for 14 days and zero fallback for the last seven.
+Applying migrations, changing environment, enabling notices or policy, and
+deploying require Jacob's explicit authorization and the release checklist.

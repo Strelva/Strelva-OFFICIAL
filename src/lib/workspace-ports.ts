@@ -210,6 +210,7 @@ export type TenantReplyAuthority =
 
 export interface TenantReviewRepliesPort {
   defaultTenantReplyDeps(): Promise<TenantReplyDepsHandle>;
+  listingDraftingAllowed(tenantId: string, locationId?: string): Promise<boolean>;
   routeTenantReviewReply(tenantId: string, deps: TenantReplyDepsHandle): Promise<{ kind: "legacy"; reason: string } | { kind: "listing"; workspaceId: string }>;
   postTenantReviewReply(input: {
     tenantId: string; workspaceId: string; eventId: string; attemptId: string; reviewId: string; text: string;
@@ -246,6 +247,13 @@ export interface WebsitePublicationReadbackPort {
   }): Promise<void>;
 }
 
+export interface PublishingContentPort {
+  authorizePublishingEvent(input: { tenantId: string; event: UnifiedEvent; actorId: string }): Promise<{ allowed: boolean; reason?: string }>;
+  prepareTenantCollectionDraft(input: { tenantId: string; actor: VerifiedActor | null; draft: unknown }): Promise<{ eventId: string; slug: string } | null>;
+
+  executePublishingEvent(input: { tenantId: string; event: UnifiedEvent; actorId: string; attemptId: string }): Promise<null | { accepted: boolean; reason?: string; receiptId?: string; verified?: boolean }>;
+}
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 export interface WorkspacePorts {
@@ -259,6 +267,7 @@ export interface WorkspacePorts {
   tenantReviewReplies(): Promise<TenantReviewRepliesPort>;
   websites(): Promise<WebsitesPort>;
   websitePublicationReadback(): Promise<WebsitePublicationReadbackPort>;
+  publishingContent(): Promise<PublishingContentPort>;
 }
 
 const SLOT = Symbol.for("strelva.workspace-ports");

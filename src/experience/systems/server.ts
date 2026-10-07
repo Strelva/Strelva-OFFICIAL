@@ -1,3 +1,4 @@
+import { publishingEnabledForWorkspace } from "@/products/publishing/server";
 /**
  * Server projection for the Systems experience. Server only: it reads the
  * spine, existing monitors and saved rebuilds, and runs Make real on an
@@ -42,7 +43,7 @@ import { planFingerprint } from "@/platform/make-real/approvals";
 import { bareHostname, websiteRebuildCandidate, type WebsiteRebuildCandidate } from "@/products/websites/index";
 import type { WorkspaceMakeRealResult, WorkspacePublishing, WorkspaceSystems } from "@/experience/workspace/contracts";
 import { addPublishingSystems, type PublishingProjection } from "@/products/publishing/projection";
-import { publishingReleaseEnabled, readPublishingExtras, readPublishingSnapshot } from "@/products/publishing/server";
+import { readPublishingExtras, readPublishingSnapshot } from "@/products/publishing/server";
 import { receiptHeadline } from "@/products/google-listing/service";
 import {
   REBUILD_SOURCE_PREFIX,
@@ -331,7 +332,7 @@ async function liveProjectionInput(deps: LiveSystemsDeps): Promise<SystemsProjec
   const spine = await listBusinessSystems(deps.actor, deps.businessId, { store: createSupabaseSystemStore(), connectedSites: connectedSitesReader(deps.actor, deps.businessId) });
   const tenantFacts = await readTenantSiteFacts(spine, deps.siteDomains);
   const { bookingViews, ...surfaced } = withTenantSurfaces(spine, tenantFacts.facts);
-  const published = publishingReleaseEnabled() ? await withPublishing(surfaced, deps.actor, now) : null;
+  const published = await publishingEnabledForWorkspace(surfaced.businessId, deps.actor) ? await withPublishing(surfaced, deps.actor, now) : null;
   const listing = published?.listing ?? surfaced;
   return {
     listing,

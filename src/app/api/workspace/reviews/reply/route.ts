@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     if (!site) return workspaceJson({ error: "This site is unavailable to your account." }, 403);
     const denied = await requireTenantAccess(site.tenantId);
     if (denied) return denied;
-    const result = await submitOwnerReviewReply(site.tenantId, body.reviewId, body.reply);
+    const result = await submitOwnerReviewReply(site.tenantId, body.reviewId, body.reply, actor.userId);
     if (result.status === "not_found") return workspaceJson({ error: "Review not found." }, 404);
     if (result.status === "publish_failed") return workspaceJson({ error: "Could not publish the reply to Google.", published: false }, 502);
     return workspaceJson({ review: result.review, published: result.published });

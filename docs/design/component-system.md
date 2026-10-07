@@ -547,6 +547,18 @@ starting implementation.
 
 [DESIGN.md](../../DESIGN.md) owns product direction. [Color system](./color-system.md) owns palette roles; [motion](./motion.md) owns animation behavior; the [atmospheric contract](./atmospheric-component-contract.md) records material decisions and rejections. Source code owns the implemented API.
 
+Publishing uses [ContentWorkspace](../../src/experience/publishing/ContentWorkspace.tsx)
+for exact-content review, collection publication/restore, and immutable newsletter
+issues with sending paused. [RecordPublishingFields](../../src/experience/publishing/RecordPublishingFields.tsx)
+saves hours, special hours and website facts through the owner boundary, shows
+the optional Google approval disclosure, and reports each location separately
+as confirmed, awaiting approval, unapplied or unknown. Unknown writes never say
+that nothing was sent. [WorkspaceGoogle](../../src/experience/places/WorkspaceGoogle.tsx)
+composes the same field and Button family for drafts, pause, reply edits,
+withdrawal and undo; reply forms retain their command identity through a submission retry,
+and undo stays keyed to its original receipt. All have permission and failure states. Local fictional
+fixtures live at `/preview/strelva/publishing`; these do not prove provider writes.
+
 | Component | Source | Contract |
 | --- | --- | --- |
 | Button / IconButton | [Button.tsx](../../src/components/ui/Button.tsx) | Button variants primary, secondary, ghost, danger, contrast; sizes sm/md/lg; loading disables and sets aria-busy; `static` disables press scale. IconButton requires `label`. |

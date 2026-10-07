@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui/Card";
+import { RecordPublishingFields } from "@/experience/publishing/RecordPublishingFields";
+import type { RecordGoogleSummary } from "@/products/publishing/client";
 import type { BusinessRecord } from "@/platform/business-record/contracts";
 import { DETAIL_LABELS, detailText, detailsWriteSource, type EditableDetail } from "@/platform/business-record/details";
 import type { DetailsSaveOutcome } from "@/platform/business-record/details-save";
@@ -17,6 +19,8 @@ import { WorkspacePlace, type PlaceState } from "./WorkspacePlace";
 
 export interface BusinessDetailsData {
   record: BusinessRecord;
+  googleApprovalCopy?: string | null;
+  publishing?: boolean;
   operator: boolean;
   sites: LinkedSite[];
   denied: LinkedSite[];
@@ -60,10 +64,11 @@ function Section({ id, title, children }: { id: string; title: string; children:
   );
 }
 
-export function WorkspaceBusinessDetails({ workspaceId, state, result, field, action }: {
+export function WorkspaceBusinessDetails({ workspaceId, state, result, googleResult, field, action }: {
   workspaceId: string;
   state: PlaceState<BusinessDetailsData>;
   result?: DetailsSaveOutcome | null;
+  googleResult?: RecordGoogleSummary | null;
   field?: EditableDetail | null;
   /** The server action; absent in previews and tests. */
   action?: (formData: FormData) => Promise<void>;
@@ -84,6 +89,7 @@ export function WorkspaceBusinessDetails({ workspaceId, state, result, field, ac
           <p className="text-sm leading-6">{notice.text}{result === "invalid" && field && INVALID_HINT[field] ? ` ${INVALID_HINT[field]}` : ""}</p>
         </Card>
       ) : null}
+      {data?.publishing && googleResult ? <Card padding="md" className="mt-4" role="status"><p className="text-sm">{{ needs_approval: "Record saved. Google changes are waiting for your approval.", confirmed: "Record saved. Google changes read back successfully.", unconfirmed: "Record saved. Google accepted the changes; confirmation is pending.", failed: "Record saved. At least one Google change did not land; each result is kept separately.", unavailable: "Record saved. Google listings could not be read; no Google update is confirmed." }[googleResult]}</p><a className="mt-2 inline-block text-sm underline" href={`/workspace/google?workspaceId=${workspaceId}`}>Review each Google change and receipt</a></Card> : null}
       {data ? (
         <>
           <Section id="business" title="About the business">
@@ -91,6 +97,7 @@ export function WorkspaceBusinessDetails({ workspaceId, state, result, field, ac
               <form action={action} className="grid gap-4">
                 <input type="hidden" name="workspaceId" value={workspaceId} />
                 <input type="hidden" name="revision" value={data.record.revision} />
+                {data.googleApprovalCopy ? <input type="hidden" name="googleApprovalDisclosed" value="1" /> : null}
                 <Field name="display_name" value={detailText(data.record, "display_name")} readOnly={readOnly} />
                 <Field name="phone" type="tel" value={detailText(data.record, "phone")} readOnly={readOnly} />
                 <Field name="email" type="email" value={detailText(data.record, "email")} readOnly={readOnly} />
@@ -99,12 +106,15 @@ export function WorkspaceBusinessDetails({ workspaceId, state, result, field, ac
                   <Field name="owner_recipient" type="email" value={detailText(data.record, "owner_recipient")} readOnly={readOnly}
                     hint="Weekly and monthly recaps, review alerts, new inquiries and anything that needs your decision go here." />
                 </div>
+                {data.googleApprovalCopy ? <p role="note" className="text-sm text-gray-muted">{data.googleApprovalCopy}</p> : null}
                 {readOnly
                   ? <p className="text-sm text-gray-muted">Only the owner can change these details.</p>
                   : <div><button type="submit" className="inline-flex min-h-[40px] items-center rounded-lg bg-warm-black px-4 text-sm font-medium text-warm-white focus-visible:outline focus-visible:outline-2">Save details</button></div>}
               </form>
             </Card>
           </Section>
+
+          {data.publishing ? <Section id="publishing-facts" title="Publishing facts"><Card padding="lg"><RecordPublishingFields record={data.record} approvalCopy={data.googleApprovalCopy} readOnly={readOnly || data.record.access !== "owner"} /></Card></Section> : null}
 
           {services.length ? (
             <Section id="services" title="Services">

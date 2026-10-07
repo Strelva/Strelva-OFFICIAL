@@ -1,6 +1,7 @@
 import { getEventRaw, getEvents } from "@/lib/events";
 import { resolveEventAction } from "@/lib/event-actions";
 import { sendEmailWithReceipt } from "@/platform/infra/email/send";
+import { publishingDecisionDeliveryAllowed } from "./publishing-delivery";
 import { DeliveryCommitmentService, PostgresServiceRequestStore, mutateServiceRequestCommitment } from "@/platform/service-requests";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { serviceRequestAdapter, tenantEventAdapter } from "./adapters";
@@ -38,6 +39,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
       const request = (await domains.websiteDomainRequestStore.list(row.workspaceId)).find(request => request.id === row.sourceId);
       return domains.websiteDomainEmailAllowed(request?.tenantId);
     },
+    canDeliver: publishingDecisionDeliveryAllowed,
     adapters: [
       tenantEventAdapter({
         linkedTenants: async (workspaceId) => (await store.linkedTenants(workspaceId)).map(link => link.tenantId),

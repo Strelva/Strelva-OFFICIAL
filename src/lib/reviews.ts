@@ -221,3 +221,19 @@ export async function replyToReviewByExternalId(
   await writeDevReviews(tenant, reviews);
   return updatedByExtId;
 }
+
+/** Accepted listing edit/withdrawal mirrored into the same store both owner
+ * surfaces read. Withdrawing also suppresses re-drafting that same review. */
+export async function mirrorPublishedReviewReply(tenant: string, externalId: string, text: string | null): Promise<void> {
+  if (text !== null) { await replyToReviewByExternalId(tenant, externalId, text); return; }
+  const { markReviewReplyDeclined } = await import("./review-replies");
+  await markReviewReplyDeclined(tenant, externalId);
+  if (dataSourceIsPostgres()) {
+    const db = reviewDb(`withdraw-by-external ${tenant}/${externalId}`);
+    const { error } = await db.from("reviews").update({ reply: null, replied_at: null }).eq("tenant_id", tenant).eq("external_id", externalId);
+    if (error) throw error;
+  } else {
+    const rows = await readDevReviews(tenant);
+    await writeDevReviews(tenant, rows.map(row => row.externalId === externalId ? { ...row, reply: undefined, repliedAt: undefined } : row));
+  }
+}

@@ -1,3 +1,4 @@
+import { workspacePorts } from "../workspace-ports";
 /**
  * The "auto-post" half of done-for-you review replies.
  *
@@ -64,6 +65,7 @@ export async function draftReplyBacklog(
     if (t.active === false) return;
     const voice = await getReplyVoice(t.id).catch(() => null);
     if (!voice || voice.mode === "off") return;
+    if (!(await (await workspacePorts().tenantReviewReplies()).listingDraftingAllowed(t.id))) return;
 
     const [reviews, pending] = await Promise.all([
       getReviews(t.id).catch(() => []),

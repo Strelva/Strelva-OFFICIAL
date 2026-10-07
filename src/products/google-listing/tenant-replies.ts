@@ -4,6 +4,7 @@ import type { ListingAuthority, ListingReceipt } from "./contracts";
 import { GBP_MANAGE_SCOPE } from "./health";
 import type { ListingReceiptStore } from "./receipts";
 import { postReviewReply } from "./service";
+import { paceGoogleWrites } from "./pacing";
 
 /**
  * A tenant's approved review reply, posted through the Google listing System.
@@ -23,6 +24,7 @@ import { postReviewReply } from "./service";
 export type TenantReplyRoute = { kind: "legacy"; reason: "release_off" | "unlinked" | "link_unreadable" } | { kind: "listing"; workspaceId: string };
 
 export type TenantReplyResult =
+  | { status: "write_unconfirmed"; reason: string; receipt: ListingReceipt }
   /** Google took it and it read back. */
   | { status: "posted"; receipt: ListingReceipt }
   /** Google took it; the read-back failed or Google holds it for review. Done; never retried. */
@@ -41,8 +43,11 @@ export interface TenantReplyDeps {
   location(tenantId: string, grant: GoogleGrant): Promise<GoogleLocationRef | null>;
   accessToken(grant: GoogleGrant): Promise<string | null>;
   client(accessToken: string): GoogleListingClient;
+  pace?(client: GoogleListingClient, workspaceId: string, locationId: string): GoogleListingClient;
   receipts(): ListingReceiptStore;
   notify(text: string): void;
+  control?(workspaceId: string, locationId: string): Promise<{ paused: boolean }>;
+  noteAccess?(workspaceId: string, locationId: string, pending: boolean): Promise<unknown>;
 }
 
 /** Which ledger this tenant's reply belongs to. Decided before any write. */
@@ -87,9 +92,13 @@ export async function postTenantReviewReply(input: {
   const locationId = located ? locationIdOf(located.locationId) : null;
   if (!located || !locationId) return fail("missing_account_location_meta");
 
+  const control = await deps.control?.(input.workspaceId, locationId);
+  if (control?.paused) return { status: "refused", reason: "refused_paused" };
+
   // Track whether Google took the reply, so a failure after acceptance is
   // never reported as "nothing sent".
-  const base = deps.client(token);
+  const rawClient = deps.client(token);
+  const base = deps.pace ? deps.pace(rawClient, input.workspaceId, locationId) : rawClient;
   let accepted = false;
   const client: GoogleListingClient = {
     ...base,
@@ -104,27 +113,36 @@ export async function postTenantReviewReply(input: {
       workspaceId: input.workspaceId,
       bindingId: grant.bindingId && grant.workspaceId === input.workspaceId ? grant.bindingId : null,
       location: { accountId: located.accountId, locationId },
-      // The listing System has no stored pause yet; the projection reads it as live.
-      lifecycle: "live",
+      lifecycle: control?.paused ? "paused" : "live",
       client,
+      onWriteAccepted: async () => (await (await import("@/platform/infra/tenant-publishing")).tenantPublishingPorts()).markExecutionExternalAccepted(input.eventId),
+      onWriteUnconfirmed: async () => (await (await import("@/platform/infra/tenant-publishing")).tenantPublishingPorts()).markExecutionExternalUnconfirmed(input.eventId),
       receipts: deps.receipts(),
     }, {
       reviewId: input.reviewId,
       text: input.text,
       authority: input.authority,
-      idempotencyKey: `review-reply:${input.eventId}:${input.attemptId}`.slice(0, 256),
+      idempotencyKey: `review-reply:${input.eventId}`.slice(0, 160),
+      retryFailed: true,
     });
+    if (outcome.status === "write_unconfirmed") return { status: "write_unconfirmed", reason: outcome.message, receipt: outcome.receipt };
     if (outcome.status === "refused") {
+      if (outcome.reason === "api_access_pending") {
+        await deps.noteAccess?.(input.workspaceId, locationId, true);
+        return { status: "failed", reason: "google_access_pending" };
+      }
       if (outcome.reason === "nothing_to_change") return { status: "already_on_google" };
       return fail(`refused_${outcome.reason}`);
     }
     if (outcome.status === "failed") {
+      if (outcome.accessPending) await deps.noteAccess?.(input.workspaceId, locationId, true);
       deps.notify(`Review reply FAILED for *${input.tenantId}* (reviewId=${input.reviewId}): ${outcome.receipt.error ?? "Google refused it"}`);
       return { status: "failed", reason: outcome.accessPending ? "google_access_pending" : "google_refused", receipt: outcome.receipt };
     }
     if (outcome.status !== "posted") {
       deps.notify(`Review reply posted for *${input.tenantId}* (reviewId=${input.reviewId}) but not confirmed: ${outcome.status}`);
     }
+    await deps.noteAccess?.(input.workspaceId, locationId, false);
     return { status: outcome.status, receipt: outcome.receipt };
   } catch (error) {
     const reason = error instanceof Error ? error.message.slice(0, 200) : "listing_write_failed";
@@ -148,12 +166,18 @@ export async function defaultTenantReplyDeps(): Promise<TenantReplyDeps> {
   ]);
   return {
     releaseEnabled: () => publishingReleaseEnabled(),
-    bindingTarget: (tenantId) => bindings.readBindingTarget(tenantId),
+    bindingTarget: async (tenantId) => {
+      const { tenantReleaseFlagEnabled } = await import("@/platform/release-flags/store");
+      return await tenantReleaseFlagEnabled("publishing", tenantId) ? bindings.readBindingTarget(tenantId) : null;
+    },
     grant: (tenantId) => access.getGoogleGrant(tenantId),
     location: (tenantId, grant) => access.getGoogleLocation(tenantId, grant),
     accessToken: (grant) => access.getValidGoogleAccessToken(grant),
     client: (token) => createHttpGoogleListingClient(token),
+    pace: (client, workspaceId, locationId) => paceGoogleWrites(client, workspaceId, locationId),
     receipts: () => createSupabaseReceiptStore(),
+    control: async (workspaceId, locationId) => (await import("./controls")).readListingControl(workspaceId, locationId),
+    noteAccess: async (workspaceId, locationId, pending) => (await import("./controls")).noteListingAccess(workspaceId, locationId, pending),
     notify: (text) => { sendSlackNotification({ text }).catch(() => {}); },
   };
 }

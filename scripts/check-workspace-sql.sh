@@ -589,6 +589,8 @@ psql "${psql_args[@]}" --file="$repo_root/tests/booking-lifecycle-schema.sql"
 # for every Google write. After Systems, because it extends the origin kinds.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261007170000_workspace_account_bindings.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-account-bindings-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010143000_publishing_reconnect.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/publishing-reconnect-schema.sql"
 # Human minutes per business, then the operator queue (marks and the
 # outside-write receipt ledger) and minutes resolved through the conversion
 # link. Fictional rows only; each test rolls back.

@@ -156,6 +156,13 @@ export async function resolveEventAction(
   // failed opaquely. Resolve as "approved" (the marker is only ever set on an
   // accepted approval); resolveEvent no-ops idempotently if already resolved.
   if (event.metadata?.execution?.state === "external_accepted") {
+    if (["workspace_collection_publish", "workspace_newsletter_issue", "workspace_google_listing_draft"].includes(String(event.metadata?.kind))) {
+      const publishing = await workspacePorts().publishingContent();
+      const authorized = await publishing.authorizePublishingEvent({ tenantId, event, actorId });
+      if (!authorized.allowed) return { changed: false, reason: authorized.reason ?? "publishing_permission_denied" };
+      const resolved = await resolveEvent(eventId, "approved", { actor: actorId });
+      return resolved.changed ? { changed: true, reason: "accepted_unverified" } : { changed: false, reason: "already_resolved" };
+    }
     const resolved = await resolveEvent(eventId, "approved", { actor: "user" });
     return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
   }
@@ -334,6 +341,27 @@ async function executeResolvedEventAction(
   // event to resolved. A failed or stale action must leave the item pending —
   // never resolve it and have the UI falsely say "Made live".
 
+  // Workspace publishing uses the existing event claim and owner decision.
+  // New kinds cannot fall through to a tenant publisher when rollout is off.
+  if (["workspace_collection_publish", "workspace_newsletter_issue", "workspace_google_listing_draft"].includes(String(event.metadata?.kind))) {
+    const publishing = await workspacePorts().publishingContent();
+    const authorization = await publishing.authorizePublishingEvent({ tenantId, event, actorId });
+    if (!authorization.allowed) return { changed: false, reason: authorization.reason ?? "publishing_permission_denied" };
+    if (action === "dismissed") {
+      const resolved = await resolveEvent(eventId, "dismissed", { actor: actorId });
+      return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
+    }
+    const execution = await publishing.executePublishingEvent({ tenantId, event, actorId, attemptId });
+    if (!execution?.accepted) return { changed: false, reason: execution?.reason ?? "publishing_unavailable" };
+    // Google acceptance, atomic site publication or an immutable newsletter
+    // approval all close this exact draft. A failed read-back never republishes.
+    await markExecutionExternalAccepted(eventId);
+    const resolved = await resolveEvent(eventId, "approved", { actor: actorId });
+    return resolved.changed
+      ? { changed: true, ...(execution.reason ? { reason: execution.reason } : execution.verified === false ? { reason: "accepted_unverified" } : {}) }
+      : { changed: false, reason: "already_resolved" };
+  }
+
   if (event.type === "content_update") {
     const kind = event.metadata?.kind;
 
@@ -499,6 +527,7 @@ async function executeResolvedEventAction(
           : { kind: "owner_approval" as const, actor: actorId.slice(0, 200) || "user", approvalRef: `event:${eventId}`.slice(0, 200) };
         if (!authority) return { changed: false, reason: "review_reply_needs_owner" };
         const posted = await postTenantReviewReply({ tenantId, workspaceId: route.workspaceId, eventId, attemptId, reviewId, text: replyText, authority }, deps);
+        if (posted.status === "write_unconfirmed") return { changed: false, reason: "google_write_unconfirmed" };
         if (posted.status === "failed" || posted.status === "refused") return { changed: false, reason: "review_reply_failed" };
         acceptedUnverified = posted.status === "posted_unverified" || posted.status === "held_by_google" || posted.status === "accepted_unrecorded";
       } else {

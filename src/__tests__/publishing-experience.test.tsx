@@ -81,6 +81,20 @@ describe("publishing in the workspace", () => {
     expect(extras.newsletters).toEqual([]);
     expect(extras.collections).toEqual([{ tenantId: "mooney-firm", types: [] }]);
   });
+  it("keeps approved newsletter outputs discoverable after the last subscriber leaves", async () => {
+    const extras = await readPublishingExtras(base, { activeSubscribers: async () => 0, collections: async () => [], approvedIssues: async () => 1 });
+    const projected = await withPublishing(base, actor, NOW, { snapshot: async () => previewPublishingSnapshot(base, "mooney", "on", NOW), extras: async () => extras });
+    expect(projected.listing.systems.find(item => item.system.kind === "newsletter")?.basis).toContain("0 active subscribers");
+    expect(projected.listing.systems.find(item => item.system.kind === "newsletter")?.basis).toContain("approved issues and receipts stay here");
+  });
+  it("keeps newsletter history when subscriber reads fail without inventing a zero count", async () => {
+    const extras = await readPublishingExtras(base, { activeSubscribers: async () => { throw new Error("down"); }, collections: async () => [], approvedIssues: async () => 1 });
+    expect(extras.newsletters).toEqual([{ tenantId: "mooney-firm", activeSubscribers: null, approvedIssues: 1 }]);
+    const projected = await withPublishing(base, actor, NOW, { snapshot: async () => previewPublishingSnapshot(base, "mooney", "on", NOW), extras: async () => extras });
+    const newsletter = projected.listing.systems.find(item => item.system.kind === "newsletter");
+    expect(newsletter?.basis).toContain("Subscriber count is unavailable");
+    expect(newsletter?.basis).toContain("approved issues and receipts stay here");
+  });
 
   it("renders the listing page with Strelva handled, and an empty state", async () => {
     const all = views(await project("on"));

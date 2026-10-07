@@ -126,6 +126,8 @@ export interface SystemView {
   surface: SystemSurface;
   /** Who builds and runs it, when recorded. Managed customers never have to. */
   operatedBy?: string;
+  /** Set only by the released publishing projection for a linked tenant. */
+  publishing?: boolean;
   connections: SystemConnection[];
   possibilities: SystemPossibility[];
   versions: SystemVersion[];

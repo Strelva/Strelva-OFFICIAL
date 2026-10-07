@@ -57,4 +57,6 @@ export const workspacePortLoaders = {
 
   websites: () => import("@/products/websites/index"),
   websitePublicationReadback: () => import("@/app/api/publish/native-readback"),
+
+  publishingContent: () => import("@/products/publishing/server"),
 };

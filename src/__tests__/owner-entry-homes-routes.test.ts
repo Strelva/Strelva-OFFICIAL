@@ -55,7 +55,7 @@ describe("POST /api/workspace/reviews/reply", () => {
     expect(await response.json()).toMatchObject({ published: true, review: { reply: "Thanks, Jane!" } });
     expect(linkedSite).toHaveBeenCalledWith(ACTOR, WS, "lakeshore");
     expect(tenantAccess).toHaveBeenCalledWith("lakeshore");
-    expect(submit).toHaveBeenCalledWith("lakeshore", "r1", "Thanks, Jane!");
+    expect(submit).toHaveBeenCalledWith("lakeshore", "r1", "Thanks, Jane!", ACTOR.userId);
   });
 
   it("refuses while workspaces are off, from another origin, or signed out", async () => {

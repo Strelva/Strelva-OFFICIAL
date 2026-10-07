@@ -28,6 +28,7 @@ async function publishReplyViaApproval(
   review: ReviewItem,
   gbpReviewId: string,
   reply: string,
+  actorId: string,
 ): Promise<boolean> {
   // Use a large limit so the scan window covers the full 90-day event retention
   // depth. getEventsRaw scans `limit * 2` raw zset entries before filtering to
@@ -74,7 +75,9 @@ async function publishReplyViaApproval(
     eventId = created.id;
   }
 
-  const result = await resolveEventAction(tenant, eventId, "approved");
+  const result = actorId === "user"
+    ? await resolveEventAction(tenant, eventId, "approved")
+    : await resolveEventAction(tenant, eventId, "approved", actorId);
   if (result.changed) return true;
   // "already_resolved" is ambiguous: it fires for BOTH a concurrent approve
   // (published to Google) AND a concurrent dismiss (nothing reached Google).
@@ -95,7 +98,7 @@ export type OwnerReviewReplyResult =
   | { status: "not_found" }
   | { status: "publish_failed" };
 
-export async function submitOwnerReviewReply(tenant: string, reviewId: string, reply: string): Promise<OwnerReviewReplyResult> {
+export async function submitOwnerReviewReply(tenant: string, reviewId: string, reply: string, actorId = "user"): Promise<OwnerReviewReplyResult> {
   const review = (await getReviews(tenant)).find((r) => r.id === reviewId);
   if (!review) return { status: "not_found" };
 
@@ -103,7 +106,7 @@ export async function submitOwnerReviewReply(tenant: string, reviewId: string, r
   if (review.source === "google" && review.externalId) {
     const connection = await getConnection(tenant, "google");
     if (connection?.status === "connected") {
-      published = await publishReplyViaApproval(tenant, review, review.externalId, reply);
+      published = await publishReplyViaApproval(tenant, review, review.externalId, reply, actorId);
       // Nothing reached Google and the draft event is still pending in the
       // review queue. Save nothing locally: an unpublished reply must not
       // flip the card to the "Your reply" state.
