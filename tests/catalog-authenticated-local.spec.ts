@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test, type APIRequestContext } from "@playwright/test";
-import { localEnvironment, signedInContext } from "./support/local-auth";
+import { localEnvironment, seedLocalSuperAdmin, signedInContext } from "./support/local-auth";
 
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1" || process.env.STRELVA_LOCAL_CATALOG_PROOF !== "1", "Requires isolated Auth and catalog provider fixtures.");
 test.setTimeout(240_000);
@@ -28,7 +28,7 @@ test("a Strelva maker takes a sentence through Draft, rehearsal, Live, member su
   const businessId = randomUUID();
   try {
     for (const person of [operator, owner, staff]) expect((await person.context.request.get("/api/workspace")).status()).toBe(200);
-    expect((await admin.from("super_admins").insert({ user_id: operator.userId, email: operator.email })).error).toBeNull();
+    seedLocalSuperAdmin(operator.userId, operator.email);
     expect((await admin.from("workspaces").insert({ id: businessId, kind: "customer", name: "Catalog bookkeeping fixture", created_by: operator.userId })).error).toBeNull();
     expect((await admin.from("workspace_memberships").insert([
       { workspace_id: businessId, user_id: operator.userId, role: "owner", created_by: operator.userId },
@@ -136,7 +136,7 @@ test("owners file Requests and a failed maker plan files one pending Request wit
   const workspaceId = randomUUID();
   try {
     for (const person of [operator, owner]) expect((await person.context.request.get("/api/workspace")).status()).toBe(200);
-    expect((await admin.from("super_admins").insert({ user_id: operator.userId, email: operator.email })).error).toBeNull();
+    seedLocalSuperAdmin(operator.userId, operator.email);
     expect((await admin.from("workspaces").insert({ id: workspaceId, kind: "customer", name: "Catalog Request fixture", created_by: operator.userId })).error).toBeNull();
     expect((await admin.from("workspace_memberships").insert([operator, owner].map(person => ({ workspace_id: workspaceId, user_id: person.userId, role: "owner", created_by: operator.userId })))).error).toBeNull();
     const ownerPage = await owner.context.newPage();

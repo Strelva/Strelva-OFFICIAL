@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test } from "@playwright/test";
-import { localEnvironment, signedInContext } from "./support/local-auth";
+import { localEnvironment, seedLocalSuperAdmin, signedInContext } from "./support/local-auth";
 
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires a separately created, isolated local Supabase stack.");
 test.setTimeout(120_000);
@@ -13,8 +13,7 @@ test("real local auth and Postgres preserve tracker edits and enforce another us
   const owner = await signedInContext(browser, admin, "owner");
   const stranger = await signedInContext(browser, admin, "other");
   try {
-    const adminRole = await admin.from("super_admins").insert({ user_id: owner.userId, email: owner.email });
-    expect(adminRole.error).toBeNull();
+    seedLocalSuperAdmin(owner.userId, owner.email);
     const agencyResponse = await owner.context.request.post("/api/workspace", { data: { action: "create_agency", name: "Local verification team" }, headers: { origin: env.app } });
     expect(agencyResponse.status()).toBe(201);
     const { workspaceId } = await agencyResponse.json();

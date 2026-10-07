@@ -26,7 +26,7 @@ insert into oe_workspace select (public.convert_tenant_to_business('owner-eviden
 insert into public.workspace_memberships(workspace_id,user_id,role,created_by)
  select id,'ce000000-0000-4000-8000-000000000001','owner','ce000000-0000-4000-8000-000000000001' from oe_workspace on conflict do nothing;
 create function pg_temp.oe_read() returns jsonb language sql as $$
- select public.read_workspace_booking_evidence((select id from oe_workspace),'ce000000-0000-4000-8000-000000000001','owner-evidence@example.test','oe-site',(now() at time zone 'UTC')::date,(now() at time zone 'UTC')::date+1)
+ select public.read_workspace_booking_evidence((select id from oe_workspace),'ce000000-0000-4000-8000-000000000001','owner-evidence@example.test','oe-site',(now() at time zone 'UTC')::date-1,(now() at time zone 'UTC')::date+1)
 $$;
 select public.record_tenant_booking('oe-site',jsonb_build_object('legacyId','oe-past','status','confirmed','origin','site','serviceName','Consultation',
  'start',date_trunc('day',now()),'end',date_trunc('day',now())+interval '1 minute','timeZone','UTC','bufferMinutes',0,'customer',jsonb_build_object('name','Past Customer')),'native');

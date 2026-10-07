@@ -17,7 +17,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { buildWorkspaceApproveUrl } from "@/lib/approve-link";
 import { siteDocumentHash, siteDocumentSchema } from "@/products/websites/site-document";
-import { localEnvironment } from "./local-auth";
+import { localEnvironment, removeLocalSuperAdmin, seedLocalSuperAdmin } from "./local-auth";
 
 export type Admin = SupabaseClient;
 export interface Person { context: BrowserContext; userId: string; email: string }
@@ -78,7 +78,8 @@ export async function person(browser: Browser, admin: Admin, label: string, opti
 }
 
 export async function makeOperator(admin: Admin, operator: Person) {
-  expect((await admin.from("super_admins").insert({ user_id: operator.userId, email: operator.email })).error).toBeNull();
+  expect((await admin.auth.admin.getUserById(operator.userId)).error).toBeNull();
+  seedLocalSuperAdmin(operator.userId, operator.email);
 }
 
 /** A fixture managed tenant, as an operator would find one before conversion. */
@@ -309,7 +310,7 @@ export async function cleanup(admin: Admin, input: { tenantIds?: string[]; works
   for (const tenantId of input.tenantIds ?? []) await admin.from("tenants").delete().eq("id", tenantId).then(() => undefined, () => undefined);
   for (const one of input.people ?? []) {
     await one.context.close().catch(() => undefined);
-    await admin.from("super_admins").delete().eq("user_id", one.userId).then(() => undefined, () => undefined);
+    try { removeLocalSuperAdmin(one.userId); } catch { /* left for the disposable stack */ }
     await admin.auth.admin.deleteUser(one.userId).catch(() => undefined);
   }
 }
