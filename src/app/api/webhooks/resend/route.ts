@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { reconcileInquiryProviderEvent, reconcileWorkspaceInquiryProviderEvent } from "@/products/inquiries";
-import { reconcileConnectedInquiryOwnerNotice } from "@/products/connected-sites/inquiry-owner-notice";
+import { reconcileConnectedInquiryOwnerNotice } from "@/products/connected-sites/server";
 
 export const dynamic = "force-dynamic";
 export const MAX_RESEND_WEBHOOK_BODY_BYTES = 1024 * 1024;

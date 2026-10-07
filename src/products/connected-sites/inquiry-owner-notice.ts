@@ -66,14 +66,16 @@ export async function reconcileConnectedInquiryOwnerNotice(input: { event: unkno
   if (!status) return { status: "ignored" };
   const timestamp = z.string().refine(value => Number.isFinite(Date.parse(value)));
   const parsed = z.object({ id: z.string().uuid(), workspaceId: z.string().uuid(), providerId: z.string().trim().min(1).max(240),
+    repairId: z.string().uuid().optional(),
     eventId: z.string().trim().min(1).max(240), at: timestamp, acceptedAt: timestamp.nullable(), to: z.array(z.string().email()).min(1), subject: z.string(),
   }).safeParse({ id: tags.strelva_connected_notice_id, workspaceId: tags.strelva_workspace_id, providerId: data.email_id,
+    repairId: tags.strelva_connected_notice_repair_id,
     eventId: input.eventId, at: event?.created_at, acceptedAt: data.created_at ?? (event?.type === "email.sent" ? event.created_at : null),
     to: Array.isArray(data.to) ? data.to : [data.to], subject: data.subject });
   if (!parsed.success) return { status: "unmatched", reason: "connected_notice_provider_evidence_invalid" };
   const row = parsed.data;
   try {
-    const result = await rpc("record_connected_inquiry_owner_notice_event", { p_lead_row_id: row.id, p_workspace_id: row.workspaceId,
+    const result = await rpc(row.repairId ? "record_connected_inquiry_owner_notice_repair_event" : "record_connected_inquiry_owner_notice_event", { ...(row.repairId ? { p_repair_id: row.repairId } : {}), p_lead_row_id: row.id, p_workspace_id: row.workspaceId,
       p_provider_message_id: row.providerId, p_event_id: row.eventId, p_status: status, p_event_at: row.at,
       p_accepted_at: row.acceptedAt, p_recipients: row.to, p_subject: row.subject }) as { status?: unknown } | null;
     if (result?.status === "recorded" || result?.status === "duplicate" || result?.status === "unmatched") return { status: result.status };

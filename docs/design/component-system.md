@@ -597,3 +597,17 @@ loading and errors, offers retry, aborts old business reads, and never projects
 private routing destinations into form data. Fixture projection, authorization,
 publication health and failure states have focused local tests; desktop/mobile
 browser inspection remains separate evidence in the stream handoff.
+
+### Operator inquiry review (wave 6)
+
+`OperatorInquiryReview` and `OperatorInquiryActions` compose console Panel/Chip
+and shared Button (`lg`). `/admin/client-leads/inquiries` is super-admin-only,
+paged and bounded. With flags off, the existing lead screen stays unchanged.
+Held-message decisions never email. Corrected-recipient notice repairs show
+refusals separately from accepted provider receipts. Local fictional previews
+cover held, empty, loading, error and permission states at 1440px and 390px,
+visible keyboard focus and no horizontal overflow. The stream handoff records
+the 28 focused tests and isolated SQL fixture; this is not provider or production
+proof.
+
+Workspace inquiry replies: current owner/member/none permission comes from the scoped inquiry read. Assigned or routed members see “Send reply” and the owner approval requirement for prices, dates and promises; unassigned members see the permission explanation. Booking commitments stay owner-only.

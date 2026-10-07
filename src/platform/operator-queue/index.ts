@@ -7,3 +7,5 @@ export { readOperatorQueue, markQueueItem, defaultQueueDependencies, type QueueD
 export { readQueueContext, writeQueueMark, readReceipts } from "./store";
 export { recordOutsideWrite, receiptCommandKey } from "./receipts";
 export { buildDomainView, type DomainViewRow } from "./domain-view";
+export { readOperatorInquiryReview, decideOperatorHeldInquiry, operatorNoticeReviewEnabled,
+  type OperatorHeldInquiry, type OperatorInquiryNotice, type InquiryReviewView } from "./inquiry-review";

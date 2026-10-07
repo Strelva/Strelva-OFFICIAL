@@ -21,8 +21,7 @@ export async function readInquiryOwnerNoticeIssues(tenantIds: string[], read = i
       return { kind: "ops_alert", sourceRef: `inquiry-owner:${raw.tenantId ?? raw.connectedSiteId}:${raw.inquiryId}`, tenantId: raw.tenantId as string | null,
         workspaceId: typeof raw.workspaceId === "string" ? raw.workspaceId : null,
         title: raw.status === "bounced" || raw.status === "failed" ? "Owner not told: email bounced or failed" : "Owner not told: inquiry notice did not send",
-        openedAt: raw.at, facts: { severity: "high" }, href: raw.tenantId ? `/admin/clients/${encodeURIComponent(String(raw.tenantId))}#needs-you`
-          : `/workspace/inquiries?workspaceId=${encodeURIComponent(String(raw.workspaceId))}` };
+        openedAt: raw.at, facts: { severity: "high" }, href: "/admin/client-leads/inquiries?view=notices" };
     });
     return { kind: "ops_alert", source, ok: true, rows };
   } catch {

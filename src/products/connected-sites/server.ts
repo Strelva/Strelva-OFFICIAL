@@ -27,6 +27,7 @@ import { ConnectedSiteInputError, connectedInquiryRecordsEnabled, connectedSites
 import { systemOriginId } from "@/platform/systems/invariants";
 
 export { ConnectedSiteInputError, ConnectedSiteRefusedError } from "./store";
+export { repairConnectedInquiryOwnerNotice } from "./inquiry-owner-repair";
 
 /**
  * The cheap early gate: connected sites could be on for at least one
@@ -215,3 +216,4 @@ export async function readConnectedSites(actor: WorkspaceActor, businessId: stri
 // src/lib in Strelva Reborn section 7; routes import them through this entry).
 export { CONNECT_CORS_HEADERS, CONNECT_MAX_BODY_BYTES, ConnectBodyError, connectErrorResponse, connectJson, connectPreflight, readConnectBody, resolveConnectSite } from "./http";
 export { connectedInquiryEmail, notifyConnectedSiteInquiry } from "./notify";
+export { reconcileConnectedInquiryOwnerNotice } from "./inquiry-owner-notice";
