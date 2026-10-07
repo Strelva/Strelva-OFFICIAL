@@ -203,10 +203,18 @@ export async function adjustStars(
   const updated = { ...existing, starsAvailable, starsLifetime, tier };
   // Snapshot the hash after all atomic increments, never overwrite Postgres
   // with an older balance assembled from this request's pre-mutation read.
-  const latest = await kv.hgetall<Record<string, unknown>>(memberKey);
-  if (latest) {
-    const payload = Object.fromEntries(Object.entries(latest).map(([k, v]) => [k, typeof v === "string" ? v : JSON.stringify(v)]));
-    await mirrorRecord("reward_members", tenant, normalizedEmail, payload);
+  if (process.env.STRELVA_CLIENT_RECORDS_DUAL_WRITE === "1" && process.env.DUAL_WRITE_PG !== "0") {
+    try {
+      const latest = await kv.hgetall<Record<string, unknown>>(memberKey);
+      if (latest) {
+        const payload = Object.fromEntries(Object.entries(latest).map(([k, v]) => [k, typeof v === "string" ? v : JSON.stringify(v)]));
+        await mirrorRecord("reward_members", tenant, normalizedEmail, payload);
+      }
+    } catch {
+      // The increments already succeeded. A snapshot outage cannot turn them
+      // into a retryable balance mutation; parity/backfill repair the copy.
+      console.error("[rewards] accepted balance update needs client-record repair", { tenant });
+    }
   }
   return updated;
 }
