@@ -29,6 +29,14 @@ export interface RebuildExperienceProps {
 export function flaggedFacts(record: RebuildView) {
   return Object.entries(record.candidate?.facts ?? {}).filter(([, fact]) => fact.origin !== "owner_confirmed" && (fact.highRisk || !fact.verification?.supported));
 }
+const skippedReason = {
+  robots: "The site's robots.txt blocks reading this page.",
+  external: "This page belongs to another website.",
+  limit: "This page is beyond the rebuild's page, size or time limit.",
+  unreachable: "This page could not be opened.",
+  javascript_only: "This page needs a browser to read.",
+  not_html: "This address is a file rather than a website page.",
+};
 export function RebuildExperience({ workspaceId, workId, readOnly = false, managed = false, allowIntake = false, operator = false, agency = false, initialRequest = "", initialRecord, transport = serverRebuildTransport, onSaved }: RebuildExperienceProps) {
   const [record, setRecord] = useState<RebuildView | null>(initialRecord ?? null);
   const [loading, setLoading] = useState(Boolean(workId && !initialRecord));
@@ -117,6 +125,7 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
         <ol className={styles.progress} aria-label="Website build progress" aria-live="polite">
           {record.stages.map(stage => <li key={stage.stage} data-status={stage.status}><span className={styles.stageIcon}>{stage.status === "completed" ? <Check size={16} aria-label="Completed" /> : stage.status === "running" ? <Loader2 size={16} className="motion-safe:animate-spin" aria-label="Running" /> : stage.status === "failed" ? <CircleAlert size={16} aria-label="Failed" /> : <span aria-label="Pending">○</span>}</span><div><strong>{stage.stage.replace(/_/g, " ")}</strong><p>{stage.message ?? stage.status}</p></div></li>)}
         </ol>
+        {record.skippedPaths.length ? <section className={styles.domain} aria-labelledby="rebuild-skipped-heading"><h2 id="rebuild-skipped-heading">Pages we could not read</h2><p>These pages are absent from the preview. Describe their missing business details to Strelva, or start a request with your business description instead.</p><ul className="grid gap-3 break-all text-sm">{record.skippedPaths.map((page, index) => <li key={`${page.url}:${page.reason}:${index}`}><strong>{page.url}</strong><p>{skippedReason[page.reason]}</p></li>)}</ul></section> : null}
         {record.status === "failed" ? <div className={styles.error} role="alert"><div><p>{record.error ?? "The last stage needs attention. Earlier stages are saved."}</p><Button variant="secondary" disabled={disabled} loading={busy} onClick={() => void run(() => transport.mutate(record, "retry"), "Retry requested. Earlier stages are retained.")}>Retry failed stage</Button></div></div> : null}
         {candidate ? <div className={styles.reviewLayout}>
           <section className={styles.preview} aria-label="Private website preview">

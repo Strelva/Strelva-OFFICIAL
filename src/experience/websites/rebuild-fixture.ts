@@ -24,6 +24,11 @@ export const fixtureSiteDocument: SiteDocument = {
 };
 export const mooneyFixtureDocument = siteDocumentSchema.parse(mooneySource);
 export function fixtureRebuild(scenario = "review"): RebuildView {
+  if (scenario === "skipped-pages") return { ...fixtureRebuild("review"), skippedPaths: [
+    { url: "https://synthetic-business.example.test/private", reason: "robots" },
+    { url: "https://synthetic-business.example.test/app", reason: "javascript_only" },
+    { url: "https://synthetic-business.example.test/missing", reason: "unreachable" },
+  ] };
   if (["published", "domain-pending", "domain-verified", "domain-error"].includes(scenario)) {
     const record = fixtureRebuild("review");
     record.title = "[Synthetic business]";
@@ -55,5 +60,5 @@ export function fixtureRebuild(scenario = "review"): RebuildView {
     { stage: "Extract facts", status: "completed", message: "Business details keep their source quotes" },
     { stage: "Compose pages", status: scenario === "building" ? "running" : "completed", message: scenario === "building" ? "Composing the saved content" : "Private preview prepared" },
     { stage: "Check facts", status: scenario === "failed" ? "failed" : scenario === "building" ? "pending" : "completed", message: scenario === "failed" ? "Verification unavailable; earlier stages retained" : "Two fixture decisions require owner review" },
-  ], candidate: scenario === "building" ? null : { revision: 1, contentHash: "a".repeat(64), previewHref: "/preview/strelva/rebuild/site", pageCount: 1, hasForms: false, facts: structuredClone(fixtureSiteDocument.facts), unmappedPages: [] }, capabilitySelection: null, audit: null, documentRevisions: [], history: [], approved: false, publishedUrl: null, readBack: null, domain: null, error: scenario === "failed" ? "Fact verification failed. Retry resumes from the saved composition." : null };
+  ], skippedPaths: [], candidate: scenario === "building" ? null : { revision: 1, contentHash: "a".repeat(64), previewHref: "/preview/strelva/rebuild/site", pageCount: 1, hasForms: false, facts: structuredClone(fixtureSiteDocument.facts), unmappedPages: [] }, capabilitySelection: null, audit: null, documentRevisions: [], history: [], approved: false, publishedUrl: null, readBack: null, domain: null, error: scenario === "failed" ? "Fact verification failed. Retry resumes from the saved composition." : null };
 }

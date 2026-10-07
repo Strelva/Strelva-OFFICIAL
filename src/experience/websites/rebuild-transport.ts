@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { websiteCapabilitySelectionSchema } from "@/products/websites/contracts";
-import { websiteRebuildSchema } from "@/products/websites/client";
+import { rebuildSkippedPathSchema, websiteRebuildSchema } from "@/products/websites/client";
 
 const factSchema = z.object({ text: z.string(), kind: z.string(), highRisk: z.boolean(), origin: z.string(), sources: z.array(z.object({ sourceId: z.string(), quote: z.string() })), verification: z.object({ supported: z.boolean(), confidence: z.number() }).optional() });
 const auditCheckSchema = z.object({ name: z.string(), status: z.string(), score: z.number(), message: z.string() });
@@ -10,6 +10,7 @@ export const rebuildViewSchema = z.object({
   workId: z.string(), workspaceId: z.string(), tenantId: z.string().nullable().default(null), revision: z.number(), title: z.string(),
   status: z.enum(["building", "review", "approved", "published", "failed"]),
   stages: z.array(z.object({ stage: z.string(), status: z.enum(["pending", "running", "completed", "failed"]), message: z.string().optional() })),
+  skippedPaths: z.array(rebuildSkippedPathSchema).max(200).default([]),
   candidate: z.object({ revision: z.number(), contentHash: z.string(), previewHref: z.string(), pageCount: z.number(), hasForms: z.boolean().default(false), facts: z.record(z.string(), factSchema), unmappedPages: z.array(z.string()).default([]) }).nullable(),
   capabilitySelection: websiteCapabilitySelectionSchema.nullable().default(null),
   approved: z.boolean(), publishedUrl: z.string().nullable(), readBack: z.enum(["verified", "failed", "pending"]).nullable(),
@@ -36,7 +37,7 @@ const rebuildEnvelopeSchema = z.object({ workId: z.string(), workspaceId: z.stri
 export function parseRebuildView(value: unknown): RebuildView {
   const record = rebuildEnvelopeSchema.parse(value);
   const item = record.rebuild;
-  return rebuildViewSchema.parse({ workId: record.workId, workspaceId: record.workspaceId, tenantId: item.tenantId, revision: item.revision, title: item.title, status: item.status === "review_ready" ? "review" : item.status, stages: Array.from(new Map(item.stages.map(stage => [stage.stage, stage])).values()), candidate: item.candidate ? { revision: item.candidate.revision, contentHash: item.candidate.contentHash, previewHref: item.candidate.previewHref, pageCount: item.candidate.document.pages.length, hasForms: Boolean(item.candidate.document.capabilities?.inquiry || item.candidate.document.capabilities?.booking), facts: item.candidate.document.facts, unmappedPages: item.pageMapping.filter(page => !page.carriedOver).map(page => page.sourceUrl) } : null, capabilitySelection: "publishedCapabilitySelection" in item ? item.publishedCapabilitySelection : null, approved: Boolean(item.candidate && item.approvedCandidateRevision === item.candidate.revision), publishedUrl: item.launch.receipt?.status === "published" ? item.launch.receipt.providerUrl : null, readBack: item.launch.readBack?.status ?? null, domain: null, error: item.lastError, audit: "audit" in item ? item.audit : null, history: item.history });
+  return rebuildViewSchema.parse({ workId: record.workId, workspaceId: record.workspaceId, tenantId: item.tenantId, revision: item.revision, title: item.title, status: item.status === "review_ready" ? "review" : item.status, stages: Array.from(new Map(item.stages.map(stage => [stage.stage, stage])).values()), skippedPaths: item.skippedPaths, candidate: item.candidate ? { revision: item.candidate.revision, contentHash: item.candidate.contentHash, previewHref: item.candidate.previewHref, pageCount: item.candidate.document.pages.length, hasForms: Boolean(item.candidate.document.capabilities?.inquiry || item.candidate.document.capabilities?.booking), facts: item.candidate.document.facts, unmappedPages: item.pageMapping.filter(page => !page.carriedOver).map(page => page.sourceUrl) } : null, capabilitySelection: "publishedCapabilitySelection" in item ? item.publishedCapabilitySelection : null, approved: Boolean(item.candidate && item.approvedCandidateRevision === item.candidate.revision), publishedUrl: item.launch.receipt?.status === "published" ? item.launch.receipt.providerUrl : null, readBack: item.launch.readBack?.status ?? null, domain: null, error: item.lastError, audit: "audit" in item ? item.audit : null, history: item.history });
 }
 async function withDomain(record: RebuildView): Promise<RebuildView> {
   if (!record.candidate) return record;
