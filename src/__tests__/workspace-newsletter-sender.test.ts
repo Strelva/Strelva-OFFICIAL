@@ -30,7 +30,7 @@ it("preserves stored mixed-case subscriber identity in unsubscribe tokens", asyn
   f.store.claim.mockResolvedValueOnce(mixed); f.store.begin.mockResolvedValueOnce(mixed.recipients);
   await sendApprovedNewsletterIssues(f);
   const message = f.send.mock.calls[0]![0].messages[0]!;
-  const token = new URL(message.headers!["List-Unsubscribe"].slice(1, -1)).searchParams.get("token")!;
+  const token = new URL(message.headers!["List-Unsubscribe"]!.slice(1, -1)).searchParams.get("token")!;
   expect(verifyUnsubscribeToken(token)).toEqual({ tenantId: "fixture", email: "MixedCase@example.test" });
 });
 it("writes not sent: gated even without unsubscribe secrets, and never begins a send", async () => {
