@@ -351,20 +351,44 @@ psql "${psql_args[@]}" --file="$repo_root/tests/workspace-authority-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-systems-schema.sql"
 
 authority_leaver='c9000000-0000-4000-8000-000000000005'
-# The contender starts a fresh psql process after observing the hold point.
-# Under parallel build/test load the old 0.6-second hold could finish before
-# that process connected, falsely reporting a missing membership lock. Keep
-# the same 150ms lock-timeout assertion with a wider transaction hold.
-authority_hold_seconds=5
 authority_session_ready() {
   local app_name="$1" attempt
   for attempt in $(seq 1 200); do
-    if [[ "$(psql "${psql_args[@]}" -Atc "select exists(select 1 from pg_stat_activity where application_name='$app_name' and wait_event='PgSleep');")" == t ]]; then
+    if [[ "$(psql "${psql_args[@]}" -Atc "select exists(select 1 from pg_stat_activity where application_name='$app_name' and state='idle in transaction' and query like '%select 1 as authority_ready%');")" == t ]]; then
       return 0
     fi
     sleep 0.02
   done
   printf 'Authority race session %s never reached its hold point.\n' "$app_name" >&2
+  return 1
+}
+# Hold the transaction on an open input pipe until the competing session has
+# actually reached its lock. A wall-clock sleep can expire before a new psql
+# connects on a busy machine, producing a false failure even with a real lock.
+authority_begin_session() {
+  local app_name="$1" statement="$2"
+  authority_fifo="$cluster_root/$app_name.sql"
+  mkfifo "$authority_fifo"
+  PGAPPNAME="$app_name" psql "${psql_args[@]}" <"$authority_fifo" >"$cluster_root/$app_name.log" 2>&1 &
+  authority_session_pid=$!
+  exec 9>"$authority_fifo"
+  printf 'begin;\n%s;\nselect 1 as authority_ready;\n' "$statement" >&9
+  authority_session_ready "$app_name"
+}
+authority_end_session() {
+  printf '%s;\n%s\n' "$1" '\q' >&9
+  exec 9>&-
+  wait "$authority_session_pid"
+  rm "$authority_fifo"
+}
+authority_contender_waiting() {
+  local contender_pid="$1" attempt
+  for attempt in $(seq 1 200); do
+    if [[ "$(psql "${psql_args[@]}" -Atc "select exists(select 1 from pg_stat_activity where application_name='authority-contender' and wait_event_type='Lock');")" == t ]]; then return 0; fi
+    if ! kill -0 "$contender_pid" 2>/dev/null; then break; fi
+    sleep 0.02
+  done
+  printf 'Authority contender never queued behind the held membership row.\n' >&2
   return 1
 }
 for authority_call in $(psql "${psql_args[@]}" -Atc "select name from public.authority_parity_calls order by name"); do
@@ -378,44 +402,41 @@ for authority_call in $(psql "${psql_args[@]}" -Atc "select name from public.aut
 
   # 1. Removed mid-transaction: a write that queues behind an uncommitted
   # removal must re-read the committed row and be denied, not land once more.
-  PGAPPNAME=authority-remover psql "${psql_args[@]}" \
-    -c "begin; delete from public.workspace_memberships where $authority_membership; select pg_sleep($authority_hold_seconds); commit;" >/dev/null &
-  authority_remover=$!
-  authority_session_ready authority-remover
-  if psql "${psql_args[@]}" -c "$authority_stmt" >"$cluster_root/authority-removed-$authority_call.log" 2>&1; then
+  authority_begin_session authority-remover "delete from public.workspace_memberships where $authority_membership"
+  PGAPPNAME=authority-contender psql "${psql_args[@]}" -c "$authority_stmt" >"$cluster_root/authority-removed-$authority_call.log" 2>&1 &
+  authority_contender=$!
+  authority_contender_waiting "$authority_contender"
+  authority_end_session commit
+  if wait "$authority_contender"; then
     printf 'Authority race: %s landed after the actor was removed.\n' "$authority_call" >&2
     exit 1
   fi
   grep -q workspace_membership_required "$cluster_root/authority-removed-$authority_call.log"
-  wait "$authority_remover"
   psql "${psql_args[@]}" -c "insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values ('$authority_workspace','$authority_leaver','admin','c9000000-0000-4000-8000-000000000001');" >/dev/null
 
   # 2. Removal waits for an in-flight write: the write holds the membership
   # row FOR SHARE, so a concurrent delete cannot get its row lock.
-  PGAPPNAME=authority-writer psql "${psql_args[@]}" \
-    -c "begin; $authority_stmt; select pg_sleep($authority_hold_seconds); rollback;" >"$cluster_root/authority-writer-$authority_call.log" 2>&1 &
-  authority_writer=$!
-  authority_session_ready authority-writer
+  authority_begin_session authority-writer "$authority_stmt"
   if psql "${psql_args[@]}" -c "set lock_timeout='150ms'; delete from public.workspace_memberships where $authority_membership;" >"$cluster_root/authority-blocked-$authority_call.log" 2>&1; then
     printf 'Authority race: removal did not wait for in-flight %s.\n' "$authority_call" >&2
     exit 1
   fi
   grep -q 'lock timeout' "$cluster_root/authority-blocked-$authority_call.log"
-  wait "$authority_writer"
+  authority_end_session rollback
 
   # 3. Downgraded mid-transaction: an owner/admin write queued behind an
   # uncommitted admin -> member change is denied.
   if [[ "$authority_tier" == manager ]]; then
-    PGAPPNAME=authority-demoter psql "${psql_args[@]}" \
-      -c "begin; update public.workspace_memberships set role='member' where $authority_membership; select pg_sleep($authority_hold_seconds); commit;" >/dev/null &
-    authority_demoter=$!
-    authority_session_ready authority-demoter
-    if psql "${psql_args[@]}" -c "$authority_stmt" >"$cluster_root/authority-demoted-$authority_call.log" 2>&1; then
+    authority_begin_session authority-demoter "update public.workspace_memberships set role='member' where $authority_membership"
+    PGAPPNAME=authority-contender psql "${psql_args[@]}" -c "$authority_stmt" >"$cluster_root/authority-demoted-$authority_call.log" 2>&1 &
+    authority_contender=$!
+    authority_contender_waiting "$authority_contender"
+    authority_end_session commit
+    if wait "$authority_contender"; then
       printf 'Authority race: %s landed after the actor was downgraded.\n' "$authority_call" >&2
       exit 1
     fi
     grep -q workspace_permission_denied "$cluster_root/authority-demoted-$authority_call.log"
-    wait "$authority_demoter"
     psql "${psql_args[@]}" -c "update public.workspace_memberships set role='admin' where $authority_membership;" >/dev/null
   fi
   printf 'Workspace authority race passed: %s\n' "$authority_call"
