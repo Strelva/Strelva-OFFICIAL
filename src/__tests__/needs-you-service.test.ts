@@ -373,3 +373,20 @@ describe("booking request clock ownership", () => {
     const { svc } = await setup(); expect((await svc.chase()).urgent).toBe(0); expect(sendEmail).not.toHaveBeenCalled();
   });
 });
+
+describe("booking calendar health alongside Needs You decisions", () => {
+  it("checks each linked business once and counts owner-not-told without opening a decision", async () => {
+    const bookingCalendarHealth = vi.fn(async () => ({ digests: 0, ownerNotTold: 1, failed: 0, complete: true }));
+    const svc = createNeedsYouService({ store: mem.store, adapters: [], sendEmail, now: () => clock.now, appOrigin: "https://app.example.test", bookingCalendarHealth });
+    const result = await svc.chase();
+    expect(bookingCalendarHealth).toHaveBeenCalledTimes(1);
+    expect(bookingCalendarHealth).toHaveBeenCalledWith(WS, { now: clock.now, appOrigin: "https://app.example.test", sendEmail });
+    expect(result.ownerNotTold).toBe(1);
+    expect(mem.items.size).toBe(0);
+  });
+  it("calendar source failure keeps the hourly chase honest without aborting its decision work", async () => {
+    const bookingCalendarHealth = vi.fn(async () => { throw new Error("health source down"); });
+    const svc = createNeedsYouService({ store: mem.store, adapters: [], sendEmail, now: () => clock.now, appOrigin: "https://app.example.test", bookingCalendarHealth });
+    expect(await svc.chase()).toMatchObject({failed:1,digests:0});
+  });
+});

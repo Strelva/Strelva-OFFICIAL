@@ -1,3 +1,4 @@
+import { chaseBookingCalendarHealth } from "@/platform/bookings/calendar-health";
 import { bookingSettingsAdapter } from "@/platform/bookings/setup";
 import { deliverBookingUpdates } from "@/platform/bookings/updates";
 import { getEventRaw, getEvents } from "@/lib/events";
@@ -34,8 +35,9 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
     store,
     appOrigin: needsYouAppOrigin(),
     now: () => Date.now(),
+    bookingCalendarHealth: chaseBookingCalendarHealth,
     async sendEmail(input) {
-      if (input.tags?.lifecycle === "booking_request") {
+      if (input.tags?.lifecycle === "booking_request" || input.tags?.lifecycle === "booking_calendar_health") {
         const { bookingCustomerEmailAllowed } = await import("@/platform/bookings/updates");
         if (!await bookingCustomerEmailAllowed(input.tenantId ?? null)) return { status: "suppressed", reason: "email_gates" };
       }

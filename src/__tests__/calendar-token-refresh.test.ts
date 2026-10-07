@@ -62,7 +62,7 @@ vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({
 }) }));
 vi.mock("@/platform/infra/redis", () => ({ getRedis: () => null }));
 
-import { assertWorkspaceCalendarWriteAllowed, getWorkspaceCalendarConnection } from "@/products/scheduling/calendar/repository";
+import { assertWorkspaceCalendarWriteAllowed, getWorkspaceCalendarConnection, markWorkspaceCalendarConnectionError } from "@/products/scheduling/calendar/repository";
 
 const actor = { userId: "33333333-3333-4333-8333-333333333333", verifiedEmail: "owner@example.test" };
 const past = "2020-09-20T14:59:00.000Z";
@@ -174,5 +174,23 @@ describe("workspace calendar credential refresh boundary", () => {
     expect(firstResult?.accessToken).toBe("first-access");
     expect(secondResult?.accessToken).toBe("first-access");
     expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+});
+
+
+describe("calendar read failure revision guard", () => {
+  it("marks rejected authorization against the current connection only", async () => {
+    state.membership = { role: "owner" };
+    state.row = { ...state.row, status: "connected", updated_at: "2026-10-07T00:00:00Z" };
+    await markWorkspaceCalendarConnectionError(actor, String(state.row.workspace_id), "outlook", "Reconnect the calendar.", "2026-10-07T00:00:00Z");
+    expect(state.row.status).toBe("error");
+    expect(state.row.last_error).toBe("Reconnect the calendar.");
+  });
+  it("a stale provider failure cannot poison a newer reconnect", async () => {
+    state.membership = { role: "owner" };
+    state.row = { ...state.row, status: "connected", updated_at: "2026-10-07T01:00:00Z", last_error: null };
+    await markWorkspaceCalendarConnectionError(actor, String(state.row.workspace_id), "outlook", "Reconnect the calendar.", "2026-10-07T00:00:00Z");
+    expect(state.row.status).toBe("connected");
+    expect(state.row.last_error).toBeNull();
   });
 });

@@ -20,6 +20,8 @@ export interface NeedsYouDeps {
   /** Origin that serves /api/approve and /workspace. */
   appOrigin: string;
   now(): number;
+  /** Booking calendar health is an owner action, separate from decisions. */
+  bookingCalendarHealth?(workspaceId: string, input: { now: number; appOrigin: string; sendEmail: NeedsYouDeps["sendEmail"] }): Promise<{ digests: number; ownerNotTold: number; failed: number; complete: boolean }>;
 }
 
 export type DecideStatus =
@@ -283,6 +285,10 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     const linked = await deps.store.linkedTenants(null).catch(() => []);
     for (const workspaceId of new Set(linked.map(link => link.workspaceId))) {
       await sync(await cronContext(workspaceId, sessions)).catch(() => { summary.failed += 1; });
+      if (deps.bookingCalendarHealth) {
+        const health = await deps.bookingCalendarHealth(workspaceId, { now, appOrigin: deps.appOrigin, sendEmail: deps.sendEmail }).catch(() => ({ digests: 0, ownerNotTold: 0, failed: 1, complete: false }));
+        summary.digests += health.digests; summary.ownerNotTold += health.ownerNotTold; summary.failed += health.failed;
+      }
     }
     const rows = await deps.store.dueForDelivery(500);
     const byBusiness = new Map<string, DeliveryRow[]>();
