@@ -8,16 +8,18 @@ page. Sibling of the
 [website rebuild spec](../website/website-rebuild-spec-2026-10-01.md), whose `Booking`
 and `InquiryForm` components this capability powers.
 
-## Current implementation status — wave 6, round 5, October 7
+## Current implementation status — wave 6, finished and verified, October 7
 
 Branch `w6/bookings`, code and local fixtures only. This status supersedes the
 historical wave-2/3/4 gap lists below; those describe their original checkpoints.
 No production step or notification is authorized here. Full results, switches,
-14 migrations/rollbacks and rollout order: [stream handoff](../../product/streams/w6-bookings.md).
+15 migrations/rollbacks and rollout order: [stream handoff](../../product/streams/w6-bookings.md).
 
-The first full verification below passed; final audit closure is still active for
-tenantless workspace bookings and visitor phone/timezone/native confirmation copy.
-Their fresh final evidence will replace this checkpoint before completion.
+Final audit closure is locally verified: bookings work without a website tenant;
+native visitor phone and browser time-zone handling are implemented; native
+receipts credit the business. The native SQL kind and manual retry calendar-key
+lookup were corrected against real PostgreSQL, including rollback/reapply.
+MCP protocol tests and OpenAPI intake-answer coverage pass. Flags remain off.
 
 Built and locally tested: both visitor entry paths on one store; current record
 hours/services/phone; stable receipts, customer management and immutable history;
@@ -35,7 +37,7 @@ streak after a partial or failed run. It is authenticated and heartbeat-register
 Every notice remains behind its switch and all three existing email gates;
 flag-off visitor response/default regressions and client compatibility pass.
 
-Local proof: 6,388 tests pass (39 intentionally skipped across the repository),
+Local proof: 6,423 tests pass (39 intentionally skipped across the repository),
 typecheck/lint/boundaries/build pass, client compatibility 196/196, and isolated
 PostgreSQL checks pass including 30 tests through both real booking route families.
 Desktop/mobile evidence and limits: [rendered fixture review](../../../output/w6-bookings-ui/README.md).

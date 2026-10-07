@@ -33,3 +33,14 @@ The calendar-disconnect follow-up renders the actual `CalendarConnectionPanel` a
 The final [native visitor measurements](./native-visitor-evidence.json) replace the old provider-confirmation screenshots with the actual native metadata branch. Fifteen measurements at 1280/390/320px use `bookingAuthority: business` only in simulated on mode. The browser resolves `America/Los_Angeles` while the business schedule is `America/New_York`: slots and receipts show the visitor time and the page names the zone. Native confirmed receipts say the business confirmed; pending requests explicitly await the business, and their readback control is named Check request status. Optional phone has a visible 3px keyboard outline, appears in the actual serialized request DTO, and remains after a conflict. Without native metadata, the provider wording and original fields remain. Both replacement mobile PNGs are tracked. No calendar mirror or provider delivery was verified.
 
 The final [website-free owner measurements](./native-owner-evidence.json) render native ready and not-yet-set-up states at 1280/390/320px, plus ready/loading/error/permission/empty/paused manual requests at 390px. The fictional native list has a workspace identity and Bookings System, with no website tenant. Its empty state asks Strelva to prepare bookings through a Request and says a website is optional. Every manual request is intercepted by Playwright before the API server, so none reaches a backend or provider. All twelve states have no horizontal overflow; two representative mobile PNGs are tracked. This proves fixture rendering, not native SQL persistence or actual permissions.
+
+The resumed completion pass rechecked the actual visitor at 1280px and the local
+production build's synthetic preview at 390px. [Resume measurements](./resume-evidence.json)
+retain the mobile pending/confirmed receipt and website-free owner ready/empty
+states: no horizontal overflow, phone in the intercepted POST, business-authority
+copy and visitor-zone labels, with visitor controls at least 44px. The browser
+used America/New_York in this pass; the earlier Los Angeles versus New York
+measurements remain the different-zone evidence. Initial connection refusal and
+the production-mode fixture's intentional 404 were resolved by starting this
+worktree's local server and using its preview-only gate. All actions stayed in
+the fixture transport; production settings and release flags were not changed.
