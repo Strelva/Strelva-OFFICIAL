@@ -76,7 +76,7 @@ describe("the Inquiries System's current form", () => {
     const work = engine.start({ actorId: actor.userId, intent: "quote inquiry" });
     engine.acceptShape(work.id, { actorId: actor.userId });
     engine.createResponsibility({ actorId: actor.userId, capabilityId: work.capabilityId!, title: "Reply", scope: "Ordinary inquiries", allowedActions: ["reply"],
-      escalation: { primary: "private@example.test" }, budget: { dailyMessages: 12, timezone: "America/New_York" },
+      escalation: { primary: "private@example.test", secondary: null }, budget: { dailyMessages: 12, timezone: "America/New_York" },
       hours: { timezone: "America/New_York", days: [1, 3], start: "09:00", end: "17:00" } });
     const current = engine.snapshot();
     expect(projectInquiryRunning("Fixture", current, workspace)).toEqual([]);

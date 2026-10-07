@@ -1,7 +1,7 @@
-# Wave 6 inquiries — round 5 handoff
+# Wave 6 inquiries — recovered and verified locally
 
 Branch: `w6/inquiries`. Worktree: `/Users/jacobrhinehart/Desktop/strelva/REB-w6-inquiries`.
-Final verification and the acceptance map are in [the wave 6 evidence record](../../capabilities/inquiries/inquiry-wave6-verification-2026-10-07.md).
+Recovery covers all 23 earlier commits, including tip `8a31dd88` and every WIP checkpoint. Final verification, the operator-gate inventory and the acceptance map are in [the wave 6 evidence record](../../capabilities/inquiries/inquiry-wave6-verification-2026-10-07.md).
 
 ## Objective and result
 
@@ -17,7 +17,7 @@ Answer totals, within-day totals, unanswered totals and average/median first-rep
 
 User-supplied fact: **0.2.1 is live, every lead dual-writes to `tenant_leads`, and 43 leads were backfilled.** This stream did not query production. Step 0 is already done; do not rerun the backfill merely because older delta prose says it is pending.
 
-No deployment, production migration, env change, client repo edit, external notification, real-provider call, dependency, push or PR was performed. All new email stays off until its switches and global/customer/per-origin-tenant gates permit it. A configured business owner with `tenantId:null` cannot bypass the originating tenant’s `reb:client-email` gate; every inquiry origin in a grouped digest is checked.
+No deployment, production migration, env change, client repo edit, external notification, real-provider call or new dependency was performed. The recovery task explicitly authorizes committing, pushing and opening a PR against `integrate/reborn-1.0` (Refs #336); it does not authorize merge or rollout. All new email stays off until its switches and global/customer/per-origin-tenant gates permit it. A configured business owner with `tenantId:null` cannot bypass the originating tenant’s `reb:client-email` gate; every inquiry origin in a grouped digest is checked.
 
 ## Switches and defaults
 
@@ -64,7 +64,7 @@ All 19 files are in the allotted range, additive, transaction-wrapped with a thr
 | `20261010125940_inquiry_booking_handoff.sql` | Signed inquiry-to-booking requests, managed and native |
 | `20261010125950_inquiry_operator_review.sql` | Operator spam review and bounded connected notice repair |
 
-Rollback files use the existing `supabase/migrations/rollback-*.sql` convention: workspace-replies, w6-inquiry-outcome-proof, weekly-outcomes, context-notices, w6-connected-inquiry-records, urgent-decisions, inbox, reply-purpose, cache-presence, connected-inquiry-owner-notices, export-before-teardown, decision-notice-claims/events, tenant-lead-parity-completeness, member-replies, business-facts, operator-authority, booking-handoff and operator-review. Focused operator/facts/booking/callback SQL and rollback rehearsals are retained in local scratch evidence. The full-schema upgrade proves historical identity/content/report rows survive.
+Rollback files use the existing `supabase/migrations/rollback-*.sql` convention: workspace-replies, w6-inquiry-outcome-proof, weekly-outcomes, context-notices, w6-connected-inquiry-records, urgent-decisions, inbox, reply-purpose, cache-presence, connected-inquiry-owner-notices, export-before-teardown, decision-notice-claims/events, tenant-lead-parity-completeness, member-replies, business-facts, operator-authority, booking-handoff and operator-review. The aggregate workspace SQL gate now rehearses all 19 rollback files independently and in reverse order on local clones, comparing exact retained rows. Recovery repaired destructive claim/receipt/proposal/offer rollbacks and their retained provider-event dependency. Five existing rollback files now revoke entry points rather than deleting durable state. Forward migrations remain unchanged. The full-schema upgrade proves historical identity/content/report rows survive.
 
 Migration `20261010125935` is required before enabling publication, including the legacy combination where inquiries are enabled but owner notices are off. Direct publication now fails closed without a current owner bound to its exact claim/event; an operator can prepare but cannot decide. Signed “Not yet” is bound to the declined source and cannot authorize a send or publish.
 
@@ -72,7 +72,7 @@ Migration `20261010125935` is required before enabling publication, including th
 
 No new cron route or schedule. Existing authenticated `lead-mirror-reconcile`, `inquiry-follow-ups`, `needs-you`, `weekly-report` and `monthly-report` do the work under their existing heartbeat registration. `needs-you` shares the durable urgent mail purpose with immediate capture; it cannot double-send after a crash.
 
-The release coordinator’s exact next action is to review/integrate this branch and reconcile dependent shared product/release state. Production actions below need Jacob’s separate authorization and the existing release checklist:
+The release coordinator’s exact next action is to review this PR, complete #251 before merge, then integrate and reconcile dependent shared product/release state. The five SQL `super_admins` checks and four new application gates are inventoried in the evidence record. `authorize_inquiry_operator_actor` still accepts a revoked row while tenant membership remains: a transactional local probe returned `true`. This task reports the finding without changing any operator gate. Classifying provider-agency versus platform-operator powers and fixing revocation are #251 work; they remain a merge blocker. Production actions below need Jacob’s separate authorization and the existing release checklist:
 
 1. Apply integrated prerequisite and inquiry migrations in order, with new switches off. Confirm readiness sentinels; the snapshot now includes all new table sentinels and inquiry switches without exposing secret values.
 2. Keep the supplied 0.2.1 dual-write/backfill state. Enable read `compare` and collect seven consecutive all-tenant days with zero unexplained misses. A missing tenant, failed Redis read or an earlier miss on a day blocks that day.
@@ -85,7 +85,7 @@ Do not roll back an accepted send into retryable work. Corrected-recipient notic
 
 ## Commits
 
-Interruption checkpoints are preserved; the final gates cover their accumulated source. Chronological commits through the verified implementation:
+Interruption checkpoints are preserved; the final gates cover their accumulated source. Earlier implementation/checkpoint commits (recovery verifies their accumulated source):
 
 - `9202136f` — WIP w6/inquiries: checkpoint after session interruption (unverified)
 - `a102896a` — WIP w6/inquiries: checkpoint 2 after second interruption (unverified)
@@ -107,7 +107,11 @@ Interruption checkpoints are preserved; the final gates cover their accumulated 
 - `b1df6cb4` — Keep email formatting bounded and defer inactive booking release reads
 - `31f6b7e5` — Enforce current inquiry policy and exact owner authority through every decision path
 - `2c354de0` — Run transactional inquiry migrations and all closure contracts in SQL gates
+- `4cfefd0c` — Show accepted inquiry installations as Versions in the current agency Library
+- `8654a551` — Exercise bounce and missing provider timelines through isolated inquiry fixtures
+- `8a31dd88` — WIP round-5 checkpoint saved after thread stop (then unverified)
+- Recovery — fix Running test-fixture typing; retain rollback evidence; add the 19-file rollback gate; replace pending proof with actual results (see current Git log).
 
 ## Current proof and remaining uncertainty
 
-Final command results, failure history, per-criterion evidence and rendered artifacts are recorded in the linked evidence record. All proof is local. Production parity time, actual oldest durable production record, live provider acceptance/delivery, and owner adoption remain unproven. No additional product decision or dependency is required to finish the code; production rollout is a separate authorized action.
+Final command results, failure history, per-criterion evidence and rendered artifacts are recorded in the linked evidence record. All proof is local. Production parity time, actual oldest durable production record, live provider acceptance/delivery, and owner adoption remain unproven. Local inquiry implementation checks are complete; #251 authority classification and the observed revoked-operator finding remain open before merge. No new dependency is required. Production rollout is a separate authorized action. Neither integration-checkout resume file was present; this handoff and its linked evidence are the continuation owners.

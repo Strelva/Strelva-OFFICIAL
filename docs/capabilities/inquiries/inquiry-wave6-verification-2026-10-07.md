@@ -1,6 +1,6 @@
 # Inquiries wave 6 — local verification, October 7
 
-Branch `w6/inquiries`, round 5. This is the current evidence map for the
+Branch `w6/inquiries`, recovered after the unverified round 5 checkpoint `8a31dd88`. This is the current evidence map for the
 [September acceptance](./inquiry-first-acceptance-2026-09-11.md), as amended by
 [the October delta](./inquiry-1.0-delta-2026-10-06.md). Historical partial/pending
 rows remain historical; the tables here identify the implemented contract and
@@ -13,7 +13,61 @@ This stream did not read production or use a real provider.
 
 ## Final aggregate verification
 
-FINAL_RESULTS_PENDING
+Recovery on October 7 ran the accumulated source from all 23 stream commits,
+including every WIP checkpoint. These are fresh results, not the previous
+thread's claims. Raw logs remain local under `.scratch/w6-inquiries/recovery-*`.
+
+- `pnpm typecheck`: passed after supplying `secondary: null` in the Running test fixture.
+- `pnpm lint`, `pnpm check:boundaries`, `pnpm check:ontology`: passed.
+- Initial `pnpm test -- inquiry`: actually ran the full suite: **710 files / 6,423 tests passed; 1 file / 37 tests skipped**. Vitest ignored selection after `--`; the focused commands below use `pnpm exec vitest run`.
+- `STRELVA_LOCAL_TEST_WORKERS=2 STRELVA_LOCAL_TEST_TIMEOUT_MS=30000 pnpm exec vitest run inquiry`: **67 files / 491 tests passed; 13 skipped**.
+- `pnpm exec vitest run` with the changed agency-home, connect-js, deprovision-atomic, event-actions, lead-read-source, needs-you-evaluator, needs-you-service, production-readiness-snapshot and workspace-ports suites: **9 files / 255 tests passed**.
+- `PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-upgrade`: passed, applying all **19** stream migrations in historical order and preserving the historical fixture.
+- `STRELVA_LOCAL_TEST_WORKERS=2 STRELVA_LOCAL_TEST_TIMEOUT_MS=30000 PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-sql`: **passed (exit 0)**, including all 19 forward contracts, engine/owner and workspace authority races, real Make real/booking-store tests, and all 19 independent/reverse-order rollback cases with exact retained rows.
+- `bash scripts/check-inquiry-rollbacks.sh` against the isolated upgrade and aggregate clusters: all **19** rollback files passed independently and as a reverse-order batch. Exact before/after rows match for inquiry records, events, claims, notice receipts, business facts/proposals and signed booking offers. The workspace SQL command now includes this rehearsal.
+- `STRELVA_UI_PREVIEW=1 EMAIL_SENDING_ENABLED=0 CUSTOMER_EMAIL_ENABLED=0 PLAYWRIGHT_PORT=3216 pnpm exec playwright test` with the six inquiry system/inbox/library/member/running/delivery-surface fixture specs: **30 passed**, desktop/mobile and failure/permission states. Screenshots remain in ignored `output/`. Browser fixture proof is separate from authenticated live journeys.
+- `pnpm check:custom-repos`: **196/196 passed** in development mode; this does not prove pinned release checkouts.
+- `NODE_ENV=production EMAIL_SENDING_ENABLED=0 CUSTOMER_EMAIL_ENABLED=0 pnpm build`: passed.
+- `git diff --check`: passed.
+
+Recovery preserved these failures: typecheck found the missing fixture field;
+the first workspace SQL run timed out after 5 seconds in the booking one-store
+suite (28 other tests passed); another full test run and dev-cache persistence
+hit `ENOSPC`. The interrupted duplicate full run is not proof. Ignored caches
+left by the stopped stream were cleared; affected runs use the already-supported
+30-second local test timeout. The 30 browser tests passed even though dev-cache
+persistence logged `ENOSPC`; no live provider was used. The rollback rehearsal
+first detected deletion of `inquiry_engine_reply_claims`; fixture retention also
+exposed reused fictional keys/emails/lead IDs, now isolated per retained fixture. Five
+rollback files now revoke entry points while retaining claims, provider receipts,
+proposals and offers. The decision-notice claim rollback no longer drops the
+parent of the retained provider-event foreign key.
+
+## Operator gates awaiting #251 — reported, unchanged
+
+The audit's **five SQL `super_admins` checks** are all present:
+
+1. `20261010123000_inquiry_context_notices.sql:43`, `authorize_inquiry_owner_notice_repair`: verified, unrevoked super-admin authorizes bounded managed-site owner-notice repair; no tenant membership check at this seam.
+2. `20261010124000_connected_inquiry_records.sql:207`, `decide_held_workspace_lead`: current workspace owner or an unrevoked super-admin may decide held spam after verified-email identity and exact record/workspace binding. The operator branch does not require workspace membership.
+3. `20261010125930_inquiry_business_facts.sql:103`, `correct_inquiry_business_fact`: after canonical business-record actor validation, an unrevoked super-admin is labelled operator and may correct facts; otherwise owner authority is required.
+4. `20261010125935_inquiry_operator_authority.sql:8`, `authorize_inquiry_operator_actor`: verified user, matching super-admin email and **any tenant membership**. **It omits `revoked_at IS NULL`.** A local transactional probe set `revoked_at` on the fictional operator and the RPC still returned `true` (log: `recovery-operator-gate-audit.log`). Existing SQL tests delete the row rather than mark it revoked. This is a concrete unresolved authority finding for #251; it was not fixed under this task's report-only instruction.
+5. `20261010125950_inquiry_operator_review.sql:8`, `inquiry_assert_operator`: verified email and unrevoked super-admin, with no business membership; protects global held/notice lists, spam decisions and corrected-recipient repair claims. Workers reverify that operator for repair.
+
+New application gates using `isSuperAdmin()` also protect:
+`src/app/admin/client-leads/inquiries/page.tsx:11`,
+`src/app/api/admin/client-leads/held/route.ts:14`,
+`src/app/api/admin/client-leads/owner-notice/route.ts:16`, and
+`src/app/api/admin/client-leads/connected-owner-notice/route.ts:13`.
+The held route and its permission view explicitly say “Strelva operators.”
+Ordinary-message review calls the SQL operator actor seam through
+`src/products/inquiries/message-review-authority.ts` and requires supervised,
+noncommitment, sponsor-bound review. These capabilities currently privilege
+Strelva operators; no provider-agency replacement was made. Existing queue
+operator-only action and workspace viewer gates were inspected and unchanged.
+
+**Merge condition:** #251 must classify each as a provider-agency check or an
+explicit platform-operator power, and address the revocation finding. Local green
+checks do not settle that authority review or authorize production.
 
 ## September acceptance, amended by October delta
 

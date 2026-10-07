@@ -1,10 +1,9 @@
 begin;
 set local lock_timeout='3s';
-drop function if exists public.correct_inquiry_business_fact(uuid,uuid,text,jsonb);
-drop function if exists public.confirm_inquiry_business_fact(uuid,uuid,uuid,text);
-drop function if exists public.inquiry_business_fact_revision(uuid,uuid);
-drop function if exists public.read_inquiry_business_facts(uuid,uuid);
-drop function if exists public.stage_inquiry_business_fact(uuid,uuid,text,jsonb,text);
--- Accepted business facts and their immutable history are kept on rollback.
-drop table if exists public.inquiry_business_fact_proposals;
+-- Keep pending/decided source proposals with the accepted facts and history.
+revoke execute on function public.correct_inquiry_business_fact(uuid,uuid,text,jsonb),
+  public.confirm_inquiry_business_fact(uuid,uuid,uuid,text),
+  public.inquiry_business_fact_revision(uuid,uuid),
+  public.read_inquiry_business_facts(uuid,uuid),
+  public.stage_inquiry_business_fact(uuid,uuid,text,jsonb,text) from service_role;
 commit;
