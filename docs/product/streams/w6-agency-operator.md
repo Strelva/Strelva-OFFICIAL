@@ -1,9 +1,31 @@
-# Wave 6: agency-operator — round 5
+# Wave 6: agency-operator — finished (round 6)
 
 Branch: `w6/agency-operator`. Worktree: `REB-w6-agency-operator`.
-Comparison base: `7b7b4d3f`. Resumed clean at `c3685728` after four interrupted
-rounds. All evidence below is local. No production access, provider writes,
-client notification, new dependency, push, PR or merge occurred.
+Comparison base: `7b7b4d3f`. Round 6 (October 7, 2026) resumed the saved
+round-5 checkpoint `056206eb`, parked its unfinished scope, merged
+`integrate/reborn-1.0` @ `0479cdab`, and reran every required check on the
+merged tree. All evidence below is local. No production access, provider write,
+client notification or new dependency occurred.
+
+## Round 6: what changed
+
+- **Parked unfinished round-5 scope.** The checkpoint carried three Version
+  migrations (`163500_version_publication_receipts`,
+  `163600_version_existing_runtimes`, `163800_version_offering_configuration`)
+  and `src/platform/system-versions/offering-runtime.ts`. None had a caller,
+  SQL proof, harness entry or handoff line; `163800` had no rollback; `163500`
+  renamed the shared `create/save_make_real_activation` functions. They are
+  preserved unchanged on `w6/agency-operator-round5-parked` and are not in this
+  PR. The launch lines in the spec do not depend on them.
+- **Kept the round-5 harness and fixture fixes** (owner-grant ordering,
+  millisecond projection precision, supported unlink in exit evidence, native
+  rollback/roll-forward, portability rollback) because the full harness now
+  proves them.
+- **Merged `integrate/reborn-1.0`.** Three conflicts, all unions: preview
+  params (`sibling` + `outcomes`, `version` + `outcomes`) and both head-only
+  count test blocks, which the merged `countResult` satisfies.
+- **File inventory corrected** from 283 to 293 paths (sibling-changes migration,
+  rollback, SQL/UI tests and six source files were missing).
 
 ## What moved
 
@@ -44,21 +66,24 @@ The launch-line mappings and their tests are in
 
 ## Verification
 
-Final source checks passed. The final whole-schema run is still completing;
-its result is recorded below before this handoff is committed.
+Round 6 results. Logs are in `.scratch/w6-round6/` (uncommitted).
 
-| Check | Local result |
+| Check | Result |
 | --- | --- |
-| `pnpm typecheck` | Passed on frozen sources, including the final readiness map. |
-| `pnpm lint` | Pending final aggregate; each owned source group passed focused lint. |
-| `pnpm check:boundaries` | Passed: baseline unchanged, 204 workspace→lib imports in 93 files, 46 older imports. |
-| `pnpm test --maxWorkers=2 --testTimeout=30000` | Passed: **725 passed files / 1 skipped; 6,481 passed tests / 38 skipped** (726 files, 6,519 tests). |
-| `PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-sql` | Pending final aggregate, including native publish/failure/rollback and outcome fixtures. |
-| `pnpm check:custom-repos` | Passed: **196/196**. |
-| `NODE_ENV=production pnpm build` | Passed: compiled, typechecked and completed static generation. |
-| `git diff --check` | Passed before final documentation update; rerun before commit. |
+| `pnpm typecheck` | Passed before and after the integration merge. |
+| `pnpm lint` (full aggregate) | Passed before and after the merge (exit 0, no findings). |
+| `pnpm check:boundaries` | Passed on the stream before the merge: baseline unchanged, 204 workspace→lib imports in 93 files, 46 older imports. **Fails after the merge** on 8 imports in `src/experience/workspace/outcomes/*` (`@/lib/motion`, `@/lib/ai-visibility-scorecard`). Those files, the checker and the baseline are byte-identical to `integrate/reborn-1.0` @ `0479cdab`, so the integration tip fails identically. Owned by the workspace-1.0 merge, not this stream. |
+| `pnpm test --maxWorkers=2 --testTimeout=30000` (merged) | Passed: **727 files passed / 1 skipped; 6,529 tests passed / 38 skipped** (728 files, 6,567 tests), 100.5 s. |
+| `LC_ALL=C PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-sql` | Passed: workspace, customer-mapping and inquiry clusters, including native publish/rollback/roll-forward, sibling changes, portability rollback, exit evidence and the Postgres-backed Version store contract (vitest 29 + 8 + 29 + 10 + 29 tests). Run before the merge; the merge changed no migration, SQL test or harness file (only five Playwright specs). |
+| `pnpm check:custom-repos` (merged) | Passed: **196/196**. |
+| `NODE_ENV=production pnpm build` (merged) | Passed: compiled, typechecked and completed static generation (exit 0). |
 
-Focused proof includes owner routing (5 files/86 tests), concurrent Redis repairs
+Retained round-6 failure: the first SQL attempt failed before any check ran.
+Postgres 18 refused to start (`postmaster became multithreaded during startup`,
+hint: set `LC_ALL`). This is a host locale problem; rerunning with `LC_ALL=C`
+passed. Only this run's own stopped clusters were removed.
+
+Round 5 history, retained below. Focused proof includes owner routing (5 files/86 tests), concurrent Redis repairs
 (6/50), outcome caller/domain failures (6/54), native Version creation/runtime/
 decisions (4/45), and the Version Possibilities bridge (6/72). Local Postgres
 contract tests run in the SQL harness rather than claiming skipped unit cases
@@ -151,6 +176,7 @@ removal would destroy client history; turning off gates precedes rollback.
 | `163100_version_management` | Owner draft/history commands | `rollback-20261010163100-version-management.sql` |
 | `163200_version_owner_grants` | Owner-only data/lineage sharing | `rollback-20261010163200-version-owner-grants.sql` |
 | `163300_version_native_applications` | Real draft/runtime with approved atomic release | `rollback-20261010163300-version-native-applications.sql` |
+| `163400_version_sibling_changes` | Scoped sibling Version changes, private data masked | `rollback-20261010163400-version-sibling-changes.sql` |
 | `164000_finite_job_adapters` | Persistent jobs/approval adapters | `rollback-w6-finite-job-adapters.sql` |
 | `165000_tenant_business_context` | Confirmed public business facts | `rollback-tenant-business-context.sql` |
 | `165500_business_portability` | Billing/outcomes/asset+exit projections; report receipts | `rollback-w6-business-portability.sql` |
@@ -199,12 +225,53 @@ accepted/read-back provider receipts; complete export/exit on the Strelva-owned
 test business; linked monthly outcome correctness; measured human minutes per
 client/month. Local proof does not substitute for any of these clocks or effects.
 
+## ADR 0012 conflict: where this stream assumes Strelva staff
+
+Reported, not fixed. ADR 0012 makes Strelva's agency an ordinary agency on a
+neutral platform. This stream was built before it and assumes the agency actor
+is Strelva: a client admin membership from conversion, or a `super_admins`
+operator. Every place below is NEW in this branch unless marked. The
+neutral-access issues should target them: #245 (provider seat), #255 (one
+acting-provider predicate on effects), #247 (separate operator from agency).
+
+**Agency reach = Strelva's admin membership (#245).**
+- `20261010160000_agency_authoring.sql:44-52`: entry via `workspace_providers`/delegation/assignment, then building requires owner/admin in the client via `system_actor_scope`.
+- `20261010163100_version_management.sql:39-45, 69` and `20261010163300_version_native_applications.sql:25-28`: create/bind Versions require owner/admin in both businesses; `read_version_binding_choices` refuses non-members.
+- `20261010163000_agency_operator_overview.sql:20-21`: decisions and receipts only for `work_ids is null` (admin-member) clients.
+- `src/experience/workspace/agency/version-server.ts:29-30, 87, 119` and `authoring-server.ts:20, 28, 82, 94`: `canManage`/authoring require a direct owner/admin membership (`read_version_actor`).
+- UI filters to `reach==="member"` owner/admin clients: `AgencyAuthoring.tsx:22`, `AgencyVersionCreate.tsx:28`; controls gated on `canManage`: `SystemVersionManagement.tsx:37, 62`, `SystemVersionImprovements.tsx:81, 143-154`. Copy: `AgencyAuthoring.tsx:28` "require admin access in that client's business".
+- Export/exit treat any admin as `'operator'`: `20261010165500_business_portability.sql:58-67, 139, 186`, `165600_exit_handoff_evidence.sql:45`, `165700_export_recovery.sql:28` (via pre-existing `workspace_export_v3_role`), `src/platform/workspace-exports/v3.ts:106`, `src/app/api/workspace-export/v3/route.ts:18, 44`, `src/platform/workspace-exit/repository.ts:101-104`, `WorkspaceExit.tsx:113`. Monthly outcomes run as "the operator for an owner with no login".
+- Pre-existing, now depended on: `system_actor_scope` (`20261004120000_systems.sql:354`), `business_record_assert_actor` (`20261002120000_business_record.sql:387`), `read_version_actor` (`20261007150000_system_versions.sql:445`), `reach:"member"` = conversion admin membership (`src/experience/workspace/agency-clients.ts:40-41`).
+
+**Internal operator queue merged into the agency view (#247).**
+- `src/experience/workspace/agency/operator-overview.ts:12-31, 49-51`: the `super_admins` operator Queue is merged into the agency Queue for `reach==="member"` clients; a non-operator agency gets nothing extra. Wired in `agency-server.ts:60-67` to `STRELVA_OPERATOR_QUEUE_RELEASE`.
+- `AgencyViews.tsx:139` (operator `QUEUE_KIND_LABELS`), `AgencyHome.tsx:350` ("shared operator Queue" gaps), `agency-home.ts:140` (`operator: "Strelva's work"`).
+- `20261010161400_operator_complete_sources.sql:6, 27-29`: client sources listed with `super_admins` as operators.
+- `src/app/admin/queue/source-actions.ts:15-31, 86-100` and `actions.ts:44-45`, `QueueBoard.tsx:163, 323`, `QueueSourceActions.tsx:43`: a super admin accepts/declines client service requests where `provider.kind==="strelva"`, triages/quotes change requests and bulk-approves "Strelva drafts". This is the platform operator acting as the client's provider.
+- `src/platform/operator-queue/rules.ts:38`: an uncertain client Google write moves to `"strelva"`.
+- Copy: `SystemVersionImprovements.tsx:129` "receipt is in Strelva handled", `native-runtime.ts:21` and `version-server.ts:60` "operator-prepared", `systems-fixture.ts:110` fixture agency "Strelva Agency".
+
+**Outside effects gated on the operator, not the acting agency (#255).**
+- `20261010161000_operator_google_attempts.sql:5, 74`, `src/platform/operator-queue/store.ts:99-111`, `sources.ts:506-508`: client Google writes recorded in `operator_google_write_attempts`, readable only through `operator_queue_assert_operator` (`super_admins`).
+- Global `STRELVA_OPERATOR_QUEUE_RELEASE` gates Google/content writes instead of an agency verification: `src/lib/gbp-management.ts:387, 506, 653`, `gbp-replies.ts:165`, `event-actions.ts:501`, `storage/content-store.ts:203`.
+
+**New gaps no issue covers yet.**
+- `20261010163300_version_native_applications.sql:152` with `src/platform/system-versions/preparation.ts:26`: a client's Live Version release can be approved by `route='strelva_reviews'`, `decided_by_kind='operator'`. Under ADR 0012 an operator power must not serve a client; closest is #247.
+- `20261010161200_operator_content_receipts.sql:4, 26`: client content publishing is `write_operator_content` with provider `'strelva_content'` (adjacent to #255).
+- `src/app/workspace/billing/page.tsx:32`: "Strelva needs to record the existing agreement" assumes Strelva is every client's payer of record (ADR 0012 rule 2, payer per business).
+
+Not used by this branch: `resolveStrelvaAgencyWorkspaceId`, `designate_strelva_agency_workspace`, the `strelva` assignee kind.
+
 ## Exact next action
 
-Integrate these commits locally with the other wave streams, reconcile the
-listed shared paths, rerun the aggregate checks and inspect the combined owner
-approval journeys. Add these migration/flag/cron/rollback steps to the release
-packet in the integration stream. Prepare the scrubbed-copy results and exact
-production batches for Jacob's approval. No production action is authorized by
-this handoff. Larger capability/vault reviews remain wave-integration work; this
-stream selected no new offer, price, provider authority or live promotion.
+Coordinator: review and merge the PR into `integrate/reborn-1.0`, then fix the
+8 inherited `outcomes/*` boundary imports in the integration branch (route
+`@/lib/motion` and `@/lib/ai-visibility-scorecard` through `src/platform/infra`
+or move them into the workspace layer). Add this stream's migration, flag, cron
+and rollback steps to the release packet. Feed the ADR 0012 list above into
+#245/#255/#247 and file the three uncovered gaps. Decide separately whether the
+parked `w6/agency-operator-round5-parked` scope (Version publication receipts,
+attaching existing runtimes, offering-configuration Versions) is still wanted
+after the neutral-access work reshapes Version authority; it needs its own
+callers, SQL tests and a `163800` rollback before it can ship. No production
+action is authorized by this handoff.

@@ -2,10 +2,10 @@
 
 Comparison base: `7b7b4d3f`, the wave brief base. The integration branch moved
 after this worktree was created, so its current tip is not the comparison base.
-Includes rounds 1–5 and new files. Root owns the index. Reconcile these shared
+Includes rounds 1–6 and new files. Round 6 merged `integrate/reborn-1.0` @ `0479cdab`; only stream-owned paths are listed. Root owns the index. Reconcile these shared
 paths before integrating; no other stream was edited here.
 
-Inventory: **283 paths**. Generated caches and local proof logs are excluded.
+Inventory: **293 paths**. Generated caches and local proof logs are excluded.
 
 ## Shared surfaces and infrastructure
 
@@ -164,6 +164,12 @@ Inventory: **283 paths**. Generated caches and local proof logs are excluded.
 - `src/products/websites/site-report.ts`
 - `src/server/workspace-export-recovery.ts`
 - `src/server/workspace-ports.ts`
+- `src/__tests__/booking-one-store.test.ts`
+- `src/__tests__/systems-experience.test.tsx`
+- `src/app/preview/strelva/page.tsx`
+- `src/experience/workspace/contracts.ts`
+- `src/experience/workspace/preview/systems-projection.ts`
+- `src/platform/system-versions/supabase-store.ts`
 - `tsconfig.json`
 - `vercel.json`
 ## Area specs and handoff
@@ -188,6 +194,7 @@ Inventory: **283 paths**. Generated caches and local proof logs are excluded.
 - `supabase/migrations/20261010163100_version_management.sql`
 - `supabase/migrations/20261010163200_version_owner_grants.sql`
 - `supabase/migrations/20261010163300_version_native_applications.sql`
+- `supabase/migrations/20261010163400_version_sibling_changes.sql`
 - `supabase/migrations/20261010164000_finite_job_adapters.sql`
 - `supabase/migrations/20261010165000_tenant_business_context.sql`
 - `supabase/migrations/20261010165500_business_portability.sql`
@@ -200,6 +207,7 @@ Inventory: **283 paths**. Generated caches and local proof logs are excluded.
 - `supabase/migrations/rollback-20261010163100-version-management.sql`
 - `supabase/migrations/rollback-20261010163200-version-owner-grants.sql`
 - `supabase/migrations/rollback-20261010163300-version-native-applications.sql`
+- `supabase/migrations/rollback-20261010163400-version-sibling-changes.sql`
 - `supabase/migrations/rollback-operator-content-receipts.sql`
 - `supabase/migrations/rollback-operator-effort-context.sql`
 - `supabase/migrations/rollback-operator-google-attempts.sql`
@@ -298,3 +306,5 @@ Inventory: **283 paths**. Generated caches and local proof logs are excluded.
 - `tests/w6-version-native-rollback.sql`
 - `tests/w6-version-native-rollforward.sql`
 - `tests/w6-version-possibilities-ui.spec.ts`
+- `tests/w6-version-sibling-changes.sql`
+- `tests/w6-version-siblings-ui.spec.ts`
