@@ -1,27 +1,30 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { UnifiedEvent } from "@/platform/infra/event-contract";
 import type { GoogleListingClient, GoogleLocationState } from "@/products/google-listing/client";
 import { createMemoryReceiptStore } from "@/products/google-listing/receipts";
 
 const m = vi.hoisted(() => ({
-  deps: vi.fn(), record: vi.fn(), add: vi.fn(), mark: vi.fn(), unconfirmed: vi.fn(), mirror: vi.fn(),
+  rpc: vi.fn(), deps: vi.fn(), record: vi.fn(), add: vi.fn(), mark: vi.fn(), unconfirmed: vi.fn(), mirror: vi.fn(),
 }));
 vi.mock("@/products/google-listing/tenant-replies", () => ({ defaultTenantReplyDeps: m.deps }));
 vi.mock("@/products/publishing/server", () => ({
   publishingEnabledForWorkspace: async () => true,
-  authorizePublishingEvent: async () => ({ allowed: true }),
-  readPublishingSnapshot: async () => ({ bindings: [{ originTenantId: "fixture", locations: [{ locationId: "location" }] }] }),
+  authorizePublishingEvent: async () => ({ allowed: true, actor: null, viewer: { operator: false, tester: false } }),
+  readPublishingSnapshot: async () => ({ bindings: [{ id: "5e000000-0000-4000-8000-000000000020", originTenantId: "fixture", locations: [{ locationId: "location" }] }] }),
 }));
 vi.mock("@/platform/business-record/service", () => ({ readBusinessRecord: m.record }));
 vi.mock("@/platform/owner-entry/linked-sites", () => ({ readLinkedSite: async () => ({ tenantId: "fixture" }) }));
 vi.mock("@/platform/infra/auth", () => ({ hasTenantPermission: async () => true }));
-vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: async () => ({ data: true, error: null }) }) }));
+vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: m.rpc }) }));
 vi.mock("@/platform/infra/tenant-publishing", () => ({ tenantPublishingPorts: async () => ({ addEvent: m.add, markExecutionExternalAccepted: m.mark, markExecutionExternalUnconfirmed: m.unconfirmed, mirrorPublishedReviewReply: m.mirror }) }));
 vi.mock("@/platform/account-bindings/store", () => ({ readGoogleBindingForTenant: async () => ({ workspaceId: "5e000000-0000-4000-8000-000000000010", locations: [{ accountId: "account", locationId: "location" }] }) }));
 vi.mock("@/products/google-listing/controls", () => ({ readListingControl: async () => ({ paused: false }), noteListingAccess: async () => undefined, setListingPaused: vi.fn() }));
 vi.mock("@/products/google-listing/pacing", () => ({ paceGoogleWrites: (client: GoogleListingClient) => client }));
 
 import { changeWorkspaceGoogleReply, executeGoogleListingEvent, prepareGoogleListingDraft } from "@/products/google-listing/workspace";
+const originalSystemsRelease = process.env.STRELVA_SYSTEMS_RELEASE;
+const originalWorkspaceRelease = process.env.STRELVA_WORKSPACE_RELEASE;
+afterEach(() => { if (originalSystemsRelease === undefined) delete process.env.STRELVA_SYSTEMS_RELEASE; else process.env.STRELVA_SYSTEMS_RELEASE = originalSystemsRelease; if (originalWorkspaceRelease === undefined) delete process.env.STRELVA_WORKSPACE_RELEASE; else process.env.STRELVA_WORKSPACE_RELEASE = originalWorkspaceRelease; });
 const workspaceId = "5e000000-0000-4000-8000-000000000010";
 const actor = { userId: "5e000000-0000-4000-8000-000000000001", verifiedEmail: "owner@example.test" };
 const location = { accountId: "account", locationId: "location" };
@@ -29,6 +32,9 @@ const event: UnifiedEvent = { id: "google-approval", tenantId: "fixture", source
 let client: GoogleListingClient;
 beforeEach(() => {
   vi.resetAllMocks();
+  process.env.STRELVA_SYSTEMS_RELEASE = "1";
+  process.env.STRELVA_WORKSPACE_RELEASE = "1";
+  m.rpc.mockResolvedValue({ data: true, error: null });
   let reply: string | null = null;
   client = {
     createPost: vi.fn(async () => ({ ok: true as const, data: { name: "accounts/account/locations/location/localPosts/post" } })),
@@ -40,7 +46,7 @@ beforeEach(() => {
     patchLocation: vi.fn(), listReviews: vi.fn(), deletePost: vi.fn(),
   };
   const receipts = createMemoryReceiptStore();
-  m.deps.mockResolvedValue({ bindingTarget: async () => ({ workspaceId }), grant: async () => ({ status: "connected", bindingId: null }), accessToken: async () => "fictional", client: () => client, receipts: () => receipts });
+  m.deps.mockResolvedValue({ bindingTarget: async () => ({ workspaceId }), grant: async () => ({ status: "connected", bindingId: "5e000000-0000-4000-8000-000000000020" }), accessToken: async () => "fictional", client: () => client, receipts: () => receipts });
   m.record.mockResolvedValue({ access: "owner", revision: 2, facts: {} });
   m.add.mockImplementation(async value => ({ ...value, id: "draft", createdAt: "2026-10-07T14:00:00Z" }));
 });
@@ -92,5 +98,59 @@ describe("Google approval recovery", () => {
     expect((await changeWorkspaceGoogleReply(actor, { ...input, commandId: "5e000000-0000-4000-8000-000000000013" })).status).toBe("posted");
     expect(client.updateReply).toHaveBeenCalledTimes(2);
     expect(client.deleteReply).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe("Google location Version approval dispatch", () => {
+  async function versionEvent() {
+    const { systemOriginId } = await import("@/platform/systems");
+    const { canonicalJson, sha256 } = await import("@/platform/business-record/tenant-import");
+    const definition = { kind: "google_listing", post: { topicType: "STANDARD", summary: "Holiday hours" } };
+    const systemId = systemOriginId(workspaceId, { kind: "google_location", ref: "5e000000-0000-4000-8000-000000000020:location" });
+    const lineage = { id: "5e000000-0000-4000-8000-000000000030", version: { businessId: workspaceId, systemId }, source: { businessId: workspaceId, systemId: "5e000000-0000-4000-8000-000000000040" }, context: { kind: "location", label: "Camillus" }, baseline: { revision: 2, definition }, overrides: [], bindings: [], localData: {}, releases: [], currentRelease: null, decisions: [], grants: [], rowRevision: 2, createdBy: actor.userId, createdAt: "2026-10-07", updatedAt: "2026-10-07" };
+    m.rpc.mockImplementation(async name => ({ data: name === "read_system_version" ? lineage : name === "read_workspace_release_flags" ? { workspaceId, flags: {}, testers: [] } : true, error: null }));
+    const approvedEvent = { ...event, metadata: { ...event.metadata, version: { versionId: lineage.id, systemId, bindingId: "5e000000-0000-4000-8000-000000000020", rowRevision: 2, definitionDigest: sha256(canonicalJson(definition)), preparedBy: actor } } };
+    return { lineage, event: approvedEvent };
+  }
+  it("freezes per-location hours from the Version without changing the business record", async () => {
+    const v = await versionEvent();
+    const hours = { timezone: "America/New_York", weekly: [{ day: 1, opens: "10:00", closes: "18:00" }] };
+    const { canonicalJson, sha256 } = await import("@/platform/business-record/tenant-import");
+    const definition = { ...v.lineage.baseline.definition, hours };
+    v.lineage.baseline.definition = definition;
+    const pin = { ...v.event.metadata.version, definitionDigest: sha256(canonicalJson(definition)) };
+    const prepared = await prepareGoogleListingDraft(actor, { workspaceId, tenantId: "fixture", locationId: "location", kind: "hours" }, { pin, hours });
+    expect(prepared.metadata?.draft).toEqual({ action: "hours", hours });
+    expect(prepared.metadata?.version).toEqual(pin);
+    expect(client.patchLocation).not.toHaveBeenCalled();
+  });
+  it("dispatches a sessionless owner approval with its own receipt and read-back, once", async () => {
+    const v = await versionEvent();
+    const input = { tenantId: "fixture", event: v.event, actorId: "owner-link:owner@example.test", attemptId: "first" };
+    expect(await executeGoogleListingEvent(input)).toMatchObject({ accepted: true, verified: true, receiptId: expect.any(String) });
+    expect(await executeGoogleListingEvent({ ...input, attemptId: "second" })).toMatchObject({ accepted: true, verified: true });
+    expect(client.createPost).toHaveBeenCalledTimes(1);
+    expect(client.getPost).toHaveBeenCalledTimes(1);
+  });
+  it("refuses a changed Version before dispatch", async () => {
+    const v = await versionEvent();
+    v.lineage.rowRevision = 3;
+    expect(await executeGoogleListingEvent({ tenantId: "fixture", event: v.event, actorId: actor.userId, attemptId: "first" })).toMatchObject({ accepted: false, reason: expect.stringContaining("Version changed") });
+    expect(client.createPost).not.toHaveBeenCalled();
+  });
+  it("refuses when the Systems gate is off, even with a Google approval", async () => {
+    const v = await versionEvent();
+    process.env.STRELVA_SYSTEMS_RELEASE = "0";
+    expect(await executeGoogleListingEvent({ tenantId: "fixture", event: v.event, actorId: actor.userId, attemptId: "first" })).toMatchObject({ accepted: false });
+    expect(client.createPost).not.toHaveBeenCalled();
+  });
+  it("settles an accepted write with failed read-back without repeating the post", async () => {
+    const v = await versionEvent();
+    vi.mocked(client.getPost).mockRejectedValue(new Error("Read-back unavailable"));
+    const input = { tenantId: "fixture", event: v.event, actorId: "owner-link:owner@example.test", attemptId: "first" };
+    expect(await executeGoogleListingEvent(input)).toMatchObject({ accepted: true, verified: false });
+    expect(await executeGoogleListingEvent({ ...input, attemptId: "second" })).toMatchObject({ accepted: true, verified: false });
+    expect(client.createPost).toHaveBeenCalledTimes(1);
   });
 });
