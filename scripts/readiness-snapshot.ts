@@ -134,6 +134,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261009100000": "strelva_service_actions",
   "20261009110000": "business_booking_messages",
   "20261009113000": "inquiry_events",
+  "20261010150300": "internal_tool_contact_conflicts",
   "20261010152000": "catalog_report_receipts",
   "20261010153000": "newsletter_contact_sync",
 };
@@ -175,6 +176,10 @@ export const FLAG_ENV = [
   "STRELVA_WEBSITE_REBUILD_RELEASE",
   "STRELVA_OWNER_ENTRY",
   "STRELVA_SYSTEMS_RELEASE",
+  "STRELVA_INTERNAL_TOOL_NOTICES_RELEASE",
+  "STRELVA_CATALOG_REPORTS_RELEASE",
+  "STRELVA_NEWSLETTER_CONTACTS_RELEASE",
+  "STRELVA_DOCUMENT_HISTORY_RELEASE",
   "STRELVA_ASK_RELEASE",
   "STRELVA_NEEDS_YOU_RELEASE",
   "STRELVA_PUBLISHING_RELEASE",
