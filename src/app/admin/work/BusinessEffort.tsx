@@ -5,7 +5,7 @@
  */
 import { Chip, Panel, PanelCount, Vital } from "../console";
 import { DataAvailabilityNotice } from "../DataAvailabilityNotice";
-import type { BusinessEffortMeasure, EffortDirection } from "@/platform/business-effort/measure";
+import type { BusinessEffortMeasure, EffortDirection, PortfolioMonth } from "@/platform/business-effort/measure";
 import type { BusinessEffortLoad } from "./effort-data";
 import { EffortLogForm } from "./EffortLogForm";
 import { EffortEntries } from "./EffortEntries";
@@ -22,7 +22,11 @@ export function monthLabel(month: string): string {
 }
 
 function minutesText(value: number | null | undefined): string {
-  return value === null || value === undefined ? "–" : String(Math.round(value * 10) / 10);
+  return value === null || value === undefined ? "Not logged" : String(Math.round(value * 10) / 10);
+}
+
+function Coverage({ period }: { period: PortfolioMonth }) {
+  return <span>{monthLabel(period.month)}: {period.loggedBusinessCount} of {period.businessCount} logged, {period.unloggedBusinessCount} not logged</span>;
 }
 
 function DirectionChip({ direction }: { direction: EffortDirection }) {
@@ -59,15 +63,15 @@ function BusinessRows({ rows, latestMonth }: { rows: BusinessEffortMeasure[]; la
   return (
     <ul className="divide-y divide-glass-border" aria-label={`Human minutes by business, ${monthLabel(latestMonth)}`}>
       {rows.map((row) => (
-        <li key={row.businessId} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3 md:grid md:grid-cols-[minmax(0,1fr)_90px_90px_90px_130px]">
-          <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-warm-white">
+        <li key={row.businessId} className="grid grid-cols-3 items-center gap-x-4 gap-y-1 py-3 md:grid-cols-[minmax(0,1fr)_90px_90px_90px_130px]">
+          <span className="col-span-3 min-w-0 text-[13px] font-semibold text-warm-white md:col-span-1">
             {row.name ?? "Unlisted business"}
             {row.tenantIds.length > 0 && <span className="ml-2 text-[11px] font-normal text-gray-faint">{row.tenantIds.join(", ")}</span>}
           </span>
           <span className="text-[12px] tabular-nums text-gray-muted"><span className="md:sr-only">Previous </span>{minutesText(row.previous?.minutes)}</span>
           <span className="text-[12px] tabular-nums text-warm-white"><span className="md:sr-only">Latest </span>{minutesText(row.latest?.minutes)}</span>
           <span className="text-[12px] tabular-nums text-gray-muted"><span className="md:sr-only">This month </span>{minutesText(row.monthToDate?.minutes)}</span>
-          <span><DirectionChip direction={row.direction} /></span>
+          <span className="col-span-3 md:col-span-1"><DirectionChip direction={row.direction} /></span>
         </li>
       ))}
     </ul>
@@ -86,8 +90,7 @@ export function BusinessEffortPortfolio({ load }: { load: BusinessEffortLoad }) 
   const { overview, today } = load;
   const { measure } = overview;
   const { latest, previous, monthToDate } = measure.portfolio;
-  const measured = measure.businesses
-    .filter((row) => row.months.length > 0)
+  const measured = [...measure.businesses]
     .sort((a, b) => (b.latest?.minutes ?? -1) - (a.latest?.minutes ?? -1) || (a.name ?? "").localeCompare(b.name ?? ""));
   const names = Object.fromEntries(overview.businesses.map((b) => [b.id, b.name]));
   const options = overview.businesses.map((b) => ({
@@ -104,21 +107,25 @@ export function BusinessEffortPortfolio({ load }: { load: BusinessEffortLoad }) 
       bodyClassName="space-y-5 px-[18px] pb-[18px]"
     >
       <p className="max-w-3xl text-[12px] leading-5 text-gray-muted">
-        The factory test: human minutes needed per business each month must fall. Months are UTC calendar months; the latest month is the last complete one. A business is measured from its first recorded entry.
+        The factory test: human minutes needed per business each month must fall. Months are UTC calendar months; the latest month is the last complete one. Every customer business counts. A month without a non-voided entry is not logged; record 0 explicitly to confirm no human work. Portfolio medians and averages require logs for every business.
       </p>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Vital
           label="Median per business"
-          value={minutesText(latest.medianMinutesPerActiveBusiness)}
-          suffix="min"
-          delta={portfolioDirection.label}
+          value={latest.medianMinutesPerBusiness === null ? "Not enough data" : minutesText(latest.medianMinutesPerBusiness)}
+          suffix={latest.medianMinutesPerBusiness === null ? undefined : "min"}
+          delta={measure.portfolio.direction === "insufficient_data" ? undefined : portfolioDirection.label}
           deltaTone={portfolioDirection.tone}
-          verdict={`${monthLabel(previous.month)}: ${minutesText(previous.medianMinutesPerActiveBusiness)} min`}
+          verdict={`Across ${latest.businessCount} businesses. ${monthLabel(previous.month)}: ${previous.medianMinutesPerBusiness === null ? "Not enough data" : minutesText(previous.medianMinutesPerBusiness)}${previous.medianMinutesPerBusiness === null ? "" : " min"} (${previous.businessCount} businesses)`}
         />
-        <Vital label="Total minutes" value={latest.totalMinutes} suffix="min" verdict={monthLabel(latest.month)} />
-        <Vital label="Businesses with effort" value={latest.businessesWithEffort} verdict={`of ${overview.businesses.length} customer businesses`} />
-        <Vital label="Month to date" value={monthToDate.totalMinutes} suffix="min" verdict={`${monthToDate.businessesWithEffort} businesses so far`} />
+        <Vital label="Average per business" value={latest.averageMinutesPerBusiness === null ? "Not enough data" : minutesText(latest.averageMinutesPerBusiness)} suffix={latest.averageMinutesPerBusiness === null ? undefined : "min"} verdict={`Across ${latest.businessCount} businesses`} />
+        <Vital label="Logged minutes" value={latest.loggedBusinessCount === 0 ? "Not logged" : latest.loggedMinutes} suffix={latest.loggedBusinessCount === 0 ? undefined : "min"} verdict={`${latest.loggedBusinessCount} of ${latest.businessCount} businesses logged; ${latest.unloggedBusinessCount} not logged`} />
+        <Vital label="Month to date · logged" value={monthToDate.loggedBusinessCount === 0 ? "Not logged" : monthToDate.loggedMinutes} suffix={monthToDate.loggedBusinessCount === 0 ? undefined : "min"} verdict={`${monthToDate.loggedBusinessCount} of ${monthToDate.businessCount} businesses logged; ${monthToDate.unloggedBusinessCount} not logged`} />
       </div>
+
+      <p className="text-[12px] leading-5 text-gray-muted" aria-label="Monthly log coverage">
+        <Coverage period={previous} /> · <Coverage period={latest} /> · <Coverage period={monthToDate} />
+      </p>
 
       <section aria-labelledby="effort-by-business">
         <h3 id="effort-by-business" className="mb-1 text-[12.5px] font-semibold text-warm-white">By business</h3>
@@ -128,7 +135,7 @@ export function BusinessEffortPortfolio({ load }: { load: BusinessEffortLoad }) 
         {measured.length > 0 ? (
           <BusinessRows rows={measured} latestMonth={measure.latestMonth} />
         ) : (
-          <p className="py-3 text-[12px] leading-5 text-gray-muted">No human minutes recorded yet. Record the first entry below to start measuring a business.</p>
+          <p className="py-3 text-[12px] leading-5 text-gray-muted">No customer businesses exist yet. Every business will appear here, including those not logged.</p>
         )}
       </section>
 
@@ -179,13 +186,13 @@ export function BusinessEffortForSite({ load, tenantId }: { load: BusinessEffort
         <Vital
           label={monthLabel(latestMonth)}
           value={minutesText(row?.latest?.minutes)}
-          suffix="min"
+          suffix={row?.latest?.minutes == null ? undefined : "min"}
           delta={trend.label}
           deltaTone={trend.tone}
-          verdict={`${monthLabel(previousMonth)}: ${minutesText(row?.previous?.minutes)} min`}
+          verdict={`${monthLabel(previousMonth)}: ${minutesText(row?.previous?.minutes)}${row?.previous?.minutes == null ? "" : " min"}`}
         />
-        <Vital label="Month to date" value={minutesText(row?.monthToDate?.minutes)} suffix="min" />
-        <Vital label="Measured since" value={business.firstEffortOn ? monthLabel(business.firstEffortOn.slice(0, 7)) : "–"} />
+        <Vital label="Month to date" value={minutesText(row?.monthToDate?.minutes)} suffix={row?.monthToDate?.minutes == null ? undefined : "min"} />
+        <Vital label="First log" value={business.firstEffortOn ? monthLabel(business.firstEffortOn.slice(0, 7)) : "Not logged"} />
       </div>
       <EffortLogForm businesses={[{ id: business.id, label: business.name }]} today={load.today} />
       <section aria-labelledby="site-effort-recent">

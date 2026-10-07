@@ -671,6 +671,25 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009140000_mak
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-flag-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009150000_reader_rpc_volatility.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/reader-rpc-volatility-schema.sql"
+# Full effort coverage, rollback before zero logs, and reapply. Both readers
+# retain VOLATILE because their identity checks lock authority rows.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009160000_business_effort_coverage.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-effort-coverage-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-business-effort-coverage.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-effort-minutes-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009160000_business_effort_coverage.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-effort-coverage-schema.sql"
+
+rollback_guard_log="$cluster_root/effort-coverage-rollback-guard.log"
+if psql "${psql_args[@]}" --file="$repo_root/tests/business-effort-coverage-rollback-schema.sql" >"$rollback_guard_log" 2>&1; then
+  printf 'Effort rollback incorrectly accepted existing zero logs.\n' >&2
+  exit 1
+fi
+if ! grep -q 'business_effort_coverage_rollback_has_zero_logs' "$rollback_guard_log"; then
+  cat "$rollback_guard_log" >&2
+  exit 1
+fi
+
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
