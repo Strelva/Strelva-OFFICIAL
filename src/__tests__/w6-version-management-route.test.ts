@@ -34,7 +34,7 @@ describe("Version management route boundaries", () => {
   it("maps foreign access and stale writes honestly", async () => {
     deps.manage.mockRejectedValueOnce(new VersionAccessError()); expect((await POST(post(command))).status).toBe(403);
     deps.manage.mockRejectedValueOnce(new VersionStaleError()); expect((await POST(post(command))).status).toBe(409);
-    deps.manage.mockRejectedValueOnce(new Error("store offline")); expect((await POST(post(command))).status).toBe(500);
+    deps.manage.mockRejectedValueOnce(new Error("store offline")); expect((await POST(post(command))).status).toBe(503);
   });
   it("requires a strict source/context creation command and both businesses released", async () => {
     const create = { action: "create", agencyWorkspaceId, workspaceId, source: { businessId: agencyWorkspaceId, systemId, revisionId: crypto.randomUUID(), number: 1 },

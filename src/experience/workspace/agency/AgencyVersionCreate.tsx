@@ -42,7 +42,7 @@ export function AgencyVersionCreate({ request, agencyWorkspaceId, clients }: { r
     finally { inFlight.current = false; setBusy(false); }
   }
   return <details className="mb-8"><summary className="cursor-pointer text-sm font-medium">Create a client Version</summary><div className="mt-4 max-w-xl space-y-4 text-sm">
-    <p className="text-gray-muted">Copy a source's reusable definition into this business as a separate Draft System. Its accounts, data and permissions start empty.</p>
+    <p className="text-gray-muted">Copy a source’s reusable definition into this business as a separate Draft System. Its accounts, data and permissions start empty.</p>
     {!sources && !error ? <p role="status">Reading source revisions…</p> : null}
     {error ? <p role="alert" className="text-critical">{error}</p> : null}
     {!sources && error ? <Button variant="secondary" size="sm" onClick={() => setAttempt(value => value + 1)}>Retry sources</Button> : null}

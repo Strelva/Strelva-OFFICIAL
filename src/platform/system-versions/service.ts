@@ -443,6 +443,7 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
 
     async grantAccess(actor: VersionActor, versionId: string, input: { granteeBusinessId: string; scope: VersionGrantScope; expectedRowRevision: number }): Promise<VersionLineage> {
       const lineage = await loadOwned(actor, versionId, true);
+      if (roleIn(actor, lineage.version.businessId) !== "owner") throw new VersionAccessError("Only the business owner can share Version lineage or data.");
       if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
       if (input.scope !== "lineage" && input.scope !== "lineage_and_data") throw new VersionValidationError("Choose a supported grant scope.");
       const grants = lineage.grants.map((grant) =>
@@ -453,6 +454,7 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
 
     async revokeAccess(actor: VersionActor, versionId: string, input: { granteeBusinessId: string; expectedRowRevision: number }): Promise<VersionLineage> {
       const lineage = await loadOwned(actor, versionId, true);
+      if (roleIn(actor, lineage.version.businessId) !== "owner") throw new VersionAccessError("Only the business owner can change Version sharing.");
       if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
       const grants = lineage.grants.map((grant) =>
         grant.granteeBusinessId === input.granteeBusinessId && !grant.revokedAt ? { ...grant, revokedAt: now() } : grant);
