@@ -238,6 +238,14 @@ export interface WebsitesPort {
   patchWebsiteRebuild(actor: VerifiedActor, workId: string, patch: Record<string, unknown> & { forceReview: true }): Promise<unknown>;
 }
 
+/** Observation only: the tenant write and revalidation have already started. */
+export interface WebsitePublicationReadbackPort {
+  observeAcceptedNativePublish(input: {
+    tenantId: string; section: string; expected: unknown; actorId: string;
+    publicationRef?: string; revalidation: Promise<unknown>;
+  }): Promise<void>;
+}
+
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 export interface WorkspacePorts {
@@ -250,6 +258,7 @@ export interface WorkspacePorts {
   inquiries(): Promise<InquiriesPort>;
   tenantReviewReplies(): Promise<TenantReviewRepliesPort>;
   websites(): Promise<WebsitesPort>;
+  websitePublicationReadback(): Promise<WebsitePublicationReadbackPort>;
 }
 
 const SLOT = Symbol.for("strelva.workspace-ports");
