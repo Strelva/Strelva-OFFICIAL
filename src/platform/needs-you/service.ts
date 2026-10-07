@@ -21,6 +21,7 @@ export interface NeedsYouDeps {
   appOrigin: string;
   now(): number;
   /** Booking calendar health is an owner action, separate from decisions. */
+  bookingWorkspaces?(): Promise<string[]>;
   bookingCalendarHealth?(workspaceId: string, input: { now: number; appOrigin: string; sendEmail: NeedsYouDeps["sendEmail"] }): Promise<{ digests: number; ownerNotTold: number; failed: number; complete: boolean }>;
 }
 
@@ -260,7 +261,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
         subject: kind === "urgent" ? `${first.businessName}: a customer is waiting on you` : options.heading,
         options,
         idempotencyKey: `needs-you:${kind}:${rows.map(row => row.id).sort().join(",")}`.slice(0, 256),
-        tags: { stream: "needs_you", kind, ...(rows.every(row => row.sourceLifecycle === "booking_request") ? { lifecycle: "booking_request" } : {}) },
+        tags: { stream: "needs_you", kind, ...(rows.every(row => row.sourceLifecycle === "booking_request") ? { lifecycle: "booking_request", bookingWorkspaceId: first.workspaceId } : {}) },
       });
     } catch (error) {
       reason = error instanceof Error ? error.message.slice(0, 200) : "send_failed";
@@ -283,7 +284,8 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     // signs in: workspace sources are read as Strelva (system).
     const sessions = new Map<string, AdapterContext>();
     const linked = await deps.store.linkedTenants(null).catch(() => []);
-    for (const workspaceId of new Set(linked.map(link => link.workspaceId))) {
+    const native = await deps.bookingWorkspaces?.().catch(() => { summary.failed += 1; return []; }) ?? [];
+    for (const workspaceId of new Set([...linked.map(link => link.workspaceId), ...native])) {
       await sync(await cronContext(workspaceId, sessions)).catch(() => { summary.failed += 1; });
       if (deps.bookingCalendarHealth) {
         const health = await deps.bookingCalendarHealth(workspaceId, { now, appOrigin: deps.appOrigin, sendEmail: deps.sendEmail }).catch(() => ({ digests: 0, ownerNotTold: 0, failed: 1, complete: false }));

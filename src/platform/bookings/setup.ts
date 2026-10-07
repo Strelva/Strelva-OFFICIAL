@@ -1,4 +1,5 @@
 /** Booking-only setup. Instant mode is an owner-approved standing policy. */
+import { resolveBookingScope } from "./booking-scope";
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import { bookingServicePolicySchema } from "./service-policy";
@@ -9,7 +10,7 @@ import type { ProposedItem } from "@/platform/needs-you/contracts";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 
 export const bookingSettingsChange = z.object({
-  workspaceId: z.string().uuid(), tenantId: z.string().min(1).max(80), expectedRevision: z.number().int().min(0),
+  workspaceId: z.string().uuid(), tenantId: z.string().min(1).max(80).optional(), expectedRevision: z.number().int().min(0),
   services: z.array(bookingServicePolicySchema).max(100).optional().refine(rows => !rows || new Set(rows.map(row => row.businessServiceId)).size === rows.length, "Services must be unique."),
   mode: z.enum(["request", "instant"]), bufferMinutes: z.number().int().min(0).max(120),
   minNoticeMinutes: z.number().int().min(0).max(43_200), maxAdvanceDays: z.number().int().min(1).max(60),
@@ -42,14 +43,14 @@ const defaults: BookingSettingsPorts = { enabled: bookingSettingsEnabled, rpc };
 async function requireEnabled(ports: BookingSettingsPorts) {
   if (!await ports.enabled()) throw new BookingSettingsError("unavailable", "Booking setup is not enabled. Nothing changed.");
 }
-export async function readBookingSettings(actor: WorkspaceActor, workspaceId: string, tenantId: string, ports = defaults) {
+export async function readBookingSettings(actor: WorkspaceActor, workspaceId: string, tenantId?: string, ports = defaults) {
   await requireEnabled(ports);
-  return ports.rpc("read_booking_setup", { p_workspace_id: workspaceId, p_tenant_id: tenantId, p_user_id: actor.userId, p_email: actor.verifiedEmail });
+  return ports.rpc("read_booking_setup", { p_workspace_id: workspaceId, p_tenant_id: resolveBookingScope(workspaceId,tenantId), p_user_id: actor.userId, p_email: actor.verifiedEmail });
 }
 export async function changeBookingSettings(actor: WorkspaceActor, input: BookingSettingsChange, ports = defaults) {
   const parsed = bookingSettingsChange.parse(input);
   await requireEnabled(ports);
-  return ports.rpc("configure_booking_setup", { p_workspace_id: parsed.workspaceId, p_tenant_id: parsed.tenantId,
+  return ports.rpc("configure_booking_setup", { p_workspace_id: parsed.workspaceId, p_tenant_id: resolveBookingScope(parsed.workspaceId,parsed.tenantId),
     p_user_id: actor.userId, p_email: actor.verifiedEmail, p_settings: parsed });
 }
 const policySchema = z.object({ id: z.string().uuid(), workspaceId: z.string().uuid(), tenantId: z.string(), revision: z.number().int(),

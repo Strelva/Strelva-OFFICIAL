@@ -1,4 +1,5 @@
 /** One send path, existing audience gates, no retry after a provider attempt. */
+import { z } from "zod";
 import { decryptSecret } from "@/platform/infra/crypto/secrets";
 import { sendEmailWithReceipt, type SendEmailInput } from "@/platform/infra/email/send";
 import { emailSendingEnabled, customerEmailEnabled } from "@/platform/infra/email/enabled";
@@ -9,8 +10,17 @@ import { bookingWhen } from "./emails";
 import { nativeRpc } from "./native";
 import { parseStoreBooking, type StoreBooking } from "./store";
 
-export async function bookingCustomerEmailAllowed(tenantId: string | null): Promise<boolean> {
-  return emailSendingEnabled() && customerEmailEnabled() && !!tenantId && await getClientEmailOverride(tenantId) !== "off";
+export async function bookingCustomerEmailAllowed(tenantId: string | null, workspaceId?: string | null): Promise<boolean> {
+  if (!emailSendingEnabled() || !customerEmailEnabled()) return false;
+  if (tenantId?.startsWith("workspace:")) {
+    workspaceId = tenantId.slice("workspace:".length);
+    tenantId = null;
+  }
+  if (tenantId) return await getClientEmailOverride(tenantId) !== "off";
+  if (!z.string().uuid().safeParse(workspaceId).success) return false;
+  // Native businesses have no tenant override to inherit. Explicit operator
+  // arming is required in addition to both global email gates.
+  return !!workspaceId && await getClientEmailOverride(`workspace:${workspaceId}`) === "on";
 }
 
 function calendarFile(booking: StoreBooking, businessName: string, address: string) {
@@ -34,7 +44,7 @@ export interface BookingUpdatePorts {
   finish(id: string, status: string, provider: string | null, detail: string | null): Promise<unknown>;
   business(booking: StoreBooking): ReturnType<typeof bookingLifecyclePorts.business>;
   manageUrl?(booking: StoreBooking): Promise<string | null>;
-  customerAllowed(tenant: string | null): Promise<boolean>;
+  customerAllowed(tenant: string | null, workspaceId?: string | null): Promise<boolean>;
   send(input: SendEmailInput): ReturnType<typeof sendEmailWithReceipt>;
 }
 const ports: BookingUpdatePorts = {
@@ -57,7 +67,7 @@ export async function deliverBookingUpdates(bookingId: string | null = null, dep
       const business = await deps.business(booking);
       const to = row.audience === "client" ? business?.ownerEmail : booking.customer.email;
       if (!business || !to) { await finish("skipped", null, "no_recipient"); continue; }
-      if (!await deps.customerAllowed(booking.tenantId)) { summary.suppressed++; await finish("suppressed", null, "email_gates"); continue; }
+      if (!await (booking.tenantId ? deps.customerAllowed(booking.tenantId) : deps.customerAllowed(null, booking.workspaceId))) { summary.suppressed++; await finish("suppressed", null, "email_gates"); continue; }
       const when = bookingWhen(booking);
       const state = booking.status;
       const rescheduled = row.reason === "Customer rescheduled";

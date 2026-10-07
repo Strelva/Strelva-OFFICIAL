@@ -15,8 +15,8 @@ import { systemsSourceAdapters } from "./systems-sources";
 import { deliverySourceAdapters } from "./sources/live-delivery";
 import { productSourceAdapters } from "./sources/live-products";
 import { bookingRequestAdapter, bookingRequestItem } from "@/platform/bookings/needs-you-adapter";
-import { decideBookingRequest, readWorkspaceBooking, readWorkspaceBookingRequests } from "@/platform/bookings/store";
-import { bookingStoreWriteEnabled, bookingOwnerNoticeEnabled } from "@/platform/bookings/flags";
+import { decideBookingRequest, readWorkspaceBooking, readWorkspaceBookingRequests, readNativeBookingWorkspaces } from "@/platform/bookings/store";
+import { bookingStoreWriteEnabled, bookingOwnerNoticeEnabled, bookingReadSource } from "@/platform/bookings/flags";
 import { updateBooking as updateLegacyBookingStatus } from "@/platform/bookings/legacy-store";
 
 import { needsYouReleaseEnabled } from "./release";
@@ -36,10 +36,11 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
     appOrigin: needsYouAppOrigin(),
     now: () => Date.now(),
     bookingCalendarHealth: chaseBookingCalendarHealth,
+    bookingWorkspaces: async () => bookingStoreWriteEnabled() && await bookingReadSource() === "postgres" ? readNativeBookingWorkspaces() : [],
     async sendEmail(input) {
       if (input.tags?.lifecycle === "booking_request" || input.tags?.lifecycle === "booking_calendar_health") {
         const { bookingCustomerEmailAllowed } = await import("@/platform/bookings/updates");
-        if (!await bookingCustomerEmailAllowed(input.tenantId ?? null)) return { status: "suppressed", reason: "email_gates" };
+        if (!await bookingCustomerEmailAllowed(input.tenantId ?? null, input.tags?.bookingWorkspaceId)) return { status: "suppressed", reason: "email_gates" };
       }
       return sendEmailWithReceipt(input);
     },

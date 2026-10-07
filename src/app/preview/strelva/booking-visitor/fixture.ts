@@ -7,7 +7,7 @@ export function visitorBookingFixtureState(value: string | null): VisitorBooking
     ? value as VisitorBookingFixtureState : "ready";
 }
 
-/** Both modes simulate the same public protocol; no real release flag is changed. */
+/** Native mode adds business-authority metadata; no real release flag is changed. */
 export function visitorBookingFixtureHtml(origin: string, state: VisitorBookingFixtureState, mode: "off" | "on"): string {
   const site: GeneratedSite = {
     version: 1, siteName: "Fictional consultation studio", theme: {},
@@ -36,6 +36,7 @@ const slots = [
   { id: "fixture-slot-two", start: "2026-11-06T16:00:00Z", end: "2026-11-06T16:30:00Z" }
 ];
 const schedule = { schemaVersion: 1, capabilityId: "consultations", version: 1, name: "Consultation", provider: "outlook", timeZone: "America/New_York", slots };
+if (fixtureMode === "on") schedule.bookingAuthority = "business";
 if (fixtureState.startsWith("intake")) schedule.intake = [{ id: "goal", label: "What would you like to discuss?", type: "textarea", required: true }, { id: "company", label: "Company", type: "text", required: false }];
 let receipt = { schemaVersion: 1, reservationId: "fictional-reservation", managementToken: "fictional-management-token", capabilityId: "consultations", version: 1, provider: "outlook", status: fixtureState === "pending" ? "pending" : "confirmed", title: "Consultation", start: slots[0].start, end: slots[0].end, timeZone: "America/New_York" };
 globalThis.__strelvaBookingFixtureRequests = [];
@@ -44,6 +45,12 @@ globalThis.fetch = async (input, init = {}) => {
   const method = String(init.method || "GET").toUpperCase();
   globalThis.__strelvaBookingFixtureRequests.push({ path: url.pathname, method, mode: fixtureMode, intercepted: true });
   if (!url.pathname.startsWith("/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native")) throw new Error("This fixture blocks all outside requests.");
+  if (method === "POST") {
+    const visitor = JSON.parse(String(init.body || "{}")).visitor;
+    const capture = globalThis.__strelvaBookingFixtureRequests.at(-1);
+    capture.visitorPhoneProvided = typeof visitor?.phone === "string";
+    capture.visitorPhoneMatchesFixture = visitor?.phone === "716-555-0118";
+  }
   if (fixtureState === "loading" && method === "GET" || ["saving", "intake-saving"].includes(fixtureState) && method === "POST") return new Promise(() => {});
   if (fixtureState === "error" && method === "GET") throw new Error("Booking availability is unavailable. Please try again.");
   if (["reserve-error", "intake-error"].includes(fixtureState) && method === "POST") return new Response(JSON.stringify({ error: "That time could not be reserved. Please choose another time." }), { status: 409, headers: { "Content-Type": "application/json" } });

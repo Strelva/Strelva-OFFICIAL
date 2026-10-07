@@ -1,0 +1,195 @@
+{
+  "date": "2026-10-07",
+  "browser": "installed Playwright Chromium; external resourcesblocked",
+  "transport": "Fictional preview list. Every manual request intercepted by browserroute beforelocalAPI; no providerorbackendwrite.",
+  "limit": "Native owner list and manual state rendering only; no live persistence or SQL authority claim.",
+  "requests": [
+    {
+      "method": "GET",
+      "intercepted": true
+    },
+    {
+      "method": "GET",
+      "intercepted": true
+    },
+    {
+      "method": "GET",
+      "intercepted": true
+    },
+    {
+      "method": "GET",
+      "intercepted": true
+    },
+    {
+      "method": "GET",
+      "intercepted": true
+    },
+    {
+      "method": "GET",
+      "intercepted": true
+    },
+    {
+      "method": "GET",
+      "intercepted": true
+    },
+    {
+      "method": "GET",
+      "intercepted": true
+    }
+  ],
+  "captures": [
+    {
+      "state": "native-empty",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, kept in this business’s Bookings System.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nYour Bookings System is not set up yet\n\nAsk Strelva to prepare bookings for this business through a Request. A website is optional.",
+        "buttons": []
+      }
+    },
+    {
+      "state": "native",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, kept in this business’s Bookings System.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nBookings\n\nNo calendar is connected. Your booking records are kept here.\n\nTake a booking request\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM – 1:00 PM\n\nJo Banks\n\nMassage, 60 min · Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM – 10:00 AM\n\nDana Reed\n\nMassage, 60 min · Checked in\n\n716-555-0100 · dana@example.test\n\n10:30 AM – 11:30 AM\n\nSam Lee\n\nMassage, 60 min · Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM – 1:30 PM\n\nAna Ruiz\n\nConsultation · Waiting for the owner\n\n716-555-0142 · ana@example.test\n\n3:00 PM – 4:00 PM\n\nLee Park\n\nMassage, 60 min · Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM – 12:30 PM\n\nMia Chen\n\nMassage, 90 min · Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings.",
+        "buttons": [
+          {
+            "name": "Take a booking request",
+            "height": 32
+          },
+          {
+            "name": "Cancel",
+            "height": 32
+          },
+          {
+            "name": "Cancel",
+            "height": 32
+          }
+        ]
+      }
+    },
+    {
+      "state": "native-empty",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, kept in this business’s Bookings System.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nYour Bookings System is not set up yet\n\nAsk Strelva to prepare bookings for this business through a Request. A website is optional.",
+        "buttons": []
+      }
+    },
+    {
+      "state": "native",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, kept in this business’s Bookings System.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nBookings\n\nNo calendar is connected. Your booking records are kept here.\n\nTake a booking request\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM – 1:00 PM\n\nJo Banks\n\nMassage, 60 min · Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM – 10:00 AM\n\nDana Reed\n\nMassage, 60 min · Checked in\n\n716-555-0100 · dana@example.test\n\n10:30 AM – 11:30 AM\n\nSam Lee\n\nMassage, 60 min · Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM – 1:30 PM\n\nAna Ruiz\n\nConsultation · Waiting for the owner\n\n716-555-0142 · ana@example.test\n\n3:00 PM – 4:00 PM\n\nLee Park\n\nMassage, 60 min · Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM – 12:30 PM\n\nMia Chen\n\nMassage, 90 min · Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings.",
+        "buttons": [
+          {
+            "name": "Take a booking request",
+            "height": 44
+          },
+          {
+            "name": "Cancel",
+            "height": 44
+          },
+          {
+            "name": "Cancel",
+            "height": 44
+          }
+        ]
+      }
+    },
+    {
+      "state": "native-empty",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, kept in this business’s Bookings System.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nYour Bookings System is not set up yet\n\nAsk Strelva to prepare bookings for this business through a Request. A website is optional.",
+        "buttons": []
+      }
+    },
+    {
+      "state": "native",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, kept in this business’s Bookings System.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nBookings\n\nNo calendar is connected. Your booking records are kept here.\n\nTake a booking request\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM – 1:00 PM\n\nJo Banks\n\nMassage, 60 min · Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM – 10:00 AM\n\nDana Reed\n\nMassage, 60 min · Checked in\n\n716-555-0100 · dana@example.test\n\n10:30 AM – 11:30 AM\n\nSam Lee\n\nMassage, 60 min · Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM – 1:30 PM\n\nAna Ruiz\n\nConsultation · Waiting for the owner\n\n716-555-0142 · ana@example.test\n\n3:00 PM – 4:00 PM\n\nLee Park\n\nMassage, 60 min · Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM – 12:30 PM\n\nMia Chen\n\nMassage, 90 min · Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings.",
+        "buttons": [
+          {
+            "name": "Take a booking request",
+            "height": 44
+          },
+          {
+            "name": "Cancel",
+            "height": 44
+          },
+          {
+            "name": "Cancel",
+            "height": 44
+          }
+        ]
+      }
+    },
+    {
+      "state": "manual-ready",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, kept in this business’s Bookings System.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nBookings\n\nNo calendar is connected. Your booking records are kept here.\n\nChoose an open time for the customer. The owner confirms the request.\n\nService\nChoose a service\nConsultation\nOpen time (America/New_York)\nChoose a time\nFri, Nov 6, 10:00 AM\nCustomer name\nCustomer email\nCustomer phone (optional)\nWhat would you like to discuss?\nSave booking request\nClose\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM – 1:00 PM\n\nJo Banks\n\nMassage, 60 min · Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM – 10:00 AM\n\nDana Reed\n\nMassage, 60 min · Checked in\n\n716-555-0100 · dana@example.test\n\n10:30 AM – 11:30 AM\n\nSam Lee\n\nMassage, 60 min · Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM – 1:30 PM\n\nAna Ruiz\n\nConsultation · Waiting for the owner\n\n716-555-0142 · ana@example.test\n\n3:00 PM – 4:00 PM\n\nLee Park\n\nMassage, 60 min · Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM – 12:30 PM\n\nMia Chen\n\nMassage, 90 min · Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings."
+      }
+    },
+    {
+      "state": "manual-loading",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, kept in this business’s Bookings System.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nBookings\n\nNo calendar is connected. Your booking records are kept here.\n\nChoose an open time for the customer. The owner confirms the request.\n\nReading open times…\n\nClose\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM – 1:00 PM\n\nJo Banks\n\nMassage, 60 min · Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM – 10:00 AM\n\nDana Reed\n\nMassage, 60 min · Checked in\n\n716-555-0100 · dana@example.test\n\n10:30 AM – 11:30 AM\n\nSam Lee\n\nMassage, 60 min · Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM – 1:30 PM\n\nAna Ruiz\n\nConsultation · Waiting for the owner\n\n716-555-0142 · ana@example.test\n\n3:00 PM – 4:00 PM\n\nLee Park\n\nMassage, 60 min · Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM – 12:30 PM\n\nMia Chen\n\nMassage, 90 min · Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings."
+      }
+    },
+    {
+      "state": "manual-error",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, kept in this business’s Bookings System.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nBookings\n\nNo calendar is connected. Your booking records are kept here.\n\nChoose an open time for the customer. The owner confirms the request.\n\nOpen times could not load. Nothing changed.\n\nTry loading again\nClose\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM – 1:00 PM\n\nJo Banks\n\nMassage, 60 min · Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM – 10:00 AM\n\nDana Reed\n\nMassage, 60 min · Checked in\n\n716-555-0100 · dana@example.test\n\n10:30 AM – 11:30 AM\n\nSam Lee\n\nMassage, 60 min · Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM – 1:30 PM\n\nAna Ruiz\n\nConsultation · Waiting for the owner\n\n716-555-0142 · ana@example.test\n\n3:00 PM – 4:00 PM\n\nLee Park\n\nMassage, 60 min · Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM – 12:30 PM\n\nMia Chen\n\nMassage, 90 min · Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings."
+      }
+    },
+    {
+      "state": "manual-permission",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, kept in this business’s Bookings System.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nBookings\n\nNo calendar is connected. Your booking records are kept here.\n\nChoose an open time for the customer. The owner confirms the request.\n\nSign in as this business owner to take requests.\n\nTry loading again\nClose\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM – 1:00 PM\n\nJo Banks\n\nMassage, 60 min · Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM – 10:00 AM\n\nDana Reed\n\nMassage, 60 min · Checked in\n\n716-555-0100 · dana@example.test\n\n10:30 AM – 11:30 AM\n\nSam Lee\n\nMassage, 60 min · Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM – 1:30 PM\n\nAna Ruiz\n\nConsultation · Waiting for the owner\n\n716-555-0142 · ana@example.test\n\n3:00 PM – 4:00 PM\n\nLee Park\n\nMassage, 60 min · Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM – 12:30 PM\n\nMia Chen\n\nMassage, 90 min · Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings."
+      }
+    },
+    {
+      "state": "manual-empty",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, kept in this business’s Bookings System.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nBookings\n\nNo calendar is connected. Your booking records are kept here.\n\nChoose an open time for the customer. The owner confirms the request.\n\nService\nChoose a service\nConsultation\n\nNo open times in the next two weeks. Choose another service or check again later.\n\nCustomer name\nCustomer email\nCustomer phone (optional)\nWhat would you like to discuss?\nSave booking request\nClose\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM – 1:00 PM\n\nJo Banks\n\nMassage, 60 min · Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM – 10:00 AM\n\nDana Reed\n\nMassage, 60 min · Checked in\n\n716-555-0100 · dana@example.test\n\n10:30 AM – 11:30 AM\n\nSam Lee\n\nMassage, 60 min · Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM – 1:30 PM\n\nAna Ruiz\n\nConsultation · Waiting for the owner\n\n716-555-0142 · ana@example.test\n\n3:00 PM – 4:00 PM\n\nLee Park\n\nMassage, 60 min · Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM – 12:30 PM\n\nMia Chen\n\nMassage, 90 min · Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings."
+      }
+    },
+    {
+      "state": "manual-paused",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, kept in this business’s Bookings System.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nBookings\n\nNo calendar is connected. Your booking records are kept here.\n\nChoose an open time for the customer. The owner confirms the request.\n\nBookings are paused. Existing bookings are kept.\n\nClose\nMon, Nov 2\n\nNo bookings.\n\nTue, Nov 3\n\n12:00 PM – 1:00 PM\n\nJo Banks\n\nMassage, 60 min · Checked in\n\njo@example.test\n\nWed, Nov 4\n\nNo bookings.\n\nThu, Nov 5\n\nNo bookings.\n\nFri, Nov 6Today\n\n9:00 AM – 10:00 AM\n\nDana Reed\n\nMassage, 60 min · Checked in\n\n716-555-0100 · dana@example.test\n\n10:30 AM – 11:30 AM\n\nSam Lee\n\nMassage, 60 min · Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCancel\n\n1:00 PM – 1:30 PM\n\nAna Ruiz\n\nConsultation · Waiting for the owner\n\n716-555-0142 · ana@example.test\n\n3:00 PM – 4:00 PM\n\nLee Park\n\nMassage, 60 min · Cancelled\n\n716-555-0177\n\nSat, Nov 7\n\n11:00 AM – 12:30 PM\n\nMia Chen\n\nMassage, 90 min · Booked\n\nmia@example.test\n\nCancel\nSun, Nov 8\n\nNo bookings."
+      }
+    }
+  ]
+}

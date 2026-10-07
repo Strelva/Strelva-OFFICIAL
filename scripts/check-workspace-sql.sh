@@ -670,11 +670,13 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135940_boo
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135945_booking_cancellation_cutoff.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135950_booking_calendar_health.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135955_booking_exit_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135956_booking_native_workspace.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-agent-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-owner-evidence-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-manual-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-service-policy-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-calendar-health-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.sql"
 
 # The one booking store through both real route families (legacy /api/booking
 # and the public booking service) against the real booking functions. Last,

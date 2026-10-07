@@ -1,5 +1,6 @@
 /** Native services and availability for agent discovery and customer management.
  * Every slot is recomputed from the record and guarded by the one store. */
+import { bookingScopeFor } from "./booking-scope";
 import { contextForService, servicePolicy, validateBookingIntake } from "./service-policy";
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
@@ -148,8 +149,8 @@ export async function nativeBookingByToken(hash: string, kind: "manage" | "confi
 
 export async function confirmAgent(hash: string) {
   const booking = await nativeBookingByToken(hash, "confirm");
-  if (!booking?.tenantId) throw new PublicBookingError("not_found", "This booking link has expired.");
-  const ctx = await context(booking.tenantId);
+  if (!booking || !bookingScopeFor(booking)) throw new PublicBookingError("not_found", "This booking link has expired.");
+  const ctx = await context(bookingScopeFor(booking)!);
   const calendar = await readCalendarBusy(ctx, booking.localDate, booking.timeZone);
   if (calendar.connected && calendar.checked && calendar.busy.some(b => Date.parse(booking.start) < Date.parse(b.end) && Date.parse(booking.end) > Date.parse(b.start))) {
     throw new PublicBookingError("conflict", "That time is now busy. Let this hold expire and choose another time.");
@@ -160,16 +161,16 @@ export async function confirmAgent(hash: string) {
 
 export async function changeNativeBooking(hash: string, action: "cancel" | "reschedule", start?: string) {
   const booking = await nativeBookingByToken(hash, "manage");
-  if (!booking?.tenantId || Date.parse(booking.end) <= Date.now()) throw new PublicBookingError("not_found", "This booking link has expired.");
+  if (!booking || !bookingScopeFor(booking) || Date.parse(booking.end) <= Date.now()) throw new PublicBookingError("not_found", "This booking link has expired.");
   let change: Record<string, unknown> = { action };
   if (action === "reschedule") {
     if (!start || !booking.serviceRef) throw new PublicBookingError("invalid", "Choose an open time.");
-    const current = await context(booking.tenantId);
+    const current = await context(bookingScopeFor(booking)!);
     if (current.paused) throw new PublicBookingError("conflict", pausedBookingMessage(current.phone));
     const service = current.services.find(s => s.active && (s.id === booking.serviceRef || s.externalRef === booking.serviceRef));
     if (!service) throw new PublicBookingError("not_found", "This service is unavailable.");
     const minutes = service.durationMinutes ?? settingsOrDefault(contextForService(current,service.id)).defaultLengthMinutes;
-    const offered = await nativeSlots(booking.tenantId, booking.serviceRef, start, new Date(Date.parse(start) + (minutes + 1) * 60000).toISOString());
+    const offered = await nativeSlots(bookingScopeFor(booking)!, booking.serviceRef, start, new Date(Date.parse(start) + (minutes + 1) * 60000).toISOString());
     const slot = offered.slots.find(s => Date.parse(s.start) === Date.parse(start));
     if (!slot) throw new PublicBookingError("conflict", "That time is unavailable.");
     change = { action, start: slot.start, end: slot.end, forceRequest: !slot.calendarChecked };

@@ -1,3 +1,5 @@
+import { bookingScopeFor, workspaceBookingScope } from "./booking-scope";
+import { resolveOwnerRecipient } from "@/platform/business-record";
 import { emailSendingEnabled } from "@/platform/infra/email/enabled";
 /**
  * The real ports of the booking lifecycle run (lifecycle.ts): the one store's
@@ -30,9 +32,9 @@ export function bookingAppOrigin(): string {
  * services, pause and unavailable storage produce no proposals. Calendar busy
  * times and current service length use exactly the public slot engine. */
 export async function nextOpenTimes(booking: StoreBooking, now: Date, count = 3): Promise<string[]> {
-  if (!booking.tenantId || !booking.serviceRef || count <= 0) return [];
+  if (!bookingScopeFor(booking) || !booking.serviceRef || count <= 0) return [];
   try {
-    const offered = await nativeSlots(booking.tenantId, booking.serviceRef, now.toISOString(), new Date(now.getTime() + 14 * 86400000).toISOString());
+    const offered = await nativeSlots(bookingScopeFor(booking)!, booking.serviceRef, now.toISOString(), new Date(now.getTime() + 14 * 86400000).toISOString());
     const day = new Intl.DateTimeFormat("en-US", { timeZone: offered.timeZone, weekday: "short", month: "short", day: "numeric" });
     const time = new Intl.DateTimeFormat("en-US", { timeZone: offered.timeZone, hour: "numeric", minute: "2-digit" });
     return offered.slots.slice(0, count).map(slot => `${day.format(new Date(slot.start))} at ${time.format(new Date(slot.start))} (${offered.timeZone})`);
@@ -45,7 +47,8 @@ export async function manageUrl(booking: StoreBooking): Promise<string | null> {
   if (!booking.publicReservationId) {
     if (!bookingMessagesEnabled()) return null;
     const { issueNativeAccess } = await import("./native");
-    const access = booking.tenantId ? await issueNativeAccess(booking.tenantId, booking.id) : null;
+    const scope = bookingScopeFor(booking);
+    const access = scope ? await issueNativeAccess(scope, booking.id) : null;
     const token = access && typeof access.manage_ciphertext === "string" ? decryptSecret(access.manage_ciphertext) : null;
     return token ? `${bookingAppOrigin()}/b/${encodeURIComponent(token)}` : null;
   }
@@ -73,7 +76,17 @@ export const bookingLifecyclePorts: BookingLifecyclePorts = {
   claim: (now, limit) => claimBookingMessages(now, limit),
   finish: (messageId, status, providerMessageId, detail) => finishBookingMessage(messageId, status, providerMessageId, detail),
   async business(booking) {
-    if (!booking.tenantId) return null;
+    if (!booking.tenantId) {
+      if (!booking.workspaceId) return null;
+      const db = bookingStoreDb();
+      if (!db) throw new Error("booking_business_facts_unavailable");
+      const details = await db.rpc("read_booking_business_details", { p_tenant_id: workspaceBookingScope(booking.workspaceId) });
+      if (details.error || !details.data) throw new Error("booking_business_facts_unavailable");
+      const facts = details.data as { name?: string; address?: string };
+      const recipient = await resolveOwnerRecipient(booking.workspaceId);
+      return { name: facts.name ?? "", address: facts.address ?? "", tenantId: null,
+        ownerEmail: recipient?.email ?? null, siteUrl: null };
+    }
     const config = await getTenantConfig(booking.tenantId);
     if (!config) return null;
     const details = await bookingStoreDb()?.rpc("read_booking_business_details", { p_tenant_id: booking.tenantId });
@@ -92,7 +105,7 @@ export const bookingLifecyclePorts: BookingLifecyclePorts = {
   async send(input) {
     if (!emailSendingEnabled()) return { status: "suppressed", reason: "email_gates" };
     const { bookingCustomerEmailAllowed } = await import("./updates");
-    if (!await bookingCustomerEmailAllowed(input.tenantId ?? null)) return { status: "suppressed", reason: "email_gates" };
+    if (!await bookingCustomerEmailAllowed(input.tenantId ?? null, input.tags?.bookingWorkspaceId)) return { status: "suppressed", reason: "email_gates" };
     return sendEmailWithReceipt(input);
   },
   appOrigin: bookingAppOrigin(),

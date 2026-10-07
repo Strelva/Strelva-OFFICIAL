@@ -5,7 +5,7 @@ import { visitorBookingFixtureHtml, visitorBookingFixtureState, visitorBookingFi
 
 export const dynamic = "force-dynamic";
 
-/** Synthetic data only; this fixture has no server mutation handler. */
+/** Synthetic visitor data only; all actions stay in the browser transport. */
 export async function GET(request: Request) {
   if (!strelvaUiPreviewEnabled()) return new Response("Not found", { status: 404 });
   const url = new URL(request.url);

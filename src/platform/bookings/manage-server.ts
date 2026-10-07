@@ -1,4 +1,5 @@
 /** Both receipt and native management use the same /b customer surface. */
+import { bookingScopeFor } from "./booking-scope";
 import { createPublicWebsiteBookingService } from "@/products/scheduling/server";
 import { PublicBookingError } from "./errors";
 import type { ManageDeps } from "./manage";
@@ -15,8 +16,8 @@ export function manageDeps(): ManageDeps {
       const receipt = await readReservationByManageTokenHash(hash);
       if (receipt || !nativeEnabled()) return receipt;
       const native = await nativeBookingByToken(hash, "manage") ?? await nativeBookingByToken(hash, "confirm");
-      if (!native?.tenantId) return null;
-      return { tenantId: native.tenantId, siteName: native.siteName, reservationId: native.id,
+      if (!native || !bookingScopeFor(native)) return null;
+      return { tenantId: bookingScopeFor(native)!, siteName: native.siteName, reservationId: native.id,
         capabilityId: `native:${native.serviceRef ?? ""}`, capabilityVersion: 1, title: native.serviceName,
         start: native.start, end: native.end, timeZone: native.timeZone,
         status: native.status === "confirmed" ? "confirmed" : native.status === "held" ? "held" : native.status === "cancelled" || native.status === "declined" ? "cancelled" : "pending",

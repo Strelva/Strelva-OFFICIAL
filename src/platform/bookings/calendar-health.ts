@@ -79,7 +79,7 @@ export async function chaseBookingCalendarHealth(workspaceId: string, input: {
           ...(recipient.tenantId ? { tenantId: recipient.tenantId } : {}),
           subject: `${snapshot.businessName}: reconnect your booking calendar`,
           idempotencyKey: `needs-you:booking-calendar:${action.id}`,
-          tags: { stream: "needs_you", kind: "health.owner_action", lifecycle: "booking_calendar_health" },
+          tags: { stream: "needs_you", kind: "health.owner_action", lifecycle: "booking_calendar_health", bookingWorkspaceId: workspaceId },
           options: { heading: "Your booking calendar needs you", paragraphs: [
             `Your ${action.provider === "google" ? "Google" : "Outlook"} calendar connection for ${snapshot.businessName} needs reconnecting. Strelva cannot reliably check its busy times until it is connected again.`,
             "Your bookings remain in Strelva. Sign in to review the connection and reconnect your calendar. Opening this link does not change calendar access.",

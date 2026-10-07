@@ -106,7 +106,8 @@ export interface RecordService {
 
 /** Everything a booking route needs about the business, read at use. */
 export interface BookingContext {
-  tenantStableId: string;
+  tenantStableId: string | null;
+  calendarKey?: string;
   workspaceId: string | null;
   systemId: string | null;
   paused: boolean;
@@ -271,19 +272,19 @@ export async function readBookingContext(tenant: string, db?: BookingStoreDb | n
     // The cached record never supplies identity, lifecycle or settings. If
     // these fresh store reads also fail, availability remains closed.
     const policy = await call<Record<string, unknown> | null>("read_tenant_booking_policy", { p_tenant_id: tenant }, db);
-    if (!policy || typeof policy.tenantStableId !== "string") throw error;
+    if (!policy || (typeof policy.tenantStableId !== "string" && !(policy.tenantStableId == null && typeof policy.calendarKey === "string" && typeof policy.workspaceId === "string"))) throw error;
     const cached = await cachedBookingRecord(tenant, {
-      tenantStableId: policy.tenantStableId, workspaceId: text(policy.workspaceId), systemId: text(policy.systemId),
+      tenantStableId: text(policy.tenantStableId), ...(typeof policy.calendarKey === "string" ? { calendarKey: policy.calendarKey } : {}), workspaceId: text(policy.workspaceId), systemId: text(policy.systemId),
       paused: policy.paused === true, settings: parseSettings(policy.settings),
       ...(bookingServicePoliciesEnabled() ? { servicePolicies: zPolicies(policy.servicePolicies) } : {}),
     });
     if (!cached) throw error;
     return cached;
   }
-  if (!data || typeof data !== "object" || typeof data.tenantStableId !== "string") return null;
+  if (!data || typeof data !== "object" || (typeof data.tenantStableId !== "string" && !(data.tenantStableId == null && typeof data.calendarKey === "string" && typeof data.workspaceId === "string"))) return null;
   const services = Array.isArray(data.services) ? data.services : [];
   const context: BookingContext = {
-    tenantStableId: data.tenantStableId,
+    tenantStableId: text(data.tenantStableId), ...(typeof data.calendarKey === "string" ? { calendarKey: data.calendarKey } : {}),
     workspaceId: text(data.workspaceId),
     systemId: text(data.systemId),
     paused: data.paused === true,
@@ -531,4 +532,10 @@ export async function setTenantBookingHours(
   const data = await call<{ status?: string; revision?: unknown }>("set_tenant_booking_hours", { p_workspace_id: workspaceId, p_tenant_id: tenant, p_hours: hours }, db);
   if (data?.status !== "updated") throw new BookingStoreError("failed", "booking_store_unexpected_response");
   return { revision: Number(data.revision) || 0 };
+}
+
+/** Bounded cron recovery for real website-optional booking Systems. */
+export async function readNativeBookingWorkspaces(db?: BookingStoreDb | null): Promise<string[]> {
+  const rows = await call<unknown>("read_native_booking_workspaces", {}, db);
+  return z.array(z.string().uuid()).max(500).parse(rows);
 }

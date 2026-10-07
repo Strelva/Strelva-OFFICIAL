@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { TextInput, TextArea, SelectInput } from "@/components/ui/TextInput";
 type Service = { id: string; name: string; intake?: Array<{ id: string; label: string; type: "text" | "textarea"; required: boolean }> };
 type Options = { timeZone: string; paused: boolean; services: Service[]; slots: Array<{ start: string; end: string }> };
-export function ManualBookingForm({ workspaceId, tenantId, request = fetch }: { workspaceId: string; tenantId: string; request?: (url: string, init?: RequestInit) => Promise<Response> }) {
+export function ManualBookingForm({ workspaceId, tenantId, request = fetch }: { workspaceId: string; tenantId?: string; request?: (url: string, init?: RequestInit) => Promise<Response> }) {
   const router = useRouter();
   const [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
   const [options, setOptions] = useState<Options | null>(null), [serviceId, setServiceId] = useState(""), [start, setStart] = useState("");
@@ -15,7 +15,7 @@ export function ManualBookingForm({ workspaceId, tenantId, request = fetch }: { 
   async function load(service = "") {
     setBusy(true); setError(null); setStart(""); setOptions(null); setAnswers({}); edit();
     try {
-      const query = new URLSearchParams({ workspaceId, tenantId, ...(service ? { serviceId: service } : {}) });
+      const query = new URLSearchParams({ workspaceId, ...(tenantId ? {tenantId} : {}), ...(service ? { serviceId: service } : {}) });
       const res = await request(`/api/workspace/bookings/manual?${query}`);
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Open times could not load. Try again.");

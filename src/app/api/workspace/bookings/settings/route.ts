@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const actor = await workspaceHttpActor();
     if (!actor) return workspaceJson({ error: "Sign in with a confirmed email to continue." }, 401);
     const query = new URL(request.url).searchParams;
-    const scope = bookingSettingsChange.pick({ workspaceId: true, tenantId: true }).safeParse({ workspaceId: query.get("workspaceId"), tenantId: query.get("tenantId") });
+    const scope = bookingSettingsChange.pick({ workspaceId: true, tenantId: true }).safeParse({ workspaceId: query.get("workspaceId"), tenantId: query.get("tenantId") ?? undefined });
     if (!scope.success) return workspaceJson({ error: "Choose the business and booking site." }, 400);
     return workspaceJson(await readBookingSettings(actor, scope.data.workspaceId, scope.data.tenantId));
   } catch (error) { return failure(error); }

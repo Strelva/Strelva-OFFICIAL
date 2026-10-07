@@ -7,7 +7,7 @@ import type { BookingContext } from "./store";
 export const BOOKING_RECORD_CACHE_MS = 60 * 60 * 1000;
 type Facts = Pick<BookingContext, "hours" | "services" | "phone">;
 type Snapshot = { at: number; facts: Facts };
-type Policy = Pick<BookingContext, "tenantStableId" | "workspaceId" | "systemId" | "paused" | "settings" | "servicePolicies">;
+type Policy = Pick<BookingContext, "tenantStableId" | "calendarKey" | "workspaceId" | "systemId" | "paused" | "settings" | "servicePolicies">;
 export interface BookingRecordFallbackPorts {
   now(): number;
   get(key: string): Promise<unknown>;
@@ -16,7 +16,7 @@ export interface BookingRecordFallbackPorts {
 }
 const memory = new Map<string, Snapshot>();
 export function resetBookingRecordCache() { memory.clear(); }
-const keyFor = (context: Policy) => `reb:booking:record:${context.tenantStableId}:${context.workspaceId ?? "none"}`;
+const keyFor = (context: Policy) => `reb:booking:record:${context.calendarKey ?? context.tenantStableId ?? context.workspaceId}:${context.workspaceId ?? "none"}`;
 const defaults: BookingRecordFallbackPorts = {
   now: () => Date.now(),
   async get(key) { return getRedis()?.get(key) ?? null; },

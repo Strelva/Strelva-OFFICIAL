@@ -117,7 +117,7 @@ async function deliver(
       subject: email.subject,
       options: email.options,
       idempotencyKey: `booking-message:${messageId}`,
-      tags: { kind: `booking_${kind}` },
+      tags: { kind: `booking_${kind}`, ...(!booking.tenantId && booking.workspaceId ? { bookingWorkspaceId: booking.workspaceId } : {}) },
     });
     if (result.status === "accepted") {
       summary.sent += 1;

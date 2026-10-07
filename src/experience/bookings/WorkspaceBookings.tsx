@@ -110,7 +110,7 @@ function SiteSection({ site, bookings, workspaceId, many }: { site: SiteBookings
       <h2 id={`site-${site.tenantId}`} className={many ? "mb-3 text-lg font-medium" : "sr-only"}>{site.siteName}</h2>
       {site.unavailable ? (
         <Card padding="lg" role="status">
-          <p className="text-sm leading-6 text-gray-muted">Bookings for {site.siteName} couldn&apos;t be read right now. Nothing is lost, and visitors can still book. Reload to try again.</p>
+          <p className="text-sm leading-6 text-gray-muted">Bookings for {site.siteName} couldn&apos;t be read right now. {site.tenantId.startsWith("workspace:") ? "Existing booking records are kept. Reload to try again." : "Nothing is lost, and visitors can still book. Reload to try again."}</p>
         </Card>
       ) : (
         <Card padding="lg">
@@ -165,7 +165,7 @@ export function WorkspaceBookings({ workspaceId, state, view }: { workspaceId: s
         <p className="mt-10 text-xs font-medium uppercase tracking-[0.14em] text-gray-muted">Bookings</p>
         <h1 className="mt-3 font-display text-[34px] font-medium leading-tight sm:text-[40px]">{heading}</h1>
         <p className="mt-3 max-w-2xl text-base leading-7 text-gray-muted">
-          {view === "day" ? "Who's coming in, in order. Check people in as they arrive." : "Every booking this week, from your website and the tools it connects to."}
+          {view === "day" ? "Who's coming in, in order. Check people in as they arrive." : ready?.native ? "Every booking this week, kept in this business’s Bookings System." : "Every booking this week, from your website and the tools it connects to."}
         </p>
 
         {state.kind === "permission" ? (
@@ -202,8 +202,8 @@ export function WorkspaceBookings({ workspaceId, state, view }: { workspaceId: s
             </div>
             {ready!.sites.length === 0 ? (
               <Card padding="lg" className="mt-6">
-                <h2 className="text-lg font-medium">No booking site is connected to this business yet</h2>
-                <p className="mt-2 text-sm leading-6 text-gray-muted">Bookings show here once Strelva runs a site that takes them for this business.</p>
+                <h2 className="text-lg font-medium">{ready!.native ? "Your Bookings System is not set up yet" : "No booking site is connected to this business yet"}</h2>
+                <p className="mt-2 text-sm leading-6 text-gray-muted">{ready!.native ? "Ask Strelva to prepare bookings for this business through a Request. A website is optional." : "Bookings show here once Strelva runs a site that takes them for this business."}</p>
               </Card>
             ) : ready!.sites.map((site) => <SiteSection key={site.tenantId} site={site} bookings={ready!} workspaceId={workspaceId} many={ready!.sites.length > 1} />)}
           </>

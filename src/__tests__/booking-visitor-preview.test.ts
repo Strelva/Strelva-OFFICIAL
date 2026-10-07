@@ -18,10 +18,12 @@ describe("isolated generated visitor fixture", () => {
     expect(mock.outside).not.toHaveBeenCalled();
   });
 
-  it("serves the same native contract in simulated off and on modes", async () => {
+  it("adds business authority only in the simulated native mode and keeps receipt contracts", async () => {
     const off = transport("ready", "off");
     const on = transport("ready", "on");
-    expect(await (await off.fetch(endpoint)).json()).toEqual(await (await on.fetch(endpoint)).json());
+    const schedule = await (await off.fetch(endpoint)).json();
+    expect(schedule).not.toHaveProperty("bookingAuthority");
+    expect(await (await on.fetch(endpoint)).json()).toEqual({ ...schedule, bookingAuthority: "business" });
     const init = { method: "POST", body: JSON.stringify({ slotId: "fixture-slot-two" }) };
     expect(await (await off.fetch(`${endpoint}/reservations`, init)).json()).toEqual(await (await on.fetch(`${endpoint}/reservations`, init)).json());
     expect(off.outside).not.toHaveBeenCalled();

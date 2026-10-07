@@ -50,7 +50,7 @@ function nextDate(date: string): string {
 }
 
 function cacheKey(context: BookingContext, date: string): string {
-  return `reb:booking:busy:${context.tenantStableId}:${date}`;
+  return `reb:booking:busy:${context.calendarKey ?? context.tenantStableId ?? context.workspaceId}:${date}`;
 }
 
 function isBusyList(value: unknown): value is BusyInterval[] {

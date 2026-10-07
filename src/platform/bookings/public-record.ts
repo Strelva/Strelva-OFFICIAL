@@ -22,7 +22,7 @@ export async function recordPublicAvailability(input: { tenantId: string; capabi
   const settings = settingsOrDefault(contextForService(context, service?.id ?? input.capabilityId));
   const from = input.range?.from ?? new Date().toISOString();
   const to = input.range?.to ?? new Date(Date.parse(from) + Math.min(60, settings.maxAdvanceDays) * 86400000).toISOString();
-  const availability = service && !context.paused ? await nativeSlots(input.tenantId, service.externalRef ?? service.id, from, to, input.requestId ? { excludePublicReservationId: publicRecordReservationId(context.tenantStableId, input.requestId) } : {}) : { slots: [] };
+  const availability = service && !context.paused ? await nativeSlots(input.tenantId, service.externalRef ?? service.id, from, to, input.requestId ? { excludePublicReservationId: publicRecordReservationId(context.calendarKey ?? context.tenantStableId ?? context.workspaceId!, input.requestId) } : {}) : { slots: [] };
   return { workspaceId: context.workspaceId, paused: context.paused, timeZone: timeZoneOf(context), name: service?.name ?? input.name,
     slots: availability.slots, recordBooking: {
       pausedMessage: pausedBookingMessage(context.phone), serviceRef: service?.externalRef ?? service?.id ?? "", bufferMinutes: settings.bufferMinutes, mode: settings.mode,

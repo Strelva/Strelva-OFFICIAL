@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   try {
     const actor = await workspaceHttpActor(); if (!actor) return workspaceJson({ error: "Sign in to take a booking." }, 401);
     const query = new URL(request.url).searchParams;
-    const scope = manualBookingScope.parse({ workspaceId: query.get("workspaceId"), tenantId: query.get("tenantId") });
+    const scope = manualBookingScope.parse({ workspaceId: query.get("workspaceId"), tenantId: query.get("tenantId") ?? undefined });
     if (await isRateLimitedWindowedAsync(`manual-booking-read:${actor.userId}`, 60, 60000)) return workspaceJson({ error: "Please wait before trying again." }, 429);
     return workspaceJson(await manualBookingOptions(actor, scope, query.get("serviceId") ?? undefined));
   } catch (error) { return failure(error); }

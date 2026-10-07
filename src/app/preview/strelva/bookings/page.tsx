@@ -32,9 +32,11 @@ export default async function BookingsPreviewPage({ searchParams }: { searchPara
     tenantId: "twintrees-a", siteName: "Twin Trees Wellness", timezone: "America/New_York", today: "2026-11-06", unavailable: false,
     bookings: ROWS.filter((row) => row.date >= range.from && row.date <= range.to),
   };
-  const ready = (sites: SiteBookings[]): WorkspaceBookingsState => ({ kind: "ready", bookings: { view, ...range, sites } });
+  const ready = (sites: SiteBookings[], native = false): WorkspaceBookingsState => ({ kind: "ready", bookings: { view, ...range, sites, ...(native ? { native: true } : {}) } });
   if (name === "loading") return <WorkspaceBookingsLoading />;
   const state: WorkspaceBookingsState = name === "permission" ? { kind: "permission" }
+    : name === "native" ? ready([{ ...site, tenantId: `workspace:${WORKSPACE}`, siteName: "Bookings", manual: true, evidence: { calendarHealth: "not_connected", paused: false, truncated: false } }], true)
+    : name === "native-empty" ? ready([], true)
     : name === "error" ? { kind: "error" }
     : name === "empty" ? ready([{ ...site, bookings: [] }])
     : name === "unlinked" ? ready([])
