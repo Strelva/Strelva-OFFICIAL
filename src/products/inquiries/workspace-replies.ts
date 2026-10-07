@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { commitmentSignals } from "@/platform/needs-you";
 import { z } from "zod";
 import { inquiryRecordsEnabled, inquiryRecordsRpc } from "@/platform/infra/inquiry-records";
 import { WorkspaceAccessError, WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
@@ -22,6 +23,7 @@ const claimSchema = z.object({
   recipient: z.string().email(), subject: z.string(), body: z.string(), tenantId: z.string().nullable(),
   replyTo: z.string().email().nullable(), businessName: z.string(),
   providerMessageId: z.string().nullable(), acceptedAt: z.string().nullable(),
+  isOwner: z.boolean().optional(),
 });
 export interface WorkspaceReplyOutcome { status: WorkspaceReplyStatus; providerMessageId: string | null; acceptedAt: string | null; retryable: false }
 export interface WorkspaceReplyDependencies {
@@ -41,6 +43,8 @@ const defaults: WorkspaceReplyDependencies = {
 };
 
 /** Owner-written text is an explicit owner decision, including any commitment.
+ * Assigned/routed members may send ordinary text only; SQL independently
+ * rechecks current delegated authority and conservative commitment signals.
  * SQL rechecks membership, record scope, intake state and pause before claiming.
  * Once claimed it cannot become a sendable retry, even if the provider or DB times out. */
 export async function replyFromWorkspace(actor: WorkspaceActor, raw: WorkspaceReplyInput, dependencies = defaults): Promise<WorkspaceReplyOutcome> {
@@ -49,13 +53,16 @@ export async function replyFromWorkspace(actor: WorkspaceActor, raw: WorkspaceRe
   const digest = createHash("sha256").update(JSON.stringify([input.rowId, input.subject, input.body])).digest("hex");
   let claim: z.infer<typeof claimSchema>;
   try {
-    claim = claimSchema.parse(await dependencies.rpc("claim_workspace_inquiry_reply", {
+    claim = claimSchema.parse(await dependencies.rpc("claim_workspace_inquiry_reply_v2", {
       p_workspace_id: input.workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail,
       p_lead_row_id: input.rowId, p_request_id: input.requestId, p_digest: digest, p_subject: input.subject, p_body: input.body,
+      p_is_commitment: commitmentSignals(`${input.subject}\n${input.body}`).length > 0,
     }, () => new WorkspaceAccessError()));
   } catch (error) {
     if (error instanceof Error && /inquiry_reply_|workspace_exit_future_work_blocked/.test(error.message)) {
-      throw new WorkspaceConflictError("This inquiry changed, is paused, or cannot be replied to. Reload before trying again.");
+      throw new WorkspaceConflictError(error.message.includes("inquiry_reply_commitment_owner_only")
+        ? "Prices, dates and promises need the business owner’s approval."
+        : "This inquiry changed, is paused, or cannot be replied to. Reload before trying again.");
     }
     throw error;
   }
@@ -73,7 +80,7 @@ export async function replyFromWorkspace(actor: WorkspaceActor, raw: WorkspaceRe
       to: claim.recipient, subject: claim.subject,
       fromName: `${claim.businessName} via Strelva`, fromAddress: `hello@${CLIENT_MAIL_DOMAIN}`,
       ...(claim.replyTo ? { replyTo: claim.replyTo } : {}),
-      options: { heading: claim.subject, paragraphs: [claim.body], footerNote: `Sent by Strelva for ${claim.businessName}, approved by the business owner.` },
+      options: { heading: claim.subject, paragraphs: [claim.body], footerNote: `Sent by Strelva for ${claim.businessName}, approved by ${claim.isOwner === false ? "the assigned team member" : "the business owner"}.` },
       idempotencyKey: `inquiry-workspace-${claim.id}`,
       tags: { strelva_workspace_message_id: claim.id, strelva_workspace_id: input.workspaceId },
     });

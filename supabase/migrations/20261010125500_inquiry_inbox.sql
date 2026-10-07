@@ -7,7 +7,7 @@ declare v_states text[] := coalesce(p_states,array['kept','released']);
 begin
  perform public.inquiry_assert_member(p_workspace_id,p_user_id,p_verified_email);
  if not(v_states <@ array['kept','released','held_as_spam','confirmed_spam']) then raise exception 'inquiry_record_invalid'; end if;
- return coalesce((select jsonb_agg(public.inquiry_lead_json(l) || jsonb_build_object('reply',(
+ return coalesce((select jsonb_agg(public.inquiry_lead_json(l) || jsonb_build_object('capturedAt',to_char(l.captured_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),'reply',(
   select jsonb_build_object('status',m.status,'providerMessageId',m.provider_message_id,'acceptedAt',m.accepted_at)
   from public.inquiry_workspace_messages m where m.lead_row_id=l.id order by m.created_at desc limit 1)) order by l.captured_at desc,l.id desc)
  from (select * from public.tenant_leads lead where workspace_id=p_workspace_id and intake_state=any(v_states)

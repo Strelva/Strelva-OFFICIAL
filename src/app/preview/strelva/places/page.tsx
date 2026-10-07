@@ -51,7 +51,7 @@ function record(access: BusinessRecord["access"]): BusinessRecord {
   };
 }
 
-export default async function PlacesPreviewPage({ searchParams }: { searchParams: Promise<{ place?: string; state?: string; result?: string; held?: string; reply?: string }> }) {
+export default async function PlacesPreviewPage({ searchParams }: { searchParams: Promise<{ place?: string; state?: string; result?: string; held?: string; reply?: string; member?: string }> }) {
   if (!strelvaUiPreviewEnabled()) notFound();
   const params = await searchParams;
   const { place, state, result } = params;
@@ -86,7 +86,7 @@ export default async function PlacesPreviewPage({ searchParams }: { searchParams
     { id: "l2", name: "Tom R.", email: "tom@example.test", message: "Do you deliver catering trays to offices downtown?", source: "quote", fields: [], createdAt: "2026-10-03T09:30:00Z" },
     { id: "l1", name: "Someone", email: null, message: "Are you open on Thanksgiving?", source: null, fields: [], createdAt: "2026-08-20T09:30:00Z" },
   ];
-  if (params.reply === "1") Object.assign(leads[0]!, { rowId: "5e000000-0000-4000-8000-0000000000d4" });
+  if (params.reply === "1") Object.assign(leads[0]!, { rowId: "5e000000-0000-4000-8000-0000000000d4", replyPermission: params.member === "1" ? "member" : params.member === "none" ? "none" : "owner" });
   const site = { key: "juniper", tenantId: "juniper", siteName: "Juniper Bakery", leads, lastThirtyDays: 2, unavailable: false };
   // A site the business connected itself (any builder): its form inquiries come in beside the managed site's.
   const connected = { key: "connected:juniper-pop-up", tenantId: null, connected: true as const, siteName: "juniperpopup.example", lastThirtyDays: 1, unavailable: false,

@@ -54,9 +54,17 @@ insert into public.memberships(user_id,tenant_id,role,tenant_stable_id)
  values('d6100000-0000-4000-8000-0000000000e2','ip-site','owner','d6100000-0000-4000-8000-0000000000b1');
 
 insert into public.tenant_leads(id,tenant_stable_id,tenant_slug_at_capture,workspace_id,lead_id,submission_hash,name,captured_at,recorded_via)
- select ('d6100000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid,'d6100000-0000-4000-8000-0000000000b1','ip-site',(select id from ir_ws where name='site'),'lead_page_'||n,'page_hash_'||n,'Dana','2026-06-01T00:00:00Z','backfill' from generate_series(1,501) n;
+ select ('d6100000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid,'d6100000-0000-4000-8000-0000000000b1','ip-site',(select id from ir_ws where name='site'),'lead_page_'||n,'pagehash'||n,'Dana','2026-06-01T00:00:00Z','backfill' from generate_series(1,501) n;
 select pg_temp.ir_assert(jsonb_array_length(public.read_workspace_inquiry_inbox_page((select id from ir_ws where name='site'),'d6100000-0000-4000-8000-0000000000e2','ip-owner@example.test',null,500,null,null))=500,'old inquiries remain pageable');
-select pg_temp.ir_assert(jsonb_array_length(public.read_workspace_inquiry_inbox_page((select id from ir_ws where name='site'),'d6100000-0000-4000-8000-0000000000e2','ip-owner@example.test',null,500,'2026-06-01','d6100000-0000-4000-8000-000000000002'))=1,'equal-time cursor retains the 501st lead');
+select pg_temp.ir_assert(jsonb_array_length(public.read_workspace_inquiry_inbox_page((select id from ir_ws where name='site'),'d6100000-0000-4000-8000-0000000000e2','ip-owner@example.test',null,500,'2026-06-01T00:00:00Z','d6100000-0000-4000-8000-000000000002'))=1,'equal-time cursor retains the 501st lead');
+insert into public.tenant_leads(id,tenant_stable_id,tenant_slug_at_capture,workspace_id,lead_id,submission_hash,name,captured_at,recorded_via)
+ select ('d6100000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid,'d6100000-0000-4000-8000-0000000000b1','ip-site',(select id from ir_ws where name='site'),'lead_micro_'||n,'microhash'||n,'Dana',('2026-07-01T00:00:00Z'::timestamptz+(n-900)*interval '1 microsecond'),'backfill' from generate_series(901,902) n;
+do $$ declare first_page jsonb; next_page jsonb; begin
+ first_page:=public.read_workspace_inquiry_inbox_page((select id from ir_ws where name='site'),'d6100000-0000-4000-8000-0000000000e2','ip-owner@example.test',null,1,null,null);
+ perform pg_temp.ir_assert(first_page#>>'{0,capturedAt}'='2026-07-01T00:00:00.000002Z','cursor preserves all database timestamp precision');
+ next_page:=public.read_workspace_inquiry_inbox_page((select id from ir_ws where name='site'),'d6100000-0000-4000-8000-0000000000e2','ip-owner@example.test',null,1,(first_page#>>'{0,capturedAt}')::timestamptz,(first_page#>>'{0,id}')::uuid);
+ perform pg_temp.ir_assert(next_page#>>'{0,leadId}'='lead_micro_901','cursor never skips an adjacent microsecond');
+end $$;
 select pg_temp.ir_assert(jsonb_array_length(public.read_workspace_inquiry_inbox_page((select id from ir_ws where name='site'),'d6100000-0000-4000-8000-0000000000e3','ip-member@example.test',null,100,null,null))=0,'workspace membership never widens tenant access');
 select pg_temp.ir_expect(format($q$select public.read_workspace_inquiry_inbox_page(%L,'d6100000-0000-4000-8000-0000000000e5','ip-other-owner@example.test',null,100,null,null)$q$,(select id from ir_ws where name='site')),'inquiry_access_denied');
 select pg_temp.ir_assert(not has_function_privilege('authenticated','public.read_workspace_inquiry_inbox_page(uuid,uuid,text,text[],integer,timestamptz,uuid)','execute'),'service role with member proof only');

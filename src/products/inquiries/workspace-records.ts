@@ -29,6 +29,7 @@ export interface WorkspaceInquiryLead {
   contactId: string | null;
   capturedAt: string;
   reply?: WorkspaceReplyOutcome;
+  replyPermission?: "owner" | "member" | "none";
 }
 
 const STATES: readonly IntakeState[] = ["kept", "held_as_spam", "released", "confirmed_spam"];
@@ -61,6 +62,7 @@ export function parseWorkspaceLead(raw: unknown): WorkspaceInquiryLead | null {
     intakeStateAt: str(r.intakeStateAt),
     contactId: str(r.contactId),
     capturedAt: r.capturedAt,
+    ...(r.replyPermission === undefined ? {} : { replyPermission: r.replyPermission === "owner" || r.replyPermission === "member" ? r.replyPermission : "none" as const }),
     ...(r.reply && typeof r.reply === "object" && typeof (r.reply as Record<string, unknown>).status === "string" ? { reply: { ...(r.reply as Omit<WorkspaceReplyOutcome, "retryable">), retryable: false as const } } : {}),
   };
 }

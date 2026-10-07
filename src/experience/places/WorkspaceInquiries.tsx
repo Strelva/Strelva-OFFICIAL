@@ -14,7 +14,7 @@ function sourceLabel(source: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function LeadCard({ lead, workspaceId, replies }: { lead: LeadView; workspaceId: string; replies?: boolean }) {
+function LeadCard({ lead, workspaceId, replies, bookingOffers }: { lead: LeadView; workspaceId: string; replies?: boolean; bookingOffers?: boolean }) {
   return (
     <Card padding="md">
       <article aria-labelledby={`lead-${lead.id}`}>
@@ -31,7 +31,7 @@ function LeadCard({ lead, workspaceId, replies }: { lead: LeadView; workspaceId:
             {lead.fields.map(([key, value]) => <div key={key} className="flex gap-2"><dt className="text-gray-muted">{sourceLabel(key)}:</dt><dd className="min-w-0 break-words">{value}</dd></div>)}
           </dl>
         ) : null}
-        {replies && lead.reply && Object.hasOwn(REPLY_OUTCOME, lead.reply.status) ? <p role="status" className="mt-4 text-sm">{REPLY_OUTCOME[lead.reply.status]}{lead.reply.providerMessageId ? <span className="mt-1 block break-all text-xs text-gray-muted">Provider receipt: {lead.reply.providerMessageId}</span> : null}</p> : lead.email && replies && lead.rowId ? <WorkspaceInquiryReply workspaceId={workspaceId} rowId={lead.rowId} name={lead.name} email={lead.email} /> : lead.email ? (
+        {replies && lead.reply && Object.hasOwn(REPLY_OUTCOME, lead.reply.status) ? <p role="status" className="mt-4 text-sm">{REPLY_OUTCOME[lead.reply.status]}{lead.reply.providerMessageId ? <span className="mt-1 block break-all text-xs text-gray-muted">Provider receipt: {lead.reply.providerMessageId}</span> : null}</p> : lead.email && replies && lead.rowId && lead.replyPermission === "none" ? <p className="mt-4 text-sm text-gray-muted">The owner or the assigned team member can reply to this inquiry.</p> : lead.email && replies && lead.rowId ? <WorkspaceInquiryReply workspaceId={workspaceId} rowId={lead.rowId} name={lead.name} email={lead.email} bookingOffers={bookingOffers && lead.replyPermission !== "member"} member={lead.replyPermission === "member"} /> : lead.email ? (
           <p className="mt-4 flex flex-wrap items-center gap-3 text-sm">
             <a className="inline-flex min-h-[40px] items-center rounded-lg bg-warm-black px-3 font-medium text-warm-white" href={`mailto:${encodeURIComponent(lead.email).replace(/%40/g, "@")}`}>Reply by email</a>
             <span className="break-all text-gray-muted">{lead.email}</span>
@@ -112,7 +112,7 @@ export function WorkspaceInquiries({ workspaceId, state, embedded = false }: { w
           ) : (
             <>
               <p className="mb-3 text-sm text-gray-muted">{data.paged ? "" : `${site.lastThirtyDays} in the last 30 days · `}{site.leads.length} shown</p>
-              <div className="grid gap-3">{site.leads.map((lead) => <LeadCard key={lead.id} lead={lead} workspaceId={workspaceId} replies={data.workspaceReplies} />)}</div>
+              <div className="grid gap-3">{site.leads.map((lead) => <LeadCard key={lead.id} lead={lead} workspaceId={workspaceId} replies={data.workspaceReplies} bookingOffers={data.bookingOffers} />)}</div>
             </>
           )}
         </section>

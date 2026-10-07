@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { TextArea, TextInput } from "@/components/ui/TextInput";
+import { InquiryBookingOfferComposer } from "./InquiryBookingOfferComposer";
 import type { WorkspaceReplyOutcome, WorkspaceReplyStatus } from "@/products/inquiries";
 
 export const REPLY_OUTCOME: Record<WorkspaceReplyStatus, string> = {
@@ -16,7 +17,7 @@ export const REPLY_OUTCOME: Record<WorkspaceReplyStatus, string> = {
   unknown: "The send couldn't be confirmed. Strelva must check the receipt before another attempt.",
 };
 
-export function WorkspaceInquiryReply({ workspaceId, rowId, name, email }: { workspaceId: string; rowId: string; name: string; email: string }) {
+export function WorkspaceInquiryReply({ workspaceId, rowId, name, email, bookingOffers = false, member = false }: { workspaceId: string; rowId: string; name: string; email: string; bookingOffers?: boolean; member?: boolean }) {
   const [open, setOpen] = useState(false);
   const [subject, setSubject] = useState("Re: Your inquiry");
   const [body, setBody] = useState("");
@@ -36,6 +37,8 @@ export function WorkspaceInquiryReply({ workspaceId, rowId, name, email }: { wor
       const result = await response.json().catch(() => null) as { outcome?: WorkspaceReplyOutcome; error?: string } | null;
       if (!response.ok || !result?.outcome || !Object.hasOwn(REPLY_OUTCOME, result.outcome.status)) {
         setError(result?.error ?? "The reply couldn't be confirmed. Keep this draft and check before trying again.");
+        // These explicit refusals happen before a send claim. Keep the draft editable.
+        if ([400, 403, 404, 409].includes(response.status)) setRequestId(null);
       } else setOutcome(result.outcome);
     } catch { setError("The reply couldn't be confirmed. Keep this draft and check before trying again."); }
     finally { setSaving(false); }
@@ -45,10 +48,11 @@ export function WorkspaceInquiryReply({ workspaceId, rowId, name, email }: { wor
       <p className="text-sm break-all">To {email}</p>
       <TextInput label="Subject" value={subject} onChange={(event) => setSubject(event.target.value)} maxLength={200} disabled={saving || requestId !== null} />
       <TextArea label={`Your reply to ${name}`} value={body} onChange={(event) => setBody(event.target.value)} maxLength={5000} disabled={saving || requestId !== null} />
-      <p className="text-xs text-gray-muted">Sending approves this exact message, including any price, date or promise. A sent reply cannot be undone.</p>
+      {bookingOffers ? <InquiryBookingOfferComposer workspaceId={workspaceId} rowId={rowId} disabled={saving || requestId !== null} append={text => { const next = body ? `${body}\n\n${text}` : text; if (next.length > 5000) return false; setBody(next); return true; }} /> : null}
+      <p className="text-xs text-gray-muted">{member ? "You can send an ordinary reply for inquiries assigned or routed to you. Prices, dates and promises need the owner’s approval. A sent reply cannot be undone." : "Sending approves this exact message, including any price, date or promise. A sent reply cannot be undone."}</p>
       {outcome ? <p role="status" className="text-sm">{REPLY_OUTCOME[outcome.status]}</p> : (
         <div className="flex flex-wrap gap-3">
-          <Button loading={saving} disabled={!subject.trim() || !body.trim()} onClick={() => void send()}>{requestId ? "Check this reply" : "Approve and send reply"}</Button>
+          <Button loading={saving} disabled={!subject.trim() || !body.trim()} onClick={() => void send()}>{requestId ? "Check this reply" : member ? "Send reply" : "Approve and send reply"}</Button>
           {!requestId ? <Button variant="ghost" onClick={() => setOpen(false)}>Close draft</Button> : null}
         </div>
       )}

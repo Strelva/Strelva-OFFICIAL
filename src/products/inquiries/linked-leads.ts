@@ -25,6 +25,7 @@ export interface LeadView {
   id: string;
   rowId?: string;
   reply?: WorkspaceReplyOutcome;
+  replyPermission?: WorkspaceInquiryLead["replyPermission"];
   /** Set for a held item released from spam review: the `tenant_leads` row id, for putting it back. */
   releasedRowId?: string;
   name: string;
@@ -69,6 +70,7 @@ export interface HeldInquiries {
 export interface WorkspaceLeads {
   sites: SiteLeads[];
   workspaceReplies?: boolean;
+  bookingOffers?: boolean;
   durable?: boolean;
   paged?: boolean;
   nextPage?: { before: string; beforeId: string };
@@ -151,6 +153,7 @@ export function releasedLeadView(lead: WorkspaceInquiryLead): LeadView {
       source: lead.source ?? undefined, fields: lead.fields, createdAt: lead.capturedAt }),
     rowId: lead.id,
     ...(lead.reply ? { reply: lead.reply } : {}),
+    ...(lead.replyPermission ? { replyPermission: lead.replyPermission } : {}),
     releasedRowId: lead.id,
   };
 }
@@ -214,7 +217,7 @@ export async function readWorkspaceLeads(actor: WorkspaceActor, workspaceId: str
       const seen = new Set(kept.map((lead) => lead.id));
       const released = (records?.released ?? []).filter((lead) => lead.tenantId === site.tenantId && !seen.has(lead.leadId)).map(releasedLeadView);
       const rowById = new Map([...(records?.kept ?? []), ...(records?.released ?? [])].filter((lead) => lead.tenantId === site.tenantId).map((lead) => [lead.leadId, lead]));
-      const mapped = kept.map((lead) => { const row = rowById.get(lead.id); return row ? { ...lead, rowId: row.id, ...(row.reply ? { reply: row.reply } : {}), ...(row.intakeState === "released" ? { releasedRowId: row.id } : {}) } : lead; });
+      const mapped = kept.map((lead) => { const row = rowById.get(lead.id); return row ? { ...lead, rowId: row.id, ...(row.reply ? { reply: row.reply } : {}), ...(row.replyPermission ? { replyPermission: row.replyPermission } : {}), ...(row.intakeState === "released" ? { releasedRowId: row.id } : {}) } : lead; });
       const leads = [...mapped, ...released].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       return { ...base, leads, lastThirtyDays: recentCount(leads, dependencies.now()), unavailable: false };
     } catch (error) {
@@ -228,9 +231,15 @@ export async function readWorkspaceLeads(actor: WorkspaceActor, workspaceId: str
   for (const section of result.sites.filter((site) => site.connected)) {
     const rows = [...(records?.kept ?? []), ...(records?.released ?? [])].filter((lead) => section.key === `connected:${lead.connectedSiteId}`);
     const byRow = new Map(rows.map((row) => [row.id, row]));
-    section.leads = section.leads.map((lead) => { const row = byRow.get(lead.id); return row ? { ...lead, rowId: row.id, ...(row.reply ? { reply: row.reply } : {}), ...(row.intakeState === "released" ? { releasedRowId: row.id } : {}) } : lead; });
+    section.leads = section.leads.map((lead) => { const row = byRow.get(lead.id); return row ? { ...lead, rowId: row.id, ...(row.reply ? { reply: row.reply } : {}), ...(row.replyPermission ? { replyPermission: row.replyPermission } : {}), ...(row.intakeState === "released" ? { releasedRowId: row.id } : {}) } : lead; });
   }
   if (dependencies.repliesEnabled?.()) result.workspaceReplies = true;
+  const { workspaceReleaseEnabled } = await import("@/platform/workspace-release");
+  const { inquiryBookingHandoffEnabled } = await import("./booking-handoff");
+  if (workspaceReleaseEnabled() && inquiryBookingHandoffEnabled()) {
+    const { inquiryReleaseEnabledForWorkspace } = await import("./release");
+    if (await inquiryReleaseEnabledForWorkspace(workspaceId, { userId: actor.userId, operator: false, tester: false })) result.bookingOffers = true;
+  }
   if (records) result.durable = true;
   if (pending) {
     // Held items of a site this person can't read through the tenant check stay hidden, like its inbox.

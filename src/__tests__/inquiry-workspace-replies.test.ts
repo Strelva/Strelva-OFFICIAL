@@ -23,7 +23,7 @@ describe("owner workspace replies", () => {
   it("saves owner scope and exact message before transport; provider acceptance survives failed readback", async () => {
     const d = deps({ readback: vi.fn(async () => ({ status: "unavailable" as const, reason: "offline" })) });
     expect(await replyFromWorkspace(actor,input,d)).toMatchObject({ status: "accepted" as const, retryable: false, providerMessageId: "mail-1" });
-    expect(d.rpc).toHaveBeenNthCalledWith(1,"claim_workspace_inquiry_reply",expect.objectContaining({ p_user_id: actor.userId,p_verified_email: actor.verifiedEmail,p_lead_row_id:input.rowId,p_body:input.body }),expect.any(Function));
+    expect(d.rpc).toHaveBeenNthCalledWith(1,"claim_workspace_inquiry_reply_v2",expect.objectContaining({ p_user_id: actor.userId,p_verified_email: actor.verifiedEmail,p_lead_row_id:input.rowId,p_body:input.body,p_is_commitment:true }),expect.any(Function));
     expect(d.send).toHaveBeenCalledWith(expect.objectContaining({ audience: "customer",fromAddress:"hello@mail.strelva.com",replyTo:"owner@example.test",idempotencyKey:expect.stringContaining(claim.id) }));
     expect(d.send).toHaveBeenCalledWith(expect.objectContaining({ tags: { strelva_workspace_message_id: claim.id, strelva_workspace_id: input.workspaceId } }));
     expect(d.rpc).toHaveBeenNthCalledWith(2,"finish_workspace_inquiry_reply",expect.objectContaining({ p_status:"accepted" as const,p_provider_message_id:"mail-1" }));
@@ -55,6 +55,19 @@ describe("owner workspace replies", () => {
     expect(workspaceReplyInput.safeParse({...input,subject:"Hello\nBCC: victim@example.test"}).success).toBe(false);
     expect(workspaceReplyInput.safeParse({...input,to:"victim@example.test"}).success).toBe(false);
     expect(workspaceReplyInput.safeParse({...input,requestId:"same"}).success).toBe(false);
+  });
+});
+describe("assigned member reply classification", () => {
+  it("server classifies exact text, records the member actor and uses truthful approval copy", async () => {
+    const plain={...input,body:"Thanks Dana. Could you tell us more?"};
+    const d=deps({rpc:vi.fn(async name=>name.startsWith("claim")?{...claim,body:plain.body,isOwner:false}:{status:"accepted"})});
+    await replyFromWorkspace({userId:actor.userId,verifiedEmail:"member@example.test"},plain,d);
+    expect(d.rpc).toHaveBeenNthCalledWith(1,"claim_workspace_inquiry_reply_v2",expect.objectContaining({p_is_commitment:false,p_verified_email:"member@example.test",p_body:plain.body}),expect.any(Function));
+    expect(d.send).toHaveBeenCalledWith(expect.objectContaining({options:expect.objectContaining({footerNote:expect.stringContaining("assigned team member")})}));
+    for(const body of ["The price is $40.","We reserved Friday.","We promise to deliver."]){
+      const blocked=deps({rpc:vi.fn(async (_name,args)=>{expect(args?.p_is_commitment).toBe(true);throw new Error("inquiry_reply_commitment_owner_only");})});
+      await expect(replyFromWorkspace(actor,{...input,body},blocked)).rejects.toThrow("owner’s approval"); expect(blocked.send).not.toHaveBeenCalled();
+    }
   });
 });
 describe("workspace reply provider reconciliation", () => {

@@ -13,7 +13,7 @@ const defaults: InboxDependencies = { base: readWorkspaceLeads, source: async ()
 function view(row: WorkspaceInquiryLead): LeadView {
   return { id: row.connectedSiteId ? row.id : row.leadId, rowId: row.id, name: row.name || "Someone", email: row.email,
     message: row.message, source: row.source, fields: Object.entries(row.fields), createdAt: row.capturedAt,
-    ...(row.reply ? { reply: row.reply } : {}), ...(row.intakeState === "released" ? { releasedRowId: row.id } : {}) };
+    ...(row.reply ? { reply: row.reply } : {}), ...(row.replyPermission ? { replyPermission: row.replyPermission } : {}), ...(row.intakeState === "released" ? { releasedRowId: row.id } : {}) };
 }
 
 /** The Postgres inbox pages beyond Redis's old 500-record cap, after the same
