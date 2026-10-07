@@ -183,6 +183,7 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
       ...(kind === "bookings" && entry.views?.length ? { views: bookingViews(entry.views, entry.tenantId ? siteById.get(entry.tenantId) : undefined) } : {}),
       ...(kind === "website" && domain ? auditsFor(domain, snapshot.work) : {}),
       connections: [], possibilities: [], versions,
+      ...(stored ? { storedVersionId: stored.id } : {}),
       ...(publishing?.websiteParts[entry.ref.systemId]?.length ? { parts: publishing.websiteParts[entry.ref.systemId]!.map(({ label, published, drafts }) => ({ label, published, drafts })) } : {}),
       ...(publishing?.offers.some(offer => offer.systemId === entry.ref.systemId)
         ? { offers: publishing.offers.filter(offer => offer.systemId === entry.ref.systemId).map(({ kind, label }) => ({ kind, label })) } : {}),

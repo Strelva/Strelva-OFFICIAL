@@ -12,9 +12,12 @@ export async function readFiniteJobs(actor: WorkspaceActor, businessId: string, 
   const verifiedEmail = z.string().email().parse(actor.verifiedEmail.trim().toLowerCase());
   const db = database ?? getSupabase() as unknown as FiniteJobsDb | null;
   if (!db) throw new WorkspaceStoreError("Finite job storage is unavailable.");
-  const result = await db.rpc("read_finite_job_sources", {
-    p_user_id: actor.userId, p_verified_email: verifiedEmail, p_business_id: businessId,
-  });
+  let result: Awaited<ReturnType<FiniteJobsDb["rpc"]>>;
+  try {
+    result = await db.rpc("read_finite_job_sources", {
+      p_user_id: actor.userId, p_verified_email: verifiedEmail, p_business_id: businessId,
+    });
+  } catch { throw new WorkspaceStoreError("Finite jobs could not be read."); }
   if (result.error) {
     if (/access_denied|workspace_denied|identity_denied/.test(result.error.message)) throw new WorkspaceAccessError();
     throw new WorkspaceStoreError("Finite jobs could not be read.");

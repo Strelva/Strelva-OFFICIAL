@@ -346,7 +346,7 @@ describe("resolveEventAction", () => {
           },
         ],
       },
-    });
+    }, { commandKey: "approval:evt_h", actor: "approved event evt_h" });
     expect(mockResolveEvent).toHaveBeenCalledWith("evt_h", "approved", { actor: "user" });
   });
 

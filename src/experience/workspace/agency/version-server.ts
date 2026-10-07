@@ -27,7 +27,21 @@ export async function decideSystemImprovement(actor: WorkspaceActor, input: { wo
   const store = createSupabaseVersionStore(db);
   const lineage = await store.findLineageByVersion(versionActor, { businessId: input.workspaceId, systemId: input.systemId });
   if (!lineage || lineage.id !== input.versionId) throw new VersionAccessError();
-  if (lineage.rowRevision !== input.rowRevision) throw new VersionStaleError();
+  if (lineage.rowRevision !== input.rowRevision) {
+    // Adoption and decision preparation use separate durable stores. Resume
+    // only this actor's exact last command after an uncertain reply; a later
+    // edit, a different choice or another actor still requires a fresh read.
+    const last = lineage.decisions.at(-1);
+    const sameChoices = last?.choice === "adopted" && JSON.stringify([...last.resolutions].sort((a, b) => a.path.localeCompare(b.path)))
+      === JSON.stringify([...(input.resolutions ?? [])].sort((a, b) => a.path.localeCompare(b.path)));
+    if (lineage.rowRevision !== input.rowRevision + 1 || last?.by !== actor.userId || last.sourceRevision !== input.revision
+      || last.choice !== (input.action === "adopt" ? "adopted" : "declined")
+      || (last.choice === "adopted" ? lineage.baseline.revision !== input.revision || !sameChoices : last.reason !== input.reason)) throw new VersionStaleError();
+    if (!versionActor.memberships.some(item => item.businessId === input.workspaceId && (item.role === "owner" || item.role === "admin"))) throw new VersionAccessError();
+    if (input.action === "decline") return { outcome: "declined", rowRevision: lineage.rowRevision, receipt: null };
+    if (!needsYouReleaseEnabled()) throw new WorkspaceStoreError("Needs you is not enabled. Nothing was released.");
+    return { outcome: "prepared", rowRevision: lineage.rowRevision, receipt: await prepareVersionRelease(actor, lineage, { db }) };
+  }
   const versions = createSystemVersions({ store, connections: createSupabaseConnectionOwnership(db) });
   if (input.action === "decline") {
     const declined = await versions.declineImprovement(versionActor, lineage.id, { revision: input.revision, reason: input.reason ?? "", expectedRowRevision: input.rowRevision });

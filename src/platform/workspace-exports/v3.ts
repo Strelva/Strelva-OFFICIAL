@@ -190,7 +190,7 @@ export async function startWorkspaceExportV3(
     assets?: V3Assets;
     schedule: (task: () => Promise<void>) => void;
     /** Sends the download link to the recipient the database chose. */
-    deliver: (input: { buildId: string; token: string; deliverTo: string; workspaceId: string; manifest: V3Manifest }) => Promise<void>;
+    deliver: (input: { buildId: string; token: string; deliverTo: string; workspaceId: string; tenantIds: string[]; manifest: V3Manifest }) => Promise<void>;
     onFailure?: (input: { buildId: string; reason: string }) => Promise<void> | void;
   },
 ): Promise<V3ExportOutcome> {
@@ -207,7 +207,17 @@ export async function startWorkspaceExportV3(
   deps.schedule(async () => {
     const written = await writeWorkspaceExportBuild(build.buildId, body, deps.rpc);
     if (written.status === "failed") { await deps.onFailure?.({ buildId: build.buildId, reason: written.reason }); return; }
-    await deps.deliver({ buildId: build.buildId, token: written.token, deliverTo: build.deliverTo, workspaceId, manifest: document.manifest });
+    const tenantIds = (document.data.linked_sites ?? []).flatMap(row => {
+      const tenantId = row && typeof row === "object" ? (row as { tenantId?: unknown }).tenantId : null;
+      return typeof tenantId === "string" ? [tenantId] : [];
+    });
+    try {
+      await deps.deliver({ buildId: build.buildId, token: written.token, deliverTo: build.deliverTo, workspaceId, tenantIds, manifest: document.manifest });
+    } catch {
+      // The archive remains ready. A failed email is distinct from a failed
+      // build and must never expose the token through provider error text.
+      await deps.onFailure?.({ buildId: build.buildId, reason: "export_link_delivery_failed" });
+    }
   });
   return { kind: "build", buildId: build.buildId, deliverTo: build.deliverTo, requesterRole: build.requesterRole };
 }

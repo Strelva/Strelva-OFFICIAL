@@ -172,7 +172,7 @@ export function tenantRedisPatterns(tenantId: string, ownerEmail?: string): stri
     `events:${tenantId}`, // event index; its id-keyed blobs are found by value below
     `account-of:${tenantId}`, // multi-site grouping reverse lookup
     `calendly-meta:${tenantId}`,
-    `reb:client-records:pending-payload:*|${tenantId}|*`,
+    ...(process.env.STRELVA_TENANT_RECEIPT_RETENTION === "1" ? [`reb:client-records:pending-payload:*|${tenantId}|*`] : []),
     `reb:content:${tenantId}:*`,
     `reb:chat:${tenantId}:*`,
     `reb:rewards:${tenantId}:*`,

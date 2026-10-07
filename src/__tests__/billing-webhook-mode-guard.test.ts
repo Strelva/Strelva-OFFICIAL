@@ -72,11 +72,18 @@ vi.mock("stripe", () => {
   return { default: FakeStripe };
 });
 
+const mockBusinessBillingMirror = vi.hoisted(() => vi.fn());
+vi.mock("@/platform/business-billing", async importOriginal => ({
+  ...await importOriginal<typeof import("@/platform/business-billing")>(),
+  mirrorStripeEventToBusinessBilling: mockBusinessBillingMirror,
+}));
+
 const ORIGINAL_SECRET = process.env.STRIPE_SECRET_KEY;
 const ORIGINAL_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockBusinessBillingMirror.mockResolvedValue({ status: "skipped", reason: "disabled" });
   process.env.STRIPE_SECRET_KEY = "sk_test_fake";
   process.env.STRIPE_WEBHOOK_SECRET = "whsec_fake";
   mockUpdateTenant.mockResolvedValue({ id: "acme" });
@@ -877,5 +884,35 @@ describe("billing webhook isTrialCreateInvoice guard", () => {
       "acme",
       expect.objectContaining({ subscriptionStatus: "active" }),
     );
+  });
+});
+
+
+describe("workspace-only business billing webhook", () => {
+  afterEach(() => vi.unstubAllEnvs());
+  const event = {
+    id: "evt_workspace_only", type: "customer.subscription.updated", created: 100,
+    data: { object: { object: "subscription", id: "sub_Workspace", status: "active", metadata: { workspaceId: "workspace-only" } } },
+  };
+  it("flags off keeps legacy missing-tenant behavior with no business write", async () => {
+    vi.stubEnv("STRELVA_BUSINESS_BILLING", "");
+    const response = await postEvent(event);
+    expect(response.status).toBe(200);
+    expect(mockBusinessBillingMirror).not.toHaveBeenCalled();
+    expect(mockUpdateTenant).not.toHaveBeenCalled();
+    expect(mockAlert).toHaveBeenCalledWith("billing_webhook_missing_tenant", "high", expect.any(Object));
+  });
+  it("mirrors the workspace status without fabricating a legacy tenant", async () => {
+    vi.stubEnv("STRELVA_BUSINESS_BILLING", "1");
+    mockBusinessBillingMirror.mockResolvedValue({ status: "mirrored", workspaceId: "workspace-only", via: "workspace_metadata", paymentStatus: "active" });
+    expect((await postEvent(event)).status).toBe(200);
+    expect(mockBusinessBillingMirror).toHaveBeenCalledWith(expect.objectContaining({ tenantId: null, workspaceId: "workspace-only", status: "active", stripeSubscriptionId: "sub_Workspace" }));
+    expect(mockUpdateTenant).not.toHaveBeenCalled();
+  });
+  it("alerts on a failed business write while preserving the webhook acknowledgement", async () => {
+    vi.stubEnv("STRELVA_BUSINESS_BILLING", "1");
+    mockBusinessBillingMirror.mockResolvedValue({ status: "failed", reason: "database down" });
+    expect((await postEvent(event)).status).toBe(200);
+    expect(mockAlert).toHaveBeenCalledWith("billing_webhook_business_mirror_failed", "medium", expect.objectContaining({ reason: "database down" }));
   });
 });

@@ -125,6 +125,8 @@ export interface SystemView {
   connections: SystemConnection[];
   possibilities: SystemPossibility[];
   versions: SystemVersion[];
+  /** Stored lineage in this business; enables its own improvement decision. */
+  storedVersionId?: string;
   /** Views of this System kept on the managed site (a Bookings System's schedule and roster). */
   views?: Array<{ id: string; label: string; href?: string }>;
   /** Issued audits of this website (website audits and AI visibility assessments). Not Systems. */

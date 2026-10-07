@@ -75,4 +75,13 @@ describe("one approval authority behind native adapters", () => {
     current = row({ state: "expired", decidedByKind: "expiry" });
     expect((await wrapped.resolve({ workspaceId: businessId }, current, "not_yet", { kind: "expiry" })).outcome).toBe("done");
   });
+  it("never lets expiry approve an expired claim or a failed flag lookup run an effect", async () => {
+    const native = adapter();
+    const expired = row({ state: "expired", decidedByKind: "expiry" });
+    const wrapped = withCanonicalApprovalStore(native, { store: { read: async () => expired }, enabled: async () => true });
+    expect(await wrapped.resolve({ workspaceId: businessId }, expired, "approve", { kind: "expiry" })).toMatchObject({ outcome: "failed" });
+    const unavailable = withCanonicalApprovalStore(native, { store: { read: vi.fn() }, enabled: async () => { throw new Error("flag storage unavailable"); } });
+    expect(await unavailable.resolve({ workspaceId: businessId }, row(), "approve", { kind: "session", actor })).toMatchObject({ outcome: "failed", reason: "approval_store_unavailable: nothing ran" });
+    expect(native.resolve).not.toHaveBeenCalled();
+  });
 });

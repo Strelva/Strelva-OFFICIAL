@@ -106,6 +106,17 @@ describe("export schema 3", () => {
     expect(deliver).toHaveBeenCalledWith(expect.objectContaining({ deliverTo: "owner@example.test" }));
   });
 
+  it("a delivery failure reports attention, keeps the complete archive and never logs the token", async () => {
+    const { rpc, state } = fakeRpc({ role: "operator" });
+    const tasks: (() => Promise<void>)[] = [];
+    const onFailure = vi.fn();
+    const deliver = vi.fn(async ({ token }: { token: string }) => { throw new Error(`provider failed ${token}`); });
+    await startWorkspaceExportV3(actor, "w-1", { rpc, snapshot, schedule: task => tasks.push(task), deliver, onFailure });
+    await expect(tasks[0]!()).resolves.toBeUndefined();
+    expect(state.status).toBe("ready");
+    expect(onFailure).toHaveBeenCalledWith({ buildId: "00000000-0000-4000-8000-000000000001", reason: "export_link_delivery_failed" });
+  });
+
   it("a build containing a credential shape is failed, never delivered", async () => {
     const leaky = fakeRpc({ role: "operator", leadBody: '"refresh_token": "1//abcdefghijk"' });
     const tasks: (() => Promise<void>)[] = [];

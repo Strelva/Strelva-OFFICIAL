@@ -47,5 +47,7 @@ describe("one finite job over native facets", () => {
     await expect(readFiniteJobs(actor, businessId, { rpc })).rejects.toBeInstanceOf(WorkspaceAccessError);
     rpc.mockResolvedValue({ data: null, error: { message: "unavailable" } });
     await expect(readFiniteJobs(actor, businessId, { rpc })).rejects.toBeInstanceOf(WorkspaceStoreError);
+    rpc.mockRejectedValue(new Error("connection lost"));
+    await expect(readFiniteJobs(actor, businessId, { rpc })).rejects.toBeInstanceOf(WorkspaceStoreError);
   });
 });

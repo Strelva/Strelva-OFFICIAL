@@ -19,7 +19,7 @@ import { OPERATOR_URL } from "@/platform/infra/brand";
 import { getAccountForTenant, setAccountSubscription, type AccountSubscriptionItem } from "@/lib/accounts";
 import { getStripe } from "@/lib/billing";
 import { syncConfiguredSubscriptionAllowance } from "@/platform/work-economics";
-import { mirrorStripeEventToBusinessBilling, stripeBillingContext } from "@/platform/business-billing";
+import { businessBillingEnabled, mirrorStripeEventToBusinessBilling, stripeBillingContext } from "@/platform/business-billing";
 
 const PROCESSED_EVENT_TTL_SECONDS = 60 * 60 * 24 * 30;
 const PROCESSING_STALE_MINUTES = 5;
@@ -189,6 +189,19 @@ async function applyTenantSubscriptionStatus(
   event: Stripe.Event
 ) {
   if (!tenantId) {
+    // New workspaces may have no legacy tenant. Preserve tenant processing
+    // while allowing a signed, workspace-scoped status into the billing home.
+    if (businessBillingEnabled() && patch.subscriptionStatus) {
+      const context = stripeBillingContext(event.data.object);
+      if (context.workspaceId) {
+        const mirrored = await mirrorStripeEventToBusinessBilling({ ...context, tenantId: null, status: patch.subscriptionStatus });
+        if (mirrored.status === "failed") {
+          alert("billing_webhook_business_mirror_failed", "medium", { eventType: event.type, reason: mirrored.reason });
+        } else if (mirrored.status === "skipped" && mirrored.reason === "unresolved") {
+          alert("billing_webhook_workspace_unresolved", "medium", { eventType: event.type });
+        }
+      }
+    }
     // A signed subscription event with no tenantId metadata is NOT retryable —
     // the event is immutable, so throwing here would 500 and trigger a 3-day
     // Stripe retry storm that fails identically every time. Alert loudly (Slack

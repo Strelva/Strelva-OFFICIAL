@@ -6,6 +6,8 @@
  * while client email is paused, nothing is sent and the operator is told.
  */
 import { sendEmailWithReceipt } from "@/platform/infra/email/send";
+import { customerEmailEnabled, emailSendingEnabled } from "@/platform/infra/email/enabled";
+import { getClientEmailOverride } from "@/platform/infra/email/client-override";
 import { alert } from "@/platform/infra/monitoring";
 import type { V3Manifest } from "./v3";
 
@@ -17,8 +19,24 @@ export function workspaceExportLink(baseUrl: string, buildId: string, token: str
 }
 
 export async function deliverWorkspaceExportLink(input: {
-  buildId: string; token: string; deliverTo: string; workspaceId: string; manifest: V3Manifest; baseUrl: string;
+  buildId: string; token: string; deliverTo: string; workspaceId: string; tenantIds: string[]; manifest: V3Manifest; baseUrl: string;
 }): Promise<"accepted" | "suppressed"> {
+  // New export sends are separately armed, then obey both global gates and
+  // every linked site's kill switch. A per-tenant "on" cannot bypass rollout.
+  let reason: string | null = null;
+  if (process.env.STRELVA_EXPORT_LINK_EMAIL !== "1" || !emailSendingEnabled() || !customerEmailEnabled()) {
+    reason = "export_link_email_disabled";
+  } else {
+    try {
+      for (const tenantId of [...new Set(input.tenantIds)]) {
+        if (await getClientEmailOverride(tenantId) === "off") { reason = "client_email_disabled"; break; }
+      }
+    } catch { reason = "client_email_gate_unavailable"; }
+  }
+  if (reason) {
+    alert("workspace_export_link_not_sent", "high", { buildId: input.buildId, workspaceId: input.workspaceId, reason });
+    return "suppressed";
+  }
   const result = await sendEmailWithReceipt({
     audience: "client",
     to: input.deliverTo,

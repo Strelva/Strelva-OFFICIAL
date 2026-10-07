@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { UnifiedEvent } from "@/lib/types";
 
 /**
  * One place to operate (docs/product/specs/operator.md). Shared shapes for the
@@ -58,6 +57,10 @@ export interface QueueSystem {
   label: string;
 }
 
+/** Read-only source detail. Source adapters supply this without importing a
+ * tenant record contract into the platform domain. */
+export interface QueueReviewContent { type: string; metadata?: Record<string, unknown> }
+
 /** How the owner was told about an owner's-call item. */
 export type OwnerReach =
   | { status: "told"; via: "email" | "approve_link"; at: string }
@@ -79,7 +82,7 @@ export interface QueueItemRaw {
   facts?: QueueFacts;
   href: string;
   receiptIds?: string[];
-  review?: Pick<UnifiedEvent, "type" | "metadata">;
+  review?: QueueReviewContent;
 }
 
 export interface QueueFacts {
@@ -150,7 +153,7 @@ export interface QueueItem {
   receiptIds: string[];
   closed: { state: "done" | "dismissed"; reason: string | null; receiptId: string | null; at: string } | null;
   closedElsewhere: { by: string; at: string } | null;
-  review?: Pick<UnifiedEvent, "type" | "metadata">;
+  review?: QueueReviewContent;
 }
 
 /** A source that could not be read. The list is then marked incomplete. */
