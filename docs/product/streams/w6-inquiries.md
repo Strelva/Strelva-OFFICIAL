@@ -1,5 +1,7 @@
 # Wave 6 inquiries — recovered and verified locally
 
+PR: [#489 — w6/inquiries: finished and verified](https://github.com/Strelva/Strelva-OFFICIAL/pull/489), base `integrate/reborn-1.0`, Refs #336. Recovery implementation commit: `661d8c3a`; pushed with the pre-push typecheck passing. Merge remains held for #251.
+
 Branch: `w6/inquiries`. Worktree: `/Users/jacobrhinehart/Desktop/strelva/REB-w6-inquiries`.
 Recovery covers all 23 earlier commits, including tip `8a31dd88` and every WIP checkpoint. Final verification, the operator-gate inventory and the acceptance map are in [the wave 6 evidence record](../../capabilities/inquiries/inquiry-wave6-verification-2026-10-07.md).
 
