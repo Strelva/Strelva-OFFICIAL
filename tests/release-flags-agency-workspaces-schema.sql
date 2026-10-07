@@ -20,7 +20,8 @@ select pg_temp.ra_assert(
   and not has_function_privilege('anon', 'public.workspace_release_assert_workspace(uuid)', 'EXECUTE')
   and not has_function_privilege('authenticated', 'public.workspace_release_assert_workspace(uuid)', 'EXECUTE')
   and not has_function_privilege('authenticated', 'public.set_workspace_release_flag(text,uuid,text,text,text,bigint)', 'EXECUTE')
-  and has_function_privilege('service_role', 'public.set_workspace_release_flag(text,uuid,text,text,text,bigint)', 'EXECUTE'),
+  and not has_function_privilege('service_role', 'public.set_workspace_release_flag(text,uuid,text,text,text,bigint)', 'EXECUTE')
+  and has_function_privilege('service_role', 'public.set_workspace_release_flag_approved(text,uuid,text,text,text,bigint,uuid)', 'EXECUTE'),
   'grants are unchanged');
 select pg_temp.ra_assert((select count(*) from pg_proc where proname = 'workspace_release_assert_workspace') = 1, 'one assert function');
 

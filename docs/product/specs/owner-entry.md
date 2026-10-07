@@ -128,9 +128,15 @@ Owner entry isn't a System. It's the door to the **Business**.
    Strelva operator (active `super_admins` row and `admin` membership) can
    invite exactly one owner. The address defaults to the business record's
    owner recipient (`resolve_business_owner_recipient`, falling back to
-   `tenants.owner_email`). The invitation goes out by email through
+   `tenants.owner_email`). When released, delivery goes through
    `src/lib/email/send.ts` with audience `client` and the tenant id, so the
-   per-tenant email override applies. Each invitation needs Jacob's yes.
+   per-tenant email override applies. Each invitation needs a server-recorded
+   approval tied to the exact workspace, address and send choice, created by a
+   different active operator. The approval expires after 15 minutes and is
+   single-use. Reject operator-controlled addresses (including linked auth
+   emails, membership emails and super-admin addresses). Record issuance and
+   revocation in each linked tenant's audit log. Owner invitations and sending
+   stay off during the silent rollout.
 9. **Accepting grants both memberships at once.** Accepting the invitation
    creates the `workspace_memberships` owner row and, for every tenant linked
    to that workspace, a `memberships` row with role `owner`, in one database
@@ -191,8 +197,8 @@ since the catalog gives those pages no workspace home at 1.0.0.
 
 | Action | Who |
 | --- | --- |
-| Turn a workspace's owner entry or other flags on or off | Strelva operator, with Jacob's yes for each client's first `on` |
-| Invite the owner of a converted workspace | Strelva operator, with Jacob's yes for each client |
+| Turn a workspace's owner entry or other flags on or off | Strelva operator; a first `on` needs a server-recorded approval from a different active operator, bound to the workspace, flag and reason |
+| Invite the owner of a converted workspace | Strelva operator with a single-use, server-recorded approval from a different active operator; operator-controlled addresses are refused |
 | Invite members | Owner (today's `create_workspace_invitation` requires `owner`) |
 | Open the old `/dashboard` for a moved tenant | Super admin only |
 | Change where admin hosts land, globally | Jacob (Reborn "Needs Jacob's yes") |
@@ -383,8 +389,10 @@ emails, Stripe return URLs, bookmarks), not owners' habits.
    workspace to `operators`, and run the proof below.
 3. Convert gldf. Set `operators`. Jacob walks every gldf page. Pages not
    `ready` show `/dashboard` with the back link.
-4. With Jacob's yes, invite gldf's owner. Set `on` only when gldf's blocking
-   pages are `ready`.
+4. Keep owner invitations and sending off in the silent rollout. When that gate
+   is opened later, one operator records an exact approval and a different
+   operator issues the invitation. Set `on` only when gldf's blocking pages
+   are `ready` and a different operator's recorded approval is present.
 5. Repeat per client. Clients who never accept an invitation stay
    `operators`. Their owners keep getting email, and every old link still
    resolves.
@@ -432,9 +440,11 @@ last-owner guard in both stores.
 - **Redirect contract.** Fetch each `/dashboard` path in the gldf and rohlax
   repos' hard-coded forms and assert 307 to the mapped target. Then flip
   the flag to `off` and assert 200 on `/dashboard`.
-- **Production.** On the Strelva-owned test business: owner invitation
-  email received, accepted, admin host sign-in lands in the workspace, one
-  flag rollback observed. Then gldf on Jacob's yes.
+- **Production.** Owner invitations remain off in the silent rollout; no
+  invitation email is sent. Once separately released, verify a recorded
+  approval, distinct issuer, audit row and acceptance on the Strelva-owned test
+  business before inviting a client. Keep gldf's first `on` behind a recorded
+  approval from a different active operator.
 
 ## 10. Open decisions
 

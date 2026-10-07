@@ -23,6 +23,7 @@ import { ReleaseFlagValidationError } from "@/platform/release-flags/store";
 
 const WS = "7f000000-0000-4000-8000-000000000010";
 const SYSTEM = "7f000000-0000-4000-8000-0000000000aa";
+const APPROVAL = "55555555-5555-4555-8555-555555555555";
 
 beforeEach(() => {
   ownerEntryForTenant.mockReset();
@@ -126,17 +127,21 @@ describe("operator commands", () => {
     expect(setWorkspaceReleaseFlag).not.toHaveBeenCalled();
   });
 
-  it("needs Jacob's yes for on and records it in the reason", async () => {
+  it("ignores the client jacobApproved flag and requires a recorded approval", async () => {
     readTenantWorkspaceLink.mockResolvedValue({ tenantId: "gldf", link: { workspaceId: WS } });
-    await expect(applyTenantReleaseCommand("op@example.test", "gldf", plain, { kind: "flag", flag: "systems", state: "on", reason: "ready", expectedRevision: 0 }))
-      .rejects.toThrow(/Jacob's yes/);
-    await applyTenantReleaseCommand("op@example.test", "gldf", plain, { kind: "flag", flag: "systems", state: "on", reason: "ready", expectedRevision: 0, jacobApproved: true });
-    expect(setWorkspaceReleaseFlag).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: WS, flag: "systems", state: "on", reason: "Jacob's yes: ready" }));
+    const untrustedRequest = { kind: "flag" as const, flag: "systems" as const, state: "on" as const, reason: "ready", expectedRevision: 0, jacobApproved: true };
+    await expect(applyTenantReleaseCommand("op@example.test", "gldf", plain, untrustedRequest as never))
+      .rejects.toThrow(/recorded approval/);
+    expect(setWorkspaceReleaseFlag).not.toHaveBeenCalled();
+    await applyTenantReleaseCommand("op@example.test", "gldf", plain, {
+      kind: "flag", flag: "systems", state: "on", reason: "ready", expectedRevision: 0, approvalId: APPROVAL,
+    });
+    expect(setWorkspaceReleaseFlag).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: WS, flag: "systems", state: "on", reason: "ready", approvalId: APPROVAL }));
   });
 
   it("refuses owner entry on while a page the client uses hasn't moved, but allows operators", async () => {
     readTenantWorkspaceLink.mockResolvedValue({ tenantId: "gldf", link: { workspaceId: WS } });
-    await expect(applyTenantReleaseCommand("op@example.test", "gldf", plain, { kind: "flag", flag: "owner_entry", state: "on", reason: "go", expectedRevision: 0, jacobApproved: true }))
+    await expect(applyTenantReleaseCommand("op@example.test", "gldf", plain, { kind: "flag", flag: "owner_entry", state: "on", reason: "go", expectedRevision: 0, approvalId: APPROVAL }))
       .rejects.toThrow(/\/dashboard\/settings/);
     await applyTenantReleaseCommand("op@example.test", "gldf", plain, { kind: "flag", flag: "owner_entry", state: "operators", reason: "walk pages", expectedRevision: 0 });
     expect(setWorkspaceReleaseFlag).toHaveBeenCalledTimes(1);

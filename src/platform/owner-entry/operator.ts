@@ -27,8 +27,8 @@ import { pagesBlockingOwnerEntry, type DashboardPageUse } from "./dispositions";
 /**
  * Operator controls for one client's release flags (`/admin/clients/[id]`).
  * Every change names its reason and is recorded in the flag history; the
- * first `on` for a client also needs Jacob's yes (spec §4 Authority), which
- * the operator confirms and the reason records.
+ * first `on` for a client also needs a one-use server approval from a distinct
+ * active operator, bound to the exact flag, state and reason.
  */
 
 export interface TenantPageFacts {
@@ -100,7 +100,7 @@ export async function readTenantReleaseState(operatorEmail: string, tenantId: st
 }
 
 export type ReleaseFlagCommand =
-  | { kind: "flag"; flag: ReleaseFlag; state: ReleaseFlagRowState | "unset"; reason: string; expectedRevision: number; jacobApproved?: boolean }
+  | { kind: "flag"; flag: ReleaseFlag; state: ReleaseFlagRowState | "unset"; reason: string; expectedRevision: number; approvalId?: string }
   | { kind: "tester"; email: string; present: boolean; reason: string };
 
 export async function applyTenantReleaseCommand(operatorEmail: string, tenantId: string, facts: TenantPageFacts, command: ReleaseFlagCommand): Promise<void> {
@@ -111,7 +111,7 @@ export async function applyTenantReleaseCommand(operatorEmail: string, tenantId:
     await setWorkspaceReleaseTester({ operatorEmail, workspaceId, testerEmail: command.email, present: command.present, reason: command.reason });
     return;
   }
-  let reason = command.reason.trim();
+  const reason = command.reason.trim();
   if (isMakeRealLiveFlag(command.flag) && (command.state === "on" || command.state === "operators")) {
     // A live channel only ever runs where Systems itself is shown (spec 6.3).
     const stored = await readWorkspaceReleaseFlags(workspaceId, { fresh: true });
@@ -121,8 +121,8 @@ export async function applyTenantReleaseCommand(operatorEmail: string, tenantId:
     }
   }
   if (command.state === "on") {
-    if (command.jacobApproved !== true) {
-      throw new ReleaseFlagValidationError("workspace_release_needs_jacob", "Turning a client on needs Jacob's yes. Confirm it, then try again.");
+    if (!command.approvalId) {
+      throw new ReleaseFlagValidationError("workspace_release_approval_required", "Turning a client on needs a recorded approval from a different operator.");
     }
     if (command.flag === "owner_entry") {
       const blockers = pagesBlockingOwnerEntry(dashboardUsesForTenant(facts));
@@ -131,7 +131,7 @@ export async function applyTenantReleaseCommand(operatorEmail: string, tenantId:
           `Owner entry can go on only when every page this client uses has moved. Still on /dashboard: ${blockers.map((entry) => `/dashboard${entry.route === "/" ? "" : entry.route}`).join(", ")}. Use operators until then.`);
       }
     }
-    reason = `Jacob's yes: ${reason}`;
   }
-  await setWorkspaceReleaseFlag({ operatorEmail, workspaceId, flag: command.flag, state: command.state, reason, expectedRevision: command.expectedRevision });
+  await setWorkspaceReleaseFlag({ operatorEmail, workspaceId, flag: command.flag, state: command.state, reason, expectedRevision: command.expectedRevision,
+    ...(command.state === "on" ? { approvalId: command.approvalId } : {}) });
 }

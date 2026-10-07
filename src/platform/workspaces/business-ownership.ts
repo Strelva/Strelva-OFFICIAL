@@ -11,12 +11,10 @@
  *    The mark grants nothing: the client list is provider rows intersected
  *    with the reader's own membership.
  *
- * Nothing here runs automatically. Every call is an explicit operator action
- * (scripts/business-ownership.ts), and each production invitation is Jacob's
- * yes. The invitation email goes through src/lib/email/send.ts with audience
- * `client` and the business's first tenant, so the per-tenant email switch
- * applies; a suppressed or failed send leaves the invitation pending and
- * returns the accept link for the operator to share by hand.
+ * Nothing here runs automatically. Every issuance is an explicit operator
+ * action and needs a server-recorded approval from a different active
+ * operator. Invitations may be rehearsed with a handoff link; email remains
+ * disabled during the silent rollout.
  */
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
@@ -46,6 +44,8 @@ function db(): OwnershipDb {
 const ACCESS = [
   "tenant_conversion_operator_required",
   "operator_owner_invitation_operator_required",
+  "workspace_release_operator_required",
+  "operator_action_approval_authority_inactive",
   "strelva_agency_workspace_invalid",
   "workspace_provider_access_denied",
   "workspace_invitation_not_found",
@@ -54,6 +54,12 @@ const CONFLICTS: Record<string, string> = {
   operator_owner_invitation_not_converted: "This business has no converted site, so there is no owner to invite yet.",
   operator_owner_invitation_owner_exists: "This business already has an owner.",
   operator_owner_invitation_pending: "An owner invitation is already waiting. Revoke it before sending another.",
+  operator_owner_invitation_controlled_recipient: "An operator-controlled address can't become the business owner.",
+  operator_action_approval_required: "A recorded approval is required for this action.",
+  operator_action_approval_used: "This approval has already been used.",
+  operator_action_approval_expired: "This approval has expired. Record a new one.",
+  operator_action_approval_not_distinct: "A different operator must issue the action they approved.",
+  operator_action_approval_mismatch: "This approval is for different action details.",
   workspace_invitation_pending: "That address already has a pending invitation to this business.",
   workspace_invitation_command_invalid: "The invitation details are invalid.",
   workspace_exit_future_work_blocked: "This business has left Strelva; no new invitations.",
@@ -148,27 +154,34 @@ export function ownerInvitationEmail(input: { workspaceName: string; siteNames: 
 export interface InviteOwnerOptions {
   /** Defaults to the business record's owner recipient (resolve_business_owner_recipient). */
   recipientEmail?: string;
-  /** False creates the invitation and returns the link without sending (local rehearsal). */
+  /** A distinct operator's server-recorded approval for this workspace and address. */
+  approvalId: string;
+  /** Must remain false while owner invitations are paused in the silent rollout. */
   sendEmail: boolean;
   /** Injected transport; defaults to src/lib/email/send.ts. */
   send?: (input: SendEmailInput) => Promise<SendEmailResult>;
   now?: () => Date;
 }
 
-/** Issue the one owner invitation for a converted business, then email it. */
+/** Issue an approved owner invitation without sending email during the silent rollout. */
 export async function inviteBusinessOwner(operator: string, workspaceId: string, options: InviteOwnerOptions): Promise<OwnerInvitationResult> {
+  if (options.sendEmail) throw new WorkspaceConflictError("Owner invitation email is disabled during the silent rollout.");
+  const normalizedOperator = operatorEmail.parse(operator);
   const state = await readOwnerInvitationState(operator, workspaceId);
   if (state.hasOwner) throw new WorkspaceConflictError(CONFLICTS.operator_owner_invitation_owner_exists);
   const recipient = email.safeParse(options.recipientEmail ?? state.recipient?.email ?? "");
   if (!recipient.success) throw new WorkspaceConflictError("No owner address is on record. Pass the owner's email address.");
+  if (recipient.data === normalizedOperator) throw new WorkspaceConflictError("An operator can't invite their own address as the owner.");
   const token = randomBytes(32).toString("base64url");
   const now = options.now?.() ?? new Date();
-  const invitation = await call("create_operator_owner_invitation", {
-    p_operator_email: operatorEmail.parse(operator),
+  const invitation = await call("create_operator_owner_invitation_approved", {
+    p_operator_email: normalizedOperator,
     p_workspace_id: state.workspaceId,
     p_recipient_email: recipient.data,
     p_token_hash: createHash("sha256").update(token, "utf8").digest("hex"),
     p_expires_at: new Date(now.getTime() + OWNER_INVITATION_LIFETIME_DAYS * 24 * 60 * 60 * 1000).toISOString(),
+    p_approval_id: uuid.parse(options.approvalId),
+    p_send_email: options.sendEmail,
   }, createdSchema, "The owner invitation could not be created.");
   const acceptUrl = ownerInvitationAcceptUrl(token);
   if (!options.sendEmail) return { invitation, acceptUrl, delivery: { status: "not_sent", reason: "email_not_requested" } };
@@ -199,7 +212,7 @@ export async function inviteBusinessOwner(operator: string, workspaceId: string,
 }
 
 export async function revokeOwnerInvitation(operator: string, invitationId: string): Promise<"revoked" | "expired" | "accepted"> {
-  return call("revoke_operator_owner_invitation", { p_operator_email: operatorEmail.parse(operator), p_invitation_id: uuid.parse(invitationId) },
+  return call("revoke_operator_owner_invitation_audited", { p_operator_email: operatorEmail.parse(operator), p_invitation_id: uuid.parse(invitationId) },
     z.enum(["revoked", "expired", "accepted"]), "The owner invitation could not be revoked.");
 }
 

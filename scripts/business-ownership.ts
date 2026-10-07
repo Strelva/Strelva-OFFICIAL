@@ -4,15 +4,12 @@
  * here runs on its own.
  *
  *   npx tsx scripts/business-ownership.ts invite-owner <tenant-slug> --operator-email=<super admin>              # dry run
- *   npx tsx scripts/business-ownership.ts invite-owner <tenant-slug> --operator-email=<email> --apply            # local: create, print link, no email
- *   npx tsx scripts/business-ownership.ts invite-owner <tenant-slug> --operator-email=<email> --apply --i-have-jacobs-yes   # send
+ *   npx tsx scripts/business-ownership.ts invite-owner <tenant-slug> --operator-email=<email> --approval-id=<id> --apply # recorded approval required
  *   npx tsx scripts/business-ownership.ts revoke-owner-invite <invitation-id> --operator-email=<email> --apply
  *   npx tsx scripts/business-ownership.ts designate-agency <agency-workspace-id> --operator-email=<email> --apply
  *
  * --apply refuses unless SUPABASE_URL is a loopback host, or --i-have-jacobs-yes
- * is passed. The owner invitation email is sent only with --i-have-jacobs-yes
- * (even locally), through src/lib/email/send.ts, so the per-client email
- * switch still decides whether it leaves. The recipient defaults to the
+ * is passed. Invitation email is disabled during the silent rollout. The recipient defaults to the
  * business record's owner contact, falling back to tenants.owner_email.
  */
 import { getSupabase } from "../src/platform/infra/db/client";

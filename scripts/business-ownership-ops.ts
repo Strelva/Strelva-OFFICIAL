@@ -17,6 +17,7 @@ export interface OwnershipOptions {
   target: string;
   operatorEmail: string;
   recipientEmail?: string;
+  approvalId?: string;
   apply: boolean;
   jacobsYes: boolean;
   json: boolean;
@@ -26,19 +27,19 @@ export interface OwnershipOptions {
 export interface OwnershipDeps {
   readLink(operatorEmail: string, tenantId: string): Promise<TenantLinkState>;
   readState(operatorEmail: string, workspaceId: string): Promise<OwnerInvitationState>;
-  invite(operatorEmail: string, workspaceId: string, options: { recipientEmail?: string; sendEmail: boolean }): Promise<OwnerInvitationResult>;
+  invite(operatorEmail: string, workspaceId: string, options: { recipientEmail?: string; sendEmail: boolean; approvalId: string }): Promise<OwnerInvitationResult>;
   revoke(operatorEmail: string, invitationId: string): Promise<string>;
   designate(operatorEmail: string, workspaceId: string): Promise<StrelvaAgencyDesignation>;
   log(line: string): void;
 }
 
-const USAGE = "Usage: business-ownership <designate-agency <agency-workspace-id> | invite-owner <tenant-slug> | revoke-owner-invite <invitation-id>> --operator-email=<super admin> [--recipient=<email>] [--apply] [--i-have-jacobs-yes] [--json]";
+const USAGE = "Usage: business-ownership <designate-agency <agency-workspace-id> | invite-owner <tenant-slug> | revoke-owner-invite <invitation-id>> --operator-email=<super admin> [--recipient=<email>] [--approval-id=<id>] [--apply] [--i-have-jacobs-yes] [--json]";
 
 export function parseOwnershipArgs(argv: string[]): OwnershipOptions {
   const [command, target] = argv.filter((arg) => !arg.startsWith("--"));
   if (command !== "designate-agency" && command !== "invite-owner" && command !== "revoke-owner-invite") throw new Error(USAGE);
   if (!target) throw new Error(USAGE);
-  const unknown = argv.filter((arg) => arg.startsWith("--") && !/^--(?:apply|dry-run|json|i-have-jacobs-yes|operator-email=.+|recipient=.+)$/.test(arg));
+  const unknown = argv.filter((arg) => arg.startsWith("--") && !/^--(?:apply|dry-run|json|i-have-jacobs-yes|operator-email=.+|recipient=.+|approval-id=.+)$/.test(arg));
   if (unknown.length) throw new Error(`Unknown flag(s): ${unknown.join(", ")}`);
   const apply = argv.includes("--apply");
   if (apply && argv.includes("--dry-run")) throw new Error("Choose --dry-run or --apply, not both.");
@@ -46,7 +47,9 @@ export function parseOwnershipArgs(argv: string[]): OwnershipOptions {
   if (!operatorEmail) throw new Error("--operator-email=<a Strelva super admin> is required; ownership lives in the database.");
   const recipientEmail = argv.find((arg) => arg.startsWith("--recipient="))?.slice("--recipient=".length);
   if (recipientEmail && command !== "invite-owner") throw new Error("--recipient applies to invite-owner only.");
-  return { command, target, operatorEmail, recipientEmail, apply, jacobsYes: argv.includes("--i-have-jacobs-yes"), json: argv.includes("--json") };
+  const approvalId = argv.find((arg) => arg.startsWith("--approval-id="))?.slice("--approval-id=".length);
+  if (approvalId && command !== "invite-owner") throw new Error("--approval-id applies to invite-owner only.");
+  return { command, target, operatorEmail, recipientEmail, approvalId, apply, jacobsYes: argv.includes("--i-have-jacobs-yes"), json: argv.includes("--json") };
 }
 
 function assertWriteAllowed(options: OwnershipOptions): void {
@@ -100,12 +103,13 @@ export async function runOwnershipCommand(options: OwnershipOptions, deps: Owner
   if (state.pending.length) log(`  pending owner invitation: ${state.pending.map((item) => `${item.invitationId} to ${item.recipientEmail} until ${item.expiresAt}`).join("; ")}`);
   log(`  recipient: ${recipient ?? "none on record (pass --recipient=<email>)"}${!options.recipientEmail && state.recipient ? ` (from ${state.recipient.from === "record" ? "the business record" : "the tenant owner email"})` : ""}`);
   log(`  on accept: workspace owner + tenant owner on ${state.tenants.length} site(s), in one transaction; Strelva stays admin`);
-  const sendEmail = options.jacobsYes;
-  log(`  email: ${sendEmail ? `through src/lib/email/send.ts (client audience, tenant ${state.tenants[0]?.tenantId ?? "none"}; the per-client email switch applies)` : "not sent without --i-have-jacobs-yes; the accept link is printed for a local rehearsal"}`);
+  const sendEmail = false;
+  log("  email: disabled during the silent rollout; issuance creates a link only");
   if (state.hasOwner) { log("Nothing to do."); return { mode, command: options.command, state }; }
   if (!recipient) throw new Error("No owner address is on record. Pass --recipient=<email>.");
   if (!options.apply) { log("Dry run: nothing was written and no email was sent."); return { mode, command: options.command, state }; }
-  const invitation = await deps.invite(options.operatorEmail, state.workspaceId, { recipientEmail: recipient, sendEmail });
+  if (!options.approvalId) throw new Error("Owner invitation requires a recorded, unexpired approval. Pass --approval-id=<id>.");
+  const invitation = await deps.invite(options.operatorEmail, state.workspaceId, { recipientEmail: recipient, sendEmail, approvalId: options.approvalId });
   log(`  invitation ${invitation.invitation.invitationId} to ${invitation.invitation.recipientEmail}, expires ${invitation.invitation.expiresAt}`);
   if (invitation.delivery.status === "sent") {
     log(`  email accepted by the provider (${invitation.delivery.providerMessageId})`);

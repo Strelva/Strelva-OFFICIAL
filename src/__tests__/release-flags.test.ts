@@ -162,7 +162,7 @@ describe("operator writes", () => {
   it("sends the normalized operator email and the expected revision", async () => {
     const rpc = fakeDb(rows({ owner_entry: "operators" }));
     await setWorkspaceReleaseFlag(input);
-    expect(rpc).toHaveBeenCalledWith("set_workspace_release_flag", expect.objectContaining({ p_operator_email: "op@example.test", p_expected_revision: 0, p_state: "operators" }));
+    expect(rpc).toHaveBeenCalledWith("set_workspace_release_flag_approved", expect.objectContaining({ p_operator_email: "op@example.test", p_expected_revision: 0, p_state: "operators", p_approval_id: null }));
   });
 
   it("maps a non-operator to an access error, a race to a conflict and bad input to validation", async () => {

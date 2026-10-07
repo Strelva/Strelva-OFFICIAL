@@ -6,9 +6,10 @@ import type { TenantReleaseState } from "@/platform/owner-entry/operator";
 
 /**
  * Per-workspace release flags for one converted client (owner-entry spec §3.7).
- * Every change needs a reason. `On` also needs Jacob's yes, and owner entry
- * can go `on` only once every page this client uses has moved; until then
- * `Operators` sends only Strelva operators and named testers to the workspace.
+ * Every change needs a reason. `On` also needs a recorded approval from a
+ * different operator, and owner entry can go `on` only once every page this
+ * client uses has moved; until then `Operators` stays limited to operators
+ * and named testers.
  */
 
 type FlagState = "unset" | "off" | "operators" | "on";
@@ -31,7 +32,8 @@ export function ReleaseFlagsPanel({ tenantId }: { tenantId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [reason, setReason] = useState("");
-  const [jacobApproved, setJacobApproved] = useState(false);
+  const [approvalId, setApprovalId] = useState("");
+  const [approvalNotice, setApprovalNotice] = useState<string | null>(null);
   const [testerEmail, setTesterEmail] = useState("");
 
   const load = useCallback(async () => {
@@ -50,6 +52,7 @@ export function ReleaseFlagsPanel({ tenantId }: { tenantId: string }) {
 
   async function send(body: Record<string, unknown>) {
     setError(null);
+    setApprovalNotice(null);
     setBusy(true);
     try {
       const res = await fetch(`/api/admin/tenants/${tenantId}/release-flags`, {
@@ -61,10 +64,33 @@ export function ReleaseFlagsPanel({ tenantId }: { tenantId: string }) {
       if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
       setState(data as TenantReleaseState);
       setReason("");
-      setJacobApproved(false);
+      setApprovalId("");
       setTesterEmail("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Nothing was changed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function recordApproval(flag: string) {
+    const workspaceId = state?.linked ? state.workspaceId : null;
+    if (!workspaceId || !reason.trim()) return;
+    setError(null);
+    setApprovalNotice(null);
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/admin/workspaces/${workspaceId}/action-approvals`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind: "workspace_release_flag.on", flag, state: "on", reason }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `Failed (${res.status})`);
+      setApprovalId(data.approval.approvalId as string);
+      setApprovalNotice(`Approval recorded through ${new Date(data.approval.expiresAt).toLocaleTimeString()}. A different operator must use this ID.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The approval could not be recorded.");
     } finally {
       setBusy(false);
     }
@@ -92,16 +118,17 @@ export function ReleaseFlagsPanel({ tenantId }: { tenantId: string }) {
   }
 
   const reasonOk = reason.trim().length >= 3;
+  const approvalIdOk = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(approvalId.trim());
   return (
     <Panel title="Release flags" trailing={<Chip tone={state.workspaceRelease ? "good" : "neutral"}>{state.workspaceRelease ? "Workspace release on" : "Workspace release off"}</Chip>}>
       <div className="space-y-5">
         <div className="space-y-1.5">
           <label htmlFor={`release-reason-${tenantId}`} className={labelCls}>Reason for the next change</label>
           <input id={`release-reason-${tenantId}`} className={inputCls} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Walk every gldf page before the owner invite" maxLength={480} />
-          <label className="flex items-center gap-2 text-[12px] text-gray-muted">
-            <input type="checkbox" checked={jacobApproved} onChange={(e) => setJacobApproved(e.target.checked)} />
-            Jacob said yes (needed to turn a client on)
-          </label>
+          <label htmlFor={`release-approval-${tenantId}`} className={`${labelCls} block pt-2`}>Recorded approval ID</label>
+          <input id={`release-approval-${tenantId}`} className={inputCls} value={approvalId} onChange={(e) => setApprovalId(e.target.value)} placeholder="Approval from a different operator" autoComplete="off" />
+          <p className="text-[11px] text-gray-faint">An approval names this business, flag, state and reason. It expires after 15 minutes and can be used once by a different operator.</p>
+          {approvalNotice && <p className="text-[12px] text-success" role="status">{approvalNotice}</p>}
         </div>
 
         <ul className="space-y-4">
@@ -121,14 +148,19 @@ export function ReleaseFlagsPanel({ tenantId }: { tenantId: string }) {
                       key={option.value}
                       type="button"
                       aria-pressed={current === option.value}
-                      disabled={busy || current === option.value || !reasonOk || (option.value === "on" && !jacobApproved)}
-                      onClick={() => void send({ kind: "flag", flag: flag.flag, state: option.value, reason, expectedRevision: flag.revision, jacobApproved })}
+                      disabled={busy || current === option.value || !reasonOk || (option.value === "on" && !approvalIdOk)}
+                      onClick={() => void send({ kind: "flag", flag: flag.flag, state: option.value, reason, expectedRevision: flag.revision, ...(option.value === "on" ? { approvalId: approvalId.trim() } : {}) })}
                       className={`rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors disabled:cursor-not-allowed ${current === option.value ? "bg-accent text-on-accent" : "text-gray-muted hover:text-warm-white disabled:opacity-40"}`}
                     >
                       {option.label}
                     </button>
                   ))}
                 </div>
+                {current !== "on" && (
+                  <button type="button" disabled={busy || !reasonOk} onClick={() => void recordApproval(flag.flag)} className="ml-2 rounded-md border border-glass-border px-2.5 py-1 text-[12px] font-medium text-gray-muted hover:text-warm-white disabled:cursor-not-allowed disabled:opacity-40">
+                    Record approval for On
+                  </button>
+                )}
                 <p className="text-[11px] text-gray-faint">{flag.envName} = {envLabel(flag.envMode)}</p>
               </li>
             );

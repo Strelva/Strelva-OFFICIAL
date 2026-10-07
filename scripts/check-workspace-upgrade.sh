@@ -198,6 +198,10 @@ psql "${psql_args[@]}" --set=tenant_import="$(cat "$repo_root/tests/fixtures/bus
   --file="$repo_root/tests/business-record-conversion-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/business-ownership-schema.sql"
+# Operator approval records are exercised against the full converted-business
+# schema, including owner invitation and release-flag action binding.
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-action-approvals-schema.sql"
 # accept_workspace_invitation is replaced by 20261007110000; the original
 # invitation contract must still hold against the replacement.
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-invitations-schema.sql"
@@ -259,6 +263,11 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011102000_nat
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011101000_business_booking_email.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/native-publishing-targets-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/business-booking-email-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261013130000_operator_action_approvals.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261013130000_operator_action_approvals.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-action-approvals-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-ownership-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 

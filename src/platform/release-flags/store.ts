@@ -89,6 +89,13 @@ const VALIDATION: Record<string, string> = {
   workspace_release_workspace_invalid: "That is not a business workspace.",
   workspace_release_tester_unknown: "No verified Strelva account uses that email.",
   workspace_release_limit_invalid: "Ask for between 1 and 200 changes.",
+  workspace_release_approval_required: "Turning a client on needs a recorded approval from a different operator.",
+  operator_action_approval_required: "A recorded approval is required for this action.",
+  operator_action_approval_used: "This approval has already been used.",
+  operator_action_approval_expired: "This approval has expired. Record a new one.",
+  operator_action_approval_not_distinct: "A different operator must apply the action they approved.",
+  operator_action_approval_mismatch: "This approval is for different action details.",
+  operator_action_approval_authority_inactive: "The approving operator no longer has approval authority.",
 };
 
 /** Shared by readers in this migration family (release flags, linked sites). */
@@ -203,16 +210,17 @@ export async function tenantReleaseFlagEnabled(
 }
 
 export async function setWorkspaceReleaseFlag(input: {
-  operatorEmail: string; workspaceId: string; flag: ReleaseFlag; state: ReleaseFlagRowState | "unset"; reason: string; expectedRevision: number;
+  operatorEmail: string; workspaceId: string; flag: ReleaseFlag; state: ReleaseFlagRowState | "unset"; reason: string; expectedRevision: number; approvalId?: string;
 }): Promise<WorkspaceReleaseFlags> {
   if (!RELEASE_FLAGS.includes(input.flag)) throw new ReleaseFlagValidationError("workspace_release_flag_unknown", VALIDATION.workspace_release_flag_unknown!);
-  const value = await callReleaseFlagsRpc("set_workspace_release_flag", {
+  const value = await callReleaseFlagsRpc("set_workspace_release_flag_approved", {
     p_operator_email: operatorEmail(input.operatorEmail),
     p_workspace_id: uuid.parse(input.workspaceId),
     p_flag: input.flag,
     p_state: input.state,
     p_reason: input.reason,
     p_expected_revision: z.number().int().min(0).parse(input.expectedRevision),
+    p_approval_id: input.approvalId ? uuid.parse(input.approvalId) : null,
   }, workspaceReleaseFlagsSchema, "The release flag could not be changed.");
   cache.set(value.workspaceId, { at: Date.now(), value });
   return value;

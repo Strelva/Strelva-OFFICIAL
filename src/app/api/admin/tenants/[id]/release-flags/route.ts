@@ -24,7 +24,7 @@ const command = z.discriminatedUnion("kind", [
     state: z.enum(["off", "operators", "on", "unset"]),
     reason: z.string().trim().min(3).max(480),
     expectedRevision: z.number().int().min(0),
-    jacobApproved: z.boolean().optional(),
+    approvalId: z.string().uuid().optional(),
   }),
   z.object({
     kind: z.literal("tester"),
