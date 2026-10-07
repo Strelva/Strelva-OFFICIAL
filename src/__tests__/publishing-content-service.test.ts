@@ -31,12 +31,13 @@ describe("workspace publishing content", () => {
   it("stale, altered, wrong-tenant and invalid proposals refuse without publication", async () => {
     const p = ports(); const event = await prepareContentDraft(target, { kind: "collection", type: "blog", data: { title: "Hello" } }, p);
     p.entry = vi.fn(async () => ({ status: "published", data: { title: "Changed elsewhere" } }));
+    p.publish = vi.fn(async () => { throw new Error("publishing_baseline_changed"); });
     expect(await approval(event, p)).toMatchObject({ accepted: false, reason: "publishing_stale" });
     const changed = structuredClone(event); (changed.metadata!.publishing as Record<string, unknown>).data = { title: "Tampered" };
     expect(await approval(changed, p)).toMatchObject({ accepted: false, reason: "publishing_draft_changed" });
     expect(await approval({ ...event, tenantId: "other" }, p)).toMatchObject({ accepted: false, reason: "publishing_wrong_scope" });
     await expect(prepareContentDraft(target, { kind: "collection", type: "product", data: { name: "Product", priceCents: -1 } }, p)).rejects.toThrow();
-    expect(p.publish).not.toHaveBeenCalled();
+    expect(p.publish).toHaveBeenCalledTimes(1);
   });
   it("newsletter approval succeeds with an immutable output receipt and no send dependency", async () => {
     const p = ports(); const event = await prepareContentDraft({ ...target, kind: "newsletter" }, { kind: "newsletter", subject: "New collection", body: "Reviewed message" }, p);
@@ -56,5 +57,17 @@ describe("workspace publishing content", () => {
     const p = ports(); const event = await prepareContentDraft(target, { kind: "collection", type: "blog", data: { title: "Hello" } }, p);
     p.entry = vi.fn(async () => ({ status: "published", data: (event.metadata?.publishing as Record<string, unknown>).data }));
     expect(await approval(event, p)).toMatchObject({ accepted: true });
+  });
+  it("accepted recovery reaches the receipt even after later edits or an unavailable collection read", async () => {
+    const p = ports(); const event = await prepareContentDraft(target, { kind: "collection", type: "blog", data: { title: "Hello" } }, p);
+    p.entry = vi.fn(async () => ({ status: "draft", data: { title: "Later owner edit" } }));
+    expect(await approval(event, p)).toMatchObject({ accepted: true, receiptId: "receipt-publish" });
+    expect(p.entry).not.toHaveBeenCalled();
+    p.entry = vi.fn(async () => { throw new Error("Collection read unavailable"); });
+    expect(await approval(event, p)).toMatchObject({ accepted: true, receiptId: "receipt-publish" });
+    expect(p.entry).not.toHaveBeenCalled();
+    p.authorize = vi.fn(async () => ({ allowed: false, reason: "publishing_owner_changed" }));
+    expect(await approval(event, p)).toMatchObject({ accepted: false, reason: "publishing_owner_changed" });
+    expect(p.publish).toHaveBeenCalledTimes(2);
   });
 });

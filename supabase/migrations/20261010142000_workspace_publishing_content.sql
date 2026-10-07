@@ -40,7 +40,6 @@ returns jsonb language plpgsql security definer set search_path = public, pg_tem
 declare v_row public.workspace_newsletter_issues%rowtype; v_workspace uuid := (p_input->>'workspaceId')::uuid;
 begin
   perform public.publishing_require_tenant(v_workspace, p_input->>'tenantId');
-  if public.workspace_exit_completed(v_workspace) or exists(select 1 from public.systems where id=(p_input->>'systemId')::uuid and lifecycle='paused') then raise exception 'publishing_paused'; end if;
   perform pg_advisory_xact_lock(hashtextextended('newsletter-issue:' || (p_input->>'eventId'),0));
   select * into v_row from public.workspace_newsletter_issues where event_id=p_input->>'eventId';
   if found then
@@ -48,6 +47,7 @@ begin
       or v_row.draft_hash<>p_input->>'draftHash' or v_row.subject<>p_input->>'subject' or v_row.body<>p_input->>'body' then
       raise exception 'newsletter_issue_conflict'; end if;
   else
+    if public.workspace_exit_completed(v_workspace) or exists(select 1 from public.systems where id=(p_input->>'systemId')::uuid and lifecycle='paused') then raise exception 'publishing_paused'; end if;
     insert into public.workspace_newsletter_issues(workspace_id,tenant_id,system_id,event_id,draft_hash,subject,body,approved_by,suppressed_count)
       values(v_workspace,p_input->>'tenantId',(p_input->>'systemId')::uuid,p_input->>'eventId',p_input->>'draftHash',p_input->>'subject',p_input->>'body',p_input->>'actor',(select count(*) from public.newsletter_subscribers where tenant_id=p_input->>'tenantId' and status='active')) returning * into v_row;
   end if;
@@ -74,16 +74,16 @@ declare
   v_current public.collection_entries%rowtype; v_receipt jsonb; v_baseline jsonb;
 begin
   perform public.publishing_require_tenant(v_workspace,v_tenant);
-  if public.workspace_exit_completed(v_workspace) or exists(select 1 from public.systems where id=(p_input->>'systemId')::uuid and lifecycle='paused') then raise exception 'publishing_paused'; end if;
   if v_status not in ('draft','published') or v_type not in ('blog','video','product') or v_slug !~ '^[a-z0-9-]{1,80}$' or jsonb_typeof(p_input->'data')<>'object'
     or octet_length((p_input->'data')::text)>14000 then raise exception 'publishing_entry_invalid'; end if;
   perform pg_advisory_xact_lock(hashtextextended('collection:'||v_tenant||':'||v_type||':'||v_slug,0));
   select public.outside_write_receipt_row(id) into v_receipt from public.outside_write_receipts where command_key=v_key;
   if found then
-    if v_receipt->>'workspaceId'<>v_workspace::text or v_receipt->>'tenantId'<>v_tenant or v_receipt->'request'->>'draftHash'<>p_input->>'draftHash' then
+    if v_receipt->>'workspaceId'<>v_workspace::text or v_receipt->>'tenantId'<>v_tenant or v_receipt->>'systemId'<>p_input->>'systemId' or v_receipt->'request'->>'draftHash'<>p_input->>'draftHash' then
       raise exception 'publishing_receipt_conflict'; end if;
     return jsonb_build_object('receiptId',v_receipt->>'id','verified',true);
   end if;
+  if public.workspace_exit_completed(v_workspace) or exists(select 1 from public.systems where id=(p_input->>'systemId')::uuid and lifecycle='paused') then raise exception 'publishing_paused'; end if;
   select * into v_current from public.collection_entries where tenant_id=v_tenant and type=v_type and slug=v_slug for update;
   v_baseline := case when found then jsonb_build_object('status',v_current.status,'data',v_current.data) else 'null'::jsonb end;
   if v_baseline is distinct from p_input->'before' then raise exception 'publishing_baseline_changed'; end if;

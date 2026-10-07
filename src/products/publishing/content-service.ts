@@ -36,7 +36,11 @@ async function rpc(name: string, input: Record<string, unknown>) {
   const db = getSupabase();
   if (!db) throw new Error("Publishing storage is unavailable.");
   const { data, error } = await (db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> }).rpc(name, { p_input: input });
-  if (error) throw new Error("The publishing change could not be confirmed. Reload before trying again.");
+  if (error) {
+    const detail = z.object({ message: z.string() }).safeParse(error);
+    if (detail.success && detail.data.message.includes("publishing_baseline_changed")) throw new Error("publishing_baseline_changed");
+    throw new Error("The publishing change could not be confirmed. Reload before trying again.");
+  }
   return z.object({ receiptId: z.string().uuid(), verified: z.boolean() }).parse(data);
 }
 const defaultPorts: ContentPorts = {
@@ -99,13 +103,12 @@ export async function executePublishingEvent(input: { tenantId: string; event: U
     const parsed = z.object({ type: collectionType, slug: z.string().regex(/^[a-z0-9-]{1,80}$/), data: z.record(z.string(), z.unknown()), before: z.unknown(), baselineHash: z.string(), status: z.enum(["draft", "published"]).optional() }).parse(publishing);
     const data = validateEntryData(parsed.type, parsed.data);
     if (!data.success) return { accepted: false, reason: "publishing_invalid" };
-    // SQL also compares the baseline under a transaction lock. This read makes
-    // stale failures legible; it is never the race protection on its own.
-    const current = contentBaseline(await ports.entry(input.tenantId, parsed.type, parsed.slug));
-    if (contentFingerprint(current) !== parsed.baselineHash && contentFingerprint(current) !== contentFingerprint({ status: parsed.status ?? "published", data: data.data })) return { accepted: false, reason: "publishing_stale" };
+    // SQL first recovers this draft's accepted receipt, then checks the baseline
+    // under its transaction lock for a new write. A later edit must not hide an
+    // earlier acceptance or cause recovery to overwrite that later edit.
     const result = await ports.publish({ ...shared, ...parsed, data: data.data });
     return { accepted: true, ...result };
-  } catch { return { accepted: false, reason: "publishing_storage_unconfirmed" }; }
+  } catch (error) { return { accepted: false, reason: error instanceof Error && error.message === "publishing_baseline_changed" ? "publishing_stale" : "publishing_storage_unconfirmed" }; }
 }
 
 export async function readContentWorkspace(target: ContentTarget) {
