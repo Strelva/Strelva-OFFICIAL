@@ -5,22 +5,32 @@
 #   pnpm check:journeys --keep-stack    # leave the stack up and print how to reuse it
 #   pnpm check:journeys --reuse <dir>   # reuse a kept stack (its env file), stop nothing
 #   pnpm check:journeys --only on|off   # one phase only
-#   pnpm check:journeys -- -g "Approve" # anything after -- goes to Playwright
+#   pnpm check:journeys --with-proposed-fixes  # apply scripts/journeys-proposed-fixes.sql to the disposable DB first
+#   pnpm check:journeys -- -g "Approve" # anything after -- goes to Playwright (filters within the phase's specs)
 #
-# Local proof only. Needs Docker, psql and npx (the Supabase CLI is pinned to
-# 2.117.0 through npx, the version CI installs). Every send stays local: client,
-# operator and prospect email are off, so deliveries are recorded as
-# suppressed and the specs rebuild the one-tap links with the same signer.
+# Local proof only. Needs Docker, psql, redis-server and npx (the Supabase CLI
+# is pinned to 2.117.0 through npx, the version CI installs). Every send stays
+# local: client, operator and prospect email are off, so deliveries are
+# recorded as suppressed and the specs rebuild the one-tap links with the same
+# signer.
+#
+# Flags on runs the way production does: Postgres sources and a Redis beside
+# them (a disposable loopback redis-server, scripts/journeys-redis.ts). Flags
+# off runs the way CI's launch verification does: no Redis, default sources.
+# One compound command: bash parses it all before running, so editing this
+# file mid-run cannot change a run in progress.
+{
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$root"
 
-keep=0 reuse="" only="" extra=()
+keep=0 reuse="" only="" fixes=0 extra=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --keep-stack) keep=1 ;;
     --reuse) reuse="$2"; shift ;;
     --only) only="$2"; shift ;;
+    --with-proposed-fixes) fixes=1 ;;
     --) shift; extra=("$@"); break ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
@@ -30,7 +40,7 @@ done
 
 # next dev loads .env.local; Redis or Resend keys in it would reach real services.
 [[ ! -e .env.local && ! -e .env ]] || { echo 'Move .env.local / .env aside first: next dev would load real service keys.' >&2; exit 1; }
-for command_name in docker psql npx node curl python3 openssl; do
+for command_name in docker psql redis-server npx node curl python3 openssl; do
   command -v "$command_name" >/dev/null 2>&1 || { echo "Required command is unavailable: $command_name" >&2; exit 1; }
 done
 docker info >/dev/null 2>&1 || { echo 'Docker is not running.' >&2; exit 1; }
@@ -42,6 +52,8 @@ ON_SPECS=(
   tests/make-real-authenticated-local.spec.ts
   tests/booking-approval-authenticated-local.spec.ts
   tests/email-only-owner-authenticated-local.spec.ts
+  tests/versions-authenticated-local.spec.ts
+  tests/inquiries-1-0-authenticated-local.spec.ts
 )
 # With every 1.0 flag off: the journeys live clients and owners use today
 # (the launch-verification CI set), plus the proof that 1.0 surfaces stay dark.
@@ -52,7 +64,11 @@ OFF_SPECS=(
   tests/onboarding-authenticated-local.spec.ts
   tests/service-request-authenticated-local.spec.ts
 )
-ON_FLAGS=(STRELVA_SYSTEMS_RELEASE STRELVA_NEEDS_YOU_RELEASE STRELVA_OWNER_ENTRY STRELVA_BOOKING_STORE_WRITE STRELVA_MAKE_REAL_OWNER_LINK_RELEASE)
+ON_FLAGS=(STRELVA_SYSTEMS_RELEASE STRELVA_NEEDS_YOU_RELEASE STRELVA_OWNER_ENTRY STRELVA_BOOKING_STORE_WRITE STRELVA_MAKE_REAL_OWNER_LINK_RELEASE STRELVA_INQUIRY_RECORDS)
+# Production's data sources, and the 1.0 read and authority switches for the
+# two client stores (bookings and leads). Read switches take effect only after
+# seven clean parity days (seed_parity).
+ON_SOURCES=(CONTENT_SOURCE=postgres TENANTS_SOURCE=postgres DATA_SOURCE=postgres STRELVA_BOOKING_STORE_READ=postgres STRELVA_LEADS_READ=postgres STRELVA_LEADS_AUTHORITY=postgres)
 
 if [[ -n "$reuse" ]]; then
   work="$(cd "$reuse" && pwd)"
@@ -61,7 +77,28 @@ if [[ -n "$reuse" ]]; then
 else
   work="$(mktemp -d "${TMPDIR:-/tmp}/strelva-journeys.XXXXXX")"
 fi
-app_pid=""
+app_pid="" redis_pid=""
+stop_redis() {
+  if [[ -n "$redis_pid" ]]; then
+    kill -TERM "$redis_pid" 2>/dev/null || true
+    wait "$redis_pid" 2>/dev/null || true
+    redis_pid=""
+  fi
+  unset UPSTASH_REDIS_REST_URL UPSTASH_REDIS_REST_TOKEN
+}
+start_redis() {
+  rm -f "$work/redis.env"
+  pnpm exec tsx scripts/journeys-redis.ts "$work/redis.env" > "$work/redis.log" 2>&1 &
+  redis_pid=$!
+  for _ in $(seq 1 60); do
+    [[ -s "$work/redis.env" ]] && break
+    kill -0 "$redis_pid" 2>/dev/null || break
+    sleep 0.5
+  done
+  [[ -s "$work/redis.env" ]] || { echo "The loopback Redis did not start. See $work/redis.log" >&2; return 1; }
+  set -a; source "$work/redis.env"; set +a
+  [[ "$UPSTASH_REDIS_REST_URL" == http://127.0.0.1:* ]] || { echo 'The Redis bridge is not on loopback.' >&2; return 1; }
+}
 stop_app() {
   if [[ -n "$app_pid" ]]; then
     pkill -TERM -P "$app_pid" 2>/dev/null || true
@@ -74,6 +111,7 @@ cleanup() {
   local code=$?
   trap - EXIT INT TERM
   stop_app
+  stop_redis
   if [[ "$keep" == 0 && -n "${STRELVA_AUTH_STACK_DIR:-}" && -f "$STRELVA_AUTH_STACK_DIR/supabase/config.toml" ]]; then
     npx --yes supabase@2.117.0 stop --workdir "$STRELVA_AUTH_STACK_DIR" --no-backup >/dev/null 2>&1 || true
     echo 'Disposable stack stopped.'
@@ -154,16 +192,32 @@ SQL
 }
 
 overall=0
+[[ "$(python3 -c 'import sys,urllib.parse;print(urllib.parse.urlparse(sys.argv[1]).hostname)' "$STRELVA_LOCAL_DB_URL")" == 127.0.0.1 ]] \
+  || { echo 'STRELVA_LOCAL_DB_URL is not the loopback stack.' >&2; exit 1; }
+if [[ "$fixes" == 1 ]]; then
+  # Fixes proposed to the owning streams, applied to this disposable database
+  # only, to prove what the journeys do once they land. Never a migration.
+  echo '== Applying proposed fixes to the disposable database (not a migration)'
+  psql "$STRELVA_LOCAL_DB_URL" -X -q -v ON_ERROR_STOP=1 -f scripts/journeys-proposed-fixes.sql
+fi
+# Every reader the app calls through supabase-js must run in PostgREST's read-only transaction.
+echo '== Read-only RPCs'
+node scripts/check-readonly-rpcs.mjs "$STRELVA_LOCAL_DB_URL" || overall=1
 if [[ -z "$only" || "$only" == on ]]; then
   for flag in "${ON_FLAGS[@]}"; do export "$flag=1"; done
-  # Booking parity is read from the one store; content from Postgres.
-  export STRELVA_BOOKING_STORE_READ=postgres CONTENT_SOURCE=postgres
+  for pair in "${ON_SOURCES[@]}"; do export "$pair"; done
   seed_parity
-  run_phase on "${ON_SPECS[@]}" || overall=1
+  if start_redis; then
+    run_phase on "${ON_SPECS[@]}" || overall=1
+  else
+    overall=1
+  fi
+  stop_redis
 fi
 if [[ -z "$only" || "$only" == off ]]; then
   for flag in "${ON_FLAGS[@]}"; do unset "$flag"; done
-  unset STRELVA_BOOKING_STORE_READ CONTENT_SOURCE
+  for pair in "${ON_SOURCES[@]}"; do unset "${pair%%=*}"; done
   run_phase off "${OFF_SPECS[@]}" || overall=1
 fi
 exit "$overall"
+}

@@ -27,8 +27,8 @@ for (const width of [1440, 390]) {
       await noHorizontalOverflow(home);
       await home.screenshot({ path: testInfo.outputPath(`booking-needs-you-${width}.png`), fullPage: true });
 
-      // Approve: keyboard reachable, then the booking is confirmed in the store.
-      const approve = needsYou.getByRole("button", { name: /^Approve: Booking request: Sam Lee/ });
+      // Confirm (the Approve of a booking ask): keyboard reachable, then the booking is confirmed in the store.
+      const approve = needsYou.getByRole("button", { name: /^Confirm: Booking request: Sam Lee/ });
       await approve.focus();
       await expect(approve).toBeFocused();
       const decided = home.waitForResponse((r) => new URL(r.url()).pathname === "/api/workspace/needs-you" && r.request().method() === "POST");
@@ -111,7 +111,7 @@ test("a visitor's request-mode booking on the tenant site reaches Needs you", as
     const item = (await decisions(admin, businessId, owner, false)).find((row) => row.sourceLifecycle === "booking_request" && row.title.startsWith("Booking request: Jo Visitor"));
     expect(item?.state).toBe("open");
     const decided = home.waitForResponse((r) => new URL(r.url()).pathname === "/api/workspace/needs-you" && r.request().method() === "POST");
-    await needsYou.getByRole("button", { name: /^Approve: Booking request: Jo Visitor/ }).click();
+    await needsYou.getByRole("button", { name: /^Confirm: Booking request: Jo Visitor/ }).click();
     expect((await (await decided).json()).status).toBe("done");
     await expect.poll(() => bookingStatus(admin, tenantId, item!.sourceId)).toBe("confirmed");
   } finally {

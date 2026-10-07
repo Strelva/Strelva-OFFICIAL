@@ -12,7 +12,7 @@ import { localEnvironment } from "./support/local-auth";
 test.skip(process.env.STRELVA_LOCAL_AUTH_PROOF !== "1", "Requires isolated local Supabase Auth and Postgres (see docs/operations/testing-and-ci.md).");
 test.beforeAll(() => {
   localEnvironment();
-  const on = ["STRELVA_SYSTEMS_RELEASE", "STRELVA_NEEDS_YOU_RELEASE", "STRELVA_OWNER_ENTRY", "STRELVA_BOOKING_STORE_WRITE", "STRELVA_MAKE_REAL_OWNER_LINK_RELEASE"].filter((name) => (process.env[name] ?? "") !== "" && process.env[name] !== "0");
+  const on = ["STRELVA_SYSTEMS_RELEASE", "STRELVA_NEEDS_YOU_RELEASE", "STRELVA_OWNER_ENTRY", "STRELVA_BOOKING_STORE_WRITE", "STRELVA_MAKE_REAL_OWNER_LINK_RELEASE", "STRELVA_INQUIRY_RECORDS"].filter((name) => (process.env[name] ?? "") !== "" && process.env[name] !== "0");
   if (on.length) throw new Error(`Unset ${on.join(", ")} for the app server and this runner.`);
   if (!process.env.APPROVE_LINK_SECRET || !process.env.CRON_SECRET) throw new Error("Set APPROVE_LINK_SECRET and CRON_SECRET (any local values) for the app server and this runner.");
 });

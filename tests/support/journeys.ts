@@ -32,6 +32,8 @@ export const JOURNEY_SERVER_FLAGS = [
   "STRELVA_BOOKING_STORE_WRITE",
   // Make real approved by email link for an owner with no account (20261009140000).
   "STRELVA_MAKE_REAL_OWNER_LINK_RELEASE",
+  // Every lead kept in Postgres, spam review and the workspace read (20261009113000).
+  "STRELVA_INQUIRY_RECORDS",
 ] as const;
 
 export function journeyEnvironment() {
@@ -66,20 +68,43 @@ export function adminHost(tenantId: string): string {
  * presented as the bound origin, and a Location on the bound origin returns to
  * the admin host. Cross-origin requests pass through untouched, so the guards
  * still refuse them. Product code is unchanged.
+ *
+ * Two runner limits shape it. The runner's DNS does not resolve *.localhost
+ * (Chromium does), so requests go to the bound origin with the admin host in
+ * the Host header, as a proxy would. And Chromium follows a fulfilled
+ * redirect without routing the next hop, so a GET redirect chain that stays
+ * on the admin host is followed here and handed to the browser as one
+ * redirect to where it ends, which is what Vercel's absolute redirects give.
  */
 export async function serveAdminHostsAsOnVercel(context: BrowserContext) {
   const bound = new URL(journeyEnvironment().app).origin;
   await context.route((url) => /^admin\.[a-z0-9-]+\.localhost$/.test(url.hostname), async (route) => {
     const request = route.request();
-    const asked = new URL(request.url()).origin;
-    const headers = { ...request.headers() };
+    let current = new URL(request.url());
+    const asked = current.origin;
+    const headers: Record<string, string> = { ...request.headers(), host: current.host };
     if (headers.origin === asked) headers.origin = bound;
-    const response = await route.fetch({ headers, maxRedirects: 0 });
+    const onAdmin = (location: string) => {
+      const target = new URL(location, current);
+      return target.origin === bound || target.origin === asked ? new URL(`${asked}${target.pathname}${target.search}${target.hash}`) : target;
+    };
+    const send = (url: URL) => route.fetch({ url: `${bound}${url.pathname}${url.search}`, headers, maxRedirects: 0 });
+    let response = await send(current);
+    let followed = false;
+    for (let hop = 0; hop < 5 && request.method() === "GET" && response.status() >= 300 && response.status() < 400; hop += 1) {
+      const location = response.headers().location;
+      const next = location ? onAdmin(location) : null;
+      // Off the admin host, or a hop that sets cookies: the browser takes it from here.
+      if (!next || next.origin !== asked || response.headersArray().some((header) => header.name.toLowerCase() === "set-cookie")) break;
+      current = next;
+      followed = true;
+      response = await send(current);
+    }
     const responseHeaders = response.headers();
-    const location = responseHeaders.location;
-    if (location && new URL(location, asked).origin === bound) {
-      const target = new URL(location, asked);
-      responseHeaders.location = `${asked}${target.pathname}${target.search}${target.hash}`;
+    if (responseHeaders.location) responseHeaders.location = onAdmin(responseHeaders.location).toString();
+    if (followed && !responseHeaders.location) {
+      await route.fulfill({ status: 307, headers: { location: current.toString(), "cache-control": "private, no-store" } });
+      return;
     }
     await route.fulfill({ response, headers: responseHeaders });
   });
@@ -120,7 +145,22 @@ export async function fixtureTenant(admin: Admin, input: { siteName: string; own
   const row = await admin.from("tenants").insert({ id: tenantId, site_name: input.siteName, active: true, owner_email: input.ownerEmail, owner_name: input.ownerName ?? null })
     .select("stable_id").single();
   expect(row.error).toBeNull();
+  await forgetTenantCache();
   return { tenantId, stableId: String(row.data!.stable_id) };
+}
+
+/**
+ * The tenant list is cached in Redis (`reb:tenants:all`); the app's own tenant
+ * writes drop that key (src/lib/tenants.ts invalidateCache). A fixture written
+ * straight to Postgres does the same, so the app sees it at once. Only the
+ * loopback Redis of pnpm check:journeys is ever touched.
+ */
+export async function forgetTenantCache() {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  if (!url) return;
+  if (new URL(url).hostname !== "127.0.0.1") throw new Error("UPSTASH_REDIS_REST_URL is not the loopback journeys Redis.");
+  const response = await fetch(url, { method: "POST", headers: { authorization: `Bearer ${process.env.UPSTASH_REDIS_REST_TOKEN}` }, body: JSON.stringify(["DEL", "reb:tenants:all"]) });
+  expect(response.status).toBe(200);
 }
 
 /** Run one operator script against the loopback database and parse its --json outcome. */
