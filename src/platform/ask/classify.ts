@@ -22,6 +22,10 @@ export type AskPreRoute =
   | { kind: "model" };
 
 const CREDENTIALS = /\b(my|the|our)\s+(password|passcode|api[ -]?key|secret key|login details|2fa code)\b|\bpassword\s*(is|:)/i;
+/** Inspect the complete message before persistence or provider context. */
+export function containsAskCredentials(text: string): boolean {
+  return CREDENTIALS.test(text);
+}
 const APPROVAL = /^\s*(yes[,!.]?\s*)?(please\s+)?(approve|publish|go ahead and publish|make it live|push it live|ship it|send it|post it)(\s+(it|this|that|them|now|the change|the (hours|services|post|reply|newsletter)( change)?))*\s*(now|please)?[.!]*\s*$/i;
 const APPROVE_WORD = /\b(i approve|approved\b|approve (it|this|that|the change)|you have my (yes|approval)|you'?re approved)\b/i;
 const MONEY = /\b(billing|invoice|refund|stripe|pay ?link|payment link|my plan|plan price|subscription|cancel (my )?(plan|subscription)|charge (me|my card)|credit card)\b/i;
@@ -43,7 +47,7 @@ export interface AskClassifyContext {
 export function classifyAsk(text: string, context: AskClassifyContext): AskPreRoute {
   const message = text.trim().slice(0, 4_000);
   if (!message) return { kind: "model" };
-  if (CREDENTIALS.test(message)) return { kind: "refusal", code: "credentials" };
+  if (containsAskCredentials(text)) return { kind: "refusal", code: "credentials" };
   if (APPROVAL.test(message) || APPROVE_WORD.test(message)) return { kind: "refusal", code: "approval_in_chat" };
   if (MONEY.test(message)) return { kind: "refusal", code: "money" };
   if (DOMAINS.test(message)) return { kind: "refusal", code: "domains" };

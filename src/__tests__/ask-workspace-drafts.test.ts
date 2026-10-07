@@ -32,6 +32,8 @@ describe("Ask exact workspace drafts", () => {
     expect(() => businessFactDraftPatch({ facts: { phone: { value: "wrong" } } })).toThrow();
     expect(() => businessFactDraftPatch({ facts: { phone: { value: "716-555-0100", verified: true } } })).toThrow("ask_draft_cannot_verify_fact");
     expect(() => businessFactDraftPatch({ facts: { description: { value: "x".repeat(700) } } })).toThrow("ask_draft_too_large_split_change");
+    expect(() => businessFactDraftPatch({ facts: { owner_recipient: { value: { email: "other@example.test" } } } })).toThrow("ask_draft_owner_recipient_requires_sign_in");
+    expect(() => businessFactDraftPatch({ facts: { owner_recipient: null } })).toThrow("ask_draft_owner_recipient_requires_sign_in");
   });
   it("stores typed fact drafts and reports both source and decision receipt IDs", async () => {
     const ctx = context();

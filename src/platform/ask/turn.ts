@@ -6,7 +6,7 @@ import type { ExistingSystemsSnapshot } from "@/platform/systems/from-existing";
 import type { WorkspaceActor, WorkspaceRole } from "@/platform/workspaces/types";
 import type { AskAuthoritySnapshot } from "./authority";
 import { authorizeAskTool } from "./authority";
-import { classifyAsk, MANAGED_REQUEST_SUMMARY } from "./classify";
+import { classifyAsk, containsAskCredentials, MANAGED_REQUEST_SUMMARY } from "./classify";
 import { ASK_REFUSALS, type AskedOnBehalf, type AskResultKind } from "./contracts";
 import type { AskPossibilityPort, AskRequestPort, NeedsYouPort } from "./ports";
 import { AskConversationNotFoundError, type AskHistoryPort } from "./history";
@@ -142,13 +142,17 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
   // Save the person's words first. A conversation that isn't theirs (or is
   // another place's) is refused before anything runs; a history store that's
   // down only means this turn isn't saved.
-  let conversationId: string | null = request.conversationId ?? null;
-  let saved = Boolean(deps.history);
+  const credentials = request.messages.some(message => containsAskCredentials(message.content));
+  let conversationId: string | null = credentials ? null : request.conversationId ?? null;
+  let saved = Boolean(deps.history) && !credentials;
   let modelMessages: ModelMessage[] = request.messages as ModelMessage[];
-  if (deps.history) {
+  if (deps.history && !credentials) {
     try {
       if (conversationId) {
         const stored = await deps.history.read(actor, { workspaceId: request.workspaceId, conversationId, limit: ASK_HISTORY_CONTEXT });
+        if (stored.messages.some(message => containsAskCredentials(message.content))) {
+          return { kind: "refused", status: 400, error: ASK_REFUSALS.credentials };
+        }
         modelMessages = [...stored.messages.map((message) => ({ role: message.role, content: message.content }) as ModelMessage), { role: "user", content: lastUserText }];
       }
       const appended = await deps.history.append(actor, {
@@ -199,7 +203,7 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
           let siteState: AskAuthoritySnapshot["site"] = null;
           if (site && systems) {
             const now = systems.managedWebsites.find((item) => item.tenantStableId === site.tenantStableId);
-            siteState = now
+            siteState = now && now.tenantId === site.tenantId
               ? { state: now.link === "tenant_link" ? "linked" : "binding", tenantActive: now.tenantActive }
               : { state: "deprovisioned", tenantActive: false };
           } else if (target.kind === "site_not_connected") {
@@ -235,7 +239,7 @@ export async function startAskTurn(deps: AskTurnDeps, actor: WorkspaceActor, raw
       };
 
       try {
-        const pre = classifyAsk(lastUserText, { managed });
+        const pre = credentials ? { kind: "refusal" as const, code: "credentials" as const } : classifyAsk(lastUserText, { managed });
         if (pre.kind === "refusal") {
           onReceipt({ kind: "refusal", toolId: "classifier", status: "refused", ids: [], summary: pre.code });
           say(pre.code === "approval_in_chat" ? `${ASK_REFUSALS.approval_in_chat} Needs you: ${deps.needsYouPath}` : ASK_REFUSALS[pre.code]);

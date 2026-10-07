@@ -152,7 +152,7 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
           case "subscribers": {
             const output = await callTenant(ctx, "list_subscribers", {});
             // Addresses only for owner and admin; a member sees the count.
-            if (ctx.role === "member") return { count: output.count, sourceProof: "Source: Subscriber list stored in dashboard" };
+            if (snapshot.role !== "owner" && snapshot.role !== "admin") return { count: output.count, sourceProof: "Source: Subscriber list stored in dashboard" };
             return output;
           }
           case "possibilities": {

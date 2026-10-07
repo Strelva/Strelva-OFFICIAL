@@ -53,6 +53,8 @@ describe("authorizeAskTool: every tool × role × link state", () => {
   const links: Array<AskAuthoritySnapshot["site"]> = [
     { state: "linked", tenantActive: true },
     { state: "binding", tenantActive: true },
+    { state: "linked", tenantActive: false },
+    { state: "binding", tenantActive: false },
     { state: "unlinked", tenantActive: false },
     { state: "deprovisioned", tenantActive: false },
   ];
@@ -64,7 +66,7 @@ describe("authorizeAskTool: every tool × role × link state", () => {
         it(label, () => {
           const decision = authorizeAskTool(toolId, { ...base, role, site: link });
           const tool = ASK_TOOL_CATALOG[toolId];
-          const linked = link!.state === "linked" || link!.state === "binding";
+          const linked = (link!.state === "linked" || link!.state === "binding") && link!.tenantActive;
           const expected = role !== null
             && (!tool.needsTenant || linked)
             && !(toolId === "draft_inquiry_reply");
@@ -244,6 +246,9 @@ function harness(options: {
     modelCalls,
     repository,
     revokeMembership: () => { membership = null; },
+    downgrade: () => { membership = { role: "member", access: "member", kind: "customer" }; },
+    rename: () => { websites = websites.map(row => ({ ...row, tenantId: `${row.tenantId}-renamed` })); },
+    deactivate: () => { websites = websites.map(row => ({ ...row, tenantActive: false })); },
     unlink: () => { websites = []; },
   };
 }
@@ -405,4 +410,30 @@ describe("startAskTurn", () => {
     expect(result.text).toContain("\"count\":2");
     expect(result.text).not.toContain("a@example.test");
   });
+
+  it("uses the freshly downgraded role for subscriber disclosure", async () => {
+    const h = harness({
+      tenantTools: { list_subscribers: { execute: async () => ({ count: 2, subscribers: [{ email: "a@example.test" }] }) } },
+      script: async function* (tools) {
+        h.downgrade();
+        yield { type: "text-delta", text: JSON.stringify(await tools.read_system!.execute({ view: "subscribers" })) };
+      },
+    });
+    const result = await run(h.deps, "How many subscribers do we have?");
+    expect(result.text).toContain('"count":2');
+    expect(result.text).not.toContain("a@example.test");
+  });
+
+  for (const change of ["rename", "deactivate"] as const) {
+    it(`refuses bound tenant tools after a mid-turn ${change}`, async () => {
+      const read = vi.fn(async () => ({ count: 1 }));
+      const h = harness({ tenantTools: { list_subscribers: { execute: read } }, script: async function* (tools) {
+        h[change]();
+        yield { type: "text-delta", text: JSON.stringify(await tools.read_system!.execute({ view: "subscribers" })) };
+      } });
+      const result = await run(h.deps, "How many subscribers do we have?");
+      expect(read).not.toHaveBeenCalled();
+      expect(result.text).toContain("site_no_longer_connected");
+    });
+  }
 });

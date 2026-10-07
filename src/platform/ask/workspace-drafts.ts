@@ -8,7 +8,8 @@ import type { AskNeedsYouRouting } from "./ports";
 export const askBusinessFactInputSchema = z.object({
   summary: z.string().trim().min(1).max(200),
   expectedRevision: z.number().int().min(0),
-  patch: businessRecordPatchSchema,
+  patch: businessRecordPatchSchema.refine(patch => !Object.hasOwn(patch.facts ?? {}, "owner_recipient"),
+    "Who receives owner decisions must be changed by a signed-in owner in Business details."),
 }).strict();
 export type AskBusinessFactInput = z.infer<typeof askBusinessFactInputSchema>;
 
@@ -40,6 +41,7 @@ export interface AskWorkspaceDraftPort {
 /** A patch authored in Ask is inferred, including when the owner asked for it. */
 export function businessFactDraftPatch(patch: unknown): BusinessRecordPatch {
   const parsed = businessRecordPatchSchema.parse(patch);
+  if (Object.hasOwn(parsed.facts ?? {}, "owner_recipient")) throw new Error("ask_draft_owner_recipient_requires_sign_in");
   if (JSON.stringify(parsed).length > 600) throw new Error("ask_draft_too_large_split_change");
   if (Object.values(parsed.facts ?? {}).some(entry => entry?.verified === true)
     || [...(parsed.services ?? []), ...(parsed.people ?? [])].some(entry => entry.op === "upsert" && entry.verified === true)) {

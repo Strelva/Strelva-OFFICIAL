@@ -64,7 +64,7 @@ export function authorizeAskTool(toolId: AskToolId, snapshot: AskAuthoritySnapsh
     if (!snapshot.site || snapshot.site.state === "unlinked") {
       return deny("site_not_connected", "This site isn't connected to this workspace. I can file a Request for Strelva instead.");
     }
-    if (snapshot.site.state === "deprovisioned") {
+    if (snapshot.site.state === "deprovisioned" || !snapshot.site.tenantActive) {
       return deny("site_no_longer_connected", "This site is no longer connected to this workspace.");
     }
   }
