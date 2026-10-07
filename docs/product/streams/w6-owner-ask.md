@@ -1,10 +1,30 @@
 # Wave 6 owner entry and Ask Strelva
 
 Branch: `w6/owner-ask`. Base: `integrate/reborn-1.0` at `7b7b4d3f`.
-Worktree: `REB-w6-owner-ask`. Round 5 resumed October 7, 2026.
+Worktree: `REB-w6-owner-ask`. Round 5 resumed October 7, 2026; round 6
+finished and verified it the same evening (see [Round 6](#round-6-finish-and-verify)).
 Local only. No production call, migration, env change, provider write, client
-notification, dependency addition, push, PR or merge occurred. All release
-flags remain off. Settings stays on `/dashboard`.
+notification, dependency addition or merge occurred. Round 6 pushed the branch
+and opened one PR against `integrate/reborn-1.0` for the coordinator. All
+release flags remain off. Settings stays on `/dashboard`.
+
+## Round 6: finish and verify
+
+Round 5 stopped at 16:08Z with an unverified checkpoint (`db4657ab`) holding
+three slices written after the last verified run. Round 6 typechecked it,
+found two compile errors, and sorted the slices:
+
+| Slice | Disposition |
+| --- | --- |
+| Existing-site Ask page set and informational rebuild (`fb89edc0`) | **Kept.** Typechecks; its tests pass. |
+| Inquiry follow-up rule alternative: one existing live rule's timing, attempts and complete Strelva-disclosed wording, with an isolated native rehearsal, signed Try and the existing Inquiry Make real path | **Kept.** One test fixture lacked `lastActivityAt`; repaired. Gated by the Inquiries release *and* Ask; the Inquiry Make real adapter strips the Ask selection before queueing, so the native request is unchanged. |
+| Ask product reads: inquiry summary, and upcoming bookings plus public booking receipts as a secret-free member read | **Kept.** `readWorkspaceBookings` gains an optional `upcomingDays`; omitting it keeps the old range. |
+| New booking service (closing the Mooney gap): migration `20261010105000_ask_booking_service_publication.sql` with a security-definer publication RPC, `products/scheduling/ask-service*`, a public-booking resolver change, `BookingServiceTry` | **Removed** (`23b7668c`). It had a `/book/...` live link with no route, no SQL check for the new RPC, and no prepare/verify/publish tests. It also changed `resolvePublishedPublicBooking`, a live public path. The full attempt stays at `db4657ab` for the coordinator. New services stay Asked Requests, as this handoff already said. |
+
+The committed scratch file `.scratch-w6-r5-repair-owner-link.sql` was removed.
+The Ask prompt and tool description again say an existing-booking page
+"cannot create or change a booking service, schedule, duration or
+availability".
 
 ## Launch requirements and what changed
 
@@ -20,6 +40,8 @@ flags remain off. Settings stays on `/dashboard`.
 | Requests, receipts, saved conversations and operator origin | Managed work remains a Request by default. Unsupported asks preserve the person's original words, System and email/phone origin at Asked; scope/deadline are not accepted. Receipt cards name each saved/queued/opened result and its ids. History, refusals, cost logging and failure states are tested. |
 | Working page-set Possibilities | Closed-catalog informational pages are real native v2 documents in durable Work, with pinned revision/hash and owner-reviewed copy. Signed Try renders the document and confines navigation. Reviewed candidates become Ready; Make real preserves their native Work identity. No empty summary masquerades as a working website. |
 | Working booking Possibilities, bounded by actual Connections | An unchanged published native website with a stored System baseline can get one new booking page using its own published inquiry/booking grants, configured schedule and connected calendar. Signed Try exercises the shared form with local callbacks, discards visitor inputs and creates no reservation. Fresh authority/revision/grant/calendar checks precede publication. Missing, ambiguous, foreign or revoked bindings remain Requests. |
+| Working inquiry follow-up Possibilities | An existing live Inquiries System with a persisted native baseline can compare one follow-up rule (timing, attempts, full wording that names Strelva). Preparation runs the real inquiry engine in isolation; Try shows the complete message and recorded rehearsal; a changed native configuration returns a Ready candidate to Exploring. Requires the Inquiries release for the business. |
+| Ask reads business state | Inquiry summary, upcoming bookings and public booking receipts are member-checked reads; no provider call, no token decryption. |
 | Cost visibility | The existing model-call path records tokens and measured/estimated/unknown cost. Optional daily business-cost warnings only log to the operator. No pricing, quota, billing or email behavior was added. |
 
 The broad Mooney example is **not fully implemented**: a newly introduced
@@ -34,11 +56,39 @@ Asked Request, as the spec requires for unavailable tools. Do not label the
 whole original Ask requirement A until this cross-product contract is supplied
 and tested. The existing-service alternative is implemented locally.
 
-## Verification — final snapshot
+## Verification — round 6 (current branch)
 
-Final runtime commits: `966a9434` and `e6545c33`; documentation follows.
-All required checks completed successfully on this final runtime snapshot. Logs are local `.scratch-w6-r5-*` files.
-No failed test was disabled or assertion weakened.
+Run on `23b7668c` (runtime) on October 7, 2026, 17:55–18:10 ET. Logs are
+local `.scratch-w6-r6-*` files. No failed test was disabled or assertion
+weakened.
+
+| Command | Actual result |
+| --- | --- |
+| `pnpm typecheck` | Checkpoint `db4657ab` **failed** with 2 errors (`ask-inquiry-follow-up.test.ts` fixture missing `lastActivityAt`; `new-booking-possibility-server.ts` passed an incomplete `ReleaseViewer`). After repair and the back-out: passed (exit 0). |
+| `pnpm lint` | Passed (exit 0); only the existing database-types Babel size note. |
+| `pnpm check:boundaries` | Passed; shrink-only baseline unchanged at 204 workspace→lib imports in 93 files and 46 older boundary imports. |
+| Focused Ask/booking/inquiry tests (16 files) | First attempt hit ENOSPC (disk 100%, 58 MiB free); after clearing stale check clusters: **16 files, 644 tests passed**. |
+| `pnpm test --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000` | **703 files passed, 1 skipped; 6,632 tests passed, 37 skipped; 97.1s. Exit 0.** |
+| `LC_ALL=en_US.UTF-8 PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-sql` | First attempt without `LC_ALL` **failed** before any check: `postmaster became multithreaded during startup` (log `.scratch-w6-r6-sql-locale-failure.log`). With `LC_ALL`: Workspace SQL passed (port 61324), Customer mapping SQL passed (62369), Inquiry SQL passed (64419). Exit 0. |
+| `pnpm check:custom-repos` | **196/196 checks passed.** |
+| `NODE_ENV=production pnpm build` | Passed (exit 0): compiled in 11.3s; 235/235 static pages. |
+| Rendered UI, `/preview/strelva/try?state=follow-up` | Checked at 1280px and 390px: full message, toggle with `aria-expanded`, recorded rehearsal and disclaimer render. Screenshots `browser-screenshot-localhost-muynt6rb-1b111341.png` and `browser-screenshot-localhost-muyntb25-defdcb21.png` in `~/.croki/userdata/browser-artifacts/`. The Playwright suite `tests/w6-owner-ask-ui.spec.ts` was not rerun in round 6. |
+
+Round-6 findings, not fixed (outside finish-only scope): the follow-up Try
+shows raw minutes ("After 1440 minutes") rather than "1 day", and the preview
+fixture's message doesn't name Strelva, though the Ask tool requires it.
+
+Host note: the disk filled because ~210 throwaway Postgres check clusters from
+all streams' runs (`strelva-{workspace,customers,inquiry}-sql.*`,
+`strelva-pg-error-*`, `strelva-release-safety-*`, `strelva-*-upgrade.*`)
+were left in `$TMPDIR`. Round 6 deleted only those that were over 90 minutes
+old and held by no process (~10 GB). `strelva-w6-production-copy-*` and other
+directories were left alone.
+
+## Verification — round 5 snapshot (superseded)
+
+Runtime commits `966a9434` and `e6545c33`. These results predate `fb89edc0`
+and the round-5 checkpoint, so they don't cover the current branch.
 
 | Command | Actual result |
 | --- | --- |
@@ -211,19 +261,53 @@ Do not invent a financial return. Next test: compare complete runs on the
 integrated snapshot with recorded load/free space; retire any heavier factory
 proposal if it adds maintenance without reducing failures or attention.
 
+## Merge hazards and ADR 0012 call sites
+
+**`workspace_release_flag_names()` (issue #253, not fixed here).** Both
+streams `create or replace` it from the same 11-name list in
+`20261009140000_make_real_owner_link_flag.sql`:
+
+- owner-ask `20261010102000_owner_decision_links.sql` adds `owner_decision_links`.
+- publishing `20261010141000_publishing_release_flags.sql` adds `publishing`
+  and `publishing_record_google_policy`.
+
+Applied in timestamp order, publishing's version runs last and drops
+`owner_decision_links`. The setter (`20261007130000`, line 123) then raises
+`workspace_release_flag_unknown` and the table CHECKs reject new rows, so the
+per-business owner-decision-links flag can't be turned on. The fix is
+one later migration whose list is the union of all 14 names.
+
+**`strelva_runs_business` (ADR 0012, left as is).** Owner-ask adds three
+direct calls, all in owner decision links:
+
+1. `strelva_owner_decision_link_session` (`20261010102000`, line 53): returns
+   no session unless Strelva runs the business.
+2. `assert_owner_decision_link` (`20261010102000`, line 99): refuses execution.
+3. `read_owner_decision_website_preview` (`20261010104000`, line 19): refuses
+   the signed read-only website review.
+
+Inherited through `assert_owner_decision_link`: the signed website reserve and
+publish entry points (`20261010102100`) and the fact-draft decision RPC
+(`20261010103000`). TypeScript reaches them through
+`src/platform/needs-you/service-actor.ts` and
+`src/app/api/owner-website-preview/preview.ts`. A neutral-platform rewrite
+would swap this check for "an agency with a delegation runs this business" in
+those three functions; the callers needn't change.
+
 ## Exact next action
 
-Coordinator reviews these commits and the new booking/inquiry contract gap,
-then incorporates flags/migrations/stop points into the shared release packet
-and reconciles the canonical model. Production proof and owner invitations
-remain separately authorized work. This stream has no further runtime edit
-in progress. All required local checks passed; production and the broader
-booking contract remain unproven. The final documentation commit records this
-handoff and the honest spec statuses.
+Coordinator reviews the PR and decides two things: the #253 flag-name union
+migration, and whether to reopen the new-booking-service attempt at
+`db4657ab` as its own stream with a public `/book` route, SQL proof and tests.
+Then fold the five migrations, flags and stop points into the release packet.
+Production proof and owner invitations remain separately authorized work. No
+runtime edit is in progress on this branch.
 
 ## Commit ledger
 
-Final documentation commit follows this runtime ledger.
+Round 6 adds `db4657ab` (round-5 checkpoint, unverified), a typecheck repair,
+`23b7668c` (back-out of the new-booking-service slice) and this handoff
+update. Earlier runtime ledger:
 
 ```text
 de25bac0 WIP w6/owner-ask: checkpoint after session interruption (unverified)

@@ -22,6 +22,11 @@ visitor inputs and create no reservation. Reviewed candidates become Ready,
 and Make real preserves the native work identity. Revoked connections or
 changed revisions refuse publication.
 
+With the Inquiries release on, Ask can also compare one follow-up rule on an
+existing live Inquiries System: timing, attempts and complete wording that
+names Strelva. It rehearses the rule in isolation, shows the full message in
+Try, and returns to Exploring if the native configuration changes.
+
 Changes to a projected managed System without a durable baseline remain
 Requests for Strelva to prepare. So do new booking services, new-site booking
 bindings, custom flows and unsupported rebuilds. The existing booking effect
