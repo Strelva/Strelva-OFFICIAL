@@ -43,6 +43,7 @@ export default async function BookingsPreviewPage({ searchParams }: { searchPara
     // Booking-only hours (owner or admin, one store in use): narrowed, following opening hours, or no record hours yet.
     : name === "owner-evidence" ? ready([{ ...site, evidence: { calendarHealth: "reconnect", paused: false, truncated: false }, bookings: site.bookings.map((booking, index) => ({ ...booking,
       ...(index === 0 ? { status: "no_show" as const } : {}),
+      ...(index === 1 ? { intake: [{ label: "What would you like to discuss?", answer: "Lower back discomfort after long workdays.\nI would like practical stretches to use between appointments." }, { label: "Preferred appointment focus", answer: "Gentle movement and recovery." }] } : {}),
       evidence: { outsideRecordHours: index === 1, canMarkNoShow: index === 1, historyTruncated: false,
         calendar: index === 1 ? { status: "failed" as const, updatedAt: "2026-11-06T12:00:00Z" } : null,
         history: [{ kind: "change" as const, actor: "visitor" as const, from: null, to: "requested" as const, reason: null, at: "2026-11-01T13:00:00Z" },

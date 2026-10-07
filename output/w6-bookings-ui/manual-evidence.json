@@ -383,8 +383,7 @@
       },
       "screenshot": {
         "captured": true,
-        "retained": true,
-        "path": "manual-error-390.png"
+        "retained": false
       }
     },
     {
@@ -826,5 +825,76 @@
         "path": "manual-receipt-390.png"
       }
     }
-  ]
+  ],
+  "followUp": {
+    "date": "2026-10-07",
+    "change": "Manual input/select mobile minimum height added after initial review",
+    "metrics": {
+      "width": 390,
+      "scrollWidth": 390,
+      "text": "Take a booking request\n\nFictional business and customer. Every action uses an isolated response; no booking or email is sent.\n\nChoose an open time for the customer. The owner confirms the request.\n\nService\nChoose a service\nConsultation\nOpen time (America/New_York)\nChoose a time\nFri, Nov 6, 10:00 AM\nMon, Nov 9, 2:00 PM\nCustomer name\nCustomer email\nCustomer phone (optional)\nWhat would you like to discuss?\nSave booking request\nClose",
+      "controls": [
+        {
+          "tag": "SELECT",
+          "name": "_r_4_",
+          "height": 44,
+          "disabled": false,
+          "required": true
+        },
+        {
+          "tag": "SELECT",
+          "name": "_r_5_",
+          "height": 44,
+          "disabled": false,
+          "required": true
+        },
+        {
+          "tag": "INPUT",
+          "name": "_r_6_",
+          "height": 44,
+          "disabled": false,
+          "required": true
+        },
+        {
+          "tag": "INPUT",
+          "name": "_r_7_",
+          "height": 44,
+          "disabled": false,
+          "required": true
+        },
+        {
+          "tag": "INPUT",
+          "name": "_r_8_",
+          "height": 44,
+          "disabled": false,
+          "required": false
+        },
+        {
+          "tag": "TEXTAREA",
+          "name": "_r_9_",
+          "height": 64,
+          "disabled": false,
+          "required": true
+        },
+        {
+          "tag": "BUTTON",
+          "name": "Save booking request",
+          "height": 44,
+          "disabled": true
+        },
+        {
+          "tag": "BUTTON",
+          "name": "Close",
+          "height": 44,
+          "disabled": false
+        }
+      ]
+    },
+    "screenshot": {
+      "captured": true,
+      "retained": true,
+      "path": "manual-ready-390.png"
+    },
+    "limit": "Other captures retain initial pre-change measurements; latest390px recheck measures inputs/selects44px."
+  }
 }
