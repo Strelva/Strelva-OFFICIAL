@@ -20,9 +20,8 @@ const req = (ip?: string) => new Request("http://localhost/api/mcp/public", { me
 /** An in-memory fixed-window counter with the same contract as the Redis limiter. */
 function counter(): LimitCheck & { counts: Map<string, number> } {
   const counts = new Map<string, number>();
-  const check = (async (key: string, max: number) => { const n = (counts.get(key) ?? 0) + 1; counts.set(key, n); return n > max; }) as LimitCheck & { counts: Map<string, number> };
-  check.counts = counts;
-  return check;
+  const check: LimitCheck = async (key, max) => { const n = (counts.get(key) ?? 0) + 1; counts.set(key, n); return n > max; };
+  return Object.assign(check, { counts });
 }
 const on = { STRELVA_AGENT_IDENTITY_LIMITS: "1" };
 const hold = (business: string, email: string, extra: Partial<Extract<AgentCall, { kind: "hold" }>> = {}): AgentCall => ({ kind: "hold", business, email, agentName: "ChatGPT", requestId: `${business}-${email}`, ...extra });
