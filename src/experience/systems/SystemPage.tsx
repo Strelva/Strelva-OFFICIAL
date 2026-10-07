@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ContentWorkspace } from "@/experience/publishing/ContentWorkspace";
 import { useState } from "react";
 import { ArrowLeft, ArrowUpRight, MessageSquareText } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -123,6 +124,7 @@ export function SystemPage(props: SystemPageProps) {
             {mode !== "possibility" || !comparing ? <figure>{comparing && mode === "both" ? <figcaption>Current · {system.surface.domain || system.name}</figcaption> : null}{system.surface.previewSrc ? <iframe title={`${system.name} as visitors see it`} src={system.surface.previewSrc} sandbox={websiteSandbox(system.surface.previewSrc)} loading="lazy" referrerPolicy="no-referrer" tabIndex={-1} /> : <p className="p-4 text-sm text-gray-muted">No address is recorded for this website yet, so there is nothing to show. Website controls still open it.</p>}</figure> : null}
             {comparing && mode !== "current" ? <figure>{mode === "both" ? <figcaption>{POSSIBILITY_STATUS_LABEL[comparing.status]} · {comparing.title}</figcaption> : null}<iframe title={`${comparing.title}, not live`} src={comparing.previewSrc} sandbox="" loading="lazy" referrerPolicy="no-referrer" tabIndex={-1} /></figure> : null}
           </div>
+          {system.publishing && !props.localPreview ? <ContentWorkspace key={system.id} workspaceId={props.workspaceId} systemId={system.id} kind="website" readOnly={readOnly || system.lifecycle === "paused"} /> : null}
         </> : <div className={styles.workSurface}><SystemSurface {...props} system={system} /></div>}
       </section>
 
@@ -193,7 +195,8 @@ function SystemSurface({ system, workspaceId, readOnly, useReadOnly = readOnly, 
     return <InquiryServerWorkspaceExperience tenantId={system.surface.tenantId} adapter={adapter} initialView="home" basePath="/workspace" routePrefix="inquiry" />;
   }
   if (system.surface.kind === "listing") return <ListingSurface surface={system.surface} />;
-  if (system.surface.kind === "newsletter") return <div className="p-6"><h2 className="text-sm font-semibold">Newsletter</h2><p className="mt-2 text-sm text-gray-muted">{system.surface.audience}</p><p className="mt-2 text-sm text-gray-muted">Strelva drafts each issue. It sends only after the owner approves, from mail.strelva.com, to active subscribers. Each send says how many the mail provider accepted.</p></div>;
+  if (system.surface.kind === "newsletter" && system.publishing && !localPreview) return <ContentWorkspace key={system.id} workspaceId={workspaceId} systemId={system.id} kind="newsletter" readOnly={readOnly || system.lifecycle === "paused"} />;
+  if (system.surface.kind === "newsletter") return <div className="p-6"><h2 className="text-sm font-semibold">Newsletter</h2><p className="mt-2 text-sm text-gray-muted">{system.surface.audience}</p><p className="mt-2 text-sm text-gray-muted">Strelva drafts each issue. Sending is paused. Approval keeps an immutable issue and receipt; no subscriber receives email.</p></div>;
   if (system.surface.kind !== "work") return null;
   const { workId, productId } = system.surface;
   if (productId === "applications" || productId === "scheduling") return <BoundedWorkExperience key={workId} workspaceId={workspaceId} workId={workId} productId={productId} sources={[...sources]} readOnly={useReadOnly} canManage={!readOnly} workspaceStopped={workspaceStopped} calendarRecoveryAllowed={calendarRecoveryAllowed} onSaved={noop} />;

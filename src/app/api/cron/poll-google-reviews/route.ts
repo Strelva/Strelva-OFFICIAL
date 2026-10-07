@@ -25,6 +25,7 @@ import { alert } from "@/platform/infra/monitoring";
 import { addEvent } from "@/lib/events";
 import { addReview } from "@/lib/reviews";
 import { getRedis } from "@/platform/infra/redis";
+import { listingDraftingAllowed } from "@/products/google-listing/server";
 import { draftReviewReply, storeRecentReply } from "@/lib/review-replies";
 import { getReplyVoice, defaultReplyVoice } from "@/lib/reviews/reply-voice";
 import { AUTO_POST_DELAY_MS, autoReplyAllowed } from "@/lib/reviews/auto-reply";
@@ -200,7 +201,7 @@ async function pollTenant(tenant: TenantConfig): Promise<number> {
     let draftedReply: string | undefined;
     let draftEventId: string | undefined;
     const replyMode = (await getReplyVoice(tenantId).catch(() => defaultReplyVoice())).mode;
-    if (replyMode !== "off") {
+    if (replyMode !== "off" && await listingDraftingAllowed(tenantId, locationId)) {
       try {
         draftedReply = await draftReviewReply(
           {

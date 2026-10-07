@@ -210,6 +210,7 @@ export type TenantReplyAuthority =
 
 export interface TenantReviewRepliesPort {
   defaultTenantReplyDeps(): Promise<TenantReplyDepsHandle>;
+  listingDraftingAllowed(tenantId: string, locationId?: string): Promise<boolean>;
   routeTenantReviewReply(tenantId: string, deps: TenantReplyDepsHandle): Promise<{ kind: "legacy"; reason: string } | { kind: "listing"; workspaceId: string }>;
   postTenantReviewReply(input: {
     tenantId: string; workspaceId: string; eventId: string; attemptId: string; reviewId: string; text: string;

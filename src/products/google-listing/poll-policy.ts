@@ -4,11 +4,20 @@ import { readBindingTarget } from "@/platform/account-bindings/store";
 import { readListingControl } from "./controls";
 
 /** Pause stops drafting, never review synchronization. Off keeps the old poller path. */
-export async function listingDraftingAllowed(tenantId: string, locationId: string): Promise<boolean> {
+export async function listingDraftingAllowed(tenantId: string, locationId?: string): Promise<boolean> {
   if (!publishingReleaseEnabled()) return true;
   if (!(await tenantReleaseFlagEnabled("publishing", tenantId))) return true;
   const target = await readBindingTarget(tenantId);
   if (!target) return true;
-  try { return !(await readListingControl(target.workspaceId, locationId.replace(/^locations\//, ""))).paused; }
+  try {
+    if (!locationId) {
+      const { readGoogleBindingForTenant } = await import("@/platform/account-bindings/store");
+      const binding = await readGoogleBindingForTenant(tenantId);
+      const primary = binding?.locations.find(item => item.isPrimary) ?? binding?.locations[0];
+      if (!primary) return false;
+      locationId = primary.locationId;
+    }
+    return !(await readListingControl(target.workspaceId, locationId.replace(/^locations\//, ""))).paused;
+  }
   catch { return false; }
 }

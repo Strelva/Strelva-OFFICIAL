@@ -1,3 +1,5 @@
+import { recordGoogleApprovalPolicyEnabled } from "@/products/publishing/release";
+import { recordGoogleApprovalCopy } from "@/products/publishing/record-changes";
 import type { Metadata } from "next";
 import { isSuperAdmin } from "@/platform/infra/auth";
 import { readBusinessRecord } from "@/platform/business-record/service";
@@ -25,7 +27,8 @@ export default async function BusinessDetailsPage({ searchParams }: { searchPara
       readLinkedSites(actor, workspaceId),
       isSuperAdmin().catch(() => false),
     ]);
-    return { record, operator, sites: linked.sites, denied: linked.denied };
+    const googleApprovalCopy = recordGoogleApprovalCopy(record, await recordGoogleApprovalPolicyEnabled(workspaceId, actor));
+    return { record, operator, googleApprovalCopy, sites: linked.sites, denied: linked.denied };
   });
   const result = typeof params.result === "string" && OUTCOMES.has(params.result as DetailsSaveOutcome) ? params.result as DetailsSaveOutcome : null;
   const field = typeof params.field === "string" && (EDITABLE_DETAILS as readonly string[]).includes(params.field) ? params.field as EditableDetail : null;

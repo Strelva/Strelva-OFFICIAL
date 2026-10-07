@@ -3,7 +3,8 @@
 import { redirect } from "next/navigation";
 import { isSuperAdmin } from "@/platform/infra/auth";
 import { getSessionUser } from "@/platform/infra/db/server-client";
-import { patchBusinessRecord, readBusinessRecord } from "@/platform/business-record/service";
+import { readBusinessRecord } from "@/platform/business-record/service";
+import { patchRecordWithGoogle } from "@/products/publishing/record-changes";
 import { saveBusinessDetails } from "@/platform/business-record/details-save";
 import { ownerEntryHomesOpen } from "@/platform/owner-entry/linked-sites";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
@@ -20,7 +21,7 @@ export async function saveBusinessDetailsAction(formData: FormData): Promise<voi
   if (!(await ownerEntryHomesOpen(workspaceId, user.id))) redirect(`/workspace?workspaceId=${workspaceId}`);
   const { outcome, field } = await saveBusinessDetails(
     { userId: user.id, verifiedEmail: user.email.trim().toLowerCase() }, workspaceId, revision, formData,
-    { read: readBusinessRecord, patch: patchBusinessRecord, operator: isSuperAdmin },
+    { read: readBusinessRecord, patch: patchRecordWithGoogle, operator: isSuperAdmin },
   );
   const params = new URLSearchParams({ workspaceId, result: outcome, ...(field ? { field } : {}) });
   redirect(`/workspace/business-details?${params}`);

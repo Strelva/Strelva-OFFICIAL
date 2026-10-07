@@ -17,6 +17,7 @@ import { WorkspacePlace, type PlaceState } from "./WorkspacePlace";
 
 export interface BusinessDetailsData {
   record: BusinessRecord;
+  googleApprovalCopy?: string | null;
   operator: boolean;
   sites: LinkedSite[];
   denied: LinkedSite[];
@@ -99,6 +100,7 @@ export function WorkspaceBusinessDetails({ workspaceId, state, result, field, ac
                   <Field name="owner_recipient" type="email" value={detailText(data.record, "owner_recipient")} readOnly={readOnly}
                     hint="Weekly and monthly recaps, review alerts, new inquiries and anything that needs your decision go here." />
                 </div>
+                {data.googleApprovalCopy ? <p role="note" className="text-sm text-gray-muted">{data.googleApprovalCopy}</p> : null}
                 {readOnly
                   ? <p className="text-sm text-gray-muted">Only the owner can change these details.</p>
                   : <div><button type="submit" className="inline-flex min-h-[40px] items-center rounded-lg bg-warm-black px-4 text-sm font-medium text-warm-white focus-visible:outline focus-visible:outline-2">Save details</button></div>}
