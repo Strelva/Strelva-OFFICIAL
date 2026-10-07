@@ -28,12 +28,11 @@ import { ownerNoticeUrl } from "@/lib/owner-notice-url";
  */
 import { NextResponse } from "next/server";
 import { verifyAnyApproveToken, type ApproveLinkClaims, type WorkspaceApproveLinkClaims } from "@/lib/approve-link";
-import { needsYouAppOrigin, needsYouReleaseEnabled, needsYouService, needsYouStore } from "@/platform/needs-you/server";
 import { resolveEventAction } from "@/lib/event-actions";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
-import { ownerWebsitePreviewHref, ownerWebsitePreviewMayBeOn } from "@/app/api/owner-website-preview/preview";
+import { ownerWebsitePreviewHref, ownerWebsitePreviewMayBeOn } from "@/app/api/owner-website-preview/links";
 
 export const dynamic = "force-dynamic";
 
@@ -134,8 +133,8 @@ const INVALID = {
 // the recipient is still the owner, then resolves through the source's own
 // resolver. Access, money and exit never resolve from a link.
 
-function workspaceOpenUrl(workspaceId: string, href?: string | null): string {
-  return `${needsYouAppOrigin().replace(/\/+$/, "")}${href ?? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}`;
+function workspaceOpenUrl(origin: string, workspaceId: string, href?: string | null): string {
+  return `${origin.replace(/\/+$/, "")}${href ?? `/workspace?workspaceId=${encodeURIComponent(workspaceId)}`}`;
 }
 
 const CHANGED = { heading: "This changed since we emailed you", body: "Nothing was done. Open Strelva to see the latest version and decide there." };
@@ -143,10 +142,11 @@ const HANDLED = { heading: "Already handled", body: "This was already taken care
 const EXPIRED = { heading: "This link expired", body: "Nothing was done. Open Strelva to see what's waiting." };
 
 async function workspaceConfirm(token: string, claims: WorkspaceApproveLinkClaims): Promise<NextResponse> {
+  const { needsYouAppOrigin, needsYouReleaseEnabled, needsYouStore } = await import("@/platform/needs-you/server");
   if (!needsYouReleaseEnabled()) return noticePage({ status: 400, ...INVALID.bad });
   const item = await needsYouStore.read(claims.workspaceId, claims.itemId).catch(() => null);
   if (!item) return noticePage({ status: 400, ...INVALID.bad });
-  const open = workspaceOpenUrl(claims.workspaceId, item.openHref);
+  const open = workspaceOpenUrl(needsYouAppOrigin(), claims.workspaceId, item.openHref);
   if (item.state === "superseded" || item.revisionHash !== claims.revision) return noticePage({ status: 200, ...CHANGED, dashboardUrl: open, buttonLabel: "Open" });
   if (item.state !== "open") return noticePage({ status: 200, ...HANDLED, dashboardUrl: open, buttonLabel: "Open" });
   if (Date.parse(item.expiresAt) <= Date.now()) return noticePage({ status: 200, ...EXPIRED, dashboardUrl: open, buttonLabel: "Open" });
@@ -163,8 +163,10 @@ async function workspaceConfirm(token: string, claims: WorkspaceApproveLinkClaim
 }
 
 async function workspaceResolve(claims: WorkspaceApproveLinkClaims): Promise<NextResponse> {
+  const { needsYouAppOrigin, needsYouReleaseEnabled, needsYouService } = await import("@/platform/needs-you/server");
   if (!needsYouReleaseEnabled()) return noticePage({ status: 400, ...INVALID.bad });
-  const open = workspaceOpenUrl(claims.workspaceId);
+  const origin = needsYouAppOrigin();
+  const open = workspaceOpenUrl(origin, claims.workspaceId);
   let result;
   try {
     result = await needsYouService().decide({
@@ -178,7 +180,7 @@ async function workspaceResolve(claims: WorkspaceApproveLinkClaims): Promise<Nex
     console.error(`[api/approve] Needs you decision failed for ${claims.workspaceId}/${claims.itemId}:`, err);
     return noticePage({ status: 200, heading: "Strelva is checking the outcome", body: "The change may have gone through, but we couldn't record its final result. Strelva needs to check it before anyone tries again.", dashboardUrl: open, buttonLabel: "Open" });
   }
-  const openItem = workspaceOpenUrl(claims.workspaceId, result.item?.openHref);
+  const openItem = workspaceOpenUrl(origin, claims.workspaceId, result.item?.openHref);
   switch (result.status) {
     case "done":
     case "done_unverified":

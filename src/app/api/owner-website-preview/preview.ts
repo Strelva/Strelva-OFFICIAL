@@ -3,25 +3,12 @@ import { z } from "zod";
 import { verifyWorkspaceApproveToken, type WorkspaceApproveLinkClaims } from "@/lib/approve-link";
 import { WEBSITE_PREVIEW_CSP } from "@/lib/website-preview-policy";
 import { getSupabase } from "@/platform/infra/db/client";
-import { ownerEntryPossible } from "@/platform/owner-entry/env";
-import { releaseFlagMayBeOn } from "@/platform/release-flags/resolve";
 import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { renderRebuildPreview, websiteRebuildSchema, safeSitePathSchema, escapeSiteHtml, type WebsiteRebuildRecord } from "@/products/websites/index";
 import { ownerDecisionSchema, type OwnerDecision } from "@/platform/needs-you/contracts";
-import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
+import { ownerWebsitePreviewHref, ownerWebsitePreviewMayBeOn } from "./links";
+export { OWNER_WEBSITE_PREVIEW_PATH, ownerWebsitePreviewHref, ownerWebsitePreviewMayBeOn } from "./links";
 import { websiteDocumentCopyItems, websiteDocumentFactItems, websiteDocumentItem } from "@/platform/needs-you/sources/website-document";
-
-export const OWNER_WEBSITE_PREVIEW_PATH = "/api/owner-website-preview";
-
-/** Cheap kill switches, before token parsing, database reads or row resolution. */
-export function ownerWebsitePreviewMayBeOn(): boolean {
-  return ownerEntryPossible() && needsYouReleaseEnabled()
-    && releaseFlagMayBeOn("owner_decision_links") && releaseFlagMayBeOn("website_rebuild");
-}
-
-export function ownerWebsitePreviewHref(token: string): string {
-  return `${OWNER_WEBSITE_PREVIEW_PATH}?${new URLSearchParams({ token })}`;
-}
 
 const resultSchema = z.object({
   item: ownerDecisionSchema,

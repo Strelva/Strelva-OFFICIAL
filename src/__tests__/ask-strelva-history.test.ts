@@ -85,6 +85,18 @@ describe("Ask Strelva conversation history in a turn", () => {
       expect(await history.list(owner, { workspaceId: WS, systemId: null })).toEqual([]);
     });
   }
+  it("refuses old stored credentials before appending or sending conversation context", async () => {
+    const history = createInMemoryAskHistory({ roleOf: roles });
+    const old = await history.append(owner, { workspaceId: WS, conversationId: null, systemId: null, role: "user", content: "My password is fictional-old-secret" });
+    const append = vi.spyOn(history, "append");
+    const { deps, modelCalls } = harness(history);
+    const result = await run(deps, owner, { conversationId: old.conversationId, messages: [{ role: "user", content: "What are our hours?" }] });
+    expect(result.refused).toMatchObject({ status: 400 });
+    expect(result.refused?.error).not.toContain("fictional-old-secret");
+    expect(append).not.toHaveBeenCalled();
+    expect(modelCalls).toHaveLength(0);
+  });
+
   it("saves the person's words and Strelva's reply with its result, and says so", async () => {
     const history = createInMemoryAskHistory({ roleOf: roles });
     const { deps } = harness(history);
