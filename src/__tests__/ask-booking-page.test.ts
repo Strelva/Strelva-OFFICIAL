@@ -40,6 +40,22 @@ function harness() {
   return { record, site, options, deps, prepare };
 }
 describe("Ask booking pages for existing authorized native sites", () => {
+  it("still revalidates an Ask booking calendar at publication after Ask is turned off", async () => {
+    const record = native();
+    record.rebuild.status = "approved";
+    record.rebuild.publishedCapabilitySelection = { tenantId: "example", bookingGrantId: grantId, inquiryCapabilityId: "consult-inquiries" };
+    record.rebuild.history = [{ revision: 4, kind: "ask_booking_page_prepared", actorId: actor.userId, at: time }];
+    const work = { id: workId, workspaceId, productId: "websites", resourceKind: "website", payload: record.rebuild } as SavedWork;
+    const resolveCapabilities = vi.fn(async () => undefined);
+    const publish = vi.fn();
+    const service = createWebsiteRebuildService({ read: async () => work } as unknown as BoundedStore, { documents: { published: async () => null, publish } as unknown as WebsiteDocumentStore, resolveCapabilities });
+    vi.stubEnv("STRELVA_ASK", "0");
+    try {
+      await expect(service.launch(actor, workId, { expectedRevision: 4, candidateRevision: 1, candidateContentHash: record.rebuild.candidate!.contentHash })).rejects.toThrow("connection changed");
+      expect(resolveCapabilities).toHaveBeenCalledWith(actor, workspaceId, workId, record.rebuild.publishedCapabilitySelection, { requireConnectedCalendar: true });
+      expect(publish).not.toHaveBeenCalled();
+    } finally { vi.unstubAllEnvs(); }
+  });
   it("pins a real stored website baseline and own grant; prepares no grant, reservation or provider write", async () => {
     const h = harness();
     const result = await prepareExistingAskBookingPage(actor, input, h.deps);

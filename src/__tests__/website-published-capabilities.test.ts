@@ -146,7 +146,14 @@ describe("published website capability resolution", () => {
   it("refuses publication if the selected booking calendar was revoked after preparation", async () => {
     configurePublishedConnections();
     fakes.listWorkspaceCalendarConnections.mockResolvedValue([{ provider: "outlook", status: "revoked" }]);
-    await expect(resolvePublishedWebsiteCapabilities(actor, workspaceId, websiteWorkId, { tenantId: "northstar", inquiryCapabilityId: "inquiry-main", bookingGrantId })).resolves.toBeUndefined();
+    await expect(resolvePublishedWebsiteCapabilities(actor, workspaceId, websiteWorkId, { tenantId: "northstar", inquiryCapabilityId: "inquiry-main", bookingGrantId }, { requireConnectedCalendar: true })).resolves.toBeUndefined();
+  });
+  it("preserves existing capability resolution when Ask is off and no Ask candidate requests the added check", async () => {
+    vi.stubEnv("STRELVA_ASK_RELEASE", "0");
+    configurePublishedConnections();
+    fakes.listWorkspaceCalendarConnections.mockResolvedValue([{ provider: "outlook", status: "revoked" }]);
+    await expect(resolvePublishedWebsiteCapabilities(actor, workspaceId, websiteWorkId, { tenantId: "northstar", inquiryCapabilityId: "inquiry-main", bookingGrantId })).resolves.toMatchObject({ booking: { capabilityId: "booking-main" } });
+    expect(fakes.listWorkspaceCalendarConnections).not.toHaveBeenCalled();
   });
 
   it("keeps multiple tenant options explicit rather than using the first binding", async () => {

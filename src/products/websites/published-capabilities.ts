@@ -137,6 +137,7 @@ export async function resolvePublishedWebsiteCapabilities(
   workspaceId: string,
   websiteWorkId: string,
   selection?: WebsiteCapabilitySelection,
+  checks: { requireConnectedCalendar?: boolean } = {},
 ): Promise<WebsitePublishedCapabilities | undefined> {
   if (!selection) return undefined;
   const parsedSelection = websiteCapabilitySelectionSchema.parse(selection);
@@ -150,7 +151,7 @@ export async function resolvePublishedWebsiteCapabilities(
     ? tenant.booking.find((candidate) => candidate.grantId === parsedSelection.bookingGrantId)
     : undefined;
   if ((parsedSelection.inquiryCapabilityId && !inquiry) || (parsedSelection.bookingGrantId && !booking)) return undefined;
-  if (booking && !(await listWorkspaceCalendarConnections(actor, workspaceId)).some(connection => connection.provider === booking.provider && connection.status === "connected")) return undefined;
+  if (checks.requireConnectedCalendar && booking && !(await listWorkspaceCalendarConnections(actor, workspaceId)).some(connection => connection.provider === booking.provider && connection.status === "connected")) return undefined;
   const baseUrl = configuredBaseUrl();
   if (!baseUrl) return undefined;
   const result = websitePublishedCapabilitiesSchema.safeParse({

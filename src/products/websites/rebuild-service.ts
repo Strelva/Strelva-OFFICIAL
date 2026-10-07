@@ -282,7 +282,10 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     }
     if (loaded.rebuild.status !== "approved" || loaded.rebuild.approvedCandidateRevision !== candidate.revision) throw new WorkspaceConflictError("Approve the exact current preview before launching.");
     if (loaded.rebuild.publishedCapabilitySelection) {
-      const projection = await (dependencies.resolveCapabilities ?? resolvePublishedWebsiteCapabilities)(actor,loaded.work.workspaceId,workId,loaded.rebuild.publishedCapabilitySelection);
+      const resolver = dependencies.resolveCapabilities ?? resolvePublishedWebsiteCapabilities;
+      const projection = loaded.rebuild.history.some(entry => entry.kind === "ask_booking_page_prepared")
+        ? await resolver(actor,loaded.work.workspaceId,workId,loaded.rebuild.publishedCapabilitySelection,{ requireConnectedCalendar: true })
+        : await resolver(actor,loaded.work.workspaceId,workId,loaded.rebuild.publishedCapabilitySelection);
       if (!projection || JSON.stringify(projection) !== JSON.stringify(candidate.document.capabilities)) throw new WorkspaceConflictError("The visitor form or booking connection changed. Reconnect it and approve the new preview before publishing.");
     }
     // Never re-approve as the launcher: that would replace the customer's
@@ -425,7 +428,7 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     const tenantId = await routeTenant(actor, loaded);
     const published = tenantId ? await documents.published(tenantId) : null;
     if (!tenantId || input.selection.tenantId !== tenantId || !published || published.workId !== workId || published.revision !== candidate.revision || published.contentHash !== candidate.contentHash) throw new WorkspaceConflictError("A booking page needs the unchanged published native website. Finish any existing draft first.");
-    const projection = await (dependencies.resolveCapabilities ?? resolvePublishedWebsiteCapabilities)(actor, loaded.work.workspaceId, workId, input.selection);
+    const projection = await (dependencies.resolveCapabilities ?? resolvePublishedWebsiteCapabilities)(actor, loaded.work.workspaceId, workId, input.selection, { requireConnectedCalendar: true });
     if (!projection?.booking || !projection.inquiry || projection.tenant !== tenantId) throw new WorkspaceConflictError("The site's booking and inquiry connections must both be published and current.");
     const document = structuredClone(candidate.document);
     if (document.pages.some(page => page.path === input.path) || document.pages.length >= 12) throw new WorkspaceConflictError("Choose a new page address within the website's page limit.");
