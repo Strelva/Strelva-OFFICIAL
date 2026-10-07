@@ -36,7 +36,7 @@ Exports from `@/platform/business-record`:
 - `selectPublishedBusinessPolicies(record)` returns only confirmed terms with
   `{ value, source, updatedAt }`. It excludes private actor and workspace IDs.
 
-The public selector accepts an already-authorized record. `/b/{handle}`,
+The public selector accepts an already-authorized record. `/biz/{handle}`,
 `get_policies`, JSON-LD and llms.txt must first enforce their own publication and
 release gates; a selector does not establish consent. Those streams own their
 routes and serializers. Do not publish `unconfirmed` as settled business terms.

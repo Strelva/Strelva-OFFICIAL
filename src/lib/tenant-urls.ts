@@ -1,3 +1,4 @@
+import { APP_ROOT_DOMAIN, SITES_ROOT_DOMAIN, CONTROL_PLANE_URL, isPlatformDomain, tenantSiteOrigin } from "@/platform/infra/brand";
 import type { TenantConfig } from "./types";
 import type { SiteConfig, TenantIdentity } from "./tenant/models";
 
@@ -12,10 +13,6 @@ export function normalizeTenantDomain(domain: string | undefined): string | null
 
 function withoutWww(domain: string): string {
   return domain.replace(/^www\./, "");
-}
-
-function isPlatformDomain(domain: string): boolean {
-  return domain.endsWith(".strelva.com");
 }
 
 function isAdminDomain(domain: string): boolean {
@@ -124,10 +121,10 @@ export function getTenantDashboardHost(tenant: SiteConfig & TenantIdentity): str
   if (normalizedAdminCustomDomain) return normalizedAdminCustomDomain;
 
   const primaryDomain = getTenantPrimaryDomain(tenant);
-  if (primaryDomain) return `admin.${primaryDomain}`;
+  if (primaryDomain && !(SITES_ROOT_DOMAIN !== APP_ROOT_DOMAIN && isPlatformDomain(primaryDomain))) return `admin.${primaryDomain}`;
 
   const subdomain = tenant.subdomain || tenant.id;
-  return `${subdomain}.strelva.com`;
+  return `${subdomain}.${APP_ROOT_DOMAIN}`;
 }
 
 export function getTenantDashboardUrl(
@@ -157,7 +154,7 @@ export function getTenantDashboardFallbackUrl(
     // app.strelva.com is the control plane and serves /client/* paths.
     // strelva.com is the marketing site and 404s on /client/* — using it here
     // broke the admin tenant-dashboard links and the post-login account redirect.
-    return `https://app.strelva.com/client/${tenantId}${normalizedPath}`;
+    return `${CONTROL_PLANE_URL}/client/${tenantId}${normalizedPath}`;
   }
 
   return `http://localhost:3000/client/${tenantId}${normalizedPath}`;
@@ -169,9 +166,9 @@ export function getTenantPublicUrl(
 ): string {
   if (environment === "production") {
     const publicDomain = getTenantPublicDomain(tenant);
-    if (publicDomain) return `https://${publicDomain}`;
+    if (publicDomain && !(SITES_ROOT_DOMAIN !== APP_ROOT_DOMAIN && isPlatformDomain(publicDomain))) return `https://${publicDomain}`;
     const subdomain = tenant.subdomain || tenant.id;
-    return `https://${subdomain}.strelva.com`;
+    return tenantSiteOrigin(subdomain);
   }
 
   const subdomain = tenant.subdomain || tenant.id;

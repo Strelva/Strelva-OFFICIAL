@@ -4,23 +4,9 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 migration="$repo_root/supabase/migrations/20260905190000_release_one_workspaces.sql"
 schema_test="$repo_root/tests/workspace-schema.sql"
-cluster_root="$(mktemp -d "${TMPDIR:-/tmp}/strelva-workspace-sql.XXXXXX")"
-cluster_data="$cluster_root/data"
-cluster_socket="$cluster_root/socket"
-cluster_log="$cluster_root/postgres.log"
+source "$repo_root/scripts/temp-postgres.sh"
+create_temp_postgres strelva-workspace-sql
 cluster_port="$((61000 + ($$ % 3000)))"
-cluster_started=0
-
-cleanup() {
-  local status=$?
-  trap - EXIT INT TERM
-  if [[ "$cluster_started" -eq 1 ]]; then
-    pg_ctl -D "$cluster_data" -m fast -w stop >/dev/null 2>&1 || true
-  fi
-  printf 'Workspace SQL cluster preserved at: %s\n' "$cluster_root"
-  exit "$status"
-}
-trap cleanup EXIT INT TERM
 
 for command_name in initdb pg_ctl psql; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -40,7 +26,7 @@ pg_ctl -D "$cluster_data" \
   -l "$cluster_log" \
   -o "-F -k '$cluster_socket' -c listen_addresses='' -p $cluster_port" \
   -w start >/dev/null
-cluster_started=1
+read -r cluster_postmaster_pid < "$cluster_data/postmaster.pid"
 
 psql_args=(
   --host="$cluster_socket"
@@ -635,6 +621,11 @@ psql "${psql_args[@]}" --file="$repo_root/tests/website-linked-publication-schem
 # facts from the business record, inquiries in tenant_leads, spam in the
 # spam pit, domain-ownership proof, and the connected_site System origin.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008151000_connected_sites.sql"
+# The new public reader replaces the historical looser connected-site filter.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012110000_business_pages.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012110000_business_pages.sql"
+psql "${psql_args[@]}" -Atc "select to_regclass('public.business_pages') is null and to_regprocedure('public.business_confirmed_public_facts(uuid)') is null" | grep -qx t
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012110000_business_pages.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-client-records-schema.sql"
@@ -693,6 +684,77 @@ fi
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
+# Batch 7A (agency 1.0): provider seats, agency verification, the neutral
+# service actor and the payer party. Each 7A contract runs, then the replaced
+# contracts that can rerun here rerun against the replacements (workspace
+# authority and business billing commit or count fixtures; they rerun after
+# the full ordered upgrade in check-workspace-upgrade.sh). Then the rollback
+# rehearsal: with committed rows in every 7A table, the four rollbacks in
+# reverse order must archive them and leave the public catalog exactly as
+# before 7A; then 7A applies again and its contracts hold.
+batch_7a=(20261009151000_provider_seats 20261009152000_agency_verifications
+  20261009153000_platform_service_actor 20261009154000_payer_party)
+catalog_fingerprint() {
+  psql "${psql_args[@]}" --tuples-only --no-align --file="$repo_root/tests/support/public-catalog-fingerprint.sql"
+}
+apply_batch_7a() {
+  local name
+  for name in "${batch_7a[@]}"; do
+    psql "${psql_args[@]}" --single-transaction --file="$repo_root/supabase/migrations/$name.sql"
+  done
+}
+check_batch_7a_contracts() {
+  psql "${psql_args[@]}" --file="$repo_root/tests/provider-seats-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/agency-verifications-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/platform-service-actor-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/payer-party-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/batch-7a-reader-modes.sql"
+}
+check_batch_7a() {
+  check_batch_7a_contracts
+  psql "${psql_args[@]}" --file="$repo_root/tests/system-versions-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/agency-client-overview-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
+}
+catalog_fingerprint >"$cluster_root/catalog-before-7a.txt"
+apply_batch_7a
+check_batch_7a
+psql "${psql_args[@]}" --file="$repo_root/tests/batch-7a-populated.sql"
+for (( index=${#batch_7a[@]}-1; index>=0; index-- )); do
+  psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-${batch_7a[$index]}.sql"
+done
+catalog_fingerprint >"$cluster_root/catalog-after-7a-rollback.txt"
+if ! diff -u "$cluster_root/catalog-before-7a.txt" "$cluster_root/catalog-after-7a-rollback.txt"; then
+  printf 'Batch 7A rollback did not restore the public catalog.\n' >&2
+  exit 1
+fi
+archived_7a="$(psql "${psql_args[@]}" --tuples-only --no-align --command="
+  select (select count(*) from release_rollback_archive.m20261009151000_provider_seats)
+    || ' ' || (select count(*) from release_rollback_archive.m20261009151000_agency_client_staff)
+    || ' ' || (select count(*) from release_rollback_archive.m20261009151000_workspace_providers)
+    || ' ' || (select count(*) from release_rollback_archive.m20261009152000_agency_verifications)
+    || ' ' || (select count(*) from release_rollback_archive.m20261009153000_strelva_service_actions)
+    || ' ' || (select count(*) from release_rollback_archive.m20261009154000_accounts)
+    || ' ' || (select count(*) from release_rollback_archive.m20261009154000_job_economics)
+    || ' ' || (select count(*) from release_rollback_archive.m20261009154000_workspace_payer_transitions)")"
+if [[ "$archived_7a" != "1 1 1 1 1 1 1 1" ]]; then
+  printf 'Batch 7A rollback archives are wrong: %s\n' "$archived_7a" >&2
+  exit 1
+fi
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-${batch_7a[0]}.sql" >"$cluster_root/7a-wrong-order.log" 2>&1; then
+  printf 'A batch 7A rollback ran against a schema without 7A.\n' >&2
+  exit 1
+fi
+grep -q 'rollback_wrong_order_or_function_drift' "$cluster_root/7a-wrong-order.log"
+# The rehearsal fixture's rows stay committed, so only the 7A contracts rerun.
+apply_batch_7a
+check_batch_7a_contracts
+printf 'Batch 7A forward, populated rollback and reapply passed.\n'
+# Agency signup (#258): the ordinary create path grants nothing outside the
+# agency, every effect starts unverified, and the cap and identity hold.
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-signup-schema.sql"
 # Wave 6 website: fallback undo, immutable release reconciliation, and
 # owner-decided domain proposals. Fictional fixtures and isolated Postgres only.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010110000_website_cutover_undo.sql"
@@ -822,6 +884,12 @@ psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-visibility-schema.
 # Every stream's release flag key survives the last literal redefinition (#253).
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 
+# #529: anonymous booking caps, email-only placement, and reversible schema.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011150000_public_booking_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011150000_public_booking_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011150000_public_booking_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/public-booking-admission-schema.sql"
+
 # Google location lineage through the real Versions/System stores, after the
 # account-binding migrations. Preparation stays fake; no Google dispatch.
 if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
@@ -861,6 +929,17 @@ for policy_guard_phase in current history; do
   fi
 done
 printf 'Policy rollback guards preserved current terms and undone history.\n'
+# Public policy output after the policy projection exists; saved pages block rollback.
+psql "${psql_args[@]}" --file="$repo_root/tests/business-pages-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-pages-rollback-schema.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012110000_business_pages.sql" >"$cluster_root/business-pages-rollback-refusal.log" 2>&1; then
+  printf 'Business page rollback discarded saved publication settings.\n' >&2
+  exit 1
+fi
+grep -q 'business_pages_rollback_requires_data_preservation' "$cluster_root/business-pages-rollback-refusal.log"
+psql "${psql_args[@]}" -Atc "select exists(select 1 from public.business_pages where handle='rollback-fixture') and to_regprocedure('public.business_confirmed_public_facts(uuid)') is not null" | grep -qx t
+printf 'Business page rollback preserved saved publication settings.\n'
+
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
@@ -873,3 +952,6 @@ bash "$repo_root/scripts/check-customer-mapping-sql.sh"
 # Inquiry capabilities use their own isolated fictional tenant fixture. This
 # validates the additive migration without connecting to production.
 bash "$repo_root/scripts/check-inquiry-workspace-sql.sh"
+
+# Agency-sourced public checks: real RLS, quota races and rollback stop points.
+bash "$repo_root/scripts/check-agency-prospects-sql.sh"

@@ -109,6 +109,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261011102000": "workspace_collection_entries",
   "20261011101000": "business_booking_email_settings",
   "20261011120000": "business_policies",
+  "20261011150000": "public_booking_requests",
   "20261010140000": "google_listing_controls",
   "20261010142000": "workspace_newsletter_issues",
   "20261010143000": "publishing_google_outages",
@@ -144,6 +145,8 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261009100000": "strelva_service_actions",
   "20261009110000": "business_booking_messages",
   "20261009113000": "inquiry_events",
+  "20261009151000": "provider_seats",
+  "20261009152000": "agency_verifications",
   "20261010110000": "website_cutover_undos",
   "20261010113000": "website_rebuild_origins",
   "20261010114000": "website_domain_requests",
@@ -160,6 +163,8 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261010152000": "catalog_report_receipts",
   "20261010153000": "newsletter_contact_sync",
   "20261011100000": "workspace_newsletter_batches",
+  "20261011170000": "prospects",
+  "20261012110000": "business_pages",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */
@@ -199,6 +204,7 @@ export const FLAG_ENV = [
   "STRELVA_WEBSITE_REBUILD_RELEASE",
   "STRELVA_OWNER_ENTRY",
   "STRELVA_SYSTEMS_RELEASE",
+  "STRELVA_AGENCY_SIGNUP_RELEASE",
   "STRELVA_INTERNAL_TOOL_NOTICES_RELEASE",
   "STRELVA_CATALOG_REPORTS_RELEASE",
   "STRELVA_NEWSLETTER_CONTACTS_RELEASE",
@@ -232,6 +238,7 @@ export const FLAG_ENV = [
   "STRELVA_BOOKING_MANUAL",
   "STRELVA_MAKE_REAL_LIVE",
   "STRELVA_CONNECTED_SITES_RELEASE",
+  "STRELVA_BUSINESS_PAGES",
   "STRELVA_WEBSITE_DOMAIN_EMAIL_ENABLED",
   "STRELVA_WEBSITE_MODEL_CALLS_ENABLED",
   "STRELVA_WEBSITE_BUSINESS_FACTS_ENABLED",

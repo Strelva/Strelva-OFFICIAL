@@ -150,7 +150,7 @@ export function StrelvaBookingForm({
     : receipt?.status === "cancelled"
       ? "This reservation is cancelled."
       : receipt
-        ? native ? "Your request is waiting for the business to confirm. This time is not confirmed yet." : "We could not confirm this reservation yet. Check the calendar before trying again."
+        ? native ? "If you received a confirmation email, confirm within 15 minutes. Your request is waiting for the business to confirm. This time is not confirmed yet." : "If you received a confirmation email, confirm within 15 minutes. We could not confirm this reservation yet. Check the calendar before trying again."
         : null;
 
   async function submit(event: FormEvent<HTMLFormElement>) {

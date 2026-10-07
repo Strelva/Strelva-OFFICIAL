@@ -213,6 +213,25 @@ plus partial and empty Loop ribbon and an empty AI mirror) and
 horizontal overflow. Jacob's visual acceptance, screen readers and physical
 devices remain open.
 
+### Agency setup checklist (October 7, flag off)
+
+[AgencyOnboarding](../../src/experience/workspace/agency/AgencyOnboarding.tsx)
+at `/workspace/agency/start` (#258, `STRELVA_AGENCY_SIGNUP_RELEASE`). Composed
+from `Button`, `TextInput` and dashboard tokens under `data-dashboard`; rules
+and whitespace group the steps, with no cards. One ordered list of four steps
+(profile, team, verification, first client), each with a ring or check mark
+and a text status ("Done", "Next", "Recorded by Strelva", "Not started"), so
+colour is never the only signal. Verification is a four-row list of effects
+with what each unlocks and "Not verified"/"Verified". The dashed monogram
+stands in for the agency logo until the brand layer (#264). States: loading,
+signed out (sign-in link back to `?as=agency`), not a member, failed read
+with retry, choose among several agencies, create (inline validation and
+the per-account cap message), ready. The `/sign-up` account-kind choice is
+two plain links in a pill group with `aria-current`. Checked in Chromium at
+1440 and 390 px by `tests/agency-signup.spec.ts` with intercepted APIs: no
+horizontal overflow. Jacob's visual acceptance, screen readers and physical
+devices remain open.
+
 ## Extending the foundation
 
 Use the existing source owners and references. Keep changes small enough to
@@ -750,3 +769,24 @@ its receipt definition list for Source. These additions are default off under
 `STRELVA_BOOKING_AGENT_VISIBILITY`; agent names are supplied at booking.
 Local proof and remaining limits live in
 [the #304 handoff](../product/streams/a1-agent-bookings-visible.md).
+
+### Agency check attribution (October 7, local)
+
+`AiVisibilityPage`, `AiVisibilityResultView`, and `WebsiteAuditPage` retain their
+owned forms/result geometry and semantic marketing tokens. Public attributed
+results add name-only agency identity, neutral provider advice and an agency
+contact CTA. Embed routes compose those same components without account chrome.
+The shared email layout accepts optional `preparedBy` identity; absent identity
+retains the existing Strelva logo markup. Rich logo/color selection remains #264.
+The agency prospects page uses a semantic table, scoped to direct agency members.
+See [the stream contract](../product/streams/a1-agency-prospecting.md) for flag,
+state, permission and local-proof limitations; no visual acceptance or production
+adoption is implied.
+
+### October 7 public booking email confirmation
+
+`/booking-confirm/[token]` uses the owned `Card` and `Button` primitives and
+semantic canvas/text roles. Opening the page is read-only; the native form
+POSTs to its action route. Expired/unavailable and rate-limit states keep the
+customer from claiming a booking was made. This is local implementation for
+#529; no production adoption or new visual-system decision is implied.

@@ -1,3 +1,4 @@
+import { limitPublicBookingRead } from "@/platform/bookings/public-read";
 import { isTenantId } from "@/lib/scaffold-contracts";
 import { publicBookingRangeSchema } from "@/products/scheduling/server";
 import { bookingError, bookingJson, bookingOptions, bookingService, stringValue } from "../_shared";
@@ -20,6 +21,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ tena
   const range = from && to ? publicBookingRangeSchema.safeParse({ from, to }) : undefined;
   if (range && !range.success) return bookingJson({ error: "The booking date range is invalid." }, 400);
   try {
+    await limitPublicBookingRead(request, tenant);
     return bookingJson(await bookingService().read({ tenantId: tenant, capabilityId, ...(range ? { range: range.data } : {}) }));
   } catch (error) {
     return bookingError(error);

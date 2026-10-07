@@ -1,3 +1,4 @@
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 /**
  * Connected sites, server side. Server only.
  *
@@ -20,7 +21,7 @@ import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { WorkspaceConflictError, type WorkspaceActor } from "@/platform/workspaces/types";
 import {
   BEACON_EVENT_KINDS, PLATFORMS, SITE_KEY_PATTERN, VERIFICATION_META_NAME, beaconBatchSchema, businessJsonLd, contactFromFields,
-  defaultAllowedOrigins, normalizeOrigin, publicFactsFromRecord, publicInquirySchema, referrerHost, safePath, verificationProofs,
+  defaultAllowedOrigins, normalizeOrigin, publicFactsFromConfirmedRecord, publicInquirySchema, referrerHost, safePath, verificationProofs,
   type ConnectedInquiry, type ConnectedSite, type PublicContext, type ResolvedConnectedSite,
 } from "./contracts";
 import { ConnectedSiteInputError, connectedSitesStore, type ConnectedSitesStore } from "./store";
@@ -70,8 +71,9 @@ function randomSlug(length: number): string {
 export const generateSiteKey = () => `sk_pub_${randomSlug(24)}`;
 export const generateVerificationToken = () => randomSlug(32);
 
-function appOrigin(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL || "https://app.strelva.com").replace(/\/+$/, "");
+/** The app's public origin, from configuration only (never a request's Host header). */
+export function appOrigin(): string {
+  return (process.env.NEXT_PUBLIC_APP_URL || CONTROL_PLANE_URL).replace(/\/+$/, "");
 }
 
 /** The two things a site owner pastes into the page. */
@@ -112,6 +114,11 @@ export async function connectSite(actor: WorkspaceActor, raw: unknown, store: Co
   });
 }
 
+/** A connected site's live page, read the one way Strelva reads them: pinned, public addresses only, bounded. */
+export function fetchLiveSitePage(url: string): Promise<string | null> {
+  return fetchPinnedPublicText(url, { timeoutMs: 8000, maxBytes: 2_000_000 });
+}
+
 /**
  * Domain-ownership proof: read the live page at the site's address (pinned,
  * public addresses only) and pass the tokens found there to SQL, which
@@ -123,7 +130,7 @@ export async function verifySite(actor: WorkspaceActor, businessId: string, site
   if (!site) throw new WorkspaceConflictError("This connected site is no longer active here. Reload and try again.");
   if (site.verifiedAt) return site;
   let html: string | null = null;
-  try { html = await (deps.fetchPage ?? (url => fetchPinnedPublicText(url, { timeoutMs: 8000, maxBytes: 2_000_000 })))(site.siteUrl); } catch { html = null; }
+  try { html = await (deps.fetchPage ?? fetchLiveSitePage)(site.siteUrl); } catch { html = null; }
   if (html === null) throw new WorkspaceConflictError(`We couldn't open ${site.siteHost} just now. Check the site is published, then try again.`);
   return store.confirmVerification(actor, businessId, siteId, verificationProofs(html));
 }
@@ -137,7 +144,7 @@ export async function resolvePublicSite(publicKey: string, store: ConnectedSites
 export async function readPublicContext(publicKey: string, site: ResolvedConnectedSite, store: ConnectedSitesStore = connectedSitesStore()): Promise<PublicContext | null> {
   const raw = await store.context(publicKey);
   if (!raw) return null;
-  const facts = publicFactsFromRecord({ facts: raw.facts, services: raw.services });
+  const facts = publicFactsFromConfirmedRecord(site.workspaceId, raw);
   return { revision: raw.revision, facts, jsonLd: raw.site.injectSchema ? businessJsonLd(facts, site.siteUrl) : null, site: raw.site };
 }
 
@@ -216,3 +223,11 @@ export async function readConnectedSites(actor: WorkspaceActor, businessId: stri
 // src/lib in Strelva Reborn section 7; routes import them through this entry).
 export { CONNECT_CORS_HEADERS, CONNECT_MAX_BODY_BYTES, ConnectBodyError, connectErrorResponse, connectJson, connectPreflight, readConnectBody, resolveConnectSite } from "./http";
 export { connectedInquiryEmail, notifyConnectedSiteInquiry } from "./notify";
+
+// Server-rendered visibility for AI crawlers (#309, #502): the public
+// business page, its llms.txt and the static JSON-LD paste block.
+export { businessPagesReleaseEnabled, checkSchemaBlock, loadPublishedBusinessPage, readBusinessVisibility, setBusinessPage, type BusinessVisibility, type SchemaBlockCheck, type SchemaBlockTarget } from "./business-pages";
+export { BUSINESS_HANDLE_PATTERN, businessFactSheet, businessPageUrl, formatAddress, isBusinessHandle, mapsUrl, suggestBusinessHandle, weeklyHours, type PublishedBusinessPage } from "./business-page";
+export { jsonLdScriptContent, schemaBlock, schemaBlockStatus, type SchemaBlock, type SchemaBlockStatus } from "./schema-block";
+
+export { publishedPolicyRows } from "./published-policies";

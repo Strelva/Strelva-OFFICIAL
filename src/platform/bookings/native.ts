@@ -30,6 +30,7 @@ export async function nativeRpc(name: string, args: Record<string, unknown>) {
     const message = response.error.message ?? "";
     if (/booking_(not_found|hold_expired)/.test(message)) throw new PublicBookingError("not_found", "This booking link has expired.");
     if (/booking_(paused|slot_taken|request_conflict)/.test(message)) throw new PublicBookingError("conflict", "This time cannot be booked now.");
+    if (message.includes("booking_public_limit")) throw new PublicBookingError("conflict", "Too many open booking requests. Confirm or cancel your existing request, or try again in 15 minutes.", 429);
     if (message.includes("booking_agent_limit")) throw new PublicBookingError("conflict", "Too many agent requests for this business. Try again later.");
     throw new PublicBookingError("unavailable", "Booking storage is unavailable.");
   }

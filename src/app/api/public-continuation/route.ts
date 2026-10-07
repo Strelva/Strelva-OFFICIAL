@@ -1,3 +1,4 @@
+import { MARKETING_URL } from "@/platform/infra/brand";
 import { NextResponse } from "next/server";
 import { parsePublicContinuation, PUBLIC_CONTINUATION_COOKIE, PUBLIC_CONTINUATION_NEXT, sealPublicContinuation } from "@/lib/public-continuation";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
@@ -31,7 +32,7 @@ function allowedOrigin(request: Request): string | null {
   const origin = request.headers.get("origin");
   if (!origin) return null;
   const configured = (process.env.PUBLIC_SITE_ORIGIN || "https://strelva.com").replace(/\/$/, "");
-  if (origin === configured || origin === "https://www.strelva.com") return origin;
+  if (origin === configured || origin === MARKETING_URL) return origin;
   if (process.env.NODE_ENV !== "production" && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return origin;
   return null;
 }
