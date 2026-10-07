@@ -1,3 +1,4 @@
+import { isPlatformDomain } from "@/platform/infra/brand";
 import { getRedis } from "@/platform/infra/redis";
 import type { DomainClaim, DomainClaimRole, TenantConfig } from "./types";
 import type { SiteConfig } from "./tenant/models";
@@ -9,8 +10,8 @@ import { workspacePorts } from "./workspace-ports";
 
 const CLAIMS_REDIS_KEY = "reb:domain-claims";
 const DOMAIN_REGEX = /^(?=.{1,253}$)(?!-)([a-z0-9-]{1,63}(?<!-)\.)+[a-z]{2,}$/i;
-const RESERVED_SUFFIXES = [".localhost", ".vercel.app", ".strelva.com"];
-const RESERVED_DOMAINS = new Set(["localhost", "strelva.com", "www.strelva.com"]);
+const RESERVED_SUFFIXES = [".localhost", ".vercel.app"];
+const RESERVED_DOMAINS = new Set(["localhost"]);
 
 type VercelDomainResponse = {
   name?: string;
@@ -62,7 +63,7 @@ export function isValidDomain(domain: string): boolean {
   const normalized = normalizeCustomDomain(domain);
   if (!normalized) return false;
   if (!DOMAIN_REGEX.test(normalized)) return false;
-  if (RESERVED_DOMAINS.has(normalized)) return false;
+  if (RESERVED_DOMAINS.has(normalized) || isPlatformDomain(normalized)) return false;
   return !RESERVED_SUFFIXES.some((suffix) => normalized.endsWith(suffix));
 }
 
