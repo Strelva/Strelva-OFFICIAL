@@ -4,6 +4,7 @@ import { buildAskTools, type AskToolsContext } from "@/platform/ask/tools";
 import { businessFactDraftPatch, type BusinessFactDraft, type BusinessFactDraftStore } from "@/platform/ask/workspace-drafts";
 import { businessRecordDraftAdapter, businessFactDraftItem } from "@/platform/needs-you/sources/business-record-draft";
 import type { OwnerDecision } from "@/platform/needs-you/contracts";
+import type { ServiceSession } from "@/platform/needs-you/service-actor";
 
 const WS = "11111111-1111-4111-8111-111111111111";
 const ID = "22222222-2222-4222-8222-222222222222";
@@ -91,6 +92,21 @@ describe("business draft Needs you resolution", () => {
   it("expiry changes no record", async () => {
     const persistence = store();
     expect(await businessRecordDraftAdapter(persistence).resolve({ workspaceId: WS }, item, "not_yet", { kind: "expiry" })).toEqual({ outcome: "done", reason: "Expired, nothing changed" });
+    expect(persistence.resolve).not.toHaveBeenCalled();
+  });
+  it("an account-free link uses the bound writer and never ordinary member authority", async () => {
+    const persistence = store();
+    const session: ServiceSession = { kind: "strelva_system", label: "Strelva (system)", sessionId: ID,
+      workspaceId: WS, purpose: "owner_decision_link", onBehalf: { role: "admin" }, actor,
+      decisionId: ID, revisionHash: item.revisionHash, recipient: "owner@example.test" };
+    const by = { kind: "owner_link" as const, recipient: session.recipient!, actor, service: session };
+    expect(await businessRecordDraftAdapter(persistence).resolve({ workspaceId: WS, actor }, item, "approve", by))
+      .toEqual({ outcome: "failed", reason: "signed_draft_writer_unavailable" });
+    expect(persistence.resolve).not.toHaveBeenCalled();
+    persistence.resolveOwnerLink = vi.fn(async () => ({ ...saved, status: "approved" as const, receipt: { sequence: 4, revision: 4 } }));
+    expect(await businessRecordDraftAdapter(persistence).resolve({ workspaceId: WS, actor }, item, "approve", by))
+      .toEqual({ outcome: "done", receiptRef: `business_record:${WS}:4` });
+    expect(persistence.resolveOwnerLink).toHaveBeenCalledWith(actor, WS, ID, "approve", session);
     expect(persistence.resolve).not.toHaveBeenCalled();
   });
 });

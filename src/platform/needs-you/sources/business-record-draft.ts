@@ -39,7 +39,7 @@ export function businessRecordDraftAdapter(store: BusinessFactDraftStore): Sourc
         const draft = (await store.list(actor, ctx.workspaceId)).find(row => row.id === item.sourceId && row.workspaceId === ctx.workspaceId);
         if (!draft || draft.status !== "pending") return { outcome: "done", reason: "already_resolved" };
         if (businessFactDraftRevision(draft) !== item.revisionHash) return { outcome: "failed", reason: "source_changed" };
-        const session = by.kind === "owner_link" ? by.serviceSession : undefined;
+        const session = by.kind === "owner_link" ? by.service : undefined;
         if (session?.purpose === "owner_decision_link" && !store.resolveOwnerLink) return { outcome: "failed", reason: "signed_draft_writer_unavailable" };
         const saved = session?.purpose === "owner_decision_link"
           ? await store.resolveOwnerLink!(actor, ctx.workspaceId, draft.id, decision, session)
