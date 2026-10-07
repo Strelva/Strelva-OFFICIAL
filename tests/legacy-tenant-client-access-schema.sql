@@ -183,7 +183,26 @@ begin
   end if;
 end $catalog$;
 
--- The server path (service role) keeps full access.
+-- The server path (service role) keeps exactly the grants it had before, and
+-- where it holds Supabase's default write grants (production), it still writes.
+do $server_grants$
+begin
+  if exists (
+    select 1
+    from release_rollback_baseline.m20261005100000_legacy_tenant_grants b
+    join pg_class c on c.oid = b.relation_oid
+    where (select coalesce(array_agg(a.privilege_type order by a.privilege_type), '{}')
+           from aclexplode(b.grants) a where a.grantee = 'service_role'::regrole)
+      is distinct from
+          (select coalesce(array_agg(a.privilege_type order by a.privilege_type), '{}')
+           from aclexplode(coalesce(c.relacl, acldefault('r', c.relowner))) a
+           where a.grantee = 'service_role'::regrole)
+  ) then
+    raise exception 'service role grants changed on a legacy tenant table';
+  end if;
+end $server_grants$;
+select has_table_privilege('service_role', 'public.tenants', 'update') as service_role_writes \gset
+\if :service_role_writes
 set local role service_role;
 update public.tenants set owner_email = 'owner-updated@rls528.example' where id = 'rls528-site';
 insert into public.invites (email, tenant_id, role, expires_at)
@@ -201,6 +220,7 @@ begin
     raise exception 'service role lost write access';
   end if;
 end $server$;
+\endif
 
 rollback;
 \echo 'Legacy tenant client access (#528): viewer/editor/admin/owner/anon refused; app reads and service role intact.'
