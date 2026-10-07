@@ -262,7 +262,8 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     const first = rows[0]!;
     const recipient = first.recipient?.email?.trim().toLowerCase() ?? null;
     if (!recipient) {
-      for (const row of rows) await deps.store.recordDelivery(row.workspaceId, row.id, kind, "suppressed", null, null, "no_owner_recipient");
+      // Only a trusted owner address gets owner links (#524). Not sent, and the operator queue says why.
+      for (const row of rows) await deps.store.recordDelivery(row.workspaceId, row.id, kind, "suppressed", null, null, "no_trusted_owner_recipient");
       summary.ownerNotTold += rows.length;
       return;
     }

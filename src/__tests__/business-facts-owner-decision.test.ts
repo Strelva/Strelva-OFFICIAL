@@ -39,6 +39,11 @@ describe("provider and operator business facts wait for the owner (#509)", () =>
     expect(describeBusinessFactChange({ entity: "service", id: "s", before: { name: "Old", active: true }, after: { name: "Old", active: false }, source: "agency" })).toBe('Service "Old": removed');
   });
 
+  it("leads with a pending owner-link recipient so the owner sees it first (#524)", () => {
+    const changes = [...review().changes, { entity: "fact" as const, id: "owner_recipient", before: { email: "owner@example.test" }, after: { email: "agency@example.test" }, source: "agency" }];
+    expect(businessFactsItem(review({ changes })).detail).toMatch(/^Who gets Strelva's emails: owner@example\.test → agency@example\.test; Phone:/);
+  });
+
   it("publishes only on the owner's signed link, with no account or session", async () => {
     const { confirm, service } = harness();
     const item = (await service.list(OWNER, WS)).items[0]!;

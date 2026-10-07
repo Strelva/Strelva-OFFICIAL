@@ -8,7 +8,11 @@ const deps = (): PublishingAuthorityDeps => ({ target: vi.fn(async () => ({ work
 describe("publishing decision authority", () => {
   it("accepts a recipient-bound decision only for the live owner of the linked business", async () => {
     const d = deps(); expect((await authorizePublishingEvent({ tenantId: "mooney", event, actorId: "owner-link:owner@example.test" }, d)).allowed).toBe(true);
+    expect(d.owner).toHaveBeenCalledWith(workspaceId);
     d.owner = vi.fn(async () => ({ email: "new-owner@example.test" } as never));
+    expect((await authorizePublishingEvent({ tenantId: "mooney", event, actorId: "owner-link:owner@example.test" }, d)).allowed).toBe(false);
+    // No trusted owner address (an operator- or agency-written one is pending): no link decides.
+    d.owner = vi.fn(async () => null);
     expect((await authorizePublishingEvent({ tenantId: "mooney", event, actorId: "owner-link:owner@example.test" }, d)).allowed).toBe(false);
   });
   it("denies generic sessionless actors, changed tenant links and an off flag", async () => {

@@ -256,5 +256,10 @@ psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-flag-schema
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 # Batch 7A readers must work in the transaction mode PostgREST chooses for POST.
 psql "${psql_args[@]}" --file="$repo_root/tests/reader-rpc-volatility-schema.sql"
+# 20261013120000 replaces the owner-recipient resolvers, claim_owner_decision
+# and record_owner_decision_delivery; the conversion, ownership, Needs you and
+# Make real contracts above ran against the replacements. Owner links go only
+# to a trusted owner address after the full ordered upgrade.
+psql "${psql_args[@]}" --file="$repo_root/tests/owner-recipient-trust-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

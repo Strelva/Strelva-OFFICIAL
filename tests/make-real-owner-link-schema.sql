@@ -100,6 +100,9 @@ select pg_temp.ml_expect(format($$select public.record_strelva_service_action('6
 -- The owner approves by link: the decision names the owner's link, and the plan fingerprint must match.
 select pg_temp.ml_assert((public.claim_owner_decision('6b000000-0000-4000-8000-000000000010', (select id from ml_items where name = 'plan'), repeat('9', 64),
   'approve', 'owner_link', null, null, 'ml-owner@example.test')->>'status') = 'changed', 'a stale plan fingerprint refuses');
+-- From 20261013120000 a link decides only once it was sent to the trusted owner.
+select pg_temp.ml_assert((public.record_owner_decision_delivery('6b000000-0000-4000-8000-000000000010', (select id from ml_items where name = 'plan'),
+  'digest', 'sent', 'ml-owner@example.test', 'ml-plan-message', null)->>'deliveryState') = 'sent', 'the plan link is sent to the owner');
 select pg_temp.ml_assert((public.claim_owner_decision('6b000000-0000-4000-8000-000000000010', (select id from ml_items where name = 'plan'), repeat('1', 64),
   'approve', 'owner_link', null, null, 'ml-owner@example.test')->>'status') = 'claimed', 'the owner link approves the plan');
 

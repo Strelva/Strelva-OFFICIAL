@@ -98,12 +98,18 @@ export function describeBusinessFactChange(change: BusinessFactChange): string {
   return `${label}: updated`;
 }
 
+/** A new recipient for owner links is pending until this item is approved
+ * (#524), so it leads the detail and never falls past the truncation. */
+function ownerRecipientFirst(changes: BusinessFactChange[]): BusinessFactChange[] {
+  return [...changes].sort((a, b) => Number(b.entity === "fact" && b.id === "owner_recipient") - Number(a.entity === "fact" && a.id === "owner_recipient"));
+}
+
 export function businessFactsItem(review: BusinessFactReview): ProposedItem {
   return {
     // fact.inferred: its floor is owner_decides, so no Strelva policy can loosen it.
     kind: "fact.inferred", route: "owner_decides",
     title: "Confirm changes to your business details",
-    detail: itemDetail(review.changes.map(describeBusinessFactChange).join("; ")),
+    detail: itemDetail(ownerRecipientFirst(review.changes).map(describeBusinessFactChange).join("; ")),
     approveEffect: "These details go live on your website and anywhere Strelva shows your business.",
     notYetEffect: "Nothing changes. Your website keeps the details you last confirmed.",
     sourceLifecycle: "business_facts", sourceId: review.workspaceId, revisionHash: review.revisionHash,

@@ -327,13 +327,13 @@ describe("the chase", () => {
     expect([...mem.items.values()][0]!.state).toBe("withdrawn");
   });
 
-  it("records owner not told when the business has no owner recipient", async () => {
+  it("records not sent when the business has no trusted owner address", async () => {
     mem.state.ownerRecipient = null;
     clock.now = Date.parse("2026-10-06T15:00:00Z");
     const summary = await service().chase();
     expect(summary.ownerNotTold).toBe(1);
     expect(sendEmail).not.toHaveBeenCalled();
-    expect([...mem.items.values()][0]!.deliveries[0]).toMatchObject({ status: "suppressed", reason: "no_owner_recipient" });
+    expect([...mem.items.values()][0]!.deliveries[0]).toMatchObject({ status: "suppressed", reason: "no_trusted_owner_recipient" });
   });
 });
 
