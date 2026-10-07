@@ -1,3 +1,4 @@
+import { isPlatformDomain } from "@/platform/infra/brand";
 import { normalizeTenantDomain } from "./tenant-urls";
 import type { SiteConfig, TenantIdentity } from "./tenant/models";
 
@@ -16,7 +17,7 @@ export function buildTenantDomainMap(
       || normalizeTenantDomain(tenant.siteUrl);
     const primaryDomain = configuredPrimary &&
       !configuredPrimary.endsWith(".vercel.app") &&
-      !configuredPrimary.endsWith(".strelva.com")
+      !isPlatformDomain(configuredPrimary)
         ? configuredPrimary.replace(/^www\./, "")
         : null;
     if (primaryDomain) {

@@ -79,6 +79,43 @@ curl -I -L https://app.strelva.com/api/health
 pnpm check:prod
 ```
 
+## Configurable hosted-sites apex (#322, activation pending #243)
+
+`src/platform/infra/brand.ts` owns two independent build-time values:
+`NEXT_PUBLIC_APP_ROOT_DOMAIN` and `NEXT_PUBLIC_SITES_ROOT_DOMAIN`. Each defaults
+to `strelva.com` when omitted or blank. Use bare DNS domains, with no scheme,
+port, path or wildcard. Invalid values fail rather than producing unsafe URLs.
+
+The sites value controls hosted publication URLs, canonical fallbacks, static
+export API origins, provisioning fallbacks and health read-back. Explicit client
+custom domains retain precedence. Existing app-apex tenant hosts continue to
+route during cutover; issued receipts and documents retain their original URLs
+and hashes. Health reads the current sites URL, and visitor-tool bindings accept
+trusted receipts from the current sites root or legacy app root after a rename.
+
+App/admin URLs and fallback dashboard hosts use the app root. All Supabase
+session writers use host-only cookies (no `Domain`), including callback and
+refresh responses. A separate sites root admits only one-label public tenant
+hosts; reserved `www`, `app`, `api`, `admin` and deeper names never become tenants
+or operator hosts. Both roots are reserved from client custom-domain claims.
+Sending domains remain `updates.strelva.com` / `mail.strelva.com`.
+
+**Nothing is activated by this preparation.** Jacob must choose a separate
+registrable apex in [#243](https://github.com/Strelva/Strelva-OFFICIAL/issues/243),
+authorize purchase and wildcard DNS/certificate setup, and authorize a new
+build/deployment with the selected sites value. A sibling subdomain of
+`strelva.com` does not provide the intended site/cookie separation. The company
+packet is `strelva/docs/outside-approvals/neutral-hosted-sites-domain.md`.
+No domain, provider or DNS writes are encoded in `vercel.json`; its automatic
+Git deployments remain disabled. Retain the old wildcard for the authorized
+migration/rollback window and qualify the new hosted response, visitor forms,
+canonicals, app session scope and custom-domain regressions before removing it.
+
+Local proof commands: `pnpm exec vitest run src/__tests__/sites-domain-config.test.ts
+src/__tests__/auth-cookie-scope.test.ts src/__tests__/middleware-supabase-session.test.ts`,
+`pnpm check`, `pnpm check:boundaries`, and `pnpm check:custom-repos`.
+Local fixtures use `sites.example`; this is test data, not a selected domain.
+
 ## Rohlax Wellness Cloudflare DNS
 
 `rohlaxwellness.com` uses Cloudflare nameservers (`dax.ns.cloudflare.com`, `vivienne.ns.cloudflare.com`). Keep the Vercel domain entries in place and add the records Vercel recommends inside Cloudflare:

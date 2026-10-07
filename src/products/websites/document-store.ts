@@ -10,7 +10,7 @@ import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type
 import { siteDocumentHash, siteDocumentSchema, unresolvedSiteFacts, type SiteDocument } from "./site-document";
 import { websiteLaunchReceiptSchema, type WebsiteLaunchReceipt } from "./contracts";
 import { bindToCurrentTenant } from "./hosted-routing";
-import { ROOT_DOMAIN } from "@/platform/infra/brand";
+import { SITES_ROOT_DOMAIN } from "@/platform/infra/brand";
 
 export interface WebsiteDocumentRevision {
   workspaceId: string; workId: string; revision: number; contentHash: string;
@@ -242,7 +242,7 @@ export async function publishedCapabilityTenant(tenantId: string, document: Site
   try {
     const row = await websiteDocumentStore.published(tenant.parse(tenantId));
     if (!row || row.contentHash !== siteDocumentHash(document)) return undefined;
-    return bindToCurrentTenant(row.document, tenantId, row.receipt, ROOT_DOMAIN).capabilities?.tenant === tenantId ? tenantId : undefined;
+    return bindToCurrentTenant(row.document, tenantId, row.receipt, SITES_ROOT_DOMAIN).capabilities?.tenant === tenantId ? tenantId : undefined;
   } catch { return undefined; }
 }
 export async function invalidatePublishedSiteDocument(tenantId: string): Promise<void> {

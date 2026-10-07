@@ -1,3 +1,4 @@
+import { hostOnlyAuthCookieOptions } from "@/platform/infra/db/auth-cookie-options";
 import { accountReturnTarget, workspaceInvitationReturnTarget, workspaceReturnTarget } from "@/platform/workspaces/location";
 /**
  * Supabase Auth callback (migration Phase 4) — redirect target for OAuth (Google)
@@ -82,7 +83,7 @@ export async function GET(request: NextRequest) {
       },
       setAll(cookiesToSet) {
         for (const { name, value, options } of cookiesToSet) {
-          response.cookies.set(name, value, options);
+          response.cookies.set(name, value, hostOnlyAuthCookieOptions(options));
         }
       },
     },

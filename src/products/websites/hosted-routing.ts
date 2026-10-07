@@ -1,3 +1,4 @@
+import { APP_ROOT_DOMAIN, SITES_ROOT_DOMAIN, tenantSiteOrigin } from "@/platform/infra/brand";
 import type { SiteDocument } from "./site-document-schema";
 import type { WebsiteLaunchReceipt } from "./contracts";
 
@@ -30,17 +31,17 @@ function slugOf(providerUrl: string | undefined, rootDomain: string): string | n
  * tenant at publication (the receipt was issued for `{slug}.{root}`). Any
  * other mismatch stays disabled, exactly as before.
  */
-export function bindToCurrentTenant(document: SiteDocument, currentTenantId: string, receipt: Pick<WebsiteLaunchReceipt, "providerUrl"> | undefined, rootDomain: string): SiteDocument {
+export function bindToCurrentTenant(document: SiteDocument, currentTenantId: string, receipt: Pick<WebsiteLaunchReceipt, "providerUrl"> | undefined, rootDomain = SITES_ROOT_DOMAIN): SiteDocument {
   const bound = document.capabilities?.tenant;
   if (!bound || bound === currentTenantId) return document;
-  if (slugOf(receipt?.providerUrl, rootDomain) !== bound) return document;
+  if ((slugOf(receipt?.providerUrl, rootDomain) ?? slugOf(receipt?.providerUrl, APP_ROOT_DOMAIN)) !== bound) return document;
   return { ...document, capabilities: { ...document.capabilities!, tenant: currentTenantId } };
 }
 
 /** Where to read a published hosted site back now: its receipt URL until a
  * rename, then the current slug's address. */
-export function currentHostedUrl(row: { tenantId: string; receipt?: Pick<WebsiteLaunchReceipt, "providerUrl"> }, rootDomain: string): string {
+export function currentHostedUrl(row: { tenantId: string; receipt?: Pick<WebsiteLaunchReceipt, "providerUrl"> }, rootDomain = SITES_ROOT_DOMAIN): string {
   const issued = slugOf(row.receipt?.providerUrl, rootDomain);
   if (issued === row.tenantId && row.receipt?.providerUrl) return row.receipt.providerUrl;
-  return `https://${row.tenantId}.${rootDomain}/`;
+  return `${tenantSiteOrigin(row.tenantId, rootDomain)}/`;
 }

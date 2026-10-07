@@ -1,3 +1,4 @@
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import { chaseBookingCalendarHealth } from "@/platform/bookings/calendar-health";
 import { bookingSettingsAdapter } from "@/platform/bookings/setup";
 import { deliverBookingUpdates } from "@/platform/bookings/updates";
@@ -29,7 +30,7 @@ export { needsYouReleaseEnabled } from "./release";
 export const needsYouStore: NeedsYouStore = PostgresNeedsYouStore;
 
 export function needsYouAppOrigin(): string {
-  return process.env.NEXT_PUBLIC_APP_URL || "https://app.strelva.com";
+  return process.env.NEXT_PUBLIC_APP_URL || CONTROL_PLANE_URL;
 }
 
 export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {

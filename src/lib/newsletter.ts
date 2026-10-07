@@ -1,3 +1,4 @@
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import { createHash } from "node:crypto";
 import { getSubscribers, getContent } from "./storage";
 import { sanitizeEmailSubjectText } from "./invite-email";
@@ -39,7 +40,7 @@ export interface SendNewsletterResult {
 const BATCH_SIZE = 100;
 
 function controlOrigin(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL || "https://app.strelva.com").replace(/\/+$/, "");
+  return (process.env.NEXT_PUBLIC_APP_URL || CONTROL_PLANE_URL).replace(/\/+$/, "");
 }
 
 /**
