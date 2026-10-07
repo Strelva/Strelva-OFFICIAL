@@ -282,7 +282,7 @@ describe.runIf(Boolean(PSQL))("one booking store, both route families (real func
       insert into public.tenants(id, stable_id, site_name, active) values ('${slug}', '${stableId}', 'Mooney Firm', true);
       select public.convert_tenant_to_business('${email}', '${slug}', '${importPayload}', '${randomUUID()}', repeat('e', 64))->>'workspaceId';`).trim();
     db.exec(`insert into public.tenant_client_record_parity(store, tenant_stable_id, checked_on, ok, redis_count, postgres_count, missing, mismatched)
-      select 'bookings', '${stableId}', (now() at time zone 'UTC')::date - d, true, 0, 0, 0, 0 from generate_series(0, 7) d
+      select 'bookings', t.stable_id, (now() at time zone 'UTC')::date - d, true, 0, 0, 0, 0 from public.tenants t cross join generate_series(0, 7) d
       on conflict do nothing;`);
     setBookingStoreDb(db);
     await oneStoreScenario({

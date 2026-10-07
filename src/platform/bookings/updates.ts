@@ -33,13 +33,14 @@ export interface BookingUpdatePorts {
   claim(bookingId: string | null, owner: boolean, agent: boolean): Promise<unknown>;
   finish(id: string, status: string, provider: string | null, detail: string | null): Promise<unknown>;
   business(booking: StoreBooking): ReturnType<typeof bookingLifecyclePorts.business>;
+  manageUrl?(booking: StoreBooking): Promise<string | null>;
   customerAllowed(tenant: string | null): Promise<boolean>;
   send(input: SendEmailInput): ReturnType<typeof sendEmailWithReceipt>;
 }
 const ports: BookingUpdatePorts = {
   claim: (id, owner, agent) => nativeRpc("claim_booking_updates", { p_booking_id: id, p_owner: owner, p_agent: agent, p_limit: 200 }),
   finish: (id, status, provider, detail) => nativeRpc("finish_booking_update", { p_id: id, p_status: status, p_provider: provider, p_detail: detail }),
-  business: (b) => bookingLifecyclePorts.business(b), customerAllowed: bookingCustomerEmailAllowed, send: sendEmailWithReceipt,
+  business: (b) => bookingLifecyclePorts.business(b), manageUrl: (b) => bookingLifecyclePorts.manageUrl(b), customerAllowed: bookingCustomerEmailAllowed, send: sendEmailWithReceipt,
 };
 
 export async function deliverBookingUpdates(bookingId: string | null = null, deps: BookingUpdatePorts = ports) {
@@ -56,7 +57,7 @@ export async function deliverBookingUpdates(bookingId: string | null = null, dep
       const business = await deps.business(booking);
       const to = row.audience === "client" ? business?.ownerEmail : booking.customer.email;
       if (!business || !to) { await finish("skipped", null, "no_recipient"); continue; }
-      if (row.audience === "customer" && !await deps.customerAllowed(booking.tenantId)) { summary.suppressed++; await finish("suppressed", null, "email_gates"); continue; }
+      if (!await deps.customerAllowed(booking.tenantId)) { summary.suppressed++; await finish("suppressed", null, "email_gates"); continue; }
       const when = bookingWhen(booking);
       const state = booking.status;
       const rescheduled = row.reason === "Customer rescheduled";
@@ -64,7 +65,7 @@ export async function deliverBookingUpdates(bookingId: string | null = null, dep
         : state === "requested" ? "Request received" : rescheduled ? "Booking rescheduled" : "Booking confirmed";
       const tokenCipher = state === "held" ? row.access?.confirm_ciphertext : row.access?.manage_ciphertext;
       const token = typeof tokenCipher === "string" ? decryptSecret(tokenCipher) : null;
-      const url = token && bookingManagePageEnabled() ? `${bookingAppOrigin()}/b/${encodeURIComponent(token)}` : null;
+      const url = bookingManagePageEnabled() ? token ? `${bookingAppOrigin()}/b/${encodeURIComponent(token)}` : await deps.manageUrl?.(booking).catch(() => null) : null;
       const result = await deps.send({ audience: row.audience, tenantId: booking.tenantId ?? undefined, to,
         fromName: business.name || "Strelva", fromAddress: "bookings@mail.strelva.com",
         subject: `${title}: ${booking.serviceName}, ${when.day} ${when.time}`,

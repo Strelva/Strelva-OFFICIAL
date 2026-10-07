@@ -1,3 +1,4 @@
+import { bookingSettingsAdapter } from "@/platform/bookings/setup";
 import { deliverBookingUpdates } from "@/platform/bookings/updates";
 import { getEventRaw, getEvents } from "@/lib/events";
 import { resolveEventAction } from "@/lib/event-actions";
@@ -47,6 +48,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
       ...systemsSourceAdapters(store),
       ...deliverySourceAdapters(),
       ...productSourceAdapters(),
+      bookingSettingsAdapter(),
       // Booking requests in the one booking store (empty until request mode is used).
       bookingRequestAdapter({
         // Nothing to read until the store receives writes (and its migration exists).

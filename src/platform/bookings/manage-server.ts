@@ -1,6 +1,6 @@
 /** Both receipt and native management use the same /b customer surface. */
 import { createPublicWebsiteBookingService } from "@/products/scheduling/server";
-import { PublicBookingError } from "@/products/scheduling/public-booking";
+import { PublicBookingError } from "./errors";
 import type { ManageDeps } from "./manage";
 import { readReservationByManageTokenHash } from "./store";
 import { bookingMessagesEnabled, bookingAgentsEnabled } from "./flags";

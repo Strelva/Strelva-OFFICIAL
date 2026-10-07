@@ -337,7 +337,7 @@ export async function configureWorkspaceCalendarConnection(actor: WorkspaceActor
 export async function revokeWorkspaceCalendarConnection(actor: WorkspaceActor, workspaceId: string, provider: CalendarProvider): Promise<boolean> {
   await assertWorkspaceCalendarManager(actor, workspaceId);
   if (process.env.STRELVA_BOOKING_CALENDAR_REVOKE === "1") {
-    const connection = await readWorkspaceCalendarConnection(actor, workspaceId, provider);
+    const connection = await getWorkspaceCalendarConnection(actor, workspaceId, provider);
     if (connection) await revokeCalendarOAuthToken(provider, connection.refreshToken || connection.accessToken || "");
   }
   const { data, error } = await db().rpc("revoke_workspace_calendar_connection", {

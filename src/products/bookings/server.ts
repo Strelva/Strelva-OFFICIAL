@@ -281,3 +281,5 @@ export async function changeWorkspaceBooking(
   if (!updated) throw new BookingNotFoundError();
   return row(updated);
 }
+
+export { BookingSettingsError, bookingSettingsChange, bookingSettingsEnabled, changeBookingSettings, readBookingSettings, bookingSettingsAdapter } from "./settings";

@@ -3,7 +3,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { decryptSecret, encryptSecret } from "@/platform/infra/crypto/secrets";
-import { PublicBookingError } from "@/products/scheduling/public-booking";
+import { PublicBookingError } from "./errors";
 import { settingsOrDefault, storeSlotsForDate, timeZoneOf, zonedLocalToUtc } from "./availability";
 import { readCalendarBusy, withoutBusy } from "./calendar-busy";
 import { bookingAgentsEnabled, bookingReadSource } from "./flags";

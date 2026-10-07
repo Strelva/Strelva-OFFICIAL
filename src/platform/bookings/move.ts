@@ -12,6 +12,7 @@ import { generateSlots, DEFAULT_BOOKING_CONFIG } from "@/lib/booking";
 import { getRedis } from "@/platform/infra/redis";
 import type { Booking, BookingConfig, DateOverride } from "@/lib/types";
 import {
+  storeBookingToLegacy,
   hoursOutsideRecord,
   legacyBookingToStoreInput,
   legacyConfigToSettings,
@@ -30,7 +31,6 @@ import {
   type BookingStoreDb,
   type StoreBooking,
   type StoreBookingInput,
-  storeBookingToLegacy,
 } from "./store";
 import { BOOKING_STORE_PENDING_KEY, compareBookingLists, parseBookingPendingMember, type SiteService } from "./tenant";
 

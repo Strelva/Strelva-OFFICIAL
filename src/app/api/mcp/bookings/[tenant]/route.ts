@@ -3,7 +3,7 @@
  * https://modelcontextprotocol.io/specification/2025-11-25/basic/transports */
 import { isTenantId } from "@/lib/scaffold-contracts";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
-import { PublicBookingError } from "@/products/scheduling/public-booking";
+import { PublicBookingError } from "@/products/scheduling/server";
 import { agentReceipt, nativeServices, nativeSlots, requestAgentBooking, requireAgentBookings, nativeBookingByToken, tokenHash } from "@/platform/bookings/native";
 import { deliverBookingUpdates } from "@/platform/bookings/updates";
 import { bodyObject } from "@/app/api/v1/bookings/_shared";

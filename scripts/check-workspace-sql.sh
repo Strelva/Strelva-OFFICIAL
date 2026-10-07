@@ -522,7 +522,7 @@ if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
   # The same Version store contract the in-memory store passes, run through
   # createSupabaseVersionStore against this cluster (psql-backed RPC port).
   STRELVA_VERSIONS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
-    pnpm --dir "$repo_root" exec vitest run src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
+    pnpm --dir "$repo_root" exec vitest run --testTimeout 30000 --maxWorkers 2 src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
 fi
 # Needs you and Strelva handled: decision policy, owner decisions and the
 # handled read model, on the same fictional cluster (needs the business record,
@@ -602,7 +602,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
 # The release flag rules still hold after the flag names gain channel keys.
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 STRELVA_POSSIBILITIES_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
-  pnpm --dir "$repo_root" exec vitest run src/__tests__/possibility-repository.test.ts
+  pnpm --dir "$repo_root" exec vitest run --testTimeout 30000 --maxWorkers 2 src/__tests__/possibility-repository.test.ts
 # Website System (2026-10-08): publish onto a linked tenant, routing after a
 # rename, the business template, and operator domain work on owner approval.
 # Replaces reserve_website_hosted_tenant and manage_published_website_tenant;
@@ -653,12 +653,22 @@ psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
 # The real Make real runner, checkpointing through these RPCs (psql-backed port).
 STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
-  pnpm --dir "$repo_root" exec vitest run src/__tests__/make-real-activation-repository.test.ts
+  pnpm --dir "$repo_root" exec vitest run --testTimeout 30000 --maxWorkers 2 src/__tests__/make-real-activation-repository.test.ts
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010130000_booking_parity.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-parity-schema.sql"
+
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010131000_booking_access.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010132000_booking_updates.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010133000_booking_calendar_mirror.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010134000_booking_inquiry_offers.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135000_booking_setup.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-agent-schema.sql"
+
 # The one booking store through both real route families (legacy /api/booking
 # and the public booking service) against the real booking functions. Last,
 # because it commits its fictional rows.
 STRELVA_BOOKINGS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
-  pnpm --dir "$repo_root" exec vitest run src/__tests__/booking-one-store.test.ts
+  pnpm --dir "$repo_root" exec vitest run --testTimeout 30000 --maxWorkers 2 src/__tests__/booking-one-store.test.ts
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 
@@ -671,9 +681,3 @@ bash "$repo_root/scripts/check-customer-mapping-sql.sh"
 # validates the additive migration without connecting to production.
 bash "$repo_root/scripts/check-inquiry-workspace-sql.sh"
 
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010130000_booking_parity.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/booking-parity-schema.sql"
-
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010131000_booking_access.sql"
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010132000_booking_updates.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/booking-agent-schema.sql"

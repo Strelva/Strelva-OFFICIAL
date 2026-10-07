@@ -206,4 +206,51 @@ select public.record_tenant_booking('ba-site',pg_temp.ba_booking('ba_past',-1,'{
 select pg_temp.ba_assert(public.claim_booking_updates(pg_temp.ba_id('ba_past'),true,true,50)='[]'::jsonb,'past booking excluded');
 select public.record_tenant_booking('ba-site',pg_temp.ba_booking('ba_lapse',43,'{"status":"declined","origin":"site","reason":"Expired without owner response"}'),'native');
 select pg_temp.ba_assert(public.claim_booking_updates(pg_temp.ba_id('ba_lapse'),true,true,50)='[]'::jsonb,'request expiry lifecycle mail excluded');
+
+-- Booking setup is tenant-bound, optimistic and owner-approved before instant.
+insert into public.users(id,email,verified_at) values('ca000000-0000-4000-8000-0000000000e2','ba-owner@example.test',now());
+insert into public.workspace_memberships(workspace_id,user_id,role) values((select id from ba_ws where name='site'),'ca000000-0000-4000-8000-0000000000e2','owner');
+select pg_temp.ba_expect($q$select public.read_booking_setup((select id from ba_ws where name='other'),'ba-site','ca000000-0000-4000-8000-0000000000e2','ba-owner@example.test')$q$,'booking_not_found');
+select pg_temp.ba_expect($q$select public.read_booking_setup((select id from ba_ws where name='site'),'ba-site','ca000000-0000-4000-8000-0000000000e2','wrong@example.test')$q$,'booking_settings_denied');
+create temporary table ba_setup on commit drop as select public.configure_booking_setup((select id from ba_ws where name='site'),'ba-site',
+ 'ca000000-0000-4000-8000-0000000000e2','ba-owner@example.test',jsonb_build_object('mode','instant','expectedRevision',
+ (select revision from public.booking_settings where calendar_key='ca000000-0000-4000-8000-0000000000b1'),
+ 'bufferMinutes',20,'minNoticeMinutes',120,'maxAdvanceDays',40,'maxPerDay',5,'cancellationCutoffHours',12)) as r;
+select pg_temp.ba_assert((select (r->>'approvalRequired')::boolean from ba_setup) and (select mode='request' and buffer_minutes=20 from public.booking_settings where calendar_key='ca000000-0000-4000-8000-0000000000b1'),'instant setup stays request pending owner');
+select pg_temp.ba_expect($q$select public.configure_booking_setup((select id from ba_ws where name='site'),'ba-site','ca000000-0000-4000-8000-0000000000e2','ba-owner@example.test','{"expectedRevision":0,"mode":"request"}')$q$,'booking_settings_stale');
+select public.decide_booking_instant_policy((select id from ba_ws where name='site'),(select (r->>'policyId')::uuid from ba_setup),1,'approve','ca000000-0000-4000-8000-0000000000e2','ba-owner@example.test',false);
+select pg_temp.ba_assert((select mode='instant' from public.booking_settings where calendar_key='ca000000-0000-4000-8000-0000000000b1'),'owner standing approval switches to instant');
+select public.upsert_tenant_booking_settings('ba-site','{"mode":"instant","bufferMinutes":0,"minNoticeMinutes":0,"maxAdvanceDays":60}','dual_write');
+select pg_temp.ba_assert((select mode='instant' and buffer_minutes=20 and min_notice_minutes=120 and max_advance_days=40 and max_per_day=5 from public.booking_settings where calendar_key='ca000000-0000-4000-8000-0000000000b1'),'legacy mirrors preserve native policy controls');
+select pg_temp.ba_assert(not has_function_privilege('authenticated','public.configure_booking_setup(uuid,text,uuid,text,jsonb)','execute') and not has_table_privilege('service_role','public.booking_instant_policies','SELECT'),'setup authorization is only via scoped RPC');
+
+-- Calendar projection resolves verified owner authority; takes one lease and
+-- keeps provider work separate from authoritative booking data.
+insert into public.workspace_calendar_connections(workspace_id,provider,calendar_id,calendar_name,time_zone,status,created_by)
+ values((select id from ba_ws where name='site'),'google','fixture-calendar','Fixture calendar','America/New_York','connected','ca000000-0000-4000-8000-0000000000e2');
+create temporary table ba_mirror on commit drop as select public.prepare_booking_calendar_mirror(pg_temp.ba_id('ba_main'),'ca000000-0000-4000-8000-0000000000a1') as r;
+select pg_temp.ba_assert((select r->>'provider'='google' and r->>'userId'='ca000000-0000-4000-8000-0000000000e2' from ba_mirror),'projection uses verified owner');
+select pg_temp.ba_assert(public.prepare_booking_calendar_mirror(pg_temp.ba_id('ba_main'),'ca000000-0000-4000-8000-0000000000a2') is null,'second mirror claimant refused');
+select public.finish_booking_calendar_mirror(pg_temp.ba_id('ba_main'),'ca000000-0000-4000-8000-0000000000a2','verified','wrong-event',null);
+select pg_temp.ba_assert((select external_event_id is null from public.business_booking_calendar_mirrors where booking_id=pg_temp.ba_id('ba_main')),'wrong lease cannot finish');
+select public.finish_booking_calendar_mirror(pg_temp.ba_id('ba_main'),'ca000000-0000-4000-8000-0000000000a1','verified','fixture-event',null);
+select pg_temp.ba_assert((select status='confirmed' from public.business_bookings where id=pg_temp.ba_id('ba_main')),'calendar evidence never changes booking authority');
+select pg_temp.ba_assert(not has_function_privilege('authenticated','public.prepare_booking_calendar_mirror(uuid,uuid)','execute'),'mirror RPC not public');
+
+-- Inquiry offers: GET does not reserve, tokens cross no tenant identity,
+-- chosen times request owner approval, retry is stable and expiry fails closed.
+create temporary table ba_offer on commit drop as select public.issue_inquiry_booking_offer('ba-site',jsonb_build_object('inquiryId','fixture-inquiry','key','receipt',
+ 'customer',jsonb_build_object('name','Dana','email','dana@example.test'),'serviceId','svc-consult','serviceName','Consultation','timeZone','America/New_York',
+ 'bufferMinutes',15,'slots',jsonb_build_array(jsonb_build_object('start',now()+interval '50 days','end',now()+interval '50 days 30 minutes')),
+ 'tokenHash',repeat('c',64),'tokenCiphertext','enc:v1:fixture','expiresAt',now()+interval '72 hours')) as r;
+select pg_temp.ba_assert(public.read_inquiry_booking_receipt('ba-other','fixture-inquiry') is null,'other tenant cannot read receipt offer');
+select pg_temp.ba_assert(public.read_inquiry_booking_offer(repeat('d',64)) is null and public.read_inquiry_booking_offer(repeat('c',64))->>'booking_id' is null,'offer read reserves nothing');
+select pg_temp.ba_assert(public.choose_inquiry_booking_offer(repeat('c',64),now()+interval '50 days',pg_temp.ba_access(50))#>>'{booking,status}'='requested','choice makes an owner request');
+select pg_temp.ba_assert(public.choose_inquiry_booking_offer(repeat('c',64),now()+interval '50 days',pg_temp.ba_access(51))->>'status'='unchanged','choice retry stable');
+select pg_temp.ba_expect($q$select public.choose_inquiry_booking_offer(repeat('c',64),now()+interval '51 days',pg_temp.ba_access(51))$q$,'booking_request_conflict');
+update public.booking_inquiry_offers set expires_at=clock_timestamp()-interval '1 second' where token_hash=repeat('c',64);
+select pg_temp.ba_assert(public.read_inquiry_booking_offer(repeat('c',64)) is null,'expired offer cannot be opened');
+select pg_temp.ba_expect($q$select public.choose_inquiry_booking_offer(repeat('c',64),now()+interval '50 days',pg_temp.ba_access(51))$q$,'booking_not_found');
+select pg_temp.ba_assert(not has_function_privilege('anon','public.choose_inquiry_booking_offer(text,timestamptz,jsonb)','execute'),'inquiry choice service-role only');
+
 rollback;

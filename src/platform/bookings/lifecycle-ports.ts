@@ -1,3 +1,4 @@
+import { emailSendingEnabled } from "@/platform/infra/email/enabled";
 /**
  * The real ports of the booking lifecycle run (lifecycle.ts): the one store's
  * functions, the tenant config and owner-recipient rule for the business, the
@@ -101,6 +102,7 @@ export const bookingLifecyclePorts: BookingLifecyclePorts = {
   alternatives: (booking, now) => nextOpenTimes(booking, now),
   manageUrl,
   async send(input) {
+    if (!emailSendingEnabled()) return { status: "suppressed", reason: "email_gates" };
     if (input.audience === "customer") {
       const { bookingCustomerEmailAllowed } = await import("./updates");
       if (!await bookingCustomerEmailAllowed(input.tenantId ?? null)) return { status: "suppressed", reason: "email_gates" };

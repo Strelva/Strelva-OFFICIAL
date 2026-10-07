@@ -4,7 +4,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { decryptSecret, encryptSecret } from "@/platform/infra/crypto/secrets";
 import type { EmailOptions } from "@/platform/infra/email/layout";
-import { PublicBookingError } from "@/products/scheduling/public-booking";
+import { PublicBookingError } from "./errors";
 import { settingsOrDefault, timeZoneOf } from "./availability";
 import { bookingReadSource, bookingStoreWriteEnabled } from "./flags";
 import { nativeRpc, nativeSlots, newBookingAccess, tokenHash } from "./native";

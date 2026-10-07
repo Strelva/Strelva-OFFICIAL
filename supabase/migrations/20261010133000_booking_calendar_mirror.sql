@@ -77,4 +77,19 @@ end;
 $$;
 revoke all on function public.prepare_booking_calendar_mirror(uuid,uuid),public.finish_booking_calendar_mirror(uuid,uuid,text,text,text) from public,anon,authenticated;
 grant execute on function public.prepare_booking_calendar_mirror(uuid,uuid),public.finish_booking_calendar_mirror(uuid,uuid,text,text,text) to service_role;
+
+create function public.booking_calendar_mirror_candidates(p_limit integer) returns jsonb
+language sql stable security definer set search_path=public,pg_temp as $$
+ select coalesce(jsonb_agg(id),'[]') from (
+   select b.id from public.business_bookings b left join public.business_booking_calendar_mirrors m on m.booking_id=b.id
+   where b.workspace_id is not null and b.public_reservation_id is null and b.origin<>'import'
+     and ((b.status='confirmed' and b.end_at>clock_timestamp()) or (b.status='cancelled' and m.booking_id is not null))
+     and (m.claim_until is null or m.claim_until<=clock_timestamp())
+     and (m.booking_id is null or m.updated_at<b.updated_at or m.status in ('unknown','failed','accepted'))
+   order by b.updated_at,b.id limit least(greatest(p_limit,1),200)
+ ) candidates
+$$;
+revoke all on function public.booking_calendar_mirror_candidates(integer) from public,anon,authenticated;
+grant execute on function public.booking_calendar_mirror_candidates(integer) to service_role;
+
 commit;

@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { UnifiedEvent } from "@/lib/types";
 import type { SendEmailInput, SendEmailResult } from "@/platform/infra/email/send";
 import type { ServiceRequest } from "@/platform/service-requests/types";
@@ -105,6 +105,8 @@ function service(adapters?: SourceAdapter[]) {
     ],
   });
 }
+
+afterEach(() => vi.unstubAllEnvs());
 
 beforeEach(() => {
   process.env.APPROVE_LINK_SECRET = "needs-you-test-secret";
@@ -332,5 +334,32 @@ describe("the chase", () => {
     expect(summary.ownerNotTold).toBe(1);
     expect(sendEmail).not.toHaveBeenCalled();
     expect([...mem.items.values()][0]!.deliveries[0]).toMatchObject({ status: "suppressed", reason: "no_owner_recipient" });
+  });
+});
+
+
+describe("booking request clock ownership", () => {
+  async function setup() {
+    const row = await mem.store.open(WS, { kind: "customer.commitment", route: "owner_decides", title: "Consultation request", approveEffect: "Confirm", notYetEffect: "Decline", sourceLifecycle: "booking_request", sourceId: "booking-clock", revisionHash: "revision", urgent: true, adminMayDecide: false });
+    const resolve = vi.fn(async () => ({ outcome: "done" as const }));
+    const adapter: SourceAdapter = { lifecycle: "booking_request", needsMemberActor: false, propose: async () => ({ items: [], complete: true }), currentRevision: async () => "revision", resolve };
+    return { row, resolve, svc: service([adapter]) };
+  }
+  it("leaves day 3/7/14 to the booking clock when reminders are armed", async () => {
+    vi.stubEnv("STRELVA_BOOKING_STORE_WRITE", "1"); vi.stubEnv("STRELVA_BOOKING_REMINDERS", "1"); vi.stubEnv("STRELVA_BOOKING_OWNER_NOTICE", "1");
+    const { row, resolve, svc } = await setup();
+    await svc.chase(); sendEmail.mockClear();
+    for (const day of [3,7,14]) { clock.now = Date.parse(row.openedAt) + day * DAY; const result = await svc.chase(); expect(result.lapsed).toBe(0); expect(result.reminded).toBe(0); }
+    expect(sendEmail).not.toHaveBeenCalled(); expect(resolve).not.toHaveBeenCalled();
+    expect(mem.items.get(row.id)?.state).toBe("open");
+  });
+  it("keeps the prior generic clock with booking reminders off", async () => {
+    vi.stubEnv("STRELVA_BOOKING_REMINDERS", "0"); vi.stubEnv("STRELVA_BOOKING_OWNER_NOTICE", "1");
+    const { row, resolve, svc } = await setup(); clock.now = Date.parse(row.openedAt) + 14 * DAY;
+    expect((await svc.chase()).lapsed).toBe(1); expect(resolve).toHaveBeenCalledOnce();
+  });
+  it("does not email booking asks while owner notices are off", async () => {
+    vi.stubEnv("STRELVA_BOOKING_OWNER_NOTICE", "0");
+    const { svc } = await setup(); expect((await svc.chase()).urgent).toBe(0); expect(sendEmail).not.toHaveBeenCalled();
   });
 });

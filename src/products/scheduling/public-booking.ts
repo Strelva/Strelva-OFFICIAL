@@ -1,3 +1,4 @@
+import { PublicBookingError } from "@/platform/bookings/errors";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
@@ -252,12 +253,7 @@ export interface PublicBookingDependencies {
   createManagementToken?: () => string;
 }
 
-export class PublicBookingError extends Error {
-  constructor(readonly code: "unavailable" | "invalid" | "conflict" | "not_found", message: string, readonly status = code === "invalid" ? 400 : code === "not_found" ? 404 : code === "conflict" ? 409 : 503) {
-    super(message);
-    this.name = "PublicBookingError";
-  }
-}
+export { PublicBookingError } from "@/platform/bookings/errors";
 
 function boundedToken(value: string, label: string): string {
   const parsed = publicToken.safeParse(value);

@@ -14,7 +14,7 @@ function fixture(options: { status?: "reserved" | "accepted" | "unknown" | "writ
     recover: vi.fn(async () => work), reschedule: vi.fn(async () => mutate("accepted")), cancel: vi.fn(async () => mutate("cancelled")),
   } satisfies BookingCalendarService;
   const ports: BookingCalendarMirrorPorts = {
-    prepare: vi.fn(async () => ({ actor: { userId: "owner", verifiedEmail: "owner@example.test" }, workId: "work-1", provider: "google", booking: { ...booking, status: options.bookingStatus ?? "confirmed" } })),
+    prepare: vi.fn(async () => ({ actor: { userId: "owner", verifiedEmail: "owner@example.test" }, workId: "work-1", provider: "google" as const, booking: { ...booking, status: options.bookingStatus ?? "confirmed" } })),
     calendar, finish: vi.fn(async () => undefined),
   };
   return { ports, calendar, mutate };

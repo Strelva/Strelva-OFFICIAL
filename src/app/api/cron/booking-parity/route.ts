@@ -24,6 +24,6 @@ export async function GET(request: Request) {
   if (result.failed || result.outOfParity.length) await alertOnce("booking_parity", "high", {
     failed: result.failed, outOfParity: result.outOfParity.length,
   }, 20 * 3600).catch(() => undefined);
-  await recordHeartbeat("booking-parity", { ok: result.failed === 0, durationMs: Date.now() - started, processed: result.recorded, failed: result.failed });
+  await recordHeartbeat("booking-parity", { ok: result.failed === 0 && result.outOfParity.length === 0, durationMs: Date.now() - started, processed: result.recorded, failed: result.failed });
   return NextResponse.json(result);
 }

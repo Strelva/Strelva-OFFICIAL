@@ -15,6 +15,7 @@
  * recorded, never retried: a provider may have accepted it. Every dependency
  * is a port so the whole run is tested without Postgres or Resend.
  */
+import { bookingOwnerNoticeEnabled } from "./flags";
 import type { SendEmailInput, SendEmailResult } from "@/platform/infra/email/send";
 import { customerReminderEmail, ownerRequestReminderEmail, requestLapsedEmail, type ReminderEmail } from "./emails";
 import type { BookingMessageKind, BookingMessageStatus, ClaimedBookingMessage, StoreBooking } from "./store";
@@ -87,6 +88,7 @@ async function deliver(
   let to: string;
   let audience: SendEmailInput["audience"];
   if (kind === "request_owner_reminder") {
+    if (!bookingOwnerNoticeEnabled()) return skip("owner_notice_off");
     if (!business.ownerEmail) return skip("no_owner_recipient");
     to = business.ownerEmail;
     audience = "client";

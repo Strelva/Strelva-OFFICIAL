@@ -3,7 +3,7 @@
  * own resolver, chase them by email, and lapse them. Every dependency is a
  * port so the whole flow runs in tests without Redis, Postgres or Resend.
  */
-import { bookingRemindersEnabled } from "@/platform/bookings/flags";
+import { bookingRemindersEnabled, bookingOwnerNoticeEnabled } from "@/platform/bookings/flags";
 import type { SendEmailInput, SendEmailResult } from "@/platform/infra/email/send";
 import type { EmailDecision, EmailOptions } from "@/platform/infra/email/layout";
 import { buildWorkspaceApproveUrl, type WorkspaceApproveLinkClaims } from "@/lib/approve-link";
@@ -318,6 +318,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
           const fresh = await reconcile(readCtx, row);
           if (fresh === "gone" || fresh === "changed") continue;
         }
+        if (row.sourceLifecycle === "booking_request" && !bookingOwnerNoticeEnabled()) continue;
         if (row.urgent && row.deliveryState === "not_sent") {
           await deliver("urgent", [row], summary);
           summary.urgent += 1;

@@ -106,3 +106,20 @@ export function bookingCalendarMirrorPorts(calendar: BookingCalendarService): Bo
     },
   };
 }
+
+/** Bounded sweep at the app edge. Accepted/uncertain work uses read-only recovery. */
+export async function runBookingCalendarMirrors(ports: BookingCalendarMirrorPorts) {
+  const summary = { processed: 0, failed: 0 };
+  if (!bookingCalendarMirrorEnabled()) return summary;
+  const db = bookingStoreDb();
+  if (!db) throw new Error("Calendar copy storage is unavailable.");
+  const { data, error } = await db.rpc("booking_calendar_mirror_candidates", { p_limit: 200 });
+  if (error || !Array.isArray(data)) throw new Error("Calendar copy candidates are unavailable.");
+  for (const id of data) {
+    if (typeof id !== "string") throw new Error("Calendar copy candidates are malformed.");
+    const outcome = await mirrorBookingCalendar(id, ports);
+    summary.processed++;
+    if (outcome === "failed" || outcome === "unknown") summary.failed++;
+  }
+  return summary;
+}

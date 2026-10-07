@@ -81,14 +81,14 @@ begin
       p_via)
     on conflict (calendar_key) do update set
       workspace_id = coalesce(excluded.workspace_id, s.workspace_id),
-      mode = case when s.recorded_via = 'native' and p_via <> 'native' then s.mode else excluded.mode end, buffer_minutes = excluded.buffer_minutes,
-      min_notice_minutes = excluded.min_notice_minutes, max_advance_days = excluded.max_advance_days,
-      default_length_minutes = excluded.default_length_minutes, max_per_day = excluded.max_per_day,
-      timezone = excluded.timezone,
+      mode = case when s.recorded_via = 'native' and p_via <> 'native' then s.mode else excluded.mode end, buffer_minutes = case when s.recorded_via = 'native' and p_via <> 'native' then s.buffer_minutes else excluded.buffer_minutes end,
+      min_notice_minutes = case when s.recorded_via = 'native' and p_via <> 'native' then s.min_notice_minutes else excluded.min_notice_minutes end, max_advance_days = case when s.recorded_via = 'native' and p_via <> 'native' then s.max_advance_days else excluded.max_advance_days end,
+      default_length_minutes = case when s.recorded_via = 'native' and p_via <> 'native' then s.default_length_minutes else excluded.default_length_minutes end, max_per_day = case when s.recorded_via = 'native' and p_via <> 'native' then s.max_per_day else excluded.max_per_day end,
+      timezone = case when s.recorded_via = 'native' and p_via <> 'native' then s.timezone else excluded.timezone end,
       -- A mirror may change numeric settings, but never reopen the native
       -- hours or silently turn an owner-request schedule into instant mode.
       bookable_hours = case when s.recorded_via = 'native' and p_via <> 'native' then s.bookable_hours else excluded.bookable_hours end,
-      bookable_overrides = excluded.bookable_overrides, legacy_requires_payment = excluded.legacy_requires_payment,
+      bookable_overrides = case when s.recorded_via = 'native' and p_via <> 'native' then s.bookable_overrides else excluded.bookable_overrides end, legacy_requires_payment = excluded.legacy_requires_payment,
       recorded_via = case when s.recorded_via = 'native' then 'native' else excluded.recorded_via end, revision = s.revision + 1, updated_at = clock_timestamp()
     returning * into v_row;
   exception

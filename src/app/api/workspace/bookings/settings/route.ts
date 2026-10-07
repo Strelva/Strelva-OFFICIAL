@@ -1,7 +1,7 @@
 import { isRateLimitedWindowedAsync } from "@/platform/infra/rate-limit";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
 import { readWorkspaceBody, workspaceHttpActor, workspaceHttpFailure, workspaceJson, workspaceWriteGuard } from "@/platform/workspaces/http";
-import { BookingSettingsError, bookingSettingsChange, bookingSettingsEnabled, changeBookingSettings, readBookingSettings } from "@/products/bookings/settings";
+import { BookingSettingsError, bookingSettingsChange, bookingSettingsEnabled, changeBookingSettings, readBookingSettings } from "@/products/bookings/server";
 
 export const dynamic = "force-dynamic";
 function failure(error: unknown) {
