@@ -7,7 +7,7 @@ import { CLIENT_RECORD_STORE_DEFINITIONS, inquiryDeliveryRecord } from "@/platfo
 const accepted = { tenantId: "previous-slug", inquiryId: "inquiry-a", action: "reply", status: "accepted", attemptId: "attempt-a", attempts: 1, startedAt: "2026-10-01T00:00:00Z", acceptedAt: "2026-10-01T00:00:01Z", providerMessageId: "provider-a" };
 function redisStore() {
   const values = new Map<string, unknown>();
-  const redis = { get: vi.fn(async (key: string) => values.get(key) ?? null), set: vi.fn(async (key: string, value: unknown, opts?: { nx?: boolean }) => { if (opts?.nx && values.has(key)) return null; values.set(key, value); return "OK"; }), eval: vi.fn(async () => 1), del: vi.fn(async () => 1), zadd: vi.fn(async () => 1), zrange: vi.fn(async () => []), scan: vi.fn(async () => ["0", [...values.keys()]]) };
+  const redis = { get: vi.fn(async (key: string) => values.get(key) ?? null), set: vi.fn(async (key: string, value: unknown, opts?: { nx?: boolean }) => { if (opts?.nx && values.has(key)) return null; values.set(key, value); return "OK"; }), eval: vi.fn(async () => 1), del: vi.fn(async () => 1), zadd: vi.fn(async () => 1), zrange: vi.fn(async () => []), scan: vi.fn(async (_cursor: unknown, _options: { match: string }) => ["0", [...values.keys()]]) };
   return { values, redis, store: createRedisInquiryDeliveryStore(redis as never) };
 }
 beforeEach(() => { vi.clearAllMocks(); mocks.stores.mockReturnValue(new Set(["inquiry_delivery"])); mocks.source.mockResolvedValue("postgres"); mocks.rows.mockResolvedValue([]); mocks.mirror.mockResolvedValue({ status: "recorded" }); });
