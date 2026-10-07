@@ -949,3 +949,6 @@ bash "$repo_root/scripts/check-customer-mapping-sql.sh"
 # Inquiry capabilities use their own isolated fictional tenant fixture. This
 # validates the additive migration without connecting to production.
 bash "$repo_root/scripts/check-inquiry-workspace-sql.sh"
+
+# Agency-sourced public checks: real RLS, quota races and rollback stop points.
+bash "$repo_root/scripts/check-agency-prospects-sql.sh"

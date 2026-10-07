@@ -163,6 +163,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261010152000": "catalog_report_receipts",
   "20261010153000": "newsletter_contact_sync",
   "20261011100000": "workspace_newsletter_batches",
+  "20261011170000": "prospects",
   "20261012110000": "business_pages",
 };
 
