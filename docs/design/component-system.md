@@ -146,6 +146,12 @@ and the owner action. Desktop/mobile fixture proof is recorded in the
 [Wave 6 website handoff](../product/streams/w6-website.md); no production proof
 is implied.
 
+October 7, Wave 6 cutover undo: [WebsiteCutoverUndo](../../src/experience/websites/WebsiteRecoveryControls.tsx)
+requires separate confirmations that the owner restored DNS and opened and
+tested the old website. Its copy states that Strelva switches its routing
+after those confirmations; it does not claim an automatic fallback check.
+The shared Button remains disabled until both confirmations are checked.
+
 Keep completion scoped to named consumers. A repaired Button does not migrate all
 native buttons, and passing component tests does not prove an entire page journey.
 Record local checks with their revision and limitations in the existing
