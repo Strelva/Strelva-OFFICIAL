@@ -48,8 +48,10 @@ The combined release-safety gate still fails on the existing missing migration
 sentinel; its rehearsal passes directly. Forced stop failure was not injected;
 SIGKILL cannot run traps.
 
-Next: open the PR for `a1/temp-cluster-cleanup` against `integrate/reborn-1.0`, then
-orchestrator review/integration. The missing readiness sentinel belongs to another
+PR: https://github.com/Strelva/Strelva-OFFICIAL/pull/543 (Closes #500), linked to
+the Croki thread. Branch pushed; review/merge remains with the orchestrator.
+
+Next: review/integrate PR #543 into `integrate/reborn-1.0`. The missing readiness sentinel belongs to another
 stream; do not edit it for this cleanup fix. Shared conflict surfaces: the
 top/startup lines of four SQL shell scripts and the release-safety entry
 point/primitives. SQL bodies and migrations were untouched.
