@@ -37,7 +37,9 @@ import { DeploymentStatus } from "./DeploymentStatus";
 import { BillingPanel } from "./BillingPanel";
 import { IntegrationsPanel } from "./IntegrationsPanel";
 import { getTenantSiteName } from "@/lib/tenant-display";
-import { ClientLogo, Chip, faviconFor } from "../../console";
+import { getClientLeadsForOperator } from "@/lib/client-leads";
+import { ClientLeadList } from "../../client-leads/ClientLeadList";
+import { ClientLogo, Chip, faviconFor, Panel, PanelLink } from "../../console";
 import { ChevronLeft, LayoutDashboard, Eye, ExternalLink } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -100,7 +102,7 @@ export default async function ClientDetailPage({
     subscriptionStatus: null,
   };
 
-  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk, dailyMetrics, suggestions, vercelStatus, goal, account, reportCadence, replyVoice, contentAutonomy, clientEmailOverride] =
+  const [pageViews, bookingClicks, drafts, activity, lastScan, domainClaims, scanHistory, visSnapshots, reviews, crm, atRisk, dailyMetrics, suggestions, vercelStatus, goal, account, reportCadence, replyVoice, contentAutonomy, clientEmailOverride, clientLeads] =
     await Promise.all([
       getClickCounts("page-view", id).catch(() => ({ thisWeek: 0, total: 0 })),
       getClickCounts("booking-click", id).catch(() => ({ thisWeek: 0, total: 0 })),
@@ -122,6 +124,7 @@ export default async function ClientDetailPage({
       getReplyVoice(id).catch(() => ({ mode: "approve" as const, guidance: "", templates: [], updatedAt: null })),
       getContentAutonomy(id).catch(() => "approve" as const),
       getClientEmailOverride(id).catch(() => "inherit" as const),
+      getClientLeadsForOperator({ tenant: id, limit: 5 }).catch(() => null),
     ]);
   const opportunities = operatorSuggestions(suggestions);
   const deployStatus = vercelStatus && vercelStatus.ok ? vercelStatus.data : null;
@@ -266,6 +269,24 @@ export default async function ClientDetailPage({
           </>
         )}
       </div>
+
+      {/* ── Who reached out ── */}
+      <Section label="Who reached out">
+        <Panel
+          title="Leads from their website"
+          trailing={<PanelLink href={`/admin/client-leads?tenant=${encodeURIComponent(tenant.id)}`}>All leads →</PanelLink>}
+        >
+          {!clientLeads || (clientLeads.postgres !== "ok" && clientLeads.redis !== "ok") ? (
+            <p className="px-[18px] pb-4 text-[12.5px] text-gray-muted">Leads couldn&apos;t be read right now.</p>
+          ) : clientLeads.leads.length === 0 ? (
+            <p className="px-[18px] pb-4 text-[12.5px] text-gray-muted">No one has sent a form through this site yet.</p>
+          ) : (
+            <div className="px-3 pb-3">
+              <ClientLeadList leads={clientLeads.leads} showClient={false} />
+            </div>
+          )}
+        </Panel>
+      </Section>
 
       {/* ── How they're doing ── */}
       <Section label="How they're doing">

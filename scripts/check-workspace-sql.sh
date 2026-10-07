@@ -364,6 +364,11 @@ do $$ begin
 end $$;
 SQL
 
+# Strelva 0.2.1: client leads copied to Postgres. The business record is not
+# on this branch, so the conversion trigger stays absent and the test skips it.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261005090000_tenant_leads.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
+
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

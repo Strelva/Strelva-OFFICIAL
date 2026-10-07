@@ -101,6 +101,7 @@ insert into public.report_snapshots (tenant_id, period, metrics)
 SQL
 
 tail_started=0
+early_lead_migration="20261005090000_tenant_leads.sql"
 for migration in $(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -name '20*.sql' | sort); do
   migration_name="$(basename "$migration")"
   if [[ "$tail_started" -eq 0 ]]; then
@@ -108,6 +109,19 @@ for migration in $(find "$repo_root/supabase/migrations" -maxdepth 1 -type f -na
       continue
     fi
     tail_started=1
+  fi
+  if [[ "$migration_name" == "$early_lead_migration" ]]; then
+    printf 'Skipping %s: applied ahead of the October 1 migrations above.\n' "$migration_name"
+    continue
+  fi
+  if [[ "$migration_name" == "20261001120000_website_documents.sql" ]]; then
+    # Production is at 20260930120000. The client lead store must be safe to
+    # apply first, on its own, before the unapplied October 1 migrations; prove
+    # that order here. A later business record migration must create the
+    # conversion trigger itself.
+    printf 'Applying client lead store ahead of October 1: %s\n' "$early_lead_migration"
+    psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/$early_lead_migration" >/dev/null
+    psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
   fi
   printf 'Applying ordered workspace/recovery migration: %s\n' "$migration_name"
   if [[ "$migration_name" == "20260920060000_content_version_request_id.sql" ]]; then
@@ -208,5 +222,6 @@ psql "${psql_args[@]}" --file="$repo_root/tests/function-exposure-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/website-documents-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/domain-registration-attempt-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-website-document-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"

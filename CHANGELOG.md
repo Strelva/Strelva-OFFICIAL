@@ -3,6 +3,15 @@
 Strelva uses [Semantic Versioning](https://semver.org/) and releases the app and
 marketing site in lockstep. Their `package.json` versions must always match.
 
+## 0.2.1 - Unreleased
+
+- Keep every client website lead in Postgres as well as Redis, so leads survive the 90-day and 500-lead Redis window. A failed copy never changes the visitor's response; it waits in Redis and an hourly job retries it.
+- Copy the leads Redis still holds into Postgres with a backfill script that dry-runs by default.
+- Show operators every client's leads at `/admin/client-leads` and on each client page.
+- Check all nine client repositories against the `/api/v1` contract.
+
+The `tenant_leads` migration, the deploy and the backfill each need a separate production yes.
+
 ## 0.2.0 - Unreleased
 
 - Create private website drafts from business briefs, review exact revisions, and download buildable website projects.

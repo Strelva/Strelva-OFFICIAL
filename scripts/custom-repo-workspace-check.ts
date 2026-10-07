@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from "fs";
 import path from "path";
 import { execFileSync } from "node:child_process";
 import { runPlatformContractConformance } from "./custom-repo-conformance";
+import { checkV1CallSites, type V1CallSite } from "./custom-repo-v1-contracts";
 
 /**
  * Custom-repo workspace check. Two kinds of proof, kept honest about which is which:
@@ -24,6 +25,16 @@ import { runPlatformContractConformance } from "./custom-repo-conformance";
  * repo must meet + per-repo extras). Adding a client repo is a manifest entry, NOT
  * a code edit — that's the whole point of the repair (the old checker hard-coded a
  * 2-tenant array that would need editing for every new client).
+ *
+ * Repos that are not built on the REB content contract (static sites, sites that
+ * only send tracker/lead beacons) name a `profile` from `customRepoWorkspace.profiles`
+ * instead of inheriting `baseline`. A repo with no `profile` gets `baseline`
+ * exactly as before, so the gldf/rohlax checks are unchanged.
+ *
+ *  3. V1 CALL SITES: each repo's `v1CallSites` are read at the pinned
+ *     `compatibleCommit` (the revision the manifest claims is compatible), not the
+ *     owner's working tree, and checked by `checkV1CallSites`. When the pin is not
+ *     in the local clone, the working tree is read and the detail says so.
  */
 
 export type CheckResult = {
@@ -37,21 +48,37 @@ export type CheckResult = {
 type RepoCheck = {
   tenant: string;
   repoDir: string;
+  profile: string;
+  v1Endpoints: string[];
+  v1CallSites: V1CallSite[];
   packageScripts: string[];
   requiredFiles: string[];
   releaseRequiredEnv: string[];
   compatibleCommit: string | null;
 };
 
+type Requirements = { packageScripts?: string[]; requiredFiles?: string[]; requiredEnv?: string[]; description?: string };
+
 export type WorkspaceManifest = {
   contractVersion?: string;
   customRepoWorkspace?: {
     contractVersion?: string;
-    baseline?: { packageScripts?: string[]; requiredFiles?: string[]; requiredEnv?: string[] };
+    baseline?: Requirements;
+    /** Named alternatives to `baseline` for repos not built on the REB content contract. */
+    profiles?: Record<string, Requirements>;
     repos?: Array<{
       tenant: string;
       localPath: string;
+      /** Name in `profiles`; omitted = `baseline`. */
+      profile?: string;
       compatibleCommit?: string;
+      v1Endpoints?: string[];
+      v1CallSites?: V1CallSite[];
+      /** false when the slug could not be confirmed against live data. */
+      tenantConfirmed?: boolean;
+      tenantEvidence?: string;
+      pinSource?: string;
+      notes?: string;
       packageScripts?: string[];
       requiredFiles?: string[];
       requiredEnv?: string[];
@@ -64,13 +91,18 @@ export type WorkspaceManifest = {
 export function resolveRepoChecks(manifest: WorkspaceManifest, workspaceRoot: string, cwd: string): RepoCheck[] {
   const ws = manifest.customRepoWorkspace;
   if (!ws?.repos) return [];
-  const base = ws.baseline ?? {};
   const merge = (a: string[] = [], b: string[] = []) => [...new Set([...a, ...b])];
   return ws.repos.map((repo) => {
     if (!repo.localPath) throw new Error(`release-manifest.json: repo "${repo.tenant}" has no localPath`);
+    const profile = repo.profile ?? "baseline";
+    const base = repo.profile ? ws.profiles?.[repo.profile] : ws.baseline ?? {};
+    if (!base) throw new Error(`release-manifest.json: repo "${repo.tenant}" names unknown profile "${repo.profile}"`);
     return {
       tenant: repo.tenant,
       repoDir: path.relative(workspaceRoot, path.resolve(cwd, repo.localPath)),
+      profile,
+      v1Endpoints: repo.v1Endpoints ?? [],
+      v1CallSites: repo.v1CallSites ?? [],
       packageScripts: merge(base.packageScripts, repo.packageScripts),
       requiredFiles: merge(base.requiredFiles, repo.requiredFiles),
       releaseRequiredEnv: merge(base.requiredEnv, repo.requiredEnv),
@@ -85,6 +117,31 @@ export function workspaceContractVersion(manifest: WorkspaceManifest): string {
 }
 
 // ── import-safe workspace checks ────────────────────────────────────────────
+
+function git(cwd: string, args: string[], trim = true): string {
+  const out = execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  return trim ? out.trim() : out;
+}
+
+function gitOk(cwd: string, args: string[]): boolean {
+  try {
+    execFileSync("git", args, { cwd, stdio: ["ignore", "ignore", "ignore"] });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Describe how the checked-out revision relates to the pin (read-only git). */
+function lineage(repoPath: string, pin: string | null, actual: string): string {
+  if (!pin) return "no pin";
+  if (!gitOk(repoPath, ["cat-file", "-e", `${pin}^{commit}`])) return "pin not in this clone";
+  if (gitOk(repoPath, ["merge-base", "--is-ancestor", pin, actual])) {
+    return `${git(repoPath, ["rev-list", "--count", `${pin}..${actual}`])} commit(s) ahead of the pin`;
+  }
+  if (gitOk(repoPath, ["merge-base", "--is-ancestor", actual, pin])) return "behind the pin";
+  return "diverged from the pin";
+}
 
 /**
  * Run the executable contract and structural workspace checks without doing
@@ -110,6 +167,36 @@ export function runWorkspaceChecks(
   function recordSkip(name: string, detail: string) {
     results.push({ name, ok: true, skipped: true, detail });
   }
+  function checkCallSites(repo: RepoCheck, repoPath: string) {
+    if (repo.v1Endpoints.length === 0 && repo.v1CallSites.length === 0) return;
+    const pin = repo.compatibleCommit;
+    const pinAvailable = Boolean(pin) && gitOk(repoPath, ["cat-file", "-e", `${pin}^{commit}`]);
+    const readSource = (file: string): string | null => {
+      if (pinAvailable) {
+        try {
+          return git(repoPath, ["show", `${pin}:${file}`], false);
+        } catch {
+          return null;
+        }
+      }
+      const full = path.join(repoPath, file);
+      return existsSync(full) ? readFileSync(full, "utf8") : null;
+    };
+    results.push({
+      name: `${repo.tenant}:v1:source`,
+      ok: true,
+      detail: pinAvailable ? `call sites read at pin ${pin!.slice(0, 7)}` : "pin not in local clone; call sites read from the working tree",
+    });
+    for (const r of checkV1CallSites({
+      tenant: repo.tenant,
+      v1Endpoints: repo.v1Endpoints,
+      callSites: repo.v1CallSites,
+      readSource,
+      platformRoot: cwd,
+    })) {
+      record(r.name, r.ok, r.detail);
+    }
+  }
   function read(filePath: string): string {
     return readFileSync(filePath, "utf8");
   }
@@ -120,6 +207,8 @@ export function runWorkspaceChecks(
     return ok;
   }
   function checkPackageScripts(repo: RepoCheck) {
+    // A static site has no package.json; a profile with no scripts skips this.
+    if (repo.packageScripts.length === 0) return;
     if (!checkFile(repo, "package.json")) return;
     const pkg = JSON.parse(read(path.join(workspaceRoot, repo.repoDir, "package.json")));
     for (const script of repo.packageScripts) {
@@ -128,6 +217,9 @@ export function runWorkspaceChecks(
     }
   }
   function checkReleaseManifest(repo: RepoCheck) {
+    // Only repos whose requirements include their own release manifest carry
+    // one (the baseline does; the beacon/static profiles do not).
+    if (!repo.requiredFiles.includes("release-manifest.json")) return;
     if (!checkFile(repo, "release-manifest.json")) return;
     const repoManifest = JSON.parse(read(path.join(workspaceRoot, repo.repoDir, "release-manifest.json")));
     record(
@@ -162,11 +254,14 @@ export function runWorkspaceChecks(
     record(`${repo.tenant}:repo`, true);
     if (options.verifyPins) {
       try {
-        const actual = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoPath, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+        const actual = git(repoPath, ["rev-parse", "HEAD"]);
         record(`${repo.tenant}:release:checkout`, actual === repo.compatibleCommit,
-          `expected ${repo.compatibleCommit}; checkout is ${actual}`);
-        const changes = execFileSync("git", ["status", "--porcelain", "--untracked-files=normal"], { cwd: repoPath, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
-        record(`${repo.tenant}:release:clean`, !changes, "checkout has local changes; use an isolated checkout of the pinned revision");
+          `expected ${repo.compatibleCommit}; checkout is ${actual} (${lineage(repoPath, repo.compatibleCommit, actual)}). ` +
+          "Release proof needs an isolated checkout of the pin: set CUSTOM_REPO_CHECKOUTS_ROOT (docs/operations/testing-and-ci.md).");
+        const changes = git(repoPath, ["status", "--porcelain", "--untracked-files=normal"]);
+        const count = changes ? changes.split("\n").length : 0;
+        record(`${repo.tenant}:release:clean`, !changes,
+          `checkout has ${count} changed path(s); use an isolated checkout of the pinned revision, never reset the owner's folder`);
       } catch {
         record(`${repo.tenant}:release:checkout`, false, "could not verify the client checkout revision");
       }
@@ -174,6 +269,7 @@ export function runWorkspaceChecks(
     checkPackageScripts(repo);
     for (const file of repo.requiredFiles) checkFile(repo, file);
     checkReleaseManifest(repo);
+    checkCallSites(repo, repoPath);
   }
 
   return results;
