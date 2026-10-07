@@ -26,6 +26,7 @@ export function createEmailInquiryTransport(options: { allowExternalSends?: bool
           audience: message.audience,
           tenantId: message.audience === "client" ? message.tenantId : undefined,
           to: message.to,
+          ...(message.tags?.strelva_booking_offer === "1" ? { fromAddress: "bookings@mail.strelva.com", fromName: message.fromName || "Strelva" } : {}),
           ...(message.replyTo ? { replyTo: message.replyTo } : {}),
           subject: message.subject,
           options: message.options,

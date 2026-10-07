@@ -21,6 +21,7 @@ import {
   lapseBookingRequests,
   readBookingContext,
   readTenantBookings,
+  bookingStoreDb,
   type StoreBooking,
 } from "./store";
 
@@ -92,8 +93,12 @@ export const bookingLifecyclePorts: BookingLifecyclePorts = {
     if (!booking.tenantId) return null;
     const config = await getTenantConfig(booking.tenantId);
     if (!config) return null;
+    const details = await bookingStoreDb()?.rpc("read_booking_business_details", { p_tenant_id: booking.tenantId });
+    if (details?.error) throw new Error("booking_business_facts_unavailable");
+    const facts = details?.data as { name?: string; address?: string } | null;
     return {
-      name: config.siteName ?? "",
+      name: facts?.name ?? config.siteName ?? "",
+      address: facts?.address ?? "",
       tenantId: booking.tenantId,
       ownerEmail: await ownerNoticeEmail(config).catch(() => null),
       siteUrl: getTenantPublicUrl(config),
@@ -103,10 +108,8 @@ export const bookingLifecyclePorts: BookingLifecyclePorts = {
   manageUrl,
   async send(input) {
     if (!emailSendingEnabled()) return { status: "suppressed", reason: "email_gates" };
-    if (input.audience === "customer") {
-      const { bookingCustomerEmailAllowed } = await import("./updates");
-      if (!await bookingCustomerEmailAllowed(input.tenantId ?? null)) return { status: "suppressed", reason: "email_gates" };
-    }
+    const { bookingCustomerEmailAllowed } = await import("./updates");
+    if (!await bookingCustomerEmailAllowed(input.tenantId ?? null)) return { status: "suppressed", reason: "email_gates" };
     return sendEmailWithReceipt(input);
   },
   appOrigin: bookingAppOrigin(),

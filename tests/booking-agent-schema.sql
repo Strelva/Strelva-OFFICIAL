@@ -253,4 +253,33 @@ select pg_temp.ba_assert(public.read_inquiry_booking_offer(repeat('c',64)) is nu
 select pg_temp.ba_expect($q$select public.choose_inquiry_booking_offer(repeat('c',64),now()+interval '50 days',pg_temp.ba_access(51))$q$,'booking_not_found');
 select pg_temp.ba_assert(not has_function_privilege('anon','public.choose_inquiry_booking_offer(text,timestamptz,jsonb)','execute'),'inquiry choice service-role only');
 
+-- Same-status receipt reschedules write one history event and both update audiences.
+select public.record_tenant_booking('ba-site',pg_temp.ba_booking('ba_receipt_move',55,'{"status":"confirmed","origin":"site"}'),'native');
+select public.record_tenant_booking('ba-site',pg_temp.ba_booking('ba_receipt_move',56,'{"status":"confirmed","origin":"site"}'),'native');
+select pg_temp.ba_assert((select count(*) from public.business_booking_history where booking_id=pg_temp.ba_id('ba_receipt_move') and reason='Customer rescheduled')=1,'reschedule history recorded');
+select public.record_tenant_booking('ba-site',pg_temp.ba_booking('ba_receipt_move',56,'{"status":"confirmed","origin":"site"}'),'native');
+select pg_temp.ba_assert((select count(*) from public.business_booking_history where booking_id=pg_temp.ba_id('ba_receipt_move') and reason='Customer rescheduled')=1,'reschedule retry does not duplicate history');
+select pg_temp.ba_assert(public.read_booking_business_details('ba-site')->>'name'='Agent Fixture Firm','confirmation business name');
+select pg_temp.ba_assert(not has_function_privilege('service_role','public.record_tenant_booking_before_w6(text,jsonb,text)','execute') and not has_function_privilege('anon','public.read_booking_business_details(text)','execute'),'wrapper and facts grants');
+
+-- Native widget management mirrors its rollback row and restarts a request clock.
+insert into public.bookings(id,tenant_id,service_id,service_name,date,start_time,end_time,client_name,client_email,client_phone,status)
+ values('ba_widget_move','ba-site','consultation','Consultation',current_date+57,'09:00','09:30','Dana Reed','dana@example.test','','confirmed');
+select public.record_tenant_booking('ba-site',pg_temp.ba_booking('ba_widget_move',57,'{"status":"confirmed","origin":"site"}'),'native');
+select public.issue_booking_access('ba-site','ba_widget_move',pg_temp.ba_access(60));
+update public.booking_settings set mode='request' where calendar_key='ca000000-0000-4000-8000-0000000000b1';
+update public.business_bookings set created_at=clock_timestamp()-interval '4 days' where id=pg_temp.ba_id('ba_widget_move');
+select public.change_native_booking(lpad(to_hex(180),64,'0'),jsonb_build_object('action','reschedule','start',now()+interval '58 days','end',now()+interval '58 days 30 minutes','forceRequest',false));
+select pg_temp.ba_assert((select requested_at>clock_timestamp()-interval '1 minute' from public.business_bookings where id=pg_temp.ba_id('ba_widget_move')),'reschedule starts fresh request clock');
+select pg_temp.ba_assert((select date=(now()+interval '58 days' at time zone 'America/New_York')::date and status='requested' from public.bookings where id='ba_widget_move'),'legacy management row matches native');
+select public.lapse_booking_requests(clock_timestamp(),500);
+select pg_temp.ba_assert((select status='requested' from public.business_bookings where id=pg_temp.ba_id('ba_widget_move')),'old creation does not immediately lapse new request');
+select public.claim_booking_messages(clock_timestamp(),500);
+select pg_temp.ba_assert(not exists(select 1 from public.business_booking_messages where booking_id=pg_temp.ba_id('ba_widget_move') and kind='request_owner_reminder'),'new request does not inherit overdue chase');
+select public.change_native_booking(lpad(to_hex(180),64,'0'),jsonb_build_object('action','reschedule','start',now()+interval '1 hour','end',now()+interval '90 minutes','forceRequest',false));
+select public.change_native_booking(lpad(to_hex(180),64,'0'),'{"action":"cancel"}');
+select pg_temp.ba_assert((select status='cancelled' and cancelled_at is not null from public.bookings where id='ba_widget_move'),'cancel mirrors legacy rollback row');
+select pg_temp.ba_assert(exists(select 1 from public.business_booking_history where booking_id=pg_temp.ba_id('ba_widget_move') and reason='Customer cancelled after the cancellation cutoff'),'late cancellation recorded without blocking');
+select pg_temp.ba_assert(not has_function_privilege('service_role','public.change_native_booking_before_w6(text,jsonb)','execute'),'native wrapper cannot be bypassed');
+
 rollback;

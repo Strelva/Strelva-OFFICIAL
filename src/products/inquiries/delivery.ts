@@ -202,6 +202,7 @@ export function getInquiryDeliveryMessageDigest(message: InquiryDeliveryMessage)
     audience: message.audience,
     to: message.to,
     replyTo: message.replyTo ?? null,
+    ...(message.fromName ? { fromName: message.fromName } : {}),
     tags: message.tags ?? null,
     subject: message.subject,
     options: message.options,

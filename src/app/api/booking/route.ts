@@ -7,7 +7,7 @@ import { isRateLimitedAsync, isRateLimitedPerInstance, rateLimitKey } from "@/pl
 import { deliverBookingUpdates, notifyBookingRequestNow } from "@/platform/bookings/updates";
 import { issueNativeAccess } from "@/platform/bookings/native";
 import { readTenantBookings } from "@/platform/bookings/store";
-import { bookingMessagesEnabled, bookingReadSource } from "@/platform/bookings/flags";
+import { bookingMessagesEnabled, bookingOwnerNoticeEnabled, bookingReadSource } from "@/platform/bookings/flags";
 import { readJsonObject } from "@/lib/request-body";
 import { sendBookingConfirmation } from "@/lib/delivery-email";
 import { notifyOwnerOfBooking } from "@/platform/bookings/notices";
@@ -140,6 +140,10 @@ export async function POST(request: Request) {
       },
       tenant
     ));
+    if (requested && bookingOwnerNoticeEnabled() && !bookingMessagesEnabled() && await bookingReadSource() === "postgres") {
+      const saved = (await readTenantBookings(tenant).catch(() => [])).find(b => b.legacyId === result.booking.id);
+      if (saved) await afterStored("request owner", () => notifyBookingRequestNow(saved));
+    }
     if (bookingMessagesEnabled() && await bookingReadSource() === "postgres") {
       const saved = (await readTenantBookings(tenant).catch(() => [])).find(b => b.legacyId === result.booking.id);
       let confirmationSent = false;

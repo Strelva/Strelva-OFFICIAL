@@ -146,6 +146,7 @@ export async function prepareInquiryDeliveryMessage(inquiry: InquiryDeliverySubm
       const booking = bookingOfferEmailOptions(offer);
       message.options = { ...message.options, rows: [...(message.options.rows ?? []), ...(booking.rows ?? [])], button: booking.button };
       message.tags = { ...message.tags, strelva_booking_offer: "1" };
+      message.fromName = inquiryBusinessName(inquiry, route.businessName);
     }
   }
   return message;
