@@ -30,6 +30,7 @@ export interface SystemHealth {
   /** One plain sentence from the evidence. Never claims a check that did not happen. */
   summary: string;
   lastVerifiedAt?: string | null;
+  signals?: string[];
 }
 
 export type SystemConnectionKind = "read" | "act" | "appear" | "share" | "depend" | "trigger";

@@ -24,6 +24,8 @@ export interface WorkPlanGenerationInput {
   userGoal: string;
   evidence: readonly WorkPlanEvidence[];
   allowedOperations: readonly WorkPlanNativeOperation[];
+  /** Resolved for the target workspace; absent preserves the original prompt. */
+  linkedFieldsEnabled?: boolean;
   /** Exact admission identity used to bind a provider billing receipt. */
   executionContext?: BudgetExecutionEvidenceContext & {
     kind: "model";
@@ -81,7 +83,7 @@ export async function defaultGenerate(input: WorkPlanGenerationInput): Promise<u
   // planning call from becoming a 40-second primary-plus-fallback request.
   const abortSignal = AbortSignal.timeout(20_000);
   const options = () => ({
-    system: PLANNING_SYSTEM_PROMPT,
+    system: PLANNING_SYSTEM_PROMPT + (input.linkedFieldsEnabled ? " When the outcome includes clients or staff assignments, use contact fields for business contacts and assigned_person for the one staff assignee; records reference their business IDs." : ""),
     prompt: promptFor(input),
     output: Output.object({ schema: generatedWorkPlanSchema }),
     maxOutputTokens: 1_800,

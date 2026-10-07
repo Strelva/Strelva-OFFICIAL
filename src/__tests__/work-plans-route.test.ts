@@ -8,18 +8,20 @@ const mocks = vi.hoisted(() => ({
   read: vi.fn(),
   list: vi.fn(),
   present: vi.fn(),
+  fallback: vi.fn(),
 }));
 
 vi.mock("@/platform/infra/db/server-client", () => ({ getSessionUser: mocks.user }));
 vi.mock("@/platform/workspace-release", () => ({ workspaceReleaseEnabled: mocks.release }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedWindowedAsync: mocks.rate }));
+vi.mock("@/products/work-plans/failure-request", () => ({ fileFailedSystemPlanRequest: mocks.fallback }));
 vi.mock("@/products/work-plans", async () => {
   const actual = await vi.importActual<Record<string, unknown>>("@/products/work-plans");
   return { ...actual, createWorkPlan: mocks.create, readWorkPlan: mocks.read, listWorkPlanOutputs: mocks.list, presentWorkPlan: mocks.present };
 });
 
 import { GET, POST } from "@/app/api/work-plans/route";
-import { WorkPlanFundingRequiredError } from "@/products/work-plans";
+import { WorkPlanFundingRequiredError, WorkPlanUnavailableError } from "@/products/work-plans";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 
 const workspaceId = "22222222-2222-4222-8222-222222222222";
@@ -44,9 +46,28 @@ beforeEach(() => {
   mocks.read.mockResolvedValue(record);
   mocks.list.mockResolvedValue([]);
   mocks.present.mockReturnValue({ work: { id: workId }, plan: { version: 1, status: "ready" } });
+  mocks.fallback.mockResolvedValue(null);
 });
 
 describe("workspace work-plan route", () => {
+  it("reports the confirmed fallback Request without claiming a plan or accepted job", async () => {
+    mocks.create.mockRejectedValue(new WorkPlanUnavailableError());
+    mocks.fallback.mockResolvedValue(workId);
+    const response = await POST(postRequest({ workspaceId, userGoal: "Make an intake" }));
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "Strelva couldn't draft this yet. Your Request is filed for review; scope and deadline are not agreed.", code: "planning_request_filed", requestId: workId });
+    expect(mocks.present).not.toHaveBeenCalled();
+  });
+  it("preserves the original unavailable response when Systems is off", async () => {
+    mocks.create.mockRejectedValue(new WorkPlanUnavailableError());
+    const response = await POST(postRequest({ workspaceId, userGoal: "Make an intake" }));
+    expect(await response.json()).toEqual({ error: "Planning is unavailable right now. Nothing was saved.", code: "planning_unavailable" });
+  });
+  it("preserves the failed goal when fallback storage also fails", async () => {
+    mocks.create.mockRejectedValue(new WorkPlanUnavailableError()); mocks.fallback.mockRejectedValue(new Error("storage"));
+    const response = await POST(postRequest({ workspaceId, userGoal: "Make an intake" }));
+    expect(await response.json()).toMatchObject({ code: "planning_request_failed", error: expect.stringContaining("could not be saved") });
+  });
   it("requires a confirmed authenticated actor", async () => {
     mocks.user.mockResolvedValue({ id: user.id, email: user.email });
     const response = await POST(postRequest({ workspaceId, userGoal: "Make a tracker" }));

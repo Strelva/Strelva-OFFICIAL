@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useId, useMemo } from "react";
+import { FormEvent, useEffect, useId, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/Button";
 import { TextInput } from "@/components/ui/TextInput";
 import type { ApplicationUseSnapshot, ApplicationViewKind } from "@/products/applications/client";
@@ -52,6 +52,8 @@ function fieldPlaceholder(type: string): string | undefined {
   return undefined;
 }
 
+const LINK_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
 function nextIdempotencyKey(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -69,9 +71,15 @@ export function ApplicationUseRenderer({
   onSubmit,
 }: ApplicationUseRendererProps) {
   const instanceId = useId();
+  const formRef = useRef<HTMLFormElement>(null);
   const formView = snapshot.views.find(view => view.kind === "form");
   const editAllowed = snapshot.access.recordEdit === "own" || snapshot.access.recordEdit === "all";
   const editing = draft.editingRecordId !== undefined;
+  useEffect(() => {
+    if (snapshot.records.some(record => record.id === draft.editingRecordId && record.linkLabels)) {
+      formRef.current?.querySelector<HTMLInputElement>("input, select")?.focus();
+    }
+  }, [draft.editingRecordId, snapshot.records]);
   const recordViews = snapshot.views.filter(view => view.kind === "list" || view.kind === "detail" || view.kind === "document");
   const recordsHeading = recordViews.some(view => view.kind !== "document") ? "Records" : "Documents";
   const recordFields = useMemo(() => {
@@ -125,10 +133,12 @@ export function ApplicationUseRenderer({
             <h2 id={`${instanceId}-application-form-heading`} className="font-display text-2xl font-medium text-warm-black">{draft.editingRecordId ? "Correct a record" : viewLabel("form")}</h2>
             <p className="text-sm leading-6 text-gray-fg">{draft.editingRecordId ? "Save a correction to the record. If someone changed it first, your correction stays here so you can review it." : "Enter the details below. Keep this tab open if you need to retry."}</p>
           </div>
-          <form className="space-y-5" onSubmit={submit} aria-busy={busy}>
+          <form ref={formRef} className="space-y-5" onSubmit={submit} aria-busy={busy}>
             <div className="grid gap-5 sm:grid-cols-2">
               {formView.fields.map(field => {
                 const value = draft.values[field.id];
+                const savedLink = (field.type === "contact" || field.type === "assigned_person") && typeof value === "string" && LINK_ID.test(value);
+                const savedLabel = savedLink ? snapshot.records.find(record => record.id === draft.editingRecordId && record.values[field.id] === value)?.linkLabels?.[field.id] : undefined;
                 if (field.type === "boolean") {
                   return (
                     <fieldset key={field.id} className="space-y-2">
@@ -181,10 +191,11 @@ export function ApplicationUseRenderer({
                     label={`${field.label}${field.required ? " *" : ""}`}
                     aria-label={field.label}
                     type={fieldInputType(field.type)}
-                    placeholder={fieldPlaceholder(field.type)}
+                    placeholder={savedLink ? savedLabel ?? "Current link (unchanged)" : fieldPlaceholder(field.type)}
+                    helperText={savedLink ? `${savedLabel ? `Currently linked: ${savedLabel}.` : field.type === "assigned_person" ? "A staff member is already linked." : "A contact is already linked."} ${field.type === "assigned_person" ? "Enter another staff email to change it." : "Enter another email or phone to change it."}` : undefined}
                     inputMode={field.type === "number" ? "decimal" : undefined}
-                    value={value === undefined ? "" : String(value)}
-                    required={field.required}
+                    value={savedLink || value === undefined ? "" : String(value)}
+                    required={field.required && !savedLink}
                     disabled={busy}
                     onChange={event => updateValue(field.id, field.type === "number" ? (event.target.value === "" ? undefined : Number(event.target.value)) : event.target.value)}
                   />
@@ -217,7 +228,7 @@ export function ApplicationUseRenderer({
                     {recordFields.map(field => (
                       <div key={field.id} className="min-w-0">
                         <dt className="text-xs uppercase tracking-[0.1em] text-gray-muted">{field.label}</dt>
-                        <dd className="mt-1 break-words text-sm text-warm-black">{displayValue(record.values[field.id])}</dd>
+                        <dd className="mt-1 break-words text-sm text-warm-black">{record.linkLabels?.[field.id] ?? displayValue(record.values[field.id])}</dd>
                       </div>
                     ))}
                   </dl>

@@ -16,6 +16,7 @@ import { ownerNoticeEmail } from "@/lib/owner-recipient";
 import { requireCronRequest } from "@/lib/cron-auth";
 import { sendEmail } from "@/platform/infra/email/send";
 import type { WeeklyBrief } from "@/lib/types";
+import { recordCatalogReport } from "@/platform/catalog-reports/receipts";
 
 // Iterates tenants; matches the platform function ceiling so it can't die
 // mid-batch at scale.
@@ -65,9 +66,12 @@ export async function GET(request: Request) {
     (t) => !hostedTenants.has(t.id) && t.active !== false && t.subscriptionStatus !== "cancelled",
   );
   const recipients = new Map<string, string>();
+  const receipt = (tenantId: string, status: "accepted" | "suppressed" | "failed", recipient: string | null, reason: string | null = null) =>
+    recordCatalogReport({ tenantId, kind: "monthly", period: monthKey, status, recipient, reason });
   await mapPool(candidates, 8, async (t) => {
     const email = await ownerNoticeEmail(t);
     if (email) recipients.set(t.id, email);
+    else await receipt(t.id, "suppressed", null, "missing_owner_email");
   });
   const tenants = candidates.filter((t) => recipients.has(t.id));
 
@@ -85,12 +89,14 @@ export async function GET(request: Request) {
       // Send gates: pause switch, then the once-per-month dedup marker.
       if (paused) {
         skipped.push({ tenantId: tenant.id, reason: "email_paused" });
+        await receipt(tenant.id, "suppressed", to, "email_paused");
         return;
       }
       if (redis) {
         const already = await redis.get(sentKey(tenant.id, monthKey)).catch(() => null);
         if (already) {
           skipped.push({ tenantId: tenant.id, reason: "already_sent" });
+          await receipt(tenant.id, "suppressed", to, "already_sent");
           return;
         }
       }
@@ -127,24 +133,29 @@ export async function GET(request: Request) {
           const reason = err instanceof Error ? err.message : "send failed";
           errors.push(`${tenant.id}: ${reason}`);
           await recordMailSend(tenant.id, "monthly_report", { ok: false, error: reason, to: to }).catch(() => {});
+          await receipt(tenant.id, "failed", to, reason.slice(0, 500));
           return;
         }
         if (!ok) {
           errors.push(`${tenant.id}: send suppressed or unconfigured`);
           await recordMailSend(tenant.id, "monthly_report", { ok: false, error: "suppressed_or_unconfigured", to: to }).catch(() => {});
+          await receipt(tenant.id, "suppressed", to, "suppressed_or_unconfigured");
           return;
         }
         await recordMailSend(tenant.id, "monthly_report", { ok: true, to: to }).catch(() => {});
+        await receipt(tenant.id, "accepted", to);
         // Mark sent ONLY after a confirmed real send so a dev-mode run (no
         // RESEND_API_KEY) never consumes the once-per-month dedup marker.
         if (redis) await redis.set(sentKey(tenant.id, monthKey), "1", { ex: 60 * 60 * 24 * 45 }).catch(() => {});
       } else {
         console.log(`[Monthly report dev] "Your ${monthName} recap" -> ${to}`);
+        await receipt(tenant.id, "suppressed", to, "email_provider_unconfigured");
       }
 
       sent.push(tenant.id);
     } catch (err) {
       errors.push(`${tenant.id}: ${err instanceof Error ? err.message : "error"}`);
+      await receipt(tenant.id, "failed", to, "report_generation_or_delivery_failed");
     }
   });
 

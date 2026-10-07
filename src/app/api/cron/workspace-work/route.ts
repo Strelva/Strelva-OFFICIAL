@@ -31,6 +31,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ status: "disabled" });
   }
   const systems = await settleSystems();
+  // Preserve the existing response exactly with notice flags off. This retry
+  // lane is independent of general background work and cannot replay sends
+  // with an unknown provider outcome.
+  const { toolNoticesMayBeOn, retryToolNotices } = await import("@/products/applications/server");
+  const notices = toolNoticesMayBeOn() ? await retryToolNotices().catch(() => ({ processed: 0, failed: 1 })) : null;
+  if (notices) {
+    systems.activations.processed += notices.processed;
+    systems.activations.failed += notices.failed;
+  }
   // New standing work is opt-in independently of the read/create workspace release.
   if (process.env.STRELVA_BACKGROUND_WORK_RELEASE !== "1") {
     await recordHeartbeat("workspace-work", { ok: systems.activations.failed === 0, processed: systems.activations.processed, failed: systems.activations.failed });

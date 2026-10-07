@@ -2,11 +2,18 @@ import { z } from "zod";
 import { WorkspaceConflictError } from "@/platform/workspaces/types";
 
 export const documentContentSchema = z.object({ title: z.string().trim().min(1).max(160), text: z.string().max(50000) });
-const receiptSchema = z.object({
+export const documentReceiptSchema = z.object({
   revision: z.number().int().positive(), actorId: z.string().min(1), at: z.string().datetime(),
   kind: z.enum(["edit", "undo"]), before: documentContentSchema, after: documentContentSchema,
   undoesRevision: z.number().int().positive().optional(),
 });
+export type DocumentReceipt = z.infer<typeof documentReceiptSchema>;
+export const documentHistoryPageSchema = z.object({
+  workId: z.string().uuid(), workspaceId: z.string().uuid(),
+  receipts: z.array(documentReceiptSchema).max(20),
+  nextBeforeRevision: z.number().int().positive().nullable(),
+});
+export type DocumentHistoryPage = z.infer<typeof documentHistoryPageSchema>;
 /**
  * The payload keeps only the most recent receipts. Every receipt is also
  * appended to `document_revisions` by `update_document_work`, so a document
@@ -17,7 +24,7 @@ export const DOCUMENT_RECENT_HISTORY = 20;
 export const documentSchema = documentContentSchema.extend({
   version: z.literal(1), revision: z.number().int().nonnegative(),
   createdBy: z.string().min(1), createdAt: z.string().datetime(),
-  history: z.array(receiptSchema).max(200),
+  history: z.array(documentReceiptSchema).max(200),
 });
 export type WorkspaceDocument = z.infer<typeof documentSchema>;
 export const documentCommandSchema = z.discriminatedUnion("kind", [

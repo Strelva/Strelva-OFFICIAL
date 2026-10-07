@@ -688,6 +688,44 @@ psql "${psql_args[@]}" --file="$repo_root/tests/website-business-facts-schema.sq
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010115700_website_native_fact_reviews.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/website-native-fact-reviews-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/website-cutover-undo-schema.sql"
+# Wave 6 catalog: additive submit/contact RPCs, report receipts, newsletter
+# projection and delegated Make authority. Run after all required flag names,
+# business ownership, Systems and work-plan functions exist.
+# Match the retained tenant newsletter table from 20260618224329. This
+# isolated workspace fixture does not apply the complete legacy schema.
+psql "${psql_args[@]}" <<'SQL'
+create table public.newsletter_subscribers (
+  tenant_id text not null references public.tenants(id) on delete cascade,
+  email text not null, name text,
+  subscribed_at timestamptz not null default now(),
+  status text not null default 'active',
+  primary key (tenant_id, email)
+);
+SQL
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010150000_internal_tool_submit_notices.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-submit-notices-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010150100_internal_tool_use_links.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-use-links-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010150200_internal_tool_notice_delivery.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-notice-delivery-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010150300_catalog_tool_evidence.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/catalog-tool-evidence-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010150400_internal_tool_use_edits.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-use-edits-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010155100_internal_tool_member_submit.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-member-submit-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010155200_internal_tool_use_link_labels.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-use-link-labels-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010152000_catalog_report_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/catalog-reports-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010153000_newsletter_contacts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-contacts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010154000_system_work_plan_authority.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/system-work-plan-authority-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010155000_failed_system_plan_request.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/failed-system-plan-request-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
+
 # The real Make real runner, checkpointing through these RPCs (psql-backed port).
 STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/make-real-activation-repository.test.ts

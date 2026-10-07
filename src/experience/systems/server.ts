@@ -15,6 +15,11 @@ import { publishingEnabledForWorkspace } from "@/products/publishing/server";
 import { checkHeartbeats } from "@/platform/infra/heartbeat";
 import { getDomainHealth } from "@/lib/domain-monitor-store";
 import { getScanSummaries } from "@/lib/scan-store";
+import { readDailyTraffic } from "@/platform/infra/analytics/traffic";
+import { readSearchConnection } from "@/platform/catalog-reports/search-connection";
+import { searchConsoleObservation, trafficObservation } from "@/platform/system-health/catalog-observations";
+import { readToolNoticeReceipts, toolNoticeObservations } from "@/platform/catalog-reports/tool-notices";
+import { readToolReleases } from "@/platform/catalog-reports/tool-history";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { BusinessSystems, SystemListing } from "@/platform/systems/from-existing";
 import { listBusinessSystems, withTenantSurfaces, type BookingView, type ExistingConnectedSite, type TenantSiteFacts } from "@/platform/systems/from-existing";
@@ -202,13 +207,15 @@ export async function projectWorkspaceSystems(input: SystemsProjectionInput): Pr
       basis: item.basis,
       savedWorkId: item.references.savedWorkId,
       tenantId: item.references.tenantId,
-      health: healthSummary(health.get(item.system.id)),
+      health: { ...healthSummary(health.get(item.system.id)),
+        ...(input.observations.some(observation => observation.subjectId === item.system.id && observation.source === "traffic") ? { signals: input.observations.filter(observation => observation.subjectId === item.system.id && ["domain-monitor", "traffic", "search-console"].includes(observation.source)).map(observation => observation.message) } : {}),
+      },
       ...(input.bookingViews?.get(item.system.id)?.length ? { views: [...input.bookingViews.get(item.system.id)!] } : {}),
       ...(item.system.kind === "website" && item.references.tenantId && input.siteEditing?.get(item.references.tenantId) ? { editing: input.siteEditing.get(item.references.tenantId)! } : {}),
       ...(item.system.kind === "website" && item.references.tenantId && input.businessFactsConnected?.has(item.references.tenantId) ? { businessFactsConnected: true } : {}),
       ...(item.connectedSite ? { connectedSite: { ...item.connectedSite } } : {}),
     })),
-    connections: connections.map(({ connection }) => {
+    connections: [...connections.map(({ connection }) => {
       const targetSystemId = connection.target.type === "system" ? connection.target.system.systemId : null;
       return {
         id: connection.id,
@@ -219,7 +226,12 @@ export async function projectWorkspaceSystems(input: SystemsProjectionInput): Pr
         state: connection.state,
         purpose: connection.purpose,
       };
-    }),
+    }), ...listings.flatMap(item => {
+      const search = input.observations.find(observation => observation.subjectId === item.system.id && observation.source === "search-console");
+      const fresh = search?.observedAt && input.now - Date.parse(search.observedAt) <= search.maxAgeSeconds * 1000;
+      return search ? [{ id: `search-console:${item.system.id}`, sourceId: item.system.id, kind: "read" as const, targetSystemId: null, targetLabel: "Google Search Console", state: search.outcome === "pass" && fresh ? "connected" as const : "stale" as const,
+        purpose: `${search.message} Authority: Strelva's service account was added to the property. Source of truth: Google. Freshness: daily, 07:00 UTC.` }] : [];
+    })],
     ...(input.publishing !== undefined ? { publishing: publishingView(input.publishing) } : {}),
     possibilities: possibilities.map(({ candidate, sandbox, affects }) => ({
       id: sandbox.possibility.id,
@@ -249,12 +261,17 @@ export async function readSystemsEvidence(listing: BusinessSystems, now: number 
     getScanSummaries(websites.map((item) => item.references.tenantId!)).catch(() => ({} as Record<string, null>)),
   ]);
   const observations: Observation[] = [];
-  for (const site of websites) {
+  await Promise.all(websites.map(async (site) => {
     const tenantId = site.references.tenantId!;
     observations.push(...domainObservations(site.system.id, domains?.results.find((result) => result.tenantId === tenantId) ?? null, domains?.scannedAt ?? null));
     observations.push(scanObservation(site.system.id, scans[tenantId] ?? null));
     observations.push(...heartbeatObservations(site.system.id, heartbeats, ["domain-monitor", "portfolio-scan"]));
-  }
+    const [daily, search] = await Promise.all([
+      readDailyTraffic(tenantId, 30).catch(() => null),
+      readSearchConnection(tenantId, listing.businessId).catch(() => null),
+    ]);
+    observations.push(trafficObservation(site.system.id, daily), searchConsoleObservation(site.system.id, search));
+  }));
   for (const inquiry of inquiries) {
     observations.push(inquiryFormUnchecked(inquiry.system.id));
     observations.push(...heartbeatObservations(inquiry.system.id, heartbeats, ["inquiry-follow-ups"]));
@@ -334,11 +351,13 @@ async function liveProjectionInput(deps: LiveSystemsDeps): Promise<SystemsProjec
   const { bookingViews, ...surfaced } = withTenantSurfaces(spine, tenantFacts.facts);
   const published = await publishingEnabledForWorkspace(surfaced.businessId, deps.actor) ? await withPublishing(surfaced, deps.actor, now) : null;
   const listing = published?.listing ?? surfaced;
+  const noticeRows = await readToolNoticeReceipts(deps.actor, deps.businessId, new Date(now - 7 * 86400_000).toISOString()).catch(() => null);
   return {
     listing,
     siteDomains: deps.siteDomains,
     candidates: deps.savedWork.flatMap((work) => websiteRebuildCandidate(work) ?? []),
-    observations: [...await readSystemsEvidence(listing, now), ...savedCheckEvidence(listing, deps.siteDomains, deps.savedWork), ...(published?.observations ?? [])],
+    observations: [...await readSystemsEvidence(listing, now), ...savedCheckEvidence(listing, deps.siteDomains, deps.savedWork), ...(published?.observations ?? []),
+      ...toolNoticeObservations(noticeRows ?? [], listing.systems.map(item => ({ systemId: item.system.id, workId: item.references.savedWorkId })))],
     actorId: deps.actor.userId,
     now,
     bookingViews,
@@ -372,7 +391,13 @@ export async function readWorkspaceSystems(deps: LiveSystemsDeps): Promise<Works
     const projection = await projectWorkspaceSystems(input);
     const stored = await withStoredPossibilities(projection, input, deps).catch(() => projection);
     const lineage = await readBusinessVersions(deps.actor, deps.businessId).catch(() => null);
-    return withVersions(stored, lineage);
+    const releases = await readToolReleases(deps.actor, deps.businessId);
+    const releaseHistory = releases.flatMap(release => {
+      const system = input.listing.systems.find(item => item.references.savedWorkId === release.workId);
+      return system ? [{ systemId: system.system.id, id: `tool-release:${release.workId}:${release.version}`, at: release.at,
+        sentence: `Strelva ${release.provenance === "rollback" ? "restored" : "released"} ${system.system.name}, release ${release.version}.` }] : [];
+    });
+    return withVersions({ ...stored, history: [...(stored.history ?? []), ...releaseHistory] }, lineage);
   } catch {
     return { status: "unavailable", systems: [], connections: [], possibilities: [] };
   }

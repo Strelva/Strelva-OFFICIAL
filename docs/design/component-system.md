@@ -647,6 +647,21 @@ StrelvaShell, StrelvaSidebar and AppFrame now provide the customer Home/navigati
 
 This adoption does not certify every legacy page control. The library supports four curated form/list templates, not arbitrary generated application code. Search is complete over supplied authorized items, not every provider's records. Session storage is continuity only and is cleared on sign-out. Request approval, budgets, external actions and publication remain server-enforced. The implementation and rendered evidence are recorded in [current component context](./current-component-context.md).
 
+Catalog extension (October 7, local): `ApplicationUseRenderer` accepts contact
+email/phone and assigned-person email fields. An existing linked ID stays in
+the correction draft while the field displays the authorized contact/staff name
+and email (or phone). Record lists use those same labels, projected only from
+the recipient's visible linked records and fields;
+typing a replacement changes the link. Opening a labeled correction focuses its
+first field; Tab follows the existing form order. The gated `/preview/strelva/tool`
+fixture rehearses labeled records, corrections, read-only and empty states with
+no network or persistence. UUIDs never become invalid email input
+values. `DocumentExperience` reuses shared fields and Button for private files
+and read-only shares, with bounded recent receipts and opt-in keyset pagination,
+loading, persistent history error/retry, and cancellation on document change.
+The server applies the same saved-work read grant to full history. Local
+verification and limitations belong in [the catalog handoff](../product/streams/w6-catalog.md).
+
 ## Hosted website catalog (v2)
 
 [SiteRenderer](../../src/products/websites/SiteRenderer.tsx) renders the closed,
@@ -679,3 +694,21 @@ document checksum, and reports the business record revision separately. Private
 previews remain pinned; unavailable reads use the approved content. The System
 Connection claims this behavior only after the issued bindings and runtime read
 are confirmed.
+
+### Catalog planning recovery, October 7, 2026
+
+`WorkPlanExperience` preserves the typed goal when planning fails. With Systems
+released, a confirmed fallback Request shows its pending review state and hides
+the duplicate filing action; a failed fallback retains Ask Strelva to build this.
+Scope and deadline remain unagreed. The server rechecks operator/delegation
+authority and uses an actor-bound retry identity. Flags off preserve the earlier
+unavailable response and planning prompt. Local route and SQL tests cover
+confirmed filing, storage failure, revocation and retry; this entry does not
+claim provider generation or production delivery.
+
+The standalone workspace planner receives the Systems release and Request
+navigation from `WorkspaceLayout`. A denied maker check shows an editable
+request with no planning budget or preparation controls; its action opens the
+existing Request form with those words. Real isolated local Auth covers owner
+filing and failed-provider recovery at 360px, and staff use at 1280 and 360px.
+The model and email providers are bounded local fixtures.

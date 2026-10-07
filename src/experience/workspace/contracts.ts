@@ -283,7 +283,7 @@ export interface WorkspaceSystemEntry {
   savedWorkId: string | null;
   tenantId: string | null;
   /** What the evidence shows. Never derived from lifecycle. */
-  health: { status: HealthStatus; summary: string; lastVerifiedAt: string | null };
+  health: { status: HealthStatus; summary: string; lastVerifiedAt: string | null; signals?: string[] };
   /** A Bookings System's day and week views on the managed site (wellness schedule, roster). */
   views?: Array<"schedule" | "roster">;
   /** A managed website: Strelva edits its content (`native`) or every change is a repo Request (`request`). */
