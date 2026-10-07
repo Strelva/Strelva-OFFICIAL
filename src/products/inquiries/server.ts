@@ -46,6 +46,7 @@ import { currentResponsibility } from "./currentness";
 
 export { recordedInquiryAssignee, recordedInquiryStatus } from "./record-projection";
 export { prepareInquiryMessageReviewWithDependencies } from "./delivery-approval-service";
+export { readAskInquirySummary } from "./ask-read";
 export { decideHeldInquiry, parseWorkspaceLead, readInquiryEvents, readWorkspaceInquiryLeads } from "./workspace-records";
 export type { HeldDecision, InquiryEventView, IntakeState, WorkspaceInquiryLead } from "./workspace-records";
 
@@ -930,3 +931,8 @@ export async function executeInquirySurface(input: {
 }
 
 export { inquiryEconomicsAuthority } from "./economics";
+
+export { composeAskInquiryFollowUp, approveAskInquiryFollowUp, followUpTryView, askInquiryFollowUpSelectionSchema } from "./ask-follow-up";
+export type { InquiryRepository } from "./repository";
+
+export { askInquiryFollowUpStillCurrent, approveAskInquiryFollowUpPublication } from "./ask-follow-up-server";

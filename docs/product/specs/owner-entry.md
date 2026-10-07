@@ -14,7 +14,8 @@ production stop points are in [the stream handoff](../streams/w6-owner-ask.md).
   307s; operators keep `?legacy=1`. Settings does not block owner entry.
 - The operator invitation panel and endpoint are built, separately gated
   by `STRELVA_OWNER_INVITATIONS_RELEASE=0`. A verified magic-link entry
-  claims only a pending operator-issued invitation with
+  claims only a pending operator-issued invitation, including an existing
+  member or admin, with
   `STRELVA_OWNER_INVITATION_CLAIM=1`; the existing accept transaction grants
   both memberships. Invitations remain deferred, and sends require the
   existing global, customer and per-tenant email gates.
@@ -26,7 +27,9 @@ production stop points are in [the stream handoff](../streams/w6-owner-ask.md).
   without an account, under `STRELVA_OWNER_DECISION_LINKS_RELEASE=0`.
   Make real retains its separate owner-link gate. Access, money and exit
   still require sign-in. Website facts, copy, preview approval and launch
-  bind the exact revision; no membership is synthesized.
+  bind the exact revision; no membership is synthesized. Signed read-only
+  website review shows complete copy and navigable pages without sign-in,
+  disables visitor actions and refuses changed recipients or candidates.
 
 Not proven here: authenticated admin-host entry and rollback on an isolated
 Supabase Auth stack, actual mail delivery, production migrations, live
@@ -225,21 +228,21 @@ The other pages are reached from inside those.
 | --- | --- | --- | --- |
 | `/` Today | Home: Needs you, **From your site** (visits, customer actions, who reached out, Strelva's work, links to the places below), Strelva handled, In progress, Recent | **Ready** while Needs you is on (`w2/owner-surfaces-a`). Approvals come through Needs you's tenant-event adapter; the rest from `/api/workspace/site-summary` | Parity gaps: no onboarding checklist or wizard, day-one cards, retention panel or "Do this next"; no sparklines; no Edit site / View live site buttons on Home |
 | `/chat` Ask Strelva | Ask Strelva (`view=ask`) on Home and each System | **Ready** while Ask and Systems are released | No approvals in chat; workspace conversations start fresh |
-| `/site` Website editor | Website System ("greatlakesdriedfruit.com") | Partial. `SystemPage.tsx` shows name, domain, live link, health and preview (local, Systems flag). Editing is link-out only | Edits for existing sites from the System page, native or embedded · S to link, L native |
+| `/site` Website editor | Website System ("greatlakesdriedfruit.com") | **Ready**, gate `systems`; native editor or repo-site request surface | Existing client APIs and governed Requests are reused; repo sites remain requests for Strelva |
 | `/content` | Website System, Edit | **Ready**, gate `systems` | Reuses the website editor |
-| `/assets` Photos | Website System, photos and files | None | Photo library on the Website System · M |
-| `/brand-kit` | Website System, look (fonts, colors) | None | Brand panel on the Website System · S–M |
-| `/collections` Blog and collections | Publishing System (blog), or Website System content | None. Publishing is 0% in the workspace | Part of Reborn §4 Publishing · L |
-| `/google` Google Business | Publishing System, plus an *acts on* Connection to the Google Business profile | None. Tenant tokens are Redis only | Token move through `crypto/secrets.ts` without re-consent, GBP panel · L–XL |
+| `/assets` Photos | Website System, photos and files | **Ready**, gate `systems` | Reuses the existing photo library through the tenant link |
+| `/brand-kit` | Website System, look (fonts, colors) | **Ready**, gate `systems` | Reuses the existing brand panel through the tenant link |
+| `/collections` Blog and collections | Publishing System (blog), or Website System content | **Ready**, gate `systems` | Reuses the existing collections manager; entries still serve through `/api/v1/collections` |
+| `/google` Google Business | Publishing System, plus an *acts on* Connection to the Google Business profile | **Ready**, gate `systems` | Reuses existing Google Business reads and governed tools; grants stay in their existing authority |
 | `/health` | `/workspace/results#site-health` | **Ready** | Keeps valid analytics date parameters |
-| `/history` Site safety, request and check history | Website System, History | Partial. `website_documents` revisions have history; tenant `content_versions` and `site_snapshots` have no workspace view | History reads the tenant stores through the link · M |
-| `/integrations` Connections | Connections on each System, plus account grants under Business details | Partial. `ConnectionsPanel` on `SystemPage` (local) doesn't read Redis `connections:{tenant}:{provider}` | Project tenant connections as System Connections · M |
+| `/history` Site safety, request and check history | Website System, History | **Ready**, gate `systems` | Reads existing tenant history; request selection survives the redirect |
+| `/integrations` Connections | Connections on each System, plus account grants under Business details | **Ready**, gate `systems` | Reuses existing Connections reads and controls |
 | `/sources` | Website System, Connections | **Ready**, gate `systems` | Reuses existing Connections reads and controls |
-| `/sources/[id]` Connection detail | That Connection on its System | None | Connection detail view · S–M |
+| `/sources/[id]` Connection detail | That Connection on its System | **Ready**, gate `systems` | Safe connection id preserved; invalid ids fall back to Connections |
 | `/leads` | Inquiries, `/workspace/inquiries` | **Ready** (`w2/owner-surfaces-a`). Every linked site's leads from Redis via `src/lib/leads.ts`, newest first, reply by email, 30-day count | Parity gaps: the `tenant_leads` mirror isn't read (Redis outage shows "couldn't be read"); not the inquiries spec's System page (status, assignee, follow-ups) |
 | `/members` (wellness) | Website Connection, Members | **Ready**, gates `owner_entry` and `systems` | Existing read-only members panel; rewards remain frozen |
-| `/roster` (wellness) | Bookings System, day roster | None | Day roster (Reborn §4 Bookings) · in L |
-| `/schedule` (wellness) | Bookings System | Partial. Workspace scheduling is ~25% and uses a different store from the tenant widget | One booking store (Reborn §2) · L |
+| `/roster` (wellness) | Bookings System, day roster | **Ready**, gate `systems` | Existing booking store, day view |
+| `/schedule` (wellness) | Bookings System | **Ready**, gate `systems` | Existing booking store, week view; hours and services remain business-record edits |
 | `/ownership` | `/workspace/business-details#ownership` | **Ready** | Export and exit still require sign-in and their existing authority |
 | `/reports` Weekly and monthly recaps | `/workspace/recaps`, linked from Home (`?view=monthly` → `period=month`) | **Ready** (branch `build/owner-entry`). Reads every linked site's recaps through the tenant link | Crons resolving the recipient through the link is the systems-catalog stream's |
 | `/analytics` Live traffic, milestone, AI visibility | Website results and health, `/workspace/results` (`?range=` kept) | **Ready** (`w2/owner-surfaces-a`). Same reads as the old page; Search Console and GA4 through `tenant_analytics_config`; latest scan as site health | Parity gaps: site health is the scan summary, not the interactive audit card; no custom date picker; no Ask Strelva hand-offs; not yet a panel on the Website System page |
@@ -247,7 +250,7 @@ The other pages are reached from inside those.
 | `/reviews` Reviews and replies | Google listing: Reviews, `/workspace/reviews` | **Ready** (`w2/owner-surfaces-a`). Reviews, existing replies, Strelva's waiting draft, reply through `/api/workspace/reviews/reply` (same governed path as `/api/reviews/reply`, plus `requireTenantAccess`), review request link | Parity gaps: no reply-voice settings or AI draft button; no copy buttons; reads the tenant review store, not Publishing's listing receipts |
 | `/settings` | Business details, `/workspace/business-details`, with a section for every old `#anchor` linking on to People and access, account, plan/ownership and the website | **Stay** (Oct 6: the home is built on `w2/owner-surfaces-a`, but `/dashboard/settings` keeps serving until branding, site basics and domains are editable here). Owner (or a Strelva operator as admin) edits name, phone, public email, description and the owner recipient in the business record, revision-checked | Parity gaps: no branding, site basics, navigation, connected services or domain editing; tenant profile fields don't change; billing still has no `workspaceId` |
 | `/store` (gldf) | Website Connection, Store | **Ready**, gates `owner_entry` and `systems` | Existing products, summary and orders panel; checkout unchanged |
-| `[...notFound]` | Home | n/a | Map · S |
+| `[...notFound]` | Home | **Ready** | Home; gated owner entry preserves the legacy fallback while off |
 
 **Which pages block which client.** No remaining disposition blocks owner
 entry for the store, wellness, local or always-used groups. Settings is the

@@ -52,6 +52,7 @@ import {
   storedTargets,
   syncRebuildPossibilities,
   syncAskPageSetPossibilities,
+  syncAskInquiryFollowUpPossibilities,
 } from "./stored-possibilities";
 
 export interface SystemsProjectionInput {
@@ -394,10 +395,12 @@ export async function withStoredPossibilities(projection: WorkspaceSystems, inpu
     repo, live, businessId: deps.businessId, targets, revisions, actorId: deps.actor.userId,
     at: new Date(input.now).toISOString(), canWrite: deps.canWrite === true,
   });
-  const stored = await syncAskPageSetPossibilities({
+  const websiteStored = await syncAskPageSetPossibilities({
     repo, live, stored: rebuilds, actorId: deps.actor.userId, at: new Date(input.now).toISOString(),
     canWrite: deps.canWrite === true, read: workId => readWebsiteRebuild(deps.actor, workId),
   });
+  const { askInquiryFollowUpStillCurrent } = await import("@/products/inquiries/server");
+  const stored = await syncAskInquiryFollowUpPossibilities({ repo, live, stored: websiteStored, actorId: deps.actor.userId, at: new Date(input.now).toISOString(), canWrite: deps.canWrite === true, current: selection => askInquiryFollowUpStillCurrent(deps.actor, selection) });
   const activations = createSupabaseActivationRepository(deps.actor);
   const withActivation = await Promise.all(stored.map(async ({ possibility }) => ({
     possibility,

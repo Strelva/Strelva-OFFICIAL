@@ -1,5 +1,5 @@
-import { readWorkspaceInquiryLeads, prepareInquiryMessageReviewWithDependencies, inquiryReleaseEnabledForWorkspace } from "@/products/inquiries/server";
-import { readWorkspaceBookings } from "@/products/bookings/server";
+import { readAskInquirySummary, prepareInquiryMessageReviewWithDependencies, inquiryReleaseEnabledForWorkspace } from "@/products/inquiries/server";
+import { readAskBookingSummary } from "@/products/bookings/server";
 import { PostgresBusinessFactDraftStore } from "@/platform/ask/workspace-drafts-repository";
 import { readBusinessRecord } from "@/platform/business-record/service";
 import type { NeedsYouStore } from "@/platform/needs-you/repository";
@@ -18,9 +18,9 @@ export function createAskWorkspaceDraftPort(deps: {
     readBusiness: readBusinessRecord,
     async readInquiries(actor, workspaceId) {
       if (!await inquiryReleaseEnabledForWorkspace(workspaceId, await releaseViewerFor(actor))) throw new Error("inquiry_not_released");
-      return readWorkspaceInquiryLeads(actor, workspaceId, { limit: 30 });
+      return readAskInquirySummary(actor, workspaceId);
     },
-    readBookings: (actor, workspaceId) => readWorkspaceBookings(actor, workspaceId, { view: "week" }),
+    readBookings: readAskBookingSummary,
     async businessFact(actor, input) {
       if (!needsYouReleaseEnabled()) throw new Error("needs_you_not_released");
       const patch = businessFactDraftPatch(input.patch);

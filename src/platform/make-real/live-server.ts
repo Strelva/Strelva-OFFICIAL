@@ -65,6 +65,7 @@ export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string) 
       restore: (section, versionId, tenantId) => restoreVersion(section as ContentSection, versionId, tenantId, "ai"),
     }, ctx),
     createInquiryFormAdapter({
+      prepareFollowUp: async (a, selection) => (await import("@/products/inquiries/server")).approveAskInquiryFollowUpPublication(a, selection),
       queue: async (input) => (await import("@/products/inquiries/server")).queueInquiryPublication(input),
       execute: async (input) => (await import("@/products/inquiries/publication")).executeInquiryPublication(input),
       claim: async (tenantId, claimId) => (await import("@/products/inquiries/repository")).getInquiryRepository().getPublicationClaim(tenantId, claimId),
@@ -73,6 +74,7 @@ export function liveChannelAdapters(actor: WorkspaceActor, workspaceId: string) 
       publish: async (a, input) => (await import("@/products/scheduling/server")).publishPublicWebsiteBookingGrant(a, input),
       list: async (a, businessId) => (await import("@/products/scheduling/server")).listPublicWebsiteBookingGrants(a, businessId),
       revoke: async (a, input) => (await import("@/products/scheduling/server")).revokePublicWebsiteBookingGrant(a, input),
+      matchesAskPublication: async (grantId, pin) => (await import("@/products/scheduling/server")).matchesPublishedAskBookingService(grantId, pin),
     }, ctx),
     createInternalAppAdapter({
       read: async (a, workId) => (await import("@/products/applications/server")).readApplication(a, workId),

@@ -20,6 +20,7 @@ import {
   createPossibility,
   possibilityInputSchema,
   markReady,
+  returnToExploring,
   recordRehearsal,
   rehearsePossibility,
   reviseCandidate,
@@ -34,6 +35,7 @@ import { customerActivationView } from "@/platform/make-real/view";
 import type { BusinessSystems, SystemListing } from "@/platform/systems/from-existing";
 import type { SystemRevision } from "@/platform/systems/contracts";
 import { siteDocumentSchema, unresolvedSiteFacts, type WebsiteRebuildCandidate, type WebsiteRebuildRecord } from "@/products/websites/index";
+import { followUpTryView } from "@/products/inquiries/server";
 import { publicBookingScheduleSchema } from "@/products/scheduling/contracts";
 import type {
   WorkspaceSystemActivation,
@@ -207,7 +209,7 @@ function lastStale(p: Possibility): string | null {
 export function storedPossibilityViews(stored: readonly ListedPossibility[], candidates: readonly WebsiteRebuildCandidate[], summaries: { evidence: (workId: string) => string | null } = { evidence: () => null }): WorkspaceSystemPossibility[] {
   return stored.flatMap(({ possibility: p, sourceRef }) => {
     if (p.status !== "exploring" && p.status !== "ready") return [];
-    const askContent = [...p.introduces, ...p.changes].find(item => ["ask-website-pages", "ask-existing-booking-page", "ask-existing-website-pages"].includes(String(item.candidate.content.kind)))?.candidate.content;
+    const askContent = [...p.introduces, ...p.changes].find(item => item.candidate.content.kind === "ask-inquiry-follow-up" || ["ask-website-pages", "ask-existing-booking-page", "ask-existing-website-pages"].includes(String(item.candidate.content.kind)))?.candidate.content;
     const workId = sourceRef?.startsWith(REBUILD_SOURCE_PREFIX) ? sourceRef.slice(REBUILD_SOURCE_PREFIX.length)
       : typeof askContent?.rebuildWorkId === "string" ? askContent.rebuildWorkId : null;
     const candidate = workId ? candidates.find((item) => item.workId === workId) : undefined;
@@ -308,4 +310,31 @@ export function storedTargets(listing: BusinessSystems, candidates: readonly Web
       .filter((item): item is SystemListing => Boolean(item && item.system.kind === "inquiry" && item.provenance === "stored" && item.system.currentRevision));
     return [{ candidate, site: found.site, inquiries, domain: found.domain }];
   });
+}
+
+/** Exact native Inquiry alternatives use their real isolated engine rehearsal, then the existing plan lifecycle. */
+export async function syncAskInquiryFollowUpPossibilities(deps: {
+  repo: SupabasePossibilityRepository; live: LiveSystemsReader; actorId: string; at: string;
+  stored: ListedPossibility[]; canWrite: boolean; current(selection: unknown): Promise<boolean>;
+}): Promise<ListedPossibility[]> {
+  if (!deps.canWrite) return deps.stored;
+  const rows = [...deps.stored];
+  for (let index = 0; index < rows.length; index++) {
+    const row = rows[index]!;
+    const p = row.possibility;
+    const content = p.changes.find(change => change.candidate.content.kind === "ask-inquiry-follow-up")?.candidate.content;
+    if (!content || p.activationId || !["exploring", "ready"].includes(p.status)) continue;
+    try {
+      if (!followUpTryView(content.selection, content.draft, content.rehearsal) || !await deps.current(content.selection)) {
+        if (p.status === "ready") {
+          const stale = returnToExploring(p, "The native Inquiry configuration changed. Review a refreshed alternative.", deps.actorId, deps.at);
+          await deps.repo.save(stale, p.revision);
+          rows[index] = { ...row, possibility: stale };
+        }
+        continue;
+      }
+      if (p.status === "exploring") rows[index] = { ...row, possibility: await prepare(p, true, deps) };
+    } catch { /* Missing authority, moved native rules, or concurrent saves remain held for review. */ }
+  }
+  return rows;
 }

@@ -4,6 +4,7 @@ import { createPossibility, type DeclaredEffect, type SystemChange, type Possibi
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { AskChangeKind, AskChangeOrigin, AskNeedsYouRoute, AskedOnBehalf } from "./contracts";
 import type { AskAuthoritySnapshot } from "./authority";
+import type { AskBookingService } from "@/products/scheduling/contracts";
 
 /**
  * Ports Ask Strelva depends on. Each has a narrow interface so this module
@@ -223,8 +224,9 @@ export interface AskPossibilityInput {
   words?: string;
   origin?: AskChangeOrigin;
   askedOnBehalf?: AskedOnBehalf | null;
-  candidate?: { kind: "website-pages"; pages: Array<{ path: string; title: string; description: string; paragraphs: string[] }> }
+  candidate?: AskBookingService | { kind: "website-pages"; pages: Array<{ path: string; title: string; description: string; paragraphs: string[] }> }
     | { kind: "existing-website-pages"; mode: "section" | "page-set" | "rebuild"; pages: Array<{ path: string; title: string; description: string; paragraphs: string[] }> }
+    | { kind: "inquiry-follow-up-rule"; capabilityId?: string; afterMinutes: number; maxAttempts: number; messageTemplate: string }
     | { kind: "existing-booking-page"; path: string; title: string; description: string; bookingGrantId?: string };
 }
 
@@ -258,30 +260,32 @@ export class AskPreparedPossibilityError extends Error {
 
 export function createPossibilityAdapter(repository: PossibilityRepository, options: {
   durable: boolean; newId?: () => string; now?: () => string;
-  prepare?: (actor: WorkspaceActor, input: AskPossibilityInput, possibilityId: string) => Promise<{ content: Record<string, unknown>; effects: DeclaredEffect[]; previewHref: string; changes?: SystemChange[] }>;
+  prepare?: (actor: WorkspaceActor, input: AskPossibilityInput, possibilityId: string) => Promise<{ content: Record<string, unknown>; effects: DeclaredEffect[]; previewHref: string; changes?: SystemChange[]; checks?: Array<{ id: string; description: string }> }>;
 }): AskPossibilityPort {
   const newId = options.newId ?? (() => crypto.randomUUID());
   const now = options.now ?? (() => new Date().toISOString());
   return {
     async open(actor, input) {
-      if (!input.introduces || !input.candidate || !options.prepare) throw new AskPossibilityUnsupportedError("This alternative needs a supported working candidate or a pinned existing System baseline.");
+      if (!input.candidate || !options.prepare) throw new AskPossibilityUnsupportedError("This alternative needs a supported working candidate or a pinned existing System baseline.");
       const id = newId();
       const prepared = await options.prepare(actor, input, id);
+      if (!prepared.changes && !input.introduces) throw new AskPossibilityUnsupportedError("A new System needs its own introduction; an existing change needs its exact baseline.");
+      if (!prepared.changes && !input.introduces) throw new AskPossibilityUnsupportedError("A new System needs its own name and purpose.");
       const possibility = createPossibility({
         title: input.title,
         intent: input.intent,
         changes: prepared.changes,
         introduces: prepared.changes ? [] : [{
-          key: input.introduces.key,
-          name: input.introduces.name,
-          purpose: input.introduces.purpose,
-          candidate: { summary: input.introduces.summary, content: prepared.content },
+          key: input.introduces!.key,
+          name: input.introduces!.name,
+          purpose: input.introduces!.purpose,
+          candidate: { summary: input.introduces!.summary, content: prepared.content },
         }],
-        checks: [{ id: "owner-tries-it", description: input.check }],
+        checks: prepared.checks ?? [{ id: "owner-tries-it", description: input.check }],
         effects: prepared.effects,
       }, { id, businessId: input.workspaceId, actorId: actor.userId, at: now() });
       try { await repository.create(possibility); }
-      catch { throw new AskPreparedPossibilityError(typeof prepared.content.rebuildWorkId === "string" ? prepared.content.rebuildWorkId : null); }
+      catch { throw new AskPreparedPossibilityError(typeof prepared.content.rebuildWorkId === "string" ? prepared.content.rebuildWorkId : typeof prepared.content.scheduleWorkId === "string" ? prepared.content.scheduleWorkId : null); }
       return { id: possibility.id, status: "exploring", durable: options.durable, previewHref: prepared.previewHref, candidateRevision: possibility.candidateRevision };
     },
     async list(workspaceId) {

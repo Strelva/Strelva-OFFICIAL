@@ -13,10 +13,23 @@ Ask never approves or performs an outside write. A failed decision sync reports
 the saved draft honestly and leaves it pending. Operators can record an owner
 ask by email or phone; the owner still decides.
 
-Possibilities use the existing Postgres repository. Ask can introduce a new
-System; changes to a projected managed System without a durable baseline remain
-Requests for Strelva to prepare. It does not invent a baseline or call a summary
-a working rebuilt site. The website builder owns the executable candidate.
+Possibilities use the existing Postgres repository and native website builder.
+Ask can prepare a real informational page set, with copy awaiting owner review,
+or add a booking page to an unchanged published native website using that
+site's existing inquiry and booking grants. Try renders the actual pinned
+document; booking tests use configured times and local callbacks, discard
+visitor inputs and create no reservation. Reviewed candidates become Ready,
+and Make real preserves the native work identity. Revoked connections or
+changed revisions refuse publication.
+
+Changes to a projected managed System without a durable baseline remain
+Requests for Strelva to prepare. So do new booking services, new-site booking
+bindings, custom flows and unsupported rebuilds. The existing booking effect
+publishes a scheduling grant; the inquiry effect requires a prepared,
+tenant-specific request/change. Ask has no tool to create that new inquiry
+binding or infer a service's duration and schedule. It preserves the person's
+words in an Asked Request and does not invent the missing authority. Managed
+work remains a Request by default, as required by behavior 7.
 Model calls retain tokens and measured/estimated/unknown cost. An optional
 per-business daily log warning adds no billing, plan allowance or email send.
 
@@ -24,6 +37,9 @@ Not proven: real model/provider quality and latency, authenticated admin-host
 journeys on an isolated Auth stack, live mail, publication/read-back/undo on a
 Strelva-owned business, actual cost per turn or owner adoption. Old tenant chat
 threads are retained on the legacy operator surface and are not copied.
+The Mooney example's newly introduced booking service is therefore not fully
+implemented by Ask: an operator must prepare its service and grants first.
+The existing-service booking alternative is implemented and tested locally.
 
 Ask Strelva is the one way in. A person in a business workspace says what they
 want in plain words. Strelva answers, drafts a change, opens a Possibility, or

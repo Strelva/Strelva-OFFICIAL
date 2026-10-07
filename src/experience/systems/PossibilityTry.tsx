@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { BookingServiceTry } from "./BookingServiceTry";
+import type { AskBookingService } from "@/products/scheduling/contracts";
 import { Button } from "@/components/ui/Button";
 import { SiteDocumentTry, type SiteDocument } from "@/products/websites/client";
 import type { PublicBookingSchedule } from "../../../custom-repo-starter/booking-client";
@@ -17,6 +19,14 @@ export interface PossibilityTryView {
   websiteDocument?: SiteDocument;
   bookingSchedule?: PublicBookingSchedule;
   bookingPath?: string;
+  newBookingService?: { service: AskBookingService; schedule: PublicBookingSchedule };
+  inquiryFollowUp?: {
+    afterMinutes: number;
+    maxAttempts: number;
+    messageTemplate: string;
+    checks: Array<{ label: string; status: "passed" | "failed" | "skipped"; detail: string }>;
+    outboundMessages: string[];
+  };
 }
 
 export type PossibilityTryState =
@@ -43,10 +53,27 @@ export function PossibilityTry({ state }: { state: PossibilityTryState }) {
         {view.introduces.map((line) => <li key={`new-${line}`}>New: {line}</li>)}
       </ul>
     </section> : null}
+    {view.newBookingService ? <BookingServiceTry service={view.newBookingService.service} schedule={view.newBookingService.schedule} /> : null}
     {view.websiteDocument ? <div className="mt-6"><SiteDocumentTry document={view.websiteDocument} bookingSchedule={view.bookingSchedule} bookingPath={view.bookingPath} /></div> : null}
-    {view.takesSubmissions && !view.websiteDocument ? <TestSubmission /> : null}
+    {view.inquiryFollowUp ? <InquiryFollowUpTry proposal={view.inquiryFollowUp} /> : null}
+    {view.takesSubmissions && !view.websiteDocument && !view.newBookingService ? <TestSubmission /> : null}
     <p className="mt-8 text-xs text-gray-muted">Nothing here changes your live site, sends a message or books anything. Make it live from the email when you are ready.</p>
   </Shell>;
+}
+
+function InquiryFollowUpTry({ proposal }: { proposal: NonNullable<PossibilityTryView["inquiryFollowUp"]> }) {
+  const [showRehearsal, setShowRehearsal] = useState(false);
+  return <section className="mt-6 space-y-4 rounded-lg border border-gray-border p-4" aria-label="Proposed inquiry follow-up">
+    <h2 className="font-display text-xl">The follow-up you would send</h2>
+    <p className="text-sm">After {proposal.afterMinutes} minutes, with up to {proposal.maxAttempts} follow-up{proposal.maxAttempts === 1 ? "" : "s"}. Your current form, routing and Connections stay in place.</p>
+    <div className="whitespace-pre-wrap break-words rounded border border-gray-border bg-surface-inset p-4 text-sm" aria-label="Complete proposed message">{proposal.messageTemplate}</div>
+    <Button variant="secondary" onClick={() => setShowRehearsal(!showRehearsal)} aria-expanded={showRehearsal}>{showRehearsal ? "Hide rehearsal" : "Show rehearsal"}</Button>
+    {showRehearsal ? <div className="space-y-4" role="region" aria-label="Recorded follow-up rehearsal">
+      <p className="text-sm" role="status">This recorded rehearsal used fictional inquiries. No message was sent and no real inquiry changed.</p>
+      <ul className="space-y-2 text-sm">{proposal.checks.map((check, index) => <li key={index}><strong>{check.label}: {check.status}</strong><p>{check.detail}</p></li>)}</ul>
+      {proposal.outboundMessages.map((message, index) => <div key={index} className="whitespace-pre-wrap break-words rounded border border-gray-border p-4 text-sm" aria-label={`Rehearsed message ${index + 1}`}>{message}</div>)}
+    </div> : null}
+  </section>;
 }
 
 function Shell({ children }: { children: React.ReactNode }) {

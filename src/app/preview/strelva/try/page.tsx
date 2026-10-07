@@ -40,6 +40,15 @@ export default async function TryPreview({ searchParams }: { searchParams: Promi
     document.capabilities = { baseUrl: "https://example.invalid", tenant: "river-practice", booking: { capabilityId: "consult", version: 1, range: { from: "2026-10-10T13:00:00.000Z", to: "2026-10-10T15:00:00.000Z" } } };
     fixture.view = { title: "A booking page for River Practice", intent: "Fictional existing-site alternative with an interactive isolated booking test. Owner review still comes before Make real.", changes: ["The existing native site with one booking page"], introduces: [], takesSubmissions: false, websiteDocument: document, bookingPath: "/book", bookingSchedule: { schemaVersion: 1, capabilityId: "consult", version: 1, name: "Consulting session", provider: "google", timeZone: "America/New_York", slots: [{ id: "test-slot-one", start: "2026-10-10T13:00:00.000Z", end: "2026-10-10T14:00:00.000Z" }, { id: "test-slot-two", start: "2026-10-10T14:00:00.000Z", end: "2026-10-10T15:00:00.000Z" }] } };
   }
+  if (state === "follow-up" && fixture.kind === "ready") fixture.view = {
+    title: "A follow-up for River Practice", intent: "An exact proposed rule with a recorded fictional rehearsal. Owner review comes before Make real.",
+    changes: ["The existing inquiry service with one follow-up rule"], introduces: [], takesSubmissions: false,
+    inquiryFollowUp: { afterMinutes: 1440, maxAttempts: 1,
+      messageTemplate: "Hi {{name}},\n\nThanks for asking about consulting. Would you like to tell us more about your project?\n\nRiver Practice",
+      checks: [{ label: "Follow-up timing", status: "passed", detail: "The fictional inquiry waited the full configured day." }, { label: "Already answered", status: "passed", detail: "The answered inquiry received no follow-up." }],
+      outboundMessages: ["Hi Fictional Visitor,\n\nThanks for asking about consulting. Would you like to tell us more about your project?\n\nRiver Practice"],
+    },
+  };
   if (["existing-pages", "existing-section", "existing-rebuild"].includes(state ?? "") && fixture.kind === "ready") {
     const published = composeAskPageSet("River Practice", { kind: "website-pages", pages: [
       { path: "/", title: "River Practice", description: "Fictional existing website", paragraphs: ["The existing home page stays live while this alternative is reviewed."] },

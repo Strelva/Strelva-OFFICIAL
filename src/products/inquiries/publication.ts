@@ -84,6 +84,11 @@ async function calculatePublication(snapshot: InquiryWorkspaceSnapshot, claim: P
   const target = claim.action === "undo"
     ? snapshot.state.capabilities.find((item) => item.id === claim.capabilityId)?.previousLive ?? null
     : work.draft;
+  if (claim.action === "make_live") {
+    const change = snapshot.state.changes.find(item => item.id === claim.changeId);
+    const liveVersion = snapshot.state.capabilities.find(item => item.id === claim.capabilityId)?.live?.version ?? null;
+    if (!change || change.baseVersion !== liveVersion) return { reason: "publication_live_baseline_changed" };
+  }
   const governance = decideAiContentGovernance("contact", target, { tenantAutoPublish: false });
   if (governance.action === "block") return { reason: "publication_blocked_by_governance" };
   const acceptedAt = new Date().toISOString();
