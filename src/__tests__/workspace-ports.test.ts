@@ -42,7 +42,7 @@ describe("workspace ports", () => {
       businessRecord: ["resolveTenantOwnerRecipient"],
       googleBindings: ["googleBindingsEnabled", "readBindingTarget", "readGoogleBindingForTenant", "setGoogleBindingStatus", "updateGoogleBindingTokens", "upsertGoogleBinding", "upsertGoogleLocation", "BindingEncryptionRefused", "AccountBindingStoreError"],
       businessBilling: ["businessBillingCheckoutMetadata"],
-      inquiries: ["isInquiryMessageReviewEvent", "authorizeInquiryMessageReviewActor", "executeInquiryMessageReview", "reconcileInquiryMessageReview", "executeInquiryPublication"],
+      inquiries: ["isInquiryMessageReviewEvent", "authorizeInquiryMessageReviewActor", "executeInquiryMessageReview", "reconcileInquiryMessageReview", "authorizeInquiryPublicationActor", "executeInquiryPublication"],
       tenantReviewReplies: ["defaultTenantReplyDeps", "routeTenantReviewReply", "postTenantReviewReply"],
       publishingContent: ["executePublishingEvent", "authorizePublishingEvent", "prepareTenantCollectionDraft"],
       websites: ["websiteRebuildReleaseMayBeOn", "websiteRebuildReleasedFor", "websiteDocumentStore", "readWebsiteRebuild", "readSiteNodes", "patchWebsiteRebuild"],

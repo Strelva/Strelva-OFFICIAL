@@ -36,6 +36,8 @@ import type {
   ResponsibilityDeliveryGate,
 } from "./delivery";
 import { inquiryEmailReadiness } from "./email-consent";
+import { inquiryMessageRouteAtUse, type InquiryMessageRouteReader } from "./inquiry-policy-at-use";
+import { bindInquiryReviewActor, authorizeSignedInquiryMessageDecision, type InquiryActorAuthorityDependencies } from "./message-review-authority";
 import { stateForReceive } from "./receive";
 import { classifyInquiryMessage } from "./message-outcome";
 import { type MessageReceiptContext, writeMessageReceipt } from "./message-receipt";
@@ -43,13 +45,14 @@ import {
   DIFFERENT_MESSAGE_SENT,
   MESSAGE_DIGEST_UNKNOWN,
   metadataFromEvent,
+  approvalEventMatches,
+  acceptanceEvidenceFromEvent,
   previewFromEvent,
   sentMessageBinding,
 } from "./message-review-event";
 import { policyFor } from "./message-review-policy";
 import { currentResponsibility, inquiryCurrentness } from "./currentness";
 import type {
-  InquiryMessageAcceptanceEvidence,
   InquiryMessageReviewAction,
   InquiryMessageReviewExecution,
   InquiryMessageReviewReconciliation,
@@ -64,7 +67,6 @@ import {
   InquiryMessageReviewEngineError,
   type InquiryMessageReviewEventMetadata,
   assertOpenInquiry,
-  assertResponsibilitySponsor,
   dependency,
   errorCode,
   errorMessage,
@@ -93,7 +95,7 @@ type ResolveRoute = (
   policy: InquiryRoutingPolicy,
 ) => Promise<InquiryRoute>;
 
-export interface InquiryMessageReviewDependencies {
+export interface InquiryMessageReviewDependencies extends InquiryActorAuthorityDependencies {
   repository?: import("./repository").InquiryRepository;
   store?: InquiryDeliveryStore;
   transport?: InquiryOutboundTransport;
@@ -107,6 +109,7 @@ export interface InquiryMessageReviewDependencies {
   allowExternalSends?: boolean;
   /** Test/host seam for the durable workspace exit authority. */
   isWorkspaceExited?: (tenantId: string) => Promise<boolean>;
+  messageRoute?: InquiryMessageRouteReader;
 }
 
 interface ReviewContext {
@@ -123,8 +126,11 @@ interface ReviewContext {
   messageBody: string;
   messageDigest: string;
   evaluation: ResponsibilityEvaluation;
+  decisionRoute: Awaited<ReturnType<InquiryMessageRouteReader>>;
   deliveryEvaluation: InquiryDeliveryResult;
   status: InquiryRecordStatus;
+  ownerDecisionActor?: string;
+  operatorReviewActor?: string;
 }
 
 async function repositoryFor(deps: InquiryMessageReviewDependencies): Promise<import("./repository").InquiryRepository> {
@@ -238,6 +244,8 @@ async function buildContext(input: {
   responsibilityId?: string;
   expectedResponsibilityRevision?: string;
   expectedPolicyVersion?: string;
+  ownerDecisionEvent?: UnifiedEvent;
+  ownerDecisionAction?: "approved" | "dismissed";
   deps: InquiryMessageReviewDependencies;
   now: Date;
 }): Promise<ReviewContext> {
@@ -249,11 +257,17 @@ async function buildContext(input: {
   await readyForEmail(input.tenantId, definition, input.deps);
   const responsibility = responsibilityFor(snapshot.state, capability.id, input.responsibilityId);
   if (responsibility.businessId !== input.businessId) throwCode("permission_denied", "This responsibility belongs to another business.");
-  assertResponsibilitySponsor(responsibility, input.actorId);
+  const actorBinding = await bindInquiryReviewActor({ tenantId: input.tenantId, businessId: input.businessId,
+    inquiryId: input.inquiryId, action: input.action, actorId: input.actorId, responsibility,
+    event: input.ownerDecisionEvent, eventAction: input.ownerDecisionAction, deps: input.deps });
   if (input.expectedResponsibilityRevision && responsibility.updatedAt !== input.expectedResponsibilityRevision) {
     throwCode("policy_changed", "The current responsibility policy changed. Prepare a fresh review.");
   }
-  const inquiry = inquiryFromLead(input.tenantId, lead, definition);
+  let inquiry = inquiryFromLead(input.tenantId, lead, definition);
+  if (input.action === "reply") {
+    const { withInquiryBookingOffer } = await import("./booking-handoff");
+    inquiry = await withInquiryBookingOffer(inquiry);
+  }
   const policy = policyFor(definition, responsibility, input.action);
   if (input.expectedPolicyVersion && policy.version !== input.expectedPolicyVersion) {
     throwCode("policy_changed", "The current responsibility policy changed. Prepare a fresh review.");
@@ -285,12 +299,17 @@ async function buildContext(input: {
   if (evaluation.decision === "block") {
     throwCode("delivery_unavailable", evaluation.reason || "The current responsibility blocks this message.");
   }
+  const decisionRoute = await (input.deps.messageRoute ?? inquiryMessageRouteAtUse)(input.tenantId, evaluation, `${message.subject}\n${messageBody}`, input.businessId);
+  if (actorBinding.operatorReviewActor && decisionRoute !== "strelva_reviews") {
+    throwCode("permission_denied", "The current responsibility does not delegate this review to Strelva.");
+  }
   const deliveryEvaluation = evaluateInquiryDelivery(inquiry, input.action, policy, null, input.now, messageDigest);
   if (deliveryEvaluation.status !== "awaiting_approval" && deliveryEvaluation.status !== "ready") {
     throwCode("delivery_unavailable", deliveryEvaluation.reason || "The message is not ready for approval.");
   }
   return {
     snapshot,
+    ...actorBinding,
     lead,
     inquiry,
     capability,
@@ -303,6 +322,7 @@ async function buildContext(input: {
     messageBody,
     messageDigest,
     evaluation,
+    decisionRoute,
     deliveryEvaluation,
     status,
   };
@@ -334,7 +354,7 @@ function metadataFor(
     messageDigest: context.messageDigest,
     preparedAt: now.toISOString(),
     expiresAt: context.deliveryEvaluation.expiresAt ?? null,
-    reviewAudience: "owner",
+    reviewAudience: process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && context.decisionRoute === "strelva_reviews" ? "operator" : "owner",
   };
 }
 
@@ -399,6 +419,11 @@ export async function prepareInquiryMessageReviewWithDependencies(
     status: "pending",
     metadata: metadata as unknown as Record<string, unknown>,
   }, { requirePersistence: true });
+  if (process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1") {
+    // Opening the owner decision is immediate; notice failures cannot undo the saved draft.
+    const { notifyPreparedInquiryDecision } = await import("./decision-notice");
+    await notifyPreparedInquiryDecision(tenantId, context.lead).catch(() => "none");
+  }
   return previewFromEvent(created, metadata, actorId);
 }
 
@@ -448,20 +473,6 @@ function outcomeFromCheckpoint(
     delivery: classification.delivery,
     retryAllowed: classification.retryAllowed,
   };
-}
-
-function approvalEventMatches(
-  event: UnifiedEvent,
-  tenantId: string,
-  input: InquiryMessageReviewApproveInput,
-  actorId: string,
-): InquiryMessageReviewEventMetadata | null {
-  const metadata = metadataFromEvent(event);
-  if (!metadata || event.tenantId !== tenantId || metadata.businessId !== input.businessId || metadata.inquiryId !== input.inquiryId || metadata.action !== input.action) return null;
-  if (metadata.requestedBy !== actorId) return metadata;
-  if (metadata.messageDigest !== input.messageDigest) return metadata;
-  if (hash(input.reviewToken) !== metadata.reviewTokenHash) return metadata;
-  return metadata;
 }
 
 function outcomeError(result: { changed: boolean; reason?: string }): InquiryMessageReviewEngineError {
@@ -686,6 +697,7 @@ export async function executeInquiryMessageReview(
       inquiryId: metadata.inquiryId,
       action: metadata.action,
       actorId: input.actorId,
+      ownerDecisionEvent: input.event,
       responsibilityId: metadata.responsibilityId,
       expectedResponsibilityRevision: metadata.responsibilityRevision,
       expectedPolicyVersion: metadata.policyVersion,
@@ -734,6 +746,7 @@ export async function executeInquiryMessageReview(
           inquiryId: metadata.inquiryId,
           action: metadata.action,
           actorId: input.actorId,
+          ownerDecisionEvent: input.event,
           responsibilityId: metadata.responsibilityId,
           expectedResponsibilityRevision: metadata.responsibilityRevision,
           expectedPolicyVersion: metadata.policyVersion,
@@ -756,6 +769,7 @@ export async function executeInquiryMessageReview(
           inquiryId: metadata.inquiryId,
           action: metadata.action,
           actorId: input.actorId,
+          ownerDecisionEvent: input.event,
           responsibilityId: metadata.responsibilityId,
           expectedResponsibilityRevision: metadata.responsibilityRevision,
           expectedPolicyVersion: metadata.policyVersion,
@@ -848,10 +862,19 @@ export async function authorizeInquiryMessageReviewActor(input: {
   tenantId: string;
   event: UnifiedEvent;
   actorId: string;
+  eventAction?: "approved" | "dismissed";
   deps?: InquiryMessageReviewDependencies;
 }): Promise<{ allowed: boolean; reason?: string }> {
   const metadata = metadataFromEvent(input.event);
   if (!metadata || input.event.tenantId !== input.tenantId) return { allowed: false, reason: "wrong_tenant" };
+  // Not yet closes the exact signed source without sending. A later email
+  // pause or capability edit cannot turn this declined decision into a send,
+  // nor should it prevent the owner from closing the old draft.
+  if (input.eventAction === "dismissed" && input.actorId.startsWith("owner-link:")) {
+    const allowed = await authorizeSignedInquiryMessageDecision({ tenantId: input.tenantId, event: input.event,
+      actorId: input.actorId, eventAction: "dismissed", deps: input.deps });
+    return { allowed, ...(allowed ? {} : { reason: "permission_denied" }) };
+  }
   try {
     const context = await buildContext({
       tenantId: input.tenantId,
@@ -859,6 +882,8 @@ export async function authorizeInquiryMessageReviewActor(input: {
       inquiryId: metadata.inquiryId,
       action: metadata.action,
       actorId: input.actorId,
+      ownerDecisionEvent: input.event,
+      ownerDecisionAction: input.eventAction,
       responsibilityId: metadata.responsibilityId,
       expectedResponsibilityRevision: metadata.responsibilityRevision,
       expectedPolicyVersion: metadata.policyVersion,
@@ -870,20 +895,6 @@ export async function authorizeInquiryMessageReviewActor(input: {
   } catch (error) {
     return { allowed: false, reason: errorCode(error) };
   }
-}
-
-function acceptanceEvidenceFromEvent(event: UnifiedEvent): InquiryMessageAcceptanceEvidence | null {
-  const raw = (event.metadata?.execution as { acceptance?: unknown } | undefined)?.acceptance;
-  if (!raw || typeof raw !== "object") return null;
-  const row = raw as Record<string, unknown>;
-  const value = (field: unknown, max: number) => (typeof field === "string" && field.trim() ? field.trim().slice(0, max) : undefined);
-  const acceptedAt = value(row.acceptedAt, 80);
-  if (acceptedAt && !Number.isFinite(Date.parse(acceptedAt))) return null;
-  return {
-    providerMessageId: value(row.providerMessageId, 240),
-    acceptedAt,
-    deliveryAttemptId: value(row.deliveryAttemptId, 240),
-  };
 }
 
 export async function reconcileInquiryMessageReview(input: {
@@ -947,6 +958,7 @@ export async function reconcileInquiryMessageReview(input: {
       inquiryId: metadata.inquiryId,
       action: metadata.action,
       actorId: input.actorId,
+      ownerDecisionEvent: input.event,
       responsibilityId: metadata.responsibilityId,
       deps: { ...deps, emailReady: async () => true },
       now,

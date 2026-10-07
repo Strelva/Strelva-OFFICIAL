@@ -14,24 +14,29 @@
  * "delivered" unless a transport supplies verification evidence.
  */
 
-import { createHash } from "node:crypto";
 import { ownerNoticeEmail } from "@/lib/owner-recipient";
 
 import type { InquiryTimelineEventType, ResponsibilityAction, ResponsibilityEvaluation, ResponsibilityPolicy } from "@/products/inquiries/contracts";
 import type { LeadRecord } from "@/lib/leads";
+export type { LeadRecord } from "@/lib/leads";
 import { getTenantConfig } from "@/lib/tenants";
 import { addTenantActivity } from "@/lib/tenant-crm";
 import { renderEmailHtml, renderEmailText } from "@/platform/infra/email/layout";
 import { createEmailInquiryTransport } from "./delivery-email";
 import { createRedisInquiryDeliveryStore } from "./delivery-store";
+import { claimInquiryMessagePurpose, releaseRejectedInquiryMessagePurpose } from "./message-purpose";
+import { inquiryMessageRouteAtUse } from "./inquiry-policy-at-use";
+import { inquiryRecordsEnabled } from "@/platform/infra/inquiry-records";
 import { INQUIRY_WORKSPACE_EXIT_CODE, isInquiryWorkspaceExited } from "./workspace-exit";
 import type { EmailAudience } from "@/platform/infra/email/send";
+import { inquiryBusinessFactsEnabled, inquiryPersonEmail, inquiryWithinBusinessHours, readInquiryBusinessContext } from "./business-context";
 import {
   actorForAction,
   createInquiryDeliveryMessage,
   prepareInquiryDeliveryMessage,
   deliveryActionLabel,
   getInquiryReplyTrackingAddress,
+  getInquiryDeliveryMessageDigest,
   inquiryBusinessName,
   validEmail,
 } from "./delivery-message";
@@ -187,32 +192,8 @@ function actionTimes(
   return { dueAt: dueAt.toISOString(), expiresAt: expiresAt.toISOString() };
 }
 
-/**
- * Bind an approval to the exact message and capability revision. The provider
- * idempotency key alone is not sufficient because an edited body could reuse
- * the same inquiry/action key under the same policy version.
- */
-export function getInquiryDeliveryMessageDigest(message: InquiryDeliveryMessage): string {
-  const canonical = JSON.stringify({
-    tenantId: message.tenantId,
-    inquiryId: message.inquiryId,
-    action: message.action,
-    capabilityId: message.capabilityId ?? null,
-    capabilityVersion: message.capabilityVersion ?? null,
-    audience: message.audience,
-    to: message.to,
-    replyTo: message.replyTo ?? null,
-    ...(message.fromName ? { fromName: message.fromName } : {}),
-    tags: message.tags ?? null,
-    subject: message.subject,
-    options: message.options,
-    idempotencyKey: message.idempotencyKey,
-  });
-  return createHash("sha256").update(canonical).digest("hex");
-}
-
 /** Build the exact message that an approval UI must display and hash. */
-export { createInquiryDeliveryMessage, prepareInquiryDeliveryMessage, getInquiryReplyTrackingAddress };
+export { createInquiryDeliveryMessage, prepareInquiryDeliveryMessage, getInquiryReplyTrackingAddress, getInquiryDeliveryMessageDigest };
 
 export function inquirySubmissionFromLead(tenantId: string, lead: LeadRecord): InquiryDeliverySubmission {
   return {
@@ -246,7 +227,8 @@ export async function resolveInquiryRoute(
   // email address, retain the tenant owner fallback for the legacy notice.
   // Without a configured destination, the one owner-recipient rule decides
   // (src/lib/owner-recipient.ts); it falls back to the tenant's owner_email.
-  const ownerEmail = validEmail(inquiry.staffDestination)
+  const business = inquiry.staffDestination ? await readInquiryBusinessContext(inquiry.tenantId) : null;
+  const ownerEmail = validEmail(business ? inquiryPersonEmail(business, inquiry.staffDestination) : inquiry.staffDestination)
     || (tenant ? validEmail(await ownerNoticeEmail(tenant)) : null);
   return {
     tenantId: inquiry.tenantId,
@@ -598,6 +580,10 @@ export async function deliverInquiryAction(
   if (route.tenantId !== inquiry.tenantId) {
     return { inquiryId: inquiry.id, tenantId: inquiry.tenantId, action, status: "unavailable", reason: "recipient_route_tenant_mismatch", retryable: false };
   }
+  if (action === "reply") {
+    const { withInquiryBookingOffer } = await import("./booking-handoff");
+    inquiry = await withInquiryBookingOffer(inquiry);
+  }
   const message = await prepareInquiryDeliveryMessage(inquiry, route, action);
   if (!message) {
     await appendTimelineSafe(store, timelineFor(inquiry, action, blockedTimelineType(action), "recipient unavailable", "blocked", now.toISOString()));
@@ -619,6 +605,19 @@ export async function deliverInquiryAction(
     const reason = responsibilityGate.reason || "responsibility_blocked";
     await appendTimelineSafe(store, timelineFor(inquiry, action, blockedTimelineType(action), reason, "blocked", now.toISOString()));
     return { inquiryId: inquiry.id, tenantId: inquiry.tenantId, action, status: blockedResultStatus(reason), reason, retryable: false };
+  }
+
+  if (action !== "owner_notification" && options.approval === undefined
+    && process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && inquiryRecordsEnabled()) {
+    const decisionRoute = responsibilityGate.evaluation
+      ? await (deps.messageRoute ?? inquiryMessageRouteAtUse)(inquiry.tenantId, responsibilityGate.evaluation,
+        `${message.subject}\n${renderInquiryMessage(message).text}`, inquiry.businessId)
+      : "never";
+    if (decisionRoute !== "handle") {
+      const reason = decisionRoute === "never" ? "responsibility_blocked" : "approval_required";
+      await appendTimelineSafe(store, timelineFor(inquiry, action, blockedTimelineType(action), reason, "blocked", now.toISOString()));
+      return { inquiryId: inquiry.id, tenantId: inquiry.tenantId, action, status: decisionRoute === "never" ? "paused" : "awaiting_approval", reason, retryable: false };
+    }
   }
 
   const messageDigest = getInquiryDeliveryMessageDigest(message);
@@ -717,6 +716,12 @@ export async function deliverInquiryAction(
   // Exit blocks a new claim, while the checkpoint branches above remain
   // available to verify or reconcile an already accepted or ambiguous write.
   try {
+    if (action !== "owner_notification" && inquiryBusinessFactsEnabled()) {
+      const business = await readInquiryBusinessContext(inquiry.tenantId);
+      if (business && !inquiryWithinBusinessHours(business, now)) {
+        return { ...evaluated, status: "paused", reason: "outside_business_hours", retryable: false };
+      }
+    }
     const exited = await (deps.isWorkspaceExited ?? ((tenantId: string) => isInquiryWorkspaceExited({ tenantId })))(inquiry.tenantId);
     if (exited) {
       const reason = INQUIRY_WORKSPACE_EXIT_CODE;
@@ -841,8 +846,23 @@ export async function deliverInquiryAction(
     } catch {
       return { ...evaluated, status: "unavailable", reason: "inquiry_workspace_exit_unavailable", attemptId, retryable: false };
     }
+    // The workspace owner and governed engine cannot acquire two first replies,
+    // even while the other's provider write or acceptance checkpoint is pending.
+    let purposeClaimed: boolean;
+    try {
+      purposeClaimed = await claimInquiryMessagePurpose(inquiry.tenantId, inquiry.id, action, attemptId);
+    } catch {
+      return { ...evaluated, status: "reconciliation_required", reason: "shared_reply_claim_unavailable", attemptId, retryable: false };
+    }
+    if (!purposeClaimed) {
+      await store.markFailed({ tenantId: inquiry.tenantId, inquiryId: inquiry.id, action, attemptId, reason: "reply_purpose_already_claimed", retryable: false });
+      return { ...evaluated, status: "paused", reason: "reply_purpose_already_claimed", attemptId, retryable: false };
+    }
     const sent = await transport.send(message);
     if (sent.status === "rejected") {
+      // Explicit rejection proves nothing was accepted. Failure to record the
+      // release stays closed; an accepted/unknown write never reaches this seam.
+      await releaseRejectedInquiryMessagePurpose(inquiry.tenantId, inquiry.id, action, attemptId).catch(() => undefined);
       let failed: InquiryDeliveryCheckpoint;
       try {
         failed = await store.markFailed({ tenantId: inquiry.tenantId, inquiryId: inquiry.id, action, attemptId, reason: sent.reason, retryable: sent.retryable });

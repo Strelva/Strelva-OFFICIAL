@@ -7,6 +7,8 @@
  * This file imports no src/lib module: the shapes are checked where the
  * loaders are registered.
  */
+const inquiryPublicationServer = () => import("@/products/inquiries/server");
+
 export const workspacePortLoaders = {
   clientRecords: async () => {
     const [mirror, move] = await Promise.all([
@@ -43,13 +45,20 @@ export const workspacePortLoaders = {
   inquiries: async () => {
     const index = await import("@/products/inquiries");
     return {
+      notifyInquiryOwner: async (input: Parameters<typeof index.notifyInquiryOwner>[0]) =>
+        (await import("@/products/inquiries")).notifyInquiryOwner(input),
+      inquiryOutcomeProofEnabled: () => process.env.STRELVA_INQUIRY_OUTCOMES === "1",
+      readTenantInquiryOutcomeProof: async (tenantId: string, from: string, to: string) =>
+        (await import("@/products/inquiries")).readTenantInquiryOutcomeProof(tenantId, from, to),
       isInquiryMessageReviewEvent: index.isInquiryMessageReviewEvent,
       authorizeInquiryMessageReviewActor: index.authorizeInquiryMessageReviewActor,
       executeInquiryMessageReview: index.executeInquiryMessageReview,
       reconcileInquiryMessageReview: index.reconcileInquiryMessageReview,
       // The server entry loads only when a publication runs, as before.
-      executeInquiryPublication: async (input: { tenantId: string; eventId: string; claimId: string }) =>
-        (await import("@/products/inquiries/server")).executeInquiryPublication(input),
+      authorizeInquiryPublicationActor: async (input: Parameters<Awaited<ReturnType<typeof inquiryPublicationServer>>["authorizeInquiryPublicationActor"]>[0]) =>
+        (await inquiryPublicationServer()).authorizeInquiryPublicationActor(input),
+      executeInquiryPublication: async (input: Parameters<Awaited<ReturnType<typeof inquiryPublicationServer>>["executeInquiryPublication"]>[0]) =>
+        (await inquiryPublicationServer()).executeInquiryPublication(input),
     };
   },
 

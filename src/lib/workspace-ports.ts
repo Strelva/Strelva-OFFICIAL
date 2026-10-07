@@ -188,15 +188,19 @@ export interface InquiryReviewOutcome {
 }
 
 export interface InquiriesPort {
+  inquiryOutcomeProofEnabled(): boolean;
+  readTenantInquiryOutcomeProof(tenantId: string, from: string, to: string): Promise<import("./types").WeeklyInquiryOutcomeProof>;
+  notifyInquiryOwner(input: { tenantId: string; lead: import("./leads").LeadRecord }): Promise<unknown>;
   isInquiryMessageReviewEvent(event: UnifiedEvent): boolean;
-  authorizeInquiryMessageReviewActor(input: { tenantId: string; event: UnifiedEvent; actorId: string }): Promise<{ allowed: boolean; reason?: string }>;
+  authorizeInquiryMessageReviewActor(input: { tenantId: string; event: UnifiedEvent; actorId: string; eventAction?: "approved" | "dismissed" }): Promise<{ allowed: boolean; reason?: string }>;
   executeInquiryMessageReview(input: { tenantId: string; eventId: string; event: UnifiedEvent; actorId: string }): Promise<InquiryReviewOutcome & {
     acceptedAt?: string;
     providerMessageId?: string;
     deliveryAttemptId?: string;
   }>;
   reconcileInquiryMessageReview(input: { tenantId: string; event: UnifiedEvent; actorId: string }): Promise<InquiryReviewOutcome>;
-  executeInquiryPublication(input: { tenantId: string; eventId: string; claimId: string }): Promise<{ accepted: boolean; verified: boolean; reason?: string }>;
+  authorizeInquiryPublicationActor(input: { tenantId: string; eventId: string; claimId: string; event: UnifiedEvent; actorId: string; action: "approved" | "dismissed" }): Promise<{ allowed: boolean; reason?: string }>;
+  executeInquiryPublication(input: { tenantId: string; eventId: string; claimId: string; event: UnifiedEvent; actorId: string }): Promise<{ accepted: boolean; verified: boolean; reason?: string }>;
 }
 
 // ── Google listing replies for a tenant (src/products/google-listing) ──────────

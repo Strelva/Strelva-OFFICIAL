@@ -646,11 +646,50 @@ psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-records-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-lead-reads-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
+# Wave 6 inquiry closure: additive replies, exact outcome proof, notice context and connected spam review.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010120000_inquiry_workspace_replies.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010121000_inquiry_outcome_proof.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010122000_inquiry_weekly_outcomes.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-workspace-replies-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010123000_inquiry_context_notices.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-context-notices-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010124000_connected_inquiry_records.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-inquiry-records-schema.sql"
 # Strelva (system): the audited service actor for the needs-you and
 # workspace-work crons, and the connected_sites flag row. Replaces
 # owner_decision_json and workspace_release_flag_names(); the Needs you,
 # Make real live and release flag contracts rerun against the replacements.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009100000_strelva_service_actor.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125000_inquiry_urgent_decisions.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125500_inquiry_inbox.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-inbox-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125700_inquiry_cache_presence.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-cache-presence-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125900_inquiry_export_before_teardown.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-export-before-teardown-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125600_inquiry_reply_purpose.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-reply-purpose-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125800_connected_inquiry_owner_notices.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-inquiry-owner-notices-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-reply-purpose-race-setup.sql"
+psql "${psql_args[@]}" --set=engine=true --file="$repo_root/tests/inquiry-reply-purpose-race.sql" >"$cluster_root/inquiry-engine-race.log" 2>&1 &
+inquiry_engine_race=$!
+psql "${psql_args[@]}" --set=engine=false --file="$repo_root/tests/inquiry-reply-purpose-race.sql" >"$cluster_root/inquiry-owner-race.log" 2>&1 &
+inquiry_owner_race=$!
+inquiry_engine_status=0
+inquiry_owner_status=0
+wait "$inquiry_engine_race" || inquiry_engine_status=$?
+wait "$inquiry_owner_race" || inquiry_owner_status=$?
+if [[ "$inquiry_engine_status" -eq 0 && "$inquiry_owner_status" -ne 0 ]]; then
+  grep -q inquiry_reply_already_sent "$cluster_root/inquiry-owner-race.log"
+elif [[ "$inquiry_owner_status" -eq 0 && "$inquiry_engine_status" -ne 0 ]]; then
+  grep -q reply_purpose_already_claimed "$cluster_root/inquiry-engine-race.log"
+else
+  printf 'Inquiry reply purpose race did not produce exactly one winner.\n' >&2
+  cat "$cluster_root/inquiry-engine-race.log" "$cluster_root/inquiry-owner-race.log" >&2
+  exit 1
+fi
+printf 'Inquiry engine/owner reply race passed: exactly one send purpose claimed.\n'
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
@@ -727,6 +766,24 @@ psql "${psql_args[@]}" --file="$repo_root/tests/failed-system-plan-request-schem
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 
 # The real Make real runner, checkpointing through these RPCs (psql-backed port).
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125910_inquiry_decision_notice_claims.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-decision-notice-claims-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125915_inquiry_decision_notice_events.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-decision-notice-events-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125920_tenant_lead_parity_completeness.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/tenant-lead-parity-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125925_inquiry_member_replies.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-member-replies-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125930_inquiry_business_facts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-business-facts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125935_inquiry_operator_authority.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-operator-authority-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125940_inquiry_booking_handoff.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-booking-handoff-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125950_inquiry_operator_review.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-operator-review-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125955_inquiry_operator_revocation.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-operator-revocation-schema.sql"
 STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/make-real-activation-repository.test.ts
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010130000_booking_parity.sql"
@@ -765,6 +822,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.
 # because it commits its fictional rows.
 STRELVA_BOOKINGS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/booking-one-store.test.ts
+bash "$repo_root/scripts/check-inquiry-rollbacks.sh" "$cluster_socket" "$cluster_port"
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 

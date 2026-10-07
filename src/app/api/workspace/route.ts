@@ -27,6 +27,7 @@ import {
 import { listManagedPresenceWork } from "@/products/managed-presence/server";
 import { publicHostname } from "@/products/managed-presence";
 import { resolveHomeFinderPreviewHref } from "@/products/home-finder/server";
+import { inquiryRecordsEnabled } from "@/platform/infra/inquiry-records";
 import { inquiryReleaseEnabledForWorkspace } from "@/products/inquiries";
 import { parseTrackerWorkPayload, presentTrackerHandoffPreview } from "@/products/tracker";
 import { presentWorkspaceWork } from "@/experience/workspace/result";
@@ -313,7 +314,7 @@ export async function GET(request: Request) {
       ...(providedClients ? { providedClients } : {}),
       products,
       ...(systems ? { systems } : {}),
-      releases: { systems: systemsReleased, needsYou: needsYouReleaseEnabled(), ask: askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
+      releases: { systems: systemsReleased, needsYou: needsYouReleaseEnabled(), ask: askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, ...(inquiriesReleased && inquiryRecordsEnabled() ? { inquiryInbox: true } : {}), websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
     };
     return json(snapshot);
   } catch (error) { return failed(error); }

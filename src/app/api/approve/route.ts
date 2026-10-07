@@ -149,7 +149,7 @@ async function workspaceConfirm(token: string, claims: WorkspaceApproveLinkClaim
   return confirmPage({
     token,
     heading: isApprove ? `Approve: ${item.title}` : `Not yet: ${item.title}`,
-    body: `${isApprove ? item.approveEffect : item.notYetEffect} Nothing happens until you confirm.`,
+    body: `${process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && (item.kind === "customer.message" || item.kind === "customer.commitment") && item.detail ? `${item.detail}\n\n` : ""}${isApprove ? item.approveEffect : item.notYetEffect} Nothing happens until you confirm.`,
     confirmLabel: isApprove ? "Confirm — approve" : "Confirm — not yet",
     dashboardUrl: open,
   });

@@ -1,5 +1,6 @@
 "use client";
 
+import { WorkspaceInquirySystem } from "@/experience/places/WorkspaceInquirySystem";
 import Link from "next/link";
 import { ContentWorkspace } from "@/experience/publishing/ContentWorkspace";
 import { useState } from "react";
@@ -55,6 +56,7 @@ export interface SystemPageProps {
   calendarRecoveryAllowed?: boolean;
   /** Domains, Waiting on you, Requests and History for a website System. Supplied by tests; otherwise read from the server. */
   websiteDetail?: WebsiteDetailState;
+  inquiryInbox?: boolean;
   inquiryAdapter?: { tenantId: string; adapter?: InquirySurfaceAdapter };
   systemHref: (id: string) => string;
   onHome: () => void;
@@ -193,9 +195,10 @@ export function websiteSandbox(src: string): string {
   }
 }
 
-function SystemSurface({ system, workspaceId, readOnly, useReadOnly = readOnly, rebuildEnabled, managed, agency, sources, localPreview, workspaceStopped, calendarRecoveryAllowed, inquiryAdapter }: SystemPageProps & { system: SystemView }) {
+function SystemSurface({ system, workspaceId, readOnly, useReadOnly = readOnly, rebuildEnabled, managed, agency, sources, localPreview, workspaceStopped, calendarRecoveryAllowed, inquiryAdapter, inquiryInbox }: SystemPageProps & { system: SystemView }) {
   const noop = () => undefined;
   if (system.surface.kind === "inquiries") {
+    if (inquiryInbox) return <WorkspaceInquirySystem key={workspaceId} workspaceId={workspaceId} />;
     const adapter = inquiryAdapter?.tenantId === system.surface.tenantId ? inquiryAdapter.adapter : undefined;
     return <InquiryServerWorkspaceExperience tenantId={system.surface.tenantId} adapter={adapter} initialView="home" basePath="/workspace" routePrefix="inquiry" />;
   }

@@ -157,6 +157,18 @@ describe("agency home on the batched read", () => {
     expect(results).toContain("Elmwood PTSkipped. Needs Google Calendar connected first.");
   });
 
+  it("shows existing inquiry Versions through the current agency Library tab", async () => {
+    const request = router({ clients: () => Response.json(page([])), library: () => Response.json({ agencyWorkspaceId: AGENCY, sources: [],
+      inquiryVersions: [{ id: "legacy-inquiry", tenantId: "lake-bakery", businessName: "Lake Bakery", name: "Ask us",
+        sourceBusinessId: AGENCY, sourceSystemId: "inquiry:source", sourceRevision: 2, currentRelease: 7, improvement: "blocked" }] }) });
+    const { node } = await render(request);
+    await act(async () => { button(node, "Library").click(); }); await settle();
+    expect(node.textContent).toContain("Inquiry Versions");
+    expect(node.textContent).toContain("Source revision 2 · this Version’s release 7");
+    expect(node.textContent).toContain("choice about local changes");
+    expect(node.querySelector('a[href="/business/lake-bakery?view=patterns"]')?.textContent).toContain("Lake Bakery");
+    expect(node.textContent).not.toContain("No sources yet");
+  });
   it("keeps Library and Team out when the Systems release is off, with clients still from one read", async () => {
     const request = router({ clients: () => Response.json(page([row(1), row(2)])) });
     const { node } = await render(request, false);

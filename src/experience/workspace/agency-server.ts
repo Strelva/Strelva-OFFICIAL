@@ -14,6 +14,9 @@
  *   here: going live is a separate release through the release gate.
  */
 import { z } from "zod";
+import { inquiryReleaseMayBeOn, inquiryReleaseEnabledForWorkspace, inquiryReleasedForCurrentUser, discoverInquiryPortfolio } from "@/products/inquiries";
+import { readLinkedSites } from "@/platform/owner-entry/linked-sites";
+import { resolveInquiryWorkspace } from "@/products/inquiries/server";
 import { createSystemVersions, improvementState, type VersionActor } from "@/platform/system-versions";
 import {
   createSupabaseConnectionOwnership,
@@ -129,6 +132,19 @@ export async function readAgencyLibrary(actor: WorkspaceActor, agencyWorkspaceId
       revisions: source.revisions.map((revision) => ({ number: revision.number, label: revision.label, summary: revision.summary, publishedAt: revision.publishedAt })),
       versions: rows,
     });
+  }
+  if (inquiryReleaseMayBeOn() && await inquiryReleaseEnabledForWorkspace(agencyWorkspaceId, { userId: actor.userId, operator: false, tester: false })) {
+    try {
+      // Source access is the agency's own current links; target access is the
+      // existing portfolio's freshly checked tenant membership. No definition,
+      // credential, inquiry, approval or connection is copied into lineage.
+      const linked = await readLinkedSites(actor, agencyWorkspaceId);
+      const sourceIds = new Set([agencyWorkspaceId, ...await Promise.all(linked.sites.map(async site =>
+        (await resolveInquiryWorkspace({ tenantId: site.tenantId, tenantStableId: site.tenantStableId, fallbackBusinessId: site.tenantStableId })).businessId))]);
+      const portfolio = await discoverInquiryPortfolio(undefined, inquiryReleasedForCurrentUser);
+      result.inquiryVersions = (portfolio.versions ?? []).filter(item => sourceIds.has(item.sourceBusinessId));
+      if (portfolio.unavailableTenantIds.length) result.inquiryVersionsUnavailable = true;
+    } catch { result.inquiryVersionsUnavailable = true; }
   }
   return result;
 }

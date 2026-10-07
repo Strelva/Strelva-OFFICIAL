@@ -1,12 +1,15 @@
 import { chaseBookingCalendarHealth } from "@/platform/bookings/calendar-health";
 import { bookingSettingsAdapter } from "@/platform/bookings/setup";
 import { deliverBookingUpdates } from "@/platform/bookings/updates";
-import { getEventRaw, getEvents } from "@/lib/events";
+import { getEventRaw, getEvents, getEventsRaw } from "@/lib/events";
 import { readCatalogReportHandled } from "@/platform/catalog-reports/receipts";
 import { readToolNoticeHandled } from "@/platform/catalog-reports/tool-notices";
 import { resolveEventAction } from "@/lib/event-actions";
 import { sendEmailWithReceipt } from "@/platform/infra/email/send";
 import { publishingDecisionDeliveryAllowed } from "./publishing-delivery";
+import { customerEmailEnabled, emailSendingEnabled } from "@/platform/infra/email/enabled";
+import { getClientEmailOverride } from "@/platform/infra/email/client-override";
+import { needsYouReleaseEnabled } from "./release";
 import { DeliveryCommitmentService, PostgresServiceRequestStore, mutateServiceRequestCommitment } from "@/platform/service-requests";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { serviceRequestAdapter, tenantEventAdapter } from "./adapters";
@@ -21,6 +24,7 @@ import { bookingRequestAdapter, bookingRequestItem } from "@/platform/bookings/n
 import { decideBookingRequest, readWorkspaceBooking, readWorkspaceBookingRequests, readNativeBookingWorkspaces } from "@/platform/bookings/store";
 import { bookingStoreWriteEnabled, bookingOwnerNoticeEnabled, bookingReadSource } from "@/platform/bookings/flags";
 import { updateBooking as updateLegacyBookingStatus } from "@/platform/bookings/legacy-store";
+import { inquiryFactAdapter } from "./sources/inquiry-fact";
 
 import { needsYouReleaseEnabled } from "./release";
 export { needsYouReleaseEnabled } from "./release";
@@ -54,6 +58,8 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
       return domains.websiteDomainEmailAllowed(request?.tenantId);
     },
     canDeliver: publishingDecisionDeliveryAllowed,
+    urgentInquiryAllowed: async (tenantId) => process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && needsYouReleaseEnabled()
+      && emailSendingEnabled() && customerEmailEnabled() && (!tenantId || await getClientEmailOverride(tenantId) !== "off"),
     adapters: [
       tenantEventAdapter({
         linkedTenants: async (workspaceId) => (await store.linkedTenants(workspaceId)).map(link => link.tenantId),
@@ -69,6 +75,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
       ...deliverySourceAdapters(),
       ...productSourceAdapters(),
       bookingSettingsAdapter(),
+      inquiryFactAdapter(),
       // Booking requests in the one booking store (empty until request mode is used).
       bookingRequestAdapter({
         // Nothing to read until the store receives writes (and its migration exists).
@@ -108,4 +115,15 @@ export async function notifyBookingRequestNow(booking: import("@/platform/bookin
   if (!item) return;
   const opened = await store.open(booking.workspaceId, item);
   await needsYouService(store).notifyBookingRequest(booking.workspaceId, opened.id);
+}
+
+/** Pending inquiry drafts use the same tenant event adapter as Needs you. */
+export function pendingInquiryDecisionEvents(tenantId: string) {
+  return getEventsRaw(tenantId, { status: "pending", limit: 1000 });
+}
+
+/** Trusted event lookup for inquiry decision executors; a global id never grants tenant access. */
+export async function readInquiryDecisionEvent(tenantId: string, eventId: string) {
+  const event = await getEventRaw(eventId);
+  return event?.tenantId === tenantId ? event : null;
 }

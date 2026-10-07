@@ -728,3 +728,70 @@ marks business confirmation explicitly: calendar sync is a copy, and a pending
 request awaits the business. Native visitor forms accept optional phone and show
 slots and receipts in the browser time zone, with the zone named. Without native
 authority metadata, the flags-off flow keeps its fields and provider wording.
+
+### Inquiry System detail (wave 6)
+
+`src/experience/places/InquirySystemDetails.tsx` composes the owned `TextInput`,
+`TextArea`, `SelectInput` and `Button` for a viewing copy of the accepted inquiry
+form. The published form comes first, the existing records follow, and typed
+Connections and recorded History sit below. Lifecycle and health stay separate.
+The viewing copy cannot submit an inquiry. The component preserves records during
+loading and errors, offers retry, aborts old business reads, and never projects
+private routing destinations into form data. Connected and native website sources
+are named without fabricating their current form or History; external forms are
+explicitly managed on the business’s own site. Fixture projection, authorization,
+publication health and failure states have focused local tests; desktop/mobile
+browser inspection remains separate evidence in the stream handoff.
+
+### Inquiry booking choice (wave 6)
+
+[InquiryBookingChoice](../../src/experience/bookings/InquiryBookingChoice.tsx) composes Card and Button for the signed customer choice page. It shows up to three actual appointment times, a saved requested/confirmed booking, an expired link or a storage error. Each time uses a plain POST form; opening a mail link never requests an appointment. Dates use the booking time zone, controls have visible labels, and failure text uses an alert. The component does not confirm appointments or send email. Desktop/mobile visual proof belongs in the inquiry stream handoff.
+
+`InquiryBookingOfferComposer` uses shared Button and SelectInput to prepare up to
+three times and append their signed choices to the existing exact-message reply.
+Preparation sends nothing. Loading disables selection; failures preserve the
+editable inquiry reply. Only the owner can add a booking proposal. The local
+System browser journey covers selection, no send before approval, receipt and
+390px keyboard use.
+
+### Operator inquiry review (wave 6)
+
+`OperatorInquiryReview` and `OperatorInquiryActions` compose console Panel/Chip
+and shared Button (`lg`). `/admin/client-leads/inquiries` is super-admin-only,
+paged and bounded. With flags off, the existing lead screen stays unchanged.
+Held-message decisions never email. Corrected-recipient notice repairs show
+refusals separately from accepted provider receipts. Local fictional previews
+cover held, empty, loading, error and permission states at 1440px and 390px,
+visible keyboard focus and no horizontal overflow. The stream handoff records
+the 28 focused tests and isolated SQL fixture; this is not provider or production
+proof.
+
+Workspace inquiry replies: current owner/member/none permission comes from the scoped inquiry read. Assigned or routed members see “Send reply” and the owner approval requirement for prices, dates and promises; unassigned members see the permission explanation. Booking commitments stay owner-only.
+
+### Inquiry Versions in the agency Library (wave 6)
+
+`src/experience/workspace/agency/AgencyLibraryView.tsx` includes read-only inquiry
+Versions projected from the existing accepted pattern installations. Source
+revision and the client’s own release are separate. Source access comes from
+current agency links, target access from current tenant memberships, and both
+inquiry release switches still apply. No inquiry data, permissions, connections,
+credentials or shape snapshots are copied into the Library. Unavailable reads
+remain explicit. The existing client inquiry review and testing commands handle
+updates; the owner still approves going live. The rows use the existing type,
+border and spacing tokens, wrap on mobile, and expose keyboard-focusable links.
+Focused server, current Library tab and desktop/mobile fixture tests cover this
+projection; local proof does not establish production adoption.
+
+### Inquiry policy sentences in Running (wave 6)
+
+`src/experience/workspace/InquiryRunning.tsx` reads the same strict-gated System
+projection used by the Inquiries page. It displays only the current policy for
+an accepted inquiry form, with policy hours, daily limit, trust/approval route,
+and separate paused or needs-checking state. It does not promise a universal
+reply deadline or create another standing responsibility. The existing Running
+surface retains operational work. Off flags hide the section without a read;
+revoked/delegated access shows no inquiry policy. Loading and storage errors
+leave other work available; retries use the shared Button. Scoped identity and
+aborted requests discard old sentences when the business changes. Current
+projection, integration, gate, zero, pause and failure tests plus desktop/mobile
+rendered fixtures cover the component locally.

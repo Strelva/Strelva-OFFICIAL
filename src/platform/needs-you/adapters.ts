@@ -64,6 +64,8 @@ export interface SourceAdapter {
   currentRevision(ctx: AdapterContext, sourceId: string): Promise<string | null>;
   /** Optional: why a source stopped waiting (it lapsed on its own clock, the customer cancelled), for the withdrawn item. */
   goneReason?(ctx: AdapterContext, sourceId: string): Promise<string | null>;
+  /** Inquiry publication mail uses the same strict gates as inquiry replies. */
+  inquiryEmailSource?(ctx: AdapterContext, sourceId: string): Promise<boolean>;
   resolve(ctx: AdapterContext, item: OwnerDecision, decision: Decision, by: ResolveBy): Promise<ResolveOutcome>;
 }
 
@@ -126,12 +128,15 @@ export function tenantEventItem(event: UnifiedEvent): ProposedItem | null {
   // A commitment (a price, a date, a promise) is always the owner's, owner only,
   // even when Strelva was reviewing the draft (inquiry 1.0 delta, C6).
   const commitment = kind === "customer.commitment";
-  const route = commitment ? "owner_decides" : observed;
+  const inquiryPublication = event.metadata?.kind === "inquiry_capability_publish" || event.metadata?.kind === "inquiry_capability_undo";
+  const route = commitment || inquiryPublication ? "owner_decides" : observed;
   return {
     kind,
     route,
     title: event.title.slice(0, 200).trim() || "A change is waiting",
-    detail: event.body ? event.body.slice(0, 600) : null,
+    detail: process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && event.metadata?.kind === "inquiry_delivery_approval"
+      ? [event.metadata.recipient, event.metadata.subject, event.metadata.messageBody].filter((value): value is string => typeof value === "string").join("\n").slice(0, 8000)
+      : event.body ? event.body.slice(0, inquiryPublication ? 8000 : 600) : null,
     approveEffect,
     notYetEffect,
     sourceLifecycle: "tenant_event",
@@ -140,7 +145,7 @@ export function tenantEventItem(event: UnifiedEvent): ProposedItem | null {
     urgent: route === "owner_decides" && urgentFor(kind),
     // The chase clock starts when Needs you first sees the ask, not when the
     // tenant event was written, so an older pending ask does not lapse at once.
-    adminMayDecide: !commitment && !String(event.metadata?.kind).startsWith("workspace_") && !OWNER_ONLY_KINDS.has(kind),
+    adminMayDecide: !commitment && !inquiryPublication && !String(event.metadata?.kind).startsWith("workspace_") && !OWNER_ONLY_KINDS.has(kind),
   };
 }
 
@@ -148,6 +153,13 @@ export function tenantEventAdapter(ports: TenantEventPorts): SourceAdapter {
   return {
     lifecycle: "tenant_event",
     needsMemberActor: false,
+    async inquiryEmailSource(ctx, sourceId) {
+      const source = splitTenantSource(sourceId);
+      if (!source || !(await ports.linkedTenants(ctx.workspaceId)).includes(source.tenantId)) return true;
+      const event = await ports.readEvent(source.eventId);
+      if (!event || event.tenantId !== source.tenantId) return true;
+      return event.metadata?.kind === "inquiry_capability_publish" || event.metadata?.kind === "inquiry_capability_undo";
+    },
     async propose(ctx) {
       const tenants = await ports.linkedTenants(ctx.workspaceId);
       let complete = true;
