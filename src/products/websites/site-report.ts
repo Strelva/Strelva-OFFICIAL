@@ -9,6 +9,8 @@ import { aiVisibilityAssessmentPayloadSchema } from "@/products/ai-visibility/cl
 import { websiteDocumentStore } from "./document-store";
 import { readWebsiteRebuild } from "./rebuild-service";
 import { sendEmailWithReceipt } from "@/platform/infra/email/send";
+import { customerEmailPaused, emailSendingPaused } from "@/platform/infra/email/enabled";
+import { getClientEmailOverride } from "@/platform/infra/email/client-override";
 import { getTenantConfig } from "@/lib/tenants";
 import { OPERATOR_URL, ROOT_DOMAIN } from "@/platform/infra/brand";
 import { bindToCurrentTenant } from "./hosted-routing";
@@ -64,7 +66,8 @@ export async function sendWebsiteMonthlyReport(report:WebsiteMonthlyReport,recip
 }
 
 /** Transport only. Callers have already checked who may send and resolved the recipient server-side. */
-function deliverWebsiteMonthlyReport(report:WebsiteMonthlyReport&{tenantId:string},to:string){
+async function deliverWebsiteMonthlyReport(report:WebsiteMonthlyReport&{tenantId:string},to:string){
+ if(process.env.STRELVA_WEBSITE_REPORT_EMAIL_ENABLED!=="1"||emailSendingPaused()||customerEmailPaused()||await getClientEmailOverride(report.tenantId)==="off")return{status:"suppressed" as const,reason:"website_report_email_disabled"};
  return sendEmailWithReceipt({audience:"client",tenantId:report.tenantId,to,fromAddress:"report@updates.strelva.com",subject:`${report.siteName}: ${report.month} website report`,idempotencyKey:`website-report:${report.workId}:${report.month}`,options:{heading:`Your ${report.month} website report`,paragraphs:["Counts come from your native inquiry and booking records. Unavailable measurements are shown below.","Assistant citation results reflect one saved answer. Website readiness checks do not measure whether an assistant names your business."],rows:[{label:"Inquiries (recent retained records)",value:report.inquiries.count===null?"Unavailable":String(report.inquiries.count)},{label:"Bookings scheduled in this period",value:report.bookings.scheduledInPeriod===null?"Unavailable":String(report.bookings.scheduledInPeriod)},{label:"Verified calendar writes",value:report.bookings.providerVerified===null?"Unavailable":String(report.bookings.providerVerified)},{label:"Saved assistant citation check",value:report.visibility.status==="available"?`${report.visibility.mentioned?"Named":"Not named"}; ${report.visibility.recommended?"recommended":"not recommended"} in this check`:"Not measured"},{label:"Website readiness checks",value:report.readiness.status==="available"?`${report.readiness.passedChecks} of ${report.readiness.totalChecks} passed`:"Not measured"},{label:"Website revisions",value:String(report.changes.length)}],button:{label:"Open website report",url:new URL(`/workspace?${new URLSearchParams({workspaceId:report.workspaceId,view:"websites",work:report.workId})}`,OPERATOR_URL).toString()}}});
 }
 
