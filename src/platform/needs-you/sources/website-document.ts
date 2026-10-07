@@ -14,8 +14,8 @@
  *   in SQL (`website_document_assert_launch_owner`). A failed public
  *   read-back after publication is `done_unverified` and never retried.
  *
- * A candidate with unresolved facts proposes those facts first. Large node
- * props that cannot fit in one complete decision stay on the website screen;
+ * A candidate with unresolved facts proposes those facts first. Copy too long
+ * for an email is reviewed in the complete signed preview;
  * a truncated preview never grants confirmation. Not yet and expiry change nothing.
  */
 import type { WorkspaceActor } from "@/platform/workspaces/types";
@@ -102,15 +102,16 @@ export function websiteDocumentFactItems(record: WebsiteRebuildRecord): Proposed
   }));
 }
 
-/** Show complete props in the decision; never approve copy hidden by truncation. */
+/** Keep small copy in the email; larger copy is reviewed in the exact signed preview. */
 export function websiteDocumentCopyItems(record: WebsiteRebuildRecord): ProposedItem[] {
   if (record.rebuild.status !== "review_ready" || !record.rebuild.candidate) return [];
   const document = record.rebuild.candidate.document;
   const unresolved = new Set(unresolvedSiteFacts(document));
   return Object.entries(document.nodes).flatMap(([nodeId, node]) => {
     if (!node.verification?.needsReview || node.factIds.some(factId => unresolved.has(factId))) return [];
-    const detail = JSON.stringify(node.props);
-    if (detail.length > 1000) return [];
+    const completeCopy = JSON.stringify(node.props);
+    const detail = completeCopy.length <= 1000 ? completeCopy
+      : "Open the complete website preview from the confirmation page to review this copy before deciding. The email does not contain the full copy.";
     return [{
       kind: "fact.inferred" as const, route: "owner_decides" as const, title: itemTitle(`Confirm this website copy: ${nodeId}`), detail,
       approveEffect: "Strelva confirms this exact copy in the website preview. Nothing is published.",

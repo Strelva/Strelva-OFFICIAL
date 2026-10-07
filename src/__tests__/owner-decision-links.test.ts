@@ -77,6 +77,14 @@ describe("account-free owner decisions", () => {
     await expect(s.decide("not_yet")).resolves.toMatchObject({ status: "done", item: { state: "declined" } });
     expect(s.resolve.mock.calls[0]?.[2]).toBe("not_yet");
   });
+  it("a receipt persistence failure after acceptance never runs the effect twice", async () => {
+    const s = await setup("website_document");
+    vi.spyOn(s.mem.store, "finish").mockRejectedValue(new Error("receipt write failed"));
+    await expect(s.decide()).rejects.toThrow("receipt write failed");
+    expect(s.resolve).toHaveBeenCalledOnce();
+    await expect(s.decide()).resolves.toMatchObject({ status: "already_handled" });
+    expect(s.resolve).toHaveBeenCalledOnce();
+  });
 });
 
 const raw = { sessionId: ITEM, workspaceId: WS, purpose: "owner_decision_link", label: "Strelva (system)", role: "admin", userId: ADMIN.userId, verifiedEmail: ADMIN.verifiedEmail, decisionId: ITEM, revisionHash: HASH, recipient: EMAIL };

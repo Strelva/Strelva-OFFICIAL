@@ -122,7 +122,7 @@ describe("exact website copy review", () => {
     expect(confirmCopy).toHaveBeenCalledOnce();
   });
 
-  it("never silently truncates large props into permission to confirm unseen copy", async () => {
+  it("keeps long copy as an exact decision linking to its complete preview, without truncation", async () => {
     const s = fixture();
     s.mutate(row => {
       const candidate = row.rebuild.candidate!;
@@ -131,6 +131,11 @@ describe("exact website copy review", () => {
       candidate.contentHash = siteDocumentHash(candidate.document);
     });
     const adapter = websiteDocumentAdapter({ list: async () => [s.row()], confirmCopy: vi.fn(), approve: vi.fn(), launch: vi.fn() });
-    expect((await adapter.propose({ workspaceId: WS, actor: ADMIN })).items).toEqual([]);
+    const items = (await adapter.propose({ workspaceId: WS, actor: ADMIN })).items;
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ sourceId: `${WORK}:copy.hero`, adminMayDecide: false,
+      detail: expect.stringContaining("email does not contain the full copy") });
+    expect(items[0]!.detail).not.toContain("a".repeat(100));
+    expect(items[0]!.revisionHash).toMatch(/^[a-f0-9]{64}$/);
   });
 });

@@ -33,6 +33,7 @@ import { resolveEventAction } from "@/lib/event-actions";
 import { getTenantConfig } from "@/lib/tenants";
 import { getTenantDashboardUrl } from "@/lib/tenant-urls";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
+import { ownerWebsitePreviewHref, ownerWebsitePreviewMayBeOn } from "@/app/api/owner-website-preview/preview";
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +102,7 @@ function confirmPage(params: {
   body: string;
   confirmLabel: string;
   dashboardUrl?: string;
+  previewUrl?: string;
 }): NextResponse {
   const secondary = params.dashboardUrl
     ? `<div style="margin-top:14px;"><a href="${escapeHtml(params.dashboardUrl)}" style="font-size:13px;color:${MUTED};text-decoration:underline;">Open your dashboard instead</a></div>`
@@ -109,7 +111,10 @@ function confirmPage(params: {
           <input type="hidden" name="token" value="${escapeHtml(params.token)}">
           <button type="submit" style="display:inline-block;padding:12px 26px;border:0;border-radius:999px;background:${ACCENT};color:#fff;font-weight:600;font-size:15px;cursor:pointer;">${escapeHtml(params.confirmLabel)}</button>
         </form>${secondary}`;
-  return shell(200, headingBody(params.heading, params.body) + form);
+  const preview = params.previewUrl
+    ? `<p style="margin-top:22px;"><a href="${escapeHtml(params.previewUrl)}" style="color:${INK};text-decoration:underline;">Review the complete website preview before deciding</a></p>`
+    : "";
+  return shell(200, headingBody(params.heading, params.body) + preview + form);
 }
 
 const INVALID = {
@@ -153,6 +158,7 @@ async function workspaceConfirm(token: string, claims: WorkspaceApproveLinkClaim
     body: `${isApprove ? item.approveEffect : item.notYetEffect} Nothing happens until you confirm.`,
     confirmLabel: isApprove ? "Confirm — approve" : "Confirm — not yet",
     dashboardUrl: open,
+    ...(item.sourceLifecycle === "website_document" && ownerWebsitePreviewMayBeOn() ? { previewUrl: ownerWebsitePreviewHref(token) } : {}),
   });
 }
 
@@ -170,7 +176,7 @@ async function workspaceResolve(claims: WorkspaceApproveLinkClaims): Promise<Nex
     });
   } catch (err) {
     console.error(`[api/approve] Needs you decision failed for ${claims.workspaceId}/${claims.itemId}:`, err);
-    return noticePage({ status: 200, heading: "We hit a snag", body: "We couldn't complete that just now. Nothing was done. Open Strelva to finish it there.", dashboardUrl: open, buttonLabel: "Open" });
+    return noticePage({ status: 200, heading: "Strelva is checking the outcome", body: "The change may have gone through, but we couldn't record its final result. Strelva needs to check it before anyone tries again.", dashboardUrl: open, buttonLabel: "Open" });
   }
   const openItem = workspaceOpenUrl(claims.workspaceId, result.item?.openHref);
   switch (result.status) {
