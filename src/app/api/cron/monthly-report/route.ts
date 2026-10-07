@@ -1,3 +1,4 @@
+import { resolveTenantBrand } from "@/platform/agency-brand/server";
 import { runWebsiteMonthlyReports } from "@/products/websites/index";
 import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@/platform/infra/heartbeat";
@@ -105,17 +106,19 @@ export async function GET(request: Request) {
       const paragraphs = recapParagraphs(recap.summary);
       const dashboardUrl = getTenantDashboardUrl(tenant, "/dashboard/reports");
 
+      const brand = await resolveTenantBrand(tenant.id);
       const html = renderEmailHtml({
+        brand,
         preheader: paragraphs[0],
         heading,
         paragraphs,
         button: { label: "See your full recap", url: dashboardUrl },
         footerNote: `Your ${monthName} recap for ${tenant.siteName}`,
       });
-      const text = renderEmailText({ heading, paragraphs, button: { label: "See your full recap", url: dashboardUrl } });
+      const text = renderEmailText({ brand, heading, paragraphs, button: { label: "See your full recap", url: dashboardUrl } });
 
       if (process.env.RESEND_API_KEY) {
-        const domain = tenant.resendDomain || process.env.RESEND_DOMAIN || EMAIL_DOMAIN;
+        const domain = brand.agencyId ? EMAIL_DOMAIN : tenant.resendDomain || process.env.RESEND_DOMAIN || EMAIL_DOMAIN;
         // Shared transport boundary; keeps the report@ from + per-tenant domain.
         let ok = false;
         try {
@@ -126,7 +129,8 @@ export async function GET(request: Request) {
             subject: `Your ${monthName} recap`,
             html,
             text,
-            fromName: sanitizeEmailSubjectText(tenant.siteName),
+            fromName: sanitizeEmailSubjectText(brand.agencyId ? brand.name : tenant.siteName).replace(/[<>"]/g, ""),
+            ...(brand.replyTo ? { replyTo: brand.replyTo } : {}),
             fromAddress: `report@${domain}`,
           });
         } catch (err) {

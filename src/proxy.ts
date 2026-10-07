@@ -34,7 +34,7 @@ const cspBaseDirectives = [
   // JSON-LD inline); removing it needs a nonce rollout.
   "script-src 'self' 'unsafe-inline' https://va.vercel-scripts.com",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://images.unsplash.com https://images.squarespace-cdn.com https://cdn.sanity.io https://*.public.blob.vercel-storage.com https://www.google.com https://*.gstatic.com",
+  "img-src 'self' data: blob: https://app.strelva.com https://images.unsplash.com https://images.squarespace-cdn.com https://cdn.sanity.io https://*.public.blob.vercel-storage.com https://www.google.com https://*.gstatic.com",
   "font-src 'self' data:",
   // Prod frame-src: no http://localhost:* (that's a dev/live-preview need only,
   // kept in the looser variant below).
@@ -101,6 +101,7 @@ const PUBLIC_PREFIXES = [
   "/onboard",
   "/api/access-request/",
   "/api/audit/",
+  "/api/agency-brand/logo/",
   "/api/onboard/",
   "/api/pay/",
   // Signed provider callbacks authenticate themselves with the provider
@@ -322,7 +323,7 @@ export function buildContentSecurityPolicy(params: {
       "default-src 'self' https: data: blob:",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https: http://localhost:*",
       "style-src 'self' 'unsafe-inline' https:",
-      "img-src 'self' data: blob: https: http://localhost:*",
+      "img-src 'self' data: blob: https://app.strelva.com https: http://localhost:*",
       "font-src 'self' data: https:",
       "connect-src 'self' https: http://localhost:*",
       "frame-src 'self' https: http://localhost:* http://*.localhost:*",

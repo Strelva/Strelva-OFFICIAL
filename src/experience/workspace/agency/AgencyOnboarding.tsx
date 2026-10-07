@@ -3,6 +3,7 @@
 import { ArrowLeft, ArrowRight, Check, Loader2, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useState, type FormEvent } from "react";
+import { AgencyBrandEditor } from "./AgencyBrandEditor";
 import { Button } from "@/components/ui/Button";
 import { TextInput } from "@/components/ui/TextInput";
 import type { AgencyEffect, AgencyOnboarding as Onboarding, AgencyOnboardingStep, AgencySummary } from "@/platform/workspaces/agency-onboarding";
@@ -206,8 +207,9 @@ function Checklist({ onboarding, workspaceHref }: { onboarding: Onboarding; work
 
   const body: Record<AgencyOnboardingStep["id"], React.ReactNode> = {
     profile: <>
+      {agency.role === "owner" ? <AgencyBrandEditor workspaceId={agency.id} /> : null}
       <p>{agency.name} is your agency’s name on Strelva.</p>
-      <p className="mt-1">Your logo and brand will appear here once agency branding is available.</p>
+      <p className="mt-1">Your agency’s brand appears on owners’ emails, reports and workspace.</p>
     </>,
     team: <>
       <p>{onboarding.members === 1 && !onboarding.pendingInvitations ? "Just you so far." : `${people}${pending}.`} Teammates join your agency, never a client’s business directly.</p>

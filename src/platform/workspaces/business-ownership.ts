@@ -21,7 +21,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
-import { OPERATOR_URL } from "@/platform/infra/brand";
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import type { SendEmailInput, SendEmailResult } from "@/platform/infra/email/send";
 import type { EmailOptions } from "@/platform/infra/email/layout";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "./types";
@@ -125,7 +125,7 @@ export interface OwnerInvitationResult {
 }
 
 export function ownerInvitationAcceptUrl(token: string): string {
-  return new URL(`/workspace/invitations/accept/${token}`, OPERATOR_URL).toString();
+  return new URL(`/workspace/invitations/accept/${token}`, CONTROL_PLANE_URL).toString();
 }
 
 /** The invitation email. Strelva is the only name that acts; no tooling words. */
@@ -178,6 +178,7 @@ export async function inviteBusinessOwner(operator: string, workspaceId: string,
     const send = options.send ?? (await import("@/platform/infra/email/send")).sendEmailWithReceipt;
     const result = await send({
       audience: "client",
+      workspaceId: invitation.workspaceId,
       ...(primaryTenant ? { tenantId: primaryTenant } : {}),
       to: invitation.recipientEmail,
       subject: `Strelva set up ${invitation.workspaceName} for you`,

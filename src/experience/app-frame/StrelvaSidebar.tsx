@@ -1,4 +1,6 @@
 "use client";
+import { OwnerBrandIdentity } from "@/components/brand/OwnerBrandIdentity";
+import type { OwnerBrand } from "@/platform/infra/agency-brand";
 
 import Link from "next/link";
 import type { MouseEvent, ReactNode } from "react";
@@ -28,6 +30,7 @@ const BUSINESS_ITEMS: readonly { id: NavigableSection; icon: LucideIcon }[] = [
 ];
 
 interface Props {
+  ownerBrand?: OwnerBrand;
   active?: StrelvaSection;
   appBase?: string;
   workspaceId?: string;
@@ -61,7 +64,7 @@ function navigateInPlace(event: MouseEvent<HTMLAnchorElement>, action: (() => vo
 }
 
 /** One navigation contract for owners, agencies, account and managed work. */
-export function StrelvaSidebar({ active, appBase = "", workspaceId, accountName, accountDetail, businessContext, contextualNavigation, recentWork = [], pinned = [], mobileOpen = false, onCloseMobile, onNavigate, onSearch, onStart, startDisabled = false, signedIn = true, signInHref, signOut, standalone = false, systemsReleased = false, needsYou }: Props) {
+export function StrelvaSidebar({ ownerBrand, active, appBase = "", workspaceId, accountName, accountDetail, businessContext, contextualNavigation, recentWork = [], pinned = [], mobileOpen = false, onCloseMobile, onNavigate, onSearch, onStart, startDisabled = false, signedIn = true, signInHref, signOut, standalone = false, systemsReleased = false, needsYou }: Props) {
   const pinnedLabel = systemsReleased ? SYSTEMS_LABEL : "Website and apps";
   const listLabel = systemsReleased ? SYSTEMS_LIST_LABEL : "All apps and files";
   const href = (section: StrelvaSection) => workspaceSectionHref(section, appBase, workspaceId);
@@ -78,11 +81,12 @@ export function StrelvaSidebar({ active, appBase = "", workspaceId, accountName,
       if (!onNavigate) onCloseMobile?.();
     }}><Icon size={18} strokeWidth={1.6} aria-hidden="true" /><span>{label}</span>{badge ? <b className={styles.badge} aria-hidden="true">{badge > 99 ? "99+" : badge}</b> : null}</Link>;
   }
-  return <aside className={styles.sidebar} data-open={mobileOpen} data-standalone={standalone} aria-label="Strelva navigation">
+  return <aside className={styles.sidebar} data-open={mobileOpen} data-standalone={standalone} aria-label={`${ownerBrand?.agencyId ? ownerBrand.name : "Strelva"} navigation`}>
     <div className={styles.brandRow}>
-      <Link href={href("home")} className={styles.brand} aria-label="Strelva home" onClick={event => navigateInPlace(event, onNavigate ? () => { onCloseMobile?.(); onNavigate("home"); } : undefined)}><LogoMark className={styles.brandMark} /><span>Strelva</span></Link>
+      <Link href={href("home")} className={styles.brand} aria-label={`${ownerBrand?.agencyId ? ownerBrand.name : "Strelva"} home`} onClick={event => navigateInPlace(event, onNavigate ? () => { onCloseMobile?.(); onNavigate("home"); } : undefined)}><>{ownerBrand?.agencyId ? <span style={{ overflowWrap: "anywhere", minWidth: 0 }}>{ownerBrand.name}</span> : <><LogoMark className={styles.brandMark} /><span>Strelva</span></>}</></Link>
       <button className={styles.mobileClose} aria-label="Close navigation" type="button" onClick={onCloseMobile}><X size={20} /></button>
     </div>
+    {ownerBrand?.agencyId ? <OwnerBrandIdentity brand={ownerBrand} /> : null}
     {businessContext ? <div className={styles.businessContext}>{businessContext}</div> : null}
     <div className={styles.body}>
       <div className={styles.utilities} aria-label="Workspace utilities">

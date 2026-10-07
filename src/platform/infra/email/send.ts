@@ -1,3 +1,4 @@
+import { resolveOwnerBrand, resolveTenantBrand } from "@/platform/agency-brand/server";
 import {
   customerEmailPaused,
   emailSendingPaused,
@@ -23,6 +24,8 @@ export type SendEmailInput = RenderedEmail & {
    * Absent (or any other audience) ⇒ behavior is unchanged (follow the global
    * switch). */
   tenantId?: string;
+  /** Business scope for owner presentation; never an authority grant. */
+  workspaceId?: string;
   fromName?: string;
   /** Full from address override, e.g. "report@updates.strelva.com". Defaults to
    * hello@{RESEND_DOMAIN}. For senders that need a distinct local-part or a
@@ -102,11 +105,17 @@ export async function sendEmailWithReceipt(input: SendEmailInput): Promise<SendE
   const { Resend } = await import("resend");
   const resend = new Resend(apiKey);
   const fromDomain = process.env.RESEND_DOMAIN || "updates.strelva.com";
-  const html = input.options ? renderEmailHtml(input.options) : input.html;
-  const text = input.options ? renderEmailText(input.options) : input.text;
-  const fromName = input.fromName || "Strelva";
-  const fromAddress = input.fromAddress || `hello@${fromDomain}`;
-  const replyTo = input.replyTo || process.env.REPLY_TO_EMAIL || "hello@strelva.com";
+  const brand = input.options?.brand ?? (input.audience === "client" && input.options
+    ? input.workspaceId ? await resolveOwnerBrand(input.workspaceId) : input.tenantId ? await resolveTenantBrand(input.tenantId) : undefined
+    : undefined);
+  const options = input.options && brand?.agencyId ? { ...input.options, brand, heading: input.options.heading.replace(/Strelva/g, brand.name) } : input.options;
+  const html = options ? renderEmailHtml(options) : input.html!;
+  const text = options ? renderEmailText(options) : input.text!;
+  const fromName = (brand?.agencyId ? brand.name : input.fromName || "Strelva").replace(/[<>"\r\n]/g, "");
+  const fromAddress = brand?.agencyId
+    ? input.fromAddress && /@(updates|mail)\.strelva\.com$/.test(input.fromAddress) ? input.fromAddress : "hello@updates.strelva.com"
+    : input.fromAddress || `hello@${fromDomain}`;
+  const replyTo = brand?.replyTo || input.replyTo || process.env.REPLY_TO_EMAIL || "hello@strelva.com";
 
   const payload = {
     from: `${fromName} <${fromAddress}>`,
@@ -151,6 +160,8 @@ export interface SendBatchInput {
   requireClientGate?: boolean;
   audience: EmailAudience;
   tenantId?: string;
+  /** Business scope for owner presentation; never an authority grant. */
+  workspaceId?: string;
   fromName: string;
   /** Must be on updates.strelva.com or mail.strelva.com. */
   fromAddress: string;

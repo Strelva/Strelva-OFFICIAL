@@ -955,3 +955,20 @@ bash "$repo_root/scripts/check-inquiry-workspace-sql.sh"
 
 # Agency-sourced public checks: real RLS, quota races and rollback stop points.
 bash "$repo_root/scripts/check-agency-prospects-sql.sh"
+
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012180000_agency_brand.sql"
+
+# #264 agency brand: full-schema behavior, actual rollback/reapply, configured-data refusal.
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-brand-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012180000_agency_brand.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012180000_agency_brand.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/agency-brand-schema.sql"
+psql "${psql_args[@]}" -c "insert into public.users(id,email,verified_at) values ('b2640000-0000-4000-8000-000000000099','rollback-brand@example.test',now()); insert into public.workspaces(id,kind,name,created_by) values ('b2640000-0000-4000-8000-000000000099','agency','Rollback brand','b2640000-0000-4000-8000-000000000099')"
+psql "${psql_args[@]}" -c "update public.workspaces set agency_brand=jsonb_build_object('displayName',name,'accentColor','#447a4f','replyTo',null,'logo',null,'credit','runs_on_strelva') where id='b2640000-0000-4000-8000-000000000099'"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012180000_agency_brand.sql" >"$cluster_root/brand-rollback-refusal.log" 2>&1; then
+  printf 'Agency brand rollback discarded configured brands.\n' >&2; exit 1
+fi
+grep -q 'agency_brand_rollback_requires_data_preservation' "$cluster_root/brand-rollback-refusal.log"
+psql "${psql_args[@]}" -c "update public.workspaces set agency_brand=null where agency_brand is not null"
+psql "${psql_args[@]}" --file="$repo_root/tests/function-exposure-schema.sql"
+printf 'Agency brand SQL passed: resolution, revocation, exposure, rollback/reapply and preservation.\n'

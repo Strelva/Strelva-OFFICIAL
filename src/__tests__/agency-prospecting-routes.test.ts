@@ -49,8 +49,8 @@ describe("agency public check attribution", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ agency, topFix: "Ask your web provider to add schema.", shareUrl: "https://app.strelva.com/ai-visibility/scan_abc123" });
     expect(mocks.rpc.mock.calls[0]).toEqual(["agency_prospecting_profile", { p_slug: "northside" }]);
-    expect(mocks.rpc.mock.calls[1]?.[0]).toBe("agency_prospect_admit");
-    expect((mocks.rpc.mock.invocationCallOrder[1] ?? Infinity)).toBeLessThan(mocks.score.mock.invocationCallOrder[0] ?? -Infinity);
+    expect(mocks.rpc.mock.calls[2]?.[0]).toBe("agency_prospect_admit");
+    expect((mocks.rpc.mock.invocationCallOrder[2] ?? Infinity)).toBeLessThan(mocks.score.mock.invocationCallOrder[0] ?? -Infinity);
     expect(mocks.saveResult.mock.calls[0]?.[0]?.agency?.workspaceId).toBe(agency.workspaceId);
   });
   it("keeps flag-off public behavior and copy unchanged", async () => {
