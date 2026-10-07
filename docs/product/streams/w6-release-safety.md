@@ -24,6 +24,19 @@ including the integration fix's missing-table tests and a new unknown-204
 active-count stop. Build, workspace SQL and restored-production rehearsals are
 running; finish these before the final handoff. Earlier failures remain below.
 
+Round 5 checkpoint: `864474fe` is an ancestor of HEAD. Round 4 build passed.
+`pnpm check:workspace-sql` now exits 0, including real-Postgres Version,
+Possibility, Make real, booking, customer-mapping and inquiry contracts. The
+checkpoint's Version connection assignment was separated from its command by
+a comment; repaired before this run. Authority race checks now use an explicit
+transaction barrier and observe the competing lock wait before release.
+`pnpm check:release-safety` also exits 0 (34 tests; eight batch cycles, full
+reversal, July layer, private populated archives and both dump/restores).
+Logs: `.scratch/release-safety/round5-workspace-sql.log` and
+`.scratch/release-safety/round5-release-safety.log`. The restored-production
+rehearsal is still pending; round 4 reached batch 1 forward then failed its
+first rollback. No production operation was performed.
+
 ## Packet edits for the integration owner
 
 **Batch 0 is done in production.** Round 4's supplied production record says

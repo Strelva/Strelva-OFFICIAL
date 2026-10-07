@@ -538,9 +538,9 @@ psql "${psql_args[@]}" --file="$repo_root/tests/agency-client-overview-schema.sq
 if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
   # The same Version store contract the in-memory store passes, run through
   # createSupabaseVersionStore against this cluster (psql-backed RPC port).
+  # SQL contracts spawn real Postgres clients; allow bounded host scheduling
+  # time without changing lock limits or any behavior assertion.
   STRELVA_VERSIONS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
-    # SQL contracts spawn real Postgres clients; allow bounded host scheduling
-    # time without changing lock limits or any behavior assertion.
     pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
 fi
 # Needs you and Strelva handled: decision policy, owner decisions and the
