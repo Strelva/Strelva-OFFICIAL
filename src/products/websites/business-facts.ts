@@ -21,7 +21,11 @@ export function projectWebsiteBusinessFacts(input: SiteDocument, record: Website
     if (binding.kind === "address" && node.type === "Map" && facts.address) node.props.address = facts.address.formatted ?? [facts.address.line1, facts.address.line2, facts.address.city, facts.address.region, facts.address.postalCode, facts.address.country].filter(Boolean).join(", ").slice(0,500);
     if (binding.kind === "hours" && node.type === "Hours" && facts.hours) {
       const names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      node.props.rows = [1,2,3,4,5,6,0].map(day => ({ day: names[day]!, hours: facts.hours!.weekly.filter(row => row.day === day).map(row => `${row.opens}–${row.closes}`).join(", ") || "Closed" }));
+      node.props.rows = [
+        ...[1,2,3,4,5,6,0].map(day => ({ day: names[day]!, hours: facts.hours!.weekly.filter(row => row.day === day).map(row => `${row.opens}–${row.closes}`).join(", ") || "Closed" })),
+        ...(facts.hours.overrides ?? []).map(row => ({ day: `${row.date}${row.label ? ` (${row.label})` : ""}`, hours: row.closed ? "Closed" : `${row.opens}–${row.closes}` })),
+        { day: "Timezone", hours: facts.hours.timezone },
+      ];
     }
     if (binding.kind === "services" && node.type === "ServiceGrid") node.props.items = record.services.map(service => ({ title: service.name, ...(service.description ? { body: service.description } : {}) }));
     if (binding.kind === "contact") {

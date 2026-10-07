@@ -43,4 +43,11 @@ describe("hosted websites read confirmed business facts", () => {
     expect(renderToStaticMarkup(<SiteRenderer document={doc} businessFacts={overfull}/>)).toContain("Earlier bakery");
     expect(renderToStaticMarkup(<SiteRenderer document={doc} businessFacts={overfull}/>)).not.toContain("strelva-business-record-revision");
   });
+  it("retains timezone and dated hour exceptions rather than publishing only the weekly schedule", () => {
+    const doc=bindWebsiteBusinessRecord(document(),record);
+    const holiday={...record,facts:{...record.facts,hours:{...record.facts.hours!,overrides:[{date:"2026-12-25",label:"Holiday",closed:true}]}}};
+    const projected=projectWebsiteBusinessFacts(doc,holiday);
+    expect(projected.nodes.hours!.props).toMatchObject({rows:expect.arrayContaining([{day:"2026-12-25 (Holiday)",hours:"Closed"},{day:"Timezone",hours:"America/New_York"}])});
+    expect(renderToStaticMarkup(<SiteRenderer document={doc} businessFacts={holiday}/>)).toContain("2026-12-25 (Holiday)");
+  });
 });
