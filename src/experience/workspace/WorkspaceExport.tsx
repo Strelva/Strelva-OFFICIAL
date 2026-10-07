@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 
-export function WorkspaceExport({ workspaceId, schema3 = false }: { workspaceId: string; schema3?: boolean }) {
+export function WorkspaceExport({ workspaceId, schema3 = false, request = fetch }: { workspaceId: string; schema3?: boolean; request?: typeof fetch }) {
   const [loading,setLoading]=useState(false);
   const [notice,setNotice]=useState("");
   const [buildId, setBuildId] = useState<string | null>(null);
@@ -16,7 +16,7 @@ export function WorkspaceExport({ workspaceId, schema3 = false }: { workspaceId:
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
       try {
-        const response = await fetch(`/api/workspace-export/v3/status?build=${encodeURIComponent(buildId!)}`, { signal: controller.signal });
+        const response = await request(`/api/workspace-export/v3/status?build=${encodeURIComponent(buildId!)}`, { signal: controller.signal });
         const body = await response.json() as { status?: string; error?: string };
         if (!response.ok) throw new Error(body.error || "Export status could not be read. Try again.");
         if (controller.signal.aborted) return;
@@ -33,11 +33,11 @@ export function WorkspaceExport({ workspaceId, schema3 = false }: { workspaceId:
     }
     void poll();
     return () => { controller.abort(); clearTimeout(timer); };
-  }, [buildId, ready]);
+  }, [buildId, ready, request]);
   async function download() {
     setLoading(true); setNotice("");
     try {
-      const response=await fetch(schema3 ? "/api/workspace-export/v3" : "/api/workspace-export",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({workspaceId})});
+      const response=await request(schema3 ? "/api/workspace-export/v3" : "/api/workspace-export",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({workspaceId})});
       if(!response.ok){const body=await response.json().catch(()=>({})) as {error?:string};throw new Error(body.error||"The workspace export could not be created.");}
       if (response.status === 202) {
         const body = await response.json() as { buildId?: string; message?: string };
