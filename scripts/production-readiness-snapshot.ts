@@ -22,6 +22,9 @@ import { createClient } from "@supabase/supabase-js";
 import { Redis } from "@upstash/redis";
 import {
   assertNoSensitiveOutput,
+  countResult,
+  type CountResponse,
+  missingTable,
   formatReport,
   parseSnapshotArgs,
   requireJacobsYes,
@@ -55,18 +58,19 @@ function applyFilters(query: Query, filters: DbFilter[] = []): Query {
   return q;
 }
 
-const missingTable = (error: { message?: string; code?: string }) =>
-  error.code === "42P01" || error.code === "PGRST205" || /does not exist|could not find the table/i.test(error.message ?? "");
-
 /** Exposes `.from(t).select(...)` and nothing else: no insert/update/delete/rpc. */
 function readOnlyDb(url: string, key: string): ReadOnlyDb {
   const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
   const db = { from: (table: string) => ({ select: (columns: string, options?: { count?: "exact"; head?: boolean }) => client.from(table).select(columns, options) }) } as unknown as SelectOnly;
   return {
     async count(table, filters): Promise<DbCount> {
-      const { count, error } = await applyFilters(db.from(table).select("*", { count: "exact", head: true }), filters);
-      if (error) return { ok: false, missing: missingTable(error), reason: error.message ?? error.code ?? "unknown" };
-      return { ok: true, count: count ?? 0 };
+      const result = countResult((await applyFilters(db.from(table).select("*", { count: "exact", head: true }), filters)) as CountResponse);
+      if (result.ok || result.missing) return result;
+      // A head-only count of a missing table can come back 204 with no error and
+      // no count. A zero-row GET carries PostgREST's error body, so it can tell.
+      const probe = (await db.from(table).select("*").limit(0)) as CountResponse;
+      if (probe.error) return { ok: false, missing: missingTable(probe.error) || probe.status === 404, reason: probe.error.message || "unknown" };
+      return result;
     },
     async rows(table, columns, options) {
       let q = applyFilters(db.from(table).select(columns), options?.filters);
