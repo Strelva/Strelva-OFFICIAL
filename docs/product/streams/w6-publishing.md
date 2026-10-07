@@ -86,3 +86,49 @@ error and a React ref read during preview render; those failed logs remain in
 `.scratch/w6-publishing/`. Browser observed a saved record with one successful
 Google double and one access-pending double, with distinct results. Final full
 checks and expanded browser proof still pending.
+
+## Round 5 passing pieces (2026-10-07)
+
+`14c5377e` recovers accepted content/issue receipts before mutable content,
+System pause or business exit checks. Authorization and receipt scope remain
+checked. SQL proves replay preserves later content, accepts paused/stopped
+recovery and rejects another System's receipt. Content tests: 7/7 pass. Full
+isolated workspace SQL exit 0 (`content-recovery-sql.log`). No new migration:
+the unapplied `20261010142000` includes this repair.
+
+Google approval and tenant reply receipts now belong to the approval, not its
+temporary execution attempt. A durable rejection permits an explicitly approved
+retry through a deterministic chain of failed receipts; accepted or uncertain
+receipts block another dispatch, including when event-marker storage fails.
+Undo remains tied to its original receipt. Reply edits carry a command identity,
+so a new owner instruction can restore identical text after withdrawal.
+
+Removing hours prepares an exact Google clear. Record propagation distinguishes
+unapplied from unknown results and preserves each location's outcome. Approved
+newsletter history survives both a zero audience and a failed subscriber read;
+an unreadable audience is never reported as zero. Fixed publishing client entry
+imports, the reconnect migration sentinel, and the release-flag test inventory.
+The missing-table probe fixes from `864474fe` remain intact.
+
+Latest targeted checks: 97 tests across six publishing/readiness/flags files;
+36 Google execution/service tests including undo uncertainty. Typecheck and
+targeted ESLint exit 0. Browser proof: 44 local fictional desktop/mobile states
+and journeys at 1280/390 px; empty/loading/error/read-only, Google access pending,
+pause/disconnect, record partial failure, blog review/publication receipt,
+newsletter approved/sending paused, and keyboard focus. No horizontal overflow
+or page errors. HTTP doubles and SQL tests do not prove real auth/provider use.
+Evidence: `.scratch/w6-publishing/ui-evidence-round5.json` and screenshots.
+
+Initial full suite: 4 failed, 6270 passed, 37 skipped. Two stale checks were fixed
+(reconnect sentinel and flags inventory); two cold-import timeouts passed
+in isolation (10/10). Initial boundary run caught three product entry imports,
+now corrected; baseline remains 204. Initial typecheck caught test literal/tuple
+typing and an action query-string narrowing issue, now corrected. Browser's
+first error-form attempt ran before hydration; rerun waited for hydration and
+passed. All failed logs remain in `.scratch/w6-publishing/`. Full suite rerun
+with two workers and final build are running/pending; no full green claim yet.
+
+Integration base: `864474fe`. The shared integration branch moved while this
+stream ran; don't interpret a two-dot diff against its new tip as this stream's
+changes. Use the merge base and cherry-pick the stream commits. No other
+worktree, shared release packet, production, live provider or client was touched.

@@ -104,7 +104,7 @@ export const SEPT30_EXTRA_APPLIED = ["20260930120000"];
 export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261010140000": "google_listing_controls",
   "20261010142000": "workspace_newsletter_issues",
-  "20261010143000": "publishing_reconnect_links",
+  "20261010143000": "publishing_google_outages",
   "20260729180000": "accounts",
   "20260928130000": "business_effort_entries",
   "20261001120000": "website_documents",

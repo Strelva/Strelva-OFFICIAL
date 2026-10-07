@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { TextInput, SelectInput } from "@/components/ui/TextInput";
 import type { BusinessRecord, FactValues } from "@/platform/business-record/contracts";
-import type { RecordGoogleEffect } from "@/products/publishing/record-changes";
+import type { RecordGoogleEffect } from "@/products/publishing/client";
 
 const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const statusText: Record<RecordGoogleEffect["status"], string> = { needs_approval: "Waiting for your Google approval", posted: "Confirmed on Google", posted_unverified: "Google accepted it; confirmation is pending", already_approved: "Already approved; review the listing receipt", already_on_google: "Already matched Google; nothing was sent", failed: "Unapplied on Google" };
+const statusText: Record<RecordGoogleEffect["status"], string> = { needs_approval: "Waiting for your Google approval", posted: "Confirmed on Google", posted_unverified: "Google accepted it; confirmation is pending", write_unconfirmed: "Google's result is unknown; review before trying again", already_approved: "Already approved; review the listing receipt", already_on_google: "Already matched Google; nothing was sent", failed: "Unapplied on Google" };
 
 /** The record is the source of truth. Each location's Google result stays
  * separate; there is no send transport or automatic approval in this form. */

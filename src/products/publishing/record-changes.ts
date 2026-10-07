@@ -11,7 +11,7 @@ export interface RecordGoogleEffect {
   tenantId: string;
   locationId: string;
   kind: "hours" | "info";
-  status: "needs_approval" | "posted" | "posted_unverified" | "already_approved" | "already_on_google" | "failed";
+  status: "needs_approval" | "posted" | "posted_unverified" | "write_unconfirmed" | "already_approved" | "already_on_google" | "failed";
   eventId?: string;
   reason?: string;
 }
@@ -53,7 +53,7 @@ export async function changeRecordWithGoogle(
   const record = await deps.patch(actor, workspaceId, expectedRevision, patch, { ...options, commandId });
   if (!record.changeCount) return { record, google: [] };
   const kinds: Array<"hours" | "info"> = [];
-  if (patch.facts?.hours) kinds.push("hours");
+  if (patch.facts && Object.hasOwn(patch.facts, "hours")) kinds.push("hours");
   const infoFields = (["phone", "description", "links"] as const).filter(key => patch.facts && Object.hasOwn(patch.facts, key));
   if (infoFields.length) kinds.push("info");
   if (!kinds.length) return { record, google: [] };
@@ -63,16 +63,18 @@ export async function changeRecordWithGoogle(
   const google: RecordGoogleEffect[] = [];
   for (const location of locations) for (const kind of kinds) {
     const effect = { ...location, kind };
+    let approvalAttempted = false;
     try {
       const draft = await deps.prepare(actor, { workspaceId, ...effect, commandId, expectedRecordRevision: record.revision, ...(kind === "info" ? { infoFields } : {}) });
       if (draft.status === "approved") { google.push({ ...effect, eventId: draft.id, status: "already_approved" }); continue; }
       if (draft.status === "dismissed") { google.push({ ...effect, eventId: draft.id, status: "failed", reason: "This Google change was declined. Review the listing before preparing another." }); continue; }
       if (!policy) { google.push({ ...effect, eventId: draft.id, status: "needs_approval" }); continue; }
+      approvalAttempted = true;
       const result = await deps.approve(location.tenantId, draft.id, actor.userId);
-      const status = result.changed ? result.reason === "already_on_google" ? "already_on_google" : result.reason ? "posted_unverified" : "posted" : result.reason === "already_resolved" ? "already_approved" : "failed";
+      const status = result.changed ? result.reason === "already_on_google" ? "already_on_google" : result.reason ? "posted_unverified" : "posted" : result.reason === "already_resolved" ? "already_approved" : ["google_write_unconfirmed", "action_reconciliation_required"].includes(result.reason ?? "") ? "write_unconfirmed" : "failed";
       google.push({ ...effect, eventId: draft.id, status, ...(result.reason ? { reason: result.reason } : {}) });
     } catch {
-      google.push({ ...effect, status: "failed", reason: "The record was saved. This Google change remains unapplied; prepare or approve it from the listing." });
+      google.push({ ...effect, status: approvalAttempted ? "write_unconfirmed" : "failed", reason: approvalAttempted ? "The record was saved. Google's result could not be confirmed. Check the listing and receipt before preparing another change." : "The record was saved. This Google change remains unapplied; prepare or approve it from the listing." });
     }
   }
   return { record, google };
@@ -89,6 +91,6 @@ export function recordGoogleSummary(result: { google: RecordGoogleEffect[]; prop
   if (!result.google.length) return null;
   if (result.google.some(effect => effect.status === "failed")) return "failed";
   if (result.google.some(effect => effect.status === "needs_approval")) return "needs_approval";
-  if (result.google.some(effect => effect.status === "posted_unverified" || effect.status === "already_approved")) return "unconfirmed";
+  if (result.google.some(effect => effect.status === "posted_unverified" || effect.status === "write_unconfirmed" || effect.status === "already_approved")) return "unconfirmed";
   return "confirmed";
 }

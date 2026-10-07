@@ -171,6 +171,18 @@ describe("review replies", () => {
     expect((await undoListingChange(ctx, { receiptId: posted.receipt.id, authority: UNDO })).status).toBe("posted");
     expect(google.writes).toEqual(["updateReply:rev-dana", "deleteReply:rev-dana"]);
   });
+  it("retries a definitively rejected undo but blocks an uncertain undo across retries", async () => {
+    const { ctx, google } = context();
+    const posted = await postReviewReply(ctx, { reviewId: "rev-dana", text: "Thank you.", authority: OWNER });
+    if (posted.status !== "posted") throw new Error("expected posted");
+    vi.mocked(google.client.deleteReply).mockResolvedValueOnce(fail(403, "Permission denied"));
+    const input = { receiptId: posted.receipt.id, authority: UNDO, retryFailed: true };
+    expect((await undoListingChange(ctx, input)).status).toBe("failed");
+    vi.mocked(google.client.deleteReply).mockRejectedValueOnce(new Error("Response lost"));
+    expect((await undoListingChange(ctx, input)).status).toBe("write_unconfirmed");
+    expect((await undoListingChange(ctx, input)).status).toBe("write_unconfirmed");
+    expect(google.client.deleteReply).toHaveBeenCalledTimes(2);
+  });
 
   it("refuses every write while the listing is paused", async () => {
     const { ctx, google } = context(undefined, { lifecycle: "paused" });
@@ -193,6 +205,15 @@ describe("review replies", () => {
 });
 
 describe("hours and info from the business record", () => {
+  it("clears removed hours using both update masks and supports undo", async () => {
+    const { ctx, google } = context();
+    const result = await syncHoursFromRecord(ctx, { hours: null, authority: OWNER });
+    expect(result.status).toBe("posted");
+    expect(google.client.patchLocation).toHaveBeenCalledWith(ctx.location, ["regularHours", "specialHours"], {});
+    if (result.status !== "posted") throw new Error("expected cleared hours");
+    await undoListingChange(ctx, { receiptId: result.receipt.id, authority: UNDO });
+    expect(google.location().regularHours?.periods[0]?.openDay).toBe("MONDAY");
+  });
   const hours = {
     timezone: "America/New_York",
     weekly: [{ day: 1, opens: "09:00", closes: "17:00" }, { day: 2, opens: "09:00", closes: "17:00" }],
@@ -296,7 +317,7 @@ describe("posts", () => {
 
   it("refuses impossible calendar dates and an end before the start without a write", async () => {
     const { ctx, google } = context();
-    for (const [startDate, endDate] of [["2026-02-30", "2026-03-01"], ["2026-11-30", "2026-11-01"]]) {
+    for (const [startDate, endDate] of [["2026-02-30", "2026-03-01"], ["2026-11-30", "2026-11-01"]] as const) {
       expect(await createListingPost(ctx, { post: { topicType: "EVENT", summary: "Open house", event: { title: "Open house", startDate, endDate } }, authority: OWNER })).toMatchObject({ reason: "invalid" });
     }
     expect(google.writes).toEqual([]);

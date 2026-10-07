@@ -122,7 +122,8 @@ export async function postTenantReviewReply(input: {
       reviewId: input.reviewId,
       text: input.text,
       authority: input.authority,
-      idempotencyKey: `review-reply:${input.eventId}:${input.attemptId}`.slice(0, 256),
+      idempotencyKey: `review-reply:${input.eventId}`.slice(0, 160),
+      retryFailed: true,
     });
     if (outcome.status === "write_unconfirmed") return { status: "write_unconfirmed", reason: outcome.message, receipt: outcome.receipt };
     if (outcome.status === "refused") {

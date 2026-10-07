@@ -1,7 +1,7 @@
 "use client";
 import { useCallback } from "react";
 import { RecordPublishingFields } from "@/experience/publishing/RecordPublishingFields";
-import { recordGoogleApprovalCopy } from "@/products/publishing/record-consent";
+import { recordGoogleApprovalCopy } from "@/products/publishing/client";
 import type { BusinessRecord } from "@/platform/business-record/contracts";
 
 const record: BusinessRecord = { workspaceId: "5e000000-0000-4000-8000-000000000010", access: "owner", revision: 1, lastSequence: 1, updatedAt: null, services: [], people: [], contactCount: 0,

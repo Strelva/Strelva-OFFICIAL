@@ -28,6 +28,8 @@ export async function saveBusinessDetailsAction(formData: FormData): Promise<voi
       googleResult = recordGoogleSummary(result); return result.record;
     }, operator: isSuperAdmin },
   );
-  const params = new URLSearchParams({ workspaceId, result: outcome, ...(field ? { field } : {}), ...(googleResult ? { googleResult } : {}) });
+  const params = new URLSearchParams({ workspaceId, result: outcome });
+  if (field) params.set("field", field);
+  if (googleResult) params.set("googleResult", googleResult);
   redirect(`/workspace/business-details?${params}`);
 }

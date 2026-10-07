@@ -33,7 +33,7 @@ export async function googleListingAction(form: FormData): Promise<void> {
       const resolved = await resolveEventAction(tenantId, eventId, action === "approve" ? "approved" : "dismissed", actor.userId);
       result = resolved.changed ? (action === "approve" ? resolved.reason === "already_on_google" ? "Google already matches. Nothing was sent." : resolved.reason ? "Google accepted the change; confirmation is still pending. See its receipt below." : "Google accepted the change. See its receipt below." : "Declined. Nothing was sent.") : resolved.reason ?? "The draft remains waiting. Nothing was sent again.";
     } else if (action === "reply" || action === "withdraw") {
-      const outcome = await changeWorkspaceGoogleReply(actor, { workspaceId, tenantId, locationId, reviewId: z.string().regex(/^[A-Za-z0-9_-]{1,300}$/).parse(form.get("reviewId")), text: String(form.get("replyText") ?? ""), withdraw: action === "withdraw" });
+      const outcome = await changeWorkspaceGoogleReply(actor, { workspaceId, tenantId, locationId, commandId: z.string().uuid().parse(form.get("commandId")), reviewId: z.string().regex(/^[A-Za-z0-9_-]{1,300}$/).parse(form.get("reviewId")), text: String(form.get("replyText") ?? ""), withdraw: action === "withdraw" });
       result = outcome.message;
     } else if (action === "undo") {
       const outcome = await undoWorkspaceGoogleChange(actor, { workspaceId, tenantId, locationId, receiptId: z.string().uuid().parse(form.get("receiptId")) });

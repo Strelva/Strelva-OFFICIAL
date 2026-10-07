@@ -6,7 +6,7 @@ import type { readWorkspaceGoogle } from "@/products/google-listing/server";
 
 type Listings = Awaited<ReturnType<typeof readWorkspaceGoogle>>;
 function Context({ workspaceId, listing }: { workspaceId: string; listing: Listings[number] }) {
-  return <><input type="hidden" name="workspaceId" value={workspaceId} /><input type="hidden" name="tenantId" value={listing.tenantId} /><input type="hidden" name="locationId" value={listing.locationId} /></>;
+  return <><input type="hidden" name="workspaceId" value={workspaceId} /><input type="hidden" name="tenantId" value={listing.tenantId} /><input type="hidden" name="locationId" value={listing.locationId} /><input type="hidden" name="commandId" value={crypto.randomUUID()} /></>;
 }
 export function WorkspaceGoogle({ workspaceId, state, result, action, reviewId, replyText }: { workspaceId: string; state: PlaceState<Listings>; result?: string; action: (form: FormData) => Promise<void>; reviewId?: string; replyText?: string }) {
   const listings = state.kind === "ready" ? state.data : [];

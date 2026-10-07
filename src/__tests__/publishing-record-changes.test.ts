@@ -64,4 +64,25 @@ describe("record changes and Google policy", () => {
     expect(d.prepare).toHaveBeenCalledWith(actor, expect.objectContaining({ kind: "info", infoFields: ["description"] }));
     expect(d.approve).not.toHaveBeenCalled();
   });
+  it("clearing hours proposes the Google clear and keeps the saved record", async () => {
+    const d = deps();
+    const result = await changeRecordWithGoogle(actor, workspaceId, 1, { facts: { hours: null } }, { source: "owner", commandId }, d);
+    expect(result.record).toEqual(saved);
+    expect(d.prepare).toHaveBeenCalledWith(actor, expect.objectContaining({ kind: "hours", expectedRecordRevision: 2 }));
+    expect(d.approve).not.toHaveBeenCalled();
+  });
+  it("does not call an uncertain approval unapplied or roll back other locations", async () => {
+    const d = deps(); d.policy = vi.fn(async () => true);
+    d.approve = vi.fn().mockResolvedValueOnce({ changed: true }).mockRejectedValueOnce(new Error("Response lost"));
+    const result = await changeRecordWithGoogle(actor, workspaceId, 1, patch, { source: "owner", commandId, googleApprovalDisclosed: true }, d);
+    expect(result.google.map(effect => effect.status)).toEqual(["posted", "write_unconfirmed"]);
+    expect(result.google[1]?.reason).toContain("could not be confirmed");
+    expect(result.record).toEqual(saved);
+  });
+  it("keeps provider uncertainty distinct from an explicit rejection", async () => {
+    const d = deps(); d.policy = vi.fn(async () => true);
+    d.approve = vi.fn(async () => ({ changed: false, reason: "google_write_unconfirmed" }));
+    const result = await changeRecordWithGoogle(actor, workspaceId, 1, patch, { source: "owner", commandId, googleApprovalDisclosed: true }, d);
+    expect(result.google.every(effect => effect.status === "write_unconfirmed")).toBe(true);
+  });
 });

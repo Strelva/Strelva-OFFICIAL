@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui/Card";
 import { RecordPublishingFields } from "@/experience/publishing/RecordPublishingFields";
-import type { RecordGoogleSummary } from "@/products/publishing/record-changes";
+import type { RecordGoogleSummary } from "@/products/publishing/client";
 import type { BusinessRecord } from "@/platform/business-record/contracts";
 import { DETAIL_LABELS, detailText, detailsWriteSource, type EditableDetail } from "@/platform/business-record/details";
 import type { DetailsSaveOutcome } from "@/platform/business-record/details-save";

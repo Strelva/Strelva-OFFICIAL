@@ -78,7 +78,7 @@ export async function readPublishingExtras(listing: BusinessSystems, readers: Pu
       readers.collections(tenantId).catch(() => null),
       readers.approvedIssues?.(listing.businessId, tenantId).catch(() => null) ?? Promise.resolve(null),
     ]);
-    if (count !== null) newsletters.push({ tenantId, activeSubscribers: count, ...(approvedIssues !== null ? { approvedIssues } : {}) });
+    if (count !== null || (approvedIssues !== null && approvedIssues > 0)) newsletters.push({ tenantId, activeSubscribers: count, ...(approvedIssues !== null ? { approvedIssues } : {}) });
     if (types) collections.push({ tenantId, types });
   }));
   newsletters.sort((a, b) => a.tenantId.localeCompare(b.tenantId));
