@@ -10,7 +10,13 @@ create role anon nologin;
 -- authenticated unless a migration revokes it. Without this the rehearsal
 -- hides grants that production actually has.
 alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
+-- Supabase also grants every privilege on new public tables and sequences to
+-- these roles, so RLS policies are the only thing between a client and a row.
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+grant usage on schema public to anon, authenticated, service_role;
 create schema auth;
+grant usage on schema auth to anon, authenticated, service_role;
 create table auth.users (
   id uuid primary key,
   email text,

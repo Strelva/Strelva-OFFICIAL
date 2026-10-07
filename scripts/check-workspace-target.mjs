@@ -131,6 +131,7 @@ export function readCandidateMigrations(directory) {
     "rollback-20261002120000_business_record.sql",
     "rollback-20261004120000_systems.sql",
     "rollback-20261005090000_tenant_leads.sql",
+    "rollback-20261005100000_restrict_legacy_tenant_client_access.sql",
     "rollback-20261005120000_workspace_authority_helpers.sql",
     "rollback-20261005120100_workspace_authority_write_rpcs.sql",
     "rollback-20261007100000_atomic_tenant_teardown.sql",
