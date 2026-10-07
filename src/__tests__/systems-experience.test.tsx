@@ -55,9 +55,10 @@ describe("Systems read adapter over the spine projection", () => {
     for (const scenario of [
       { editing: "request" as const, savedWorkId: null, status: "not_connected", sentence: "Strelva updates this site by hand" },
       { editing: "native" as const, savedWorkId: null, status: "not_connected", sentence: "native website content" },
-      { editing: "native" as const, savedWorkId: "document", status: "connected", sentence: "when it renders" },
+      { editing: "native" as const, savedWorkId: "document", status: "not_connected", sentence: "not connected", businessFactsConnected: false },
+      { editing: "native" as const, savedWorkId: "document", status: "connected", sentence: "when it renders", businessFactsConnected: true },
     ]) {
-      const mapped = readBusinessSystems({ snapshot: snapshot([], projection({ systems: [entry(SITE, "website", "The Mooney Firm", { tenantId: "mooney-firm", editing: scenario.editing, savedWorkId: scenario.savedWorkId })] })), sites: [mooneySite] });
+      const mapped = readBusinessSystems({ snapshot: snapshot([], projection({ systems: [entry(SITE, "website", "The Mooney Firm", { tenantId: "mooney-firm", editing: scenario.editing, savedWorkId: scenario.savedWorkId, businessFactsConnected: scenario.businessFactsConnected })] })), sites: [mooneySite] });
       const facts = mapped.systems[0]!.connections.find(connection => connection.target === "Business record")!;
       expect(facts).toMatchObject({ kind: "read", status: scenario.status, contract: { sourceOfTruth: "The business record's confirmed facts" } });
       expect(facts.sentence).toContain(scenario.sentence);
@@ -66,7 +67,7 @@ describe("Systems read adapter over the spine projection", () => {
   });
   it("enriches a connected site's existing business facts read once after it becomes hosted", () => {
     const mapped = readBusinessSystems({ snapshot: snapshot([], projection({
-      systems: [entry(SITE, "website", "Connected website", { tenantId: "mooney-firm", savedWorkId: "document", connectedSite: { siteUrl: "https://attymooney.com", siteHost: "attymooney.com", verified: true, lastEventAt: null } })],
+      systems: [entry(SITE, "website", "Connected website", { tenantId: "mooney-firm", savedWorkId: "document", businessFactsConnected: true, connectedSite: { siteUrl: "https://attymooney.com", siteHost: "attymooney.com", verified: true, lastEventAt: null } })],
       connections: [{ id: "facts", sourceId: SITE, kind: "read", targetSystemId: null, targetLabel: "Business record", state: "connected", purpose: "Confirmed facts from the business record are filled into the site" }],
     })), sites: [mooneySite] });
     expect(mapped.systems[0]!.connections).toEqual([expect.objectContaining({ id: "facts", target: "Business record", status: "connected", sentence: "This website reads confirmed business facts when it renders." })]);

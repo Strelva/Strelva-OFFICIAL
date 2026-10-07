@@ -617,3 +617,11 @@ private previews are noindexed. The static export includes the immutable
 document, each page, redirect mappings, image bytes and file checksums. No new
 renderer dependencies were added. Local automated and rendered verification is
 recorded with the website rebuild delivery evidence.
+
+An explicitly bound hosted document can read confirmed public business facts
+under `STRELVA_WEBSITE_BUSINESS_FACTS_ENABLED`. `SiteRenderer` projects typed
+name, contact, address, hours and service slots onto a copy, preserves the issued
+document checksum, and reports the business record revision separately. Private
+previews remain pinned; unavailable reads use the approved content. The System
+Connection claims this behavior only after the issued bindings and runtime read
+are confirmed.

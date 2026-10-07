@@ -11529,6 +11529,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      read_hosted_website_business_facts: { Args: { p_tenant_id: string }; Returns: Json };
       accept_operational_assignment: {
         Args: {
           p_assignment_id: string

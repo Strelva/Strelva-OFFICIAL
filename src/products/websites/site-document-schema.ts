@@ -88,12 +88,14 @@ export const siteDocumentSchema = z.object({
   pages: z.array(z.object({ path: safeSitePathSchema, title: z.string().trim().min(1).max(70), description: text(160), root: siteIdSchema }).strict()).min(1).max(12),
   nodes: z.record(siteIdSchema, catalogNodeSchema), facts: z.record(siteIdSchema, factSchema), assets: z.record(assetId, siteAssetSchema),
   capabilities: websitePublishedCapabilitiesSchema.optional(),
+  businessRecord: z.object({ bindings: z.array(z.object({ nodeId: siteIdSchema, kind: z.enum(["name", "address", "hours", "services", "contact"]) }).strict()).min(1).max(100) }).strict().optional(),
   redirects: z.array(z.object({ from: safeSitePathSchema, to: safeSitePathSchema }).strict()).max(200),
   provenance: z.object({ sourceUrl: z.string().url().max(2048).optional(), crawledAt: z.string().datetime({ offset: true }).optional(), composer: z.enum(["jev", "model", "rules"]) }).strict(),
 }).strict().superRefine((doc, ctx) => {
   const issue = (path: (string | number)[], message: string) => ctx.addIssue({ code: "custom", path, message });
   if (Object.keys(doc.nodes).length > 500 || Object.keys(doc.facts).length > 1000 || Object.keys(doc.assets).length > 200) issue([], "The document exceeds its bounded catalog limits");
   const paths = new Set<string>();
+  for (const binding of doc.businessRecord?.bindings ?? []) if (!doc.nodes[binding.nodeId]) issue(["businessRecord"], "Missing business-record node");
   doc.pages.forEach((page, i) => { if (paths.has(page.path)) issue(["pages", i, "path"], "Duplicate page path"); paths.add(page.path); if (!doc.nodes[page.root]) issue(["pages", i, "root"], "Missing root node"); });
   if (!paths.has("/")) issue(["pages"], "A website needs a home page");
   const visiting = new Set<string>(); const visited = new Set<string>();

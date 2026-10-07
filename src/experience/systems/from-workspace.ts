@@ -213,13 +213,14 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
     const system = byId.get(entry.ref.systemId);
     if (!system) continue;
     const connectedOnly = Boolean(entry.connectedSite && !entry.tenantId);
-    const document = Boolean(entry.savedWorkId && entry.tenantId);
+    const document = Boolean(entry.businessFactsConnected);
     const automatic = document || (connectedOnly && entry.connectedSite?.verified);
     const native = entry.editing === "native";
     const facts: SystemConnection = {
       id: `${system.id}:business-facts`, kind: "read", target: "Business record", status: automatic ? "connected" : "not_connected",
       sentence: document ? "This website reads confirmed business facts when it renders."
         : connectedOnly ? "Confirmed business facts are filled into the connected site after ownership is proven."
+          : entry.savedWorkId ? "This website uses its approved content. Business fact reads are not connected."
           : native ? "Strelva prepares business fact changes as native website content for review and publishing."
             : "Strelva updates this site by hand; it does not read the business record.",
       contract: { sourceOfTruth: "The business record's confirmed facts", authority: "Only confirmed public business facts; no contacts, requests or owner-only details.",

@@ -22,6 +22,8 @@ import { auditRebuildHtml } from "./rebuild-audit";
 import { renderSiteDocumentHtml } from "./site-export";
 import { ROOT_DOMAIN } from "@/platform/infra/brand";
 import { normalizeCustomDomain } from "@/lib/domains";
+import { bindWebsiteBusinessRecord, projectWebsiteBusinessFacts } from "./business-facts";
+import { readCandidateBusinessFacts } from "./business-facts-server";
 
 interface Loaded { work: SavedWork; rebuild: WebsiteRebuild }
 /** One part of a cutover onto an existing site, reported on its own. */
@@ -97,6 +99,8 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     return loadWork(await store.update(actor, loaded.work, loaded.rebuild.revision, payload));
   }
   async function saveCandidate(actor: WorkspaceActor, loaded: Loaded, document: SiteDocument, kind: string, forceNewRevision = false) {
+    const businessFacts = await readCandidateBusinessFacts(actor,loaded.work.workspaceId);
+    document = projectWebsiteBusinessFacts(bindWebsiteBusinessRecord(document,businessFacts),businessFacts);
     await store.member(actor,loaded.work.workspaceId);
     const latest = await documents.read(actor,{ workspaceId: loaded.work.workspaceId, workId: loaded.work.id });
     const contentHash = siteDocumentHash(document);
@@ -346,7 +350,11 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     const input = rebuildSelectionSchema.extend({ ops: z.unknown(), forceReview: z.boolean().optional() }).strict().parse(raw);
     const loaded = await load(actor,workId); const { candidate } = exact(loaded,{ expectedRevision: input.expectedRevision, candidateRevision: input.candidateRevision, candidateContentHash: input.candidateContentHash });
     await store.member(actor,loaded.work.workspaceId);
-    const prepared = await prepareSitePatch({ document: candidate.document, ops: input.ops, forceReview: input.forceReview });
+    const modelOptions = await (await import("./rebuild-runtime")).configuredWebsitePatchOptions({
+      actor, workspaceId: loaded.work.workspaceId, workId, document: candidate.document, ops: input.ops,
+      recheck: () => store.member(actor,loaded.work.workspaceId).then(() => undefined),
+    });
+    const prepared = await prepareSitePatch({ document: candidate.document, ops: input.ops, forceReview: input.forceReview, ...modelOptions });
     if (prepared.governance.action === "block") throw new WorkspaceConflictError(prepared.governance.reason);
     return present(await saveCandidate(actor,loaded,prepared.document,"site_patched"));
   }
