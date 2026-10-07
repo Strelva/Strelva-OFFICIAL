@@ -39,7 +39,7 @@ export interface WebsiteRequestItem {
   href: string | null;
 }
 
-export type WebsiteHistorySource = "content" | "snapshot" | "document" | "deploy";
+export type WebsiteHistorySource = "content" | "snapshot" | "document" | "deploy" | "system";
 
 export interface WebsiteHistoryItem {
   id: string;
@@ -50,6 +50,10 @@ export interface WebsiteHistoryItem {
   title: string;
   /** Where undo exists, in words; null when it does not (stated, not faked). */
   undo: string | null;
+  restore?: { section: string; versionId: string } | { kind: "snapshot"; snapshotId: string } | { kind: "document"; workId: string; targetRevision: number; targetContentHash: string };
+  restoreHref?: string;
+  /** Evidence retained by a deploy receipt, including unsuccessful read-back. */
+  deployment?: { commitSha: string; url: string; readBack: "confirmed" | "not_confirmed" | "not_checked" };
 }
 
 /** A connected site's own block: proof of the host, install lines, reporting and inquiries. */
@@ -83,10 +87,13 @@ export interface ChangeRequestRow { requestId: string; title: string; kind: "cus
 export interface DecisionRow { id: string; title: string; detail: string | null; openedAt: string; openHref: string | null }
 export interface LinkedPublicationRow { revision: number; tenantSlugAtPublication: string; publishedAt: string; fallbackUntil: string; priorDeliveryModel: string }
 export interface ServiceRequestRow { id: string; outcome: string; createdAt: string; status: string; commitment: string | null }
+export interface RepoDeploymentRow { id: string; requestId: string; title: string; commitSha: string; deploymentUrl: string; readBack: "confirmed" | "not_confirmed" | "not_checked"; recordedAt: string }
 
 export interface WebsiteDetailInputs {
   systemId: string;
   actorId: string;
+  workspaceId?: string;
+  workId?: string | null;
   domains: WebsiteDomainItem[];
   decisions: DecisionRow[];
   /** Sections with a saved draft that has not been published. */
@@ -99,6 +106,7 @@ export interface WebsiteDetailInputs {
   snapshots: SnapshotRow[];
   documentRevisions: DocumentRevisionRow[];
   linkedPublications: LinkedPublicationRow[];
+  repoDeployments?: RepoDeploymentRow[];
   connectedSite?: ConnectedSiteDetail;
   unavailable: string[];
 }
@@ -129,6 +137,7 @@ function serviceStage(row: ServiceRequestRow): WebsiteRequestItem["stage"] {
 const newestFirst = <T extends { at: string }>(items: T[]) => items.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
 
 export function buildWebsiteSystemDetail(input: WebsiteDetailInputs): WebsiteSystemDetail {
+  const latestDocumentRevision = Math.max(0, ...input.documentRevisions.map(item => item.revision));
   // Waiting on you: the owner's open decisions for this site, then drafts no
   // decision already covers, then a hosted candidate awaiting approval.
   const covered = new Set(input.changeRequests.filter(row => row.kind === "content_update" && row.status === "review" && row.section).map(row => row.section!));
@@ -148,23 +157,59 @@ export function buildWebsiteSystemDetail(input: WebsiteDetailInputs): WebsiteSys
       const restore = row.changes?.some(change => change.field === "_restore");
       return { id: `content:${row.id}`, source: "content" as const, at: row.timestamp, by: authorWords(row.author),
         title: restore ? `Restored an earlier ${sectionWords(row.section)}` : `Updated the ${sectionWords(row.section)}`,
-        undo: "Restore the earlier version; it comes back as a draft for review." };
+        undo: "Restore this saved content as a draft for review.", restore: { section: row.section, versionId: row.id } };
     }),
     ...input.snapshots.map(row => ({ id: `snapshot:${row.id}`, source: "snapshot" as const, at: row.createdAt, by: row.author === "user" ? "You" : "Strelva",
-      title: row.status === "restored" ? `${row.label} (restored)` : row.label, undo: row.status === "available" ? "Restore this saved copy of the whole site." : null })),
+      title: row.status === "restored" ? `${row.label} (restored)` : row.label, undo: row.status === "available" ? "Ask Strelva to prepare this exact saved copy for review before restoring it." : null,
+      ...(row.status === "available" && input.workspaceId ? { restore: { kind: "snapshot" as const, snapshotId: row.id } } : {}) })),
     ...input.documentRevisions.map(row => ({ id: `document:${row.revision}:${row.contentHash.slice(0, 12)}`, source: "document" as const, at: row.createdAt,
       by: row.createdBy === input.actorId ? "You" : "Strelva or your team",
       title: row.published ? `Published site revision ${row.revision}` : `Saved site revision ${row.revision}`,
-      undo: "Save an earlier revision as a new one; you approve it before it goes live." })),
+      undo: row.revision < latestDocumentRevision ? "Save this earlier revision as a new candidate; you approve it before it goes live." : null,
+      ...(input.workspaceId && input.workId && row.revision < latestDocumentRevision ? { restore: { kind: "document" as const, workId: input.workId, targetRevision: row.revision, targetContentHash: row.contentHash } } : {}) })),
     ...input.linkedPublications.map(row => ({ id: `cutover:${row.revision}:${row.publishedAt}`, source: "document" as const, at: row.publishedAt, by: "You",
       title: `Replaced the site at ${row.tenantSlugAtPublication} with revision ${row.revision}`,
       undo: Date.parse(row.fallbackUntil) > Date.now() ? `The old site is kept until ${row.fallbackUntil.slice(0, 10)}; Strelva can switch back until then.` : null })),
     ...input.changeRequests.filter(row => row.kind === "custom_request" && row.status === "shipped").map(row => ({ id: `deploy:${row.requestId}`, source: "deploy" as const, at: row.resolvedAt ?? row.createdAt, by: "Strelva",
       title: row.title, undo: "Strelva can redeploy the previous version." })),
+    ...(input.repoDeployments ?? []).map(row => ({ id: `deploy-receipt:${row.id}`, source: "deploy" as const, at: row.recordedAt, by: "Strelva",
+      title: row.readBack === "confirmed" ? `${row.title} · live and checked` : `${row.title} · deployed, not yet confirmed`,
+      undo: "Ask Strelva to prepare a redeploy of the previous commit for approval.",
+      deployment: { commitSha: row.commitSha, url: row.deploymentUrl, readBack: row.readBack } })),
   ]).slice(0, 50);
 
   if (input.connectedSite && !input.connectedSite.verified) {
     waiting.unshift({ id: `connect:${input.connectedSite.siteId}`, kind: "decision", title: `Prove ${input.connectedSite.siteHost} is yours`, detail: "Add the two lines shown under Connected site, publish your site, then check. Nothing is collected until then.", at: null, href: null });
   }
   return { systemId: input.systemId, ...(input.connectedSite ? { connectedSite: input.connectedSite } : {}), domains: input.domains, waiting, requests, history, unavailable: [...new Set(input.unavailable)] };
+}
+
+/** Native rows already describe their mirrored System revision. Handled
+ * receipts and revisions without a native row join that same History. */
+export function mergeWebsiteHistory(native: WebsiteHistoryItem[], system: Array<{ id: string; sentence: string; at: string; releaseRef?: string; implementationKind?: string }>): WebsiteHistoryItem[] {
+  const extra = system.filter(row => !native.some(item => {
+    if (item.title === row.sentence && item.at === row.at) return true;
+    if (!row.releaseRef) return false;
+    if (item.source === "content") return row.releaseRef.endsWith(`@${item.id.slice("content:".length)}`);
+    if (item.source === "document" && row.implementationKind === "website_document") return row.releaseRef.endsWith(`@${item.id.split(":")[1]}`);
+    if (item.id.startsWith("deploy-receipt:")) return row.releaseRef.startsWith(`deploy:${item.id.slice("deploy-receipt:".length)}@`);
+    return false;
+  })).map(row => ({ id: row.id, source: "system" as const, at: row.at, by: "Strelva", title: row.sentence, undo: null }));
+  return newestFirst([...native, ...extra]);
+}
+
+/** Domain ownership and routing observations keep their own freshness and
+ * authority. Listing a Connection never authorizes a DNS or provider write. */
+export function websiteDomainConnections(detail: WebsiteSystemDetail): import("./model").SystemConnection[] {
+  return detail.domains.map(domain => ({
+    id: `${detail.systemId}:domain:${domain.hostname}`, kind: "appear", target: domain.hostname,
+    sentence: `The website appears at ${domain.hostname}. ${domain.label}.`,
+    status: domain.state === "verified" ? "connected" : domain.state === "pending" || domain.state === "not_claimed" ? "unknown" : "not_connected",
+    contract: {
+      sourceOfTruth: domain.label.includes("business's") || domain.label.includes("proof") ? "Connected site ownership proof; this does not verify hosted routing." : "Domain claims and the hosting provider's routing checks.",
+      authority: `Strelva may check this address. Changes are owner-decided. ${domain.whoCanChange}`,
+      freshness: domain.lastCheckedAt ? `Last checked ${domain.lastCheckedAt}.` : "No completed domain check is recorded.",
+      failureBehavior: "A routing problem changes domain health, not the website's lifecycle. DNS changes require the owner's decision and exact records.",
+    },
+  }));
 }

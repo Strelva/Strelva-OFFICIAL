@@ -96,7 +96,7 @@ function plainReason(reason: string | undefined): string | null {
 /** One line per step, in the customer's words. Accepted effects that rollback
  * left in place say they can't be undone, with why. */
 export function customerStepLines(a: Activation): CustomerStepLine[] {
-  return a.steps.map((s) => {
+  return a.steps.flatMap((s): CustomerStepLine[] => {
     const isolated = s.receipt?.adapterMode === "isolated";
     let state: CustomerStepState;
     let detail: string | null = null;
@@ -120,7 +120,14 @@ export function customerStepLines(a: Activation): CustomerStepLine[] {
       case "running": state = "Not started"; detail = "Running now."; break;
       default: state = "Not started";
     }
-    return { step: s.id, label: s.label, state, detail, isolated };
+    const main = { step: s.id, label: s.label, state, detail, isolated };
+    const cutover = s.receipt?.adapterMode === "live" && Array.isArray(s.receipt.result?.cutover) ? s.receipt.result.cutover : [];
+    return [main, ...cutover.flatMap((raw): CustomerStepLine[] => {
+      if (!raw || typeof raw !== "object") return [];
+      const item = raw as Record<string, unknown>;
+      if (typeof item.id !== "string" || typeof item.label !== "string" || !["done", "waiting", "failed", "not_needed"].includes(String(item.status))) return [];
+      return [{ step: `${s.id}:${item.id}`, label: item.label, state: item.status === "waiting" ? "Waiting" : item.status === "failed" ? "Done, not yet confirmed" : "Done", detail: item.status === "not_needed" ? "Not needed for this site." : null, isolated: false }];
+    })];
   });
 }
 
@@ -131,9 +138,10 @@ export function customerActivationView(a: Activation, name: string): CustomerAct
   const total = a.steps.length;
   const landed = a.steps.some((s) => (s.kind === "effect" && s.effect === "accepted") || (s.kind === "activate" && s.status === "completed"));
   const checking = a.steps.some((s) => s.status === "unknown");
-  const partlyLive = a.status === "needs_attention" && landed && !a.rollbackStartedAt;
+  const cutoverWaiting = lines.some((line) => line.step.includes(":domain_moved") && line.state === "Waiting");
+  const partlyLive = (a.status === "needs_attention" || cutoverWaiting) && landed && !a.rollbackStartedAt;
   const headline =
-    a.status === "made_real" ? "Live."
+    a.status === "made_real" ? (cutoverWaiting ? "Live at its Strelva address. Your domain is waiting on DNS." : "Live.")
       : a.status === "rolled_back" ? "Undone."
         : a.rollbackStartedAt ? (checking ? "Undoing. Strelva is checking what already happened." : "Undoing.")
           : a.status === "needs_attention" ? (landed ? "Partly live" : "Nothing changed yet. Strelva is on it.")

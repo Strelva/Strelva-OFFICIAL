@@ -40,7 +40,7 @@ describe("workspace website places", () => {
       expect(workspaceSiteTarget(target)).toBe(target);
       expect(workspaceReturnTarget(target)).toBe(target);
     }
-    expect(workspaceReturnTarget(`/workspace/site?workspaceId=${WS}`)).toBeNull();
+    expect(workspaceReturnTarget(`/workspace/site?workspaceId=${WS}`)).toBe(`/workspace/site?workspaceId=${WS}`);
     expect(workspaceReturnTarget(`/workspace/site?workspaceId=${WS}&system=${gldfSystem}&tab=admin`)).toBeNull();
     expect(workspaceReturnTarget(`/workspace/site?workspaceId=${WS}&system=${gldfSystem}&tab=source`)).toBeNull();
     expect(workspaceReturnTarget(`/workspace/site?workspaceId=${WS}&system=${gldfSystem}&source=x`)).toBeNull();

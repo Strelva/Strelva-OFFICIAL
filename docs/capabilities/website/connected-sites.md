@@ -1,5 +1,15 @@
 # Connected sites
 
+**Wave 6 round 5, local only:** operator rollout checks, silent inquiry notices,
+System identity through a hosted rebuild, merged hosted-domain checks, and
+business-fact Connection contracts are tested. The installed script respects
+revoked consent for already mounted forms and sends no referrer with inquiries.
+All new notices require `STRELVA_CONNECTED_SITE_EMAIL_ENABLED=1` and the
+existing global, customer and tenant email gates. Connected-site entry remains
+independently switchable from paste-URL rebuilding. Actual builder installation,
+domain proof and retained reporting are production acceptance work. See
+[current stream evidence](../../product/streams/w6-website.md).
+
 Status: built locally Oct 8 on `w2/website-system`, flag
 `STRELVA_CONNECTED_SITES_RELEASE` off. Oct 6 on `w3/decision-gaps` (local): a
 per-business `connected_sites` release row, the public gate per business, the

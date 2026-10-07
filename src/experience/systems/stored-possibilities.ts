@@ -75,7 +75,8 @@ export function rebuildPossibilityInput(target: StoredTarget, revisions: Readonl
     effects: [{
       id: "publish-site", kind: "publish", channel: "hosted_website", system: { systemId: site.system.id },
       description: `Publish the ${agency ? "changed" : "rebuilt"} ${domain}`,
-      request: { workId: candidate.workId, candidateRevision: candidate.candidateRevision, candidateContentHash: candidate.candidateContentHash },
+      request: { workId: candidate.workId, candidateRevision: candidate.candidateRevision, candidateContentHash: candidate.candidateContentHash,
+        ...(site.references.tenantId ? { tenantId: site.references.tenantId } : {}) },
       after: [],
     }],
     checks: [
@@ -239,6 +240,8 @@ export function revisionHistory(systemId: string, revisions: readonly SystemRevi
         ? `Made live: ${r.summary ?? "a change"}`
         : `${IMPLEMENTATION_SENTENCE[r.implementation.kind] ?? r.summary ?? "Changed"}`,
     at: r.createdAt,
+    releaseRef: r.implementation.ref,
+    implementationKind: r.implementation.kind,
   }));
 }
 

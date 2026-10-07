@@ -7,6 +7,7 @@ import { patchBusinessRecord, readBusinessRecord } from "@/platform/business-rec
 import { saveBusinessDetails } from "@/platform/business-record/details-save";
 import { ownerEntryHomesOpen } from "@/platform/owner-entry/linked-sites";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
+import { nativeWebsiteFactsPatch } from "./native-website-facts";
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 
@@ -20,7 +21,7 @@ export async function saveBusinessDetailsAction(formData: FormData): Promise<voi
   if (!(await ownerEntryHomesOpen(workspaceId, user.id))) redirect(`/workspace?workspaceId=${workspaceId}`);
   const { outcome, field } = await saveBusinessDetails(
     { userId: user.id, verifiedEmail: user.email.trim().toLowerCase() }, workspaceId, revision, formData,
-    { read: readBusinessRecord, patch: patchBusinessRecord, operator: isSuperAdmin },
+    { read: readBusinessRecord, patch: nativeWebsiteFactsPatch(patchBusinessRecord), operator: isSuperAdmin },
   );
   const params = new URLSearchParams({ workspaceId, result: outcome, ...(field ? { field } : {}) });
   redirect(`/workspace/business-details?${params}`);

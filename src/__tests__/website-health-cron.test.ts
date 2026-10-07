@@ -46,6 +46,45 @@ describe("website health cron",()=>{
  it("treats a domain result with no host checked as no evidence",async()=>{deps.release.mockReturnValue(false);deps.domainSnapshot.mockResolvedValue({scannedAt:new Date().toISOString(),results:[{...domainHealth("mclears"),checks:[],worst:"up"}]});deps.probe.mockImplementation(async(tenant:{id:string})=>({...domainHealth(tenant.id),checks:[],worst:"up"}));
   const response=await GET(authenticatedCronRequest());expect(response.status).toBe(200);expect(savedCoverage().results.find(result=>result.tenantId==="mclears")!.status).toBe("unknown");expect(await response.json()).toMatchObject({coverage:{noHosts:9}});});
  it("reports a coverage storage failure instead of hiding it",async()=>{deps.release.mockReturnValue(false);deps.saveCoverage.mockRejectedValue(Error("redis down"));const response=await GET(authenticatedCronRequest());expect(response.status).toBe(207);expect(await response.json()).toMatchObject({coverage:{saved:false}});});
+ it("rechecks stale snapshots for every custom repo instead of keeping old green evidence",async()=>{
+  deps.release.mockReturnValue(false);
+  deps.domainSnapshot.mockResolvedValue({scannedAt:new Date(Date.now()-2*60*60*1000).toISOString(),results:CUSTOM_REPOS.map(id=>domainHealth(id))});
+  deps.probe.mockImplementation(async(tenant:{id:string})=>domainHealth(tenant.id,tenant.id==="mooney"?"down":"up"));
+  const response=await GET(authenticatedCronRequest());
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({coverage:{sites:9,customRepos:9,probed:9,blocked:1}});
+  expect(deps.probe.mock.calls.map(([tenant])=>tenant.id).sort()).toEqual([...CUSTOM_REPOS].sort());
+  expect(savedCoverage().results.find(result=>result.tenantId==="mooney")).toMatchObject({status:"blocked",domainEvidence:"probe"});
+  expect(deps.send).not.toHaveBeenCalled();
+ });
+ it("isolates one failed probe and still saves health for every remaining client",async()=>{
+  deps.release.mockReturnValue(false);deps.domainSnapshot.mockResolvedValue(null);
+  deps.probe.mockImplementation(async(tenant:{id:string})=>{if(tenant.id==="leslie")throw Error("unreachable evidence source");return domainHealth(tenant.id);});
+  const response=await GET(authenticatedCronRequest());
+  expect(response.status).toBe(207);
+  expect(await response.json()).toMatchObject({coverage:{sites:9,probed:8,probeFailed:1,saved:true}});
+  expect(savedCoverage().results.map(result=>result.tenantId).sort()).toEqual([...CUSTOM_REPOS].sort());
+  expect(savedCoverage().results.find(result=>result.tenantId==="leslie")).toMatchObject({status:"unknown",domainEvidence:"none"});
+  expect(savedCoverage().results.find(result=>result.tenantId==="mclears")).toMatchObject({status:"healthy",domainEvidence:"probe"});
+  expect(deps.send).not.toHaveBeenCalled();
+ });
+ it("keeps legacy clients without a delivery model in custom-repo coverage",async()=>{
+  deps.release.mockReturnValue(false);
+  deps.tenants.mockResolvedValue([{id:"mclears",siteName:"McLears",customRepo:{revalidationHealth:"not_configured"}}]);
+  const response=await GET(authenticatedCronRequest());
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({coverage:{sites:1,customRepos:1,degraded:1}});
+  expect(savedCoverage().results[0]).toMatchObject({tenantId:"mclears",deliveryModel:"custom_repo",status:"degraded"});
+  expect(savedCoverage().results[0]?.reasons.some(reason=>reason.signal==="site.revalidation")).toBe(true);
+ });
+ it("fails visibly when the tenant inventory cannot be read",async()=>{
+  deps.release.mockReturnValue(false);deps.tenants.mockRejectedValue(Error("tenant storage unavailable"));
+  const response=await GET(authenticatedCronRequest());
+  expect(response.status).toBe(503);
+  expect(await response.json()).toEqual({error:"Website health checks could not be confirmed."});
+  expect(deps.saveCoverage).not.toHaveBeenCalled();expect(deps.probe).not.toHaveBeenCalled();expect(deps.send).not.toHaveBeenCalled();
+  expect(deps.heartbeat).toHaveBeenLastCalledWith("website-health",expect.objectContaining({ok:false,processed:0,failed:1}));
+ });
  it("prunes expired crawl pages independently of published document health",async()=>{deps.prune.mockResolvedValue(3);deps.fetch.mockResolvedValue(`<meta name="strelva-site-hash" content="${"a".repeat(64)}">`);const response=await GET(authenticatedCronRequest());expect(response.status).toBe(200);expect(await response.json()).toMatchObject({crawlRetention:{status:"pruned",removed:3},hosted:{processed:1,failed:0},failed:0});expect(deps.save).toHaveBeenCalledWith(expect.objectContaining({status:"healthy"}));deps.prune.mockRejectedValue(Error("retention unavailable"));const failed=await GET(authenticatedCronRequest());expect(failed.status).toBe(207);expect(await failed.json()).toMatchObject({crawlRetention:{status:"failed"},hosted:{processed:1},failed:1});expect(deps.save).toHaveBeenCalledTimes(2);expect(deps.heartbeat).toHaveBeenLastCalledWith("website-health",expect.objectContaining({ok:false,failed:1}));});
  it("records missing hash, feeds it into the site's health, and alerts only through shared operator transport",async()=>{deps.fetch.mockResolvedValue("<html>unexpected</html>");expect((await GET(authenticatedCronRequest())).status).toBe(207);expect(deps.save).toHaveBeenCalledWith(expect.objectContaining({status:"hash_missing",contentHash:"a".repeat(64)}));expect(deps.send).toHaveBeenCalledWith(expect.objectContaining({audience:"operator",fromAddress:"health@updates.strelva.com"}));expect(savedCoverage().results.find(result=>result.tenantId==="mooney")!.reasons.some(reason=>reason.signal==="site.published_revision")).toBe(true);expect(deps.heartbeat).toHaveBeenCalledWith("website-health",expect.objectContaining({ok:false,failed:1}));});
  it("records healthy checks without notifying and does not conceal receipt storage failures",async()=>{deps.fetch.mockResolvedValue(`<meta name="strelva-site-hash" content="${"a".repeat(64)}">`);expect((await GET(authenticatedCronRequest())).status).toBe(200);expect(deps.send).not.toHaveBeenCalled();deps.save.mockRejectedValue(Error("durable storage down"));expect((await GET(authenticatedCronRequest())).status).toBe(503);expect(deps.heartbeat).toHaveBeenLastCalledWith("website-health",expect.objectContaining({ok:false,failed:1}));});

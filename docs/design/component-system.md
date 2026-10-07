@@ -132,6 +132,38 @@ the owning implementation and the affected rendered behavior has been checked.
 | Font and identity adoption | REB now loads Geist Sans for interface and display roles through one Next font binding; the original vector lettering remains separate. The component reference renders the actual family in both theme modes. | Verify computed family after fonts load and review 400/500/600 weights on the actual materials. Marketing and client repositories retain their own adoption rows. |
 | Rendered foundation reference | Existing colors/components previews cover only part of the system. | Show spacing/type roles and actual atoms with relevant states, not inline lookalikes. Verify desktop/mobile, keyboard, reflow and enlarged content. |
 
+October 7, Wave 6 local History contract: [WebsiteHistoryPanel](../../src/experience/systems/WebsiteSystemPanels.tsx)
+uses the shared Button for native content and earlier document restores. The
+document action pins the saved revision and prepares a new candidate through
+the existing undo service; approval is cleared and the live site is unchanged.
+Saved-copy actions say **Ask Strelva to restore** and file a Request containing
+the exact snapshot ID and date, because full-copy preparation still belongs to
+Strelva. Read-only access has no restore action. Busy actions cannot repeat;
+an unconfirmed response shows an alert and requires a reload before another
+attempt. Successful preparation shows a status message and refreshes the lists.
+`website-history-restore.test.ts`, `website-system-detail.test.ts` and
+`website-system-panels.test.tsx` cover authority, exact targets, failure states
+and the owner action. Desktop/mobile fixture proof is recorded in the
+[Wave 6 website handoff](../product/streams/w6-website.md); no production proof
+is implied.
+
+October 7, Wave 6 cutover undo: [WebsiteCutoverUndo](../../src/experience/websites/WebsiteRecoveryControls.tsx)
+requires separate confirmations that the owner restored DNS and opened and
+tested the old website. Its copy states that Strelva switches its routing
+after those confirmations; it does not claim an automatic fallback check.
+The shared Button remains disabled until both confirmations are checked.
+
+October 7, Wave 6 website Connections: the System page retains a business-record
+read across a connected site's rebuild. Hosted documents describe reads at
+render; native content describes reviewed publication; repo-only sites say
+**Not connected** and "Strelva updates this site by hand." Per-domain
+**appear** Connections use the same domain observations as the Domains panel,
+with source of truth, owner authority, last check and DNS failure behavior.
+Disconnected or unconfirmed Connections remain visible; working ones use the
+existing **Works with** disclosure. These are read-only contracts behind the
+Systems release, not new grants or provider writes. Focused projection and
+render tests cover the contracts; browser proof belongs in the stream handoff.
+
 Keep completion scoped to named consumers. A repaired Button does not migrate all
 native buttons, and passing component tests does not prove an entire page journey.
 Record local checks with their revision and limitations in the existing
@@ -627,3 +659,11 @@ private previews are noindexed. The static export includes the immutable
 document, each page, redirect mappings, image bytes and file checksums. No new
 renderer dependencies were added. Local automated and rendered verification is
 recorded with the website rebuild delivery evidence.
+
+An explicitly bound hosted document can read confirmed public business facts
+under `STRELVA_WEBSITE_BUSINESS_FACTS_ENABLED`. `SiteRenderer` projects typed
+name, contact, address, hours and service slots onto a copy, preserves the issued
+document checksum, and reports the business record revision separately. Private
+previews remain pinned; unavailable reads use the approved content. The System
+Connection claims this behavior only after the issued bindings and runtime read
+are confirmed.

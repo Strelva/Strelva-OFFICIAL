@@ -21,6 +21,7 @@ import { connectedSitesReleaseEnabled, connectedSitesReleasedFor } from "@/produ
 import { connectedSitesStore } from "@/products/connected-sites/store";
 import { getTenantConfig } from "@/lib/tenants";
 import { siteEditingFor, type SiteEditing } from "@/products/websites/server";
+import { getPublishedSiteDocument, readHostedBusinessFacts } from "@/products/websites";
 import { savedCheckObservations } from "@/products/investigations/system-health";
 import { createSupabaseSystemStore } from "@/platform/systems/supabase-store";
 import { readBusinessVersions } from "@/platform/system-versions/supabase-store";
@@ -65,6 +66,7 @@ export interface SystemsProjectionInput {
   bookingViews?: ReadonlyMap<string, readonly BookingView[]>;
   /** How each managed site changes, by tenant id. Absent: not known, nothing is claimed. */
   siteEditing?: ReadonlyMap<string, SiteEditing>;
+  businessFactsConnected?: ReadonlySet<string>;
   /** Set while STRELVA_PUBLISHING_RELEASE is on. Null: the read failed. */
   publishing?: Omit<PublishingProjection, "listing" | "observations"> | null;
 }
@@ -202,6 +204,7 @@ export async function projectWorkspaceSystems(input: SystemsProjectionInput): Pr
       health: healthSummary(health.get(item.system.id)),
       ...(input.bookingViews?.get(item.system.id)?.length ? { views: [...input.bookingViews.get(item.system.id)!] } : {}),
       ...(item.system.kind === "website" && item.references.tenantId && input.siteEditing?.get(item.references.tenantId) ? { editing: input.siteEditing.get(item.references.tenantId)! } : {}),
+      ...(item.system.kind === "website" && item.references.tenantId && input.businessFactsConnected?.has(item.references.tenantId) ? { businessFactsConnected: true } : {}),
       ...(item.connectedSite ? { connectedSite: { ...item.connectedSite } } : {}),
     })),
     connections: connections.map(({ connection }) => {
@@ -294,18 +297,25 @@ export interface LiveSystemsDeps {
  * own config. A failed read adds nothing for that site: no Store Connection
  * and no booking views are claimed without the fact.
  */
-async function readTenantSiteFacts(listing: BusinessSystems, siteDomains: ReadonlyMap<string, string>): Promise<{ facts: Map<string, TenantSiteFacts>; editing: Map<string, SiteEditing> }> {
+async function readTenantSiteFacts(listing: BusinessSystems, siteDomains: ReadonlyMap<string, string>): Promise<{ facts: Map<string, TenantSiteFacts>; editing: Map<string, SiteEditing>; businessFactsConnected: Set<string> }> {
   const tenantIds = [...new Set(listing.systems.flatMap((item) => item.system.kind === "website" && item.references.tenantId ? [item.references.tenantId] : []))];
   const facts = new Map<string, TenantSiteFacts>();
   const editing = new Map<string, SiteEditing>();
+  const businessFactsConnected = new Set<string>();
   await Promise.all(tenantIds.map(async (tenantId) => {
     const tenant = await getTenantConfig(tenantId).catch(() => undefined);
     if (!tenant || tenant.id !== tenantId) return;
     const domain = siteDomains.get(tenantId);
     facts.set(tenantId, { features: tenant.features ?? [], domain: domain ? bareHostname(domain) : null });
     editing.set(tenantId, siteEditingFor(tenant));
+    if (process.env.STRELVA_WEBSITE_BUSINESS_FACTS_ENABLED === "1") {
+      try {
+        const document = await getPublishedSiteDocument(tenantId);
+        if (document?.businessRecord?.bindings.length && await readHostedBusinessFacts(tenantId)) businessFactsConnected.add(tenantId);
+      } catch { /* A failed runtime read never claims a working Connection. */ }
+    }
   }));
-  return { facts, editing };
+  return { facts, editing, businessFactsConnected };
 }
 
 /** Saved checks become health evidence of the Systems they watch. */
@@ -332,6 +342,7 @@ async function liveProjectionInput(deps: LiveSystemsDeps): Promise<SystemsProjec
     now,
     bookingViews,
     siteEditing: tenantFacts.editing,
+    businessFactsConnected: tenantFacts.businessFactsConnected,
     ...(published ? { publishing: published.publishing } : {}),
   };
 }

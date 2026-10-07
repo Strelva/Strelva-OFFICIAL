@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useWorkspaceRequest } from "@/experience/workspace/WorkspaceRequest";
+import { Button } from "@/components/ui/Button";
 import { SystemPanel as Panel } from "./SystemPanel";
 import type { WebsiteHistoryItem, WebsiteRequestItem, WebsiteSystemDetail, WebsiteWaitingItem } from "./website-detail";
+import { mergeWebsiteHistory } from "./website-detail";
+import type { SystemHistoryRow } from "./model";
 import styles from "./systems.module.css";
 
 export type WebsiteDetailState =
@@ -52,7 +55,7 @@ const STAGE_LABEL: Record<WebsiteRequestItem["stage"], string> = {
 };
 
 const SOURCE_LABEL: Record<WebsiteHistoryItem["source"], string> = {
-  content: "Content", snapshot: "Saved copy", document: "Site revision", deploy: "Deploy",
+  content: "Content", snapshot: "Saved copy", document: "Site revision", deploy: "Deploy", system: "Release",
 };
 
 function Unavailable({ names }: { names: readonly string[] }) {
@@ -115,7 +118,7 @@ function ConnectedSitePanel({ workspaceId, systemId, site, readOnly }: { workspa
  * list comes from the store that owns it (website-detail-server.ts); a list
  * that could not be read says so instead of reading as empty.
  */
-export function WebsiteSystemPanels({ workspaceId, systemId, state, onAsk, onAskChange, readOnly }: { workspaceId: string; systemId: string; state: WebsiteDetailState; onAsk: (request: string) => void; /** A managed site files a Request instead of prefilling the composer. */ onAskChange?: () => void; readOnly: boolean }) {
+export function WebsiteSystemPanels({ workspaceId, systemId, state, onAsk, onAskChange, readOnly, includeHistory = true }: { workspaceId: string; systemId: string; state: WebsiteDetailState; onAsk: (request: string) => void; /** A managed site files a Request instead of prefilling the composer. */ onAskChange?: () => void; readOnly: boolean; includeHistory?: boolean }) {
   if (state.status === "loading") return <section className={styles.panel} aria-busy="true" aria-label="Website details"><p role="status">Loading domains, requests and history…</p></section>;
   if (state.status === "error") return <section className={styles.panel} aria-label="Website details"><p role="alert">{state.message} The site itself is unchanged.</p></section>;
   const { detail } = state;
@@ -123,35 +126,83 @@ export function WebsiteSystemPanels({ workspaceId, systemId, state, onAsk, onAsk
   const domainsMissing = unavailable.has("Domains");
   const waitingMissing = ["Decisions", "Drafts", "Site review"].filter(name => unavailable.has(name));
   const requestsMissing = ["Requests and pending changes", "Service requests"].filter(name => unavailable.has(name));
-  const historyMissing = ["Content history", "Saved copies", "Site revisions", "Site replacements"].filter(name => unavailable.has(name));
   return <>
     {detail.connectedSite ? <ConnectedSitePanel workspaceId={workspaceId} systemId={systemId} site={detail.connectedSite} readOnly={readOnly} /> : null}
-    <Panel id={`${systemId}-domains`} title="Domains" count={detail.domains.length} intro="Where the site answers, and whether each address is verified.">
+    {detail.domains.length || domainsMissing ? <Panel id={`${systemId}-domains`} title="Domains" count={detail.domains.length} intro="Where the site answers, and whether each address is verified.">
       {detail.domains.length ? <ul className={styles.panelList} aria-label="Domains">{detail.domains.map(domain => <li key={domain.hostname} data-domain-state={domain.state}>
         <span>{domain.hostname}</span>
         <small>{domain.label}{domain.lastCheckedAt ? ` · checked ${when(domain.lastCheckedAt)}` : ""}</small>
         <small>{domain.whoCanChange}</small>
       </li>)}</ul> : domainsMissing ? null : <p className="mt-3">No domain is recorded for this site yet.</p>}
       <Unavailable names={domainsMissing ? ["Domains"] : []} />
-    </Panel>
-    <Panel id={`${systemId}-waiting`} title="Waiting on you" count={detail.waiting.length} intro="Only the decisions that are yours. The same items as Needs you, for this site.">
+    </Panel> : null}
+    {detail.waiting.length || waitingMissing.length ? <Panel id={`${systemId}-waiting`} title="Waiting on you" count={detail.waiting.length} intro="Only the decisions that are yours. The same items as Needs you, for this site.">
       {detail.waiting.length ? <ul className={styles.panelList} aria-label="Waiting on you">{detail.waiting.map(item => <WaitingRow key={item.id} item={item} />)}</ul> : waitingMissing.length ? null : <p className="mt-3">Nothing is waiting on you for this site.</p>}
       <Unavailable names={waitingMissing} />
-    </Panel>
-    <Panel id={`${systemId}-requests`} title="Requests" count={detail.requests.length} intro="Work asked for on this site, until it is done.">
+    </Panel> : null}
+    {detail.requests.length || requestsMissing.length ? <Panel id={`${systemId}-requests`} title="Requests" count={detail.requests.length} intro="Work asked for on this site, until it is done.">
       {detail.requests.length ? <ul className={styles.panelList} aria-label="Requests">{detail.requests.map(item => <li key={item.id}>
         <span>{item.href ? <a href={item.href}>{item.title}</a> : item.title}</span>
         <small>{STAGE_LABEL[item.stage]} · <time dateTime={item.at}>{when(item.at)}</time></small>
       </li>)}</ul> : requestsMissing.length ? null : <p className="mt-3">No open requests. <button type="button" className="underline" disabled={readOnly} onClick={() => onAskChange ? onAskChange() : onAsk("Change on the website: ")}>Ask for a change</button></p>}
       <Unavailable names={requestsMissing} />
-    </Panel>
-    <Panel id={`${systemId}-history`} title="History" count={detail.history.length} intro="Every release of this site, newest first. Issued changes are never rewritten; undo is a new release.">
-      {detail.history.length ? <ol className={styles.panelList} aria-label="History">{detail.history.map(item => <li key={item.id}>
-        <span>{item.title}</span>
-        <small>{SOURCE_LABEL[item.source]} · {item.by} · <time dateTime={item.at}>{when(item.at)}</time></small>
-        <small>{item.undo ?? "No undo for this change."}</small>
-      </li>)}</ol> : historyMissing.length ? null : <p className="mt-3">No releases are recorded for this site yet.</p>}
-      <Unavailable names={historyMissing} />
-    </Panel>
+    </Panel> : null}
+    {includeHistory ? <WebsiteHistoryPanel workspaceId={workspaceId} systemId={systemId} state={state} canRestore={!readOnly} /> : null}
   </>;
+}
+
+export function hasWebsiteDetail(state: WebsiteDetailState | null): boolean {
+  return Boolean(state && (state.status !== "ready" || state.detail.connectedSite || state.detail.domains.length || state.detail.waiting.length
+    || state.detail.requests.length || state.detail.history.length || state.detail.unavailable.length));
+}
+
+function WebsiteHistoryRow({ item, workspaceId, systemId, canRestore, appBase, onPrepared, onAskRestore }: {
+  item: WebsiteHistoryItem; workspaceId: string; systemId: string; canRestore: boolean; appBase: string; onPrepared?: () => void; onAskRestore?: () => void;
+}) {
+  const request = useWorkspaceRequest();
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<{ error: boolean; text: string } | null>(null);
+  async function restore() {
+    if (!item.restore || busy) return;
+    setBusy(true); setNotice(null);
+    try {
+      const response = await request("/api/workspace/systems/website/restore", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, systemId, ...item.restore }) });
+      const body = await response.json().catch(() => null) as { status?: string; message?: string; error?: string } | null;
+      if (!response.ok || (body?.status !== "queued" && body?.status !== "requested")) throw new Error(body?.error || "The restore could not be confirmed. Reload before trying again.");
+      setNotice({ error: false, text: body.message || "The earlier content is prepared for review. Your live site is unchanged." });
+      onPrepared?.();
+    } catch (error) {
+      const message = error instanceof Error && !(error instanceof TypeError) ? error.message : "The restore could not be confirmed.";
+      setNotice({ error: true, text: message.includes("Reload before trying again") ? message : `${message} Reload before trying again.` });
+    }
+    finally { setBusy(false); }
+  }
+  return <li>
+    <span>{item.title}</span>
+    <small>{SOURCE_LABEL[item.source]} · {item.by} · <time dateTime={item.at}>{when(item.at)}</time></small>
+    {item.deployment ? <small>Commit {item.deployment.commitSha} · <a href={item.deployment.url} target="_blank" rel="noopener noreferrer">Open deployment</a></small> : null}
+    <small>{item.undo ?? "No undo for this change."}</small>
+    {canRestore && item.restore ? <Button size="sm" variant="secondary" loading={busy} disabled={busy || notice !== null} onClick={() => void restore()}>{"kind" in item.restore && item.restore.kind === "snapshot" ? "Ask Strelva to restore" : "Prepare restore"}</Button>
+      : canRestore && item.restoreHref ? <a href={`${appBase}${item.restoreHref}`} className="text-sm underline underline-offset-4">Restore from History</a>
+        : canRestore && item.source === "deploy" && item.undo && onAskRestore ? <Button size="sm" variant="secondary" onClick={onAskRestore}>Ask Strelva to restore</Button> : null}
+    {notice ? <small role={notice.error ? "alert" : "status"}>{notice.text}</small> : null}
+  </li>;
+}
+
+/** One History, after Connections and Possibilities, with five recent rows. */
+export function WebsiteHistoryPanel({ workspaceId, systemId, state, systemHistory = [], canRestore, appBase = "", onPrepared, onAskRestore }: {
+  workspaceId: string; systemId: string; state: WebsiteDetailState; systemHistory?: SystemHistoryRow[]; canRestore: boolean;
+  appBase?: string; onPrepared?: () => void; onAskRestore?: () => void;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  if (state.status !== "ready") return null;
+  const detail = state.detail;
+  const missing = detail.unavailable.filter(name => ["Content history", "Saved copies", "Site revisions", "Site replacements", "Repo deploy history", "System release history"].includes(name));
+  const history = mergeWebsiteHistory(detail.history, systemHistory);
+  if (!history.length && !missing.length) return null;
+  return <Panel id={`${systemId}-history`} title="History" count={history.length} intro="Every release of this site, newest first. Issued changes are never rewritten; undo is a new release.">
+    {history.length ? <ol className={styles.panelList} aria-label="History">{(showAll ? history : history.slice(0, 5)).map(item => <WebsiteHistoryRow key={item.id} item={item} workspaceId={workspaceId} systemId={systemId} canRestore={canRestore} appBase={appBase} onPrepared={onPrepared} onAskRestore={onAskRestore} />)}</ol> : null}
+    {history.length > 5 ? <button type="button" className="mt-3 min-h-11 text-sm underline underline-offset-4" onClick={() => setShowAll(value => !value)}>{showAll ? "Show recent changes" : "Show more history"}</button> : null}
+    <Unavailable names={missing} />
+  </Panel>;
 }

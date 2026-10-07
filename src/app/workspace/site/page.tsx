@@ -9,7 +9,7 @@ import { systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
 import { readExistingSystemsSnapshot } from "@/platform/systems/from-existing";
 import { listWorkspaces } from "@/platform/workspaces";
 import { askReleaseMayBeOn } from "@/platform/ask/release";
-import { NATIVE_TABS, REQUEST_TABS, isSiteTab, workspaceDashboardHref, workspaceSiteHref, type SiteTab } from "@/platform/workspaces/site-places";
+import { isSiteTab, workspaceDashboardHref, workspaceSiteHref, type SiteTab } from "@/platform/workspaces/site-places";
 import { loadBrandKitSettings, loadCollectionsData, loadGoogleBusinessData, loadSiteEditorData, siteFrameFor } from "@/lib/website-page-data";
 import { getTenantPrimaryDomain } from "@/lib/tenant-urls";
 import { resolveWorkspaceSite } from "@/products/websites/server";
@@ -27,7 +27,11 @@ import { SiteHistoryContent } from "@/components/dashboard/SiteHistoryContent";
 import Link from "next/link";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import { StrelvaShell } from "@/experience/app-frame/StrelvaShell";
-import { ConnectSiteExperience } from "@/experience/connected-sites/ConnectSiteExperience";
+import { WebsiteEntry } from "@/experience/websites/WebsiteEntry";
+import { managedSiteNavigation, websiteEntryPath } from "@/experience/websites/site-navigation";
+import { websiteRebuildReleasedFor } from "@/products/websites/index";
+import { listWebsiteRebuilds } from "@/products/websites/index";
+import { parseRebuildView } from "@/experience/websites/rebuild-transport";
 import { connectedSitesReleasedFor, readConnectedSites } from "@/products/connected-sites/server";
 
 export const dynamic = "force-dynamic";
@@ -53,7 +57,7 @@ export default async function WorkspaceSitePage({ searchParams }: { searchParams
   const workspaceId = one("workspaceId");
   const systemId = one("system");
   // No System named: the business's connected-site entry (bring the website it already has).
-  if (workspaceId && UUID.test(workspaceId) && systemId === null) return <ConnectedSitesPage workspaceId={workspaceId} />;
+  if (workspaceId && UUID.test(workspaceId) && systemId === null) return WebsiteEntryPage({ workspaceId, entry: one("entry"), workId: one("workId") });
   if (!workspaceId || !UUID.test(workspaceId) || !systemId || !UUID.test(systemId)) redirect("/workspace");
   const requestedTab: SiteTab | null = isSiteTab(one("tab")) ? one("tab") as SiteTab : null;
   const source = one("source");
@@ -80,9 +84,7 @@ export default async function WorkspaceSitePage({ searchParams }: { searchParams
   if (state.kind === "error") return <WorkspaceSiteMessage title="The website didn't open." body="Strelva couldn't read this site's details just now. Nothing was changed. Try again in a moment." href={here} action="Try again" />;
 
   const { site, editing, operator } = state;
-  const tabs = editing === "native" ? NATIVE_TABS : REQUEST_TABS;
-  const tab: SiteTab = requestedTab && (tabs.includes(requestedTab) || (requestedTab === "source" && tabs.includes("connections")) || requestedTab === "request") ? requestedTab : tabs[0]!;
-  const visibleTabs = editing === "native" && tab === "request" ? [...tabs, "request" as const] : tabs;
+  const { tab, tabs: visibleTabs } = managedSiteNavigation(editing, operator, requestedTab);
 
   const requestHeaders = await headers();
   // On a client admin host the proxy already names this tenant; elsewhere its APIs are reached through /client/<tenant>.
@@ -132,7 +134,7 @@ export default async function WorkspaceSitePage({ searchParams }: { searchParams
   }
 
   return <WorkspaceSiteFrame workspaceId={workspaceId} systemId={systemId} workspaceName={state.workspaceName} siteLabel={siteLabel} tab={tab} tabs={visibleTabs}
-    tenantRoot={tenantRoot} tenantId={site.tenantId} askReleased={askReleased} readOnly={readOnly} liveUrl={domain ? `https://${domain}` : frame.siteUrl || undefined}
+    tenantRoot={tenantRoot} tenantId={site.tenantId} askReleased={askReleased} readOnly={readOnly || !operator} liveUrl={domain ? `https://${domain}` : frame.siteUrl || undefined}
     site={frame} notice={notice}>
     {panel}
   </WorkspaceSiteFrame>;
@@ -146,30 +148,39 @@ function WorkspaceSiteMessageInline({ title, body, href, action }: { title: stri
   </div>;
 }
 
-/**
- * Where a new business brings the website it already has (connected sites,
- * the working default for decision 3). Presentation only: every read and
- * write below is authorized again by SQL. Off unless
- * STRELVA_CONNECTED_SITES_RELEASE=1 and Systems is on for this business.
- */
-async function ConnectedSitesPage({ workspaceId }: { workspaceId: string }) {
-  const next = `/workspace/site?workspaceId=${workspaceId}`;
+/** Independent, per-business release switches preserve the unselected entry decision. */
+async function WebsiteEntryPage({ workspaceId, entry, workId }: { workspaceId: string; entry: string | null; workId: string | null }) {
+  if ((entry !== null && entry !== "connect" && entry !== "rebuild") || (workId !== null && (entry !== "rebuild" || !UUID.test(workId)))) redirect("/workspace");
+  const next = `/workspace/site?${new URLSearchParams({ workspaceId, ...(entry ? { entry } : {}), ...(workId ? { workId } : {}) })}`;
   const user = await getSessionUser().catch(() => null);
   if (!user?.id || !user.email || !user.email_confirmed_at) redirect(`/sign-in?next=${encodeURIComponent(next)}`);
   const actor = { userId: user.id, verifiedEmail: user.email.trim().toLowerCase() };
-  // Per workspace: connected sites open where Systems is on for this business.
-  if (!(await connectedSitesReleasedFor(actor, workspaceId).catch(() => false))) redirect(`/workspace?${new URLSearchParams({ workspaceId })}`);
-  const workspace = (await listWorkspaces(actor).catch(() => [])).find(item => item.id === workspaceId && item.kind === "customer");
-  let overview: Awaited<ReturnType<typeof readConnectedSites>> | null = null;
-  let failure: string | null = workspace ? null : "This business isn't available to your account.";
-  if (workspace) {
-    try { overview = await readConnectedSites(actor, workspaceId); }
-    catch (error) { failure = error instanceof WorkspaceAccessError ? "This business isn't available to your account." : "Your website couldn't be loaded just now. Nothing changed."; }
+  let workspaces: Awaited<ReturnType<typeof listWorkspaces>>;
+  try { workspaces = await listWorkspaces(actor); }
+  catch { return <Unavailable message="This business couldn't be loaded just now. Nothing changed. Try again in a moment." />; }
+  const workspace = workspaces.find(item => item.id === workspaceId && item.kind === "customer" && item.access === "member");
+  if (!workspace) return <Unavailable message="This business isn't available to your account." />;
+  const operator = await isSuperAdmin().catch(() => false);
+  const systemsOn = await systemsReleaseEnabledForWorkspace(workspaceId, { operator, tester: false, userId: user.id }).catch(() => false);
+  if (!systemsOn) redirect(`/workspace?${new URLSearchParams({ workspaceId })}`);
+  const [connectedEnabled, rebuildEnabled] = await Promise.all([
+    connectedSitesReleasedFor(actor, workspaceId).catch(() => false),
+    websiteRebuildReleasedFor(actor, workspaceId).catch(() => false),
+  ]);
+  if (!connectedEnabled && !rebuildEnabled) redirect(`/workspace?${new URLSearchParams({ workspaceId })}`);
+  const path = websiteEntryPath(connectedEnabled, rebuildEnabled, entry);
+  const canManage = workspace.role === "owner" || workspace.role === "admin";
+  let body: React.ReactNode;
+  try {
+    const [overview, records] = await Promise.all([
+      path === "connect" ? readConnectedSites(actor, workspaceId) : null,
+      path === "rebuild" ? listWebsiteRebuilds(actor, workspaceId) : [],
+    ]);
+    body = <WebsiteEntry workspaceId={workspaceId} connectedEnabled={connectedEnabled} rebuildEnabled={rebuildEnabled} path={path} canManage={canManage} operator={operator}
+      initialWorkId={workId ?? undefined} rebuilds={records.map(parseRebuildView)} sites={overview?.sites.map(site => ({ id: site.id, siteHost: site.siteHost, siteUrl: site.siteUrl, status: site.status, verifiedAt: site.verifiedAt, systemId: site.systemId, snippet: site.snippet }))} />;
+  } catch (error) {
+    body = <Unavailable message={error instanceof WorkspaceAccessError ? "This business isn't available to your account." : "Your website couldn't be loaded just now. Nothing changed. Try again in a moment."} />;
   }
-  const canManage = workspace?.access === "member" && (workspace.role === "owner" || workspace.role === "admin");
-  const body = failure || !overview ? <Unavailable message={failure ?? "Your website couldn't be loaded just now. Nothing changed."} />
-    : <ConnectSiteExperience workspaceId={workspaceId} canManage={canManage}
-      initialSites={overview.sites.map(site => ({ id: site.id, siteHost: site.siteHost, siteUrl: site.siteUrl, status: site.status, verifiedAt: site.verifiedAt, systemId: site.systemId, snippet: site.snippet }))} />;
   return <StrelvaShell title="Website" workspaceId={workspaceId} accountName={user.email}><div className="min-h-0 flex-1 overflow-y-auto">{body}</div></StrelvaShell>;
 }
 

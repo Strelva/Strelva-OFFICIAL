@@ -24,8 +24,9 @@ import {
 } from "./model";
 import { workspaceSiteHref } from "@/platform/workspaces/site-places";
 import { SystemPanel as Panel } from "./SystemPanel";
-import { WebsiteSystemPanels, useWebsiteSystemDetail, type WebsiteDetailState } from "./WebsiteSystemPanels";
+import { WebsiteSystemPanels, WebsiteHistoryPanel, hasWebsiteDetail, useWebsiteSystemDetail, type WebsiteDetailState } from "./WebsiteSystemPanels";
 import { WebsiteChangeAsk } from "./WebsiteChangeAsk";
+import { websiteDomainConnections } from "./website-detail";
 import styles from "./systems.module.css";
 
 export interface SystemPageProps {
@@ -39,6 +40,8 @@ export interface SystemPageProps {
   useReadOnly?: boolean;
   rebuildEnabled?: boolean;
   managed?: boolean;
+  /** Managed website tooling is available only to a Strelva operator. */
+  operator?: boolean;
   agency?: boolean;
   readOnlyReason?: string;
   /** Only owners can make a Possibility real. When false, say why. */
@@ -68,13 +71,13 @@ export function SystemPage(props: SystemPageProps) {
   const [detailVersion, setDetailVersion] = useState(0);
   const fetchedDetail = useWebsiteSystemDetail(props.workspaceId, system?.id ?? "", Boolean(system && system.kind === "website" && !props.websiteDetail), detailVersion);
   const websiteDetail = props.websiteDetail ?? fetchedDetail;
-  const siteHref = system && system.surface.kind === "website" && system.surface.editing ? (tab: "connections" | "google") => workspaceSiteHref({ workspaceId: props.workspaceId, systemId: system.id, tab }, props.appBase || "") : undefined;
+  const siteHref = props.operator && system && system.surface.kind === "website" && system.surface.editing ? (tab: "connections" | "google") => workspaceSiteHref({ workspaceId: props.workspaceId, systemId: system.id, tab }, props.appBase || "") : undefined;
   const back = <button type="button" className={styles.back} onClick={onHome}><ArrowLeft size={16} aria-hidden="true" />Home</button>;
   if (loading && !system) return <div className={styles.page}>{back}<p role="status" className="mt-6 text-sm text-gray-muted">Opening this system…</p></div>;
   if (!system) return <div className={styles.page}>{back}<div className={styles.notFound}><h1 className="font-display">This system isn’t available here.</h1><p>It may belong to another business, or your access may have changed. Nothing about it was changed.</p></div></div>;
   // Website panels and the site's own editor links count as context too.
-  const showAside = hasContext(system) || Boolean(system.kind === "website" && websiteDetail) || Boolean(siteHref);
   const filesRequests = system.kind === "website" && system.surface.kind === "website" && Boolean(system.surface.editing) && !readOnly;
+  const showAside = hasContext(system) || (system.kind === "website" && hasWebsiteDetail(websiteDetail)) || Boolean(siteHref) || (filesRequests && askingChange);
   function askForChange() {
     if (filesRequests) setAskingChange(true);
     else onAsk(`About ${system!.name}: `);
@@ -103,7 +106,7 @@ export function SystemPage(props: SystemPageProps) {
       </div>
       <div className={styles.actions}>
         {system.surface.kind === "website" && system.surface.liveUrl ? <a className={styles.linkAction} href={system.surface.liveUrl} target="_blank" rel="noreferrer">Visit site<ArrowUpRight size={16} aria-hidden="true" /></a> : null}
-        {system.surface.kind === "website" && system.surface.editing ? <a className={styles.linkAction} data-variant="secondary" href={workspaceSiteHref({ workspaceId: props.workspaceId, systemId: system.id, tab: system.surface.editing === "native" ? "edit" : "request" }, props.appBase || "")}>{system.surface.editing === "native" ? "Edit site" : "Changes to this site"}</a>
+        {system.surface.kind === "website" && system.surface.editing ? <a className={styles.linkAction} data-variant="secondary" href={workspaceSiteHref({ workspaceId: props.workspaceId, systemId: system.id, tab: "request" }, props.appBase || "")}>Changes to this site</a>
           : system.surface.kind === "website" && system.surface.manageHref ? <a className={styles.linkAction} data-variant="secondary" href={system.surface.manageHref}>Website controls</a> : null}
         {readOnly && readOnlyReason ? <span className="self-center text-xs text-gray-muted">{readOnlyReason}</span> : null}
         <Button size="sm" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} icon={<MessageSquareText size={16} />} aria-expanded={filesRequests ? askingChange : undefined} onClick={askForChange}>Ask for a change</Button>
@@ -128,17 +131,18 @@ export function SystemPage(props: SystemPageProps) {
 
       {showAside ? <aside className={styles.aside} aria-label={`About ${system.name}`}>
         {filesRequests && askingChange ? <WebsiteChangeAsk workspaceId={props.workspaceId} systemId={system.id} siteName={system.name} onFiled={() => setDetailVersion(version => version + 1)} onClose={() => setAskingChange(false)} /> : null}
-        {system.kind === "website" && websiteDetail ? <WebsiteSystemPanels workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} onAsk={onAsk} onAskChange={filesRequests ? () => setAskingChange(true) : undefined} readOnly={readOnly} /> : null}
+        {system.kind === "website" && websiteDetail ? <WebsiteSystemPanels workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} onAsk={onAsk} onAskChange={filesRequests ? () => setAskingChange(true) : undefined} readOnly={readOnly} includeHistory={false} /> : null}
         {system.activations?.length ? <ActivationsPanel system={system} /> : null}
         {system.possibilities.length ? <PossibilitiesPanel system={system} systems={systems} workspaceId={props.workspaceId} readOnly={readOnly} readOnlyReason={readOnlyReason} canMakeReal={props.canMakeReal ?? !readOnly} makeRealReason={props.makeRealReason ?? readOnlyReason} appBase={props.appBase || ""} comparingId={comparing && mode !== "current" ? comparing.id : null} onCompare={system.surface.kind === "website" ? compare : undefined} onAsk={onAsk} /> : null}
-        {system.connections.length || system.offers?.length || siteHref ? <ConnectionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} siteHref={siteHref} /> : null}
+        {system.connections.length || system.offers?.length || siteHref || (websiteDetail?.status === "ready" && websiteDetail.detail.domains.length) ? <ConnectionsPanel system={system.kind === "website" && websiteDetail?.status === "ready" ? { ...system, connections: [...system.connections, ...websiteDomainConnections(websiteDetail.detail)] } : system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} siteHref={siteHref} /> : null}
         <PartsPanel system={system} />
         {system.versions.length ? <VersionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} /> : null}
-        {system.history?.length ? <HistoryPanel system={system} /> : null}
+        {system.kind === "website" && websiteDetail?.status === "ready" ? <WebsiteHistoryPanel workspaceId={props.workspaceId} systemId={system.id} state={websiteDetail} systemHistory={system.history} canRestore={!readOnly && (props.operator || (props.canMakeReal ?? true))} appBase={props.appBase} onPrepared={() => setDetailVersion(version => version + 1)} onAskRestore={filesRequests ? () => setAskingChange(true) : undefined} />
+          : system.history?.length ? <HistoryPanel system={system} /> : null}
         {system.audits?.length ? <AuditsPanel system={system} workspaceId={props.workspaceId} appBase={props.appBase || ""} /> : null}
       </aside> : null}
     </div>
-    {hasContext(system) ? null : <p className={styles.askMore}><button type="button" className="underline" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else {system.name} could become.</button></p>}
+    {showAside ? null : <p className={styles.askMore}><button type="button" className="underline" disabled={readOnly} title={readOnly ? readOnlyReason : undefined} onClick={() => onAsk(`What else could ${system.name} become? `)}>Ask what else {system.name} could become.</button></p>}
   </div>;
 }
 
@@ -247,6 +251,7 @@ function ConnectionsPanel({ system, systemHref, onOpenSystem, siteHref }: { syst
   const item = (connection: SystemConnection) => <li key={connection.id}>
     <span>{connection.sentence}</span>
     <small>{(connection.direction === "in" ? INCOMING_CONNECTION_LABEL : CONNECTION_KIND_LABEL)[connection.kind]} <SystemLink id={connection.systemId} label={connection.target} systemHref={systemHref} onOpenSystem={onOpenSystem} />{connection.status === "connected" ? "" : connection.status === "not_connected" ? " · Not connected" : " · Not confirmed"}</small>
+    {connection.contract ? <><small>Source: {connection.contract.sourceOfTruth}</small><small>{connection.contract.authority}</small><small>{connection.contract.freshness}</small><small>{connection.contract.failureBehavior}</small></> : null}
   </li>;
   return <Panel id={`${system.id}-connections`} title="Connections" count={system.connections.length} intro="What it works with.">
     {attention.length ? <ul className={styles.panelList}>{attention.map(item)}</ul> : null}

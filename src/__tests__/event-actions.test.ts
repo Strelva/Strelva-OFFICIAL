@@ -22,6 +22,8 @@ const mockIsInquiryMessageReviewEvent = vi.fn();
 const mockAuthorizeInquiryMessageReviewActor = vi.fn();
 const mockExecuteInquiryMessageReview = vi.fn();
 const mockReconcileInquiryMessageReview = vi.fn();
+const observeAcceptedNativePublish = vi.hoisted(() => vi.fn());
+vi.mock("@/app/api/publish/native-readback", () => ({ observeAcceptedNativePublish }));
 
 vi.mock("../lib/events", () => ({
   getEvent: (...args: unknown[]) => mockGetEvent(...args),
@@ -96,6 +98,22 @@ describe("resolveEventAction", () => {
     mockFinishEventAction.mockResolvedValue(undefined);
     mockRevalidateClientSite.mockResolvedValue(undefined);
     mockIsInquiryMessageReviewEvent.mockReturnValue(false);
+  });
+
+  it("keeps approved content resolved when public observation fails, without a second publish", async () => {
+    const event = { id: "accepted-content", tenantId: "tenant-a", type: "content_update", status: "pending", metadata: { kind: "agent_preview", section: "hero", proposedData: { title: "Approved title" } } };
+    mockGetEvent.mockResolvedValue(event);
+    mockGetDraftContent.mockResolvedValue(null);
+    mockGetContent.mockResolvedValue({ title: "Old title" });
+    mockSetContent.mockResolvedValue(undefined);
+    mockResolveEvent.mockResolvedValue({ changed: true });
+    observeAcceptedNativePublish.mockRejectedValueOnce(new Error("Observation unavailable"));
+    expect(await resolveEventAction("tenant-a", event.id, "approved")).toEqual({ changed: true });
+    expect(observeAcceptedNativePublish).toHaveBeenCalledWith(expect.objectContaining({ publicationRef: event.id, section: "hero", expected: { title: "Approved title" } }));
+    mockGetEvent.mockResolvedValue({ ...event, status: "approved" });
+    expect(await resolveEventAction("tenant-a", event.id, "approved")).toEqual({ changed: false, reason: "already_resolved" });
+    expect(mockSetContent).toHaveBeenCalledTimes(1);
+    expect(mockRevalidateClientSite).toHaveBeenCalledTimes(1);
   });
 
   it("does not execute suggestion side effects for already resolved events", async () => {

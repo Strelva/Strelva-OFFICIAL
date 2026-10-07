@@ -7,6 +7,7 @@ import { getPublishedSiteDocument, publishedCapabilityTenant } from "./document-
 import { SiteRenderer } from "./SiteRenderer";
 import { hostedRedirectTarget } from "./site-routing";
 import { siteDocumentMetadata, tenantCanonicalOrigin } from "./site-seo";
+import { readHostedBusinessFacts } from "./business-facts-server";
 
 export const getHostedSite = cache(async () => {
   const requestHeaders = await headers();
@@ -15,7 +16,8 @@ export const getHostedSite = cache(async () => {
   const document = await getPublishedSiteDocument(tenant);
   if (!document) return null;
   const [config, preview, capabilityTenant] = await Promise.all([getTenantConfig(tenant), isPreviewMode(), publishedCapabilityTenant(tenant, document)]);
-  return { tenant, document, config, preview, capabilityTenant, origin: tenantCanonicalOrigin(tenant, config) };
+  const businessFacts = document.businessRecord && !preview ? await readHostedBusinessFacts(tenant) : null;
+  return { tenant, document, config, preview, capabilityTenant, businessFacts, origin: tenantCanonicalOrigin(tenant, config) };
 });
 export async function hostedPageMetadata(path: string) {
   const site = await getHostedSite();
@@ -27,5 +29,5 @@ export async function renderHostedPage(path: string) {
   const target = hostedRedirectTarget(site.document, path);
   if (target) permanentRedirect(target);
   if (!site.document.pages.some(page => page.path === path)) notFound();
-  return <SiteRenderer document={site.document} path={path} tenant={site.tenant} preview={site.preview} capabilityTenant={site.capabilityTenant} />;
+  return <SiteRenderer document={site.document} path={path} tenant={site.tenant} preview={site.preview} capabilityTenant={site.capabilityTenant} businessFacts={site.businessFacts} />;
 }

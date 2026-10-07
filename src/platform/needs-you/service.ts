@@ -19,6 +19,8 @@ export interface NeedsYouDeps {
   /** Origin that serves /api/approve and /workspace. */
   appOrigin: string;
   now(): number;
+  /** New sources may impose additional opt-in gates without changing existing email delivery. */
+  emailAllowed?(row: DeliveryRow): Promise<boolean>;
 }
 
 export type DecideStatus =
@@ -238,6 +240,18 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
   }
 
   async function deliver(kind: "urgent" | "digest" | "reminder_1" | "reminder_2", rows: DeliveryRow[], summary: ChaseSummary) {
+    if (deps.emailAllowed) {
+      const allowed: DeliveryRow[] = [];
+      for (const row of rows) {
+        if (await deps.emailAllowed(row).catch(() => false)) allowed.push(row);
+        else {
+          await deps.store.recordDelivery(row.workspaceId, row.id, kind, "suppressed", null, null, "source_email_disabled");
+          summary.ownerNotTold += 1;
+        }
+      }
+      rows = allowed;
+      if (!rows.length) return;
+    }
     const first = rows[0]!;
     const recipient = first.recipient?.email?.trim().toLowerCase() ?? null;
     if (!recipient) {

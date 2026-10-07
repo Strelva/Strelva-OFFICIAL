@@ -152,6 +152,7 @@ export const SOURCE_LIFECYCLES = [
   "service_request",
   "provider_delivery",
   "website_document",
+  "website_domain",
   "standing_responsibility",
   "work_responsibility",
   "assignment_offer",

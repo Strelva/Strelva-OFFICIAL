@@ -426,9 +426,14 @@ async function executeResolvedEventAction(
       const { revalidatePath } = await import("next/cache");
       revalidatePath("/");
       const { revalidateClientSite } = await import("./revalidate-client");
-      revalidateClientSite(tenantId, clientRevalidationTargetForSections([section])).catch(() => {});
+      const revalidation = revalidateClientSite(tenantId, clientRevalidationTargetForSections([section])).catch(() => {});
       await clearDraft(section, tenantId);
       if (event.source === "ai") recordApproval(tenantId).catch(() => {});
+      try {
+        await (await workspacePorts().websitePublicationReadback()).observeAcceptedNativePublish({
+          tenantId, section, expected: draft, actorId, publicationRef: eventId, revalidation,
+        });
+      } catch { /* The approved publish remains accepted when read-back fails. */ }
       return { changed: true };
     }
 

@@ -185,7 +185,7 @@
     if (!isContactForm(form)) return;
     var fields = fieldsOf(form);
     if (!fields) return;
-    post("/inquiries", { id: "i" + rand(22), sid: session(), capture: "site-form", path: location.pathname, ref: d.referrer || undefined, fields: fields }, false);
+    post("/inquiries", { id: "i" + rand(22), sid: session(), capture: "site-form", path: location.pathname, fields: fields }, false);
   }
 
   // ---- The Strelva form ---------------------------------------------------
@@ -227,13 +227,14 @@
     form.appendChild(status);
     form.addEventListener("submit", function (e) {
       e.preventDefault();
+      if (!granted) { status.textContent = "Allow Strelva to send this form before continuing, or call or email us."; return; }
       if (!email.value.trim() && !phone.value.trim()) { status.textContent = "Add an email or phone number so we can reply."; email.focus(); return; }
       if (!message.value.trim() && !name.value.trim()) { status.textContent = "Tell us a little about what you need."; message.focus(); return; }
       button.disabled = true; status.textContent = "Sending…";
       var fields = {}, list = [name, email, phone, message];
       for (var i = 0; i < list.length; i++) if (list[i].value.trim()) fields[list[i].name] = list[i].value.trim().slice(0, 5000);
       w.fetch(base + "/inquiries", { method: "POST", credentials: "omit", headers: { "Content-Type": "text/plain" },
-        body: JSON.stringify({ id: "i" + rand(22), sid: session(), capture: "strelva-form", path: location.pathname, ref: d.referrer || undefined, _hp: hp.value, fields: fields }) })
+        body: JSON.stringify({ id: "i" + rand(22), sid: session(), capture: "strelva-form", path: location.pathname, _hp: hp.value, fields: fields }) })
         .then(function (r) {
           if (!r.ok) throw new Error(String(r.status));
           form.reset(); status.textContent = "Thanks. Your message was sent.";

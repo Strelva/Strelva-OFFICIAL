@@ -1,5 +1,24 @@
 # The website System at 1.0.0
 
+**Current status — wave 6, round 5, `w6/website`, local only:** release
+reconciliation, owner request/restore paths, native accepted/read-back separation,
+linked rebuild Make real, domain proposals and one-shot uncertain outcomes,
+cutover undo, connected-site identity and consent, and independent entry gates
+are implemented. Bound hosted documents now read confirmed public business facts;
+native phone/email changes from Business details prepare a durable reviewed
+contact draft. Domain and fact Connections state their actual authority and
+failure behavior. [The stream handoff](../../product/streams/w6-website.md) owns
+the current proof and production prerequisites; the older checkpoints below are
+historical.
+
+**Strict A remains blocked locally:** behavior 11 is partial for native sites.
+Services/name need explicit per-site mappings that preserve existing booking,
+image and marketing fields, and address/hours have no owner mutation entry.
+Direct business-record callers are not all wired to native propagation. The
+rebuild spec's automatic-document-publish promise also lacks a durable standing
+owner grant; exact revision approval remains required. Neither gap is a
+production-only acceptance step.
+
 Status: draft spec, 2026-10-06, not approved. **Built and proven locally
 Oct 6 on `w2/owner-surfaces-b`, not migrated or deployed:** the System
 page's edit control opens `/workspace/site` (the existing editor, photos,
