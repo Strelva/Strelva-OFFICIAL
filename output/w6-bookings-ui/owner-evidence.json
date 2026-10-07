@@ -1,0 +1,307 @@
+{
+  "reviewedAt": "2026-10-07",
+  "scope": "local owner fixtures, no save sent",
+  "baseUrl": "http://localhost:3026",
+  "rows": [
+    {
+      "surface": "bookings",
+      "state": "owner-evidence-day",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "Back to Home\n\nBOOKINGS\n\nFriday, November 6\n\nWho's coming in, in order. Check people in as they arrive.\n\nDay\nWeek\nPrevious day\nToday\nNext day\nTwin Trees Wellness\n\nReconnect your calendar. Bookings are kept, and new bookings can still be requested.\n\n2 appointments \u00b7 0 checked in\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 No-show\n\n716-555-0100 \u00b7 dana@example.test\n\nBooking history\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nOutside the business's current opening hours. This booking is kept; review it with the customer.\n\nNot on your calendar yet. The booking is kept; the calendar copy needs review.\n\nBooking history\nCheck in\nMark no-show\nCancel\n\n1:00 PM \u2013 1:30 PM\n\nAna Ruiz\n\nConsultation \u00b7 Waiting for the owner\n\n716-555-0142 \u00b7 ana@example.test\n\nBooking history\n\n3:00 PM \u2013 4:00 PM\n\nLee Park\n\nMassage, 60 min \u00b7 Cancelled\n\n716-555-0177\n\nBooking history",
+        "links": [
+          {
+            "text": "Day",
+            "height": 32
+          },
+          {
+            "text": "Week",
+            "height": 32
+          },
+          {
+            "text": "Previous day",
+            "height": 32
+          },
+          {
+            "text": "Today",
+            "height": 32
+          },
+          {
+            "text": "Next day",
+            "height": 32
+          }
+        ],
+        "disclosures": [
+          {
+            "text": "Booking history",
+            "height": 44
+          },
+          {
+            "text": "Booking history",
+            "height": 44
+          },
+          {
+            "text": "Booking history",
+            "height": 44
+          },
+          {
+            "text": "Booking history",
+            "height": 44
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=owner-evidence&view=day",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "owner-evidence-day",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "Back to Home\n\nBOOKINGS\n\nFriday, November 6\n\nWho's coming in, in order. Check people in as they arrive.\n\nDay\nWeek\nPrevious day\nToday\nNext day\nTwin Trees Wellness\n\nReconnect your calendar. Bookings are kept, and new bookings can still be requested.\n\n2 appointments \u00b7 0 checked in\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 No-show\n\n716-555-0100 \u00b7 dana@example.test\n\nBooking history\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nOutside the business's current opening hours. This booking is kept; review it with the customer.\n\nNot on your calendar yet. The booking is kept; the calendar copy needs review.\n\nBooking history\nCheck in\nMark no-show\nCancel\n\n1:00 PM \u2013 1:30 PM\n\nAna Ruiz\n\nConsultation \u00b7 Waiting for the owner\n\n716-555-0142 \u00b7 ana@example.test\n\nBooking history\n\n3:00 PM \u2013 4:00 PM\n\nLee Park\n\nMassage, 60 min \u00b7 Cancelled\n\n716-555-0177\n\nBooking history",
+        "links": [
+          {
+            "text": "Day",
+            "height": 44
+          },
+          {
+            "text": "Week",
+            "height": 44
+          },
+          {
+            "text": "Previous day",
+            "height": 44
+          },
+          {
+            "text": "Today",
+            "height": 44
+          },
+          {
+            "text": "Next day",
+            "height": 44
+          }
+        ],
+        "disclosures": [
+          {
+            "text": "Booking history",
+            "height": 44
+          },
+          {
+            "text": "Booking history",
+            "height": 44
+          },
+          {
+            "text": "Booking history",
+            "height": 44
+          },
+          {
+            "text": "Booking history",
+            "height": 44
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=owner-evidence&view=day",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "owner-evidence-day",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "Back to Home\n\nBOOKINGS\n\nFriday, November 6\n\nWho's coming in, in order. Check people in as they arrive.\n\nDay\nWeek\nPrevious day\nToday\nNext day\nTwin Trees Wellness\n\nReconnect your calendar. Bookings are kept, and new bookings can still be requested.\n\n2 appointments \u00b7 0 checked in\n\n9:00 AM \u2013 10:00 AM\n\nDana Reed\n\nMassage, 60 min \u00b7 No-show\n\n716-555-0100 \u00b7 dana@example.test\n\nBooking history\n\n10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nOutside the business's current opening hours. This booking is kept; review it with the customer.\n\nNot on your calendar yet. The booking is kept; the calendar copy needs review.\n\nBooking history\nCheck in\nMark no-show\nCancel\n\n1:00 PM \u2013 1:30 PM\n\nAna Ruiz\n\nConsultation \u00b7 Waiting for the owner\n\n716-555-0142 \u00b7 ana@example.test\n\nBooking history\n\n3:00 PM \u2013 4:00 PM\n\nLee Park\n\nMassage, 60 min \u00b7 Cancelled\n\n716-555-0177\n\nBooking history",
+        "links": [
+          {
+            "text": "Day",
+            "height": 44
+          },
+          {
+            "text": "Week",
+            "height": 44
+          },
+          {
+            "text": "Previous day",
+            "height": 44
+          },
+          {
+            "text": "Today",
+            "height": 44
+          },
+          {
+            "text": "Next day",
+            "height": 44
+          }
+        ],
+        "disclosures": [
+          {
+            "text": "Booking history",
+            "height": 44
+          },
+          {
+            "text": "Booking history",
+            "height": 44
+          },
+          {
+            "text": "Booking history",
+            "height": 44
+          },
+          {
+            "text": "Booking history",
+            "height": 44
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=owner-evidence&view=day",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "owner-history-day",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nOutside the business's current opening hours. This booking is kept; review it with the customer.\n\nNot on your calendar yet. The booking is kept; the calendar copy needs review.\n\nBooking history\n\nWaiting for the owner \u00b7 Customer\n\nNov 1, 8:00 AM EST\n\nOwner approved \u00b7 Owner\n\nNov 1, 9:00 AM EST\n\n24-hour reminder \u00b7 Not sent: email is disabled\n\nNov 5, 9:00 AM EST\nCheck in\nMark no-show\nCancel",
+        "historyOpen": true
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=owner-evidence&view=day",
+        "screenshotPath": "/Users/jacobrhinehart/Desktop/strelva/REB-w6-bookings/output/w6-bookings-ui/bookings-owner-history-day-1280.png",
+        "retained": true
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "no-show-confirmation-day",
+      "width": 1280,
+      "metrics": {
+        "width": 1280,
+        "scrollWidth": 1280,
+        "text": "10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nOutside the business's current opening hours. This booking is kept; review it with the customer.\n\nNot on your calendar yet. The booking is kept; the calendar copy needs review.\n\nBooking history\n\nWaiting for the owner \u00b7 Customer\n\nNov 1, 8:00 AM EST\n\nOwner approved \u00b7 Owner\n\nNov 1, 9:00 AM EST\n\n24-hour reminder \u00b7 Not sent: email is disabled\n\nNov 5, 9:00 AM EST\nCheck in\nMark Sam Lee as a no-show?\nConfirm no-show\nKeep booked",
+        "buttons": [
+          {
+            "text": "Check in",
+            "height": 32
+          },
+          {
+            "text": "Confirm no-show",
+            "height": 32
+          },
+          {
+            "text": "Keep booked",
+            "height": 32
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=owner-evidence&view=day",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "owner-history-day",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nOutside the business's current opening hours. This booking is kept; review it with the customer.\n\nNot on your calendar yet. The booking is kept; the calendar copy needs review.\n\nBooking history\n\nWaiting for the owner \u00b7 Customer\n\nNov 1, 8:00 AM EST\n\nOwner approved \u00b7 Owner\n\nNov 1, 9:00 AM EST\n\n24-hour reminder \u00b7 Not sent: email is disabled\n\nNov 5, 9:00 AM EST\nCheck in\nMark no-show\nCancel",
+        "historyOpen": true
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=owner-evidence&view=day",
+        "screenshotPath": "/Users/jacobrhinehart/Desktop/strelva/REB-w6-bookings/output/w6-bookings-ui/bookings-owner-history-day-390.png",
+        "retained": true
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "no-show-confirmation-day",
+      "width": 390,
+      "metrics": {
+        "width": 390,
+        "scrollWidth": 390,
+        "text": "10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nOutside the business's current opening hours. This booking is kept; review it with the customer.\n\nNot on your calendar yet. The booking is kept; the calendar copy needs review.\n\nBooking history\n\nWaiting for the owner \u00b7 Customer\n\nNov 1, 8:00 AM EST\n\nOwner approved \u00b7 Owner\n\nNov 1, 9:00 AM EST\n\n24-hour reminder \u00b7 Not sent: email is disabled\n\nNov 5, 9:00 AM EST\nCheck in\nMark Sam Lee as a no-show?\nConfirm no-show\nKeep booked",
+        "buttons": [
+          {
+            "text": "Check in",
+            "height": 44
+          },
+          {
+            "text": "Confirm no-show",
+            "height": 44
+          },
+          {
+            "text": "Keep booked",
+            "height": 44
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=owner-evidence&view=day",
+        "screenshotPath": "/Users/jacobrhinehart/Desktop/strelva/REB-w6-bookings/output/w6-bookings-ui/bookings-no-show-confirmation-day-390.png",
+        "retained": true
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "owner-history-day",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nOutside the business's current opening hours. This booking is kept; review it with the customer.\n\nNot on your calendar yet. The booking is kept; the calendar copy needs review.\n\nBooking history\n\nWaiting for the owner \u00b7 Customer\n\nNov 1, 8:00 AM EST\n\nOwner approved \u00b7 Owner\n\nNov 1, 9:00 AM EST\n\n24-hour reminder \u00b7 Not sent: email is disabled\n\nNov 5, 9:00 AM EST\nCheck in\nMark no-show\nCancel",
+        "historyOpen": true
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=owner-evidence&view=day",
+        "captured": true,
+        "retained": false
+      }
+    },
+    {
+      "surface": "bookings",
+      "state": "no-show-confirmation-day",
+      "width": 320,
+      "metrics": {
+        "width": 320,
+        "scrollWidth": 320,
+        "text": "10:30 AM \u2013 11:30 AM\n\nSam Lee\n\nMassage, 60 min \u00b7 Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nOutside the business's current opening hours. This booking is kept; review it with the customer.\n\nNot on your calendar yet. The booking is kept; the calendar copy needs review.\n\nBooking history\n\nWaiting for the owner \u00b7 Customer\n\nNov 1, 8:00 AM EST\n\nOwner approved \u00b7 Owner\n\nNov 1, 9:00 AM EST\n\n24-hour reminder \u00b7 Not sent: email is disabled\n\nNov 5, 9:00 AM EST\nCheck in\nMark Sam Lee as a no-show?\nConfirm no-show\nKeep booked",
+        "buttons": [
+          {
+            "text": "Check in",
+            "height": 44
+          },
+          {
+            "text": "Confirm no-show",
+            "height": 44
+          },
+          {
+            "text": "Keep booked",
+            "height": 44
+          }
+        ]
+      },
+      "screenshot": {
+        "url": "http://localhost:3026/preview/strelva/bookings?state=owner-evidence&view=day",
+        "captured": true,
+        "retained": false
+      }
+    }
+  ]
+}

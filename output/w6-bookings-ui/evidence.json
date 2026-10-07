@@ -27,8 +27,8 @@
       },
       "screenshot": {
         "url": "http://localhost:3026/preview/strelva/booking-manage?state=ready",
-        "screenshotPath": "/Users/jacobrhinehart/Desktop/strelva/REB-w6-bookings/output/w6-bookings-ui/manage-ready-1280.png",
-        "retained": true
+        "captured": true,
+        "retained": false
       }
     },
     {
@@ -1591,8 +1591,8 @@
       },
       "screenshot": {
         "url": "http://localhost:3026/preview/strelva/bookings?state=error",
-        "screenshotPath": "/Users/jacobrhinehart/Desktop/strelva/REB-w6-bookings/output/w6-bookings-ui/bookings-error-390.png",
-        "retained": true
+        "captured": true,
+        "retained": false
       }
     },
     {
@@ -2536,8 +2536,8 @@
       },
       "screenshot": {
         "url": "http://localhost:3026/preview/strelva/bookings?state=day&view=day",
-        "screenshotPath": "/Users/jacobrhinehart/Desktop/strelva/REB-w6-bookings/output/w6-bookings-ui/bookings-day-390.png",
-        "retained": true
+        "captured": true,
+        "retained": false
       }
     },
     {
