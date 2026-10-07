@@ -1,51 +1,120 @@
 # Wave 6 catalog handoff
 
-Branch: `w6/catalog`. Worktree: `REB-w6-catalog`. Local work only; no production calls, sends, pushes, PRs or merges authorized.
+Branch: `w6/catalog`. Worktree: `REB-w6-catalog`. Integration base: `integrate/reborn-1.0` @ `864474fe`. Round 5 continues the interrupted rounds 1–4 as a standalone thread. Local work only; no production reads/writes, delivered mail, pushes, PRs, merges or dependencies.
 
-## Current objective and continuation
+## Objective, result and active bet
 
-Round 4 resumed all three saved checkpoints and rebased them onto `integrate/reborn-1.0` @ `864474fe`, retaining its missing-table readiness fix. The checkpoints contain internal-tool use/contact links and gated notices, builder-only sentence plans, newsletter contact mirroring, report receipts and Search Console evidence, and document history pagination/UI. Earlier integration already contains bounded document/onboarding/application histories, store/wellness projection and tracker/saved-check merges.
+Build the launch catalog in [systems-catalog](../specs/systems-catalog.md): sentence-built internal tools; store/rewards/wellness projection without storefront changes; workspace analytics/recaps; private documents with full history; the 200-edit regression. Owners file Requests. Strelva and actively delegated agencies make Systems.
 
-The active bet is an agency/Strelva builder path with owners filing Requests; tenant storefronts, frozen commerce/rewards and report crons remain compatible while release flags are off. No adoption, delivered mail, provider access or production operation is established by this stream.
+The launch implementation is built and locally tested; final results are recorded below. Production activation and business demand remain unproven. The active bet is a managed tool that a business can use without its owner learning to build; the illustrative bookkeeping intake is a fixture, not a customer commitment.
 
-Round 4 review fixed linked recipient corrections: an existing assigned-person UUID no longer fails browser email validation, and typed contact/person replacements resolve inside one grant/revision-checked database transaction. Flags off retain the original edit RPC and do no additional reads. Migration `20261010150400` and rollback are added. Cron compatibility/failure tests and the missing `20261010150300` readiness sentinel are added.
+| Launch area | Implementation and proof |
+| --- | --- |
+| Internal tools | `make_systems` parity and SQL create/change checks; operator membership and active agency delegation; sentence planning and accepted funding in the right workspace; Draft rehearsal without live records; Live/Paused projection and release history. Contact/person fields resolve inside atomic member/use-grant submit and edit RPCs. Contact conflicts and notice failures reach the operator queue. |
+| Owners and failed plans | Owner direct planning/create is denied. The standalone planner shows a Request path without preparation/budget controls and retains its sentence. Eligible failed maker planning files one idempotent `requested` service Request, with pending provider acceptance, no notification and no scope/deadline commitment. Storage failure is reported honestly; revoked authority, funding and replay failures do not file it. |
+| Store/rewards/newsletter | Store is a website Connection with no checkout authority. Tenant order/rewards behavior stays frozen. Newsletter mirroring adds `newsletter` contact source after conversion; subscribe/duplicate bodies remain exact for gldf and rohlax, on/off; unsubscribe never creates a subscription through a contact. Backfill defaults to dry run. |
+| Wellness | Bookings shows schedule/roster views; existing tenant routes/data remain; no new wellness member store or surface. |
+| Analytics/recaps | Website health reads traffic and Search Console, with unavailable/stale distinct from zero. Read Connection describes service-account authority and daily freshness. Weekly/monthly/hosted reports share recipient resolution; catalog receipt instrumentation records acceptance, suppression or failure, with operator recovery. Running shows a monthly recap line. Postgres analytics config/report state has Redis fallback and monotonic last-sent behavior. |
+| Documents/histories | Documents stay private files outside Home Systems. Full append-only revisions, 20 recent document receipts and paginated history. Engine + SQL regressions save 1,000 document edits and latest Undo; onboarding saves 600 changes; application release/candidate histories exceed the old 100 limit and still roll back to release 1. |
+| Checks/merges | Tracker projects as an internal tool; saved checks project into each watched System's health with last-checked/stale evidence; documents/onboarding/checks stay out of Home Systems. Agency website drafts remain website Possibilities. |
 
-Round 5 resumed the standalone branch. Initial whole test run passed 696 files / 6,324 tests (37 skips). Independent review identified and fixed flags-off planner guidance and the missing failed-plan Request fallback. Linked member submissions now resolve contacts and save records in one SQL transaction (new `20261010155100`), alongside grant submissions/edits. Failed maker planning files an idempotent pending Request (new `20261010155000`), without acceptance or notifications. Both new migrations have rollbacks.
+Earlier integration already contains the history migrations, maker permission, tenant surface projection and typed analytics/report persistence. Round 5 completed recovery gaps, atomic linked member submission, flags-off planner prompt compatibility, readable grant-scoped links and the real isolated Auth journey. The gated tool rehearsal and correction-focus fix support repeatable UI verification without depending on Docker.
 
-Round 5 isolated catalog SQL passed after fixing the fictional operator/contact fixtures, a missing SQL test helper, and an ambiguous column in the linked-edit RPC. Fresh-cluster full SQL, final whole tests, lint and build are pending. First build failed because this harness inherits `NODE_ENV=development`; the normal `NODE_ENV=production` build is running. A disposable local Auth stack is starting using an existing cached CLI; no dependency was added. The document denied state is now rendered at 1280 and 320px, with no overflow or editing controls.
+## Commits
 
-Next action: finish verification, complete any available isolated Auth journey, update spec and final handoff, and commit passing pieces. Current code is local only.
-
-## Flags and migrations already in checkpoints
-
-- `internal_tool_notices` / `STRELVA_INTERNAL_TOOL_NOTICES_RELEASE`: off by default, also requires Systems and workspace release, global email gates and tenant `reb:client-email` gate.
-- `catalog_reports` / `STRELVA_CATALOG_REPORTS_RELEASE`: off by default; receipt instrumentation and Search Console status.
-- `newsletter_contacts` / `STRELVA_NEWSLETTER_CONTACTS_RELEASE`: off by default; additive mirror, original subscribe response retained.
-- Existing `STRELVA_SYSTEMS_RELEASE` gates System projection and builder restrictions; planning also needs `STRELVA_PLANNING_ENABLED`.
-- Assigned migrations: `20261010150000` submit notices; `20261010150100` grant-use links; `20261010152000` catalog report receipts; `20261010153000` newsletter contacts; `20261010154000` work-plan authority. Each has rollback SQL. Not applied to production.
-- No new cron or dependencies in the checkpoints. Existing weekly/monthly/Search Console schedules remain unchanged.
-
-## Verification
-
-Round 4 checks so far (local):
+The branch history retains checkpoints from killed sessions; the final verification proves their combined tree:
 
 ```text
-Focused catalog: Test Files 11 passed (11); Tests 124 passed (124).
-Extended product regressions: Test Files 22 passed (22); Tests 156 passed (156).
-Linked edit/use regressions: Test Files 4 passed (4); Tests 18 passed (18).
-Cron + readiness regressions: Test Files 2 passed (2); Tests 25 passed (25).
-pnpm typecheck (initial): Types generated successfully; exit 0.
-pnpm lint (initial): exit 0; generated database.types.ts Babel size note.
-pnpm check:boundaries: Product boundaries passed; 204 workspace -> src/lib imports in 93 files, 46 older boundary imports.
-pnpm check:custom-repos: Custom repo workspace check passed: 196/196 checks passed.
+9b4a8cd1 WIP w6/catalog: checkpoint after session interruption (unverified)
+e798a62b WIP w6/catalog: checkpoint 2 after second interruption (unverified)
+e313f241 WIP w6/catalog: checkpoint 3 after third interruption (unverified)
+0b311f4c Allow grant holders to correct linked internal-tool records atomically
+43092f07 Prove catalog cron compatibility and register migration readiness
+e5c6f098 Record catalog verification progress and stabilize SQL race holds
+a39e2d16 WIP w6/catalog: checkpoint 4 after fourth interruption (unverified)
+afd06f3e Make linked tool submissions atomic and file failed plans as Requests
+27cfd660 Route owners to Requests and prove the catalog with isolated Auth
+0c93676e Show contact and staff labels within application use grants
+8d740fa7 Rehearse linked tool records and focus recipient corrections
 ```
 
-Failures retained: the first unrestricted `pnpm test` encountered the missing catalog tool-conflict migration sentinel plus several 5-second timeouts and was interrupted (exit 130). The sentinel is fixed; a two-worker run with 30-second limits is running. The first SQL check completed SQL assertions but failed two embedded `possibility-repository` tests at 5 seconds under contention. Embedded cluster tests now use the script's existing one-worker/30-second convention; SQL rerun is in progress. The first new cron test run failed two monthly cases because the heartbeat/Redis test doubles returned no Promise; corrected doubles pass all 25 cron/readiness tests. No application assertion was weakened.
+## Flags, migrations and crons
 
-Rendered shared-document rehearsal on local port 3016: 1280px populated editable file, 360px read-only and history error/retry, 320px loading/empty/flag-off. Pagination grew 20 to 40 rows while preserving recent edits; read-only had no save or undo controls; errors preserved all 20 recent rows. Checked widths had no horizontal overflow. Browser transport interruption prevented capturing the denied state; denied access is covered by the component and route tests. Screenshots: `/Users/jacobrhinehart/.t3/dev/browser-artifacts/browser-screenshot-localhost-muy8ff1w-45cd68a2.png` and `/Users/jacobrhinehart/.t3/dev/browser-artifacts/browser-screenshot-localhost-muy8gpxp-8bdc7ae6.png`. Fixtures prove rendered behavior, not provider authentication or production delivery.
+All new behavior defaults off. `internal_tool_notices`, `catalog_reports`, `newsletter_contacts` use existing release-row resolution with their matching `STRELVA_*_RELEASE` envs. Systems/workspace release must also be on for the relevant workspace behavior. Planning requires `STRELVA_PLANNING_ENABLED`; full document-history reading additionally requires `STRELVA_DOCUMENT_HISTORY_RELEASE=1`. These gates remain distinct from authorization. The tool/document UI rehearsals also require `STRELVA_UI_PREVIEW=1` in development or an explicitly enabled preview deployment; they are disabled in production.
 
-## Production steps and unknowns
+Every new notice obeys `EMAIL_SENDING_ENABLED=true`, `CUSTOMER_EMAIL_ENABLED=true`, and the existing `reb:client-email` gate for a tenant-linked business. Enabling the notice release never bypasses those gates. Known provider failures retry within three attempts; uncertain provider acceptance remains an operator reconciliation item and is never blindly resent. Provider acceptance ends the write even if read-back fails.
 
-Separate authorization is required for applying migrations, checking live counts and recipients, newsletter backfill, setting release rows/env, and any delivered notice/report or provider read. Keep rollout silent. Owner invites remain deferred. Real converted-client parity, Google access and the Strelva-owned test-business notice/recap remain unproven.
+Assigned additive migrations, each with its rollback under `supabase/migrations/`:
 
-Any material capability delta can be reconciled into the canonical main-checkout model by the integration agent; this stream writes only its worktree and leaves shared company state untouched.
+| Timestamp | Change | Rollback |
+| --- | --- | --- |
+| `20261010150000` | Linked contact/person submit and notice receipts | `rollback-w6-internal-tool-submit-notices.sql` |
+| `20261010150100` | Use-grant linked submit | `rollback-w6-internal-tool-use-links.sql` |
+| `20261010150200` | Notice delivery leases and bounded retries | `rollback-w6-internal-tool-notice-delivery.sql` |
+| `20261010150300` | Contact conflicts and tool evidence | `rollback-w6-catalog-tool-evidence.sql` |
+| `20261010150400` | Use-grant linked corrections | `rollback-w6-internal-tool-use-edits.sql` |
+| `20261010152000` | Report receipts and Search Console reachability | `rollback-catalog-report-receipts.sql` |
+| `20261010153000` | Newsletter contacts and dry-run backfill | `rollback-newsletter-contacts.sql` |
+| `20261010154000` | Maker-only work plans and funding authority | `rollback-w6-system-work-plan-authority.sql` |
+| `20261010155000` | Failed maker plan → pending Request | `rollback-w6-failed-system-plan-request.sql` |
+| `20261010155100` | Atomic linked member submission | `rollback-w6-internal-tool-member-submit.sql` |
+| `20261010155200` | Grant-scoped readable contact/staff labels | `rollback-w6-internal-tool-use-link-labels.sql` |
+
+Inherited integration migrations include `20261007190000` document revisions, `20261007190100` onboarding revisions, `20261007190200` application version history, `20261007192000` maker authority, `20261007192100` record link types and `20261007194000` typed analytics/report persistence. None was applied to production by this stream.
+
+No new cron. The existing `workspace-work` cron drives notice retries behind their release/gates. Weekly, monthly, Search Console and order-review schedules remain unchanged. No dependency added.
+
+## Local verification
+
+Final local results on the combined branch:
+
+```text
+pnpm test --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000
+  Test Files 698 passed | 1 skipped (699)
+  Tests 6352 passed | 37 skipped (6389); duration 124.04s (final tree)
+pnpm typecheck: Types generated successfully; exit 0 (final retry after stopping dev)
+pnpm lint: exit 0 (generated database.types.ts Babel size note)
+pnpm check:boundaries: passed; 204 workspace -> src/lib imports in 93 files, 46 older imports
+pnpm check:custom-repos: 196/196 checks passed
+PATH=/opt/homebrew/opt/postgresql@18/bin:$PATH pnpm check:workspace-sql
+  Workspace SQL checks passed; customer mapping and inquiry SQL checks passed; exit 0
+NODE_ENV=production pnpm build: exit 0
+Isolated real Auth + catalog fixture browser tests: 2 passed (5.0s)
+```
+
+Whole-test output: `/tmp/w6-catalog-round5-test-final-2.log`. SQL output: `/tmp/w6-catalog-round5-sql-complete.log`. Final build: `/tmp/w6-catalog-round5-build-final.log`. Typecheck: `/tmp/w6-catalog-round5-typecheck-recovered.log`; lint: `/tmp/w6-catalog-round5-lint-final-3.log`; boundaries: `/tmp/w6-catalog-round5-boundaries-final-4.log`; compatibility: `/tmp/w6-catalog-round5-custom-repos-2.log`. Auth journey: `/tmp/w6-catalog-auth-journey-6.log`. Full fresh-cluster SQL exercised migrations, authority/revocation races and failure paths on throwaway Postgres; it never connected to production.
+
+Real disposable local Supabase Auth plus loopback app/API/database: maker sentence → validated plan → Draft → rehearsal (no live records) → publish → staff grant → submit at 1280 and 360px → contact upsert → captured assigned-person email → persisted accepted-send receipt. A separate 360px test saves an owner's Request and forces provider failure, verifying a pending maker Request, preserved words and no duplicate filing action. The provider preloader allows only loopback, a static plan response and the existing local email sink. It proves application transport/authorization/persistence, not real model quality or mail delivery.
+
+Rendered documents on local port 3016: 1280px populated editable file; 360px read-only and history error/retry; 320px loading/empty/flag-off/denied. Pagination grows 20 to 40 rows without losing recent edits. Read-only/denied states have no editing controls, error retains recent rows, and checked widths have no horizontal overflow. Croki screenshots: `browser-screenshot-localhost-muy8ff1w-45cd68a2.png`, `browser-screenshot-localhost-muy8gpxp-8bdc7ae6.png`, `browser-screenshot-localhost-muy951s9-b86b337a.png`, `browser-screenshot-localhost-muy9ea80-e3238744.png` under `/Users/jacobrhinehart/.t3/dev/browser-artifacts/`.
+
+Auth screenshots under ignored `test-results/`: `catalog-staff-1280.png`, `catalog-staff-360.png`, `catalog-owner-request-360.png`, `catalog-failed-plan-request-360.png`. The rendered staff list revealed raw link UUIDs; readable use-grant labels now join only contacts/staff referenced by the current recipient’s visible records/fields, rechecking grant/release/identity. SQL tests cover own/all/none scope, hidden fields, foreign links, revocation and expiry; rollback/reapply passed. Croki rendered the real recipient component through the gated, network-free `/preview/strelva/tool` rehearsal: 360px labeled records and a saved correction; 1280px read-only without edit/submit controls; 320px empty. Labels fit without overflow, IDs stay in the correction draft, email validation accepts an unchanged person link, and keyboard focus moves into the correction then tabs through fields. Screenshots under the same browser-artifacts directory: `browser-screenshot-localhost-muyangsm-2092f1af.png`, `browser-screenshot-localhost-muyao7al-d65a5628.png`, `browser-screenshot-localhost-muyaokwc-064a2d5c.png`, `browser-screenshot-localhost-muyaol0a-4936fa8b.png`.
+
+The real Auth journey passed before the additive display-label lookup. Docker then became unresponsive and the owned loopback Auth database stopped accepting connections, so that Auth journey was not repeated after labels. Current labels are proven separately in the real SQL boundary, service projection tests and browser renderer. No Docker daemon restart or unrelated-stack action was attempted. This limitation is preserved rather than called a provider or production failure. The owned dev servers are stopped. Auth stack cleanup was attempted with a bounded stop of only `/tmp/strelva-auth.Qt8VdE`; Docker did not respond, so cleanup is not confirmed. When Docker recovers, run the cached Supabase CLI `stop --workdir /tmp/strelva-auth.Qt8VdE --no-backup`; do not stop unrelated stacks. Its private local env is `/tmp/w6-catalog-auth.env`, and cleanup output is `/tmp/w6-catalog-auth-cleanup.log`.
+
+Failures retained and resolved:
+
+- Round 4's unrestricted test run found a missing tool-evidence readiness sentinel and 5-second contention timeouts; it was interrupted (130). Sentinel fixed; bounded-worker full run passes. SQL embedded tests use the existing one-worker/30-second harness convention. Cron fixture Promises were corrected; no assertion was weakened.
+- Round 5 fresh SQL uncovered invalid fictional fixtures: missing super-admin row, generated `phone_key` insertion, missing seen timestamps and unsupported `manual` source. Fixed to valid operator-backed contacts. SQL also exposed a missing error helper and an ambiguous workspace `id` in the linked-edit RPC; both fixed. Full fresh SQL subsequently passed.
+- First build inherited `NODE_ENV=development` and failed prerender; `NODE_ENV=production` succeeds.
+- A later typecheck collided with dev-generated `.next-catalog-auth` types and reported malformed generated files. Stopped the owned dev server and removed only its automatic tsconfig include before the final typecheck.
+- The final boundary check caught a route importing a product-internal file; exported the helper through the product index, and the boundary check passes.
+- Initial Auth fixture tried direct service-role access to protected business tables (42501); changed setup to the guarded loopback cluster administrator. Subsequent test fixtures matched Next's hidden alert and queried an obsolete `stage` column; corrected the locator/query. Actual Request/UI assertions pass.
+
+No stream diff touches `src/app/api/v1`, `custom-repo-starter`, `src/lib/scaffold-contracts.ts` or `release-manifest.json`. Newsletter byte bodies and flags-off cron paths are tested; deployed 60/60 storefront comparison remains a separately authorized production step.
+
+## Production steps and remaining uncertainty
+
+Nothing has been activated. The integration/release owner must first reconcile the branch and its readiness sentinels, run the combined checks, then prepare these actions for Jacob's authorization:
+
+1. Check current production workspace/history counts and store/rewards/wellness state; review and apply the assigned and required inherited migrations in timestamp order, with the rollback files available.
+2. Run the report-recipient dry run; review every difference before changing recipients. Backfill typed analytics config and monotonic report state, retaining the frozen Redis fallback. Run newsletter-contact backfill per converted tenant as a dry run before any apply.
+3. Set reviewed release rows/env only through the existing release process; env changes require a new production deploy. Keep rollout silent and email gates off. Owner invites remain deferred.
+4. Capture/compare deployed storefront responses around migration/deploy (60/60 method) and run the release checklist. Local 196/196 compatibility is not a live parity claim.
+5. After separate permission, authorize real Google reads/model credentials and one Strelva-owned test-business tool submit, delivered notice and recap with receipts. Do not infer mailbox delivery from provider acceptance.
+
+Not proven: live converted-client parity; actual provider access/reliability/delivery; production row counts/backfills; adoption or willingness to pay. The remaining release actions require production evidence and Jacob's authorization. The fixture bookkeeping business is not evidence of demand.
+
+Canonical project-model/capability/vault reconciliation belongs to the integration agent in the main checkout. This stream leaves shared company state untouched and supplies code/spec/handoff evidence.
+
+Exact next action: the integration agent reviews the committed `w6/catalog` tree and runs combined verification before promotion. Repeat the optional isolated Auth journey after Docker is available, then prepare the silent production steps above for Jacob. Production remains a separate decision.

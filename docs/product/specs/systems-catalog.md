@@ -1,11 +1,31 @@
 # The rest of the Systems a business starts with
 
-Status: draft spec, 2026-10-06. Not approved. For Jacob's review.
+Status: wave 6 launch code built and locally verified,
+2026-10-07, branch `w6/catalog`. This does not authorize production rollout or
+the open commercial decisions. The “today” statements below describe the
+October 6 baseline. Current evidence is in the
+[catalog stream handoff](../streams/w6-catalog.md).
 §3.4 items 3 and 4 (one recipient resolver for `weekly-report`,
 `monthly-report` and `runWebsiteMonthlyReports`) built and proven locally on
 `build/business-ownership` (Oct 6). The hosted path still needs a current
 owner to read the report; a converted business without one is reported as
 "no owner has accepted this business yet".
+
+### Local implementation evidence, wave 6 round 5
+
+| Launch promise | Built and tested locally | Remaining production evidence |
+| --- | --- | --- |
+| §3.1 Sentence → Draft → rehearsal → Live → staff use | Maker-only plans and create/change RPCs; contact/person links; atomic member and use-grant submits/edits; gated notices, retries, receipts and operator recovery. Real disposable Supabase Auth takes a sentence through the journey at 1280 and 360px using bounded model/mail fixtures. Owners file Requests; failed maker planning files a pending Request. | Real model quality, provider delivery and use in the Strelva-owned test business. |
+| §3.2 Store, rewards and subscribers | Website Store Connection with no checkout authority; frozen tenant store/rewards; additive newsletter contact mirror and dry-run backfill. Exact gldf/rohlax subscribe bodies are tested with flags on and off. | Live converted-client parity, newsletter backfill and current store/rewards counts. |
+| §3.3 Wellness | Schedule/roster project as Bookings views; tenant routes remain in place; members stay frozen. | Current wellness usage and converted-client parity. |
+| §3.4 Analytics and reports | Workspace traffic and Search Console evidence distinguish unavailable/stale reads from zero. One recipient rule; send/suppression/failure receipts, operator recovery and monthly Running text. Typed Postgres analytics/report state preserves Redis fallback and monotonic sent markers. | Actual Google access, reviewed live recipient dry run, state backfill and one delivered recap receipt. |
+| §3.5 Documents and bounded histories | Private files stay outside Systems. Append-only full revision tables plus 20 recent document receipts and bounded onboarding/application windows; paginated history respects exact-work access. Engine and SQL regressions take 1,000 document edits plus latest Undo, 600 onboarding changes and application versions past their prior cap. Rendered document states cover editable/read-only, loading, empty, history error/retry, flag off and denied access. | Apply migrations after checking current workspace row counts. |
+| §3.6 Checks and merges | Saved checks become watched-System health with last-checked/stale evidence; tracker becomes `internal_app`; documents, onboarding and checks stay outside Home Systems. Agency website drafts remain website Possibilities. | Release activation and live health evidence. |
+
+No catalog change touches `/api/v1`, `custom-repo-starter`, the storefront
+contracts or manifest relative to this stream's integration base. The local
+client compatibility check remains 196/196. The deployed 60/60 byte comparison
+requires separately authorized production reads and is not claimed here.
 
 This spec covers everything in [Strelva 1.0.0](../strelva-1.0.0.md) §2 other
 than the website, inquiries, bookings and publishing: internal tools, store,
