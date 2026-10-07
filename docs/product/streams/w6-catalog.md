@@ -149,6 +149,10 @@ Additional checks on this integrated tree:
 pnpm install --frozen-lockfile: exit 0
 pnpm exec playwright test tests/catalog-authenticated-local.spec.ts --workers=1 --retries=0 --reporter=line
   Expanded dev-server journey: 2 passed (24.0s)
+NODE_ENV=production pnpm build: exit 0
+NODE_ENV=production pnpm exec next start --hostname localhost --port 3147
+pnpm exec playwright test tests/catalog-authenticated-local.spec.ts --workers=1 --retries=0 --reporter=line
+  Local optimized production-build journey: 2 passed (11.6s), no retries
 pnpm typecheck: exit 0
 pnpm lint: exit 0 (generated database.types.ts Babel size note)
 pnpm exec eslint tests/catalog-authenticated-local.spec.ts: exit 0
@@ -165,12 +169,29 @@ pnpm test src/__tests__/internal-tool-links.test.ts src/__tests__/internal-tool-
 ```
 
 Result: **10 files, 100 tests passed (2.82s)**. Full commands also accompany the
-#472 PR. Local
-evidence logs use `/tmp/a1-472-*`; screenshots remain under ignored
+#472 PR. Local evidence logs use `/tmp/a1-472-*`; screenshots remain under ignored
 `test-results/` as `catalog-staff-1280.png`, `catalog-staff-360.png`,
 `catalog-owner-request-360.png` and `catalog-failed-plan-request-360.png`.
 Desktop and mobile screenshots were inspected; readable labels wrap within the
 record cards, and both widths pass the horizontal-overflow assertion.
+
+Both app runs use `STRELVA_LOCAL_AUTH_PROOF=1`,
+`STRELVA_LOCAL_CATALOG_PROOF=1`, the catalog provider preload, local Auth keys
+from `scripts/prepare-launch-auth-stack.sh`, and workspace/Systems/planning/
+internal-tool-notice release flags on. The model and Resend keys are dummy
+fixture values; both dev access bypasses are off. The optimized server additionally
+uses disposable Unix-socket Redis through the existing `startLocalRedis` and
+`startUpstashBridge` exports in `scripts/scrubbed-copy/redis.ts`, with
+`TENANTS_SOURCE=postgres`, `CONTENT_SOURCE=postgres` and `DATA_SOURCE=postgres`.
+This exercises the production rate-limit guard through the real Redis client.
+
+The owned app servers, Redis process/REST bridge and Supabase stack
+`/tmp/strelva-auth.sBaiDd` are stopped. `supabase stop --no-backup` succeeded;
+no containers remain for its project ID `strelva-proof-a1-catalog-472-1`.
+The three stopped SQL clusters, Auth directory/private env, Redis directory/
+private env, temporary Redis launcher and generated `.next` directories were
+removed. Unrelated stacks were left alone. Cleanup evidence is in
+`/tmp/a1-472-auth-cleanup.log` and `/tmp/a1-472-redis.log`.
 
 Failures preserved:
 
@@ -178,6 +199,16 @@ Failures preserved:
   assertions, then failed because the new test read `grant.id` instead of
   `grant.grant.id` and sent no JSON body/header. Corrected the fixture request;
   the app's JSON guard was working as intended.
+- The first optimized-server attempt omitted Redis and failed both planning
+  checks with generic 503s, before the catalog journey could proceed. Production
+  rate limiting requires Redis and deliberately fails closed. Added disposable
+  local Redis through the existing bridge; the journey then passed. That run's
+  log also exposed a missing `TENANTS_SOURCE=postgres` setting in the test server.
+  Set the local data-source flags to Postgres and repeated the journey: **2
+  passed (11.6s)**, with no production-guard errors in the final app log. No app
+  guard was bypassed or weakened. Initial logs are
+  `/tmp/a1-472-production-journey-no-redis.log` and
+  `/tmp/a1-472-production-app-no-tenant-source.log`.
 - `pnpm test -- <paths>` forwarded a literal `--` to Vitest and started a broad
   run. Interrupted it and used `pnpm test <paths> --maxWorkers=2` for the actual
   targeted result: **10 files, 100 tests passed**. The targeted files cover
