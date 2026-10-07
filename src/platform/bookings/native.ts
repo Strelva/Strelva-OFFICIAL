@@ -74,7 +74,7 @@ export async function nativeSlots(tenant: string, serviceId: string, from: strin
     const offered = storeSlotsForDate(ctx, date, minutes, bookings);
     if (!offered.length) continue;
     const calendar = await readCalendarBusy(ctx, date, zone);
-    const times = calendar.connected && calendar.checked ? withoutBusy(offered, date, minutes, zone, calendar.busy) : offered;
+    const times = calendar.connected && calendar.checked ? withoutBusy(offered, date, minutes + settingsOrDefault(ctx).bufferMinutes, zone, calendar.busy) : offered;
     for (const time of times) {
       const start = zonedLocalToUtc(date, time, zone), end = new Date(Date.parse(start) + minutes * 60000).toISOString();
       if (Date.parse(start) < fromMs || Date.parse(end) > toMs) continue;

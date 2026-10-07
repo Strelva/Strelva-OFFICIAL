@@ -58,6 +58,11 @@ describe("fresh conflict alternatives", () => {
 });
 
 describe("booking changes follow the current service contract", () => {
+  it("keeps the booking's buffer free before a provider-busy event", async () => {
+    setCalendarBusyPorts({ connection: async () => ({ provider: "google", status: "connected" }), busy: async () => [{ start: "2026-11-06T16:50:00Z", end: "2026-11-06T17:00:00Z" }] });
+    const offered = await nativeSlots(tenant, "consult", "2026-11-06T15:30:00Z", "2026-11-06T17:00:00Z");
+    expect(offered.slots).toEqual([]); // 75-minute service ends16:45;15-minute buffer meets busy16:50.
+  });
   it("reschedules a formerly 30-minute booking to the service's current 75-minute slot", async () => {
     const changed = await changeNativeBooking("manage-hash", "reschedule", "2026-11-06T15:30:00Z");
     expect(changed.start).toBe("2026-11-06T15:30:00.000Z");

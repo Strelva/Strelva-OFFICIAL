@@ -166,7 +166,7 @@ export async function storeAvailableSlots(tenant: string, date: string, serviceI
   const slots = storeSlotsForDate(effective, date, service.durationMinutes, bookings);
   if (!slots.length) return slots;
   const calendar = await readCalendarBusy(ctx, date, timeZoneOf(ctx));
-  return calendar.connected && calendar.checked ? withoutBusy(slots, date, service.durationMinutes, timeZoneOf(ctx), calendar.busy) : slots;
+  return calendar.connected && calendar.checked ? withoutBusy(slots, date, service.durationMinutes + settingsOrDefault(ctx).bufferMinutes, timeZoneOf(ctx), calendar.busy) : slots;
 }
 
 // --- Store-first booking (reads flipped) -----------------------------------------
@@ -205,7 +205,7 @@ export async function claimStoreBooking(
   // A connected calendar: busy refuses the time; unreadable turns instant into a request.
   const calendar = await readCalendarBusy(ctx, draft.date, timeZoneOf(ctx));
   if (calendar.connected && calendar.checked
-    && withoutBusy([draft.startTime], draft.date, service.durationMinutes, timeZoneOf(ctx), calendar.busy).length === 0) {
+    && withoutBusy([draft.startTime], draft.date, service.durationMinutes + settingsOrDefault(ctx).bufferMinutes, timeZoneOf(ctx), calendar.busy).length === 0) {
     return { success: false, code: "taken", error: TAKEN };
   }
   const settings = settingsOrDefault(ctx);

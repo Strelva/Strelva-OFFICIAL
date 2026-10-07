@@ -23,6 +23,15 @@ function links() { setReleaseFlagsDb({ rpc: async () => ({ data: [{ tenantId: "f
 afterEach(() => { setReleaseFlagsDb(null); setBookingStoreDb(undefined); vi.restoreAllMocks(); });
 
 describe("owner booking evidence", () => {
+  it("shows captured intake answers with current labels and retains removed question answers", async () => {
+    links();
+    const id = "cf000000-0000-4000-8000-000000000030";
+    const evidence = { ...EVIDENCE, bookings: [{ ...EVIDENCE.bookings[0]!, booking: { ...BOOKING, businessServiceId: id, intakeAnswers: { reason: "Estate planning", removed_question: "Keep this earlier answer", message: "Please call first" } } }] };
+    const context = { ...CONTEXT, servicePolicies: [{ businessServiceId: id, mode: "request" as const, bufferMinutes: 15, bookable: true, intake: [{ id: "reason", label: "What brings you in?", type: "textarea" as const, required: true }] }] };
+    const result = await readWorkspaceBookings(ACTOR, WS, { view: "day", date: "2026-11-06" }, deps({ evidence: async () => evidence, context: async () => context }));
+    const html = renderToStaticMarkup(createElement(WorkspaceBookings, { workspaceId: WS, view: "day", state: { kind: "ready", bookings: result } }));
+    expect(html).toContain("What brings you in?"); expect(html).toContain("Estate planning"); expect(html).toContain("Keep this earlier answer"); expect(html).toContain("Customer message");
+  });
   it("serves the full authoritative status and bounded history instead of the legacy no-show projection", async () => {
     links();
     const dependencies = deps();

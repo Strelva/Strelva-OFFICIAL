@@ -11,6 +11,7 @@ import { BookingStoreError, readBookingContext, setTenantBookingHours, type Stor
 import { readOwnerBookingEvidence, markOwnerBookingNoShow, type OwnerBookingEvidence, type BookingHistoryEntry } from "@/platform/bookings/owner-evidence";
 import { openRanges, settingsOrDefault } from "@/platform/bookings/availability";
 import { assertWorkspaceCalendarManager } from "@/products/scheduling/server";
+import { manualBookingsEnabled } from "@/platform/bookings/manual";
 
 /**
  * The bookings System's day and week views in the workspace (Reborn §6,
@@ -34,6 +35,7 @@ export interface BookingRow {
   clientPhone: string;
   serviceName: string;
   notes?: string;
+  intake?: Array<{ label: string; answer: string }>;
   status: StoreBookingStatus;
   evidence?: { history: BookingHistoryEntry[]; historyTruncated: boolean; calendar: OwnerBookingEvidence["bookings"][number]["calendar"]; outsideRecordHours: boolean | null; canMarkNoShow: boolean };
 }
@@ -54,6 +56,7 @@ export interface SiteBookings {
    * narrowing (null means bookable whenever the business is open).
    */
   hours?: BookingHoursView;
+  manual?: boolean;
   evidence?: { calendarHealth: OwnerBookingEvidence["calendarHealth"]; truncated: boolean; paused: boolean };
 }
 
@@ -195,8 +198,13 @@ export async function readWorkspaceBookings(
         ]);
         if (!context) throw new BookingStoreError("failed");
         site.evidence = { calendarHealth: evidence.calendarHealth, truncated: evidence.truncated, paused: context.paused };
+        if (await manualBookingsEnabled()) site.manual = true;
         site.bookings = evidence.bookings.map(({ booking, history, historyTruncated, calendar }) => {
-          return { ...storeRow(booking), evidence: { history, historyTruncated, calendar,
+          const questions = context.servicePolicies?.find(p => p.businessServiceId === booking.businessServiceId)?.intake ?? [];
+          const intake = Object.entries(booking.intakeAnswers).filter(([key]) => key !== "notes").map(([key, answer]) => ({
+            label: questions.find(q => q.id === key)?.label ?? (key === "message" ? "Customer message" : key), answer,
+          }));
+          return { ...storeRow(booking), ...(intake.length ? { intake } : {}), evidence: { history, historyTruncated, calendar,
             outsideRecordHours: bookingOutsideRecordHours(booking, context),
             canMarkNoShow: booking.status === "confirmed" && Date.parse(booking.end) <= (options.now ?? new Date()).getTime() } };
         });

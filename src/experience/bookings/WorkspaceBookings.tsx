@@ -4,6 +4,7 @@ import { addDays, type BookingRow, type BookingView, type SiteBookings, type Wor
 import { BookingActions } from "./BookingActions";
 import { CalendarConnectionPanel } from "@/experience/scheduling/CalendarConnectionPanel";
 import { BookingHoursEditor } from "./BookingHoursEditor";
+import { ManualBookingForm } from "./ManualBookingForm";
 
 /**
  * The bookings System's day and week views (systems catalog §3.3). The day
@@ -63,6 +64,7 @@ function BookingItem({ booking, site, workspaceId, view }: { booking: BookingRow
           <span>{STATUS[booking.status]}</span>
         </p>
         {booking.notes ? <p className="mt-2 max-w-prose text-sm leading-6 text-gray-muted">{booking.notes}</p> : null}
+        {booking.intake?.length ? <dl className="mt-2 max-w-prose space-y-2 text-sm leading-6 text-gray-muted">{booking.intake.map((entry, index) => <div key={index}><dt className="font-medium">{entry.label}</dt><dd className="whitespace-pre-wrap">{entry.answer}</dd></div>)}</dl> : null}
         {booking.clientPhone || booking.clientEmail ? (
           <p className="mt-1 text-sm text-gray-muted">
             {booking.clientPhone ? <a className="underline-offset-4 hover:underline" href={`tel:${booking.clientPhone}`}>{booking.clientPhone}</a> : null}
@@ -74,7 +76,7 @@ function BookingItem({ booking, site, workspaceId, view }: { booking: BookingRow
       {booking.evidence ? (
         <div className="min-w-0 sm:max-w-[260px]">
           {booking.evidence.outsideRecordHours && (booking.status === "confirmed" || booking.status === "requested") ? <p className="text-sm leading-6 text-critical">Outside the business&apos;s current opening hours. This booking is kept; review it with the customer.</p> : null}
-          {booking.evidence.calendar && booking.evidence.calendar.status !== "skipped" ? <p className="text-sm leading-6 text-gray-muted">{booking.evidence.calendar.status === "verified" ? "Calendar copy verified." : "Not on your calendar yet. The booking is kept; the calendar copy needs review."}</p> : null}
+          {booking.evidence.calendar && booking.evidence.calendar.status !== "skipped" ? <p className="text-sm leading-6 text-gray-muted">{booking.evidence.calendar.status === "verified" ? "Calendar copy was verified." : "Not verified on your calendar yet. The booking is kept; the calendar copy needs review."} <time dateTime={booking.evidence.calendar.updatedAt}>{new Date(booking.evidence.calendar.updatedAt).toLocaleString("en-US", { timeZone: site.timezone, month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZoneName: "short" })}</time></p> : null}
           {!booking.evidence.calendar && booking.status === "confirmed" && site.evidence?.calendarHealth === "connected" ? <p className="text-sm leading-6 text-gray-muted">No calendar copy has been verified yet. The booking is kept.</p> : null}
           <details className="mt-2 text-sm">
             <summary className="inline-flex min-h-11 cursor-pointer items-center rounded-md font-medium underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2">Booking history</summary>
@@ -121,6 +123,7 @@ function SiteSection({ site, bookings, workspaceId, many }: { site: SiteBookings
             </details> : null}
             {site.evidence.truncated ? <p role="status">Showing the first 500 bookings in this date range. Open the day view to narrow the list.</p> : null}
           </div> : null}
+          {site.manual ? <ManualBookingForm workspaceId={workspaceId} tenantId={site.tenantId} /> : null}
           {bookings.view === "day" ? (
             <p className="text-sm text-gray-muted">
               {active.length === 0 ? "Nothing booked." : `${active.length} ${active.length === 1 ? "appointment" : "appointments"} · ${checkedIn} checked in`}
