@@ -281,8 +281,11 @@ describe.runIf(Boolean(PSQL))("one booking store, both route families (real func
       insert into public.super_admins(user_id, email) values ('${operator}', '${email}');
       insert into public.tenants(id, stable_id, site_name, active) values ('${slug}', '${stableId}', 'Mooney Firm', true);
       select public.convert_tenant_to_business('${email}', '${slug}', '${importPayload}', '${randomUUID()}', repeat('e', 64))->>'workspaceId';`).trim();
+    // The wave-6 read gate requires every tenant in this fictional cluster to
+    // have the full streak. A lone green tenant correctly stays on legacy.
     db.exec(`insert into public.tenant_client_record_parity(store, tenant_stable_id, checked_on, ok, redis_count, postgres_count, missing, mismatched)
-      select 'bookings', '${stableId}', (now() at time zone 'UTC')::date - d, true, 0, 0, 0, 0 from generate_series(0, 7) d
+      select 'bookings', t.stable_id, (now() at time zone 'UTC')::date - d, true, 0, 0, 0, 0
+      from public.tenants t cross join generate_series(0, 7) d
       on conflict do nothing;`);
     setBookingStoreDb(db);
     await oneStoreScenario({
