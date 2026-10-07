@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { buildWebsiteSystemDetail, type WebsiteDetailInputs } from "@/experience/systems/website-detail";
 import type { WebsiteDetailSources } from "@/experience/systems/website-detail-server";
+import type { ConnectedSitesOverview } from "@/products/connected-sites/server";
 
 vi.mock("@/platform/systems/supabase-store", () => ({ createSupabaseSystemStore: () => ({}) }));
 const { readWebsiteSystemDetail } = await import("@/experience/systems/website-detail-server");
@@ -103,6 +104,45 @@ function sources(overrides: Partial<WebsiteDetailSources> = {}): WebsiteDetailSo
 }
 
 describe("website System page loader", () => {
+  const connectedId = "75000000-0000-4000-8000-000000000020";
+  function connectedOverview(siteHost = "gldf.example.test"): ConnectedSitesOverview {
+    return { sites: [{ id: connectedId, workspaceId: businessId, publicKey: `sk_pub_${"a".repeat(24)}`, label: siteHost,
+      siteUrl: `https://${siteHost}/`, siteHost, allowedOrigins: [`https://${siteHost}`], platform: "wix",
+      captureForms: true, injectSchema: true, status: "active", verificationToken: null,
+      verifiedAt: "2026-10-01T00:00:00Z", createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z",
+      revokedAt: null, firstEventAt: null, lastEventAt: null, systemId: siteId, snippet: { meta: null, script: "" }, activity: {} }], inquiries: [] };
+  }
+  function connectedSources(siteHost = "gldf.example.test", tenantId: string | null = "gldf") {
+    return sources({
+      listSystems: vi.fn(async () => ({ businessId, connections: [], systems: [{ system: { id: siteId, kind: "website", name: siteHost },
+        references: { tenantId, savedWorkId: tenantId ? workId : null, tenantStableId: null, connectedSiteId: connectedId }, provenance: "existing", basis: null }] })) as unknown as WebsiteDetailSources["listSystems"],
+      connectedSites: async () => connectedOverview(siteHost),
+    });
+  }
+  it("shows current hosted routing status after a connected site rebuild, keeping one row per hostname", async () => {
+    const detail = (await readWebsiteSystemDetail(actor, businessId, siteId, connectedSources()))!;
+    expect(detail.domains).toEqual([{ hostname: "gldf.example.test", state: "misconfigured", label: "DNS misconfigured",
+      lastCheckedAt: "2026-10-07T00:00:00Z", whoCanChange: "The owner, with their registrar" }]);
+    expect(detail.connectedSite?.verified).toBe(true);
+  });
+  it("keeps the original connected address and adds domains of its hosted replacement", async () => {
+    const detail = (await readWebsiteSystemDetail(actor, businessId, siteId, connectedSources("original.example.test")))!;
+    expect(detail.domains.map(domain => [domain.hostname, domain.state])).toEqual([["original.example.test", "verified"], ["gldf.example.test", "misconfigured"]]);
+    expect(detail.domains[0]?.label).toBe("Proven to be this business's");
+  });
+  it("retains ownership proof while exposing an unavailable hosted-domain check", async () => {
+    const s = connectedSources();
+    s.domains = vi.fn(async () => { throw new Error("domain storage down"); });
+    const detail = (await readWebsiteSystemDetail(actor, businessId, siteId, s))!;
+    expect(detail.domains).toEqual([expect.objectContaining({ hostname: "gldf.example.test", label: "Proven to be this business's", lastCheckedAt: "2026-10-01T00:00:00Z" })]);
+    expect(detail.unavailable).toContain("Domains");
+  });
+  it("keeps a connected-only site's domain unchanged without reading a tenant", async () => {
+    const s = connectedSources("original.example.test", null);
+    const detail = (await readWebsiteSystemDetail(actor, businessId, siteId, s))!;
+    expect(detail.domains).toEqual([{ hostname: "original.example.test", state: "verified", label: "Proven to be this business's", lastCheckedAt: "2026-10-01T00:00:00Z", whoCanChange: "Your site's builder; Strelva never changes it." }]);
+    expect(s.domains).not.toHaveBeenCalled();
+  });
   it("reads every source for the site this business holds, filtering decisions and requests to it", async () => {
     const s = sources();
     const detail = (await readWebsiteSystemDetail(actor, businessId, siteId, s))!;

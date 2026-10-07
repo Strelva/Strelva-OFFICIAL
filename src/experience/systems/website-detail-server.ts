@@ -130,13 +130,18 @@ export async function readWebsiteSystemDetail(actor: WorkspaceActor, businessId:
     label: connectedSite.verifiedAt ? "Proven to be this business's" : "Waiting for proof it's yours",
     lastCheckedAt: connectedSite.verifiedAt, whoCanChange: "Your site's builder; Strelva never changes it.",
   }] : [];
-  const domains: WebsiteDomainItem[] = connectedDomains.length ? connectedDomains : (domainRows?.rows ?? []).map(row => ({
+  const tenantDomains: WebsiteDomainItem[] = (domainRows?.rows ?? []).map(row => ({
     hostname: row.domain,
     state: (DOMAIN_STATES.has(row.verification.status) ? row.verification.status : "pending") as WebsiteDomainItem["state"],
     label: row.verification.label,
     lastCheckedAt: row.lastCheckedAt,
     whoCanChange: row.whoCanChange,
   }));
+  // The connected site's identity survives a hosted rebuild. Its earlier
+  // ownership proof must not hide current hosted routing checks or domains.
+  // For the same hostname the tenant domain view owns the current status.
+  const domains = [...new Map([...connectedDomains, ...tenantDomains]
+    .map(domain => [domain.hostname.toLowerCase().replace(/\.$/, ""), domain])).values()];
 
   // The same items as Home's Needs you, filtered to this System; with Needs
   // you off, the tenant's own pending owner asks, classified the same way.
