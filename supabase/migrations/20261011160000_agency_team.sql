@@ -236,12 +236,30 @@ begin
 end;
 $$;
 
+-- Replace 7A's cleanup without changing that checksum-pinned migration.
+-- Assignment revocation fields are its existing audit record. Unattributed
+-- administrative deletes retain a null actor rather than inventing one.
+create or replace function public.agency_membership_end_staff() returns trigger
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+  removal_actor uuid := nullif(current_setting('strelva.agency_team_removal_actor',true),'')::uuid;
+  removal_time timestamptz := clock_timestamp();
+begin
+  update public.agency_client_staff set status = 'ended', ended_by = removal_actor, ended_at = removal_time
+    where agency_workspace_id = old.workspace_id and user_id = old.user_id and status = 'active';
+  update public.operational_assignments set status = 'revoked', revoked_by = removal_actor, revoked_at = removal_time
+    where assignee_kind = 'agency' and assignee_workspace_id = old.workspace_id
+      and assignee_user_id = old.user_id and status in ('offered','accepted');
+  return old;
+end;
+$$;
+
 -- Owners and the actor's own membership stay outside this staff-management surface.
--- Removing membership invokes the 7A trigger, ending all that person's staff rows.
+-- Removing membership ends staff rows and agency assignments in the same transaction.
 create function public.manage_agency_team_member(p_user_id uuid, p_verified_email text, p_agency_workspace_id uuid,
   p_staff_user_id uuid, p_role text)
 returns jsonb language plpgsql security definer set search_path=public,pg_temp as $$
-declare target_role text;
+declare target_role text; previous_removal_actor text;
 begin
   perform public.agency_team_require(p_user_id,p_verified_email,p_agency_workspace_id,true);
   if p_staff_user_id is null or p_staff_user_id=p_user_id or (p_role is not null and p_role not in ('admin','member')) then
@@ -252,7 +270,10 @@ begin
   if not found then raise exception 'agency_team_member_missing'; end if;
   if target_role='owner' then raise exception 'agency_team_member_protected'; end if;
   if p_role is null then
+    previous_removal_actor := current_setting('strelva.agency_team_removal_actor',true);
+    perform set_config('strelva.agency_team_removal_actor',p_user_id::text,true);
     delete from public.workspace_memberships where workspace_id=p_agency_workspace_id and user_id=p_staff_user_id;
+    perform set_config('strelva.agency_team_removal_actor',coalesce(previous_removal_actor,''),true);
   else
     update public.workspace_memberships set role=p_role where workspace_id=p_agency_workspace_id and user_id=p_staff_user_id;
   end if;

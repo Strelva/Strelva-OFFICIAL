@@ -1,6 +1,14 @@
 -- Restore the exact pre-Team invitation authority. Membership and staff
 -- history remain; rolling back this surface does not remove accepted people.
 begin;
+create or replace function public.agency_membership_end_staff() returns trigger
+language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  update public.agency_client_staff set status = 'ended', ended_at = clock_timestamp()
+    where agency_workspace_id = old.workspace_id and user_id = old.user_id and status = 'active';
+  return old;
+end;
+$$;
 drop function if exists public.bulk_set_agency_client_staff(uuid,text,uuid,uuid[],uuid[],boolean);
 drop function if exists public.manage_agency_team_member(uuid,text,uuid,uuid,text);
 drop function if exists public.read_agency_team(uuid,text,uuid);
