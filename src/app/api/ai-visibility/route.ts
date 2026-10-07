@@ -1,3 +1,5 @@
+import { resolveAgencyAttribution, admitAgencyCheck, AgencyProspectingError } from "@/platform/agency-prospecting/server";
+import { attributedAiVisibility } from "@/products/ai-visibility/server";
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 import { scoreAiVisibility, type ScoreInput, saveAiVisibilityResult } from "@/products/ai-visibility/server";
@@ -21,7 +23,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let body: { business?: string; url?: string; category?: string; city?: string; source?: string };
+  let body: { business?: string; url?: string; category?: string; city?: string; source?: string; agency?: string };
   try {
     body = await request.json();
   } catch {
@@ -55,7 +57,9 @@ export async function POST(request: NextRequest) {
   };
 
   try {
-    const result = await scoreAiVisibility(input);
+    const agency = await resolveAgencyAttribution(request.nextUrl.searchParams.get("agency") ?? body.agency);
+    if (agency) await admitAgencyCheck(agency);
+    const result = attributedAiVisibility(await scoreAiVisibility(input), agency);
     const stored = await saveAiVisibilityResult(result, {
       category: input.category,
       location: input.location,
@@ -65,6 +69,7 @@ export async function POST(request: NextRequest) {
       : null;
     return NextResponse.json({ ...result, scanId: stored?.id ?? null, shareUrl });
   } catch (err) {
+    if (err instanceof AgencyProspectingError) return NextResponse.json({ error: err.message }, { status: err.status });
     Sentry.captureException(err, {
       tags: { feature: "ai-visibility-audit" },
       extra: { business, url },

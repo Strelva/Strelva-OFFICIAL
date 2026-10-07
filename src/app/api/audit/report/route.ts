@@ -1,3 +1,5 @@
+import { resolveAgencyAttribution, AgencyProspectingError } from "@/platform/agency-prospecting/server";
+import { attributedAudit } from "@/lib/audit/attribution";
 import { NextRequest, NextResponse } from "next/server";
 import { renderAuditReport } from "@/lib/audit/html";
 import type { AuditResult, CategoryResult } from "@/lib/audit/types";
@@ -57,7 +59,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const html = renderAuditReport(body);
+  let result: AuditResult;
+  try {
+    const agency = await resolveAgencyAttribution(request.nextUrl.searchParams.get("agency"));
+    const clean = { ...body };
+    delete clean.agency;
+    result = attributedAudit(clean, agency);
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Report unavailable." },
+      { status: error instanceof AgencyProspectingError ? error.status : 503 });
+  }
+  const html = renderAuditReport(result);
   return new NextResponse(html, {
     status: 200,
     headers: {

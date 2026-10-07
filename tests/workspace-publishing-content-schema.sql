@@ -10,7 +10,7 @@ begin
   end;
   raise exception 'expected failure %',expected;
 end; $$;
-insert into public.users(id,email,email_confirmed_at) values('cf000000-0000-4000-8000-000000000001','content-fixture@example.test',now());
+insert into public.users(id,email,verified_at) values('cf000000-0000-4000-8000-000000000001','content-fixture@example.test',now());
 insert into public.workspaces(id,kind,name,created_by) values
  ('cf000000-0000-4000-8000-000000000010','customer','Content Fixture','cf000000-0000-4000-8000-000000000001'),
  ('cf000000-0000-4000-8000-000000000011','customer','Other Fixture','cf000000-0000-4000-8000-000000000001');

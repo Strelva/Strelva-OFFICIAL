@@ -150,12 +150,12 @@ export function addPublishingSystems(base: BusinessSystems, rawSnapshot: Publish
       name: location.title ?? (website ? `${website.system.name} on Google` : "Google listing"),
       kind: "listing", lifecycle: snapshot.controls?.find((control) => control.locationId === location.locationId)?.paused ? "paused" : "live", createdAt: binding.createdAt, updatedAt: binding.updatedAt,
     });
-    if (seen.has(listingSystem.id)) continue;
+    const alreadyStored = seen.has(listingSystem.id);
     seen.add(listingSystem.id);
     const receipts = snapshot.receipts.filter((receipt) => receipt.bindingId === binding.id && receipt.locationId === location.locationId);
     const healthInput = { binding, receipts: receipts as unknown as ListingReceipt[], now, accessPending: snapshot.controls?.find((control) => control.locationId === location.locationId)?.accessPending };
     const verdict = listingHealth(healthInput);
-    systems.push({
+    if (!alreadyStored) systems.push({
       system: listingSystem, provenance: "existing",
       basis: "Connected to Google. Replies, hours and posts go through approval.",
       references: { savedWorkId: null, tenantStableId: binding.originTenantStableId, tenantId: binding.originTenantId },

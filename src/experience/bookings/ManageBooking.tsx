@@ -40,6 +40,7 @@ function Summary({ booking }: { booking: ManagedBookingView }) {
         </dd>
         <dt className="text-gray-muted">Status</dt>
         <dd>{STATUS[booking.status]}</dd>
+        {booking.agentSource ? <><dt className="text-gray-muted">Source</dt><dd className="break-words">{booking.agentSource}</dd></> : null}
       </dl>
     </Card>
   );

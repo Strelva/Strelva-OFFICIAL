@@ -70,7 +70,7 @@ function rowToReference(row: DbRow, suppliedToken?: string, currentTenantId?: st
     start: requiredText(row, "start_at"),
     end: requiredText(row, "end_at"),
     timeZone: requiredText(row, "time_zone"),
-    status: text(row, "status") as "pending" | "confirmed" | "cancelled",
+    status: (row.email_confirmation_required === true && Date.parse(text(row, "email_confirmation_expires_at")) <= Date.now() ? "cancelled" : text(row, "status")) as "pending" | "confirmed" | "cancelled",
   };
 }
 

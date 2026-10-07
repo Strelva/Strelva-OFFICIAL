@@ -4,7 +4,7 @@ import { getActorContext, isSuperAdmin } from "@/platform/infra/auth";
 import { getAllTenants, isActiveTenant, getTenantConfig } from "@/lib/tenants";
 import { sendUpdateLiveEmail } from "@/lib/delivery-email";
 import { SECTION_LABELS } from "@/components/ui/section-labels";
-import { ROOT_DOMAIN } from "@/platform/infra/brand";
+import { tenantSiteHost } from "@/platform/infra/brand";
 import {
   listDrafts,
   getDraftContent,
@@ -178,7 +178,7 @@ export async function POST(request: Request) {
         const siteName = tenantConfig?.siteName || tenant;
         const sectionLabel = SECTION_LABELS[typedSection] || typedSection;
         const whatChanged = `your ${sectionLabel.toLowerCase()}`;
-        const domain = tenantConfig?.productionDomain || `${tenant}.${ROOT_DOMAIN}`;
+        const domain = tenantConfig?.productionDomain || tenantSiteHost(tenant);
         const siteUrl =
           tenantConfig?.siteUrl ||
           (domain.startsWith("http") ? domain : `https://${domain}`);

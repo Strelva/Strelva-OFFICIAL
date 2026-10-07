@@ -50,5 +50,12 @@ describe("private workspace documents", () => {
     expect(next.revision).toBe(201);
     expect(next.history).toHaveLength(DOCUMENT_RECENT_HISTORY);
     expect(next.history.at(-1)!.revision).toBe(201);
+    let continued = next;
+    for (let revision = 202; revision <= 450; revision += 1) {
+      continued = changeDocument(continued, { kind: "edit", expectedRevision: revision - 1, title: "Legacy", text: `v${revision}` }, "owner");
+    }
+    expect(continued.revision).toBe(450);
+    expect(continued.history).toHaveLength(DOCUMENT_RECENT_HISTORY);
+    expect(changeDocument(continued, { kind: "undo", expectedRevision: 450, targetRevision: 450 }, "owner").text).toBe("v449");
   });
 });

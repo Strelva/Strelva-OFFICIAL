@@ -1999,6 +1999,51 @@ export type Database = {
           },
         ]
       }
+      business_policies: {
+        Row: {
+          policy_key: string
+          source: string
+          updated_at: string
+          updated_by: string
+          value: Json
+          verified: boolean
+          workspace_id: string
+        }
+        Insert: {
+          policy_key: string
+          source: string
+          updated_at: string
+          updated_by: string
+          value: Json
+          verified: boolean
+          workspace_id: string
+        }
+        Update: {
+          policy_key?: string
+          source?: string
+          updated_at?: string
+          updated_by?: string
+          value?: Json
+          verified?: boolean
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_policies_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_policies_workspace_id_policy_key_fkey"
+            columns: ["workspace_id", "policy_key"]
+            isOneToOne: true
+            referencedRelation: "business_record_facts"
+            referencedColumns: ["workspace_id", "fact_key"]
+          },
+        ]
+      }
       business_record_facts: {
         Row: {
           fact_key: string
@@ -11799,6 +11844,29 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      business_policy_integer_valid: {
+        Args: {
+          hi: number
+          lo: number
+          v: Json
+        }
+        Returns: boolean
+      }
+      business_policy_valid: {
+        Args: {
+          p_key: string
+          p_value: Json
+        }
+        Returns: boolean
+      }
+      read_business_policies: {
+        Args: {
+          p_user_id: string
+          p_verified_email: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
       read_hosted_website_business_facts: { Args: { p_tenant_id: string }; Returns: Json };
       accept_operational_assignment: {
         Args: {

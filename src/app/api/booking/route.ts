@@ -7,7 +7,7 @@ import { getContent, logActivity } from "@/lib/storage";
 import { createBookingAtomic } from "@/platform/bookings/legacy-store";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
-import { isRateLimitedAsync, isRateLimitedPerInstance, rateLimitKey } from "@/platform/infra/rate-limit";
+import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { deliverBookingUpdates, notifyBookingRequestNow } from "@/platform/bookings/updates";
 import { issueNativeAccess } from "@/platform/bookings/native";
 import { readTenantBookings } from "@/platform/bookings/store";
@@ -30,22 +30,10 @@ function cleanText(value: unknown, maxLength: number): string {
 
 const UNAVAILABLE = "We couldn't save your booking just now, so nothing was booked. Please try again in a minute.";
 
-/**
- * The visitor's rate limit. Redis is required for it in production and fails
- * closed. With the one booking store serving (its exclusion constraint guards
- * every slot), a Redis outage falls back to a per-instance limit so a
- * client's customer can still book; otherwise the visitor is told honestly
- * that nothing was booked.
- */
+/** Booking writes require the shared limiter; a limiter outage denies before effects. */
 async function bookingRateLimit(request: Request): Promise<"ok" | "limited" | "unavailable"> {
-  const key = rateLimitKey(request, "booking");
-  try {
-    return (await isRateLimitedAsync(key, 10)) ? "limited" : "ok";
-  } catch (error) {
-    if ((await bookingReadSource()) !== "postgres") return "unavailable";
-    console.warn("[booking] rate limit store unavailable; using the per-instance limit while the one booking store serves:", error instanceof Error ? error.message : error);
-    return isRateLimitedPerInstance(key, 10) ? "limited" : "ok";
-  }
+  try { return await isRateLimitedAsync(rateLimitKey(request, "booking"), 10) ? "limited" : "ok"; }
+  catch { return "unavailable"; }
 }
 
 /** After the booking is stored, nothing that follows may turn it into a failure for the visitor. */

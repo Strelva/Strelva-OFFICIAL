@@ -1,3 +1,5 @@
+import { workspacePublishingScope } from "@/platform/infra/publishing-scope";
+import { releaseFlagMayBeOn } from "@/platform/release-flags/resolve";
 /**
  * One adapter per source lifecycle. An adapter turns the source's pending
  * asks into Needs you items and resolves a decision through the source's OWN
@@ -145,17 +147,18 @@ export function tenantEventItem(event: UnifiedEvent): ProposedItem | null {
 }
 
 export function tenantEventAdapter(ports: TenantEventPorts): SourceAdapter {
+  const scopes = async (workspaceId: string) => [...await ports.linkedTenants(workspaceId), ...(releaseFlagMayBeOn("publishing") ? [workspacePublishingScope(workspaceId)] : [])];
   return {
     lifecycle: "tenant_event",
     needsMemberActor: false,
     async propose(ctx) {
-      const tenants = await ports.linkedTenants(ctx.workspaceId);
+      const tenants = await scopes(ctx.workspaceId);
       let complete = true;
       const items: ProposedItem[] = [];
       for (const tenantId of tenants) {
         try {
           for (const event of await ports.pendingEvents(tenantId)) {
-            if (event.tenantId !== tenantId) continue;
+            if (event.tenantId !== tenantId || (tenantId === workspacePublishingScope(ctx.workspaceId) && event.metadata?.workspaceId !== ctx.workspaceId)) continue;
             const item = tenantEventItem(event);
             if (item) items.push(item);
           }
@@ -168,14 +171,14 @@ export function tenantEventAdapter(ports: TenantEventPorts): SourceAdapter {
     async currentRevision(ctx, sourceId) {
       const source = splitTenantSource(sourceId);
       if (!source) return null;
-      if (!(await ports.linkedTenants(ctx.workspaceId)).includes(source.tenantId)) return null;
+      if (!(await scopes(ctx.workspaceId)).includes(source.tenantId)) return null;
       const event = await ports.readEvent(source.eventId);
       if (!event || event.tenantId !== source.tenantId || event.status !== "pending") return null;
       return tenantEventRevision(event);
     },
     async resolve(ctx, item, decision, by) {
       const source = splitTenantSource(item.sourceId);
-      if (!source || !(await ports.linkedTenants(ctx.workspaceId)).includes(source.tenantId)) return { outcome: "failed", reason: "source_not_linked" };
+      if (!source || !(await scopes(ctx.workspaceId)).includes(source.tenantId)) return { outcome: "failed", reason: "source_not_linked" };
       // A lapse does nothing at the source: the event stays pending and the
       // operator queue keeps it as the owner's call until someone closes it.
       if (by.kind === "expiry") return { outcome: "done", reason: "Expired, nothing changed" };

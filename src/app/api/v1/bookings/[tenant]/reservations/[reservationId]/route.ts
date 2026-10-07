@@ -1,3 +1,4 @@
+import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { bookingAlternativeRange } from "@/platform/bookings/conflicts";
 import { isTenantId } from "@/lib/scaffold-contracts";
 import { bookingConflictError, bookingError, bookingJson, bookingOptions, bookingService, bodyObject, stringValue } from "../../../_shared";
@@ -21,6 +22,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ te
   const slotId = stringValue(body.slotId, 256);
   if (!managementToken || !capabilityId || !capabilityVersion || !slotId || !reservationId) return bookingJson({ error: "The reservation change is incomplete." }, 400);
   try {
+    if (await isRateLimitedAsync(rateLimitKey(request, "booking-management"), 20)) return bookingJson({ error: "Too many requests." }, 429);
     return bookingJson(await bookingService().change({ tenantId: tenant, reservationId, managementToken, capabilityId, capabilityVersion, slotId }));
   } catch (error) {
     return bookingConflictError(error, () => bookingService().read({ tenantId: tenant, capabilityId, range: bookingAlternativeRange() }));
@@ -34,6 +36,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ t
   const managementToken = body ? stringValue(body.managementToken, 256) : undefined;
   if (!managementToken || !reservationId) return bookingJson({ error: "The reservation cancellation is incomplete." }, 400);
   try {
+    if (await isRateLimitedAsync(rateLimitKey(request, "booking-management"), 20)) return bookingJson({ error: "Too many requests." }, 429);
     return bookingJson(await bookingService().cancel({ tenantId: tenant, reservationId, managementToken }));
   } catch (error) {
     return bookingError(error);
