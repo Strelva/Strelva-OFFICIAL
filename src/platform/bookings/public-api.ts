@@ -12,9 +12,11 @@
 import { alertOnce } from "@/platform/infra/monitoring";
 import { getRedis } from "@/platform/infra/redis";
 import type { PublicBookingSlot, PublicBookingStatus, PublicBookingStoreHook } from "@/products/scheduling/public-booking";
+import { recordPublicSlot } from "./public-record";
+import { PublicBookingError } from "./errors";
 import { blocksTime } from "./availability";
 import { bookingMessagesEnabled, bookingReadSource, bookingStoreWriteEnabled } from "./flags";
-import { readTenantBookings, recordBooking, type StoreBookingStatus } from "./store";
+import { readTenantBookings, recordBooking, setBookingStatus, type StoreBookingStatus } from "./store";
 import { BOOKING_STORE_PENDING_KEY, bookingPendingMember } from "./tenant";
 
 const STATUS: Record<PublicBookingStatus, StoreBookingStatus> = { pending: "requested", confirmed: "confirmed", cancelled: "cancelled" };
@@ -33,6 +35,7 @@ export function publicBookingStoreHook(): PublicBookingStoreHook | undefined {
   return {
     async claim(input) {
       try {
+        const record = input.binding.recordBooking ? await recordPublicSlot(input.binding, input.start, input.end) : null;
         const result = await recordBooking(input.binding.tenantId, {
           publicReservationId: input.reservationId,
           status: "requested",
@@ -46,6 +49,7 @@ export function publicBookingStoreHook(): PublicBookingStoreHook | undefined {
           ...(input.visitor.message ? { intakeAnswers: { message: input.visitor.message } } : {}),
           inquiryId: input.inquiryId,
           requestFingerprint: input.requestFingerprint,
+          ...(record ? { ...record, reason: record.status === "requested" ? "Owner confirmation requested" : "Instant booking" } : {}),
         }, "native");
         if (result.status !== "conflict") return "claimed";
         if ((await bookingReadSource()) === "postgres") return "conflict";
@@ -53,11 +57,29 @@ export function publicBookingStoreHook(): PublicBookingStoreHook | undefined {
         await alertOnce("booking_store_conflict", "high", { tenant: input.binding.tenantId }, 3600).catch(() => undefined);
         return "skipped";
       } catch (error) {
+        if (input.binding.recordBooking) {
+          if (error instanceof PublicBookingError) throw error;
+          throw new PublicBookingError("unavailable", "Nothing was booked. Booking storage is unavailable.");
+        }
         await queue(input.binding.tenantId, input.reservationId, error instanceof Error ? error.message : String(error));
         return "skipped";
       }
     },
+    async release(binding, reservationId) {
+      if (!binding.recordBooking) return;
+      const row = (await readTenantBookings(binding.tenantId)).find(b => b.publicReservationId === reservationId);
+      if (row) await setBookingStatus(binding.tenantId, row.id, "cancelled", "system", "Receipt unavailable; nothing booked");
+    },
     async settle(input) {
+      if (input.binding.recordBooking) {
+        const booking = (await readTenantBookings(input.binding.tenantId)).find(b => b.publicReservationId === input.reservationId);
+        if (booking?.serviceRef) {
+          const { deliverBookingUpdates, notifyBookingRequestNow } = await import("./updates");
+          await notifyBookingRequestNow(booking);
+          if (bookingMessagesEnabled()) await deliverBookingUpdates(booking.id).catch(() => undefined);
+          return;
+        }
+      }
       try {
         const result = await recordBooking(input.binding.tenantId, {
           publicReservationId: input.reservationId,

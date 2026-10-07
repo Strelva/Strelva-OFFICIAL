@@ -22,6 +22,8 @@ import {
 import { scheduleSchema } from "./contracts";
 import { createPublicBookingService, PublicBookingError, type PublicBookingBinding, type PublicBookingCalendar, type PublicBookingInquiryCapture, type PublicBookingRange } from "./public-booking";
 import { postgresPublicBookingTokenStore } from "./public-booking-store";
+import { bookingReadSource } from "@/platform/bookings/flags";
+import { recordPublicAvailability, changePublicRecord, cancelPublicRecord, confirmPublicRecord } from "@/platform/bookings/public-record";
 import { publicBookingStoreHook, subtractStoreBookings } from "@/platform/bookings/public-api";
 
 type DbRow = Record<string, unknown>;
@@ -134,6 +136,21 @@ export async function resolvePublishedPublicBooking(input: {
   }
   const work = await readWorkspaceSchedule(owner, workId);
   const schedule = scheduleSchema.parse(work.payload);
+  if (await bookingReadSource() === "postgres") {
+    const record = await recordPublicAvailability({ ...input, name: requiredText(grant, "display_name") });
+    if (record.workspaceId !== workspaceId) throw new PublicBookingError("not_found", "This booking belongs to another business.");
+    const paused = Boolean(schedule.pause) || record.paused;
+    return {
+      tenantId: input.tenantId, tenantStableId: config.stableId, grantId: requiredText(grant, "id"),
+      status: text(grant, "status") as "published" | "revoked", websiteBindingActive, paused,
+      capabilityId: input.capabilityId, version: numberValue(grant, "capability_version"),
+      inquiryCapabilityId: requiredText(grant, "inquiry_capability_id"), inquiryVersion: numberValue(grant, "inquiry_version"),
+      name: record.name, provider: requiredText(grant, "provider") as "outlook" | "google", timeZone: record.timeZone,
+      recordBooking: record.recordBooking, slots: paused ? [] : record.slots.map(slot => ({
+        id: slotId(input.tenantId, input.capabilityId, numberValue(grant, "capability_version"), slot.start, slot.end), start: slot.start, end: slot.end,
+      })), owner, workspaceId, workId,
+    };
+  }
   // A paused schedule offers no open times. The response keeps its shape (an
   // empty slot list is a valid published schedule), and the provider is not
   // asked about times nobody can book.
@@ -256,6 +273,7 @@ function nativeCalendar(): PublicBookingCalendar {
   }
   return {
     async reserve(input) {
+      if (input.binding.recordBooking) return confirmPublicRecord(input.binding, input.reservationId);
       const current = await read(input.binding);
       await changeWorkspaceSchedule(input.binding.owner, input.binding.workId, {
         kind: "reserve",
@@ -269,6 +287,10 @@ function nativeCalendar(): PublicBookingCalendar {
       return confirmation(await read(input.binding), input.requestId, input);
     },
     async change(input) {
+      if (input.binding.recordBooking) {
+        const result = await changePublicRecord(input.binding, input.reservationId, input.start, input.end);
+        if (result) return result;
+      }
       await calendarSchedulingService.reschedule(input.binding.owner, input.binding.workId, input.requestId, {
         provider: input.binding.provider,
         expectedRevision: input.expectedRevision,
@@ -278,6 +300,10 @@ function nativeCalendar(): PublicBookingCalendar {
       return confirmation(await read(input.binding), input.requestId, input);
     },
     async cancel(input) {
+      if (input.binding.recordBooking) {
+        const result = await cancelPublicRecord(input.binding, input.reservationId);
+        if (result) return result;
+      }
       await calendarSchedulingService.cancel(input.binding.owner, input.binding.workId, input.requestId, {
         provider: input.binding.provider,
         expectedRevision: input.expectedRevision,

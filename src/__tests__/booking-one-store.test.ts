@@ -58,6 +58,7 @@ import { resetBookingFlagCache } from "@/platform/bookings/flags";
 import { setBookingStoreDb, readTenantBookings, upsertBookingSettings, type BookingStoreDb } from "@/platform/bookings/store";
 import { publicBookingStoreHook, subtractStoreBookings } from "@/platform/bookings/public-api";
 import { createPublicBookingService, PublicBookingError, type PublicBookingBinding, type PublicBookingReservationRef } from "@/products/scheduling/public-booking";
+import { recordPublicAvailability, confirmPublicRecord, changePublicRecord, cancelPublicRecord } from "@/platform/bookings/public-record";
 import { BOOKING_STORE_PENDING_KEY } from "@/platform/bookings/tenant";
 import { backfillTenantBookings, checkTenantBookingParity, repairPendingBookings, type LegacyBookingPorts } from "@/platform/bookings/move";
 import { recordCalendlyBooking } from "@/platform/bookings/calendly";
@@ -254,6 +255,49 @@ function fakeWorld(overrides: Partial<FakeTenant> = {}) {
 }
 
 describe("one booking store, both route families (in-memory store)", () => {
+  it("the real public and widget routes follow changed Friday facts and share request commitments", async () => {
+    const { world } = fakeWorld(); env("postgres");
+    vi.stubEnv("STRELVA_BOOKING_MESSAGES", "0"); vi.stubEnv("STRELVA_BOOKING_CALENDAR_BUSY", "0");
+    await upsertBookingSettings(world.tenant, { ...STORE_SETTINGS, mode: "request", bufferMinutes: 15 }, "native", world.db);
+    const tokens = new Map<string, PublicBookingReservationRef>();
+    const service = createPublicBookingService({
+      async resolve(input) {
+        const record = await recordPublicAvailability({ ...input, name: "Consultation", range: input.range ?? { from: `${FRIDAY}T00:00:00Z`, to: "2026-11-07T00:00:00Z" } });
+        return { ...record, tenantId: world.tenant, tenantStableId: world.stableId, grantId: randomUUID(), capabilityId: input.capabilityId, version: 1,
+          provider: "google", slots: record.slots.map(slot => ({ id: `slot-${Date.parse(slot.start)}`, start: slot.start, end: slot.end })),
+          owner: { userId: randomUUID(), verifiedEmail: "owner@example.test" }, workId: randomUUID() };
+      },
+      inquiries: { capture: async () => ({ inquiryId: "fixture-inquiry" }) }, store: publicBookingStoreHook(),
+      calendar: { reserve: i => confirmPublicRecord(i.binding, i.reservationId), change: async i => (await changePublicRecord(i.binding, i.reservationId, i.start, i.end))!, cancel: async i => (await cancelPublicRecord(i.binding, i.reservationId))! },
+      tokens: { findByRequest: async i => [...tokens.values()].find(r => r.requestId === i.requestId) ?? null, findByToken: async i => [...tokens.values()].find(r => r.managementToken === i.managementToken) ?? null, save: async r => { tokens.set(r.reservationId, r); return r; } },
+    });
+    const shared = await import("@/app/api/v1/bookings/_shared");
+    const stub = vi.spyOn(shared, "bookingService").mockReturnValue(service);
+    try {
+      const { GET } = await import("@/app/api/v1/bookings/[tenant]/route");
+      const { POST } = await import("@/app/api/v1/bookings/[tenant]/reservations/route");
+      const params = { params: Promise.resolve({ tenant: world.tenant }) };
+      const apiSlots = async () => {
+        const response = await GET(new Request(`https://app.strelva.test/api/v1/bookings/${world.tenant}?capabilityId=svc-consult`), params);
+        expect(response.status).toBe(200);
+        return (await response.json()).slots as Array<{ id: string; start: string; end: string }>;
+      };
+      const before = await apiSlots();
+      expect(before.some(slot => slot.start === "2026-11-06T18:30:00.000Z")).toBe(true);
+      expect(await availability()).toContain("13:30");
+      await world.setFridayCloses("12:00");
+      const after = await apiSlots();
+      expect(after.every(slot => Date.parse(slot.end) <= Date.parse("2026-11-06T17:00:00Z"))).toBe(true);
+      expect(await availability()).not.toContain("13:30");
+      const placed = await POST(new Request(`https://app.strelva.test/api/v1/bookings/${world.tenant}/reservations`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ capabilityId: "svc-consult", capabilityVersion: 1, slotId: after[0]!.id, requestId: requestId(), visitor }) }), params);
+      expect(placed.status).toBe(201); expect((await placed.json()).status).toBe("pending");
+      expect((await readTenantBookings(world.tenant))[0]).toMatchObject({ status: "requested", serviceRef: "svc-consult", bufferMinutes: 15, localStart: "09:00" });
+      expect(await availability()).not.toContain("09:00");
+      expect((await postBooking(bookingRequest("09:00"))).status).toBe(409);
+      await world.pause();
+      expect(await apiSlots()).toEqual([]); expect(await availability()).toEqual([]);
+    } finally { stub.mockRestore(); }
+  });
   it("a widget booking and an API reservation share one calendar; hours, pause and rollback hold", async () => {
     const { world } = fakeWorld();
     await oneStoreScenario(world);

@@ -120,6 +120,8 @@ export interface PublicBookingBinding {
   provider: PublicBookingProvider;
   timeZone: string;
   slots: readonly PublicBookingSlot[];
+  /** Store-served contract; absent on the unchanged legacy calendar path. */
+  recordBooking?: { serviceRef: string; bufferMinutes: number; mode: "request" | "instant"; uncheckedStarts: string[] };
   /** Customer workspace authority for the existing native calendar service. */
   owner: WorkspaceActor;
   workspaceId: string;
@@ -182,6 +184,8 @@ export interface PublicBookingInquiryCapture {
 export interface PublicBookingCalendarConfirmation {
   /** `verified` requires the existing provider readback decision. */
   verification: "verified" | "pending";
+  /** An authoritative store outcome is independent of calendar read-back. */
+  status?: PublicBookingStatus;
   start: string;
   end: string;
   expectedRevision: number;
@@ -192,6 +196,7 @@ export interface PublicBookingCalendar {
   reserve(input: {
     binding: PublicBookingBinding;
     requestId: string;
+    reservationId?: string;
     title: string;
     start: string;
     end: string;
@@ -200,6 +205,7 @@ export interface PublicBookingCalendar {
   change(input: {
     binding: PublicBookingBinding;
     requestId: string;
+    reservationId?: string;
     expectedRevision: number;
     start: string;
     end: string;
@@ -208,6 +214,7 @@ export interface PublicBookingCalendar {
   cancel(input: {
     binding: PublicBookingBinding;
     requestId: string;
+    reservationId?: string;
     expectedRevision: number;
   }): Promise<PublicBookingCalendarConfirmation>;
 }
@@ -221,6 +228,8 @@ export interface PublicBookingCalendar {
  * failure never fails the visitor; the hook queues it.
  */
 export interface PublicBookingStoreHook {
+  /** Release a new store claim whose durable public receipt could not land. */
+  release?(binding: PublicBookingBinding, reservationId: string): Promise<void>;
   claim(input: {
     binding: PublicBookingBinding;
     reservationId: string;
@@ -467,7 +476,11 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
       const claim = await dependencies.store.claim({
         binding: safe, reservationId: pendingReservationId, requestFingerprint, title,
         start: slot.start, end: slot.end, visitor, inquiryId: captured.inquiryId,
-      }).catch(() => "skipped" as const);
+      }).catch((error) => {
+        if (safe.recordBooking) throw error;
+        return "skipped" as const;
+      });
+      if (safe.recordBooking && claim === "skipped") throw new PublicBookingError("unavailable", "Nothing was booked. Booking storage is unavailable.");
       if (claim === "conflict") throw new PublicBookingError("conflict", "That booking time is no longer available. Choose another time.");
     }
     const pending = await saveToken(dependencies, {
@@ -493,6 +506,9 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
       end: slot.end,
       timeZone: safe.timeZone,
       status: "pending",
+    }).catch(async error => {
+      await dependencies.store?.release?.(safe, pendingReservationId).catch(() => undefined);
+      throw error;
     });
     if (pending.requestFingerprint !== requestFingerprint || pending.slotId !== slot.id) {
       throw new PublicBookingError("conflict", "This booking request is already used for different booking details.");
@@ -501,12 +517,13 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
     // our lookup and save. Its receipt is authoritative; never call the
     // provider for the losing request.
     if (pending.reservationId !== pendingReservationId) {
-      await settleStore({ binding: safe, reservationId: pendingReservationId, status: "cancelled", title, start: slot.start, end: slot.end });
+      if (safe.recordBooking) await dependencies.store?.release?.(safe, pendingReservationId);
+      else await settleStore({ binding: safe, reservationId: pendingReservationId, status: "cancelled", title, start: slot.start, end: slot.end });
       return receipt(pending);
     }
     let result: Awaited<ReturnType<PublicBookingCalendar["reserve"]>>;
     try {
-      result = await dependencies.calendar.reserve({ binding: safe, requestId: idempotencyRequestId, title, start: slot.start, end: slot.end });
+      result = await dependencies.calendar.reserve({ binding: safe, requestId: idempotencyRequestId, reservationId: pendingReservationId, title, start: slot.start, end: slot.end });
     } catch (error) {
       if (error instanceof PublicBookingError) throw error;
       throw new PublicBookingError("unavailable", "The booking request was received, but the calendar could not confirm it. Try again or contact the business.");
@@ -516,7 +533,7 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
       expectedRevision: result.expectedRevision,
       start: result.start,
       end: result.end,
-      status: result.verification === "verified" ? "confirmed" : "pending",
+      status: result.status ?? (result.verification === "verified" ? "confirmed" : "pending"),
     });
     if (ref.requestFingerprint !== requestFingerprint) throw new PublicBookingError("conflict", "This booking request is already used for different booking details.");
     await settleStore({ binding: safe, reservationId: ref.reservationId, status: ref.status, title, start: ref.start, end: ref.end, visitor });
@@ -549,12 +566,12 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
     const slot = slotFor(safe, input.slotId);
     let result: Awaited<ReturnType<PublicBookingCalendar["change"]>>;
     try {
-      result = await dependencies.calendar.change({ binding: safe, requestId: ref.requestId, expectedRevision: ref.expectedRevision, start: slot.start, end: slot.end });
+      result = await dependencies.calendar.change({ binding: safe, requestId: ref.requestId, reservationId: ref.reservationId, expectedRevision: ref.expectedRevision, start: slot.start, end: slot.end });
     } catch (error) {
       if (error instanceof PublicBookingError) throw error;
       throw new PublicBookingError("unavailable", "The calendar could not confirm this change. Try again or contact the business.");
     }
-    const changed = await saveToken(dependencies, { ...ref, expectedRevision: result.expectedRevision, start: result.start, end: result.end, status: result.verification === "verified" ? "confirmed" : "pending" });
+    const changed = await saveToken(dependencies, { ...ref, expectedRevision: result.expectedRevision, start: result.start, end: result.end, status: result.status ?? (result.verification === "verified" ? "confirmed" : "pending") });
     await settleStore({ binding: safe, reservationId: changed.reservationId, status: changed.status, title: changed.title, start: changed.start, end: changed.end });
     return receipt(changed);
   }
@@ -570,12 +587,12 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
     if (ref.version !== safe.version) throw new PublicBookingError("conflict", "This booking changed. Reload before cancelling it.");
     let result: Awaited<ReturnType<PublicBookingCalendar["cancel"]>>;
     try {
-      result = await dependencies.calendar.cancel({ binding: safe, requestId: ref.requestId, expectedRevision: ref.expectedRevision });
+      result = await dependencies.calendar.cancel({ binding: safe, requestId: ref.requestId, reservationId: ref.reservationId, expectedRevision: ref.expectedRevision });
     } catch (error) {
       if (error instanceof PublicBookingError) throw error;
       throw new PublicBookingError("unavailable", "The calendar could not confirm this cancellation. Try again or contact the business.");
     }
-    const cancelled = await saveToken(dependencies, { ...ref, expectedRevision: result.expectedRevision, start: result.start, end: result.end, status: result.verification === "verified" ? "cancelled" : "pending" });
+    const cancelled = await saveToken(dependencies, { ...ref, expectedRevision: result.expectedRevision, start: result.start, end: result.end, status: result.status ?? (result.verification === "verified" ? "cancelled" : "pending") });
     await settleStore({ binding: safe, reservationId: cancelled.reservationId, status: cancelled.status, title: cancelled.title, start: cancelled.start, end: cancelled.end });
     return receipt(cancelled);
   }
