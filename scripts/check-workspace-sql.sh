@@ -967,7 +967,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/booking-calendar-health-schema.s
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.sql"
 # Prove the final interrupted checkpoint's rollback restores the tenant-only
 # functions and can be reapplied before any native commitments are admitted.
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-w6-booking-native-workspace.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261010135956_booking_native_workspace.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135956_booking_native_workspace.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.sql"
 # Wave 6: confirmed shared business facts, never private owner contact data.
@@ -1028,7 +1028,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/owner-decision-website-preview-s
 # Retain a fictional native Version, then prove rollback leaves the business's
 # live application, destination records and preparation receipts intact.
 psql "${psql_args[@]}" --set=native_keep_fixture=true --file="$repo_root/tests/w6-version-native-applications.sql"
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261010163300-version-native-applications.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261010163300_version_native_applications.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-native-rollback.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163300_version_native_applications.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-native-rollforward.sql"

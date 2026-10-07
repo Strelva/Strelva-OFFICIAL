@@ -167,11 +167,11 @@ lock timeout and no hot-table rewrite. Apply only after explicit authorization.
 
 | Migration | Rollback |
 | --- | --- |
-| `20261010100000_owner_invitation_claim.sql` | `rollback-w6-owner-invitation-claim.sql`; accepted memberships retained. |
-| `20261010102000_owner_decision_links.sql` | `rollback-owner-decision-links.sql`; link sessions/audit history retained. |
-| `20261010102100_website_owner_link_launch.sql` | Same combined `rollback-owner-decision-links.sql`, removing narrow reserve/publish entry points. |
-| `20261010103000_ask_business_fact_drafts.sql` | `rollback-20261010103000-ask-business-fact-drafts.sql`; export needed draft/audit data before dropping this new store. |
-| `20261010104000_owner_decision_website_preview.sql` | `rollback-20261010104000-owner-decision-website-preview.sql`; removes read-only RPC only. |
+| `20261010100000_owner_invitation_claim.sql` | `rollback-20261010100000_owner_invitation_claim.sql`; accepted memberships retained. |
+| `20261010102000_owner_decision_links.sql` | `rollback-20261010102000_owner_decision_links.sql`; link sessions/audit history retained. |
+| `20261010102100_website_owner_link_launch.sql` | Same combined `rollback-20261010102000_owner_decision_links.sql`, removing narrow reserve/publish entry points. |
+| `20261010103000_ask_business_fact_drafts.sql` | `rollback-20261010103000_ask_business_fact_drafts.sql`; export needed draft/audit data before dropping this new store. |
+| `20261010104000_owner_decision_website_preview.sql` | `rollback-20261010104000_owner_decision_website_preview.sql`; removes read-only RPC only. |
 
 Disable relevant flags first; apply rollback in reverse dependency order.
 Neither forward migration nor rollback was run against production.

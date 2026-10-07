@@ -90,7 +90,7 @@ select pg_temp.rpc_assert(has_function_privilege('service_role', signature, 'exe
   from rpc_cases;
 
 -- Rehearse the rollback and prove the real defect on each affected path.
-\ir ../supabase/migrations/rollback-reader-rpc-volatility.sql
+\ir ../supabase/migrations/rollback-20261009150000_reader_rpc_volatility.sql
 select pg_temp.rpc_assert(p.provolatile = 's', c.signature || ' rolled back to STABLE')
   from rpc_cases c join pg_proc p on p.oid = c.signature::regprocedure;
 select pg_temp.rpc_assert(to_jsonb(p) - 'provolatile' = b.definition - 'provolatile'

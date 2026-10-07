@@ -49,14 +49,26 @@ end $$;
 SQL
 
 rollbacks=(
-  inquiry-workspace-replies w6-inquiry-outcome-proof inquiry-weekly-outcomes
-  inquiry-context-notices w6-connected-inquiry-records inquiry-urgent-decisions
-  inquiry-inbox inquiry-reply-purpose inquiry-cache-presence
-  connected-inquiry-owner-notices inquiry-export-before-teardown
-  inquiry-decision-notice-claims inquiry-decision-notice-events
-  tenant-lead-parity-completeness inquiry-member-replies inquiry-business-facts
-  inquiry-operator-authority inquiry-booking-handoff inquiry-operator-review
-  inquiry-operator-revocation
+  20261010120000_inquiry_workspace_replies
+  20261010121000_inquiry_outcome_proof
+  20261010122000_inquiry_weekly_outcomes
+  20261010123000_inquiry_context_notices
+  20261010124000_connected_inquiry_records
+  20261010125000_inquiry_urgent_decisions
+  20261010125500_inquiry_inbox
+  20261010125600_inquiry_reply_purpose
+  20261010125700_inquiry_cache_presence
+  20261010125800_connected_inquiry_owner_notices
+  20261010125900_inquiry_export_before_teardown
+  20261010125910_inquiry_decision_notice_claims
+  20261010125915_inquiry_decision_notice_events
+  20261010125920_tenant_lead_parity_completeness
+  20261010125925_inquiry_member_replies
+  20261010125930_inquiry_business_facts
+  20261010125935_inquiry_operator_authority
+  20261010125940_inquiry_booking_handoff
+  20261010125950_inquiry_operator_review
+  20261010125955_inquiry_operator_revocation
 )
 for rollback in "${rollbacks[@]}"; do
   psql "${psql_args[@]}" --dbname=postgres -c 'create database inquiry_rollback_case template inquiry_rollback_template strategy file_copy' >/dev/null

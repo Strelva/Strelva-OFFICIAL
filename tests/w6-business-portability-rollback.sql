@@ -22,7 +22,7 @@ select public.record_business_outcome_report_delivery((select workspace_id from 
  (select token from w6_report_tokens where month='2026-09-01'),'unknown');
 -- October stays dispatching, modelling a crash after provider dispatch.
 commit;
-\ir ../supabase/migrations/rollback-w6-business-portability.sql
+\ir ../supabase/migrations/rollback-20261010165500_business_portability.sql
 
 do $$ begin
  if (select count(*) from public.business_outcome_report_deliveries d join w6_report_roundtrip r using(workspace_id))<>3

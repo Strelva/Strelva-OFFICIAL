@@ -172,27 +172,27 @@ removal would destroy client history; turning off gates precedes rollback.
 
 | Migration suffix | Purpose | Rollback file (in `supabase/migrations/`) |
 | --- | --- | --- |
-| `160000_agency_authoring` | Atomic Package/create/preparation commands | `rollback-20261010160000-agency-authoring.sql` |
-| `161000_operator_google_attempts` | Google attempt receipts | `rollback-operator-google-attempts.sql` |
-| `161100_operator_effort_context` | Human effort contexts | `rollback-operator-effort-context.sql` |
-| `161200_operator_content_receipts` | Atomic content receipts | `rollback-operator-content-receipts.sql` |
-| `161300_review_reply_reservations` | Review dispatch reservations | `rollback-w6-review-reply-reservations.sql` |
-| `161400_operator_complete_sources` | Complete source reads | `rollback-w6-operator-complete-sources.sql` |
-| `162000_complete_client_record_stores` | All remaining durable client stores/watermarks | `rollback-w6-complete-client-record-stores.sql` |
-| `162100_tenant_receipt_retention` | Retained tenant history | `rollback-w6-tenant-receipt-retention.sql` |
-| `162200_inquiry_delivery_records` | Durable inquiry delivery state | `rollback-w6-inquiry-delivery-records.sql` |
-| `163000_agency_operator_overview` | Scoped batched agency read | `rollback-20261010163000-agency-operator-overview.sql` |
-| `163100_version_management` | Owner draft/history commands | `rollback-20261010163100-version-management.sql` |
-| `163200_version_owner_grants` | Owner-only data/lineage sharing | `rollback-20261010163200-version-owner-grants.sql` |
-| `163300_version_native_applications` | Real draft/runtime with approved atomic release | `rollback-20261010163300-version-native-applications.sql` |
-| `163400_version_sibling_changes` | Scoped sibling Version changes, private data masked | `rollback-20261010163400-version-sibling-changes.sql` |
-| `164000_finite_job_adapters` | Persistent jobs/approval adapters | `rollback-w6-finite-job-adapters.sql` |
-| `165000_tenant_business_context` | Confirmed public business facts | `rollback-tenant-business-context.sql` |
-| `165500_business_portability` | Billing/outcomes/asset+exit projections; report receipts | `rollback-w6-business-portability.sql` |
-| `165600_exit_handoff_evidence` | Per-site completion evidence | `rollback-w6-exit-handoff-evidence.sql` |
-| `165700_export_recovery` | Fenced durable workers and send reservations | `rollback-w6-export-recovery.sql` |
-| `165800_unbounded_export_archive` | Complete paged archives | `rollback-w6-unbounded-export-archive.sql` |
-| `165900_export_build_access` | Fenced owner/export access | `rollback-w6-export-build-access.sql` |
+| `160000_agency_authoring` | Atomic Package/create/preparation commands | `rollback-20261010160000_agency_authoring.sql` |
+| `161000_operator_google_attempts` | Google attempt receipts | `rollback-20261010161000_operator_google_attempts.sql` |
+| `161100_operator_effort_context` | Human effort contexts | `rollback-20261010161100_operator_effort_context.sql` |
+| `161200_operator_content_receipts` | Atomic content receipts | `rollback-20261010161200_operator_content_receipts.sql` |
+| `161300_review_reply_reservations` | Review dispatch reservations | `rollback-20261010161300_review_reply_reservations.sql` |
+| `161400_operator_complete_sources` | Complete source reads | `rollback-20261010161400_operator_complete_sources.sql` |
+| `162000_complete_client_record_stores` | All remaining durable client stores/watermarks | `rollback-20261010162000_complete_client_record_stores.sql` |
+| `162100_tenant_receipt_retention` | Retained tenant history | `rollback-20261010162100_tenant_receipt_retention.sql` |
+| `162200_inquiry_delivery_records` | Durable inquiry delivery state | `rollback-20261010162200_inquiry_delivery_records.sql` |
+| `163000_agency_operator_overview` | Scoped batched agency read | `rollback-20261010163000_agency_operator_overview.sql` |
+| `163100_version_management` | Owner draft/history commands | `rollback-20261010163100_version_management.sql` |
+| `163200_version_owner_grants` | Owner-only data/lineage sharing | `rollback-20261010163200_version_owner_grants.sql` |
+| `163300_version_native_applications` | Real draft/runtime with approved atomic release | `rollback-20261010163300_version_native_applications.sql` |
+| `163400_version_sibling_changes` | Scoped sibling Version changes, private data masked | `rollback-20261010163400_version_sibling_changes.sql` |
+| `164000_finite_job_adapters` | Persistent jobs/approval adapters | `rollback-20261010164000_finite_job_adapters.sql` |
+| `165000_tenant_business_context` | Confirmed public business facts | `rollback-20261010165000_tenant_business_context.sql` |
+| `165500_business_portability` | Billing/outcomes/asset+exit projections; report receipts | `rollback-20261010165500_business_portability.sql` |
+| `165600_exit_handoff_evidence` | Per-site completion evidence | `rollback-20261010165600_exit_handoff_evidence.sql` |
+| `165700_export_recovery` | Fenced durable workers and send reservations | `rollback-20261010165700_export_recovery.sql` |
+| `165800_unbounded_export_archive` | Complete paged archives | `rollback-20261010165800_unbounded_export_archive.sql` |
+| `165900_export_build_access` | Fenced owner/export access | `rollback-20261010165900_export_build_access.sql` |
 
 New cron: `/api/cron/workspace-export-recovery`, every ten minutes in
 `vercel.json`; `requireCronRequest`, recovery gate and heartbeat maximum age
