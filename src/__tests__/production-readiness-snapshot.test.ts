@@ -297,6 +297,22 @@ describe("production readiness snapshot", () => {
     expect(missing.silentRollout.safe).toBe(false);
   });
 
+  it("stops silent rollout when the fixed head-count path leaves active inventory unknown", async () => {
+    const d = deps({ env: {}, redis: fakeRedis({}).redis });
+    const db = d.value.db!;
+    const count = db.count.bind(db);
+    db.count = async (table, filters) => table === "tenants" && filters?.some((f) => f.column === "active")
+      ? countResult({ count: null, error: null, status: 204 })
+      : count(table, filters);
+    const report = await runReadinessSnapshot({ jacobsYes: true }, d.value);
+    expect(report.postgres.tenants.active).toBeNull();
+    expect(report.postgres.activeTenants).toHaveLength(2);
+    expect(report.silentRollout).toEqual({
+      safe: false,
+      stopConditions: ["Active tenant inventory is incomplete; silent rollout cannot be verified."],
+    });
+  });
+
   it("stops an active on override even when both global email gates are off", async () => {
     const report = await runReadinessSnapshot({ jacobsYes: true }, deps({ env: {
       EMAIL_SENDING_ENABLED: "false", CUSTOMER_EMAIL_ENABLED: "false",
@@ -333,8 +349,10 @@ describe("countResult", () => {
     expect(countResult({ count: null, error: null, status: 404 })).toEqual({ ok: false, missing: true, reason: "404: table not found" });
   });
 
-  it("treats a missing count as unknown, not as zero rows", () => {
-    expect(countResult({ count: null, error: null, status: 200 })).toMatchObject({ ok: false, missing: false });
+  it("treats a missing count as unknown, not as zero rows, including the production 204", () => {
+    for (const status of [200, 204]) {
+      expect(countResult({ count: null, error: null, status })).toMatchObject({ ok: false, missing: false });
+    }
   });
 
   it("reads a head-only 404 with an empty error as missing", () => {

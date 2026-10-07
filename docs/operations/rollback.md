@@ -45,7 +45,7 @@ provider writes, Stripe events, emails, or schema migrations.
 
 ## Prepared 1.0 schema reversals (local evidence only)
 
-The 51 pending migrations in the 1.0 release packet have companion
+The 51 migrations in the 1.0 release packet have companion
 `rollback-<forward-file>` SQL, plus a guarded July org-layer companion. The
 [release-safety tool contract](../../scripts/release-safety/README.md) owns
 order, archive preservation, timeouts, refusal behavior, and local proof

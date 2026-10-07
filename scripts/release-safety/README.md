@@ -1,6 +1,9 @@
 # Release safety tools
 
-Prepared for the 51-file 1.0 packet at `integrate/reborn-1.0` (`7b7b4d3f`).
+Prepared for the 51-file 1.0 packet; rebased onto `integrate/reborn-1.0`
+(`864474fe`). Batch 0 (`20261005090000_tenant_leads`) is already applied in
+production per the October 7 release record. The manifest retains it so local
+baseline proofs and batch 1 history validation include the applied migration.
 These tools never authorize a production operation. New migrations from other
 streams require a reviewed manifest/rollback update and another rehearsal.
 

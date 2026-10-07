@@ -1,6 +1,6 @@
 # Wave 6 release safety
 
-Branch: `w6/release-safety`; baseline `integrate/reborn-1.0` at `7b7b4d3f`.
+Branch: `w6/release-safety`; rebased onto `integrate/reborn-1.0` at `864474fe`.
 Scope: local release preparation only. No production/provider calls, pushes,
 PRs, merges, deployment, or client notices are authorized or performed.
 
@@ -17,12 +17,23 @@ July org layer, populated private archives, and two dump/restore rehearsals.
 passes 196/196. The [tool contract](../../../scripts/release-safety/README.md)
 owns usage, failure handling, recovery order and scope.
 
-Exact next action: finish aggregate validation and update the verification
-section before the final handoff. The first aggregate run recorded two 5-second
-test timeouts (`approve-route`, `model-call-sites`) and a workspace SQL race
-assertion (`save_workspace_calendar_connection`). Separate reruns are in
-progress/planned; these are not cleared by the focused release-safety pass.
-Build and final lint remain running. No release packet edits have been made.
+Round 4: the full suite passes with two workers (687 files passed, one skipped;
+6,242 tests passed, 37 skipped; 264.97s). Lint, boundaries and client-repo
+compatibility (196/196) pass. Snapshot/release-tool focused tests pass 40/40,
+including the integration fix's missing-table tests and a new unknown-204
+active-count stop. Build, workspace SQL and restored-production rehearsals are
+running; finish these before the final handoff. Earlier failures remain below.
+
+## Packet edits for the integration owner
+
+**Batch 0 is done in production.** Round 4's supplied production record says
+`20261005090000_tenant_leads` is applied, the lead backfill is 43/43, and 0.2.1
+(PR #213) is live at `main` `2dd3453a`, deployment
+`dpl_9ViM5iWeCepPiio8k3AZ5NFwKFPx`. This stream did not inspect production.
+Start pending execution at batch 1 after a fresh authorized history snapshot;
+do not push or reverse batch 0 as part of the pending release rehearsal.
+The local manifest deliberately retains batch 0 for baseline/history checks.
+Shared release-packet and launch-spec files remain untouched per the brief.
 
 The final populated proof is
 `.scratch/release-safety/round3-release-safety-final-2.log`. Its private cluster,
