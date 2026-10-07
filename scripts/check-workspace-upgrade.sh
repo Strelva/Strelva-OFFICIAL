@@ -5,24 +5,9 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 baseline_migration="20260802120000_report_snapshots.sql"
 upgrade_migration="20260905190000_release_one_workspaces.sql"
 schema_test="$repo_root/tests/workspace-upgrade-schema.sql"
-cluster_root="$(mktemp -d "${TMPDIR:-/tmp}/strelva-workspace-upgrade.XXXXXX")"
-cluster_data="$cluster_root/data"
-cluster_socket="$(mktemp -d /tmp/strelva-upgrade-socket.XXXXXX)"
-cluster_log="$cluster_root/postgres.log"
+source "$repo_root/scripts/temp-postgres.sh"
+create_temp_postgres strelva-workspace-upgrade strelva-upgrade-socket
 cluster_port="$((61000 + ($$ % 3000)))"
-cluster_started=0
-
-cleanup() {
-  local exit_code=$?
-  trap - EXIT INT TERM
-  if [[ "$cluster_started" -eq 1 ]]; then
-    pg_ctl -D "$cluster_data" -m fast -w stop >/dev/null 2>&1 || true
-  fi
-  rm -rf "$cluster_socket"
-  printf 'Workspace upgrade cluster preserved at: %s\n' "$cluster_root"
-  exit "$exit_code"
-}
-trap cleanup EXIT INT TERM
 
 for command_name in initdb pg_ctl psql grep; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -41,7 +26,7 @@ pg_ctl -D "$cluster_data" \
   -l "$cluster_log" \
   -o "-F -k '$cluster_socket' -c listen_addresses='' -p $cluster_port" \
   -w start >/dev/null
-cluster_started=1
+read -r cluster_postmaster_pid < "$cluster_data/postmaster.pid"
 
 psql_args=(
   --host="$cluster_socket"
