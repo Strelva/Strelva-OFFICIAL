@@ -10,7 +10,7 @@ vi.mock("@/products/google-listing/tenant-replies", () => ({ defaultTenantReplyD
 vi.mock("@/products/publishing/server", () => ({
   publishingEnabledForWorkspace: async () => true,
   authorizePublishingEvent: async () => ({ allowed: true, actor: null, viewer: { operator: false, tester: false } }),
-  readPublishingSnapshot: async () => ({ bindings: [{ originTenantId: "fixture", locations: [{ locationId: "location" }] }] }),
+  readPublishingSnapshot: async () => ({ bindings: [{ id: "5e000000-0000-4000-8000-000000000020", originTenantId: "fixture", locations: [{ locationId: "location" }] }] }),
 }));
 vi.mock("@/platform/business-record/service", () => ({ readBusinessRecord: m.record }));
 vi.mock("@/platform/owner-entry/linked-sites", () => ({ readLinkedSite: async () => ({ tenantId: "fixture" }) }));
@@ -113,6 +113,18 @@ describe("Google location Version approval dispatch", () => {
     const approvedEvent = { ...event, metadata: { ...event.metadata, version: { versionId: lineage.id, systemId, bindingId: "5e000000-0000-4000-8000-000000000020", rowRevision: 2, definitionDigest: sha256(canonicalJson(definition)), preparedBy: actor } } };
     return { lineage, event: approvedEvent };
   }
+  it("freezes per-location hours from the Version without changing the business record", async () => {
+    const v = await versionEvent();
+    const hours = { timezone: "America/New_York", weekly: [{ day: 1, opens: "10:00", closes: "18:00" }] };
+    const { canonicalJson, sha256 } = await import("@/platform/business-record/tenant-import");
+    const definition = { ...v.lineage.baseline.definition, hours };
+    v.lineage.baseline.definition = definition;
+    const pin = { ...v.event.metadata.version, definitionDigest: sha256(canonicalJson(definition)) };
+    const prepared = await prepareGoogleListingDraft(actor, { workspaceId, tenantId: "fixture", locationId: "location", kind: "hours" }, { pin, hours });
+    expect(prepared.metadata?.draft).toEqual({ action: "hours", hours });
+    expect(prepared.metadata?.version).toEqual(pin);
+    expect(client.patchLocation).not.toHaveBeenCalled();
+  });
   it("dispatches a sessionless owner approval with its own receipt and read-back, once", async () => {
     const v = await versionEvent();
     const input = { tenantId: "fixture", event: v.event, actorId: "owner-link:owner@example.test", attemptId: "first" };

@@ -32,7 +32,7 @@ async function fixture(twoBusinesses = false) {
       return { id: `approval-${input.locationId}`, tenantId: input.tenantId, source: "google", type: "content_update", title: "Review", status: "pending", body: "Frozen copy", createdAt: "2026-10-07" };
     }),
   };
-  const result = await commandGoogleLocationVersions(actor, { action: "publish", workspaceId: agency, name: "Shared Google listing", definition, summary: "Shared defaults", commandId: id(100) }, deps);
+  const result = await commandGoogleLocationVersions(actor, { action: "publish", workspaceId: agency, name: "Shared Google listing", hidden: false, definition, summary: "Shared defaults", commandId: id(100) }, deps);
   if (!result.source || !result.revision) throw new Error("Missing source");
   const source = result.source;
   const versionRows = [];
@@ -111,6 +111,15 @@ describe("Google locations reuse contextual Versions", () => {
     const member = { ...f.versionActor, memberships: [{ businessId: agency, role: "admin" as const }, { businessId: business, role: "member" as const }] };
     expect(await commandGoogleLocationVersions(actor, { action: "prepare", workspaceId: agency, sourceSystemId: f.source.systemId, revision: 1, kind: "post", versions: [{ workspaceId: business, versionId: f.versionRows[0]!.id, expectedRowRevision: 1 }], commandId: id(127) }, { ...f.deps, actor: async () => member })).toMatchObject({ results: [{ status: "blocked" }] });
     expect(f.prepared).toHaveLength(0);
+  });
+
+  it("replays a source publish without appending a second revision, and refuses an outdated base", async () => {
+    const f = await fixture();
+    const input = { action: "publish", workspaceId: agency, sourceSystemId: f.source.systemId, name: "Shared", expectedSourceRevision: 1, definition: { ...definition, post }, summary: "New post", commandId: id(128) };
+    expect(await commandGoogleLocationVersions(actor, input, f.deps)).toMatchObject({ revision: { source: { number: 2 } } });
+    expect(await commandGoogleLocationVersions(actor, input, f.deps)).toMatchObject({ replayed: true, revision: { source: { number: 2 } } });
+    await expect(commandGoogleLocationVersions(actor, { ...input, summary: "Changed request" }, f.deps)).rejects.toThrow("source changed");
+    expect(await f.store.listRevisions(f.versionActor, f.source)).toHaveLength(2);
   });
 
   it("rejects secrets, targets and policy inside a shared definition", () => {

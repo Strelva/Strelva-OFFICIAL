@@ -26,7 +26,7 @@ export const googleVersionPinSchema = z.object({
 export type GoogleVersionPin = z.infer<typeof googleVersionPinSchema>;
 
 export const googleLocationVersionCommandSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("publish"), workspaceId: z.string().uuid(), sourceSystemId: z.string().uuid().optional(), name: z.string().trim().min(1).max(160), definition: googleLocationDefinitionSchema, expectedSourceRevision: z.number().int().nonnegative().default(0), summary: z.string().trim().min(1).max(500), commandId: z.string().uuid() }).strict(),
+  z.object({ action: z.literal("publish"), workspaceId: z.string().uuid(), sourceSystemId: z.string().uuid().optional(), name: z.string().trim().min(1).max(160), hidden: z.boolean().default(true), definition: googleLocationDefinitionSchema, expectedSourceRevision: z.number().int().nonnegative().default(0), summary: z.string().trim().min(1).max(500), commandId: z.string().uuid() }).strict(),
   z.object({ action: z.literal("share"), workspaceId: z.string().uuid(), sourceSystemId: z.string().uuid(), businessId: z.string().uuid() }).strict(),
   z.object({ action: z.literal("attach"), workspaceId: z.string().uuid(), sourceWorkspaceId: z.string().uuid(), sourceSystemId: z.string().uuid(), revision: z.number().int().positive(), bindingId: z.string().uuid(), locationId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/), label: z.string().trim().min(1).max(200), commandId: z.string().uuid() }).strict(),
   z.object({ action: z.literal("override"), workspaceId: z.string().uuid(), versionId: z.string().uuid(), expectedRowRevision: z.number().int().positive(), path: z.enum(["hours", "post"]), value: z.unknown().optional() }).strict(),
@@ -78,6 +78,7 @@ export async function readGoogleLocationVersion(actor: WorkspaceActor, workspace
   const lineage = await deps.store.getLineage(versionActor, versionId);
   if (!lineage || lineage.version.businessId !== workspaceId) throw new VersionAccessError();
   const view = await deps.versions.readVersion(versionActor, versionId);
+  if (view.access !== "owner") throw new VersionAccessError();
   await locationTarget(deps, actor, lineage.version);
   googleLocationDefinitionSchema.parse(view.workingDefinition);
   return { version: view, rowRevision: lineage.rowRevision, improvements: await deps.versions.listAvailableImprovements(versionActor, versionId) };
@@ -91,12 +92,14 @@ export async function commandGoogleLocationVersions(actor: WorkspaceActor, raw: 
   if (!versionActor.memberships.some(row => row.businessId === input.workspaceId && (row.role === "owner" || row.role === "admin"))) throw new VersionAccessError();
   if (input.action === "publish") {
     const source = input.sourceSystemId ? { businessId: input.workspaceId, systemId: input.sourceSystemId } : (await deps.source(versionActor, {
-      businessId: input.workspaceId, name: input.name, kind: "listing", hidden: true, commandId: input.commandId,
+      businessId: input.workspaceId, name: input.name, kind: "listing", hidden: input.hidden, commandId: input.commandId,
     })).source;
-    // The supplied source must be a listing source, not an unrelated Library System.
-    const detail = await deps.systems.readSystem(actor, source);
-    if (detail.system.kind !== "listing") throw new VersionValidationError("Choose a Google listing source.");
+    // Agency sources use Versions' source authority, not a client's System read.
     const latest = (await deps.store.listRevisions(versionActor, source)).at(-1);
+    if (input.sourceSystemId) {
+      if (!latest) throw new VersionValidationError("Publish the initial Google source before updating it.");
+      googleLocationDefinitionSchema.parse(latest.definition);
+    }
     if ((latest?.source.number ?? 0) !== input.expectedSourceRevision) {
       if (latest?.source.number === input.expectedSourceRevision + 1 && latest.summary === input.summary && canonicalJson(latest.definition) === canonicalJson(input.definition)) return { source, revision: latest, replayed: true };
       throw new VersionStaleError("The source changed. Reload it before publishing another improvement.");
@@ -131,7 +134,10 @@ export async function commandGoogleLocationVersions(actor: WorkspaceActor, raw: 
         implementation: { kind: "google_location", ref: origin.ref }, summary: "Connected Google listing adopted for location lineage. No Google change was sent.",
       }, uuidFromSeed(`google-location-adoption:${input.commandId}`))).system;
     }
-    if (adopted.lifecycle === "draft") await deps.systems.transitionLifecycle(actor, ref, adopted.changeNumber, snapshot.controls?.find(row => row.locationId === location.locationId)?.paused ? "paused" : "live");
+    if (adopted.lifecycle === "draft") {
+      adopted = await deps.systems.transitionLifecycle(actor, ref, adopted.changeNumber, "live");
+      if (snapshot.controls?.find(row => row.locationId === location.locationId)?.paused) await deps.systems.transitionLifecycle(actor, ref, adopted.changeNumber, "paused");
+    }
     const prior = await deps.store.findLineageByVersion(versionActor, ref);
     if (prior) {
       if (prior.source.businessId !== source.businessId || prior.source.systemId !== source.systemId || prior.context.kind !== "location" || prior.context.label !== input.label) throw new VersionValidationError("This listing already descends from a different source or context.");
@@ -172,7 +178,7 @@ export async function commandGoogleLocationVersions(actor: WorkspaceActor, raw: 
       const pin: GoogleVersionPin = { versionId: lineage.id, systemId: lineage.version.systemId, bindingId: target.bindingId, rowRevision: lineage.rowRevision, definitionDigest: sha256(canonicalJson(definition)), preparedBy: actor };
       // Adoption changes working copy only. This event is each location's own approval; never approve here.
       const event = await deps.prepare(actor, { workspaceId: target.workspaceId, tenantId: target.tenantId, locationId: target.locationId, kind: input.kind, ...(input.kind === "post" ? { post: definition.post! } : {}), commandId: uuidFromSeed(`google-version-draft:${input.commandId}:${lineage.id}`) }, { pin, ...(input.kind === "hours" ? { hours: definition.hours! } : {}) });
-      results.push({ versionId: lineage.id, workspaceId: selected.workspaceId, status: "needs_approval" as const, eventId: event.id, rowRevision: lineage.rowRevision });
+      results.push({ versionId: lineage.id, workspaceId: selected.workspaceId, status: event.status === "approved" || event.status === "auto_approved" ? "already_approved" as const : event.status === "dismissed" ? "declined" as const : "needs_approval" as const, eventId: event.id, rowRevision: lineage.rowRevision });
     } catch (error) {
       results.push({ versionId: selected.versionId, workspaceId: selected.workspaceId, status: "blocked" as const, reason: error instanceof Error ? error.message : "This location could not be prepared." });
     }

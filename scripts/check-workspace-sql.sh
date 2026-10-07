@@ -802,6 +802,13 @@ psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.
 # Every stream's release flag key survives the last literal redefinition (#253).
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 
+# Google location lineage through the real Versions/System stores, after the
+# account-binding migrations. Preparation stays fake; no Google dispatch.
+if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
+  STRELVA_VERSIONS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
+    pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/google-location-versions-postgres.test.ts
+fi
+
 # The one booking store through both real route families (legacy /api/booking
 # and the public booking service) against the real booking functions. Last,
 # because it commits its fictional rows.
