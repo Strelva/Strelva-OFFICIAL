@@ -152,7 +152,7 @@ describe("booking lifecycle run", () => {
     });
     await runBookingLifecycle(p, { now: NOW });
     expect(sent[0]!.options?.bullets).toBeUndefined();
-    expect(sent[0]!.options?.paragraphs?.[1]).toBe("Pick another time on the website, or reply to this email to reach the business.");
+    expect(sent[0]!.options?.paragraphs?.[1]).toBe("Reply to this email to ask the business for another time.");
     expect(sent[0]!.fromName).toBe("Strelva");
   });
 });

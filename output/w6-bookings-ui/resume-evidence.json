@@ -1,0 +1,103 @@
+{
+  "date": "2026-10-07",
+  "scope": "Synthetic local fixture recheck; no actual booking, email or provider actions.",
+  "transport": "T3 collaborative browser; local production build with VERCEL_ENV=preview and STRELVA_UI_PREVIEW=1",
+  "measurements": [
+    {
+      "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on&state=pending",
+      "width": 390,
+      "scrollWidth": 390,
+      "text": "Fictional consultation studio\nVisitor booking fixture\n\nAPPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. The business confirms your booking; a connected calendar receives a copy.\n\nTimes shown in America/New_York.\n\nAvailable time\nNov 5, 2026, 10:00 AM–Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM–Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nPhone (optional)\nReserve time\n\nYour request was received for confirmation.\n\nConsultation\n\nNov 5, 2026, 10:00 AM–Nov 5, 2026, 10:30 AM\n\nYour request is waiting for the business to confirm. This time is not confirmed yet.\n\nCheck request status\nFictional consultation studio\n\nLocal interface fixture. Every request stays in this browser; no booking or email is sent.",
+      "requests": [
+        {
+          "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+          "method": "GET",
+          "mode": "on",
+          "intercepted": true
+        },
+        {
+          "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+          "method": "POST",
+          "mode": "on",
+          "intercepted": true,
+          "visitorPhoneProvided": true,
+          "visitorPhoneMatchesFixture": true
+        }
+      ],
+      "controls": [
+        {
+          "id": "strelva-booking-slot",
+          "text": "Nov 5, 2026, 10:00 AM–Nov 5, 2026, 10:30 AMNov 6, 2026, 11:00 AM–Nov 6, 2026, 11:30 AM",
+          "height": 44.390625
+        },
+        {
+          "id": "strelva-booking-name",
+          "text": "",
+          "height": 49.984375
+        },
+        {
+          "id": "strelva-booking-email",
+          "text": "",
+          "height": 49.984375
+        },
+        {
+          "id": "strelva-booking-phone",
+          "text": "",
+          "height": 49.984375
+        },
+        {
+          "id": "",
+          "text": "Reserve time",
+          "height": 51.1875
+        },
+        {
+          "id": "",
+          "text": "Check request status",
+          "height": 51.1875
+        }
+      ]
+    },
+    {
+      "url": "http://localhost:3026/preview/strelva/booking-visitor?mode=on&state=pending",
+      "width": 390,
+      "scrollWidth": 390,
+      "text": "Fictional consultation studio\nVisitor booking fixture\n\nAPPOINTMENTS\n\nChoose a time\nConsultation\n\nChoose a time. The business confirms your booking; a connected calendar receives a copy.\n\nTimes shown in America/New_York.\n\nAvailable time\nNov 5, 2026, 10:00 AM–Nov 5, 2026, 10:30 AM\nNov 6, 2026, 11:00 AM–Nov 6, 2026, 11:30 AM\nName\nEmail\nNote (optional)\nPhone (optional)\nReserve time\n\nThe reservation is confirmed.\n\nConsultation\n\nNov 5, 2026, 10:00 AM–Nov 5, 2026, 10:30 AM\n\nThe business confirmed this booking.\n\nChange timeCancel reservation\nFictional consultation studio\n\nLocal interface fixture. Every request stays in this browser; no booking or email is sent.",
+      "requests": [
+        {
+          "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native",
+          "method": "GET",
+          "mode": "on",
+          "intercepted": true
+        },
+        {
+          "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations",
+          "method": "POST",
+          "mode": "on",
+          "intercepted": true,
+          "visitorPhoneProvided": true,
+          "visitorPhoneMatchesFixture": true
+        },
+        {
+          "path": "/preview/strelva/booking-visitor/mock/api/v1/bookings/fixture-native/reservations/fictional-reservation/readback",
+          "method": "POST",
+          "mode": "on",
+          "intercepted": true,
+          "visitorPhoneProvided": false,
+          "visitorPhoneMatchesFixture": false
+        }
+      ]
+    },
+    {
+      "url": "http://localhost:3026/preview/strelva/bookings?state=native&view=day",
+      "width": 390,
+      "scrollWidth": 390,
+      "text": "Back to Home\n\nBOOKINGS\n\nFriday, November 6\n\nWho's coming in, in order. Check people in as they arrive.\n\nDay\nWeek\nPrevious day\nToday\nNext day\nBookings\n\nNo calendar is connected. Your booking records are kept here.\n\nTake a booking request\n\n3 appointments · 1 checked in\n\n9:00 AM – 10:00 AM\n\nDana Reed\n\nMassage, 60 min · Checked in\n\n716-555-0100 · dana@example.test\n\nUndo check-in\n\n10:30 AM – 11:30 AM\n\nSam Lee\n\nMassage, 60 min · Booked\n\nFirst visit. Lower back.\n\nsam@example.test\n\nCheck in\nCancel\n\n1:00 PM – 1:30 PM\n\nAna Ruiz\n\nConsultation · Waiting for the owner\n\n716-555-0142 · ana@example.test\n\n3:00 PM – 4:00 PM\n\nLee Park\n\nMassage, 60 min · Cancelled\n\n716-555-0177"
+    },
+    {
+      "url": "http://localhost:3026/preview/strelva/bookings?state=native-empty&view=week",
+      "width": 390,
+      "scrollWidth": 390,
+      "text": "Back to Home\n\nBOOKINGS\n\nWeek of Mon, Nov 2\n\nEvery booking this week, kept in this business’s Bookings System.\n\nDay\nWeek\nPrevious week\nToday\nNext week\nYour Bookings System is not set up yet\n\nAsk Strelva to prepare bookings for this business through a Request. A website is optional."
+    }
+  ]
+}

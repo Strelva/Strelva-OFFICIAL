@@ -9,10 +9,19 @@ import { decryptSecret } from "@/platform/infra/crypto/secrets";
 import { resetBookingFlagCache, bookingAgentsEnabled } from "@/platform/bookings/flags";
 import { POST } from "@/app/api/v1/bookings/[tenant]/reservations/route";
 import { POST as mcp } from "@/app/api/mcp/bookings/[tenant]/route";
+import { GET as openapi } from "@/app/api/v1/bookings/openapi.json/route";
 const params={params:Promise.resolve({tenant:"fixture"})};
 beforeEach(()=>{vi.clearAllMocks(); resetBookingFlagCache(); vi.stubEnv("STRELVA_BOOKING_AGENTS","0");vi.stubEnv("STRELVA_BOOKING_STORE_WRITE","0");vi.stubEnv("STRELVA_BOOKING_STORE_READ","legacy");vi.stubEnv("SECRETS_ENC_KEY","11".repeat(32));});
 afterEach(()=>vi.unstubAllEnvs());
 describe("agent confirmation and flags-off contract",()=>{
+ it("keeps OpenAPI off and documents bounded intake for enabled agent requests",async()=>{
+  expect(openapi().status).toBe(503);expect(mocks.db).not.toHaveBeenCalled();
+  vi.stubEnv("STRELVA_BOOKING_AGENTS","1");vi.stubEnv("STRELVA_BOOKING_STORE_WRITE","1");
+  const response=openapi();expect(response.status).toBe(200);
+  const document=await response.json();
+  expect(document.paths["/api/v1/bookings/{tenant}/reservations"].post.requestBody.content["application/json"].schema.properties.intakeAnswers)
+   .toMatchObject({type:"object",maxProperties:8,additionalProperties:{type:"string",maxLength:2000}});
+ });
  it("defaults off without store/parity I/O",async()=>{expect(bookingAgentsEnabled({})).toBe(false);await expect(requireAgentBookings()).rejects.toMatchObject({code:"unavailable"});expect(mocks.db).not.toHaveBeenCalled();});
  it("separates unpredictable manage, confirmation and status bearer tokens; stores encrypted tokens",()=>{const access=newBookingAccess("Fixture assistant");const tokens=[access.manageCiphertext,access.confirmCiphertext!,access.statusCiphertext!].map(decryptSecret);expect(new Set(tokens).size).toBe(3);for(const token of tokens)expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);expect(access.manageHash).toBe(tokenHash(tokens[0]!));expect(access.confirmHash).toBe(tokenHash(tokens[1]!));expect(access.statusHash).toBe(tokenHash(tokens[2]!));expect(access.manageCiphertext).not.toContain(tokens[0]!);});
  it("refuses plaintext fallback if token encryption is absent",()=>{vi.stubEnv("SECRETS_ENC_KEY","");expect(()=>newBookingAccess()).toThrow("encryption");});

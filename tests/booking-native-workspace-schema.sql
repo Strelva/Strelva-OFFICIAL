@@ -8,8 +8,8 @@ insert into public.users(id,email,verified_at) values
  ('e6000000-0000-4000-8000-000000000002','native-member@example.test',now()),
  ('e6000000-0000-4000-8000-000000000003','native-outsider@example.test',now());
 insert into public.workspaces(id,kind,name,created_by) values
- ('e6000000-0000-4000-8000-000000000010','business','Native Consultation','e6000000-0000-4000-8000-000000000001'),
- ('e6000000-0000-4000-8000-000000000011','business','Other Business','e6000000-0000-4000-8000-000000000003'),
+ ('e6000000-0000-4000-8000-000000000010','customer','Native Consultation','e6000000-0000-4000-8000-000000000001'),
+ ('e6000000-0000-4000-8000-000000000011','customer','Other Business','e6000000-0000-4000-8000-000000000003'),
  ('e6000000-0000-4000-8000-000000000012','personal','Personal Fixture','e6000000-0000-4000-8000-000000000001');
 insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values
  ('e6000000-0000-4000-8000-000000000010','e6000000-0000-4000-8000-000000000001','owner','e6000000-0000-4000-8000-000000000001'),

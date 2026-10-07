@@ -248,8 +248,11 @@ select pg_temp.ba_assert(not has_function_privilege('authenticated','public.prep
 
 -- Inquiry offers: GET does not reserve, tokens cross no tenant identity,
 -- chosen times request owner approval, retry is stable and expiry fails closed.
+-- An offer must name a current business-record service, never a copied label.
+insert into public.business_services(workspace_id,name,external_ref,duration_minutes,active,source,created_by,updated_by)
+ select id,'Consultation','consultation',30,true,'owner','ca000000-0000-4000-8000-0000000000e2','ca000000-0000-4000-8000-0000000000e2' from ba_ws where name='site';
 create temporary table ba_offer on commit drop as select public.issue_inquiry_booking_offer('ba-site',jsonb_build_object('inquiryId','fixture-inquiry','key','receipt',
- 'customer',jsonb_build_object('name','Dana','email','dana@example.test'),'serviceId','svc-consult','serviceName','Consultation','timeZone','America/New_York',
+ 'customer',jsonb_build_object('name','Dana','email','dana@example.test'),'serviceId','consultation','serviceName','Consultation','timeZone','America/New_York',
  'bufferMinutes',15,'slots',jsonb_build_array(jsonb_build_object('start',now()+interval '50 days','end',now()+interval '50 days 30 minutes')),
  'tokenHash',repeat('c',64),'tokenCiphertext','enc:v1:fixture','expiresAt',now()+interval '72 hours')) as r;
 select pg_temp.ba_assert(public.read_inquiry_booking_receipt('ba-other','fixture-inquiry') is null,'other tenant cannot read receipt offer');

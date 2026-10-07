@@ -677,6 +677,11 @@ psql "${psql_args[@]}" --file="$repo_root/tests/booking-manual-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-service-policy-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-calendar-health-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.sql"
+# Prove the final interrupted checkpoint's rollback restores the tenant-only
+# functions and can be reapplied before any native commitments are admitted.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-w6-booking-native-workspace.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135956_booking_native_workspace.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.sql"
 
 # The one booking store through both real route families (legacy /api/booking
 # and the public booking service) against the real booking functions. Last,

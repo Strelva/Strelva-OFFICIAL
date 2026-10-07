@@ -23,7 +23,7 @@ language sql stable security definer set search_path=public,pg_temp as $$
  union all
  select null::uuid,w.id,s.id,case when public.workspace_exit_completed(w.id) or s.id is null or s.lifecycle<>'live' or exists(select 1 from public.tenant_workspace_links l where l.workspace_id=w.id) then 'paused' else s.lifecycle end
  from public.workspaces w left join lateral(select x.id,x.lifecycle from public.systems x where x.business_workspace_id=w.id and x.kind='booking' order by x.created_at,x.id limit 1) s on true
- where w.kind='business' and 'workspace:'||w.id::text=p_tenant_id
+ where w.kind='customer' and 'workspace:'||w.id::text=p_tenant_id
 $$;
 
 create or replace function public.read_tenant_booking_context_before_service_policy(p_tenant_id text) returns jsonb
@@ -735,7 +735,7 @@ create or replace function public.sync_booking_calendar_health(p_workspace_id uu
 language plpgsql security definer set search_path=public,pg_temp as $$
 declare v_connection public.workspace_calendar_connections; v_revision text; v_out jsonb;
 begin
- if not exists(select 1 from public.tenant_workspace_links where workspace_id=p_workspace_id) and not exists(select 1 from public.systems s join public.workspaces w on w.id=s.business_workspace_id where s.business_workspace_id=p_workspace_id and s.kind='booking' and w.kind='business') then
+ if not exists(select 1 from public.tenant_workspace_links where workspace_id=p_workspace_id) and not exists(select 1 from public.systems s join public.workspaces w on w.id=s.business_workspace_id where s.business_workspace_id=p_workspace_id and s.kind='booking' and w.kind='customer') then
   raise exception 'booking_health_workspace_unlinked';
  end if;
  -- Serialize both cron processes for this business, before reading connection state.
@@ -761,7 +761,7 @@ create or replace function public.claim_booking_calendar_health(p_workspace_id u
 language plpgsql security definer set search_path=public,pg_temp as $$
 declare a public.booking_calendar_health_actions; c public.workspace_calendar_connections;
 begin
- if p_day is null or not exists(select 1 from public.tenant_workspace_links where workspace_id=p_workspace_id) and not exists(select 1 from public.systems s join public.workspaces w on w.id=s.business_workspace_id where s.business_workspace_id=p_workspace_id and s.kind='booking' and w.kind='business') then return false; end if;
+ if p_day is null or not exists(select 1 from public.tenant_workspace_links where workspace_id=p_workspace_id) and not exists(select 1 from public.systems s join public.workspaces w on w.id=s.business_workspace_id where s.business_workspace_id=p_workspace_id and s.kind='booking' and w.kind='customer') then return false; end if;
  select * into a from public.booking_calendar_health_actions where id=p_id and workspace_id=p_workspace_id for update;
  if a.id is null or a.state<>'open' or a.revision_hash<>p_revision or a.delivery_status in ('sent','claimed') or a.last_attempt_day=p_day then return false; end if;
  select * into c from public.workspace_calendar_connections where id=a.connection_id and workspace_id=p_workspace_id for share;
@@ -823,6 +823,34 @@ begin
   return public.booking_json(b);
 end $$;
 
+create or replace function public.create_workspace_manual_booking(p_workspace_id uuid,p_tenant_id text,p_user_id uuid,p_email text,p_booking jsonb) returns jsonb
+language plpgsql security definer set search_path=public,pg_temp as $$
+declare ctx jsonb; b public.business_bookings; s public.business_services; v_ref text;
+begin
+ ctx:=public.read_workspace_manual_booking_context(p_workspace_id,p_tenant_id,p_user_id,p_email);
+ perform pg_advisory_xact_lock(hashtextextended(coalesce(ctx->>'calendarKey',ctx->>'tenantStableId'),9107));
+ -- Recheck membership, pause and record after the lock.
+ ctx:=public.read_workspace_manual_booking_context(p_workspace_id,p_tenant_id,p_user_id,p_email);
+ v_ref:=p_booking->>'legacyId';
+ if v_ref is null or v_ref !~ '^manual-[A-Za-z0-9_-]{8,80}$' then raise exception 'booking_invalid'; end if;
+ select * into b from public.business_bookings where calendar_key=(coalesce(ctx->>'calendarKey',ctx->>'tenantStableId'))::uuid and legacy_id=v_ref for update;
+ if found then
+   if b.origin<>'owner' or b.request_fingerprint is distinct from p_booking->>'requestFingerprint' then raise exception 'booking_request_conflict'; end if;
+   return jsonb_build_object('status','unchanged','booking',public.booking_json(b));
+ end if;
+ if (ctx->>'paused')::boolean then raise exception 'booking_paused'; end if;
+ if public.workspace_exit_completed(p_workspace_id) then raise exception 'booking_paused'; end if;
+ select * into s from public.business_services where workspace_id=p_workspace_id and active
+   and (id::text=p_booking->>'serviceRef' or external_ref=p_booking->>'serviceRef');
+ if not found then raise exception 'booking_invalid'; end if;
+ if (p_booking->>'start')::timestamptz<=clock_timestamp() or (p_booking->>'end')::timestamptz<=(p_booking->>'start')::timestamptz then raise exception 'booking_invalid'; end if;
+ -- Origin is set here, never trusted from the browser. Staff file a request;
+ -- approval remains the owner's existing Needs you decision.
+ return public.record_tenant_booking(p_tenant_id,p_booking||jsonb_build_object('origin','owner','status','requested',
+   'serviceName',s.name,'bufferMinutes',coalesce((ctx#>>'{settings,bufferMinutes}')::integer,15),
+   'timeZone',coalesce(ctx#>>'{hours,timezone}',ctx#>>'{settings,timezone}','America/New_York')),'native');
+end $$;
+
 -- Actor-scoped owner list transitions. A pending request is never approved here.
 create function public.change_workspace_booking_status(p_workspace_id uuid,p_user_id uuid,p_email text,p_scope text,p_ref text,p_status text) returns jsonb
 language plpgsql security definer set search_path=public,pg_temp as $$
@@ -847,7 +875,7 @@ declare v_ids jsonb;
 begin
  select coalesce(jsonb_agg(id),'[]'::jsonb) into v_ids from (
    select distinct w.id from public.workspaces w join public.systems s on s.business_workspace_id=w.id
-    where w.kind='business' and s.kind='booking' and not exists(select 1 from public.tenant_workspace_links l where l.workspace_id=w.id)
+    where w.kind='customer' and s.kind='booking' and not exists(select 1 from public.tenant_workspace_links l where l.workspace_id=w.id)
     order by w.id limit 501) native;
  if jsonb_array_length(v_ids)>500 then raise exception 'booking_workspaces_incomplete'; end if;
  return v_ids;

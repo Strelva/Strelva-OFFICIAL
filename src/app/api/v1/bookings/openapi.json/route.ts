@@ -14,6 +14,7 @@ export function GET() {
           origin: { const: "agent" }, serviceId: string, start: { type: "string", format: "date-time" }, requestId: { type: "string", pattern: "^[A-Za-z0-9_-]{8,80}$" },
           agent: { type: "object", required: ["name"], properties: { name: string } },
           customer: { type: "object", required: ["name", "email"], properties: { name: string, email: { type: "string", format: "email" }, phone: string } },
+          intakeAnswers: { type: "object", maxProperties: 8, propertyNames: { pattern: "^[A-Za-z0-9_-]{1,80}$" }, additionalProperties: { type: "string", maxLength: 2000 } },
         } } } } }, responses: { ...ok, "201": { description: "Held, not confirmed. Receipt contains reservationId, status, start, end, confirmationRequired and statusToken. No confirmation or management token is exposed to the agent." }, "409": { description: "Taken, paused, changed request or tenant hold limit reached" } } } },
       "/api/v1/bookings/{tenant}/status": { get: { operationId: "get_booking_status", parameters: [tenant, { name: "token", in: "query", required: true, schema: string }], responses: ok } },
     },
