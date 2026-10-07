@@ -3,6 +3,7 @@ import { getClientEmailOverride } from "@/platform/infra/email/client-override";
 import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { tenantPublishingPorts } from "@/platform/infra/tenant-publishing";
 import type { DeliveryRow } from "@/platform/needs-you/repository";
+import { releaseFlagMayBeOn } from "@/platform/release-flags/resolve";
 
 export const PUBLISHING_EVENT_KINDS = new Set([
   "workspace_collection_publish", "workspace_newsletter_issue", "workspace_google_write", "record_google_change", "workspace_google_listing_draft",
@@ -19,12 +20,14 @@ export async function publishingNoticesEnabled(workspaceId: string, tenantId?: s
 /** A narrow extension of the existing Needs you digest. Legacy items keep
  * their existing delivery policy, and publishing items use the new gates. */
 export async function publishingDecisionDeliveryAllowed(row: DeliveryRow): Promise<boolean> {
+  if (!releaseFlagMayBeOn("publishing")) return true;
   if (row.sourceLifecycle !== "tenant_event") return true;
   const separator = row.sourceId.indexOf(":");
   if (separator <= 0) return true;
   const tenantId = row.sourceId.slice(0, separator);
   const event = await (await tenantPublishingPorts()).getEventRaw(row.sourceId.slice(separator + 1));
-  if (!event || !PUBLISHING_EVENT_KINDS.has(String(event.metadata?.kind ?? ""))) return true;
+  if (!event) return false;
+  if (!PUBLISHING_EVENT_KINDS.has(String(event.metadata?.kind ?? ""))) return true;
   return publishingNoticesEnabled(row.workspaceId, tenantId);
 }
 

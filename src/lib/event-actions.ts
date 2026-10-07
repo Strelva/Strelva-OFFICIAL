@@ -156,6 +156,13 @@ export async function resolveEventAction(
   // failed opaquely. Resolve as "approved" (the marker is only ever set on an
   // accepted approval); resolveEvent no-ops idempotently if already resolved.
   if (event.metadata?.execution?.state === "external_accepted") {
+    if (["workspace_collection_publish", "workspace_newsletter_issue", "workspace_google_listing_draft"].includes(String(event.metadata?.kind))) {
+      const publishing = await workspacePorts().publishingContent();
+      const authorized = await publishing.authorizePublishingEvent({ tenantId, event, actorId });
+      if (!authorized.allowed) return { changed: false, reason: authorized.reason ?? "publishing_permission_denied" };
+      const resolved = await resolveEvent(eventId, "approved", { actor: actorId });
+      return resolved.changed ? { changed: true, reason: "accepted_unverified" } : { changed: false, reason: "already_resolved" };
+    }
     const resolved = await resolveEvent(eventId, "approved", { actor: "user" });
     return resolved.changed ? { changed: true } : { changed: false, reason: "already_resolved" };
   }
@@ -351,7 +358,7 @@ async function executeResolvedEventAction(
     await markExecutionExternalAccepted(eventId);
     const resolved = await resolveEvent(eventId, "approved", { actor: actorId });
     return resolved.changed
-      ? { changed: true, ...(execution.reason ? { reason: execution.reason } : {}) }
+      ? { changed: true, ...(execution.reason ? { reason: execution.reason } : execution.verified === false ? { reason: "accepted_unverified" } : {}) }
       : { changed: false, reason: "already_resolved" };
   }
 

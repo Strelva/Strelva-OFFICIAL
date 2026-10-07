@@ -18,7 +18,7 @@ import { googleDraftInputSchema, postInputSchema, type ListingReceipt } from "./
 import { createListingPost, syncHoursFromRecord, syncInfoFromRecord, undoListingChange, receiptHeadline, type ListingContext, type ListingWriteOutcome, postReviewReply, withdrawReviewReply } from "./service";
 import { infoToGoogle, hoursToGoogle, type RecordInfo } from "./record";
 
-const infoSchema = z.object({ phone: factValueSchemas.phone.optional(), description: factValueSchemas.description.optional(), links: factValueSchemas.links.optional() }).strict();
+const infoSchema = z.object({ phone: factValueSchemas.phone.nullable().optional(), description: factValueSchemas.description.nullable().optional(), links: factValueSchemas.links.nullable().optional() }).strict();
 
 const draftSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("hours"), hours: factValueSchemas.hours }),
@@ -44,9 +44,10 @@ export async function prepareGoogleListingDraft(actor: WorkspaceActor, raw: z.in
   else if (input.kind === "hours") draft = { action: "hours", hours: factValueSchemas.hours.parse(record.facts.hours?.value) };
   else {
     const info: RecordInfo = {};
-    for (const key of ["phone", "description", "links"] as const) {
+    for (const key of input.infoFields ?? ["phone", "description", "links"] as const) {
       const value = record.facts[key]?.value;
       if (value !== undefined) Object.assign(info, { [key]: factValueSchemas[key].parse(value) });
+      else if (input.infoFields?.includes(key)) Object.assign(info, { [key]: null });
     }
     if (!infoToGoogle(info).updateMask.length) throw new Error("Add your phone, website or description to Business details first.");
     draft = { action: "info", record: info };
@@ -131,6 +132,7 @@ export async function executeGoogleListingEvent(input: { tenantId: string; event
 
 export async function undoWorkspaceGoogleChange(actor: WorkspaceActor, input: { workspaceId: string; tenantId: string; locationId: string; receiptId: string }): Promise<ListingWriteOutcome> {
   if (!(await publishingEnabledForWorkspace(input.workspaceId, actor)) || !(await readLinkedSite(actor, input.workspaceId, input.tenantId)) || !(await hasTenantPermission(input.tenantId, "publishing:manage"))) throw new Error("Only an authorized owner can undo this Google change.");
+  if ((await readBusinessRecord(actor, input.workspaceId)).access !== "owner") throw new Error("This Google change needs the business owner's instruction.");
   return undoListingChange(await tenantListingContext(input.tenantId, input.workspaceId, input.locationId), { receiptId: input.receiptId, authority: { kind: "owner_undo", actor: actor.userId } });
 }
 
@@ -139,17 +141,19 @@ export async function readWorkspaceGoogle(actor: WorkspaceActor, workspaceId: st
   const { readLinkedSites } = await import("@/platform/owner-entry/linked-sites");
   const { sites } = await readLinkedSites(actor, workspaceId);
   const allowed = new Set(sites.map(site => site.tenantId));
+  const owner = (await readBusinessRecord(actor, workspaceId)).access === "owner";
   return Promise.all(snapshot.bindings.filter(binding => binding.originTenantId && allowed.has(binding.originTenantId)).flatMap(binding => binding.locations.map(async location => {
     const tenantId = binding.originTenantId!;
     const [control, events, canManage] = await Promise.all([readListingControl(workspaceId, location.locationId), tenantPublishingPorts().then(ports => ports.getEvents(tenantId, { limit: 1000, status: "pending" })), hasTenantPermission(tenantId, "publishing:manage")]);
     const receipts = snapshot.receipts.filter(receipt => receipt.locationId === location.locationId && receipt.bindingId === binding.id) as unknown as ListingReceipt[];
-    return { tenantId, locationId: location.locationId, name: location.title ?? "Google listing", control, canManage, connected: binding.status === "connected", drafts: events.filter(event => isGoogleListingEvent(event) && event.metadata?.workspaceId === workspaceId && event.metadata?.locationId === location.locationId).map(event => ({ id: event.id, title: event.title, body: event.body })), receipts: receipts.map(receipt => ({ id: receipt.id, headline: receiptHeadline(receipt), before: receipt.before, after: receipt.after, authority: receipt.authority, readback: receipt.readback, status: receipt.status, undo: Boolean(receipt.undo) && ["posted", "posted_unverified", "held_by_google"].includes(receipt.status) })) };
+    return { tenantId, locationId: location.locationId, name: location.title ?? "Google listing", control, canManage: owner && canManage, connected: binding.status === "connected", drafts: events.filter(event => isGoogleListingEvent(event) && event.metadata?.workspaceId === workspaceId && event.metadata?.locationId === location.locationId).map(event => ({ id: event.id, title: event.title, body: event.body })), receipts: receipts.map(receipt => ({ id: receipt.id, headline: receiptHeadline(receipt), before: receipt.before, after: receipt.after, authority: receipt.authority, readback: receipt.readback, status: receipt.status, undo: Boolean(receipt.undo) && ["posted", "posted_unverified", "held_by_google"].includes(receipt.status) })) };
   })));
 }
 export { setListingPaused };
 
 export async function changeWorkspaceGoogleReply(actor: WorkspaceActor, input: { workspaceId: string; tenantId: string; locationId: string; reviewId: string; text?: string; withdraw: boolean }): Promise<ListingWriteOutcome> {
   if (!(await publishingEnabledForWorkspace(input.workspaceId, actor)) || !(await readLinkedSite(actor, input.workspaceId, input.tenantId)) || !(await hasTenantPermission(input.tenantId, "publishing:manage"))) throw new Error("Only an authorized owner can change a Google reply.");
+  if ((await readBusinessRecord(actor, input.workspaceId)).access !== "owner") throw new Error("This reply needs the business owner's instruction.");
   const ctx = await tenantListingContext(input.tenantId, input.workspaceId, input.locationId);
   const authority = { kind: "owner_approval" as const, actor: actor.userId };
   const outcome = await (input.withdraw ? withdrawReviewReply(ctx, { reviewId: input.reviewId, authority }) : postReviewReply(ctx, { reviewId: input.reviewId, text: input.text ?? "", authority }));

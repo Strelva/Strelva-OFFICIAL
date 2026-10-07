@@ -1,15 +1,16 @@
 "use client";
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ContentWorkspace, type ContentWorkspaceData } from "@/experience/publishing/ContentWorkspace";
 
 /** Local, fictional HTTP double. The real component handles compose/review;
  * this route has no storage, auth bypass, email or Google transport. */
 export function PublishingContentPreview({ kind, state }: { kind: "website" | "newsletter"; state: string }) {
-  const data = useRef<ContentWorkspaceData>({ permissions: { canCompose: state !== "read_only", canApprove: state !== "read_only" }, content: {
+  const [initial] = useState<ContentWorkspaceData>(() => ({ permissions: { canCompose: state !== "read_only", canApprove: state !== "read_only" }, content: {
     entries: kind === "website" && state !== "empty" ? [{ type: "blog", entries: [{ slug: "holiday-hours", status: "published", data: { title: "Holiday hours at Juniper Bakery", excerpt: "A fictional post", body: "We will be closed Friday after Thanksgiving.", author: "Maria", tags: [] } }] }] : [],
     drafts: state === "empty" ? [] : [{ id: "fictional-draft", title: kind === "newsletter" ? "Approve newsletter: November at Juniper" : "Publish blog: Holiday hours", body: "Visit us for cardamom buns this Saturday.", status: "pending", metadata: { publishing: { data: { title: "Holiday hours", body: "We will be closed Friday after Thanksgiving." } } } }],
     outputs: [], receipts: [], sendingEnabled: false,
-  } });
+  } }));
+  const data = useRef(initial);
   const request = useCallback<typeof fetch>(async (_url, options) => {
     if (state === "loading") await new Promise(resolve => setTimeout(resolve, 1500));
     if (state === "error") return Response.json({ error: "Publishing storage is unavailable. Your drafts are kept." }, { status: 503 });
@@ -29,5 +30,5 @@ export function PublishingContentPreview({ kind, state }: { kind: "website" | "n
     }
     return Response.json(data.current);
   }, [kind, state]);
-  return <ContentWorkspace workspaceId="5e000000-0000-4000-8000-000000000010" systemId="5e000000-0000-4000-8000-000000000020" kind={kind} request={request} initial={["error", "loading"].includes(state) ? undefined : data.current} />;
+  return <ContentWorkspace workspaceId="5e000000-0000-4000-8000-000000000010" systemId="5e000000-0000-4000-8000-000000000020" kind={kind} request={request} initial={["error", "loading"].includes(state) ? undefined : initial} />;
 }

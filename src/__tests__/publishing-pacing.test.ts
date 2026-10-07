@@ -5,7 +5,7 @@ import { classifyGoogleFailure, type GoogleListingClient } from "@/products/goog
 function fixture() {
   const updateReply = vi.fn().mockResolvedValue({ ok: true, data: { comment: "Approved" } });
   const base = { updateReply } as unknown as GoogleListingClient;
-  const pacing = { limited: vi.fn(async () => false), wait: vi.fn(async () => undefined) };
+  const pacing = { limited: vi.fn(async (_key: string) => false), wait: vi.fn(async (_ms: number) => undefined) };
   return { updateReply, pacing, client: paceGoogleWrites(base, "fixture-workspace", "fixture-location", pacing) };
 }
 describe("Google rejected-write pacing", () => {

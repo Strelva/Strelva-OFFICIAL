@@ -6,7 +6,7 @@ export { defaultTenantReplyDeps, postTenantReviewReply, routeTenantReviewReply }
 export type { TenantReplyDeps, TenantReplyResult, TenantReplyRoute } from "./tenant-replies";
 
 
-export { listingDraftingAllowed } from "./poll-policy";
+export { listingDraftingAllowed, noteTenantListingRead } from "./poll-policy";
 export { readListingControl, setListingPaused, noteListingAccess } from "./controls";
 
 

@@ -13,7 +13,7 @@ import {
   withdrawReviewReply,
   type ListingContext,
 } from "@/products/google-listing/service";
-import { hoursToGoogle, recordDrift } from "@/products/google-listing/record";
+import { hoursToGoogle, infoToGoogle, recordDrift } from "@/products/google-listing/record";
 
 // The Google listing System's writes, against a fake Google. No live calls.
 
@@ -261,6 +261,12 @@ describe("hours and info from the business record", () => {
       .toMatchObject({ status: "refused", reason: "unsafe_url" });
   });
 
+  it("clears removed record facts without touching facts absent from the change", () => {
+    expect(infoToGoogle({ description: null })).toEqual({ body: { profile: { description: "" } }, updateMask: ["profile"] });
+    expect(infoToGoogle({ phone: null, links: null })).toEqual({ body: { phoneNumbers: {}, websiteUri: "" }, updateMask: ["phoneNumbers", "websiteUri"] });
+    expect(infoToGoogle({})).toEqual({ body: {}, updateMask: [] });
+  });
+
   it("names drift between the record and Google", () => {
     expect(recordDrift({ hours, phone: "(716) 555-0100" }, { regularHours: { periods: [] }, phoneNumbers: { primaryPhone: "+1 716-555-0100" } }))
       .toEqual(["Google hours differ from your record."]);
@@ -286,6 +292,14 @@ describe("posts", () => {
     const { ctx } = context();
     expect(await createListingPost(ctx, { post: { topicType: "EVENT", summary: "Open house" }, authority: OWNER })).toMatchObject({ reason: "invalid" });
     expect(await createListingPost(ctx, { post: { topicType: "STANDARD", summary: "Hi", callToAction: { actionType: "BOOK" } }, authority: OWNER })).toMatchObject({ reason: "invalid" });
+  });
+
+  it("refuses impossible calendar dates and an end before the start without a write", async () => {
+    const { ctx, google } = context();
+    for (const [startDate, endDate] of [["2026-02-30", "2026-03-01"], ["2026-11-30", "2026-11-01"]]) {
+      expect(await createListingPost(ctx, { post: { topicType: "EVENT", summary: "Open house", event: { title: "Open house", startDate, endDate } }, authority: OWNER })).toMatchObject({ reason: "invalid" });
+    }
+    expect(google.writes).toEqual([]);
   });
 });
 

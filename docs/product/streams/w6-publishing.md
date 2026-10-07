@@ -67,3 +67,22 @@ avoid new workspace imports of `src/lib`. Fixed shared select API use,
 checkpoint test types, and per-location/per-kind record command identities.
 Local SQL run exit 0, including publication/receipt atomicity, immutable issues,
 reconnect security and replay. Full lint/checks and remaining launch gaps follow.
+
+## Round 4 passing piece: record facts and honest Google outcomes
+
+Rebased onto `integrate/reborn-1.0` including `864474fe`; no readiness changes
+in this stream. Added owner-only record facts UI and API for weekly/holiday
+hours and website URL, preserving untouched facts. Default policy prepares
+separate Google approvals. Activated policy requires the visible consent
+copy and records each location's result after the record commits. Clears of
+phone/description/website are exact Google patches; retrying an already approved
+draft does not write again. Google acceptance with failed read-back stays
+unconfirmed, never a claimed confirmed write. Poll reads now persist quota-zero
+access health. Issued newsletter outputs keep their System after audience zero.
+
+Targeted run: 14 files, 102 tests passed (6.66s). Typecheck exit 0; targeted
+ESLint exit 0. The preceding attempts found and fixed a test mock tuple typing
+error and a React ref read during preview render; those failed logs remain in
+`.scratch/w6-publishing/`. Browser observed a saved record with one successful
+Google double and one access-pending double, with distinct results. Final full
+checks and expanded browser proof still pending.

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Card } from "@/components/ui/Card";
+import { RecordPublishingFields } from "@/experience/publishing/RecordPublishingFields";
+import type { RecordGoogleSummary } from "@/products/publishing/record-changes";
 import type { BusinessRecord } from "@/platform/business-record/contracts";
 import { DETAIL_LABELS, detailText, detailsWriteSource, type EditableDetail } from "@/platform/business-record/details";
 import type { DetailsSaveOutcome } from "@/platform/business-record/details-save";
@@ -18,6 +20,7 @@ import { WorkspacePlace, type PlaceState } from "./WorkspacePlace";
 export interface BusinessDetailsData {
   record: BusinessRecord;
   googleApprovalCopy?: string | null;
+  publishing?: boolean;
   operator: boolean;
   sites: LinkedSite[];
   denied: LinkedSite[];
@@ -61,10 +64,11 @@ function Section({ id, title, children }: { id: string; title: string; children:
   );
 }
 
-export function WorkspaceBusinessDetails({ workspaceId, state, result, field, action }: {
+export function WorkspaceBusinessDetails({ workspaceId, state, result, googleResult, field, action }: {
   workspaceId: string;
   state: PlaceState<BusinessDetailsData>;
   result?: DetailsSaveOutcome | null;
+  googleResult?: RecordGoogleSummary | null;
   field?: EditableDetail | null;
   /** The server action; absent in previews and tests. */
   action?: (formData: FormData) => Promise<void>;
@@ -85,6 +89,7 @@ export function WorkspaceBusinessDetails({ workspaceId, state, result, field, ac
           <p className="text-sm leading-6">{notice.text}{result === "invalid" && field && INVALID_HINT[field] ? ` ${INVALID_HINT[field]}` : ""}</p>
         </Card>
       ) : null}
+      {data?.publishing && googleResult ? <Card padding="md" className="mt-4" role="status"><p className="text-sm">{{ needs_approval: "Record saved. Google changes are waiting for your approval.", confirmed: "Record saved. Google changes read back successfully.", unconfirmed: "Record saved. Google accepted the changes; confirmation is pending.", failed: "Record saved. At least one Google change did not land; each result is kept separately.", unavailable: "Record saved. Google listings could not be read; no Google update is confirmed." }[googleResult]}</p><a className="mt-2 inline-block text-sm underline" href={`/workspace/google?workspaceId=${workspaceId}`}>Review each Google change and receipt</a></Card> : null}
       {data ? (
         <>
           <Section id="business" title="About the business">
@@ -108,6 +113,8 @@ export function WorkspaceBusinessDetails({ workspaceId, state, result, field, ac
               </form>
             </Card>
           </Section>
+
+          {data.publishing ? <Section id="publishing-facts" title="Publishing facts"><Card padding="lg"><RecordPublishingFields record={data.record} approvalCopy={data.googleApprovalCopy} readOnly={readOnly || data.record.access !== "owner"} /></Card></Section> : null}
 
           {services.length ? (
             <Section id="services" title="Services">

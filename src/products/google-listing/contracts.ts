@@ -77,6 +77,10 @@ export type ListingHealth = (typeof LISTING_HEALTH)[number];
 
 export const REVIEW_REPLY_MAX_BYTES = 4096;
 export const POST_SUMMARY_MAX_CHARS = 1500;
+const postDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine(value => {
+  const date = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}, "Use a real calendar date.");
 
 export const postInputSchema = z.object({
   topicType: z.enum(["STANDARD", "EVENT", "OFFER"]),
@@ -87,8 +91,8 @@ export const postInputSchema = z.object({
   }).strict().optional(),
   event: z.object({
     title: z.string().trim().min(1).max(58),
-    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    startDate: postDate,
+    endDate: postDate,
   }).strict().optional(),
   offer: z.object({
     couponCode: z.string().max(58).optional(),
@@ -97,6 +101,7 @@ export const postInputSchema = z.object({
   }).strict().optional(),
 }).strict().superRefine((post, context) => {
   if (post.topicType !== "STANDARD" && !post.event) context.addIssue({ code: "custom", path: ["event"], message: "Events and offers need a title and dates" });
+  if (post.event && post.event.endDate < post.event.startDate) context.addIssue({ code: "custom", path: ["event", "endDate"], message: "End date must follow the start date." });
   if (post.topicType !== "OFFER" && post.offer) context.addIssue({ code: "custom", path: ["offer"], message: "Only an offer carries offer details" });
   if (post.callToAction && post.callToAction.actionType !== "CALL" && !post.callToAction.url) {
     context.addIssue({ code: "custom", path: ["callToAction", "url"], message: "This button needs a link" });
@@ -125,4 +130,4 @@ export const listingControlSchema = z.object({
 });
 export type ListingControl = z.infer<typeof listingControlSchema>;
 
-export const googleDraftInputSchema = z.object({ workspaceId: z.string().uuid(), tenantId: z.string().min(1).max(120), locationId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/), kind: z.enum(["hours", "info", "post"]), post: postInputSchema.optional(), commandId: z.string().uuid().optional(), expectedRecordRevision: z.number().int().nonnegative().optional() }).strict();
+export const googleDraftInputSchema = z.object({ workspaceId: z.string().uuid(), tenantId: z.string().min(1).max(120), locationId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/), kind: z.enum(["hours", "info", "post"]), post: postInputSchema.optional(), commandId: z.string().uuid().optional(), expectedRecordRevision: z.number().int().nonnegative().optional(), infoFields: z.array(z.enum(["phone", "description", "links"])).min(1).max(3).optional() }).strict();

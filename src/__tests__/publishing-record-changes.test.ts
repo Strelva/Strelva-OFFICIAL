@@ -20,7 +20,7 @@ describe("record changes and Google policy", () => {
   it("default policy creates separate approvals per location and never writes", async () => {
     const d = deps(); const result = await changeRecordWithGoogle(actor, workspaceId, 1, patch, { source: "owner", commandId }, d);
     expect(result.google.map(effect => effect.status)).toEqual(["needs_approval", "needs_approval"]);
-    expect(d.prepare).toHaveBeenCalledWith(actor, { workspaceId, tenantId: "mooney", locationId: "second", kind: "info", commandId, expectedRecordRevision: 2 });
+    expect(d.prepare).toHaveBeenCalledWith(actor, { workspaceId, tenantId: "mooney", locationId: "second", kind: "info", commandId, expectedRecordRevision: 2, infoFields: ["phone"] });
     expect(d.approve).not.toHaveBeenCalled();
   });
   it("activated policy approves the exact drafts and retains the saved record after partial Google failure", async () => {
@@ -35,6 +35,18 @@ describe("record changes and Google policy", () => {
     expect(result.google.every(effect => effect.status === "needs_approval")).toBe(true);
     expect(d.policy).not.toHaveBeenCalled(); expect(d.approve).not.toHaveBeenCalled();
   });
+  it("does not approve or resend a command whose Google draft is already approved", async () => {
+    const d = deps(); d.patch = vi.fn(async () => ({ ...saved, replayed: true })); d.policy = vi.fn(async () => true);
+    d.prepare = vi.fn(async () => ({ id: "draft", status: "approved" }));
+    const result = await changeRecordWithGoogle(actor, workspaceId, 1, patch, { source: "owner", commandId, googleApprovalDisclosed: true }, d);
+    expect(result.google.map(effect => effect.status)).toEqual(["already_approved", "already_approved"]);
+    expect(d.approve).not.toHaveBeenCalled();
+  });
+  it("says nothing was sent when Google already holds the approved facts", async () => {
+    const d = deps(); d.policy = vi.fn(async () => true); d.approve = vi.fn(async () => ({ changed: true, reason: "already_on_google" }));
+    const result = await changeRecordWithGoogle(actor, workspaceId, 1, patch, { source: "owner", commandId, googleApprovalDisclosed: true }, d);
+    expect(result.google.map(effect => effect.status)).toEqual(["already_on_google", "already_on_google"]);
+  });
   it("does not claim failed listing discovery rolled the record back", async () => {
     const d = deps(); d.locations = vi.fn(async () => { throw new Error("storage unavailable"); });
     const result = await changeRecordWithGoogle(actor, workspaceId, 1, patch, { source: "owner", commandId }, d);
@@ -44,5 +56,12 @@ describe("record changes and Google policy", () => {
     const d = deps(); d.read = vi.fn(async () => ({ ...record, access: "member" as const }));
     await expect(changeRecordWithGoogle(actor, workspaceId, 1, patch, { source: "owner", commandId }, d)).rejects.toThrow("Only an owner");
     expect(d.patch).not.toHaveBeenCalled(); expect(recordGoogleApprovalCopy(record, false)).toBeNull(); expect(recordGoogleApprovalCopy(record, true)).toContain("also approves");
+  });
+  it("clearing a recorded fact still prepares its exact Google effect instead of leaving the old value live", async () => {
+    const d = deps();
+    const result = await changeRecordWithGoogle(actor, workspaceId, 1, { facts: { description: null } }, { source: "owner", commandId }, d);
+    expect(result.google.map(effect => effect.status)).toEqual(["needs_approval", "needs_approval"]);
+    expect(d.prepare).toHaveBeenCalledWith(actor, expect.objectContaining({ kind: "info", infoFields: ["description"] }));
+    expect(d.approve).not.toHaveBeenCalled();
   });
 });

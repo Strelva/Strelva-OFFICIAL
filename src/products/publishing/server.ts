@@ -35,9 +35,17 @@ export async function readPublishingSnapshot(actor: WorkspaceActor, businessId: 
 export interface PublishingExtraReaders {
   activeSubscribers(tenantId: string): Promise<number>;
   collections(tenantId: string): Promise<SiteCollections["types"]>;
+  approvedIssues?(workspaceId: string, tenantId: string): Promise<number>;
 }
 
 const defaultReaders: PublishingExtraReaders = {
+  async approvedIssues(workspaceId, tenantId) {
+    const db = getSupabase();
+    if (!db) throw new Error("Newsletter issues are unavailable.");
+    const { data, error } = await (db as unknown as Db).rpc("read_workspace_newsletter_issues", { p_workspace_id: workspaceId, p_tenant_id: tenantId });
+    if (error || !Array.isArray(data)) throw new Error("Newsletter issues could not be read.");
+    return data.length;
+  },
   async activeSubscribers(tenantId) {
     const { getSubscribers } = await import("@/lib/storage/newsletter-store");
     return (await getSubscribers(tenantId)).filter((subscriber) => subscriber.status === "active").length;
@@ -65,11 +73,12 @@ export async function readPublishingExtras(listing: BusinessSystems, readers: Pu
   const newsletters: SiteAudience[] = [];
   const collections: SiteCollections[] = [];
   await Promise.all(tenants.map(async (tenantId) => {
-    const [count, types] = await Promise.all([
+    const [count, types, approvedIssues] = await Promise.all([
       readers.activeSubscribers(tenantId).catch(() => null),
       readers.collections(tenantId).catch(() => null),
+      readers.approvedIssues?.(listing.businessId, tenantId).catch(() => null) ?? Promise.resolve(null),
     ]);
-    if (count !== null) newsletters.push({ tenantId, activeSubscribers: count });
+    if (count !== null) newsletters.push({ tenantId, activeSubscribers: count, ...(approvedIssues !== null ? { approvedIssues } : {}) });
     if (types) collections.push({ tenantId, types });
   }));
   newsletters.sort((a, b) => a.tenantId.localeCompare(b.tenantId));
@@ -95,7 +104,8 @@ export const patchRecordWithGoogle = async (...args: Parameters<typeof import(".
 
 export const executePublishingEvent = async (...args: Parameters<typeof import("./execution").executePublishingEvent>) => (await import("./execution")).executePublishingEvent(...args);
 
-export { recordGoogleApprovalCopy } from "./record-changes";
+export { recordGoogleApprovalCopy, recordGoogleSummary } from "./record-changes";
+export type { RecordGoogleSummary } from "./record-changes";
 export * from "./reconnect";
 export { reconnectPage } from "./reconnect-page";
 

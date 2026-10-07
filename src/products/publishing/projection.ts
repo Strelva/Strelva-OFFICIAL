@@ -42,6 +42,7 @@ export type PublishingSnapshot = z.infer<typeof publishingSnapshotSchema>;
 export interface SiteAudience {
   tenantId: string;
   activeSubscribers: number;
+  approvedIssues?: number;
 }
 
 export interface SiteCollections {
@@ -182,7 +183,7 @@ export function addPublishingSystems(base: BusinessSystems, rawSnapshot: Publish
 
   for (const audience of extras.newsletters ?? []) {
     const website = websitesByTenantId.get(audience.tenantId);
-    if (!website || audience.activeSubscribers <= 0 || !website.references.tenantStableId) continue;
+    if (!website || (audience.activeSubscribers <= 0 && !audience.approvedIssues) || !website.references.tenantStableId) continue;
     const newsletter = system(businessId, { kind: "tenant_newsletter", ref: website.references.tenantStableId }, {
       name: `${website.system.name} newsletter`, kind: "newsletter", lifecycle: "live",
       createdAt: website.system.createdAt, updatedAt: website.system.updatedAt,
@@ -191,7 +192,7 @@ export function addPublishingSystems(base: BusinessSystems, rawSnapshot: Publish
     seen.add(newsletter.id);
     systems.push({
       system: newsletter, provenance: "existing",
-      basis: `${audience.activeSubscribers} active subscriber${audience.activeSubscribers === 1 ? "" : "s"}. Each issue is approved before it sends.`,
+      basis: `${audience.activeSubscribers} active subscriber${audience.activeSubscribers === 1 ? "" : "s"}. Sending is paused; approved issues and receipts stay here.`,
       references: { savedWorkId: null, tenantStableId: website.references.tenantStableId, tenantId: audience.tenantId },
     });
     connections.push({ provenance: "existing", connection: connection(newsletter, "appear", { type: "audience", audience: "subscribers" }, "connected", "Sent to active subscribers") });

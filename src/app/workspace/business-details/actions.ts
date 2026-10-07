@@ -5,6 +5,7 @@ import { isSuperAdmin } from "@/platform/infra/auth";
 import { getSessionUser } from "@/platform/infra/db/server-client";
 import { readBusinessRecord } from "@/platform/business-record/service";
 import { changeRecordWithGoogle } from "@/products/publishing/server";
+import { recordGoogleSummary, type RecordGoogleSummary } from "@/products/publishing/server";
 import { saveBusinessDetails } from "@/platform/business-record/details-save";
 import { ownerEntryHomesOpen } from "@/platform/owner-entry/linked-sites";
 import { workspaceReleaseEnabled } from "@/platform/workspace-release";
@@ -19,10 +20,14 @@ export async function saveBusinessDetailsAction(formData: FormData): Promise<voi
   const user = await getSessionUser().catch(() => null);
   if (!user?.id || !user.email || !user.email_confirmed_at) redirect(`/sign-in?next=${encodeURIComponent(`/workspace/business-details?workspaceId=${workspaceId}`)}`);
   if (!(await ownerEntryHomesOpen(workspaceId, user.id))) redirect(`/workspace?workspaceId=${workspaceId}`);
+  let googleResult: RecordGoogleSummary | null = null;
   const { outcome, field } = await saveBusinessDetails(
     { userId: user.id, verifiedEmail: user.email.trim().toLowerCase() }, workspaceId, revision, formData,
-    { read: readBusinessRecord, patch: async (actor, workspaceId, revision, patch, options) => (await changeRecordWithGoogle(actor, workspaceId, revision, patch, { ...options, googleApprovalDisclosed: formData.get("googleApprovalDisclosed") === "1" })).record, operator: isSuperAdmin },
+    { read: readBusinessRecord, patch: async (actor, workspaceId, revision, patch, options) => {
+      const result = await changeRecordWithGoogle(actor, workspaceId, revision, patch, { ...options, googleApprovalDisclosed: formData.get("googleApprovalDisclosed") === "1" });
+      googleResult = recordGoogleSummary(result); return result.record;
+    }, operator: isSuperAdmin },
   );
-  const params = new URLSearchParams({ workspaceId, result: outcome, ...(field ? { field } : {}) });
+  const params = new URLSearchParams({ workspaceId, result: outcome, ...(field ? { field } : {}), ...(googleResult ? { googleResult } : {}) });
   redirect(`/workspace/business-details?${params}`);
 }

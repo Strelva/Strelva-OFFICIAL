@@ -109,6 +109,9 @@ describe("publishing delivery gates and existing digest", () => {
     mocks.event.mockResolvedValue({ metadata: { kind: "workspace_google_listing_draft" } });
     expect(await publishingDecisionDeliveryAllowed(row as never)).toBe(false); expect(mocks.event).toHaveBeenCalledWith("event-id");
     mocks.event.mockResolvedValue({ metadata: { kind: "review_reply_draft" } }); expect(await publishingDecisionDeliveryAllowed(row as never)).toBe(true);
+    mocks.event.mockResolvedValue(null); expect(await publishingDecisionDeliveryAllowed(row as never)).toBe(false);
+    vi.stubEnv("STRELVA_PUBLISHING_RELEASE", "0"); mocks.event.mockClear();
+    expect(await publishingDecisionDeliveryAllowed(row as never)).toBe(true); expect(mocks.event).not.toHaveBeenCalled();
   });
   it("gated rows stay unsent, then existing morning digest contains each revision-bound approve link and records delivery", async () => {
     const memory = needsYouMemoryStore({ clock: { now: clock } });

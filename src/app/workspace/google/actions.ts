@@ -31,7 +31,7 @@ export async function googleListingAction(form: FormData): Promise<void> {
       const event = await getEventRaw(eventId);
       if (event?.tenantId !== tenantId || event.metadata?.kind !== "workspace_google_listing_draft" || event.metadata.workspaceId !== workspaceId || event.metadata.locationId !== locationId) throw new Error("That draft is not available here.");
       const resolved = await resolveEventAction(tenantId, eventId, action === "approve" ? "approved" : "dismissed", actor.userId);
-      result = resolved.changed ? (action === "approve" ? "Google accepted the change. See its receipt below." : "Declined. Nothing was sent.") : resolved.reason ?? "The draft remains waiting. Nothing was sent again.";
+      result = resolved.changed ? (action === "approve" ? resolved.reason === "already_on_google" ? "Google already matches. Nothing was sent." : resolved.reason ? "Google accepted the change; confirmation is still pending. See its receipt below." : "Google accepted the change. See its receipt below." : "Declined. Nothing was sent.") : resolved.reason ?? "The draft remains waiting. Nothing was sent again.";
     } else if (action === "reply" || action === "withdraw") {
       const outcome = await changeWorkspaceGoogleReply(actor, { workspaceId, tenantId, locationId, reviewId: z.string().regex(/^[A-Za-z0-9_-]{1,300}$/).parse(form.get("reviewId")), text: String(form.get("replyText") ?? ""), withdraw: action === "withdraw" });
       result = outcome.message;
