@@ -693,6 +693,74 @@ fi
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
+# Batch 7A (agency 1.0): provider seats, agency verification, the neutral
+# service actor and the payer party. Each 7A contract runs, then the replaced
+# contracts that can rerun here rerun against the replacements (workspace
+# authority and business billing commit or count fixtures; they rerun after
+# the full ordered upgrade in check-workspace-upgrade.sh). Then the rollback
+# rehearsal: with committed rows in every 7A table, the four rollbacks in
+# reverse order must archive them and leave the public catalog exactly as
+# before 7A; then 7A applies again and its contracts hold.
+batch_7a=(20261009151000_provider_seats 20261009152000_agency_verifications
+  20261009153000_platform_service_actor 20261009154000_payer_party)
+catalog_fingerprint() {
+  psql "${psql_args[@]}" --tuples-only --no-align --file="$repo_root/tests/support/public-catalog-fingerprint.sql"
+}
+apply_batch_7a() {
+  local name
+  for name in "${batch_7a[@]}"; do
+    psql "${psql_args[@]}" --single-transaction --file="$repo_root/supabase/migrations/$name.sql"
+  done
+}
+check_batch_7a_contracts() {
+  psql "${psql_args[@]}" --file="$repo_root/tests/provider-seats-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/agency-verifications-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/platform-service-actor-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/payer-party-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/batch-7a-reader-modes.sql"
+}
+check_batch_7a() {
+  check_batch_7a_contracts
+  psql "${psql_args[@]}" --file="$repo_root/tests/system-versions-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/agency-client-overview-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-schema.sql"
+  psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
+}
+catalog_fingerprint >"$cluster_root/catalog-before-7a.txt"
+apply_batch_7a
+check_batch_7a
+psql "${psql_args[@]}" --file="$repo_root/tests/batch-7a-populated.sql"
+for (( index=${#batch_7a[@]}-1; index>=0; index-- )); do
+  psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-${batch_7a[$index]}.sql"
+done
+catalog_fingerprint >"$cluster_root/catalog-after-7a-rollback.txt"
+if ! diff -u "$cluster_root/catalog-before-7a.txt" "$cluster_root/catalog-after-7a-rollback.txt"; then
+  printf 'Batch 7A rollback did not restore the public catalog.\n' >&2
+  exit 1
+fi
+archived_7a="$(psql "${psql_args[@]}" --tuples-only --no-align --command="
+  select (select count(*) from release_rollback_archive.m20261009151000_provider_seats)
+    || ' ' || (select count(*) from release_rollback_archive.m20261009151000_agency_client_staff)
+    || ' ' || (select count(*) from release_rollback_archive.m20261009151000_workspace_providers)
+    || ' ' || (select count(*) from release_rollback_archive.m20261009152000_agency_verifications)
+    || ' ' || (select count(*) from release_rollback_archive.m20261009153000_strelva_service_actions)
+    || ' ' || (select count(*) from release_rollback_archive.m20261009154000_accounts)
+    || ' ' || (select count(*) from release_rollback_archive.m20261009154000_job_economics)
+    || ' ' || (select count(*) from release_rollback_archive.m20261009154000_workspace_payer_transitions)")"
+if [[ "$archived_7a" != "1 1 1 1 1 1 1 1" ]]; then
+  printf 'Batch 7A rollback archives are wrong: %s\n' "$archived_7a" >&2
+  exit 1
+fi
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-${batch_7a[0]}.sql" >"$cluster_root/7a-wrong-order.log" 2>&1; then
+  printf 'A batch 7A rollback ran against a schema without 7A.\n' >&2
+  exit 1
+fi
+grep -q 'rollback_wrong_order_or_function_drift' "$cluster_root/7a-wrong-order.log"
+# The rehearsal fixture's rows stay committed, so only the 7A contracts rerun.
+apply_batch_7a
+check_batch_7a_contracts
+printf 'Batch 7A forward, populated rollback and reapply passed.\n'
 # Wave 6 website: fallback undo, immutable release reconciliation, and
 # owner-decided domain proposals. Fictional fixtures and isolated Postgres only.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010110000_website_cutover_undo.sql"
