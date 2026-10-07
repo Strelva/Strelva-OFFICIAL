@@ -10,7 +10,7 @@ const fields = [{ id: "title", label: "Business", type: "text" as const, require
   { id: "handler", label: "Staff", type: "assigned_person" as const, required: true }];
 const values = { title: "Acme", client: contactId, handler: personId };
 const snapshot: ApplicationUseSnapshot = { workId: "11111111-1111-4111-8111-111111111111", title: "Intake", releaseVersion: 1,
-  views: [{ kind: "form", fields }, { kind: "list", fields }], records: [{ id: "r1", values, revision: 2 }],
+  views: [{ kind: "form", fields }, { kind: "list", fields }], records: [{ id: "r1", values, revision: 2, linkLabels: { client: "Acme · client@example.test", handler: "Sam Rivera · sam@example.test" } }],
   access: { views: ["form", "list"], recordRead: "own", recordEdit: "own", recordSubmit: false, expiresAt: "2027-01-01T00:00:00Z" } };
 let container: HTMLDivElement; let root: Root;
 beforeEach(() => { vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); container = document.createElement("div"); document.body.append(container); root = createRoot(container); });
@@ -21,12 +21,20 @@ function Harness({ onSubmit }: { onSubmit: (draft: ApplicationUseDraft) => void 
   return createElement(ApplicationUseRenderer, { snapshot, draft, onDraftChange: setDraft, onSubmit });
 }
 describe("correcting saved contact links", () => {
+  it("shows human names and addresses in the record list", async () => {
+    await act(async () => root.render(createElement(Harness, { onSubmit: vi.fn() })));
+    expect(container.textContent).toContain("Acme · client@example.test");
+    expect(container.textContent).toContain("Sam Rivera · sam@example.test");
+    expect(container.textContent).not.toContain(contactId);
+    expect(container.textContent).not.toContain(personId);
+  });
   it("keeps stored UUIDs out of email validation and preserves them on an unrelated correction", async () => {
     const onSubmit = vi.fn(); await act(async () => root.render(createElement(Harness, { onSubmit })));
     await act(async () => button("Edit record").click());
     const staff = container.querySelector<HTMLInputElement>('input[aria-label="Staff"]')!;
     expect(staff.type).toBe("email"); expect(staff.value).toBe(""); expect(staff.required).toBe(false);
-    expect(container.textContent).toContain("A staff member is already linked.");
+    expect(container.textContent).toContain("Currently linked: Sam Rivera · sam@example.test.");
+    expect(staff.placeholder).toBe("Sam Rivera · sam@example.test");
     expect(container.querySelector("form")!.checkValidity()).toBe(true);
     await act(async () => button("Save correction").click());
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ values, recordId: "r1", expectedRecordRevision: 2 }));

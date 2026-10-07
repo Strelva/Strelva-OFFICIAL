@@ -132,6 +132,7 @@ export function ApplicationUseRenderer({
               {formView.fields.map(field => {
                 const value = draft.values[field.id];
                 const savedLink = (field.type === "contact" || field.type === "assigned_person") && typeof value === "string" && LINK_ID.test(value);
+                const savedLabel = savedLink ? snapshot.records.find(record => record.id === draft.editingRecordId && record.values[field.id] === value)?.linkLabels?.[field.id] : undefined;
                 if (field.type === "boolean") {
                   return (
                     <fieldset key={field.id} className="space-y-2">
@@ -184,8 +185,8 @@ export function ApplicationUseRenderer({
                     label={`${field.label}${field.required ? " *" : ""}`}
                     aria-label={field.label}
                     type={fieldInputType(field.type)}
-                    placeholder={savedLink ? "Current link (unchanged)" : fieldPlaceholder(field.type)}
-                    helperText={savedLink ? (field.type === "assigned_person" ? "A staff member is already linked. Enter another staff email to change it." : "A contact is already linked. Enter another email or phone to change it.") : undefined}
+                    placeholder={savedLink ? savedLabel ?? "Current link (unchanged)" : fieldPlaceholder(field.type)}
+                    helperText={savedLink ? `${savedLabel ? `Currently linked: ${savedLabel}.` : field.type === "assigned_person" ? "A staff member is already linked." : "A contact is already linked."} ${field.type === "assigned_person" ? "Enter another staff email to change it." : "Enter another email or phone to change it."}` : undefined}
                     inputMode={field.type === "number" ? "decimal" : undefined}
                     value={savedLink || value === undefined ? "" : String(value)}
                     required={field.required && !savedLink}
@@ -221,7 +222,7 @@ export function ApplicationUseRenderer({
                     {recordFields.map(field => (
                       <div key={field.id} className="min-w-0">
                         <dt className="text-xs uppercase tracking-[0.1em] text-gray-muted">{field.label}</dt>
-                        <dd className="mt-1 break-words text-sm text-warm-black">{displayValue(record.values[field.id])}</dd>
+                        <dd className="mt-1 break-words text-sm text-warm-black">{record.linkLabels?.[field.id] ?? displayValue(record.values[field.id])}</dd>
                       </div>
                     ))}
                   </dl>
