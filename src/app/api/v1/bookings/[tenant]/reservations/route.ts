@@ -20,8 +20,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
   try {
     if (await isRateLimitedAsync(rateLimitKey(request, `v1-bookings:${tenant}`), 20)) return bookingJson({ error: "Too many booking requests." }, 429);
   } catch {
-    // A limiter outage must not make a truthful booking boundary look like an
-    // availability outage; the durable idempotency key still protects retries.
+    return bookingJson({ error: "Booking requests are temporarily unavailable. Nothing was booked." }, 503);
   }
   const body = await bodyObject(request);
   if (!body) return bookingJson({ error: "Invalid request body." }, 400);

@@ -102,10 +102,23 @@ function dependencies(options: {
     save: vi.fn(async (value: PublicBookingReservationRef) => { saved.push(value); return value; }),
   };
   const resolve = vi.fn(async () => options.currentBinding ?? binding());
-  return { calendar: { read, recover }, tokens, resolve, saved };
+  return { calendar: { read, recover }, tokens, resolve, saved, admission: { verified: vi.fn(async () => true) } };
 }
 
 describe("public booking readback recovery", () => {
+  it.each(["pending", "cancelled"] as const)("returns an unverified %s receipt without resolving or reconciling the provider", async status => {
+    const deps = dependencies({ currentRef: ref({ status }) });
+    deps.admission.verified.mockResolvedValue(false);
+    expect((await recoverPublicWebsiteBooking({ tenantId, reservationId, managementToken }, deps)).status).toBe(status);
+    expect(deps.resolve).not.toHaveBeenCalled(); expect(deps.calendar.read).not.toHaveBeenCalled();
+    expect(deps.calendar.recover).not.toHaveBeenCalled(); expect(deps.tokens.save).not.toHaveBeenCalled();
+  });
+  it("fails closed when email authorization lookup is unavailable", async () => {
+    const deps = dependencies(); deps.admission.verified.mockRejectedValue(new Error("admission unavailable"));
+    await expect(recoverPublicWebsiteBooking({ tenantId, reservationId, managementToken }, deps)).rejects.toThrow("admission unavailable");
+    expect(deps.resolve).not.toHaveBeenCalled(); expect(deps.calendar.recover).not.toHaveBeenCalled();
+  });
+
   it("returns a truthful pending receipt without native recovery when the durable claim has no reservation", async () => {
     const deps = dependencies({ currentRef: ref({ status: "confirmed" }), current: schedule(4) });
     const result = await recoverPublicWebsiteBooking({ tenantId, reservationId, managementToken }, deps);

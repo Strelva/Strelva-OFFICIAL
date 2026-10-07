@@ -48,7 +48,7 @@ export function manageDeps(): ManageDeps {
       return service.cancel(input);
     },
     async confirm(token) {
-      if (!bookingAgentsEnabled()) throw new PublicBookingError("not_found", "Agent bookings are unavailable.");
+      if (!nativeEnabled()) throw new PublicBookingError("not_found", "Booking confirmation is unavailable.");
       const booking = await confirmAgent(tokenHash(token));
       await notifyBookingRequestNow(booking);
       await deliverBookingUpdates(booking.id).catch(() => undefined);

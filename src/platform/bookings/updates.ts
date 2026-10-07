@@ -85,7 +85,7 @@ export async function deliverBookingUpdates(bookingId: string | null = null, dep
         subject: `${title}: ${booking.serviceName}, ${when.day} ${when.time}`,
         idempotencyKey: `booking-update:${row.messageId}`,
         options: { heading: title, paragraphs: [state === "held"
-          ? "An assistant requested this time for you. Confirm below within 15 minutes. Nothing is booked until you confirm."
+          ? "You requested this time. Confirm below within 15 minutes. Nothing is booked until you confirm."
           : state === "requested" ? "The business will confirm this request. This time is not confirmed yet."
           : state === "cancelled" ? "This booking is cancelled."
           : state === "declined" ? "This time was not confirmed. Reply to ask about another time."
