@@ -47,7 +47,7 @@ describe("owner booking evidence", () => {
     links();
     const result = await readWorkspaceBookings(ACTOR, WS, { view: "day", date: "2026-11-06" }, deps());
     const html = renderToStaticMarkup(createElement(WorkspaceBookings, { workspaceId: WS, view: "day", state: { kind: "ready", bookings: result } }));
-    expect(html).toContain("No-show"); expect(html).toContain("Booking history"); expect(html).toContain("Owner approved"); expect(html).toContain("Not sent: email is disabled"); expect(html).toContain("Not on your calendar yet"); expect(html).toContain("Reconnect your calendar");
+    expect(html).toContain("No-show"); expect(html).toContain("Booking history"); expect(html).toContain("Owner approved"); expect(html).toContain("Not sent: email is disabled"); expect(html).toContain("Not verified on your calendar yet"); expect(html).toContain("Reconnect your calendar");
     expect(html).not.toContain("Calendar copy verified"); expect(html).not.toContain("Checked in");
   });
   it("keeps existing confirmed bookings outside changed record hours and permits marking ended appointments only", async () => {

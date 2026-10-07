@@ -1,3 +1,4 @@
+import { ProposeBookingTimes } from "@/experience/bookings/ProposeBookingTimes";
 import { Card } from "@/components/ui/Card";
 import type { HeldInquiries, HeldView, LeadView, WorkspaceLeads } from "@/products/inquiries/linked-leads";
 import { HeldInquiryActions } from "./HeldInquiryActions";
@@ -13,7 +14,7 @@ function sourceLabel(source: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function LeadCard({ lead, workspaceId }: { lead: LeadView; workspaceId: string }) {
+function LeadCard({ lead, workspaceId, tenantId, bookingProposals }: { lead: LeadView; workspaceId: string; tenantId: string | null; bookingProposals?: boolean }) {
   return (
     <Card padding="md">
       <article aria-labelledby={`lead-${lead.id}`}>
@@ -36,6 +37,7 @@ function LeadCard({ lead, workspaceId }: { lead: LeadView; workspaceId: string }
             <span className="break-all text-gray-muted">{lead.email}</span>
           </p>
         ) : null}
+        {bookingProposals && tenantId && lead.email ? <ProposeBookingTimes workspaceId={workspaceId} tenantId={tenantId} inquiryId={lead.id} customerName={lead.name} /> : null}
         {lead.releasedRowId ? (
           <>
             <p className="mt-3 text-xs text-gray-muted">Released from held messages.</p>
@@ -111,7 +113,7 @@ export function WorkspaceInquiries({ workspaceId, state }: { workspaceId: string
           ) : (
             <>
               <p className="mb-3 text-sm text-gray-muted">{site.lastThirtyDays} in the last 30 days · {site.leads.length} in all</p>
-              <div className="grid gap-3">{site.leads.map((lead) => <LeadCard key={lead.id} lead={lead} workspaceId={workspaceId} />)}</div>
+              <div className="grid gap-3">{site.leads.map((lead) => <LeadCard key={lead.id} lead={lead} workspaceId={workspaceId} tenantId={site.tenantId} bookingProposals={site.bookingProposals} />)}</div>
             </>
           )}
         </section>

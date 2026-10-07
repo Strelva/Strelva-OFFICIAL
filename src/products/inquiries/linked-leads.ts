@@ -1,3 +1,4 @@
+import { ownerCanProposeBookingTimes } from "@/products/bookings/inquiry-proposals";
 import { getLeads, type LeadRecord } from "@/lib/leads";
 import { getRedis } from "@/platform/infra/redis";
 import { inquiryRecordsEnabled } from "@/lib/inquiry-records";
@@ -44,6 +45,8 @@ export interface SiteLeads {
   /** How many reached out in the last 30 days. */
   lastThirtyDays: number;
   unavailable: boolean;
+  /** Owner/admin reply action, only after the booking offers and store-read gates. */
+  bookingProposals?: true;
 }
 
 export interface HeldView {
@@ -91,6 +94,7 @@ export interface LeadDependencies {
   /** Held and released items from Postgres; null when the switch is off. Membership is checked again in SQL. */
   records?: (actor: WorkspaceActor, workspaceId: string) => Promise<InquiryRecordsRead> | null;
   /** Null when connected sites are off for this business. Throws when they can't be read. */
+  canProposeBookings?: typeof ownerCanProposeBookingTimes;
   connected?: (actor: WorkspaceActor, workspaceId: string) => Promise<ConnectedSiteInquiries[] | null>;
 }
 
@@ -119,6 +123,7 @@ const defaults: LeadDependencies = {
     ]).then(([held, released]) => ({ held, released }))
     : null,
   connected: readConnectedSiteInquiries,
+  canProposeBookings: ownerCanProposeBookingTimes,
 };
 
 export function heldView(lead: WorkspaceInquiryLead): HeldView {
@@ -178,6 +183,7 @@ export function leadView(lead: LeadRecord): LeadView {
 export async function readWorkspaceLeads(actor: WorkspaceActor, workspaceId: string, dependencies: LeadDependencies = defaults): Promise<WorkspaceLeads> {
   const { sites, denied } = await dependencies.sites(actor, workspaceId);
   const ready = dependencies.storeReady();
+  const canPropose = await dependencies.canProposeBookings?.(actor, workspaceId).catch(() => false);
   let records: InquiryRecordsRead | null = null;
   let recordsUnavailable = false;
   const pending = dependencies.records?.(actor, workspaceId) ?? null;
@@ -200,7 +206,7 @@ export async function readWorkspaceLeads(actor: WorkspaceActor, workspaceId: str
       const seen = new Set(kept.map((lead) => lead.id));
       const released = (records?.released ?? []).filter((lead) => lead.tenantId === site.tenantId && !seen.has(lead.leadId)).map(releasedLeadView);
       const leads = [...kept, ...released].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-      return { ...base, leads, lastThirtyDays: recentCount(leads, dependencies.now()), unavailable: false };
+      return { ...base, leads, lastThirtyDays: recentCount(leads, dependencies.now()), unavailable: false, ...(canPropose ? { bookingProposals: true as const } : {}) };
     } catch (error) {
       console.error("[inquiries] lead store read failed", { tenantId: site.tenantId, error: error instanceof Error ? error.message : String(error) });
       return { ...base, leads: [], lastThirtyDays: 0, unavailable: true };
