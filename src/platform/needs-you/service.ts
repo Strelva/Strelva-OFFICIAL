@@ -248,11 +248,31 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
       summary.ownerNotTold += rows.length;
       return;
     }
-    if (rows.some(row => row.sourceLifecycle === "tenant_event" && (row.kind === "customer.message" || row.kind === "customer.commitment"))
+    const inquiryEmail = rows.some(row => row.sourceLifecycle === "tenant_event" && (row.kind === "customer.message" || row.kind === "customer.commitment"));
+    if (inquiryEmail
       && (!deps.urgentInquiryAllowed || !(await deps.urgentInquiryAllowed(first.recipient?.tenantId ?? null)))) {
       for (const row of rows) await deps.store.recordDelivery(row.workspaceId, row.id, kind, "suppressed", recipient, null, "inquiry_email_gates_off");
       summary.ownerNotTold += rows.length;
       return "suppressed";
+    }
+    const durableUrgent = inquiryEmail && kind === "urgent";
+    if (durableUrgent) {
+      // Immediate delivery and the hourly chase share this SQL claim. A stale
+      // not_sent projection cannot send after a timeout or failed checkpoint.
+      if (rows.length !== 1 || !deps.store.claimInquiryNotice || !deps.store.finishInquiryNotice) {
+        await deps.store.recordDelivery(first.workspaceId, first.id, kind, "suppressed", recipient, null, "inquiry_send_claim_unavailable");
+        return "suppressed";
+      }
+      try {
+        const claim = await deps.store.claimInquiryNotice(first, recipient);
+        if (!claim.acquired) {
+          if (claim.status === "accepted") return "sent";
+          if (claim.status === "suppressed") return "suppressed";
+          return "failed";
+        }
+      } catch {
+        return "failed";
+      }
     }
     const options = email(kind === "urgent" ? "urgent" : kind === "digest" ? "digest" : "reminder", first.businessName, rows, recipient);
     if (inquiryNotice) options.paragraphs = [
@@ -277,6 +297,17 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
       reason = error instanceof Error ? error.message.slice(0, 200) : "send_failed";
     }
     const status = result?.status === "accepted" ? "sent" : result?.status === "suppressed" ? "suppressed" : "failed";
+    if (durableUrgent) {
+      // Provider acceptance is the result even if checkpoint persistence
+      // fails. The earlier durable sending claim still excludes another send.
+      await deps.store.finishInquiryNotice!(first, status === "sent" ? "accepted" : status === "suppressed" ? "suppressed" : "unknown",
+        result?.status === "accepted" ? result.providerMessageId : null,
+        result?.status === "accepted" ? result.acceptedAt : null,
+        result?.status === "suppressed" ? result.reason : reason).catch(() => undefined);
+      if (status === "suppressed") summary.ownerNotTold += 1;
+      if (status === "failed") summary.failed += 1;
+      return status;
+    }
     for (const row of rows) {
       await deps.store.recordDelivery(row.workspaceId, row.id, kind, status, recipient,
         result?.status === "accepted" ? result.providerMessageId : null,
@@ -304,7 +335,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
       : (await deps.store.dueForDelivery(500)).find(item => item.workspaceId === workspaceId && item.sourceLifecycle === sourceLifecycle && item.sourceId === sourceId) ?? null;
     if (!row || row.state !== "open" || !row.urgent || row.route !== "owner_decides") return "none";
     if (await reconcile(ctx, row) !== "current") return "none";
-    if (row.deliveryState !== "not_sent") return row.deliveryState === "suppressed" ? "suppressed" : "sent";
+    if (row.deliveryState !== "not_sent") return row.deliveryState === "suppressed" ? "suppressed" : row.deliveryState === "bounced" ? "failed" : "sent";
     if (!(await deps.urgentInquiryAllowed(row.recipient?.tenantId ?? null))) {
       await deps.store.recordDelivery(workspaceId, row.id, "urgent", "suppressed", row.recipient?.email ?? null, null, "inquiry_email_gates_off");
       return "suppressed";

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LeadRecord } from "@/lib/leads";
 import type { UnifiedEvent } from "@/lib/types";
@@ -17,8 +17,13 @@ import { createMemoryInquiryDeliveryStore } from "@/products/inquiries/delivery-
 import { reconcileInquiryProviderEvent } from "@/products/inquiries/reconciliation";
 import type { InquiryDeliveryStore, InquiryOutboundTransport } from "@/products/inquiries/delivery-types";
 import { createInMemoryInquiryRepository, type InquiryRepository } from "@/products/inquiries/repository";
+import { setInquiryRecordsDb } from "@/platform/infra/inquiry-records";
+import { tenantEventAdapter, tenantEventItem } from "@/platform/needs-you/adapters";
+import { ownerDecisionSchema } from "@/platform/needs-you/contracts";
+import { tenantEventRevision } from "@/platform/needs-you/tenant-classify";
 
 vi.mock("@/lib/tenant-crm", () => ({ addTenantActivity: vi.fn(async () => undefined) }));
+afterEach(() => { setInquiryRecordsDb(undefined); vi.unstubAllEnvs(); });
 
 const TENANT = "approval-tenant";
 const BUSINESS = "approval-business";
@@ -209,6 +214,57 @@ function transport(verification: "verified" | "unverified" = "verified"): Inquir
       : { status: "unverified" as const, reason: "Provider read-back is unavailable.", retryable: false }),
   };
 }
+
+describe("signed owner decision through the tenant adapter and inquiry executor", () => {
+  it.each(["approved", "unclaimed", "wrong_recipient", "stale_revision", "flags_off"] as const)("uses exact recorded owner authority: %s", async (authorization) => {
+    const { base, events, repository } = await fixture();
+    await prepare("reply", base);
+    const event = events[0]!;
+    const revision = tenantEventRevision(event);
+    const owner = "owner@example.test";
+    vi.stubEnv("STRELVA_INQUIRY_OWNER_NOTICES", authorization === "flags_off" ? "0" : "1");
+    vi.stubEnv("STRELVA_INQUIRY_RECORDS", "1");
+    vi.stubEnv("DUAL_WRITE_PG", "1");
+    const authorize = vi.fn(async (name: string, args: Record<string, unknown>) => ({
+      data: name === "authorize_inquiry_owner_link_decision" && authorization !== "unclaimed"
+        && args.p_tenant_id === TENANT && args.p_event_id === event.id
+        && args.p_revision === (authorization === "stale_revision" ? "b".repeat(64) : revision)
+        && args.p_recipient === (authorization === "wrong_recipient" ? "other@example.test" : owner), error: null,
+    }));
+    setInquiryRecordsDb({ rpc: authorize });
+    const mail = transport();
+    const adapter = tenantEventAdapter({
+      linkedTenants: async () => [TENANT], pendingEvents: async () => events,
+      readEvent: async id => events.find(item => item.id === id) ?? null,
+      resolveEventAction: async (tenantId, eventId, _action, actorId) => {
+        const execution = await executeInquiryMessageReview({ tenantId, eventId, event, actorId, deps: { ...base, transport: mail } });
+        return { changed: execution.safeToResolve, ...(execution.verified ? {} : { reason: execution.reason }) };
+      },
+    });
+    const proposed = tenantEventItem(event)!;
+    const item = ownerDecisionSchema.parse({
+      ...proposed, id: "a0000000-0000-4000-8000-000000000001", workspaceId: "a0000000-0000-4000-8000-000000000002",
+      systemId: null, detail: proposed.detail ?? null, openHref: proposed.openHref ?? null,
+      signInRequired: false, state: "approved", outcome: null, outcomeReason: null, receiptRef: null,
+      decidedByKind: "owner_link", decidedAt: AT, deliveryState: "sent", operatorNote: null,
+      openedAt: AT, expiresAt: "2026-09-25T12:00:00Z", reminded1At: null, reminded2At: null, deliveries: [],
+    });
+    const result = await adapter.resolve({ workspaceId: item.workspaceId }, item, "approve", { kind: "owner_link", recipient: owner, actor: null });
+    if (authorization === "approved") {
+      expect(result).toEqual({ outcome: "done", receiptRef: `tenant_event:${event.id}` });
+      expect(mail.send).toHaveBeenCalledTimes(1);
+      expect((await repository.getSnapshot(TENANT, BUSINESS))?.state.responsibilityReceipts).toHaveLength(1);
+      expect((await repository.getSnapshot(TENANT, BUSINESS))?.state.responsibilityReceipts[0]).toMatchObject({
+        why: "The business owner approved the exact rendered message through a signed decision.",
+        outcomeEvidence: expect.arrayContaining(["signed owner decision owner-link:[redacted email]"]),
+      });
+      expect(authorize).toHaveBeenCalledWith("authorize_inquiry_owner_link_decision", { p_tenant_id: TENANT, p_event_id: event.id, p_revision: revision, p_recipient: owner });
+    } else {
+      expect(result).toMatchObject({ outcome: "failed", reason: "permission_denied" });
+      expect(mail.send).not.toHaveBeenCalled();
+    }
+  });
+});
 
 describe("inquiry message review approval", () => {
   beforeEach(() => vi.clearAllMocks());

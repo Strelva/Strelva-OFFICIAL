@@ -4,7 +4,7 @@ import type { UnifiedEvent } from "@/lib/types";
 import type { SendEmailInput, SendEmailResult } from "@/platform/infra/email/send";
 import type { ServiceRequest } from "@/platform/service-requests/types";
 import type { OwnerDecision, ProposedItem } from "@/platform/needs-you/contracts";
-import { serviceRequestAdapter, tenantEventAdapter, type SourceAdapter } from "@/platform/needs-you/adapters";
+import { serviceRequestAdapter, tenantEventAdapter, tenantEventItem, type SourceAdapter } from "@/platform/needs-you/adapters";
 import { NeedsYouRefusedError, type DeliveryRow, type NeedsYouStore } from "@/platform/needs-you/repository";
 import { createNeedsYouService } from "@/platform/needs-you/service";
 import { tenantEventRevision } from "@/platform/needs-you/tenant-classify";
@@ -18,6 +18,7 @@ const DAY = 24 * 3600 * 1000;
 /** In-memory twin of the SQL functions, enough to drive the service. The SQL itself is proven by tests/needs-you-schema.sql. */
 function memoryStore(clock: { now: number }) {
   const items = new Map<string, OwnerDecision>();
+  const noticeClaims = new Map<string, "sending" | "accepted" | "suppressed" | "unknown">();
   const state = { ownerRecipient: "owner@example.test" as string | null, ownerMember: true };
   const store: NeedsYouStore = {
     async open(workspaceId, p: ProposedItem) {
@@ -66,13 +67,25 @@ function memoryStore(clock: { now: number }) {
       return [...items.values()].filter(i => i.state === "open" && i.route === "owner_decides")
         .map(i => ({ ...i, businessName: "Mooney Fixture Firm", timezone: "America/New_York", recipient: state.ownerRecipient ? { email: state.ownerRecipient, from: "tenant_fallback", tenantId: "fixture-firm" } : null }) as DeliveryRow);
     },
+    async claimInquiryNotice(row, recipient) {
+      const prior = noticeClaims.get(row.id);
+      if (prior) return { acquired: false, status: prior };
+      if (items.get(row.id)?.revisionHash !== row.revisionHash || recipient !== state.ownerRecipient) throw new Error("changed");
+      noticeClaims.set(row.id, "sending");
+      return { acquired: true, status: "sending" };
+    },
+    async finishInquiryNotice(row, status, providerMessageId, _acceptedAt, reason) {
+      if (noticeClaims.get(row.id) !== "sending") return;
+      noticeClaims.set(row.id, status);
+      await store.recordDelivery(row.workspaceId, row.id, "urgent", status === "accepted" ? "sent" : status === "suppressed" ? "suppressed" : "failed", state.ownerRecipient, providerMessageId, reason);
+    },
     async linkedTenants(ws) { return ws === OTHER_WS ? [] : [{ workspaceId: WS, tenantId: "fixture-firm" }]; },
     async ownerActor(_ws, recipient) { return state.ownerMember && recipient === state.ownerRecipient ? OWNER : null; },
     async policies() { return []; },
     async setPolicy() { throw new Error("unused"); },
     async handled() { return []; },
   };
-  return { store, items, state };
+  return { store, items, state, noticeClaims };
 }
 
 function ev(over: Partial<UnifiedEvent>): UnifiedEvent {
@@ -88,12 +101,13 @@ let sendEmail: ReturnType<typeof vi.fn<(input: SendEmailInput) => Promise<SendEm
 let requests: ServiceRequest[];
 let change: ReturnType<typeof vi.fn>;
 
-function service(adapters?: SourceAdapter[]) {
+function service(adapters?: SourceAdapter[], urgentInquiryAllowed?: () => Promise<boolean>) {
   return createNeedsYouService({
     store: mem.store,
     appOrigin: "https://app.example.test",
     now: () => clock.now,
     sendEmail,
+    urgentInquiryAllowed,
     adapters: adapters ?? [
       tenantEventAdapter({
         linkedTenants: async (ws) => (await mem.store.linkedTenants(ws)).map(l => l.tenantId),
@@ -345,5 +359,78 @@ describe("the chase", () => {
     expect(summary.ownerNotTold).toBe(1);
     expect(sendEmail).not.toHaveBeenCalled();
     expect([...mem.items.values()][0]!.deliveries[0]).toMatchObject({ status: "suppressed", reason: "no_owner_recipient" });
+  });
+});
+
+describe("durable urgent inquiry owner notices", () => {
+  it.each(["inquiry_capability_publish", "inquiry_capability_undo"])("keeps %s owner-only even when its old event was operator-routed", kind => {
+    const item = tenantEventItem(ev({ type: "change_request", metadata: { kind, reviewAudience: "operator" } }));
+    expect(item).toMatchObject({ route: "owner_decides", adminMayDecide: false });
+  });
+  function inquiryService() {
+    requests = [];
+    clock.now = Date.parse("2026-10-06T15:00:00Z");
+    events = new Map([["evt-1", ev({ type: "change_request", metadata: {
+      kind: "inquiry_delivery_approval", inquiryId: "lead_fixture", action: "reply",
+      subject: "Party", messageBody: "We can host 30 guests for $40 each.",
+    } })]]);
+    return service(undefined, async () => true);
+  }
+  const deliver = (svc: ReturnType<typeof service>) => svc.deliverUrgentSource(WS, "tenant_event", "fixture-firm:evt-1");
+
+  it("serializes immediate delivery against another immediate call and the chase", async () => {
+    const svc = inquiryService();
+    let started!: () => void;
+    const inProvider = new Promise<void>(resolve => { started = resolve; });
+    let accept!: (result: SendEmailResult) => void;
+    sendEmail.mockImplementationOnce(async () => { started(); return new Promise<SendEmailResult>(resolve => { accept = resolve; }); });
+    const first = deliver(svc);
+    await inProvider;
+    expect(await deliver(svc)).toBe("failed");
+    await svc.chase();
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    accept({ status: "accepted", providerMessageId: "msg-race", acceptedAt: new Date(clock.now).toISOString() });
+    expect(await first).toBe("sent");
+    expect(await deliver(svc)).toBe("sent");
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps acceptance closed when its durable checkpoint fails past provider idempotency expiry", async () => {
+    const svc = inquiryService();
+    sendEmail.mockResolvedValue({ status: "accepted", providerMessageId: "msg-accepted", acceptedAt: new Date(clock.now).toISOString() });
+    mem.store.finishInquiryNotice = vi.fn().mockRejectedValue(new Error("database down"));
+    expect(await deliver(svc)).toBe("sent");
+    expect([...mem.noticeClaims.values()]).toEqual(["sending"]);
+    clock.now += 2 * DAY;
+    expect(await deliver(svc)).toBe("failed");
+    await svc.chase();
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("never retries an ambiguous provider response or calls it sent", async () => {
+    const svc = inquiryService();
+    sendEmail.mockRejectedValue(new Error("provider response lost"));
+    expect(await deliver(svc)).toBe("failed");
+    expect([...mem.noticeClaims.values()]).toEqual(["unknown"]);
+    clock.now += 2 * DAY;
+    expect(await deliver(svc)).toBe("failed");
+    await svc.chase();
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a bounced decision as failed without a new email", async () => {
+    const svc = inquiryService();
+    await svc.list(OWNER, WS);
+    const row = [...mem.items.values()][0]!;
+    mem.items.set(row.id, { ...row, deliveryState: "bounced" });
+    expect(await deliver(svc)).toBe("failed");
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("fails closed without the durable claim port", async () => {
+    const svc = inquiryService();
+    delete mem.store.claimInquiryNotice;
+    expect(await deliver(svc)).toBe("suppressed");
+    expect(sendEmail).not.toHaveBeenCalled();
   });
 });

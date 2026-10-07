@@ -79,6 +79,8 @@ function actorArgs(actor: WorkspaceActor) {
 const recipientSchema = z.object({ email: z.string(), from: z.string(), tenantId: z.string().nullable().optional() }).passthrough();
 export type DeliveryRow = OwnerDecision & { businessName: string; timezone: string; recipient: z.infer<typeof recipientSchema> | null };
 const deliveryRowSchema = ownerDecisionSchema.extend({ businessName: z.string(), timezone: z.string(), recipient: recipientSchema.nullable() });
+const inquiryNoticeClaimSchema = z.object({ acquired: z.boolean(), status: z.enum(["sending", "accepted", "suppressed", "unknown"]) });
+export type InquiryNoticeClaim = z.infer<typeof inquiryNoticeClaimSchema>;
 
 const claimSchema = z.object({ status: z.enum(["claimed", "already_handled", "changed", "expired"]), item: ownerDecisionSchema });
 export type ClaimResult = z.infer<typeof claimSchema>;
@@ -105,6 +107,9 @@ export interface NeedsYouStore {
   dueForDelivery(limit: number): Promise<DeliveryRow[]>;
   /** Exact urgent source; avoids unrelated businesses or the cron's page cap. */
   deliveryForSource?(workspaceId: string, lifecycle: string, sourceId: string): Promise<DeliveryRow | null>;
+  /** One durable inquiry urgent-send purpose. Ambiguous sends never reopen. */
+  claimInquiryNotice?(row: DeliveryRow, recipient: string): Promise<InquiryNoticeClaim>;
+  finishInquiryNotice?(row: DeliveryRow, status: "accepted" | "suppressed" | "unknown", providerMessageId: string | null, acceptedAt: string | null, reason: string | null): Promise<void>;
   linkedTenants(workspaceId: string | null): Promise<{ workspaceId: string; tenantId: string }[]>;
   ownerActor(workspaceId: string, recipient: string): Promise<WorkspaceActor | null>;
   /**
@@ -142,6 +147,10 @@ export const PostgresNeedsYouStore: NeedsYouStore = {
   }, ownerDecisionSchema, "The delivery could not be recorded."),
   dueForDelivery: (limit) => call("list_open_owner_decisions_for_delivery", { p_limit: limit }, z.array(deliveryRowSchema), "Open decisions could not be listed."),
   deliveryForSource: (workspaceId, lifecycle, sourceId) => call("read_owner_decision_source_for_delivery", { p_workspace_id: workspaceId, p_lifecycle: lifecycle, p_source_id: sourceId }, deliveryRowSchema.nullable(), "The urgent decision could not be read."),
+  claimInquiryNotice: (row, recipient) => call("claim_inquiry_decision_notice", { p_workspace_id: row.workspaceId, p_decision_id: row.id, p_revision: row.revisionHash, p_recipient: recipient }, inquiryNoticeClaimSchema, "The inquiry email could not be claimed."),
+  finishInquiryNotice: async (row, status, providerMessageId, acceptedAt, reason) => {
+    await call("finish_inquiry_decision_notice", { p_workspace_id: row.workspaceId, p_decision_id: row.id, p_status: status, p_provider_message_id: providerMessageId, p_accepted_at: acceptedAt, p_reason: reason }, z.boolean(), "The inquiry email receipt could not be recorded.");
+  },
   linkedTenants: (workspaceId) => call("needs_you_linked_tenants", { p_workspace_id: workspaceId }, z.array(z.object({ workspaceId: z.string().uuid(), tenantId: z.string() })), "Linked sites could not be read."),
   ownerActor: (workspaceId, recipient) => call("needs_you_owner_actor", { p_workspace_id: workspaceId, p_recipient: recipient }, z.object({ userId: z.string().uuid(), verifiedEmail: z.string() }).nullable(), "The owner could not be confirmed."),
   serviceSession: async (workspaceId) => parseServiceSession(await call("strelva_service_reader", { p_workspace_id: workspaceId, p_purpose: "needs_you_sync" }, z.unknown(), "Strelva's service session could not start.")),

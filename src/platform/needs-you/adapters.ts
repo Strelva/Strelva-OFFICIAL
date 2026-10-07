@@ -122,7 +122,8 @@ export function tenantEventItem(event: UnifiedEvent): ProposedItem | null {
   // A commitment (a price, a date, a promise) is always the owner's, owner only,
   // even when Strelva was reviewing the draft (inquiry 1.0 delta, C6).
   const commitment = kind === "customer.commitment";
-  const route = commitment ? "owner_decides" : observed;
+  const inquiryPublication = event.metadata?.kind === "inquiry_capability_publish" || event.metadata?.kind === "inquiry_capability_undo";
+  const route = commitment || inquiryPublication ? "owner_decides" : observed;
   return {
     kind,
     route,
@@ -138,7 +139,7 @@ export function tenantEventItem(event: UnifiedEvent): ProposedItem | null {
     urgent: route === "owner_decides" && urgentFor(kind),
     // The chase clock starts when Needs you first sees the ask, not when the
     // tenant event was written, so an older pending ask does not lapse at once.
-    adminMayDecide: !commitment && !OWNER_ONLY_KINDS.has(kind),
+    adminMayDecide: !commitment && !inquiryPublication && !OWNER_ONLY_KINDS.has(kind),
   };
 }
 

@@ -36,6 +36,8 @@ import type {
   ResponsibilityDeliveryGate,
 } from "./delivery";
 import { inquiryEmailReadiness } from "./email-consent";
+import { inquiryRecordsEnabled, inquiryRecordsRpc } from "@/platform/infra/inquiry-records";
+import { tenantEventRevision } from "@/platform/needs-you";
 import { stateForReceive } from "./receive";
 import { classifyInquiryMessage } from "./message-outcome";
 import { type MessageReceiptContext, writeMessageReceipt } from "./message-receipt";
@@ -107,6 +109,8 @@ export interface InquiryMessageReviewDependencies {
   allowExternalSends?: boolean;
   /** Test/host seam for the durable workspace exit authority. */
   isWorkspaceExited?: (tenantId: string) => Promise<boolean>;
+  /** Exact approved signed-owner decision, not an actor-name shortcut. */
+  ownerLinkAuthorized?: (tenantId: string, event: UnifiedEvent, actorId: string) => Promise<boolean>;
 }
 
 interface ReviewContext {
@@ -125,6 +129,7 @@ interface ReviewContext {
   evaluation: ResponsibilityEvaluation;
   deliveryEvaluation: InquiryDeliveryResult;
   status: InquiryRecordStatus;
+  ownerDecisionActor?: string;
 }
 
 async function repositoryFor(deps: InquiryMessageReviewDependencies): Promise<import("./repository").InquiryRepository> {
@@ -238,6 +243,7 @@ async function buildContext(input: {
   responsibilityId?: string;
   expectedResponsibilityRevision?: string;
   expectedPolicyVersion?: string;
+  ownerDecisionEvent?: UnifiedEvent;
   deps: InquiryMessageReviewDependencies;
   now: Date;
 }): Promise<ReviewContext> {
@@ -249,7 +255,17 @@ async function buildContext(input: {
   await readyForEmail(input.tenantId, definition, input.deps);
   const responsibility = responsibilityFor(snapshot.state, capability.id, input.responsibilityId);
   if (responsibility.businessId !== input.businessId) throwCode("permission_denied", "This responsibility belongs to another business.");
-  assertResponsibilitySponsor(responsibility, input.actorId);
+  if (responsibility.sponsorId !== input.actorId && input.actorId.startsWith("owner-link:") && input.ownerDecisionEvent) {
+    const authorized = await (input.deps.ownerLinkAuthorized ?? (async (tenantId, event, actorId) => {
+      if (process.env.STRELVA_INQUIRY_OWNER_NOTICES !== "1" || !inquiryRecordsEnabled()) return false;
+      if (event.tenantId !== tenantId || event.status !== "pending" || !metadataFromEvent(event)) return false;
+      return await inquiryRecordsRpc("authorize_inquiry_owner_link_decision", {
+        p_tenant_id: tenantId, p_event_id: event.id, p_revision: tenantEventRevision(event),
+        p_recipient: actorId.slice("owner-link:".length),
+      }) === true;
+    }))(input.tenantId, input.ownerDecisionEvent, input.actorId).catch(() => false);
+    if (!authorized) throwCode("permission_denied", "This message has no current approved owner decision.");
+  } else assertResponsibilitySponsor(responsibility, input.actorId);
   if (input.expectedResponsibilityRevision && responsibility.updatedAt !== input.expectedResponsibilityRevision) {
     throwCode("policy_changed", "The current responsibility policy changed. Prepare a fresh review.");
   }
@@ -291,6 +307,7 @@ async function buildContext(input: {
   }
   return {
     snapshot,
+    ...(input.actorId.startsWith("owner-link:") ? { ownerDecisionActor: input.actorId } : {}),
     lead,
     inquiry,
     capability,
@@ -691,6 +708,7 @@ export async function executeInquiryMessageReview(
       inquiryId: metadata.inquiryId,
       action: metadata.action,
       actorId: input.actorId,
+      ownerDecisionEvent: input.event,
       responsibilityId: metadata.responsibilityId,
       expectedResponsibilityRevision: metadata.responsibilityRevision,
       expectedPolicyVersion: metadata.policyVersion,
@@ -739,6 +757,7 @@ export async function executeInquiryMessageReview(
           inquiryId: metadata.inquiryId,
           action: metadata.action,
           actorId: input.actorId,
+          ownerDecisionEvent: input.event,
           responsibilityId: metadata.responsibilityId,
           expectedResponsibilityRevision: metadata.responsibilityRevision,
           expectedPolicyVersion: metadata.policyVersion,
@@ -761,6 +780,7 @@ export async function executeInquiryMessageReview(
           inquiryId: metadata.inquiryId,
           action: metadata.action,
           actorId: input.actorId,
+          ownerDecisionEvent: input.event,
           responsibilityId: metadata.responsibilityId,
           expectedResponsibilityRevision: metadata.responsibilityRevision,
           expectedPolicyVersion: metadata.policyVersion,
@@ -864,6 +884,7 @@ export async function authorizeInquiryMessageReviewActor(input: {
       inquiryId: metadata.inquiryId,
       action: metadata.action,
       actorId: input.actorId,
+      ownerDecisionEvent: input.event,
       responsibilityId: metadata.responsibilityId,
       expectedResponsibilityRevision: metadata.responsibilityRevision,
       expectedPolicyVersion: metadata.policyVersion,
@@ -952,6 +973,7 @@ export async function reconcileInquiryMessageReview(input: {
       inquiryId: metadata.inquiryId,
       action: metadata.action,
       actorId: input.actorId,
+      ownerDecisionEvent: input.event,
       responsibilityId: metadata.responsibilityId,
       deps: { ...deps, emailReady: async () => true },
       now,
