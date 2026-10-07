@@ -1,7 +1,7 @@
 # #261 · Agency Team management
 
 October 7, 2026. Implementation branch: `a1/agency-team`, based on
-`origin/integrate/reborn-1.0` with batch 7A. Objective: an agency owner/admin can
+`origin/integrate/reborn-1.0` with batch 7A. PR: [#554](https://github.com/Strelva/Strelva-OFFICIAL/pull/554). Objective: an agency owner/admin can
 invite staff, set agency roles, remove them, assign specific clients and bulk
 assign, then see the resulting assignments. All proof here is local.
 
@@ -66,6 +66,12 @@ the per-workspace Systems gate. Team mounts only when its tab is opened.
   measured `scrollWidth=390`; keyboard focus produced a visible solid outline.
   A failed write disabled management until reload. No browser console errors
   were observed in the inspected states.
+
+Integration update: merged the newer integration branch in `88edda40`; the
+only manual conflict was the SQL check script tail. Both Team and agency
+prospecting checks were preserved. Typecheck, targeted tests (45 passed,
+1 skipped), boundaries and both full SQL suites passed again. The integrated
+Team tab was rechecked at 1280px and 390px with no horizontal overflow.
 
 ## Remaining limits and handoff
 
