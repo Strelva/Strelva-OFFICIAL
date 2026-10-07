@@ -173,6 +173,7 @@ export const calendarSchedulingService = createCalendarSchedulingService(undefin
 export { createPublicWebsiteBookingService, resolvePublishedPublicBooking } from "./public-booking-server";
 export { recoverPublicWebsiteBooking } from "./public-booking-recovery";
 export { listPublicWebsiteBookingGrants, publishPublicWebsiteBookingGrant, revokePublicWebsiteBookingGrant } from "./public-booking-admin";
+export { publicBookingScheduleSchema } from "./public-booking";
 export {
   PublicBookingError,
   publicBookingRangeSchema,

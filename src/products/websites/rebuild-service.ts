@@ -417,7 +417,42 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     return present(await saveCandidate(actor,{ ...loaded,rebuild },siteDocumentSchema.parse(document),"visitor_tools_connected"));
   }
   async function capabilityOptions(actor: WorkspaceActor,workId: string) { const loaded = await load(actor,workId); return listPublishedWebsiteCapabilityOptions(actor,loaded.work.workspaceId,workId); }
-  return { create, read, list, retry, resolveFact, resolveCopyReview, approve, launch, publishOntoLinkedTenant, patch, undo, domain, initializeHandoff, connectCapabilities, capabilityOptions };
+  async function prepareBookingPage(actor: WorkspaceActor, workId: string, raw: unknown) {
+    const input = rebuildSelectionSchema.extend({ selection: connectWebsiteCapabilitiesInputSchema.shape.selection.unwrap(), path: z.string().min(1).max(80), title: z.string().min(1).max(70), description: z.string().max(160) }).strict().parse(raw);
+    const loaded = await load(actor, workId);
+    const { candidate } = exact(loaded, { expectedRevision: input.expectedRevision, candidateRevision: input.candidateRevision, candidateContentHash: input.candidateContentHash });
+    await documents.manage(actor, { workspaceId: loaded.work.workspaceId, workId });
+    const tenantId = await routeTenant(actor, loaded);
+    const published = tenantId ? await documents.published(tenantId) : null;
+    if (!tenantId || input.selection.tenantId !== tenantId || !published || published.workId !== workId || published.revision !== candidate.revision || published.contentHash !== candidate.contentHash) throw new WorkspaceConflictError("A booking page needs the unchanged published native website. Finish any existing draft first.");
+    const projection = await (dependencies.resolveCapabilities ?? resolvePublishedWebsiteCapabilities)(actor, loaded.work.workspaceId, workId, input.selection);
+    if (!projection?.booking || !projection.inquiry || projection.tenant !== tenantId) throw new WorkspaceConflictError("The site's booking and inquiry connections must both be published and current.");
+    const document = structuredClone(candidate.document);
+    if (document.pages.some(page => page.path === input.path) || document.pages.length >= 12) throw new WorkspaceConflictError("Choose a new page address within the website's page limit.");
+    const suffix = createHash("sha256").update(input.path).digest("hex").slice(0,12);
+    const root = `ask_booking_page_${suffix}`;
+    const heading = `ask_booking_heading_${suffix}`;
+    const booking = `ask_booking_form_${suffix}`;
+    if ([root, heading, booking].some(id => document.nodes[id])) throw new WorkspaceConflictError("This page already has a prepared candidate.");
+    const header = Object.values(document.nodes).find(node => node.type === "Header");
+    const footer = Object.values(document.nodes).find(node => node.type === "Footer");
+    document.nodes[heading] = { id: heading, type: "PageHeader", variant: "standard", props: { title: input.title, body: input.description }, children: [], factIds: [] };
+    document.nodes[booking] = { id: booking, type: "Booking", variant: "inline", props: { title: input.title }, children: [], factIds: [] };
+    document.nodes[root] = { id: root, type: "Section", variant: "container", props: {}, children: [...(header ? [header.id] : []), heading, booking, ...(footer ? [footer.id] : [])], factIds: [] };
+    if (header?.type === "Header") header.props.links = [...(header.props.links ?? []), { label: input.title.slice(0,40), href: input.path }];
+    document.pages.push({ path: input.path, title: input.title, description: input.description, root });
+    document.capabilities = projection;
+    const prepared = await prepareSitePatch({ document: candidate.document, ops: [
+      ...[root, heading, booking].map(id => ({ op: "add", path: `/nodes/${id}`, value: document.nodes[id] })),
+      ...(header ? [{ op: "replace", path: `/nodes/${header.id}`, value: header }] : []),
+      { op: "add", path: "/pages/-", value: document.pages.at(-1) },
+    ], forceReview: true });
+    if (prepared.governance.action === "block") throw new WorkspaceConflictError(prepared.governance.reason);
+    // Only the server-resolved same-tenant grant can supply capabilities.
+    prepared.document.capabilities = projection;
+    return present(await saveCandidate(actor, { ...loaded, rebuild: { ...loaded.rebuild, publishedCapabilitySelection: input.selection } }, siteDocumentSchema.parse(prepared.document), "ask_booking_page_prepared"));
+  }
+  return { create, read, list, retry, resolveFact, resolveCopyReview, approve, launch, publishOntoLinkedTenant, patch, undo, domain, initializeHandoff, connectCapabilities, capabilityOptions, prepareBookingPage };
 }
 export const websiteRebuildService = createWebsiteRebuildService();
 export const createWebsiteRebuild = websiteRebuildService.create;
@@ -429,6 +464,7 @@ export const resolveWebsiteRebuildCopyReview = websiteRebuildService.resolveCopy
 export const approveWebsiteRebuild = websiteRebuildService.approve;
 export const launchWebsiteRebuild = websiteRebuildService.launch;
 export const patchWebsiteRebuild = websiteRebuildService.patch;
+export const prepareWebsiteBookingPage = websiteRebuildService.prepareBookingPage;
 export const publishWebsiteRebuildOntoLinkedSite = websiteRebuildService.publishOntoLinkedTenant;
 export const undoWebsiteRebuild = websiteRebuildService.undo;
 export const websiteRebuildDomain = websiteRebuildService.domain;

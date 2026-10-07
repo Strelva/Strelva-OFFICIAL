@@ -2,6 +2,7 @@ import { verifyPossibilityPreviewToken } from "@/platform/possibilities/preview-
 import type { PossibilityTryState } from "./PossibilityTry";
 import { siteDocumentSchema } from "@/products/websites/client";
 import { siteDocumentHash } from "@/products/websites/index";
+import { publicBookingScheduleSchema } from "@/products/scheduling/contracts";
 
 /**
  * The state of a signed "Try it" link (systems-experience spec behavior 19).
@@ -23,11 +24,16 @@ export async function possibilityTryState(token: string, deps: {
   if (!(await deps.enabled(claims.workspaceId).catch(() => false))) return null;
   const p = await deps.read({ businessId: claims.workspaceId, possibilityId: claims.possibilityId, candidateRevision: claims.candidateRevision }).catch(() => null);
   if (!p) return { kind: "changed" };
-  const website = p.introduces.find(intro => intro.candidate?.content.kind === "ask-website-pages");
+  const website = [...p.introduces, ...p.changes].find(item => ["ask-website-pages", "ask-existing-booking-page"].includes(String(item.candidate?.content.kind)));
+  const booking = website?.candidate?.content.kind === "ask-existing-booking-page";
   const document = siteDocumentSchema.safeParse(website?.candidate?.content.document);
   if (website && !document.success) return { kind: "changed" };
+  const bookingSchedule = publicBookingScheduleSchema.safeParse(website?.candidate?.content.bookingSchedule);
   if (website && document.success && (siteDocumentHash(document.data) !== website.candidate?.content.candidateContentHash
-    || document.data.capabilities || Object.values(document.data.nodes).some(node => node.type === "Booking" || node.type === "InquiryForm"))) return { kind: "changed" };
+    || !booking && (document.data.capabilities || Object.values(document.data.nodes).some(node => node.type === "Booking" || node.type === "InquiryForm"))
+    || booking && (!bookingSchedule.success || document.data.capabilities?.booking?.capabilityId !== bookingSchedule.data.capabilityId || document.data.capabilities.booking.version !== bookingSchedule.data.version))) return { kind: "changed" };
+  const bookingPath = website?.candidate?.content.bookingPath;
+  if (booking && (typeof bookingPath !== "string" || !document.success || !document.data.pages.some(page => page.path === bookingPath))) return { kind: "changed" };
   return {
     kind: "ready",
     view: {
@@ -36,6 +42,7 @@ export async function possibilityTryState(token: string, deps: {
       changes: p.changes.map((change) => change.candidate.summary.replace(/^the /, "The ")),
       introduces: p.introduces.map((intro) => intro.name),
       ...(document.success ? { websiteDocument: document.data } : {}),
+      ...(booking && bookingSchedule.success && typeof bookingPath === "string" ? { bookingSchedule: bookingSchedule.data, bookingPath } : {}),
       takesSubmissions: !document.success && (p.introduces.length > 0
         || p.effects.some((effect) => effect.channel === "inquiry_form" || effect.channel === "booking_page")
         || p.changes.some((change) => "form" in change.candidate.content)),

@@ -33,6 +33,7 @@ import { customerActivationView } from "@/platform/make-real/view";
 import type { BusinessSystems, SystemListing } from "@/platform/systems/from-existing";
 import type { SystemRevision } from "@/platform/systems/contracts";
 import { siteDocumentSchema, unresolvedSiteFacts, type WebsiteRebuildCandidate, type WebsiteRebuildRecord } from "@/products/websites/index";
+import { publicBookingScheduleSchema } from "@/products/scheduling/contracts";
 import type {
   WorkspaceSystemActivation,
   WorkspaceSystemHistoryRow,
@@ -161,24 +162,32 @@ export async function syncAskPageSetPossibilities(deps: {
   for (let index = 0; index < rows.length; index++) {
     const row = rows[index]!;
     let p = row.possibility;
-    const intro = p.introduces.find(item => item.candidate.content.kind === "ask-website-pages");
+    const intro = [...p.introduces, ...p.changes].find(item => ["ask-website-pages", "ask-existing-booking-page"].includes(String(item.candidate.content.kind)));
     const workId = intro?.candidate.content.rebuildWorkId;
     if (!intro || typeof workId !== "string" || p.activationId || !["exploring", "ready"].includes(p.status)) continue;
     try {
       const record = await deps.read(workId);
       const candidate = record.rebuild.candidate;
       if (record.workspaceId !== p.businessId || !candidate || record.rebuild.status === "published") continue;
-      const content = { ...intro.candidate.content, candidateRevision: candidate.revision, candidateContentHash: candidate.contentHash, document: candidate.document };
+      const content: Record<string, unknown> = { ...intro.candidate.content, candidateRevision: candidate.revision, candidateContentHash: candidate.contentHash, document: candidate.document };
       if (canonicalJson(content) !== canonicalJson(intro.candidate.content)) {
         const revised = reviseCandidate(p, {
-          introduces: p.introduces.map(item => item.key === intro.key ? { ...item, candidate: { ...item.candidate, content } } : item),
+          introduces: p.introduces.map(item => item.candidate.content.rebuildWorkId === workId ? { ...item, candidate: { ...item.candidate, content } } : item),
+          changes: p.changes.map(item => item.candidate.content.rebuildWorkId === workId ? { ...item, candidate: { ...item.candidate, content } } : item),
           effects: p.effects.map(effect => effect.channel === "hosted_website" && effect.request.workId === workId ? { ...effect, request: { workId, candidateRevision: candidate.revision, candidateContentHash: candidate.contentHash } } : effect),
         }, p.revision, deps.actorId, deps.at);
         await deps.repo.save(revised, p.revision);
         p = revised;
       }
       const checked = siteDocumentSchema.parse(candidate.document);
+      const bookingSchedule = publicBookingScheduleSchema.safeParse(content.bookingSchedule);
+      const bookingMatches = content.kind !== "ask-existing-booking-page" || bookingSchedule.success
+        && checked.capabilities?.booking?.capabilityId === bookingSchedule.data.capabilityId
+        && checked.capabilities.booking.version === bookingSchedule.data.version
+        && record.rebuild.publishedCapabilitySelection?.bookingGrantId === content.grantId
+        && checked.pages.some(page => page.path === content.bookingPath);
       const reviewed = ["review_ready", "approved"].includes(record.rebuild.status)
+        && bookingMatches
         && unresolvedSiteFacts(checked).length === 0
         && Object.values(checked.nodes).every(node => !node.verification?.needsReview);
       if (p.status === "exploring" && reviewed) p = await prepare(p, true, deps);
@@ -197,16 +206,16 @@ function lastStale(p: Possibility): string | null {
 export function storedPossibilityViews(stored: readonly ListedPossibility[], candidates: readonly WebsiteRebuildCandidate[], summaries: { evidence: (workId: string) => string | null } = { evidence: () => null }): WorkspaceSystemPossibility[] {
   return stored.flatMap(({ possibility: p, sourceRef }) => {
     if (p.status !== "exploring" && p.status !== "ready") return [];
-    const askContent = p.introduces.find(intro => intro.candidate.content.kind === "ask-website-pages")?.candidate.content;
+    const askContent = [...p.introduces, ...p.changes].find(item => ["ask-website-pages", "ask-existing-booking-page"].includes(String(item.candidate.content.kind)))?.candidate.content;
     const workId = sourceRef?.startsWith(REBUILD_SOURCE_PREFIX) ? sourceRef.slice(REBUILD_SOURCE_PREFIX.length)
       : typeof askContent?.rebuildWorkId === "string" ? askContent.rebuildWorkId : null;
     const candidate = workId ? candidates.find((item) => item.workId === workId) : undefined;
     return [{
       id: p.id,
       title: p.title,
-      summary: candidate?.summary ?? p.intent,
+      summary: askContent ? p.intent : candidate?.summary ?? p.intent,
       status: p.status,
-      affects: [...p.changes.map((c) => c.baseline.systemId), ...(typeof askContent?.contextSystemId === "string" ? [askContent.contextSystemId] : [])],
+      affects: [...new Set([...p.changes.map((c) => c.baseline.systemId), ...(typeof askContent?.contextSystemId === "string" ? [askContent.contextSystemId] : [])])],
       evidence: candidate?.evidence ?? (workId ? summaries.evidence(workId) : null),
       previewHref: candidate?.previewHref ?? null,
       workId: workId ?? p.id,

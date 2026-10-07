@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
+import { publicBookingSlotSchema, publicBookingScheduleSchema } from "./public-booking-contracts";
+export { publicBookingSlotSchema, publicBookingScheduleSchema } from "./public-booking-contracts";
 
 /**
  * Server boundary for a native booking surface on a generated client site.
@@ -27,11 +29,6 @@ export const publicBookingRangeSchema = z.object({ from: isoDate, to: isoDate })
   .refine(value => Date.parse(value.to) > Date.parse(value.from), "The booking range must end after it starts.");
 export type PublicBookingRange = z.infer<typeof publicBookingRangeSchema>;
 
-export const publicBookingSlotSchema = z.object({
-  id: publicToken,
-  start: isoDate,
-  end: isoDate,
-}).strict().refine(value => Date.parse(value.end) > Date.parse(value.start), "The booking slot must end after it starts.");
 export type PublicBookingSlot = z.infer<typeof publicBookingSlotSchema>;
 
 export const publicBookingVisitorSchema = z.object({
@@ -69,15 +66,6 @@ export function publicBookingRequestFingerprint(input: {
   return createHash("sha256").update(canonical, "utf8").digest("hex");
 }
 
-export const publicBookingScheduleSchema = z.object({
-  schemaVersion: z.literal(1),
-  capabilityId: z.string().trim().min(1).max(200),
-  version: z.number().int().positive(),
-  name: z.string().trim().min(1).max(160),
-  provider: publicBookingProviderSchema,
-  timeZone: z.string().trim().min(1).max(128),
-  slots: z.array(publicBookingSlotSchema).max(500),
-}).strict();
 export type PublicBookingSchedule = z.infer<typeof publicBookingScheduleSchema>;
 
 export const publicBookingReceiptSchema = z.object({

@@ -51,6 +51,7 @@ export { generateWebsiteDraft, websiteDraftPreviewHtml } from "./generation";
 export * from "./rebuild-providers";
 export { askPageSetSchema, composeAskPageSet } from "./ask-page-set";
 export const prepareAskPageSet: typeof import("./ask-page-set").prepareAskPageSet = (...args) => import("./ask-page-set").then(module => module.prepareAskPageSet(...args));
+export const prepareWebsiteBookingPage: typeof import("./rebuild-service").prepareWebsiteBookingPage = (...args) => import("./rebuild-service").then(module => module.prepareWebsiteBookingPage(...args));
 export * from "./rebuild-benchmark";
 
 export const readAgencyWebsiteDocument: typeof import("./agency-document-service").readAgencyWebsiteDocument = (...args) => import("./agency-document-service").then(module => module.readAgencyWebsiteDocument(...args));

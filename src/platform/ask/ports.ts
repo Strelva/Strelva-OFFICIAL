@@ -1,6 +1,6 @@
 import type { UnifiedEvent } from "@/lib/types";
 import { observedTenantRoute } from "@/platform/needs-you/tenant-classify";
-import { createPossibility, type DeclaredEffect, type PossibilityRepository } from "@/platform/possibilities";
+import { createPossibility, type DeclaredEffect, type SystemChange, type PossibilityRepository } from "@/platform/possibilities";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { AskChangeKind, AskChangeOrigin, AskNeedsYouRoute, AskedOnBehalf } from "./contracts";
 import type { AskAuthoritySnapshot } from "./authority";
@@ -223,7 +223,8 @@ export interface AskPossibilityInput {
   words?: string;
   origin?: AskChangeOrigin;
   askedOnBehalf?: AskedOnBehalf | null;
-  candidate?: { kind: "website-pages"; pages: Array<{ path: string; title: string; description: string; paragraphs: string[] }> };
+  candidate?: { kind: "website-pages"; pages: Array<{ path: string; title: string; description: string; paragraphs: string[] }> }
+    | { kind: "existing-booking-page"; path: string; title: string; description: string; bookingGrantId?: string };
 }
 
 export interface AskOpenedPossibility {
@@ -253,7 +254,7 @@ export class AskPreparedPossibilityError extends Error {
 
 export function createPossibilityAdapter(repository: PossibilityRepository, options: {
   durable: boolean; newId?: () => string; now?: () => string;
-  prepare?: (actor: WorkspaceActor, input: AskPossibilityInput, possibilityId: string) => Promise<{ content: Record<string, unknown>; effects: DeclaredEffect[]; previewHref: string }>;
+  prepare?: (actor: WorkspaceActor, input: AskPossibilityInput, possibilityId: string) => Promise<{ content: Record<string, unknown>; effects: DeclaredEffect[]; previewHref: string; changes?: SystemChange[] }>;
 }): AskPossibilityPort {
   const newId = options.newId ?? (() => crypto.randomUUID());
   const now = options.now ?? (() => new Date().toISOString());
@@ -265,7 +266,8 @@ export function createPossibilityAdapter(repository: PossibilityRepository, opti
       const possibility = createPossibility({
         title: input.title,
         intent: input.intent,
-        introduces: [{
+        changes: prepared.changes,
+        introduces: prepared.changes ? [] : [{
           key: input.introduces.key,
           name: input.introduces.name,
           purpose: input.introduces.purpose,

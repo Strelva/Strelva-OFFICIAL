@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/Button";
 import { SiteDocumentTry, type SiteDocument } from "@/products/websites/client";
+import type { PublicBookingSchedule } from "../../../custom-repo-starter/booking-client";
 
 export interface PossibilityTryView {
   title: string;
@@ -14,6 +15,8 @@ export interface PossibilityTryView {
   /** Whether the candidate takes submissions (a form or a booking page). */
   takesSubmissions: boolean;
   websiteDocument?: SiteDocument;
+  bookingSchedule?: PublicBookingSchedule;
+  bookingPath?: string;
 }
 
 export type PossibilityTryState =
@@ -40,7 +43,7 @@ export function PossibilityTry({ state }: { state: PossibilityTryState }) {
         {view.introduces.map((line) => <li key={`new-${line}`}>New: {line}</li>)}
       </ul>
     </section> : null}
-    {view.websiteDocument ? <div className="mt-6"><SiteDocumentTry document={view.websiteDocument} /></div> : null}
+    {view.websiteDocument ? <div className="mt-6"><SiteDocumentTry document={view.websiteDocument} bookingSchedule={view.bookingSchedule} bookingPath={view.bookingPath} /></div> : null}
     {view.takesSubmissions && !view.websiteDocument ? <TestSubmission /> : null}
     <p className="mt-8 text-xs text-gray-muted">Nothing here changes your live site, sends a message or books anything. Make it live from the email when you are ready.</p>
   </Shell>;

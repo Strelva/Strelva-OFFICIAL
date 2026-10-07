@@ -30,3 +30,4 @@ export const scheduleCommandSchema = z.discriminatedUnion("kind", [
 // Public product boundary for workspace routes and dedicated scheduling
 // controls. Provider internals remain inside this product's calendar folder.
 export * from "./calendar/contracts";
+export * from "./public-booking-contracts";

@@ -322,7 +322,7 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
       }),
     }),
     open_possibility: tool({
-      description: "Prepare a real new informational website/page set as an isolated Possibility. Supply candidate kind website-pages with complete page copy and a home page. All copy needs owner review; Make real goes through Needs you. Booking, intake, apps, changes to existing Systems, or alternatives without this supported candidate are filed honestly as Requests at Asked. Never substitute informational pages for a requested working flow.",
+      description: "Prepare a real isolated Possibility: website-pages creates a new informational website with complete page copy/home page; existing-booking-page adds a visitor page for this native site's already configured booking service, requiring a real stored baseline and current same-site booking/inquiry/calendar Connections. It cannot create or change a booking service, schedule, duration or availability. All copy needs owner review; Make real goes through Needs you. Unsupported flows and missing baselines/Connections are Requests at Asked. Never substitute informational pages for a working flow.",
       inputSchema: z.object({
         title: z.string().min(1).max(160),
         intent: z.string().min(1).max(2_000),
@@ -330,13 +330,16 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
         newSystemName: z.string().min(1).max(120),
         purpose: z.string().min(1).max(500),
         summary: z.string().min(1).max(500),
-        candidate: z.object({
+        candidate: z.discriminatedUnion("kind", [z.object({
           kind: z.literal("website-pages"),
           pages: z.array(z.object({
             path: z.string().min(1).max(80), title: z.string().min(1).max(70),
             description: z.string().max(160), paragraphs: z.array(z.string().min(1).max(600)).min(1).max(8),
           }).strict()).min(1).max(6),
-        }).strict().optional(),
+        }).strict(), z.object({
+          kind: z.literal("existing-booking-page"), path: z.string().min(1).max(80),
+          title: z.string().min(1).max(70), description: z.string().max(160), bookingGrantId: z.string().uuid().optional(),
+        }).strict()]).optional(),
       }),
       execute: (input) => guarded("open_possibility", async () => {
         try {
@@ -348,7 +351,7 @@ export function buildAskTools(ctx: AskToolsContext): Record<AskToolId, Tool> {
             words: ctx.lastUserText, origin: ctx.origin, askedOnBehalf: ctx.askedOnBehalf,
           });
           ctx.onReceipt({ kind: "possibility", toolId: "open_possibility", status: "opened", ids: [opened.id], summary: `${input.title} · Draft` });
-          return { success: true, possibilityId: opened.id, previewHref: opened.previewHref, reviewStatus: opened.reviewStatus, status: "Draft", agentResultStatus: "drafted", message: `Prepared "${input.title}" as a working page-set Possibility. Open the preview to navigate its pages. ${opened.reviewStatus === "needs_you" ? "Copy is handed to Needs you for owner review." : "Copy still needs owner review; the saved draft is waiting for Needs you synchronization."} Nothing live changed.` };
+          return { success: true, possibilityId: opened.id, previewHref: opened.previewHref, reviewStatus: opened.reviewStatus, status: "Draft", agentResultStatus: "drafted", message: `Prepared "${input.title}" as a working ${input.candidate?.kind === "existing-booking-page" ? "booking-page Possibility for this site's existing configured service" : "page-set Possibility"}. ${input.candidate?.kind === "existing-booking-page" ? "Try it uses configured test times; no real booking is made." : "Open the preview to navigate its pages."} ${opened.reviewStatus === "needs_you" ? "Copy is handed to Needs you for owner review." : "Copy still needs owner review; the saved draft is waiting for Needs you synchronization."} Nothing live changed.` };
         } catch (error) {
           if (error instanceof AskPossibilityUnsupportedError) {
             try {

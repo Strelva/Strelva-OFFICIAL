@@ -109,6 +109,7 @@ export function StrelvaBookingForm({
   onReconcile,
   initialRequestDraft,
   submitLabel = "Reserve time",
+  testOnly = false,
 }: {
   schedule: PublicBookingSchedule;
   receipt?: PublicBookingReceipt | null;
@@ -118,6 +119,8 @@ export function StrelvaBookingForm({
   onReconcile?: (receipt: PublicBookingReceipt) => Promise<PublicBookingReceipt>;
   initialRequestDraft?: PublicBookingRequestDraft | null;
   submitLabel?: string;
+  /** Isolated Strelva candidate preview: callbacks must be supplied locally. */
+  testOnly?: boolean;
 }) {
   const prefix = useId();
   const [pending, setPending] = useState(false);
@@ -152,7 +155,7 @@ export function StrelvaBookingForm({
       setName("");
       setEmail("");
       setMessage("");
-      setStatus({ kind: "success", text: next.status === "confirmed" ? "Your time is reserved." : "Your request was received for confirmation." });
+      setStatus({ kind: "success", text: testOnly ? "Test booking completed. Nobody was told, no calendar changed, and no real record was kept." : next.status === "confirmed" ? "Your time is reserved." : "Your request was received for confirmation." });
     } catch (error) {
       setStatus({ kind: "error", text: error instanceof Error ? error.message : "Your booking was not confirmed. Please try again." });
     } finally { setPending(false); }
@@ -198,6 +201,12 @@ export function StrelvaBookingForm({
     } finally { setReconciling(false); }
   }
 
+  if (testOnly && receipt) return <section aria-label={schedule.name}>
+    <h2>{schedule.name}</h2>
+    <p role="status">Test booking completed. Nobody was told, no calendar changed, and no real record was kept.</p>
+    <button type="button" onClick={() => { setReceipt(null); setStatus(null); }}>Try another test</button>
+  </section>;
+
   if (!schedule.slots.length) {
     return <p role="status">No booking times are available right now. Please contact the business directly.</p>;
   }
@@ -205,7 +214,7 @@ export function StrelvaBookingForm({
   return (
     <section aria-label={schedule.name}>
       <h2>{schedule.name}</h2>
-      <p>Choose a time. {providerLabel(schedule.provider)} will confirm the reservation.</p>
+      <p>{testOnly ? "Choose a configured test time. Live availability is checked only after publication; this test goes nowhere." : <>Choose a time. {providerLabel(schedule.provider)} will confirm the reservation.</>}</p>
       <form onSubmit={(event) => void submit(event)} aria-label="Reserve a time">
         <label htmlFor={`${prefix}-slot`}>Available time</label>
         <select id={`${prefix}-slot`} value={slotId} disabled={pending} onChange={event => setSlotId(event.target.value)}>

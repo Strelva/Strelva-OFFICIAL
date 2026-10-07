@@ -7,7 +7,7 @@ import { composeAskPageSet } from "@/products/websites/index";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Try it interface fixture", robots: { index: false, follow: false } };
 
-/** Local fixture for the signed "Try it" page: `state=ready|pages|changed|expired`. Fictional content. */
+/** Local fixture for the signed "Try it" page: `state=ready|pages|booking|changed|expired`. Fictional content. */
 export default async function TryPreview({ searchParams }: { searchParams: Promise<{ state?: string }> }) {
   if (!strelvaUiPreviewEnabled()) notFound();
   const { state } = await searchParams;
@@ -30,5 +30,15 @@ export default async function TryPreview({ searchParams }: { searchParams: Promi
       { path: "/consulting", title: "Consulting", description: "Plan your next step", paragraphs: ["We help teams understand their next step. This proposed wording still needs the owner's review.", "A service page can describe the work clearly before an owner chooses to publish. This candidate has no booking, intake, payment, or message Connection."] },
     ] }).document,
   };
+  if (state === "booking" && fixture.kind === "ready") {
+    const document = composeAskPageSet("River Practice", { kind: "website-pages", pages: [
+      { path: "/", title: "River Practice", description: "Fictional existing website", paragraphs: ["The original website remains available in this isolated candidate."] },
+      { path: "/book", title: "Book a consulting session", description: "Try the configured service", paragraphs: ["Fictional configured consulting service. These are test times, not a check of live calendar availability."] },
+    ] }).document;
+    document.nodes.booking = { id: "booking", type: "Booking", variant: "inline", props: { title: "Book a consulting session" }, children: [], factIds: [] };
+    document.nodes.page_1!.children.push("booking");
+    document.capabilities = { baseUrl: "https://example.invalid", tenant: "river-practice", booking: { capabilityId: "consult", version: 1, range: { from: "2026-10-10T13:00:00.000Z", to: "2026-10-10T15:00:00.000Z" } } };
+    fixture.view = { title: "A booking page for River Practice", intent: "Fictional existing-site alternative with an interactive isolated booking test. Owner review still comes before Make real.", changes: ["The existing native site with one booking page"], introduces: [], takesSubmissions: false, websiteDocument: document, bookingPath: "/book", bookingSchedule: { schemaVersion: 1, capabilityId: "consult", version: 1, name: "Consulting session", provider: "google", timeZone: "America/New_York", slots: [{ id: "test-slot-one", start: "2026-10-10T13:00:00.000Z", end: "2026-10-10T14:00:00.000Z" }, { id: "test-slot-two", start: "2026-10-10T14:00:00.000Z", end: "2026-10-10T15:00:00.000Z" }] } };
+  }
   return <PossibilityTry state={fixture} />;
 }
