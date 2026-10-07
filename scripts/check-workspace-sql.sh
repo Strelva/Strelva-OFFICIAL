@@ -799,6 +799,20 @@ psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-w6-booking-native-workspace.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135956_booking_native_workspace.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.sql"
+# Agency 1.0 native publishing targets and logged booking email enablement.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011102000_native_publishing_targets.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011101000_business_booking_email.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/native-publishing-targets-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-booking-email-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011101000_business_booking_email.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011102000_native_publishing_targets.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011102000_native_publishing_targets.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011101000_business_booking_email.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/native-publishing-targets-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-booking-email-schema.sql"
+# Native paused issues cannot enter the integrated tenant-only sender;
+# its legacy acceptance/recovery contract remains intact after this migration.
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-newsletter-sender-schema.sql"
 # #304 read-only visibility: forward, rollback and reapply.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011140000_agent_booking_visibility.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-visibility-schema.sql"

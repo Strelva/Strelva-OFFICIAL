@@ -1,3 +1,4 @@
+import { publishingWorkspaceId } from "@/platform/infra/publishing-scope";
 import { z } from "zod";
 import { tenantPublishingPorts } from "@/platform/infra/tenant-publishing";
 import type { UnifiedEvent } from "@/platform/infra/event-contract";
@@ -23,7 +24,7 @@ interface Baseline { status: string; data: unknown }
 export interface ContentPorts {
   enabled(workspaceId: string, actor?: WorkspaceActor | null): Promise<boolean>;
   authorize(input: { tenantId: string; event: UnifiedEvent; actorId: string }): Promise<{ allowed: boolean; reason?: string; actor?: WorkspaceActor | null }>;
-  entry(tenant: string, type: CollectionType, slug: string): Promise<Baseline | null>;
+  entry(tenant: string, type: CollectionType, slug: string, systemId?: string): Promise<Baseline | null>;
   add(event: Omit<UnifiedEvent, "id" | "createdAt">): Promise<UnifiedEvent>;
   publish(input: Record<string, unknown>): Promise<{ receiptId: string; verified: boolean }>;
   approveIssue(input: Record<string, unknown>): Promise<{ receiptId: string; verified: boolean }>;
@@ -46,10 +47,14 @@ async function rpc(name: string, input: Record<string, unknown>) {
 const defaultPorts: ContentPorts = {
   enabled: (workspaceId, actor) => actor ? publishingEnabledForWorkspace(workspaceId, actor) : workspaceReleaseFlagEnabled("publishing", workspaceId),
   authorize: authorizePublishingEvent,
-  entry: async (...args) => (await tenantPublishingPorts()).getEntry(...args),
+  entry: async (scope, type, slug, systemId) => {
+    const workspaceId = publishingWorkspaceId(scope);
+    if (!workspaceId) return (await tenantPublishingPorts()).getEntry(scope, type, slug);
+    return (await readNativeContent(workspaceId, systemId!)).find(row => row.type === type && row.slug === slug) ?? null;
+  },
   add: async event => (await tenantPublishingPorts()).addEvent(event, { requirePersistence: true }),
-  publish: input => rpc("publish_workspace_collection", input),
-  approveIssue: input => rpc("approve_workspace_newsletter_issue", input),
+  publish: input => rpc(publishingWorkspaceId(String(input.tenantId)) ? "publish_native_workspace_collection" : "publish_workspace_collection", input),
+  approveIssue: input => rpc(publishingWorkspaceId(String(input.tenantId)) ? "approve_native_workspace_newsletter_issue" : "approve_workspace_newsletter_issue", input),
 };
 
 /** Compose a proposed output without touching the live collection or sending mail.
@@ -66,7 +71,7 @@ export async function prepareContentDraft(target: ContentTarget, raw: unknown, p
     if (Buffer.byteLength(JSON.stringify(data)) > 12000) throw new Error("This entry is too large to review safely.");
     const slug = draft.slug ?? String(data[COLLECTION_TYPES[draft.type].titleField]).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
     z.string().regex(/^[a-z0-9-]{1,80}$/).parse(slug);
-    const before = contentBaseline(await ports.entry(target.tenantId, draft.type, slug));
+    const before = contentBaseline(await ports.entry(target.tenantId, draft.type, slug, target.systemId));
     payload = { type: draft.type, slug, data, before, baselineHash: contentFingerprint(before), ...(draft.status ? { status: draft.status } : {}) };
     title = `${draft.status === "draft" ? "Unpublish" : "Publish"} ${COLLECTION_TYPES[draft.type].label.toLowerCase()}: ${String(data[COLLECTION_TYPES[draft.type].titleField]).slice(0, 160)}`;
     body = JSON.stringify(data, null, 2);
@@ -112,19 +117,21 @@ export async function executePublishingEvent(input: { tenantId: string; event: U
 }
 
 export async function readContentWorkspace(target: ContentTarget) {
+  const nativeWorkspace = publishingWorkspaceId(target.tenantId);
+  const nativeEntries = nativeWorkspace && target.kind === "website" ? await readNativeContent(nativeWorkspace, target.systemId) : null;
   const [entries, events, outputs, receipts] = await Promise.all([
-    target.kind === "website" ? Promise.all((["blog", "video", "product"] as const).map(async type => ({ type, entries: await (await tenantPublishingPorts()).listEntriesForType(target.tenantId, type, { limit: 100 }) }))) : Promise.resolve([]),
+    target.kind === "website" ? Promise.all((["blog", "video", "product"] as const).map(async type => ({ type, entries: nativeEntries ? nativeEntries.filter(row => row.type === type) : await (await tenantPublishingPorts()).listEntriesForType(target.tenantId, type, { limit: 100 }) }))) : Promise.resolve([]),
     tenantPublishingPorts().then(ports => ports.getEventsRaw(target.tenantId, { limit: 100 })),
-    target.kind === "newsletter" ? readNewsletterIssues(target.workspaceId, target.tenantId) : Promise.resolve([]),
+    target.kind === "newsletter" ? readNewsletterIssues(target.workspaceId, target.tenantId, target.systemId) : Promise.resolve([]),
     target.kind === "website" ? readCollectionReceipts(target) : Promise.resolve([]),
   ]);
   return { target, entries, drafts: events.filter(event => event.metadata?.systemId === target.systemId && [COLLECTION_PUBLISH, NEWSLETTER_ISSUE].includes(String(event.metadata?.kind))), outputs, receipts, sendingEnabled: false as const };
 }
 
-async function readNewsletterIssues(workspaceId: string, tenantId: string): Promise<unknown[]> {
+async function readNewsletterIssues(workspaceId: string, tenantId: string, systemId: string): Promise<unknown[]> {
   const db = getSupabase();
   if (!db) throw new Error("Publishing storage is unavailable.");
-  const { data, error } = await (db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> }).rpc("read_workspace_newsletter_issues", { p_workspace_id: workspaceId, p_tenant_id: tenantId });
+  const { data, error } = await (db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> }).rpc(publishingWorkspaceId(tenantId) ? "read_native_workspace_newsletter_issues" : "read_workspace_newsletter_issues", publishingWorkspaceId(tenantId) ? { p_workspace_id: workspaceId, p_system_id: systemId } : { p_workspace_id: workspaceId, p_tenant_id: tenantId });
   if (error || !Array.isArray(data)) throw new Error("Newsletter receipts could not be loaded.");
   return data;
 }
@@ -132,7 +139,7 @@ async function readNewsletterIssues(workspaceId: string, tenantId: string): Prom
 async function readCollectionReceipts(target: ContentTarget): Promise<unknown[]> {
   const db = getSupabase();
   if (!db) throw new Error("Publishing storage is unavailable.");
-  const { data, error } = await (db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> }).rpc("read_workspace_collection_receipts", { p_workspace_id: target.workspaceId, p_tenant_id: target.tenantId, p_system_id: target.systemId });
+  const { data, error } = await (db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> }).rpc(publishingWorkspaceId(target.tenantId) ? "read_native_workspace_collection_receipts" : "read_workspace_collection_receipts", { p_workspace_id: target.workspaceId, ...(publishingWorkspaceId(target.tenantId) ? {} : { p_tenant_id: target.tenantId }), p_system_id: target.systemId });
   if (error || !Array.isArray(data)) throw new Error("Publishing receipts could not be loaded.");
   return data;
 }
@@ -145,4 +152,12 @@ export async function prepareContentRestore(target: ContentTarget, receiptId: st
       (await readCollectionReceipts(target)).find(row => (row as { id?: string }).id === receiptId));
   return prepareContentDraft(target, { kind: "collection", type: receipt.request.type, slug: receipt.request.slug,
     data: receipt.beforeState?.data ?? receipt.request.data, status: receipt.beforeState?.status ?? "draft" });
+}
+
+async function readNativeContent(workspaceId: string, systemId: string) {
+  const db = getSupabase();
+  if (!db) throw new Error("Publishing storage is unavailable.");
+  const { data, error } = await (db as unknown as { rpc(name: string, args: Record<string, unknown>): Promise<{ data: unknown; error: unknown }> }).rpc("read_native_workspace_collection", { p_workspace_id: workspaceId, p_system_id: systemId });
+  if (error) throw new Error("Publishing content could not be read.");
+  return z.array(z.object({ type: collectionType, slug: z.string(), status: z.string(), data: z.record(z.string(), z.unknown()) })).parse(data);
 }
