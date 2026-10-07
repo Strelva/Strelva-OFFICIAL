@@ -4,11 +4,13 @@ Branch: `w6/catalog`. Worktree: `REB-w6-catalog`. Local work only; no production
 
 ## Current objective and continuation
 
-Resume the two saved checkpoints (`32ea36bd`, `c1fb3632`) against the catalog launch requirements. Those commits contain internal-tool use/contact links and gated notices, builder-only sentence plans, newsletter contact mirroring, report receipts and Search Console evidence, and document history pagination/UI. Earlier integration already contains bounded document/onboarding/application histories, store/wellness projection and tracker/saved-check merges. Do not rebuild these without inspecting their tests.
+Round 4 resumed all three saved checkpoints and rebased them onto `integrate/reborn-1.0` @ `864474fe`, retaining its missing-table readiness fix. The checkpoints contain internal-tool use/contact links and gated notices, builder-only sentence plans, newsletter contact mirroring, report receipts and Search Console evidence, and document history pagination/UI. Earlier integration already contains bounded document/onboarding/application histories, store/wellness projection and tracker/saved-check merges.
 
 The active bet is an agency/Strelva builder path with owners filing Requests; tenant storefronts, frozen commerce/rewards and report crons remain compatible while release flags are off. No adoption, delivered mail, provider access or production operation is established by this stream.
 
-Next action: run focused catalog tests and typecheck; audit flags-off paths and the spec's failure requirements; finish missing code/tests, then run all required checks once near completion. Inspect document history desktop/mobile locally. Update this handoff with actual outputs and commit each passing piece.
+Round 4 review fixed linked recipient corrections: an existing assigned-person UUID no longer fails browser email validation, and typed contact/person replacements resolve inside one grant/revision-checked database transaction. Flags off retain the original edit RPC and do no additional reads. Migration `20261010150400` and rollback are added. Cron compatibility/failure tests and the missing `20261010150300` readiness sentinel are added.
+
+Next action: finish the running full test, SQL and typecheck checks; run build after stopping this worktree's local dev server; update final verification/spec status and commit. Current code is local only.
 
 ## Flags and migrations already in checkpoints
 
@@ -21,7 +23,22 @@ Next action: run focused catalog tests and typecheck; audit flags-off paths and 
 
 ## Verification
 
-Pending. No A claim until the required checks and relevant failure paths pass. Preserve failures here alongside successful evidence.
+Round 4 checks so far (local):
+
+```text
+Focused catalog: Test Files 11 passed (11); Tests 124 passed (124).
+Extended product regressions: Test Files 22 passed (22); Tests 156 passed (156).
+Linked edit/use regressions: Test Files 4 passed (4); Tests 18 passed (18).
+Cron + readiness regressions: Test Files 2 passed (2); Tests 25 passed (25).
+pnpm typecheck (initial): Types generated successfully; exit 0.
+pnpm lint (initial): exit 0; generated database.types.ts Babel size note.
+pnpm check:boundaries: Product boundaries passed; 204 workspace -> src/lib imports in 93 files, 46 older boundary imports.
+pnpm check:custom-repos: Custom repo workspace check passed: 196/196 checks passed.
+```
+
+Failures retained: the first unrestricted `pnpm test` encountered the missing catalog tool-conflict migration sentinel plus several 5-second timeouts and was interrupted (exit 130). The sentinel is fixed; a two-worker run with 30-second limits is running. The first SQL check completed SQL assertions but failed two embedded `possibility-repository` tests at 5 seconds under contention. Embedded cluster tests now use the script's existing one-worker/30-second convention; SQL rerun is in progress. The first new cron test run failed two monthly cases because the heartbeat/Redis test doubles returned no Promise; corrected doubles pass all 25 cron/readiness tests. No application assertion was weakened.
+
+Rendered shared-document rehearsal on local port 3016: 1280px populated editable file, 360px read-only and history error/retry, 320px loading/empty/flag-off. Pagination grew 20 to 40 rows while preserving recent edits; read-only had no save or undo controls; errors preserved all 20 recent rows. Checked widths had no horizontal overflow. Browser transport interruption prevented capturing the denied state; denied access is covered by the component and route tests. Screenshots: `/Users/jacobrhinehart/.t3/dev/browser-artifacts/browser-screenshot-localhost-muy8ff1w-45cd68a2.png` and `/Users/jacobrhinehart/.t3/dev/browser-artifacts/browser-screenshot-localhost-muy8gpxp-8bdc7ae6.png`. Fixtures prove rendered behavior, not provider authentication or production delivery.
 
 ## Production steps and unknowns
 

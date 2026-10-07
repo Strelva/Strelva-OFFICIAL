@@ -351,6 +351,11 @@ psql "${psql_args[@]}" --file="$repo_root/tests/workspace-authority-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-systems-schema.sql"
 
 authority_leaver='c9000000-0000-4000-8000-000000000005'
+# The contender starts a fresh psql process after observing the hold point.
+# Under parallel build/test load the old 0.6-second hold could finish before
+# that process connected, falsely reporting a missing membership lock. Keep
+# the same 150ms lock-timeout assertion with a wider transaction hold.
+authority_hold_seconds=5
 authority_session_ready() {
   local app_name="$1" attempt
   for attempt in $(seq 1 200); do
@@ -374,7 +379,7 @@ for authority_call in $(psql "${psql_args[@]}" -Atc "select name from public.aut
   # 1. Removed mid-transaction: a write that queues behind an uncommitted
   # removal must re-read the committed row and be denied, not land once more.
   PGAPPNAME=authority-remover psql "${psql_args[@]}" \
-    -c "begin; delete from public.workspace_memberships where $authority_membership; select pg_sleep(0.6); commit;" >/dev/null &
+    -c "begin; delete from public.workspace_memberships where $authority_membership; select pg_sleep($authority_hold_seconds); commit;" >/dev/null &
   authority_remover=$!
   authority_session_ready authority-remover
   if psql "${psql_args[@]}" -c "$authority_stmt" >"$cluster_root/authority-removed-$authority_call.log" 2>&1; then
@@ -388,7 +393,7 @@ for authority_call in $(psql "${psql_args[@]}" -Atc "select name from public.aut
   # 2. Removal waits for an in-flight write: the write holds the membership
   # row FOR SHARE, so a concurrent delete cannot get its row lock.
   PGAPPNAME=authority-writer psql "${psql_args[@]}" \
-    -c "begin; $authority_stmt; select pg_sleep(0.6); rollback;" >"$cluster_root/authority-writer-$authority_call.log" 2>&1 &
+    -c "begin; $authority_stmt; select pg_sleep($authority_hold_seconds); rollback;" >"$cluster_root/authority-writer-$authority_call.log" 2>&1 &
   authority_writer=$!
   authority_session_ready authority-writer
   if psql "${psql_args[@]}" -c "set lock_timeout='150ms'; delete from public.workspace_memberships where $authority_membership;" >"$cluster_root/authority-blocked-$authority_call.log" 2>&1; then
@@ -402,7 +407,7 @@ for authority_call in $(psql "${psql_args[@]}" -Atc "select name from public.aut
   # uncommitted admin -> member change is denied.
   if [[ "$authority_tier" == manager ]]; then
     PGAPPNAME=authority-demoter psql "${psql_args[@]}" \
-      -c "begin; update public.workspace_memberships set role='member' where $authority_membership; select pg_sleep(0.6); commit;" >/dev/null &
+      -c "begin; update public.workspace_memberships set role='member' where $authority_membership; select pg_sleep($authority_hold_seconds); commit;" >/dev/null &
     authority_demoter=$!
     authority_session_ready authority-demoter
     if psql "${psql_args[@]}" -c "$authority_stmt" >"$cluster_root/authority-demoted-$authority_call.log" 2>&1; then
