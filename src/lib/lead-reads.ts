@@ -7,7 +7,9 @@
  *            one and not the other. The lead-mirror-reconcile cron records one
  *            parity result per tenant per day in the shared parity ledger.
  *   postgres serve `tenant_leads`, but only after 7 consecutive days of parity
- *            (client_record_parity_streak('tenant_leads')). Until then it acts
+ *            (tenant_lead_read_parity_streak()). Every tenant must have a
+ *            successful check each day, and a failed day cannot be repaired
+ *            into a passing day. Until then it acts
  *            as compare. Any Postgres failure or miss serves Redis, so a
  *            flipped read never shows less than Redis would.
  * Rollback is setting the switch back: both stores keep receiving every write.
@@ -99,7 +101,7 @@ export async function leadReadSource(options: { db?: LeadMirrorDb | null; env?: 
   const db = database(options.db);
   if (!db) return "redis";
   try {
-    const { data, error } = await rpc(db, "client_record_parity_streak", { p_store: LEAD_PARITY_STORE });
+    const { data, error } = await rpc(db, "tenant_lead_read_parity_streak", {});
     if (error) return "compare";
     const days = Number((data as { days?: unknown } | null)?.days ?? 0);
     streakCache = { days: Number.isFinite(days) ? days : 0, at: now };
@@ -259,7 +261,7 @@ export interface LeadParityReport {
  * The daily parity check for one tenant: every lead Redis still holds must be
  * in Postgres with the same submission hash. Records the day's result in the
  * shared parity ledger unless `record: false`. Throws when either store can't
- * be read (the day then has no result, which breaks the streak).
+ * be read; the runner records a failed day whenever Postgres is reachable.
  */
 export async function checkLeadParity(
   tenant: string,
@@ -298,17 +300,27 @@ export async function checkLeadParity(
     recorded: false,
   };
   if (options.record !== false) {
-    const saved = await rpc(db, "record_client_record_parity", {
-      p_store: LEAD_PARITY_STORE,
+    const saved = await rpc(db, "record_tenant_lead_read_parity", {
       p_tenant_id: tenant,
       p_redis_count: report.redisCount,
       p_postgres_count: postgresCount,
       p_missing: missing.length,
       p_mismatched: mismatched.length,
     });
-    report.recorded = !saved.error;
+    report.recorded = !saved.error && typeof saved.data === "object" && saved.data !== null
+      && typeof (saved.data as { ok?: unknown }).ok === "boolean";
+    if (report.recorded && (saved.data as { ok: boolean }).ok === false) report.ok = false;
   }
   return report;
+}
+
+/** A failed read invalidates today's parity even if an earlier hourly check passed. */
+export async function recordFailedLeadReadParity(tenant: string): Promise<void> {
+  const db = database();
+  if (!db) return;
+  await rpc(db, "record_tenant_lead_read_parity", {
+    p_tenant_id: tenant, p_redis_count: 0, p_postgres_count: 0, p_missing: 1, p_mismatched: 0,
+  }).catch(() => undefined);
 }
 
 /** Presence includes spam: only an absent ID may be treated as a pending copy. */

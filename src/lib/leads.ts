@@ -361,7 +361,7 @@ export async function getLeads(tenant: string, limit = 50, before: string | null
   const source = await leadReadSource();
   // The cursor is additive and affects only the opted-in durable read path.
   const redisPage = async () => {
-    const leads = await getRedisLeads(tenant, before && source !== "redis" ? LEAD_KEEP : limit);
+    const leads = await getRedisLeads(tenant, source === "postgres" || (before && source !== "redis") ? LEAD_KEEP : limit);
     return before && source !== "redis" ? leads.filter((lead) => (Date.parse(lead.createdAt) < Date.parse(before) || (beforeId !== null && Date.parse(lead.createdAt) === Date.parse(before) && lead.id < beforeId))).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt) || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0)).slice(0, limit) : leads;
   };
   if (source === "redis") return redisPage();
@@ -386,13 +386,13 @@ export async function getLeads(tenant: string, limit = 50, before: string | null
     getRedis() ? redisPage().catch(() => null) : Promise.resolve(null),
   ]);
   if (!pgLeads) {
-    if (redisLeads) return redisLeads;
+    if (redisLeads) return redisLeads.slice(0, limit);
     throw new Error("lead_read_unavailable");
   }
   const extras = (redisLeads ?? []).filter(lead => !pgLeads.some(row => row.id === lead.id));
   // Durable exclusions and page boundaries win over stale cached records.
   const present = await readPostgresLeadPresence(tenant, extras.map(lead => lead.id)).catch(() => null);
-  if (!present) return redisLeads ?? pgLeads;
+  if (!present) return redisLeads?.slice(0, limit) ?? pgLeads;
   return mergeNewestFirst(pgLeads, extras.filter(lead => !present.has(lead.id)), limit);
 }
 

@@ -76,8 +76,8 @@ const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
   if (name === "read_tenant_lead_digests") {
     return { data: Object.fromEntries(rows.filter((r) => r.tenant === args.p_tenant_id).map((r) => [r.leadId, r.hash])), error: null };
   }
-  if (name === "client_record_parity_streak") return { data: { store: args.p_store, days: streakDays }, error: null };
-  if (name === "record_client_record_parity") {
+  if (name === "tenant_lead_read_parity_streak") return { data: { store: "tenant_leads", days: streakDays }, error: null };
+  if (name === "record_tenant_lead_read_parity") {
     parity.push(args);
     return { data: { ok: args.p_missing === 0 && args.p_mismatched === 0 }, error: null };
   }
@@ -274,6 +274,18 @@ describe("postgres mode (flipped reads)", () => {
     rpc.mockImplementation(impl);
   });
 
+  it("a newer held cache entry cannot hide a pending lead beyond the requested page limit", async () => {
+    redisOnlyLead("t1", "lead_held", "2026-10-05T10:00:00.000Z");
+    redisOnlyLead("t1", "lead_pending", "2026-10-04T10:00:00.000Z");
+    pgOnlyLead("t1", "lead_older", "2026-10-01T10:00:00.000Z");
+    const impl = rpc.getMockImplementation()!;
+    rpc.mockImplementation(async (name, args) => name === "read_tenant_lead_presence"
+      ? { data: (args.p_lead_ids as string[]).filter(id => id === "lead_held" || id === "lead_older"), error: null }
+      : impl(name, args));
+    expect((await getLeads("t1", 1)).map(lead => lead.id)).toEqual(["lead_pending"]);
+    rpc.mockImplementation(impl);
+  });
+
   it("counts every recent Postgres lead beyond the Redis retention cap", async () => {
     vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-06T00:00:00Z"));
     for (let index = 0; index < 650; index++) pgOnlyLead("t1", `lead_${index}`, "2026-10-05T10:00:00.000Z");
@@ -424,8 +436,8 @@ describe("daily parity", () => {
     const run = await runLeadReadParity({ mode: "compare" });
     expect(run).toMatchObject({ ran: true, checked: 2, inParity: 1, outOfParity: [{ tenant: "t2", missing: 1, mismatched: 0 }] });
     expect(parity).toEqual([
-      expect.objectContaining({ p_store: "tenant_leads", p_tenant_id: "t1", p_missing: 0, p_mismatched: 0 }),
-      expect.objectContaining({ p_store: "tenant_leads", p_tenant_id: "t2", p_missing: 1 }),
+      expect.objectContaining({ p_tenant_id: "t1", p_missing: 0, p_mismatched: 0 }),
+      expect.objectContaining({ p_tenant_id: "t2", p_missing: 1 }),
     ]);
   });
 
@@ -441,6 +453,39 @@ describe("daily parity", () => {
     const run = await runLeadReadParity({ mode: "compare", tenants: async () => ["t1"] });
     expect(run.failed).toHaveLength(1);
     expect(parity).toEqual([]);
+  });
+
+  it("unconfigured Redis records failure, never a successful empty day", async () => {
+    redisAvailable = false;
+    const run = await runLeadReadParity({ mode: "compare", tenants: async () => ["t1"] });
+    expect(run).toMatchObject({ inParity: 0, failed: [{ tenant: "t1", reason: "lead_parity_redis_unconfigured" }] });
+    expect(parity).toEqual([expect.objectContaining({ p_tenant_id: "t1", p_missing: 1 })]);
+  });
+
+  it("a configured Redis read failure invalidates today's earlier successful check", async () => {
+    vi.spyOn(redis, "zrange").mockRejectedValueOnce(new Error("redis refused"));
+    const run = await runLeadReadParity({ mode: "compare", tenants: async () => ["t1"] });
+    expect(run).toMatchObject({ inParity: 0, failed: [{ tenant: "t1", reason: "redis refused" }] });
+    expect(parity).toEqual([expect.objectContaining({ p_tenant_id: "t1", p_missing: 1 })]);
+  });
+
+  it("a failed ledger write cannot count as a verified parity day", async () => {
+    const impl = rpc.getMockImplementation()!;
+    rpc.mockImplementation(async (name, args) => name === "record_tenant_lead_read_parity"
+      ? { data: null, error: { message: "ledger unavailable" } } : impl(name, args));
+    const run = await runLeadReadParity({ mode: "compare", tenants: async () => ["t1"] });
+    expect(run).toMatchObject({ inParity: 0, failed: [{ tenant: "t1", reason: "lead_parity_record_failed" }] });
+    rpc.mockImplementation(impl);
+  });
+
+  it("an earlier failed check cannot be reported as healthy after repair on the same day", async () => {
+    const impl = rpc.getMockImplementation()!;
+    rpc.mockImplementation(async (name, args) => name === "record_tenant_lead_read_parity"
+      ? { data: { ok: false }, error: null } : impl(name, args));
+    const run = await runLeadReadParity({ mode: "compare", tenants: async () => ["t1"] });
+    expect(run.inParity).toBe(0);
+    expect(run.outOfParity).toEqual([{ tenant: "t1", missing: 0, mismatched: 0 }]);
+    rpc.mockImplementation(impl);
   });
 });
 
