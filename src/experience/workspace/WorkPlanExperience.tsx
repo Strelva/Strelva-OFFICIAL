@@ -115,6 +115,7 @@ function PlanSession({ presentation, workspaceId, systemsRelease, onRequest, wor
   const [budgetError, setBudgetError] = useState("");
   const [fundingWorkspaceId, setFundingWorkspaceId] = useState(workspaceId);
   const [requestRequired, setRequestRequired] = useState(false);
+  const [fallbackRequestId, setFallbackRequestId] = useState<string | null>(null);
   const [budgetBusy, setBudgetBusy] = useState(false);
   const [budgetRetry, setBudgetRetry] = useState<PlanningBudgetCommand | null>(null);
   const [executionJobId, setExecutionJobId] = useState(providedPlanningEconomics?.jobId ?? null);
@@ -299,6 +300,10 @@ function PlanSession({ presentation, workspaceId, systemsRelease, onRequest, wor
           throw new Error("A previous planning call has a durable receipt. Its maximum remains held until the cost is reconciled.");
         }
         if (systemsRelease && code === "make_systems_required") setRequestRequired(true);
+        if (code === "planning_request_filed") {
+          const id = (body as { requestId?: unknown }).requestId;
+          if (typeof id === "string") setFallbackRequestId(id);
+        }
         throw new Error(responseError(body, "The plan could not be prepared."));
       }
       const planResponse = body as PlanResponse;
@@ -324,7 +329,8 @@ function PlanSession({ presentation, workspaceId, systemsRelease, onRequest, wor
     {!localPreview ? <PlanningBudgetPanel workspaceId={fundingWorkspaceId} budget={budget} loading={budgetLoading} error={budgetError} busy={budgetBusy} retry={budgetRetry} execution={latestExecution} canPropose={!workId || refining} readOnly={Boolean(readOnly)} onCommand={command} onRetry={() => void loadPlanningBudget()} /> : null}
     {error ? <p role="alert" className="text-sm text-critical">{error}</p> : null}
     {systemsRelease && fundingWorkspaceId !== workspaceId ? <p className="text-sm text-gray-muted">Your agency funds this planning call. The draft and its records stay in this client’s workspace.</p> : null}
-    {systemsRelease && onRequest && (requestRequired || error || budgetError) ? <Button type="button" variant="secondary" disabled={busy || !request.trim()} onClick={() => onRequest(request.trim())}>Ask Strelva to build this</Button> : null}
+    {fallbackRequestId ? <p role="status" className="text-sm">Your Request is in this business’s Requests for Strelva to review.</p> : null}
+    {systemsRelease && onRequest && !fallbackRequestId && (requestRequired || error || budgetError) ? <Button type="button" variant="secondary" disabled={busy || !request.trim()} onClick={() => onRequest(request.trim())}>Ask Strelva to build this</Button> : null}
     {result?.planningEconomics ? <p role="status" className="text-sm text-gray-muted">Planning admission recorded. The provider cost is unverified, so up to the accepted maximum remains held until reconciliation.</p> : null}
     {workId && !plan && !error && !localPreview ? <p role="status">Loading your plan…</p> : null}
     {(!workId || refining) && !readOnly ? <form className="space-y-4" onSubmit={event => { event.preventDefault(); void prepare(); }}>

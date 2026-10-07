@@ -701,12 +701,16 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010150300_cat
 psql "${psql_args[@]}" --file="$repo_root/tests/catalog-tool-evidence-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010150400_internal_tool_use_edits.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-use-edits-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010155100_internal_tool_member_submit.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/internal-tool-member-submit-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010152000_catalog_report_receipts.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/catalog-reports-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010153000_newsletter_contacts.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-contacts-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010154000_system_work_plan_authority.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/system-work-plan-authority-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010155000_failed_system_plan_request.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/failed-system-plan-request-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 
 # The real Make real runner, checkpointing through these RPCs (psql-backed port).

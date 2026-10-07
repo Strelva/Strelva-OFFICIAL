@@ -7,7 +7,7 @@ import {
 } from "@/platform/workspaces/types";
 import { boundedStore, initial, type BoundedStore } from "@/platform/bounded-work/repository";
 import { createSystemWork, requireSystemChanger, requireSystemMaker } from "@/platform/bounded-work/make-systems";
-import { assertLinkFieldsReleased, linkFields, linkFieldsReleasedFor, notifyAssignedPerson, resolveRecordLinks, type AssignedPersonNoticeStatus } from "./internal-tool-links";
+import { assertLinkFieldsReleased, linkFields, linkFieldsReleasedFor, notifyAssignedPerson, submitRecordWithLinks, type AssignedPersonNoticeStatus } from "./internal-tool-links";
 import { applicationCommandSchema, applicationPublishInputSchema, applicationRehearseInputSchema, applicationReviseInputSchema, applicationRollbackInputSchema, applicationSchema, applicationSpecSchema, applicationSubmitInputSchema, APPLICATION_RECORD_LIMIT, type ApplicationRelease } from "./contracts";
 import { applyLegacyApplicationCommand, assertLegacyApplicationRevision, cloneState, currentRelease, normalizeReleaseVersion, releaseSpec, reviseCandidate, rehearseCandidate, publishCandidate, rollbackRelease, validateRecord } from "./domain";
 import {
@@ -279,9 +279,9 @@ export function createApplicationService(store: BoundedStore = boundedStore) {
       if (linked) assertLinkFieldsReleased(release.spec, await linkFieldsReleasedFor(release.spec, actor, loaded.work.workspaceId));
       const target = { workspaceId: loaded.work.workspaceId, workId: id };
       const { record, conflicts } = linked
-        ? await resolveRecordLinks(db, actor, target, release.spec, input.record, input.links)
+        ? await submitRecordWithLinks(db, actor, target, release.spec, input)
         : { record: input.record, conflicts: [] as string[] };
-      await durableRpc(db, "submit_application_record", {
+      if (!linked) await durableRpc(db, "submit_application_record", {
         p_work_id: id,
         p_workspace_id: loaded.work.workspaceId,
         p_expected_release_version: input.expectedReleaseVersion,

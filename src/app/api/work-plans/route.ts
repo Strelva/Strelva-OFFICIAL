@@ -1,4 +1,5 @@
 import { WorkspaceMakeSystemsError } from "@/platform/workspaces/types";
+import { fileFailedSystemPlanRequest } from "@/products/work-plans/failure-request";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSessionUser } from "@/platform/infra/db/server-client";
@@ -132,8 +133,19 @@ export async function POST(request: Request) {
     if (await isRateLimitedWindowedAsync(`workspace:planning:${current.userId}`, 5, 60_000)) {
       return json({ error: "Please wait before preparing another plan." }, 429);
     }
-    const result = await createWorkPlan({ actor: current, ...input });
-    return json(presentWorkPlan(result), 201);
+    try {
+      const result = await createWorkPlan({ actor: current, ...input });
+      return json(presentWorkPlan(result), 201);
+    } catch (error) {
+      try {
+        const requestId = await fileFailedSystemPlanRequest(error, current, input);
+        if (requestId) return json({ error: "Strelva couldn't draft this yet. Your Request is filed for review; scope and deadline are not agreed.",
+          code: "planning_request_filed", requestId }, 503);
+      } catch {
+        return json({ error: "Strelva couldn't draft this yet, and the Request could not be saved. Try filing it again.", code: "planning_request_failed" }, 503);
+      }
+      return failure(error);
+    }
   } catch (error) {
     return failure(error);
   }

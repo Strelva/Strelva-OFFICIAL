@@ -6,8 +6,8 @@ import { workspaceReleaseFlagEnabled } from "@/platform/release-flags/store";
 import { releaseViewerFor } from "@/platform/release-flags/viewer";
 import { releaseFlagMayBeOn, workspaceReleaseOn } from "@/platform/release-flags/resolve";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
-import type { ApplicationRecord, ApplicationSpec, applicationLinkInputSchema } from "./contracts";
-import type { z } from "zod";
+import { recordSchema, type ApplicationRecord, type ApplicationSpec, type applicationLinkInputSchema } from "./contracts";
+import { z } from "zod";
 
 /**
  * Internal tools that point at the business record
@@ -56,7 +56,10 @@ export async function linkFieldsReleasedFor(spec: ApplicationSpec, actor: { user
 
 function failure(error: { message?: string; code?: string }, field?: LinkField): never {
   const detail = `${error.code ?? ""} ${error.message ?? ""}`;
-  if (detail.includes("workspace_membership_required") || detail.includes("application_access_denied")) throw new WorkspaceAccessError();
+  if (detail.includes("workspace_membership_required") || detail.includes("application_access_denied") || detail.includes("verified_identity_required")) throw new WorkspaceAccessError();
+  if (/application_(release_conflict|records_revision_conflict|record_duplicate|record_limit_reached)/.test(detail)) {
+    throw new WorkspaceConflictError("This application's records or release changed. Reload before submitting.");
+  }
   if (detail.includes("application_record_person_unknown")) {
     throw new WorkspaceConflictError(`${field?.label ?? "Assigned person"}: that email isn't on this business's staff.`);
   }
@@ -74,14 +77,11 @@ function failure(error: { message?: string; code?: string }, field?: LinkField):
  * to save and the labels of contact fields where the email and the phone
  * matched different contacts (the email match was kept).
  */
-export async function resolveRecordLinks(
-  db: LinkDb,
-  actor: WorkspaceActor,
-  target: { workspaceId: string; workId: string },
+function recordLinkRequests(
   spec: ApplicationSpec,
   record: ApplicationRecord,
   links: Record<string, LinkInput> = {},
-): Promise<{ record: ApplicationRecord; conflicts: string[] }> {
+) {
   const requests: Array<Record<string, unknown>> = [];
   const fields = new Map<string, LinkField>();
   for (const field of linkFields(spec)) {
@@ -97,6 +97,18 @@ export async function resolveRecordLinks(
       requests.push({ fieldId: field.id, kind: field.type, ...fallback, ...typed });
     }
   }
+  return { requests, fields };
+}
+
+export async function resolveRecordLinks(
+  db: LinkDb,
+  actor: WorkspaceActor,
+  target: { workspaceId: string; workId: string },
+  spec: ApplicationSpec,
+  record: ApplicationRecord,
+  links: Record<string, LinkInput> = {},
+): Promise<{ record: ApplicationRecord; conflicts: string[] }> {
+  const { requests, fields } = recordLinkRequests(spec, record, links);
   if (!requests.length) return { record, conflicts: [] };
   const { data, error } = await db.rpc("resolve_internal_tool_links", {
     p_workspace_id: target.workspaceId,
@@ -116,6 +128,28 @@ export async function resolveRecordLinks(
     if (resolved[fieldId]?.conflict === true) conflicts.push(field.label);
   }
   return { record: { ...record, values }, conflicts };
+}
+
+/** Contact resolution and member submit share the revision-checked SQL transaction. */
+export async function submitRecordWithLinks(
+  db: LinkDb,
+  actor: WorkspaceActor,
+  target: { workspaceId: string; workId: string },
+  spec: ApplicationSpec,
+  input: { record: ApplicationRecord; links?: Record<string, LinkInput>; expectedReleaseVersion: number; expectedRecordsRevision: number },
+): Promise<{ record: ApplicationRecord; conflicts: string[] }> {
+  const { requests, fields } = recordLinkRequests(spec, input.record, input.links);
+  const { data, error } = await db.rpc("submit_internal_tool_member_record", {
+    p_workspace_id: target.workspaceId, p_work_id: target.workId,
+    p_user_id: actor.userId, p_verified_email: actor.verifiedEmail,
+    p_expected_release_version: input.expectedReleaseVersion,
+    p_expected_records_revision: input.expectedRecordsRevision,
+    p_record_id: input.record.id, p_values: input.record.values, p_links: requests,
+  });
+  if (error) failure(error, requests.length === 1 ? fields.get(String(requests[0]!.fieldId)) : undefined);
+  const saved = z.object({ record: recordSchema, conflicts: z.array(z.string()).max(30) }).safeParse(data);
+  if (!saved.success || saved.data.record.id !== input.record.id) throw new WorkspaceStoreError("The application record could not be confirmed.");
+  return saved.data;
 }
 
 function oneLine(value: string, max = 120): string {

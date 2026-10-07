@@ -120,7 +120,7 @@ begin
   -- Form submission replaces only form-owned fields. Other saved values are
   -- not writable by the recipient and must survive the correction.
   merged_values := (target.values - array(select jsonb_array_elements_text(form_fields))) || (p_record->'values');
-  if not exists(select 1 from public.workspaces where id=app.workspace_id and kind='customer') then
+  if not exists(select 1 from public.workspaces w where w.id=app.workspace_id and w.kind='customer') then
     raise exception 'application_record_link_denied';
   end if;
   if public.workspace_exit_completed(app.workspace_id) then raise exception 'workspace_exit_future_work_blocked'; end if;

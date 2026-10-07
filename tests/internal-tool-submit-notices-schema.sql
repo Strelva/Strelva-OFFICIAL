@@ -1,5 +1,9 @@
 \set ON_ERROR_STOP on
 -- Uses the fictional Leslie tool retained by internal-tool-links-schema.sql.
+-- The retained links fixture predates the operator queue. Make its named
+-- operator an actual active operator before exercising operator-only reads.
+insert into public.super_admins(user_id,email)
+values ('e8000000-0000-4000-8000-000000000001','links-operator@example.test');
 create function pg_temp.assert_true(condition boolean, message text) returns void language plpgsql as $$
 begin if condition is not true then raise exception 'assertion failed: %', message; end if; end; $$;
 create function pg_temp.expect_error(stmt text, expected text) returns void language plpgsql as $$

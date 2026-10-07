@@ -75,6 +75,7 @@ export async function createWorkPlan(input: {
     userGoal: request.userGoal,
     evidence,
     allowedOperations: catalog,
+    ...(systemsMaker ? { linkedFieldsEnabled: true } : {}),
   } satisfies WorkPlanGenerationInput;
   let generated: unknown;
   let planningReceipt: BudgetExecution | undefined;

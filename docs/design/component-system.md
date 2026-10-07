@@ -595,3 +595,14 @@ private previews are noindexed. The static export includes the immutable
 document, each page, redirect mappings, image bytes and file checksums. No new
 renderer dependencies were added. Local automated and rendered verification is
 recorded with the website rebuild delivery evidence.
+
+### Catalog planning recovery, October 7, 2026
+
+`WorkPlanExperience` preserves the typed goal when planning fails. With Systems
+released, a confirmed fallback Request shows its pending review state and hides
+the duplicate filing action; a failed fallback retains Ask Strelva to build this.
+Scope and deadline remain unagreed. The server rechecks operator/delegation
+authority and uses an actor-bound retry identity. Flags off preserve the earlier
+unavailable response and planning prompt. Local route and SQL tests cover
+confirmed filing, storage failure, revocation and retry; this entry does not
+claim provider generation or production delivery.

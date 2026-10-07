@@ -278,28 +278,53 @@ describe("member submit of a live tool", () => {
   const release = { version: 1, spec, publishedAt: "2026-10-07T12:00:00Z", publishedBy: "operator", provenance: "published" as const };
   beforeEach(() => {
     boundary.state = { currentReleaseVersion: 1, releases: [release], recordsRevision: 0, status: "installed" };
+    boundary.responses.submit_internal_tool_member_record = args => ({ data: {
+      record: { id: args.p_record_id, values: { ...(args.p_values as Record<string, unknown>), client: contactId, handler: personId } }, conflicts: [],
+    }, error: null });
     vi.stubEnv("EMAIL_SENDING_ENABLED", "false");
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
   });
 
-  it("resolves links, saves ids, then claims one notice", async () => {
-    boundary.responses.resolve_internal_tool_links = resolved;
+  it("resolves links and saves ids in one RPC, then claims one notice", async () => {
     boundary.responses.claim_internal_tool_submit_notice = claimed;
     const result = await createApplicationService().submit(staff, workId, {
       expectedReleaseVersion: 1, expectedRecordsRevision: 0,
       record: { id: "r1", values: { business: "Brightline", client: "owner@brightline.example.test", handler: "sam@leslie.example.test" } },
     });
-    expect(boundary.calls.map((call) => call.name)).toEqual(["resolve_internal_tool_links", "submit_application_record", "claim_internal_tool_submit_notice", "lease_internal_tool_notice", "finish_internal_tool_notice_delivery"]);
-    expect(boundary.calls[1]!.args.p_values).toEqual({ business: "Brightline", client: contactId, handler: personId });
+    expect(boundary.calls.map((call) => call.name)).toEqual(["submit_internal_tool_member_record", "claim_internal_tool_submit_notice", "lease_internal_tool_notice", "finish_internal_tool_notice_delivery"]);
+    expect(boundary.calls[0]!.args).toMatchObject({ p_expected_records_revision: 0, p_expected_release_version: 1,
+      p_values: { business: "Brightline", client: "owner@brightline.example.test", handler: "sam@leslie.example.test" },
+      p_links: [{ fieldId: "client", kind: "contact", email: "owner@brightline.example.test" }, { fieldId: "handler", kind: "assigned_person", email: "sam@leslie.example.test" }],
+    });
     expect(result).toMatchObject({ linkResult: { notice: "suppressed", contactConflicts: [] } });
   });
 
   it("saves nothing when a contact cannot be resolved", async () => {
-    boundary.responses.resolve_internal_tool_links = () => ({ data: null, error: { message: "application_record_invalid" } });
+    boundary.responses.submit_internal_tool_member_record = () => ({ data: null, error: { message: "application_record_invalid" } });
     await expect(createApplicationService().submit(staff, workId, {
       expectedReleaseVersion: 1, expectedRecordsRevision: 0, record: { id: "r1", values: { business: "A", client: "not an email" } },
     })).rejects.toThrow("Check the email or phone in this record.");
-    expect(boundary.calls.map((call) => call.name)).toEqual(["resolve_internal_tool_links"]);
+    expect(boundary.calls.map((call) => call.name)).toEqual(["submit_internal_tool_member_record"]);
+  });
+
+  it.each(["application_records_revision_conflict", "application_release_conflict", "application_record_duplicate"])("does not claim a notice after %s", async error => {
+    boundary.responses.submit_internal_tool_member_record = () => ({ data: null, error: { message: error } });
+    await expect(createApplicationService().submit(staff, workId, {
+      expectedReleaseVersion: 1, expectedRecordsRevision: 0, record: { id: "r1", values: { business: "A", client: "a@client.example.test" } },
+    })).rejects.toBeInstanceOf(WorkspaceConflictError);
+    expect(boundary.calls.map(call => call.name)).toEqual(["submit_internal_tool_member_record"]);
+  });
+
+  it("passes typed contact details into the transaction and returns its conflict labels", async () => {
+    boundary.responses.submit_internal_tool_member_record = () => ({ data: { record: { id: "r1", values: { business: "A", client: contactId } }, conflicts: ["Client contact"] }, error: null });
+    boundary.responses.claim_internal_tool_submit_notice = claimed;
+    const result = await createApplicationService().submit(staff, workId, {
+      expectedReleaseVersion: 1, expectedRecordsRevision: 0,
+      record: { id: "r1", values: { business: "A", client: "a@client.example.test" } },
+      links: { client: { name: "Acme", phone: "7165550100" } },
+    });
+    expect(boundary.calls[0]!.args.p_links).toEqual([{ fieldId: "client", kind: "contact", email: "a@client.example.test", name: "Acme", phone: "7165550100" }]);
+    expect(result).toMatchObject({ linkResult: { contactConflicts: ["Client contact"] } });
   });
 
   it("refuses to use a tool with link fields while the flag is off", async () => {

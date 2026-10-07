@@ -10,7 +10,11 @@ The active bet is an agency/Strelva builder path with owners filing Requests; te
 
 Round 4 review fixed linked recipient corrections: an existing assigned-person UUID no longer fails browser email validation, and typed contact/person replacements resolve inside one grant/revision-checked database transaction. Flags off retain the original edit RPC and do no additional reads. Migration `20261010150400` and rollback are added. Cron compatibility/failure tests and the missing `20261010150300` readiness sentinel are added.
 
-Next action: finish the running full test, SQL and typecheck checks; run build after stopping this worktree's local dev server; update final verification/spec status and commit. Current code is local only.
+Round 5 resumed the standalone branch. Initial whole test run passed 696 files / 6,324 tests (37 skips). Independent review identified and fixed flags-off planner guidance and the missing failed-plan Request fallback. Linked member submissions now resolve contacts and save records in one SQL transaction (new `20261010155100`), alongside grant submissions/edits. Failed maker planning files an idempotent pending Request (new `20261010155000`), without acceptance or notifications. Both new migrations have rollbacks.
+
+Round 5 isolated catalog SQL passed after fixing the fictional operator/contact fixtures, a missing SQL test helper, and an ambiguous column in the linked-edit RPC. Fresh-cluster full SQL, final whole tests, lint and build are pending. First build failed because this harness inherits `NODE_ENV=development`; the normal `NODE_ENV=production` build is running. A disposable local Auth stack is starting using an existing cached CLI; no dependency was added. The document denied state is now rendered at 1280 and 320px, with no overflow or editing controls.
+
+Next action: finish verification, complete any available isolated Auth journey, update spec and final handoff, and commit passing pieces. Current code is local only.
 
 ## Flags and migrations already in checkpoints
 

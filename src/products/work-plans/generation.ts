@@ -16,7 +16,7 @@ const PLANNING_SYSTEM_PROMPT = [
   "If the goal cannot be scoped to those operations, use status needs_scoping and state the missing decision.",
   "For a create_document or create_tracker output, include a small reviewable draft when the requested result is specific enough. A document draft contains only title and private text; a tracker draft names one of the supplied empty templates.",
   "For create_application, infer the smallest useful private app from the requested outcome. Include an application draft with title, typed fields, and approved form/list/detail/document components referencing those fields. Never include executable code, arbitrary URLs, customer records, permissions, deployment claims, or a maintenance owner. The server assigns ownership and the native app must pass checks before activation.",
-  "For an equipment or repair request, prefer a concise intake and review list with only the fields the request calls for, such as equipment, location, problem, urgency, and notes. Use the supported text, number, and boolean types. When the outcome includes clients or staff assignments, use contact fields for business contacts and assigned_person for the one staff assignee; records reference their business IDs.",
+  "For an equipment or repair request, prefer a concise intake and review list with only the fields the request calls for, such as equipment, location, problem, urgency, and notes. Use the supported text, number, and boolean types.",
   "Set no cost value. The server records estimatedCost as null until a trusted estimate exists.",
 ].join(" ");
 
@@ -24,6 +24,8 @@ export interface WorkPlanGenerationInput {
   userGoal: string;
   evidence: readonly WorkPlanEvidence[];
   allowedOperations: readonly WorkPlanNativeOperation[];
+  /** Resolved for the target workspace; absent preserves the original prompt. */
+  linkedFieldsEnabled?: boolean;
   /** Exact admission identity used to bind a provider billing receipt. */
   executionContext?: BudgetExecutionEvidenceContext & {
     kind: "model";
@@ -81,7 +83,7 @@ export async function defaultGenerate(input: WorkPlanGenerationInput): Promise<u
   // planning call from becoming a 40-second primary-plus-fallback request.
   const abortSignal = AbortSignal.timeout(20_000);
   const options = () => ({
-    system: PLANNING_SYSTEM_PROMPT,
+    system: PLANNING_SYSTEM_PROMPT + (input.linkedFieldsEnabled ? " When the outcome includes clients or staff assignments, use contact fields for business contacts and assigned_person for the one staff assignee; records reference their business IDs." : ""),
     prompt: promptFor(input),
     output: Output.object({ schema: generatedWorkPlanSchema }),
     maxOutputTokens: 1_800,

@@ -1,4 +1,10 @@
 \set ON_ERROR_STOP on
+create function pg_temp.expect_error(statement text, expected text) returns void language plpgsql as $$
+begin
+  begin execute statement;
+  exception when others then if sqlerrm<>expected then raise; end if; return; end;
+  raise exception 'expected error %',expected;
+end; $$;
 -- Existing use fixture is revoked; grant corrections without submit authority.
 create temp table w6_edit_grant as select * from public.grant_application_use_with_edit(
 'e8000000-0000-4000-8000-000000000001','links-operator@example.test','e8000000-0000-4000-8000-000000000040',
@@ -44,6 +50,11 @@ select pg_temp.expect_error($q$select * from public.edit_internal_tool_use_recor
 (select id from w6_edit_grant),1,1,'{"id":"r1","values":{"business":"Not mine","client":"foreign-edit@client.example.test"}}','w6-edit-other')$q$,'application_use_denied');
 select pg_temp.expect_error($q$select * from public.edit_internal_tool_use_record('e8000000-0000-4000-8000-000000000003','links-outsider@example.test','e8000000-0000-4000-8000-000000000040',
 (select id from w6_edit_grant),1,3,'{"id":"w6-use","values":{"business":"Cross business","client":"e8000000-0000-4000-8000-000000000032"}}','w6-edit-cross')$q$,'application_record_link_denied');
+select pg_temp.expect_error($q$select * from public.edit_internal_tool_use_record('e8000000-0000-4000-8000-000000000003','links-outsider@example.test','e8000000-0000-4000-8000-000000000040',
+(select id from w6_edit_grant),1,3,'{"id":"w6-use","values":{"business":"Foreign assignee","client":"foreign-assignee-rollback@client.example.test","handler":"e8000000-0000-4000-8000-000000000022"}}','w6-edit-foreign-assignee')$q$,'application_record_link_denied');
+do $$ begin
+if exists(select 1 from public.business_contacts where email='foreign-assignee-rollback@client.example.test') then raise exception 'foreign assignee leaked contact'; end if;
+end $$;
 select pg_temp.expect_error($q$select * from public.edit_internal_tool_use_record('e8000000-0000-4000-8000-000000000003','links-outsider@example.test','e8000000-0000-4000-8000-000000000040',
 (select id from w6_edit_grant),1,3,'{"id":"w6-use","values":{"business":"Unknown staff","client":"e8000000-0000-4000-8000-000000000030","handler":"staff@other.example.test"}}','w6-edit-staff')$q$,'application_record_person_unknown');
 update public.application_use_grants set status='revoked',revoked_at=clock_timestamp() where id=(select id from w6_edit_grant);

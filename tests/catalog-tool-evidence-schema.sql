@@ -10,9 +10,9 @@ do $$ begin
     raise exception 'cross-workspace history accepted';
   exception when others then if sqlerrm<>'workspace_access_denied' then raise; end if; end;
 end $$;
-insert into public.business_contacts(id,workspace_id,email,phone,phone_key,sources) values
-  ('e8000000-0000-4000-8000-000000000070','e8000000-0000-4000-8000-000000000010','w6-email@example.test',null,null,array['manual']),
-  ('e8000000-0000-4000-8000-000000000071','e8000000-0000-4000-8000-000000000010',null,'7165550199','7165550199',array['manual']);
+insert into public.business_contacts(id,workspace_id,email,phone,sources,first_seen_at,last_seen_at) values
+  ('e8000000-0000-4000-8000-000000000070','e8000000-0000-4000-8000-000000000010','w6-email@example.test',null,array['operator'],now(),now()),
+  ('e8000000-0000-4000-8000-000000000071','e8000000-0000-4000-8000-000000000010',null,'7165550199',array['operator'],now(),now());
 select public.resolve_internal_tool_links('e8000000-0000-4000-8000-000000000010','e8000000-0000-4000-8000-000000000040',
   'e8000000-0000-4000-8000-000000000002','links-staff@example.test',
   '[{"fieldId":"client","kind":"contact","email":"w6-email@example.test","phone":"7165550199"}]');
