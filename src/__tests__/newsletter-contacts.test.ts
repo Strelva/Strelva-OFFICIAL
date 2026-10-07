@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   add: vi.fn(), workspace: vi.fn(), released: vi.fn(), rpc: vi.fn(),
   tenant: vi.fn(), unsubscribe: vi.fn(), limited: vi.fn(),
+  userClient: vi.fn(), getUser: vi.fn(), userRpc: vi.fn(),
 }));
 vi.mock("@/lib/storage", () => ({ addSubscriber: mocks.add }));
 vi.mock("@/lib/tenant", () => ({ getTenantFromHeaders: mocks.tenant }));
@@ -10,6 +11,7 @@ vi.mock("@/platform/release-flags/store", () => ({
   releaseWorkspaceForTenant: mocks.workspace, workspaceReleaseFlagEnabled: mocks.released,
 }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: () => ({ rpc: mocks.rpc }) }));
+vi.mock("@/platform/infra/db/server-client", () => ({ createUserClient: mocks.userClient }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: mocks.limited, rateLimitKey: () => "newsletter-test" }));
 vi.mock("@/lib/storage/newsletter-store", () => ({ unsubscribeSubscriber: mocks.unsubscribe }));
 vi.mock("@/lib/newsletter-unsubscribe", () => ({ verifyUnsubscribeToken: () => ({ tenantId: "gldf", email: "reader@example.test" }) }));
@@ -27,6 +29,8 @@ beforeEach(() => {
   vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");
   vi.stubEnv("STRELVA_NEWSLETTER_CONTACTS_RELEASE", "");
   vi.stubEnv("DATA_SOURCE", "postgres");
+  mocks.userClient.mockResolvedValue({ auth: { getUser: mocks.getUser }, rpc: mocks.userRpc });
+  mocks.getUser.mockResolvedValue({ data: { user: { id: "signed-in-operator" } }, error: null });
   mocks.add.mockResolvedValue({ duplicate: false });
   mocks.tenant.mockResolvedValue("gldf");
   mocks.workspace.mockResolvedValue(workspace);
@@ -138,29 +142,57 @@ describe("newsletter contact bridge and frozen public response", () => {
 });
 
 describe("newsletter backfill preparation", () => {
-  const input = { operatorEmail: "operator@example.test", tenantId: "gldf", workspaceId: workspace };
+  const input = { tenantId: "gldf", workspaceId: workspace };
   const summary = { workspaceId: workspace, tenantId: "gldf", dryRun: true, examined: 3,
     creates: 1, merges: 1, invalid: 1, unsubscribed: 1, linked: 0, failed: 0, nextAfter: null };
 
   it("defaults to a dry run while releases are off", async () => {
-    mocks.rpc.mockResolvedValue({ data: summary, error: null });
+    mocks.userRpc.mockResolvedValue({ data: summary, error: null });
     expect(await backfillNewsletterContacts(input)).toEqual(summary);
-    expect(mocks.rpc).toHaveBeenCalledWith("backfill_newsletter_contacts", {
-      p_operator_email: "operator@example.test", p_tenant_id: "gldf", p_workspace_id: workspace,
+    expect(mocks.userRpc).toHaveBeenCalledWith("backfill_newsletter_contacts", {
+      p_tenant_id: "gldf", p_workspace_id: workspace,
       p_apply: false, p_after: null, p_limit: 500,
     });
     expect(mocks.released).not.toHaveBeenCalled();
+    expect(mocks.getUser).toHaveBeenCalledOnce();
+    expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
   it("refuses an apply with env off even when a row resolver could return true", async () => {
     await expect(backfillNewsletterContacts({ ...input, apply: true })).rejects.toThrow("not released");
+    expect(mocks.userRpc).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { data: { user: null }, error: null },
+    { data: { user: { id: "unverified-cookie" } }, error: { message: "invalid session" } },
+  ])("refuses an absent or invalid signed-in user", async (identity) => {
+    mocks.getUser.mockResolvedValue(identity);
+    await expect(backfillNewsletterContacts(input)).rejects.toThrow("signed-in operator");
+    expect(mocks.userRpc).not.toHaveBeenCalled();
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+
+  it("refuses unavailable session storage", async () => {
+    mocks.userClient.mockResolvedValue(null);
+    await expect(backfillNewsletterContacts(input)).rejects.toThrow("signed-in operator");
+    expect(mocks.userRpc).not.toHaveBeenCalled();
+  });
+
+  it("ignores a supplied operator email and leaves authorization to the session RPC", async () => {
+    mocks.userRpc.mockResolvedValue({ data: null, error: { message: "newsletter_contact_operator_required" } });
+    const spoofed = { ...input, operatorEmail: "privileged@example.test" };
+    await expect(backfillNewsletterContacts(spoofed)).rejects.toThrow("could not be read");
+    expect(mocks.userRpc).toHaveBeenCalledWith("backfill_newsletter_contacts", {
+      p_tenant_id: "gldf", p_workspace_id: workspace, p_apply: false, p_after: null, p_limit: 500,
+    });
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
   it("surfaces failed reads and malformed reports", async () => {
-    mocks.rpc.mockResolvedValueOnce({ data: null, error: { message: "denied" } });
+    mocks.userRpc.mockResolvedValueOnce({ data: null, error: { message: "denied" } });
     await expect(backfillNewsletterContacts(input)).rejects.toThrow("could not be read");
-    mocks.rpc.mockResolvedValueOnce({ data: { creates: 5 }, error: null });
+    mocks.userRpc.mockResolvedValueOnce({ data: { creates: 5 }, error: null });
     await expect(backfillNewsletterContacts(input)).rejects.toThrow();
   });
 });

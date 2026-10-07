@@ -671,6 +671,25 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009140000_mak
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-flag-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009150000_reader_rpc_volatility.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/reader-rpc-volatility-schema.sql"
+# Full effort coverage, rollback before zero logs, and reapply. Both readers
+# retain VOLATILE because their identity checks lock authority rows.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009160000_business_effort_coverage.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-effort-coverage-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-business-effort-coverage.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-effort-minutes-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009160000_business_effort_coverage.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-effort-coverage-schema.sql"
+
+rollback_guard_log="$cluster_root/effort-coverage-rollback-guard.log"
+if psql "${psql_args[@]}" --file="$repo_root/tests/business-effort-coverage-rollback-schema.sql" >"$rollback_guard_log" 2>&1; then
+  printf 'Effort rollback incorrectly accepted existing zero logs.\n' >&2
+  exit 1
+fi
+if ! grep -q 'business_effort_coverage_rollback_has_zero_logs' "$rollback_guard_log"; then
+  cat "$rollback_guard_log" >&2
+  exit 1
+fi
+
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
@@ -729,6 +748,29 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010152000_cat
 psql "${psql_args[@]}" --file="$repo_root/tests/catalog-reports-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010153000_newsletter_contacts.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-contacts-schema.sql"
+psql "${psql_args[@]}" <<'SQL'
+create schema auth;
+create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
+-- Match the retained collection table; publishing outputs depend on it.
+create table public.collection_entries (
+ id uuid primary key default gen_random_uuid(),tenant_id text not null references public.tenants(id),
+ type text not null,slug text not null,status text not null default 'draft',data jsonb not null default '{}',
+ created_at timestamptz not null default now(),updated_at timestamptz not null default now(),unique(tenant_id,type,slug)
+);
+SQL
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010142000_workspace_publishing_content.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-publishing-content-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011100000_workspace_newsletter_sender.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-newsletter-sender-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-workspace-newsletter-sender.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011100000_workspace_newsletter_sender.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-newsletter-sender-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011100100_newsletter_backfill_identity.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-backfill-identity-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-newsletter-backfill-identity.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-contacts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011100100_newsletter_backfill_identity.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-backfill-identity-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010154000_system_work_plan_authority.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/system-work-plan-authority-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010155000_failed_system_plan_request.sql"
@@ -769,11 +811,46 @@ psql "${psql_args[@]}" --file="$repo_root/tests/booking-native-workspace-schema.
 # Every stream's release flag key survives the last literal redefinition (#253).
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 
+# Google location lineage through the real Versions/System stores, after the
+# account-binding migrations. Preparation stays fake; no Google dispatch.
+if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
+  STRELVA_VERSIONS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
+    pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/google-location-versions-postgres.test.ts
+fi
+
 # The one booking store through both real route families (legacy /api/booking
 # and the public booking service) against the real booking functions. Last,
 # because it commits its fictional rows.
 STRELVA_BOOKINGS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/booking-one-store.test.ts
+# Policy facts: confirmation/provenance/history/undo on the existing record RPC.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011120000_business_policies.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-policies-schema.sql"
+# Rollback before adoption and reapply preserve legacy service areas.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011120000_business_policies.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011120000_business_policies.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-policies-schema.sql"
+
+# Adoption is a stop point: rollback refuses both current facts and historical
+# policy terms, even after Undo. The real rollback file runs in both cases.
+psql "${psql_args[@]}" --set=check_history=0 --set=undo_terms=0 --file="$repo_root/tests/business-policies-rollback-schema.sql"
+for policy_guard_phase in current history; do
+  if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011120000_business_policies.sql" >"$cluster_root/policy-rollback-refusal.log" 2>&1; then
+    printf 'Policy rollback discarded %s terms.\n' "$policy_guard_phase" >&2
+    exit 1
+  fi
+  if ! grep -q 'business_policies_rollback_requires_data_preservation' "$cluster_root/policy-rollback-refusal.log"; then
+    cat "$cluster_root/policy-rollback-refusal.log" >&2
+    exit 1
+  fi
+  if [[ "$policy_guard_phase" == "current" ]]; then
+    psql "${psql_args[@]}" --set=check_history=0 --set=undo_terms=1 --file="$repo_root/tests/business-policies-rollback-schema.sql"
+  else
+    psql "${psql_args[@]}" --set=check_history=1 --set=undo_terms=0 --file="$repo_root/tests/business-policies-rollback-schema.sql"
+  fi
+done
+printf 'Policy rollback guards preserved current terms and undone history.\n'
+
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 

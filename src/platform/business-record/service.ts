@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import {
   businessContactSchema,
+  businessPolicyPatchSchema,
   businessRecordPatchSchema,
   businessRecordRevisionSchema,
   businessRecordSchema,
@@ -34,6 +35,8 @@ import {
 import { actorArgs, BusinessRecordValidationError, callBusinessRecord } from "./repository";
 import { canonicalJson, sha256, type TenantUnlinkCommand } from "./tenant-import";
 
+import { selectBusinessPolicies, type BusinessPolicies } from "./policies";
+
 const workspaceId = z.string().uuid();
 const commandId = z.string().uuid();
 
@@ -61,6 +64,11 @@ export async function readConfirmedBusinessFacts(actor: WorkspaceActor, workspac
     confirmedBusinessFactsSchema, "The confirmed business details could not be loaded.");
 }
 
+/** Exact same membership/agency read boundary as the business record. */
+export async function readBusinessPolicies(actor: WorkspaceActor, workspace: string): Promise<BusinessPolicies> {
+  return selectBusinessPolicies(await readBusinessRecord(actor, workspace));
+}
+
 export async function patchBusinessRecord(
   actor: WorkspaceActor, workspace: string, expectedRevision: number, rawPatch: unknown, options: WriteOptions,
 ): Promise<BusinessRecordWriteResult> {
@@ -74,6 +82,14 @@ export async function patchBusinessRecord(
     p_workspace_id: workspaceId.parse(workspace), ...actorArgs(actor), p_source: source,
     p_expected_revision: revision, p_patch: patch, p_command_id: id, p_command_digest: digest,
   }, businessRecordWriteResultSchema, "The business record could not be saved.");
+}
+
+/** Same revision, idempotency, provenance and confirmation rules as all facts.
+ * Remove a policy with null; undo with undoBusinessRecordRevision. */
+export async function patchBusinessPolicies(
+  actor: WorkspaceActor, workspace: string, expectedRevision: number, rawPolicies: unknown, options: WriteOptions,
+): Promise<BusinessRecordWriteResult> {
+  return patchBusinessRecord(actor, workspace, expectedRevision, { facts: businessPolicyPatchSchema.parse(rawPolicies) }, options);
 }
 
 export async function undoBusinessRecordRevision(

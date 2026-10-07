@@ -79,9 +79,9 @@ describe("human minutes on Internal work", () => {
     const text = container.textContent ?? "";
     expect(text).toContain("Human minutes per business");
     expect(text).toContain("August 2026");
-    // August: Mooney 45 (void excluded), Juniper 90 → median 67.5; July median 180.
+    // August: Mooney 45 (void excluded), Juniper 90 → median 67.5; July incomplete.
     expect(text).toContain("67.5");
-    expect(text).toContain("July 2026: 180 min");
+    expect(text).toContain("July 2026: Not enough data");
     expect(text).toContain("Falling");
     expect(text).toContain("The Mooney Firm");
     expect(text).toContain("attymooney");
@@ -92,10 +92,38 @@ describe("human minutes on Internal work", () => {
 
   it("shows an honest empty state", async () => {
     render(createElement(BusinessEffortPortfolio, { load: await readyLoad({ entries: [], businesses: [] }) }));
-    expect(container.textContent).toContain("No human minutes recorded yet");
+    expect(container.textContent).toContain("No customer businesses exist yet");
     expect(container.textContent).toContain("No customer businesses exist yet");
     expect(container.textContent).toContain("No entries recorded yet.");
     expect(container.querySelector("form")).toBeNull();
+  });
+
+  it("shows never-logged businesses and per-period coverage without claiming portfolio statistics", async () => {
+    render(createElement(BusinessEffortPortfolio, { load: await readyLoad({ businesses: [...businesses,
+      { id: "10000000-0000-4000-8000-00000000000c", name: "No logs yet", tenantIds: [], firstEffortOn: null }] }) }));
+    const rows = container.querySelector('ul[aria-label^="Human minutes by business"]')!;
+    expect(rows.children).toHaveLength(3);
+    expect(rows.textContent).toContain("No logs yet");
+    expect(rows.textContent).toContain("Not logged");
+    expect(container.textContent).toContain("Across 3 businesses");
+    expect(container.textContent).toContain("2 of 3 businesses logged; 1 not logged");
+    expect(container.textContent).toContain("Not enough data");
+    expect(container.textContent).not.toContain("67.5");
+    expect(container.querySelector('[aria-label="Monthly log coverage"]')?.textContent).toContain("July 2026: 1 of 3 logged, 2 not logged");
+  });
+
+  it("accepts explicit zero logs and shows a covered zero in business rows", async () => {
+    render(createElement(BusinessEffortPortfolio, { load: await readyLoad({ entries: [entry(1, MOONEY, "2026-08-31", 0, "No human work")] }) }));
+    const rows = container.querySelector('ul[aria-label^="Human minutes by business"]')!;
+    const mooney = Array.from(rows.children).find((row) => row.textContent?.includes("The Mooney Firm"))!;
+    expect(mooney.textContent).toMatch(/Latest 0/);
+    const form = container.querySelector('form[aria-label="Record human minutes"]') as HTMLFormElement;
+    const minutes = form.querySelector('[inputmode="numeric"]') as HTMLInputElement;
+    act(() => { setValue(form.querySelector("select")!, JUNIPER); setValue(minutes, "0"); });
+    expect((form.querySelector('button[type="submit"]') as HTMLButtonElement).disabled).toBe(false);
+    mockRecord.mockResolvedValueOnce({ ok: true, message: "Recorded 0 minutes." });
+    await act(async () => { form.requestSubmit(); });
+    expect(mockRecord.mock.calls[0]![0]).toMatchObject({ businessId: JUNIPER, minutes: 0 });
   });
 
   it("shows unavailable storage instead of zero", () => {
@@ -118,8 +146,8 @@ describe("human minutes on Internal work", () => {
     const minutes = Array.from(form.querySelectorAll("input")).find((input) => input.getAttribute("inputmode") === "numeric") as HTMLInputElement;
     const submit = form.querySelector('button[type="submit"]') as HTMLButtonElement;
     expect(submit.disabled).toBe(true);
-    act(() => { setValue(business, MOONEY); setValue(minutes, "0"); });
-    expect(form.textContent).toContain("Enter whole minutes from 1 to 1440.");
+    act(() => { setValue(business, MOONEY); setValue(minutes, "-1"); });
+    expect(form.textContent).toContain("Enter whole minutes from 0 to 1440.");
     expect(submit.disabled).toBe(true);
     act(() => setValue(minutes, "35"));
     expect(submit.disabled).toBe(false);
@@ -166,7 +194,7 @@ describe("human minutes on a client", () => {
     expect(text).toContain("The Mooney Firm");
     expect(text).toContain("July 2026: 180 min");
     expect(text).toContain("Falling");
-    expect(text).toContain("Measured since");
+    expect(text).toContain("First log");
     expect(text).not.toContain("Menu page rebuild");
     expect(container.textContent).not.toContain("Choose a business");
   });

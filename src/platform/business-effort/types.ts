@@ -28,7 +28,7 @@ const calendarDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
 export const businessEffortEntrySchema = z.object({
   id: z.string().uuid(),
   businessId: z.string().uuid(),
-  minutes: z.number().int().min(1).max(MAX_EFFORT_MINUTES),
+  minutes: z.number().int().min(0).max(MAX_EFFORT_MINUTES),
   category: z.enum(BUSINESS_EFFORT_CATEGORIES),
   occurredOn: calendarDate,
   note: z.string().nullable(),
@@ -49,7 +49,7 @@ export type EffortBusiness = z.infer<typeof effortBusinessSchema>;
 export const recordBusinessEffortSchema = z.object({
   entryId: z.string().uuid(),
   businessId: z.string().uuid(),
-  minutes: z.number().int().min(1).max(MAX_EFFORT_MINUTES),
+  minutes: z.number().int().min(0).max(MAX_EFFORT_MINUTES),
   category: z.enum(BUSINESS_EFFORT_CATEGORIES),
   occurredOn: calendarDate,
   note: z.string().trim().max(MAX_EFFORT_TEXT).optional().transform((value) => value || undefined),

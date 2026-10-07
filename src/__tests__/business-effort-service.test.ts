@@ -39,7 +39,7 @@ describe("business effort service", () => {
   });
 
   it.each([
-    ["zero minutes", { minutes: 0 }],
+    ["negative minutes", { minutes: -1 }],
     ["fractional minutes", { minutes: 12.5 }],
     ["more than a day", { minutes: 1441 }],
     ["unknown category", { category: "build" }],
@@ -60,6 +60,12 @@ describe("business effort service", () => {
     expect(store.record).toHaveBeenCalledWith(ACTOR, { ...input, minutes: 1440, occurredOn: "2026-09-28", note: "Launch call" });
     await recordBusinessEffort(store, ACTOR, { ...input, note: "   " }, NOW);
     expect(store.record).toHaveBeenLastCalledWith(ACTOR, { ...input, note: undefined });
+  });
+
+  it("persists an explicit zero log through the same actor-checked command", async () => {
+    const store = fakeStore();
+    await recordBusinessEffort(store, ACTOR, { ...input, minutes: 0 }, NOW);
+    expect(store.record).toHaveBeenCalledWith(ACTOR, { ...input, minutes: 0 });
   });
 
   it("requires a void reason", async () => {
@@ -93,6 +99,11 @@ describe("Postgres business effort store", () => {
       p_user_id: ACTOR.userId, p_verified_email: "operator@example.test", p_entry_id: ENTRY, p_business_id: BUSINESS,
       p_minutes: 30, p_category: "support", p_occurred_on: "2026-09-27", p_note: null,
     });
+  });
+
+  it("reads a stored zero log without treating it as unavailable", async () => {
+    rpc.mockResolvedValue({ data: [{ ...row, minutes: 0 }], error: null });
+    await expect(PostgresBusinessEffortStore.listEntries(ACTOR, { from: "2025-10-01" })).resolves.toEqual([{ ...row, minutes: 0 }]);
   });
 
   it("reports storage unavailable when Supabase is not configured", async () => {

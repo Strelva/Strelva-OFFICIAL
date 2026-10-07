@@ -202,6 +202,8 @@ psql "${psql_args[@]}" --file="$schema_test"
 psql "${psql_args[@]}" --file="$repo_root/tests/service-delivery-commitments-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/customer-business-entry-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/function-exposure-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/newsletter-backfill-identity-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/workspace-newsletter-sender-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/website-documents-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/domain-registration-attempt-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-website-document-schema.sql"
@@ -218,6 +220,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/tenant-report-analytics-state-sc
 psql "${psql_args[@]}" -Atc "select count(*) from pg_trigger where tgname = 'tenant_workspace_links_attach_leads'" | grep -qx 1 \
   || { printf 'Conversion trigger for client leads is missing after out-of-order apply.\n' >&2; exit 1; }
 psql "${psql_args[@]}" --file="$repo_root/tests/business-effort-minutes-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-effort-coverage-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/operator-queue-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-account-bindings-schema.sql"
 # 20261008160000 replaces convert_tenant_to_business and the billing link
