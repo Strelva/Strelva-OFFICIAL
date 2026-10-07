@@ -62,6 +62,21 @@ describe("inquiry to requested booking", () => {
     expect((await chooseInquiryBookingSlot(signInquiryBookingOffer(id, saved.expiresAt, "fictional-secret"), 0, d)).status).toBe("confirmed");
     expect(d.rpc).toHaveBeenCalledTimes(1);
   });
+  it("requires #529 email verification before holding a time and issues the confirmation for the held booking", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(now);
+    const d = deps();
+    const booking = { id, start: saved.slots[0]!.start, end: saved.slots[0]!.end, status: "requested", inquiryId: leadId, origin: "inquiry" };
+    d.rpc = vi.fn(async (name) => name === "read_inquiry_booking_offer" ? { tenantId: "site", context, offer: saved, booking: null } : booking);
+    d.requireConfirmation = vi.fn(async () => { throw new Error("Email confirmation is not available."); });
+    d.confirm = vi.fn(async () => undefined);
+    await expect(chooseInquiryBookingSlot(signInquiryBookingOffer(id, saved.expiresAt, "fictional-secret"), 0, d)).rejects.toThrow("Email confirmation");
+    expect(d.requireConfirmation).toHaveBeenCalledWith("site");
+    expect(d.rpc).not.toHaveBeenCalledWith("choose_inquiry_booking_slot", expect.anything());
+    expect(d.confirm).not.toHaveBeenCalled();
+    d.requireConfirmation = vi.fn(async () => undefined);
+    await chooseInquiryBookingSlot(signInquiryBookingOffer(id, saved.expiresAt, "fictional-secret"), 0, d);
+    expect(d.confirm).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id, origin: "inquiry" }));
+  });
   it("recomputes available times when the owner selects a different service", async () => {
     vi.useFakeTimers(); vi.setSystemTime(now);
     const d = deps();

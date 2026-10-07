@@ -1,3 +1,4 @@
+import { isSameOriginBookingForm } from "@/platform/bookings/public-form";
 import { NextResponse } from "next/server";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { readBoundedBody } from "@/platform/workspaces/http";
@@ -8,12 +9,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
   const { token } = await params;
   const page = new URL(`/inquiry-booking/${encodeURIComponent(token)}`, request.url);
   page.host = request.headers.get("host") ?? page.host;
-  const origin = request.headers.get("origin");
-  if (origin) {
-    try {
-      if (new URL(origin).host !== page.host) return new NextResponse("Forbidden", { status: 403 });
-    } catch { return new NextResponse("Forbidden", { status: 403 }); }
-  }
+  if (!isSameOriginBookingForm(request)) return new NextResponse("Forbidden", { status: 403 });
   if (await isRateLimitedAsync(rateLimitKey(request, "inquiry-booking"), 10)) {
     page.searchParams.set("error", "rate");
     return new NextResponse(null, { status: 303, headers: { Location: page.toString() } });

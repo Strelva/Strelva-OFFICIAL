@@ -1,3 +1,4 @@
+import { issuePublicInquiryConfirmation, requirePublicBookingEmail } from "@/platform/bookings/public-confirmation";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { inquiryRecordsRpc, inquiryRecordsEnabled } from "@/platform/infra/inquiry-records";
@@ -27,8 +28,11 @@ export interface InquiryBookingDependencies {
   busy: typeof readCalendarBusy;
   now(): Date;
   secret(): string;
+  requireConfirmation?(scope: string): Promise<void>;
+  confirm?(booking: StoreBooking): Promise<void>;
 }
 const defaults: InquiryBookingDependencies = {
+  requireConfirmation: requirePublicBookingEmail, confirm: issuePublicInquiryConfirmation,
   enabled: inquiryBookingHandoffEnabled, released: (tenantId) => inquiryReleaseEnabledForTenant(tenantId), workspaceReleased: (workspaceId) => inquiryReleaseEnabledForWorkspace(workspaceId), rpc: inquiryRecordsRpc,
   bookings: readTenantBookings,
   nativeBookings: async (workspaceId, range) => {
@@ -143,7 +147,8 @@ export async function chooseInquiryBookingSlot(token: string, index: number, dep
   const raw = await deps.rpc("read_inquiry_booking_offer", { p_offer_id: id }) as { tenantId: string | null; workspaceId: string; offer: unknown; booking: unknown; context: BookingContext } | null;
   if (!raw || !(raw.tenantId ? await deps.released(raw.tenantId) : await deps.workspaceReleased?.(raw.workspaceId))) throw new WorkspaceConflictError("These times are no longer available.");
   const existing = parseStoreBooking(raw.booking);
-  if (existing) return existing;
+  if (existing) { await deps.confirm?.(existing); return existing; }
+  await deps.requireConfirmation?.(raw.tenantId ?? `workspace:${raw.workspaceId}`);
   const offer = offerSchema.parse(raw.offer);
   const chosen = offer.slots[index];
   if (!chosen) throw new WorkspaceConflictError("Choose an offered time.");
@@ -152,6 +157,7 @@ export async function chooseInquiryBookingSlot(token: string, index: number, dep
   const result = await deps.rpc("choose_inquiry_booking_slot", { p_offer_id: id, p_slot_index: index });
   const booking = parseStoreBooking(result);
   if (!booking) throw new WorkspaceConflictError("That time is no longer available. Nothing was confirmed.");
+  await deps.confirm?.(booking);
   return booking;
 }
 /** The same saved offer is hashed into the governed email review and the actual send. */

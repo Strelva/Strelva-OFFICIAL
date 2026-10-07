@@ -34,10 +34,14 @@ describe("inquiry booking routes", () => {
     mocks.rate.mockResolvedValue(true); mocks.choose.mockClear();
     expect((await choose(selection(), { params: Promise.resolve({ token: "fixture" }) })).headers.get("location")).toContain("error=rate"); expect(mocks.choose).not.toHaveBeenCalled();
   });
-  it("preserves the browser Host behind a proxy and refuses malformed Origin", async () => {
-    const request = new Request("http://localhost:32766/inquiry-booking/fixture/action", { method: "POST", headers: { origin: "http://127.0.0.1:32766", host: "127.0.0.1:32766", "content-type": "application/x-www-form-urlencoded" }, body: "slot=0" });
+  it("redirects to the browser Host and refuses a mismatched or malformed Origin (#529)", async () => {
+    const request = new Request("http://127.0.0.1:32766/inquiry-booking/fixture/action", { method: "POST", headers: { origin: "http://127.0.0.1:32766", host: "127.0.0.1:32766", "content-type": "application/x-www-form-urlencoded" }, body: "slot=0" });
     const response = await choose(request, { params: Promise.resolve({ token: "fixture" }) });
     expect(response.headers.get("location")).toBe("http://127.0.0.1:32766/inquiry-booking/fixture");
+    const proxied = new Request("http://localhost:32766/inquiry-booking/fixture/action", { method: "POST", headers: { origin: "http://127.0.0.1:32766", host: "127.0.0.1:32766", "content-type": "application/x-www-form-urlencoded" }, body: "slot=0" });
+    expect((await choose(proxied, { params: Promise.resolve({ token: "fixture" }) })).status).toBe(403);
+    const crossSite = new Request("https://app.strelva.test/inquiry-booking/fixture/action", { method: "POST", headers: { origin: "https://app.strelva.test", "sec-fetch-site": "cross-site", "content-type": "application/x-www-form-urlencoded" }, body: "slot=0" });
+    expect((await choose(crossSite, { params: Promise.resolve({ token: "fixture" }) })).status).toBe(403);
     expect((await choose(selection("0", "null"), { params: Promise.resolve({ token: "fixture" }) })).status).toBe(403);
   });
   it("requires a verified member, workspace release and owner SQL authority to propose times", async () => {
