@@ -50,7 +50,7 @@ export interface WebsiteHistoryItem {
   title: string;
   /** Where undo exists, in words; null when it does not (stated, not faked). */
   undo: string | null;
-  restore?: { section: string; versionId: string };
+  restore?: { section: string; versionId: string } | { kind: "snapshot"; snapshotId: string } | { kind: "document"; workId: string; targetRevision: number; targetContentHash: string };
   restoreHref?: string;
   /** Evidence retained by a deploy receipt, including unsuccessful read-back. */
   deployment?: { commitSha: string; url: string; readBack: "confirmed" | "not_confirmed" | "not_checked" };
@@ -137,6 +137,7 @@ function serviceStage(row: ServiceRequestRow): WebsiteRequestItem["stage"] {
 const newestFirst = <T extends { at: string }>(items: T[]) => items.sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
 
 export function buildWebsiteSystemDetail(input: WebsiteDetailInputs): WebsiteSystemDetail {
+  const latestDocumentRevision = Math.max(0, ...input.documentRevisions.map(item => item.revision));
   // Waiting on you: the owner's open decisions for this site, then drafts no
   // decision already covers, then a hosted candidate awaiting approval.
   const covered = new Set(input.changeRequests.filter(row => row.kind === "content_update" && row.status === "review" && row.section).map(row => row.section!));
@@ -159,13 +160,13 @@ export function buildWebsiteSystemDetail(input: WebsiteDetailInputs): WebsiteSys
         undo: "Restore this saved content as a draft for review.", restore: { section: row.section, versionId: row.id } };
     }),
     ...input.snapshots.map(row => ({ id: `snapshot:${row.id}`, source: "snapshot" as const, at: row.createdAt, by: row.author === "user" ? "You" : "Strelva",
-      title: row.status === "restored" ? `${row.label} (restored)` : row.label, undo: row.status === "available" ? "Restore this saved copy of the whole site." : null,
-      ...(row.status === "available" && input.workspaceId ? { restoreHref: `/workspace/site?${new URLSearchParams({ workspaceId: input.workspaceId, system: input.systemId, tab: "history" })}` } : {}) })),
+      title: row.status === "restored" ? `${row.label} (restored)` : row.label, undo: row.status === "available" ? "Ask Strelva to prepare this exact saved copy for review before restoring it." : null,
+      ...(row.status === "available" && input.workspaceId ? { restore: { kind: "snapshot" as const, snapshotId: row.id } } : {}) })),
     ...input.documentRevisions.map(row => ({ id: `document:${row.revision}:${row.contentHash.slice(0, 12)}`, source: "document" as const, at: row.createdAt,
       by: row.createdBy === input.actorId ? "You" : "Strelva or your team",
       title: row.published ? `Published site revision ${row.revision}` : `Saved site revision ${row.revision}`,
-      undo: "Save an earlier revision as a new one; you approve it before it goes live.",
-      ...(input.workspaceId && input.workId ? { restoreHref: `/workspace/site?${new URLSearchParams({ workspaceId: input.workspaceId, entry: "rebuild", workId: input.workId })}` } : {}) })),
+      undo: row.revision < latestDocumentRevision ? "Save this earlier revision as a new candidate; you approve it before it goes live." : null,
+      ...(input.workspaceId && input.workId && row.revision < latestDocumentRevision ? { restore: { kind: "document" as const, workId: input.workId, targetRevision: row.revision, targetContentHash: row.contentHash } } : {}) })),
     ...input.linkedPublications.map(row => ({ id: `cutover:${row.revision}:${row.publishedAt}`, source: "document" as const, at: row.publishedAt, by: "You",
       title: `Replaced the site at ${row.tenantSlugAtPublication} with revision ${row.revision}`,
       undo: Date.parse(row.fallbackUntil) > Date.now() ? `The old site is kept until ${row.fallbackUntil.slice(0, 10)}; Strelva can switch back until then.` : null })),

@@ -168,10 +168,13 @@ function WebsiteHistoryRow({ item, workspaceId, systemId, canRestore, appBase, o
     try {
       const response = await request("/api/workspace/systems/website/restore", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workspaceId, systemId, ...item.restore }) });
       const body = await response.json().catch(() => null) as { status?: string; message?: string; error?: string } | null;
-      if (!response.ok || body?.status !== "queued") throw new Error(body?.error || "The restore could not be confirmed. Reload before trying again.");
+      if (!response.ok || (body?.status !== "queued" && body?.status !== "requested")) throw new Error(body?.error || "The restore could not be confirmed. Reload before trying again.");
       setNotice({ error: false, text: body.message || "The earlier content is prepared for review. Your live site is unchanged." });
       onPrepared?.();
-    } catch (error) { setNotice({ error: true, text: error instanceof Error ? error.message : "The restore could not be confirmed. Reload before trying again." }); }
+    } catch (error) {
+      const message = error instanceof Error && !(error instanceof TypeError) ? error.message : "The restore could not be confirmed.";
+      setNotice({ error: true, text: message.includes("Reload before trying again") ? message : `${message} Reload before trying again.` });
+    }
     finally { setBusy(false); }
   }
   return <li>
@@ -179,7 +182,7 @@ function WebsiteHistoryRow({ item, workspaceId, systemId, canRestore, appBase, o
     <small>{SOURCE_LABEL[item.source]} · {item.by} · <time dateTime={item.at}>{when(item.at)}</time></small>
     {item.deployment ? <small>Commit {item.deployment.commitSha} · <a href={item.deployment.url} target="_blank" rel="noopener noreferrer">Open deployment</a></small> : null}
     <small>{item.undo ?? "No undo for this change."}</small>
-    {canRestore && item.restore ? <Button size="sm" variant="secondary" loading={busy} disabled={busy || notice?.error === false} onClick={() => void restore()}>Prepare restore</Button>
+    {canRestore && item.restore ? <Button size="sm" variant="secondary" loading={busy} disabled={busy || notice !== null} onClick={() => void restore()}>{"kind" in item.restore && item.restore.kind === "snapshot" ? "Ask Strelva to restore" : "Prepare restore"}</Button>
       : canRestore && item.restoreHref ? <a href={`${appBase}${item.restoreHref}`} className="text-sm underline underline-offset-4">Restore from History</a>
         : canRestore && item.source === "deploy" && item.undo && onAskRestore ? <Button size="sm" variant="secondary" onClick={onAskRestore}>Ask Strelva to restore</Button> : null}
     {notice ? <small role={notice.error ? "alert" : "status"}>{notice.text}</small> : null}

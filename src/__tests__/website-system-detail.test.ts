@@ -29,9 +29,21 @@ describe("website System page lists", () => {
     expect(detail.history[0]).toMatchObject({ title: "Private events page added", by: "Strelva" });
     expect(detail.history[1]).toMatchObject({ title: "Restored an earlier homepage banner", by: "You" });
     expect(detail.history[2]).toMatchObject({ title: "Published site revision 2", by: "You" });
-    expect(detail.history.every(item => item.undo)).toBe(true);
+    expect(detail.history.filter(item => item.source !== "document").every(item => item.undo)).toBe(true);
+    expect(detail.history[2].undo).toBeNull();
     // Issued rows never change here: History only reads them.
     expect(detail.requests).toEqual([]);
+  });
+  it("pins a saved copy Request and an earlier document restore directly on the owner's History row", () => {
+    const detail = buildWebsiteSystemDetail(inputs({
+      workspaceId: businessId, workId,
+      snapshots: [{ id: "saved-copy", label: "Before rebuilding", reason: "manual", author: "user", createdAt: "2026-10-01T00:00:00Z", status: "available" }],
+      documentRevisions: [1, 2].map(revision => ({ revision, contentHash: String(revision).repeat(64), createdAt: `2026-10-0${revision}T00:00:00Z`, createdBy: actor.userId, published: true })),
+    }));
+    expect(detail.history.find(row => row.source === "snapshot")).toMatchObject({ restore: { kind: "snapshot", snapshotId: "saved-copy" } });
+    expect(detail.history.find(row => row.id.startsWith("document:1:"))).toMatchObject({ restore: { kind: "document", workId, targetRevision: 1, targetContentHash: "1".repeat(64) } });
+    expect(detail.history.find(row => row.id.startsWith("document:2:"))?.restore).toBeUndefined();
+    expect(detail.history.every(row => !row.restoreHref)).toBe(true);
   });
   it("includes actual deploy receipts with honest failed read-back and immutable evidence", () => {
     const detail = buildWebsiteSystemDetail(inputs({ repoDeployments: [{

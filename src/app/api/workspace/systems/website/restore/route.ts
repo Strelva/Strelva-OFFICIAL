@@ -14,6 +14,6 @@ export async function POST(request: Request) {
     if (await isRateLimitedWindowedAsync(`website-restore:${actor.userId}`, 10, 60_000)) return workspaceJson({ error: "Please wait before preparing another restore." }, 429);
     const result = await prepareWebsiteContentRestore(actor, await readWorkspaceBody(request, 4000));
     if (result.status === "blocked" || result.status === "failed") return workspaceJson({ error: result.status === "blocked" ? result.message : "The saved content could not be prepared for review." }, 409);
-    return workspaceJson({ status: result.status, ...(result.status === "queued" ? { eventId: result.eventId } : {}), message: "The earlier content is prepared for review. Your live website is unchanged." });
+    return workspaceJson({ status: result.status, ...(result.status === "queued" ? { eventId: result.eventId } : {}), ...("requestId" in result ? { requestId: result.requestId } : {}), ...("previewHref" in result ? { previewHref: result.previewHref } : {}), message: "message" in result ? result.message : "The earlier content is prepared for review. Your live website is unchanged." });
   } catch (error) { return workspaceHttpFailure(error); }
 }
