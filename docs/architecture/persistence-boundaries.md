@@ -82,6 +82,11 @@ does not treat a second request as permission to act.
 Tenant isolation is enforced in application code. Routes derive a tenant from trusted headers,
 session membership, or server configuration and call the access/permission guard before using
 the service-role client. RLS remains defense-in-depth because the service-role client bypasses it.
+Supabase grants `anon` and `authenticated` every privilege on new public tables, so a policy is
+the only gate on a table that keeps those grants. Since `20261005100000` (#528) the 38 legacy
+tenant tables grant clients nothing and keep only `for select` policies; browser and cookie
+clients call Supabase Auth only. A new table revokes client grants unless a reviewed browser read
+needs one.
 
 When moving an operational store to Postgres, change its read path, failure semantics, tests,
 and this table in the same change. Do not update documentation based on a shadow write alone.

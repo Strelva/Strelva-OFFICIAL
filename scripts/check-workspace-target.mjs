@@ -126,6 +126,7 @@ export function readCandidateMigrations(directory) {
   const helpers = new Set([
     "rollback-identity-spine-expand.sql",
     "rollback-org-layer-phase0.sql",
+    "rollback-20261005100000_restrict_legacy_tenant_client_access.sql",
     "verify-identity-spine-expand.sql",
   ]);
   return readdirSync(directory).filter(name => name.endsWith(".sql") && !helpers.has(name)).sort().map(name => {

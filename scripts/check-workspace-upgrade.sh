@@ -62,7 +62,13 @@ create role anon nologin;
 -- authenticated unless a migration revokes it. Without this the rehearsal
 -- hides grants that production actually has.
 alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
+-- Supabase also grants every privilege on new public tables and sequences to
+-- these roles, so RLS policies are the only thing between a client and a row.
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+grant usage on schema public to anon, authenticated, service_role;
 create schema auth;
+grant usage on schema auth to anon, authenticated, service_role;
 create table auth.users (
   id uuid primary key,
   email text,
@@ -178,6 +184,17 @@ insert into public.domain_claims(tenant_id,domain,role,status,dns_status,ssl_sta
  values('upgrade-site','domain-registration-legacy.example.test','production','verified','configured','issued','2026-09-01T00:00:00Z','2026-09-01T00:00:00Z');
 SQL
   fi
+  if [[ "$migration_name" == "20261005100000_restrict_legacy_tenant_client_access.sql" ]]; then
+    # #528: forward, rollback, forward. The rollback must restore the exact
+    # policies (including expressions) and table ACLs it replaced.
+    legacy_catalog="select md5(coalesce((select string_agg(format('%s|%s|%s|%s|%s|%s', tablename, policyname, cmd, roles, qual, with_check), E'\n' order by tablename, policyname) from pg_policies where schemaname='public'), '') || coalesce((select string_agg(relname || '=' || coalesce(relacl::text, ''), E'\n' order by relname) from pg_class where relnamespace='public'::regnamespace and relkind='r'), ''));"
+    legacy_before="$(psql "${psql_args[@]}" -Atc "$legacy_catalog")"
+    psql "${psql_args[@]}" --file="$migration" >/dev/null
+    psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-$migration_name" >/dev/null
+    [[ "$(psql "${psql_args[@]}" -Atc "$legacy_catalog")" == "$legacy_before" ]] || {
+      printf 'Legacy tenant access rollback did not restore policies and grants.\n' >&2; exit 1; }
+    printf 'Legacy tenant access forward, rollback and forward restored the catalog.\n'
+  fi
   psql "${psql_args[@]}" --file="$migration" >/dev/null
   if [[ "$migration_name" == "20260920060100_content_version_request_index.sql" ]]; then
     psql "${psql_args[@]}" --file="$migration" > "$cluster_root/index-retry.log" 2>&1
@@ -223,5 +240,6 @@ psql "${psql_args[@]}" --file="$repo_root/tests/website-documents-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/domain-registration-attempt-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-website-document-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/legacy-tenant-client-access-schema.sql"
 printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
