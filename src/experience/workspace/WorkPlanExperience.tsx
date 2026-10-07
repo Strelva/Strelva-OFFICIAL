@@ -186,7 +186,7 @@ function PlanSession({ presentation, prepareUrl = "/api/work-plans", outputUrl, 
     } finally {
       setBudgetLoading(false);
     }
-  }, [applyBudget, localPreview, workspaceId]);
+  }, [applyBudget, localPreview, transport, workspaceId]);
 
   useEffect(() => { void loadPlanningBudget(); }, [loadPlanningBudget]);
 
@@ -215,7 +215,7 @@ function PlanSession({ presentation, prepareUrl = "/api/work-plans", outputUrl, 
     } finally {
       setBudgetBusy(false);
     }
-  }, [applyBudget, budgetBusy, localPreview, readOnly]);
+  }, [applyBudget, budgetBusy, localPreview, readOnly, transport]);
 
   useEffect(() => {
     if (!workId || localPreview) return;
@@ -227,7 +227,7 @@ function PlanSession({ presentation, prepareUrl = "/api/work-plans", outputUrl, 
         if (!controller.signal.aborted) { setResult(body); setRequest(body.plan.userGoal); }
       }).catch(cause => { if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : "Your plan could not be loaded."); });
     return () => controller.abort();
-  }, [workspaceId, workId, localPreview]);
+  }, [workspaceId, workId, localPreview, transport]);
 
   async function prepare() {
     if (busy || readOnly || localPreview || !request.trim()) return;

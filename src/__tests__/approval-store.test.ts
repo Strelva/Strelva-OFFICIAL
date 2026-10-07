@@ -18,7 +18,7 @@ function row(over: Partial<OwnerDecision> = {}): OwnerDecision {
 }
 function adapter() {
   return {
-    lifecycle: "tenant_event", propose: vi.fn().mockResolvedValue({ items: [], complete: true }),
+    lifecycle: "tenant_event", needsMemberActor: false, propose: vi.fn().mockResolvedValue({ items: [], complete: true }),
     currentRevision: vi.fn().mockResolvedValue(subject.revision), resolve: vi.fn().mockResolvedValue({ outcome: "done", receiptRef: "native-receipt" }),
   } satisfies SourceAdapter;
 }
@@ -46,8 +46,8 @@ describe("one approval authority behind native adapters", () => {
     const native = adapter(), read = vi.fn().mockResolvedValue(row());
     const wrapped = withCanonicalApprovalStore(native, { store: { read }, enabled: async () => true });
     await expect(wrapped.resolve({ workspaceId: businessId, actor }, row(), "approve", { kind: "session", actor })).resolves.toMatchObject({ outcome: "done" });
-    expect(read.mock.invocationCallOrder[0]).toBeLessThan(native.currentRevision.mock.invocationCallOrder[0]);
-    expect(native.currentRevision.mock.invocationCallOrder[0]).toBeLessThan(native.resolve.mock.invocationCallOrder[0]);
+    expect(read.mock.invocationCallOrder[0]!).toBeLessThan(native.currentRevision.mock.invocationCallOrder[0]!);
+    expect(native.currentRevision.mock.invocationCallOrder[0]!).toBeLessThan(native.resolve.mock.invocationCallOrder[0]!);
   });
   it.each([
     ["missing", null], ["withdrawn", row({ state: "withdrawn" })], ["wrong business", row({ workspaceId: actor.userId })],

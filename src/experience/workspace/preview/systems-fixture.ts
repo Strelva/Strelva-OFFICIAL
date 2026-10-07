@@ -106,7 +106,7 @@ export function createSystemsPreviewRequest(scenario: SystemsPreviewScenario): t
   const current = agency ? AGENCY : twin ? TWIN_TREES : MOONEY;
   const mooneyAccess = scenario === "mooney-shared" || agency ? { access: "delegated_read" as const } : scenario === "mooney-member" ? { access: "member" as const, role: "member" as const } : { role: "owner" as const };
   const workspaces: WorkspaceSnapshot["workspaces"] = [
-    ...(agency ? [{ id: AGENCY, kind: "agency" as const, name: "Strelva Agency" }] : []),
+    ...(agency ? [{ id: AGENCY, kind: "agency" as const, name: "Strelva Agency", role: "owner" as const }] : []),
     ...(twin ? [{ id: TWIN_TREES, kind: "customer" as const, name: "Twin Trees", role: "owner" as const }] : [{ id: MOONEY, kind: "customer" as const, name: "The Mooney Firm", ...mooneyAccess }]),
     ...(agency ? [{ id: HARBOR, kind: "customer" as const, name: "Harbor Dental", access: "delegated_read" as const }] : []),
   ];

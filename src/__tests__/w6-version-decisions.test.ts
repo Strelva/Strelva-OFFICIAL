@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInMemoryVersionStore, createInMemoryConnectionOwnership, createSystemVersions, VersionAccessError, VersionStaleError, VersionConflictError, type VersionActor, type VersionStore } from "@/platform/system-versions";
-const deps = vi.hoisted(() => ({ store: null as VersionStore | null, actor: null as VersionActor | null, prepare: vi.fn(), enabled: true }));
+const deps = vi.hoisted(() => ({ store: null as VersionStore | null, actor: null as VersionActor | null, prepare: vi.fn(), enabled: true, systems: true }));
 vi.mock("@/platform/system-versions/supabase-store", () => ({ createSupabaseVersionStore: () => deps.store, createSupabaseConnectionOwnership: () => createInMemoryConnectionOwnership(), readVersionActor: async () => deps.actor, versionsDb: () => ({}) }));
 vi.mock("@/platform/system-versions/preparation", () => ({ prepareVersionRelease: deps.prepare }));
 vi.mock("@/platform/needs-you/release", () => ({ needsYouReleaseEnabled: () => deps.enabled }));
+vi.mock("@/platform/systems-release", () => ({ systemsReleasedFor: async () => deps.systems }));
+import { reviewAllImprovements } from "@/experience/workspace/agency-server";
 import { decideSystemImprovement, readSystemVersion } from "@/experience/workspace/agency/version-server";
 const workspaceId = crypto.randomUUID(), systemId = crypto.randomUUID(), agencyId = crypto.randomUUID();
 const actor = { userId: crypto.randomUUID(), verifiedEmail: "operator@example.test" };
@@ -18,9 +20,9 @@ async function setup(conflict = false) {
   if (conflict) lineage = await versions.setOverride(versionActor, lineage.id, { path: "text", value: "Local", expectedRowRevision: lineage.rowRevision });
   await versions.publishSourceRevision(versionActor, { source, definition: { text: "New" }, summary: "Second" });
   const input = { workspaceId, systemId, versionId: lineage.id, rowRevision: lineage.rowRevision, revision: 2, action: "adopt" as const };
-  return { versions, lineage, input };
+  return { versions, lineage, input, source };
 }
-beforeEach(() => { deps.enabled = true; deps.prepare.mockReset().mockImplementation(async (_actor, lineage) => ({ receiptId: crypto.randomUUID(), decisionId: crypto.randomUUID(), workspaceId, versionId: lineage.id, rowRevision: lineage.rowRevision })); });
+beforeEach(() => { deps.enabled = true; deps.systems = true; deps.prepare.mockReset().mockImplementation(async (_actor, lineage) => ({ receiptId: crypto.randomUUID(), decisionId: crypto.randomUUID(), workspaceId, versionId: lineage.id, rowRevision: lineage.rowRevision })); });
 describe("Version improvement decisions", () => {
   it("reads the owning System's conflicts and keeps adoption separate from release", async () => {
     const { versions, input } = await setup(true);
@@ -71,5 +73,37 @@ describe("Version improvement decisions", () => {
     await expect(readSystemVersion(actor, crypto.randomUUID(), systemId)).rejects.toBeInstanceOf(VersionAccessError);
     deps.actor = { ...actor, memberships: [{ businessId: agencyId, role: "owner" }] };
     await expect(readSystemVersion(actor, workspaceId, systemId)).rejects.toBeInstanceOf(VersionAccessError);
+  });
+});
+
+
+describe("bulk review release boundaries", () => {
+  async function bulk() {
+    const { versions, input, source } = await setup();
+    const db = { rpc: async () => ({ data: { workspaceId: agencyId, sources: [{
+      systemId: source.systemId, workspaceId: agencyId, hidden: false, name: "Source",
+      revisions: [{ number: 2, label: null, summary: "Update", publishedAt: "2026-10-07" }],
+      versions: [{ versionId: input.versionId, workspaceId, clientName: "Harbor", systemId, systemName: "Intake", access: "full" }],
+    }] }, error: null }) };
+    const command = { agencyWorkspaceId: agencyId, sourceSystemId: source.systemId, revision: 2, versionIds: [input.versionId] };
+    return { versions, input, db, command };
+  }
+  it("adopts nothing when the decision store is off", async () => {
+    const { versions, input, db, command } = await bulk(); deps.enabled = false;
+    expect(await reviewAllImprovements(actor, command, db)).toMatchObject({ results: [{ outcome: "failed", detail: expect.stringContaining("Nothing was adopted") }] });
+    expect((await versions.readVersion(versionActor, input.versionId)).baselineRevision).toBe(1);
+    expect(deps.prepare).not.toHaveBeenCalled();
+  });
+  it("adopts nothing for a client whose Systems flag is off", async () => {
+    const { versions, input, db, command } = await bulk(); deps.systems = false;
+    expect(await reviewAllImprovements(actor, command, db)).toMatchObject({ results: [{ outcome: "failed" }] });
+    expect((await versions.readVersion(versionActor, input.versionId)).baselineRevision).toBe(1);
+    expect(deps.prepare).not.toHaveBeenCalled();
+  });
+  it("prepares the client's own decision and receipt, with no live release", async () => {
+    const { versions, input, db, command } = await bulk();
+    const reviewed = await reviewAllImprovements(actor, command, db);
+    expect(reviewed.results[0]).toMatchObject({ outcome: "prepared", workspaceId, versionId: input.versionId, receiptId: expect.any(String), decisionId: expect.any(String) });
+    expect((await versions.readVersion(versionActor, input.versionId)).currentRelease).toBeNull();
   });
 });

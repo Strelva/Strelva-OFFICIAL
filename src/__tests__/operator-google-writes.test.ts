@@ -40,8 +40,15 @@ describe("operator Google dispatch reservations and read-back", () => {
       .mockResolvedValueOnce(json({ regularHours: { periods: [{ openDay: "MONDAY", openTime: { hours: 9 }, closeDay: "MONDAY", closeTime: { hours: 17 } }] } }));
     expect(await updateBusinessHours("alpha", hours, options)).toMatchObject({ success: true, verified: true });
     expect(writes(fetch)).toHaveLength(1);
-    expect(mocks.begin.mock.invocationCallOrder[0]).toBeLessThan(fetch.mock.invocationCallOrder[1]);
+    expect(mocks.begin.mock.invocationCallOrder[0]!).toBeLessThan(fetch.mock.invocationCallOrder[1]!);
     expect(mocks.complete).toHaveBeenCalledWith(attemptId, expect.objectContaining({ beforeState: beforeHours, acceptance: "accepted", readback: "pending" }));
+    expect(mocks.readback).toHaveBeenCalledWith(receiptId, "matched", expect.any(String));
+  });
+  it("treats Google's empty midnight TimeOfDay as zero hours and minutes", async () => {
+    const midnight = { regularHours: { periods: [{ openDay: "MONDAY" as const, openTime: { hours: 0, minutes: 0 }, closeDay: "MONDAY" as const, closeTime: { hours: 8, minutes: 0 } }] } };
+    fetchDouble().mockResolvedValueOnce(json(beforeHours)).mockResolvedValueOnce(json({ name: "locations/2" }))
+      .mockResolvedValueOnce(json({ regularHours: { periods: [{ openDay: "MONDAY", openTime: {}, closeDay: "MONDAY", closeTime: { hours: 8 } }] } }));
+    expect(await updateBusinessHours("alpha", midnight, options)).toMatchObject({ success: true, verified: true });
     expect(mocks.readback).toHaveBeenCalledWith(receiptId, "matched", expect.any(String));
   });
   it("fails closed before PATCH when before-hours or reservation storage is unavailable", async () => {
@@ -63,7 +70,7 @@ describe("operator Google dispatch reservations and read-back", () => {
     else fetch.mockResolvedValueOnce(json({ name: resource, summary: readback === "matched" ? "Hello" : "Changed" }));
     expect(await createGbpPost("alpha", { summary: "Hello" }, options)).toMatchObject({ success: true, verified: readback === "matched" });
     expect(writes(fetch)).toHaveLength(1); expect(mocks.readback).toHaveBeenCalledWith(receiptId, readback, expect.any(String));
-    expect(mocks.complete.mock.invocationCallOrder[0]).toBeLessThan(fetch.mock.invocationCallOrder[1]);
+    expect(mocks.complete.mock.invocationCallOrder[0]!).toBeLessThan(fetch.mock.invocationCallOrder[1]!);
   });
   it("records missing Google resource identity as not possible, never as verified", async () => {
     const fetch = fetchDouble().mockResolvedValueOnce(json({}));

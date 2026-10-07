@@ -14,6 +14,7 @@
  *   here: going live is a separate release through the release gate.
  */
 import { z } from "zod";
+import { systemsReleasedFor } from "@/platform/systems-release";
 import { prepareVersionRelease, type VersionPreparationReceipt } from "@/platform/system-versions/preparation";
 import type { VersionLineage } from "@/platform/system-versions";
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
@@ -158,12 +159,13 @@ export async function reviewAllImprovements(
     }
     const named = { versionId, workspaceId: item.workspaceId, clientName: item.clientName };
     try {
+      if (!prepare || !(await systemsReleasedFor(actor, item.workspaceId))) throw new WorkspaceStoreError("Review is not enabled for this business. Nothing was adopted.");
       // One business, one decision: each Version is prepared on its own.
       const comparison = await versions.compareImprovement(versionActor, versionId, input.revision);
       if (comparison.status === "up_to_date") {
         // A reply lost after adoption can resume the decision/receipt without adopting twice.
         const existing = await store.getLineage(versionActor, versionId);
-        const receipt = prepare && existing ? await prepare(actor, existing) : null;
+        const receipt = existing ? await prepare(actor, existing) : null;
         results.push(receipt ? { ...named, outcome: "prepared", detail: "The draft and its release decision are ready. Nothing went live.", ...receipt } : { ...named, outcome: "skipped_up_to_date", detail: "Already includes this revision." });
         continue;
       }
@@ -178,7 +180,7 @@ export async function reviewAllImprovements(
       const lineage = await store.getLineage(versionActor, versionId);
       if (!lineage) throw new Error("This Version is unavailable.");
       const adopted = await versions.adoptImprovement(versionActor, versionId, { revision: input.revision, expectedRowRevision: lineage.rowRevision });
-      const receipt = prepare ? await prepare(actor, adopted) : null;
+      const receipt = await prepare(actor, adopted);
       results.push({ ...named, outcome: "prepared", detail: receipt ? `Ready for ${item.clientName}'s release decision. Nothing is live yet.` : "The working definition is prepared. Needs you is off; no release decision was opened.", ...(receipt ?? {}) });
     } catch (error) {
       results.push({ ...named, outcome: "failed", detail: error instanceof Error ? error.message.slice(0, 300) : "Could not prepare." });

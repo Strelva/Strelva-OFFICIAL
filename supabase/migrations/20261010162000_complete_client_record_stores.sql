@@ -99,8 +99,21 @@ begin
   v_exists := found;
 
   if p_mode = 'remove' then
-    if not v_exists then return jsonb_build_object('status', 'unchanged', 'id', null, 'workspaceId', null); end if;
-    update public.tenant_client_records set removed_at = coalesce(removed_at, clock_timestamp()), updated_at = clock_timestamp()
+    if not v_exists then
+      v_workspace := public.tenant_client_record_workspace(v_stable);
+      -- A removal can arrive before the failed initial save is repaired.
+      -- Keep its timestamp so that delayed save cannot restore revoked data.
+      insert into public.tenant_client_records(tenant_stable_id, workspace_id, store, record_id, payload, payload_hash,
+          captured_at, recorded_via, removed_at)
+        values (v_stable, v_workspace, p_store, p_record_id, '{}'::jsonb, repeat('0',64), p_captured_at, p_via, p_captured_at)
+        returning id into v_id;
+      return jsonb_build_object('status', 'removed', 'id', v_id, 'workspaceId', v_workspace);
+    end if;
+    if p_captured_at < v_row.captured_at then
+      return jsonb_build_object('status', 'kept', 'id', v_row.id, 'workspaceId', v_row.workspace_id);
+    end if;
+    update public.tenant_client_records set removed_at = greatest(coalesce(removed_at, p_captured_at), p_captured_at),
+        captured_at = greatest(captured_at, p_captured_at), updated_at = clock_timestamp()
       where id = v_row.id;
     return jsonb_build_object('status', 'removed', 'id', v_row.id, 'workspaceId', v_row.workspace_id);
   end if;

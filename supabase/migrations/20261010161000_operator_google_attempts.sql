@@ -53,6 +53,7 @@ begin
   select * into row from public.operator_google_write_attempts where attempt_id = p_attempt_id for update;
   if not found then raise exception 'outside_write_receipt_invalid'; end if;
   if row.tenant_id is distinct from p_receipt->>'tenantId' or row.write_kind is distinct from p_receipt->>'writeKind'
+    or row.request is distinct from p_receipt->'request'
     or p_receipt->>'provider' is distinct from 'google_business'
     or p_receipt->>'acceptance' is null or p_receipt->>'acceptance' not in ('accepted','rejected','unknown') then
     raise exception 'outside_write_receipt_conflict';

@@ -31,7 +31,7 @@ describe("one finite job over native facets", () => {
     expect(combineFiniteJobs(businessId, data).map(job => job.id)).toEqual([`delivery:${deliveryId}`, `budget:${budgetId}`]);
   });
   it("rejects cross-business, missing linked delivery and duplicate native rows", () => {
-    const data = sources(); data.deliveries[0].business_workspace_id = other;
+    const data = sources(); data.deliveries[0]!.business_workspace_id = other;
     expect(() => combineFiniteJobs(businessId, data)).toThrow("another business");
     expect(() => combineFiniteJobs(businessId, { ...sources(), deliveries: [] })).toThrow("could not be read");
     expect(() => combineFiniteJobs(businessId, { ...sources(), requests: [...sources().requests, ...sources().requests] })).toThrow("Duplicate");

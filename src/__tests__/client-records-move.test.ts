@@ -190,6 +190,12 @@ describe.skipIf(!isolatedRedisAvailable)("client-record move pattern (isolated R
     expect(await clientRecordReadSource("spam_held")).toBe("redis");
     fake.state.streak = 7;
     expect(await clientRecordReadSource("spam_held")).toBe("postgres");
+    vi.stubEnv("DUAL_WRITE_PG", "0");
+    expect(await clientRecordReadSource("spam_held")).toBe("redis");
+    vi.stubEnv("DUAL_WRITE_PG", "1");
+    vi.stubEnv("STRELVA_CLIENT_RECORDS_DUAL_WRITE", "0");
+    expect(await clientRecordReadSource("spam_held")).toBe("redis");
+    vi.stubEnv("STRELVA_CLIENT_RECORDS_DUAL_WRITE", "1");
     expect(await clientRecordReadSource("account_grouping")).toBe("redis");
     fake.state.streakError = true;
     expect(await clientRecordReadSource("spam_held")).toBe("redis");

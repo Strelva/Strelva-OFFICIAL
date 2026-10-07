@@ -241,13 +241,13 @@ async function resolveWriteContext(
 /** Stable per approval, so an accepted or uncertain dispatch cannot be replayed. */
 export interface GoogleWriteOptions { commandKey?: string; actor?: string }
 
-function normalizedGoogleValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(normalizedGoogleValue).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+function normalizedGoogleValue(value: unknown, key?: string): unknown {
+  if (Array.isArray(value)) return value.map(item => normalizedGoogleValue(item)).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
   if (!value || typeof value !== "object") return value;
   const object = value as Record<string, unknown>;
   // Google omits zero in TimeOfDay. Compare the semantics, including midnight.
-  if ("hours" in object || "minutes" in object) return { hours: object.hours ?? 0, minutes: object.minutes ?? 0 };
-  return Object.fromEntries(Object.keys(object).sort().map((key) => [key, normalizedGoogleValue(object[key])]));
+  if (key === "openTime" || key === "closeTime" || "hours" in object || "minutes" in object) return { hours: object.hours ?? 0, minutes: object.minutes ?? 0 };
+  return Object.fromEntries(Object.keys(object).sort().map((key) => [key, normalizedGoogleValue(object[key], key)]));
 }
 
 /** Same governance caller, durable dispatch reservation and honest read-back.

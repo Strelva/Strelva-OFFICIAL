@@ -215,7 +215,7 @@ export async function mirrorClientRecord(
 /** Dual-write a removal (the record left Redis on purpose). Never throws. */
 export async function mirrorClientRecordRemoval(store: ClientRecordStore, tenant: string, recordId: string): Promise<ClientRecordWriteResult> {
   if (!clientRecordDualWriteEnabled()) return { status: "skipped", reason: "disabled" };
-  const record = { recordId, remove: true as const };
+  const record = { recordId, remove: true as const, capturedAt: new Date().toISOString() };
   const result = await writeClientRecord(store, tenant, record, "dual_write");
   if (result.status === "failed" || result.status === "skipped") await rememberPending(store, tenant, record, result.reason);
   else await forgetOlderPending(store, tenant, record);

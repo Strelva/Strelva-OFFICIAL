@@ -45,7 +45,7 @@ export function applicationPackageDefinition(payload: unknown): JsonObject {
   return definition;
 }
 
-export interface PackageChoice { systemId: string; name: string; revision: number; fingerprint: string; definition: JsonObject }
+export interface PackageChoice { systemId: string; name: string; revision: number; fingerprint: string; definition: JsonObject; requires: { bindingKinds: string[] } }
 
 async function packageChoice(actor: WorkspaceActor, agencyWorkspaceId: string, systemId: string, db: VersionsDb): Promise<PackageChoice> {
   const listing = await listBusinessSystems(actor, agencyWorkspaceId, { store: createSupabaseSystemStore(db), db });
@@ -58,8 +58,12 @@ async function packageChoice(actor: WorkspaceActor, agencyWorkspaceId: string, s
   const lineage = await store.findLineageByVersion(versionActor, source);
   let definition: JsonObject;
   let fingerprint: string;
+  let requires = { bindingKinds: [] as string[] };
   if (lineage) {
     const view = await createSystemVersions({ store, connections: createSupabaseConnectionOwnership(db) }).readVersion(versionActor, lineage.id);
+    const baseline = await store.getRevision(versionActor, lineage.source, lineage.baseline.revision);
+    if (!baseline) throw new WorkspaceStoreError("The source requirements could not be read.");
+    requires = baseline.requires;
     definition = view.workingDefinition; fingerprint = `version:${lineage.rowRevision}`;
   } else if (row.references.savedWorkId) {
     const work = await getWork(actor, row.references.savedWorkId);
@@ -68,10 +72,10 @@ async function packageChoice(actor: WorkspaceActor, agencyWorkspaceId: string, s
   } else {
     const latest = revisions.at(-1);
     if (!latest) throw new WorkspaceStoreError("This System has no reusable definition yet.");
-    definition = latest.definition; fingerprint = `source:${latest.source.revisionId}`;
+    definition = latest.definition; requires = latest.requires; fingerprint = `source:${latest.source.revisionId}`;
   }
   assertShareableDefinition(definition);
-  return { systemId, name: row.system.name, revision: revisions.at(-1)?.source.number ?? 0, fingerprint, definition };
+  return { systemId, name: row.system.name, revision: revisions.at(-1)?.source.number ?? 0, fingerprint, definition, requires };
 }
 
 export async function readPackageChoices(actor: WorkspaceActor, agencyWorkspaceId: string, db: VersionsDb = versionsDb()) {
@@ -88,20 +92,34 @@ export async function readPackageChoices(actor: WorkspaceActor, agencyWorkspaceI
 
 export async function packageAgencySystem(actor: WorkspaceActor, input: { workspaceId: string; systemId: string; commandId: string; fingerprint: string; expectedRevision: number; summary: string }, db: VersionsDb = versionsDb()) {
   await requireAgencyAuthoring(actor, input.workspaceId, input.workspaceId, db);
+  const packageReceipt = (value: unknown) => {
+    const parsed = z.object({ source: z.object({ businessId: z.string().uuid(), systemId: z.string().uuid(), revisionId: z.string().uuid(), number: z.number().int().positive() }).strict() }).passthrough().safeParse(value);
+    if (!parsed.success || parsed.data.source.businessId !== input.workspaceId || parsed.data.source.systemId !== input.systemId || parsed.data.source.number !== input.expectedRevision + 1) throw new WorkspaceStoreError("The package receipt could not be confirmed.");
+    return parsed.data.source;
+  };
+  const replay = await db.rpc("read_agency_package_command", {
+    p_workspace_id: input.workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail,
+    p_command_id: input.commandId, p_system_id: input.systemId, p_fingerprint: input.fingerprint,
+    p_expected_revision: input.expectedRevision, p_summary: input.summary,
+  });
+  if (replay.error) mapVersionsError(replay.error, "The package could not be confirmed. Retry the same request.");
+  if (replay.data !== null) {
+    const receipt = packageReceipt(replay.data);
+    return { workspaceId: input.workspaceId, systemId: input.systemId, revision: receipt.number, revisionId: receipt.revisionId };
+  }
   const choice = await packageChoice(actor, input.workspaceId, input.systemId, db);
   if (choice.fingerprint !== input.fingerprint) throw new WorkspaceStoreError("This System changed. Reload the package before publishing.");
   const actorForVersions = await readVersionActor(actor, db);
   const base = createSupabaseVersionStore(db);
   // Reuse all the source store's checks. Only insertion has a command receipt.
   const store: VersionStore = { ...base, async insertRevision(_actor, revision) {
-    const publication = { ...revision, source: { ...revision.source, number: input.expectedRevision + 1 } };
+    const publication = { ...revision, source: { ...revision.source, number: input.expectedRevision + 1 }, packageFingerprint: input.fingerprint };
     const { data, error } = await db.rpc("publish_agency_package", {
       p_workspace_id: input.workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail,
       p_command_id: input.commandId, p_expected_revision: input.expectedRevision, p_revision: publication,
     });
     if (error) mapVersionsError(error, "The package could not be confirmed. Retry the same request.");
-    const parsed = z.object({ source: z.object({ businessId: z.string().uuid(), systemId: z.string().uuid(), revisionId: z.string().uuid(), number: z.number().int().positive() }).strict() }).passthrough().safeParse(data);
-    if (!parsed.success || parsed.data.source.businessId !== input.workspaceId || parsed.data.source.systemId !== input.systemId || parsed.data.source.number !== input.expectedRevision + 1) throw new WorkspaceStoreError("The package receipt could not be confirmed.");
+    packageReceipt(data);
     return data as Awaited<ReturnType<VersionStore["getRevision"]>> & {};
   } };
   // Derived native Systems are adopted at their existing identity before source publication.
@@ -112,7 +130,7 @@ export async function packageAgencySystem(actor: WorkspaceActor, input: { worksp
     name: row.system.name, kind: row.system.kind, origin: row.system.origin,
   }, input.systemId);
   const revision = await createSystemVersions({ store, connections: createSupabaseConnectionOwnership(db) }).publishSourceRevision(actorForVersions, {
-    source: { businessId: input.workspaceId, systemId: input.systemId }, definition: choice.definition, summary: input.summary,
+    source: { businessId: input.workspaceId, systemId: input.systemId }, definition: choice.definition, requires: choice.requires, summary: input.summary,
   });
   return { workspaceId: input.workspaceId, systemId: input.systemId, revision: revision.source.number, revisionId: revision.source.revisionId };
 }

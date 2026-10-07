@@ -135,7 +135,7 @@ export function SystemPage(props: SystemPageProps) {
         {system.connections.length || system.offers?.length || siteHref ? <ConnectionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} siteHref={siteHref} /> : null}
         <PartsPanel system={system} />
         {system.versions.length ? <VersionsPanel system={system} systemHref={props.systemHref} onOpenSystem={props.onOpenSystem} /> : null}
-        {system.storedVersionId ? <Panel id={`${system.id}-improvements`} title="Shared improvements" intro="Review changes from the source. Preparing a draft leaves the current release in place."><SystemVersionImprovements key={`${props.workspaceId}:${system.id}`} workspaceId={props.workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={readOnly} /></Panel> : null}
+        {system.storedVersionId ? <Panel id={`${system.id}-improvements`} title="Shared improvements" count={1} intro="Review changes from the source. Preparing a draft leaves the current release in place."><SystemVersionImprovements key={`${props.workspaceId}:${system.id}`} workspaceId={props.workspaceId} systemId={system.id} versionId={system.storedVersionId} readOnly={readOnly} /></Panel> : null}
         {system.history?.length ? <HistoryPanel system={system} /> : null}
         {system.audits?.length ? <AuditsPanel system={system} workspaceId={props.workspaceId} appBase={props.appBase || ""} /> : null}
       </aside> : null}

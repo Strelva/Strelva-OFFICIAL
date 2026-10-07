@@ -7,6 +7,7 @@ import {
   CLIENT_RECORD_PENDING_KEY,
   CLIENT_RECORD_STORES,
   clientRecordDb,
+  clientRecordDualWriteEnabled,
   clientRecordHash,
   parsePendingMember,
   pendingPayloadKey,
@@ -126,7 +127,7 @@ export function clientRecordReadStores(): Set<ClientRecordStore> {
  * I/O. Any doubt (no database, a failed streak read) answers Redis.
  */
 export async function clientRecordReadSource(store: ClientRecordStore, db: ClientRecordDb | null = null): Promise<"redis" | "postgres"> {
-  if (!clientRecordReadStores().has(store)) return "redis";
+  if (!clientRecordDualWriteEnabled() || !clientRecordReadStores().has(store)) return "redis";
   const client = db ?? clientRecordDb();
   if (!client) return "redis";
   try {

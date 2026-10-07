@@ -106,6 +106,36 @@ describe("export schema 3", () => {
     expect(deliver).toHaveBeenCalledWith(expect.objectContaining({ deliverTo: "owner@example.test" }));
   });
 
+  it("accepts a background build before collecting, and includes all native facets for an operator", async () => {
+    const fake = fakeRpc({ role: "operator" });
+    const rpc = vi.fn(fake.rpc);
+    const tasks: (() => Promise<void>)[] = [];
+    snapshot.mockClear();
+    const deliver = vi.fn(async () => {});
+    const outcome = await startWorkspaceExportV3(actor, "w-1", { rpc, snapshot, background: true, includeOperatorSnapshot: true, schedule: task => tasks.push(task), deliver });
+    expect(outcome.kind).toBe("build");
+    expect(rpc.mock.calls.map(call => call[0])).toEqual(["start_workspace_export_build"]);
+    expect(snapshot).not.toHaveBeenCalled();
+    await tasks[0]!();
+    expect(snapshot).toHaveBeenCalledOnce();
+    expect(fake.state.status).toBe("ready");
+    expect(deliver).toHaveBeenCalledOnce();
+  });
+
+  it("fails a background collection without ready parts or a link when access disappears", async () => {
+    const fake = fakeRpc();
+    const rpc: V3Rpc = async (name, args) => name === "workspace_export_v3_role"
+      ? { data: null, error: { message: "workspace_export_denied" } } : fake.rpc(name, args);
+    const tasks: (() => Promise<void>)[] = [];
+    const deliver = vi.fn(), onFailure = vi.fn();
+    await startWorkspaceExportV3(actor, "w-1", { rpc, snapshot, background: true, schedule: task => tasks.push(task), deliver, onFailure });
+    await tasks[0]!();
+    expect(fake.state.status).toBe("failed");
+    expect(fake.parts.size).toBe(0);
+    expect(deliver).not.toHaveBeenCalled();
+    expect(onFailure).toHaveBeenCalledWith(expect.objectContaining({ reason: "export_collection_failed" }));
+  });
+
   it("a delivery failure reports attention, keeps the complete archive and never logs the token", async () => {
     const { rpc, state } = fakeRpc({ role: "operator" });
     const tasks: (() => Promise<void>)[] = [];

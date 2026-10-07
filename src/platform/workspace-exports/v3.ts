@@ -98,6 +98,7 @@ export async function collectWorkspaceExportV3(
   snapshot: (actor: WorkspaceActor, workspaceId: string) => Promise<WorkspaceExportSnapshot>,
   now: () => Date = () => new Date(),
   assets?: V3Assets,
+  includeOperatorSnapshot = false,
 ): Promise<V3Document> {
   const role = await rpc("workspace_export_v3_role", { p_workspace_id: workspaceId, p_user_id: actor.userId, p_verified_email: actor.verifiedEmail });
   if (role.error) throw rpcError(role.error.message);
@@ -142,7 +143,7 @@ export async function collectWorkspaceExportV3(
     }
   } else unavailable.push({ category: "assets_manifest", reason: "The asset manifest reader is unavailable." });
   let workspaceSnapshot: WorkspaceExportSnapshot | null = null;
-  if (requesterRole === "owner") {
+  if (requesterRole === "owner" || includeOperatorSnapshot) {
     workspaceSnapshot = await snapshot(actor, workspaceId);
     included.push({ category: "workspace_snapshot_schema_2", count: 1 });
   } else {
@@ -188,16 +189,19 @@ export async function startWorkspaceExportV3(
     rpc: V3Rpc;
     snapshot: (actor: WorkspaceActor, workspaceId: string) => Promise<WorkspaceExportSnapshot>;
     assets?: V3Assets;
+    /** Production archive collection runs after the accepted build, including native facets. */
+    background?: boolean;
+    includeOperatorSnapshot?: boolean;
     schedule: (task: () => Promise<void>) => void;
     /** Sends the download link to the recipient the database chose. */
     deliver: (input: { buildId: string; token: string; deliverTo: string; workspaceId: string; tenantIds: string[]; manifest: V3Manifest }) => Promise<void>;
     onFailure?: (input: { buildId: string; reason: string }) => Promise<void> | void;
   },
 ): Promise<V3ExportOutcome> {
-  const document = await collectWorkspaceExportV3(actor, workspaceId, deps.rpc, deps.snapshot, undefined, deps.assets);
-  const body = JSON.stringify(document);
-  const byteSize = Buffer.byteLength(body);
-  if (document.manifest.requesterRole === "owner" && byteSize <= V3_INLINE_MAXIMUM_BYTES) {
+  const document = deps.background ? null : await collectWorkspaceExportV3(actor, workspaceId, deps.rpc, deps.snapshot, undefined, deps.assets, deps.includeOperatorSnapshot);
+  const body = document ? JSON.stringify(document) : null;
+  const byteSize = body ? Buffer.byteLength(body) : 0;
+  if (document && body && document.manifest.requesterRole === "owner" && byteSize <= V3_INLINE_MAXIMUM_BYTES) {
     if (findSecretShapes(body).length) throw new WorkspaceExportV3Error("secret_detected", "The export stopped: something that looks like a credential was found. Nothing was sent.");
     return { kind: "inline", body, byteSize, document };
   }
@@ -205,14 +209,21 @@ export async function startWorkspaceExportV3(
   if (started.error) throw rpcError(started.error.message);
   const build = started.data as { buildId: string; deliverTo: string; requesterRole: "owner" | "operator" };
   deps.schedule(async () => {
-    const written = await writeWorkspaceExportBuild(build.buildId, body, deps.rpc);
+    let collected: V3Document;
+    try { collected = document ?? await collectWorkspaceExportV3(actor, workspaceId, deps.rpc, deps.snapshot, undefined, deps.assets, deps.includeOperatorSnapshot); }
+    catch {
+      await deps.rpc("fail_workspace_export_build", { p_build_id: build.buildId, p_failure: "export_collection_failed" }).catch(() => undefined);
+      await deps.onFailure?.({ buildId: build.buildId, reason: "export_collection_failed" });
+      return;
+    }
+    const written = await writeWorkspaceExportBuild(build.buildId, body ?? JSON.stringify(collected), deps.rpc);
     if (written.status === "failed") { await deps.onFailure?.({ buildId: build.buildId, reason: written.reason }); return; }
-    const tenantIds = (document.data.linked_sites ?? []).flatMap(row => {
+    const tenantIds = (collected.data.linked_sites ?? []).flatMap(row => {
       const tenantId = row && typeof row === "object" ? (row as { tenantId?: unknown }).tenantId : null;
       return typeof tenantId === "string" ? [tenantId] : [];
     });
     try {
-      await deps.deliver({ buildId: build.buildId, token: written.token, deliverTo: build.deliverTo, workspaceId, tenantIds, manifest: document.manifest });
+      await deps.deliver({ buildId: build.buildId, token: written.token, deliverTo: build.deliverTo, workspaceId, tenantIds, manifest: collected.manifest });
     } catch {
       // The archive remains ready. A failed email is distinct from a failed
       // build and must never expose the token through provider error text.

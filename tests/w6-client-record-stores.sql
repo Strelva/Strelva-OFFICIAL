@@ -16,6 +16,18 @@ begin
   if has_function_privilege('authenticated','public.read_tenant_client_records_page(text,text,integer,timestamptz,text)','EXECUTE')
     or has_function_privilege('anon','public.find_client_calendly_tenant(text)','EXECUTE') then raise exception 'public access'; end if;
   if has_table_privilege('service_role','public.tenant_client_records','SELECT') then raise exception 'direct table access'; end if;
+  -- Removal before the first copy still blocks that copy's delayed retry.
+  perform public.record_tenant_client_record('w6-store-client','orders','gone',null,null,'2026-10-06 13:00:00+00','dual_write','remove');
+  v_result := public.record_tenant_client_record('w6-store-client','orders','gone','{"value":0}','cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc','2026-10-06 12:00:00+00','repair','replace');
+  if v_result->>'status'<>'kept' then raise exception 'late initial save revived deletion'; end if;
+  -- A repair loaded before a newer save cannot delete the saved value.
+  v_result := public.record_tenant_client_record('w6-store-client','orders','r1',null,null,'2026-10-06 11:00:00+00','repair','remove');
+  if v_result->>'status'<>'kept' then raise exception 'stale removal deleted newer save'; end if;
+  perform public.record_tenant_client_record('w6-store-client','orders','r1',null,null,'2026-10-06 13:00:00+00','dual_write','remove');
+  v_result := public.record_tenant_client_record('w6-store-client','orders','r1','{"value":0}','cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc','2026-10-06 12:30:00+00','repair','replace');
+  if v_result->>'status'<>'kept' then raise exception 'stale save revived deletion'; end if;
+  perform public.record_tenant_client_record('w6-store-client','orders','r1','{"value":3}','dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd','2026-10-06 14:00:00+00','dual_write','replace');
+  if jsonb_array_length(public.read_tenant_client_records_page('w6-store-client','orders',1000,null,null))<>2 then raise exception 'new save did not revive record'; end if;
 end $$;
 update public.tenants set id='w6-store-renamed' where id='w6-store-client';
 do $$begin

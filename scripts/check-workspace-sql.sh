@@ -653,6 +653,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
 # Wave 6 agency, operator, durable client records and portability.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010160000_agency_authoring.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-agency-authoring.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010161000_operator_google_attempts.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010161100_operator_effort_context.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/operator-google-attempts-schema.sql"
@@ -664,6 +665,10 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010164000_fin
 psql "${psql_args[@]}" --file="$repo_root/tests/finite-job-adapters-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165500_business_portability.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/w6-business-portability.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165800_unbounded_export_archive.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-unbounded-export-archive.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165900_export_build_access.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-export-build-access.sql"
 # The real Make real runner, checkpointing through these RPCs (psql-backed port).
 STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run src/__tests__/make-real-activation-repository.test.ts
