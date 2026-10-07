@@ -13,11 +13,12 @@ import { createNeedsYouService } from "./service";
 import { systemsSourceAdapters } from "./systems-sources";
 import { deliverySourceAdapters } from "./sources/live-delivery";
 import { productSourceAdapters } from "./sources/live-products";
-import { bookingRequestAdapter } from "@/platform/bookings/needs-you-adapter";
+import { bookingRequestAdapter, bookingRequestItem } from "@/platform/bookings/needs-you-adapter";
 import { decideBookingRequest, readWorkspaceBooking, readWorkspaceBookingRequests } from "@/platform/bookings/store";
-import { bookingStoreWriteEnabled } from "@/platform/bookings/flags";
+import { bookingStoreWriteEnabled, bookingOwnerNoticeEnabled } from "@/platform/bookings/flags";
 import { updateBooking as updateLegacyBookingStatus } from "@/platform/bookings/legacy-store";
 
+import { needsYouReleaseEnabled } from "./release";
 export { needsYouReleaseEnabled } from "./release";
 
 /** The item store, exposed so the approve route can render its confirm page. */
@@ -33,7 +34,13 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
     store,
     appOrigin: needsYouAppOrigin(),
     now: () => Date.now(),
-    sendEmail: sendEmailWithReceipt,
+    async sendEmail(input) {
+      if (input.tags?.lifecycle === "booking_request") {
+        const { bookingCustomerEmailAllowed } = await import("@/platform/bookings/updates");
+        if (!await bookingCustomerEmailAllowed(input.tenantId ?? null)) return { status: "suppressed", reason: "email_gates" };
+      }
+      return sendEmailWithReceipt(input);
+    },
     adapters: [
       tenantEventAdapter({
         linkedTenants: async (workspaceId) => (await store.linkedTenants(workspaceId)).map(link => link.tenantId),
@@ -77,4 +84,13 @@ export async function readStrelvaHandled(actor: WorkspaceActor, workspaceId: str
   const events = (await Promise.all(tenants.map(async link => (await getEvents(link.tenantId, { limit: 100 }).catch(() => []))
     .filter(event => !decided.has(`${link.tenantId}:${event.id}`))))).flat();
   return mergeHandled([...rows.map(handledFromStore), ...events.map(handledFromTenantEvent)], since).slice(0, 50);
+}
+
+/** Booking capture opens only this request; the hourly cron remains recovery. */
+export async function notifyBookingRequestNow(booking: import("@/platform/bookings/store").StoreBooking, store: NeedsYouStore = PostgresNeedsYouStore) {
+  if (!needsYouReleaseEnabled() || !bookingStoreWriteEnabled() || !bookingOwnerNoticeEnabled() || !booking.workspaceId) return;
+  const item = bookingRequestItem(booking, booking.workspaceId);
+  if (!item) return;
+  const opened = await store.open(booking.workspaceId, item);
+  await needsYouService(store).notifyBookingRequest(booking.workspaceId, opened.id);
 }

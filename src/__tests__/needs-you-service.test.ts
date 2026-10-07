@@ -345,6 +345,16 @@ describe("booking request clock ownership", () => {
     const adapter: SourceAdapter = { lifecycle: "booking_request", needsMemberActor: false, propose: async () => ({ items: [], complete: true }), currentRevision: async () => "revision", resolve };
     return { row, resolve, svc: service([adapter]) };
   }
+  it("delivers only the newly captured booking and leaves unrelated work for the cron", async () => {
+    vi.stubEnv("STRELVA_BOOKING_OWNER_NOTICE","1");
+    const { row, svc } = await setup();
+    const other = await mem.store.open(WS, { kind:"website.publish", route:"owner_decides", title:"Unrelated publish", approveEffect:"Publish", notYetEffect:"Keep draft", sourceLifecycle:"other", sourceId:"other", revisionHash:"other", urgent:true, adminMayDecide:false });
+    expect((await svc.notifyBookingRequest(WS,row.id)).urgent).toBe(1);
+    expect(sendEmail).toHaveBeenCalledOnce();
+    expect(sendEmail.mock.calls[0]?.[0].tags).toMatchObject({lifecycle:"booking_request",kind:"urgent"});
+    expect(mem.items.get(other.id)?.deliveryState).toBe("not_sent");
+    expect((await svc.notifyBookingRequest(WS,row.id)).urgent).toBe(0);
+  });
   it("leaves day 3/7/14 to the booking clock when reminders are armed", async () => {
     vi.stubEnv("STRELVA_BOOKING_STORE_WRITE", "1"); vi.stubEnv("STRELVA_BOOKING_REMINDERS", "1"); vi.stubEnv("STRELVA_BOOKING_OWNER_NOTICE", "1");
     const { row, resolve, svc } = await setup();

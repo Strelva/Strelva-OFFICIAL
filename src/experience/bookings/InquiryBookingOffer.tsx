@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import type { InquiryBookingOffer as Offer } from "@/platform/bookings/inquiry-offers";
 /** Plain customer form: keyboard usable, never preselects a commitment. */
@@ -11,7 +12,7 @@ export function InquiryBookingOffer({ offer, actionUrl, error }: { offer: Offer 
       <fieldset><legend className="text-base font-medium">{offer.serviceName}</legend><p className="mt-2 text-sm text-gray-muted">Times in {offer.timeZone}</p>
         <div className="mt-4 grid gap-3">{offer.slots.map(slot => <label key={slot.start} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-gray-border p-3 focus-within:outline-2 focus-within:outline-accent"><input type="radio" name="start" value={slot.start} required className="h-4 w-4"/><span>{format!.format(new Date(slot.start))}</span></label>)}</div>
       </fieldset>
-      <button type="submit" className="mt-6 inline-flex min-h-12 items-center justify-center rounded-full bg-accent px-5 text-sm font-medium text-on-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">Request this time</button>
+      <Button type="submit" className="mt-6">Request this time</Button>
     </form></Card> : null}
   </div></main>;
 }

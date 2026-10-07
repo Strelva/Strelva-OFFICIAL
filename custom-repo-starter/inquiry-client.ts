@@ -61,7 +61,7 @@ export async function loadInquiryForm(baseUrl: string, tenant: string, capabilit
   return body;
 }
 
-export async function submitInquiryForm(baseUrl: string, tenant: string, definition: PublicInquiryForm, fields: Record<string, string>): Promise<void> {
+export async function submitInquiryForm(baseUrl: string, tenant: string, definition: PublicInquiryForm, fields: Record<string, string>): Promise<PublicInquiryBookingOffer | void> {
   const response = await fetch(endpoint(baseUrl, tenant, "leads"), {
     method: "POST",
     credentials: "omit",
@@ -79,4 +79,14 @@ export async function submitInquiryForm(baseUrl: string, tenant: string, definit
   if (!response.ok) throw new Error(response.status === 409 ? "This form changed. Reload it before sending your request." : "Your request was not confirmed. Please try again.");
   const result: unknown = await response.json();
   if (!result || typeof result !== "object" || !("ok" in result) || result.ok !== true) throw new Error("Your request was not confirmed. Please try again.");
+  if ("bookingOffer" in result && isInquiryBookingOffer(result.bookingOffer)) return result.bookingOffer;
+}
+
+export interface PublicInquiryBookingOffer { serviceName: string; timeZone: string; url: string; slots: Array<{ start: string; end: string }> }
+export function isInquiryBookingOffer(value: unknown): value is PublicInquiryBookingOffer {
+  if (!value || typeof value !== "object") return false;
+  const offer = value as PublicInquiryBookingOffer;
+  if (typeof offer.serviceName !== "string" || typeof offer.timeZone !== "string" || typeof offer.url !== "string" || !Array.isArray(offer.slots) || !offer.slots.length || offer.slots.length > 3) return false;
+  try { const url = new URL(offer.url); if (url.protocol !== "https:" && !(url.protocol === "http:" && url.hostname === "localhost")) return false; new Intl.DateTimeFormat(undefined, { timeZone: offer.timeZone }); } catch { return false; }
+  return offer.slots.every(slot => slot && typeof slot.start === "string" && typeof slot.end === "string" && Number.isFinite(Date.parse(slot.start)) && Date.parse(slot.end) > Date.parse(slot.start));
 }

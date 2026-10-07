@@ -414,6 +414,8 @@ describe("owner notice and request mode", () => {
     fakeWorld();
     env("postgres");
     vi.stubEnv("STRELVA_BOOKING_OWNER_NOTICE", "1");
+    vi.stubEnv("EMAIL_SENDING_ENABLED", "true");
+    vi.stubEnv("CUSTOMER_EMAIL_ENABLED", "true");
     await postBooking(bookingRequest("10:00"));
     expect(h.sendNewBookingOwnerEmail).toHaveBeenCalledTimes(1);
     expect(h.sendNewBookingOwnerEmail.mock.calls[0]![0]).toMatchObject({

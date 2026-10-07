@@ -145,6 +145,7 @@ export function createCapabilityApi(fetcher = globalThis.fetch) {
       });
       const value = await jsonResponse(response, response.status === 409 ? "This form changed. Reload it before sending your request." : "Your request was not confirmed. Please try again.");
       if (value.ok !== true) throw new Error("Your request was not confirmed. Please try again.");
+      return value.bookingOffer;
     },
     async loadBooking(config, signal) {
       const expected = config.booking;
@@ -224,7 +225,21 @@ function mountInquiry(root, config, api) {
     form.addEventListener("submit", event => {
       event.preventDefault(); submit.disabled = true; result.textContent = "";
       const values = Object.fromEntries(fields.map(field => [field.name, String(field.value).trim()]));
-      void api.submitInquiry(config, definition, values).then(() => { form.reset(); result.textContent = "Your request has been received."; }, error => { result.textContent = error instanceof Error ? error.message : "Your request was not confirmed. Please try again."; }).finally(() => { submit.disabled = false; });
+      void api.submitInquiry(config, definition, values).then(offer => {
+        form.reset(); result.textContent = "Your request has been received.";
+        if (record(offer) && text(offer.url) && Array.isArray(offer.slots) && offer.slots.length <= 3) {
+          let url; try { url = new URL(offer.url); } catch { return; }
+          if (url.protocol !== "https:" && !(url.protocol === "http:" && url.hostname === "localhost")) return;
+          const choices = element("div");
+          choices.append(element("p", "You can also request a time. The business will confirm it."));
+          for (const slot of offer.slots) {
+            if (!record(slot) || !Number.isFinite(Date.parse(slot.start))) continue;
+            let label; try { label = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short", timeZone: offer.timeZone }).format(new Date(slot.start)); } catch { label = slot.start; }
+            choices.append(element("p", `${text(offer.serviceName)} · ${label}`));
+          }
+          choices.append(element("a", "Choose a time to request", { href: url.toString() })); result.after(choices);
+        }
+      }, error => { result.textContent = error instanceof Error ? error.message : "Your request was not confirmed. Please try again."; }).finally(() => { submit.disabled = false; });
     });
     root.replaceChildren(form);
   }, error => status(root, error instanceof Error ? error.message : "This inquiry form is unavailable."));

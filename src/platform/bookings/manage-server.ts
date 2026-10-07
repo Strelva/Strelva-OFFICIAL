@@ -5,7 +5,7 @@ import type { ManageDeps } from "./manage";
 import { readReservationByManageTokenHash } from "./store";
 import { bookingMessagesEnabled, bookingAgentsEnabled } from "./flags";
 import { nativeBookingByToken, nativeSlots, tokenHash, changeNativeBooking, confirmAgent } from "./native";
-import { deliverBookingUpdates } from "./updates";
+import { deliverBookingUpdates, notifyBookingRequestNow } from "./updates";
 
 export function manageDeps(): ManageDeps {
   const service = createPublicWebsiteBookingService();
@@ -31,12 +31,14 @@ export function manageDeps(): ManageDeps {
       if (!input.capabilityId.startsWith("native:")) return service.change(input);
       if (!nativeEnabled()) throw new PublicBookingError("not_found", "Booking management is unavailable.");
       const booking = await changeNativeBooking(tokenHash(input.managementToken), "reschedule", input.slotId);
+      await notifyBookingRequestNow(booking);
       await deliverBookingUpdates(booking.id).catch(() => undefined);
       return { status: booking.status === "confirmed" ? "confirmed" : "pending" };
     },
     async cancel(input) {
       if (nativeEnabled() && await nativeBookingByToken(tokenHash(input.managementToken), "manage")) {
         const booking = await changeNativeBooking(tokenHash(input.managementToken), "cancel");
+        await notifyBookingRequestNow(booking);
         await deliverBookingUpdates(booking.id).catch(() => undefined);
         return { status: "cancelled" };
       }
@@ -45,6 +47,7 @@ export function manageDeps(): ManageDeps {
     async confirm(token) {
       if (!bookingAgentsEnabled()) throw new PublicBookingError("not_found", "Agent bookings are unavailable.");
       const booking = await confirmAgent(tokenHash(token));
+      await notifyBookingRequestNow(booking);
       await deliverBookingUpdates(booking.id).catch(() => undefined);
       return { status: booking.status === "confirmed" ? "confirmed" : "pending" };
     },

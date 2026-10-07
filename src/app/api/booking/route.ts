@@ -4,7 +4,7 @@ import { createBookingAtomic } from "@/platform/bookings/legacy-store";
 import { getTenantFromHeaders } from "@/lib/tenant";
 import { getTenantConfig } from "@/lib/tenants";
 import { isRateLimitedAsync, isRateLimitedPerInstance, rateLimitKey } from "@/platform/infra/rate-limit";
-import { deliverBookingUpdates } from "@/platform/bookings/updates";
+import { deliverBookingUpdates, notifyBookingRequestNow } from "@/platform/bookings/updates";
 import { issueNativeAccess } from "@/platform/bookings/native";
 import { readTenantBookings } from "@/platform/bookings/store";
 import { bookingMessagesEnabled, bookingReadSource } from "@/platform/bookings/flags";
@@ -144,12 +144,14 @@ export async function POST(request: Request) {
       const saved = (await readTenantBookings(tenant).catch(() => [])).find(b => b.legacyId === result.booking.id);
       let confirmationSent = false;
       if (saved) {
+        await afterStored("request owner", () => notifyBookingRequestNow(saved));
         await afterStored("manage link", () => issueNativeAccess(tenant, saved.id));
         await afterStored("booking messages", async () => {
           const messages = await deliverBookingUpdates(saved.id);
           confirmationSent = !requested && messages.customerSent > 0;
         });
       }
+      if (!saved) await afterStored("owner notice", () => notifyOwnerOfBooking(tenant, result.booking));
       return NextResponse.json({ success: true, booking: result.booking, confirmationSent, ...(requested ? { requested: true } : {}) });
     }
     // "New booking" to the owner recipient (off unless STRELVA_BOOKING_OWNER_NOTICE=1).

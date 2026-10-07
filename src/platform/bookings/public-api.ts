@@ -13,7 +13,7 @@ import { alertOnce } from "@/platform/infra/monitoring";
 import { getRedis } from "@/platform/infra/redis";
 import type { PublicBookingSlot, PublicBookingStatus, PublicBookingStoreHook } from "@/products/scheduling/public-booking";
 import { blocksTime } from "./availability";
-import { bookingReadSource, bookingStoreWriteEnabled } from "./flags";
+import { bookingMessagesEnabled, bookingReadSource, bookingStoreWriteEnabled } from "./flags";
 import { readTenantBookings, recordBooking, type StoreBookingStatus } from "./store";
 import { BOOKING_STORE_PENDING_KEY, bookingPendingMember } from "./tenant";
 
@@ -59,7 +59,7 @@ export function publicBookingStoreHook(): PublicBookingStoreHook | undefined {
     },
     async settle(input) {
       try {
-        await recordBooking(input.binding.tenantId, {
+        const result = await recordBooking(input.binding.tenantId, {
           publicReservationId: input.reservationId,
           status: STATUS[input.status],
           origin: "site",
@@ -71,6 +71,10 @@ export function publicBookingStoreHook(): PublicBookingStoreHook | undefined {
           customer: input.visitor ? { name: input.visitor.name, email: input.visitor.email } : { name: "Customer" },
           ...(input.status === "cancelled" ? { cancelledAt: new Date().toISOString() } : {}),
         }, "native");
+        if (bookingMessagesEnabled() && result.status !== "conflict") {
+          const { deliverBookingUpdates } = await import("./updates");
+          await deliverBookingUpdates(result.booking.id).catch(() => undefined);
+        }
       } catch (error) {
         await queue(input.binding.tenantId, input.reservationId, error instanceof Error ? error.message : String(error));
       }

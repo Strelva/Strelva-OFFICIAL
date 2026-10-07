@@ -61,11 +61,11 @@ export async function deliverBookingUpdates(bookingId: string | null = null, dep
       const when = bookingWhen(booking);
       const state = booking.status;
       const rescheduled = row.reason === "Customer rescheduled";
-      const title = state === "held" ? "Confirm your booking request" : state === "cancelled" ? "Booking cancelled" : state === "declined" ? "Your time wasn't confirmed"
+      const title = row.audience === "client" && state === "confirmed" && !rescheduled ? "New booking" : state === "held" ? "Confirm your booking request" : state === "cancelled" ? "Booking cancelled" : state === "declined" ? "Your time wasn't confirmed"
         : state === "requested" ? "Request received" : rescheduled ? "Booking rescheduled" : "Booking confirmed";
       const tokenCipher = state === "held" ? row.access?.confirm_ciphertext : row.access?.manage_ciphertext;
       const token = typeof tokenCipher === "string" ? decryptSecret(tokenCipher) : null;
-      const url = bookingManagePageEnabled() ? token ? `${bookingAppOrigin()}/b/${encodeURIComponent(token)}` : await deps.manageUrl?.(booking).catch(() => null) : null;
+      const url = row.audience === "client" ? `${bookingAppOrigin()}/workspace/bookings?${new URLSearchParams({ workspaceId: booking.workspaceId ?? "", date: booking.localDate })}` : bookingManagePageEnabled() ? token ? `${bookingAppOrigin()}/b/${encodeURIComponent(token)}` : await deps.manageUrl?.(booking).catch(() => null) : null;
       const result = await deps.send({ audience: row.audience, tenantId: booking.tenantId ?? undefined, to,
         fromName: business.name || "Strelva", fromAddress: "bookings@mail.strelva.com",
         subject: `${title}: ${booking.serviceName}, ${when.day} ${when.time}`,
@@ -78,7 +78,7 @@ export async function deliverBookingUpdates(bookingId: string | null = null, dep
           : "Your time is confirmed.",
           ...(business.address ? [`Where: ${business.address}`] : [])],
           rows: [{ label: "Service", value: booking.serviceName }, { label: "When", value: `${when.day}, ${when.time} (${booking.timeZone})` }],
-          ...(url ? { button: { label: state === "held" ? "Review and confirm" : "Change or cancel", url } } : {}) },
+          ...(url ? { button: { label: row.audience === "client" ? "Open bookings" : state === "held" ? "Review and confirm" : "Change or cancel", url } } : {}) },
         ...(state === "confirmed" && row.audience === "customer" ? { attachments: [{ filename: "booking.ics", content: Buffer.from(calendarFile(booking, business.name, business.address ?? "")).toString("base64") }] } : {}),
       });
       if (result.status === "accepted") { summary.sent++; if (row.audience === "customer") summary.customerSent++; await finish("sent", result.providerMessageId); }
@@ -88,4 +88,13 @@ export async function deliverBookingUpdates(bookingId: string | null = null, dep
     }
   }
   return summary;
+}
+
+/** The booking is already durable. Owner delivery cannot fail its receipt. */
+export async function notifyBookingRequestNow(booking: StoreBooking) {
+  if (booking.status !== "requested" || !bookingOwnerNoticeEnabled()) return;
+  try {
+    const { notifyBookingRequestNow: notify } = await import("@/platform/needs-you/server");
+    await notify(booking);
+  } catch { /* The durable request will be reconciled by the cron. */ }
 }

@@ -1,3 +1,4 @@
+import { deliverBookingUpdates, notifyBookingRequestNow } from "@/platform/bookings/updates";
 import { NextResponse } from "next/server";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
 import { bookingInquiryOffersEnabled, chooseInquiryBookingOffer } from "@/platform/bookings/inquiry-offers";
@@ -10,7 +11,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     if (await isRateLimitedAsync(rateLimitKey(request, "booking-inquiry-choice"), 20)) throw new Error("rate");
     if (!request.headers.get("content-type")?.startsWith("application/x-www-form-urlencoded")) throw new Error("invalid");
     const form = new URLSearchParams((await readBoundedBody(request, 2000)).toString("utf8"));
-    await chooseInquiryBookingOffer(token, form.get("start") ?? "");
+    const booking = await chooseInquiryBookingOffer(token, form.get("start") ?? "");
+    await notifyBookingRequestNow(booking);
+    await deliverBookingUpdates(booking.id).catch(() => undefined);
   } catch { page.searchParams.set("error", "unavailable"); }
   return NextResponse.redirect(page, 303);
 }

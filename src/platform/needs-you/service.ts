@@ -258,7 +258,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
         subject: kind === "urgent" ? `${first.businessName}: a customer is waiting on you` : options.heading,
         options,
         idempotencyKey: `needs-you:${kind}:${rows.map(row => row.id).sort().join(",")}`.slice(0, 256),
-        tags: { stream: "needs_you", kind },
+        tags: { stream: "needs_you", kind, ...(rows.every(row => row.sourceLifecycle === "booking_request") ? { lifecycle: "booking_request" } : {}) },
       });
     } catch (error) {
       reason = error instanceof Error ? error.message.slice(0, 200) : "send_failed";
@@ -336,7 +336,17 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     return summary;
   }
 
-  return { sync, list, decide, chase };
+  /** One newly captured booking reaches its owner now, without chasing other work. */
+  async function notifyBookingRequest(workspaceId: string, itemId: string): Promise<ChaseSummary> {
+    const summary: ChaseSummary = { lapsed: 0, reminded: 0, digests: 0, urgent: 0, ownerNotTold: 0, failed: 0 };
+    if (!bookingOwnerNoticeEnabled()) return summary;
+    const row = (await deps.store.dueForDelivery(500)).find(item => item.workspaceId === workspaceId && item.id === itemId && item.sourceLifecycle === "booking_request" && item.state === "open" && item.urgent && item.deliveryState === "not_sent");
+    if (!row || await reconcile({ workspaceId }, row) !== "current") return summary;
+    await deliver("urgent", [row], summary); summary.urgent = 1;
+    return summary;
+  }
+
+  return { sync, list, decide, chase, notifyBookingRequest };
 }
 
 export type NeedsYouService = ReturnType<typeof createNeedsYouService>;

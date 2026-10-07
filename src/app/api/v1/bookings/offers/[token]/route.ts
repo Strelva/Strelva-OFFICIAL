@@ -1,3 +1,4 @@
+import { deliverBookingUpdates, notifyBookingRequestNow } from "@/platform/bookings/updates";
 import { z } from "zod";
 import { readWorkspaceBody } from "@/platform/workspaces/http";
 import { isRateLimitedAsync, rateLimitKey } from "@/platform/infra/rate-limit";
@@ -16,6 +17,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     if (await isRateLimitedAsync(rateLimitKey(request, "booking-inquiry-choice"), 20)) return bookingJson({ error: "Too many requests." }, 429);
     const input = z.object({ start: z.string().datetime({ offset: true }) }).strict().parse(await readWorkspaceBody(request, 2000));
     const booking = await chooseInquiryBookingOffer((await params).token, input.start);
+    await notifyBookingRequestNow(booking);
+    await deliverBookingUpdates(booking.id).catch(() => undefined);
     return bookingJson({ reservationId: booking.id, status: booking.status, start: booking.start, end: booking.end });
   } catch (error) {
     if (error instanceof z.ZodError) return bookingJson({ error: "Choose a valid suggested time." }, 400);
