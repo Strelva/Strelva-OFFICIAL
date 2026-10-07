@@ -9,7 +9,7 @@ import { createSystemStoreLiveSystems, createInMemoryRevisionContent } from "@/p
 import type { WebsiteRebuildRecord } from "@/products/websites/rebuild-contracts";
 import { createAskPossibilityPort } from "@/app/api/workspace/ask/possibilities-server";
 import { possibilityTryState } from "@/experience/systems/try-state";
-import { signPossibilityPreviewToken } from "@/platform/possibilities/preview-link";
+import { signPossibilityPreviewToken, verifyPossibilityPreviewToken } from "@/platform/possibilities/preview-link";
 
 const workspaceId = "11111111-1111-4111-8111-111111111111";
 const id = "22222222-2222-4222-8222-222222222222";
@@ -82,6 +82,19 @@ describe("real Ask page-set candidates", () => {
     expect((await port.open(actor, input)).reviewStatus).toBe("pending_sync");
     sync.mockRejectedValueOnce(new Error("sync unavailable"));
     expect((await port.open(actor, input)).reviewStatus).toBe("pending_sync");
+  });
+  it("opens the exact isolated signed Try directly from Ask and stored System Possibilities", async () => {
+    vi.stubEnv("APPROVE_LINK_SECRET", "ask-open-test-only");
+    try {
+      const repository = createInMemoryPossibilityRepository();
+      const port = createAskPossibilityPort(actor, { repository, released: async () => true, prepare: async () => record() });
+      const opened = await port.open(actor, input);
+      const p = (await repository.get(workspaceId, opened.id))!;
+      expect(verifyPossibilityPreviewToken(opened.tryHref!.slice(5))).toEqual({ workspaceId, possibilityId: p.id, candidateRevision: p.candidateRevision });
+      const views = storedPossibilityViews([{ possibility: p, sourceRef: null, lastActivityAt: p.updatedAt }], []);
+      expect(verifyPossibilityPreviewToken(views[0]!.tryHref!.slice(5))).toEqual({ workspaceId, possibilityId: p.id, candidateRevision: p.candidateRevision });
+      expect(p.status).toBe("exploring");
+    } finally { vi.unstubAllEnvs(); }
   });
   it("does not store a summary shell for unsupported booking or missing existing baseline", async () => {
     const repository = createInMemoryPossibilityRepository();

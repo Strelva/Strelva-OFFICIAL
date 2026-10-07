@@ -214,7 +214,7 @@ export function readBusinessSystems(input: SystemsInput): BusinessSystems {
       affects: possibility.affects.filter(id => byId.has(id)),
       ...(possibility.evidence ? { evidence: possibility.evidence } : {}),
       ...(possibility.previewHref && sameAppHref(possibility.previewHref) ? { previewSrc: sameAppHref(possibility.previewHref) || undefined } : {}),
-      openHref: `/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&view=websites&work=${encodeURIComponent(possibility.workId)}`,
+      openHref: (possibility.tryHref && sameAppHref(possibility.tryHref)) || `/workspace?workspaceId=${encodeURIComponent(snapshot.workspaceId)}&view=websites&work=${encodeURIComponent(possibility.workId)}`,
       ...(possibility.staleReason ? { staleReason: possibility.staleReason } : {}),
     };
     for (const id of view.affects) byId.get(id)!.possibilities.push(view);

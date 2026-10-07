@@ -4,6 +4,7 @@ import { prepareAskPageSet, websiteRebuildReleasedFor } from "@/products/website
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import type { PossibilityRepository } from "@/platform/possibilities";
 import { prepareExistingAskBookingPage } from "./booking-possibility-server";
+import { possibilityPreviewPath } from "@/platform/possibilities/preview-link";
 
 export function createAskPossibilityPort(actor: WorkspaceActor, dependencies: {
   repository?: PossibilityRepository; prepare?: typeof prepareAskPageSet; released?: typeof websiteRebuildReleasedFor;
@@ -33,12 +34,16 @@ export function createAskPossibilityPort(actor: WorkspaceActor, dependencies: {
     ...port,
     async open(currentActor: WorkspaceActor, input: Parameters<typeof port.open>[1]) {
       const opened = await port.open(currentActor, input);
+      let tryHref: string | undefined;
+      try {
+        if (opened.candidateRevision) tryHref = possibilityPreviewPath({ workspaceId: input.workspaceId, possibilityId: opened.id, candidateRevision: opened.candidateRevision });
+      } catch { /* Native review remains available when signing is not configured. */ }
       let reviewStatus: "needs_you" | "pending_sync" = "pending_sync";
       if (dependencies.sync) {
         try { if ((await dependencies.sync(currentActor, input.workspaceId)).complete === true) reviewStatus = "needs_you"; }
         catch { /* The saved draft stays held; Home retries synchronization. */ }
       }
-      return { ...opened, reviewStatus };
+      return { ...opened, ...(tryHref ? { tryHref } : {}), reviewStatus };
     },
   };
 }

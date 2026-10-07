@@ -233,6 +233,9 @@ export interface AskOpenedPossibility {
   /** False when the repository does not survive a deploy (in-memory today). */
   durable: boolean;
   previewHref?: string;
+  candidateRevision?: number;
+  /** Signed isolated Try, with no decision authority. */
+  tryHref?: string;
   reviewStatus?: "needs_you" | "pending_sync";
 }
 
@@ -278,7 +281,7 @@ export function createPossibilityAdapter(repository: PossibilityRepository, opti
       }, { id, businessId: input.workspaceId, actorId: actor.userId, at: now() });
       try { await repository.create(possibility); }
       catch { throw new AskPreparedPossibilityError(typeof prepared.content.rebuildWorkId === "string" ? prepared.content.rebuildWorkId : null); }
-      return { id: possibility.id, status: "exploring", durable: options.durable, previewHref: prepared.previewHref };
+      return { id: possibility.id, status: "exploring", durable: options.durable, previewHref: prepared.previewHref, candidateRevision: possibility.candidateRevision };
     },
     async list(workspaceId) {
       return (await repository.list(workspaceId)).map((p) => ({ id: p.id, title: p.title, status: p.status }));

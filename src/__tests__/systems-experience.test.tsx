@@ -78,6 +78,10 @@ describe("Systems read adapter over the spine projection", () => {
     expect(systems[1]!.possibilities.map(item => item.id)).toEqual(["website-rebuild:rebuild"]);
     const hostile = projection({ ...mooney, possibilities: [{ ...mooney.possibilities[0]!, previewHref: "https://evil.example/x" }] });
     expect(readBusinessSystems({ snapshot: snapshot([], hostile), sites: [mooneySite] }).systems[0]!.possibilities[0]!.previewSrc).toBeUndefined();
+    const signedTry = projection({ ...mooney, possibilities: [{ ...mooney.possibilities[0]!, tryHref: "/try/signed-candidate" }] });
+    expect(readBusinessSystems({ snapshot: snapshot([], signedTry), sites: [mooneySite] }).systems[0]!.possibilities[0]).toMatchObject({ openHref: "/try/signed-candidate", previewSrc: "/api/websites/rebuild/preview" });
+    const hostileTry = projection({ ...mooney, possibilities: [{ ...mooney.possibilities[0]!, tryHref: "https://evil.example/x" }] });
+    expect(readBusinessSystems({ snapshot: snapshot([], hostileTry), sites: [mooneySite] }).systems[0]!.possibilities[0]!.openHref).toBe(`/workspace?workspaceId=${BUSINESS}&view=websites&work=rebuild`);
   });
 
   it("claims nothing when the spine could not be read, and has no Systems for a workspace without a projection", () => {

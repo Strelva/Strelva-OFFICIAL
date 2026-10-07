@@ -13,6 +13,7 @@
  * failure leaves the per-request projection in place and claims nothing.
  */
 import { randomUUID } from "node:crypto";
+import { possibilityPreviewPath } from "@/platform/possibilities/preview-link";
 import { canonicalJson } from "@/platform/business-record/tenant-import";
 import { WorkspaceAccessError } from "@/platform/workspaces/types";
 import {
@@ -210,6 +211,10 @@ export function storedPossibilityViews(stored: readonly ListedPossibility[], can
     const workId = sourceRef?.startsWith(REBUILD_SOURCE_PREFIX) ? sourceRef.slice(REBUILD_SOURCE_PREFIX.length)
       : typeof askContent?.rebuildWorkId === "string" ? askContent.rebuildWorkId : null;
     const candidate = workId ? candidates.find((item) => item.workId === workId) : undefined;
+    let tryHref: string | undefined;
+    try {
+      if (askContent) tryHref = possibilityPreviewPath({ workspaceId: p.businessId, possibilityId: p.id, candidateRevision: p.candidateRevision });
+    } catch { /* Keep the native review link when signing is not configured. */ }
     return [{
       id: p.id,
       title: p.title,
@@ -218,6 +223,7 @@ export function storedPossibilityViews(stored: readonly ListedPossibility[], can
       affects: [...new Set([...p.changes.map((c) => c.baseline.systemId), ...(typeof askContent?.contextSystemId === "string" ? [askContent.contextSystemId] : [])])],
       evidence: candidate?.evidence ?? (workId ? summaries.evidence(workId) : null),
       previewHref: candidate?.previewHref ?? null,
+      ...(tryHref ? { tryHref } : {}),
       workId: workId ?? p.id,
       stored: true,
       staleReason: lastStale(p),
