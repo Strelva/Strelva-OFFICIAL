@@ -738,3 +738,15 @@ marks business confirmation explicitly: calendar sync is a copy, and a pending
 request awaits the business. Native visitor forms accept optional phone and show
 slots and receipts in the browser time zone, with the zone named. Without native
 authority metadata, the flags-off flow keeps its fields and provider wording.
+
+### Agent booking source, October 7, 2026
+
+`WorkspaceBookings` reuses Card, semantic status text, native details disclosures
+and existing navigation. Agent source is a wrapping text pill using the owned
+gray surface tokens; it grants no authority. The source filter preserves the
+chosen date and view, has 44px targets, and names the selected source with
+`aria-current`. Delegated reads hide all booking actions. `ManageBooking` reuses
+its receipt definition list for Source. These additions are default off under
+`STRELVA_BOOKING_AGENT_VISIBILITY`; agent names are supplied at booking.
+Local proof and remaining limits live in
+[the #304 handoff](../product/streams/a1-agent-bookings-visible.md).

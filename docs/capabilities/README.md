@@ -253,3 +253,11 @@ reviews, blog, and newsletter. Writes go through governance and owner approval.
 ## Home Finder
 
 - `src/products/home-finder/`, `src/platform/customers/home-finder-port.ts`, `/preview/strelva/customers`. Needs `HOME_FINDER_*` env; not sold.
+
+## Agent booking attribution
+
+- Owner and delegated agency booking source, filter, existing Needs-you approval
+  and receipts, and weekly request counts: default off under
+  `STRELVA_BOOKING_AGENT_VISIBILITY`. Uses the native Postgres booking store.
+- [Local #304 evidence and integration handoff](../product/streams/a1-agent-bookings-visible.md).
+  This is local implementation evidence; production and actual owner use remain unverified.

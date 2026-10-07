@@ -28,6 +28,8 @@ export interface StoreBooking {
   systemId: string | null;
   status: StoreBookingStatus;
   origin: StoreBookingOrigin;
+  /** Recorded at capture; a self-reported source, not a verified identity. */
+  agentName?: string | null;
   serviceRef: string | null;
   businessServiceId: string | null;
   serviceName: string;
@@ -201,6 +203,7 @@ export function parseStoreBooking(raw: unknown): StoreBooking | null {
     systemId: text(r.systemId),
     status: r.status as StoreBookingStatus,
     origin: String(r.origin) as StoreBookingOrigin,
+    ...(text(r.agentName) ? { agentName: text(r.agentName) } : {}),
     serviceRef: text(r.serviceRef),
     businessServiceId: text(r.businessServiceId),
     serviceName: String(r.serviceName ?? ""),
@@ -460,6 +463,7 @@ export async function readWorkspaceBooking(
 }
 
 export interface ManagedReservation {
+  agentSource?: string;
   tenantId: string;
   siteName: string;
   reservationId: string;
