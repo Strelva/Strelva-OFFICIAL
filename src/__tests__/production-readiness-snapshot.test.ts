@@ -297,6 +297,13 @@ describe("production readiness snapshot", () => {
     expect(missing.silentRollout.safe).toBe(false);
   });
 
+  it("stops an active on override even when both global email gates are off", async () => {
+    const report = await runReadinessSnapshot({ jacobsYes: true }, deps({ env: {
+      EMAIL_SENDING_ENABLED: "false", CUSTOMER_EMAIL_ENABLED: "false",
+    } }).value);
+    expect(report.silentRollout.stopConditions).toEqual(["Active tenant gldf has reb:client-email override on."]);
+  });
+
   it("does not infer safety from an empty or incomplete active tenant listing", async () => {
     const db = fakeDb(tables).db;
     db.rows = async () => ({ ok: true, rows: [] });

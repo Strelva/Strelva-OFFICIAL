@@ -1,7 +1,7 @@
 # Rollback and recovery
 
 Status: **current**
-Updated: 2026-07-30
+Updated: 2026-10-07
 
 Supabase Auth and Postgres are the only identity/data backbone. Sanity and Clerk
 rollback paths no longer exist. Data recovery is forward-only: restore an
@@ -42,6 +42,23 @@ provider writes, Stripe events, emails, or schema migrations.
   (migration `20260729180000_org_layer_phase0_accounts` applied). Nothing reads them
   yet — `tenants.subscription_*` remains authoritative. Rollback of org-layer work
   is a forward corrective migration, not a revert of the applied migration.
+
+## Prepared 1.0 schema reversals (local evidence only)
+
+The 51 pending migrations in the 1.0 release packet have companion
+`rollback-<forward-file>` SQL, plus a guarded July org-layer companion. The
+[release-safety tool contract](../../scripts/release-safety/README.md) owns
+order, archive preservation, timeouts, refusal behavior, and local proof
+commands. The [Wave 6 handoff](../product/streams/w6-release-safety.md) records
+the exact verification and remaining hosted/production limits.
+
+These files prepare an exceptional separately reviewed recovery operation;
+they do not authorize a destructive downgrade, rewrite applied migration
+history, automatically restore archived rows, or replace the forward
+corrective-migration preference above. Reverse conversions before business
+billing. Preserve private archives and a verified dump. Hosted PostgreSQL,
+current application behavior, lock limits and data compatibility require
+separate rehearsal before choosing any live reversal.
 
 ## Redis recovery
 

@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import manifest from "./release-safety/batches.json";
 import { catalog, command, sql, type Catalog } from "./release-safety/postgres";
-import { rehearse } from "./rehearse-database-restore";
+import { compareCounts, rehearse, tableCounts } from "./rehearse-database-restore";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 type Migration = (typeof manifest.batches)[number][number];
@@ -30,10 +30,12 @@ const legacy = (url: string) => sql(url, { file: join(root, "scripts/release-saf
 
 function expectRefusal(url: string, operation: () => void, label: string) {
   const before = catalog(url, root);
+  const counts = tableCounts(url);
   let refused = false;
   try { operation(); } catch { refused = true; }
   if (!refused) throw new Error(label + " was incorrectly accepted.");
   assertCatalog(catalog(url, root), before, label + " atomic refusal");
+  compareCounts(counts, tableCounts(url));
   console.log(label + " refused atomically.");
 }
 
@@ -44,8 +46,8 @@ async function main() {
   mkdirSync(socket, { mode: 0o700 });
   const port = 61_000 + process.pid % 3000;
   const admin = `postgresql:///postgres?host=${encodeURIComponent(socket)}&port=${port}&application_name=release-safety`;
-  const receipt: { scope: string; batches: object[]; passed: boolean; restore?: Awaited<ReturnType<typeof rehearse>>; julyOrgLayer?: boolean } = {
-    scope: "Local Postgres only; hosted/current deployed app not exercised", batches: [], passed: false,
+  const receipt: { scope: string; postgres: string; batches: object[]; passed: boolean; upgradedRestore?: Awaited<ReturnType<typeof rehearse>>; restore?: Awaited<ReturnType<typeof rehearse>>; julyOrgLayer?: boolean } = {
+    scope: "Local Postgres only; hosted/current deployed app not exercised", postgres: command("psql", ["--version"]), batches: [], passed: false,
   };
   let started = false;
   try {
@@ -61,7 +63,15 @@ insert into public.tenants(id,site_name,active,subscription_status,subscription_
  values('release-fixture','Release Fixture',true,'active','growth');
 insert into public.memberships(user_id,tenant_id,role)
  values('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','release-fixture','owner');
-insert into public.content(tenant_id,section,data) values('release-fixture','hero','{"headline":"Before 1.0"}');` });
+insert into public.content(tenant_id,section,data) values('release-fixture','hero','{"headline":"Before 1.0"}');
+insert into public.accounts(id,name) values('cccccccc-cccc-4ccc-8ccc-cccccccccccc','Dormant account fixture');
+insert into public.account_memberships(account_id,user_id,role)
+ values('cccccccc-cccc-4ccc-8ccc-cccccccccccc','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','owner');
+insert into public.subscriptions(id,account_id,status,plan,amount_cents)
+ values('dddddddd-dddd-4ddd-8ddd-dddddddddddd','cccccccc-cccc-4ccc-8ccc-cccccccccccc','active','growth',12345);
+insert into public.subscription_items(subscription_id,tenant_id,amount_cents)
+ values('dddddddd-dddd-4ddd-8ddd-dddddddddddd','release-fixture',12345);
+update public.tenants set account_id='cccccccc-cccc-4ccc-8ccc-cccccccccccc' where id='release-fixture';` });
     const baseline = catalog(admin, root);
     legacy(admin);
     for (const [number, items] of manifest.batches.entries()) {
@@ -80,11 +90,12 @@ from pg_proc p where p.oid=to_regprocedure('${literal}');` }) !== "f") throw new
       for (const item of [...items].reverse()) reverse(admin, item);
       assertCatalog(catalog(admin, root), before, `Batch ${number} rollback`);
       legacy(admin);
-      // Disposable test DB only: real recovery archives must be retained and renamed before a repeat reversal.
-      sql(admin, { text: "drop schema if exists release_rollback_archive cascade;" });
       for (const item of items) apply(admin, item);
       assertCatalog(catalog(admin, root), forward, `Batch ${number} second forward`);
       legacy(admin);
+      if (number === 7) expectRefusal(admin, () => reverse(admin, items.at(-1)!), "Repeat rollback with an existing archive");
+      // Disposable test DB only: real recovery archives must be retained and renamed before a repeat reversal.
+      sql(admin, { text: "drop schema if exists release_rollback_archive cascade;" });
       receipt.batches.push({ batch: number, files: items.length, forwardRollbackForward: true, catalogRestored: true, legacyBehavior: true });
       console.log(`Batch ${number}: ${items.length} forward, rollback, forward; catalog/ACL and legacy reads/writes/auth/billing passed.`);
     }
@@ -96,7 +107,17 @@ from pg_proc p where p.oid=to_regprocedure('${literal}');` }) !== "f") throw new
     sql(admin, { text: `insert into public.tenant_leads(tenant_stable_id,tenant_slug_at_capture,lead_id,submission_hash,name,captured_at,recorded_via,intake_state,held_reason)
 select stable_id,id,'lead_held_rollback_proof','s123456789abcdef','Synthetic held lead',now(),'spam_hold','held_as_spam','fixture'
 from public.tenants where id='release-fixture';` });
+    sql(admin, { text: `do $seed$ declare w uuid; begin
+select id into w from public.create_owned_workspace('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','owner@release.example','personal','Archive fixture');
+insert into public.workspace_release_flags(workspace_id,flag,state,changed_by)
+ values(w,'make_real_owner_link','on','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+insert into public.workspace_release_flag_changes(workspace_id,subject,from_state,to_state,reason,changed_by)
+ values(w,'make_real_owner_link','unset','on','Synthetic archive proof','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+end; $seed$;` });
+    receipt.upgradedRestore = await rehearse(admin, admin, join(cluster, "upgraded-backup"));
+    console.log(`Upgraded dump/restore: ${receipt.upgradedRestore.tables.length} table counts match; ${receipt.upgradedRestore.dumpBytes} bytes; dump ${receipt.upgradedRestore.dumpSeconds}s, restore ${receipt.upgradedRestore.restoreSeconds}s.`);
     for (const item of [...manifest.batches[7]!].reverse()) reverse(admin, item);
+    if (sql(admin, { text: "select (select count(*) from release_rollback_archive.m20261009140000_workspace_release_flags where flag='make_real_owner_link')=1 and (select count(*) from release_rollback_archive.m20261009140000_workspace_release_flag_changes where subject='make_real_owner_link')=1;" }) !== "t") throw new Error("Owner-link flag/history not preserved.");
     reverse(admin, manifest.batches[6]!.at(-1)!);
     if (sql(admin, { text: "select count(*) from release_rollback_archive.m20261009113000_tenant_leads where lead_id='lead_held_rollback_proof';" }) !== "1") throw new Error("Held lead was not preserved in the private archive.");
     if (sql(admin, { text: "select has_schema_privilege('anon','release_rollback_archive','usage') or has_schema_privilege('authenticated','release_rollback_archive','usage') or has_schema_privilege('service_role','release_rollback_archive','usage');" }) !== "f") throw new Error("Recovery archive was exposed.");
@@ -113,6 +134,12 @@ from public.tenants where id='release-fixture';` });
     console.log(`Dump/restore: ${receipt.restore.tables.length} table counts match; ${receipt.restore.dumpBytes} bytes; dump ${receipt.restore.dumpSeconds}s, restore ${receipt.restore.restoreSeconds}s.`);
     const orgBefore = catalog(admin, root);
     sql(admin, { file: join(root, "supabase/migrations/rollback-org-layer-phase0.sql") });
+    if (sql(admin, { text: `select
+ (select count(*) from release_rollback_archive.m20260729180000_accounts)=1 and
+ (select count(*) from release_rollback_archive.m20260729180000_account_memberships)=1 and
+ (select amount_cents from release_rollback_archive.m20260729180000_subscriptions)=12345 and
+ (select amount_cents from release_rollback_archive.m20260729180000_subscription_items)=12345 and
+ (select account_id from release_rollback_archive.m20260729180000_tenant_accounts where id='release-fixture')='cccccccc-cccc-4ccc-8ccc-cccccccccccc';` }) !== "t") throw new Error("July account data/pointer not preserved.");
     legacy(admin);
     sql(admin, { file: join(root, "supabase/migrations/20260729180000_org_layer_phase0_accounts.sql") });
     assertCatalog(catalog(admin, root), orgBefore, "July forward after rollback");

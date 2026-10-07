@@ -1,10 +1,10 @@
 #!/usr/bin/env npx tsx
 /** Consistent dump → fresh database → row count comparison. Local fixtures by default. */
 import { spawn } from "node:child_process";
-import { chmodSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { randomUUID } from "node:crypto";
-import { dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { command, databaseUrl, identifier, pgBinary, pgEnv, requireLocal, sql } from "./release-safety/postgres";
 
@@ -35,8 +35,9 @@ export async function rehearse(source: string, admin: string, output: string, ja
   // Both guards run before filesystem mutation or any connection.
   requireLocal(source, jacobsYes);
   requireLocal(admin, jacobsYes);
-  const out = resolve(output);
-  const repo = dirname(dirname(fileURLToPath(import.meta.url)));
+  const requested = resolve(output);
+  const out = join(realpathSync(dirname(requested)), basename(requested));
+  const repo = realpathSync(dirname(dirname(fileURLToPath(import.meta.url))));
   const location = relative(repo, out);
   if (!location || (!location.startsWith("../") && location !== "..")) throw new Error("Backup output must be outside the repository.");
   mkdirSync(out, { mode: 0o700, recursive: false });

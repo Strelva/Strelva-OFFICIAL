@@ -10,32 +10,37 @@ Resume checkpoint commits `2c70127b` and `731bbba1`; prove all packet batches
 0–7 forward → rollback → forward, the July org layer, and retained pre-1.0
 behavior. Finish dump/restore, silent rollout, and offline staging checks.
 
-The checkpoints contain 51 rollback files, a revised July rollback, TypeScript
-rehearsal/staging/preflight tools, and snapshot stop conditions. Round 3 now
-passes `pnpm check:release-safety`: 3 test files / 33 tests; every batch 0–7
-forward → rollback → forward; whole-release reversal; July reversal/reapply;
-wrong-order, function-drift and premature July rollback refusals; held-lead
-archive preservation and private archive access. Dump/restore matches all 204
-table counts, 1,581,421 bytes, dump 0.309s, restore 0.444s (small synthetic
-fixture, not production recovery time).
+The local deliverables are implemented and pass `pnpm check:release-safety`:
+3 test files / 34 tests, all eight batch reversals/reapplications, full reversal,
+July org layer, populated private archives, and two dump/restore rehearsals.
+`pnpm typecheck` and `pnpm check:boundaries` pass; `pnpm check:custom-repos`
+passes 196/196. The [tool contract](../../../scripts/release-safety/README.md)
+owns usage, failure handling, recovery order and scope.
 
-`pnpm typecheck`, `pnpm lint`, and `pnpm check:boundaries` pass. Exact next
-action: strengthen populated recovery fixtures and retain a final proof receipt,
-then run the remaining required aggregate checks once and finalize this handoff.
+Exact next action: finish aggregate validation and update the verification
+section before the final handoff. The first aggregate run recorded two 5-second
+test timeouts (`approve-route`, `model-call-sites`) and a workspace SQL race
+assertion (`save_workspace_calendar_connection`). Separate reruns are in
+progress/planned; these are not cleared by the focused release-safety pass.
+Build and final lint remain running. No release packet edits have been made.
 
-Evidence: `.scratch/release-safety/round3-release-safety-9.log`,
-`round3-typecheck-final.log`, `round3-lint.log`, `round3-boundaries.log` (local,
-untracked). The private cluster and restore receipt are at
-`/var/folders/0t/9xnfycn50vd2yv5gb7p4cdsh0000gn/T/strelva-release-safety-dvPjqv`.
-The release packet remains unchanged.
+The final populated proof is
+`.scratch/release-safety/round3-release-safety-final-2.log`. Its private cluster,
+dumps and full row-count receipts are at
+`/var/folders/0t/9xnfycn50vd2yv5gb7p4cdsh0000gn/T/strelva-release-safety-xbYIYa`.
+Upgraded dump: 191 tables, 2,697,710 bytes, 1.099s dump / 4.739s restore.
+Rolled-back dump: 204 tables (includes archives), 1,582,246 bytes,
+0.359s dump / 0.945s restore. These small synthetic fixtures do not estimate
+production recovery time.
 
-Round 3 failures preserved in `round3-release-safety*.log`: invalid fixture
-billing/lead columns; trigger functions misclassified as callable RPCs;
-generated-column dependency on a dropped function; a missing constraint
-parenthesis; archive work after an early commit; an incorrect history column
-(`flag` instead of `subject`); and temporary function creation in a read-only
-transaction. Fixed and rerun. Initial typecheck failures in checkpoint scripts
-are also retained, corrected under strict indexed access.
+Round 3 failures remain in the ignored local investigation directory. Fixed
+and rerun: nonexistent fixture billing/lead columns; trigger functions
+misclassified as callable RPCs; generated-column dependency on a dropped
+function; missing constraint parenthesis; archive work after an early commit;
+wrong history column (`flag` instead of `subject`); temporary function creation
+in a read-only transaction; strict indexed-access errors in checkpoint scripts.
+The original checkpoint commits are retained; verified follow-through starts
+at `931dcdbb`.
 
 ## Authority and limits
 

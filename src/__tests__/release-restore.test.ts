@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -23,6 +23,10 @@ describe("dump/restore safety", () => {
   it("never reuses backup output or writes a dump inside the checkout", async () => {
     await expect(rehearse("postgresql://localhost/db", "postgresql://localhost/db", temp())).rejects.toThrow();
     await expect(rehearse("postgresql://localhost/db", "postgresql://localhost/db", join(process.cwd(), "dump"))).rejects.toThrow(/outside/);
+    const linked = join(temp(), "checkout-link");
+    symlinkSync(process.cwd(), linked, "dir");
+    await expect(rehearse("postgresql://localhost/db", "postgresql://localhost/db", join(linked, "dump"))).rejects.toThrow(/outside/);
+    expect(existsSync(join(process.cwd(), "dump"))).toBe(false);
   });
   it("requires every table and exact row count, including counts beyond JS integer precision", () => {
     const before = { a: "9007199254740993", b: "0" };
