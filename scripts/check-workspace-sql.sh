@@ -784,6 +784,10 @@ psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.
 # because it commits its fictional rows.
 STRELVA_BOOKINGS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/booking-one-store.test.ts
+
+# Published platform schema disagreements reuse owner decisions.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010120000_connected_site_schema_conflicts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-site-schema-conflicts.sql"
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 

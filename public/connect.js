@@ -136,8 +136,48 @@
     for (var i = 0; i < s.length; i++) if (BIZ_LD.test(s[i].textContent || "")) return true;
     return false;
   }
+  // Report public business fields only; never send the full graph or page.
+  function ownBusinessSchema() {
+    var out = [], scripts = d.querySelectorAll('script[type="application/ld+json"]:not([data-strelva])');
+    function text(v) { return typeof v === "string" ? v.trim().slice(0, 300) : undefined; }
+    function strings(v, limit) {
+      if (typeof v === "string") return text(v);
+      return Array.isArray(v) ? v.slice(0, limit).map(text).filter(function (s) { return s !== undefined; }) : undefined;
+    }
+    function walk(node, depth) {
+      if (!node || depth > 8 || out.length >= 8) return;
+      if (Array.isArray(node)) { for (var i = 0; i < node.length && i < 100; i++) walk(node[i], depth + 1); return; }
+      if (typeof node !== "object") return;
+      if (BIZ_LD.test(JSON.stringify({ "@type": node["@type"] }))) {
+        var b = { name: text(node.name), telephone: text(node.telephone) }, a = node.address;
+        if (typeof a === "string") b.address = text(a);
+        else if (a && typeof a === "object") b.address = {
+          streetAddress: text(a.streetAddress), addressLocality: text(a.addressLocality), addressRegion: text(a.addressRegion),
+          postalCode: text(a.postalCode), addressCountry: text(typeof a.addressCountry === "object" && a.addressCountry ? a.addressCountry.name : a.addressCountry)
+        };
+        b.openingHours = strings(node.openingHours, 14);
+        var h = node.openingHoursSpecification;
+        if (h && !Array.isArray(h)) h = [h];
+        if (Array.isArray(h)) b.openingHoursSpecification = h.slice(0, 14).filter(function (r) { return r && typeof r === "object"; }).map(function (r) {
+          return { dayOfWeek: strings(r.dayOfWeek, 7), opens: text(r.opens), closes: text(r.closes) };
+        });
+        out.push(b);
+      }
+      walk(node["@graph"], depth + 1);
+    }
+    for (var i = 0; i < scripts.length && i < 100; i++) {
+      var raw = scripts[i].textContent || "";
+      if (raw.length > 100000) continue;
+      try { walk(JSON.parse(raw), 0); } catch (_e) { /* still report presence */ }
+    }
+    while (encodeURIComponent(JSON.stringify(out)).replace(/%[0-9A-F]{2}/gi, "x").length > 12000) out.pop();
+    return { present: true, businesses: out };
+  }
   function injectLd(ld) {
-    if (hasOwnBusinessLd()) return;
+    if (hasOwnBusinessLd()) {
+      if (granted) post("/events", { events: [], platformSchema: ownBusinessSchema() }, false);
+      return;
+    }
     var el = d.querySelector("script[data-strelva]");
     if (!el) { el = d.createElement("script"); el.type = "application/ld+json"; el.setAttribute("data-strelva", ""); d.head.appendChild(el); }
     el.textContent = JSON.stringify(ld);

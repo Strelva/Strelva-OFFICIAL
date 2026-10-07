@@ -5,6 +5,7 @@
  * calls recheck the key, the proven host and the Origin.
  */
 import { z } from "zod";
+import { ownerDecisionSchema, type OwnerDecision, type ProposedItem } from "@/platform/needs-you/contracts";
 import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { connectedSiteSchema, resolvedConnectedSiteSchema, type ConnectedInquiry, type ConnectedSite, type ResolvedConnectedSite } from "./contracts";
@@ -36,6 +37,7 @@ export interface ConnectedSitesStore {
   recordEvents(publicKey: string, origin: string | null, events: StoredEvent[]): Promise<number>;
   recordInquiry(publicKey: string, origin: string | null, lead: StoredLead): Promise<{ status: "recorded" | "exists" | "duplicate"; id: string; workspaceId: string }>;
   recordSpam(publicKey: string, origin: string | null, input: { recordId: string; payload: Record<string, unknown>; payloadHash: string; capturedAt: string }): Promise<{ status: "recorded" | "exists" }>;
+  recordSchemaConflict(publicKey: string, origin: string | null, item: ProposedItem): Promise<OwnerDecision>;
   purge(limit: number): Promise<{ events: number; spam: number }>;
 }
 
@@ -91,6 +93,7 @@ export function createConnectedSitesStore(db?: ConnectedSitesRpc): ConnectedSite
     async recordSpam(publicKey, origin, input) {
       return z.object({ status: z.enum(["recorded", "exists"]) }).parse(await rpc("record_connected_site_spam", { p_public_key: publicKey, p_origin: origin, p_record_id: input.recordId, p_payload: input.payload, p_payload_hash: input.payloadHash, p_captured_at: input.capturedAt }));
     },
+    async recordSchemaConflict(publicKey, origin, item) { return ownerDecisionSchema.parse(await rpc("record_connected_site_schema_conflict", { p_public_key: publicKey, p_origin: origin, p_item: item })); },
     async purge(limit) { return z.object({ events: z.number(), spam: z.number() }).parse(await rpc("purge_connected_site_records", { p_limit: limit })); },
   };
 }

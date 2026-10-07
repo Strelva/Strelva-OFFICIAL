@@ -196,6 +196,37 @@ describe("connect.js", () => {
     expect(own.win.document.querySelector("script[data-strelva]")).toBeNull();
   });
 
+  it("reports platform business fields from a graph without changing its schema", async () => {
+    const ld = { "@context": "https://schema.org", "@graph": [
+      { "@type": "WebSite", name: "Unrelated page" },
+      { "@type": ["Organization", "LocalBusiness"], name: "Old Mooney", telephone: "716-555-0199",
+        address: { "@type": "PostalAddress", streetAddress: "1 Main St", addressLocality: "Buffalo", addressRegion: "NY", postalCode: "14201", addressCountry: { "@type": "Country", name: "US" } },
+        openingHoursSpecification: { dayOfWeek: ["Monday", "Tuesday"], opens: "08:00", closes: "16:00" },
+        openingHours: "Mo-Fr 08:00-16:00", email: "not-reported@example.test", description: "Not reported" },
+    ] };
+    const original = JSON.stringify(ld);
+    const page = load("", { head: `<script type="application/ld+json">${original}</script>` });
+    await tick();
+    expect(posts(page, "/events")).toEqual([{ events: [], platformSchema: { present: true, businesses: [{
+      name: "Old Mooney", telephone: "716-555-0199", address: { streetAddress: "1 Main St", addressLocality: "Buffalo", addressRegion: "NY", postalCode: "14201", addressCountry: "US" },
+      openingHours: "Mo-Fr 08:00-16:00", openingHoursSpecification: [{ dayOfWeek: ["Monday", "Tuesday"], opens: "08:00", closes: "16:00" }],
+    }] } }]);
+    expect(page.win.document.querySelector('script[type="application/ld+json"]')!.textContent).toBe(original);
+    expect(page.win.document.querySelector("script[data-strelva]")).toBeNull();
+    expect(JSON.stringify(posts(page, "/events"))).not.toContain("not-reported");
+  });
+
+  it("reports presence for malformed platform schema and leaves injection off untouched", async () => {
+    const page = load("", { head: '<script type="application/ld+json">{"@type":"LocalBusiness", invalid}</script>' });
+    await tick();
+    expect(posts(page, "/events")).toEqual([{ events: [], platformSchema: { present: true, businesses: [] } }]);
+    expect(page.win.document.querySelector("script[data-strelva]")).toBeNull();
+    page.close();
+    const off = load("", { head: '<script type="application/ld+json">{"@type":"LocalBusiness","name":"Old"}</script>', context: { ...DEFAULT_CONTEXT, site: { captureForms: true, injectSchema: false } } });
+    await tick();
+    expect(posts(off, "/events")).toEqual([]);
+  });
+
   it("sends nothing until consent when consent is required", async () => {
     const page = load(`<div data-strelva-form></div><a id="call" href="tel:+17165550100">Call</a>`, { attrs: 'data-strelva-consent="required"' });
     await tick();

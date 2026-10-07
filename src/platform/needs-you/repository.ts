@@ -156,3 +156,8 @@ export const PostgresNeedsYouStore: NeedsYouStore = {
   }, policyStateSchema, "The setting could not be saved."),
   handled: (actor, workspaceId, since) => call("read_strelva_handled", { p_workspace_id: workspaceId, ...actorArgs(actor), p_since: since }, z.array(z.record(z.string(), z.unknown())), "Strelva handled could not be loaded."),
 };
+
+/** Latest open published-schema item; SQL scopes the active site to this business. */
+export function readConnectedSiteSchemaDecision(workspaceId: string, siteId: string): Promise<OwnerDecision | null> {
+  return call("read_connected_site_schema_conflict", { p_workspace_id: z.string().uuid().parse(workspaceId), p_site_id: z.string().uuid().parse(siteId) }, ownerDecisionSchema.nullable(), "The published schema decision could not be read.");
+}
