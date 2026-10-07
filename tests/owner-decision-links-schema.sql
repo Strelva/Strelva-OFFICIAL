@@ -28,6 +28,12 @@ begin
   insert into public.tenants(id,site_name,owner_email,template,industry) values('ol-existing-fixture','Existing Owner Link','ol-owner@example.test','professional','consulting');
   insert into public.tenant_workspace_links(tenant_stable_id,tenant_slug_at_link,workspace_id,linked_by,command_id,command_digest,receipt)
     select t.stable_id,t.id,ws,actor,gen_random_uuid(),h,'{}'::jsonb from public.tenants t where t.id='ol-existing-fixture';
+  -- Batch 7A: the platform serves a business through its agency of record,
+  -- verified for email, the same for every agency (Strelva's included).
+  insert into public.workspaces(id,kind,name,created_by) values('b2000000-0000-4000-8000-0000000000a1','agency','Owner link fixture agency',actor);
+  insert into public.workspace_providers(customer_workspace_id,provider_workspace_id,source,started_by) values(ws,'b2000000-0000-4000-8000-0000000000a1','business_choice',actor);
+  insert into public.agency_verifications(agency_workspace_id,effect,status,evidence,verified_by,verifier_is_agency_member)
+    values('b2000000-0000-4000-8000-0000000000a1','email','verified','{"note":"fixture"}',actor,false);
   select * into work from public.claim_website_rebuild(ws,actor,'ol-operator@example.test','ol-request-one','ol-example.test','{"url":"https://ol-example.test"}',
     jsonb_build_object('version',2,'revision',0,'title','Owner link fixture','status','building','createdBy',actor,'createdAt','2026-10-08T10:00:00Z','history','[]'::jsonb));
   perform public.append_website_document(ws,work.id,actor,'ol-operator@example.test',0,h,doc);
@@ -41,6 +47,8 @@ begin
   link:=public.strelva_owner_decision_link_session(ws,id,revision_hash,' OL-Owner@Example.test ');
   sid:=(link->>'sessionId')::uuid;
   perform pg_temp.ol_assert(link->>'role'='admin' and link->>'recipient'='ol-owner@example.test' and link->>'decisionId'=id::text,'bound unchanged admin identity');
+  perform pg_temp.ol_assert(link->>'providerWorkspaceId'='b2000000-0000-4000-8000-0000000000a1'
+    and (select provider_workspace_id from public.strelva_service_actions where id=sid)='b2000000-0000-4000-8000-0000000000a1','session names the agency of record');
   perform pg_temp.ol_expect(format('select public.authorize_owner_decision_link_run(%L,%L,%L,%L,%L)',ws,sid,id,revision_hash,'ol-owner@example.test'),'strelva_service_access_denied');
   perform public.claim_owner_decision(ws,id,revision_hash,'approve','owner_link',null,null,'ol-owner@example.test');
   perform public.authorize_owner_decision_link_run(ws,sid,id,revision_hash,'ol-owner@example.test');

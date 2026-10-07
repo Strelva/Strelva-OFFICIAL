@@ -18,7 +18,9 @@ begin
   end if;
   if p_write then access:=public.business_record_assert_actor(p_workspace_id,p_user_id,p_verified_email,true);
   elsif exists(select 1 from public.workspace_memberships wm join public.workspaces w on w.id=wm.workspace_id and w.kind='customer'
-    where wm.workspace_id=p_workspace_id and wm.user_id=p_user_id) then
+    where wm.workspace_id=p_workspace_id and wm.user_id=p_user_id)
+    -- Batch 7A: a provider seat reads its client's Systems as a member does.
+    or public.provider_seat_role(p_workspace_id,p_user_id,false) is not null then
     access:=public.business_record_assert_actor(p_workspace_id,p_user_id,p_verified_email,false);
   else access:='agency'; end if;
   if access<>'agency' then work_ids:=null; return; end if;

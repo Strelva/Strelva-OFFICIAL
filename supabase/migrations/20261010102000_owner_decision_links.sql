@@ -36,9 +36,22 @@ end;
 $migration$;
 revoke all on function public.workspace_release_flag_names() from public,anon,authenticated;
 
+-- Batch 7A rechecks every service session against the agency the platform
+-- serves the business through (platform_service_session_holds). A routine
+-- owner decision reaches the owner by email, the same effect strelva_runs_business
+-- checks, so link sessions are served, logged and rechecked like needs_you_sync.
+create or replace function public.platform_service_effect(p_purpose text) returns text
+language sql immutable set search_path = public, pg_temp as $$
+  select case p_purpose
+    when 'needs_you_sync' then 'email'
+    when 'make_real_resume' then 'publish'
+    when 'make_real_link' then 'publish'
+    when 'owner_decision_link' then 'email' end
+$$;
+
 create function public.strelva_owner_decision_link_session(p_workspace_id uuid,p_decision_id uuid,p_revision_hash text,p_recipient text) returns jsonb
 language plpgsql security definer set search_path=public,pg_temp as $$
-declare item public.owner_decisions; recipient jsonb; reader record; creator uuid; session_id uuid;
+declare item public.owner_decisions; recipient jsonb; reader record; creator uuid; session_id uuid; provider uuid;
   document_head public.website_document_heads; document_hash text;
 begin
   select * into item from public.owner_decisions where workspace_id=p_workspace_id and id=p_decision_id;
@@ -54,7 +67,8 @@ begin
     raise exception 'owner_decision_recipient_not_owner';
   end if;
   if public.needs_you_owner_actor(p_workspace_id,p_recipient) is not null then raise exception 'strelva_service_owner_has_account'; end if;
-  if not public.strelva_runs_business(p_workspace_id) then return null; end if;
+  provider := public.platform_serving_provider(p_workspace_id, public.platform_service_effect('owner_decision_link'));
+  if provider is null then return null; end if;
   -- Creator-only lifecycles retain their real creator identity and authority.
   -- The owner approves the item; the creator is only the execution identity.
   if item.source_lifecycle='standing_responsibility' then
@@ -73,13 +87,13 @@ begin
     if not found then raise exception 'strelva_service_access_denied'; end if;
     select content_hash into document_hash from public.website_documents where website_work_id=document_head.website_work_id and revision=document_head.revision;
   end if;
-  insert into public.strelva_service_actions(workspace_id,purpose,action,on_behalf_user_id,on_behalf_role,subject,detail)
+  insert into public.strelva_service_actions(workspace_id,purpose,action,on_behalf_user_id,on_behalf_role,subject,detail,provider_workspace_id)
     values(p_workspace_id,'owner_decision_link','session',reader.user_id,reader.role,'owner_decision:'||item.id,
-      'Signed routine owner decision; unchanged member identity.') returning id into session_id;
+      'Signed routine owner decision; unchanged member identity.',provider) returning id into session_id;
   insert into public.owner_decision_link_sessions(session_id,workspace_id,decision_id,revision_hash,recipient,website_revision,website_hash)
     values(session_id,p_workspace_id,item.id,p_revision_hash,lower(btrim(p_recipient)),document_head.revision,document_hash);
   return jsonb_build_object('sessionId',session_id,'workspaceId',p_workspace_id,'purpose','owner_decision_link','label','Strelva (system)',
-    'role',reader.role,'userId',reader.user_id,'verifiedEmail',reader.email,'decisionId',item.id,'revisionHash',p_revision_hash,'recipient',lower(btrim(p_recipient)));
+    'role',reader.role,'userId',reader.user_id,'verifiedEmail',reader.email,'decisionId',item.id,'revisionHash',p_revision_hash,'recipient',lower(btrim(p_recipient)),'providerWorkspaceId',provider);
 end $$;
 
 -- Private assertion reused by the narrow website reserve/publish RPCs. Each

@@ -22,6 +22,12 @@ begin
   insert into public.tenants(id,site_name,owner_email,template,industry) values('op-existing-fixture','Fictional Preview','op-owner@example.test','professional','consulting');
   insert into public.tenant_workspace_links(tenant_stable_id,tenant_slug_at_link,workspace_id,linked_by,command_id,command_digest,receipt)
     select t.stable_id,t.id,ws,actor,gen_random_uuid(),h,'{}'::jsonb from public.tenants t where t.id='op-existing-fixture';
+  -- Batch 7A: the platform serves a business through its agency of record,
+  -- verified for email, the same for every agency (Strelva's included).
+  insert into public.workspaces(id,kind,name,created_by) values('b6000000-0000-4000-8000-0000000000a1','agency','Preview fixture agency',actor);
+  insert into public.workspace_providers(customer_workspace_id,provider_workspace_id,source,started_by) values(ws,'b6000000-0000-4000-8000-0000000000a1','business_choice',actor);
+  insert into public.agency_verifications(agency_workspace_id,effect,status,evidence,verified_by,verifier_is_agency_member)
+    values('b6000000-0000-4000-8000-0000000000a1','email','verified','{"note":"fixture"}',actor,false);
   select * into work from public.claim_website_rebuild(ws,actor,'op-operator@example.test','op-request-one','op-example.test','{"url":"https://op-example.test"}',
     jsonb_build_object('version',2,'revision',0,'title','Fictional Preview','status','building','createdBy',actor,'createdAt','2026-10-08T10:00:00Z','history','[]'::jsonb));
   perform public.append_website_document(ws,work.id,actor,'op-operator@example.test',0,h,doc);
