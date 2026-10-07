@@ -664,6 +664,8 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010115000_web
 psql "${psql_args[@]}" --file="$repo_root/tests/website-model-admission-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010115500_website_business_facts.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/website-business-facts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010115700_website_native_fact_reviews.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-native-fact-reviews-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/website-cutover-undo-schema.sql"
 # The real Make real runner, checkpointing through these RPCs (psql-backed port).
 STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \

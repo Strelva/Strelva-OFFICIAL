@@ -21,8 +21,7 @@ import { connectedSitesReleaseEnabled, connectedSitesReleasedFor } from "@/produ
 import { connectedSitesStore } from "@/products/connected-sites/store";
 import { getTenantConfig } from "@/lib/tenants";
 import { siteEditingFor, type SiteEditing } from "@/products/websites/server";
-import { getPublishedSiteDocument } from "@/products/websites/document-store";
-import { readHostedBusinessFacts } from "@/products/websites/business-facts-server";
+import { getPublishedSiteDocument, readHostedBusinessFacts } from "@/products/websites";
 import { savedCheckObservations } from "@/products/investigations/system-health";
 import { createSupabaseSystemStore } from "@/platform/systems/supabase-store";
 import { readBusinessVersions } from "@/platform/system-versions/supabase-store";

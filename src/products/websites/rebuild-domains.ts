@@ -2,8 +2,9 @@ import { z } from "zod";
 import { addCustomDomain, isValidDomain, listTenantDomainClaims, normalizeCustomDomain, refreshDomainClaim } from "@/lib/domains";
 import { WorkspaceConflictError, WorkspaceStoreError } from "@/platform/workspaces/types";
 import type { WebsiteDomainView } from "./rebuild-contracts";
-import type { DomainClaim } from "@/lib/types";
 import { WebsiteDomainEffectUnconfirmedError } from "@/platform/needs-you/sources/website-domain-store";
+
+type DomainClaim = Awaited<ReturnType<typeof listTenantDomainClaims>>[number];
 
 const configSchema = z.object({
   recommendedIPv4: z.array(z.object({ rank: z.number().optional(), value: z.array(z.string()) })).optional(),
