@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { compareCounts, rehearse } from "../../scripts/rehearse-database-restore";
+import { compareCounts, rehearse, type TableCounts } from "../../scripts/rehearse-database-restore";
 import { databaseUrl, isLocalUrl, pgEnv } from "../../scripts/release-safety/postgres";
 
 const temps: string[] = [];
@@ -27,7 +27,8 @@ describe("dump/restore safety", () => {
   it("requires every table and exact row count, including counts beyond JS integer precision", () => {
     const before = { a: "9007199254740993", b: "0" };
     compareCounts(before, { ...before });
-    for (const after of [{ a: "9007199254740992", b: "0" }, { a: before.a }, { ...before, extra: "1" }]) expect(() => compareCounts(before, after)).toThrow(/mismatch/);
+    const mismatches: TableCounts[] = [{ a: "9007199254740992", b: "0" }, { a: before.a }, { ...before, extra: "1" }];
+    for (const after of mismatches) expect(() => compareCounts(before, after)).toThrow(/mismatch/);
   });
   it("removes ambient libpq routing and changes only the database name for the fresh target", () => {
     vi.stubEnv("PGHOST", "production"); vi.stubEnv("PGSERVICE", "production"); vi.stubEnv("PGPASSFILE", "production");

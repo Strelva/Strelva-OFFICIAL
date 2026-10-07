@@ -13,6 +13,18 @@ begin
   if (select md5(pg_get_functiondef(to_regprocedure('public.workspace_release_flag_names()')))) is distinct from 'fd4deb4575b04c0b59a55f8f45179e59' then raise exception 'rollback_wrong_order_or_function_drift: workspace_release_flag_names'; end if;
 end;
 $rollback_guard$;
+lock table public."workspace_release_flags", public."workspace_release_flag_changes" in access exclusive mode;
+create schema if not exists release_rollback_archive;
+revoke all on schema release_rollback_archive from public, anon, authenticated, service_role;
+create table release_rollback_archive."m20261009140000_workspace_release_flags" as table public."workspace_release_flags";
+revoke all on release_rollback_archive."m20261009140000_workspace_release_flags" from public, anon, authenticated, service_role;
+create table release_rollback_archive."m20261009140000_workspace_release_flag_changes" as table public."workspace_release_flag_changes";
+revoke all on release_rollback_archive."m20261009140000_workspace_release_flag_changes" from public, anon, authenticated, service_role;
+-- Preserve 1.0-only rows before restoring the earlier constraints.
+alter table public.workspace_release_flag_changes disable trigger workspace_release_flag_changes_immutable_trg;
+delete from public.workspace_release_flag_changes where subject = 'make_real_owner_link';
+alter table public.workspace_release_flag_changes enable trigger workspace_release_flag_changes_immutable_trg;
+delete from public.workspace_release_flags where flag = 'make_real_owner_link';
 CREATE OR REPLACE FUNCTION public.workspace_release_flag_names()
  RETURNS text[]
  LANGUAGE sql
@@ -26,16 +38,4 @@ $function$
 ;
 revoke all on function public.workspace_release_flag_names() from public, anon, authenticated, service_role;
 grant execute on function public.workspace_release_flag_names() to "service_role";
-commit;lock table public."workspace_release_flags", public."workspace_release_flag_changes" in access exclusive mode;
-create schema if not exists release_rollback_archive;
-revoke all on schema release_rollback_archive from public, anon, authenticated, service_role;
-create table release_rollback_archive."m20261009140000_workspace_release_flags" as table public."workspace_release_flags";
-revoke all on release_rollback_archive."m20261009140000_workspace_release_flags" from public, anon, authenticated, service_role;
-create table release_rollback_archive."m20261009140000_workspace_release_flag_changes" as table public."workspace_release_flag_changes";
-revoke all on release_rollback_archive."m20261009140000_workspace_release_flag_changes" from public, anon, authenticated, service_role;
--- Preserve 1.0-only rows before restoring the earlier constraints.
-alter table public.workspace_release_flag_changes disable trigger workspace_release_flag_changes_immutable_trg;
-delete from public.workspace_release_flag_changes where flag = 'make_real_owner_link';
-alter table public.workspace_release_flag_changes enable trigger workspace_release_flag_changes_immutable_trg;
-delete from public.workspace_release_flags where flag = 'make_real_owner_link';
-
+commit;

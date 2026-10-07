@@ -117,6 +117,8 @@ drop function public.tenant_unlink_plan(uuid);
 drop function public.business_record_sources();
 drop function public.business_contact_sources();
 drop function public.tenant_workspace_link_guard();
+-- The archived generated value survives; remove its dependency before the function.
+alter table public.business_contacts drop column phone_key;
 drop function public.business_contact_phone_key(text);
 drop function public.preview_tenant_unlink(text,text);
 drop function public.business_record_email_valid(text);

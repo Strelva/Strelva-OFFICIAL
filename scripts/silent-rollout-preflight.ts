@@ -9,7 +9,7 @@ try {
   if (args.length !== 2 || args[0] !== "--env-file") {
     throw new Error("Usage: pnpm exec tsx scripts/silent-rollout-preflight.ts --env-file <complete-intended-env>");
   }
-  const stops = silentRolloutEnvStops(parseRolloutEnv(readFileSync(args[1], "utf8")));
+  const stops = silentRolloutEnvStops(parseRolloutEnv(readFileSync(args[1]!, "utf8")));
   console.log(stops.length ? `STOP: ${stops.join(" ")}` : "Silent rollout env preflight passed. Tenant overrides still require a fresh readiness snapshot; owner invites remain deferred.");
   if (stops.length) process.exitCode = 1;
 } catch (error) {

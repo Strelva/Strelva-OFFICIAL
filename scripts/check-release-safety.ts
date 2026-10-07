@@ -57,8 +57,8 @@ async function main() {
     sql(admin, { text: `insert into public.users(id,email,verified_at) values
  ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','owner@release.example',now()),
  ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','unverified@release.example',null);
-insert into public.tenants(id,site_name,active,subscription_status,commercial_plan)
- values('release-fixture','Release Fixture',true,'active','website');
+insert into public.tenants(id,site_name,active,subscription_status,subscription_plan)
+ values('release-fixture','Release Fixture',true,'active','growth');
 insert into public.memberships(user_id,tenant_id,role)
  values('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','release-fixture','owner');
 insert into public.content(tenant_id,section,data) values('release-fixture','hero','{"headline":"Before 1.0"}');` });
@@ -71,7 +71,11 @@ insert into public.content(tenant_id,section,data) values('release-fixture','her
       legacy(admin);
       for (const signature of Object.keys(forward.functions ?? {}).filter((key) => !Object.hasOwn(before.functions!, key))) {
         const literal = ("public." + signature).replaceAll("'", "''");
-        if (sql(admin, { text: `select has_function_privilege('anon','${literal}','execute') or has_function_privilege('authenticated','${literal}','execute');` }) !== "f") throw new Error("Introduced RPC exposed to browser role: " + signature);
+        // Trigger-returning functions cannot be invoked as an RPC. Their ACLs are
+        // still compared on rollback, but do not imply a browser-callable entry.
+        if (sql(admin, { text: `select p.prorettype not in ('trigger'::regtype, 'event_trigger'::regtype)
+and (has_function_privilege('anon',p.oid,'execute') or has_function_privilege('authenticated',p.oid,'execute'))
+from pg_proc p where p.oid=to_regprocedure('${literal}');` }) !== "f") throw new Error("Introduced RPC exposed to browser role: " + signature);
       }
       for (const item of [...items].reverse()) reverse(admin, item);
       assertCatalog(catalog(admin, root), before, `Batch ${number} rollback`);
@@ -89,11 +93,12 @@ insert into public.content(tenant_id,section,data) values('release-fixture','her
     sql(admin, { text: "create or replace function public.workspace_release_flag_names() returns text[] language sql immutable as $$ select array['drift']::text[] $$;" });
     expectRefusal(admin, () => reverse(admin, manifest.batches[7]![2]!), "Function drift rollback");
     apply(admin, manifest.batches[7]![2]!);
-    sql(admin, { text: `insert into public.tenant_leads(tenant_stable_id,lead_id,payload,recorded_via,intake_state,held_reason)
-select stable_id,'held-rollback-proof','{}','spam_hold','held','fixture' from public.tenants where id='release-fixture';` });
+    sql(admin, { text: `insert into public.tenant_leads(tenant_stable_id,tenant_slug_at_capture,lead_id,submission_hash,name,captured_at,recorded_via,intake_state,held_reason)
+select stable_id,id,'lead_held_rollback_proof','s123456789abcdef','Synthetic held lead',now(),'spam_hold','held_as_spam','fixture'
+from public.tenants where id='release-fixture';` });
     for (const item of [...manifest.batches[7]!].reverse()) reverse(admin, item);
     reverse(admin, manifest.batches[6]!.at(-1)!);
-    if (sql(admin, { text: "select count(*) from release_rollback_archive.m20261009113000_tenant_leads where lead_id='held-rollback-proof';" }) !== "1") throw new Error("Held lead was not preserved in the private archive.");
+    if (sql(admin, { text: "select count(*) from release_rollback_archive.m20261009113000_tenant_leads where lead_id='lead_held_rollback_proof';" }) !== "1") throw new Error("Held lead was not preserved in the private archive.");
     if (sql(admin, { text: "select has_schema_privilege('anon','release_rollback_archive','usage') or has_schema_privilege('authenticated','release_rollback_archive','usage') or has_schema_privilege('service_role','release_rollback_archive','usage');" }) !== "f") throw new Error("Recovery archive was exposed.");
     legacy(admin);
     console.log("Post-forward held lead preserved; archive inaccessible to app/browser roles.");

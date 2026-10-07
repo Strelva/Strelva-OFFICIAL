@@ -40,7 +40,9 @@ export function databaseUrl(admin: string, name: string): string {
 
 export function pgEnv(): NodeJS.ProcessEnv {
   // libpq ambient routing, services and passfiles must never redirect a selected target.
-  return Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("PG")));
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) if (key.startsWith("PG")) delete env[key];
+  return env;
 }
 
 export function command(name: string, args: string[], input?: string): string {

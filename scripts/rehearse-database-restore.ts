@@ -18,21 +18,16 @@ export function tableCounts(url: string, snapshot?: string): TableCounts {
   // Discover and count tables inside the same transaction/snapshot as pg_dump.
   // JSON strings preserve bigint counts without rounding them through JS numbers.
   const snapshotSql = snapshot ? `set transaction snapshot '${snapshot}';` : "";
-  const output = sql(url, { text: `begin isolation level repeatable read read only;
+  const output = command("psql", ["--dbname=" + url, "-X", "-qAt", "-v", "ON_ERROR_STOP=1"], `begin isolation level repeatable read read only;
 ${snapshotSql}
-create function pg_temp.release_table_counts() returns jsonb language plpgsql as $counts$
-declare r record; n bigint; counts jsonb := '{}'::jsonb;
-begin
-  for r in select ns.nspname,c.relname from pg_class c join pg_namespace ns on ns.oid=c.relnamespace
-    where c.relkind in ('r','p') and ns.nspname not like 'pg_%' and ns.nspname <> 'information_schema'
-    order by ns.nspname,c.relname loop
-    execute format('select count(*) from %I.%I',r.nspname,r.relname) into n;
-    counts := counts || jsonb_build_object(jsonb_build_array(r.nspname,r.relname)::text,n::text);
-  end loop;
-  return counts;
-end; $counts$;
-select pg_temp.release_table_counts();
-rollback;` });
+select 'select coalesce(jsonb_object_agg(table_name,row_count),''{}''::jsonb) from (' ||
+  coalesce(string_agg(format('select %L::text as table_name, count(*)::text as row_count from %I.%I',
+    jsonb_build_array(ns.nspname,c.relname)::text, ns.nspname,c.relname), ' union all ' order by ns.nspname,c.relname),
+    'select null::text as table_name, null::text as row_count where false') || ') counts'
+from pg_class c join pg_namespace ns on ns.oid=c.relnamespace
+where c.relkind in ('r','p') and ns.nspname not like 'pg_%' and ns.nspname <> 'information_schema'
+\\gexec
+rollback;`);
   return JSON.parse(output);
 }
 

@@ -44,8 +44,8 @@ describe("offline batch staging", () => {
     const out = join(temp(), "batch");
     const receipt = stageReleaseBatch({ repoRoot: process.cwd(), out, batch, appliedVersions: prior.map(({ file }) => file.slice(0, 14)) });
     const staged = readdirSync(join(out, "supabase/migrations"));
-    expect(staged).toEqual([...prior, ...RELEASE_BATCHES[batch]].map(({ file }) => file).sort());
-    expect(receipt.pending).toEqual(RELEASE_BATCHES[batch].map(({ file }) => file));
+    expect(staged).toEqual([...prior, ...RELEASE_BATCHES[batch]!].map(({ file }) => file).sort());
+    expect(receipt.pending).toEqual(RELEASE_BATCHES[batch]!.map(({ file }) => file));
     expect(staged.some((f) => f.startsWith("rollback-") || f.startsWith("verify-"))).toBe(false);
     expect(JSON.parse(readFileSync(join(out, "batch-receipt.json"), "utf8"))).toEqual(receipt);
   });
@@ -63,7 +63,7 @@ describe("offline batch staging", () => {
     expect(source).not.toMatch(/fetch\(|child_process|supabase-js|@upstash|https?:\/\//);
     const repo = temp();
     // One corrupted first baseline file is enough to prove fail-before-write.
-    const file = RELEASE_BASELINE[0].file;
+    const file = RELEASE_BASELINE[0]!.file;
     const out = join(temp(), "batch");
     // This deliberately uses a minimal fixture: the digest failure precedes config or other reads.
     mkdirSync(join(repo, "supabase/migrations"), { recursive: true });

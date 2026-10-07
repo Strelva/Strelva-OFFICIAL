@@ -27,13 +27,14 @@ export function parseRolloutEnv(text: string): Record<string, string> {
     if (!line || line.startsWith("#")) continue;
     const match = /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/.exec(line);
     if (!match) throw new Error(`Invalid env assignment at line ${index + 1}.`);
-    const [, key, rhs] = match;
+    const key = match[1]!;
+    const rhs = match[2]!;
     if (Object.hasOwn(env, key)) throw new Error(`Duplicate env name: ${key}.`);
     let value: string;
     if (rhs.startsWith('"') || rhs.startsWith("'")) {
       const quoted = /^(["'])(.*?)\1\s*(?:#.*)?$/.exec(rhs);
       if (!quoted) throw new Error(`Invalid quoted env assignment at line ${index + 1}.`);
-      value = quoted[2];
+      value = quoted[2]!;
     } else value = rhs.replace(/\s+#.*$/, "").trim();
     if (/[$`\\]/.test(value)) throw new Error(`Env expansion is unsupported at line ${index + 1}.`);
     env[key] = value;

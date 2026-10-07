@@ -100,7 +100,7 @@ const tables: Record<string, Row[]> = {
 };
 
 const redisKeys = {
-  "reb:client-email:gldf": { type: "string", override: "on" },
+  "reb:client-email:gldf": { type: "string", override: "on" as const },
   "orders:gldf": { type: "zset", card: 12 },
   "order:gldf:o1": { type: "string" },
   "reb:rewards:gldf:members": { type: "set" },

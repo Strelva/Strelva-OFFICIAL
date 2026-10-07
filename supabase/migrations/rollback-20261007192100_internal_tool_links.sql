@@ -194,5 +194,5 @@ $function$
 ;
 revoke all on function public.validate_application_record(jsonb,text,jsonb) from public, anon, authenticated, service_role;
 alter table public."business_contacts" add constraint "business_contacts_sources_check" CHECK ((cardinality(sources) between 1 and 8) AND (sources <@ ARRAY['inquiry'::text, 'booking'::text, 'tenant_import'::text, 'owner'::text, 'operator'::text, 'agency'::text, 'website'::text, 'agent'::text]));
-alter table public."business_record_revisions" add constraint "business_record_revisions_source_check" CHECK ((source = ANY (ARRAY['owner'::text, 'operator'::text, 'agency'::text, 'tenant_import'::text, 'website_rebuild'::text, 'bookings'::text, 'inquiries'::text, 'agent'::text]));
+alter table public."business_record_revisions" add constraint "business_record_revisions_source_check" CHECK ((source = ANY (ARRAY['owner'::text, 'operator'::text, 'agency'::text, 'tenant_import'::text, 'website_rebuild'::text, 'bookings'::text, 'inquiries'::text, 'agent'::text])));
 commit;

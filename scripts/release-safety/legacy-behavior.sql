@@ -14,7 +14,7 @@ begin
     raise exception 'legacy_owner_access_changed';
   end if;
   if not exists(select 1 from public.tenants where id='release-fixture'
-    and subscription_status='active' and commercial_plan='website') then
+    and subscription_status='active' and subscription_plan='growth') then
     raise exception 'legacy_billing_changed';
   end if;
   insert into public.content(tenant_id,section,data) values('release-fixture','rollback-probe','{"write":"works"}');
