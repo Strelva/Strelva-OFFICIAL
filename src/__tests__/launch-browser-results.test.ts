@@ -11,10 +11,30 @@ const core = [
   ["onboarding-authenticated-local.spec.ts", 1],
   ["service-request-authenticated-local.spec.ts", 1],
 ] as const;
-function report(profile: "core" | "marketing" = "core") {
-  const counts = profile === "core" ? core : [["marketing-launch-authenticated-local.spec.ts", 6]] as const;
+const profiles = {
+  core,
+  marketing: [["marketing-launch-authenticated-local.spec.ts", 6]],
+  "journeys-on": [
+    ["owner-journey-1-0-authenticated-local.spec.ts", 2],
+    ["operator-queue-authenticated-local.spec.ts", 2],
+    ["make-real-authenticated-local.spec.ts", 1],
+    ["booking-approval-authenticated-local.spec.ts", 3],
+    ["email-only-owner-authenticated-local.spec.ts", 2],
+    ["versions-authenticated-local.spec.ts", 1],
+    ["inquiries-1-0-authenticated-local.spec.ts", 1],
+  ],
+  "journeys-off": [
+    ["release-1-0-flags-off-authenticated-local.spec.ts", 1],
+    ["launch-business-authenticated-local.spec.ts", 2],
+    ["application-use-authenticated-local.spec.ts", 3],
+    ["onboarding-authenticated-local.spec.ts", 1],
+    ["service-request-authenticated-local.spec.ts", 1],
+  ],
+} as const;
+function report(profile: keyof typeof profiles = "core") {
+  const counts = profiles[profile];
   return {
-    stats: { expected: 6, skipped: 0, unexpected: 0, flaky: 0 },
+    stats: { expected: counts.reduce((total, [, count]) => total + count, 0), skipped: 0, unexpected: 0, flaky: 0 },
     errors: [] as string[],
     suites: [{ specs: counts.flatMap(([file, count]) => Array.from({ length: count }, () => ({
       file, tests: [{ status: "expected", results: [{ status: "passed", retry: 0 }] }],
@@ -59,4 +79,15 @@ describe("critical browser proof gate", () => {
     const value = report("marketing"); value.suites[0]!.specs.pop();
     expect(run(value, "marketing").status).toBe(1);
   });
+  it.each(["journeys-on", "journeys-off"] as const)("accepts a complete %s run", profile => {
+    expect(run(report(profile), profile).status).toBe(0);
+  });
+  for (const profile of ["journeys-on", "journeys-off"] as const) {
+    it.each(profiles[profile].map(([file]) => file))(`rejects an omitted %s test in ${profile} even with green summary counts`, file => {
+      const value = report(profile);
+      const index = value.suites[0]!.specs.findIndex(spec => spec.file === file);
+      value.suites[0]!.specs.splice(index, 1);
+      expect(run(value, profile).status).toBe(1);
+    });
+  }
 });
