@@ -42,6 +42,8 @@ export function pgEnv(): NodeJS.ProcessEnv {
   // libpq ambient routing, services and passfiles must never redirect a selected target.
   const env = { ...process.env };
   for (const key of Object.keys(env)) if (key.startsWith("PG")) delete env[key];
+  // PostgreSQL 18 on macOS requires a valid locale during initdb/pg_ctl startup.
+  env.LC_ALL = "C";
   return env;
 }
 
