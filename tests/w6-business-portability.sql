@@ -44,6 +44,11 @@ select pg_temp.w6_assert(jsonb_array_length(pg_temp.w6_category('orders')->'item
 select pg_temp.w6_assert(pg_temp.w6_category('orders',0,1)->>'next'='1' and jsonb_array_length(pg_temp.w6_category('orders',2,1)->'items')=0,'paged orders');
 select pg_temp.w6_assert(pg_temp.w6_category('provider_metadata')#>>'{items,0,payload,locationId}'='location-a'
  and pg_temp.w6_category('provider_metadata')::text not like '%never-export%','connection metadata allowlist, no credential');
+
+select public.record_tenant_client_record('w6-export-a','inquiry_delivery','checkpoint:a','{"kind":"checkpoint","key":"inquiry-a:reply","value":{"status":"accepted","inquiryId":"inquiry-a","attemptId":"internal-attempt","messageDigest":"internal-digest","replyTo":"private-reply-alias@example.test"}}',repeat('c',64),now(),'dual_write','replace');
+select public.record_tenant_client_record('w6-export-a','inquiry_delivery','reply_target:a','{"kind":"reply_target","key":"private-reply-alias@example.test","value":{"replyTo":"private-reply-alias@example.test","inquiryId":"inquiry-a"}}',repeat('d',64),now(),'dual_write','replace');
+select pg_temp.w6_assert(jsonb_array_length(pg_temp.w6_category('inquiry_delivery')->'items')=1,'checkpoint evidence exported; internal routing index omitted');
+select pg_temp.w6_assert(pg_temp.w6_category('inquiry_delivery')::text not like '%internal-attempt%' and pg_temp.w6_category('inquiry_delivery')::text not like '%internal-digest%' and pg_temp.w6_category('inquiry_delivery')::text not like '%private-reply-alias%','delivery control credentials omitted');
 select pg_temp.w6_assert(jsonb_array_length(pg_temp.w6_category('systems')->'items')=2,'every System');
 select pg_temp.w6_assert(not ((pg_temp.w6_category('systems')#>'{items,0}') ? 'command_digest'),'internal command digests omitted');
 select pg_temp.w6_assert(jsonb_array_length(public.read_business_portfolio_billing(array['w6-export-a','w6-export-b']))=1,'one MRR row per business');

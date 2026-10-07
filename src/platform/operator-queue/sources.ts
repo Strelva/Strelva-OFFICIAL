@@ -283,18 +283,29 @@ interface UntypedQuery extends PromiseLike<SelectResult> {
   gt(column: string, value: string): UntypedQuery;
   order(column: string, options: { ascending: boolean }): UntypedQuery;
   limit(count: number): UntypedQuery;
+  range(from: number, to: number): UntypedQuery;
 }
 export async function readAssignmentOffers(now: number): Promise<SourceRead> {
   const source = "Assignment offers";
   const db = getSupabase() as unknown as { from(table: string): UntypedQuery } | null;
   if (!db) return { kind: "assignment_offer", source, ok: false, reason: "Postgres unavailable" };
   try {
-    const result = await db.from("operational_assignments")
+    const query = () => db.from("operational_assignments")
       .select("id,workspace_id,work_id,assignee_email,offered_at,expires_at")
-      .eq("status", "offered")
-      .gt("expires_at", new Date(now).toISOString())
-      .order("offered_at", { ascending: true })
-      .limit(500);
+      .eq("status", "offered").gt("expires_at", new Date(now).toISOString())
+      .order("offered_at", { ascending: true });
+    let result: SelectResult;
+    if (!operatorQueueReleaseEnabled()) result = await query().limit(500);
+    else {
+      const rows: NonNullable<SelectResult["data"]> = [];
+      for (let offset = 0; ; offset += 500) {
+        const page = await query().order("id", { ascending: true }).range(offset, offset + 499);
+        if (page.error || !page.data) return { kind: "assignment_offer", source, ok: false, reason: "Postgres read failed" };
+        rows.push(...page.data);
+        if (page.data.length < 500) break;
+      }
+      result = { data: rows, error: null };
+    }
     if (result.error || !result.data) return { kind: "assignment_offer", source, ok: false, reason: "Postgres read failed" };
     return {
       kind: "assignment_offer", source, ok: true,
@@ -315,7 +326,7 @@ export async function readUnkeptLeads(): Promise<SourceRead> {
   const redis = getRedis();
   if (!redis) return noRedis(["lead_unkept"], source)[0]!;
   try {
-    const flat = await redis.zrange<(string | number)[]>(LEAD_MIRROR_PENDING_KEY, 0, 499, { withScores: true });
+    const flat = await redis.zrange<(string | number)[]>(LEAD_MIRROR_PENDING_KEY, 0, operatorQueueReleaseEnabled() ? -1 : 499, { withScores: true });
     const rows: QueueItemRaw[] = [];
     for (let index = 0; index + 1 < flat.length; index += 2) {
       const member = String(flat[index]);
@@ -338,7 +349,7 @@ export async function readProspectLeads(now: number): Promise<SourceRead> {
   const source = "Strelva sales leads";
   if (!getRedis()) return noRedis(["prospect_lead"], source)[0]!;
   try {
-    const leads = await getDeliveryLeads(200);
+    const leads = await getDeliveryLeads(operatorQueueReleaseEnabled() ? 0 : 200);
     const workflow = await getAllLeadWorkflow(leads.map((lead) => lead.statusToken));
     const cutoff = now - PROSPECT_WINDOW_DAYS * DAY;
     return {

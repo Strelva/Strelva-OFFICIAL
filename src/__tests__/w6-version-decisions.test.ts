@@ -6,7 +6,7 @@ vi.mock("@/platform/system-versions/preparation", () => ({ prepareVersionRelease
 vi.mock("@/platform/needs-you/release", () => ({ needsYouReleaseEnabled: () => deps.enabled }));
 vi.mock("@/platform/systems-release", () => ({ systemsReleasedFor: async () => deps.systems }));
 import { reviewAllImprovements } from "@/experience/workspace/agency-server";
-import { decideSystemImprovement, readSystemVersion } from "@/experience/workspace/agency/version-server";
+import { decideSystemImprovement, readSystemVersion, manageBusinessVersion } from "@/experience/workspace/agency/version-server";
 const workspaceId = crypto.randomUUID(), systemId = crypto.randomUUID(), agencyId = crypto.randomUUID();
 const actor = { userId: crypto.randomUUID(), verifiedEmail: "operator@example.test" };
 const versionActor: VersionActor = { ...actor, memberships: [{ businessId: workspaceId, role: "admin" }, { businessId: agencyId, role: "owner" }] };
@@ -24,6 +24,40 @@ async function setup(conflict = false) {
 }
 beforeEach(() => { deps.enabled = true; deps.systems = true; deps.prepare.mockReset().mockImplementation(async (_actor, lineage) => ({ receiptId: crypto.randomUUID(), decisionId: crypto.randomUUID(), workspaceId, versionId: lineage.id, rowRevision: lineage.rowRevision })); });
 describe("Version improvement decisions", () => {
+  it("restores an earlier release into a draft, removing new fields without moving the baseline or Live backward", async () => {
+    const { versions, input, source } = await setup();
+    let current = (await versions.readVersion(versionActor, input.versionId));
+    const first = await versions.release(versionActor, input.versionId, { expectedRowRevision: input.rowRevision });
+    const adopted = await versions.adoptImprovement(versionActor, input.versionId, { revision: 2, expectedRowRevision: first.rowRevision });
+    const added = await versions.setOverride(versionActor, input.versionId, { path: "added", value: "Later field", expectedRowRevision: adopted.rowRevision });
+    const second = await versions.release(versionActor, input.versionId, { expectedRowRevision: added.rowRevision });
+    const restored = await manageBusinessVersion(actor, { ...input, action: "restore", releaseNumber: 1, rowRevision: second.rowRevision });
+    current = await versions.readVersion(versionActor, input.versionId);
+    expect(restored.outcome).toBe("saved");
+    expect(current).toMatchObject({ currentRelease: 2, baselineRevision: 2, workingDefinition: { text: "Old" } });
+    expect(current.workingDefinition).not.toHaveProperty("added");
+    expect(current.releases).toEqual(second.releases);
+    expect(deps.prepare).not.toHaveBeenCalled();
+    deps.enabled = false;
+    await expect(manageBusinessVersion(actor, { ...input, action: "prepare_release", rowRevision: restored.rowRevision })).rejects.toThrow(/Nothing went live/);
+    deps.enabled = true;
+    expect(await manageBusinessVersion(actor, { ...input, action: "prepare_release", rowRevision: restored.rowRevision })).toMatchObject({ outcome: "prepared", rowRevision: restored.rowRevision });
+    expect((await versions.readVersion(versionActor, input.versionId)).currentRelease).toBe(2);
+    await versions.publishSourceRevision(versionActor, { source, definition: { text: "Third", added: "Upstream field" }, summary: "Third" });
+    expect((await versions.compareImprovement(versionActor, input.versionId, 3)).conflicts).toMatchObject([{ path: "*", local: { text: "Old" } }]);
+    const kept = await versions.adoptImprovement(versionActor, input.versionId, { revision: 3, expectedRowRevision: restored.rowRevision, resolutions: [{ path: "*", choice: "keep_local" }] });
+    expect((await versions.readVersion(versionActor, kept.id)).workingDefinition).toEqual({ text: "Old" });
+  });
+  it("checks stale, foreign, missing History, permission and account ownership before changing a Version", async () => {
+    const { input, versions } = await setup();
+    await expect(manageBusinessVersion(actor, { ...input, action: "restore", releaseNumber: 99 })).rejects.toThrow(/not in this Version/);
+    await expect(manageBusinessVersion(actor, { ...input, action: "override", path: "text", value: "Local", rowRevision: input.rowRevision + 1 })).rejects.toBeInstanceOf(VersionStaleError);
+    await expect(manageBusinessVersion(actor, { ...input, systemId: crypto.randomUUID(), action: "override", path: "text", value: "Local" })).rejects.toBeInstanceOf(VersionAccessError);
+    await expect(manageBusinessVersion(actor, { ...input, action: "bind", kind: "booking_calendar", connectionId: `calendar:${crypto.randomUUID()}` })).rejects.toBeInstanceOf(VersionAccessError);
+    deps.actor = { ...versionActor, memberships: [{ businessId: workspaceId, role: "member" }] };
+    await expect(manageBusinessVersion(actor, { ...input, action: "override", path: "text", value: "Local" })).rejects.toBeInstanceOf(VersionAccessError);
+    expect((await versions.readVersion(versionActor, input.versionId)).workingDefinition).toEqual({ text: "Old" });
+  });
   it("reads the owning System's conflicts and keeps adoption separate from release", async () => {
     const { versions, input } = await setup(true);
     expect(await readSystemVersion(actor, workspaceId, systemId)).toMatchObject({ versionId: input.versionId, canManage: true, offers: [expect.objectContaining({ conflicts: [expect.objectContaining({ local: "Local", upstream: "New" })] })] });

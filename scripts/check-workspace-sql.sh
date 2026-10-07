@@ -374,7 +374,7 @@ for authority_call in $(psql "${psql_args[@]}" -Atc "select name from public.aut
   # 1. Removed mid-transaction: a write that queues behind an uncommitted
   # removal must re-read the committed row and be denied, not land once more.
   PGAPPNAME=authority-remover psql "${psql_args[@]}" \
-    -c "begin; delete from public.workspace_memberships where $authority_membership; select pg_sleep(0.6); commit;" >/dev/null &
+    -c "begin; delete from public.workspace_memberships where $authority_membership; select pg_sleep(5); commit;" >/dev/null &
   authority_remover=$!
   authority_session_ready authority-remover
   if psql "${psql_args[@]}" -c "$authority_stmt" >"$cluster_root/authority-removed-$authority_call.log" 2>&1; then
@@ -388,7 +388,7 @@ for authority_call in $(psql "${psql_args[@]}" -Atc "select name from public.aut
   # 2. Removal waits for an in-flight write: the write holds the membership
   # row FOR SHARE, so a concurrent delete cannot get its row lock.
   PGAPPNAME=authority-writer psql "${psql_args[@]}" \
-    -c "begin; $authority_stmt; select pg_sleep(0.6); rollback;" >"$cluster_root/authority-writer-$authority_call.log" 2>&1 &
+    -c "begin" -c "$authority_stmt" -c "select pg_sleep(60)" -c "rollback" >"$cluster_root/authority-writer-$authority_call.log" 2>&1 &
   authority_writer=$!
   authority_session_ready authority-writer
   if psql "${psql_args[@]}" -c "set lock_timeout='150ms'; delete from public.workspace_memberships where $authority_membership;" >"$cluster_root/authority-blocked-$authority_call.log" 2>&1; then
@@ -396,13 +396,23 @@ for authority_call in $(psql "${psql_args[@]}" -Atc "select name from public.aut
     exit 1
   fi
   grep -q 'lock timeout' "$cluster_root/authority-blocked-$authority_call.log"
-  wait "$authority_writer"
+  # Hold until the delete has actually tested the row lock. A fixed 600ms
+  # sleep could finish before a contended host starts the deleting session.
+  # Cancelling only this named fixture session closes its transaction; the
+  # accepted write above already ran, and the intentional cancellation is
+  # verified independently from any unexpected SQL failure.
+  psql "${psql_args[@]}" -Atc "select pg_cancel_backend(pid) from pg_stat_activity where application_name='authority-writer' and wait_event='PgSleep';" >/dev/null
+  if wait "$authority_writer"; then
+    printf 'Authority hold was not cancelled as expected.\n' >&2
+    exit 1
+  fi
+  grep -q 'canceling statement due to user request' "$cluster_root/authority-writer-$authority_call.log"
 
   # 3. Downgraded mid-transaction: an owner/admin write queued behind an
   # uncommitted admin -> member change is denied.
   if [[ "$authority_tier" == manager ]]; then
     PGAPPNAME=authority-demoter psql "${psql_args[@]}" \
-      -c "begin; update public.workspace_memberships set role='member' where $authority_membership; select pg_sleep(0.6); commit;" >/dev/null &
+      -c "begin; update public.workspace_memberships set role='member' where $authority_membership; select pg_sleep(5); commit;" >/dev/null &
     authority_demoter=$!
     authority_session_ready authority-demoter
     if psql "${psql_args[@]}" -c "$authority_stmt" >"$cluster_root/authority-demoted-$authority_call.log" 2>&1; then
@@ -654,11 +664,23 @@ psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql
 # Wave 6 agency, operator, durable client records and portability.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010160000_agency_authoring.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/w6-agency-authoring.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163000_agency_operator_overview.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-agency-operator-overview.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010163100_version_management.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-version-management.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010161000_operator_google_attempts.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010161100_operator_effort_context.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/operator-google-attempts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010161200_operator_content_receipts.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/operator-content-receipts-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010161300_review_reply_reservations.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-review-reply-reservations.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010161400_operator_complete_sources.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-operator-complete-sources.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010162000_complete_client_record_stores.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/w6-client-record-stores.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010162200_inquiry_delivery_records.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-inquiry-delivery-records.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010162100_tenant_receipt_retention.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/w6-tenant-retention.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010164000_finite_job_adapters.sql"
@@ -669,6 +691,10 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165800_unb
 psql "${psql_args[@]}" --file="$repo_root/tests/w6-unbounded-export-archive.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165900_export_build_access.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/w6-export-build-access.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165600_exit_handoff_evidence.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-exit-handoff-evidence.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010165700_export_recovery.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/w6-export-recovery.sql"
 # The real Make real runner, checkpointing through these RPCs (psql-backed port).
 STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run src/__tests__/make-real-activation-repository.test.ts

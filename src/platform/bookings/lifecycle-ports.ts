@@ -3,6 +3,7 @@
  * functions, the tenant config and owner-recipient rule for the business, the
  * store-served slot engine for new times, and the one email path.
  */
+import { readReleasedTenantBusinessContext } from "@/platform/business-record/public-reader";
 import { decryptSecret } from "@/platform/infra/crypto/secrets";
 import { getSupabase } from "@/platform/infra/db/client";
 import { sendEmailWithReceipt } from "@/platform/infra/email/send";
@@ -84,8 +85,9 @@ export const bookingLifecyclePorts: BookingLifecyclePorts = {
     if (!booking.tenantId) return null;
     const config = await getTenantConfig(booking.tenantId);
     if (!config) return null;
+    const context = await readReleasedTenantBusinessContext(booking.tenantId);
     return {
-      name: config.siteName ?? "",
+      name: context?.facts.display_name || context?.facts.legal_name || config.siteName || "",
       tenantId: booking.tenantId,
       ownerEmail: await ownerNoticeEmail(config).catch(() => null),
       siteUrl: getTenantPublicUrl(config),

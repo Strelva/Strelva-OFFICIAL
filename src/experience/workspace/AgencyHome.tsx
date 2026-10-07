@@ -19,6 +19,7 @@ import {
 import { AgencyClientList, AgencyClientsError, AgencyClientsLoading, AgencyQueueList, AgencyTeamList } from "./agency/AgencyViews";
 import { AgencyAuthoring } from "./agency/AgencyAuthoring";
 import { AgencyLibraryView } from "./agency/AgencyLibraryView";
+import { AgencyVersionCreate } from "./agency/AgencyVersionCreate";
 
 type ClientsState =
   | { status: "loading" }
@@ -346,6 +347,7 @@ export function AgencyHome({
     <TabsPanel id={tab("queue").panelId} tabId={tab("queue").id} active={view === "queue"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
       <p className="mb-4 text-[12px] text-gray-muted">Oldest first. Each item opens the client’s own System or work, never a copy.</p>
       {queueList}
+      {combined?.queueGaps.length ? <div role="alert" className="mt-4 text-sm text-critical"><p>This Queue is incomplete. Some sources could not be read.</p><ul className="mt-2 list-disc pl-5">{combined.queueGaps.map(gap => <li key={gap}>{gap}</li>)}</ul></div> : null}
       <div className="mt-12 space-y-10">
         {serviceRequests}
         {applicationDraftSection}
@@ -356,6 +358,7 @@ export function AgencyHome({
     <TabsPanel id={tab("library").panelId} tabId={tab("library").id} active={view === "library"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">
       <p className="mb-6 max-w-2xl text-[12px] leading-relaxed text-gray-muted">Sources {agencyName} keeps, and where each client’s Version stands against the latest revision. Nothing reaches a client until its owner approves.</p>
       {libraryOpened ? <AgencyLibraryView request={request} agencyWorkspaceId={snapshot.workspaceId} onWorkspace={onWorkspace} /> : null}
+      {libraryOpened && (current?.role === "owner" || current?.role === "admin") ? <AgencyVersionCreate request={request} agencyWorkspaceId={snapshot.workspaceId} clients={combined?.clients ?? []} /> : null}
     </TabsPanel>
 
     <TabsPanel id={tab("team").panelId} tabId={tab("team").id} active={view === "team"} className="mt-6 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-text">

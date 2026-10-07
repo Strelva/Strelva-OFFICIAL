@@ -27,7 +27,7 @@ language sql immutable set search_path = public, pg_temp as $$
   select array['business_record','systems','linked_sites','leads','spam_held','inquiry_timelines','inquiry_first_replies',
     'booking_config','bookings','reviews','content','billing','orders','reward_members','reward_transactions',
     'threads','tenant_settings','provider_metadata','system_history','system_connections','system_outputs','versions',
-    'saved_system_work','native_records','website_documents','business_bookings','booking_settings','inquiry_events']::text[]
+    'saved_system_work','native_records','website_documents','business_bookings','booking_settings','inquiry_events','inquiry_delivery']::text[]
 $$;
 
 -- Fixed table/column allowlist; no caller-selected identifier reaches EXECUTE.
@@ -41,15 +41,19 @@ declare
   v_remove text[] := array['command_id','command_digest','idempotency_key','dedupe_key','manage_token_hash','request_fingerprint'];
 begin
   perform public.workspace_export_v3_role(p_workspace_id, p_user_id, p_verified_email);
-  if p_category in ('orders','reward_members','reward_transactions','threads','tenant_settings','provider_metadata') then
+  if p_category in ('orders','reward_members','reward_transactions','threads','tenant_settings','provider_metadata','inquiry_delivery') then
     select coalesce(jsonb_agg(jsonb_build_object('tenantId', t.id, 'recordId', x.record_id,
       'payload', case when p_category = 'provider_metadata' then jsonb_build_object(
         'provider', x.record_id, 'accountId', x.payload#>'{value,accountId}', 'locationId', x.payload#>'{value,locationId}',
-        'locationName', x.payload#>'{value,locationName}', 'userUri', x.payload#>'{value,userUri}') else x.payload end,
+        'locationName', x.payload#>'{value,locationName}', 'userUri', x.payload#>'{value,userUri}')
+        when p_category='inquiry_delivery' then jsonb_build_object('kind',x.payload->'kind','value',
+          case when jsonb_typeof(x.payload->'value')='object' then (x.payload->'value')-array['replyTo','attemptId','messageDigest'] else x.payload->'value' end)
+        else x.payload end,
       'capturedAt', x.captured_at) order by x.captured_at, x.id), '[]'::jsonb) into v_items
     from (select r.* from public.tenant_client_records r
       join public.tenant_workspace_links l on l.tenant_stable_id = r.tenant_stable_id
       where l.workspace_id = p_workspace_id and r.store = p_category and r.removed_at is null
+        and (p_category<>'inquiry_delivery' or r.payload->>'kind' in ('checkpoint','reply_state','provider_event'))
       order by r.captured_at, r.id offset v_offset limit v_limit) x
     join public.tenants t on t.stable_id = x.tenant_stable_id;
   elsif p_category in ('systems','system_history','system_connections','system_outputs','versions','saved_system_work',

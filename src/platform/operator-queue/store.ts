@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { operatorQueueReleaseEnabled } from "./release";
 import { getSupabase } from "@/platform/infra/db/client";
 import {
   OperatorQueueAccessError, OperatorQueueConflictError, OperatorQueueUnavailableError, OperatorQueueValidationError,
@@ -57,7 +58,7 @@ function parse<T>(schema: z.ZodType<T>, value: unknown): T {
 }
 
 export async function readQueueContext(actor: QueueActor): Promise<QueueContext> {
-  return parse(queueContextSchema, await rpc("read_operator_queue_context", identity(actor)));
+  return parse(queueContextSchema, await rpc(operatorQueueReleaseEnabled() ? "read_operator_queue_context_v2" : "read_operator_queue_context", identity(actor)));
 }
 
 export interface MarkCommand {
@@ -135,5 +136,5 @@ export type ListingReadbackFailure = z.infer<typeof listingReadbackFailureSchema
 
 /** Operator only: listing writes Google accepted whose read-back failed. Read only. */
 export async function readListingReadbackFailures(actor: QueueActor, limit = 200): Promise<ListingReadbackFailure[]> {
-  return parse(z.array(listingReadbackFailureSchema), await rpc("read_google_listing_readback_failures", { ...identity(actor), p_limit: limit }));
+  return parse(z.array(listingReadbackFailureSchema), await rpc(operatorQueueReleaseEnabled() ? "read_google_listing_readback_failures_v2" : "read_google_listing_readback_failures", { ...identity(actor), ...(operatorQueueReleaseEnabled() ? {} : { p_limit: limit }) }));
 }

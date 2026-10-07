@@ -24,7 +24,7 @@ export const V3_CATEGORIES = [
   "business_record", "systems", "linked_sites", "leads", "spam_held", "inquiry_timelines", "inquiry_first_replies",
   "booking_config", "bookings", "reviews", "content", "billing", "orders", "reward_members", "reward_transactions",
   "threads", "tenant_settings", "provider_metadata", "system_history", "system_connections", "system_outputs", "versions",
-  "saved_system_work", "native_records", "website_documents", "business_bookings", "booking_settings", "inquiry_events",
+  "saved_system_work", "native_records", "website_documents", "business_bookings", "booking_settings", "inquiry_events", "inquiry_delivery",
 ] as const;
 export type V3Category = (typeof V3_CATEGORIES)[number] | "assets_manifest";
 
@@ -33,6 +33,7 @@ export const V3_OMITTED = [
   { category: "provider_connection_secrets", reason: "Connections are listed by name, direction and status; their secrets stay with Strelva." },
   { category: "card_data", reason: "Card details live only with Stripe; the billing state is exported without them." },
   { category: "booking_management_tokens", reason: "Booking management links are credentials." },
+  { category: "inquiry_delivery_routing", reason: "Reverse routing indices, tracked reply aliases, send attempt IDs and message digests are internal delivery controls; checkpoint and reply evidence are included." },
   { category: "operator_notes", reason: "Strelva's own notes about the client are Strelva's records." },
 ] as const;
 

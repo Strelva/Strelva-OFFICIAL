@@ -61,6 +61,18 @@ export function firstReplyRecord(inquiryId: string, acceptedAt: string, action: 
   return { recordId: inquiryId, payload: { firstReplyAt: acceptedAt, by, action }, capturedAt: acceptedAt };
 }
 
+export const INQUIRY_DELIVERY_KINDS = ["checkpoint", "provider_target", "reply_target", "reply_state", "provider_event"] as const;
+export type InquiryDeliveryRecordKind = typeof INQUIRY_DELIVERY_KINDS[number];
+export function inquiryDeliveryRecordId(kind: InquiryDeliveryRecordKind, key: string): string {
+  return `${kind}:${createHash("sha256").update(`${kind}\0${key}`).digest("hex")}`;
+}
+/** Stable-id context supplies the tenant; payloads never pin a mutable slug. */
+export function inquiryDeliveryRecord(kind: InquiryDeliveryRecordKind, key: string, value: unknown, capturedAt = new Date().toISOString()): ClientRecord {
+  const normalized = value && typeof value === "object" && !Array.isArray(value) ? { ...value as Record<string, unknown> } : value;
+  if (normalized && typeof normalized === "object") delete (normalized as Record<string, unknown>).tenantId;
+  return { recordId: inquiryDeliveryRecordId(kind, key), payload: { kind, key, value: normalized }, capturedAt };
+}
+
 export interface ClientRecordStoreDefinition {
   store: ClientRecordStore;
   mode: ClientRecordMode;
@@ -176,6 +188,25 @@ export const CLIENT_RECORD_STORE_DEFINITIONS: Record<ClientRecordStore, ClientRe
         }
       }
       return [...earliest.values()];
+    },
+  },
+  inquiry_delivery: {
+    store: "inquiry_delivery", mode: "replace", removalIsIntentional: false,
+    async readRedis(redis, tenant, now) {
+      const definitions: [InquiryDeliveryRecordKind, string][] = [
+        ["checkpoint", `reb:inquiry-delivery:${keyPart(tenant)}:`],
+        ["provider_target", `reb:inquiry-delivery-provider:${keyPart(tenant)}:`],
+        ["reply_target", `reb:inquiry-reply:${keyPart(tenant)}:`],
+        ["reply_state", `reb:inquiry-reply-state:${keyPart(tenant)}:`],
+        ["provider_event", `reb:inquiry-delivery-event:${keyPart(tenant)}:`],
+      ];
+      const records: ClientRecord[] = [];
+      for (const [kind, prefix] of definitions) for (const key of await scanAll(redis, `${prefix}*`)) {
+        const value = parse(await redis.get(key));
+        if (value === null || value === undefined || (kind === "provider_event" && value !== "completed")) continue;
+        records.push(inquiryDeliveryRecord(kind, key.slice(prefix.length), value, nowIso(now)));
+      }
+      return records;
     },
   },
   booking_config: {

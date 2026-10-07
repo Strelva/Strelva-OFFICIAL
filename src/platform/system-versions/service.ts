@@ -38,10 +38,11 @@ export interface SystemVersionsDeps {
 }
 
 function overlaps(left: string, right: string): boolean {
-  return left === right || left.startsWith(`${right}.`) || right.startsWith(`${left}.`);
+  return left === "*" || right === "*" || left === right || left.startsWith(`${right}.`) || right.startsWith(`${left}.`);
 }
 
 function validPath(path: string): string {
+  if (path === "*") return path;
   if (typeof path !== "string" || !/^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$/.test(path) || path.length > 300) {
     throw new VersionValidationError("The override path is invalid.");
   }
@@ -243,6 +244,13 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
       const path = validPath(input.path);
       const at = now();
+      const restored = lineage.overrides.find(override => override.path === "*");
+      if (path === "*" || restored) {
+        const definition = path === "*" ? input.value : cloneJson(restored!.value);
+        if (path !== "*") writePath(definition as JsonObject, path, input.value === undefined ? readPath(lineage.baseline.definition, path) : input.value);
+        if (definition !== undefined) assertShareableDefinition(definition);
+        return save(actor, { ...lineage, overrides: definition === undefined ? [] : [{ path: "*", value: definition, setBy: actor.userId, setAt: at }] }, input.expectedRowRevision);
+      }
       let overrides = lineage.overrides.filter((override) => !override.path.startsWith(`${path}.`));
       const ancestor = overrides.find((override) => path.startsWith(`${override.path}.`));
       if (ancestor) {
@@ -296,6 +304,18 @@ export function createSystemVersions(deps: SystemVersionsDeps) {
       };
       const bindings = [...lineage.bindings.filter((item) => item.kind !== binding.kind), binding];
       return save(actor, { ...lineage, bindings }, input.expectedRowRevision);
+    },
+
+    /** Restore an immutable release into a draft. The baseline never moves
+     * backward, histories stay append-only, and Live waits for approval. A
+     * whole-definition override also removes fields added after that release. */
+    async restoreReleaseDraft(actor: VersionActor, versionId: string, input: { releaseNumber: number; expectedRowRevision: number }): Promise<VersionLineage> {
+      const lineage = await loadOwned(actor, versionId, true);
+      if (lineage.rowRevision !== input.expectedRowRevision) throw new VersionStaleError();
+      const release = lineage.releases.find(item => item.number === input.releaseNumber);
+      if (!release) throw new VersionValidationError("That release is not in this Version's History.");
+      assertShareableDefinition(release.definition);
+      return save(actor, { ...lineage, overrides: [{ path: "*", value: cloneJson(release.definition), setBy: actor.userId, setAt: now() }] }, input.expectedRowRevision);
     },
 
     async putLocalData(actor: VersionActor, versionId: string, input: { key: string; value: JsonValue; expectedRowRevision: number }): Promise<VersionLineage> {

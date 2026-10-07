@@ -27,6 +27,7 @@ export const CLIENT_RECORD_STORES = [
   "spam_held",
   "inquiry_timeline",
   "inquiry_reply",
+  "inquiry_delivery",
   "booking_config",
   "account_grouping",
   "orders", "provider_connections", "provider_metadata",

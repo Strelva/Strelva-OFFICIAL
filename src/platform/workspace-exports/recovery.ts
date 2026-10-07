@@ -64,7 +64,8 @@ export async function runExportRecovery(deps: ExportRecoveryDeps, buildId?: stri
       return { processed: 1, failed: 1, delivered: false };
     }
   } else {
-    token = job.tokenCiphertext ? decryptSecret(job.tokenCiphertext) : "";
+    try { token = job.tokenCiphertext ? decryptSecret(job.tokenCiphertext) : ""; }
+    catch { token = ""; }
     manifest = job.manifest as V3Manifest;
     if (!token || !manifest) {
       await write("delivery_failed", {});

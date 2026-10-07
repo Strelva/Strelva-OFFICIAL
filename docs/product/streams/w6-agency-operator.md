@@ -49,3 +49,28 @@ Minimal additive edits already present in the checkpoints: both
 Inspect the first local check results, fix any failures, finish focused proof,
 then run the slow required checks once. Record exact flags, migration/rollback
 inventory, cron changes, production steps and any remaining code gaps below.
+
+
+## Round 4 closure in progress — October 7
+
+Focused resumed suites: 24 files, 210 passed / 1 skipped. Initial typecheck,
+lint and boundary checks passed. First full SQL run failed at the existing
+real-Postgres Versions journey's 5-second Vitest timeout; that integration
+case now has a 30-second timeout. The failure is retained in the final report.
+
+Additional audit-driven closure: atomic tenant-content receipts; durable
+review-reply dispatch reservations; queue source actions; complete receipt,
+assignment and unkept-lead reads; scoped agency health/owner-decision overview;
+recorded exit handoff evidence; durable export worker recovery; remaining
+inquiry presentation and booking notice business-record reads. Further
+Version management and inquiry delivery-state persistence are being closed.
+
+Production observation supplied by Jacob: batch 0 is applied, 0.2.1 dual-writes
+leads, and the lead backfill is 43/43. This stream has not accessed production
+or independently verified that observation. All other migration, rollout,
+parity-window, provider-acceptance and operating proof remain pending.
+
+Only this worktree is edited. Coordination with owner-ask remains integration
+work. Root owns staging to prevent parallel agents sharing Git's index; one
+content receipt commit also captured the separately tested queue action files.
+No work was lost and no production action followed.

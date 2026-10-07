@@ -1,4 +1,4 @@
-import { collectTenantMedia } from "@/lib/media-store";
+import { collectTenantMedia } from "@/platform/infra/media/store";
 import { getSupabase } from "@/platform/infra/db/client";
 import { alert } from "@/platform/infra/monitoring";
 import { exportWorkspaceArchive } from "@/platform/workspace-exports/repository";

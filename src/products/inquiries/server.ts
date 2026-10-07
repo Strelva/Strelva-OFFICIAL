@@ -1,3 +1,4 @@
+import { readReleasedTenantBusinessContext } from "@/platform/business-record/public-reader";
 import { addEvent, resolveEvent } from "@/lib/events";
 import { getLeads, type LeadRecord } from "@/lib/leads";
 import { getRedis } from "@/platform/infra/redis";
@@ -632,6 +633,9 @@ async function surfaceSnapshot(input: SurfaceContext, workspace: InquiryWorkspac
   const permissions = await surfacePermissions(input.tenantId);
   const readOnly = permissions?.canEdit !== true;
   const businessRole: "owner" | "agency_member" | "read_only" = readOnly ? "read_only" : input.audience === "agency" ? "agency_member" : "owner";
+  const businessContext = await readReleasedTenantBusinessContext(input.tenantId);
+  const businessName = businessContext?.facts.display_name || businessContext?.facts.legal_name || config.siteName;
+  const description = businessContext?.facts.description || (config.industry ? `${config.industry} inquiry workspace.` : "Inquiry workspace for this business.");
   const website = config.siteUrl ?? config.productionDomain ?? null;
   const projectedConnections = projectInquiryConnections(input.tenantId, connections, "/account?connections=1");
   const patternInstallations = listPatternInstallations(new InquiryEngine({ businessId: input.businessId, state: baseState })).map(({ id, capabilityId, sourceBusinessId, sourceCapabilityId, sourceVersion, targetVersion, status, lastProposalId, updatedAt }) => ({ id, capabilityId, sourceBusinessId, sourceCapabilityId, sourceVersion, targetVersion, status, lastProposalId, updatedAt }));
@@ -644,10 +648,10 @@ async function surfaceSnapshot(input: SurfaceContext, workspace: InquiryWorkspac
     business: {
       id: input.businessId,
       tenantId: input.tenantId,
-      name: config.siteName,
+      name: businessName,
       domain: website,
       role: businessRole,
-      description: config.industry ? `${config.industry} inquiry workspace.` : "Inquiry workspace for this business.",
+      description,
     },
     state: visibleState,
     capabilities: visibleState.capabilities,
@@ -656,7 +660,7 @@ async function surfaceSnapshot(input: SurfaceContext, workspace: InquiryWorkspac
       website,
       statements: [
         { id: "website", label: "Website", value: website, provenance: website ? "Tenant settings" : null, editable: true, confirmed: Boolean(website) },
-        { id: "business", label: "Business name", value: config.siteName || null, provenance: "Tenant settings", editable: true, confirmed: Boolean(config.siteName) },
+        { id: "business", label: "Business name", value: businessName || null, provenance: businessContext?.facts.display_name || businessContext?.facts.legal_name ? "Business record" : "Tenant settings", editable: true, confirmed: Boolean(businessName) },
         { id: "type", label: "Business type", value: config.industry || null, provenance: config.industry ? "Tenant settings" : null, editable: true, confirmed: Boolean(config.industry) },
       ],
       checks: [{ id: "website", label: "Website evidence", status: "unknown", detail: website ? "An address is recorded. Read the website to propose sourced facts." : "Add a website address before running a check." }],

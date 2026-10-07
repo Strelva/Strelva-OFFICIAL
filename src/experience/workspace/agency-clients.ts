@@ -30,6 +30,7 @@ export const agencyClientSystemSchema = z.object({
   lifecycle: z.enum(["draft", "live", "paused"]),
   /** Set when this System is a Version of a source: its context label. */
   versionContext: z.string().max(200).nullable(),
+  health: z.object({ status: z.enum(["healthy", "degraded", "blocked", "unknown"]), summary: z.string(), lastVerifiedAt: iso.nullable() }).strict().optional(),
 }).strict();
 
 export const agencyClientRowSchema = z.object({
@@ -54,7 +55,7 @@ export const agencyClientRowSchema = z.object({
 
 export const agencyQueueItemSchema = z.object({
   id: z.string().min(1).max(200),
-  kind: z.enum(["request", "needs_you", "improvement"]),
+  kind: z.enum(["request", "needs_you", "improvement", "health", "owner_email", "operator"]),
   workspaceId: uuid,
   clientName: z.string().min(1).max(120),
   title: z.string().min(1).max(300),
@@ -62,6 +63,8 @@ export const agencyQueueItemSchema = z.object({
   systemId: uuid.nullable(),
   workId: uuid.nullable(),
   since: iso,
+  label: z.string().max(120).optional(),
+  href: z.string().startsWith("/").max(500).optional(),
 }).strict();
 
 export const agencyTeamMemberSchema = z.object({
@@ -81,6 +84,8 @@ export const agencyClientsPageSchema = z.object({
   nextCursor: z.string().max(200).nullable(),
   /** Whether the provider relationship table was read. False until it is migrated. */
   providersRead: z.boolean(),
+  queueComplete: z.boolean().optional(),
+  queueGaps: z.array(z.string().max(300)).optional(),
 }).strict();
 
 export type AgencyClientSystem = z.infer<typeof agencyClientSystemSchema>;
