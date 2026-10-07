@@ -8,6 +8,52 @@ page. Sibling of the
 [website rebuild spec](../website/website-rebuild-spec-2026-10-01.md), whose `Booking`
 and `InquiryForm` components this capability powers.
 
+## Current implementation status — wave 6, round 5, October 7
+
+Branch `w6/bookings`, code and local fixtures only. This status supersedes the
+historical wave-2/3/4 gap lists below; those describe their original checkpoints.
+No production step or notification is authorized here. Full results, switches,
+14 migrations/rollbacks and rollout order: [stream handoff](../../product/streams/w6-bookings.md).
+
+The first full verification below passed; final audit closure is still active for
+tenantless workspace bookings and visitor phone/timezone/native confirmation copy.
+Their fresh final evidence will replace this checkpoint before completion.
+
+Built and locally tested: both visitor entry paths on one store; current record
+hours/services/phone; stable receipts, customer management and immutable history;
+per-service bookability/mode/buffer/intake; exact-revision owner-approved instant
+rules; inquiry three-slot offers and owner proposal replies; staff-entered requests
+without decision authority; agent API/MCP/OpenAPI/ReserveAction with customer
+confirmation and 15-minute holds; reminders and separate request clocks; calendar
+busy/mirror/recovery; owner history/no-shows/outside-hours/intake/health; bounded
+record fallback; pause and completed-workspace-exit admission rules. Agent bookings
+were required by this adopted spec and use no new dependency.
+
+A read-only daily booking-parity cron at `45 5 * * *` UTC compares bookings and
+60 days of slots, writes only parity/heartbeat evidence, and cannot advance the
+streak after a partial or failed run. It is authenticated and heartbeat-registered.
+Every notice remains behind its switch and all three existing email gates;
+flag-off visitor response/default regressions and client compatibility pass.
+
+Local proof: 6,388 tests pass (39 intentionally skipped across the repository),
+typecheck/lint/boundaries/build pass, client compatibility 196/196, and isolated
+PostgreSQL checks pass including 30 tests through both real booking route families.
+Desktop/mobile evidence and limits: [rendered fixture review](../../../output/w6-bookings-ui/README.md).
+The production build requires `NODE_ENV=production` on this host, whose inherited
+value is `development`; failures and corrective reruns are preserved in the handoff.
+
+Still unproven: production migration/backfill, seven consecutive parity days,
+real provider grants/event behavior, outside-client use and delivered/read-back
+email. The disposable real-provider suite is present but was not enabled.
+Google granular scopes and revoke-before-wipe are implemented behind flags.
+Microsoft disconnect wipes local credentials, while application consent must be
+removed in My Apps (or by an administrator for admin-granted consent). Automatic
+per-application Microsoft revocation is **not implemented** with the existing
+calendar permission. The [account-wide Graph revocation API](https://learn.microsoft.com/en-us/graph/api/user-revokesigninsessions?view=graph-rest-1.0)
+requires broader permission and affects all apps; no such permission was added.
+That literal spec line needs an accepted provider exception or separately authorized
+authority design. It is not silently marked complete.
+
 **Built locally October 6 (wave 2, branch `w2/bookings-inquiries`, not
 applied or deployed; every switch off).** Phase 1a of the build plan:
 
@@ -730,6 +776,11 @@ outside the bar for a 5 because the timing is Google's.
 
 ## Done means proven: the bar for a 5
 
+Checked rows below mean local code/fixture proof only, as recorded in the current
+status and handoff. Production rows stay unchecked. The real-provider suite is
+implemented but its credentialed cases remain skipped; 429 is a deterministic
+contract test rather than a deliberately induced provider rate limit.
+
 - [ ] On tenant zero in production: book, reschedule and cancel through the
       site with a real Google calendar and a real Outlook calendar connected.
       Events appear and disappear in both.
@@ -738,27 +789,27 @@ outside the bar for a 5 because the timing is Google's.
 - [ ] An outside client books through the MCP server and the public API,
       and the customer confirmation gate holds.
 - [ ] Customer confirmation and reminder emails are delivered and read back.
-- [ ] Failure-path tests for every row above, including concurrency and DST.
-- [ ] A real-provider test suite behind a flag: revoked token, 429, deleted
+- [x] Failure-path tests for every row above, including concurrency and DST.
+- [x] A real-provider test suite behind a flag: revoked token, 429, deleted
       event, etag conflict.
-- [ ] Desktop and mobile review of the booking component, manage page, owner
+- [x] Desktop and mobile review of the booking component, manage page, owner
       setup and owner list in empty, loading, error and permission states.
-- [ ] `pnpm check`, `check:custom-repos` and the workspace SQL checks pass.
+- [x] `pnpm check`, `check:custom-repos` and the workspace SQL checks pass.
       `/api/v1` changes are additive, and contract tests cover the new
       routes.
-- [ ] `booking-reminders` and hold-expiry crons declared, authenticated and
+- [x] `booking-reminders` and hold-expiry crons declared, authenticated and
       registered.
-- [ ] **[New Oct 6]** One store: a legacy `/api/booking` booking and a
+- [x] **[New Oct 6]** One store: a legacy `/api/booking` booking and a
       `/api/v1/bookings` reservation land in the same table, and the slot
       each takes is refused to the other. Tested locally with both routes.
-- [ ] **[New Oct 6]** Changing Friday hours in the business record changes
+- [x] **[New Oct 6]** Changing Friday hours in the business record changes
       Friday slots on both routes with no booking-side edit.
-- [ ] **[New Oct 6]** Pausing the bookings System keeps every future
+- [x] **[New Oct 6]** Pausing the bookings System keeps every future
       booking, its reminder and its manage link, and offers no new slots.
 - [ ] **[New Oct 6]** A request reaches the owner recipient by email and is
       approved from the link without signing in, on the `strelva` test
       business in production after Jacob's yes on email.
-- [ ] **[New Oct 6]** `/dashboard/schedule` and `/dashboard/roster` show the
+- [x] **[New Oct 6]** `/dashboard/schedule` and `/dashboard/roster` show the
       same bookings before and after the store flip, for a wellness fixture.
 
 ## Build plan
