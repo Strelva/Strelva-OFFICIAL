@@ -669,6 +669,7 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135920_boo
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135940_booking_manual.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135945_booking_cancellation_cutoff.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135950_booking_calendar_health.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010135955_booking_exit_admission.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-agent-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-owner-evidence-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/booking-manual-schema.sql"

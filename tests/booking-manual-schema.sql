@@ -64,4 +64,15 @@ select pg_temp.mb_assert(public.set_tenant_booking_status('mb-site','late-public
 select public.set_tenant_booking_status('mb-site','late-public','cancelled','visitor','Customer cancelled');
 select pg_temp.mb_assert((select count(*) from public.business_booking_history h join public.business_bookings b on h.booking_id=b.id where b.legacy_id='late-public' and h.reason='Customer cancelled after the cancellation cutoff')=1,'late visitor cancellation has one immutable receipt');
 select pg_temp.mb_assert(not has_function_privilege('service_role','public.set_tenant_booking_status_before_cutoff(text,text,text,text,text)','execute'),'cutoff cannot be bypassed through old RPC');
+insert into public.workspace_exit_requests(workspace_id,requested_by,idempotency_key,command_digest,future_work,provider_participation,maintained_resource_action,state,completed_at)
+ select id,'cf000000-0000-4000-8000-000000000001','fixture-exit',repeat('a',64),'pause','keep','stop','{"status":"completed"}',now() from mb_workspace;
+select pg_temp.mb_assert((public.read_tenant_booking_context('mb-site')->>'paused')::boolean
+ and (public.read_tenant_booking_policy('mb-site')->>'paused')::boolean,'exit closes ordinary and cached-record admission');
+select pg_temp.mb_expect($q$select public.create_workspace_manual_booking((select id from mb_workspace),'mb-site','cf000000-0000-4000-8000-000000000001','manual-owner@example.test',pg_temp.mb_input('manual-exit-0001'))$q$,'booking_paused');
+select pg_temp.mb_expect($q$select public.hold_agent_booking('mb-site',pg_temp.mb_input('agent-exit-0001')||jsonb_build_object('origin','agent','status','held'),'{}')$q$,'booking_paused');
+select public.decide_workspace_booking_request((select id from mb_workspace),(select id from public.business_bookings where legacy_id='manual-request-0001'),'approve','owner');
+select pg_temp.mb_assert((select status='confirmed' from public.business_bookings where legacy_id='manual-request-0001'),'owner can still confirm a kept request after exit');
+select public.claim_booking_messages(now()+interval '11 days 5 seconds',100);
+select pg_temp.mb_assert(exists(select 1 from public.business_booking_messages m join public.business_bookings b on b.id=m.booking_id where b.legacy_id='manual-request-0001' and m.kind='reminder_24h'),'kept booking keeps its reminder after exit');
+select pg_temp.mb_assert(public.set_tenant_booking_status('mb-site','manual-request-0001','cancelled','visitor','Customer cancelled')->>'status'='updated','customer can cancel after exit');
 rollback;
