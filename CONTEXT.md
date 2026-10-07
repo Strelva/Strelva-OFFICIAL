@@ -427,3 +427,13 @@ presence of these routes.
   and [acceptance matrix](./docs/capabilities/inquiries/inquiry-first-acceptance-2026-09-11.md).
 - [Client dashboard surfaces](./docs/architecture/client-dashboard-ia.md) and
   [operator responsibilities](./docs/architecture/operator-command-center.md).
+
+## Agency prospecting (October 7, local)
+
+The `a1/agency-prospecting` stream prepares agency-attributed public checks,
+name-only report/email branding, agency-owned prospect capture, membership-only
+reads and durable per-agency quota behind the default-off
+`STRELVA_AGENCY_PROSPECTING_RELEASE`. Its [stream contract](./docs/product/streams/a1-agency-prospecting.md)
+owns the routes, configuration, migration/rollback proof and extension handoff.
+This is local implementation, not a production change or evidence of agency
+adoption. Extensions and richer agency profiles/branding remain unfinished.

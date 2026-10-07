@@ -164,6 +164,8 @@ export interface WorkspaceSnapshot {
 }
 
 export interface WorkspaceReleases {
+  /** Agency-owned public check leads, off unless explicitly released. */
+  agencyProspecting?: boolean;
   systems: boolean;
   /** STRELVA_NEEDS_YOU_RELEASE: Home reads Needs you and Strelva handled from the policy model. */
   needsYou?: boolean;

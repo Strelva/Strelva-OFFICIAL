@@ -1,3 +1,4 @@
+import { agencyProspectingEnabled } from "@/platform/agency-prospecting/server";
 import { websiteRebuildReleaseEnabledForWorkspace, websiteRebuildReleasedFor } from "@/products/websites/index";
 import { websiteRebuildSchema } from "@/products/websites/index";
 import { initializeRebuildHandoff } from "@/products/websites/index";
@@ -313,7 +314,7 @@ export async function GET(request: Request) {
       ...(providedClients ? { providedClients } : {}),
       products,
       ...(systems ? { systems } : {}),
-      releases: { systems: systemsReleased, needsYou: needsYouReleaseEnabled(), ask: askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
+      releases: { ...(agencyProspectingEnabled() ? { agencyProspecting: true } : {}), systems: systemsReleased, needsYou: needsYouReleaseEnabled(), ask: askReleaseMayBeOn() && systemsReleased, inquiries: inquiriesReleased, websiteRebuild: websiteRebuildReleased, ...(connectedSitesReleased ? { connectedSites: true } : {}) },
     };
     return json(snapshot);
   } catch (error) { return failed(error); }

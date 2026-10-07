@@ -766,3 +766,24 @@ its receipt definition list for Source. These additions are default off under
 `STRELVA_BOOKING_AGENT_VISIBILITY`; agent names are supplied at booking.
 Local proof and remaining limits live in
 [the #304 handoff](../product/streams/a1-agent-bookings-visible.md).
+
+### Agency check attribution (October 7, local)
+
+`AiVisibilityPage`, `AiVisibilityResultView`, and `WebsiteAuditPage` retain their
+owned forms/result geometry and semantic marketing tokens. Public attributed
+results add name-only agency identity, neutral provider advice and an agency
+contact CTA. Embed routes compose those same components without account chrome.
+The shared email layout accepts optional `preparedBy` identity; absent identity
+retains the existing Strelva logo markup. Rich logo/color selection remains #264.
+The agency prospects page uses a semantic table, scoped to direct agency members.
+See [the stream contract](../product/streams/a1-agency-prospecting.md) for flag,
+state, permission and local-proof limitations; no visual acceptance or production
+adoption is implied.
+
+### October 7 public booking email confirmation
+
+`/booking-confirm/[token]` uses the owned `Card` and `Button` primitives and
+semantic canvas/text roles. Opening the page is read-only; the native form
+POSTs to its action route. Expired/unavailable and rate-limit states keep the
+customer from claiming a booking was made. This is local implementation for
+#529; no production adoption or new visual-system decision is implied.

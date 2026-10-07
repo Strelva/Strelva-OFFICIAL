@@ -1,7 +1,10 @@
 name: Launch verification
 
 on:
+  # Oct 7, 2026 (Jacob): only PRs into main; manual runs otherwise.
+  workflow_dispatch:
   pull_request:
+    branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - 'src/**'
@@ -49,9 +52,13 @@ jobs:
         run: |
           pnpm test:workspace-target
           pnpm exec vitest run src/__tests__/service-delivery-commitment.test.ts src/__tests__/service-requests.test.ts src/__tests__/workspace-start-launch.test.ts src/__tests__/business-entry.test.ts src/__tests__/business-entry-route.test.ts src/__tests__/delivery-client.test.ts src/__tests__/delivery-launch-ui.test.tsx src/__tests__/workspace-launch-return.test.ts
+      - uses: supabase/setup-cli@v3
+        with:
+          version: 2.117.0
       - name: Full ordered upgrade and delivery lifecycle
         run: |
           export PATH="$(pg_config --bindir):$PATH"
+          pnpm test:migration-helpers
           pnpm check:workspace-upgrade
       - name: Install browser
         run: pnpm exec playwright install --with-deps chromium

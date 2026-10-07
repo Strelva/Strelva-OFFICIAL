@@ -4,23 +4,9 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 migration="$repo_root/supabase/migrations/20260905190000_release_one_workspaces.sql"
 schema_test="$repo_root/tests/workspace-schema.sql"
-cluster_root="$(mktemp -d "${TMPDIR:-/tmp}/strelva-workspace-sql.XXXXXX")"
-cluster_data="$cluster_root/data"
-cluster_socket="$cluster_root/socket"
-cluster_log="$cluster_root/postgres.log"
+source "$repo_root/scripts/temp-postgres.sh"
+create_temp_postgres strelva-workspace-sql
 cluster_port="$((61000 + ($$ % 3000)))"
-cluster_started=0
-
-cleanup() {
-  local status=$?
-  trap - EXIT INT TERM
-  if [[ "$cluster_started" -eq 1 ]]; then
-    pg_ctl -D "$cluster_data" -m fast -w stop >/dev/null 2>&1 || true
-  fi
-  printf 'Workspace SQL cluster preserved at: %s\n' "$cluster_root"
-  exit "$status"
-}
-trap cleanup EXIT INT TERM
 
 for command_name in initdb pg_ctl psql; do
   if ! command -v "$command_name" >/dev/null 2>&1; then
@@ -40,7 +26,7 @@ pg_ctl -D "$cluster_data" \
   -l "$cluster_log" \
   -o "-F -k '$cluster_socket' -c listen_addresses='' -p $cluster_port" \
   -w start >/dev/null
-cluster_started=1
+read -r cluster_postmaster_pid < "$cluster_data/postmaster.pid"
 
 psql_args=(
   --host="$cluster_socket"
@@ -635,6 +621,11 @@ psql "${psql_args[@]}" --file="$repo_root/tests/website-linked-publication-schem
 # facts from the business record, inquiries in tenant_leads, spam in the
 # spam pit, domain-ownership proof, and the connected_site System origin.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261008151000_connected_sites.sql"
+# The new public reader replaces the historical looser connected-site filter.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012110000_business_pages.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012110000_business_pages.sql"
+psql "${psql_args[@]}" -Atc "select to_regclass('public.business_pages') is null and to_regprocedure('public.business_confirmed_public_facts(uuid)') is null" | grep -qx t
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261012110000_business_pages.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-leads-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/tenant-client-records-schema.sql"
@@ -890,6 +881,12 @@ psql "${psql_args[@]}" --file="$repo_root/tests/agent-booking-visibility-schema.
 # Every stream's release flag key survives the last literal redefinition (#253).
 psql "${psql_args[@]}" --file="$repo_root/tests/release-flag-names-final-schema.sql"
 
+# #529: anonymous booking caps, email-only placement, and reversible schema.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011150000_public_booking_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011150000_public_booking_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011150000_public_booking_admission.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/public-booking-admission-schema.sql"
+
 # Google location lineage through the real Versions/System stores, after the
 # account-binding migrations. Preparation stays fake; no Google dispatch.
 if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
@@ -929,6 +926,17 @@ for policy_guard_phase in current history; do
   fi
 done
 printf 'Policy rollback guards preserved current terms and undone history.\n'
+# Public policy output after the policy projection exists; saved pages block rollback.
+psql "${psql_args[@]}" --file="$repo_root/tests/business-pages-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-pages-rollback-schema.sql"
+if psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261012110000_business_pages.sql" >"$cluster_root/business-pages-rollback-refusal.log" 2>&1; then
+  printf 'Business page rollback discarded saved publication settings.\n' >&2
+  exit 1
+fi
+grep -q 'business_pages_rollback_requires_data_preservation' "$cluster_root/business-pages-rollback-refusal.log"
+psql "${psql_args[@]}" -Atc "select exists(select 1 from public.business_pages where handle='rollback-fixture') and to_regprocedure('public.business_confirmed_public_facts(uuid)') is not null" | grep -qx t
+printf 'Business page rollback preserved saved publication settings.\n'
+
 
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
@@ -949,3 +957,5 @@ psql "${psql_args[@]}" --file="$repo_root/tests/agency-team-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-20261011160000_agency_team.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011160000_agency_team.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/agency-team-schema.sql"
+# Agency-sourced public checks: real RLS, quota races and rollback stop points.
+bash "$repo_root/scripts/check-agency-prospects-sql.sh"

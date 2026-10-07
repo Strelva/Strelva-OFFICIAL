@@ -27,7 +27,7 @@ function formatSourceDate(value?: string | null): string | null {
 
 /** Report, content, photos, connections, and site preview cards. */
 export function displayChatTools(deps: ChatToolDeps): ChatToolEntries {
-  const { tenant, mods: { getTemplateManifestForTenant, getTenantConfig, getConnections, ROOT_DOMAIN, DISCOVERABLE_INTEGRATIONS, deriveIntelligenceStatus, getIntegrationCategories, normalizeIntegrationStatus } } = deps;
+  const { tenant, mods: { getTemplateManifestForTenant, getTenantConfig, getConnections, tenantSiteHost, DISCOVERABLE_INTEGRATIONS, deriveIntelligenceStatus, getIntegrationCategories, normalizeIntegrationStatus } } = deps;
   return {
     // ─────────────────────────────────────────────────────────────
     // INLINE DISPLAY TOOLS — return structured JSON for rich rendering
@@ -260,7 +260,7 @@ export function displayChatTools(deps: ChatToolDeps): ChatToolEntries {
           const settings = await getContent("settings", tenant);
 
           // Build the site URL
-          const domain = config?.productionDomain || `${tenant}.${ROOT_DOMAIN}`;
+          const domain = config?.productionDomain || tenantSiteHost(tenant);
           const url = `https://${domain}`;
 
           return {

@@ -1,3 +1,4 @@
+import { APP_ROOT_DOMAIN, SITES_ROOT_DOMAIN, isPlatformDomain, tenantSiteOrigin } from "@/platform/infra/brand";
 import type { Metadata } from "next";
 import type { SiteDocument } from "./site-document";
 import type { TenantConfig } from "@/lib/types";
@@ -6,11 +7,11 @@ import { getTenantPublicUrlFromDomainMap, normalizeTenantDomain } from "@/lib/te
 /** Canonicals are configuration, never a caller-controlled Host header. */
 export function tenantCanonicalOrigin(tenant: string, config: TenantConfig | null | undefined): string {
   const preferred = normalizeTenantDomain(config?.productionDomain) || normalizeTenantDomain(config?.siteUrl);
-  if (preferred && !preferred.startsWith("admin.") && !preferred.endsWith(".vercel.app") && !preferred.includes("localhost") && /^[a-z0-9.-]+$/.test(preferred)) return `https://${preferred}`;
+  if (preferred && !(SITES_ROOT_DOMAIN !== APP_ROOT_DOMAIN && isPlatformDomain(preferred)) && !preferred.startsWith("admin.") && !preferred.endsWith(".vercel.app") && !preferred.includes("localhost") && /^[a-z0-9.-]+$/.test(preferred)) return `https://${preferred}`;
   const verified = config?.domainClaims?.find(claim => claim.status === "verified" && claim.role !== "admin" && !claim.domain.startsWith("admin."));
   const domain = normalizeTenantDomain(verified?.domain);
   if (domain && /^[a-z0-9.-]+$/.test(domain)) return `https://${domain}`;
-  return getTenantPublicUrlFromDomainMap(tenant) || `https://${encodeURIComponent(tenant)}.strelva.com`;
+  return getTenantPublicUrlFromDomainMap(tenant) || tenantSiteOrigin(tenant);
 }
 export function safeJsonLd(value: unknown): string {
   return JSON.stringify(value).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
