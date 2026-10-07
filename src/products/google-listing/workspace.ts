@@ -1,5 +1,6 @@
 import { googleVersionPinSchema, googleVersionDraftCurrent, type GoogleVersionPin } from "./versions";
 import { systemsReleasedFor, systemsReleaseEnabledForWorkspace } from "@/platform/systems-release";
+import { publishingWorkspaceId, workspacePublishingScope } from "@/platform/infra/publishing-scope";
 import { paceGoogleWrites } from "./pacing";
 import { z } from "zod";
 import { tenantPublishingPorts } from "@/platform/infra/tenant-publishing";
@@ -33,10 +34,9 @@ const metadataSchema = z.object({ kind: z.literal("workspace_google_listing_draf
 export async function prepareGoogleListingDraft(actor: WorkspaceActor, raw: z.infer<typeof googleDraftInputSchema>, version?: { pin: GoogleVersionPin; hours?: z.infer<typeof factValueSchemas.hours> | null }): Promise<UnifiedEvent> {
   const input = googleDraftInputSchema.parse(raw);
   if (!(await publishingEnabledForWorkspace(input.workspaceId, actor))) throw new Error("Publishing is not enabled for this business.");
-  const site = await readLinkedSite(actor, input.workspaceId, input.tenantId);
-  if (!site || !(await hasTenantPermission(input.tenantId, "publishing:manage"))) throw new Error("Only an authorized owner can prepare Google changes.");
+  if (!(await googleTargetAllowed(actor, input.workspaceId, input.tenantId))) throw new Error("Only an authorized owner can prepare Google changes.");
   const snapshot = await readPublishingSnapshot(actor, input.workspaceId);
-  const binding = snapshot.bindings.find(row => row.originTenantId === input.tenantId && row.locations.some(location => location.locationId === input.locationId));
+  const binding = snapshot.bindings.find(row => (row.originTenantId === input.tenantId || (!row.originTenantId && publishingWorkspaceId(input.tenantId) === input.workspaceId)) && row.locations.some(location => location.locationId === input.locationId));
   if (version && (binding?.id !== version.pin.bindingId || !(await systemsReleasedFor(actor, input.workspaceId)))) throw new Error("This Google Version is unavailable.");
   if (!binding) throw new Error("This Google listing does not belong to this website.");
   if ((await readListingControl(input.workspaceId, input.locationId)).paused) throw new Error("The Google listing is paused.");
@@ -82,7 +82,8 @@ export function isGoogleListingEvent(event: UnifiedEvent): boolean { return even
 
 export async function tenantListingContext(tenantId: string, workspaceId: string, locationId: string): Promise<ListingContext> {
   const deps = await defaultTenantReplyDeps();
-  const target = await deps.bindingTarget(tenantId);
+  const nativeWorkspace = publishingWorkspaceId(tenantId);
+  const target = nativeWorkspace ? { workspaceId: nativeWorkspace } : await deps.bindingTarget(tenantId);
   if (target?.workspaceId !== workspaceId) throw new Error("The Google listing is not linked to this business.");
   const grant = await deps.grant(tenantId);
   if (!grant || grant.status !== "connected") throw new Error("Google disconnected. Reconnect Google to continue.");
@@ -139,7 +140,7 @@ export async function executeGoogleListingEvent(input: { tenantId: string; event
 }
 
 export async function undoWorkspaceGoogleChange(actor: WorkspaceActor, input: { workspaceId: string; tenantId: string; locationId: string; receiptId: string }): Promise<ListingWriteOutcome> {
-  if (!(await publishingEnabledForWorkspace(input.workspaceId, actor)) || !(await readLinkedSite(actor, input.workspaceId, input.tenantId)) || !(await hasTenantPermission(input.tenantId, "publishing:manage"))) throw new Error("Only an authorized owner can undo this Google change.");
+  if (!(await publishingEnabledForWorkspace(input.workspaceId, actor)) || !(await googleTargetAllowed(actor, input.workspaceId, input.tenantId))) throw new Error("Only an authorized owner can undo this Google change.");
   if ((await readBusinessRecord(actor, input.workspaceId)).access !== "owner") throw new Error("This Google change needs the business owner's instruction.");
   return undoListingChange(await tenantListingContext(input.tenantId, input.workspaceId, input.locationId), { receiptId: input.receiptId, authority: { kind: "owner_undo", actor: actor.userId }, retryFailed: true });
 }
@@ -150,9 +151,9 @@ export async function readWorkspaceGoogle(actor: WorkspaceActor, workspaceId: st
   const { sites } = await readLinkedSites(actor, workspaceId);
   const allowed = new Set(sites.map(site => site.tenantId));
   const owner = (await readBusinessRecord(actor, workspaceId)).access === "owner";
-  return Promise.all(snapshot.bindings.filter(binding => binding.originTenantId && allowed.has(binding.originTenantId)).flatMap(binding => binding.locations.map(async location => {
-    const tenantId = binding.originTenantId!;
-    const [control, events, canManage] = await Promise.all([readListingControl(workspaceId, location.locationId), tenantPublishingPorts().then(ports => ports.getEvents(tenantId, { limit: 1000, status: "pending" })), hasTenantPermission(tenantId, "publishing:manage")]);
+  return Promise.all(snapshot.bindings.filter(binding => (binding.originTenantId ? allowed.has(binding.originTenantId) : true)).flatMap(binding => binding.locations.map(async location => {
+    const tenantId = binding.originTenantId ?? workspacePublishingScope(workspaceId);
+    const [control, events, canManage] = await Promise.all([readListingControl(workspaceId, location.locationId), tenantPublishingPorts().then(ports => ports.getEvents(tenantId, { limit: 1000, status: "pending" })), binding.originTenantId ? hasTenantPermission(tenantId, "publishing:manage") : Promise.resolve(owner)]);
     const receipts = snapshot.receipts.filter(receipt => receipt.locationId === location.locationId && receipt.bindingId === binding.id) as unknown as ListingReceipt[];
     return { tenantId, locationId: location.locationId, name: location.title ?? "Google listing", control, canManage: owner && canManage, connected: binding.status === "connected", drafts: events.filter(event => isGoogleListingEvent(event) && event.metadata?.workspaceId === workspaceId && event.metadata?.locationId === location.locationId).map(event => ({ id: event.id, title: event.title, body: event.body })), receipts: receipts.map(receipt => ({ id: receipt.id, headline: receiptHeadline(receipt), before: receipt.before, after: receipt.after, authority: receipt.authority, readback: receipt.readback, status: receipt.status, undo: Boolean(receipt.undo) && ["posted", "posted_unverified", "held_by_google"].includes(receipt.status) })) };
   })));
@@ -160,15 +161,22 @@ export async function readWorkspaceGoogle(actor: WorkspaceActor, workspaceId: st
 export { setListingPaused };
 
 export async function changeWorkspaceGoogleReply(actor: WorkspaceActor, input: { workspaceId: string; tenantId: string; locationId: string; reviewId: string; text?: string; withdraw: boolean; commandId: string }): Promise<ListingWriteOutcome> {
-  if (!(await publishingEnabledForWorkspace(input.workspaceId, actor)) || !(await readLinkedSite(actor, input.workspaceId, input.tenantId)) || !(await hasTenantPermission(input.tenantId, "publishing:manage"))) throw new Error("Only an authorized owner can change a Google reply.");
+  if (!(await publishingEnabledForWorkspace(input.workspaceId, actor)) || !(await googleTargetAllowed(actor, input.workspaceId, input.tenantId))) throw new Error("Only an authorized owner can change a Google reply.");
   if ((await readBusinessRecord(actor, input.workspaceId)).access !== "owner") throw new Error("This reply needs the business owner's instruction.");
   const ctx = await tenantListingContext(input.tenantId, input.workspaceId, input.locationId);
   const authority = { kind: "owner_approval" as const, actor: actor.userId };
   const idempotencyKey = `reply-command:${input.workspaceId}:${z.string().uuid().parse(input.commandId)}`;
   const outcome = await (input.withdraw ? withdrawReviewReply(ctx, { reviewId: input.reviewId, authority, idempotencyKey, retryFailed: true }) : postReviewReply(ctx, { reviewId: input.reviewId, text: input.text ?? "", authority, idempotencyKey, retryFailed: true }));
-  if (["posted", "posted_unverified", "held_by_google"].includes(outcome.status)) {
+  if (!publishingWorkspaceId(input.tenantId) && ["posted", "posted_unverified", "held_by_google"].includes(outcome.status)) {
     try { await (await tenantPublishingPorts()).mirrorPublishedReviewReply(input.tenantId, input.reviewId, input.withdraw ? null : input.text ?? ""); }
     catch { outcome.message += " Google accepted it; the workspace review copy needs reconciliation."; }
   }
   return outcome;
+}
+
+/** A native target is the checked business, not an invented legacy tenant. */
+export async function googleTargetAllowed(actor: WorkspaceActor, workspaceId: string, scope: string): Promise<boolean> {
+  const nativeWorkspace = publishingWorkspaceId(scope);
+  if (nativeWorkspace) return nativeWorkspace === workspaceId && (await readBusinessRecord(actor, workspaceId)).access === "owner";
+  return !!await readLinkedSite(actor, workspaceId, scope) && await hasTenantPermission(scope, "publishing:manage");
 }

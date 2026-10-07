@@ -140,6 +140,7 @@ export async function getGoogleGrant(tenantId: string): Promise<GoogleGrant | nu
       await noteFallback(tenantId, reasonOf(error, store));
     }
   }
+  if (/^workspace-[0-9a-f-]{36}$/i.test(tenantId)) return null;
   const connection = await getConnection(tenantId, "google");
   return connection ? grantFromConnection(connection) : null;
 }

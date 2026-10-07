@@ -1,3 +1,4 @@
+import { businessBookingEmailEnabled } from "./email-enablement";
 /** One send path, existing audience gates, no retry after a provider attempt. */
 import { z } from "zod";
 import { decryptSecret } from "@/platform/infra/crypto/secrets";
@@ -20,7 +21,7 @@ export async function bookingCustomerEmailAllowed(tenantId: string | null, works
   if (!z.string().uuid().safeParse(workspaceId).success) return false;
   // Native businesses have no tenant override to inherit. Explicit operator
   // arming is required in addition to both global email gates.
-  return !!workspaceId && await getClientEmailOverride(`workspace:${workspaceId}`) === "on";
+  return !!workspaceId && await businessBookingEmailEnabled(workspaceId);
 }
 
 function calendarFile(booking: StoreBooking, businessName: string, address: string) {
