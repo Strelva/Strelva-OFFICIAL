@@ -1,11 +1,9 @@
-import { readWorkspaceInquiryLeads } from "@/products/inquiries/workspace-records";
+import { readWorkspaceInquiryLeads, prepareInquiryMessageReviewWithDependencies, inquiryReleaseEnabledForWorkspace } from "@/products/inquiries/server";
 import { readWorkspaceBookings } from "@/products/bookings/server";
 import { PostgresBusinessFactDraftStore } from "@/platform/ask/workspace-drafts-repository";
 import { readBusinessRecord } from "@/platform/business-record/service";
 import type { NeedsYouStore } from "@/platform/needs-you/repository";
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
-import { prepareInquiryMessageReviewWithDependencies } from "@/products/inquiries/delivery-approval-service";
-import { inquiryReleaseEnabledForWorkspace } from "@/products/inquiries/release";
 import { releaseViewerFor } from "@/platform/release-flags/viewer";
 import { businessFactDraftPatch, type AskWorkspaceDraftPort, type BusinessFactDraftStore } from "@/platform/ask/workspace-drafts";
 

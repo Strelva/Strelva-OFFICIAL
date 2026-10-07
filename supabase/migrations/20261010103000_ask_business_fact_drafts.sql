@@ -69,6 +69,7 @@ create function public.resolve_ask_business_draft(p_workspace_id uuid,p_user_id 
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare d public.ask_business_record_drafts%rowtype; result jsonb; actor_role text;
 begin
+ perform pg_advisory_xact_lock(hashtextextended(p_workspace_id::text,7415));
  actor_role := public.business_record_assert_actor(p_workspace_id,p_user_id,p_verified_email,true);
  if actor_role not in ('owner','admin') then raise exception 'business_record_access_denied'; end if;
  select * into d from public.ask_business_record_drafts where workspace_id=p_workspace_id and id=p_draft_id for update;

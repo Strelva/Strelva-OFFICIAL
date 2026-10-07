@@ -1,45 +1,35 @@
 
  RUN  v4.1.11 /Users/jacobrhinehart/Desktop/strelva/REB-w6-owner-ask
 
-(node:288) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:28592) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
- ❯ src/__tests__/owner-entry.test.ts (38 tests | 1 failed) 8122ms
-     × is the same name in the proxy and the dashboard 5560ms
- � ❯ src/__tests__/ask-strelva-route.test.ts (0 test
-�
-⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
-
- FAIL  src/__tests__/ask-strelva-route.test.ts [ src/__tests__/ask-strelva-route.test.ts ]
-Error: Cannot find module '/src/platform/ask/workspace-drafts-server.ts' imported from /Users/jacobrhinehart/Desktop/strelva/REB-w6-owner-ask/src/app/api/workspace/ask/route.ts
- ❯ src/app/api/workspace/ask/route.ts:20:       18| } from "@/platform/ask";
-     19| import { loadTenantAskTools, tenantGoogleWriteGranted } from "@/platfo…
-     20| import { createAskWorkspaceDraftPort } from "@/platform/ask/workspace-…
-       | ^
-     21| import { streamModelText } from "@/platform/infra/model-calls";
-     22| import { createSupabasePossibilityRepository } from "@/platform/possib…
- ❯ src/__tests__/ask-strelva-route.test.ts:19:1
-
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
-
+ ❯ src/__tests__/inquiry-delivery-approval.test.ts (29 tests | 1 failed) 607ms
+     × execution sends the authored copy, not the template 37ms
 
 ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
 
- FAIL  src/__tests__/owner-entry.test.ts > the trusted dashboard path header > is the same name in the proxy and the dashboard
-Error: Test timed out in 5000ms.
-If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
- ❯ src/__tests__/owner-entry.test.ts:208:3
-    206|
-    207| describe("the trusted dashboard path header", () => {
-    208|   it("is the same name in the proxy and the dashboard", async () => {
-       |   ^
-    209|     const [{ DASHBOARD_PATH_HEADER: proxyName }, { DASHBOARD_PATH_HEAD…
-    210|     expect(serverName).toBe(proxyName);
+ FAIL  src/__tests__/inquiry-delivery-approval.test.ts > Ask-authored reply binding at the provider boundary > execution sends the authored copy, not the template
+AssertionError: expected { accepted: false, …(8) } to match object { accepted: true, status: 'verified' }
+(7 matching properties omitted from actual)
 
-⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+- Expected
++ Received
+
+  {
+-   "accepted": true,
+-   "status": "verified",
++   "accepted": false,
++   "status": "awaiting_approval",
+  }
+
+ ❯ src/__tests__/inquiry-delivery-approval.test.ts:709:162
 
 
- Test Files  2 failed | 3 passed (5)
-      Tests  1 failed | 75 passed (76)
-   Start at  23:00:30
-   Duration  173.72s (transform 202.03s, setup 16.92s, import 158.75s, tests 7.00s, environment 0ms)
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 5 passed (6)
+      Tests  1 failed | 123 passed (124)
+   Start at  09:28:34
+   Duration  11.92s (transform 17.37s, setup 1.35s, import 22.63s, tests 3.03s, environment 1ms)
 

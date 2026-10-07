@@ -558,6 +558,8 @@ export async function deliverInquiryAction(
   options: {
     policy?: PartialInquiryRoutingPolicy | null;
     approval?: InquiryDeliveryApproval | null;
+    /** Exact reviewed copy; the approval digest is checked against these options before sending. */
+    messageOptions?: InquiryDeliveryMessage["options"];
     responsibilityGate?: ResponsibilityDeliveryGate;
     deps?: InquiryDeliveryDependencies;
   } = {},
@@ -601,6 +603,7 @@ export async function deliverInquiryAction(
     await appendTimelineSafe(store, timelineFor(inquiry, action, blockedTimelineType(action), "recipient unavailable", "blocked", now.toISOString()));
     return { inquiryId: inquiry.id, tenantId: inquiry.tenantId, action, status: "unavailable", reason: "recipient_unavailable", retryable: false };
   }
+  if (options.messageOptions) message.options = options.messageOptions;
 
   let responsibilityGate: ResponsibilityDeliveryGate | null | undefined = options.responsibilityGate;
   if (deps.getResponsibilityGate) {

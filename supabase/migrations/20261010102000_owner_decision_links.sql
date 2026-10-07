@@ -1,6 +1,7 @@
 -- Account-free routine decisions. No membership is created or elevated.
 -- The link/session binds one item, recipient and revision; every real write
 -- still goes through its lifecycle resolver. Env flag is off by default.
+begin;
 set local lock_timeout = '3s';
 
 alter table public.strelva_service_actions drop constraint strelva_service_actions_purpose_check;
@@ -120,3 +121,5 @@ revoke all on function public.assert_owner_decision_link(uuid,uuid,uuid,text,tex
 revoke all on function public.authorize_owner_decision_link_run(uuid,uuid,uuid,text,text) from public,anon,authenticated;
 grant execute on function public.strelva_owner_decision_link_session(uuid,uuid,text,text) to service_role;
 grant execute on function public.authorize_owner_decision_link_run(uuid,uuid,uuid,text,text) to service_role;
+
+commit;

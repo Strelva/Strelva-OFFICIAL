@@ -807,6 +807,7 @@ export async function executeInquiryMessageReview(
     result = await deliverInquiryAction(context.inquiry, metadata.action, {
       policy: context.policy,
       approval,
+      ...(metadata.authoredReply === undefined ? {} : { messageOptions: context.message.options }),
       deps: deliveryDeps,
     });
   } catch (error) {

@@ -45,6 +45,7 @@ import { assertInquiryWorkspaceOpen } from "./workspace-exit";
 import { currentResponsibility } from "./currentness";
 
 export { recordedInquiryAssignee, recordedInquiryStatus } from "./record-projection";
+export { prepareInquiryMessageReviewWithDependencies } from "./delivery-approval-service";
 export { decideHeldInquiry, parseWorkspaceLead, readInquiryEvents, readWorkspaceInquiryLeads } from "./workspace-records";
 export type { HeldDecision, InquiryEventView, IntakeState, WorkspaceInquiryLead } from "./workspace-records";
 

@@ -1,5 +1,6 @@
 -- Website launch from one signed routine owner decision. No owner role or
 -- tenant membership is synthesized; the actual admin remains the executor.
+begin;
 set local lock_timeout = '3s';
 
 create function public.assert_website_owner_link(p_workspace_id uuid,p_work_id uuid,p_user_id uuid,p_verified_email text,
@@ -86,3 +87,5 @@ revoke all on function public.reserve_website_by_owner_link(uuid,uuid,uuid,text,
 revoke all on function public.publish_website_by_owner_link(uuid,uuid,uuid,text,integer,text,text,jsonb,uuid,uuid,text,text) from public,anon,authenticated;
 grant execute on function public.reserve_website_by_owner_link(uuid,uuid,uuid,text,integer,text,text,uuid,uuid,text,text) to service_role;
 grant execute on function public.publish_website_by_owner_link(uuid,uuid,uuid,text,integer,text,text,jsonb,uuid,uuid,text,text) to service_role;
+
+commit;

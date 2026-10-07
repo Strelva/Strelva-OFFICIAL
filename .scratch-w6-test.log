@@ -1,0 +1,21 @@
+
+> strelva@0.2.0 test /Users/jacobrhinehart/Desktop/strelva/REB-w6-owner-ask
+> vitest run --maxWorkers=4
+
+(node:47238) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+ RUN  v4.1.11 /Users/jacobrhinehart/Desktop/strelva/REB-w6-owner-ask
+
+ ❯ src/__tests__/booking-one-store.test.ts (29 tests | 1 failed | 1 skipped) 5767ms
+     × day and week views read identical bookings from the legacy store and the one store 5167ms
+ ❯ src/__tests__/owner-entry-homes.test.ts (37 tests | 3 failed) 441ms
+     × keeps Settings on /dashboard until owners can edit branding and domains in the workspace 156ms
+     × keeps meaning carried in the query 13ms
+     × no longer blocks owner entry for these pages; Settings still does 2ms
+ ❯ src/__tests__/production-readiness-snapshot.test.ts (8 tests | 1 failed) 213ms
+     × has a sentinel table for every unapplied migration that creates a table 189ms
+(node:70940) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:70201) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)

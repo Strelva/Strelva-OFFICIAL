@@ -1,5 +1,6 @@
 -- Pending operator owner invitations claimed by magic-link entry. Additive;
 -- the original accept transaction rechecks sponsor, verified identity and both memberships.
+begin;
 set local lock_timeout = '3s';
 create function public.claim_pending_business_owner(p_actor_id uuid, p_verified_email text, p_tenant_id text) returns uuid
 language plpgsql security definer set search_path = public, pg_temp as $$
@@ -21,3 +22,5 @@ end;
 $$;
 revoke all on function public.claim_pending_business_owner(uuid,text,text) from public, anon, authenticated;
 grant execute on function public.claim_pending_business_owner(uuid,text,text) to service_role;
+
+commit;

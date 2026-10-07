@@ -107,7 +107,7 @@ BEGIN
 SET
               handoff_id              |        customer_workspace_id         |           customer_work_id           | delegation_id | already_accepted 
 --------------------------------------+--------------------------------------+--------------------------------------+---------------+------------------
- 50000000-0000-4000-8000-000000000007 | cdfb636c-7e62-42f8-8cb9-b4948abddce8 | aeaac49d-8351-499f-880a-8393c259f0ad |               | f
+ 50000000-0000-4000-8000-000000000007 | f6881b49-ab4c-4b38-aaee-d3bf60f09004 | 04dc2518-b94b-4b3a-978f-5181eb3c53d1 |               | f
 (1 row)
 
 RESET
@@ -226,3 +226,1392 @@ DO
  work economics schema checks passed
 (1 row)
 
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+DO
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+DO
+DO
+CREATE TABLE
+ALTER TABLE
+REVOKE
+GRANT
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+REVOKE
+GRANT
+DO
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+CREATE FUNCTION
+CREATE FUNCTION
+                                                                                                                                                                                     job_economics_command                                                                                                                                                                                     
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ (894c12b7-edd8-40d1-88be-b3a1058f0f66,11111111-1111-4111-8111-111111111111,88888888-8888-4888-8888-888888888888,tracker,tracker,,,,,aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa,usd,500000,800000,0,0,100000,,f,cancelled,aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa,aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa,"2026-10-07 09:30:17.270454-04","2026-10-07 09:30:16.987762-04","2026-10-07 09:30:24.500225-04")
+(1 row)
+
+DO
+INSERT 0 1
+DO
+DO
+UPDATE 1
+DO
+DO
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+DO
+CREATE TABLE
+CREATE TABLE
+ALTER TABLE
+ALTER TABLE
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+DO
+CREATE TABLE
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+DO
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+DO
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+DO
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+DO
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+DO
+ALTER TABLE
+UPDATE 3
+DO
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+GRANT
+GRANT
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+INSERT 0 2
+INSERT 0 4
+INSERT 0 4
+INSERT 0 1
+INSERT 0 1
+INSERT 0 5
+DO
+              result               
+-----------------------------------
+ handoff destination checks passed
+(1 row)
+
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+REVOKE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TRIGGER
+INSERT 0 2
+INSERT 0 0
+INSERT 0 0
+UPDATE 0
+DO
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+DO
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+psql:/Users/jacobrhinehart/Desktop/strelva/REB-w6-owner-ask/supabase/migrations/20260914021000_application_source_updates.sql:123: NOTICE:  trigger "application_release_history_guard" for relation "public.application_releases" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+REVOKE
+REVOKE
+GRANT
+CREATE FUNCTION
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+REVOKE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+INSERT 0 3
+INSERT 0 2
+INSERT 0 3
+DO
+              result               
+-----------------------------------
+ application release checks passed
+(1 row)
+
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+DO
+DO
+                 result                  
+-----------------------------------------
+ application source update checks passed
+(1 row)
+
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+DO
+            result             
+-------------------------------
+ application use checks passed
+(1 row)
+
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+REVOKE
+GRANT
+GRANT
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+DO
+                result                 
+---------------------------------------
+ standing responsibility checks passed
+(1 row)
+
+ALTER FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+psql:/Users/jacobrhinehart/Desktop/strelva/REB-w6-owner-ask/supabase/migrations/20260914041000_standing_execution.sql:157: NOTICE:  trigger "standing_responsibility_claim_guard_trg" for relation "public.saved_product_work" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+REVOKE
+REVOKE
+REVOKE
+GRANT
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+DO
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+REVOKE
+REVOKE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TRIGGER
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+INSERT 0 3
+INSERT 0 2
+INSERT 0 3
+DO
+               result                
+-------------------------------------
+ offering installation checks passed
+(1 row)
+
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+DO
+CREATE FUNCTION
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+REVOKE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+INSERT 0 3
+INSERT 0 1
+INSERT 0 3
+INSERT 0 1
+DO
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+ALTER TABLE
+ALTER TABLE
+REVOKE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+INSERT 0 5
+INSERT 0 3
+INSERT 0 3
+INSERT 0 1
+DO
+            result             
+-------------------------------
+ service request checks passed
+(1 row)
+
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 3
+INSERT 0 2
+UPDATE 1
+DO
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+DO
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE FUNCTION
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+REVOKE
+GRANT
+REVOKE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+REVOKE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+REVOKE
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+INSERT 0 3
+INSERT 0 2
+INSERT 0 4
+INSERT 0 2
+INSERT 0 2
+DO
+             result             
+--------------------------------
+ offering website checks passed
+(1 row)
+
+CREATE TABLE
+ALTER TABLE
+REVOKE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+REVOKE
+GRANT
+CREATE FUNCTION
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+INSERT 0 1
+INSERT 0 2
+INSERT 0 2
+SELECT 1
+SELECT 1
+ assert_true 
+-------------
+ 
+(1 row)
+
+ assert_true 
+-------------
+ 
+(1 row)
+
+DO
+INSERT 0 1
+DELETE 1
+ assert_true 
+-------------
+ 
+(1 row)
+
+DO
+DO
+DO
+DELETE 1
+DO
+DO
+DO
+                  result                  
+------------------------------------------
+ public continuation schema checks passed
+(1 row)
+
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+GRANT
+CREATE FUNCTION
+INSERT 0 8
+INSERT 0 1
+INSERT 0 3
+DO
+DO
+CREATE EXTENSION
+CREATE FUNCTION
+CREATE TRIGGER
+DO
+DROP TRIGGER
+DO
+DO
+DO
+               result               
+------------------------------------
+ workspace invitation checks passed
+(1 row)
+
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+INSERT 0 4
+INSERT 0 1
+INSERT 0 4
+INSERT 0 2
+                  id                  |             workspace_id             |               work_id                | product_id | resource_kind | tenant_id | business_id | request_id | capability_id |               payer_id               | currency | estimate_cents | max_authorized_cents | reserved_cents | used_cents | strelva_retry_cents | actual_cents | actual_known | status |              created_by              | accepted_by | accepted_at |          created_at           |          updated_at           
+--------------------------------------+--------------------------------------+--------------------------------------+------------+---------------+-----------+-------------+------------+---------------+--------------------------------------+----------+----------------+----------------------+----------------+------------+---------------------+--------------+--------------+--------+--------------------------------------+-------------+-------------+-------------------------------+-------------------------------
+ 4e969516-1dce-4960-a507-b4bddac35c92 | a1000000-0000-4000-8000-000000000010 | a1000000-0000-4000-8000-000000000020 | tracker    | tracker       |           |             |            |               | a1000000-0000-4000-8000-000000000001 | usd      |                |                  500 |              0 |          0 |                   0 |              | f            | draft  | a1000000-0000-4000-8000-000000000001 |             |             | 2026-10-07 09:31:29.943975-04 | 2026-10-07 09:31:29.943975-04
+(1 row)
+
+                  id                  |             workspace_id             |          successor_user_id           |   successor_email    | status  |             proposed_by              | resolved_by |          proposed_at          | resolved_at | accepted_at 
+--------------------------------------+--------------------------------------+--------------------------------------+----------------------+---------+--------------------------------------+-------------+-------------------------------+-------------+-------------
+ 6c2b371a-95d5-4eff-b54e-804503ab2017 | a1000000-0000-4000-8000-000000000010 | a1000000-0000-4000-8000-000000000002 | successor@payer.test | pending | a1000000-0000-4000-8000-000000000001 |             | 2026-10-07 09:31:30.354089-04 |             | 
+(1 row)
+
+DO
+DO
+                  id                  |             workspace_id             |               work_id                | product_id | resource_kind | tenant_id | business_id | request_id | capability_id |               payer_id               | currency | estimate_cents | max_authorized_cents | reserved_cents | used_cents | strelva_retry_cents | actual_cents | actual_known | status |              created_by              | accepted_by | accepted_at |          created_at           |          updated_at           
+--------------------------------------+--------------------------------------+--------------------------------------+------------+---------------+-----------+-------------+------------+---------------+--------------------------------------+----------+----------------+----------------------+----------------+------------+---------------------+--------------+--------------+--------+--------------------------------------+-------------+-------------+-------------------------------+-------------------------------
+ 2648e91c-039b-4141-a36a-b0412e8430ee | a1000000-0000-4000-8000-000000000010 | a1000000-0000-4000-8000-000000000021 | tracker    | tracker       |           |             |            |               | a1000000-0000-4000-8000-000000000002 | usd      |                |                  700 |              0 |          0 |                   0 |              | f            | draft  | a1000000-0000-4000-8000-000000000001 |             |             | 2026-10-07 09:31:30.513222-04 | 2026-10-07 09:31:30.513222-04
+(1 row)
+
+                  id                  |             workspace_id             |               work_id                | product_id | resource_kind | tenant_id | business_id | request_id | capability_id |               payer_id               | currency | estimate_cents | max_authorized_cents | reserved_cents | used_cents | strelva_retry_cents | actual_cents | actual_known | status |              created_by              | accepted_by | accepted_at |          created_at           |          updated_at           
+--------------------------------------+--------------------------------------+--------------------------------------+------------+---------------+-----------+-------------+------------+---------------+--------------------------------------+----------+----------------+----------------------+----------------+------------+---------------------+--------------+--------------+--------+--------------------------------------+-------------+-------------+-------------------------------+-------------------------------
+ 4e969516-1dce-4960-a507-b4bddac35c92 | a1000000-0000-4000-8000-000000000010 | a1000000-0000-4000-8000-000000000020 | tracker    | tracker       |           |             |            |               | a1000000-0000-4000-8000-000000000001 | usd      |                |                  500 |              0 |          0 |                   0 |              | f            | draft  | a1000000-0000-4000-8000-000000000001 |             |             | 2026-10-07 09:31:29.943975-04 | 2026-10-07 09:31:29.943975-04
+(1 row)
+
+DO
+DELETE 1
+                  id                  |             workspace_id             |          successor_user_id           | successor_email  | status  |             proposed_by              | resolved_by |          proposed_at          | resolved_at | accepted_at 
+--------------------------------------+--------------------------------------+--------------------------------------+------------------+---------+--------------------------------------+-------------+-------------------------------+-------------+-------------
+ 257692c6-116a-4d7a-bef4-a743af80c83f | a1000000-0000-4000-8000-000000000010 | a1000000-0000-4000-8000-000000000003 | wrong@payer.test | pending | a1000000-0000-4000-8000-000000000001 |             | 2026-10-07 09:31:31.096969-04 |             | 
+(1 row)
+
+DELETE 1
+DO
+INSERT 0 1
+INSERT 0 1
+                  id                  |             workspace_id             |          successor_user_id           | successor_email  | status  |             proposed_by              | resolved_by |          proposed_at          | resolved_at | accepted_at 
+--------------------------------------+--------------------------------------+--------------------------------------+------------------+---------+--------------------------------------+-------------+-------------------------------+-------------+-------------
+ edfacd79-0cd3-47cd-b60a-1befbfad84a0 | a1000000-0000-4000-8000-000000000010 | a1000000-0000-4000-8000-000000000003 | wrong@payer.test | pending | a1000000-0000-4000-8000-000000000001 |             | 2026-10-07 09:31:31.859508-04 |             | 
+(1 row)
+
+                  id                  |             workspace_id             |          successor_user_id           | successor_email  |  status  |             proposed_by              |             resolved_by              |          proposed_at          |          resolved_at          |          accepted_at          
+--------------------------------------+--------------------------------------+--------------------------------------+------------------+----------+--------------------------------------+--------------------------------------+-------------------------------+-------------------------------+-------------------------------
+ edfacd79-0cd3-47cd-b60a-1befbfad84a0 | a1000000-0000-4000-8000-000000000010 | a1000000-0000-4000-8000-000000000003 | wrong@payer.test | accepted | a1000000-0000-4000-8000-000000000001 | a1000000-0000-4000-8000-000000000003 | 2026-10-07 09:31:31.859508-04 | 2026-10-07 09:31:31.993586-04 | 2026-10-07 09:31:31.993586-04
+(1 row)
+
+                  id                  |             workspace_id             |               work_id                | product_id | resource_kind | tenant_id | business_id | request_id | capability_id |               payer_id               | currency | estimate_cents | max_authorized_cents | reserved_cents | used_cents | strelva_retry_cents | actual_cents | actual_known | status |              created_by              | accepted_by | accepted_at |          created_at          |          updated_at           
+--------------------------------------+--------------------------------------+--------------------------------------+------------+---------------+-----------+-------------+------------+---------------+--------------------------------------+----------+----------------+----------------------+----------------+------------+---------------------+--------------+--------------+--------+--------------------------------------+-------------+-------------+------------------------------+-------------------------------
+ 772aea0d-f28f-41d3-8371-908392bbf909 | a1000000-0000-4000-8000-000000000010 | a1000000-0000-4000-8000-000000000026 | tracker    | tracker       |           |             |            |               | a1000000-0000-4000-8000-000000000003 | usd      |            100 |                  300 |              0 |          0 |                   0 |              | f            | draft  | a1000000-0000-4000-8000-000000000001 |             |             | 2026-10-07 09:31:32.02165-04 | 2026-10-07 09:31:32.116061-04
+(1 row)
+
+                  id                  |             workspace_id             |               work_id                | product_id | resource_kind | tenant_id | business_id | request_id | capability_id |               payer_id               | currency | estimate_cents | max_authorized_cents | reserved_cents | used_cents | strelva_retry_cents | actual_cents | actual_known |  status  |              created_by              |             accepted_by              |          accepted_at          |          created_at          |          updated_at           
+--------------------------------------+--------------------------------------+--------------------------------------+------------+---------------+-----------+-------------+------------+---------------+--------------------------------------+----------+----------------+----------------------+----------------+------------+---------------------+--------------+--------------+----------+--------------------------------------+--------------------------------------+-------------------------------+------------------------------+-------------------------------
+ 772aea0d-f28f-41d3-8371-908392bbf909 | a1000000-0000-4000-8000-000000000010 | a1000000-0000-4000-8000-000000000026 | tracker    | tracker       |           |             |            |               | a1000000-0000-4000-8000-000000000003 | usd      |            100 |                  300 |              0 |          0 |                   0 |              | f            | accepted | a1000000-0000-4000-8000-000000000001 | a1000000-0000-4000-8000-000000000003 | 2026-10-07 09:31:32.256257-04 | 2026-10-07 09:31:32.02165-04 | 2026-10-07 09:31:32.256257-04
+(1 row)
+
+DO
+                  id                  |             workspace_id             |          successor_user_id           | successor_email  | status  |             proposed_by              | resolved_by |          proposed_at          | resolved_at | accepted_at 
+--------------------------------------+--------------------------------------+--------------------------------------+------------------+---------+--------------------------------------+-------------+-------------------------------+-------------+-------------
+ 60aa7f70-4279-4135-9c67-b3b3e55e368f | a1000000-0000-4000-8000-000000000010 | a1000000-0000-4000-8000-000000000003 | wrong@payer.test | pending | a1000000-0000-4000-8000-000000000001 |             | 2026-10-07 09:31:33.037533-04 |             | 
+(1 row)
+
+                  id                  |             workspace_id             |          successor_user_id           | successor_email  | status  |             proposed_by              | resolved_by |          proposed_at          | resolved_at | accepted_at 
+--------------------------------------+--------------------------------------+--------------------------------------+------------------+---------+--------------------------------------+-------------+-------------------------------+-------------+-------------
+ b2659daa-94c7-42ad-8d5f-19c38d097971 | a1000000-0000-4000-8000-000000000010 | a1000000-0000-4000-8000-000000000001 | owner@payer.test | pending | a1000000-0000-4000-8000-000000000001 |             | 2026-10-07 09:31:33.315863-04 |             | 
+(1 row)
+
+DO
+                  id                  |             workspace_id             |          successor_user_id           |   successor_email    | status  |             proposed_by              | resolved_by |          proposed_at          | resolved_at | accepted_at 
+--------------------------------------+--------------------------------------+--------------------------------------+----------------------+---------+--------------------------------------+-------------+-------------------------------+-------------+-------------
+ 14f4564a-4355-4515-9331-b1a9009b0bd4 | a1000000-0000-4000-8000-000000000010 | a1000000-0000-4000-8000-000000000002 | successor@payer.test | pending | a1000000-0000-4000-8000-000000000001 |             | 2026-10-07 09:31:33.421729-04 |             | 
+(1 row)
+
+DO
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+INSERT 0 3
+INSERT 0 2
+INSERT 0 3
+INSERT 0 1
+INSERT 0 3
+INSERT 0 2
+INSERT 0 1
+INSERT 0 1
+DO
+             result             
+--------------------------------
+ workspace export checks passed
+(1 row)
+
+INSERT 0 1
+INSERT 0 1
+INSERT 0 2
+                  id                  |             workspace_id             |          successor_user_id           | successor_email | status  |             proposed_by              | resolved_by |          proposed_at          | resolved_at | accepted_at 
+--------------------------------------+--------------------------------------+--------------------------------------+-----------------+---------+--------------------------------------+-------------+-------------------------------+-------------+-------------
+ 7119ba6c-a511-4ad9-affa-dd627bb45f21 | a1000000-0000-4000-8000-000000000010 | a1000000-0000-4000-8000-000000000004 | next@payer.test | pending | a1000000-0000-4000-8000-000000000001 |             | 2026-10-07 09:31:37.596208-04 |             | 
+(1 row)
+
+DO
+DO
+INSERT 0 2
+DO
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+REVOKE
+ALTER TABLE
+DO
+ALTER TABLE
+DO
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+REVOKE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+CREATE TRIGGER
+ALTER TABLE
+DO
+CREATE INDEX
+CREATE FUNCTION
+psql:/Users/jacobrhinehart/Desktop/strelva/REB-w6-owner-ask/supabase/migrations/20260920030000_agency_provider_delivery.sql:32: NOTICE:  trigger "operational_assignment_agency_identity" for relation "public.operational_assignments" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+REVOKE
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+REVOKE
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+REVOKE
+GRANT
+REVOKE
+GRANT
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+REVOKE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+ALTER TABLE
+ALTER TABLE
+DO
+psql:/Users/jacobrhinehart/Desktop/strelva/REB-w6-owner-ask/supabase/migrations/20260920080000_subscription_allowance_entitlements.sql:37: NOTICE:  constraint "work_allowances_check2" of relation "work_allowances" does not exist, skipping
+ALTER TABLE
+psql:/Users/jacobrhinehart/Desktop/strelva/REB-w6-owner-ask/supabase/migrations/20260920080000_subscription_allowance_entitlements.sql:38: NOTICE:  constraint "work_allowances_cap_acceptance_check" of relation "work_allowances" does not exist, skipping
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+ALTER TABLE
+UPDATE 0
+CREATE FUNCTION
+psql:/Users/jacobrhinehart/Desktop/strelva/REB-w6-owner-ask/supabase/migrations/20260920080200_precise_provider_receipts.sql:34: NOTICE:  trigger "work_provider_receipt_fill_exact_amount_trigger" for relation "public.work_provider_receipts" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+ALTER TABLE
+REVOKE
+GRANT
+CREATE TABLE
+ALTER TABLE
+REVOKE
+GRANT
+CREATE TABLE
+ALTER TABLE
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE TABLE
+ALTER TABLE
+REVOKE
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+GRANT
+GRANT
+ALTER TABLE
+ALTER TABLE
+CREATE FUNCTION
+REVOKE
+GRANT
+ALTER FUNCTION
+REVOKE

@@ -2,8 +2,6 @@
 > strelva@0.2.0 check:boundaries /Users/jacobrhinehart/Desktop/strelva/REB-w6-owner-ask
 > tsx scripts/check-product-boundaries.ts
 
-src/app/api/workspace/ask/workspace-drafts-server.ts:5 Import a product through its index, contracts, server, or client entry point. (@/products/inquiries/delivery-approval-service)
-src/app/api/workspace/ask/workspace-drafts-server.ts:6 Import a product through its index, contracts, server, or client entry point. (@/products/inquiries/release)
-(node:8522) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+Product boundaries passed (source and scripts, including untracked files). Baseline, shrink only: 204 workspace -> src/lib imports in 93 files, 46 older boundary imports.
+(node:47310) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
- ELIFECYCLE  Command failed with exit code 1.
