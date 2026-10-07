@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PublicBookingError } from "@/platform/bookings/errors";
-const mocks = vi.hoisted(() => ({ limit: vi.fn(), read: vi.fn(), reserve: vi.fn(), confirm: vi.fn() }));
+const mocks = vi.hoisted(() => ({ limit: vi.fn(), read: vi.fn(), reserve: vi.fn(), confirm: vi.fn(), change: vi.fn(), cancel: vi.fn(), recover: vi.fn() }));
 vi.mock("@/platform/infra/rate-limit", () => ({ isRateLimitedAsync: mocks.limit, rateLimitKey: (_r: Request, prefix: string) => prefix + ":fixture-ip" }));
 vi.mock("@/products/scheduling/server", () => ({ PublicBookingError, publicBookingRangeSchema: { safeParse: (data: unknown) => ({ success: true, data }) }, publicBookingVisitorSchema: { safeParse: (data: unknown) => ({ success: true, data }) },
-  createPublicWebsiteBookingService: () => ({ read: mocks.read, reserve: mocks.reserve, confirm: mocks.confirm }) }));
+  recoverPublicWebsiteBooking: mocks.recover, createPublicWebsiteBookingService: () => ({ read: mocks.read, reserve: mocks.reserve, confirm: mocks.confirm, change: mocks.change, cancel: mocks.cancel }) }));
 import { GET as read } from "@/app/api/v1/bookings/[tenant]/route";
 import { POST as reserve } from "@/app/api/v1/bookings/[tenant]/reservations/route";
 import { POST as confirm } from "@/app/booking-confirm/[token]/action/route";
+import { PATCH as change, DELETE as cancel } from "@/app/api/v1/bookings/[tenant]/reservations/[reservationId]/route";
+import { POST as readback } from "@/app/api/v1/bookings/[tenant]/reservations/[reservationId]/readback/route";
 import confirmationPage from "@/app/booking-confirm/[token]/page";
 import { renderToStaticMarkup } from "react-dom/server";
 const params = { params: Promise.resolve({ tenant: "fixture" }) };
@@ -16,6 +18,12 @@ describe("public booking route limits", () => {
   it.each([true, new Error("Redis down")])("denies reservation writes on rate limit or limiter error before placement", async result => {
     if (result instanceof Error) mocks.limit.mockRejectedValue(result); else mocks.limit.mockResolvedValue(result);
     expect((await reserve(request(), params)).status).toBe(result === true ? 429 : 503); expect(mocks.reserve).not.toHaveBeenCalled();
+  });
+  it.each([change, cancel, readback])("management and status paths fail closed before calendar work", async route => {
+    mocks.limit.mockRejectedValue(new Error("Redis down"));
+    const req = new Request("https://app.example.test/api/v1/bookings/fixture/reservations/receipt", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ managementToken: "management-token", capabilityId: "consult", capabilityVersion: 1, slotId: "slot-abcdefgh" }) });
+    expect((await route(req, { params: Promise.resolve({ tenant: "fixture", reservationId: "receipt" }) })).status).toBe(503);
+    expect(mocks.change).not.toHaveBeenCalled(); expect(mocks.cancel).not.toHaveBeenCalled(); expect(mocks.recover).not.toHaveBeenCalled();
   });
   it("checks both visitor and business budgets before reading a calendar", async () => {
     expect((await read(new Request("https://app.example.test/api/v1/bookings/fixture?capabilityId=consult"), params)).status).toBe(200);
