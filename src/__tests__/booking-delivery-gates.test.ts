@@ -16,7 +16,7 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe("real booking lifecycle email boundary", () => {
   it.each(["client", "customer"] as const)("requires all email gates for %s reminders", async audience => {
-    const input = { audience, tenantId: "fixture", to: "dana@example.test", subject: "Fixture reminder" };
+    const input = { audience, tenantId: "fixture", to: "dana@example.test", subject: "Fixture reminder", options: { heading: "Reminder", paragraphs: ["Your time is booked."] } };
     for (const flag of ["EMAIL_SENDING_ENABLED", "CUSTOMER_EMAIL_ENABLED"]) {
       vi.stubEnv(flag, "false");
       expect(await bookingLifecyclePorts.send(input)).toEqual({ status: "suppressed", reason: "email_gates" });

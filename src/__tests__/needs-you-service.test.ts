@@ -348,7 +348,7 @@ describe("booking request clock ownership", () => {
   it("delivers only the newly captured booking and leaves unrelated work for the cron", async () => {
     vi.stubEnv("STRELVA_BOOKING_OWNER_NOTICE","1");
     const { row, svc } = await setup();
-    const other = await mem.store.open(WS, { kind:"website.publish", route:"owner_decides", title:"Unrelated publish", approveEffect:"Publish", notYetEffect:"Keep draft", sourceLifecycle:"other", sourceId:"other", revisionHash:"other", urgent:true, adminMayDecide:false });
+    const other = await mem.store.open(WS, { kind:"structure", route:"owner_decides", title:"Unrelated publish", approveEffect:"Publish", notYetEffect:"Keep draft", sourceLifecycle:"website_document", sourceId:"other", revisionHash:"other", urgent:true, adminMayDecide:false });
     expect((await svc.notifyBookingRequest(WS,row.id)).urgent).toBe(1);
     expect(sendEmail).toHaveBeenCalledOnce();
     expect(sendEmail.mock.calls[0]?.[0].tags).toMatchObject({lifecycle:"booking_request",kind:"urgent"});

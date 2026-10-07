@@ -6,7 +6,7 @@ vi.mock("@/platform/bookings/inquiry-offers", () => ({
 }));
 import { createInquiryDeliveryMessage, prepareInquiryDeliveryMessage } from "@/products/inquiries/delivery-message";
 const inquiry = { id: "inq1", tenantId: "fictional", name: "Dana", email: "dana@example.test", businessName: "Fictional Firm", receivedAt: "2026-11-01T12:00:00Z" };
-const route = { tenantId: "fictional", businessName: "Fictional Firm", customerEmail: "dana@example.test", ownerEmail: "owner@example.test", ownerNotification: "legacy" as const, active: true };
+const route = { tenantId: "fictional", businessName: "Fictional Firm", customerEmail: "dana@example.test", customerReplyTo: "firm@example.test", ownerEmail: "owner@example.test", ownerNotification: "legacy" as const, active: true };
 beforeEach(() => { mocks.offer.mockReset(); mocks.offer.mockResolvedValue(null); });
 it("keeps the original receipt exact when there is no enabled offer", async () => {
   expect(await prepareInquiryDeliveryMessage(inquiry, route, "reply")).toEqual(createInquiryDeliveryMessage(inquiry, route, "reply"));
