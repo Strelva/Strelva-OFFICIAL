@@ -101,22 +101,26 @@ begin
   select c->>'id' into service_id from jsonb_array_elements(review->'changes') c where c->>'entity' = 'service' and c->'after'->>'name' = 'Agency cleaning';
   perform pg_temp.fo_assert(service_id is not null, 'the agency service is pending');
 
-  -- 3. A recipient an operator wrote cannot approve its own change.
+  -- 3. A recipient an operator wrote neither receives nor approves owner
+  -- links: delivery and the link claim keep resolving the existing owner.
   perform public.patch_business_record(ws, operator_id, 'lp-operator@example.test', 'operator', rev,
     '{"facts":{"owner_recipient":{"value":{"email":"lp-operator@example.test"}}}}', gen_random_uuid(), repeat('b', 64));
   rev := rev + 1;
+  perform pg_temp.fo_assert(public.resolve_business_owner_recipient(ws)->>'email' = 'lp-owner@example.test'
+    and (public.resolve_business_owner_recipient(ws)->>'trusted')::boolean, 'a pending provider recipient does not displace the owner');
   review := public.read_business_fact_review(ws);
   item := public.open_owner_decision(ws, jsonb_build_object('kind', 'fact.inferred', 'route', 'owner_decides', 'title', 'Confirm changes to your business details',
     'approveEffect', 'These details go live.', 'notYetEffect', 'Nothing changes.', 'sourceLifecycle', 'business_facts', 'sourceId', ws::text,
     'revisionHash', review->>'revisionHash', 'urgent', false, 'adminMayDecide', false));
   d1 := (item->>'id')::uuid;
+  perform pg_temp.fo_assert((select d->'recipient'->>'email' from jsonb_array_elements(public.list_open_owner_decisions_for_delivery(500)) d
+    where (d->>'id')::uuid = d1) = 'lp-owner@example.test', 'the email goes to the owner, not the provider address');
   perform pg_temp.fo_error(format('select public.confirm_business_facts(%L,%L,%L)', ws, d1, review->>'revisionHash'), 'business_facts_owner_approval_required');
   perform pg_temp.fo_error(format('select public.claim_owner_decision(%L,%L,%L,%L,%L,%L,%L,null)', ws, d1, review->>'revisionHash', 'approve', 'operator', operator_id, 'lp-operator@example.test'), 'owner_decision_owner_only');
   perform pg_temp.fo_error(format('select public.claim_owner_decision(%L,%L,%L,%L,%L,%L,%L,null)', ws, d1, review->>'revisionHash', 'approve', 'session', admin_id, 'lp-admin@example.test'), 'owner_decision_permission_denied');
-  result := public.claim_owner_decision(ws, d1, review->>'revisionHash', 'approve', 'owner_link', null, null, 'lp-operator@example.test');
-  perform pg_temp.fo_assert(result->>'status' = 'claimed', 'the redirected link claims under the shared resolver');
-  perform pg_temp.fo_error(format('select public.confirm_business_facts(%L,%L,%L)', ws, d1, review->>'revisionHash'), 'business_facts_owner_approval_required');
-  perform pg_temp.fo_assert(public.read_hosted_website_business_facts(tenant)->'facts'->>'phone' = '716-555-0101', 'a redirected approval publishes nothing');
+  perform pg_temp.fo_error(format('select public.claim_owner_decision(%L,%L,%L,%L,%L,null,null,%L)', ws, d1, review->>'revisionHash', 'approve', 'owner_link', 'lp-operator@example.test'),
+    'owner_decision_recipient_not_owner');
+  perform pg_temp.fo_assert(public.read_hosted_website_business_facts(tenant)->'facts'->>'phone' = '716-555-0101', 'a redirected link publishes nothing');
   perform public.patch_business_record(ws, operator_id, 'lp-operator@example.test', 'operator', rev, '{"facts":{"owner_recipient":null}}', gen_random_uuid(), repeat('b', 64));
   rev := rev + 1;
 
@@ -135,6 +139,7 @@ begin
 
   -- 5. The owner's signed link (no session, no account needed) publishes exactly what was shown.
   review := public.read_business_fact_review(ws);
+  perform pg_temp.fo_assert(public.list_business_fact_review_workspaces(500) @> to_jsonb(array[ws]), 'the chase finds a business with pending facts');
   item := public.open_owner_decision(ws, jsonb_build_object('kind', 'fact.inferred', 'route', 'owner_decides', 'title', 'Confirm changes to your business details',
     'approveEffect', 'These details go live.', 'notYetEffect', 'Nothing changes.', 'sourceLifecycle', 'business_facts', 'sourceId', ws::text,
     'revisionHash', review->>'revisionHash', 'urgent', false, 'adminMayDecide', false));
@@ -143,6 +148,8 @@ begin
   perform pg_temp.fo_assert(result->>'status' = 'claimed', 'the trusted owner recipient claims');
   result := public.confirm_business_facts(ws, d3, review->>'revisionHash');
   perform pg_temp.fo_assert(result->>'replayed' = 'false' and result->>'decidedByKind' = 'owner_link', 'owner link decision is applied');
+  perform pg_temp.fo_assert(result->'factKeys' @> '["description","display_name","email","hours","phone"]'::jsonb
+    and (result->>'recordRevision')::bigint = (review->>'recordRevision')::bigint, 'the receipt names the confirmed facts and revision');
   hosted := public.read_hosted_website_business_facts(tenant);
   perform pg_temp.fo_assert(hosted->'facts'->>'phone' = '716-555-0199', 'approved operator phone is live');
   perform pg_temp.fo_assert(not (hosted->'facts' ? 'display_name'), 'approved deletion is live');
@@ -150,6 +157,7 @@ begin
   perform pg_temp.fo_assert(exists (select 1 from jsonb_array_elements(hosted->'services') s where s->>'name' = 'Agency cleaning' and s->>'priceText' = '$99'), 'approved agency service is live');
   perform pg_temp.fo_assert(public.read_connected_site_context(key)->'facts'->>'description' = 'Late agency copy.', 'approval reaches connected sites');
   perform pg_temp.fo_assert(public.read_business_fact_review(ws) is null, 'nothing waits after approval');
+  perform pg_temp.fo_assert(not public.list_business_fact_review_workspaces(500) @> to_jsonb(array[ws]), 'nothing to chase after approval');
   perform pg_temp.fo_assert(public.confirm_business_facts(ws, d3, review->>'revisionHash')->>'replayed' = 'true', 'replay returns the first receipt');
   perform pg_temp.fo_error(format('update public.business_record_fact_confirmations set decided_by = %L where decision_id = %L', 'x', d3), 'business_record_history_immutable');
   perform pg_temp.fo_error(format('delete from public.business_record_fact_confirmations where decision_id = %L', d3), 'business_record_history_immutable');
@@ -170,6 +178,33 @@ begin
   update public.workspace_memberships set role = 'owner' where workspace_id = ws and user_id = owner_id;
   perform public.confirm_business_facts(ws, (item->>'id')::uuid, review->>'revisionHash');
   perform pg_temp.fo_assert(public.read_hosted_website_business_facts(tenant)->'services' @> '[{"name":"Agency cleaning","priceText":"$120"}]', 'owner session approval is live');
+
+  -- 7. An owner-confirmed recipient A stays the approver while a provider's
+  -- change to B waits: delivery, claim and confirmation all trust A, and
+  -- approving it makes B the owner's address.
+  rev := (select revision from public.business_records where workspace_id = ws);
+  perform public.patch_business_record(ws, owner_id, 'lp-owner@example.test', 'owner', rev,
+    '{"facts":{"owner_recipient":{"value":{"email":"fo-owner-a@example.test","name":"Owner A"}}}}', gen_random_uuid(), repeat('b', 64));
+  rev := rev + 1;
+  perform pg_temp.fo_assert(public.resolve_business_owner_recipient(ws)->>'email' = 'fo-owner-a@example.test', 'the owner-written recipient is trusted at once');
+  perform public.patch_business_record(ws, agency_user, 'fo-agency@example.test', 'agency', rev,
+    '{"facts":{"owner_recipient":{"value":{"email":"fo-provider-b@example.test"}}}}', gen_random_uuid(), repeat('b', 64));
+  rev := rev + 1;
+  perform pg_temp.fo_assert(public.resolve_business_owner_recipient(ws) @> '{"email":"fo-owner-a@example.test","name":"Owner A","from":"record","trusted":true}',
+    'delivery keeps the confirmed owner while the change waits');
+  review := public.read_business_fact_review(ws);
+  item := public.open_owner_decision(ws, jsonb_build_object('kind', 'fact.inferred', 'route', 'owner_decides', 'title', 'Confirm changes to your business details',
+    'approveEffect', 'These details go live.', 'notYetEffect', 'Nothing changes.', 'sourceLifecycle', 'business_facts', 'sourceId', ws::text,
+    'revisionHash', review->>'revisionHash', 'urgent', false, 'adminMayDecide', false));
+  perform pg_temp.fo_assert((select d->'recipient'->>'email' from jsonb_array_elements(public.list_open_owner_decisions_for_delivery(500)) d
+    where d->>'id' = item->>'id') = 'fo-owner-a@example.test', 'the item is emailed to A');
+  perform pg_temp.fo_error(format('select public.claim_owner_decision(%L,%L,%L,%L,%L,null,null,%L)', ws, item->>'id', review->>'revisionHash', 'approve', 'owner_link', 'fo-provider-b@example.test'),
+    'owner_decision_recipient_not_owner');
+  result := public.claim_owner_decision(ws, (item->>'id')::uuid, review->>'revisionHash', 'approve', 'owner_link', null, null, 'fo-owner-a@example.test');
+  perform pg_temp.fo_assert(result->>'status' = 'claimed', 'A claims without an account');
+  result := public.confirm_business_facts(ws, (item->>'id')::uuid, review->>'revisionHash');
+  perform pg_temp.fo_assert(result->'factKeys' = '["owner_recipient"]'::jsonb, 'A confirmed the recipient change');
+  perform pg_temp.fo_assert(public.resolve_business_owner_recipient(ws)->>'email' = 'fo-provider-b@example.test', 'the approved recipient is the owner address now');
 end $$;
 rollback;
 

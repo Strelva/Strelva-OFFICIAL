@@ -17,6 +17,9 @@ import { applySectionUpdate } from "@/lib/apply-section-update";
 import { addEvent } from "@/lib/events";
 import { siteEditingFor } from "@/products/websites/server";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
+import type { ResolveBy } from "@/platform/needs-you/adapters";
+import type { BusinessFactsReceipt } from "@/platform/needs-you/sources/business-facts";
+import { needsYouStore } from "@/platform/needs-you/server";
 
 const CONTACT_KEYS = ["phone", "email", "address", "hours"] as const;
 
@@ -148,5 +151,42 @@ export function nativeWebsiteFactsPatch(patch: typeof patchBusinessRecord = patc
       try { await prepare(args[0], args[1], result.revision, Object.keys(raw.facts ?? {})); } catch { /* The business save remains accepted. */ }
     }
     return result;
+  };
+}
+
+const confirmedLive = {
+  enabled: live.enabled,
+  /** Linked native custom-repo sites, read without a member (the owner's link has none). */
+  nativeTenants: async (workspaceId: string) => {
+    const tenants = await Promise.all((await needsYouStore.linkedTenants(workspaceId)).map(link => getTenantConfig(link.tenantId)));
+    return tenants.filter(tenant => tenant?.active && tenant.deliveryModel === "custom_repo" && siteEditingFor(tenant) === "native").map(tenant => tenant!.id);
+  },
+  report: async (tenantId: string, revision: number) => { await addEvent({ tenantId, source: "website", type: "change_verify_failed", status: "pending",
+    title: "Owner-approved business facts need a website review", body: "The owner approved new contact details by email link. Prepare this site's contact review from the confirmed business record.",
+    metadata: { reviewAudience: "operator", kind: "native_business_facts", recordRevision: revision, reason: "owner_link_confirmation" } }, { requirePersistence: true }); },
+};
+export type ConfirmedNativeFactPorts = typeof confirmedLive;
+
+/**
+ * After the owner's Needs you decision confirms business facts (#509), a
+ * native website's contact section follows as it does after the owner's own
+ * save. Signed in, the owner prepares that review as themselves. A signed
+ * link carries no member identity, so each linked native site gets an
+ * operator review item instead, and the decision reports the website as
+ * pending rather than live.
+ */
+export function createConfirmedNativeFactsEffect(prepare = createNativeWebsiteFactService(), ports: ConfirmedNativeFactPorts = confirmedLive) {
+  return async (receipt: BusinessFactsReceipt, by: ResolveBy): Promise<{ websitePending: boolean }> => {
+    const changed = receipt.factKeys.filter(key => CONTACT_KEYS.some(contact => contact === key));
+    if (!changed.length || !ports.enabled()) return { websitePending: false };
+    const actor = by.kind === "session" ? by.actor : by.kind === "owner_link" ? by.actor : null;
+    if (actor) {
+      await prepare(actor, receipt.workspaceId, receipt.recordRevision, changed);
+      return { websitePending: false };
+    }
+    if (by.kind !== "owner_link") return { websitePending: false };
+    const tenants = await ports.nativeTenants(receipt.workspaceId);
+    for (const tenantId of tenants) await ports.report(tenantId, receipt.recordRevision);
+    return { websitePending: tenants.length > 0 };
   };
 }

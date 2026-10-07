@@ -17,7 +17,7 @@ import { createNeedsYouService } from "./service";
 import { systemsSourceAdapters } from "./systems-sources";
 import { deliverySourceAdapters } from "./sources/live-delivery";
 import { productSourceAdapters } from "./sources/live-products";
-import { businessFactsAdapter, createBusinessFactReviewStore } from "./sources/business-facts";
+import { businessFactsAdapter, createBusinessFactReviewStore, type BusinessFactsPorts } from "./sources/business-facts";
 import { bookingRequestAdapter, bookingRequestItem } from "@/platform/bookings/needs-you-adapter";
 import { decideBookingRequest, readWorkspaceBooking, readWorkspaceBookingRequests, readNativeBookingWorkspaces } from "@/platform/bookings/store";
 import { bookingStoreWriteEnabled, bookingOwnerNoticeEnabled, bookingReadSource } from "@/platform/bookings/flags";
@@ -33,14 +33,22 @@ export function needsYouAppOrigin(): string {
   return process.env.NEXT_PUBLIC_APP_URL || "https://app.strelva.com";
 }
 
-export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
+/** What a decision carries past the source, wired at the app edge (routes may import what platform can't). */
+export interface NeedsYouEffects {
+  /** After business facts are confirmed: native websites follow (#509). */
+  businessFactsConfirmed?: BusinessFactsPorts["confirmed"];
+}
+
+export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore, effects: NeedsYouEffects = {}) {
   const commitments = new DeliveryCommitmentService(mutateServiceRequestCommitment);
+  const facts = createBusinessFactReviewStore();
   return createNeedsYouService({
     store,
     appOrigin: needsYouAppOrigin(),
     now: () => Date.now(),
     bookingCalendarHealth: chaseBookingCalendarHealth,
     bookingWorkspaces: async () => bookingStoreWriteEnabled() && await bookingReadSource() === "postgres" ? readNativeBookingWorkspaces() : [],
+    pendingWorkspaces: () => facts.pendingWorkspaces(),
     async sendEmail(input) {
       if (input.tags?.lifecycle === "booking_request" || input.tags?.lifecycle === "booking_calendar_health") {
         const { bookingCustomerEmailAllowed } = await import("@/platform/bookings/updates");
@@ -71,7 +79,7 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
       ...productSourceAdapters(),
       bookingSettingsAdapter(),
       // Provider and operator edits to business details wait for the owner (#509).
-      businessFactsAdapter(createBusinessFactReviewStore()),
+      businessFactsAdapter({ read: facts.read, confirm: facts.confirm, ...(effects.businessFactsConfirmed ? { confirmed: effects.businessFactsConfirmed } : {}) }),
       // Booking requests in the one booking store (empty until request mode is used).
       bookingRequestAdapter({
         // Nothing to read until the store receives writes (and its migration exists).

@@ -100,7 +100,13 @@ function confirmPage(params: {
   body: string;
   confirmLabel: string;
   dashboardUrl?: string;
+  /** Every value the confirm applies, in full (Needs you sources with a review). */
+  lines?: readonly string[];
 }): NextResponse {
+  const review = params.lines?.length
+    ? `<ul style="margin:22px 0 0;padding:0 0 0 18px;text-align:left;font-size:14px;line-height:1.55;color:${INK};">${params.lines
+      .map(line => `<li style="margin:0 0 8px;white-space:pre-wrap;overflow-wrap:anywhere;">${escapeHtml(line)}</li>`).join("")}</ul>`
+    : "";
   const secondary = params.dashboardUrl
     ? `<div style="margin-top:14px;"><a href="${escapeHtml(params.dashboardUrl)}" style="font-size:13px;color:${MUTED};text-decoration:underline;">Open your dashboard instead</a></div>`
     : "";
@@ -108,7 +114,7 @@ function confirmPage(params: {
           <input type="hidden" name="token" value="${escapeHtml(params.token)}">
           <button type="submit" style="display:inline-block;padding:12px 26px;border:0;border-radius:999px;background:${ACCENT};color:#fff;font-weight:600;font-size:15px;cursor:pointer;">${escapeHtml(params.confirmLabel)}</button>
         </form>${secondary}`;
-  return shell(200, headingBody(params.heading, params.body) + form);
+  return shell(200, headingBody(params.heading, params.body) + review + form);
 }
 
 const INVALID = {
@@ -145,6 +151,10 @@ async function workspaceConfirm(token: string, claims: WorkspaceApproveLinkClaim
   if (item.state !== "open") return noticePage({ status: 200, ...HANDLED, dashboardUrl: open, buttonLabel: "Open" });
   if (Date.parse(item.expiresAt) <= Date.now()) return noticePage({ status: 200, ...EXPIRED, dashboardUrl: open, buttonLabel: "Open" });
   if (item.signInRequired) return noticePage({ status: 200, heading: "Sign in to decide this", body: "Decisions about access, money or leaving Strelva need you signed in. Nothing was done.", dashboardUrl: open, buttonLabel: "Sign in and open" });
+  // A source whose detail can't hold every value shows the complete review
+  // here, read for this exact revision; without it nothing is offered.
+  const lines = await needsYouService().review(item).catch(() => null);
+  if (lines === null) return noticePage({ status: 200, ...CHANGED, dashboardUrl: open, buttonLabel: "Open" });
   const isApprove = claims.action === "approve";
   return confirmPage({
     token,
@@ -152,6 +162,7 @@ async function workspaceConfirm(token: string, claims: WorkspaceApproveLinkClaim
     body: `${isApprove ? item.approveEffect : item.notYetEffect} Nothing happens until you confirm.`,
     confirmLabel: isApprove ? "Confirm — approve" : "Confirm — not yet",
     dashboardUrl: open,
+    ...(lines ? { lines } : {}),
   });
 }
 
@@ -160,7 +171,9 @@ async function workspaceResolve(claims: WorkspaceApproveLinkClaims): Promise<Nex
   const open = workspaceOpenUrl(claims.workspaceId);
   let result;
   try {
-    result = await needsYouService().decide({
+    // Confirmed business facts carry on to native websites (#509).
+    const { createConfirmedNativeFactsEffect } = await import("@/app/workspace/business-details/native-website-facts");
+    result = await needsYouService(needsYouStore, { businessFactsConfirmed: createConfirmedNativeFactsEffect() }).decide({
       workspaceId: claims.workspaceId,
       itemId: claims.itemId,
       revision: claims.revision,

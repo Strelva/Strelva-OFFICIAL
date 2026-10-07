@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockRead = vi.hoisted(() => vi.fn());
 const mockDecide = vi.hoisted(() => vi.fn());
+const mockReview = vi.hoisted(() => vi.fn(async (): Promise<string[] | null | undefined> => undefined));
+const mockService = vi.hoisted(() => vi.fn());
 const mockReleased = vi.hoisted(() => vi.fn(() => true));
 const mockResolveEventAction = vi.hoisted(() => vi.fn());
 
@@ -13,8 +15,9 @@ vi.mock("@/platform/needs-you/server", () => ({
   needsYouReleaseEnabled: mockReleased,
   needsYouAppOrigin: () => "https://app.example.test",
   needsYouStore: { read: mockRead },
-  needsYouService: () => ({ decide: mockDecide }),
+  needsYouService: (...args: unknown[]) => { mockService(...args); return { decide: mockDecide, review: mockReview }; },
 }));
+vi.mock("@/app/workspace/business-details/native-website-facts", () => ({ createConfirmedNativeFactsEffect: () => "native-facts-effect" }));
 vi.mock("@/lib/event-actions", () => ({ resolveEventAction: mockResolveEventAction }));
 vi.mock("@/lib/tenants", () => ({ getTenantConfig: vi.fn(async () => ({ id: "gldf", siteName: "GLDF" })) }));
 vi.mock("@/lib/tenant-urls", () => ({ getTenantDashboardUrl: () => "https://admin.gldf.example.test/dashboard" }));
@@ -119,6 +122,26 @@ describe("GET with a workspace link (scanner-safe)", () => {
     expect(mockDecide).not.toHaveBeenCalled();
   });
 
+  it("shows every value a business-facts approval applies, and offers nothing when that review is gone (#509)", async () => {
+    const { signWorkspaceApproveToken } = await import("@/lib/approve-link");
+    const long = `${"Long owner copy. ".repeat(130)}<script>end</script>`;
+    mockRead.mockResolvedValueOnce(item({ title: "Confirm changes to your business details", sourceLifecycle: "business_facts" }));
+    mockReview.mockResolvedValueOnce([`Description: ${long}`, 'Service "Cleaning" Price: $99 → $999', "Phone: 716-555-0101 → 716-555-0199"]);
+    const html = await (await get(signWorkspaceApproveToken(claims))).text();
+    expect(html).toContain('Service &quot;Cleaning&quot; Price: $99 → $999');
+    expect(html).toContain("Phone: 716-555-0101 → 716-555-0199");
+    expect(html).toContain("Long owner copy. ".repeat(130).trim());
+    expect(html).toContain("&lt;script&gt;end&lt;/script&gt;");
+    expect(html).not.toContain("<script>end");
+    expect(html).toContain('method="POST"');
+    expect(mockReview).toHaveBeenCalledWith(expect.objectContaining({ id: ITEM, revisionHash: REV }));
+    mockReview.mockResolvedValueOnce(null);
+    const gone = await (await get(signWorkspaceApproveToken(claims))).text();
+    expect(gone).toContain("This changed since we emailed you");
+    expect(gone).not.toContain('method="POST"');
+    expect(mockDecide).not.toHaveBeenCalled();
+  });
+
   it("says already handled for a closed item", async () => {
     const { signWorkspaceApproveToken } = await import("@/lib/approve-link");
     mockRead.mockResolvedValueOnce(item({ state: "approved" }));
@@ -132,6 +155,7 @@ describe("POST with a workspace link", () => {
     const res = await post(signWorkspaceApproveToken({ ...claims, action: "not-yet" }));
     expect(res.status).toBe(200);
     expect(mockDecide).toHaveBeenCalledWith({ workspaceId: WS, itemId: ITEM, revision: REV, decision: "not_yet", by: { kind: "owner_link", recipient: "owner@example.test" } });
+    expect(mockService).toHaveBeenCalledWith(expect.anything(), { businessFactsConfirmed: "native-facts-effect" });
     expect(await res.text()).toContain("Not yet");
   });
 

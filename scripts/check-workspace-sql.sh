@@ -692,7 +692,10 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011133700_bus
 psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/rollback-business-facts-owner-decision.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/website-business-facts-schema.sql"
+# Owner history before the forward migration: the confirmed copy keeps it.
+psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-backfill-seed.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261011133700_business_facts_owner_decision.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-backfill.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/business-facts-owner-decision-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/website-business-facts-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"

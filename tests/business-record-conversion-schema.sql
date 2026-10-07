@@ -105,8 +105,10 @@ select pg_temp.cv_assert((select value#>>'{counts,facts}' = '9' and value#>>'{co
 select pg_temp.cv_assert((public.read_business_record((select id from cv_ws), 'cf000000-0000-4000-8000-000000000001', 'operator@strelva.example.test')->>'access') = 'admin', 'operator reads the record as admin');
 
 -- The owner recipient comes from the record, imported from tenants.owner_email.
-select pg_temp.cv_assert((select public.resolve_business_owner_recipient(id) from cv_ws)
+-- After 20261011133700 (#509) the resolver also says the import is trusted.
+select pg_temp.cv_assert((select public.resolve_business_owner_recipient(id) - 'trusted' from cv_ws)
   = '{"email":"owner@example.com","name":"Pat Example","from":"record","source":"tenant_import","verified":false,"tenantId":null}'::jsonb, 'owner recipient from the imported fact');
+select pg_temp.cv_assert((select public.resolve_business_owner_recipient(id)->>'trusted' from cv_ws) is distinct from 'false', 'the imported recipient is trusted');
 
 -- Reruns are no-ops: the same command replays; a new plan for a linked tenant returns the existing receipt.
 insert into cv_result select 'replay', public.convert_tenant_to_business('operator@strelva.example.test', 'gldf',
@@ -150,7 +152,7 @@ select pg_temp.cv_expect($$select public.convert_tenant_to_business('operator@st
 insert into cv_result select 'quiet', public.convert_tenant_to_business('operator@strelva.example.test', 'quiet-site',
   '{"tenantId":"quiet-site","tenantStableId":"c0ffee00-0000-4000-8000-0000000000a3","workspaceName":"Quiet Site","billing":null,"account":null,"patch":{},"contacts":[]}',
   'cf000000-0000-4000-8000-0000000000c5', repeat('5', 64));
-select pg_temp.cv_assert((select public.resolve_business_owner_recipient((value->>'workspaceId')::uuid) from cv_result where label = 'quiet')
+select pg_temp.cv_assert((select public.resolve_business_owner_recipient((value->>'workspaceId')::uuid) - 'trusted' from cv_result where label = 'quiet')
   = '{"email":"quiet-owner@example.com","name":null,"from":"tenant_fallback","source":null,"verified":false,"tenantId":"quiet-site"}'::jsonb, 'owner recipient falls back to the linked tenant');
 
 -- Workspace isolation: another business's owner sees none of this.
