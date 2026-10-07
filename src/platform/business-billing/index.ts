@@ -24,6 +24,12 @@ import { resolveBillingType, type BillingFields } from "@/lib/billing-type";
 export const BUSINESS_BILLING_STATES = ["subscription", "custom", "comped", "grandfathered", "none"] as const;
 export type BusinessBillingState = (typeof BUSINESS_BILLING_STATES)[number];
 
+/** A price decision and a separate sale path are still required. Existing
+ * tenant checkout plans and charges stay unchanged. */
+export const WORKSPACE_SUBSCRIPTION_PLAN = Object.freeze({
+  key: "workspace", billingState: "subscription", monthlyCents: null, stripePriceId: null, purchasable: false,
+} as const);
+
 export function businessBillingEnabled(): boolean {
   return process.env.STRELVA_BUSINESS_BILLING === "1";
 }

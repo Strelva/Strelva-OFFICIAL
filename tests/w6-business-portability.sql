@@ -49,15 +49,54 @@ select public.record_tenant_client_record('w6-export-a','inquiry_delivery','chec
 select public.record_tenant_client_record('w6-export-a','inquiry_delivery','reply_target:a','{"kind":"reply_target","key":"private-reply-alias@example.test","value":{"replyTo":"private-reply-alias@example.test","inquiryId":"inquiry-a"}}',repeat('d',64),now(),'dual_write','replace');
 select pg_temp.w6_assert(jsonb_array_length(pg_temp.w6_category('inquiry_delivery')->'items')=1,'checkpoint evidence exported; internal routing index omitted');
 select pg_temp.w6_assert(pg_temp.w6_category('inquiry_delivery')::text not like '%internal-attempt%' and pg_temp.w6_category('inquiry_delivery')::text not like '%internal-digest%' and pg_temp.w6_category('inquiry_delivery')::text not like '%private-reply-alias%','delivery control credentials omitted');
-select pg_temp.w6_assert(jsonb_array_length(pg_temp.w6_category('systems')->'items')=2,'every System');
+select pg_temp.w6_assert(jsonb_array_length(pg_temp.w6_category('systems')->'items')=4,'both projected tenant websites plus two native Systems');
+select pg_temp.w6_assert(
+ (select array_agg(item->>'id' order by item->>'id') from jsonb_array_elements(pg_temp.w6_category('systems')->'items') item)=
+ (select array_agg(id::text order by id::text) from public.systems where business_workspace_id=(select id from w6_workspace)),
+ 'export carries exactly every authoritative business System');
 select pg_temp.w6_assert(not ((pg_temp.w6_category('systems')#>'{items,0}') ? 'command_digest'),'internal command digests omitted');
 select pg_temp.w6_assert(jsonb_array_length(public.read_business_portfolio_billing(array['w6-export-a','w6-export-b']))=1,'one MRR row per business');
 select pg_temp.w6_assert(jsonb_array_length(public.read_business_portfolio_billing(array['w6-export-a','w6-export-b'])#>'{0,tenantIds}')=2,'both sites attached');
+select pg_temp.w6_assert(jsonb_array_length(public.list_business_outcome_reports(array['w6-export-a','w6-export-b'],'2026-10-01'))=1,'one outcome line per business');
+select pg_temp.w6_assert(public.list_business_outcome_reports(array['w6-export-b'],'2026-10-01')#>>'{0,primaryTenantId}'='w6-export-b','report chooses the eligible site');
+select pg_temp.w6_assert(jsonb_array_length(public.list_business_outcome_reports(array['w6-export-a'],'2026-10-01')#>'{0,tenantIds}')=2,'report carries every linked site for deduplication');
+select pg_temp.w6_assert(jsonb_array_length(public.list_business_outcome_reports(array['w6-export-other'],'2026-10-01'))=0,'unconverted tenant receives no invented business figures');
+select pg_temp.w6_assert(not has_function_privilege('authenticated','public.list_business_outcome_reports(text[],date)','EXECUTE'),'outcome cron read private');
+-- A provider import joins earlier inquiries across the business by email or
+-- normalized phone, without counting mirrors of legacy/public receipts twice.
+select public.record_tenant_lead('w6-export-a','{"leadId":"lead_email","submissionHash":"e1","name":"Email fixture","email":"booking@example.test","capturedAt":"2026-10-01T00:00:00Z"}','dual_write');
+select public.record_tenant_lead('w6-export-b','{"leadId":"lead_phone","submissionHash":"p1","name":"Phone fixture","fields":{"phone":"(716) 555-0123"},"capturedAt":"2026-10-01T00:00:00Z"}','dual_write');
+select public.record_tenant_booking('w6-export-a','{"externalSource":"calendly","externalRef":"fixture-email","status":"confirmed","origin":"import","serviceName":"Consult","start":"2026-10-10T10:00:00Z","end":"2026-10-10T11:00:00Z","timeZone":"UTC","customer":{"name":"Email fixture","email":"BOOKING@example.test"},"createdAt":"2026-10-02T00:00:00Z"}','import');
+select public.record_tenant_booking('w6-export-a','{"externalSource":"calendly","externalRef":"fixture-phone","status":"confirmed","origin":"import","serviceName":"Consult","start":"2026-10-11T10:00:00Z","end":"2026-10-11T11:00:00Z","timeZone":"UTC","customer":{"name":"Phone fixture","phone":"+1 716 555 0123"},"createdAt":"2026-10-02T00:00:00Z"}','import');
+select public.record_tenant_booking('w6-export-a','{"externalSource":"calendly","externalRef":"fixture-cancelled","status":"cancelled","origin":"import","serviceName":"Consult","start":"2026-10-12T10:00:00Z","end":"2026-10-12T11:00:00Z","timeZone":"UTC","customer":{"name":"Cancelled fixture","email":"booking@example.test"},"createdAt":"2026-10-02T00:00:00Z"}','import');
+select public.record_tenant_booking('w6-export-a','{"legacyId":"already-counted-elsewhere","status":"confirmed","origin":"legacy","serviceName":"Consult","start":"2026-10-13T10:00:00Z","end":"2026-10-13T11:00:00Z","timeZone":"UTC","customer":{"name":"Mirror fixture","email":"booking@example.test"},"createdAt":"2026-10-02T00:00:00Z"}','backfill');
+select pg_temp.w6_assert(public.list_business_outcome_reports(array['w6-export-a'],'2026-10-01')#>>'{0,outcome,bookings,value}'='2','two imported bookings; cancellation and mirrors excluded');
+select pg_temp.w6_assert(public.list_business_outcome_reports(array['w6-export-a'],'2026-10-01')#>>'{0,outcome,bookingsFromInquiry,value}'='2','email and phone link only earlier business inquiries');
+select pg_temp.w6_assert(not has_function_privilege('service_role','public.business_outcome_month_before_w6(uuid,uuid,text,date)','EXECUTE'),'outcome source remains private');
+update public.users set verified_at=null where id in ('e6000000-0000-4000-8000-000000000001','e6000000-0000-4000-8000-000000000002','e6000000-0000-4000-8000-000000000003');
+select pg_temp.w6_denied($q$select public.list_business_outcome_reports(array['w6-export-a'],'2026-10-01')$q$,'business_outcome_authority_unavailable');
+update public.users set verified_at=now() where id in ('e6000000-0000-4000-8000-000000000001','e6000000-0000-4000-8000-000000000002','e6000000-0000-4000-8000-000000000003');
+create temporary table outcome_delivery as select public.reserve_business_outcome_report_delivery((select id from w6_workspace),'2026-10-01') as result;
+select pg_temp.w6_assert((select result->>'token' from outcome_delivery) is not null,'report reserves before provider call');
+select pg_temp.w6_assert(public.reserve_business_outcome_report_delivery((select id from w6_workspace),'2026-10-01') is null,'another worker cannot duplicate report');
+select public.record_business_outcome_report_delivery((select id from w6_workspace),'2026-10-01',((select result from outcome_delivery)->>'token')::uuid,'suppressed');
+create temporary table outcome_delivery_retry as select public.reserve_business_outcome_report_delivery((select id from w6_workspace),'2026-10-01') as result;
+select pg_temp.w6_assert((select result->>'token' from outcome_delivery_retry)<>(select result->>'token' from outcome_delivery),'only explicit suppression can retry');
+select pg_temp.w6_denied(format($q$select public.record_business_outcome_report_delivery(%L,'2026-10-01',%L,'accepted')$q$,(select id from w6_workspace),(select result->>'token' from outcome_delivery)),'business_outcome_delivery_conflict');
+select public.record_business_outcome_report_delivery((select id from w6_workspace),'2026-10-01',((select result from outcome_delivery_retry)->>'token')::uuid,'accepted');
+select pg_temp.w6_assert(public.reserve_business_outcome_report_delivery((select id from w6_workspace),'2026-10-01') is null,'accepted report cannot resend');
+create temporary table outcome_unknown as select public.reserve_business_outcome_report_delivery((select id from w6_workspace),'2026-11-01') as result;
+select public.record_business_outcome_report_delivery((select id from w6_workspace),'2026-11-01',((select result from outcome_unknown)->>'token')::uuid,'unknown');
+select pg_temp.w6_assert(public.reserve_business_outcome_report_delivery((select id from w6_workspace),'2026-11-01') is null,'unknown provider result cannot resend');
+select pg_temp.w6_assert(not has_table_privilege('service_role','public.business_outcome_report_deliveries','SELECT') and not has_function_privilege('anon','public.reserve_business_outcome_report_delivery(uuid,date)','EXECUTE'),'report delivery receipts private');
 select pg_temp.w6_denied(format($q$select public.export_workspace_v3_category(%L,'e6000000-0000-4000-8000-000000000003','w6-port-member@example.test','orders',0,100)$q$,(select id from w6_workspace)),'workspace_export_denied');
 select pg_temp.w6_denied(format($q$select public.complete_workspace_exit_with_handoff(%L,'e6000000-0000-4000-8000-000000000001','w6-port-operator@example.test','pause','keep','{"kind":"stop"}','operator-exit',repeat('a',64),null)$q$,(select id from w6_workspace)),'workspace_exit_denied');
 create temporary table w6_exit as select public.complete_workspace_exit_with_handoff((select id from w6_workspace),'e6000000-0000-4000-8000-000000000002','w6-port-owner@example.test','pause','keep','{"kind":"stop"}','owner-exit',repeat('c',64),null) as result;
 select pg_temp.w6_assert(jsonb_array_length((select result#>'{state,handoff,sites}' from w6_exit))=2,'exit contains every site');
-select pg_temp.w6_assert(jsonb_array_length((select result#>'{state,handoff,systems}' from w6_exit))=2,'exit contains every System');
+select pg_temp.w6_assert(
+ (select array_agg(item->>'id' order by item->>'id') from jsonb_array_elements((select result#>'{state,handoff,systems}' from w6_exit)) item)=
+ (select array_agg(id::text order by id::text) from public.systems where business_workspace_id=(select id from w6_workspace)),
+ 'exit carries exactly every authoritative business System');
 select pg_temp.w6_assert((select result#>>'{state,handoff,dataDeleted}' from w6_exit)='false','exit never deletes');
 select pg_temp.w6_assert((select count(*) from public.tenant_client_records where store='orders')>=3,'orders kept after exit');
 select pg_temp.w6_assert(public.complete_workspace_exit_with_handoff((select id from w6_workspace),'e6000000-0000-4000-8000-000000000002','w6-port-owner@example.test','pause','keep','{"kind":"stop"}','owner-exit',repeat('c',64),null)->>'replayed'='true','same exit idempotent');

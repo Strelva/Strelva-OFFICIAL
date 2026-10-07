@@ -1,17 +1,53 @@
 # Money and the client's data
 
-Status: draft spec, 2026-10-06; built and proven **locally only** on branch
-`build/money-data` (2026-10-06). Nothing applied to production, Stripe or
-Supabase. Every new behavior is behind a flag that is off by default.
+Status: implementation prepared locally through wave 6 round 5 on
+`w6/agency-operator` (2026-10-10 migration series). Nothing in this work
+applies production migrations, changes Stripe, sends live email or flips a
+production flag. Code and local tests establish implementation; production
+conversion, provider delivery and seven days of parity remain rollout proof.
 
-| Part | Built | Proven (local) | Not built |
-| --- | --- | --- | --- |
-| Rename fix (6.6) | `tenant-rename.ts` moves zsets, hashes, sets and lists atomically in Lua, keeps TTLs, keeps going after one bad key; spam pit and client-email keys added | real disposable `redis-server` test; fails on the old code | |
-| Deprovision (6.6) | Sweeps every client store the rename registry moves, event blobs, account grouping; keeps the operator CRM | real `redis-server` test | |
-| (a) Billing | `20261007180000_business_billing.sql`: billing state on `accounts` keyed by `workspace_id`, written by a trigger at conversion, undone at unlink, payer = owner recipient; webhook mirror and checkout `workspaceId` behind `STRELVA_BUSINESS_BILLING`; `scripts/stripe-workspace-metadata.ts` (dry run, no Stripe call) | SQL cluster test for every tenant shape, Twin Trees, rename, unlink, access; unit tests; `/api/v1`, hosted pages, lead capture and the public booking POST pinned ungated | Portfolio MRR reading the billing home (5); failed-payment Needs you item (7, webhook already emails); the flat plan (9) |
-| (b) Redis → Postgres | `20261007181000_tenant_client_records.sql` + `src/platform/client-records`: dual-write (`STRELVA_CLIENT_RECORDS_DUAL_WRITE`), dry-run backfill and parity script, read flag per store (`STRELVA_CLIENT_RECORDS_READ`) after 7 days; applied to spam held, inquiry timelines and first replies, booking config, account grouping (analytics config and report markers use the Systems catalog's typed tables instead; see below) | SQL cluster test; real `redis-server` tests for dual-write failure, repair, backfill, parity mismatch, read flip and fallback | Orders and rewards (read-only key count only); events, threads, connections, owner settings |
-| (c) Export | `20261007182000_workspace_export_v3.sql` + `src/platform/workspace-exports/v3.ts`, `POST /api/workspace-export/v3` behind `STRELVA_EXPORT_SCHEMA_3`: paged categories, background builds in parts, credential-shape check, expiring token link to the owner recipient | SQL cluster test (pages, isolation, partial builds refused, token, expiry); unit tests | Exit steps per linked site (20); assets manifest; orders and rewards |
-| (d) Outcome loop | `20261007183000_business_outcomes.sql` + `src/platform/business-outcomes`; optional `page`, `referrer`, `utm_*` on `/api/v1/leads` and the starter form | SQL cluster test with every join; formatter tests | Wiring into the monthly report email; Calendly bookings |
+| Launch requirement | Implemented path | Local evidence / remaining proof |
+| --- | --- | --- |
+| Billing 1–4: one state per business, conversion sources, bundled sites, additive Stripe metadata | `business-billing`, existing business billing migration, conversion trigger, checkout/webhook mirror, dry-run metadata script | `business-billing.test.ts` and SQL billing fixtures; Stripe test-mode metadata and actual converted clients still require approved rollout |
+| Billing 5–8: amount/MRR from billing home, public service survives payment failure, owner decision, explicit allowances | `read_business_portfolio_billing`, `readBusinessPortfolioBilling`, billing Needs you source, existing owner email and explicit allowance configuration | Portfolio SQL fixture, business billing/public-route tests and operator tests; live owner delivery remains unproven |
+| Billing 9: flat plan exists without a price | `WORKSPACE_SUBSCRIPTION_PLAN` defines `workspace`, subscription, no amount/Stripe price, `purchasable: false`; excluded from legacy checkout keys | `w6-business-outcome-reports.test.ts`; Jacob's price decision is open, no offer activated |
+| Redis 10–12: every store, safe dual writes, repair and dry-run backfill | `client-records` complete store registry plus typed analytics/report, lead, booking and inquiry homes; encrypted provider records use shared secrets path | Client move/removal/parity tests; real disposable Redis rename and repair race tests prove retained snapshots survive source expiry and failed writes never replay rewards balances |
+| Redis 13–15: per-store seven-day parity/read switch, rename and deprovision | Parity ledger and sweep, Postgres readers, stable tenant identity, explicit tombstones, atomic pending-repair rekey and compare-and-delete acknowledgement | Local parity, rename, deletion and SQL stale-write fixtures; seven consecutive production days and each store's read flip are outstanding |
+| Export 16–17: record, every System/history, native and tenant data, assets, honest manifest | Schema 3 additive categories, credential scrub, asset manifest, native records, orders/rewards, provider metadata allowlist | Export contracts/V3/native-facet and SQL portability fixtures; unavailable provider-only or already-expired history stays explicit |
+| Export 18–19: large archives, operator start, owner-only expiring link and receipt | Background parts, archive download, shared owner resolver, cron recovery with durable predispatch reservation; accepted/unknown delivery cannot auto-send again after receipt failure or worker crash | `w6-export-recovery.test.ts`, SQL recovery fixture, export UI tests; live owner delivery not exercised. Expiring download tokens do not expire the retained export receipts/exit evidence |
+| Exit 20: each site's export, custom repo/files, billing and domain handoff | `complete_workspace_exit_with_handoff`, per-site/System plan and retained obligations; exit never deletes records | SQL portability and workspace-exit tests; `/preview/strelva/portability` uses the real export/exit components with local request doubles for ready/loading/error/permission states |
+| Outcomes 21–23: per-business counts, attribution and first reply | PostgreSQL outcome RPC; additive lead API/starter attribution; provider-accepted first reply mirror | Outcome SQL/domain, inquiry reply and API contract tests; unavailable counts retain null rather than becoming zero |
+| Outcomes 24–25: bookings joined where evidence exists, one monthly business line | Original public/legacy counts plus unique one-store bookings including Calendly imports; explicit inquiry/contact/email/normalized phone joins to earlier business leads; existing native and legacy report transports append the line | Native/legacy caller tests, domain formatter and SQL import/join fixture. Shared private business/month reservation excludes accepted, dispatching and unknown deliveries from retry; grouping outage while armed suppresses delivery |
+
+The report integration requires both `STRELVA_WORKSPACE_RELEASE=1` and the
+new `STRELVA_BUSINESS_OUTCOME_REPORTS=1`; the latter is off by default. It
+respects the existing global/customer email gates and every linked site's
+email override. Flags off retain the existing report path. An armed grouping
+or receipt outage never falls back around the durable delivery reservation.
+Rollback retains private monthly delivery receipts, and reapply refuses
+accepted, unknown and dispatching months (`w6-business-portability-rollback.sql`).
+
+Business-record launch mapping (`strelva-1.0.0.md` §3): facts, services,
+people and contacts have one revisioned home, website/booking/inquiry readers,
+and history/undo tested by the business-record contracts, reader and surface
+suites. Export carries that record plus linked Systems and their history.
+The stream owner audits and owns the shared owner-recipient rule; this money
+slice consumes it rather than defining a second recipient policy.
+
+Clients-moved launch mapping (`strelva-1.0.0.md` §6): conversion, bundled
+billing, `/api/v1` compatibility and the complete Redis exit are prepared in
+code and local fixtures. No live client is asserted converted by these tests.
+Nine-repo compatibility and the full verification belong in the stream's final
+handoff. The seven-day parity window, production backfills, approved conversion
+and real client/storefront smoke proof cannot be replaced by local greens.
+
+Production stop points: apply the prepared migrations only after approval;
+verify the existing encryption key and backfill inputs without exposing
+credentials; dry-run each store, then prove seven days of parity before reads
+move; verify Stripe metadata in test mode before any live metadata action;
+prove owner delivery and handoff on the Strelva-owned test business and actual
+converted clients. Keep grandfathered terms and the Twin Trees bundle intact.
+The flat plan stays unsellable until Jacob sets its price.
 
 Corrections found while building: the Postgres home for these stores is one
 table, `tenant_client_records`, not per-store tables (section 5); typed tables

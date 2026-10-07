@@ -215,6 +215,21 @@ describe("outcome line, linked only where joined", () => {
     await expect(readBusinessOutcomeMonth(actor, "w", "Sept", rpc)).rejects.toMatchObject({ code: "invalid" });
     await expect(readBusinessOutcomeMonth(actor, "w", "2026-09", async () => ({ data: null, error: { message: "business_outcome_denied" } }))).rejects.toMatchObject({ code: "denied" });
   });
+  it("distinguishes unavailable counts from measured zero without claiming joined outcomes", () => {
+    const line = formatOutcomeLine({ ...september,
+      visits: { kind: "counted", value: null }, reviews: { kind: "counted", value: null },
+      inquiries: { kind: "counted", value: null, reason: "Inquiry records could not be read." },
+      bookings: { kind: "counted", value: null, native: 0, legacy: null },
+    });
+    expect(line.text).toBe("Inquiries unavailable: Inquiry records could not be read. Bookings unavailable.");
+    expect(line.figures).toEqual([]); expect(line.text).not.toContain("0 inquiries"); expect(line.text).not.toContain("0 bookings");
+    const zero = formatOutcomeLine({ ...september,
+      visits: { kind: "counted", value: null }, reviews: { kind: "counted", value: null },
+      inquiries: { kind: "counted", value: 0 }, bookings: { kind: "counted", value: 0, native: 0, legacy: 0 },
+    });
+    expect(zero.text).toBe("0 inquiries. 0 bookings.");
+    expect(zero.figures).toEqual([{ label: "inquiries", value: 0, kind: "counted" }, { label: "bookings", value: 0, kind: "counted" }]);
+  });
 });
 
 describe("lead attribution (additive on /api/v1/leads)", () => {

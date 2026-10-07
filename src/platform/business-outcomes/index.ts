@@ -55,22 +55,30 @@ export function formatOutcomeLine(outcome: BusinessOutcomeMonth): OutcomeLine {
     sentences.push(`${plural(outcome.visits.value, "visit", "visits")}.`);
     figures.push({ label: "visits", value: outcome.visits.value, kind: "counted" });
   }
-  const inquiries = outcome.inquiries.value ?? 0;
-  figures.push({ label: "inquiries", value: inquiries, kind: "counted" });
-  let inquiry = plural(inquiries, "inquiry", "inquiries");
-  if (inquiries > 0 && outcome.answered.withinDay !== null && outcome.answered.value !== null) {
-    inquiry += `; ${outcome.answered.withinDay.toLocaleString("en-US")} answered within a day`;
-    figures.push({ label: "answered within a day", value: outcome.answered.withinDay, kind: "linked" });
+  const inquiries = outcome.inquiries.value;
+  if (inquiries !== null) {
+    figures.push({ label: "inquiries", value: inquiries, kind: "counted" });
+    let inquiry = plural(inquiries, "inquiry", "inquiries");
+    if (inquiries > 0 && outcome.answered.withinDay !== null && outcome.answered.value !== null) {
+      inquiry += `; ${outcome.answered.withinDay.toLocaleString("en-US")} answered within a day`;
+      figures.push({ label: "answered within a day", value: outcome.answered.withinDay, kind: "linked" });
+    }
+    sentences.push(`${inquiry}.`);
+  } else {
+    sentences.push(outcome.inquiries.reason ? `Inquiries unavailable: ${outcome.inquiries.reason}` : "Inquiries unavailable.");
   }
-  sentences.push(`${inquiry}.`);
-  const bookings = outcome.bookings.value ?? 0;
-  figures.push({ label: "bookings", value: bookings, kind: "counted" });
-  let booking = plural(bookings, "booking", "bookings");
-  if (bookings > 0 && outcome.bookingsFromInquiry.value !== null) {
-    booking += `, ${outcome.bookingsFromInquiry.value.toLocaleString("en-US")} of them from a website inquiry`;
-    figures.push({ label: "bookings from a website inquiry", value: outcome.bookingsFromInquiry.value, kind: "linked" });
+  const bookings = outcome.bookings.value;
+  if (bookings !== null) {
+    figures.push({ label: "bookings", value: bookings, kind: "counted" });
+    let booking = plural(bookings, "booking", "bookings");
+    if (bookings > 0 && outcome.bookingsFromInquiry.value !== null) {
+      booking += `, ${outcome.bookingsFromInquiry.value.toLocaleString("en-US")} of them from a website inquiry`;
+      figures.push({ label: "bookings from a website inquiry", value: outcome.bookingsFromInquiry.value, kind: "linked" });
+    }
+    sentences.push(`${booking}.`);
+  } else {
+    sentences.push(outcome.bookings.reason ? `Bookings unavailable: ${outcome.bookings.reason}` : "Bookings unavailable.");
   }
-  sentences.push(`${booking}.`);
   if (outcome.reviews.value !== null) {
     sentences.push(`${plural(outcome.reviews.value, "new review", "new reviews")}.`);
     figures.push({ label: "new reviews", value: outcome.reviews.value, kind: "counted" });

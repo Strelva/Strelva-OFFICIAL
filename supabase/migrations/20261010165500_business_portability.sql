@@ -16,6 +16,102 @@ $$;
 revoke all on function public.read_business_portfolio_billing(text[]) from public, anon, authenticated;
 grant execute on function public.read_business_portfolio_billing(text[]) to service_role;
 
+-- Add one-store bookings that are not mirrors of already-counted public/legacy
+-- rows, including Calendly imports. The original function retains its actor
+-- boundary and counts; this wrapper adds only explicit retained record joins.
+alter function public.business_outcome_month(uuid,uuid,text,date) rename to business_outcome_month_before_w6;
+revoke all on function public.business_outcome_month_before_w6(uuid,uuid,text,date) from public,anon,authenticated,service_role;
+create function public.business_outcome_month(p_workspace_id uuid,p_user_id uuid,p_verified_email text,p_month date) returns jsonb
+language plpgsql stable security definer set search_path=public,pg_temp as $$
+declare v_result jsonb; v_count integer; v_imports integer; v_linked integer; v_total integer;
+  v_from timestamptz; v_to timestamptz;
+begin
+  v_result:=public.business_outcome_month_before_w6(p_workspace_id,p_user_id,p_verified_email,p_month);
+  v_from:=date_trunc('month',p_month::timestamp) at time zone 'UTC';
+  v_to:=(date_trunc('month',p_month::timestamp)+interval '1 month') at time zone 'UTC';
+  select count(*),count(*) filter(where b.origin='import'),count(*) filter(where exists(
+    select 1 from public.tenant_leads l join public.tenant_workspace_links links on links.tenant_stable_id=l.tenant_stable_id
+    left join public.business_contacts c on c.id=b.contact_id and c.workspace_id=p_workspace_id
+    where links.workspace_id=p_workspace_id and l.captured_at<=b.created_at and (
+      (b.inquiry_id=l.lead_id and b.tenant_stable_id=l.tenant_stable_id)
+      or lower(nullif(l.email,''))=lower(coalesce(nullif(b.customer_email,''),c.email))
+      or public.business_contact_phone_key(l.fields->>'phone')=coalesce(public.business_contact_phone_key(b.customer_phone),c.phone_key)
+    ))) into v_count,v_imports,v_linked from public.business_bookings b
+    where (b.workspace_id=p_workspace_id or exists(select 1 from public.tenant_workspace_links links
+      where links.workspace_id=p_workspace_id and links.tenant_stable_id=b.tenant_stable_id))
+      and b.status in ('confirmed','completed','no_show') and b.start_at>=v_from and b.start_at<v_to
+      and b.public_reservation_id is null and b.legacy_id is null;
+  v_total:=(v_result#>>'{bookings,value}')::integer+v_count;
+  v_result:=jsonb_set(v_result,'{bookings,value}',to_jsonb(v_total));
+  v_result:=jsonb_set(v_result,'{bookings,native}',to_jsonb((v_result#>>'{bookings,native}')::integer+v_count-v_imports));
+  if v_imports>0 then v_result:=jsonb_set(v_result,'{bookings,legacy}',to_jsonb(coalesce((v_result#>>'{bookings,legacy}')::integer,0)+v_imports)); end if;
+  if v_total>0 then
+    v_result:=jsonb_set(v_result,'{bookingsFromInquiry,value}',to_jsonb(coalesce((v_result#>>'{bookingsFromInquiry,value}')::integer,0)+v_linked));
+    v_result:=jsonb_set(v_result,'{bookingsFromInquiry,reason}','null'::jsonb);
+  end if;
+  return jsonb_set(v_result,'{bookingsFromInquiry,joins}',(v_result#>'{bookingsFromInquiry,joins}')||
+    '["business_bookings.inquiry_id = earlier lead id","business_bookings contact/email/phone = earlier business lead"]'::jsonb);
+end $$;
+revoke all on function public.business_outcome_month(uuid,uuid,text,date) from public,anon,authenticated;
+grant execute on function public.business_outcome_month(uuid,uuid,text,date) to service_role;
+
+-- Trusted monthly cron read; current verified membership supplies the
+-- existing boundary, including the operator for an owner with no login.
+create function public.list_business_outcome_reports(p_tenant_ids text[], p_month date) returns jsonb
+language plpgsql stable security definer set search_path=public,pg_temp as $$
+declare v record; v_actor record; v_rows jsonb := '[]'::jsonb; v_tenants jsonb;
+begin
+  if p_month is null then raise exception 'business_outcome_invalid'; end if;
+  for v in select l.workspace_id,min(t.id) as primary_tenant_id from public.tenant_workspace_links l
+    join public.tenants t on t.stable_id=l.tenant_stable_id where t.id=any(p_tenant_ids)
+    group by l.workspace_id order by l.workspace_id loop
+    select u.id,u.email into v_actor from public.workspace_memberships m join public.users u on u.id=m.user_id
+      where m.workspace_id=v.workspace_id and u.verified_at is not null order by m.created_at,u.id limit 1;
+    if not found then raise exception 'business_outcome_authority_unavailable'; end if;
+    select coalesce(jsonb_agg(t.id order by t.id),'[]'::jsonb) into v_tenants from public.tenant_workspace_links l
+      join public.tenants t on t.stable_id=l.tenant_stable_id where l.workspace_id=v.workspace_id;
+    v_rows := v_rows || jsonb_build_array(jsonb_build_object('workspaceId',v.workspace_id,
+      'primaryTenantId',v.primary_tenant_id,'tenantIds',v_tenants,
+      'outcome',public.business_outcome_month(v.workspace_id,v_actor.id,v_actor.email,p_month)));
+  end loop;
+  return v_rows;
+end $$;
+revoke all on function public.list_business_outcome_reports(text[],date) from public,anon,authenticated;
+grant execute on function public.list_business_outcome_reports(text[],date) to service_role;
+
+create table if not exists public.business_outcome_report_deliveries (
+  workspace_id uuid not null references public.workspaces(id), month date not null,
+  token uuid not null, status text not null check(status in ('dispatching','accepted','suppressed','unknown')),
+  reserved_at timestamptz not null default clock_timestamp(), settled_at timestamptz,
+  primary key(workspace_id,month)
+);
+alter table public.business_outcome_report_deliveries enable row level security;
+revoke all on public.business_outcome_report_deliveries from public,anon,authenticated,service_role;
+create function public.reserve_business_outcome_report_delivery(p_workspace_id uuid,p_month date) returns jsonb
+language plpgsql security definer set search_path=public,pg_temp as $$
+declare v_token uuid := gen_random_uuid(); v_inserted uuid;
+begin
+  if p_month is null or p_month<>date_trunc('month',p_month)::date then raise exception 'business_outcome_invalid'; end if;
+  insert into public.business_outcome_report_deliveries(workspace_id,month,token,status)
+    values(p_workspace_id,p_month,v_token,'dispatching') on conflict(workspace_id,month) do update
+    set token=excluded.token,status='dispatching',reserved_at=clock_timestamp(),settled_at=null
+    where business_outcome_report_deliveries.status='suppressed' returning token into v_inserted;
+  return case when v_inserted is null then null else jsonb_build_object('token',v_inserted) end;
+end $$;
+create function public.record_business_outcome_report_delivery(p_workspace_id uuid,p_month date,p_token uuid,p_status text) returns jsonb
+language plpgsql security definer set search_path=public,pg_temp as $$
+begin
+  if p_status is null or p_status not in ('accepted','suppressed','unknown') then raise exception 'business_outcome_invalid'; end if;
+  update public.business_outcome_report_deliveries set status=p_status,settled_at=clock_timestamp()
+    where workspace_id=p_workspace_id and month=p_month and token=p_token and status='dispatching';
+  if not found then raise exception 'business_outcome_delivery_conflict'; end if;
+  return jsonb_build_object('status',p_status);
+end $$;
+revoke all on function public.reserve_business_outcome_report_delivery(uuid,date) from public,anon,authenticated;
+revoke all on function public.record_business_outcome_report_delivery(uuid,date,uuid,text) from public,anon,authenticated;
+grant execute on function public.reserve_business_outcome_report_delivery(uuid,date) to service_role;
+grant execute on function public.record_business_outcome_report_delivery(uuid,date,uuid,text) to service_role;
+
 -- The source RPC stays private and is called for unchanged categories.
 alter function public.export_workspace_v3_category(uuid, uuid, text, text, integer, integer)
   rename to export_workspace_v3_category_before_w6;
