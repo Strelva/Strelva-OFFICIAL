@@ -69,6 +69,28 @@ afterEach(() => {
 });
 
 describe("connect.js", () => {
+  it("renders offered native booking times only from signed app links after inquiry confirmation", async () => {
+    const page = load('<div data-strelva-form></div>');
+    await tick();
+    page.fetch.mockImplementation(async (url: string) => url.endsWith("/inquiries") ? { ok: true, status: 201, json: async () => ({ ok: true, bookingOffer: { serviceName: "Consultation", slots: [{ label: "Friday 9 AM", chooseUrl: "/inquiry-booking/encoded.signature?slot=0" }] } }) } : { ok: true, status: 200, json: async () => DEFAULT_CONTEXT });
+    const form = page.win.document.querySelector<HTMLFormElement>("[data-strelva-form] form")!;
+    form.querySelector<HTMLInputElement>('input[name="name"]')!.value = "Dana";
+    form.querySelector<HTMLInputElement>('input[name="email"]')!.value = "dana@example.test";
+    form.dispatchEvent(new page.win.Event("submit", { bubbles: true, cancelable: true }));
+    await tick();
+    const link = form.querySelector<HTMLAnchorElement>('[aria-label="Appointment times"] a')!;
+    expect(link.textContent).toBe("Friday 9 AM");
+    expect(link.href).toBe("https://app.strelva.test/inquiry-booking/encoded.signature?slot=0");
+    expect(form.textContent).toContain("business must confirm");
+    page.fetch.mockImplementation(async () => ({ ok: true, status: 201, json: async () => ({ ok: true, bookingOffer: { serviceName: "Consultation", slots: [{ label: "Bad link", chooseUrl: "https://other.test/path" }] } }) }));
+    form.querySelector<HTMLInputElement>('input[name="name"]')!.value = "Dana";
+    form.querySelector<HTMLInputElement>('input[name="email"]')!.value = "dana@example.test";
+    form.dispatchEvent(new page.win.Event("submit", { bubbles: true, cancelable: true }));
+    await tick();
+    expect(form.querySelector('[aria-label="Appointment times"] a')).toBeNull();
+    expect(form.textContent).toContain("Thanks. Your message was sent.");
+  });
+
   it("sends a visit with the path but no query string, and only the referrer's origin", async () => {
     const page = load("<main>Hi</main>");
     await tick();

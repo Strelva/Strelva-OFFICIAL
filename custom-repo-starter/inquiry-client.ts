@@ -61,7 +61,18 @@ export async function loadInquiryForm(baseUrl: string, tenant: string, capabilit
   return body;
 }
 
+export interface PublicInquiryBookingOffer {
+  serviceName: string;
+  slots: Array<{ label: string; chooseUrl: string }>;
+}
+export interface InquirySubmissionReceipt { bookingOffer?: PublicInquiryBookingOffer }
+
+/** Old consumers retain the void return; accepting the additive receipt is deliberate. */
 export async function submitInquiryForm(baseUrl: string, tenant: string, definition: PublicInquiryForm, fields: Record<string, string>): Promise<void> {
+  await submitInquiryFormWithReceipt(baseUrl, tenant, definition, fields);
+}
+
+export async function submitInquiryFormWithReceipt(baseUrl: string, tenant: string, definition: PublicInquiryForm, fields: Record<string, string>): Promise<InquirySubmissionReceipt> {
   const response = await fetch(endpoint(baseUrl, tenant, "leads"), {
     method: "POST",
     credentials: "omit",
@@ -79,4 +90,18 @@ export async function submitInquiryForm(baseUrl: string, tenant: string, definit
   if (!response.ok) throw new Error(response.status === 409 ? "This form changed. Reload it before sending your request." : "Your request was not confirmed. Please try again.");
   const result: unknown = await response.json();
   if (!result || typeof result !== "object" || !("ok" in result) || result.ok !== true) throw new Error("Your request was not confirmed. Please try again.");
+  const receipt: InquirySubmissionReceipt = {};
+  if (!("bookingOffer" in result) || !result.bookingOffer || typeof result.bookingOffer !== "object") return receipt;
+  const offer = result.bookingOffer as Record<string, unknown>;
+  if (typeof offer.serviceName !== "string" || offer.serviceName.length > 160 || !Array.isArray(offer.slots) || offer.slots.length < 1 || offer.slots.length > 3) return receipt;
+  const slots: PublicInquiryBookingOffer["slots"] = [];
+  for (const item of offer.slots) {
+    if (!item || typeof item !== "object" || typeof item.label !== "string" || item.label.length > 200 || typeof item.chooseUrl !== "string"
+      || !/^\/inquiry-booking\/[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\?slot=[0-2]$/.test(item.chooseUrl)) return receipt;
+    const link = new URL(item.chooseUrl, baseUrl);
+    if (link.protocol !== "https:" && link.protocol !== "http:") return receipt;
+    slots.push({ label: item.label, chooseUrl: link.toString() });
+  }
+  receipt.bookingOffer = { serviceName: offer.serviceName, slots };
+  return receipt;
 }

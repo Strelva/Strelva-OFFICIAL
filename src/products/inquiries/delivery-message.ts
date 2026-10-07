@@ -11,6 +11,11 @@ import type {
   InquiryRoute,
 } from "./delivery-types";
 
+function bookingLink(path: string): string {
+  const origin = (process.env.NEXT_PUBLIC_APP_URL || "https://app.strelva.com").replace(/\/$/, "");
+  return new URL(path, origin).toString();
+}
+
 export function validEmail(value: string | null | undefined): string | null {
   if (typeof value !== "string") return null;
   const email = value.trim().toLowerCase();
@@ -116,7 +121,14 @@ export function createInquiryDeliveryMessage(
           "This is an automatic confirmation sent by Strelva for the business named above.",
         ],
     ...(message && !isFollowUp ? { rows: [{ label: "Your message", value: message }] } : {}),
-    footerNote: `Automatic ${isFollowUp ? "follow-up" : "reply"} · sent by Strelva for ${business}`,
+    ...(!isFollowUp && inquiry.bookingOffer ? {
+      rows: [
+        ...(message ? [{ label: "Your message", value: message }] : []),
+        ...inquiry.bookingOffer.slots.map((slot) => ({ label: "Request a time", value: `${slot.label}: ${bookingLink(slot.chooseUrl)}` })),
+      ],
+      button: { label: "Choose a time", url: bookingLink(inquiry.bookingOffer.chooseUrl) },
+    } : {}),
+    footerNote: `${inquiry.bookingOffer && !isFollowUp ? "Choosing a time requests an appointment; the business must confirm. " : ""}Automatic ${isFollowUp ? "follow-up" : "reply"} · sent by Strelva for ${business}`,
   };
   const trackingReplyTo = getInquiryReplyTrackingAddress(inquiry);
   const fallbackReplyTo = validEmail(route.customerReplyTo);

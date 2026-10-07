@@ -33,6 +33,7 @@ export type InquiryDeliveryStatus =
   | "unavailable";
 
 export interface InquiryDeliverySubmission {
+  bookingOffer?: import("./booking-handoff").InquiryBookingOffer;
   id: string;
   tenantId: string;
   name: string;

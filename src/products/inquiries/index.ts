@@ -79,3 +79,6 @@ export type { InquirySystemDetail } from "./system-detail";
 export { readInquiryFactProposals, stageInquiryScanFacts, inquiryScanFactSuggestions } from "./business-facts";
 export type { InquiryFactProposal } from "./business-facts";
 export { inquiryBusinessFactsEnabled, inquiryDefinitionAtUse } from "./business-context";
+
+export { inquiryBookingHandoffEnabled, prepareInquiryBookingInput, prepareWorkspaceInquiryBooking, prepareInquiryBookingOffer, loadInquiryBookingChoice, chooseInquiryBookingSlot } from "./booking-handoff";
+export type { InquiryBookingOffer, InquiryBookingChoice, PrepareInquiryBookingInput } from "./booking-handoff";

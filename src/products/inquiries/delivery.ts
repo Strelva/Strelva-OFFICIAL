@@ -600,6 +600,10 @@ export async function deliverInquiryAction(
   if (route.tenantId !== inquiry.tenantId) {
     return { inquiryId: inquiry.id, tenantId: inquiry.tenantId, action, status: "unavailable", reason: "recipient_route_tenant_mismatch", retryable: false };
   }
+  if (action === "reply") {
+    const { withInquiryBookingOffer } = await import("./booking-handoff");
+    inquiry = await withInquiryBookingOffer(inquiry);
+  }
   const message = createInquiryDeliveryMessage(inquiry, route, action);
   if (!message) {
     await appendTimelineSafe(store, timelineFor(inquiry, action, blockedTimelineType(action), "recipient unavailable", "blocked", now.toISOString()));

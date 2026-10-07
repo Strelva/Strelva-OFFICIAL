@@ -259,8 +259,12 @@ export async function POST(
         if (evidence.status === "rejected") return corsJson({ error: evidence.reason }, 400);
         if (evidence.status === "unavailable") return corsJson({ error: "Inquiry provenance is temporarily unavailable." }, 503);
       }
-      if (captured.status === "duplicate") return corsJson({ ok: true, duplicate: true }, 200);
-      return corsJson({ ok: true }, 200);
+      let bookingOffer: unknown;
+      if (process.env.STRELVA_INQUIRY_BOOKING_HANDOFF === "1" && durableLead) {
+        const { prepareInquiryBookingOffer } = await import("@/products/inquiries");
+        bookingOffer = await prepareInquiryBookingOffer({ tenantId: tenant, inquiryId: durableLead.id }).catch(() => null);
+      }
+      return corsJson({ ok: true, ...(captured.status === "duplicate" ? { duplicate: true } : {}), ...(bookingOffer ? { bookingOffer } : {}) }, 200);
     }
 
     if (!name) return corsJson({ error: "name is required" }, 400);

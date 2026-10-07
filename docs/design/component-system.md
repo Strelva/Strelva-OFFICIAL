@@ -598,6 +598,17 @@ private routing destinations into form data. Fixture projection, authorization,
 publication health and failure states have focused local tests; desktop/mobile
 browser inspection remains separate evidence in the stream handoff.
 
+### Inquiry booking choice (wave 6)
+
+[InquiryBookingChoice](../../src/experience/bookings/InquiryBookingChoice.tsx) composes Card and Button for the signed customer choice page. It shows up to three actual appointment times, a saved requested/confirmed booking, an expired link or a storage error. Each time uses a plain POST form; opening a mail link never requests an appointment. Dates use the booking time zone, controls have visible labels, and failure text uses an alert. The component does not confirm appointments or send email. Desktop/mobile visual proof belongs in the inquiry stream handoff.
+
+`InquiryBookingOfferComposer` uses shared Button and SelectInput to prepare up to
+three times and append their signed choices to the existing exact-message reply.
+Preparation sends nothing. Loading disables selection; failures preserve the
+editable inquiry reply. Only the owner can add a booking proposal. The local
+System browser journey covers selection, no send before approval, receipt and
+390px keyboard use.
+
 ### Operator inquiry review (wave 6)
 
 `OperatorInquiryReview` and `OperatorInquiryActions` compose console Panel/Chip

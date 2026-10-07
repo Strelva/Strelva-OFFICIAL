@@ -269,7 +269,11 @@ async function buildContext(input: {
   if (input.expectedResponsibilityRevision && responsibility.updatedAt !== input.expectedResponsibilityRevision) {
     throwCode("policy_changed", "The current responsibility policy changed. Prepare a fresh review.");
   }
-  const inquiry = inquiryFromLead(input.tenantId, lead, definition);
+  let inquiry = inquiryFromLead(input.tenantId, lead, definition);
+  if (input.action === "reply") {
+    const { withInquiryBookingOffer } = await import("./booking-handoff");
+    inquiry = await withInquiryBookingOffer(inquiry);
+  }
   const policy = policyFor(definition, responsibility, input.action);
   if (input.expectedPolicyVersion && policy.version !== input.expectedPolicyVersion) {
     throwCode("policy_changed", "The current responsibility policy changed. Prepare a fresh review.");

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState, type FormEvent } from "react";
-import { isPublicInquiryForm, loadInquiryForm, submitInquiryForm, type PublicInquiryForm } from "./inquiry-client";
+import { isPublicInquiryForm, loadInquiryForm, submitInquiryFormWithReceipt, type InquirySubmissionReceipt, type PublicInquiryForm } from "./inquiry-client";
 
 type ConnectedProps = { baseUrl: string; tenant: string; capabilityId: string; expectedVersion?: number };
 
@@ -23,17 +23,18 @@ function InquiryFormLoader({ baseUrl, tenant, capabilityId, expectedVersion }: C
   if (result === null) return <p role="status">Loading inquiry form…</p>;
   if (result instanceof Error) return <p role="alert">{result.message}</p>;
   if (expectedVersion !== undefined && result.version !== expectedVersion) return <p role="alert">This form changed. Please contact the business directly.</p>;
-  return <StrelvaInquiryForm definition={result} onSubmit={(fields) => submitInquiryForm(baseUrl, tenant, result, fields)} />;
+  return <StrelvaInquiryForm definition={result} onSubmit={(fields) => submitInquiryFormWithReceipt(baseUrl, tenant, result, fields)} />;
 }
 
 /** Fixed renderer shared by the owner preview and client-site inquiry surface. */
 export function StrelvaInquiryForm({ definition, onSubmit, submitLabel = "Send request" }: {
   definition: PublicInquiryForm;
-  onSubmit?: (fields: Record<string, string>) => Promise<void>;
+  onSubmit?: (fields: Record<string, string>) => Promise<void | InquirySubmissionReceipt>;
   submitLabel?: string;
 }) {
   const prefix = useId();
   const [pending, setPending] = useState(false);
+  const [receipt, setReceipt] = useState<InquirySubmissionReceipt | null>(null);
   const [status, setStatus] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   if (!isPublicInquiryForm(definition)) return <p role="alert">This inquiry form is unavailable.</p>;
 
@@ -45,8 +46,10 @@ export function StrelvaInquiryForm({ definition, onSubmit, submitLabel = "Send r
     const fields = Object.fromEntries(definition.form.fields.map((field) => [field.id, String(data.get(field.id) ?? "").trim()]));
     setPending(true);
     setStatus(null);
+    setReceipt(null);
     try {
-      await onSubmit(fields);
+      const received = await onSubmit(fields);
+      setReceipt(received ?? null);
       setStatus({ kind: "success", text: "Your request has been received." });
       form.reset();
     } catch (error) {
@@ -70,6 +73,11 @@ export function StrelvaInquiryForm({ definition, onSubmit, submitLabel = "Send r
     </fieldset>
     <p>Strelva helps this business handle your request.</p>
     {onSubmit ? <button type="submit" disabled={pending} style={{ minHeight: "2.75rem", padding: ".65rem 1rem", font: "inherit" }}>{pending ? "Sending…" : submitLabel}</button> : <p>Preview only. This form does not send a request.</p>}
+    {receipt?.bookingOffer ? <section aria-label="Appointment times" style={{ marginTop: "1.5rem" }}>
+      <h3>Request a time for {receipt.bookingOffer.serviceName}</h3>
+      <p>The business must confirm your appointment.</p>
+      <ul style={{ display: "grid", gap: ".75rem", padding: 0, listStyle: "none" }}>{receipt.bookingOffer.slots.map((slot) => <li key={slot.chooseUrl}><a href={slot.chooseUrl} style={{ display: "inline-flex", minHeight: "2.75rem", alignItems: "center" }}>{slot.label}</a></li>)}</ul>
+    </section> : null}
     {status ? <p role={status.kind === "error" ? "alert" : "status"}>{status.text}</p> : null}
   </form>;
 }

@@ -11,7 +11,10 @@ const mocks = vi.hoisted(() => ({
   evidence: vi.fn(),
   workspace: vi.fn(),
   notice: vi.fn(),
+  bookingOffer: vi.fn(),
 }));
+
+vi.mock("@/products/inquiries", async (original) => ({ ...(await original<typeof import("@/products/inquiries")>()), prepareInquiryBookingOffer: mocks.bookingOffer, notifyInquiryOwner: mocks.notice }));
 
 vi.mock("@/products/inquiries/owner-notice", () => ({ notifyInquiryOwner: mocks.notice }));
 
@@ -99,6 +102,18 @@ function capabilityBody(overrides: Record<string, unknown> = {}) {
 }
 
 describe("public inquiry capability submission", () => {
+  it("adds bookable times only when the handoff switch is on; offer failure never loses capture", async () => {
+    const offer = { chooseUrl: "/inquiry-booking/fixture", slots: [{ label: "Friday 9 AM" }] };
+    mocks.bookingOffer.mockResolvedValue(offer);
+    const unchanged = await request(capabilityBody());
+    expect(await unchanged.json()).toEqual({ ok: true });
+    expect(mocks.bookingOffer).not.toHaveBeenCalled();
+    vi.stubEnv("STRELVA_INQUIRY_BOOKING_HANDOFF", "1");
+    expect(await (await request(capabilityBody())).json()).toEqual({ ok: true, bookingOffer: offer });
+    expect(mocks.bookingOffer).toHaveBeenCalledWith({ tenantId: "acme", inquiryId: "lead-1" });
+    mocks.bookingOffer.mockRejectedValue(new Error("booking unavailable"));
+    expect(await (await request(capabilityBody())).json()).toEqual({ ok: true });
+  });
   afterEach(() => vi.unstubAllEnvs());
   beforeEach(() => {
     vi.clearAllMocks();
@@ -112,6 +127,7 @@ describe("public inquiry capability submission", () => {
     mocks.notice.mockResolvedValue({ status: "accepted" });
     vi.stubEnv("STRELVA_INQUIRY_RECORDS", "");
     vi.stubEnv("STRELVA_INQUIRY_OWNER_NOTICES", "");
+    vi.stubEnv("STRELVA_INQUIRY_BOOKING_HANDOFF", "");
   });
 
   it("keeps paused intake closed with the rollout off, and retains the exact published form with it on", async () => {
