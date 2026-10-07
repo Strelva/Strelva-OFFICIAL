@@ -351,16 +351,36 @@ psql "${psql_args[@]}" --file="$repo_root/tests/workspace-authority-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-systems-schema.sql"
 
 authority_leaver='c9000000-0000-4000-8000-000000000005'
+# The holder waits for an explicit parent command instead of a short PgSleep.
+# Its ready application name is set only after the guarded statement finishes.
+# A loaded machine can miss a timed hold entirely; this barrier cannot expire
+# before the competing transaction has actually reached its lock wait.
 authority_session_ready() {
-  local app_name="$1" attempt
+  local app_name="$1" state="$2" attempt
   for attempt in $(seq 1 200); do
-    if [[ "$(psql "${psql_args[@]}" -Atc "select exists(select 1 from pg_stat_activity where application_name='$app_name' and wait_event='PgSleep');")" == t ]]; then
+    if [[ "$(psql "${psql_args[@]}" -Atc "select exists(select 1 from pg_stat_activity where application_name='$app_name' and $state);")" == t ]]; then
       return 0
     fi
     sleep 0.02
   done
-  printf 'Authority race session %s never reached its hold point.\n' "$app_name" >&2
+  printf 'Authority race session %s never reached its required state.\n' "$app_name" >&2
   return 1
+}
+authority_hold() {
+  local app_name="$1" statement="$2"
+  authority_pipe="$cluster_root/authority-session.in"
+  mkfifo "$authority_pipe"
+  exec 9<>"$authority_pipe"
+  PGAPPNAME="$app_name" psql "${psql_args[@]}" <"$authority_pipe" >"$cluster_root/$app_name-$authority_call.log" 2>&1 &
+  authority_holder=$!
+  printf "begin;\n%s;\nset local application_name='%s-ready';\n" "$statement" "$app_name" >&9
+  authority_session_ready "$app_name-ready" "state='idle in transaction'"
+}
+authority_release() {
+  printf '%s;\n\\q\n' "$1" >&9
+  wait "$authority_holder"
+  exec 9>&-
+  rm "$authority_pipe"
 }
 for authority_call in $(psql "${psql_args[@]}" -Atc "select name from public.authority_parity_calls order by name"); do
   authority_stmt="$(psql "${psql_args[@]}" -Atc "select replace(stmt, ':actor', quote_literal('$authority_leaver') || '::uuid') from public.authority_parity_calls where name='$authority_call'")"
@@ -371,46 +391,43 @@ for authority_call in $(psql "${psql_args[@]}" -Atc "select name from public.aut
   esac
   authority_membership="workspace_id='$authority_workspace' and user_id='$authority_leaver'"
 
-  # 1. Removed mid-transaction: a write that queues behind an uncommitted
-  # removal must re-read the committed row and be denied, not land once more.
-  PGAPPNAME=authority-remover psql "${psql_args[@]}" \
-    -c "begin; delete from public.workspace_memberships where $authority_membership; select pg_sleep(0.6); commit;" >/dev/null &
-  authority_remover=$!
-  authority_session_ready authority-remover
-  if psql "${psql_args[@]}" -c "$authority_stmt" >"$cluster_root/authority-removed-$authority_call.log" 2>&1; then
+  # 1. Removed mid-transaction: observe the write queued behind an uncommitted
+  # removal, then commit removal. The write must re-read the row and be denied.
+  authority_hold authority-remover "delete from public.workspace_memberships where $authority_membership"
+  PGAPPNAME=authority-removed-write psql "${psql_args[@]}" -c "set statement_timeout='30s'; $authority_stmt" >"$cluster_root/authority-removed-$authority_call.log" 2>&1 &
+  authority_writer=$!
+  authority_session_ready authority-removed-write "wait_event_type='Lock'"
+  authority_release commit
+  if wait "$authority_writer"; then
     printf 'Authority race: %s landed after the actor was removed.\n' "$authority_call" >&2
     exit 1
   fi
   grep -q workspace_membership_required "$cluster_root/authority-removed-$authority_call.log"
-  wait "$authority_remover"
   psql "${psql_args[@]}" -c "insert into public.workspace_memberships(workspace_id,user_id,role,created_by) values ('$authority_workspace','$authority_leaver','admin','c9000000-0000-4000-8000-000000000001');" >/dev/null
 
-  # 2. Removal waits for an in-flight write: the write holds the membership
-  # row FOR SHARE, so a concurrent delete cannot get its row lock.
-  PGAPPNAME=authority-writer psql "${psql_args[@]}" \
-    -c "begin; $authority_stmt; select pg_sleep(0.6); rollback;" >"$cluster_root/authority-writer-$authority_call.log" 2>&1 &
-  authority_writer=$!
-  authority_session_ready authority-writer
+  # 2. An in-flight write holds membership FOR SHARE until we release it.
+  # A concurrent delete must time out even if process scheduling is delayed.
+  authority_hold authority-writer "$authority_stmt"
   if psql "${psql_args[@]}" -c "set lock_timeout='150ms'; delete from public.workspace_memberships where $authority_membership;" >"$cluster_root/authority-blocked-$authority_call.log" 2>&1; then
     printf 'Authority race: removal did not wait for in-flight %s.\n' "$authority_call" >&2
     exit 1
   fi
   grep -q 'lock timeout' "$cluster_root/authority-blocked-$authority_call.log"
-  wait "$authority_writer"
+  authority_release rollback
 
-  # 3. Downgraded mid-transaction: an owner/admin write queued behind an
-  # uncommitted admin -> member change is denied.
+  # 3. Observe a manager write queued behind an uncommitted downgrade, then
+  # commit the downgrade. The write must re-read the role and be denied.
   if [[ "$authority_tier" == manager ]]; then
-    PGAPPNAME=authority-demoter psql "${psql_args[@]}" \
-      -c "begin; update public.workspace_memberships set role='member' where $authority_membership; select pg_sleep(0.6); commit;" >/dev/null &
-    authority_demoter=$!
-    authority_session_ready authority-demoter
-    if psql "${psql_args[@]}" -c "$authority_stmt" >"$cluster_root/authority-demoted-$authority_call.log" 2>&1; then
+    authority_hold authority-demoter "update public.workspace_memberships set role='member' where $authority_membership"
+    PGAPPNAME=authority-demoted-write psql "${psql_args[@]}" -c "set statement_timeout='30s'; $authority_stmt" >"$cluster_root/authority-demoted-$authority_call.log" 2>&1 &
+    authority_writer=$!
+    authority_session_ready authority-demoted-write "wait_event_type='Lock'"
+    authority_release commit
+    if wait "$authority_writer"; then
       printf 'Authority race: %s landed after the actor was downgraded.\n' "$authority_call" >&2
       exit 1
     fi
     grep -q workspace_permission_denied "$cluster_root/authority-demoted-$authority_call.log"
-    wait "$authority_demoter"
     psql "${psql_args[@]}" -c "update public.workspace_memberships set role='admin' where $authority_membership;" >/dev/null
   fi
   printf 'Workspace authority race passed: %s\n' "$authority_call"
@@ -522,7 +539,9 @@ if [[ -n "${STRELVA_VERSIONS_CONTRACT-1}" ]]; then
   # The same Version store contract the in-memory store passes, run through
   # createSupabaseVersionStore against this cluster (psql-backed RPC port).
   STRELVA_VERSIONS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
-    pnpm --dir "$repo_root" exec vitest run src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
+    # SQL contracts spawn real Postgres clients; allow bounded host scheduling
+    # time without changing lock limits or any behavior assertion.
+    pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/system-versions-store-contract.test.ts src/__tests__/agency-versions-server.test.ts
 fi
 # Needs you and Strelva handled: decision policy, owner decisions and the
 # handled read model, on the same fictional cluster (needs the business record,
@@ -602,7 +621,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
 # The release flag rules still hold after the flag names gain channel keys.
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 STRELVA_POSSIBILITIES_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
-  pnpm --dir "$repo_root" exec vitest run src/__tests__/possibility-repository.test.ts
+  pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/possibility-repository.test.ts
 # Website System (2026-10-08): publish onto a linked tenant, routing after a
 # rename, the business template, and operator domain work on owner approval.
 # Replaces reserve_website_hosted_tenant and manage_published_website_tenant;
@@ -653,12 +672,12 @@ psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
 # The real Make real runner, checkpointing through these RPCs (psql-backed port).
 STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
-  pnpm --dir "$repo_root" exec vitest run src/__tests__/make-real-activation-repository.test.ts
+  pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/make-real-activation-repository.test.ts
 # The one booking store through both real route families (legacy /api/booking
 # and the public booking service) against the real booking functions. Last,
 # because it commits its fictional rows.
 STRELVA_BOOKINGS_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
-  pnpm --dir "$repo_root" exec vitest run src/__tests__/booking-one-store.test.ts
+  pnpm --dir "$repo_root" exec vitest run --maxWorkers=2 --testTimeout=30000 --hookTimeout=30000 src/__tests__/booking-one-store.test.ts
 printf 'Workspace SQL checks passed on isolated PostgreSQL at %s (port %s).\n' \
   "$cluster_socket" "$cluster_port"
 
