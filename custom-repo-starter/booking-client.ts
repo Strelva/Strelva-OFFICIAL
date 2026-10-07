@@ -27,6 +27,7 @@ export interface PublicBookingSchedule {
   timeZone: string;
   slots: PublicBookingSlot[];
   intake?: PublicBookingIntakeQuestion[];
+  bookingAuthority?: "business";
 }
 
 export interface PublicBookingReceipt {
@@ -47,6 +48,7 @@ export interface PublicBookingVisitor {
   name: string;
   email: string;
   message?: string;
+  phone?: string;
   intakeAnswers?: Record<string,string>;
 }
 
@@ -96,7 +98,7 @@ function requestStorage(): Storage | null {
 
 function validVisitor(value: unknown): value is PublicBookingVisitor {
   if (!isRecord(value) || typeof value.name !== "string" || typeof value.email !== "string") return false;
-  return (value.message === undefined || typeof value.message === "string") && (value.intakeAnswers === undefined || (isRecord(value.intakeAnswers) && Object.values(value.intakeAnswers).every(v=>typeof v === "string")));
+  return (value.phone === undefined || typeof value.phone === "string") && (value.message === undefined || typeof value.message === "string") && (value.intakeAnswers === undefined || (isRecord(value.intakeAnswers) && Object.values(value.intakeAnswers).every(v=>typeof v === "string")));
 }
 
 function validRequestDraft(value: unknown): value is PublicBookingRequestDraft {
@@ -136,7 +138,7 @@ export function sameBookingRequest(draft: PublicBookingRequestDraft, input: { sl
   return draft.slotId === input.slotId &&
     (input.capabilityVersion === undefined || draft.capabilityVersion === input.capabilityVersion) &&
     previous.name === current.name && previous.email === current.email &&
-    (previous.message ?? "") === (current.message ?? "") && JSON.stringify(previous.intakeAnswers ?? {}) === JSON.stringify(current.intakeAnswers ?? {});
+    (previous.phone ?? "") === (current.phone ?? "") && (previous.message ?? "") === (current.message ?? "") && JSON.stringify(previous.intakeAnswers ?? {}) === JSON.stringify(current.intakeAnswers ?? {});
 }
 
 function endpoint(baseUrl: string, tenant: string, suffix = ""): string {
@@ -172,11 +174,11 @@ export class PublicBookingConflictError extends Error {
 
 /** Validate the published schedule before rendering visitor controls. */
 export function isPublicBookingSchedule(value: unknown): value is PublicBookingSchedule {
-  if (!isRecord(value) || !exactKeys(value, ["schemaVersion", "capabilityId", "version", "name", "provider", "timeZone", "slots", "intake"]) || value.schemaVersion !== 1 || typeof value.capabilityId !== "string" || !value.capabilityId ||
+  if (!isRecord(value) || !exactKeys(value, ["schemaVersion", "capabilityId", "version", "name", "provider", "timeZone", "slots", "intake", "bookingAuthority"]) || value.schemaVersion !== 1 || typeof value.capabilityId !== "string" || !value.capabilityId ||
     !Number.isSafeInteger(value.version) || Number(value.version) < 1 || typeof value.name !== "string" ||
     !isProvider(value.provider) || typeof value.timeZone !== "string" || !value.timeZone ||
     !Array.isArray(value.slots) || value.slots.length > 500) return false;
-  return value.slots.every(isSlot) && (value.intake === undefined || (Array.isArray(value.intake) && value.intake.length<=8 && value.intake.every(q=>isRecord(q) && exactKeys(q,["id","label","type","required"]) && typeof q.id==="string" && /^[A-Za-z0-9_-]{1,80}$/.test(q.id) && typeof q.label==="string" && q.label.length>0 && q.label.length<=200 && (q.type==="text" || q.type==="textarea") && typeof q.required==="boolean") && new Set(value.intake.map(q=>q.id)).size===value.intake.length));
+  return (value.bookingAuthority === undefined || value.bookingAuthority === "business") && value.slots.every(isSlot) && (value.intake === undefined || (Array.isArray(value.intake) && value.intake.length<=8 && value.intake.every(q=>isRecord(q) && exactKeys(q,["id","label","type","required"]) && typeof q.id==="string" && /^[A-Za-z0-9_-]{1,80}$/.test(q.id) && typeof q.label==="string" && q.label.length>0 && q.label.length<=200 && (q.type==="text" || q.type==="textarea") && typeof q.required==="boolean") && new Set(value.intake.map(q=>q.id)).size===value.intake.length));
 }
 
 /** Validate a safe receipt returned after the provider readback decision. */
@@ -194,7 +196,7 @@ function visitorBody(visitor: PublicBookingVisitor): PublicBookingVisitor {
   const name = visitor.name.trim().slice(0, 160);
   const email = visitor.email.trim().toLowerCase().slice(0, 320);
   if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter your name and a valid email address.");
-  return { name, email, ...(visitor.message?.trim() ? { message: visitor.message.trim().slice(0, 2000) } : {}), ...(visitor.intakeAnswers ? { intakeAnswers: Object.fromEntries(Object.entries(visitor.intakeAnswers).sort(([a],[b])=>a.localeCompare(b)).map(([id,value])=>[id,value.slice(0,2000)])) } : {}) };
+  return { name, email, ...(visitor.phone?.trim() ? { phone: visitor.phone.trim().slice(0,80) } : {}), ...(visitor.message?.trim() ? { message: visitor.message.trim().slice(0, 2000) } : {}), ...(visitor.intakeAnswers ? { intakeAnswers: Object.fromEntries(Object.entries(visitor.intakeAnswers).sort(([a],[b])=>a.localeCompare(b)).map(([id,value])=>[id,value.slice(0,2000)])) } : {}) };
 }
 
 async function readResponse(response: Response, fallback: string): Promise<Record<string, unknown>> {

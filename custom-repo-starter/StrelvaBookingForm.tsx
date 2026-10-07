@@ -131,22 +131,26 @@ export function StrelvaBookingForm({
   const [slotId, setSlotId] = useState(initialSlotId);
   const [name, setName] = useState(initialRequestDraft?.visitor.name ?? "");
   const [email, setEmail] = useState(initialRequestDraft?.visitor.email ?? "");
+  const [phone, setPhone] = useState(initialRequestDraft?.visitor.phone ?? "");
+  const native = schedule.bookingAuthority === "business";
+  const [visitorTimeZone, setVisitorTimeZone] = useState(schedule.timeZone);
+  useEffect(() => { if (native) setVisitorTimeZone(new Intl.DateTimeFormat().resolvedOptions().timeZone); }, [native]);
   const [intakeAnswers,setIntakeAnswers]=useState<Record<string,string>>(initialRequestDraft?.visitor.intakeAnswers ?? {});
   const [message, setMessage] = useState(initialRequestDraft?.visitor.message ?? "");
   const [alternatives, setAlternatives] = useState<PublicBookingConflictError | null>(null);
 
   const slots = alternatives?.nextSlots ?? schedule.slots;
   const slot = slots.find(value => value.id === slotId);
-  const timeZone = alternatives?.timeZone ?? schedule.timeZone;
+  const timeZone = native ? visitorTimeZone : alternatives?.timeZone ?? schedule.timeZone;
   function showConflict(error: unknown) {
     if (error instanceof PublicBookingConflictError) { setAlternatives(error); setSlotId(error.nextSlots[0]?.id ?? ""); }
   }
   const reservationLabel = receipt?.status === "confirmed"
-    ? `${providerLabel(schedule.provider)} confirmed this reservation.`
+    ? native ? "The business confirmed this booking." : `${providerLabel(schedule.provider)} confirmed this reservation.`
     : receipt?.status === "cancelled"
       ? "This reservation is cancelled."
       : receipt
-        ? "We could not confirm this reservation yet. Check the calendar before trying again."
+        ? native ? "Your request is waiting for the business to confirm. This time is not confirmed yet." : "We could not confirm this reservation yet. Check the calendar before trying again."
         : null;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -155,10 +159,11 @@ export function StrelvaBookingForm({
     setPending(true);
     setStatus(null);
     try {
-      const next = await onReserve(slot, { name, email, ...(message.trim() ? { message } : {}), ...(schedule.intake ? {intakeAnswers} : {}) });
+      const next = await onReserve(slot, { name, email, ...(native && phone.trim() ? { phone: phone.trim() } : {}), ...(message.trim() ? { message } : {}), ...(schedule.intake ? {intakeAnswers} : {}) });
       setReceipt(next);
       setName("");
       setEmail("");
+      setPhone("");
       setMessage("");
       setStatus({ kind: "success", text: next.status === "confirmed" ? "Your time is reserved." : "Your request was received for confirmation." });
     } catch (error) {
@@ -202,7 +207,7 @@ export function StrelvaBookingForm({
     try {
       const next = await onReconcile(receipt);
       setReceipt(next);
-      setStatus({ kind: "success", text: next.status === "confirmed" ? "The reservation is confirmed." : next.status === "cancelled" ? "The reservation is cancelled." : "The reservation is still awaiting confirmation. Check the calendar before trying again." });
+      setStatus({ kind: "success", text: next.status === "confirmed" ? "The reservation is confirmed." : next.status === "cancelled" ? "The reservation is cancelled." : native ? "The business has not confirmed your request yet." : "The reservation is still awaiting confirmation. Check the calendar before trying again." });
     } catch (error) {
       setStatus({ kind: "error", text: error instanceof Error ? error.message : "The booking status could not be checked. Please try again." });
     } finally { setReconciling(false); }
@@ -215,7 +220,8 @@ export function StrelvaBookingForm({
   return (
     <section aria-label={schedule.name}>
       <h2>{schedule.name}</h2>
-      <p>Choose a time. {providerLabel(schedule.provider)} will confirm the reservation.</p>
+      <p>{native ? "Choose a time. The business confirms your booking; a connected calendar receives a copy." : `Choose a time. ${providerLabel(schedule.provider)} will confirm the reservation.`}</p>
+      {native ? <p>Times shown in {visitorTimeZone}.</p> : null}
       <form onSubmit={(event) => void submit(event)} aria-label="Reserve a time">
         <label htmlFor={`${prefix}-slot`}>Available time</label>
         <select id={`${prefix}-slot`} value={slotId} disabled={pending} onChange={event => setSlotId(event.target.value)}>
@@ -231,6 +237,7 @@ export function StrelvaBookingForm({
           {question.type === "textarea" ? <textarea id={`${prefix}-intake-${question.id}`} value={intakeAnswers[question.id] ?? ""} required={question.required} maxLength={2000} disabled={pending} onChange={event=>setIntakeAnswers(current=>({...current,[question.id]:event.target.value}))} />
             : <input id={`${prefix}-intake-${question.id}`} value={intakeAnswers[question.id] ?? ""} required={question.required} maxLength={2000} disabled={pending} onChange={event=>setIntakeAnswers(current=>({...current,[question.id]:event.target.value}))} />}
         </div>)}
+        {native ? <><label htmlFor={`${prefix}-phone`}>Phone (optional)</label><input id={`${prefix}-phone`} name="phone" type="tel" value={phone} maxLength={80} disabled={pending} onChange={event => setPhone(event.target.value)} /></> : null}
         <label htmlFor={`${prefix}-message`}>Note (optional)</label>
         <textarea id={`${prefix}-message`} name="message" value={message} maxLength={2000} disabled={pending} onChange={event => setMessage(event.target.value)} />
         <button type="submit" disabled={pending || !onReserve || !slot}>{pending ? "Saving…" : submitLabel}</button>
@@ -238,12 +245,12 @@ export function StrelvaBookingForm({
       {receipt ? (
         <section aria-label="Booking receipt">
           <h3>{receipt.title}</h3>
-          <p>{formatSlot({ start: receipt.start, end: receipt.end }, receipt.timeZone)}</p>
+          <p>{formatSlot({ start: receipt.start, end: receipt.end }, native ? visitorTimeZone : receipt.timeZone)}</p>
           <p role="status">{reservationLabel}</p>
           {receipt.status !== "cancelled" ? (
             <>
               {receipt.status === "pending" ? (
-                onReconcile ? <button type="button" disabled={pending || reconciling} onClick={() => void reconcile()}>{reconciling ? "Checking…" : "Check booking status"}</button> : null
+                onReconcile ? <button type="button" disabled={pending || reconciling} onClick={() => void reconcile()}>{reconciling ? "Checking…" : native ? "Check request status" : "Check booking status"}</button> : null
               ) : (
                 <>
                   <form onSubmit={(event) => void change(event)} aria-label="Change reservation">

@@ -40,6 +40,7 @@ export type PublicBookingSlot = z.infer<typeof publicBookingSlotSchema>;
 export const publicBookingVisitorSchema = z.object({
   name: z.string().trim().min(1).max(160),
   email: z.string().trim().email().max(320),
+  phone: z.string().trim().max(80).optional(),
   message: z.string().trim().max(2_000).optional(),
   intakeAnswers: z.record(z.string().max(80),z.string().max(2000)).optional(),
 }).strict();
@@ -68,6 +69,7 @@ export function publicBookingRequestFingerprint(input: {
       name: input.visitor.name.trim(),
       email: input.visitor.email.trim().toLowerCase(),
       message: input.visitor.message?.trim() ?? "",
+      ...(input.visitor.phone?.trim() ? { phone: input.visitor.phone.trim() } : {}),
       ...(input.visitor.intakeAnswers ? { intakeAnswers: Object.fromEntries(Object.entries(input.visitor.intakeAnswers).sort(([a],[b])=>a.localeCompare(b))) } : {}),
     },
   });
@@ -83,6 +85,7 @@ export const publicBookingScheduleSchema = z.object({
   timeZone: z.string().trim().min(1).max(128),
   slots: z.array(publicBookingSlotSchema).max(500),
   intake: z.array(intakeQuestionSchema).max(8).optional(),
+  bookingAuthority: z.literal("business").optional(),
 }).strict();
 export type PublicBookingSchedule = z.infer<typeof publicBookingScheduleSchema>;
 
@@ -405,6 +408,7 @@ export function createPublicBookingService(dependencies: PublicBookingDependenci
       provider: safe.provider,
       timeZone: safe.timeZone,
       slots: rangeSlots(safe, range),
+      ...(safe.recordBooking ? { bookingAuthority: "business" } : {}),
       ...(safe.recordBooking?.intake ? { intake: safe.recordBooking.intake } : {}),
     });
   }

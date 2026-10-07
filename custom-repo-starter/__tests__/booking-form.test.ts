@@ -260,3 +260,29 @@ describe("fresh conflict choices", () => {
     expect(onReserve.mock.calls[1]).toEqual([nextSlots[0], { name: "Avery Buyer", email: "avery@example.test" }]);
   });
 });
+
+
+describe("native business confirmation", () => {
+  it("shows local timezone and optional phone without claiming a calendar write", async () => {
+    const native = { ...schedule, bookingAuthority: "business" as const };
+    const onReserve = vi.fn().mockResolvedValue(receipt);
+    await renderForm({ schedule: native, onReserve });
+    expect(container.textContent).toContain(`Times shown in ${new Intl.DateTimeFormat().resolvedOptions().timeZone}.`);
+    expect(container.textContent).not.toContain("Outlook will confirm");
+    const name = container.querySelector<HTMLInputElement>('input[name="name"]')!; const email = container.querySelector<HTMLInputElement>('input[name="email"]')!;
+    const phone = container.querySelector<HTMLInputElement>('input[name="phone"]')!;
+    await act(async () => { setValue(name,"Dana"); setValue(email,"dana@example.test"); setValue(phone,"716-555-0123"); });
+    await act(async () => container.querySelector<HTMLFormElement>('form[aria-label="Reserve a time"]')!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })));
+    expect(onReserve).toHaveBeenCalledWith(schedule.slots[0], { name: "Dana", email: "dana@example.test", phone: "716-555-0123" });
+    expect(container.textContent).toContain("The business confirmed this booking."); expect(container.textContent).not.toContain("Outlook confirmed");
+  });
+  it("calls a native request pending business confirmation instead of calendar readback", async () => {
+    await renderForm({ schedule: { ...schedule, bookingAuthority: "business" }, receipt: { ...receipt, status: "pending" }, onReconcile: vi.fn() });
+    expect(container.textContent).toContain("Your request is waiting for the business to confirm"); expect(container.textContent).toContain("Check request status");
+    expect(container.textContent).not.toContain("Check the calendar");
+  });
+  it("keeps the original phone-free provider flow when native metadata is absent", async () => {
+    await renderForm({ receipt }); expect(container.querySelector('input[name="phone"]')).toBeNull();
+    expect(container.textContent).toContain("Outlook confirmed this reservation."); expect(container.textContent).not.toContain("Times shown in");
+  });
+});

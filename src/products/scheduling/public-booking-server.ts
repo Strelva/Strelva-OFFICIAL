@@ -225,11 +225,13 @@ function publicInquiryCapture(): PublicBookingInquiryCapture {
         email: input.visitor.email,
         ...(message ? { message } : {}),
       };
+      if (input.visitor.phone?.trim()) for (const field of capability.live.form.fields.filter(field => field.kind === "phone")) fields[field.id] = input.visitor.phone.trim();
       const validationErrors = validateInquiryFields(capability.live, fields);
       if (validationErrors.length) throw new Error(validationErrors[0]);
       const captured = await captureLead(input.tenantId, {
         name: input.visitor.name,
         email: input.visitor.email,
+        ...(input.visitor.phone?.trim() ? { phone: input.visitor.phone.trim() } : {}),
         message,
         source: "public-booking",
         fields,

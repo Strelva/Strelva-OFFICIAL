@@ -53,7 +53,7 @@ export function publicBookingStoreHook(): PublicBookingStoreHook | undefined {
           end: input.end,
           bufferMinutes: 0,
           timeZone: input.binding.timeZone,
-          customer: { name: input.visitor.name, email: input.visitor.email },
+          customer: { name: input.visitor.name, email: input.visitor.email, ...(input.visitor.phone?.trim() ? { phone: input.visitor.phone.trim() } : {}) },
           ...(input.visitor.intakeAnswers || input.visitor.message ? { intakeAnswers: { ...input.visitor.intakeAnswers, ...(input.visitor.message ? { message: input.visitor.message } : {}) } } : {}),
           inquiryId: input.inquiryId,
           requestFingerprint: input.requestFingerprint,

@@ -177,3 +177,12 @@ describe("additive booking conflicts", () => {
     try { await request(); } catch (error) { expect(error).not.toBeInstanceOf(PublicBookingConflictError); expect((error as Error).message).toBe("Taken"); }
   });
 });
+
+
+it("accepts gated authority metadata and sends optional phone without changing old requests", async () => {
+  expect(isPublicBookingSchedule({ ...schedule, bookingAuthority: "business" })).toBe(true);
+  expect(isPublicBookingSchedule({ ...schedule, bookingAuthority: "calendar" })).toBe(false);
+  const fetcher = vi.fn().mockResolvedValue(Response.json(receipt)); vi.stubGlobal("fetch",fetcher);
+  await reserveBooking("https://app.example","northstar",schedule,schedule.slots[0]!,{name:"Dana",email:"dana@example.test",phone:" 716-555-0123 "});
+  expect(JSON.parse(fetcher.mock.calls[0]![1].body).visitor.phone).toBe("716-555-0123");
+});

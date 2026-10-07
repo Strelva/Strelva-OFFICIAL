@@ -109,3 +109,22 @@ describe("generated booking conflict guidance", () => {
     expect(JSON.parse(fetcher.mock.calls[2]![1].body)).toMatchObject({ slotId: next.id, visitor: { name: "Avery Buyer", email: "avery@example.test" } });
   });
 });
+
+
+describe("native business receipt and phone", () => {
+  it("keeps phone and shows business confirmation without asserting a provider copy", async () => {
+    const fetcher = vi.fn().mockResolvedValueOnce(response({ ...schedule, bookingAuthority: "business" }))
+      .mockResolvedValueOnce(response(pending,201)).mockResolvedValueOnce(response(confirmed));
+    vi.stubGlobal("fetch",fetcher);
+    const root=document.createElement("div");root.setAttribute("data-strelva-capability","booking");root.setAttribute("data-strelva-config",JSON.stringify(config));document.body.append(root);
+    mountPublishedCapabilities(document);await settle();
+    expect(root.textContent).toContain(`Times shown in ${new Intl.DateTimeFormat().resolvedOptions().timeZone}.`);
+    const name=root.querySelector<HTMLInputElement>("#strelva-booking-name")!;const email=root.querySelector<HTMLInputElement>("#strelva-booking-email")!;const phone=root.querySelector<HTMLInputElement>("#strelva-booking-phone")!;
+    name.value="Dana";email.value="dana@example.test";phone.value=" 716-555-0123 ";
+    root.querySelector<HTMLFormElement>('form[aria-label="Reserve a time"]')!.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));await settle();
+    expect(JSON.parse(fetcher.mock.calls[1]![1].body).visitor.phone).toBe("716-555-0123");
+    expect(root.textContent).toContain("Your request is waiting for the business to confirm");expect(root.textContent).not.toContain("Check the calendar");
+    Array.from(root.querySelectorAll("button")).find(button=>button.textContent==="Check request status")!.click();await settle();
+    expect(root.textContent).toContain("The business confirmed this booking.");expect(root.textContent).not.toContain("Outlook confirmed");
+  });
+});

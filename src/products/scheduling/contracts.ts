@@ -30,3 +30,16 @@ export const scheduleCommandSchema = z.discriminatedUnion("kind", [
 // Public product boundary for workspace routes and dedicated scheduling
 // controls. Provider internals remain inside this product's calendar folder.
 export * from "./calendar/contracts";
+
+/** Outlook disconnect removes Strelva's tokens, not Microsoft account consent. */
+export const calendarProviderConsentActionSchema = z.object({
+  href: z.literal("https://myapps.microsoft.com"),
+  label: z.string().min(1).max(160),
+  message: z.string().min(1).max(600),
+}).strict();
+export type CalendarProviderConsentAction = z.infer<typeof calendarProviderConsentActionSchema>;
+export const outlookCalendarConsentAction: CalendarProviderConsentAction = {
+  href: "https://myapps.microsoft.com",
+  label: "Remove Strelva consent in Microsoft My Apps",
+  message: "Strelva is disconnected. Microsoft calendar consent has not been removed. Remove Strelva's permissions in Microsoft My Apps. If your organization granted consent, ask its administrator to remove it.",
+};

@@ -65,6 +65,7 @@ describe("record-served public visitor bookings", () => {
     const input = { tenantId: tenant, capabilityId: "consultation", capabilityVersion: 1, slotId: offered.slots[0]!.id,
       visitor: { name: "Dana", email: "dana@example.test" }, requestId: "request-one-".repeat(4) };
     const receipt = await api.reserve(input);
+    expect(offered.bookingAuthority).toBe("business");
     expect(receipt.status).toBe("pending"); expect((await api.reserve(input)).reservationId).toBe(receipt.reservationId);
     expect(store.rows).toHaveLength(1); expect(store.rows[0]).toMatchObject({ status: "requested", bufferMinutes: 15, serviceRef: "consultation" });
     expect(provider).not.toHaveBeenCalled();
@@ -142,4 +143,15 @@ describe("record-served public visitor bookings", () => {
     await expect(api.reserve({ tenantId: tenant, capabilityId: "consultation", capabilityVersion: 1, slotId: current.slots[0]!.id, visitor: { name: "Dana", email: "dana@example.test" }, requestId: "down-request-".repeat(4) })).rejects.toMatchObject({ code: "unavailable" });
     expect(refs).toEqual([]); expect(provider).not.toHaveBeenCalled();
   });
+});
+
+
+it("keeps an optional phone in the native record and binds retries to it", async () => {
+  const { api } = service(); const offered = await api.read({ tenantId: tenant, capabilityId: "consultation" });
+  const input = { tenantId: tenant, capabilityId: "consultation", capabilityVersion: 1, slotId: offered.slots[0]!.id,
+    visitor: { name: "Dana", email: "dana@example.test", phone: " 716-555-0123 " }, requestId: "phone-request-".repeat(3) };
+  const receipt = await api.reserve(input); expect(store.rows[0]).toMatchObject({ customer: { phone: "716-555-0123" } });
+  expect(await api.reserve(input)).toEqual(receipt);
+  await expect(api.reserve({ ...input, visitor: { ...input.visitor, phone: "716-555-0999" } })).rejects.toMatchObject({ code: "conflict" });
+  expect(store.rows).toHaveLength(1);
 });
