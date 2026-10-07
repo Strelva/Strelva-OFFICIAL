@@ -11,10 +11,14 @@ export interface ConnectedOwnerNoticeDependencies {
   gates: (tenantId: string | null) => Promise<boolean>;
   send: (input: SendEmailInput) => Promise<SendEmailResult>;
 }
+/** Durable connected notices also honor the connected-site arming switch. */
+export async function connectedOwnerNoticeGates(tenantId: string | null): Promise<boolean> {
+  return process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && process.env.STRELVA_CONNECTED_SITE_EMAIL_ENABLED === "1"
+    && emailSendingEnabled() && customerEmailEnabled() && (!tenantId || await getClientEmailOverride(tenantId) !== "off");
+}
 const defaults: ConnectedOwnerNoticeDependencies = {
   rpc: inquiryRecordsRpc,
-  gates: async (tenantId) => process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && process.env.STRELVA_CONNECTED_SITE_EMAIL_ENABLED === "1"
-    && emailSendingEnabled() && customerEmailEnabled() && (!tenantId || await getClientEmailOverride(tenantId) !== "off"),
+  gates: connectedOwnerNoticeGates,
   send: sendEmailWithReceipt,
 };
 

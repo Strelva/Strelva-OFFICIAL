@@ -20,7 +20,7 @@ vi.mock("@/products/inquiries", async (original) => ({ ...(await original<typeof
 
 vi.mock("@/products/inquiries/owner-notice", () => ({ notifyInquiryOwner: mocks.notice }));
 
-vi.mock("@/lib/leads", () => ({ captureLead: mocks.capture, recordLead: mocks.legacy }));
+vi.mock("@/lib/leads", () => ({ captureLead: mocks.capture, recordLead: mocks.legacy, getLeadById: async () => null }));
 vi.mock("@/platform/infra/rate-limit", () => ({
   isRateLimitedAsync: mocks.limited,
   rateLimitKey: () => "inquiry-submit-test",

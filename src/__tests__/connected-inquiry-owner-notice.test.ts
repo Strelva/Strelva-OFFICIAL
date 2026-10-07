@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { notifyDurableConnectedInquiryOwner, reconcileConnectedInquiryOwnerNotice, type ConnectedOwnerNoticeDependencies } from "@/products/connected-sites/inquiry-owner-notice";
+import { connectedOwnerNoticeGates, notifyDurableConnectedInquiryOwner, reconcileConnectedInquiryOwnerNotice, type ConnectedOwnerNoticeDependencies } from "@/products/connected-sites/inquiry-owner-notice";
 import { readInquiryOwnerNoticeIssues } from "@/platform/operator-queue/inquiry-owner-notices";
 
 const rowId = "c1800000-0000-4000-8000-000000000001";
@@ -14,6 +14,13 @@ function dependencies(patch: Partial<ConnectedOwnerNoticeDependencies> = {}): Co
 beforeEach(() => { vi.stubEnv("STRELVA_INQUIRY_RECORDS", "1"); vi.stubEnv("STRELVA_INQUIRY_OWNER_NOTICES", "1"); vi.stubEnv("DUAL_WRITE_PG", "1"); });
 afterEach(() => vi.unstubAllEnvs());
 describe("connected inquiry owner notice receipts", () => {
+  it("default gates keep durable notices silent until connected-site email is armed", async () => {
+    vi.stubEnv("EMAIL_SENDING_ENABLED", "true"); vi.stubEnv("CUSTOMER_EMAIL_ENABLED", "true");
+    vi.stubEnv("STRELVA_CONNECTED_SITE_EMAIL_ENABLED", "");
+    expect(await connectedOwnerNoticeGates(null)).toBe(false);
+    vi.stubEnv("STRELVA_CONNECTED_SITE_EMAIL_ENABLED", "1");
+    expect(await connectedOwnerNoticeGates(null)).toBe(true);
+  });
   it("records the provider acceptance under the exact source-aware claim", async () => {
     const d = dependencies();
     expect(await notifyDurableConnectedInquiryOwner(input, d)).toBe("sent");

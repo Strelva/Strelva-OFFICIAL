@@ -9,7 +9,6 @@ import { sendEmailWithReceipt } from "@/platform/infra/email/send";
 import { publishingDecisionDeliveryAllowed } from "./publishing-delivery";
 import { customerEmailEnabled, emailSendingEnabled } from "@/platform/infra/email/enabled";
 import { getClientEmailOverride } from "@/platform/infra/email/client-override";
-import { needsYouReleaseEnabled } from "./release";
 import { DeliveryCommitmentService, PostgresServiceRequestStore, mutateServiceRequestCommitment } from "@/platform/service-requests";
 import type { WorkspaceActor } from "@/platform/workspaces/types";
 import { serviceRequestAdapter, tenantEventAdapter } from "./adapters";

@@ -415,6 +415,9 @@ describe("booking calendar health alongside Needs You decisions", () => {
     const bookingCalendarHealth = vi.fn(async () => { throw new Error("health source down"); });
     const svc = createNeedsYouService({ store: mem.store, adapters: [], sendEmail, now: () => clock.now, appOrigin: "https://app.example.test", bookingCalendarHealth });
     expect(await svc.chase()).toMatchObject({failed:1,digests:0});
+  });
+});
+
 describe("strict inquiry fact and publication email gates", () => {
   it.each(["inquiry_capability_publish","inquiry_capability_undo"])("gates %s digests and reminders before generic tenant overrides", async kind => {
     requests=[]; events=new Map([["evt-1",ev({type:"change_request",metadata:{kind}})]]);
