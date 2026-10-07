@@ -12,15 +12,19 @@ export interface VersionContext {
 }
 
 // On the server the actor comes from `read_version_actor` (direct workspace
-// memberships, src/platform/system-versions/supabase-store.ts). Postgres
-// rechecks every call, including agency scope, which this shape does not
-// carry: a partner agency with no membership is refused here first.
+// memberships plus provider seats, src/platform/system-versions/supabase-store.ts).
+// A provider seat is the agency's standing access to a client business
+// (20261009151000_provider_seats.sql) and counts like a direct membership
+// with the seat's role. Postgres rechecks every call, including agency
+// scope, which this shape does not carry: a partner agency with neither a
+// membership nor a seat is refused here first.
 export type VersionRole = "owner" | "admin" | "member";
+export type VersionMembershipVia = "membership" | "provider_seat";
 export interface VersionActor {
   userId: string;
   /** Required by the Postgres store, which rechecks the actor in the database. */
   verifiedEmail?: string;
-  memberships: ReadonlyArray<{ businessId: string; role: VersionRole }>;
+  memberships: ReadonlyArray<{ businessId: string; role: VersionRole; via?: VersionMembershipVia }>;
 }
 
 /** The authoring side of lineage. Only its business can publish revisions. */

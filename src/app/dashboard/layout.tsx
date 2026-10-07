@@ -1,3 +1,4 @@
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { headers } from "next/headers";
@@ -88,8 +89,8 @@ export default async function DashboardLayout({
   }
   const requestHost = requestHeaders.get("host") || "";
   const hostname = requestHost.toLowerCase().split(":")[0];
-  const appBase = hostname === "localhost" || hostname === "127.0.0.1" || hostname?.endsWith(".localhost") || hostname === "app.strelva.com" || hostname?.endsWith(".vercel.app")
-    ? "" : "https://app.strelva.com";
+  const appBase = hostname === "localhost" || hostname === "127.0.0.1" || hostname?.endsWith(".localhost") || hostname === new URL(CONTROL_PLANE_URL).hostname || hostname?.endsWith(".vercel.app")
+    ? "" : CONTROL_PLANE_URL;
   const requestProto = requestHeaders.get("x-forwarded-proto")
     || (requestHost.includes("localhost") ? "http" : "https");
   // The same framing the workspace website uses (src/lib/website-page-data.ts).

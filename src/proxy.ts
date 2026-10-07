@@ -10,7 +10,7 @@ import type { NextRequest } from "next/server";
 import { getDevAccessTenant, isDevAccessBypassEnabled } from "@/platform/infra/dev-access";
 import { MARKETING_HOSTS, isMarketingHost } from "./lib/marketing-hosts";
 import { parseTenantHost } from "./lib/tenant-host";
-import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
+import { APP_ROOT_DOMAIN, CONTROL_PLANE_URL, MARKETING_URL, OPERATOR_URL, isPlatformDomain, tenantSiteHost } from "@/platform/infra/brand";
 // No workspace is known here: the proxy only asks "could the rebuild be on";
 // the per-site decision is getPublishedSiteDocument's (per tenant).
 import { websiteRebuildReleaseMayBeOn } from "./products/websites/index";
@@ -22,7 +22,7 @@ export { isMarketingHost } from "./lib/marketing-hosts";
 export { validateCronRequest } from "@/lib/cron-auth";
 
 const LEGACY_PUBLIC_SITE_REDIRECTS: Record<string, string> = {
-  "gldf.strelva.com": "https://greatlakesdriedfruit.com",
+  [tenantSiteHost("gldf", APP_ROOT_DOMAIN)]: "https://greatlakesdriedfruit.com",
 };
 
 const cspBaseDirectives = [
@@ -136,7 +136,7 @@ export function shouldResolveCustomDomain(host: string): boolean {
   return (
     !isMarketingHost(host) &&
     !hostWithoutPort.endsWith(".localhost") &&
-    !hostWithoutPort.endsWith(".strelva.com") &&
+    !isPlatformDomain(hostWithoutPort) &&
     !hostWithoutPort.endsWith(".vercel.app")
   );
 }
@@ -176,7 +176,7 @@ export function shouldRewriteMarketingRoot(host: string, pathname: string): bool
 
 // Root domains under which `admin.<root>` is the OPERATOR console host (not a
 // client's admin dashboard). Mirrors the suffixes extractTenantFromHost keys on.
-const ADMIN_HOST_ROOT_SUFFIXES = [".strelva.com", ".localhost"] as const;
+const ADMIN_HOST_ROOT_SUFFIXES = [`.${APP_ROOT_DOMAIN}`, ".localhost"] as const;
 
 // True only for the BARE admin subdomain of a root domain (admin.strelva.com,
 // admin.localhost[:port]). NOT admin.<tenant>.strelva.com — that is a client's
@@ -291,14 +291,14 @@ function isLivePreviewRequest(req: NextRequest): boolean {
 function getPreviewFrameAncestors(host: string, protocol: string): string[] {
   const ancestors = new Set([
     "'self'",
-    "https://strelva.com",
-    "https://www.strelva.com",
-    "https://admin.strelva.com",
+    `https://${APP_ROOT_DOMAIN}`,
+    MARKETING_URL,
+    OPERATOR_URL,
     "http://localhost:3000",
     "http://localhost:3001",
   ]);
 
-  if (host && !MARKETING_HOSTS.has(host) && !host.endsWith(".strelva.com")) {
+  if (host && !MARKETING_HOSTS.has(host) && !isPlatformDomain(host)) {
     const bare = host.replace(/^(www|admin)\./, "");
     ancestors.add(`${protocol}//${bare}`);
     ancestors.add(`${protocol}//www.${bare}`);
@@ -327,7 +327,7 @@ export function buildContentSecurityPolicy(params: {
       "frame-src 'self' https: http://localhost:* http://*.localhost:*",
       "base-uri 'self' https:",
       "form-action 'self'",
-      "frame-ancestors 'self' http://localhost:3000 http://localhost:3001 https://strelva.com https://admin.strelva.com",
+      `frame-ancestors 'self' http://localhost:3000 http://localhost:3001 https://${APP_ROOT_DOMAIN} ${OPERATOR_URL}`,
     ].join("; ");
   }
 

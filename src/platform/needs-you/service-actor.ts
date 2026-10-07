@@ -1,13 +1,14 @@
 /**
  * Strelva (system): the narrow service actor for work that runs when nobody
  * is signed in (product model rule 6). SQL in
- * supabase/migrations/20261009100000_strelva_service_actor.sql.
+ * supabase/migrations/20261009100000_strelva_service_actor.sql, made
+ * agency-neutral by 20261009153000_platform_service_actor.sql.
  *
  * A session is per business and per purpose, lasts 30 minutes, and is logged
  * in `strelva_service_actions` as "Strelva (system)". It carries the member
  * identity the existing RPCs recheck (the business's verified owner, else
- * its verified admin, which on a converted business is the Strelva
- * operator), because those RPCs are the only read path. What it may do is
+ * a verified direct admin, else a verified staff member on the provider's
+ * seat), because those RPCs are the only read path. What it may do is
  * narrower than that identity:
  *
  * - `needs_you_sync`: read pending asks and open Needs you items. Never
@@ -22,8 +23,10 @@
  *   and only after the link approved the decision
  *   (20261009131000_make_real_owner_link.sql).
  *
- * Only for a business Strelva runs (converted, or provided by Strelva's
- * agency). Anything else gets no session.
+ * Only for a business whose provider of record is an agency verified for
+ * the purpose's effect (needs_you_sync: email; Make real: publish), the same
+ * rule for every agency, Strelva's included. The session names that
+ * provider. Anything else gets no session.
  */
 import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
@@ -41,6 +44,8 @@ export interface ServiceSession {
   /** Whose membership the existing RPCs recheck. Never a decider. */
   onBehalf: { role: "owner" | "admin" };
   actor: WorkspaceActor;
+  /** The verified agency of record the platform acted for. */
+  providerWorkspaceId?: string;
 }
 
 const sessionSchema = z.object({
@@ -51,6 +56,7 @@ const sessionSchema = z.object({
   role: z.enum(["owner", "admin"]),
   userId: z.string().uuid(),
   verifiedEmail: z.string().email(),
+  providerWorkspaceId: z.string().uuid().optional(),
 }).nullable();
 
 export function parseServiceSession(data: unknown): ServiceSession | null {
@@ -61,6 +67,7 @@ export function parseServiceSession(data: unknown): ServiceSession | null {
   return {
     kind: "strelva_system", label: STRELVA_SYSTEM_LABEL, sessionId: row.sessionId, workspaceId: row.workspaceId, purpose: row.purpose,
     onBehalf: { role: row.role }, actor: { userId: row.userId, verifiedEmail: row.verifiedEmail.toLowerCase() },
+    ...(row.providerWorkspaceId ? { providerWorkspaceId: row.providerWorkspaceId } : {}),
   };
 }
 
@@ -75,7 +82,7 @@ function db(): Rpc {
   return client as unknown as Rpc;
 }
 
-/** Start a logged session for one business, or null when Strelva doesn't run it or it has no verified owner or admin. */
+/** Start a logged session for one business, or null when no verified provider serves it or nobody verified can be read as. */
 export async function startServiceSession(workspaceId: string, purpose: Exclude<ServicePurpose, "make_real_link">): Promise<ServiceSession | null> {
   const { data, error } = await db().rpc("strelva_service_reader", { p_workspace_id: z.string().uuid().parse(workspaceId), p_purpose: purpose });
   if (error) throw new WorkspaceStoreError("Strelva's service session could not start.");

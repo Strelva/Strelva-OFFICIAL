@@ -1,3 +1,4 @@
+import { CONTROL_PLANE_URL } from "@/platform/infra/brand";
 /**
  * Connected sites, server side. Server only.
  *
@@ -72,7 +73,7 @@ export const generateVerificationToken = () => randomSlug(32);
 
 /** The app's public origin, from configuration only (never a request's Host header). */
 export function appOrigin(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL || "https://app.strelva.com").replace(/\/+$/, "");
+  return (process.env.NEXT_PUBLIC_APP_URL || CONTROL_PLANE_URL).replace(/\/+$/, "");
 }
 
 /** The two things a site owner pastes into the page. */

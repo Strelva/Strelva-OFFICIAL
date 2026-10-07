@@ -257,6 +257,7 @@ export interface PublishingContentPort {
 // ── Registry ──────────────────────────────────────────────────────────────────
 
 export interface WorkspacePorts {
+  bookingProof(): Promise<{ readAgentRequestProof(tenantId: string, from: string, to: string): Promise<string | null> }>;
   clientRecords(): Promise<ClientRecordsPort>;
   tenantPolicy(): Promise<TenantPolicyPort>;
   outsideWriteReceipts(): Promise<OutsideWriteReceiptsPort>;

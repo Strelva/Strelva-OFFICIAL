@@ -27,3 +27,4 @@ export const undoWorkspaceGoogleChange = async (...args: Parameters<typeof impor
 export const changeWorkspaceGoogleReply = async (...args: Parameters<typeof import("./workspace").changeWorkspaceGoogleReply>) => (await import("./workspace")).changeWorkspaceGoogleReply(...args);
 
 export { commandGoogleLocationVersions, readGoogleLocationVersion, googleLocationVersionCommandSchema } from "./versions";
+export const googleTargetAllowed = async (...args: Parameters<typeof import("./workspace").googleTargetAllowed>) => (await import("./workspace")).googleTargetAllowed(...args);
