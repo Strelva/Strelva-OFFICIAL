@@ -79,7 +79,7 @@ function actorArgs(actor: WorkspaceActor) {
 const recipientSchema = z.object({ email: z.string(), from: z.string(), tenantId: z.string().nullable().optional() }).passthrough();
 export type DeliveryRow = OwnerDecision & { businessName: string; timezone: string; recipient: z.infer<typeof recipientSchema> | null };
 const deliveryRowSchema = ownerDecisionSchema.extend({ businessName: z.string(), timezone: z.string(), recipient: recipientSchema.nullable() });
-const inquiryNoticeClaimSchema = z.object({ acquired: z.boolean(), status: z.enum(["sending", "accepted", "suppressed", "unknown"]) });
+const inquiryNoticeClaimSchema = z.object({ acquired: z.boolean(), status: z.enum(["sending", "accepted", "delivered", "deferred", "bounced", "failed", "suppressed", "unknown"]) });
 export type InquiryNoticeClaim = z.infer<typeof inquiryNoticeClaimSchema>;
 
 const claimSchema = z.object({ status: z.enum(["claimed", "already_handled", "changed", "expired"]), item: ownerDecisionSchema });
@@ -108,7 +108,7 @@ export interface NeedsYouStore {
   /** Exact urgent source; avoids unrelated businesses or the cron's page cap. */
   deliveryForSource?(workspaceId: string, lifecycle: string, sourceId: string): Promise<DeliveryRow | null>;
   /** One durable inquiry urgent-send purpose. Ambiguous sends never reopen. */
-  claimInquiryNotice?(row: DeliveryRow, recipient: string): Promise<InquiryNoticeClaim>;
+  claimInquiryNotice?(row: DeliveryRow, recipient: string, subject: string): Promise<InquiryNoticeClaim>;
   finishInquiryNotice?(row: DeliveryRow, status: "accepted" | "suppressed" | "unknown", providerMessageId: string | null, acceptedAt: string | null, reason: string | null): Promise<void>;
   linkedTenants(workspaceId: string | null): Promise<{ workspaceId: string; tenantId: string }[]>;
   ownerActor(workspaceId: string, recipient: string): Promise<WorkspaceActor | null>;
@@ -147,7 +147,7 @@ export const PostgresNeedsYouStore: NeedsYouStore = {
   }, ownerDecisionSchema, "The delivery could not be recorded."),
   dueForDelivery: (limit) => call("list_open_owner_decisions_for_delivery", { p_limit: limit }, z.array(deliveryRowSchema), "Open decisions could not be listed."),
   deliveryForSource: (workspaceId, lifecycle, sourceId) => call("read_owner_decision_source_for_delivery", { p_workspace_id: workspaceId, p_lifecycle: lifecycle, p_source_id: sourceId }, deliveryRowSchema.nullable(), "The urgent decision could not be read."),
-  claimInquiryNotice: (row, recipient) => call("claim_inquiry_decision_notice", { p_workspace_id: row.workspaceId, p_decision_id: row.id, p_revision: row.revisionHash, p_recipient: recipient }, inquiryNoticeClaimSchema, "The inquiry email could not be claimed."),
+  claimInquiryNotice: (row, recipient, subject) => call("claim_inquiry_decision_notice_v2", { p_workspace_id: row.workspaceId, p_decision_id: row.id, p_revision: row.revisionHash, p_recipient: recipient, p_subject: subject }, inquiryNoticeClaimSchema, "The inquiry email could not be claimed."),
   finishInquiryNotice: async (row, status, providerMessageId, acceptedAt, reason) => {
     await call("finish_inquiry_decision_notice", { p_workspace_id: row.workspaceId, p_decision_id: row.id, p_status: status, p_provider_message_id: providerMessageId, p_accepted_at: acceptedAt, p_reason: reason }, z.boolean(), "The inquiry email receipt could not be recorded.");
   },

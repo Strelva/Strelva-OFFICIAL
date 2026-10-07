@@ -248,14 +248,19 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
       summary.ownerNotTold += rows.length;
       return;
     }
-    const inquiryEmail = rows.some(row => row.sourceLifecycle === "tenant_event" && (row.kind === "customer.message" || row.kind === "customer.commitment"));
+    const inquiryUrgent = rows.some(row => row.sourceLifecycle === "tenant_event" && (row.kind === "customer.message" || row.kind === "customer.commitment"));
+    const inquiryEmail = inquiryUrgent || rows.some(row => row.sourceLifecycle === "inquiry_fact")
+      || (await Promise.all(rows.filter(row => row.sourceLifecycle === "tenant_event" && (row.kind === "system.go_live" || row.kind === "system.change_live"))
+        .map(row => adapterFor(row.sourceLifecycle)?.inquiryEmailSource?.({ workspaceId: row.workspaceId }, row.sourceId).catch(() => true) ?? true))).some(Boolean);
     if (inquiryEmail
       && (!deps.urgentInquiryAllowed || !(await deps.urgentInquiryAllowed(first.recipient?.tenantId ?? null)))) {
       for (const row of rows) await deps.store.recordDelivery(row.workspaceId, row.id, kind, "suppressed", recipient, null, "inquiry_email_gates_off");
       summary.ownerNotTold += rows.length;
       return "suppressed";
     }
-    const durableUrgent = inquiryEmail && kind === "urgent";
+    const options = email(kind === "urgent" ? "urgent" : kind === "digest" ? "digest" : "reminder", first.businessName, rows, recipient);
+    const subject = kind === "urgent" ? `${first.businessName}: a customer is waiting on you` : options.heading;
+    const durableUrgent = inquiryUrgent && kind === "urgent";
     if (durableUrgent) {
       // Immediate delivery and the hourly chase share this SQL claim. A stale
       // not_sent projection cannot send after a timeout or failed checkpoint.
@@ -264,9 +269,9 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
         return "suppressed";
       }
       try {
-        const claim = await deps.store.claimInquiryNotice(first, recipient);
+        const claim = await deps.store.claimInquiryNotice(first, recipient, subject);
         if (!claim.acquired) {
-          if (claim.status === "accepted") return "sent";
+          if (["accepted", "delivered", "deferred"].includes(claim.status)) return "sent";
           if (claim.status === "suppressed") return "suppressed";
           return "failed";
         }
@@ -274,7 +279,6 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
         return "failed";
       }
     }
-    const options = email(kind === "urgent" ? "urgent" : kind === "digest" ? "digest" : "reminder", first.businessName, rows, recipient);
     if (inquiryNotice) options.paragraphs = [
       `New inquiry from ${inquiryNotice.name.slice(0, 160)}.`,
       ...(inquiryNotice.message ? [inquiryNotice.message.slice(0, 2000)] : []),
@@ -288,10 +292,10 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
         // Client email is tenant-aware; without a linked tenant the global switch decides.
         ...(first.recipient?.tenantId ? { tenantId: first.recipient.tenantId } : {}),
         to: recipient,
-        subject: kind === "urgent" ? `${first.businessName}: a customer is waiting on you` : options.heading,
+        subject,
         options,
         idempotencyKey: `needs-you:${kind}:${rows.map(row => row.id).sort().join(",")}`.slice(0, 256),
-        tags: { stream: "needs_you", kind },
+        tags: { stream: "needs_you", kind, ...(durableUrgent ? { strelva_inquiry_decision_id: first.id, strelva_workspace_id: first.workspaceId } : {}) },
       });
     } catch (error) {
       reason = error instanceof Error ? error.message.slice(0, 200) : "send_failed";

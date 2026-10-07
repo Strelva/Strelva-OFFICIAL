@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   reconcile: vi.fn(),
   workspace: vi.fn(),
   connected: vi.fn(),
+  decision: vi.fn(),
 }));
 
 vi.mock("resend", () => ({
@@ -15,7 +16,9 @@ vi.mock("resend", () => ({
 vi.mock("@/products/inquiries/reconciliation", () => ({ reconcileInquiryProviderEvent: mocks.reconcile }));
 
 vi.mock("@/products/inquiries/workspace-replies", () => ({ reconcileWorkspaceInquiryProviderEvent: mocks.workspace }));
-vi.mock("@/products/connected-sites/inquiry-owner-notice", () => ({ reconcileConnectedInquiryOwnerNotice: mocks.connected }));
+vi.mock("@/products/connected-sites/server", () => ({ reconcileConnectedInquiryOwnerNotice: mocks.connected }));
+
+vi.mock("@/platform/needs-you", () => ({ reconcileInquiryDecisionNotice: mocks.decision }));
 
 import { POST } from "@/app/api/webhooks/resend/route";
 import { MAX_RESEND_WEBHOOK_BODY_BYTES } from "@/app/api/webhooks/resend/route";
@@ -27,11 +30,21 @@ beforeEach(() => {
   mocks.reconcile.mockResolvedValue({ status: "recorded" });
   mocks.workspace.mockResolvedValue({ status: "ignored" });
   mocks.connected.mockResolvedValue({ status: "ignored" });
+  mocks.decision.mockResolvedValue({ status: "ignored" });
 });
 
 afterEach(() => vi.unstubAllEnvs());
 
 describe("Resend inquiry webhook", () => {
+  it("routes signed urgent decision evidence directly and retries failed persistence", async () => {
+    for (const [status, expected] of [["recorded",200],["unavailable",503]] as const) {
+      mocks.decision.mockResolvedValue({ status });
+      const response = await POST(new Request("https://app.strelva.test/api/webhooks/resend", { method: "POST", body: "{}", headers: { "svix-id": "signed-decision", "svix-timestamp": "123", "svix-signature": "signature" } }));
+      expect(response.status).toBe(expected);
+      expect(mocks.decision).toHaveBeenCalledWith({ event: mocks.verify.mock.results[0]?.value, eventId: "signed-decision" });
+      expect(mocks.connected).not.toHaveBeenCalled(); expect(mocks.workspace).not.toHaveBeenCalled(); expect(mocks.reconcile).not.toHaveBeenCalled();
+    }
+  });
   it("reconciles connected notice outcomes only after signature verification", async () => {
     mocks.connected.mockResolvedValue({ status: "recorded" });
     const response = await POST(new Request("https://app.strelva.test/api/webhooks/resend", { method: "POST", body: "{}", headers: { "svix-id": "signed-connected", "svix-timestamp": "123", "svix-signature": "signature" } }));
@@ -119,5 +132,6 @@ describe("Resend inquiry webhook", () => {
     }));
     expect(response.status).toBe(401);
     expect(mocks.reconcile).not.toHaveBeenCalled();
+    expect(mocks.decision).not.toHaveBeenCalled();
   });
 });

@@ -362,6 +362,28 @@ describe("the chase", () => {
   });
 });
 
+describe("strict inquiry fact and publication email gates", () => {
+  it.each(["inquiry_capability_publish","inquiry_capability_undo"])("gates %s digests and reminders before generic tenant overrides", async kind => {
+    requests=[]; events=new Map([["evt-1",ev({type:"change_request",metadata:{kind}})]]);
+    const svc=service(undefined,async()=>false); await svc.list(OWNER,WS);
+    const item=[...mem.items.values()][0]!;
+    await svc.chase(); expect(sendEmail).not.toHaveBeenCalled();
+    mem.items.set(item.id,{...item,deliveryState:"sent"}); clock.now+=4*DAY;
+    await svc.chase(); expect(sendEmail).not.toHaveBeenCalled();
+    expect([...mem.items.values()][0]?.deliveries.at(-1)).toMatchObject({status:"suppressed",reason:"inquiry_email_gates_off"});
+  });
+  it("gates inquiry fact digests and reminders while generic review notices retain their path", async () => {
+    requests=[]; events.clear();
+    const item:ProposedItem={kind:"fact.inferred",route:"owner_decides",title:"Confirm website fact",approveEffect:"Confirm",notYetEffect:"Nothing",sourceLifecycle:"inquiry_fact",sourceId:"fact",revisionHash:"a".repeat(64),urgent:false,adminMayDecide:false};
+    const adapter:SourceAdapter={lifecycle:"inquiry_fact",needsMemberActor:false,propose:async()=>({items:[item],complete:true}),currentRevision:async()=>item.revisionHash,resolve:async()=>({outcome:"done"})};
+    const svc=service([adapter],async()=>false); await svc.list(OWNER,WS); await svc.chase(); expect(sendEmail).not.toHaveBeenCalled();
+    const opened=[...mem.items.values()][0]!; mem.items.set(opened.id,{...opened,deliveryState:"sent"}); clock.now+=4*DAY;
+    await svc.chase(); expect(sendEmail).not.toHaveBeenCalled();
+    expect([...mem.items.values()][0]?.deliveries.at(-1)).toMatchObject({status:"suppressed",reason:"inquiry_email_gates_off"});
+    events=new Map([["evt-1",ev({})]]); mem=memoryStore(clock); await service(undefined,async()=>false).chase(); expect(sendEmail).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe("durable urgent inquiry owner notices", () => {
   it.each(["inquiry_capability_publish", "inquiry_capability_undo"])("keeps %s owner-only even when its old event was operator-routed", kind => {
     const item = tenantEventItem(ev({ type: "change_request", metadata: { kind, reviewAudience: "operator" } }));
