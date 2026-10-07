@@ -240,7 +240,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     };
   }
 
-  async function deliver(kind: "urgent" | "digest" | "reminder_1" | "reminder_2", rows: DeliveryRow[], summary: ChaseSummary) {
+  async function deliver(kind: "urgent" | "digest" | "reminder_1" | "reminder_2", rows: DeliveryRow[], summary: ChaseSummary, inquiryNotice?: { name: string; message: string | null }) {
     const first = rows[0]!;
     const recipient = first.recipient?.email?.trim().toLowerCase() ?? null;
     if (!recipient) {
@@ -248,7 +248,18 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
       summary.ownerNotTold += rows.length;
       return;
     }
+    if (deps.urgentInquiryAllowed && rows.some(row => row.sourceLifecycle === "tenant_event" && (row.kind === "customer.message" || row.kind === "customer.commitment"))
+      && !(await deps.urgentInquiryAllowed(first.recipient?.tenantId ?? null))) {
+      for (const row of rows) await deps.store.recordDelivery(row.workspaceId, row.id, kind, "suppressed", recipient, null, "inquiry_email_gates_off");
+      summary.ownerNotTold += rows.length;
+      return "suppressed";
+    }
     const options = email(kind === "urgent" ? "urgent" : kind === "digest" ? "digest" : "reminder", first.businessName, rows, recipient);
+    if (inquiryNotice) options.paragraphs = [
+      `New inquiry from ${inquiryNotice.name.slice(0, 160)}.`,
+      ...(inquiryNotice.message ? [inquiryNotice.message.slice(0, 2000)] : []),
+      ...(options.paragraphs ?? []),
+    ];
     let result: SendEmailResult | null = null;
     let reason: string | null = null;
     try {
@@ -278,7 +289,7 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
 
   /** One just-created inquiry decision, without waiting for the hourly chase
    * or contacting any other business. Source revision is re-read before send. */
-  async function deliverUrgentSource(workspaceId: string, sourceLifecycle: string, sourceId: string): Promise<"sent" | "suppressed" | "failed" | "none"> {
+  async function deliverUrgentSource(workspaceId: string, sourceLifecycle: string, sourceId: string, inquiryNotice?: { name: string; message: string | null }): Promise<"sent" | "suppressed" | "failed" | "none"> {
     if (!deps.urgentInquiryAllowed) return "none";
     const adapter = adapterFor(sourceLifecycle);
     if (!adapter || adapter.needsMemberActor) return "none";
@@ -291,14 +302,15 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
     const row = deps.store.deliveryForSource
       ? await deps.store.deliveryForSource(workspaceId, sourceLifecycle, sourceId)
       : (await deps.store.dueForDelivery(500)).find(item => item.workspaceId === workspaceId && item.sourceLifecycle === sourceLifecycle && item.sourceId === sourceId) ?? null;
-    if (!row || row.state !== "open" || row.deliveryState !== "not_sent" || !row.urgent || row.route !== "owner_decides") return "none";
+    if (!row || row.state !== "open" || !row.urgent || row.route !== "owner_decides") return "none";
     if (await reconcile(ctx, row) !== "current") return "none";
+    if (row.deliveryState !== "not_sent") return row.deliveryState === "suppressed" ? "suppressed" : "sent";
     if (!(await deps.urgentInquiryAllowed(row.recipient?.tenantId ?? null))) {
       await deps.store.recordDelivery(workspaceId, row.id, "urgent", "suppressed", row.recipient?.email ?? null, null, "inquiry_email_gates_off");
       return "suppressed";
     }
     const summary: ChaseSummary = { lapsed: 0, reminded: 0, digests: 0, urgent: 0, ownerNotTold: 0, failed: 0 };
-    return (await deliver("urgent", [row], summary)) ?? "suppressed";
+    return (await deliver("urgent", [row], summary, inquiryNotice)) ?? "suppressed";
   }
 
   /** The hourly chase: lapse at day 14, urgent at once, morning email and reminders at 07:00 local. */

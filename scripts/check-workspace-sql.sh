@@ -629,7 +629,6 @@ psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010120000_inquiry_workspace_replies.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010121000_inquiry_outcome_proof.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010122000_inquiry_weekly_outcomes.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-weekly-outcomes-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-workspace-replies-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010123000_inquiry_context_notices.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-context-notices-schema.sql"
@@ -640,6 +639,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/connected-inquiry-records-schema
 # owner_decision_json and workspace_release_flag_names(); the Needs you,
 # Make real live and release flag contracts rerun against the replacements.
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009100000_strelva_service_actor.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125000_inquiry_urgent_decisions.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/needs-you-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"

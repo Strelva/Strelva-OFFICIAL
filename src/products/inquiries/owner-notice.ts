@@ -1,3 +1,4 @@
+import { notifyPreparedInquiryDecision } from "./decision-notice";
 import { createHash } from "node:crypto";
 import { copyInquiryEvent, inquiryRecordsRpc } from "@/platform/infra/inquiry-records";
 import { deliverInquiryAction, getInquiryDeliveryMessageDigest, inquirySubmissionFromLead, normalizeInquiryRoutingPolicy, resolveInquiryRoute, type LeadRecord } from "./delivery";
@@ -35,6 +36,12 @@ function recipientDigest(email: string): string {
  * of customer handling. Both the release switch and the shared client-email
  * gate must allow it; the inquiry delivery store claims it only once. */
 export async function notifyInquiryOwner(input: { tenantId: string; lead: LeadRecord }, deps: OwnerNoticeDependencies = {}): Promise<InquiryDeliveryResult> {
+  if (inquiryOwnerNoticesEnabled() && await (deps.released ?? inquiryReleaseEnabledForTenant)(input.tenantId).catch(() => false)) {
+    const combined = await notifyPreparedInquiryDecision(input.tenantId, input.lead).catch(() => "none");
+    if (combined !== "none") return { inquiryId: input.lead.id, tenantId: input.tenantId, action: "owner_notification",
+      status: combined === "sent" ? "accepted_unverified" : combined === "suppressed" ? "suppressed" : "unavailable",
+      reason: "notice_in_owner_decision_email", retryable: false };
+  }
   return deliverOwnerNotice(input, deps);
 }
 

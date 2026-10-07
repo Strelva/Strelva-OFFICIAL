@@ -35,8 +35,8 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
     appOrigin: needsYouAppOrigin(),
     now: () => Date.now(),
     sendEmail: sendEmailWithReceipt,
-    urgentInquiryAllowed: async (tenantId) => process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && needsYouReleaseEnabled()
-      && emailSendingEnabled() && customerEmailEnabled() && (!tenantId || await getClientEmailOverride(tenantId) !== "off"),
+    urgentInquiryAllowed: process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" ? async (tenantId) => needsYouReleaseEnabled()
+      && emailSendingEnabled() && customerEmailEnabled() && (!tenantId || await getClientEmailOverride(tenantId) !== "off") : undefined,
     adapters: [
       tenantEventAdapter({
         linkedTenants: async (workspaceId) => (await store.linkedTenants(workspaceId)).map(link => link.tenantId),

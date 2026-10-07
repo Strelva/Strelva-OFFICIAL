@@ -71,7 +71,7 @@ select public.finish_workspace_inquiry_reply((select id from public.inquiry_work
 select pg_temp.ir_assert(pg_temp.ir_claim('d0000000-0000-4000-8000-0000000000e2')->>'status'='bounced','bounce is permanently closed');
 select pg_temp.ir_expect($$update public.inquiry_workspace_message_events set status='delivered'$$,'inquiry_events_immutable');
 select pg_temp.ir_assert((public.business_inquiry_outcomes((select id from ir_ws where name='site'),'d0000000-0000-4000-8000-0000000000e2','ir-owner@example.test','2026-10-01','2026-10-08')->>'answered')::int=1,'first acceptance counted');
-select pg_temp.ir_assert((public.business_inquiry_outcomes((select id from ir_ws where name='site'),'d0000000-0000-4000-8000-0000000000e2','ir-owner@example.test','2026-10-01','2026-10-08')->>'averageReplySeconds')::int=7200,'first reply seconds');
+select pg_temp.ir_assert((public.business_inquiry_outcomes((select id from ir_ws where name='site'),'d0000000-0000-4000-8000-0000000000e2','ir-owner@example.test','2026-10-01','2026-10-08')->>'averageReplySeconds')::numeric=7200,'first reply seconds');
 select public.hold_tenant_lead_as_spam('ir-site','{"id":"spam_1","reason":"honeypot","name":"Bot","email":"bot@example.test","createdAt":"2026-10-05T10:00:00Z"}');
 select pg_temp.ir_assert((public.business_inquiry_outcomes((select id from ir_ws where name='site'),'d0000000-0000-4000-8000-0000000000e2','ir-owner@example.test','2026-10-01','2026-10-08')->>'inquiries')::int=1,'spam excluded');
 select pg_temp.ir_expect(format($q$select public.claim_workspace_inquiry_reply(%L,'d0000000-0000-4000-8000-0000000000e2','ir-owner@example.test',%L,gen_random_uuid(),repeat('a',64),'Re: Hello','Hi')$q$,
@@ -138,4 +138,12 @@ select pg_temp.ir_assert((select status='bounced' from public.inquiry_workspace_
 select pg_temp.ir_assert(not (pg_temp.ir_claim('d0000000-0000-4000-8000-0000000000e2','site','d0000000-0000-4000-8000-0000000000f3')->>'acquired')::boolean,'provider events never reopen send');
 select pg_temp.ir_assert(not has_function_privilege('authenticated','public.record_workspace_inquiry_provider_event(uuid,uuid,text,text,text,timestamptz,timestamptz,text[],text)','execute'),'provider repair service role only');
 
+-- Trusted weekly cron reads the same exact business cohort without owner login.
+select pg_temp.ir_assert(public.business_inquiry_outcomes_for_tenant('ir-site','2026-10-01','2026-10-08')
+ = public.business_inquiry_outcomes((select id from ir_ws where name='site'),'d0000000-0000-4000-8000-0000000000e2','ir-owner@example.test','2026-10-01','2026-10-08'),'weekly and workspace cohort agree');
+select pg_temp.ir_assert(public.business_inquiry_outcomes_for_tenant('ir-plain','2026-10-01','2026-10-08')->>'status'='unavailable','unconverted is unavailable not zero');
+select pg_temp.ir_assert((public.business_inquiry_outcomes_for_tenant('ir-site','2026-10-05T10:00:00Z','2026-10-05T10:00:01Z')->>'answered')::int=2,'first provider acceptance counts once per inquiry');
+select pg_temp.ir_expect($$select public.business_inquiry_outcomes_for_tenant('ir-site','2026-10-08','2026-10-01')$$,'inquiry_record_invalid');
+select pg_temp.ir_assert(not has_function_privilege('authenticated','public.business_inquiry_outcomes_for_tenant(text,timestamptz,timestamptz)','execute')
+ and not has_function_privilege('service_role','public.inquiry_outcome_cohort(uuid,timestamptz,timestamptz)','execute'),'trusted cron wrapper only');
 rollback;

@@ -399,6 +399,11 @@ export async function prepareInquiryMessageReviewWithDependencies(
     status: "pending",
     metadata: metadata as unknown as Record<string, unknown>,
   }, { requirePersistence: true });
+  if (process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1") {
+    // Opening the owner decision is immediate; notice failures cannot undo the saved draft.
+    const { notifyPreparedInquiryDecision } = await import("./decision-notice");
+    await notifyPreparedInquiryDecision(tenantId, context.lead).catch(() => "none");
+  }
   return previewFromEvent(created, metadata, actorId);
 }
 

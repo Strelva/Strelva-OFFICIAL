@@ -6,7 +6,9 @@
  * path and only while client email is enabled. The inquiry is already stored
  * before this runs; a failure here never loses it.
  */
-import { emailSendingPaused } from "@/platform/infra/email/enabled";
+import { customerEmailEnabled, emailSendingPaused } from "@/platform/infra/email/enabled";
+import { inquiryRecordsEnabled } from "@/platform/infra/inquiry-records";
+import { getClientEmailOverride } from "@/platform/infra/email/client-override";
 import { sendEmail } from "@/platform/infra/email/send";
 import { resolveOwnerRecipient } from "@/platform/business-record/service";
 import type { ConnectedInquiry, ResolvedConnectedSite } from "./contracts";
@@ -37,7 +39,9 @@ export async function notifyConnectedSiteInquiry({ site, inquiry }: { site: Reso
   if ((deps.paused ?? emailSendingPaused)()) return "paused";
   const recipient = await (deps.recipient ?? resolveOwnerRecipient)(site.workspaceId);
   if (!recipient?.email) return "no_recipient";
+  if (inquiryRecordsEnabled() && (process.env.STRELVA_INQUIRY_OWNER_NOTICES !== "1" || !customerEmailEnabled()
+    || (recipient.tenantId && await getClientEmailOverride(recipient.tenantId) === "off"))) return "paused";
   const email = connectedInquiryEmail(site, inquiry);
-  await (deps.send ?? sendEmail)({ audience: "client", to: recipient.email, subject: email.subject, options: email.options, tags: { kind: "connected-site-inquiry" }, idempotencyKey: `connected-inquiry:${inquiry.id}` });
-  return "sent";
+  const sent = await (deps.send ?? sendEmail)({ audience: "client", ...(recipient.tenantId ? { tenantId: recipient.tenantId } : {}), to: recipient.email, subject: email.subject, options: email.options, tags: { kind: "connected-site-inquiry" }, idempotencyKey: `connected-inquiry:${inquiry.id}` });
+  return inquiryRecordsEnabled() && !sent ? "paused" : "sent";
 }

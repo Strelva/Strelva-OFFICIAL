@@ -240,6 +240,7 @@ psql "${psql_args[@]}" --file="$repo_root/tests/website-linked-publication-schem
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
 # 20261009100000 (Strelva service actor) replaces owner_decision_json and
 # workspace_release_flag_names(); its contract holds after the full ordered upgrade.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125000_inquiry_urgent_decisions.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
 # 20261009130000 replaces read_strelva_handled and 20261009131000 replaces
 # record_strelva_service_action; both contracts hold after the full upgrade.
@@ -254,6 +255,5 @@ printf 'Workspace full-schema upgrade rehearsal passed on isolated PostgreSQL at
 
 # Wave 6 inquiry contracts against the complete upgrade.
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-workspace-replies-schema.sql"
-psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-weekly-outcomes-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-context-notices-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-inquiry-records-schema.sql"
