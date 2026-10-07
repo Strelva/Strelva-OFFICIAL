@@ -116,6 +116,9 @@ start_app() {
     sleep 2
   done
   echo "The app did not start for the flags-$phase phase. See $work/app-$phase.log" >&2
+  # next dev allows one server per build dir; a leftover journeys server holds the lock.
+  grep -A3 'Another next dev server is already running' "$work/app-$phase.log" >&2 || true
+  stop_app
   return 1
 }
 
@@ -123,7 +126,8 @@ run_phase() {
   local phase="$1"; shift
   local specs=("$@")
   echo "== Flags $phase: ${#specs[@]} specs on $PLAYWRIGHT_BASE_URL"
-  start_app "$phase"
+  # No app, no run: specs against a dead port would only report connection errors.
+  start_app "$phase" || return 1
   local status=0
   PLAYWRIGHT_JSON_OUTPUT_FILE="$work/results-$phase.json" pnpm exec playwright test "${specs[@]}" \
     --workers=1 --retries=0 --reporter=line,json --output="test-results/journeys-$phase" ${extra[@]+"${extra[@]}"} || status=$?
@@ -132,11 +136,29 @@ run_phase() {
   return "$status"
 }
 
+# The flags-on world is the one after the bookings move: seven clean parity days.
+# The streak is global and the app caches it for five minutes, and parity rows
+# cascade away with a test's tenant, so one fixture tenant that no spec deletes
+# holds the streak for the whole run, whatever order the specs run in.
+seed_parity() {
+  [[ "$(python3 -c 'import sys,urllib.parse;print(urllib.parse.urlparse(sys.argv[1]).hostname)' "$STRELVA_LOCAL_DB_URL")" == 127.0.0.1 ]] \
+    || { echo 'STRELVA_LOCAL_DB_URL is not the loopback stack.' >&2; return 1; }
+  psql "$STRELVA_LOCAL_DB_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+insert into public.tenants(id, site_name, active) values ('journeys-parity', 'Journeys parity fixture', false) on conflict (id) do nothing;
+insert into public.tenant_client_record_parity(store, tenant_stable_id, checked_on, ok, redis_count, postgres_count, missing, mismatched)
+  select s.store, t.stable_id, (clock_timestamp() at time zone 'UTC')::date - d, true, 0, 0, 0, 0
+  from public.tenants t, generate_series(0, 7) d, (values ('bookings'), ('tenant_leads')) s(store)
+  where t.id = 'journeys-parity'
+  on conflict do nothing;
+SQL
+}
+
 overall=0
 if [[ -z "$only" || "$only" == on ]]; then
   for flag in "${ON_FLAGS[@]}"; do export "$flag=1"; done
   # Booking parity is read from the one store; content from Postgres.
   export STRELVA_BOOKING_STORE_READ=postgres CONTENT_SOURCE=postgres
+  seed_parity
   run_phase on "${ON_SPECS[@]}" || overall=1
 fi
 if [[ -z "$only" || "$only" == off ]]; then

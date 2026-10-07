@@ -56,6 +56,36 @@ export function adminHost(tenantId: string): string {
 }
 
 /**
+ * Serve client admin hosts the way Vercel does. On Vercel, Next trusts the Host
+ * header, so request.url names the host the browser asked for. A self-hosted
+ * `next dev` builds request.url from its own bound hostname instead
+ * (NextNodeServer.attachRequestMeta), so on admin.<tenant>.localhost every
+ * same-origin write guard (`origin === new URL(request.url).origin`) refuses
+ * and every redirect built from request.url points at the app host. This
+ * route maps both back for admin hosts only: a same-origin Origin header is
+ * presented as the bound origin, and a Location on the bound origin returns to
+ * the admin host. Cross-origin requests pass through untouched, so the guards
+ * still refuse them. Product code is unchanged.
+ */
+export async function serveAdminHostsAsOnVercel(context: BrowserContext) {
+  const bound = new URL(journeyEnvironment().app).origin;
+  await context.route((url) => /^admin\.[a-z0-9-]+\.localhost$/.test(url.hostname), async (route) => {
+    const request = route.request();
+    const asked = new URL(request.url()).origin;
+    const headers = { ...request.headers() };
+    if (headers.origin === asked) headers.origin = bound;
+    const response = await route.fetch({ headers, maxRedirects: 0 });
+    const responseHeaders = response.headers();
+    const location = responseHeaders.location;
+    if (location && new URL(location, asked).origin === bound) {
+      const target = new URL(location, asked);
+      responseHeaders.location = `${asked}${target.pathname}${target.search}${target.hash}`;
+    }
+    await route.fulfill({ response, headers: responseHeaders });
+  });
+}
+
+/**
  * A verified local identity signed in on each origin given. Session cookies
  * are host-only in Strelva, so a person signed in on the app host and on a
  * client admin host holds one cookie set per host, exactly as in production.
@@ -76,6 +106,7 @@ export async function person(browser: Browser, admin: Admin, label: string, opti
   if (signedIn.error) throw new Error(`The local Auth service rejected ${label}.`);
   const hosts = [env.app, ...(options.origins ?? [])].map((origin) => new URL(origin).hostname);
   await context.addCookies(hosts.flatMap((domain) => collected.map((cookie) => ({ ...cookie, domain, secure: false, sameSite: "Lax" as const }))));
+  if (hosts.some((host) => /^admin\.[a-z0-9-]+\.localhost$/.test(host))) await serveAdminHostsAsOnVercel(context);
   return { context, userId: created.data.user.id, email };
 }
 

@@ -27,16 +27,8 @@ export async function GET(request: NextRequest) {
   return redirectTo(request, entryDestination(decision, withClientFallbackRoot(root, "/dashboard")));
 }
 
-/**
- * Same host the browser asked for. Behind `next dev`/`next start --hostname`,
- * request.url names the bound hostname (localhost), not the client's admin
- * host, and the owner would land signed out on another origin. Host is only
- * ever this request's own host, so nothing new is trusted.
- */
 function redirectTo(request: NextRequest, path: string) {
-  const host = request.headers.get("host");
-  const origin = host && /^[a-z0-9.-]+(?::\d+)?$/i.test(host) ? `${request.nextUrl.protocol}//${host}` : request.url;
-  const response = NextResponse.redirect(new URL(path, origin), 307);
+  const response = NextResponse.redirect(new URL(path, request.url), 307);
   response.headers.set("Cache-Control", "private, no-store");
   return response;
 }

@@ -109,14 +109,6 @@ describe("/auth/entry", () => {
     expect(response.headers.get("location")).toBe("https://app.strelva.com/sign-in");
   });
 
-  it("stays on the host the browser asked for when request.url names the bound hostname", async () => {
-    ownerEntryForTenant.mockResolvedValue({ kind: "workspace", workspaceId: WS, tenantStableId: null, operator: false, tester: false });
-    const local = new NextRequest("http://localhost:3100/auth/entry", { headers: { host: "admin.gldf.localhost:3100", "x-tenant": "gldf" } });
-    expect((await entry(local)).headers.get("location")).toBe(`http://admin.gldf.localhost:3100/workspace?workspaceId=${WS}`);
-    const odd = new NextRequest("http://localhost:3100/auth/entry", { headers: { host: "evil.example/@x", "x-tenant": "gldf" } });
-    expect((await entry(odd)).headers.get("location")).toBe(`http://localhost:3100/workspace?workspaceId=${WS}`);
-  });
-
   it("never takes the tenant from anywhere but the proxy header", async () => {
     const response = await entry(new NextRequest("https://app.strelva.com/auth/entry?tenant=gldf"));
     expect(response.headers.get("location")).toBe("https://app.strelva.com/account");
