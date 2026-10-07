@@ -16,7 +16,8 @@
 --      go from active to ended.
 --   2. agency_client_staff: which agency members work on which client. Set by
 --      an agency owner/admin, only while the seat is active. Ending the seat
---      ends its staff rows.
+--      ends its staff rows. Leaving the agency ends the person's staff rows,
+--      so being added back does not quietly restore client access.
 --   3. One resolution, the same for every agency: active seat AND the user's
 --      agency membership AND an active staff row resolves to the role
 --      provider_seat_direct_role() returns. business_record_assert_actor,
@@ -69,10 +70,12 @@ create table public.agency_client_staff (
   status text not null default 'active' check (status in ('active', 'ended')),
   assigned_by uuid not null references public.users(id) on delete restrict,
   assigned_at timestamptz not null default clock_timestamp(),
+  -- Null on an ended row: the person left the agency (no one in this record ended it).
   ended_by uuid references public.users(id) on delete restrict,
   ended_at timestamptz,
   check (customer_workspace_id <> agency_workspace_id),
-  check ((status = 'ended') = (ended_at is not null and ended_by is not null))
+  check ((status = 'ended') = (ended_at is not null)),
+  check (status = 'ended' or ended_by is null)
 );
 create unique index agency_client_staff_one_active_idx
   on public.agency_client_staff(agency_workspace_id, customer_workspace_id, user_id) where status = 'active';
@@ -174,6 +177,20 @@ $$;
 create trigger workspace_providers_end_seat after update of status on public.workspace_providers
   for each row when (old.status = 'active' and new.status = 'ended')
   execute function public.workspace_provider_end_seat();
+
+-- Leaving an agency ends the person's staff rows on its clients. Resolution
+-- already requires current agency membership; this makes re-adding the
+-- person a fresh start, staffed again by an owner/admin.
+create function public.agency_membership_end_staff() returns trigger
+language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  update public.agency_client_staff set status = 'ended', ended_at = clock_timestamp()
+    where agency_workspace_id = old.workspace_id and user_id = old.user_id and status = 'active';
+  return old;
+end;
+$$;
+create trigger workspace_memberships_end_agency_staff after delete on public.workspace_memberships
+  for each row execute function public.agency_membership_end_staff();
 
 -- Open decision #241. The role an active provider seat resolves to, for
 -- every agency alike. `admin` is operator-level direct access: the whole
@@ -538,14 +555,15 @@ begin
     for key share;
   if not found then raise exception 'provider_seat_access_denied'; end if;
   perform pg_advisory_xact_lock(hashtextextended(p_workspace_id::text, 7415));
-  if exists (select 1 from public.workspace_memberships m join public.workspaces w on w.id = m.workspace_id and w.kind = 'customer'
-      where m.workspace_id = p_workspace_id and m.user_id = p_user_id and m.role = 'owner') then
+  perform 1 from public.workspace_memberships m join public.workspaces w on w.id = m.workspace_id and w.kind = 'customer'
+    where m.workspace_id = p_workspace_id and m.user_id = p_user_id and m.role = 'owner' for share of m;
+  if found then
     by_kind := 'owner';
-  elsif exists (select 1 from public.workspace_memberships m join public.workspaces w on w.id = m.workspace_id and w.kind = 'agency'
-      where m.workspace_id = p_agency_workspace_id and m.user_id = p_user_id and m.role in ('owner', 'admin')) then
-    by_kind := 'agency';
   else
-    raise exception 'provider_seat_access_denied';
+    perform 1 from public.workspace_memberships m join public.workspaces w on w.id = m.workspace_id and w.kind = 'agency'
+      where m.workspace_id = p_agency_workspace_id and m.user_id = p_user_id and m.role in ('owner', 'admin') for share of m;
+    if not found then raise exception 'provider_seat_access_denied'; end if;
+    by_kind := 'agency';
   end if;
   update public.provider_seats set status = 'ended', ended_by = p_user_id, ended_at = clock_timestamp(),
       end_reason = coalesce(nullif(btrim(p_reason), ''),
@@ -640,6 +658,7 @@ revoke all on function public.provider_seat_guard() from public, anon, authentic
 revoke all on function public.agency_client_staff_guard() from public, anon, authenticated, service_role;
 revoke all on function public.provider_seat_end_staff() from public, anon, authenticated, service_role;
 revoke all on function public.workspace_provider_end_seat() from public, anon, authenticated, service_role;
+revoke all on function public.agency_membership_end_staff() from public, anon, authenticated, service_role;
 revoke all on function public.provider_seat_direct_role() from public, anon, authenticated, service_role;
 revoke all on function public.provider_seat_role(uuid, uuid, boolean) from public, anon, authenticated, service_role;
 revoke all on function public.provider_seat_businesses(uuid, text) from public, anon, authenticated, service_role;

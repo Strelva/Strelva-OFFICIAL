@@ -4,6 +4,7 @@
 -- the billing home and new job budgets name the agency, the agency's
 -- owners/admins read the bill and sign job limits, and the owner can switch
 -- back to the business. The person-successor path still works as before.
+-- Agency authority is current: a removed or demoted signer is refused.
 -- Runs inside a transaction that is rolled back.
 begin;
 create or replace function pg_temp.pp_assert(condition boolean, message text) returns void language plpgsql as $$
@@ -19,6 +20,13 @@ begin
 end; $$;
 create or replace function pg_temp.pp_command(p_command jsonb, p_actor uuid, p_email text) returns public.workspace_payer_transitions
 language sql as $$ select * from public.workspace_payer_transition_command(p_command, p_actor, p_email) $$;
+-- The job ids the actor's payer inbox lists.
+create or replace function pg_temp.pp_inbox(p_actor uuid, p_email text) returns uuid[] language sql as $$
+  select coalesce(array_agg(j.id), '{}') from public.job_economics_payer_inbox(p_actor, p_email) j
+$$;
+create or replace function pg_temp.pp_act(p_action text, p_job uuid, p_actor uuid, p_email text) returns public.job_economics language sql as $$
+  select * from public.job_economics_command_with_payer_authority(jsonb_build_object('action',p_action,'jobId',p_job), p_actor, p_email)
+$$;
 create or replace function pg_temp.pp_job(p_work uuid) returns public.job_economics language sql as $$
   select * from public.job_economics_create_with_payer_transition(jsonb_build_object('action','create',
     'workspaceId','6d000000-0000-4000-8000-000000000010','workId',p_work,'productId','tracker','resourceKind','tracker',
@@ -59,7 +67,8 @@ insert into public.workspace_memberships(workspace_id, user_id, role, created_by
 insert into public.saved_product_work(id, workspace_id, product_id, resource_kind, title, payload, created_by) values
   ('6d000000-0000-4000-8000-000000000031', '6d000000-0000-4000-8000-000000000010', 'tracker', 'tracker', 'Agency-paid job', '{}', '6d000000-0000-4000-8000-000000000001'),
   ('6d000000-0000-4000-8000-000000000032', '6d000000-0000-4000-8000-000000000010', 'tracker', 'tracker', 'Business-paid job', '{}', '6d000000-0000-4000-8000-000000000001'),
-  ('6d000000-0000-4000-8000-000000000033', '6d000000-0000-4000-8000-000000000010', 'tracker', 'tracker', 'Person-signed job', '{}', '6d000000-0000-4000-8000-000000000001');
+  ('6d000000-0000-4000-8000-000000000033', '6d000000-0000-4000-8000-000000000010', 'tracker', 'tracker', 'Person-signed job', '{}', '6d000000-0000-4000-8000-000000000001'),
+  ('6d000000-0000-4000-8000-000000000034', '6d000000-0000-4000-8000-000000000010', 'tracker', 'tracker', 'Revoked-signer job', '{}', '6d000000-0000-4000-8000-000000000001');
 insert into public.accounts(name, workspace_id, billing_type) values ('Payer Client', '6d000000-0000-4000-8000-000000000010', 'subscription');
 
 -- Default: the business pays.
@@ -141,6 +150,60 @@ select pg_temp.pp_assert((select status = 'accepted' and payer_id = '6d000000-00
   from public.job_economics_command_with_payer_authority(jsonb_build_object('action','accept','jobId',(select id from pp_jobs where name = 'agency')),
     '6d000000-0000-4000-8000-000000000002', 'pp-agency-owner@agency.example.test')), 'agency owner signs the limit for the agency');
 
+-- Agency authority is current, never captured. The admin who accepted the
+-- payer transition is the draft's stored signer; that stores no authority.
+insert into pp_jobs values ('revoked', (pg_temp.pp_job('6d000000-0000-4000-8000-000000000034')).id);
+select pg_temp.pp_assert((select payer_kind = 'agency' and payer_id = '6d000000-0000-4000-8000-000000000003' and status = 'draft'
+  from public.job_economics where id = (select id from pp_jobs where name = 'revoked')), 'the stored signer is the accepting admin');
+-- Removed from the agency: the stored signer sees, reads, accepts and cancels nothing.
+delete from public.workspace_memberships
+  where workspace_id = '6d000000-0000-4000-8000-000000000020' and user_id = '6d000000-0000-4000-8000-000000000003';
+select pg_temp.pp_assert(not ((select id from pp_jobs where name = 'revoked') = any(pg_temp.pp_inbox('6d000000-0000-4000-8000-000000000003',
+  'pp-agency-admin@agency.example.test'))) and cardinality(pg_temp.pp_inbox('6d000000-0000-4000-8000-000000000003',
+  'pp-agency-admin@agency.example.test')) = 0, 'removed signer: empty payer inbox');
+select pg_temp.pp_expect(format($$select * from public.get_job_economics(%L, '6d000000-0000-4000-8000-000000000003',
+  'pp-agency-admin@agency.example.test')$$, (select id from pp_jobs where name = 'revoked')), 'job_economics_workspace_denied');
+select pg_temp.pp_expect(format($$select pg_temp.pp_act('accept', %L, '6d000000-0000-4000-8000-000000000003',
+  'pp-agency-admin@agency.example.test')$$, (select id from pp_jobs where name = 'revoked')), 'job_economics_payer_required');
+select pg_temp.pp_expect(format($$select pg_temp.pp_act('cancel', %L, '6d000000-0000-4000-8000-000000000003',
+  'pp-agency-admin@agency.example.test')$$, (select id from pp_jobs where name = 'revoked')), 'job_economics_payer_required');
+select pg_temp.pp_expect($$select public.read_business_billing('6d000000-0000-4000-8000-000000000010', '6d000000-0000-4000-8000-000000000003',
+  'pp-agency-admin@agency.example.test')$$, 'business_billing_denied');
+-- Back as a plain member (demoted), even with direct access to the client
+-- business that the native command honours: still refused.
+insert into public.workspace_memberships(workspace_id, user_id, role, created_by) values
+  ('6d000000-0000-4000-8000-000000000020', '6d000000-0000-4000-8000-000000000003', 'member', '6d000000-0000-4000-8000-000000000002'),
+  ('6d000000-0000-4000-8000-000000000010', '6d000000-0000-4000-8000-000000000003', 'member', '6d000000-0000-4000-8000-000000000001');
+select pg_temp.pp_assert(cardinality(pg_temp.pp_inbox('6d000000-0000-4000-8000-000000000003', 'pp-agency-admin@agency.example.test')) = 0,
+  'demoted signer: empty payer inbox');
+select pg_temp.pp_expect(format($$select pg_temp.pp_act('accept', %L, '6d000000-0000-4000-8000-000000000003',
+  'pp-agency-admin@agency.example.test')$$, (select id from pp_jobs where name = 'revoked')), 'job_economics_payer_required');
+select pg_temp.pp_expect(format($$select pg_temp.pp_act('cancel', %L, '6d000000-0000-4000-8000-000000000003',
+  'pp-agency-admin@agency.example.test')$$, (select id from pp_jobs where name = 'revoked')), 'job_economics_payer_required');
+delete from public.workspace_memberships
+  where workspace_id = '6d000000-0000-4000-8000-000000000010' and user_id = '6d000000-0000-4000-8000-000000000003';
+select pg_temp.pp_assert((select status = 'draft' from public.job_economics where id = (select id from pp_jobs where name = 'revoked')),
+  'nothing changed while refused');
+-- Reinstated as admin: the authority comes back with the membership.
+update public.workspace_memberships set role = 'admin'
+  where workspace_id = '6d000000-0000-4000-8000-000000000020' and user_id = '6d000000-0000-4000-8000-000000000003';
+select pg_temp.pp_assert((select id from pp_jobs where name = 'revoked') = any(pg_temp.pp_inbox('6d000000-0000-4000-8000-000000000003',
+  'pp-agency-admin@agency.example.test')), 'reinstated admin sees the limit');
+select pg_temp.pp_assert((select status = 'accepted' and payer_id = '6d000000-0000-4000-8000-000000000003'
+  and accepted_by = '6d000000-0000-4000-8000-000000000003' from pg_temp.pp_act('accept', (select id from pp_jobs where name = 'revoked'),
+  '6d000000-0000-4000-8000-000000000003', 'pp-agency-admin@agency.example.test')), 'reinstated admin signs');
+-- Demoted after signing: cannot cancel what they signed; a current owner can.
+update public.workspace_memberships set role = 'member'
+  where workspace_id = '6d000000-0000-4000-8000-000000000020' and user_id = '6d000000-0000-4000-8000-000000000003';
+select pg_temp.pp_expect(format($$select pg_temp.pp_act('cancel', %L, '6d000000-0000-4000-8000-000000000003',
+  'pp-agency-admin@agency.example.test')$$, (select id from pp_jobs where name = 'revoked')), 'job_economics_payer_required');
+select pg_temp.pp_assert(exists (select 1 from public.get_job_economics((select id from pp_jobs where name = 'revoked'),
+  '6d000000-0000-4000-8000-000000000002', 'pp-agency-owner@agency.example.test')), 'a current agency owner reads the job without client access');
+select pg_temp.pp_assert((select status = 'cancelled' from pg_temp.pp_act('cancel', (select id from pp_jobs where name = 'revoked'),
+  '6d000000-0000-4000-8000-000000000002', 'pp-agency-owner@agency.example.test')), 'a current agency owner cancels');
+update public.workspace_memberships set role = 'admin'
+  where workspace_id = '6d000000-0000-4000-8000-000000000020' and user_id = '6d000000-0000-4000-8000-000000000003';
+
 -- A billing home created later for an agency-paid business is stamped agency.
 select pg_temp.pp_command(jsonb_build_object('action','accept','transitionId',
   (pg_temp.pp_command(jsonb_build_object('action','propose','workspaceId','6d000000-0000-4000-8000-000000000011',
@@ -164,8 +227,18 @@ select pg_temp.pp_command(jsonb_build_object('action','accept','transitionId',(s
   '6d000000-0000-4000-8000-000000000001', 'pp-owner@example.test');
 select pg_temp.pp_assert((select payer_kind = 'business' and payer_workspace_id is null from public.accounts
   where workspace_id = '6d000000-0000-4000-8000-000000000010'), 'back to business-paid');
+insert into pp_jobs values ('business', (pg_temp.pp_job('6d000000-0000-4000-8000-000000000032')).id);
 select pg_temp.pp_assert((select payer_kind = 'business' and payer_id = '6d000000-0000-4000-8000-000000000001'
-  from pg_temp.pp_job('6d000000-0000-4000-8000-000000000032')), 'new job is business-paid again');
+  from public.job_economics where id = (select id from pp_jobs where name = 'business')), 'new job is business-paid again');
+-- The business-paid path is unchanged: the signer sees and signs; the agency does not.
+select pg_temp.pp_assert((select id from pp_jobs where name = 'business') = any(pg_temp.pp_inbox('6d000000-0000-4000-8000-000000000001',
+  'pp-owner@example.test')) and not ((select id from pp_jobs where name = 'business') = any(pg_temp.pp_inbox(
+  '6d000000-0000-4000-8000-000000000002', 'pp-agency-owner@agency.example.test'))), 'business job: signer inbox only');
+select pg_temp.pp_expect(format($$select pg_temp.pp_act('accept', %L, '6d000000-0000-4000-8000-000000000002',
+  'pp-agency-owner@agency.example.test')$$, (select id from pp_jobs where name = 'business')), 'job_economics_%');
+select pg_temp.pp_assert((select status = 'accepted' and accepted_by = '6d000000-0000-4000-8000-000000000001'
+  from pg_temp.pp_act('accept', (select id from pp_jobs where name = 'business'), '6d000000-0000-4000-8000-000000000001',
+  'pp-owner@example.test')), 'business signer accepts');
 select pg_temp.pp_expect($$select public.read_business_billing('6d000000-0000-4000-8000-000000000010', '6d000000-0000-4000-8000-000000000002',
   'pp-agency-owner@agency.example.test')$$, 'business_billing_denied');
 
@@ -177,8 +250,15 @@ select pg_temp.pp_expect(format($$select pg_temp.pp_command(jsonb_build_object('
   'payer_transition_successor_required');
 select pg_temp.pp_command(jsonb_build_object('action','accept','transitionId',(select id from pp_t where name = 'person')),
   '6d000000-0000-4000-8000-000000000005', 'pp-bookkeeper@example.test');
+insert into pp_jobs values ('person', (pg_temp.pp_job('6d000000-0000-4000-8000-000000000033')).id);
 select pg_temp.pp_assert((select payer_kind = 'business' and payer_id = '6d000000-0000-4000-8000-000000000005'
-  from pg_temp.pp_job('6d000000-0000-4000-8000-000000000033')), 'person-signed job stays business-paid');
+  from public.job_economics where id = (select id from pp_jobs where name = 'person')), 'person-signed job stays business-paid');
+-- A named payer with no business access still sees, reads and signs, as before 7A.
+select pg_temp.pp_assert((select id from pp_jobs where name = 'person') = any(pg_temp.pp_inbox('6d000000-0000-4000-8000-000000000005',
+  'pp-bookkeeper@example.test')) and exists (select 1 from public.get_job_economics((select id from pp_jobs where name = 'person'),
+  '6d000000-0000-4000-8000-000000000005', 'pp-bookkeeper@example.test')), 'person signer sees and reads the job');
+select pg_temp.pp_assert((select status = 'accepted' from pg_temp.pp_act('accept', (select id from pp_jobs where name = 'person'),
+  '6d000000-0000-4000-8000-000000000005', 'pp-bookkeeper@example.test')), 'person signer accepts');
 select pg_temp.pp_assert((select payer_kind = 'business' from public.accounts where workspace_id = '6d000000-0000-4000-8000-000000000010'),
   'a person successor keeps the business as payer');
 

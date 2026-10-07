@@ -34,6 +34,13 @@
 --      signer on acceptance. Allowances and entitlements are business-paid
 --      only today (their payer must be a member); the column is the key the
 --      agency path will use.
+--   6. Agency authority is current, never captured. On an agency-paid job,
+--      payer_id and accepted_by only record who signed. Seeing the job,
+--      accepting it and cancelling it each require owner/admin membership of
+--      the paying agency at that moment, held FOR SHARE through the change.
+--      A signer who leaves the agency or is demoted loses all of it; added
+--      back as owner/admin, they have it again. An acceptance already made
+--      stands as the agency's commitment; any current owner/admin can cancel.
 
 set local lock_timeout = '3s';
 
@@ -444,11 +451,14 @@ begin
   return next created_job;
 end $$;
 
--- Same contract as 20260918140000. For an agency-paid job, any owner/admin
--- of the paying agency holds payer authority; accepting makes them its signer.
+-- Same contract as 20260918140000. For an agency-paid job, payer authority is
+-- current owner/admin membership of the paying agency, rechecked here and held
+-- FOR SHARE so a concurrent removal or demotion waits for this change. The
+-- stored signer gets nothing from being the signer; accepting makes the
+-- current owner/admin the signer.
 create or replace function public.job_economics_command_with_payer_authority(p_command jsonb,p_actor_id uuid,p_verified_email text)
 returns setof public.job_economics language plpgsql security definer set search_path=public,pg_temp as $$
-declare a text:=p_command->>'action'; j public.job_economics%rowtype; jid uuid; agency_signer boolean;
+declare a text:=p_command->>'action'; j public.job_economics%rowtype; jid uuid;
 begin
   if a not in ('accept','cancel') then
     return query select * from public.job_economics_command(p_command,p_actor_id,p_verified_email); return;
@@ -461,10 +471,18 @@ begin
   if not found then raise exception 'job_economics_identity_denied'; end if;
   select * into j from public.job_economics where id=jid for update;
   if not found then raise exception 'job_economics_not_found'; end if;
-  agency_signer := j.payer_kind = 'agency' and j.payer_id <> p_actor_id and exists (
-    select 1 from public.workspace_memberships m join public.workspaces w on w.id = m.workspace_id and w.kind = 'agency'
-      where m.workspace_id = j.payer_workspace_id and m.user_id = p_actor_id and m.role in ('owner','admin'));
-  if j.payer_id<>p_actor_id and not agency_signer then
+  if j.payer_kind = 'agency' then
+    perform 1 from public.workspace_memberships m join public.workspaces w on w.id = m.workspace_id and w.kind = 'agency'
+      where m.workspace_id = j.payer_workspace_id and m.user_id = p_actor_id and m.role in ('owner','admin')
+      for share of m;
+    if not found then
+      -- The native command would still read the stored payer_id as authority,
+      -- so a removed or demoted signer is refused here. Anyone else falls
+      -- through to it for its sponsor rule (stop funding your own cancelled work).
+      if a = 'accept' or j.payer_id = p_actor_id then raise exception 'job_economics_payer_required'; end if;
+      return query select * from public.job_economics_command(p_command,p_actor_id,p_verified_email); return;
+    end if;
+  elsif j.payer_id<>p_actor_id then
     return query select * from public.job_economics_command(p_command,p_actor_id,p_verified_email); return;
   end if;
   if a='accept' then
@@ -484,8 +502,8 @@ begin
   return next j;
 end $$;
 
--- Same rows as 20260918140000: jobs the actor signs for, plus jobs paid by an
--- agency the actor is an owner/admin of.
+-- Same rows as 20260918140000: business-paid jobs the actor signs for, plus
+-- jobs paid by an agency the actor is an owner/admin of now.
 create or replace function public.job_economics_payer_inbox(p_actor_id uuid,p_verified_email text)
 returns table(id uuid,workspace_id uuid,workspace_name text,product_id text,resource_kind text,
   estimate_cents integer,max_authorized_cents integer,reserved_cents integer,used_cents integer,
@@ -497,10 +515,34 @@ begin
   return query select j.id,j.workspace_id,w.name,j.product_id,j.resource_kind,j.estimate_cents,
     j.max_authorized_cents,j.reserved_cents,j.used_cents,j.actual_cents,j.actual_known,j.status,j.created_at
     from public.job_economics j join public.workspaces w on w.id=j.workspace_id
-    where j.payer_id=p_actor_id
+    where (j.payer_kind='business' and j.payer_id=p_actor_id)
       or (j.payer_kind='agency' and exists(select 1 from public.workspace_memberships m
+        join public.workspaces aw on aw.id=m.workspace_id and aw.kind='agency'
         where m.workspace_id=j.payer_workspace_id and m.user_id=p_actor_id and m.role in ('owner','admin')))
     order by j.created_at desc;
+end $$;
+
+-- Same contract as 20260918140000. The payer reads a job without workspace
+-- access: the signer of a business-paid job, or a current owner/admin of the
+-- agency paying for it. Members and read-delegated agency staff as before.
+create or replace function public.get_job_economics(p_job_id uuid,p_actor_id uuid,p_verified_email text)
+returns setof public.job_economics language plpgsql security definer set search_path=public,pg_temp as $$
+declare j public.job_economics%rowtype;
+begin
+  perform 1 from public.users where id=p_actor_id and lower(email)=lower(btrim(p_verified_email)) and verified_at is not null;
+  if not found then raise exception 'job_economics_identity_denied'; end if;
+  select * into j from public.job_economics where id=p_job_id;
+  if not found then return; end if;
+  if not (j.payer_kind='business' and j.payer_id=p_actor_id)
+    and not (j.payer_kind='agency' and exists(select 1 from public.workspace_memberships m
+      join public.workspaces aw on aw.id=m.workspace_id and aw.kind='agency'
+      where m.workspace_id=j.payer_workspace_id and m.user_id=p_actor_id and m.role in ('owner','admin')))
+    and j.workspace_id is not null
+    and not exists(select 1 from public.workspace_memberships where workspace_id=j.workspace_id and user_id=p_actor_id)
+    and not exists(select 1 from public.workspace_delegations d join public.workspace_memberships m on m.workspace_id=d.agency_workspace_id
+      where d.customer_workspace_id=j.workspace_id and d.customer_work_id=j.work_id and d.scope=array['work:read']::text[]
+        and d.status='active' and m.user_id=p_actor_id) then raise exception 'job_economics_workspace_denied'; end if;
+  return next j;
 end $$;
 
 revoke all on function public.business_payer_party(uuid) from public, anon, authenticated, service_role;
@@ -515,6 +557,7 @@ revoke all on function public.workspace_payer_transition_inbox(uuid,text) from p
 revoke all on function public.job_economics_create_with_payer_transition(jsonb,uuid,text) from public,anon,authenticated;
 revoke all on function public.job_economics_command_with_payer_authority(jsonb,uuid,text) from public,anon,authenticated;
 revoke all on function public.job_economics_payer_inbox(uuid,text) from public,anon,authenticated;
+revoke all on function public.get_job_economics(uuid,uuid,text) from public,anon,authenticated;
 grant execute on function public.read_business_billing(uuid, uuid, text) to service_role;
 grant execute on function public.workspace_payer_transition_command(jsonb,uuid,text) to service_role;
 grant execute on function public.workspace_payer_transition_snapshot(uuid,uuid,text) to service_role;
@@ -522,3 +565,4 @@ grant execute on function public.workspace_payer_transition_inbox(uuid,text) to 
 grant execute on function public.job_economics_create_with_payer_transition(jsonb,uuid,text) to service_role;
 grant execute on function public.job_economics_command_with_payer_authority(jsonb,uuid,text) to service_role;
 grant execute on function public.job_economics_payer_inbox(uuid,text) to service_role;
+grant execute on function public.get_job_economics(uuid,uuid,text) to service_role;

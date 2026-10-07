@@ -1,5 +1,5 @@
 -- Rollback for 20261009154000_payer_party.sql
--- Forward SHA-256: 5348513ba96ffda0761fa75be57b998b106c137b4d71c6034052df636741391a
+-- Forward SHA-256: 14c64f9f4c8fe52a73c404ae18b286ce307a80539cd0c5abd137f4937db7cf4c
 -- Batch 7A: reverse file order (20261009154000 first); undo every later batch first.
 -- Prepared SQL only. Production execution requires a separately reviewed approval.
 -- Take a verified dump first. Removed data is retained in the private archive schema.
@@ -20,8 +20,9 @@ begin
   if (select md5(pg_get_functiondef(to_regprocedure('public.workspace_payer_transition_snapshot(uuid,uuid,text)')))) is distinct from 'ff4dbf4db9a4764eca6125fecdf15d8c' then raise exception 'rollback_wrong_order_or_function_drift: workspace_payer_transition_snapshot'; end if;
   if (select md5(pg_get_functiondef(to_regprocedure('public.workspace_payer_transition_inbox(uuid,text)')))) is distinct from '5fe81e965592efc8a0d8131b6e310067' then raise exception 'rollback_wrong_order_or_function_drift: workspace_payer_transition_inbox'; end if;
   if (select md5(pg_get_functiondef(to_regprocedure('public.job_economics_create_with_payer_transition(jsonb,uuid,text)')))) is distinct from '5f959305377ab6e3c705495c11487cd8' then raise exception 'rollback_wrong_order_or_function_drift: job_economics_create_with_payer_transition'; end if;
-  if (select md5(pg_get_functiondef(to_regprocedure('public.job_economics_command_with_payer_authority(jsonb,uuid,text)')))) is distinct from '1b3419c0c94b0212279646f27e1cfea6' then raise exception 'rollback_wrong_order_or_function_drift: job_economics_command_with_payer_authority'; end if;
-  if (select md5(pg_get_functiondef(to_regprocedure('public.job_economics_payer_inbox(uuid,text)')))) is distinct from '5e235f8c33efc54a5f2c5999f7729ec4' then raise exception 'rollback_wrong_order_or_function_drift: job_economics_payer_inbox'; end if;
+  if (select md5(pg_get_functiondef(to_regprocedure('public.job_economics_command_with_payer_authority(jsonb,uuid,text)')))) is distinct from '2e8b4d78c3baa1d3f62dc0cc93e67e1c' then raise exception 'rollback_wrong_order_or_function_drift: job_economics_command_with_payer_authority'; end if;
+  if (select md5(pg_get_functiondef(to_regprocedure('public.job_economics_payer_inbox(uuid,text)')))) is distinct from '30fcb68159929d2b3ab551fdcc6a998c' then raise exception 'rollback_wrong_order_or_function_drift: job_economics_payer_inbox'; end if;
+  if (select md5(pg_get_functiondef(to_regprocedure('public.get_job_economics(uuid,uuid,text)')))) is distinct from '5d7a0a0169aa4446c45b3cd01201e982' then raise exception 'rollback_wrong_order_or_function_drift: get_job_economics'; end if;
 end;
 $rollback_guard$;
 lock table public."accounts", public."job_economics", public."work_allowances", public."work_allowance_subscription_entitlements", public."workspace_payer_transitions" in access exclusive mode;
@@ -303,6 +304,28 @@ end $function$
 ;
 revoke all on function public.job_economics_payer_inbox(uuid,text) from public, anon, authenticated, service_role;
 grant execute on function public.job_economics_payer_inbox(uuid,text) to "service_role";
+CREATE OR REPLACE FUNCTION public.get_job_economics(p_job_id uuid, p_actor_id uuid, p_verified_email text)
+ RETURNS SETOF job_economics
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare j public.job_economics%rowtype;
+begin
+  perform 1 from public.users where id=p_actor_id and lower(email)=lower(btrim(p_verified_email)) and verified_at is not null;
+  if not found then raise exception 'job_economics_identity_denied'; end if;
+  select * into j from public.job_economics where id=p_job_id;
+  if not found then return; end if;
+  if j.payer_id<>p_actor_id and j.workspace_id is not null
+    and not exists(select 1 from public.workspace_memberships where workspace_id=j.workspace_id and user_id=p_actor_id)
+    and not exists(select 1 from public.workspace_delegations d join public.workspace_memberships m on m.workspace_id=d.agency_workspace_id
+      where d.customer_workspace_id=j.workspace_id and d.customer_work_id=j.work_id and d.scope=array['work:read']::text[]
+        and d.status='active' and m.user_id=p_actor_id) then raise exception 'job_economics_workspace_denied'; end if;
+  return next j;
+end $function$
+;
+revoke all on function public.get_job_economics(uuid,uuid,text) from public, anon, authenticated, service_role;
+grant execute on function public.get_job_economics(uuid,uuid,text) to "service_role";
 drop function public.workspace_payer_transition_snapshot(uuid,uuid,text);
 CREATE OR REPLACE FUNCTION public.workspace_payer_transition_snapshot(p_workspace_id uuid, p_actor_id uuid, p_verified_email text)
  RETURNS TABLE(id uuid, workspace_id uuid, successor_user_id uuid, successor_email text, status text, proposed_by uuid, proposer_email text, resolved_by uuid, proposed_at timestamp with time zone, resolved_at timestamp with time zone, accepted_at timestamp with time zone)

@@ -144,10 +144,48 @@ select pg_temp.pa_assert((public.strelva_make_real_link_session('6c000000-0000-4
 select public.record_agency_verification('pa-operator@strelva.example.test', '6c000000-0000-4000-8000-000000000030',
   'email', 'unverified', '{}', 'Fixture revocation.');
 select pg_temp.pa_assert(public.strelva_service_reader('6c000000-0000-4000-8000-000000000011', 'needs_you_sync') is null, 'revoked: no session');
+-- An open session is rechecked at each use: the revocation stops it too.
+select pg_temp.pa_expect(format($$select public.open_owner_decision_as_service('6c000000-0000-4000-8000-000000000011', %L,
+  pg_temp.pa_item('north-after-revoke'))$$, (select body->>'sessionId' from pa_sessions where name = 'north')), 'strelva_service_access_denied');
 
--- Ending the seat leaves no identity to read as when the owner never signed in.
+-- Verified again: nothing was captured, so the open session holds again ...
 select public.record_agency_verification('pa-operator@strelva.example.test', '6c000000-0000-4000-8000-000000000030',
   'email', 'verified', '{"note":"fixture again"}', null);
+select pg_temp.pa_assert((public.open_owner_decision_as_service('6c000000-0000-4000-8000-000000000011',
+  (select (body->>'sessionId')::uuid from pa_sessions where name = 'north'), pg_temp.pa_item('north-reverified'))->>'openedBy') = 'Strelva (system)',
+  'reverified: the open session works');
+-- ... until its member identity leaves the serving agency.
+delete from public.workspace_memberships
+  where workspace_id = '6c000000-0000-4000-8000-000000000030' and user_id = '6c000000-0000-4000-8000-000000000003';
+select pg_temp.pa_expect(format($$select public.open_owner_decision_as_service('6c000000-0000-4000-8000-000000000011', %L,
+  pg_temp.pa_item('north-left'))$$, (select body->>'sessionId' from pa_sessions where name = 'north')), 'strelva_service_access_denied');
+insert into public.workspace_memberships(workspace_id, user_id, role, created_by) values
+  ('6c000000-0000-4000-8000-000000000030', '6c000000-0000-4000-8000-000000000003', 'member', '6c000000-0000-4000-8000-000000000002');
+select pg_temp.pa_expect(format($$select public.open_owner_decision_as_service('6c000000-0000-4000-8000-000000000011', %L,
+  pg_temp.pa_item('north-back'))$$, (select body->>'sessionId' from pa_sessions where name = 'north')), 'strelva_service_access_denied');
+
+-- A Make real session holds while served, and stops when its identity is
+-- demoted or the owner ends the provider of record.
+insert into pa_sessions values
+  ('strelva-resume', public.strelva_service_reader('6c000000-0000-4000-8000-000000000010', 'make_real_resume'));
+select pg_temp.pa_assert(public.record_strelva_service_action('6c000000-0000-4000-8000-000000000010',
+  (select (body->>'sessionId')::uuid from pa_sessions where name = 'strelva-resume'), 'resume', 'activation:pa-1', null) is not null,
+  'resume recorded while served');
+update public.workspace_memberships set role = 'member'
+  where workspace_id = '6c000000-0000-4000-8000-000000000010' and user_id = '6c000000-0000-4000-8000-000000000001';
+select pg_temp.pa_expect(format($$select public.record_strelva_service_action('6c000000-0000-4000-8000-000000000010', %L,
+  'resume', 'activation:pa-1', null)$$, (select body->>'sessionId' from pa_sessions where name = 'strelva-resume')),
+  'strelva_service_access_denied');
+update public.workspace_memberships set role = 'admin'
+  where workspace_id = '6c000000-0000-4000-8000-000000000010' and user_id = '6c000000-0000-4000-8000-000000000001';
+update public.workspace_providers set status = 'ended', ended_by = '6c000000-0000-4000-8000-000000000001', ended_at = clock_timestamp(),
+    end_reason = 'Fixture end.'
+  where customer_workspace_id = '6c000000-0000-4000-8000-000000000010' and status = 'active';
+select pg_temp.pa_expect(format($$select public.record_strelva_service_action('6c000000-0000-4000-8000-000000000010', %L,
+  'resume', 'activation:pa-1', null)$$, (select body->>'sessionId' from pa_sessions where name = 'strelva-resume')),
+  'strelva_service_access_denied');
+
+-- Ending the seat leaves no identity to read as when the owner never signed in.
 update public.provider_seats set status = 'ended', ended_by = '6c000000-0000-4000-8000-000000000002', ended_at = clock_timestamp()
   where customer_workspace_id = '6c000000-0000-4000-8000-000000000011';
 select pg_temp.pa_assert(public.strelva_service_reader('6c000000-0000-4000-8000-000000000011', 'needs_you_sync') is null,

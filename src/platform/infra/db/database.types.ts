@@ -14635,6 +14635,21 @@ export type Database = {
         }
         Returns: Record<string, unknown>
       }
+      platform_service_identity_holds: {
+        Args: {
+          p_provider_workspace_id: string
+          p_role: string
+          p_user_id: string
+          p_workspace_id: string
+        }
+        Returns: boolean
+      }
+      platform_service_session_holds: {
+        Args: {
+          p_session: unknown
+        }
+        Returns: boolean
+      }
       platform_serving_provider: {
         Args: {
           p_effect: string

@@ -144,6 +144,26 @@ select pg_temp.ps_assert(jsonb_array_length(public.read_agency_provider_seats('5
 select pg_temp.ps_expect($$select public.read_agency_provider_seats('5e000000-0000-4000-8000-000000000005',
   'ps-b-owner@agency-b.example.test', '5e000000-0000-4000-8000-000000000020')$$, 'provider_seat_access_denied');
 
+-- Leaving the agency ends the person's staff row; being added back restores
+-- nothing until an owner/admin staffs them again.
+delete from public.workspace_memberships
+  where workspace_id = '5e000000-0000-4000-8000-000000000020' and user_id = '5e000000-0000-4000-8000-000000000003';
+select pg_temp.ps_assert(pg_temp.ps_role('5e000000-0000-4000-8000-000000000003', 'ps-a-staff@agency-a.example.test', false)
+  = 'business_record_access_denied', 'removed from the agency: no access');
+select pg_temp.ps_assert((select status = 'ended' and ended_by is null and ended_at is not null from public.agency_client_staff
+  where agency_workspace_id = '5e000000-0000-4000-8000-000000000020' and user_id = '5e000000-0000-4000-8000-000000000003'),
+  'leaving the agency ends the staff row');
+insert into public.workspace_memberships(workspace_id, user_id, role, created_by) values
+  ('5e000000-0000-4000-8000-000000000020', '5e000000-0000-4000-8000-000000000003', 'member', '5e000000-0000-4000-8000-000000000002');
+select pg_temp.ps_assert(pg_temp.ps_role('5e000000-0000-4000-8000-000000000003', 'ps-a-staff@agency-a.example.test', false)
+  = 'business_record_access_denied', 'added back: still no client access');
+select pg_temp.ps_assert(public.list_provided_clients('5e000000-0000-4000-8000-000000000003', 'ps-a-staff@agency-a.example.test',
+  '5e000000-0000-4000-8000-000000000020') = '[]'::jsonb, 'added back: the client is not listed');
+select public.set_agency_client_staff('5e000000-0000-4000-8000-000000000002', 'ps-a-owner@agency-a.example.test',
+  '5e000000-0000-4000-8000-000000000020', '5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000003', true);
+select pg_temp.ps_assert(pg_temp.ps_role('5e000000-0000-4000-8000-000000000003', 'ps-a-staff@agency-a.example.test', false) = 'admin',
+  'staffed again: access again');
+
 -- Another agency gets nothing from Agency A's seat, and cannot staff without one.
 select pg_temp.ps_expect($$select public.set_agency_client_staff('5e000000-0000-4000-8000-000000000005', 'ps-b-owner@agency-b.example.test',
   '5e000000-0000-4000-8000-000000000030', '5e000000-0000-4000-8000-000000000010', '5e000000-0000-4000-8000-000000000005', true)$$,

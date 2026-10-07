@@ -1,5 +1,5 @@
 -- Rollback for 20261009151000_provider_seats.sql
--- Forward SHA-256: 13c5b17bc9110b64b7fa69a5c7ff07c018292c38a21ad393b68c5571e75c2d10
+-- Forward SHA-256: d1ec7026cf1c1749f009a0fce9ef90a3dff3d7a5f4e2f2a9746eb4a4ca31f4b7
 -- Batch 7A: reverse file order (20261009154000 first); undo every later batch first.
 -- Prepared SQL only. Production execution requires a separately reviewed approval.
 -- Take a verified dump first. Removed data is retained in the private archive schema.
@@ -20,7 +20,7 @@ begin
   if (select md5(pg_get_functiondef(to_regprocedure('public.provider_seat_assert_owner(uuid,uuid,text)')))) is distinct from 'f86e006b126d998ee7ca6e3be4cfc765' then raise exception 'rollback_wrong_order_or_function_drift: provider_seat_assert_owner'; end if;
   if (select md5(pg_get_functiondef(to_regprocedure('public.choose_business_provider(uuid,text,uuid,uuid)')))) is distinct from '773d625a3e907f3745a6fa8b8be2ef17' then raise exception 'rollback_wrong_order_or_function_drift: choose_business_provider'; end if;
   if (select md5(pg_get_functiondef(to_regprocedure('public.end_business_provider(uuid,text,uuid,text)')))) is distinct from '8c543f9d4b9266b8b0410bae7bad8043' then raise exception 'rollback_wrong_order_or_function_drift: end_business_provider'; end if;
-  if (select md5(pg_get_functiondef(to_regprocedure('public.end_provider_seat(uuid,text,uuid,uuid,text)')))) is distinct from 'b90f40dbab28ee31d50ac6f6b1605403' then raise exception 'rollback_wrong_order_or_function_drift: end_provider_seat'; end if;
+  if (select md5(pg_get_functiondef(to_regprocedure('public.end_provider_seat(uuid,text,uuid,uuid,text)')))) is distinct from '70cb2a18c3b356fb9b02f82ff8e25f55' then raise exception 'rollback_wrong_order_or_function_drift: end_provider_seat'; end if;
   if (select md5(pg_get_functiondef(to_regprocedure('public.set_agency_client_staff(uuid,text,uuid,uuid,uuid,boolean)')))) is distinct from '719bf76c8ebd2e0dab86b69f11b7263c' then raise exception 'rollback_wrong_order_or_function_drift: set_agency_client_staff'; end if;
   if (select md5(pg_get_functiondef(to_regprocedure('public.read_agency_provider_seats(uuid,text,uuid)')))) is distinct from 'e4ffcb882cdd13b5226e19486ef3e5c0' then raise exception 'rollback_wrong_order_or_function_drift: read_agency_provider_seats'; end if;
   if (select md5(pg_get_functiondef(to_regprocedure('public.business_record_assert_actor(uuid,uuid,text,boolean)')))) is distinct from 'f4ab36121534ef70ed118ed6ad0044ae' then raise exception 'rollback_wrong_order_or_function_drift: business_record_assert_actor'; end if;
@@ -31,6 +31,7 @@ begin
   if (select md5(pg_get_functiondef(to_regprocedure('public.workspace_require(uuid,uuid,text)')))) is distinct from 'f57a7b855ba3f1c4f653afa8ebc103af' then raise exception 'rollback_wrong_order_or_function_drift: workspace_require'; end if;
   if (select md5(pg_get_functiondef(to_regprocedure('public.list_provided_clients(uuid,text,uuid)')))) is distinct from '4e7e97d99a33a3738ca9e089b0d9ba38' then raise exception 'rollback_wrong_order_or_function_drift: list_provided_clients'; end if;
   if to_regclass('public.agency_verifications') is not null then raise exception 'rollback_wrong_order: a later 7A file is still applied'; end if;
+  if (select md5(pg_get_functiondef(to_regprocedure('public.agency_membership_end_staff()')))) is distinct from 'dcba60a586734d2b4db32915f99e2448' then raise exception 'rollback_wrong_order_or_function_drift: agency_membership_end_staff'; end if;
 end;
 $rollback_guard$;
 lock table public."workspace_providers", public."provider_seats", public."agency_client_staff" in access exclusive mode;
@@ -43,6 +44,7 @@ revoke all on release_rollback_archive."m20261009151000_agency_client_staff" fro
 create table release_rollback_archive."m20261009151000_workspace_providers" as select * from public."workspace_providers" where source = 'business_choice';
 revoke all on release_rollback_archive."m20261009151000_workspace_providers" from public, anon, authenticated, service_role;
 drop trigger "workspace_providers_end_seat" on public."workspace_providers";
+drop trigger "workspace_memberships_end_agency_staff" on public."workspace_memberships";
 CREATE OR REPLACE FUNCTION public.business_record_assert_actor(p_workspace_id uuid, p_user_id uuid, p_verified_email text, p_write boolean)
  RETURNS text
  LANGUAGE plpgsql
@@ -236,6 +238,7 @@ drop function public.provider_seat_direct_role();
 drop table public."agency_client_staff";
 drop table public."provider_seats";
 drop function public.agency_client_staff_guard();
+drop function public.agency_membership_end_staff();
 drop function public.provider_seat_end_staff();
 drop function public.provider_seat_guard();
 drop function public.workspace_provider_end_seat();
