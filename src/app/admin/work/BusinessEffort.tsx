@@ -63,15 +63,15 @@ function BusinessRows({ rows, latestMonth }: { rows: BusinessEffortMeasure[]; la
   return (
     <ul className="divide-y divide-glass-border" aria-label={`Human minutes by business, ${monthLabel(latestMonth)}`}>
       {rows.map((row) => (
-        <li key={row.businessId} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-3 md:grid md:grid-cols-[minmax(0,1fr)_90px_90px_90px_130px]">
-          <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-warm-white">
+        <li key={row.businessId} className="grid grid-cols-3 items-center gap-x-4 gap-y-1 py-3 md:grid-cols-[minmax(0,1fr)_90px_90px_90px_130px]">
+          <span className="col-span-3 min-w-0 text-[13px] font-semibold text-warm-white md:col-span-1">
             {row.name ?? "Unlisted business"}
             {row.tenantIds.length > 0 && <span className="ml-2 text-[11px] font-normal text-gray-faint">{row.tenantIds.join(", ")}</span>}
           </span>
           <span className="text-[12px] tabular-nums text-gray-muted"><span className="md:sr-only">Previous </span>{minutesText(row.previous?.minutes)}</span>
           <span className="text-[12px] tabular-nums text-warm-white"><span className="md:sr-only">Latest </span>{minutesText(row.latest?.minutes)}</span>
           <span className="text-[12px] tabular-nums text-gray-muted"><span className="md:sr-only">This month </span>{minutesText(row.monthToDate?.minutes)}</span>
-          <span><DirectionChip direction={row.direction} /></span>
+          <span className="col-span-3 md:col-span-1"><DirectionChip direction={row.direction} /></span>
         </li>
       ))}
     </ul>
@@ -109,7 +109,7 @@ export function BusinessEffortPortfolio({ load }: { load: BusinessEffortLoad }) 
       <p className="max-w-3xl text-[12px] leading-5 text-gray-muted">
         The factory test: human minutes needed per business each month must fall. Months are UTC calendar months; the latest month is the last complete one. Every customer business counts. A month without a non-voided entry is not logged; record 0 explicitly to confirm no human work. Portfolio medians and averages require logs for every business.
       </p>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Vital
           label="Median per business"
           value={latest.medianMinutesPerBusiness === null ? "Not enough data" : minutesText(latest.medianMinutesPerBusiness)}
