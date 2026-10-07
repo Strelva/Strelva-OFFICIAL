@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { openWorkspacePlace } from "@/platform/owner-entry/place";
 import { readPlace } from "@/platform/owner-entry/place-state";
-import { readWorkspaceInquiryInbox } from "@/products/inquiries/workspace-inbox";
+import { readWorkspaceInquiryInbox } from "@/products/inquiries";
 import { z } from "zod";
 import { WorkspaceInquiries } from "@/experience/places/WorkspaceInquiries";
 

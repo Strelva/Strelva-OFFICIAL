@@ -264,6 +264,19 @@ describe("service requests", () => {
 });
 
 describe("the chase", () => {
+  it("never sends an inquiry decision without the explicit inquiry email gates", async () => {
+    requests = [];
+    clock.now = Date.parse("2026-10-06T15:00:00Z");
+    events = new Map([["evt-1", ev({ type: "change_request", metadata: {
+      kind: "inquiry_delivery_approval", inquiryId: "lead_fixture", action: "reply",
+      subject: "Party", messageBody: "We can host 30 guests for $40 each.",
+    } })]]);
+    const svc = service();
+    await svc.list(OWNER, WS);
+    expect((await svc.chase()).ownerNotTold).toBeGreaterThan(0);
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect([...mem.items.values()][0]?.deliveries[0]).toMatchObject({ status: "suppressed", reason: "inquiry_email_gates_off" });
+  });
   it("emails an urgent ask at once, records owner not told while email is gated, and never repeats it", async () => {
     clock.now = Date.parse("2026-10-06T15:00:00Z"); // 11:00 New York: not digest time
     const svc = service();

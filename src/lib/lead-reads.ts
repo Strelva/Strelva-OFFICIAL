@@ -310,3 +310,13 @@ export async function checkLeadParity(
   }
   return report;
 }
+
+/** Presence includes spam: only an absent ID may be treated as a pending copy. */
+export async function readPostgresLeadPresence(tenant: string, ids: string[], db?: LeadMirrorDb | null): Promise<Set<string>> {
+  if (!ids.length) return new Set();
+  const client = database(db);
+  if (!client) throw new Error("lead_read_unconfigured");
+  const { data, error } = await rpc(client, "read_tenant_lead_presence", { p_tenant_id: tenant, p_lead_ids: ids.slice(0, 500) });
+  if (error || !Array.isArray(data) || data.some(id => typeof id !== "string" || !ids.includes(id))) throw new Error("lead_read_presence_failed");
+  return new Set(data as string[]);
+}

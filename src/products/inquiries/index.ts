@@ -69,3 +69,8 @@ export type {
 export { replyFromWorkspace, workspaceInquiryRepliesEnabled, workspaceReplyInput } from "./workspace-replies";
 export type { WorkspaceReplyOutcome, WorkspaceReplyStatus } from "./workspace-replies";
 export { notifyInquiryOwner, repairInquiryOwnerNotice } from "./owner-notice";
+
+export async function readWorkspaceInquiryInbox(...args: Parameters<typeof import("./workspace-inbox").readWorkspaceInquiryInbox>) {
+  return (await import("./workspace-inbox")).readWorkspaceInquiryInbox(...args);
+}
+export type { WorkspaceLeads } from "./linked-leads";

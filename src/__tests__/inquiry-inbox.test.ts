@@ -5,13 +5,13 @@ import { WorkspaceInquiries } from "@/experience/places/WorkspaceInquiries";
 const actor = { userId: "d0000000-0000-4000-8000-000000000002", verifiedEmail: "owner@example.test" };
 const workspace = "d0000000-0000-4000-8000-000000000010";
 const base = { sites: [{ key: "fixture", tenantId: "fixture", siteName: "Fixture", leads: [], lastThirtyDays: 0, unavailable: false }], denied: [] };
-function deps(rows: unknown[] = []): InboxDependencies { return { base: vi.fn(async () => base), source: vi.fn(async () => "postgres"), rpc: vi.fn(async () => rows) }; }
+function deps(rows: unknown[] = []): InboxDependencies { return { base: vi.fn(async () => base), source: vi.fn(async () => "postgres" as const), rpc: vi.fn(async () => rows) }; }
 afterEach(() => vi.unstubAllEnvs());
 describe("retained inquiry inbox", () => {
   it("flag off and parity not yet ready preserve the old read and response", async () => {
     vi.stubEnv("STRELVA_INQUIRY_RECORDS", "");
     const d = deps(); expect(await readWorkspaceInquiryInbox(actor, workspace, undefined, d)).toBe(base); expect(d.rpc).not.toHaveBeenCalled(); expect(d.source).not.toHaveBeenCalled();
-    vi.stubEnv("STRELVA_INQUIRY_RECORDS", "1"); d.source = vi.fn(async () => "compare");
+    vi.stubEnv("STRELVA_INQUIRY_RECORDS", "1"); d.source = vi.fn(async () => "compare" as const);
     expect(await readWorkspaceInquiryInbox(actor, workspace, undefined, d)).toBe(base); expect(d.rpc).not.toHaveBeenCalled();
   });
   it("pages by captured time and row identity without leaking a denied site", async () => {

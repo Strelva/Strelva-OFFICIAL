@@ -4,7 +4,7 @@ import type { UnifiedEvent } from "@/lib/types";
 const lead = { id: "lead_1", name: "Dana", message: "Private party for 30?", createdAt: "2026-10-06T12:00:00Z" };
 const event = { id: "event_1", tenantId: "fixture", source: "ai", type: "change_request", status: "pending", title: "Approve reply", body: "It costs $40 each.", createdAt: lead.createdAt,
   metadata: { kind: "inquiry_delivery_approval", inquiryId: lead.id, action: "reply", subject: "Private party", messageBody: "It costs $40 each." } } as UnifiedEvent;
-function deps(): InquiryDecisionNoticeDependencies { return { released: vi.fn(async () => true), events: vi.fn(async () => [event]), workspace: vi.fn(async () => "fixture-workspace"), deliver: vi.fn(async () => "sent") }; }
+function deps(): InquiryDecisionNoticeDependencies { return { released: vi.fn(async () => true), events: vi.fn(async () => [event]), workspace: vi.fn(async () => "fixture-workspace"), deliver: vi.fn(async () => "sent" as const) }; }
 afterEach(() => vi.unstubAllEnvs());
 describe("inquiry and decision in one notice", () => {
   it("off or unreleased reads no draft and sends nothing", async () => {

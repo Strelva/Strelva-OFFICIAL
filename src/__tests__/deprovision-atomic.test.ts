@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * Audit finding 1 (2026-10-05): deprovision deleted each tenant table in its
@@ -27,7 +27,8 @@ vi.mock("@/platform/infra/db/client", () => ({
     rpc: async (name: string, args: Record<string, unknown>) => {
       db.rpcs.push({ name, args });
       if (name === "tenant_teardown_blockers") return { data: [db.blockers], error: null };
-      if (name === "deprovision_tenant_rows") return db.teardownError ? { data: null, error: db.teardownError } : { data: { memberships: 1, tenants: 1 }, error: null };
+      if (name === "assert_tenant_inquiry_export") return db.teardownError ? { data: null, error: db.teardownError } : { data: null, error: null };
+      if (name === "deprovision_tenant_rows" || name === "deprovision_tenant_rows_after_inquiry_export") return db.teardownError ? { data: null, error: db.teardownError } : { data: { memberships: 1, tenants: 1 }, error: null };
       if (name === "pause_tenant_systems") return db.pauseError ? { data: null, error: db.pauseError } : { data: 2, error: null };
       return { data: null, error: { message: `unexpected rpc ${name}` } };
     },
@@ -45,7 +46,21 @@ beforeEach(() => {
   redis.del.mockClear(); vercel.deleteVercelProject.mockClear();
 });
 
+afterEach(() => vi.unstubAllEnvs());
 describe("atomic hosted-tenant deprovision", () => {
+  it("Postgres authority refuses a missing export before pausing Systems or purging anything", async () => {
+    vi.stubEnv("DUAL_WRITE_PG", "1"); vi.stubEnv("STRELVA_LEADS_AUTHORITY", "postgres");
+    db.teardownError = { message: "inquiry_export_required_before_teardown" };
+    await expect(runDeprovision({ tenantId: "fictional-free", tenant: null, dryRun: false })).rejects.toThrow("inquiry_export_required_before_teardown");
+    expect(db.rpcs.map(row => row.name)).not.toContain("pause_tenant_systems");
+    expect(redis.del).not.toHaveBeenCalled(); expect(vercel.deleteVercelProject).not.toHaveBeenCalled();
+  });
+  it("authority uses the atomic export-checked wrapper; flags off retain the original RPC", async () => {
+    vi.stubEnv("DUAL_WRITE_PG", "1"); vi.stubEnv("STRELVA_LEADS_AUTHORITY", "postgres");
+    await runDeprovision({ tenantId: "fictional-free", tenant: null, dryRun: false });
+    expect(db.rpcs.map(row => row.name)).toContain("deprovision_tenant_rows_after_inquiry_export");
+    expect(db.rpcs.map(row => row.name)).not.toContain("deprovision_tenant_rows");
+  });
   it("refuses a tenant a workspace website still holds before deleting anything", async () => {
     db.blockers = { publications: 1, reservations: 1 };
     const result = await runDeprovision({ tenantId: "fictional-hosted", tenant: null, dryRun: false });

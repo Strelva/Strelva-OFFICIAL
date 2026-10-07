@@ -642,8 +642,14 @@ psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261009100000_str
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125000_inquiry_urgent_decisions.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125500_inquiry_inbox.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-inbox-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125700_inquiry_cache_presence.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-cache-presence-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125900_inquiry_export_before_teardown.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-export-before-teardown-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125600_inquiry_reply_purpose.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-reply-purpose-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125800_connected_inquiry_owner_notices.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-inquiry-owner-notices-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-reply-purpose-race-setup.sql"
 psql "${psql_args[@]}" --set=engine=true --file="$repo_root/tests/inquiry-reply-purpose-race.sql" >"$cluster_root/inquiry-engine-race.log" 2>&1 &
 inquiry_engine_race=$!

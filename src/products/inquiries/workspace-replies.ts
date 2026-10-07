@@ -6,7 +6,7 @@ import { customerEmailEnabled, emailSendingEnabled } from "@/platform/infra/emai
 import { getClientEmailOverride } from "@/platform/infra/email/client-override";
 import { CLIENT_MAIL_DOMAIN, getEmailReadback, sendEmailWithReceipt, type SendEmailInput, type SendEmailResult, type EmailReadbackResult } from "@/platform/infra/email/send";
 
-export function workspaceInquiryRepliesEnabled(env = process.env): boolean {
+export function workspaceInquiryRepliesEnabled(env: Partial<Record<string, string | undefined>> = process.env): boolean {
   return env.STRELVA_INQUIRY_REPLIES === "1" && inquiryRecordsEnabled(env);
 }
 export const workspaceReplyInput = z.object({

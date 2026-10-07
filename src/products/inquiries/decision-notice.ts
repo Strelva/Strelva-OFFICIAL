@@ -1,20 +1,18 @@
 import { inquiryReleaseEnabledForTenant } from "./release";
-import { getEventsRaw } from "@/lib/events";
 import { inquiryRecordsRpc } from "@/platform/infra/inquiry-records";
 import { needsYouReleaseEnabled } from "@/platform/needs-you/release";
 import { tenantEventItem } from "@/platform/needs-you/adapters";
-import type { LeadRecord } from "@/lib/leads";
-import type { UnifiedEvent } from "@/lib/types";
+type InquiryDecisionEvent = Parameters<typeof tenantEventItem>[0];
 
 export interface InquiryDecisionNoticeDependencies {
   released(tenantId: string): Promise<boolean>;
-  events(tenantId: string): Promise<UnifiedEvent[]>;
+  events(tenantId: string): Promise<InquiryDecisionEvent[]>;
   workspace(tenantId: string): Promise<string | null>;
   deliver(workspaceId: string, sourceId: string, notice: { name: string; message: string | null }): Promise<"sent" | "suppressed" | "failed" | "none">;
 }
 const defaults: InquiryDecisionNoticeDependencies = {
   released: inquiryReleaseEnabledForTenant,
-  events: (tenantId) => getEventsRaw(tenantId, { status: "pending", limit: 1000 }),
+  events: async (tenantId) => (await import("@/platform/needs-you/server")).pendingInquiryDecisionEvents(tenantId),
   workspace: async (tenantId) => {
     const context = await inquiryRecordsRpc("read_inquiry_business_context", { p_tenant_id: tenantId }) as { workspaceId?: unknown } | null;
     return typeof context?.workspaceId === "string" ? context.workspaceId : null;
@@ -27,7 +25,7 @@ const defaults: InquiryDecisionNoticeDependencies = {
 
 /** A pending owner draft at notice time travels with the inquiry in one email.
  * The same Needs you source owns the revision, signed link and send identity. */
-export async function notifyPreparedInquiryDecision(tenantId: string, lead: LeadRecord, deps = defaults): Promise<"sent" | "suppressed" | "failed" | "none"> {
+export async function notifyPreparedInquiryDecision(tenantId: string, lead: { id: string; name: string; message?: string }, deps = defaults): Promise<"sent" | "suppressed" | "failed" | "none"> {
   if (process.env.STRELVA_INQUIRY_OWNER_NOTICES !== "1" || !needsYouReleaseEnabled()) return "none";
   if (!(await deps.released(tenantId))) return "none";
   const event = (await deps.events(tenantId)).find(event => event.tenantId === tenantId && event.status === "pending"

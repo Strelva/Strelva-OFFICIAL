@@ -61,6 +61,9 @@ const rpc = vi.fn(async (name: string, args: Record<string, unknown>) => {
       .slice(0, Number(args.p_limit));
     return { data: list.map(pgItem), error: null };
   }
+  if (name === "read_tenant_lead_presence") {
+    return { data: rows.filter(row => row.tenant === args.p_tenant_id && (args.p_lead_ids as string[]).includes(row.leadId)).map(row => row.leadId), error: null };
+  }
   if (name === "read_tenant_lead_summary") {
     const list = rows.filter((row) => row.tenant === args.p_tenant_id && Date.parse(row.capturedAt) >= Date.parse(String(args.p_since)))
       .sort((a, b) => Date.parse(b.capturedAt) - Date.parse(a.capturedAt));
@@ -251,6 +254,24 @@ describe("postgres mode (flipped reads)", () => {
     expect(summary.count).toBe(2);
     expect(summary.recent.map((l) => l.id)).toEqual(["lead_2", "lead_1"]);
     vi.useRealTimers();
+  });
+
+  it("adds pending Redis copies to the durable summary without counting mirrored leads twice", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(Date.parse("2026-10-06T00:00:00Z"));
+    pgOnlyLead("t1", "lead_both", "2026-10-04T10:00:00.000Z");
+    redisOnlyLead("t1", "lead_both", "2026-10-04T10:00:00.000Z");
+    redisOnlyLead("t1", "lead_pending", "2026-10-05T10:00:00.000Z");
+    expect(await getLeadSummary("t1", 30)).toMatchObject({ count: 2, recent: [{ id: "lead_pending" }, { id: "lead_both" }] });
+  });
+
+  it("durable exclusions win over a stale Redis copy", async () => {
+    redisOnlyLead("t1", "lead_held", "2026-10-05T10:00:00.000Z");
+    const impl = rpc.getMockImplementation()!;
+    rpc.mockImplementation(async (name, args) => name === "read_tenant_lead_presence"
+      ? { data: ["lead_held"], error: null } : impl(name, args));
+    expect(await getLeads("t1")).toEqual([]);
+    expect(await getLeadById("t1", "lead_held")).toBeNull();
+    rpc.mockImplementation(impl);
   });
 
   it("counts every recent Postgres lead beyond the Redis retention cap", async () => {

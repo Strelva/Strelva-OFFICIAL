@@ -35,6 +35,7 @@ import {
   readPostgresLeads,
   readPostgresLeadPage,
   readPostgresLeadSummary,
+  readPostgresLeadPresence,
   reportLeadReadDifference,
 } from "./lead-reads";
 
@@ -388,7 +389,11 @@ export async function getLeads(tenant: string, limit = 50, before: string | null
     if (redisLeads) return redisLeads;
     throw new Error("lead_read_unavailable");
   }
-  return mergeNewestFirst(pgLeads, redisLeads ?? [], limit);
+  const extras = (redisLeads ?? []).filter(lead => !pgLeads.some(row => row.id === lead.id));
+  // Durable exclusions and page boundaries win over stale cached records.
+  const present = await readPostgresLeadPresence(tenant, extras.map(lead => lead.id)).catch(() => null);
+  if (!present) return redisLeads ?? pgLeads;
+  return mergeNewestFirst(pgLeads, extras.filter(lead => !present.has(lead.id)), limit);
 }
 
 /** Read one captured lead by its durable id, from the read source in force. */
@@ -406,18 +411,28 @@ export async function getLeadById(tenant: string, id: string): Promise<LeadRecor
     }
     return redisLead;
   }
+  let failed = false;
   const pgLead = await readPostgresLead(tenant, id).catch((err: unknown) => {
+    failed = true;
     console.error(`[lead-reads] Postgres read failed for ${tenant}/${id}; serving Redis:`, err instanceof Error ? err.message : err);
     return null;
   });
-  return pgLead ?? getRedisLeadById(tenant, id);
+  if (pgLead) return pgLead;
+  if (!failed && (await readPostgresLeadPresence(tenant, [id]).catch(() => new Set<string>())).has(id)) return null;
+  return getRedisLeadById(tenant, id);
 }
 
 /** Count of leads in the window + the most recent few, for the Today feed. */
 export async function getLeadSummary(tenant: string, sinceDays = 30): Promise<LeadSummary> {
   if (await leadReadSource() === "postgres") {
     try {
-      return await readPostgresLeadSummary(tenant, new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString());
+      const cutoff = Date.now() - sinceDays * 24 * 60 * 60 * 1000;
+      const summary = await readPostgresLeadSummary(tenant, new Date(cutoff).toISOString());
+      const cached = getRedis() ? await getRedisLeads(tenant, LEAD_KEEP).catch(() => []) : [];
+      const candidates = cached.filter(lead => Date.parse(lead.createdAt) >= cutoff);
+      const present = await readPostgresLeadPresence(tenant, candidates.map(lead => lead.id));
+      const pending = candidates.filter(lead => !present.has(lead.id));
+      return { count: summary.count + pending.length, recent: mergeNewestFirst(summary.recent, pending, 5) };
     } catch (error) {
       console.error(`[lead-reads] Postgres summary failed for ${tenant}; serving cached records:`, error instanceof Error ? error.message : error);
     }

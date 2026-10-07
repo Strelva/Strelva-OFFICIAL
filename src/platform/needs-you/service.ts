@@ -248,8 +248,8 @@ export function createNeedsYouService(deps: NeedsYouDeps) {
       summary.ownerNotTold += rows.length;
       return;
     }
-    if (deps.urgentInquiryAllowed && rows.some(row => row.sourceLifecycle === "tenant_event" && (row.kind === "customer.message" || row.kind === "customer.commitment"))
-      && !(await deps.urgentInquiryAllowed(first.recipient?.tenantId ?? null))) {
+    if (rows.some(row => row.sourceLifecycle === "tenant_event" && (row.kind === "customer.message" || row.kind === "customer.commitment"))
+      && (!deps.urgentInquiryAllowed || !(await deps.urgentInquiryAllowed(first.recipient?.tenantId ?? null)))) {
       for (const row of rows) await deps.store.recordDelivery(row.workspaceId, row.id, kind, "suppressed", recipient, null, "inquiry_email_gates_off");
       summary.ownerNotTold += rows.length;
       return "suppressed";

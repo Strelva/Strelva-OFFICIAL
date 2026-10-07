@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { WorkspaceInquiries } from "./WorkspaceInquiries";
-import type { WorkspaceLeads } from "@/products/inquiries/linked-leads";
+import type { WorkspaceLeads } from "@/products/inquiries";
 import type { PlaceState } from "./WorkspacePlace";
 
 /** Customer System surface; internal drafts and policies stay on operator views. */

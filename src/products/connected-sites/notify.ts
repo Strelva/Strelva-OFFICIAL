@@ -12,6 +12,7 @@ import { getClientEmailOverride } from "@/platform/infra/email/client-override";
 import { sendEmail } from "@/platform/infra/email/send";
 import { resolveOwnerRecipient } from "@/platform/business-record/service";
 import type { ConnectedInquiry, ResolvedConnectedSite } from "./contracts";
+import { notifyDurableConnectedInquiryOwner } from "./inquiry-owner-notice";
 
 function appOrigin(): string {
   return (process.env.NEXT_PUBLIC_APP_URL || "https://app.strelva.com").replace(/\/+$/, "");
@@ -36,6 +37,10 @@ export function connectedInquiryEmail(site: Pick<ResolvedConnectedSite, "siteHos
 }
 
 export async function notifyConnectedSiteInquiry({ site, inquiry }: { site: ResolvedConnectedSite; inquiry: Pick<ConnectedInquiry, "id" | "name" | "email" | "message"> }, deps: { paused?: () => boolean; recipient?: typeof resolveOwnerRecipient; send?: typeof sendEmail } = {}): Promise<"sent" | "paused" | "no_recipient"> {
+  if (inquiryRecordsEnabled()) {
+    const email = connectedInquiryEmail(site, inquiry);
+    return notifyDurableConnectedInquiryOwner({ rowId: inquiry.id, siteId: site.id, workspaceId: site.workspaceId, ...email });
+  }
   if ((deps.paused ?? emailSendingPaused)()) return "paused";
   const recipient = await (deps.recipient ?? resolveOwnerRecipient)(site.workspaceId);
   if (!recipient?.email) return "no_recipient";

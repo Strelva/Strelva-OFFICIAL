@@ -118,7 +118,7 @@ export async function readConnectedSiteInquiries(actor: WorkspaceActor, workspac
 
 const defaults: LeadDependencies = {
   sites: (actor, workspaceId) => readLinkedSites(actor, workspaceId),
-  storeReady: leadReadStoreReady,
+  storeReady: () => leadReadStoreReady(),
   repliesEnabled: workspaceInquiryRepliesEnabled,
   leads: (tenantId) => getLeads(tenantId, LEAD_READ_LIMIT),
   now: () => Date.now(),

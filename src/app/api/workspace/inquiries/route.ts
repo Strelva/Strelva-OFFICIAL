@@ -4,7 +4,7 @@ import { inquiryRecordsEnabled } from "@/platform/infra/inquiry-records";
 import { workspaceHttpActor, workspaceHttpFailure, workspaceJson } from "@/platform/workspaces/http";
 import { ownerEntryHomesOpen } from "@/platform/owner-entry/linked-sites";
 import { inquiryReleaseEnabledForWorkspace } from "@/products/inquiries";
-import { readWorkspaceInquiryInbox } from "@/products/inquiries/workspace-inbox";
+import { readWorkspaceInquiryInbox } from "@/products/inquiries";
 export const dynamic = "force-dynamic";
 const query = z.object({ workspaceId: z.string().uuid(), before: z.iso.datetime({ offset: true }).optional(), beforeId: z.string().uuid().optional() });
 export async function GET(request: Request) {

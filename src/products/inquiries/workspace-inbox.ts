@@ -1,16 +1,15 @@
 import { inquiryRecordsEnabled, inquiryRecordsRpc, InquiryRecordsError } from "@/platform/infra/inquiry-records";
 import { WorkspaceAccessError, type WorkspaceActor } from "@/platform/workspaces/types";
-import { leadReadSource } from "@/lib/lead-reads";
 import { readWorkspaceLeads, type WorkspaceLeads, type LeadView } from "./linked-leads";
 import { parseWorkspaceLead, type WorkspaceInquiryLead } from "./workspace-records";
 
 export interface InboxCursor { before: string; beforeId: string }
 export interface InboxDependencies {
   base: typeof readWorkspaceLeads;
-  source: typeof leadReadSource;
+  source: () => Promise<"redis" | "compare" | "postgres">;
   rpc: typeof inquiryRecordsRpc;
 }
-const defaults: InboxDependencies = { base: readWorkspaceLeads, source: leadReadSource, rpc: inquiryRecordsRpc };
+const defaults: InboxDependencies = { base: readWorkspaceLeads, source: async () => (await import("./server")).inquiryLeadReadSource(), rpc: inquiryRecordsRpc };
 function view(row: WorkspaceInquiryLead): LeadView {
   return { id: row.connectedSiteId ? row.id : row.leadId, rowId: row.id, name: row.name || "Someone", email: row.email,
     message: row.message, source: row.source, fields: Object.entries(row.fields), createdAt: row.capturedAt,

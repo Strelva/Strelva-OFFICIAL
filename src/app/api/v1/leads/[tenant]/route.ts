@@ -17,7 +17,7 @@ import { captureLead } from "@/lib/leads";
 import { scoreLeadSpam } from "@/lib/lead-spam";
 import { recordSpam } from "@/lib/spam-pit";
 import { readLeadAttribution } from "@/lib/lead-attribution";
-import { notifyInquiryOwner } from "@/products/inquiries/owner-notice";
+import { notifyInquiryOwner } from "@/products/inquiries";
 import {
   getInquiryRepository,
   inquiryReleaseEnabledForTenant,

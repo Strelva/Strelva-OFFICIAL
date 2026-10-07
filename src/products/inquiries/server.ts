@@ -1,5 +1,5 @@
 import { addEvent, resolveEvent } from "@/lib/events";
-import { getLeads, leadReadStoreReady, type LeadRecord } from "@/lib/leads";
+import { getLeads, leadReadSource, leadReadStoreReady, type LeadRecord } from "@/lib/leads";
 import { getRedis } from "@/platform/infra/redis";
 import { getConnections } from "@/lib/connections";
 import { getTenantRole, roleHasPermission, type ClientRole, type TenantPermission } from "@/platform/infra/auth";
@@ -934,3 +934,6 @@ export async function executeInquirySurface(input: {
 export { inquiryEconomicsAuthority } from "./economics";
 
 export { replyFromWorkspace, workspaceInquiryRepliesEnabled, workspaceReplyInput } from "./workspace-replies";
+
+/** Shared tenant read switch at the existing legacy adapter boundary. */
+export async function inquiryLeadReadSource() { return leadReadSource(); }

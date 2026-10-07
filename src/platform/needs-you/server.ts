@@ -1,4 +1,4 @@
-import { getEventRaw, getEvents } from "@/lib/events";
+import { getEventRaw, getEvents, getEventsRaw } from "@/lib/events";
 import { resolveEventAction } from "@/lib/event-actions";
 import { sendEmailWithReceipt } from "@/platform/infra/email/send";
 import { customerEmailEnabled, emailSendingEnabled } from "@/platform/infra/email/enabled";
@@ -35,8 +35,8 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
     appOrigin: needsYouAppOrigin(),
     now: () => Date.now(),
     sendEmail: sendEmailWithReceipt,
-    urgentInquiryAllowed: process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" ? async (tenantId) => needsYouReleaseEnabled()
-      && emailSendingEnabled() && customerEmailEnabled() && (!tenantId || await getClientEmailOverride(tenantId) !== "off") : undefined,
+    urgentInquiryAllowed: async (tenantId) => process.env.STRELVA_INQUIRY_OWNER_NOTICES === "1" && needsYouReleaseEnabled()
+      && emailSendingEnabled() && customerEmailEnabled() && (!tenantId || await getClientEmailOverride(tenantId) !== "off"),
     adapters: [
       tenantEventAdapter({
         linkedTenants: async (workspaceId) => (await store.linkedTenants(workspaceId)).map(link => link.tenantId),
@@ -78,4 +78,9 @@ export async function readStrelvaHandled(actor: WorkspaceActor, workspaceId: str
   const events = (await Promise.all(tenants.map(async link => (await getEvents(link.tenantId, { limit: 100 }).catch(() => []))
     .filter(event => !decided.has(`${link.tenantId}:${event.id}`))))).flat();
   return mergeHandled([...rows.map(handledFromStore), ...events.map(handledFromTenantEvent)], since).slice(0, 50);
+}
+
+/** Pending inquiry drafts use the same tenant event adapter as Needs you. */
+export function pendingInquiryDecisionEvents(tenantId: string) {
+  return getEventsRaw(tenantId, { status: "pending", limit: 1000 });
 }

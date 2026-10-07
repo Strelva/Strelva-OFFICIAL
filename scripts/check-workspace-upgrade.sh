@@ -240,10 +240,11 @@ psql "${psql_args[@]}" --file="$repo_root/tests/website-linked-publication-schem
 psql "${psql_args[@]}" --file="$repo_root/tests/connected-sites-schema.sql"
 # 20261009100000 (Strelva service actor) replaces owner_decision_json and
 # workspace_release_flag_names(); its contract holds after the full ordered upgrade.
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125000_inquiry_urgent_decisions.sql"
-psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010125500_inquiry_inbox.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-inbox-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-cache-presence-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-export-before-teardown-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/inquiry-reply-purpose-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/connected-inquiry-owner-notices-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
 # 20261009130000 replaces read_strelva_handled and 20261009131000 replaces
 # record_strelva_service_action; both contracts hold after the full upgrade.
