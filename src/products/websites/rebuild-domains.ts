@@ -10,7 +10,7 @@ const configSchema = z.object({
 const projectSchema = z.object({ verification: z.array(z.object({ type: z.string().optional(), domain: z.string().optional(), value: z.string().optional() })).optional() }).passthrough();
 
 /** DNS recommendations are provider responses, never hard-coded IPs or CNAMEs. */
-export async function readHostedDomainRecords(domain: string, fetcher: typeof fetch = fetch): Promise<WebsiteDomainView["records"]> {
+export async function readHostedDomainRecords(domain: string, fetcher: typeof fetch = fetch, options: { allowUnattached?: boolean } = {}): Promise<WebsiteDomainView["records"]> {
   const token = process.env.VERCEL_API_TOKEN;
   const projectId = process.env.VERCEL_PROJECT_ID || process.env.VERCEL_PROJECT_NAME;
   if (!token || !projectId) throw new WorkspaceStoreError("Domain setup is unavailable until the hosting provider is configured.");
@@ -20,9 +20,9 @@ export async function readHostedDomainRecords(domain: string, fetcher: typeof fe
     fetcher(`https://api.vercel.com/v6/domains/${encodeURIComponent(domain)}/config${team}`, { headers, signal: AbortSignal.timeout(10000), cache: "no-store" }),
     fetcher(`https://api.vercel.com/v9/projects/${encodeURIComponent(projectId)}/domains/${encodeURIComponent(domain)}${team}`, { headers, signal: AbortSignal.timeout(10000), cache: "no-store" }),
   ]);
-  if (!configResponse.ok || !projectResponse.ok) throw new WorkspaceStoreError("The hosting provider could not return this domain's DNS records.");
+  if (!configResponse.ok || (!projectResponse.ok && !(options.allowUnattached && projectResponse.status === 404))) throw new WorkspaceStoreError("The hosting provider could not return this domain's DNS records.");
   const config = configSchema.parse(await configResponse.json());
-  const project = projectSchema.parse(await projectResponse.json());
+  const project = projectResponse.ok ? projectSchema.parse(await projectResponse.json()) : {};
   const records: WebsiteDomainView["records"] = [];
   const cnames = [...(config.recommendedCNAME ?? [])].sort((a,b) => (a.rank ?? 0) - (b.rank ?? 0));
   const ips = [...(config.recommendedIPv4 ?? [])].sort((a,b) => (a.rank ?? 0) - (b.rank ?? 0));

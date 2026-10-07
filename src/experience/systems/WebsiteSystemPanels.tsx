@@ -123,7 +123,7 @@ export function WebsiteSystemPanels({ workspaceId, systemId, state, onAsk, onAsk
   const domainsMissing = unavailable.has("Domains");
   const waitingMissing = ["Decisions", "Drafts", "Site review"].filter(name => unavailable.has(name));
   const requestsMissing = ["Requests and pending changes", "Service requests"].filter(name => unavailable.has(name));
-  const historyMissing = ["Content history", "Saved copies", "Site revisions", "Site replacements"].filter(name => unavailable.has(name));
+  const historyMissing = ["Content history", "Saved copies", "Site revisions", "Site replacements", "Repo deploy history", "System release history"].filter(name => unavailable.has(name));
   return <>
     {detail.connectedSite ? <ConnectedSitePanel workspaceId={workspaceId} systemId={systemId} site={detail.connectedSite} readOnly={readOnly} /> : null}
     <Panel id={`${systemId}-domains`} title="Domains" count={detail.domains.length} intro="Where the site answers, and whether each address is verified.">
@@ -149,6 +149,7 @@ export function WebsiteSystemPanels({ workspaceId, systemId, state, onAsk, onAsk
       {detail.history.length ? <ol className={styles.panelList} aria-label="History">{detail.history.map(item => <li key={item.id}>
         <span>{item.title}</span>
         <small>{SOURCE_LABEL[item.source]} · {item.by} · <time dateTime={item.at}>{when(item.at)}</time></small>
+        {item.deployment ? <small>Commit {item.deployment.commitSha} · <a href={item.deployment.url} target="_blank" rel="noopener noreferrer">Open deployment</a></small> : null}
         <small>{item.undo ?? "No undo for this change."}</small>
       </li>)}</ol> : historyMissing.length ? null : <p className="mt-3">No releases are recorded for this site yet.</p>}
       <Unavailable names={historyMissing} />

@@ -10,6 +10,8 @@ import type { SourceAdapter } from "../adapters";
 import { agencyGrantAdapter, type PendingAgencyGrant } from "./agency-grant";
 import { providerDeliveryAdapter } from "./provider-delivery";
 import { standingResponsibilityAdapter } from "./standing-responsibility";
+import { websiteRebuildReleaseMayBeOn } from "@/products/websites/rebuild-release";
+import { websiteDomainAdapter } from "./website-domain";
 import { websiteDocumentAdapter } from "./website-document";
 import { workResponsibilityAdapter } from "./work-responsibility";
 
@@ -86,6 +88,16 @@ export function deliverySourceAdapters(): SourceAdapter[] {
         return service.launchWebsiteRebuild(actor, workId, selection);
       },
     }),
+    ...(websiteRebuildReleaseMayBeOn() ? [websiteDomainAdapter({
+      async list(workspaceId) {
+        const release = await import("@/products/websites/rebuild-release");
+        if (!release.websiteRebuildReleaseMayBeOn() || !(await release.websiteRebuildReleaseEnabledForWorkspace(workspaceId))) return [];
+        return (await import("@/products/websites/domain-requests")).websiteDomainRequestStore.list(workspaceId);
+      },
+      async approve(request, decisionId) {
+        return (await import("@/products/websites/domain-requests")).websiteDomainRequestService.approve(request, decisionId);
+      },
+    })] : []),
     providerDeliveryAdapter({
       list: async (actor, businessId) => (await offeringServices()).deliveries.list(actor, businessId),
       async workCompleted(actor, delivery) {

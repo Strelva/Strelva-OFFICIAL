@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockHeadersGet = vi.fn((key: string) => {
   if (key === "x-tenant") return "test-tenant";
@@ -22,6 +22,14 @@ const mockClearDraft = vi.fn();
 const mockAddEvent = vi.fn();
 const mockRevalidateClientSite = vi.fn();
 const mockRequireTenantPermission = vi.fn();
+const mockTenantReleaseFlagEnabled = vi.fn();
+const mockGetTenantConfig = vi.fn();
+const mockPublicReadBack = vi.fn();
+
+vi.mock("@/platform/release-flags/store", () => ({ tenantReleaseFlagEnabled: (...args: unknown[]) => mockTenantReleaseFlagEnabled(...args) }));
+vi.mock("@/platform/release-flags/viewer", () => ({ currentReleaseViewer: async () => ({ operator: false, tester: false }) }));
+vi.mock("@/lib/tenants", () => ({ getTenantConfig: (...args: unknown[]) => mockGetTenantConfig(...args) }));
+vi.mock("@/products/websites/content-readback", () => ({ readPublishedWebsiteContent: (...args: unknown[]) => mockPublicReadBack(...args) }));
 
 vi.mock("next/headers", () => ({
   headers: vi.fn(() =>
@@ -112,6 +120,12 @@ const HERO_DRAFT = {
 describe("site editor publish routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "0");
+    vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "0");
+    vi.stubEnv("STRELVA_MAKE_REAL_LIVE", "0");
+    mockTenantReleaseFlagEnabled.mockResolvedValue(true);
+    mockGetTenantConfig.mockResolvedValue({ id: "test-tenant", productionDomain: "example.test" });
+    mockPublicReadBack.mockResolvedValue({ ok: true, status: "verified", detail: "The public page shows the published values." });
     mockGetPageConfig.mockResolvedValue({ home: { sections: [] } });
     mockGetDraftPageConfig.mockResolvedValue(null);
     mockSetPageConfig.mockResolvedValue(undefined);
@@ -133,6 +147,7 @@ describe("site editor publish routes", () => {
     mockIsSuperAdmin.mockResolvedValue(false);
     mockGetOpenChangeRequest.mockResolvedValue(null);
   });
+  afterEach(() => vi.unstubAllEnvs());
 
   it("GET /api/page-config?draft=true returns the draft page config when present", async () => {
     mockGetDraftPageConfig.mockResolvedValue(PAGE_CONFIG);
@@ -182,6 +197,41 @@ describe("site editor publish routes", () => {
     expect(mockSetPageConfig).toHaveBeenCalledWith(PAGE_CONFIG, "test-tenant");
     expect(mockClearDraftPageConfig).toHaveBeenCalledWith("test-tenant");
     expect(mockRevalidateClientSite).toHaveBeenCalledWith("test-tenant", "all");
+  });
+
+  it("POST /api/publish keeps its exact response and call path with release flags off", async () => {
+    mockListDrafts.mockResolvedValue({ hero: true });mockGetDraftContent.mockResolvedValue(HERO_DRAFT);
+    mockRevalidateClientSite.mockResolvedValue({ success: true });
+    const { POST } = await import("@/app/api/publish/route");
+    const response = await POST();
+    expect(await response.json()).toEqual({ success: true, publishedSections: ["hero"], publishedPageConfig: false, liveSite: { status: "revalidated" } });
+    expect(mockTenantReleaseFlagEnabled).not.toHaveBeenCalled();expect(mockGetTenantConfig).toHaveBeenCalledOnce();expect(mockPublicReadBack).not.toHaveBeenCalled(); // Existing template-manifest routing reads the tenant.
+    expect(mockSetContent).toHaveBeenCalledOnce();expect(mockRevalidateClientSite).toHaveBeenCalledOnce();
+  });
+
+  it("POST /api/publish reads the public site only when this tenant's channel is enabled", async () => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "workspace");vi.stubEnv("STRELVA_MAKE_REAL_LIVE", "workspace");
+    mockListDrafts.mockResolvedValue({ hero: true });mockGetDraftContent.mockResolvedValue(HERO_DRAFT);
+    const { POST } = await import("@/app/api/publish/route");
+    expect(await (await POST()).json()).toMatchObject({ success: true, readBack: { ok: true, status: "verified" } });
+    expect(mockTenantReleaseFlagEnabled).toHaveBeenCalledWith("systems", "test-tenant", expect.anything());
+    expect(mockTenantReleaseFlagEnabled).toHaveBeenCalledWith("make_real_live:tenant_content", "test-tenant", expect.anything());
+    expect(mockPublicReadBack).toHaveBeenCalledOnce();
+    expect(mockPublicReadBack).toHaveBeenCalledWith({ tenant: { id: "test-tenant", productionDomain: "example.test" }, section: "website", expected: { hero: HERO_DRAFT } });
+    expect(mockLogAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ action: "content.public_read_back", metadata: expect.objectContaining({ ok: true }) }));
+    mockPublicReadBack.mockClear();mockTenantReleaseFlagEnabled.mockResolvedValue(false);
+    expect(await (await POST()).json()).not.toHaveProperty("readBack");expect(mockPublicReadBack).not.toHaveBeenCalled();
+  });
+
+  it("POST /api/publish preserves acceptance when read-back fails, without repeating a write", async () => {
+    vi.stubEnv("STRELVA_WORKSPACE_RELEASE", "1");vi.stubEnv("STRELVA_SYSTEMS_RELEASE", "1");vi.stubEnv("STRELVA_MAKE_REAL_LIVE", "1");
+    mockListDrafts.mockResolvedValue({ hero: true });mockGetDraftContent.mockResolvedValue(HERO_DRAFT);
+    mockRevalidateClientSite.mockResolvedValue({ success: true });mockPublicReadBack.mockRejectedValue(Error("read-back transport unavailable"));
+    const { POST } = await import("@/app/api/publish/route");
+    const response = await POST();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, liveSite: { status: "revalidated" }, readBack: { ok: false, status: "unverified" } });
+    expect(mockSetContent).toHaveBeenCalledOnce();expect(mockAppendVersion).toHaveBeenCalledOnce();expect(mockRevalidateClientSite).toHaveBeenCalledOnce();expect(mockPublicReadBack).toHaveBeenCalledOnce();
   });
 
   it("POST /api/content/:section/versions restores history into a draft", async () => {

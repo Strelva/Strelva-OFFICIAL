@@ -1,0 +1,10 @@
+begin;
+set local lock_timeout='5s';
+drop function if exists public.record_website_domain_request(uuid,uuid,jsonb,jsonb);
+drop function if exists public.approve_website_domain_request(uuid,uuid,uuid,text);
+drop function if exists public.authorize_website_domain_request(uuid,uuid);
+drop function if exists public.list_website_domain_requests(uuid);
+drop function if exists public.prepare_website_domain_request(uuid,uuid,uuid,uuid,text,text,integer,text,text,jsonb,text);
+drop function if exists public.website_domain_request_json(public.website_domain_requests);
+drop table if exists public.website_domain_requests;
+commit;

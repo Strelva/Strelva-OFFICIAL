@@ -32,7 +32,11 @@ export async function GET(request:Request){
    const day=new Date().toISOString().slice(0,10);const marker=`reb:website-domain-alert:${digest}:${day}`;const redis=getRedis();if(redis&&await redis.get(marker).catch(()=>null))return;
    const delivery=await sendEmailWithReceipt({audience:"operator",to:resolveLeadNotifyRecipients(),fromAddress:"health@updates.strelva.com",subject:"Strelva: website domain still awaits verification",idempotencyKey:`website-domain:${digest}:${day}`,options:{heading:"A website domain has waited seven days",paragraphs:["The owner has not completed DNS verification. The hosted site remains available on its Strelva address."],rows:[{label:"Website",value:value.tenantId},{label:"Domain",value:value.hostname},{label:"Domain requested",value:value.createdAt},{label:"Last provider check",value:value.checkedAt}],button:{label:"Open operator workspace",url:OPERATOR_URL}}});
    if(delivery.status==="accepted"&&redis)await redis.set(marker,"accepted",{ex:48*3600}).catch(()=>undefined);
-  }}:{})});processed=result.processed;failed=result.failed;ok=failed===0;return NextResponse.json({...result,mode:alerting?"alerting":"report_only"},{status:failed?207:200});
+  }}:{})});processed=result.processed;failed=result.failed;
+  // New owner receipts are isolated behind the rebuild release; the checker
+  // reads provider state and never retries an attachment.
+  const proposals=alerting?await (await import("@/products/websites/domain-requests")).reconcileWebsiteDomainRequests():null;
+  failed+=proposals?.failed??0;ok=failed===0;return NextResponse.json({...result,...(proposals?{domainRequests:proposals}:{}),mode:alerting?"alerting":"report_only"},{status:failed?207:200});
  }catch{failed=Math.max(1,failed);return NextResponse.json({error:"Website domain verification could not be confirmed."},{status:503});}
  finally{await recordHeartbeat("website-domain-verification",{ok,processed,failed,durationMs:Date.now()-started});}
 }

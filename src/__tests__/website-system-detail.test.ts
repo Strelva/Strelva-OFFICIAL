@@ -33,6 +33,16 @@ describe("website System page lists", () => {
     // Issued rows never change here: History only reads them.
     expect(detail.requests).toEqual([]);
   });
+  it("includes actual deploy receipts with honest failed read-back and immutable evidence", () => {
+    const detail = buildWebsiteSystemDetail(inputs({ repoDeployments: [{
+      id: "deploy-receipt", requestId: "request", title: "Private events page", commitSha: "abcdef0",
+      deploymentUrl: "https://fictional.vercel.app", readBack: "not_confirmed", recordedAt: "2026-10-05T10:00:00Z",
+    }] }));
+    expect(detail.history).toEqual([expect.objectContaining({
+      source: "deploy", title: "Private events page · deployed, not yet confirmed",
+      deployment: { commitSha: "abcdef0", url: "https://fictional.vercel.app", readBack: "not_confirmed" },
+    })]);
+  });
   it("lists only open Requests, with their stage", () => {
     const detail = buildWebsiteSystemDetail(inputs({
       changeRequests: [
@@ -89,6 +99,13 @@ describe("website System page loader", () => {
     expect(detail.requests.map(item => item.title)).toEqual(["Menu page"]);
     expect(detail.unavailable).toEqual([]);
     expect(s.events).toHaveBeenCalledWith("gldf", { limit: 100 });
+  });
+  it("keeps deploy and reconciliation outages visible without inventing an empty history", async () => {
+    const detail = (await readWebsiteSystemDetail(actor, businessId, siteId, sources({
+      repoChanges: async () => { throw new Error("receipt storage down"); },
+    })))!;
+    expect(detail.unavailable).toContain("Repo deploy history");
+    expect(detail.history).toEqual([]);
   });
   it("names a source it could not read instead of showing it as empty", async () => {
     const detail = (await readWebsiteSystemDetail(actor, businessId, siteId, sources({ versions: vi.fn(async () => { throw new Error("down"); }) as unknown as WebsiteDetailSources["versions"], domains: vi.fn(async () => { throw new Error("down"); }) as unknown as WebsiteDetailSources["domains"] })))!;

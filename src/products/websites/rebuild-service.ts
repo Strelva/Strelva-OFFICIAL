@@ -307,18 +307,21 @@ export function createWebsiteRebuildService(store: BoundedStore = boundedStore, 
     if (loaded.rebuild.approvedCandidateRevision !== candidate.revision) throw new WorkspaceConflictError("Approve the exact current preview before publishing it onto your site.");
     const providerUrl = `https://${input.tenantId}.${ROOT_DOMAIN}/`;
     const receipt: WebsiteLaunchReceipt = websiteLaunchReceiptSchema.parse({ status: "published", provider: "strelva-hosted", providerUrl, receiptId: `hosted-${createHash("sha256").update(`${workId}:${input.tenantId}:${candidate.revision}:${candidate.contentHash}`).digest("hex").slice(0,32)}`, artifactHash: candidate.contentHash, candidateRevision: candidate.revision, publishedAt: now(), evidence: "The approved immutable site document is the linked tenant's published revision." });
-    const row = await documents.publishToLinkedTenant(actor,{ workspaceId: loaded.work.workspaceId, workId, revision: candidate.revision, contentHash: candidate.contentHash, tenantId: input.tenantId, receipt });
+    const prior = await documents.published(input.tenantId);
+    const replay = prior?.workId === workId && prior.revision === candidate.revision && prior.contentHash === candidate.contentHash && prior.receipt;
+    const linked = replay && documents.linkedPublications ? (await documents.linkedPublications(actor,{ workspaceId: loaded.work.workspaceId, workId })).find(item => item.revision === candidate.revision && item.contentHash === candidate.contentHash) : undefined;
+    const row = replay && linked ? { ...prior, priorDeliveryModel: linked.priorDeliveryModel, fallbackUntil: linked.fallbackUntil } : await documents.publishToLinkedTenant(actor,{ workspaceId: loaded.work.workspaceId, workId, revision: candidate.revision, contentHash: candidate.contentHash, tenantId: input.tenantId, receipt });
     const committedReceipt = row.receipt ?? receipt;
     const tenantId = row.tenantId ?? input.tenantId;
     // The publication is committed. Nothing after this point can make it retryable.
-    loaded = await update(actor,loaded,"published_onto_linked_site",{ status: "published", tenantId, launch: { receipt: committedReceipt, readBack: { status: "pending", checkedAt: now(), message: "Published; checking the public site." } } });
+    if (!replay || loaded.rebuild.status !== "published" || loaded.rebuild.launch.receipt?.receiptId !== committedReceipt.receiptId) loaded = await update(actor,loaded,"published_onto_linked_site",{ status: "published", tenantId, launch: { receipt: committedReceipt, readBack: { status: "pending", checkedAt: now(), message: "Published; checking the public site." } } });
     try { await invalidatePublishedSiteDocument(tenantId); await (dependencies.revalidate ?? (async () => { revalidatePath("/","layout"); }))(); } catch { /* Cache and read-back are separate from the publication. */ }
     const readUrl = committedReceipt.providerUrl;
-    let readBack: WebsiteRebuild["launch"]["readBack"];
-    try {
+    let readBack: WebsiteRebuild["launch"]["readBack"] = loaded.rebuild.launch.readBack;
+    if (!replay) try {
       readBack = dependencies.checkLive ? await dependencies.checkLive(row,readUrl) : await (async () => { const result = await checkWebsiteHealth({ workspaceId: row.workspaceId, workId, tenantId, revision: row.revision, contentHash: row.contentHash, url: readUrl }); return { status: result.status === "healthy" ? "verified" as const : "failed" as const, checkedAt: result.checkedAt, message: result.status === "healthy" ? "The public site matches the published document." : "Published, but we couldn't confirm the public document yet." }; })();
     } catch { readBack = { status: "failed", checkedAt: now(), message: "Published, but we couldn't confirm the public document yet." }; }
-    loaded = await update(actor,loaded,"hosted_read_back",{ launch: { receipt: committedReceipt, readBack } });
+    if (!replay) loaded = await update(actor,loaded,"hosted_read_back",{ launch: { receipt: committedReceipt, readBack } });
     const redirects = candidate.document.redirects.length;
     const cutover: WebsiteCutoverItem[] = [
       { id: "document_published", status: "done", label: `Published revision ${row.revision} at ${tenantId}.${ROOT_DOMAIN}.` },

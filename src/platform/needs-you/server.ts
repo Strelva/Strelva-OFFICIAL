@@ -32,6 +32,12 @@ export function needsYouService(store: NeedsYouStore = PostgresNeedsYouStore) {
     appOrigin: needsYouAppOrigin(),
     now: () => Date.now(),
     sendEmail: sendEmailWithReceipt,
+    emailAllowed: async row => {
+      if (row.sourceLifecycle !== "website_domain") return true;
+      const domains = await import("@/products/websites/domain-requests");
+      const request = (await domains.websiteDomainRequestStore.list(row.workspaceId)).find(request => request.id === row.sourceId);
+      return domains.websiteDomainEmailAllowed(request?.tenantId);
+    },
     adapters: [
       tenantEventAdapter({
         linkedTenants: async (workspaceId) => (await store.linkedTenants(workspaceId)).map(link => link.tenantId),

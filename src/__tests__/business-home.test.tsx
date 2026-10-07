@@ -102,6 +102,8 @@ describe("business home", () => {
     const website = { id: "site-1", kind: "website" as const, name: "alder.example", detail: "", lifecycle: "live" as const, health: { state: "unknown" as const, summary: "" }, surface: { kind: "website" as const, previewSrc: "", previewLabel: "", domain: "alder.example" }, connections: [], possibilities: [], versions: [] };
     const withSite = renderToStaticMarkup(createElement(BusinessHome, { ...base, snapshot: on, systems: [website] as never }));
     expect(withSite).toContain("Have another website?");
+    const rebuild = { ...snapshot([]), releases: { systems: true, websiteRebuild: true } };
+    expect(renderToStaticMarkup(createElement(BusinessHome, { ...base, snapshot: rebuild, systems: [] }))).toContain("Open website options");
     // Off for this business, or a read-only agency view: no link.
     expect(renderToStaticMarkup(createElement(BusinessHome, { ...base, snapshot: { ...snapshot([]), releases: { systems: true } }, systems: [] }))).not.toContain("/workspace/site");
     const shared = { ...on, workspaces: [{ id: "business-1", kind: "customer" as const, name: "Alder Workshop", access: "delegated_read" as const }] };

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getSupabase } from "@/platform/infra/db/client";
 import { WorkspaceAccessError, WorkspaceConflictError, WorkspaceStoreError, type WorkspaceActor } from "@/platform/workspaces/types";
 import { siteChangeReceiptSchema, siteChangeRequestSchema, type RecordSiteChange, type SiteChangeReceipt, type SiteChangeRequest } from "./site-change-model";
+import { observeWebsiteSystemRelease } from "./system-releases";
 
 export * from "./site-change-model";
 
@@ -57,8 +58,10 @@ export function createSiteChangeStore(db?: SiteChangesDb) {
       if (error) failure(error);
       const parsed = siteChangeReceiptSchema.passthrough().safeParse(data);
       if (!parsed.success) throw new WorkspaceStoreError("The receipt could not be confirmed. Reload before trying again.");
+      if (parsed.data.kind === "deployed" && typeof parsed.data.systemId === "string") {
+        await observeWebsiteSystemRelease(actor, workspaceId, parsed.data.systemId, client());
+      }
       return parsed.data;
     },
   };
 }
-

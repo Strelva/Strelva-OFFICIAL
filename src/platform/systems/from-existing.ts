@@ -73,6 +73,8 @@ export const existingSavedWorkSchema = z.object({
   websiteApprovedRevision: nullableInt,
   websitePublishedRevision: nullableInt,
   websitePublishedHash: nullableText,
+  /** A rebuilt connected site keeps the website identity it had first. */
+  connectedSiteId: nullableText,
   hostedTenantStableId: nullableText,
   hostedTenantId: nullableText,
   /** True when this work row created its own hosted tenant (native first).
@@ -271,7 +273,9 @@ export function systemsFromExisting(raw: ExistingSystemsSnapshot): BusinessSyste
     const state = savedWorkLifecycle(work, snapshot);
     if (!state) continue;
     // A rebuild of a managed site stands for that site: the tenant came first.
-    const origin: SystemOrigin = mapping.kind === "website" && work.hostedTenantStableId && !work.hostedTenantReserved
+    const origin: SystemOrigin = mapping.kind === "website" && work.connectedSiteId
+      ? { kind: "connected_site", ref: work.connectedSiteId }
+      : mapping.kind === "website" && work.hostedTenantStableId && !work.hostedTenantReserved
       ? { kind: "tenant", ref: work.hostedTenantStableId }
       : { kind: "saved_work", ref: work.id };
     const system = existingSystem(businessId, origin, {
@@ -280,7 +284,8 @@ export function systemsFromExisting(raw: ExistingSystemsSnapshot): BusinessSyste
     });
     systems.push({
       system, provenance: "existing", basis: state.basis,
-      references: { savedWorkId: work.id, tenantStableId: work.hostedTenantStableId, tenantId: work.hostedTenantId },
+      references: { savedWorkId: work.id, tenantStableId: work.hostedTenantStableId, tenantId: work.hostedTenantId,
+        ...(work.connectedSiteId ? { connectedSiteId: work.connectedSiteId } : {}) },
     });
     if (mapping.kind === "website" && work.hostedTenantStableId) websiteByTenant.set(work.hostedTenantStableId, system);
   }
@@ -308,6 +313,16 @@ export function systemsFromExisting(raw: ExistingSystemsSnapshot): BusinessSyste
   // A site the business already runs elsewhere, connected by script. Its id is
   // connected_site:<id> and survives a later rebuild (a new revision, same System).
   for (const site of snapshot.connectedSites) {
+    const rebuilt = systems.find(item => item.references.connectedSiteId === site.id);
+    if (rebuilt) {
+      rebuilt.connectedSite = { siteUrl: site.siteUrl, siteHost: site.siteHost, verified: site.verifiedAt !== null, lastEventAt: site.lastEventAt };
+      // A draft alternative does not pause the site that is already live.
+      if (rebuilt.system.lifecycle === "draft" && site.status === "active" && site.verifiedAt) {
+        rebuilt.system.lifecycle = "live";
+        rebuilt.basis = `Connected; ${site.siteHost} is proven to be this business's. A rebuild is prepared beside it.`;
+      }
+      continue;
+    }
     const verified = site.verifiedAt !== null;
     const lifecycle: SystemLifecycle = site.status === "revoked" ? "paused" : verified ? "live" : "draft";
     const system = existingSystem(businessId, { kind: "connected_site", ref: site.id }, {

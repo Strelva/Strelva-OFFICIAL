@@ -651,6 +651,14 @@ psql "${psql_args[@]}" --file="$repo_root/tests/make-real-owner-link-flag-schema
 psql "${psql_args[@]}" --file="$repo_root/tests/workspace-release-flags-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/make-real-live-schema.sql"
 psql "${psql_args[@]}" --file="$repo_root/tests/strelva-service-actor-schema.sql"
+# Wave 6 website: fallback undo, immutable release reconciliation, and
+# owner-decided domain proposals. Fictional fixtures and isolated Postgres only.
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010110000_website_cutover_undo.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010113000_website_system_releases.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-system-releases-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/supabase/migrations/20261010114000_website_domain_requests.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-domain-requests-schema.sql"
+psql "${psql_args[@]}" --file="$repo_root/tests/website-cutover-undo-schema.sql"
 # The real Make real runner, checkpointing through these RPCs (psql-backed port).
 STRELVA_MAKE_REAL_PSQL="--host=$cluster_socket --port=$cluster_port --username=$(id -un) --dbname=postgres" \
   pnpm --dir "$repo_root" exec vitest run src/__tests__/make-real-activation-repository.test.ts

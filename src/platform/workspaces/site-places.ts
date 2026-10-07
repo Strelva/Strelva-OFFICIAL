@@ -65,14 +65,21 @@ export function workspaceSiteTarget(value: string): string | null {
   if (url.pathname !== "/workspace/site" || url.hash) return null;
   const params = url.searchParams;
   for (const key of params.keys()) {
-    if (params.getAll(key).length !== 1 || !["workspaceId", "system", "tab", "source", "request"].includes(key)) return null;
+    if (params.getAll(key).length !== 1 || !["workspaceId", "system", "tab", "source", "request", "entry", "workId"].includes(key)) return null;
   }
   const workspaceId = params.get("workspaceId");
   const systemId = params.get("system");
   const tab = params.get("tab");
   const source = params.get("source");
   const request = params.get("request");
-  if (!workspaceId || !UUID.test(workspaceId) || !systemId || !UUID.test(systemId)) return null;
+  if (!workspaceId || !UUID.test(workspaceId)) return null;
+  const entry = params.get("entry");
+  const workId = params.get("workId");
+  if (systemId === null) {
+    if (tab !== null || source !== null || request !== null || (entry !== null && entry !== "connect" && entry !== "rebuild") || (workId !== null && (entry !== "rebuild" || !UUID.test(workId)))) return null;
+    return `${url.pathname}?${params}`;
+  }
+  if (!UUID.test(systemId) || entry !== null || workId !== null) return null;
   if (tab !== null && !isSiteTab(tab)) return null;
   if (source !== null && (tab !== "source" || !SOURCE_ID.test(source))) return null;
   if (tab === "source" && source === null) return null;

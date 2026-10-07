@@ -180,12 +180,13 @@ describe("Make real and the System page", () => {
     expect(html).not.toContain("Not checked here yet");
   });
 
-  it("opens the site's own editor in the workspace instead of /dashboard/site", () => {
+  it("opens managed change review instead of asking owners to edit", () => {
     const native = render({ system: { ...site, surface: { ...site.surface, editing: "native" } as SystemView["surface"] } });
-    expect(native).toContain(`href="/workspace/site?workspaceId=${BUSINESS}&amp;system=${SITE}"`);
-    expect(native).toContain(">Edit site<");
+    expect(native).toContain(`href="/workspace/site?workspaceId=${BUSINESS}&amp;system=${SITE}&amp;tab=request"`);
+    expect(native).toContain(">Changes to this site<");
+    expect(native).not.toContain(">Edit site<");
     expect(native).not.toContain("Website controls");
-    expect(native).toContain(`tab=connections`);
+    expect(native).not.toContain(`tab=connections`);
     const repo = render({ system: { ...site, surface: { ...site.surface, editing: "request" } as SystemView["surface"] }, appBase: "/preview/strelva" });
     expect(repo).toContain(`href="/preview/strelva/workspace/site?workspaceId=${BUSINESS}&amp;system=${SITE}&amp;tab=request"`);
     expect(repo).toContain(">Changes to this site<");

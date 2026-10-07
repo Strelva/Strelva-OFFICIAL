@@ -131,6 +131,25 @@ describe("live channel adapters", () => {
     await expect(adapter.perform({ businessId: BIZ, effect: { ...hostedEffect(), request: {} }, idempotencyKey: "k3" })).resolves.toMatchObject({ status: "rejected" });
   });
 
+  it("publishes rebuilds onto the named existing tenant and retains each cutover result", async () => {
+    const { ports, state } = hostedPorts();
+    const publishLinked = vi.fn(async (_actor, _workId, selection) => {
+      const launched = await ports.launch(_actor, _workId, selection);
+      return { ...launched, cutover: [{ id: "domain_moved", status: "waiting", label: "Owner DNS step pending." }] };
+    });
+    const launch = vi.spyOn(ports, "launch");
+    const adapter = createHostedWebsiteAdapter({ ...ports, publishLinked }, ctx());
+    const effect = { ...hostedEffect(), request: { ...hostedEffect().request, tenantId: "linked-client" } };
+    const result = await adapter.perform({ businessId: BIZ, effect, idempotencyKey: "linked" });
+    expect(publishLinked).toHaveBeenCalledWith(expect.anything(), WORK, expect.objectContaining({ tenantId: "linked-client", candidateRevision: 3 }));
+    expect(result).toMatchObject({ status: "accepted", result: { tenantId: "linked-client", cutover: [{ status: "waiting" }] } });
+    expect(state.approvals).toBe(1);
+    expect(launch).toHaveBeenCalledOnce(); // only the test double uses new-site launch
+    state.receipt = null;
+    await expect(createHostedWebsiteAdapter(ports, ctx()).perform({ businessId: BIZ, effect, idempotencyKey: "unconnected" })).resolves.toMatchObject({ status: "rejected" });
+    expect(launch).toHaveBeenCalledOnce();
+  });
+
   it("tenant content: governed publish with the step key on the version, read back, restore the previous version", async () => {
     const versions: Array<{ id: string; requestId?: string; data?: unknown }> = [{ id: "v_old", data: { headline: "Old" } }];
     let live: Record<string, unknown> = { headline: "Old" };
@@ -144,6 +163,7 @@ describe("live channel adapters", () => {
       }),
       versions: async () => versions,
       content: async () => live,
+      publicReadBack: vi.fn(async () => ({ ok: true, detail: "The visitor page shows New." })),
       restore,
     };
     const adapter = createTenantContentAdapter(ports, ctx());

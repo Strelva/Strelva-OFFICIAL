@@ -32,6 +32,8 @@ import { needsYouReleaseEnabled, needsYouService } from "@/platform/needs-you/se
 import { PostgresServiceRequestStore } from "@/platform/service-requests";
 import { websiteDocumentStore } from "@/products/websites/document-store";
 import { websiteRebuildReleaseEnabled } from "@/products/websites/rebuild-release";
+import { createSiteChangeStore } from "@/products/websites/site-changes";
+import { reconcileWebsiteSystemReleases } from "@/products/websites/system-releases";
 import { connectedSitesReleaseEnabled, connectedSitesReleasedFor, readConnectedSites, type ConnectedSitesOverview } from "@/products/connected-sites/server";
 import { buildWebsiteSystemDetail, type WebsiteDetailInputs, type WebsiteDomainItem, type WebsiteSystemDetail } from "./website-detail";
 
@@ -48,6 +50,8 @@ export interface WebsiteDetailSources {
   rebuild: (actor: WorkspaceActor, workId: string) => Promise<{ rebuild: { status: string; candidate: { revision: number } | null; history: Array<{ at: string }> } } | null>;
   /** Null while STRELVA_CONNECTED_SITES_RELEASE is off. */
   connectedSites: (actor: WorkspaceActor, businessId: string) => Promise<ConnectedSitesOverview> | null;
+  repoChanges?: ReturnType<typeof createSiteChangeStore>["list"];
+  reconcileReleases?: typeof reconcileWebsiteSystemReleases;
 }
 
 const liveSources: WebsiteDetailSources = {
@@ -60,6 +64,8 @@ const liveSources: WebsiteDetailSources = {
   needsYou: () => ({ enabled: needsYouReleaseEnabled(), list: (actor, workspaceId) => needsYouService().list(actor, workspaceId) }),
   serviceRequests: (actor, businessId) => PostgresServiceRequestStore.list(actor, { businessId }),
   documents: websiteDocumentStore,
+  repoChanges: (actor, businessId, systemId) => createSiteChangeStore().list(actor, businessId, systemId),
+  reconcileReleases: reconcileWebsiteSystemReleases,
   rebuild: async (actor, workId) => {
     if (!websiteRebuildReleaseEnabled()) return null;
     const { readWebsiteRebuild } = await import("@/products/websites/rebuild-service");
@@ -88,11 +94,16 @@ export async function readWebsiteSystemDetail(actor: WorkspaceActor, businessId:
   if (!site || site.system.kind !== "website") return null;
   const { tenantId, savedWorkId } = site.references;
   const unavailable: string[] = [];
+  if (site.system.origin && sources.reconcileReleases) {
+    await read("System release history", unavailable, 0, () => sources.reconcileReleases!(actor, businessId, {
+      systemId, origin: site.system.origin!, tenantId,
+    }));
+  }
   if (connectedRead && !connected) unavailable.push("Connected site");
   const connectedSite = site.references.connectedSiteId ? connected?.sites.find(item => item.id === site.references.connectedSiteId) : undefined;
   const workspaceHref = (workId: string) => `/workspace?${new URLSearchParams({ workspaceId: businessId, view: "websites", work: workId })}`;
 
-  const [domainRows, events, drafts, versions, snapshots, decisions, services, documents, linked, rebuild] = await Promise.all([
+  const [domainRows, events, drafts, versions, snapshots, decisions, services, documents, linked, rebuild, repoChanges] = await Promise.all([
     tenantId ? read("Domains", unavailable, null, () => sources.domains([{ tenantId, label: site.system.name }])) : Promise.resolve(null),
     tenantId ? read("Requests and pending changes", unavailable, [], () => sources.events(tenantId, { limit: 100 })) : Promise.resolve([]),
     tenantId ? read("Drafts", unavailable, {} as Record<string, boolean>, () => sources.drafts(tenantId)) : Promise.resolve({} as Record<string, boolean>),
@@ -111,6 +122,7 @@ export async function readWebsiteSystemDetail(actor: WorkspaceActor, businessId:
     }) : Promise.resolve(null),
     savedWorkId && sources.documents.linkedPublications ? read("Site replacements", unavailable, [], () => sources.documents.linkedPublications!(actor, { workspaceId: businessId, workId: savedWorkId })) : Promise.resolve([]),
     savedWorkId ? read("Site review", unavailable, null, () => sources.rebuild(actor, savedWorkId)) : Promise.resolve(null),
+    sources.repoChanges ? read("Repo deploy history", unavailable, [], () => sources.repoChanges!(actor, businessId, systemId)) : Promise.resolve([]),
   ]);
 
   const connectedDomains: WebsiteDomainItem[] = connectedSite ? [{
@@ -152,6 +164,9 @@ export async function readWebsiteSystemDetail(actor: WorkspaceActor, businessId:
     snapshots,
     documentRevisions: (documents?.rows ?? []).map(row => ({ revision: row.revision, contentHash: row.contentHash, createdAt: row.createdAt, createdBy: row.createdBy, published: published.has(`${row.revision}:${row.contentHash}`) })),
     linkedPublications: linked,
+    repoDeployments: repoChanges.flatMap(request => request.receipts.filter(receipt => receipt.kind === "deployed" && receipt.commitSha && receipt.deploymentUrl && receipt.readBack)
+      .map(receipt => ({ id: receipt.id, requestId: request.id, title: request.request,
+        commitSha: receipt.commitSha!, deploymentUrl: receipt.deploymentUrl!, readBack: receipt.readBack!, recordedAt: receipt.recordedAt }))),
     ...(connectedSite ? { connectedSite: {
       siteId: connectedSite.id, siteHost: connectedSite.siteHost, verified: connectedSite.verifiedAt !== null,
       install: connectedSite.verifiedAt || !connectedSite.verificationToken ? null : connectedSite.snippet,

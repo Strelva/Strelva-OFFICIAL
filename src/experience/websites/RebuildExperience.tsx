@@ -9,6 +9,7 @@ import { serverRebuildTransport, parseRebuildView, type RebuildTransport, type R
 import { WebsiteConnectionSelector } from "./WebsiteConnections";
 import { WebsiteRebuildReport } from "./WebsiteRebuildReport";
 import { WebsiteRebuildSharing } from "./WebsiteRebuildSharing";
+import { WebsiteCutoverUndo, WebsiteDomainRequest } from "./WebsiteRecoveryControls";
 import styles from "./rebuild-experience.module.css";
 
 export interface RebuildExperienceProps {
@@ -16,6 +17,8 @@ export interface RebuildExperienceProps {
   workId?: string;
   readOnly?: boolean;
   managed?: boolean;
+  /** Intake supplies business facts; managed launch and editing stay with Strelva. */
+  allowIntake?: boolean;
   operator?: boolean;
   agency?: boolean;
   initialRequest?: string;
@@ -26,7 +29,7 @@ export interface RebuildExperienceProps {
 export function flaggedFacts(record: RebuildView) {
   return Object.entries(record.candidate?.facts ?? {}).filter(([, fact]) => fact.origin !== "owner_confirmed" && (fact.highRisk || !fact.verification?.supported));
 }
-export function RebuildExperience({ workspaceId, workId, readOnly = false, managed = false, operator = false, agency = false, initialRequest = "", initialRecord, transport = serverRebuildTransport, onSaved }: RebuildExperienceProps) {
+export function RebuildExperience({ workspaceId, workId, readOnly = false, managed = false, allowIntake = false, operator = false, agency = false, initialRequest = "", initialRecord, transport = serverRebuildTransport, onSaved }: RebuildExperienceProps) {
   const [record, setRecord] = useState<RebuildView | null>(initialRecord ?? null);
   const [loading, setLoading] = useState(Boolean(workId && !initialRecord));
   const [busy, setBusy] = useState(false);
@@ -92,12 +95,12 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
   const previewHref = candidate?.previewHref;
   const safePreview = Boolean(previewHref?.startsWith("/") && !previewHref.startsWith("//"));
   const previousDocuments = record?.documentRevisions.filter(item => item.revision < (candidate?.revision ?? 0)).sort((a, b) => b.revision - a.revision) ?? [];
-  const canCreate = !managed || operator;
+  const canCreate = !managed || operator || allowIntake;
   return <section className={styles.root} aria-label="Website rebuild" aria-busy={busy || loading || undefined}>
     <header className={styles.header}>
       <p className={styles.eyebrow}>{operator ? "Managed delivery" : "Website"}</p>
       <h1 className="font-display">{record?.title ?? (managed && !operator ? "Your website, taken care of" : "Your business. A new website.")}</h1>
-      <p>{record ? "Review the preview and the decisions below. Every saved change clears the earlier approval." : managed && !operator ? "Strelva handles setup, testing and delivery. Your preview will appear here when it is ready for your judgment." : "Start with your current website. We read its content, compose a new site and show you what needs your judgment."}</p>
+      <p>{record ? "Review the preview and the decisions below. Every saved change clears the earlier approval." : managed && !operator ? allowIntake ? "Share your current website or describe your business. Strelva prepares a private preview and handles delivery after your review." : "Strelva handles setup, testing and delivery. Your preview will appear here when it is ready for your judgment." : "Start with your current website. We read its content, compose a new site and show you what needs your judgment."}</p>
     </header>
     {readOnly ? <p className={styles.notice}><ShieldCheck size={18} aria-hidden="true" />You have read-only access. An owner or authorized operator can make changes.</p> : null}
     {error ? <div className={styles.error} role="alert"><CircleAlert size={18} aria-hidden="true" /><div>{error}<p>Your inputs and saved work remain available.</p></div></div> : null}
@@ -149,7 +152,9 @@ export function RebuildExperience({ workspaceId, workId, readOnly = false, manag
         {record.publishedUrl ? <WebsiteRebuildReport key={record.workId} workId={record.workId} fixture={transport !== serverRebuildTransport} /> : null}
         {record.publishedUrl ? <section className={styles.domain} aria-labelledby="rebuild-domain-heading"><h2 id="rebuild-domain-heading">Your website</h2>{record.publishedUrl ? <a className={styles.link} href={record.publishedUrl} target="_blank" rel="noopener noreferrer">{record.publishedUrl} <ExternalLink size={16} aria-hidden="true" /></a> : null}<p>{record.readBack === "verified" ? "The published document was verified." : record.readBack === "failed" ? "Published, but we could not confirm it yet. Strelva will check it; this does not republish the site." : "Publication recorded. Verification is pending."}</p>
           {record.domain ? <><h3>{record.domain.hostname}</h3><p>Status: {record.domain.status} · Last checked: {record.domain.checkedAt ? new Date(record.domain.checkedAt).toLocaleString() : "Not checked yet"}</p>{record.domain.error ? <div role="alert" className={styles.error}>{record.domain.error}</div> : null}{record.domain.records.length ? <div className={styles.records}><table className={styles.dns}><caption>DNS records returned by the domain provider</caption><thead><tr><th>Type</th><th>Name</th><th>Value</th></tr></thead><tbody>{record.domain.records.map((dns, index) => <tr key={index}><td>{dns.type}</td><td>{dns.name}</td><td>{dns.value}</td></tr>)}</tbody></table></div> : <p>No DNS records have been returned yet.</p>}</> : null}
+          {operator && !readOnly && transport === serverRebuildTransport ? <WebsiteDomainRequest workId={record.workId} /> : null}
           {(!managed || operator) && !readOnly ? <form className={styles.domainForm} onSubmit={event => { event.preventDefault(); if (domain.trim() || record.domain) void run(() => transport.mutate(record, "domain", { domain: domain.trim() || record.domain?.hostname }), "Domain status refreshed."); }}><TextInput label="Your domain" placeholder="your-business.com" value={domain} onChange={event => setDomain(event.target.value)} disabled={busy} /><Button type="submit" variant="secondary" disabled={busy || (!domain.trim() && !record.domain)} loading={busy}>{record.domain ? "Check domain status" : "Connect domain"}</Button></form> : <p>Strelva handles your domain setup and verification.</p>}
+          {!readOnly && !operator && record.tenantId && transport === serverRebuildTransport ? <WebsiteCutoverUndo key={`${record.workId}:${candidate?.contentHash}`} record={record} /> : null}
           {(!managed || operator) && !readOnly && previousDocuments.length ? <div className={styles.domainForm}><SelectInput label="Revision to restore" value={undoTarget || String(previousDocuments[0]!.revision)} onChange={event => setUndoTarget(event.target.value)} options={previousDocuments.map(item => ({ value: String(item.revision), label: `Revision ${item.revision} · ${new Date(item.createdAt).toLocaleDateString()}` }))} disabled={busy} /><Button variant="secondary" disabled={busy} onClick={() => void run(() => transport.mutate(record, "undo", { targetRevision: Number(undoTarget || previousDocuments[0]!.revision) }), "The selected document is restored as a new revision. Review and approve it before publishing.")}>Restore for review</Button></div> : null}
         </section> : null}
       </>}

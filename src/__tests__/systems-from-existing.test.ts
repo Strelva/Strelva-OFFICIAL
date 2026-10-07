@@ -159,6 +159,22 @@ describe("systems from existing things", () => {
     expect(listed.systems).toHaveLength(6);
   });
 
+  it("keeps connected identity from draft rebuild through hosted launch, without a duplicate website", () => {
+    const connectedId = "5e000000-0000-4000-8000-0000000000cc";
+    const connected = { id: connectedId, label: "Connected site", siteUrl: "https://connected.example.test/", siteHost: "connected.example.test", status: "active" as const, verifiedAt: AT, lastEventAt: null, createdAt: AT, updatedAt: AT };
+    for (const published of [false, true]) {
+      const listing = systemsFromExisting({
+        businessId: BUSINESS, savedWork: [work("5e000000-0000-4000-8000-0000000000a9", "websites", "website", "Connected rebuild", {
+          connectedSiteId: connectedId, ...(published ? { websitePublishedRevision: 1, hostedTenantStableId: NATIVE_TENANT, hostedTenantId: "connected", hostedTenantReserved: true } : {}),
+        })], managedWebsites: published ? [{ link: "website_binding", tenantStableId: NATIVE_TENANT, tenantId: "connected", siteName: "Connected", tenantActive: true, linkedAt: AT }] : [],
+        connectedSites: [connected], inquiryWorkspaces: [], bookingGrants: [], calendarConnections: [],
+      });
+      expect(listing.systems).toHaveLength(1);
+      expect(listing.systems[0]?.system).toMatchObject({ id: systemOriginId(BUSINESS, { kind: "connected_site", ref: connectedId }), lifecycle: "live" });
+      expect(listing.systems[0]?.references).toMatchObject({ connectedSiteId: connectedId, savedWorkId: "5e000000-0000-4000-8000-0000000000a9" });
+    }
+  });
+
   it("keeps one website System under one id as a managed site converts", async () => {
     const TENANT = "5e000000-0000-4000-8000-0000000000b7";
     const WORK = "5e000000-0000-4000-8000-0000000000a9";
