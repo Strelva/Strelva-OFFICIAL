@@ -636,6 +636,7 @@ function WorkspaceContent({ appBase, signOut, inquiry: inquiryConfig, rebuildEna
             />
           ) : isHorizontalView(view) ? <>
             {view === "operations" ? <WorkspaceOngoing
+              inquiriesEnabled={snapshot.releases?.inquiries === true && !delegatedRead}
               workspaceId={snapshot.workspaceId}
               sources={snapshot.work}
               selectedWork={selectedWork}

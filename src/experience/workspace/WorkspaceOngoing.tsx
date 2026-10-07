@@ -1,6 +1,7 @@
 "use client";
 
 import { ResponsibilityExperience, StandingResponsibilityPicker } from "@/experience/operations/ResponsibilityExperience";
+import { InquiryRunning } from "./InquiryRunning";
 import type { WorkspaceWork } from "./contracts";
 
 export function WorkspaceOngoing({
@@ -12,6 +13,7 @@ export function WorkspaceOngoing({
   creatingStanding,
   readOnly,
   newWorkBlocked = false,
+  inquiriesEnabled = false,
   initialRequest,
   onCreatingStandingChange,
   onOpenStanding,
@@ -26,6 +28,7 @@ export function WorkspaceOngoing({
   readOnly: boolean;
   /** Stop/paused work blocks new commands while leaving owner recovery available. */
   newWorkBlocked?: boolean;
+  inquiriesEnabled?: boolean;
   initialRequest?: string;
   onCreatingStandingChange: (creating: boolean) => void;
   onOpenStanding: (id: string) => void;
@@ -43,6 +46,8 @@ export function WorkspaceOngoing({
       <h1 className="mt-3 font-display text-4xl font-normal text-warm-black">What Strelva keeps running</h1>
       <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray-muted">Each one is named by what it keeps true. Strelva acts within the access you have given, asks when it can’t, and records every run.</p>
     </header>}
+
+    {finiteJobOpen ? null : <InquiryRunning key={workspaceId} workspaceId={workspaceId} enabled={inquiriesEnabled} />}
 
     {finiteJobOpen ? null : <StandingResponsibilityPicker
       workspaceId={workspaceId}

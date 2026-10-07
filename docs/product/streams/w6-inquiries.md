@@ -1,33 +1,113 @@
-# Wave 6 inquiries handoff
+# Wave 6 inquiries — round 5 handoff
 
-Branch: `w6/inquiries`. Worktree: `REB-w6-inquiries`.
-Resumed October 7 from `9202136` and `a102896`, both unverified interruption checkpoints.
-Local implementation only; no production, client repositories, provider calls, dependencies, pushes or PRs authorized.
+Branch: `w6/inquiries`. Worktree: `/Users/jacobrhinehart/Desktop/strelva/REB-w6-inquiries`.
+Final verification and the acceptance map are in [the wave 6 evidence record](../../capabilities/inquiries/inquiry-wave6-verification-2026-10-07.md).
 
-## Current objective and continuation
+## Objective and result
 
-Close the inquiry launch contract: retain every lead, review spam, reply from the workspace, notify the owner; complete the delta including durable read cutover and outcome proof.
-The checkpoints contain direct owner replies and provider-event reconciliation, connected-site durable records/spam review, owner notices/repair queue, business-record routing context, urgent commitment decisions, pause-safe intake, paged lead reads and outcome SQL/report plumbing.
-These require fresh verification before acceptance. Exact next action: focused inquiry tests and typecheck, inspect failure paths, finish missing wiring and proof, then run all required final gates.
+Close the inquiry launch contract and October delta in code: every lead kept, spam review, workspace replies, owner decisions without an account, exact answer/reply-time proof, and guarded Redis read cutover. The September customer builder/frame/agency requirements follow the adopted C1–C16 changes; internal fixed-component engine, isolation, testing and receipt requirements remain.
 
-## Production boundaries
+The customer opens the Inquiries System: current accepted form, records, Connections and History. Connected/native sources honestly say when their external form/history is unavailable. A current assigned or routed member can send ordinary replies; prices, dates and promises remain the owner’s decision. Strelva reviews supervised ordinary messages; trusted messages can run only inside current policy, sending permissions, hours and budget. An owner can approve or decline an exact live change or reply by signed confirmation, without an account.
 
-All new switches remain off by default. Email must also pass `EMAIL_SENDING_ENABLED`, `CUSTOMER_EMAIL_ENABLED` and per-tenant `reb:client-email`. No live action is performed by this stream.
-The coordinator owns strategic-state reconciliation and shared release/product docs; this handoff supplies the evidence delta without editing another worktree.
+Operators review durable held spam and “Owner not told” evidence, and can repair known unsent notices or a corrected recipient. Provider acceptance closes the purpose before read-back. Ambiguous sends never become retries. Inquiry-to-booking offers use the existing bookings store for managed and standalone/connected businesses, share the contact, and request a time without claiming confirmation.
 
-## Verification
+Answer totals, within-day totals, unanswered totals and average/median first-reply time use the complete scoped cohort, deduplicated first provider acceptance. This proves acceptance, not delivery or customer response. Monthly and weekly reports consume the same evidence; missing or malformed proof remains unavailable.
 
-Pending fresh checks. Earlier scratch logs are retained as failed/incomplete evidence, not final results: SQL authority race never reached its hold point; the interrupted full test run reported failures including event-actions, listing replies and inquiry-delivery-server.
+## Production boundary
 
+User-supplied fact: **0.2.1 is live, every lead dual-writes to `tenant_leads`, and 43 leads were backfilled.** This stream did not query production. Step 0 is already done; do not rerun the backfill merely because older delta prose says it is pending.
 
-## Round 4 continuation (October 7)
+No deployment, production migration, env change, client repo edit, external notification, real-provider call, dependency, push or PR was performed. All new email stays off until its switches and global/customer/per-origin-tenant gates permit it. A configured business owner with `tenantId:null` cannot bypass the originating tenant’s `reb:client-email` gate; every inquiry origin in a grouped digest is checked.
 
-Coordinator-supplied production state: 0.2.1 is live and batch 0/backfill completed (43/43); this stream made no production calls. Read parity is still a separate seven-day gate. The Oct 7 missing-table readiness correction is preserved with the new inquiry migration sentinels.
+## Switches and defaults
 
-Fresh focused proof: initial inquiry suite 45 files, 381 passed /13 skipped; closure subset 6 files /91 passed; client compatibility 196/196. Boundary imports corrected through public entry points/existing tenant adapters, baseline pruned. Typecheck checkpoint mock errors fixed; final check rerunning.
+| Switch | Default / dependency | Behavior |
+| --- | --- | --- |
+| `STRELVA_LEADS_READ` | `redis` when unset/unknown | `compare` serves Redis and records comparisons; `postgres` requires seven consecutive complete parity days across every current tenant, otherwise compare. DB errors fall back safely. |
+| `STRELVA_LEADS_AUTHORITY` | Redis when unset | `postgres` writes durable first; DB refusal/timeouts keep the Redis lead and pending reconciliation. Separate from the read switch. |
+| `STRELVA_INQUIRY_RECORDS` | Off; dual-write must be enabled | Durable workspace inbox, events, held-spam/contact paths and receipt metadata. |
+| `STRELVA_INQUIRY_REPLIES` | Off; requires records | Owner/current assigned or routed member reply claims; one shared first-reply purpose with the governed engine. |
+| `STRELVA_INQUIRY_OWNER_NOTICES` | Off | Current owner recipient, combined notice/draft when available, urgent decisions, exact authority, delivery reconciliation and bounded repair. |
+| `STRELVA_INQUIRY_BUSINESS_FACTS` | Off | Current canonical facts/people/hours/services; sourced pending suggestions and owner confirmation/corrections. |
+| `STRELVA_INQUIRY_OUTCOMES` | Off | Exact scoped cohort and weekly/monthly reply proof. |
+| `STRELVA_INQUIRY_BOOKING_HANDOFF` | Off; records + `STRELVA_BOOKING_STORE_WRITE=1` | Signed offers into one bookings request store; actual live booking System, current services/settings/availability required. |
+| `STRELVA_INQUIRIES_RELEASE` and workspace `inquiries` release row | Existing release defaults remain off | Converted tenants follow current workspace release; unconverted tenants retain the existing global legacy mode. |
+| Needs you / workspace / owner-entry / Systems releases | Existing flags, off | Necessary for their customer/signed-link/Library surfaces; respect current per-workspace flags and authority. |
+| `EMAIL_SENDING_ENABLED`, `CUSTOMER_EMAIL_ENABLED`, `reb:client-email:<tenant>` | Existing gates preserved | Every new send checks global and customer gates, then every applicable origin tenant. Native business mail has no fabricated tenant. |
+| `DUAL_WRITE_PG` | Existing default on; explicit `0`/`false` kills it | No new default or production flip by this stream. |
 
-Newly found gaps being closed: summaries now retain Redis leads pending their Postgres copy without double counting; durable exclusions win over stale cache; a shared durable purpose prevents an engine reply racing an owner workspace reply; Needs you inquiry emails fail closed behind all required gates. Connected-site owner-notice receipts/repair visibility is under implementation.
+The read parity RPC now requires every current tenant on every day; a failed day remains failed even after a successful retry, and missing/error Redis reads cannot become healthy empty comparisons. Cache merges retain only genuinely pending Redis leads; durable held/excluded records cannot reappear. Positive streak reads have a five-minute cache. Repeated production misses still need explanation and a new qualifying window.
 
-Failures retained: initial SQL gate hit a 5-second timeout in Version-store proof; first full Vitest run overwhelmed the shared host and hit import/test timeouts. Full suite rerunning with two workers and 30-second runner timeouts. This changes runner capacity, not product policy clocks. Browser preview running only from this worktree on port 32766, no provider credentials, all email gates off.
+## Prepared migrations
 
-Exact next action: finish connected owner notices and SQL proof, inspect reply/spam/empty/permission/error UI at desktop/mobile, run build and final checks, replace this continuation with final acceptance evidence and clean commits.
+All 19 files are in the allotted range, additive, transaction-wrapped with a three-second local lock timeout. They were applied only to throwaway local PostgreSQL. Rollbacks retain received inquiries and accepted delivery evidence, and require callers to be switched off first. Apply in timestamp order after the integrated prerequisite migrations; do not edit migrations already applied in production.
+
+| Migration | Purpose |
+| --- | --- |
+| `20261010120000_inquiry_workspace_replies.sql` | Workspace reply claims and accepted receipts |
+| `20261010121000_inquiry_outcome_proof.sql` | Full cohort counts, reply times, lead summaries and stable pages |
+| `20261010122000_inquiry_weekly_outcomes.sql` | Weekly/service-role scoped outcome proof |
+| `20261010123000_inquiry_context_notices.sql` | Current business context and owner-notice repair reads |
+| `20261010124000_connected_inquiry_records.sql` | Connected/native durable records and spam review |
+| `20261010125000_inquiry_urgent_decisions.sql` | Exact urgent decision source delivery |
+| `20261010125500_inquiry_inbox.sql` | Bounded inbox and complete confirmation detail |
+| `20261010125600_inquiry_reply_purpose.sql` | Shared engine/owner first-reply purpose |
+| `20261010125700_inquiry_cache_presence.sql` | Pending cache presence and exclusion authority |
+| `20261010125800_connected_inquiry_owner_notices.sql` | Connected/native owner-notice receipts |
+| `20261010125900_inquiry_export_before_teardown.sql` | Export-before-teardown wrapper; preserves lead evidence |
+| `20261010125910_inquiry_decision_notice_claims.sql` | Durable urgent mail claims and signed owner decisions |
+| `20261010125915_inquiry_decision_notice_events.sql` | Urgent provider-event reconciliation |
+| `20261010125920_tenant_lead_parity_completeness.sql` | Complete all-tenant seven-day parity gate |
+| `20261010125925_inquiry_member_replies.sql` | Current assigned/routed member authority and precise cursor |
+| `20261010125930_inquiry_business_facts.sql` | Sourced business fact proposals and exact owner confirmation |
+| `20261010125935_inquiry_operator_authority.sql` | Current operator and exact publication/message owner authority |
+| `20261010125940_inquiry_booking_handoff.sql` | Signed inquiry-to-booking requests, managed and native |
+| `20261010125950_inquiry_operator_review.sql` | Operator spam review and bounded connected notice repair |
+
+Rollback files use the existing `supabase/migrations/rollback-*.sql` convention: workspace-replies, w6-inquiry-outcome-proof, weekly-outcomes, context-notices, w6-connected-inquiry-records, urgent-decisions, inbox, reply-purpose, cache-presence, connected-inquiry-owner-notices, export-before-teardown, decision-notice-claims/events, tenant-lead-parity-completeness, member-replies, business-facts, operator-authority, booking-handoff and operator-review. Focused operator/facts/booking/callback SQL and rollback rehearsals are retained in local scratch evidence. The full-schema upgrade proves historical identity/content/report rows survive.
+
+Migration `20261010125935` is required before enabling publication, including the legacy combination where inquiries are enabled but owner notices are off. Direct publication now fails closed without a current owner bound to its exact claim/event; an operator can prepare but cannot decide. Signed “Not yet” is bound to the declined source and cannot authorize a send or publish.
+
+## Crons and rollout additions
+
+No new cron route or schedule. Existing authenticated `lead-mirror-reconcile`, `inquiry-follow-ups`, `needs-you`, `weekly-report` and `monthly-report` do the work under their existing heartbeat registration. `needs-you` shares the durable urgent mail purpose with immediate capture; it cannot double-send after a crash.
+
+The release coordinator’s exact next action is to review/integrate this branch and reconcile dependent shared product/release state. Production actions below need Jacob’s separate authorization and the existing release checklist:
+
+1. Apply integrated prerequisite and inquiry migrations in order, with new switches off. Confirm readiness sentinels; the snapshot now includes all new table sentinels and inquiry switches without exposing secret values.
+2. Keep the supplied 0.2.1 dual-write/backfill state. Enable read `compare` and collect seven consecutive all-tenant days with zero unexplained misses. A missing tenant, failed Redis read or an earlier miss on a day blocks that day.
+3. Authorize the read switch separately. Check actual oldest durable leads, per-tenant counts and dashboard/engine reads. Restore `redis` to roll back reads; neither store is deleted.
+4. Before authority, prove export-before-teardown and the retained-lead delete refusal. Authorize `STRELVA_LEADS_AUTHORITY=postgres` separately; retain Redis/pending reconciliation.
+5. Enable workspace inquiry rows and scoped capabilities on the test business first. Keep all email silent until separately authorized. Verify actual owner recipient/fallback, tenant consent, sender domains, signed links, Resend webhook signature/provider payload, one notice and one provider send under retries.
+6. Booking offers additionally need a live request-mode bookings System with current service/hours/calendar availability. An unavailable booking system must leave the inquiry and reply draft intact.
+
+Do not roll back an accepted send into retryable work. Corrected-recipient notices create a new bounded purpose while preserving the original receipt. Unknown/in-flight transport outcomes require reconciliation; changing flags is not evidence that they were unsent.
+
+## Commits
+
+Interruption checkpoints are preserved; the final gates cover their accumulated source. Chronological commits through the verified implementation:
+
+- `9202136f` — WIP w6/inquiries: checkpoint after session interruption (unverified)
+- `a102896a` — WIP w6/inquiries: checkpoint 2 after second interruption (unverified)
+- `cce7b0e4` — Wire workspace inquiry receipts into signed provider webhook
+- `bc1cc850` — Complete weekly inquiry proof and immediate gated owner decisions
+- `72706c84` — WIP w6/inquiries: checkpoint 3 after third interruption (unverified)
+- `a697a2d5` — Share first-reply authority between workspace owners and inquiry engine
+- `d83acfcf` — WIP w6/inquiries: checkpoint 4 after fourth interruption (unverified)
+- `647edbfa` — Require complete seven-day lead parity before durable read cutover
+- `351dc208` — Validate and report inquiry answer counts and first reply times
+- `cef35162` — Claim urgent inquiry notices and authorize signed owner decisions
+- `0bbd5149` — Show the live inquiry System and use confirmed business facts at use
+- `ec10821b` — Give operators durable spam review and bounded owner-notice repair
+- `8d761f14` — Reconcile urgent inquiry notice bounces and enforce all inquiry email gates
+- `0936c6b7` — Hand managed and standalone inquiries into signed booking requests
+- `f2708050` — Permit current assigned-member replies and preserve precise inquiry pagination
+- `569c128c` — Open the inquiry System for current customers instead of the legacy builder
+- `a9172300` — Check every originating tenant before sending an inquiry decision email
+- `b1df6cb4` — Keep email formatting bounded and defer inactive booking release reads
+- `31f6b7e5` — Enforce current inquiry policy and exact owner authority through every decision path
+- `2c354de0` — Run transactional inquiry migrations and all closure contracts in SQL gates
+
+## Current proof and remaining uncertainty
+
+Final command results, failure history, per-criterion evidence and rendered artifacts are recorded in the linked evidence record. All proof is local. Production parity time, actual oldest durable production record, live provider acceptance/delivery, and owner adoption remain unproven. No additional product decision or dependency is required to finish the code; production rollout is a separate authorized action.

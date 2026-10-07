@@ -594,7 +594,9 @@ form. The published form comes first, the existing records follow, and typed
 Connections and recorded History sit below. Lifecycle and health stay separate.
 The viewing copy cannot submit an inquiry. The component preserves records during
 loading and errors, offers retry, aborts old business reads, and never projects
-private routing destinations into form data. Fixture projection, authorization,
+private routing destinations into form data. Connected and native website sources
+are named without fabricating their current form or History; external forms are
+explicitly managed on the business’s own site. Fixture projection, authorization,
 publication health and failure states have focused local tests; desktop/mobile
 browser inspection remains separate evidence in the stream handoff.
 
@@ -622,3 +624,31 @@ the 28 focused tests and isolated SQL fixture; this is not provider or productio
 proof.
 
 Workspace inquiry replies: current owner/member/none permission comes from the scoped inquiry read. Assigned or routed members see “Send reply” and the owner approval requirement for prices, dates and promises; unassigned members see the permission explanation. Booking commitments stay owner-only.
+
+### Inquiry Versions in the agency Library (wave 6)
+
+`src/experience/workspace/agency/AgencyLibraryView.tsx` includes read-only inquiry
+Versions projected from the existing accepted pattern installations. Source
+revision and the client’s own release are separate. Source access comes from
+current agency links, target access from current tenant memberships, and both
+inquiry release switches still apply. No inquiry data, permissions, connections,
+credentials or shape snapshots are copied into the Library. Unavailable reads
+remain explicit. The existing client inquiry review and testing commands handle
+updates; the owner still approves going live. The rows use the existing type,
+border and spacing tokens, wrap on mobile, and expose keyboard-focusable links.
+Focused server, current Library tab and desktop/mobile fixture tests cover this
+projection; local proof does not establish production adoption.
+
+### Inquiry policy sentences in Running (wave 6)
+
+`src/experience/workspace/InquiryRunning.tsx` reads the same strict-gated System
+projection used by the Inquiries page. It displays only the current policy for
+an accepted inquiry form, with policy hours, daily limit, trust/approval route,
+and separate paused or needs-checking state. It does not promise a universal
+reply deadline or create another standing responsibility. The existing Running
+surface retains operational work. Off flags hide the section without a read;
+revoked/delegated access shows no inquiry policy. Loading and storage errors
+leave other work available; retries use the shared Button. Scoped identity and
+aborted requests discard old sentences when the business changes. Current
+projection, integration, gate, zero, pause and failure tests plus desktop/mobile
+rendered fixtures cover the component locally.
