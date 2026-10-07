@@ -88,6 +88,7 @@ export async function sendAuditReportEmail(params: {
   reportUrl: string;
   replyTo?: string;
 }): Promise<boolean> {
+  if (params.result.agency && !params.replyTo) return false;
   const opts = buildAuditReportEmailOptions(params.lead, params.result, params.reportUrl);
   try {
     const host = displayHost(params.lead.url);

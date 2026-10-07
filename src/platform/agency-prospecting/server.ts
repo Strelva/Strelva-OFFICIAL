@@ -33,8 +33,13 @@ export async function resolveAgencyAttribution(slug: unknown): Promise<AgencyAtt
   const rows = await rpc("agency_prospecting_profile", { p_slug: slug });
   const row = (Array.isArray(rows) ? rows[0] : null) as Row | undefined;
   if (!row) throw new AgencyProspectingError("This agency check is unavailable.", 404);
+  const contactUrl = String(row.contact_url);
+  try {
+    const parsed = new URL(contactUrl);
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password) throw new Error("Invalid agency contact URL");
+  } catch { throw new AgencyProspectingError("This agency check is unavailable.", 503); }
   return { workspaceId: String(row.workspace_id), slug: String(row.slug), name: String(row.name),
-    contactUrl: String(row.contact_url), brand: { logoUrl: null, accentColor: null } };
+    contactUrl, brand: { logoUrl: null, accentColor: null } };
 }
 
 /** Durable quota admission before expensive scoring; failures never fall back to Slack. */

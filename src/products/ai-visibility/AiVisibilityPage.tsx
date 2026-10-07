@@ -92,7 +92,10 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
       if (data.scanId && /^scan_[a-z0-9]+$/i.test(data.scanId)) {
         const location = new URL(window.location.href);
         if (embedded) location.searchParams.set("scan", data.scanId);
-        else location.pathname = `/ai-visibility/${encodeURIComponent(data.scanId)}`;
+        else {
+          location.pathname = `/ai-visibility/${encodeURIComponent(data.scanId)}`;
+          if (!agency) location.search = "";
+        }
         window.history.replaceState(window.history.state, "", `${location.pathname}${location.search}`);
       }
       setShareUrl(data.shareUrl);
@@ -106,7 +109,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
   function handleReset() {
     const location = new URL(window.location.href);
     if (embedded) location.searchParams.delete("scan");
-    else location.pathname = "/ai-visibility";
+    else { location.pathname = "/ai-visibility"; if (!agency) location.search = ""; }
     if (agency) location.searchParams.set("agency", agency.slug);
     window.history.replaceState(window.history.state, "", `${location.pathname}${location.search}`);
     setState("idle");
@@ -119,7 +122,7 @@ export function AiVisibilityPage({ initialResult, scanId: initialScanId, workspa
   return (
     <div className="product-surface px-6 py-8 md:px-12">
       <div className="relative z-10 mx-auto max-w-[760px] pb-16">
-        {agency && <p data-agency-brand={agency.slug} className="mb-6 text-sm font-medium text-m-text-2">{agency.name} on Strelva</p>}
+        {agency && state !== "done" && <p data-agency-brand={agency.slug} className="mb-6 text-sm font-medium text-m-text-2">{agency.name} on Strelva</p>}
         {(state === "idle" || state === "error") && (
           <div className="motion-rise">
             <p className="text-[14px] font-medium text-m-text-3">Free AI visibility audit</p>

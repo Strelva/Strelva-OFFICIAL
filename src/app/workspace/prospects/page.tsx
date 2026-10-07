@@ -1,6 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getSessionUser } from "@/platform/infra/db/server-client";
 import { listAgencyProspects, AgencyProspectingError } from "@/platform/agency-prospecting/server";
+
+export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Agency prospects", robots: { index: false, follow: false }, referrer: "no-referrer" };
 
 export default async function ProspectsPage({ searchParams }: { searchParams: Promise<{ workspace?: string }> }) {
   const user = await getSessionUser();

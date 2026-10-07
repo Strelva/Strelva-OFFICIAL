@@ -158,6 +158,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261010153000": "newsletter_contact_sync",
   "20261011120000": "business_policies",
   "20261011100000": "workspace_newsletter_batches",
+  "20261011170000": "prospects",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */
