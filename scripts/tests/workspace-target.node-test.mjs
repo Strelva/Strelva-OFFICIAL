@@ -19,6 +19,13 @@ test("rejects an unrecognized non-versioned SQL file instead of hiding a migrati
     assert.throws(() => readCandidateMigrations(directory), /non-versioned/);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
+test("rejects an unregistered rollback helper instead of silently dropping SQL", () => {
+  const directory = mkdtempSync(join(tmpdir(), "strelva-target-test-"));
+  try {
+    writeFileSync(join(directory, "rollback-new-business.sql"), "select 1;");
+    assert.throws(() => readCandidateMigrations(directory), /non-versioned/);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
 function input() {
   const migrations = [{ version: "20260920120000", name: "websites" }, { version: "20260920121000", name: "agency_managed_website_draft_authority" }];
   return {

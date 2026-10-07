@@ -106,6 +106,9 @@ export const SEPT30_EXTRA_APPLIED = ["20260930120000"];
  * `accounts`. "missing" there is a stop.
  */
 export const MIGRATION_SENTINELS: Record<string, string> = {
+  "20261011102000": "workspace_collection_entries",
+  "20261011101000": "business_booking_email_settings",
+  "20261011120000": "business_policies",
   "20261010140000": "google_listing_controls",
   "20261010142000": "workspace_newsletter_issues",
   "20261010143000": "publishing_google_outages",
@@ -158,6 +161,7 @@ export const MIGRATION_SENTINELS: Record<string, string> = {
   "20261010150300": "internal_tool_contact_conflicts",
   "20261010152000": "catalog_report_receipts",
   "20261010153000": "newsletter_contact_sync",
+  "20261011100000": "workspace_newsletter_batches",
 };
 
 /** Env names reported. Secrets: presence only. Flags: normalized value. */

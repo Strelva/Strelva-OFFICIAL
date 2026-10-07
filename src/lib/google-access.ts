@@ -21,6 +21,7 @@
  */
 
 import { getConnection, saveConnection } from "./connections";
+import { publishingWorkspaceId } from "@/platform/infra/publishing-scope";
 import { decryptSecret } from "@/platform/infra/crypto/secrets";
 import { refreshGoogleTokens } from "./google-token";
 import { getRedis } from "@/platform/infra/redis";
@@ -123,6 +124,7 @@ function reasonOf(error: unknown, store: GoogleBindingsPort): GoogleFallbackReas
 
 /** The tenant's Google grant: the binding first, Redis as the fallback. */
 export async function getGoogleGrant(tenantId: string): Promise<GoogleGrant | null> {
+  const nativeWorkspace = publishingWorkspaceId(tenantId);
   const store = await bindingStore();
   if (store.googleBindingsEnabled()) {
     try {
@@ -131,15 +133,16 @@ export async function getGoogleGrant(tenantId: string): Promise<GoogleGrant | nu
         try {
           return grantFromBinding(tenantId, binding);
         } catch {
-          await noteFallback(tenantId, "decrypt_failed");
+          if (!nativeWorkspace) await noteFallback(tenantId, "decrypt_failed");
         }
       } else {
-        await noteFallback(tenantId, "no_binding");
+        if (!nativeWorkspace) await noteFallback(tenantId, "no_binding");
       }
     } catch (error) {
-      await noteFallback(tenantId, reasonOf(error, store));
+      if (!nativeWorkspace) await noteFallback(tenantId, reasonOf(error, store));
     }
   }
+  if (nativeWorkspace) return null;
   const connection = await getConnection(tenantId, "google");
   return connection ? grantFromConnection(connection) : null;
 }
@@ -194,7 +197,7 @@ export async function getValidGoogleAccessToken(grant: GoogleGrant, now = Date.n
   }
   // Redis keeps working during the move: a rotated refresh token reaches it
   // too, and a Redis-sourced grant gets its fresh access token back.
-  const connection = grant.connection ?? (rotated ? await getConnection(grant.tenantId, "google").catch(() => null) : null);
+  const connection = grant.connection ?? (rotated && !publishingWorkspaceId(grant.tenantId) ? await getConnection(grant.tenantId, "google").catch(() => null) : null);
   if (connection && (grant.source === "redis" || rotated)) {
     await saveConnection({
       ...connection,
@@ -210,7 +213,7 @@ export async function markGoogleGrantNeedsReauth(grant: GoogleGrant, reason: str
   if (grant.bindingId) {
     await (await bindingStore()).setGoogleBindingStatus(grant.bindingId, "needs_reauth", reason, new Date().toISOString()).catch(() => {});
   }
-  const connection = grant.connection ?? await getConnection(grant.tenantId, "google").catch(() => null);
+  const connection = grant.connection ?? (publishingWorkspaceId(grant.tenantId) ? null : await getConnection(grant.tenantId, "google").catch(() => null));
   if (connection && connection.status === "connected") {
     await saveConnection({ ...connection, status: "needs_reauth" });
   }
