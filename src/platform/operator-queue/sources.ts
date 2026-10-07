@@ -7,7 +7,7 @@ import { listPendingDigests, type MaintenanceDigest } from "@/lib/maintenance-di
 import { dataSourceIsPostgres } from "@/platform/infra/db/source-flags";
 import { CRON_MAX_AGE_SECONDS } from "@/platform/infra/heartbeat";
 import { buildAttentionBriefing, buildAttentionFromSnapshot } from "@/lib/attention";
-import { getPortfolioSummaryState } from "@/lib/portfolio";
+import { getPortfolioSummaryState, readPortfolioOperations } from "@/lib/portfolio";
 import { getDomainHealth } from "@/lib/domain-monitor-store";
 import { listTenantDomainClaims } from "@/lib/domains";
 import { LEAD_MIRROR_PENDING_KEY, parsePendingMember } from "@/lib/lead-mirror";
@@ -193,6 +193,24 @@ export async function readMaintenanceDigests(): Promise<SourceRead> {
 
 export async function readOpsAlerts(): Promise<SourceRead> {
   try {
+    if (operatorQueueReleaseEnabled()) {
+      // The cached portfolio is useful for the old overview, but it cannot
+      // prove the queue read today's failure sources completely.
+      const report = await readPortfolioOperations({ requireStore: true });
+      const rows: QueueItemRaw[] = [];
+      if (report.metrics.webhookFailures) rows.push({ kind: "ops_alert", sourceRef: "webhook-failures", tenantId: null, workspaceId: null,
+        title: `${report.metrics.webhookFailures} webhook failure(s)`, openedAt: report.timestamp, facts: { severity: "high" }, href: "/admin/ops" });
+      for (const entry of report.revalidationFailures) rows.push({ kind: "ops_alert", sourceRef: `revalidation:${shortHash(`${entry.tenantId}:${entry.timestamp}:${entry.error}`)}`,
+        tenantId: entry.tenantId, workspaceId: null, title: "A content update did not reach the client site", openedAt: entry.timestamp,
+        facts: { severity: "high" }, href: clientHref(entry.tenantId, "health") });
+      for (const entry of report.metrics.failedAiWriteItems ?? []) rows.push({ kind: "ops_alert", sourceRef: `ai-write:${shortHash(`${entry.tenantId}:${entry.title}:${entry.error}`)}`,
+        tenantId: entry.tenantId, workspaceId: null, title: `${entry.title}: ${entry.error}`, openedAt: report.timestamp,
+        facts: { severity: "medium" }, href: clientHref(entry.tenantId) });
+      for (const entry of report.metrics.domainDrift ?? []) rows.push({ kind: "ops_alert", sourceRef: `domain-drift:${shortHash(`${entry.tenantId}:${entry.message}`)}`,
+        tenantId: entry.tenantId, workspaceId: null, title: entry.message, openedAt: report.timestamp,
+        facts: { severity: "medium" }, href: clientHref(entry.tenantId, "domains") });
+      return { kind: "ops_alert", source: "Operations alerts", ok: true, rows };
+    }
     const state = await getPortfolioSummaryState();
     const briefing = state.snapshot ? buildAttentionFromSnapshot(state.snapshot) : await buildAttentionBriefing();
     return {
@@ -490,6 +508,7 @@ export async function readAllSources(input: { tenants: QueueTenant[]; context: Q
       rows: (await readGoogleWriteUncertainty(actor)).map((attempt) => ({
         kind: "readback_failed", sourceRef: `google-attempt:${attempt.id}`, tenantId: attempt.tenantId, workspaceId: null,
         title: attempt.acceptance === "accepted" ? `${attempt.writeKind}: Google accepted, read-back not confirmed` : `${attempt.writeKind}: Google acceptance uncertain; do not resend`,
+        facts: { writeAcceptance: attempt.acceptance === "accepted" ? "accepted" : "unknown" },
         openedAt: attempt.startedAt, receiptIds: attempt.receiptId ? [attempt.receiptId] : [], href: clientHref(attempt.tenantId, "receipts"),
       })),
     }))] : []),

@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SiteHealthSnapshot } from "@/platform/operator-queue/site-coverage";
-const deps = vi.hoisted(() => ({ redis: vi.fn(), db: vi.fn(), members: vi.fn(), get: vi.fn(), digests: vi.fn(), drafts: vi.fn(), health: vi.fn() }));
+const deps = vi.hoisted(() => ({ redis: vi.fn(), db: vi.fn(), members: vi.fn(), get: vi.fn(), digests: vi.fn(), drafts: vi.fn(), health: vi.fn(), ops: vi.fn() }));
 vi.mock("@/platform/infra/redis", () => ({ getRedis: deps.redis }));
 vi.mock("@/platform/infra/db/client", () => ({ getSupabase: deps.db }));
 vi.mock("@/lib/maintenance-digest", () => ({ listPendingDigests: deps.digests }));
 vi.mock("@/lib/storage", () => ({ listDrafts: deps.drafts }));
 vi.mock("@/platform/operator-queue/site-health-store", () => ({ readSiteHealth: deps.health }));
-import { readMaintenanceDigests, readSiteDrafts, readSiteHealthItems } from "@/platform/operator-queue/sources";
+vi.mock("@/lib/ops", () => ({ buildOpsReport: deps.ops }));
+import { readMaintenanceDigests, readOpsAlerts, readSiteDrafts, readSiteHealthItems } from "@/platform/operator-queue/sources";
 const NOW = Date.parse("2026-10-07T12:00:00Z");
 const DAY = 86_400_000;
 const digest = { tenant: "alpha", siteName: "Alpha", weekOf: "2026-10-01", items: [], status: "pending", createdAt: "2026-10-01T12:00:00Z" };
@@ -21,6 +22,13 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllEnvs());
 describe("operator source integrity", () => {
+  it("reads operations directly, retaining per-business failures and naming an outage", async () => {
+    deps.ops.mockResolvedValue({ timestamp: "2026-10-07T12:00:00Z", revalidationFailures: [{ tenantId: "alpha", timestamp: "2026-10-07T10:00:00Z", error: "failed" }],
+      metrics: { webhookFailures: 1, failedAiWriteItems: [], domainDrift: [] } });
+    const result = await readOpsAlerts(); expect(result).toMatchObject({ ok: true, rows: [{ tenantId: null }, { tenantId: "alpha", openedAt: "2026-10-07T10:00:00Z" }] });
+    expect(deps.ops).toHaveBeenCalledWith({ requireStore: true });
+    deps.ops.mockRejectedValue(new Error("Redis unavailable")); expect(await readOpsAlerts()).toMatchObject({ ok: false, source: "Operations alerts", reason: "Redis unavailable" });
+  });
   it("reads every indexed digest strictly and names an index or blob failure", async () => {
     expect(await readMaintenanceDigests()).toMatchObject({ ok: true, rows: [{ sourceRef: "alpha:2026-10-01" }] });
     expect(deps.digests).not.toHaveBeenCalled();

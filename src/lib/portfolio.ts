@@ -58,6 +58,12 @@ export async function computeBusinessMrrDollars(tenants: Parameters<typeof compu
   } catch { return computeMrrDollars(tenants); }
 }
 import { buildOpsReport, type OpsReport } from "./ops";
+
+/** Live operations read through the portfolio's existing aggregation boundary.
+ * The operator queue requires strict sources instead of the cached snapshot. */
+export function readPortfolioOperations(options: { requireStore?: boolean } = {}): Promise<OpsReport> {
+  return buildOpsReport(options);
+}
 import { getRedis } from "@/platform/infra/redis";
 import { getLatestSnapshots } from "./visibility/snapshots";
 import { summarizeVisibility, type VisibilitySummary } from "./visibility/diagnose";

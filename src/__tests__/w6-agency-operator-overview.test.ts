@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { OperatorQueueAccessError, type QueueContext, type QueueItemRaw } from "@/platform/operator-queue/contracts";
+import { QUEUE_KINDS, OperatorQueueAccessError, type QueueContext, type QueueItemRaw } from "@/platform/operator-queue/contracts";
 import { projectQueue } from "@/platform/operator-queue/project";
 import { addAgencyOperatorOverview } from "@/experience/workspace/agency/operator-overview";
 import { clientSystemLabel } from "@/experience/workspace/agency-home";
@@ -25,7 +25,7 @@ function page(): AgencyClientsPage {
   ], team: [], total: 1, nextCursor: null, providersRead: true };
 }
 function shared(rows: QueueItemRaw[]) {
-  return { ...projectQueue({ reads: rows.map(row => ({ kind: row.kind, source: row.kind, ok: true, rows: [row] })), context, tenants: [], emailPaused: true, now }), context };
+  return { ...projectQueue({ reads: QUEUE_KINDS.map(kind => ({ kind, source: kind, ok: true, rows: rows.filter(row => row.kind === kind) })), context, tenants: [], emailPaused: true, now }), context };
 }
 function raw(kind: QueueItemRaw["kind"], overrides: Partial<QueueItemRaw> = {}): QueueItemRaw {
   return { kind, sourceRef: kind, title: kind, openedAt: at, workspaceId: business, tenantId: null, systemId: system, href: "/admin", ...overrides };
@@ -75,6 +75,7 @@ describe("one agency operator Queue", () => {
   });
   it("reports partial source failures and stale or missing health as unverified", async () => {
     const queue = shared([]); queue.gaps = [{ kind: "service_request", source: "Requests", reason: "Unavailable" }];
+    queue.complete = false;
     const stale = { ...health, checkedAt: new Date(now - 27 * 3600_000).toISOString() };
     const result = await addAgencyOperatorOverview(actor, page(), { queue: async () => queue, health: async () => stale }, now);
     expect(result.queueComplete).toBe(false);

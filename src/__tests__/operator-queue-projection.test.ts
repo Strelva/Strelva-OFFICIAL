@@ -172,6 +172,9 @@ describe("operator queue projection", () => {
 });
 
 describe("priority and clocks", () => {
+  it("does not describe an uncertain provider dispatch as accepted", () => {
+    expect(priorityFor(raw("readback_failed", { facts: { writeAcceptance: "unknown" } }), NOW)).toMatchObject({ priority: "P1", reason: "The provider's acceptance is uncertain. Never re-sent automatically." });
+  });
   it("raises a draft older than 80 days to P2 with days left", () => {
     const opened = NOW - 85 * DAY;
     const result = priorityFor(raw("draft_review", { openedAt: iso(opened), facts: { expiresAt: iso(opened + 90 * DAY) } }), NOW);

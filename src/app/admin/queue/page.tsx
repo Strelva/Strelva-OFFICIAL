@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import { ShieldAlert } from "lucide-react";
-import { AdminEmpty } from "../console";
+import { QueueLoadState } from "./QueueLoadState";
 import { QueueView } from "./QueueView";
 import { loadOperatorQueue } from "./queue-data";
 import { OwnerNotToldPanel } from "./OwnerNotToldPanel";
@@ -26,13 +25,5 @@ export default async function QueuePage() {
       <div className="mx-auto mt-4 max-w-[920px]"><OwnerNotToldPanel load={notTold} /></div>
     </>;
   }
-  return (
-    <div className="mx-auto max-w-[920px]">
-      <AdminEmpty
-        icon={<ShieldAlert className="size-5" aria-hidden />}
-        title={load.state === "denied" ? "Operators only" : "The queue could not be read"}
-        description={load.state === "denied" ? "The queue is for Strelva operators. Sign in with a verified operator account." : load.message}
-      />
-    </div>
-  );
+  return <QueueLoadState state={load.state} message={load.state === "unavailable" ? load.message : undefined} />;
 }

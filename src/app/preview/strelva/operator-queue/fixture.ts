@@ -90,5 +90,10 @@ export function queuePreview(scenario: QueuePreviewScenario, now = Date.now()): 
   const reads: SourceRead[] = QUEUE_KINDS.map((kind) => down.includes(kind)
     ? { kind, source: kind === "change_request" ? "Change requests" : "Domain monitor", ok: false as const, reason: kind === "change_request" ? "Redis unavailable" : "No domain scan on record" }
     : { kind, source: kind, ok: true as const, rows: data[kind] });
-  return projectQueue({ reads, context: context(now), tenants, emailPaused: true, now });
+  return { ...projectQueue({ reads, context: context(now), tenants, emailPaused: true, now }), businessLeads: [
+    { businessKey: `w:${HARBOR}`, businessName: "Harbor Bakery", lastSevenDays: scenario === "empty" ? 0 : 7, failure: null },
+    { businessKey: `w:${ALDER}`, businessName: "Alder Tile", lastSevenDays: scenario === "empty" ? 0 : 3, failure: null },
+    { businessKey: "t:kestrel-law", businessName: "Kestrel Law", lastSevenDays: 0, failure: null },
+    { businessKey: "t:willow-pilates", businessName: "Willow Pilates", lastSevenDays: 0, failure: null },
+  ] };
 }

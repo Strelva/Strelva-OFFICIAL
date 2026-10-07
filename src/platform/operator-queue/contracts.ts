@@ -86,6 +86,8 @@ export interface QueueItemRaw {
 }
 
 export interface QueueFacts {
+  /** Accepted writes and uncertain dispatches must never be confused. */
+  writeAcceptance?: "accepted" | "unknown";
   /** domain_alert: what the monitor saw. */
   domainState?: "down" | "parked" | "unreachable" | "expiring";
   daysToExpiry?: number | null;
@@ -171,7 +173,11 @@ export interface OperatorQueue {
   /** Count parity: every raw row from every source lands in items or parked. */
   counts: QueueSourceCount[];
   operators: { userId: string; email: string }[];
+  /** Released operator enrichment, containing counts and no lead contents. */
+  businessLeads?: QueueBusinessLeadCount[];
 }
+
+export interface QueueBusinessLeadCount { businessKey: string; businessName: string; lastSevenDays: number | null; failure: string | null }
 
 export interface QueueLink { tenantId: string; tenantStableId: string; workspaceId: string; workspaceName: string; systemId: string | null }
 export interface QueueDelegation { agencyWorkspaceId: string; customerWorkspaceId: string }

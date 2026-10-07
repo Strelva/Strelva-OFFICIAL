@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readQueueServiceRequestAction, runQueueSourceAction, type QueueSourceAction } from "@/app/admin/queue/source-actions";
 const mocks = vi.hoisted(() => ({ admin: vi.fn(), actor: vi.fn(), queue: vi.fn(), request: vi.fn(), execute: vi.fn(),
-  lead: vi.fn(), mirror: vi.fn(), clear: vi.fn(), scan: vi.fn(), domains: vi.fn(), refresh: vi.fn(), event: vi.fn(), resolve: vi.fn(), permission: vi.fn(), subscription: vi.fn() }));
+  lead: vi.fn(), mirror: vi.fn(), clear: vi.fn(), scan: vi.fn(), domains: vi.fn(), refresh: vi.fn(), event: vi.fn(), resolve: vi.fn(), permission: vi.fn(), subscription: vi.fn(), published: vi.fn(), checkHosted: vi.fn(), saveHosted: vi.fn() }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/platform/infra/auth", () => ({ isSuperAdmin: mocks.admin, requireTenantPermission: mocks.permission }));
 vi.mock("@/platform/workspaces/http", () => ({ workspaceHttpActor: mocks.actor }));
@@ -15,6 +15,8 @@ vi.mock("@/lib/domains", () => ({ refreshDomainClaim: mocks.refresh }));
 vi.mock("@/lib/events", () => ({ getEventRaw: mocks.event }));
 vi.mock("@/lib/event-actions", () => ({ resolveEventAction: mocks.resolve }));
 vi.mock("@/lib/subscription", () => ({ requireActiveSubscription: mocks.subscription }));
+vi.mock("@/products/websites/index", () => ({ websiteDocumentStore: { listPublished: mocks.published, recordHealth: mocks.saveHosted }, checkWebsiteHealth: mocks.checkHosted, currentHostedUrl: () => "https://hosted.example.test" }));
+vi.mock("@/products/websites/hosted-routing", () => ({ currentHostedUrl: () => "https://hosted.example.test" }));
 const actor = { userId: "10000000-0000-4000-8000-000000000001", verifiedEmail: "operator@example.test" };
 const workspaceId = "10000000-0000-4000-8000-000000000002";
 const requestId = "10000000-0000-4000-8000-000000000003";
@@ -30,6 +32,8 @@ beforeEach(() => {
   mocks.event.mockResolvedValue({ type: "change_request", status: "pending", tenantId: "alpha" }); mocks.resolve.mockResolvedValue({ changed: true });
   mocks.request.mockResolvedValue({ id: requestId, businessId: workspaceId, provider: { kind: "strelva" }, status: "requested", providerAcceptance: { status: "pending" }, revision: 3 });
   mocks.execute.mockResolvedValue({});
+  mocks.published.mockResolvedValue([{ workspaceId, workId: "website", tenantId: "hosted", revision: 3, contentHash: "a".repeat(64) }]);
+  mocks.checkHosted.mockResolvedValue({ status: "healthy", workspaceId, workId: "website", revision: 3 }); mocks.saveHosted.mockResolvedValue(undefined);
 });
 afterEach(() => vi.unstubAllEnvs());
 describe("queue source actions", () => {
@@ -55,6 +59,19 @@ describe("queue source actions", () => {
     mocks.queue.mockResolvedValue({ items: [item("site_health")] }); expect((await run("check_health")).ok).toBe(true);
     expect(await mocks.scan.mock.calls[0]![0].json()).toEqual({ tenant: "alpha" });
     mocks.scan.mockResolvedValue(new Response("{}", { status: 503 })); expect((await run("check_health")).ok).toBe(false);
+  });
+  it("rechecks an exact workspace publication even without a tenant-workspace link", async () => {
+    mocks.queue.mockResolvedValue({ items: [{ ...item("site_health", "document:website:3"), business: { kind: "workspace", workspaceId, tenantId: null } }] });
+    expect(await run("check_health")).toMatchObject({ ok: true, message: "Published revision read back and matched." });
+    expect(mocks.checkHosted).toHaveBeenCalledWith(expect.objectContaining({ workspaceId, workId: "website", tenantId: "hosted", revision: 3, url: "https://hosted.example.test" }));
+    expect(mocks.saveHosted).toHaveBeenCalledOnce(); expect(mocks.scan).not.toHaveBeenCalled();
+    mocks.published.mockResolvedValue([{ workspaceId: "other", workId: "website", tenantId: "hosted", revision: 3 }]);
+    expect((await run("check_health")).ok).toBe(false); expect(mocks.checkHosted).toHaveBeenCalledOnce();
+  });
+  it("records a failing hosted readback as attention and refuses to claim a lost health receipt", async () => {
+    mocks.queue.mockResolvedValue({ items: [item("site_health", "document:website:3")] });
+    mocks.checkHosted.mockResolvedValue({ status: "unreachable" }); expect(await run("check_health")).toMatchObject({ ok: true, message: expect.stringContaining("still needs attention") });
+    mocks.saveHosted.mockRejectedValue(new Error("Health storage unavailable")); expect((await run("check_health")).ok).toBe(false);
   });
   it("uses read-only verification or the existing portfolio domain scan", async () => {
     mocks.queue.mockResolvedValue({ items: [item("domain_unverified", "alpha:alpha.test")] }); expect((await run("check_domain")).ok).toBe(true);
